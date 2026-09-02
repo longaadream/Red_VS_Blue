@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { roomStore } from "@/lib/game/room-store"
 import {
+  broadcastBattleSnapshot,
   broadcastBattleTransition,
-  broadcastToRoom,
   queueBotTurnIfReady,
 } from "@/lib/ws-server"
 import {
@@ -11,9 +11,24 @@ import {
   dispatchRoomBattleAction,
   scheduleRoomBattleTimeout,
 } from "@/lib/game/room-battle-actions"
+import {
+  BATTLE_AUTHORITY_BUILD_ID,
+  BATTLE_AUTHORITY_PROTOCOL_VERSION,
+} from "@/lib/game/battle-public-patch"
 import { parseBattleAuthorityEnvelope, roomBattleAuthorityVersion } from "@/lib/game/battle-transition"
-import { verifyBattleActionAuth } from "@/lib/game/identity-verify"
+import { verifyBattleActionAuth, verifyBattleSubscribeAuth } from "@/lib/game/identity-verify"
 import { getClientTerminalSubmissionError } from "@/lib/server/battle-terminal"
+import { getGameProfileErrorPayloadV1 } from "@/lib/content-pipeline/runtime/profile-game-identity"
+
+function profileErrorResponse(error: unknown): NextResponse | undefined {
+  const profileError = getGameProfileErrorPayloadV1(error)
+  if (!profileError) return undefined
+  return NextResponse.json({
+    error: profileError.message,
+    code: profileError.code,
+    context: profileError.context,
+  }, { status: profileError.status })
+}
 
 // Full snapshots are recovery/checkpoint responses only. Normal commands return
 // an exact receipt plus an ordered public patch.
@@ -26,12 +41,39 @@ export async function GET(
   const room = await roomStore.getRoom(roomId)
   if (!room) return NextResponse.json({ error: 'Room not found' }, { status: 404 })
 
-  const viewerPlayerId = req.headers.get('x-player-id')
-    ?? req.nextUrl.searchParams.get('viewerPlayerId')
-    ?? undefined
+  // Unsigned viewer claims are intentionally ignored. A GET without a signed
+  // subscription identity receives the spectator projection.
+  const authHeader = req.headers.get('x-battle-subscribe-auth')
+  let viewerPlayerId: string | undefined
+  if (authHeader !== null) {
+    let candidate: unknown
+    try {
+      candidate = JSON.parse(authHeader)
+    } catch {
+      return NextResponse.json({
+        error: 'Malformed battle subscription authentication header',
+        code: 'SUBSCRIBE_AUTH_INVALID',
+      }, { status: 401 })
+    }
+    try {
+      viewerPlayerId = (await verifyBattleSubscribeAuth(candidate, {
+        roomId,
+        protocolVersion: BATTLE_AUTHORITY_PROTOCOL_VERSION,
+        authorityBuildId: BATTLE_AUTHORITY_BUILD_ID,
+      })).playerId
+    } catch (error) {
+      const authError = error as { code?: string; message?: string }
+      return NextResponse.json({
+        error: authError.message ?? 'Battle subscription authentication failed',
+        code: authError.code ?? 'SUBSCRIBE_AUTH_INVALID',
+      }, { status: 401 })
+    }
+  }
   try {
     return NextResponse.json(createPublicBattleSnapshot(room, viewerPlayerId))
   } catch (err) {
+    const profileResponse = profileErrorResponse(err)
+    if (profileResponse) return profileResponse
     return NextResponse.json({ error: err instanceof Error ? err.message : String(err) }, { status: 400 })
   }
 }
@@ -69,7 +111,8 @@ export async function POST(
   let envelope
   try {
     envelope = parseBattleAuthorityEnvelope({
-      protocolVersion: body.protocolVersion ?? 2,
+      protocolVersion: body.protocolVersion ?? BATTLE_AUTHORITY_PROTOCOL_VERSION,
+      authorityBuildId: body.authorityBuildId ?? BATTLE_AUTHORITY_BUILD_ID,
       roomId,
       clientActionId: body.clientActionId ?? command.clientActionId,
       expectedAuthorityVersion: Number.isSafeInteger(body.expectedAuthorityVersion)
@@ -110,12 +153,17 @@ export async function POST(
 
     if (result.transition) broadcastBattleTransition(roomId, result)
     else if (result.kind === 'applied' || result.kind === 'expired') {
-      broadcastToRoom(roomId, { type: 'stateUpdate', ...result.snapshot })
+      await broadcastBattleSnapshot(roomId, {
+        snapshot: result.snapshot,
+        state: result.actionResult.state,
+      })
     }
     await scheduleRoomBattleTimeout(roomStore, roomId, {
-      onCommitted: snapshot => broadcastToRoom(roomId, { type: 'stateUpdate', ...snapshot }),
+      onCommitted: () => broadcastBattleSnapshot(roomId),
       onTransitionCommitted: timerResult => broadcastBattleTransition(roomId, timerResult),
-      onBotTurnReady: snapshot => { void queueBotTurnIfReady(roomId, snapshot.state) },
+      onBotTurnReady: (_snapshot, authorityState) => {
+        void queueBotTurnIfReady(roomId, authorityState)
+      },
     })
     queueBotTurnIfReady(roomId, result.actionResult.state)
 
@@ -146,6 +194,8 @@ export async function POST(
       duplicate: result.kind === 'duplicate',
     })
   } catch (err) {
+    const profileResponse = profileErrorResponse(err)
+    if (profileResponse) return profileResponse
     const message = err instanceof Error ? err.message : String(err)
     const errAny = err as any
     const status = errAny?.code === 'VIEWER_FORBIDDEN' || errAny?.code === 'ACTION_PLAYER_MISMATCH'

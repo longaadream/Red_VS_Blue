@@ -56,6 +56,8 @@ async function signedSubscribe(
     type: 'battle-subscribe' as const,
     roomId,
     playerId: claimedPlayerId,
+    protocolVersion: 3,
+    authorityBuildId: 'rvb-authority-v3-chunked-sha256-1',
     timestamp: Date.now(),
   }
   const signature = await globalThis.crypto.subtle.sign(
@@ -67,6 +69,8 @@ async function signedSubscribe(
     type: 'subscribe' as const,
     roomId,
     playerId: claimedPlayerId,
+    protocolVersion: 3,
+    authorityBuildId: 'rvb-authority-v3-chunked-sha256-1',
     publicKey: identity.publicKey,
     payload,
     signature: bytesToHex(new Uint8Array(signature)),
@@ -147,7 +151,12 @@ describe('Relay WebSocket signed subscription identity', () => {
 
     await wsHandler.message(ws, JSON.stringify(await signedSubscribe(host, room.id)))
 
-    expect(sent[0]).toEqual({ type: 'subscribed', role: 'host' })
+    expect(sent[0]).toEqual({
+      type: 'subscribed',
+      role: 'host',
+      protocolVersion: 3,
+      authorityBuildId: 'rvb-authority-v3-chunked-sha256-1',
+    })
     expect(ws.data).toEqual({ roomId: room.id, playerId: host.id, role: 'host' })
     expect(relayStore.addWsClient).toHaveBeenCalledWith(room.id, ws)
 
@@ -306,9 +315,27 @@ describe('Relay WebSocket signed subscription identity', () => {
     relayStore.broadcastToRoom.mockClear()
     relayStore.setRoom.mockClear()
 
+    await wsHandler.message(guestSocket.ws, JSON.stringify({
+      type: 'action',
+      seq: 8,
+      protocolVersion: 3,
+      authorityBuildId: 'rvb-authority-v3-chunked-sha256-1',
+      roomId: room.id,
+      clientActionId: 'guest-action-forwarded',
+      expectedAuthorityVersion: 7,
+      playerId: guest.id,
+      command: { type: 'endTurn', playerId: guest.id },
+    }))
+    expect(relayStore.sendToHost).toHaveBeenCalledWith(room.id, expect.objectContaining({
+      type: 'pendingAction',
+      protocolVersion: 3,
+      authorityBuildId: 'rvb-authority-v3-chunked-sha256-1',
+    }))
+
     const transition = {
       type: 'battleTransition',
-      protocolVersion: 2,
+      protocolVersion: 3,
+      authorityBuildId: 'rvb-authority-v3-chunked-sha256-1',
       roomId: room.id,
       fromVersion: 7,
       toVersion: 8,
@@ -418,10 +445,35 @@ describe('Relay WebSocket signed subscription identity', () => {
 
     await wsHandler.message(ws, JSON.stringify(await signedSubscribe(host, room.id)))
 
-    expect(sent[0]).toEqual({ type: 'subscribed', role: 'host' })
+    expect(sent[0]).toEqual({
+      type: 'subscribed',
+      role: 'host',
+      protocolVersion: 3,
+      authorityBuildId: 'rvb-authority-v3-chunked-sha256-1',
+    })
     expect(room.status).toBe('waiting_host')
     expect(relayStore.cancelHostTimeout).not.toHaveBeenCalled()
     expect(relayStore.setRoom).not.toHaveBeenCalled()
     expect(relayStore.broadcastToRoom).not.toHaveBeenCalled()
+  })
+
+  it('rejects an incompatible signed build before registering the Relay socket', async () => {
+    const host = await createTestIdentity()
+    const room = roomFor(host)
+    relayStore.getRoom.mockReturnValue(room)
+    const { ws, sent } = fakeWebSocket(room.id)
+    const subscribe = await signedSubscribe(host, room.id)
+    subscribe.authorityBuildId = 'old-build'
+
+    await wsHandler.message(ws, JSON.stringify(subscribe))
+
+    expect(sent[0]).toMatchObject({
+      type: 'battleProtocolUnsupported',
+      code: 'BATTLE_PROTOCOL_UNSUPPORTED',
+      expectedProtocolVersion: 3,
+      receivedAuthorityBuildId: 'old-build',
+    })
+    expect(ws.data).toEqual({})
+    expect(relayStore.addWsClient).not.toHaveBeenCalled()
   })
 })

@@ -217,9 +217,15 @@ function randomBudgetEnvironment(): AIEnvironment {
     listLegalActions: state => {
       const playerId = state.turn.currentPlayerId
       const revision = (state as BattleState & { fixtureRevision?: number }).fixtureRevision ?? 0
-      if (revision < 3 || revision === 4) {
-        return [candidate(`structural-${revision}`, { type: 'beginPhase' }, 'phase-advance')]
-      }
+      if (revision === 0) return [
+        candidate('structural-0-a', {
+          type: 'deployReservePiece', playerId, pieceId: 'fixture-reserve-a', expectedDeploymentRevision: 0,
+        }, 'reserve-deployment'),
+        candidate('structural-0-b', {
+          type: 'deployReservePiece', playerId, pieceId: 'fixture-reserve-b', expectedDeploymentRevision: 0,
+        }, 'reserve-deployment'),
+      ]
+      if (revision === 4) return [candidate('structural-4', { type: 'beginPhase' }, 'phase-advance')]
       return [
         candidate('progress', { type: 'beginPhase' }, 'move'),
         candidate('end', { type: 'endTurn', playerId }, 'end-turn'),
@@ -232,7 +238,7 @@ function randomBudgetEnvironment(): AIEnvironment {
         next.fixtureRevision = 4
         return result(next, selected)
       }
-      if ((next.fixtureRevision ?? 0) < 4) {
+      if ((next.fixtureRevision ?? 0) === 0) {
         next.fixtureRevision = (next.fixtureRevision ?? 0) + 1
         return result(next, selected)
       }
@@ -503,6 +509,124 @@ describe('offline self-play league and evaluation baseline', () => {
     })).toThrowError(/requires 2/i)
   })
 
+  it('assigns a progressive deployment input to its active owner instead of the normal turn player', async () => {
+    const fixtureManifest = manifest({ lineups: [manifest().lineups[0]] })
+    const scheduled = buildPairedMatchSchedule(fixtureManifest, [201])[0]
+    const environment: AIEnvironment = {
+      protocolVersion: 1,
+      capabilities: { protocolVersion: 1, supportedActionTypes: [] as never, unsupportedActionTypes: [] },
+      observe: () => ({} as never),
+      isTerminal: state => state.terminalResult !== undefined,
+      stateKey: state => hashStable(state),
+      listLegalActions: (_state, playerId) => [candidate('active-owner-deploy', {
+        type: 'deployReservePiece', playerId, pieceId: 'blue-reserve', expectedDeploymentRevision: 3,
+      }, 'reserve-deployment')],
+      simulate: (state, input) => {
+        const selected = 'action' in input ? input : candidate('direct', input, 'reserve-deployment')
+        const action = selected.action as Extract<CandidateAction['action'], { type: 'deployReservePiece' }>
+        const next = structuredClone(state)
+        const loserPlayerId = action.playerId === 'player-red' ? 'player-blue' : 'player-red'
+        next.terminalResult = {
+          status: 'finished',
+          winnerPlayerId: action.playerId,
+          loserPlayerId,
+          reason: 'core-eliminated',
+          settledAt: {
+            actionIndex: 1, actionType: action.type, actorPlayerId: action.playerId,
+            turnNumber: next.turn.turnNumber, phase: next.turn.phase, completedRound: 0,
+          },
+        }
+        return result(next, selected)
+      },
+    }
+    const match = await runSelfPlayMatch({
+      manifest: fixtureManifest,
+      seedPartitions: SEEDS,
+      explicitSeeds: [201],
+      agentArchives: [CANDIDATE, CHAMPION],
+      rosterArchives: ROSTERS,
+      createInitialState: async () => {
+        const state = await createFixtureState()
+        state.deployment = {
+          mode: 'progressive-reserve-v1', status: 'awaiting-reserve-deploy',
+          playerIds: ['player-red', 'player-blue'], choices: {}, locks: {},
+          startedAt: 0, deadlineAt: 0, revision: 3, initialPositions: {},
+          activePlayerId: 'player-blue', offerTurnNumber: state.turn.turnNumber,
+        }
+        return state
+      },
+      environment,
+      now: () => 0,
+    }, scheduled)
+
+    expect(match.status).toBe('finished')
+    expect(match.actions[0]).toMatchObject({
+      playerId: 'player-blue',
+      agentId: scheduled.seats['player-blue'].agentId,
+      action: { type: 'deployReservePiece', playerId: 'player-blue' },
+    })
+  })
+
+  it('assigns a cross-player pending input before the progressive deployment owner', async () => {
+    const fixtureManifest = manifest({ lineups: [manifest().lineups[0]] })
+    const scheduled = buildPairedMatchSchedule(fixtureManifest, [201])[0]
+    const environment: AIEnvironment = {
+      protocolVersion: 1,
+      capabilities: { protocolVersion: 1, supportedActionTypes: [] as never, unsupportedActionTypes: [] },
+      observe: () => ({} as never),
+      isTerminal: state => state.terminalResult !== undefined,
+      stateKey: state => hashStable(state),
+      listLegalActions: (_state, playerId) => [candidate('pending-owner', {
+        type: 'pendingOptionSelect',
+        playerId,
+        selectedOption: 'continue',
+        selectionId: 'pending-cross-player',
+        stateRevision: 1,
+      }, 'pending-option')],
+      simulate: (state, input) => {
+        const selected = 'action' in input ? input : candidate('direct', input, 'pending-option')
+        const action = selected.action as Extract<CandidateAction['action'], { type: 'pendingOptionSelect' }>
+        const next = structuredClone(state)
+        const loserPlayerId = action.playerId === 'player-red' ? 'player-blue' : 'player-red'
+        next.terminalResult = {
+          status: 'finished', winnerPlayerId: action.playerId, loserPlayerId, reason: 'core-eliminated',
+          settledAt: {
+            actionIndex: 1, actionType: action.type, actorPlayerId: action.playerId,
+            turnNumber: next.turn.turnNumber, phase: next.turn.phase, completedRound: 0,
+          },
+        }
+        return result(next, selected)
+      },
+    }
+    const match = await runSelfPlayMatch({
+      manifest: fixtureManifest,
+      seedPartitions: SEEDS,
+      explicitSeeds: [201],
+      agentArchives: [CANDIDATE, CHAMPION],
+      rosterArchives: ROSTERS,
+      createInitialState: async () => {
+        const state = await createFixtureState()
+        state.deployment = {
+          mode: 'progressive-reserve-v1', status: 'awaiting-reserve-deploy',
+          playerIds: ['player-red', 'player-blue'], choices: {}, locks: {},
+          startedAt: 0, deadlineAt: 0, revision: 3, initialPositions: {},
+          activePlayerId: 'player-blue', offerTurnNumber: state.turn.turnNumber,
+        }
+        state.pendingOptionSelection = { playerId: 'player-red' } as never
+        return state
+      },
+      environment,
+      now: () => 0,
+    }, scheduled)
+
+    expect(match.status).toBe('finished')
+    expect(match.actions[0]).toMatchObject({
+      playerId: 'player-red',
+      agentId: scheduled.seats['player-red'].agentId,
+      action: { type: 'pendingOptionSelect', playerId: 'player-red' },
+    })
+  })
+
   it('excludes forced structural actions and ends legal-random turns before the strategy budget is exhausted', async () => {
     const historicalRandom: SelfPlayAgentArchive = {
       ...RANDOM,
@@ -528,10 +652,10 @@ describe('offline self-play league and evaluation baseline', () => {
     expect(report.promotionGate.hardGatePassed).toBe(true)
     expect(report.summary.budgetFailures).toBe(0)
     for (const match of report.matches) {
-      expect(match.actions).toHaveLength(5)
-      expect(match.actions.slice(0, 3).every(action => action.action.type === 'beginPhase')).toBe(true)
-      expect(match.actions[3].action.type).toBe('endTurn')
-      expect(match.actions[4].action.type).toBe('beginPhase')
+      expect(match.actions).toHaveLength(3)
+      expect(match.actions[0].action.type).toBe('deployReservePiece')
+      expect(match.actions[1].action.type).toBe('endTurn')
+      expect(match.actions[2].action.type).toBe('beginPhase')
     }
   })
 
@@ -587,11 +711,11 @@ describe('offline self-play league and evaluation baseline', () => {
         'f857d7516d0bcdb05c1ea32e05157d28e9322c7245b950115f71dc172db6af0d',
         'f857d7516d0bcdb05c1ea32e05157d28e9322c7245b950115f71dc172db6af0d',
       ],
-      // RED-109 makes authority action/replay counters and RNG cursors canonical so
-      // compacted checkpoints can resume the same deterministic stream.
+      // RED-131 keeps the deterministic state sequence but binds its digest to
+      // the v3 chunk hierarchy instead of the legacy whole-state serialization.
       stateTraceHashes: [
-        '93a36163ed078aee8def7d90f00c6aa37aadf5822f80472e6c16712eeb8730c6',
-        '93a36163ed078aee8def7d90f00c6aa37aadf5822f80472e6c16712eeb8730c6',
+        'acafe41533063615e59bb02024bdc3e523e4509ed035901c41347da7397a6e1b',
+        'acafe41533063615e59bb02024bdc3e523e4509ed035901c41347da7397a6e1b',
       ],
       terminal: [
         ['finished', 'core-eliminated'],

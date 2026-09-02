@@ -5,9 +5,10 @@ import { Script, createContext } from 'node:vm'
 import { describe, expect, it } from 'vitest'
 
 import { toPublicBattleState } from '@/lib/game/deployment'
-import { hashBattleState, runBattleAction } from '@/lib/game/battle-runner'
+import { hashBattleState, hashStable, runBattleAction } from '@/lib/game/battle-runner'
 import { createDebugDuel } from '@/lib/game/debug-battle'
 import { makeState } from '../helpers/minimal-state'
+import { pinTestBattleState } from './profile-test-identity'
 
 function terminalResult() {
   return {
@@ -31,7 +32,8 @@ function tracedState(finished: boolean) {
   if (finished) state.terminalResult = terminalResult()
   const checkpoint = JSON.parse(JSON.stringify(state))
   delete checkpoint.extensions
-  const checkpointHash = hashBattleState(checkpoint)
+  const authorityHash = hashBattleState(checkpoint)
+  const checkpointHash = hashStable(checkpoint)
   state.extensions = {
     debugBattle: {
       appliedActionIds: ['action-secret-id'],
@@ -43,8 +45,8 @@ function tracedState(finished: boolean) {
         tick: 0,
         turn: 1,
         playerId: 'player-red',
-        preStateHash: checkpointHash,
-        postStateHash: checkpointHash,
+        preStateHash: authorityHash,
+        postStateHash: authorityHash,
         randomStreams: [],
       }],
       commandLog: [{
@@ -54,7 +56,8 @@ function tracedState(finished: boolean) {
       }],
       replay: {
         format: 'rvb-battle-replay/v2',
-        initialStateHash: checkpointHash,
+        initialStateHash: authorityHash,
+        initialCheckpointHash: checkpointHash,
         initialState: checkpoint,
         frames: [{
           index: 0,
@@ -66,8 +69,10 @@ function tracedState(finished: boolean) {
           turnAfter: 3,
           phaseBefore: 'action',
           phaseAfter: 'action',
-          preStateHash: checkpointHash,
-          postStateHash: checkpointHash,
+          preStateHash: authorityHash,
+          postStateHash: authorityHash,
+          preCheckpointHash: checkpointHash,
+          postCheckpointHash: checkpointHash,
           postState: checkpoint,
           events: [{
             type: 'futureUnknownEvent',
@@ -80,6 +85,7 @@ function tracedState(finished: boolean) {
       },
     },
   }
+  pinTestBattleState(state as unknown as Record<string, unknown>, 9876)
   return state
 }
 
@@ -326,6 +332,31 @@ describe('developer tools match trace boundary', () => {
     })).rejects.toThrow(/size|MiB/i)
 
     expect(toPlainObject(await tools.readStoredTrace())).toEqual(toPlainObject(valid))
+  })
+
+  it('retries terminal Trace creation before the completed-record guard', () => {
+    const battlePage = readFileSync(resolve(process.cwd(), 'data/pages/battle.html'), 'utf8')
+    const start = battlePage.indexOf('function handleGameOver()')
+    const end = battlePage.indexOf('var _signedRecord', start)
+    const handler = battlePage.slice(start, end)
+
+    expect(start).toBeGreaterThanOrEqual(0)
+    expect(handler.indexOf('storeCompletedMatchTrace()'))
+      .toBeLessThan(handler.indexOf('if (recordSaved) return'))
+    expect(handler.indexOf('storeCompletedMatchTrace()'))
+      .toBeLessThan(handler.indexOf('RvBWs.disconnect()'))
+    expect(battlePage).toContain('id="matchTraceStatus"')
+    expect(battlePage).toContain('Trace 生成失败：')
+  })
+
+  it('uses the replay final authority hash instead of the viewer-specific public snapshot hash', () => {
+    const battlePage = readFileSync(resolve(process.cwd(), 'data/pages/battle.html'), 'utf8')
+    const start = battlePage.indexOf('function storeCompletedMatchTrace()')
+    const end = battlePage.indexOf('async function downloadCompletedMatchTrace()', start)
+    const storeHandler = battlePage.slice(start, end)
+
+    expect(start).toBeGreaterThanOrEqual(0)
+    expect(storeHandler).not.toContain('stateHash: latestAuthorityStateHash')
   })
 })
 

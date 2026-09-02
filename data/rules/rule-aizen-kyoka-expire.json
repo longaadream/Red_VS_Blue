@@ -1,0 +1,7 @@
+{
+  "id": "rule-aizen-kyoka-expire",
+  "name": "镜花水月·失效",
+  "description": "镜花水月在对方回合结束时失效。",
+  "trigger": { "type": "endTurn" },
+  "skillCode": "var aizen = context.rulePiece; if (!aizen) return { success: false, message: '' }; var secret = aizen.statusTags && aizen.statusTags.find(function(tag) { return tag.type === 'aizen-kyoka-secret'; }); if (!secret || context.playerId !== secret.opponentPlayerId) return { success: false, message: '' }; aizen.statusTags = (aizen.statusTags || []).filter(function(tag) { return tag.type !== 'aizen-kyoka-active' && tag.type !== 'aizen-kyoka-secret'; }); return { success: true, message: aizen.name + '的镜花水月失效' };"
+}

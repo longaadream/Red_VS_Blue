@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="复生">
+  <circle cx="32" cy="32" r="29" fill="#08251c" stroke="#34d399" stroke-width="4"/>
+  <path d="M14 34a18 18 0 1 1 6 13" fill="none" stroke="#d1fae5" stroke-width="5" stroke-linecap="round"/>
+  <path d="m12 23 2 12 12-2" fill="none" stroke="#34d399" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M29 21h6v9h9v6h-9v9h-6v-9h-9v-6h9Z" fill="#34d399"/>
+</svg>

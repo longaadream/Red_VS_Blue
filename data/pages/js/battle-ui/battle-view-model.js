@@ -59,16 +59,29 @@
     const seen = new Set()
     const tags = visibleTags !== undefined ? visibleTags : piece.statusTags
     ;[].concat(tags || [], piece.buffs || [], piece.debuffs || []).forEach(function (status) {
-      if (!status || status.visible === false) return
+      if (!status) return
       const item = typeof status === 'string' ? { id: status, name: status } : status
+      const iconRegistry = root.BattleEffectIcons
+      const meta = iconRegistry && typeof iconRegistry.resolveStatus === 'function'
+        ? iconRegistry.resolveStatus(item)
+        : null
+      if (item.visible === false || (meta && meta.visibility === 'hidden')) return
       const id = String(item.id || item.type || item.name || statusLabel(item))
+      const type = String(item.type || item.id || item.name || id)
       const key = id + ':' + String(item.sourceId || '')
       if (seen.has(key)) return
       seen.add(key)
       statuses.push({
         id: id,
-        label: statusLabel(item),
+        type: type,
+        label: String(item.name || item.label || (meta && meta.label) || statusLabel(item)),
         description: String(item.description || item.message || ''),
+        iconId: meta ? meta.iconId : 'fallback',
+        iconPath: meta ? meta.assetPath : 'images/effect-icons/fallback.svg',
+        category: meta ? meta.category : 'unknown',
+        tone: meta ? meta.tone : 'neutral',
+        color: meta ? meta.color : '#94a3b8',
+        visibility: meta ? meta.visibility : 'detail',
         stacks: firstNumber([item.stacks], 0),
         duration: firstNumber([
           item.remainingDuration,
@@ -162,6 +175,37 @@
     }
   }
 
+  function normalizePresentationEvents(value) {
+    if (!Array.isArray(value)) return []
+    return value.flatMap(function (event) {
+      if (!event || typeof event !== 'object' || !event.eventId || !event.rootEventId || !event.kind) return []
+      return [{
+        eventId: String(event.eventId),
+        rootEventId: String(event.rootEventId),
+        parentEventId: event.parentEventId ? String(event.parentEventId) : null,
+        actionId: String(event.actionId || ''),
+        sequence: numberOr(event.sequence, 0),
+        kind: String(event.kind),
+        iconId: String(event.iconId || 'fallback'),
+        actorPlayerId: event.actorPlayerId ? String(event.actorPlayerId) : null,
+        sourcePieceId: event.sourcePieceId ? String(event.sourcePieceId) : null,
+        skillId: event.skillId ? String(event.skillId) : null,
+        cardId: event.cardId ? String(event.cardId) : null,
+        ruleId: event.ruleId ? String(event.ruleId) : null,
+        targetPieceIds: Array.isArray(event.targetPieceIds) ? event.targetPieceIds.map(String) : [],
+        targetPlayerIds: Array.isArray(event.targetPlayerIds) ? event.targetPlayerIds.map(String) : [],
+        targetCell: event.targetCell && Number.isFinite(Number(event.targetCell.x)) && Number.isFinite(Number(event.targetCell.y))
+          ? { x: Number(event.targetCell.x), y: Number(event.targetCell.y) }
+          : null,
+        statusId: event.statusId ? String(event.statusId) : null,
+        statusType: event.statusType ? String(event.statusType) : null,
+        result: event.result && typeof event.result === 'object' ? Object.assign({}, event.result) : null,
+        priority: numberOr(event.priority, 0),
+        skippable: event.skippable !== false,
+      }]
+    }).sort(function (left, right) { return left.sequence - right.sequence })
+  }
+
   function create(options) {
     const input = options || {}
     const interaction = input.interaction || {}
@@ -200,6 +244,7 @@
       },
       pieces: pieces,
       effects: ((snapshot.extensions && snapshot.extensions.tileEffects) || []).map(normalizeEffect),
+      presentationEvents: normalizePresentationEvents(input.presentationEvents),
       players: players,
       viewer: viewer,
       turn: {
@@ -229,5 +274,9 @@
     }
   }
 
-  root.BattleViewModel = { create: create, normalizeCells: normalizeCells }
+  root.BattleViewModel = {
+    create: create,
+    normalizeCells: normalizeCells,
+    normalizePresentationEvents: normalizePresentationEvents,
+  }
 })(typeof window !== 'undefined' ? window : globalThis)

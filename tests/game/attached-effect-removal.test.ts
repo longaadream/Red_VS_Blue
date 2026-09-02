@@ -101,12 +101,12 @@ describe('RED-80 Rule + statusTag authority', () => {
       ruleIds: entry.ruleIds,
       stateHash: entry.stateHash,
     }))).toEqual([
-      { fixture: 'silenced', blocked: true, damage: null, statusTypes: ['silenced'], ruleIds: ['rule-silenced-block'], stateHash: 'b9100a73f0572db09ab117d6996acb0e7a138fc3eb4f63efdb9a8c2491b29d49' },
-      { fixture: 'freeze', blocked: true, damage: null, statusTypes: ['freeze'], ruleIds: ['rule-freeze-prevent-move'], stateHash: 'd323adef5d280060b1421cda440baffa4af6dca232ef937d0b051ff6c392f03b' },
-      { fixture: 'divine-shield', blocked: true, damage: 9, statusTypes: [], ruleIds: [], stateHash: '1235a749ff165ff000ef7ccd4c9da1c615a7d915cc7af42273b2dea53258c9cb' },
-      { fixture: 'sleep', blocked: true, damage: null, statusTypes: ['sleep'], ruleIds: ['rule-sleep-prevent-move'], stateHash: 'b10bb61b0e19f0bd1a305763d31e4224b6d0b395bf517bd877a8a5f4344bb2fd' },
-      { fixture: 'watcher-rage', blocked: false, damage: 6, statusTypes: ['rage-stance'], ruleIds: ['rule-watcher-rage-dealt'], stateHash: '0170d1b8e9ad9875536a5e2862ffcc0c71f5483d31f54f95fb41357d45219446' },
-      { fixture: 'blood-oath', blocked: false, damage: null, statusTypes: [], ruleIds: [], stateHash: 'e07b203a91a4adb51cb157b50679476f09c7b2f90d7bc888e225e3ed59f47948' },
+      { fixture: 'silenced', blocked: true, damage: null, statusTypes: ['silenced'], ruleIds: ['rule-silenced-block'], stateHash: 'f94d8b3ccc41a508ee2e83eab39fb6aea409dc2dfaa910b2c1ed4a8b2053d8f6' },
+      { fixture: 'freeze', blocked: true, damage: null, statusTypes: ['freeze'], ruleIds: ['rule-freeze-prevent-move'], stateHash: '395fb02f25fdd69f5634d83e554c274e04f0700966479bd6bd4b6f6f16b07ed2' },
+      { fixture: 'divine-shield', blocked: true, damage: 9, statusTypes: [], ruleIds: [], stateHash: '7a9046418c47f96c0cd4f6df59b001df84a82c31f0bbfe1e11a8af5d8d16097a' },
+      { fixture: 'sleep', blocked: true, damage: null, statusTypes: ['sleep'], ruleIds: ['rule-sleep-prevent-move'], stateHash: '1555633d854f487f8325c55252d215553766ebc198b185d34560634e7f394f0d' },
+      { fixture: 'watcher-rage', blocked: false, damage: 6, statusTypes: ['rage-stance'], ruleIds: ['rule-watcher-rage-dealt'], stateHash: 'ce1e986a3024fd0f62c64e373cc24a9e3fab47cd97f945845f6e230e1230367f' },
+      { fixture: 'blood-oath', blocked: false, damage: null, statusTypes: [], ruleIds: [], stateHash: 'c64901334059db48a7ad59db08d2caa3eb1d4e2bb6bafbdee577ee0c18ae67fd' },
     ])
   })
 })

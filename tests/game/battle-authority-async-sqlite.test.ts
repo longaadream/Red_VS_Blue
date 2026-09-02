@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import { afterAll, describe, expect, it, vi } from 'vitest'
 
 import { hashPublicBattleState } from '@/lib/game/battle-public-patch'
+import { createTestServerBattleState, pinTestBattleState } from './profile-test-identity'
 const originalDatabaseUrl = process.env.DATABASE_URL
 const originalAsyncFlag = process.env.RVB_BATTLE_ASYNC_JOURNAL
 const originalAuthorityFlag = process.env.RVB_BATTLE_AUTHORITY_V2
@@ -119,7 +120,7 @@ describe('battle authority async SQLite persistence', () => {
     persistence.forgetBattleAuthorityRoom(room.id)
     const restored = await store.getRoom(room.id)
     expect(restored?.battleAuthorityVersion).toBe(20)
-    expect((restored?.battleState as unknown as { seed: number }).seed).toBe(unsignedSeed)
+    expect((restored?.battleState as unknown as { rootSeed: number }).rootSeed).toBe(unsignedSeed)
     expect(actions.createPublicBattleSnapshot(restored!).stateHash).toBe(lastHash)
     expect(store.inspectBattleAuthorityPersistence(room.id)).toMatchObject({
       status: 'durable',
@@ -189,7 +190,7 @@ describe('battle authority async SQLite persistence', () => {
     expect(JSON.parse(checkpoint.stateJson).seed).toBe(unsignedSeed)
   }, 30_000)
 
-  it('contains a real SQLite lock failure to one room without overlapping the next room write', async () => {
+  it('keeps locked writes queued under WAL and drains every room after SQLite recovers', async () => {
     const directory = mkdtempSync(join(tmpdir(), 'rvb-red109-sqlite-lock-'))
     temporaryDirectories.push(directory)
     process.env.DATABASE_URL = `file:${join(directory, 'authority.db').replaceAll('\\', '/')}`
@@ -240,6 +241,10 @@ describe('battle authority async SQLite persistence', () => {
         ).state),
       })
     }
+    const journalMode = await prisma.$queryRawUnsafe<Array<{ journal_mode: string }>>(
+      'PRAGMA journal_mode',
+    )
+    expect(journalMode[0]?.journal_mode.toLowerCase()).toBe('wal')
 
     const locker = new PrismaClient()
     activePrismaClients.push(locker)
@@ -277,7 +282,10 @@ describe('battle authority async SQLite persistence', () => {
 
     try {
       await vi.waitFor(() => {
-        expect(persistence.inspectBattleAuthorityPersistence(roomA.id).status).toBe('degraded')
+        expect(persistence.inspectBattleAuthorityPersistence(roomA.id)).toMatchObject({
+          status: 'pending',
+          pending: 1,
+        })
       }, { timeout: 8_000 })
       expect(persistence.inspectBattleAuthorityPersistence(roomB.id).status).toBe('pending')
     } finally {
@@ -285,15 +293,14 @@ describe('battle authority async SQLite persistence', () => {
       await lockPromise
     }
 
-    await persistence.drainBattleAuthorityPersistence(roomB.id)
+    await persistence.drainBattleAuthorityPersistence()
     const roomAPersistence = persistence.inspectBattleAuthorityPersistence(roomA.id)
     expect(roomAPersistence).toMatchObject({
-      status: 'degraded',
-      durableAuthorityVersion: 0,
+      status: 'durable',
+      durableAuthorityVersion: 1,
       authorityVersion: 1,
       pending: 0,
     })
-    expect(roomAPersistence.lastError).not.toContain('journal persist timed out')
     expect(persistence.inspectBattleAuthorityPersistence(roomB.id)).toMatchObject({
       status: 'durable',
       durableAuthorityVersion: 1,
@@ -301,7 +308,7 @@ describe('battle authority async SQLite persistence', () => {
       pending: 0,
     })
     await expect(prisma.room.findUniqueOrThrow({ where: { id: roomA.id } }))
-      .resolves.toMatchObject({ battleAuthorityVersion: 0 })
+      .resolves.toMatchObject({ battleAuthorityVersion: 1 })
     await expect(prisma.room.findUniqueOrThrow({ where: { id: roomB.id } }))
       .resolves.toMatchObject({ battleAuthorityVersion: 1 })
 
@@ -348,6 +355,7 @@ function makeRoom(
       'piece-blue': { x: 8, y: 8 },
     },
   }
+  pinTestBattleState(state as unknown as Record<string, unknown>, seed)
   recordBattleInitialization(state, new RuleRuntime({ rootSeed: seed }), ['player-red', 'player-blue'])
   return {
     id: roomId,
@@ -362,7 +370,7 @@ function makeRoom(
     actions: [],
     version: 0,
     battleAuthorityVersion: 0,
-    battleState: { type: 'server-state', seed, state } as unknown as import('@/lib/game/room-store').Room['battleState'],
+    battleState: createTestServerBattleState(state as unknown as Record<string, unknown>, seed),
   }
 }
 
@@ -442,4 +450,5 @@ function resetAuthorityGlobals(): void {
   delete globals.__rvbAuthorityReceiptCacheV2
   delete globals.__rvbAuthorityHistoryCacheV2
   delete globals.__rvbAuthorityAsyncJournalV2
+  delete globals.__rvbAuthoritySqliteWalPromiseV2
 }

@@ -62,15 +62,18 @@ describe('relay deployment initialization', () => {
     expect(response.status).toBe(200)
     expect(body.state.map.id).toBe(mapId)
     expect(body.state.extensions.playerAlignments).toEqual({ alice: 'light', bob: 'dark' })
-    expect(body.state.pieces.filter((piece: { isCore?: boolean }) => piece.isCore)).toHaveLength(16)
+    expect(body.state.pieces.filter((piece: { isCore?: boolean }) => piece.isCore)).toHaveLength(2)
     expect(body.state.deployment).toMatchObject({
-      status: 'awaiting-locks',
+      mode: 'progressive-reserve-v1',
+      status: 'awaiting-reserve-deploy',
+      activePlayerId: 'alice',
+      reserveCounts: { alice: 7, bob: 6 },
       choices: {},
-      revision: 0,
+      locks: {},
+      revision: 1,
     })
-    expect(body.state.deployment.deadlineAt - body.state.deployment.startedAt).toBe(DEPLOYMENT_DURATION_MS)
     expect(body.state.turn.currentPlayerId).toBe('alice')
-    expect(body.state.gameStartFired).toBeFalsy()
+    expect(body.state.gameStartFired).toBe(true)
     expect(body.authorityVersion).toBe(1)
     expect(body.state.extensions.debugBattle.actionLog[0].deployment.authorityVersion).toBe(1)
     expect(body.stateHash).toEqual(expect.any(String))
@@ -87,7 +90,9 @@ describe('relay deployment initialization', () => {
     expect(body.stateHash).toEqual(expect.any(String))
     expect(body.state.map.id).toBe(mapId)
     expect(body.state.extensions.playerAlignments).toEqual({ alice: 'light', bob: 'dark' })
+    expect(body.state.pieces.filter((piece: { isCore?: boolean }) => piece.isCore)).toHaveLength(16)
     expect(body.state.deployment).toMatchObject({
+      mode: 'legacy-reroll-v1',
       status: 'awaiting-locks',
       choices: {},
       locks: {
@@ -97,7 +102,13 @@ describe('relay deployment initialization', () => {
       revision: 0,
     })
     expect(body.state.deployment.deadlineAt - body.state.deployment.startedAt).toBe(DEPLOYMENT_DURATION_MS)
+    expect(body.state.deployment).not.toHaveProperty('activePlayerId')
+    expect(body.state.deployment).not.toHaveProperty('reserves')
+    expect(body.state.deployment).not.toHaveProperty('reserveCounts')
+    expect(body.state.deployment).not.toHaveProperty('offerPieceIds')
+    expect(body.state.deployment).not.toHaveProperty('offerPieces')
     expect(body.state.turn.currentPlayerId).toBe('alice')
+    expect(body.state.gameStartFired).toBeFalsy()
     expect(body.state.extensions.debugBattle.actionLog[0].deployment.authorityVersion).toBe(1)
   })
 
@@ -161,7 +172,7 @@ describe('relay deployment initialization', () => {
     const afterInvalid = JSON.parse(await handleMobileServerRequest('GET', '/api/lobby', {}))
     expect(afterInvalid.rooms).toHaveLength(initialCount + selectableMapIds.length)
   })
-  it.each(selectableMapIds)('starts an Android local room on %s with the authoritative deployment cursor', async mapId => {
+  it.each(selectableMapIds)('starts an Android local room on %s with legacy reroll deployment', async mapId => {
     const hostId = `local-host-${mapId}`
     const guestId = `local-guest-${mapId}`
     const created = JSON.parse(await handleMobileServerRequest('POST', '/api/lobby', {
@@ -244,12 +255,23 @@ describe('relay deployment initialization', () => {
             id: string
             tiles: Array<{ x: number; y: number; props: { type: string; walkable: boolean } }>
           }
-          pieces: Array<{ isCore?: boolean; x: number; y: number }>
+          pieces: Array<{
+            isCore?: boolean
+            ownerPlayerId: string
+            x: number | null
+            y: number | null
+          }>
           deployment: {
+            mode?: string
             status: string
             startedAt: number
             deadlineAt: number
             locks: Record<string, { locked: boolean }>
+            activePlayerId?: string
+            reserveCounts?: Record<string, number>
+            offerPieceIds?: string[]
+            offerPieces?: Array<{ instanceId: string }>
+            legalPositions?: Array<{ x: number; y: number }>
           }
           turn: { phase: string }
           gameStartFired?: boolean
@@ -274,11 +296,15 @@ describe('relay deployment initialization', () => {
       startCursor: 0,
       endCursor: 16,
     })
+    expect((initAction.randomStreams ?? []).some(
+      stream => stream.name.startsWith('progressive-deployment/'),
+    )).toBe(false)
     expect(state.map.id).toBe(mapId)
     expect(cores).toHaveLength(16)
-    expect(new Set(cores.map(piece => `${piece.x},${piece.y}`))).toHaveLength(16)
+    expect(new Set(cores.map(piece => `${piece.x},${piece.y}`)).size).toBe(16)
     expect(cores.every(piece => ordinaryFloors.has(`${piece.x},${piece.y}`))).toBe(true)
     expect(state.deployment).toMatchObject({
+      mode: 'legacy-reroll-v1',
       status: 'awaiting-locks',
       locks: {
         [hostId]: { locked: false },
@@ -286,6 +312,11 @@ describe('relay deployment initialization', () => {
       },
     })
     expect(state.deployment.deadlineAt - state.deployment.startedAt).toBe(DEPLOYMENT_DURATION_MS)
+    expect(state.deployment).not.toHaveProperty('activePlayerId')
+    expect(state.deployment).not.toHaveProperty('reserves')
+    expect(state.deployment).not.toHaveProperty('reserveCounts')
+    expect(state.deployment).not.toHaveProperty('offerPieceIds')
+    expect(state.deployment).not.toHaveProperty('offerPieces')
     expect(state.turn.phase).toBe('start')
     expect(state.gameStartFired).toBeFalsy()
     expect(state.extensions.playerAlignments).toEqual({ [hostId]: 'light', [guestId]: 'dark' })
@@ -386,7 +417,7 @@ describe('relay deployment initialization', () => {
     expect(page).not.toContain('publishRelayAuthorityResult')
   })
 
-  it('submits signed Relay commands and ignores legacy host-authority messages', () => {
+  it('submits Relay commands through Colyseus and ignores legacy host-authority messages', () => {
     const page = readFileSync(resolve(process.cwd(), 'data/pages/battle.html'), 'utf8')
     const wsClient = readFileSync(resolve(process.cwd(), 'data/pages/js/ws-client.js'), 'utf8')
 
@@ -398,8 +429,11 @@ describe('relay deployment initialization', () => {
     expect(page).not.toContain('postLocalRelayInitialization')
     expect(page).not.toContain('verifyRelayBattleActionAuth')
     expect(page).not.toContain('relayAuthorityState')
-    expect(wsClient).toContain("type: 'battle-subscribe'")
-    expect(wsClient).toContain('signature: await window.RvBIdentity.sign(payload)')
+    expect(wsClient).toContain("_client.joinById(_roomId, joinOptions(_playerId))")
+    expect(wsClient).toContain("_room.send('battleCommand', message)")
+    expect(wsClient).toContain("localStorage.getItem('rvb_game_profile_identity')")
+    expect(wsClient).toContain('profileIdentity: profileIdentity')
+    expect(wsClient).not.toContain("type: 'battle-subscribe'")
   })
 })
 

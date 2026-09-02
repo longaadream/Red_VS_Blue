@@ -1,0 +1,20 @@
+{
+  "id": "grimmjow-gran-rey-cero",
+  "name": "王虚的闪光",
+  "description": "灵压。选择同一行或同一列6格内1名敌人，对路径上所有敌人造成200%攻击力的魔法伤害。",
+  "keywords": ["灵压"],
+  "statusTag": { "id": "spiritual-pressure", "type": "skill-rule", "name": "灵压", "rule": "rule-spiritual-pressure" },
+  "targetText": "同一行或同一列6格内1名敌人",
+  "effectTags": ["魔法伤害", "路径"],
+  "icon": "🔷",
+  "kind": "active",
+  "type": "normal",
+  "cooldownTurns": 2,
+  "maxCharges": 0,
+  "powerMultiplier": 2,
+  "actionPointCost": 2,
+  "range": "area",
+  "requiresTarget": true,
+  "targeting": { "steps": [{ "kind": "target", "type": "piece", "filter": "enemy", "range": 6, "sameRowOrColumn": true }], "availability": [{ "type": "sourceStatus", "statusType": "resurreccion", "present": false, "message": "归刃后无法使用王虚的闪光" }] },
+  "code": "function executeSkill(context) { var caster = context.piece; var target = selectTarget({ type: 'piece', range: 6, filter: 'enemy' }); if (!target || target.needsTargetSelection) return target; if (caster.x !== target.x && caster.y !== target.y) return { success: false, message: '目标必须与自身处于同一行或同一列' }; var dx = Math.sign(target.x - caster.x); var dy = Math.sign(target.y - caster.y); var enemies = battle.pieces.filter(function(piece) { if (piece.currentHp <= 0 || piece.ownerPlayerId === caster.ownerPlayerId) return false; if (dx !== 0) return piece.y === caster.y && (piece.x - caster.x) * dx > 0 && Math.abs(piece.x - caster.x) <= Math.abs(target.x - caster.x); return piece.x === caster.x && (piece.y - caster.y) * dy > 0 && Math.abs(piece.y - caster.y) <= Math.abs(target.y - caster.y); }).sort(function(a, b) { return (Math.abs(a.x - caster.x) + Math.abs(a.y - caster.y)) - (Math.abs(b.x - caster.x) + Math.abs(b.y - caster.y)); }); var result = dealDamage(caster, enemies, caster.attack * 2, 'magical', battle, 'grimmjow-gran-rey-cero'); var alive = battle.pieces.find(function(piece) { return piece.instanceId === caster.instanceId && piece.currentHp > 0; }); if (alive) dealDamage(alive, alive, 1, 'true', battle, 'grimmjow-destruction-instinct'); return { success: true, message: caster.name + '释放王虚的闪光，造成' + (result.totalDamage || result.damage || 0) + '点魔法伤害' }; }"
+}

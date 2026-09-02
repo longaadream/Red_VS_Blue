@@ -26,25 +26,48 @@ function writeLog(message: string) {
 
 // 重新导出类型，保持向后兼容
 import type { BoardMap } from "./map"
-import type { PieceInstance, PieceStats } from "./piece"
+import {
+  DEPLOYMENT_FIRST_MOVE_FREE_STATUS,
+  type PieceInstance,
+  type PieceStats,
+  type PieceStatusTag,
+} from "./piece"
 import type { SkillDefinition } from "./skills"
-import { dealDamage, healDamage, loadRuleById, loadCardById, executeCardFunction, executeSkillFunction, getEffectiveChargeCost } from "./skills"
-import { dynamicCodeRuntime } from './dynamic-code-runtime'
-import { globalTriggerSystem, type TriggerResult } from "./triggers"
+import { dealDamage, drainBattleEffectChain, healDamage, hydratePreparedPieceDefinitions, loadRuleById, loadRuleForBattle, loadCardForBattle, loadSkillForBattle, restorePersistedRuleRuntime, rethrowAttachedEffectContentError, executeCardFunction, executeSkillFunction, getEffectiveChargeCost, getRuleDynamicCodeRuntime } from "./skills"
+import { globalTriggerSystem, type TriggerContext, type TriggerResult, type TriggerRule } from "./triggers"
+import {
+  EffectChainFatalError,
+  createDamageQueueWriter,
+  createEffectChain,
+  createHealQueueWriter,
+  createSummonQueueWriter,
+  getActiveEffectChain,
+  installEffectChain,
+  isEffectChainFatalError,
+  isEffectChainPendingSignal,
+  resolveSummonRedirectPosition,
+  uninstallEffectChain,
+  type EffectBatchContext,
+  type EffectChain,
+  type SummonRequest,
+  type TemplateSummonSpec,
+} from './effect-batch'
 import { getSkillById } from "./skill-repository"
 import {
   RANDOM_STREAM_NAMES,
   RuleRuntime,
   getActiveRuleRuntime,
+  getRuleExecutionTriggerSystem,
   getRuleDate,
   getRuleMath,
   withRuleRuntime,
   withRuleRuntimeCheckpoint,
 } from "./rule-runtime"
+
+const getActiveTriggerSystem = () => getRuleExecutionTriggerSystem(globalTriggerSystem)
 import {
   SUSPENDABLE_ACTION_TRANSACTION_PROTOCOL_VERSION,
   SuspendableActionRuntime,
-  isSuspendableActionPending,
   withSuspendableActionRuntime,
   type SuspendableActionTransaction,
   type SuspendableInteractionInput,
@@ -52,11 +75,21 @@ import {
 } from './suspendable-action-transaction'
 import { getNormalMoveRejection, manhattanDistance } from "./spatial"
 import {
+  PROGRESSIVE_DEPLOYMENT_MODE,
+  getEmptyWalkableDeploymentPositions,
+  getSafeDeploymentPositions,
+  isProgressiveDeployment,
+  reservePiecesForPlayer,
+} from './deployment'
+import {
   TargetingRuleError,
   advancePendingTargetSession,
   finalizePendingTargetSession,
   assertActionTargetingReady,
   assertPendingTargetCancellation,
+  enumeratePrimaryPieceTargetIds,
+  getReservedSkillLandingCells,
+  isSinglePieceTargetAction,
   stampTargetingRevision,
   validatePendingTargetSubmissions,
 } from "./targeting"
@@ -83,7 +116,8 @@ const FORCE_RULE_RELOAD = process.env.RVB_FORCE_RULE_RELOAD === '1'
 
 // ─── 辅助函数：恢复棋子规则的 effect 函数（用于 API 传输后重新加载）────────────────
 function restorePieceRules(state: BattleState): void {
-  state.pieces.forEach(piece => {
+  const reservePieces = Object.values(state.deployment?.reserves ?? {}).flat()
+  ;[...state.pieces, ...reservePieces].forEach(piece => {
     // 确保 rules 数组存在
     if (!piece.rules) {
       piece.rules = []
@@ -92,15 +126,17 @@ function restorePieceRules(state: BattleState): void {
     // 1. 恢复现有规则（全量替换，确保 trigger/effect 都是最新版本）
     if (piece.rules.length > 0) {
       piece.rules = piece.rules.map((rule: any) => {
-        if (rule.id) {
-          try {
-            const reloadedRule = loadRuleById(rule.id, FORCE_RULE_RELOAD)
-            if (reloadedRule && typeof reloadedRule.effect === 'function') {
-              return reloadedRule
-            }
-          } catch {
-            // 忽略规则重载错误
-          }
+        const ruleId = typeof rule?.id === 'string' ? rule.id : ''
+        const reloadedRule = loadRuleForBattle(state, ruleId, {
+          sourceId: piece.instanceId,
+        })
+        if (reloadedRule && typeof reloadedRule.effect === 'function') {
+          return restorePersistedRuleRuntime(
+            state,
+            reloadedRule,
+            rule,
+            piece.instanceId,
+          )
         }
         return rule
       })
@@ -110,19 +146,28 @@ function restorePieceRules(state: BattleState): void {
     if (piece.statusTags && piece.statusTags.length > 0) {
       piece.statusTags.forEach((statusTag: any) => {
         // 检查状态标签是否有关联的规则
-        if (statusTag.relatedRules && statusTag.relatedRules.length > 0) {
-          statusTag.relatedRules.forEach((ruleId: string) => {
+        const relatedRules = statusTag.relatedRules
+        if (relatedRules !== undefined && !Array.isArray(relatedRules)) {
+          rethrowAttachedEffectContentError(
+            state,
+            new Error(`Status ${String(statusTag?.id || '<unknown>')} has invalid relatedRules`),
+            'Status relatedRules could not hydrate during an EffectChain',
+            { sourceId: piece.instanceId },
+          )
+          return
+        }
+        if (Array.isArray(relatedRules) && relatedRules.length > 0) {
+          relatedRules.forEach((rawRuleId: unknown) => {
+            const ruleId = typeof rawRuleId === 'string' ? rawRuleId : ''
             // 检查规则是否已存在
             const existingRule = piece.rules!.find((r: any) => r.id === ruleId)
             if (!existingRule) {
               // 规则不存在，重新添加
-              try {
-                const reloadedRule = loadRuleById(ruleId, FORCE_RULE_RELOAD)
-                if (reloadedRule && typeof reloadedRule.effect === 'function') {
-                  piece.rules!.push(reloadedRule)
-                }
-              } catch {
-                // 忽略规则重载错误
+              const reloadedRule = loadRuleForBattle(state, ruleId, {
+                sourceId: piece.instanceId,
+              })
+              if (reloadedRule && typeof reloadedRule.effect === 'function') {
+                piece.rules!.push(reloadedRule)
               }
             }
           })
@@ -147,18 +192,43 @@ function restorePlayerRules(state: BattleState): void {
     // 恢复现有规则（全量替换，确保 trigger/effect 都是最新版本）
     if (player.rules.length > 0) {
       player.rules = player.rules.map((rule: any) => {
-        if (rule.id) {
-          try {
-            const reloadedRule = loadRuleById(rule.id, FORCE_RULE_RELOAD)
-            if (reloadedRule && typeof reloadedRule.effect === 'function') {
-              return reloadedRule
-            }
-          } catch {
-            // 忽略规则重载错误
-          }
+        const ruleId = typeof rule?.id === 'string' ? rule.id : ''
+        const reloadedRule = loadRuleForBattle(state, ruleId, {
+          sourceId: player.playerId,
+        })
+        if (reloadedRule && typeof reloadedRule.effect === 'function') {
+          return restorePersistedRuleRuntime(
+            state,
+            reloadedRule,
+            rule,
+            player.playerId,
+          )
         }
         return rule
       })
+    }
+
+    for (const statusTag of (player as any).statusTags || []) {
+      const relatedRules = statusTag?.relatedRules
+      if (relatedRules !== undefined && !Array.isArray(relatedRules)) {
+        rethrowAttachedEffectContentError(
+          state,
+          new Error(`Player status ${String(statusTag?.id || '<unknown>')} has invalid relatedRules`),
+          'Player status relatedRules could not hydrate during an EffectChain',
+          { sourceId: player.playerId },
+        )
+        continue
+      }
+      for (const rawRuleId of relatedRules || []) {
+        const ruleId = typeof rawRuleId === 'string' ? rawRuleId : ''
+        if (player.rules.some((rule: any) => rule.id === ruleId)) continue
+        const reloadedRule = loadRuleForBattle(state, ruleId, {
+          sourceId: player.playerId,
+        })
+        if (reloadedRule && typeof reloadedRule.effect === 'function') {
+          player.rules.push(reloadedRule)
+        }
+      }
     }
   })
 }
@@ -178,6 +248,12 @@ export function safeCloneBattleState(state: BattleState): BattleState {
   const pieceFns   = collectRuleFns(state.pieces)
   const graveFns   = collectRuleFns((state as any).graveyard || [])
   const playerFns  = collectRuleFns(state.players)
+  const reserveFns = Object.fromEntries(
+    Object.entries(state.deployment?.reserves ?? {}).map(([playerId, pieces]) => [
+      playerId,
+      collectRuleFns(pieces),
+    ]),
+  )
 
   // JSON 序列化/反序列化：自动剥离所有函数（编译缓存、effect 等），不需要临时删除
   const cloned = JSON.parse(JSON.stringify(state)) as BattleState
@@ -192,8 +268,18 @@ export function safeCloneBattleState(state: BattleState): BattleState {
   restoreRuleFns(cloned.pieces, pieceFns)
   restoreRuleFns((cloned as any).graveyard || [], graveFns)
   restoreRuleFns(cloned.players, playerFns)
+  for (const [playerId, fnMap] of Object.entries(reserveFns)) {
+    restoreRuleFns(cloned.deployment?.reserves?.[playerId] ?? [], fnMap)
+  }
 
   cloned._v = BATTLE_STATE_VERSION
+  return cloned
+}
+
+function cloneBattleStateForEffectExecution(state: BattleState): BattleState {
+  const activeEffectChain = getActiveEffectChain(state)
+  const cloned = safeCloneBattleState(state)
+  if (activeEffectChain) installEffectChain(cloned, activeEffectChain)
   return cloned
 }
 
@@ -285,16 +371,47 @@ export interface DeploymentLock {
   reason?: 'player' | 'timeout'
 }
 
+export type DeploymentMode = 'legacy-reroll-v1' | 'progressive-reserve-v1'
+
+export type DeploymentStatus =
+  | 'awaiting-locks'
+  | 'awaiting-reserve-deploy'
+  | 'turn-ready'
+  | 'complete'
+
+export interface DeploymentOfferPiece {
+  instanceId: string
+  templateId: string
+  name: string
+}
+
 export interface DeploymentState {
-  status: 'awaiting-locks' | 'complete'
+  /** Missing on RED-29 saved states, which are interpreted as legacy-reroll-v1. */
+  mode?: DeploymentMode
+  status: DeploymentStatus
   playerIds: PlayerId[]
   choices: Record<PlayerId, DeploymentChoice>
   locks: Record<PlayerId, DeploymentLock>
   startedAt: number
   deadlineAt: number
   revision: number
+  /** Set only after both seeded opening summons and their trigger queues finish. */
+  openingVanguardsInitialized?: boolean
   initialPositions: Record<string, DeploymentPosition>
   finalPositions?: Record<string, DeploymentPosition>
+  /** Server-only stable core instances that have not entered the board. */
+  reserves?: Record<PlayerId, PieceInstance[]>
+  /** Public count only; reserve identities and order remain server-private. */
+  reserveCounts?: Record<PlayerId, number>
+  activePlayerId?: PlayerId
+  offerTurnNumber?: number
+  /** Server-private IDs. The public projection exposes them only to activePlayerId. */
+  offerPieceIds?: string[]
+  /** Projection-only summaries for the active player. */
+  offerPieces?: DeploymentOfferPiece[]
+  /** Server-authoritative safe cells, exposed only to activePlayerId. */
+  legalPositions?: DeploymentPosition[]
+  lastDeployedPieceId?: string
 }
 
 export interface BattleState {
@@ -358,6 +475,15 @@ export type BattleAction =
       clientActionId?: string
     }
   | {
+      type: "deployReservePiece"
+      playerId: PlayerId
+      expectedDeploymentRevision: number
+      pieceId: string
+      toX?: number
+      toY?: number
+      clientActionId?: string
+    }
+  | {
       type: "turnTimerSync"
       receivedAt: number
       now: number
@@ -380,6 +506,16 @@ export type BattleAction =
       expectedPendingOwnerPlayerId?: PlayerId | null
       expectedPendingSelectionId?: string | null
       expectedPendingStateRevision?: number | null
+    }
+  | {
+      type: "pendingTimeout"
+      now: number
+      clientActionId?: string
+      expectedTurnNumber?: number
+      expectedDeadlineAt?: number
+      expectedInputOwnerPlayerId?: PlayerId
+      expectedPendingSelectionId?: string
+      expectedPendingStateRevision?: number
     }
   | {
       type: "move"
@@ -508,6 +644,265 @@ function resolveDeploymentChoices(state: BattleState, deployment: DeploymentStat
     .map(piece => [piece.instanceId, { x: piece.x as number, y: piece.y as number }]))
 }
 
+function progressiveReserveEntry(
+  deployment: DeploymentState,
+  playerId: string,
+): { playerId: string; pieces: PieceInstance[] } | undefined {
+  const normalized = normalizeStablePlayerId(playerId)
+  const stablePlayerId = Object.keys(deployment.reserves ?? {}).find(
+    candidate => normalizeStablePlayerId(candidate) === normalized,
+  )
+  return stablePlayerId
+    ? { playerId: stablePlayerId, pieces: deployment.reserves?.[stablePlayerId] ?? [] }
+    : undefined
+}
+
+function updateProgressiveReserveCounts(deployment: DeploymentState): void {
+  deployment.reserveCounts = Object.fromEntries(
+    deployment.playerIds.map(playerId => [
+      playerId,
+      progressiveReserveEntry(deployment, playerId)?.pieces.length ?? 0,
+    ]),
+  )
+}
+
+function allProgressiveReservesEmpty(deployment: DeploymentState): boolean {
+  return deployment.playerIds.every(
+    playerId => (progressiveReserveEntry(deployment, playerId)?.pieces.length ?? 0) === 0,
+  )
+}
+
+function clearProgressiveTurnInput(deployment: DeploymentState): void {
+  delete deployment.activePlayerId
+  delete deployment.offerTurnNumber
+  delete deployment.offerPieceIds
+  delete deployment.offerPieces
+  delete deployment.legalPositions
+}
+
+function isCurrentTurnDeploymentFirstMoveFree(
+  statusTag: PieceStatusTag,
+  turnNumber: number,
+): boolean {
+  return statusTag.type === DEPLOYMENT_FIRST_MOVE_FREE_STATUS
+    && statusTag.grantedTurnNumber === turnNumber
+    && statusTag.currentUses === 1
+}
+
+function grantDeploymentFirstMoveFree(piece: PieceInstance, turnNumber: number): void {
+  piece.statusTags = (piece.statusTags ?? []).filter(
+    statusTag => statusTag.type !== DEPLOYMENT_FIRST_MOVE_FREE_STATUS,
+  )
+  piece.statusTags.push({
+    id: DEPLOYMENT_FIRST_MOVE_FREE_STATUS,
+    type: DEPLOYMENT_FIRST_MOVE_FREE_STATUS,
+    name: '本回合首次移动免费',
+    visible: true,
+    grantedTurnNumber: turnNumber,
+    currentDuration: 1,
+    currentUses: 1,
+  })
+}
+
+function consumeDeploymentFirstMoveFree(piece: PieceInstance, turnNumber: number): boolean {
+  const statusIndex = (piece.statusTags ?? []).findIndex(
+    statusTag => isCurrentTurnDeploymentFirstMoveFree(statusTag, turnNumber),
+  )
+  if (statusIndex < 0) return false
+  piece.statusTags.splice(statusIndex, 1)
+  return true
+}
+
+function clearDeploymentFirstMoveFree(state: BattleState): void {
+  const candidates = [
+    ...state.pieces,
+    ...(state.graveyard ?? []),
+    ...Object.values(state.deployment?.reserves ?? {}).flat(),
+  ]
+  const seen = new Set<PieceInstance>()
+  for (const piece of candidates) {
+    if (seen.has(piece)) continue
+    seen.add(piece)
+    piece.statusTags = (piece.statusTags ?? []).filter(
+      statusTag => statusTag.type !== DEPLOYMENT_FIRST_MOVE_FREE_STATUS,
+    )
+  }
+}
+
+function assertExpectedProgressiveDeploymentRevision(
+  state: BattleState,
+  expectedDeploymentRevision: number,
+): DeploymentState {
+  const deployment = state.deployment
+  if (!Number.isSafeInteger(expectedDeploymentRevision)
+    || !deployment
+    || !Number.isSafeInteger(deployment.revision)
+    || expectedDeploymentRevision !== deployment.revision) {
+    throw new BattleRuleError(
+      'Progressive deployment command revision is stale or invalid',
+      'PROGRESSIVE_DEPLOYMENT_STALE_REVISION',
+    )
+  }
+  return deployment
+}
+
+function startProgressiveDeploymentTurn(state: BattleState): boolean {
+  const deployment = state.deployment
+  if (!deployment || deployment.mode !== PROGRESSIVE_DEPLOYMENT_MODE) return false
+
+  updateProgressiveReserveCounts(deployment)
+  const currentPlayerId = state.turn.currentPlayerId
+  const reserve = progressiveReserveEntry(deployment, currentPlayerId)?.pieces ?? []
+  if (reserve.length === 0) {
+    clearProgressiveTurnInput(deployment)
+    deployment.status = allProgressiveReservesEmpty(deployment) ? 'complete' : 'turn-ready'
+    return false
+  }
+
+  const runtime = getActiveRuleRuntime()
+  if (!runtime) {
+    throw new BattleRuleError(
+      'Progressive deployment offer requires a deterministic rule runtime',
+      'PROGRESSIVE_DEPLOYMENT_RUNTIME_REQUIRED',
+    )
+  }
+  const pool = [...reserve].sort((left, right) => compareStableText(left.instanceId, right.instanceId))
+  const offerCount = Math.min(3, pool.length)
+  const streamName = `${RANDOM_STREAM_NAMES.progressiveDeploymentOffer}/${normalizeStablePlayerId(currentPlayerId)}`
+  for (let index = 0; index < offerCount; index += 1) {
+    const selectedIndex = index + runtime.nextInt(streamName, pool.length - index)
+    const selected = pool[selectedIndex]
+    pool[selectedIndex] = pool[index]
+    pool[index] = selected
+  }
+
+  deployment.status = 'awaiting-reserve-deploy'
+  deployment.activePlayerId = currentPlayerId
+  deployment.offerTurnNumber = state.turn.turnNumber
+  deployment.offerPieceIds = pool.slice(0, offerCount).map(piece => piece.instanceId)
+  deployment.legalPositions = getSafeDeploymentPositions(state)
+  deployment.revision += 1
+  return true
+}
+
+function appendTriggerMessages(
+  state: BattleState,
+  playerId: string,
+  result: TriggerResult,
+): void {
+  if (!result.success || result.messages.length === 0) return
+  if (!state.actions) state.actions = []
+  result.messages.forEach(message => {
+    state.actions!.push({
+      type: 'triggerEffect',
+      playerId,
+      turn: state.turn.turnNumber,
+      payload: { message },
+    })
+  })
+}
+
+function assertSynchronousSummonTrigger(result: TriggerResult, eventType: string): void {
+  if (!result.needsOptionSelection && !result.needsTargetSelection) return
+  throw new BattleRuleError(
+    `[${eventType}] interactive trigger is unsupported at this summon boundary`,
+    'INTERACTIVE_TRIGGER_UNSUPPORTED',
+  )
+}
+
+function commitReservePieceSummon(
+  state: BattleState,
+  playerId: string,
+  pieceId: string,
+  position: DeploymentPosition,
+  positionPolicy: 'safe' | 'fallback',
+): PieceInstance {
+  const deployment = state.deployment
+  if (!deployment || deployment.mode !== PROGRESSIVE_DEPLOYMENT_MODE) {
+    throw new BattleRuleError('Progressive deployment is unavailable')
+  }
+  const reserveEntry = progressiveReserveEntry(deployment, playerId)
+  const reserveIndex = reserveEntry?.pieces.findIndex(piece => piece.instanceId === pieceId) ?? -1
+  const piece = reserveIndex >= 0 ? reserveEntry!.pieces[reserveIndex] : undefined
+  if (!piece || piece.isCore !== true || piece.currentHp <= 0) {
+    throw new BattleRuleError('Reserve core is unavailable')
+  }
+
+  const beforeContext = {
+    type: 'beforePieceSummoned' as const,
+    playerId,
+    targetPosition: { ...position },
+    pieceTemplateId: piece.templateId,
+    faction: piece.faction,
+  }
+  const beforeResult = getActiveTriggerSystem().checkTriggers(state, beforeContext)
+  assertSynchronousSummonTrigger(beforeResult, 'beforePieceSummoned')
+  appendTriggerMessages(state, playerId, beforeResult)
+  if (beforeResult.blocked) {
+    throw new BattleRuleError(
+      beforeResult.messages.join('；') || 'Reserve summon was blocked',
+      'PROGRESSIVE_DEPLOYMENT_SUMMON_BLOCKED',
+    )
+  }
+
+  const finalPosition = beforeContext.targetPosition
+  const legalFinalPositions = positionPolicy === 'safe'
+    ? getSafeDeploymentPositions(state)
+    : getEmptyWalkableDeploymentPositions(state)
+  if (!finalPosition || !legalFinalPositions.some(candidate =>
+    candidate.x === finalPosition.x && candidate.y === finalPosition.y)) {
+    throw new BattleRuleError(
+      positionPolicy === 'safe'
+        ? 'Summon trigger changed the deployment outside the authoritative safe cells'
+        : 'Summon trigger changed the fallback deployment to an invalid position',
+      'PROGRESSIVE_DEPLOYMENT_TRIGGER_POSITION_INVALID',
+    )
+  }
+
+  reserveEntry!.pieces.splice(reserveIndex, 1)
+  piece.x = finalPosition.x
+  piece.y = finalPosition.y
+  const deployedPosition = { x: finalPosition.x, y: finalPosition.y }
+  state.pieces.push(piece)
+  updateProgressiveReserveCounts(deployment)
+
+  const afterResult = getActiveTriggerSystem().checkTriggers(state, {
+    type: 'afterPieceSummoned',
+    playerId,
+    sourcePiece: piece,
+    pieceTemplateId: piece.templateId,
+    faction: piece.faction,
+  })
+  assertSynchronousSummonTrigger(afterResult, 'afterPieceSummoned')
+  appendTriggerMessages(state, playerId, afterResult)
+
+  if (!state.actions) state.actions = []
+  state.actions.push({
+    type: 'deployReservePiece',
+    playerId,
+    turn: state.turn.turnNumber,
+    payload: {
+      message: `${piece.name || piece.templateId} entered the board at (${deployedPosition.x}, ${deployedPosition.y})`,
+      pieceId: piece.instanceId,
+      toX: deployedPosition.x,
+      toY: deployedPosition.y,
+    },
+  })
+  return piece
+}
+
+function finishProgressiveDeploymentTurn(state: BattleState): BattleState {
+  const deployment = state.deployment
+  if (!deployment || deployment.mode !== PROGRESSIVE_DEPLOYMENT_MODE) return state
+  clearProgressiveTurnInput(deployment)
+  updateProgressiveReserveCounts(deployment)
+  deployment.status = allProgressiveReservesEmpty(deployment) ? 'complete' : 'turn-ready'
+  deployment.revision += 1
+  return applyBattleActionInternal(state, { type: 'beginPhase' }, {
+    skipProgressiveDeployment: true,
+  })
+}
+
 // 辅助函数：大小写不敏感地比较两个玩家ID
 function isSamePlayer(playerId1: PlayerId, playerId2: PlayerId): boolean {
   return playerId1.toLowerCase() === playerId2.toLowerCase()
@@ -526,10 +921,23 @@ function validateMove(
   if (rejection) throw new BattleRuleError(rejection.message)
 }
 
-function getSkillDefinitionOrThrow(state: BattleState, skillId: string): SkillDefinition {
-  const skillDef = state.skillsById[skillId] || getSkillById(skillId)
+function getSkillDefinitionOrThrow(
+  state: BattleState,
+  skillId: string,
+  sourceId?: string,
+): SkillDefinition {
+  const requestedSkillId = typeof skillId === 'string' ? skillId : ''
+  const activeChain = getActiveEffectChain(state)
+  const candidate = requestedSkillId
+    ? state.skillsById?.[requestedSkillId]
+      || ((!activeChain || activeChain.detached) ? getSkillById(requestedSkillId) : undefined)
+    : undefined
+  const skillDef = loadSkillForBattle(state, requestedSkillId, candidate, {
+    requireExecutable: true,
+    metadata: { sourceId, skillId: requestedSkillId },
+  })
   if (!skillDef) {
-    throw new BattleRuleError(`Skill ${skillId} not found`)
+    throw new BattleRuleError(`Skill ${requestedSkillId || '<empty>'} not found`)
   }
   return skillDef
 }
@@ -588,7 +996,7 @@ function validateSkillActionBasics(
   action: { targetPieceId?: string; targetX?: number; targetY?: number },
   isChargeAction: boolean,
 ): SkillDefinition {
-  const skillDef = getSkillDefinitionOrThrow(state, skillId)
+  const skillDef = getSkillDefinitionOrThrow(state, skillId, piece.instanceId)
   const playerMeta = getPlayerMeta(state, playerId)
   const isChargeSkill = (skillDef.chargeCost ?? 0) > 0
   if (isChargeAction !== isChargeSkill) {
@@ -937,9 +1345,48 @@ function requireActionPhase(state: BattleState) {
 type InternalContinuation = {
   skipTargetingValidation?: boolean
   skipBeginTurn?: boolean
+  skipProgressiveDeployment?: boolean
   skipEndTurnTrigger?: boolean
   skipBeforeSkillUse?: boolean
   skipBeforeCardPlay?: boolean
+}
+
+function assertAttachedActionDefinitionBeforeTargeting(
+  state: BattleState,
+  action: BattleAction,
+): void {
+  const chain = getActiveEffectChain(state)
+  if (!chain || chain.detached) return
+  if (
+    action.type !== 'useBasicSkill'
+    && action.type !== 'useChargeSkill'
+    && action.type !== 'playCard'
+  ) return
+  if (typeof action.playerId !== 'string' || action.playerId.length === 0) return
+  if (state.turn.phase !== 'action' || !isCurrentPlayer(state, action.playerId)) return
+
+  if (action.type === 'useBasicSkill' || action.type === 'useChargeSkill') {
+    const piece = state.pieces.find(candidate => (
+      candidate.instanceId === action.pieceId
+      && candidate.currentHp > 0
+      && isSamePlayer(candidate.ownerPlayerId, action.playerId)
+    ))
+    if (!piece) return
+    getSkillDefinitionOrThrow(state, action.skillId, piece.instanceId)
+    return
+  }
+
+  if (action.type !== 'playCard') return
+  const player = state.players.find(candidate => isSamePlayer(candidate.playerId, action.playerId))
+  const card = player?.hand?.find(candidate => candidate.instanceId === action.cardInstanceId)
+  if (!card) return
+  loadCardForBattle(state, card.cardId, {
+    forceReload: true,
+    metadata: {
+      sourceId: card.instanceId,
+      skillId: card.cardId,
+    },
+  })
 }
 
 function applyBattleActionInternal(
@@ -958,6 +1405,7 @@ function applyBattleActionInternal(
   const isDeploymentCommand = action.type === 'deploymentChoice'
     || action.type === 'deploymentLock'
     || action.type === 'deploymentTimeout'
+    || action.type === 'deployReservePiece'
   const isTimerCommand = isTurnTimerSystemAction(action)
   const isPendingInteractionCommand = action.type === 'pendingOptionSelect'
     || action.type === 'pendingTargetSelect'
@@ -970,10 +1418,24 @@ function applyBattleActionInternal(
   ) {
     throw new BattleRuleError('Battle actions are unavailable until deployment is complete')
   }
+  if (
+    state.deployment?.mode === PROGRESSIVE_DEPLOYMENT_MODE
+    && state.deployment.status === 'awaiting-reserve-deploy'
+    && !isDeploymentCommand
+    && action.type !== 'surrender'
+    && !isPendingInteractionCommand
+    && !isTimerCommand
+  ) {
+    throw new BattleRuleError(
+      'Resolve the current reserve deployment before taking normal battle actions',
+      'PROGRESSIVE_DEPLOYMENT_REQUIRED',
+    )
+  }
 
   // RED-59: all target discovery and final target validation happen before
   // cloning, triggers, payment, logging, or effect execution.
   if (action.type !== 'surrender' && !isTimerCommand && !continuation.skipTargetingValidation) {
+    assertAttachedActionDefinitionBeforeTargeting(state, action)
     assertActionTargetingReady(state, action)
   }
   const validatedPendingTargets = action.type === 'pendingTargetSelect'
@@ -993,7 +1455,7 @@ function applyBattleActionInternal(
   }
 
   // 规则恢复会补充数组和 effect 函数；先克隆，确保非法动作不会污染权威输入状态。
-  const hydratedState = safeCloneBattleState(state)
+  const hydratedState = cloneBattleStateForEffectExecution(state)
   restorePieceRules(hydratedState)
   restorePlayerRules(hydratedState)
   state = hydratedState
@@ -1046,6 +1508,12 @@ function applyBattleActionInternal(
     seed: PendingSeed = {},
   ): boolean => {
     if (!result.needsOptionSelection && !result.needsTargetSelection) return false
+    if (result.needsTargetSelection && Array.isArray(result.targetCandidates)) {
+      const minimum = Number.isSafeInteger(result.minSelections)
+        ? Math.max(0, result.minSelections!)
+        : 1
+      if (result.targetCandidates.length < minimum) return false
+    }
     const currentRuleId = result.pendingRuleId || currentContext.pendingRuleId
     const currentRuleSourceId = result.pendingRuleSourceId || currentContext.pendingRuleSourceId
     const triggerContext = {
@@ -1182,6 +1650,13 @@ function applyBattleActionInternal(
     return applyBattleActionInternal(next, resumeAction, trustedContinuation)
   }
 
+  const applyPendingTargetRewrite = (pending: PendingSession, result: TriggerResult): void => {
+    if (!result.targetReplacementPieceId || !pending.pendingAction) return
+    ;(pending.pendingAction as any).targetPieceId = result.targetReplacementPieceId
+    delete (pending.pendingAction as any).targetX
+    delete (pending.pendingAction as any).targetY
+  }
+
   const resumePendingInteraction = (
     next: BattleState,
     pending: PendingSession,
@@ -1197,7 +1672,8 @@ function applyBattleActionInternal(
         __deferReactiveCards: true,
         __pendingReactiveCards: pending.pendingReactiveCards,
       }
-      const result = globalTriggerSystem.checkTriggers(next, currentContext)
+      const result = getActiveTriggerSystem().checkTriggers(next, currentContext)
+      applyPendingTargetRewrite(pending, result)
       appendTriggerMessages(next, result, actorPlayerId)
       if (result.blocked) return resumeDeferredAction(next, pending, input, true)
       if (setPendingInteraction(next, result, currentContext, {
@@ -1218,7 +1694,8 @@ function applyBattleActionInternal(
         __deferReactiveCards: true,
         __pendingReactiveCards: pending.pendingReactiveCards,
       }
-      const result = globalTriggerSystem.checkTriggers(next, currentContext)
+      const result = getActiveTriggerSystem().checkTriggers(next, currentContext)
+      applyPendingTargetRewrite(pending, result)
       appendTriggerMessages(next, result, actorPlayerId)
       if (result.blocked) return resumeDeferredAction(next, pending, input, true)
       if (setPendingInteraction(next, result, currentContext, {
@@ -1230,7 +1707,7 @@ function applyBattleActionInternal(
     }
 
     if (pending.pendingReactiveCards?.length) {
-      const reactiveResult = globalTriggerSystem.checkTriggers(next, {
+      const reactiveResult = getActiveTriggerSystem().checkTriggers(next, {
         ...continuationContext,
         __reactiveCardsOnly: true,
         __pendingReactiveCards: pending.pendingReactiveCards,
@@ -1417,7 +1894,7 @@ function applyBattleActionInternal(
 
 
   if (action.type === 'cancelPendingSelection') {
-    const next = safeCloneBattleState(state)
+    const next = cloneBattleStateForEffectExecution(state)
     const pending = (next.pendingOptionSelection || next.pendingTargetSelection) as PendingSession
     next.pendingOptionSelection = undefined
     next.pendingTargetSelection = undefined
@@ -1459,7 +1936,7 @@ function applyBattleActionInternal(
 
   switch (action.type) {
     case "turnTimerSync": {
-      const next = safeCloneBattleState(state)
+      const next = cloneBattleStateForEffectExecution(state)
       const timer = syncTurnTimerAfterAcceptedAction(next, {
         receivedAt: action.receivedAt,
         resumedAt: action.now,
@@ -1487,7 +1964,7 @@ function applyBattleActionInternal(
     }
 
     case "turnTimerBurn": {
-      const next = safeCloneBattleState(state)
+      const next = cloneBattleStateForEffectExecution(state)
       if (next.turnTimer?.burnPhase === 'burning') return next
       try {
         next.turnTimer = markTurnTimerBurning(next, action.now)
@@ -1510,7 +1987,7 @@ function applyBattleActionInternal(
     }
 
     case "turnTimeout": {
-      const next = safeCloneBattleState(state)
+      const next = cloneBattleStateForEffectExecution(state)
       try {
         next.turnTimer = recordTurnTimeout(next, action.now)
       } catch (error) {
@@ -1547,6 +2024,35 @@ function applyBattleActionInternal(
       // by a player command. Cancellable sessions cancel; mandatory sessions
       // consume one deterministic candidate. The expired budget is never reset.
       let progressed = resolveTimedOutPendingChain(next)
+      finalizeBattleTerminal(progressed, action)
+      if (progressed.terminalResult) return progressed
+      if (isProgressiveDeployment(progressed)) {
+        const deployment = progressed.deployment!
+        if (deployment.status === 'awaiting-reserve-deploy') {
+          const pieceId = deployment.offerPieceIds?.[0]
+          if (!pieceId) {
+            throw new BattleRuleError(
+              'Progressive deployment timeout has no authoritative offer',
+              'PROGRESSIVE_DEPLOYMENT_OFFER_REQUIRED',
+            )
+          }
+          if (getEmptyWalkableDeploymentPositions(progressed).length === 0) {
+            throw new BattleRuleError(
+              'No empty walkable deployment position exists',
+              'PROGRESSIVE_DEPLOYMENT_NO_EMPTY_CELL',
+            )
+          }
+          const safePosition = deployment.legalPositions?.[0]
+          progressed = applyBattleActionInternal(progressed, {
+            type: 'deployReservePiece',
+            playerId: progressed.turn.currentPlayerId,
+            expectedDeploymentRevision: deployment.revision,
+            pieceId,
+            ...(safePosition ? { toX: safePosition.x, toY: safePosition.y } : {}),
+          })
+          if (progressed.terminalResult) return progressed
+        }
+      }
       const endTurnAlreadySettled = progressed.turn.phase === 'end'
       if (!endTurnAlreadySettled) {
         progressed = applyBattleActionInternal(progressed, {
@@ -1554,12 +2060,158 @@ function applyBattleActionInternal(
           playerId: progressed.turn.currentPlayerId,
         })
         progressed = resolveTimedOutPendingChain(progressed)
+        finalizeBattleTerminal(progressed, action)
+        if (progressed.terminalResult) return progressed
       }
-      return applyBattleActionInternal(progressed, { type: 'beginPhase' })
+      return applySuspendableChildAction(progressed, { type: 'beginPhase' })
+    }
+
+    case "pendingTimeout": {
+      const next = cloneBattleStateForEffectExecution(state)
+      const response = next.turnTimer?.pendingResponse
+      if (!response) {
+        throw new BattleRuleError('No pending response timer is active', 'PENDING_TIMEOUT_REJECTED')
+      }
+      if (action.now < response.deadlineAt) {
+        throw new BattleRuleError(
+          'Pending timeout cannot run before its authoritative deadline',
+          'PENDING_TIMEOUT_REJECTED',
+        )
+      }
+      const pending = next.pendingOptionSelection ?? next.pendingTargetSelection
+      const pendingOwnerPlayerId = pending && 'ownerPlayerId' in pending && pending.ownerPlayerId
+        ? pending.ownerPlayerId
+        : pending?.playerId
+      if (!pending
+        || pending.selectionId !== response.selectionId
+        || pending.stateRevision !== response.stateRevision
+        || !isSamePlayer(pendingOwnerPlayerId ?? '', response.ownerPlayerId)) {
+        throw new BattleRuleError(
+          'Pending timeout does not match the active response session',
+          'PENDING_TIMEOUT_REJECTED',
+        )
+      }
+      if (!next.actions) next.actions = []
+      next.actions.push({
+        type: 'pendingTimeout',
+        playerId: response.ownerPlayerId,
+        turn: next.turn.turnNumber,
+        payload: {
+          message: 'Pending response timed out',
+          deadlineAt: response.deadlineAt,
+          selectionId: response.selectionId,
+          resolution: response.timeoutResolution.kind,
+        },
+      } as any)
+      const credentials = {
+        playerId: response.ownerPlayerId,
+        selectionId: response.selectionId,
+        stateRevision: response.stateRevision,
+      }
+      if (response.timeoutResolution.kind === 'cancel') {
+        return applyBattleActionInternal(next, {
+          type: 'cancelPendingSelection',
+          ...credentials,
+        })
+      }
+      if (response.timeoutResolution.kind === 'option') {
+        return applyBattleActionInternal(next, {
+          type: 'pendingOptionSelect',
+          ...credentials,
+          selectedOption: response.timeoutResolution.selectedOption,
+        })
+      }
+      const { targetPieceId, targetX, targetY, extraTargets } = response.timeoutResolution
+      return applyBattleActionInternal(next, {
+        type: 'pendingTargetSelect',
+        ...credentials,
+        targetPieceId,
+        targetX,
+        targetY,
+        extraTargets,
+      })
+    }
+
+    case 'deployReservePiece': {
+      assertExpectedProgressiveDeploymentRevision(state, action.expectedDeploymentRevision)
+      const next = safeCloneBattleState(state)
+      const deployment = next.deployment
+      if (!deployment || deployment.mode !== PROGRESSIVE_DEPLOYMENT_MODE
+        || deployment.status !== 'awaiting-reserve-deploy') {
+        throw new BattleRuleError('Reserve deployment is not awaiting a piece')
+      }
+      if (!isCurrentPlayer(next, action.playerId)
+        || !isSamePlayer(deployment.activePlayerId ?? '', action.playerId)
+        || deployment.offerTurnNumber !== next.turn.turnNumber) {
+        throw new BattleRuleError('Reserve deployment belongs to another player or turn')
+      }
+      if (!(deployment.offerPieceIds ?? []).includes(action.pieceId)) {
+        throw new BattleRuleError('Selected piece is not in the authoritative reserve offer')
+      }
+
+      const safePositions = getSafeDeploymentPositions(next)
+      let position: DeploymentPosition
+      if (safePositions.length > 0) {
+        if (!Number.isSafeInteger(action.toX) || !Number.isSafeInteger(action.toY)) {
+          throw new BattleRuleError('A safe deployment position is required')
+        }
+        const requested = safePositions.find(candidate =>
+          candidate.x === action.toX && candidate.y === action.toY)
+        if (!requested) {
+          throw new BattleRuleError('Deployment position is outside the authoritative safe cells')
+        }
+        position = requested
+      } else {
+        const fallbackPositions = getEmptyWalkableDeploymentPositions(next)
+        if (fallbackPositions.length === 0) {
+          throw new BattleRuleError(
+            'No empty walkable deployment position exists',
+            'PROGRESSIVE_DEPLOYMENT_NO_EMPTY_CELL',
+          )
+        }
+        const runtime = getActiveRuleRuntime()
+        if (!runtime) {
+          throw new BattleRuleError(
+            'Fallback deployment requires a deterministic rule runtime',
+            'PROGRESSIVE_DEPLOYMENT_RUNTIME_REQUIRED',
+          )
+        }
+        const streamName = `${RANDOM_STREAM_NAMES.progressiveDeploymentFallback}/${normalizeStablePlayerId(action.playerId)}`
+        position = fallbackPositions[runtime.nextInt(streamName, fallbackPositions.length)]
+      }
+
+      const deployedPiece = commitReservePieceSummon(
+        next,
+        action.playerId,
+        action.pieceId,
+        position,
+        safePositions.length > 0 ? 'safe' : 'fallback',
+      )
+
+      deployment.lastDeployedPieceId = deployedPiece.instanceId
+      delete deployment.offerPieceIds
+      delete deployment.offerPieces
+      delete deployment.legalPositions
+      if (finalizeBattleTerminal(next, action)) {
+        clearProgressiveTurnInput(deployment)
+        updateProgressiveReserveCounts(deployment)
+        deployment.status = allProgressiveReservesEmpty(deployment) ? 'complete' : 'turn-ready'
+        deployment.revision += 1
+        return next
+      }
+      const livingDeployedPiece = next.pieces.find(piece =>
+        piece.instanceId === deployedPiece.instanceId
+        && piece.currentHp > 0
+        && piece.x !== null
+        && piece.y !== null)
+      if (livingDeployedPiece) {
+        grantDeploymentFirstMoveFree(livingDeployedPiece, next.turn.turnNumber)
+      }
+      return finishProgressiveDeploymentTurn(next)
     }
 
     case "deploymentChoice": {
-      const next = safeCloneBattleState(state)
+      const next = cloneBattleStateForEffectExecution(state)
       const deployment = next.deployment
       if (!deployment || deployment.status !== 'awaiting-locks') {
         throw new BattleRuleError('Deployment choice is only available during deployment')
@@ -1593,7 +2245,7 @@ function applyBattleActionInternal(
     }
 
     case "deploymentLock": {
-      const next = safeCloneBattleState(state)
+      const next = cloneBattleStateForEffectExecution(state)
       const deployment = next.deployment
       if (!deployment || deployment.status !== 'awaiting-locks') {
         throw new BattleRuleError('Deployment lock is only available during deployment')
@@ -1613,7 +2265,7 @@ function applyBattleActionInternal(
     }
 
     case "deploymentTimeout": {
-      const next = safeCloneBattleState(state)
+      const next = cloneBattleStateForEffectExecution(state)
       const deployment = next.deployment
       if (!deployment || deployment.status !== 'awaiting-locks') {
         throw new BattleRuleError('Deployment timeout is only available during deployment')
@@ -1636,7 +2288,7 @@ function applyBattleActionInternal(
     }
 
     case "beginPhase": {
-      const next = safeCloneBattleState(state)
+      const next = cloneBattleStateForEffectExecution(state)
       writeLog('[beginPhase] Current phase: ' + next.turn.phase + ', gameStartFired: ' + next.gameStartFired + ', turnNumber: ' + next.turn.turnNumber)
       if (next.turn.phase === "start") {
         if (!continuation.skipBeginTurn) {
@@ -1644,18 +2296,21 @@ function applyBattleActionInternal(
         if (!next.gameStartFired && next.turn.turnNumber === 1) {
           writeLog('[beginPhase] Triggering gameStart rules...')
           next.gameStartFired = true
-          // 为初始棋子补发 afterPieceSummoned，确保"进入战场"类规则对初始棋子也能生效
-          for (const piece of next.pieces) {
-            const initialSummonResult = globalTriggerSystem.checkTriggers(next, {
-              type: "afterPieceSummoned",
-              playerId: piece.ownerPlayerId,
-              sourcePiece: piece,
-              pieceTemplateId: piece.templateId,
-              faction: piece.faction
-            })
-            assertNoUnhandledInteraction(initialSummonResult, 'afterPieceSummoned')
+          // Legacy/no-deployment battles still treat their initial board as summoned.
+          // Progressive reserve pieces emit this event only when actually entering play.
+          if (!isProgressiveDeployment(next)) {
+            for (const piece of next.pieces) {
+              const initialSummonResult = getActiveTriggerSystem().checkTriggers(next, {
+                type: "afterPieceSummoned",
+                playerId: piece.ownerPlayerId,
+                sourcePiece: piece,
+                pieceTemplateId: piece.templateId,
+                faction: piece.faction
+              })
+              assertNoUnhandledInteraction(initialSummonResult, 'afterPieceSummoned')
+            }
           }
-          const gameStartResult = globalTriggerSystem.checkTriggers(next, {
+          const gameStartResult = getActiveTriggerSystem().checkTriggers(next, {
             type: "gameStart",
             playerId: next.turn.currentPlayerId,
             turnNumber: 1
@@ -1670,13 +2325,22 @@ function applyBattleActionInternal(
           }
         }
 
+        // gameStart may settle the board. Do not generate a private offer or
+        // consume its random stream after either side has lost its last core.
+        if (finalizeBattleTerminal(next, action)) return next
+
+        if (!continuation.skipProgressiveDeployment
+          && startProgressiveDeploymentTurn(next)) {
+          return next
+        }
+
         // 触发回合开始效果（只调用一次，checkTriggers会扫描所有棋子和玩家的规则）
         const beginTurnContext = {
           type: "beginTurn",
           turnNumber: next.turn.turnNumber,
           playerId: next.turn.currentPlayerId
         }
-        const beginTurnResult = globalTriggerSystem.checkTriggers(next, beginTurnContext);
+        const beginTurnResult = getActiveTriggerSystem().checkTriggers(next, beginTurnContext);
 
         // 处理触发效果的消息
         if (beginTurnResult.success && beginTurnResult.messages.length > 0) {
@@ -1702,7 +2366,7 @@ function applyBattleActionInternal(
         }
 
         // 更新冷却
-        globalTriggerSystem.updateCooldowns();
+        getActiveTriggerSystem().updateCooldowns();
 
         // 行动点已经在回合切换时设置，这里不再重复增加
         // 确保当前玩家有行动点属性
@@ -1724,7 +2388,7 @@ function applyBattleActionInternal(
         })
 
         // 触发whenever规则（每一步行动后检测）
-        const wheneverResult = globalTriggerSystem.checkTriggers(next, {
+        const wheneverResult = getActiveTriggerSystem().checkTriggers(next, {
           type: "whenever",
           playerId: next.turn.currentPlayerId,
           turnNumber: next.turn.turnNumber
@@ -1830,12 +2494,12 @@ function applyBattleActionInternal(
     }
 
     case "grantChargePoints": {
-      const next = safeCloneBattleState(state)
+      const next = cloneBattleStateForEffectExecution(state)
       const meta = getPlayerMeta(next, action.playerId)
       meta.chargePoints += action.amount
 
       // 触发whenever规则（每一步行动后检测）
-      const wheneverResult = globalTriggerSystem.checkTriggers(next, {
+      const wheneverResult = getActiveTriggerSystem().checkTriggers(next, {
         type: "whenever",
         playerId: action.playerId
       });
@@ -1867,13 +2531,22 @@ function applyBattleActionInternal(
         throw new BattleRuleError("It is not this player's turn")
       }
 
-      // 检查行动点是否足够
+      // Preserve the old side-effect-free AP rejection before cloning or firing
+      // beforeMove. The current-turn deployment tag is the sole exception.
+      const sourcePieceCheck = state.pieces.find(
+        p => p.instanceId === action.pieceId
+          && isSamePlayer(p.ownerPlayerId, action.playerId)
+          && p.currentHp > 0,
+      )
+      const hasDeploymentFirstMoveFree = !!sourcePieceCheck?.statusTags?.some(
+        statusTag => isCurrentTurnDeploymentFirstMoveFree(statusTag, state.turn.turnNumber),
+      )
       const playerMetaCheck = getPlayerMeta(state, action.playerId)
-      if (playerMetaCheck.actionPoints < 1) {
+      if (!hasDeploymentFirstMoveFree && playerMetaCheck.actionPoints < 1) {
         throw new BattleRuleError("Not enough action points to move")
       }
 
-      const next = safeCloneBattleState(state)
+      const next = cloneBattleStateForEffectExecution(state)
       const piece = next.pieces.find(
         (p) =>
           p.instanceId === action.pieceId &&
@@ -1897,7 +2570,7 @@ function applyBattleActionInternal(
         targetX: action.toX,
         targetY: action.toY
       };
-      const beforeMoveResult = globalTriggerSystem.checkTriggers(next, moveContext);
+      const beforeMoveResult = getActiveTriggerSystem().checkTriggers(next, moveContext);
       assertNoUnhandledInteraction(beforeMoveResult, 'beforeMove')
 
       // 检查是否有规则触发了效果
@@ -1920,6 +2593,14 @@ function applyBattleActionInternal(
 
       // 检查是否有规则明确阻止了行动（在添加消息之后检查）
       if (beforeMoveResult.blocked) {
+        // A blocked deployment-free move is an authority rejection, so the
+        // runner discards this clone together with trigger effects and RNG reads.
+        if (hasDeploymentFirstMoveFree) {
+          throw new BattleRuleError(
+            beforeMoveResult.messages.join('；') || 'Deployment first move was blocked',
+            'DEPLOYMENT_FIRST_MOVE_BLOCKED',
+          )
+        }
         return next; // 返回包含消息的状态，不执行移动
       }
 
@@ -1928,6 +2609,15 @@ function applyBattleActionInternal(
       const finalToY = moveContext.targetY;
 
       validateMove(next, piece, finalToX, finalToY)
+
+      const deploymentFirstMoveFree = consumeDeploymentFirstMoveFree(
+        piece,
+        next.turn.turnNumber,
+      )
+      const playerMeta = getPlayerMeta(next, action.playerId)
+      if (!deploymentFirstMoveFree && playerMeta.actionPoints < 1) {
+        throw new BattleRuleError("Not enough action points to move")
+      }
 
       // 记录移动前的位置
       const fromX = piece.x
@@ -1938,8 +2628,7 @@ function applyBattleActionInternal(
       piece.y = finalToY
       
       // 消耗行动点
-      const playerMeta = getPlayerMeta(next, action.playerId)
-      playerMeta.actionPoints -= 1
+      if (!deploymentFirstMoveFree) playerMeta.actionPoints -= 1
       
       // 初始化actions数组（如果不存在）
       if (!next.actions) {
@@ -1960,12 +2649,13 @@ function applyBattleActionInternal(
           fromX,
           fromY,
           toX: finalToX,
-          toY: finalToY
+          toY: finalToY,
+          deploymentFirstMoveFree,
         }
       })
 
       // 触发移动后的规则
-      const moveResult = globalTriggerSystem.checkTriggers(next, {
+      const moveResult = getActiveTriggerSystem().checkTriggers(next, {
         type: "afterMove",
         sourcePiece: piece,
         playerId: action.playerId
@@ -1990,7 +2680,7 @@ function applyBattleActionInternal(
       }
 
       // 触发whenever规则（每一步行动后检测）
-      const wheneverResult = globalTriggerSystem.checkTriggers(next, {
+      const wheneverResult = getActiveTriggerSystem().checkTriggers(next, {
         type: "whenever",
         sourcePiece: piece,
         playerId: action.playerId
@@ -2027,7 +2717,7 @@ function applyBattleActionInternal(
       //   throw new BattleRuleError("Basic skill already used this turn")
       // }
 
-      const next = safeCloneBattleState(state)
+      const next = cloneBattleStateForEffectExecution(state)
       const piece = next.pieces.find(
         (p) =>
           p.instanceId === action.pieceId &&
@@ -2057,11 +2747,19 @@ function applyBattleActionInternal(
         playerId: action.playerId,
         skillId: action.skillId,
         selectedOption: (action as any).selectedOption,
+        reservedCells: getReservedSkillLandingCells(next, action),
+        legalPrimaryTargetPieceIds: enumeratePrimaryPieceTargetIds(next, action),
+        isSinglePieceTargetAction: isSinglePieceTargetAction(next, action),
       };
       const beforeSkillUseResult = continuation.skipBeforeSkillUse
         ? { success: true, messages: [], blocked: false } as any
-        : globalTriggerSystem.checkTriggers(next, skillUseContext);
-
+        : getActiveTriggerSystem().checkTriggers(next, skillUseContext);
+      if (beforeSkillUseResult.targetReplacementPieceId) {
+        skillUseContext.targetPiece = next.pieces.find(candidate => (
+          candidate.instanceId === beforeSkillUseResult.targetReplacementPieceId && candidate.currentHp > 0
+        ))
+        if (!skillUseContext.targetPiece) throw new BattleRuleError('Replacement skill target is unavailable')
+      }
       // 检查是否有规则阻止了技能使用
       if (beforeSkillUseResult.success) {
         // 初始化actions数组
@@ -2098,7 +2796,7 @@ function applyBattleActionInternal(
 
       // 优先使用战局中已加载的技能定义，回退到模块缓存
       // 使用触发器可能修改后的技能ID
-      let skillDef = next.skillsById[finalSkillId] || getSkillById(finalSkillId)
+      const skillDef = getSkillDefinitionOrThrow(next, finalSkillId, piece.instanceId)
 
       // 检查行动点是否足够
       const playerMeta = getPlayerMeta(state, action.playerId)
@@ -2154,7 +2852,8 @@ function applyBattleActionInternal(
         }
         return { info: null, pos: null };
       };
-      const _t1 = buildTargetSlot(action.targetPieceId, action.targetX, action.targetY);
+      const finalTargetPieceId = skillUseContext.targetPiece?.instanceId || action.targetPieceId
+      const _t1 = buildTargetSlot(finalTargetPieceId, action.targetX, action.targetY);
       const _actAny = action as any;
       const _extraTargets: Array<{pieceId?: string; x?: number; y?: number}> = _actAny.extraTargets || [];
       const targets = [
@@ -2167,7 +2866,9 @@ function applyBattleActionInternal(
         target: _t1.info,
         targetPosition: _t1.pos,
         targets,
+        ruleRewrittenPrimaryTargetPieceId: beforeSkillUseResult.targetReplacementPieceId,
         selectedOption: _actAny.selectedOption,
+        reservedCells: skillUseContext.reservedCells,
         battle: next,
         skill: {
           id: skillDef.id,
@@ -2219,7 +2920,11 @@ function applyBattleActionInternal(
         // 效果已经在技能执行时直接应用，这里只需要处理返回的消息
         const pendingTarget = (result as any).pendingTargetSelection
         battleDebugLog('[STAGE1] skill result.pendingTargetSelection:', pendingTarget ? { playerId: pendingTarget.playerId, targetType: pendingTarget.targetType, hasEffectCode: !!pendingTarget.effectCode, effectCodeLen: pendingTarget.effectCode ? pendingTarget.effectCode.length : 0 } : null)
-        if (pendingTarget) {
+        const pendingCandidates = pendingTarget?.targetCandidates || pendingTarget?.candidates
+        const pendingMinimum = Number.isSafeInteger(pendingTarget?.minSelections)
+          ? Math.max(0, pendingTarget.minSelections)
+          : 1
+        if (pendingTarget && (!Array.isArray(pendingCandidates) || pendingCandidates.length >= pendingMinimum)) {
           next.pendingTargetSelection = {
             playerId: pendingTarget.playerId || action.playerId,
             ownerPlayerId: pendingTarget.playerId || action.playerId,
@@ -2230,8 +2935,8 @@ function applyBattleActionInternal(
             effectCode: pendingTarget.effectCode,
             payload: pendingTarget.payload,
             source: { type: 'skill', id: finalSkillId, pieceId: piece.instanceId },
-            candidates: pendingTarget.targetCandidates || pendingTarget.candidates,
-            fixedCandidates: Array.isArray(pendingTarget.targetCandidates || pendingTarget.candidates),
+            candidates: pendingCandidates,
+            fixedCandidates: Array.isArray(pendingCandidates),
             selectionMode: pendingTarget.selectionMode,
             minSelections: pendingTarget.minSelections,
             maxSelections: pendingTarget.maxSelections,
@@ -2257,14 +2962,16 @@ function applyBattleActionInternal(
       let skillMessage = `${pieceName}使用了${skillDef.name || finalSkillId}`;
       
       // 如果有目标，添加目标信息
-      if (action.targetPieceId) {
-        const targetPiece = next.pieces.find(p => p.instanceId === action.targetPieceId);
-        if (targetPiece) {
-          const targetName = targetPiece.name || targetPiece.templateId;
-          skillMessage += `，目标是${targetName}`;
+      if (!skillDef.concealTargetInBattleLog) {
+        if (finalTargetPieceId) {
+          const targetPiece = next.pieces.find(p => p.instanceId === finalTargetPieceId);
+          if (targetPiece) {
+            const targetName = targetPiece.name || targetPiece.templateId;
+            skillMessage += `，目标是${targetName}`;
+          }
+        } else if (action.targetX !== undefined && action.targetY !== undefined) {
+          skillMessage += `，目标位置是(${action.targetX}, ${action.targetY})`;
         }
-      } else if (action.targetX !== undefined && action.targetY !== undefined) {
-        skillMessage += `，目标位置是(${action.targetX}, ${action.targetY})`;
       }
       
       // 添加技能执行结果消息
@@ -2286,7 +2993,7 @@ function applyBattleActionInternal(
       // 不再设置 hasUsedBasicSkill，允许一回合使用多个技能
 
       // 触发whenever规则（每一步行动后检测）
-      const wheneverResult = globalTriggerSystem.checkTriggers(next, {
+      const wheneverResult = getActiveTriggerSystem().checkTriggers(next, {
         type: "whenever",
         sourcePiece: piece,
         playerId: action.playerId,
@@ -2324,7 +3031,7 @@ function applyBattleActionInternal(
       //   throw new BattleRuleError("Charge skill already used this turn")
       // }
 
-      const next = safeCloneBattleState(state)
+      const next = cloneBattleStateForEffectExecution(state)
       const piece = next.pieces.find(
         (p) =>
           p.instanceId === action.pieceId &&
@@ -2354,34 +3061,24 @@ function applyBattleActionInternal(
         playerId: action.playerId,
         skillId: action.skillId,
         selectedOption: (action as any).selectedOption,
+        reservedCells: getReservedSkillLandingCells(next, action),
+        legalPrimaryTargetPieceIds: enumeratePrimaryPieceTargetIds(next, action),
+        isSinglePieceTargetAction: isSinglePieceTargetAction(next, action),
       };
       const beforeSkillUseResult = continuation.skipBeforeSkillUse
         ? { success: true, messages: [], blocked: false } as any
-        : globalTriggerSystem.checkTriggers(next, skillUseContext);
+        : getActiveTriggerSystem().checkTriggers(next, skillUseContext);
+      if (beforeSkillUseResult.targetReplacementPieceId) {
+        skillUseContext.targetPiece = next.pieces.find(candidate => (
+          candidate.instanceId === beforeSkillUseResult.targetReplacementPieceId && candidate.currentHp > 0
+        ))
+        if (!skillUseContext.targetPiece) throw new BattleRuleError('Replacement skill target is unavailable')
+      }
 
       // 触发器可能修改了技能ID，使用修改后的值
       const finalSkillId = skillUseContext.skillId;
 
-      let skillDef = next.skillsById[finalSkillId]
-
-      // 如果技能定义找不到，使用默认技能定义
-      if (!skillDef) {
-        skillDef = {
-          id: finalSkillId,
-          name: finalSkillId,
-          description: "Default skill",
-          kind: "active",
-          type: "super",
-          cooldownTurns: 0,
-          maxCharges: 0,
-          chargeCost: 1,
-          powerMultiplier: 1,
-          code: "function executeSkill(context) { return { message: 'Skill executed', success: true } }",
-          range: "self",
-          requiresTarget: false,
-          actionPointCost: 2
-        }
-      }
+      const skillDef = getSkillDefinitionOrThrow(next, finalSkillId, piece.instanceId)
 
       // 检查行动点是否足够
       const playerMeta = getPlayerMeta(state, action.playerId)
@@ -2480,7 +3177,8 @@ function applyBattleActionInternal(
         }
         return { info: null, pos: null };
       };
-      const _t1 = buildTargetSlot(action.targetPieceId, action.targetX, action.targetY);
+      const finalTargetPieceId = skillUseContext.targetPiece?.instanceId || action.targetPieceId
+      const _t1 = buildTargetSlot(finalTargetPieceId, action.targetX, action.targetY);
       const _actAny = action as any;
       const _extraTargets: Array<{pieceId?: string; x?: number; y?: number}> = _actAny.extraTargets || [];
       const targets = [
@@ -2493,7 +3191,9 @@ function applyBattleActionInternal(
         target: _t1.info,
         targetPosition: _t1.pos,
         targets,
+        ruleRewrittenPrimaryTargetPieceId: beforeSkillUseResult.targetReplacementPieceId,
         selectedOption: _actAny.selectedOption,
+        reservedCells: skillUseContext.reservedCells,
         battle: next,
         skill: {
           id: skillDef.id,
@@ -2545,7 +3245,11 @@ function applyBattleActionInternal(
         // 效果已经在技能执行时直接应用，这里只需要处理返回的消息
         const pendingTarget = (result as any).pendingTargetSelection
         battleDebugLog('[STAGE1] skill result.pendingTargetSelection:', pendingTarget ? { playerId: pendingTarget.playerId, targetType: pendingTarget.targetType, hasEffectCode: !!pendingTarget.effectCode, effectCodeLen: pendingTarget.effectCode ? pendingTarget.effectCode.length : 0 } : null)
-        if (pendingTarget) {
+        const pendingCandidates = pendingTarget?.targetCandidates || pendingTarget?.candidates
+        const pendingMinimum = Number.isSafeInteger(pendingTarget?.minSelections)
+          ? Math.max(0, pendingTarget.minSelections)
+          : 1
+        if (pendingTarget && (!Array.isArray(pendingCandidates) || pendingCandidates.length >= pendingMinimum)) {
           next.pendingTargetSelection = {
             playerId: pendingTarget.playerId || action.playerId,
             ownerPlayerId: pendingTarget.playerId || action.playerId,
@@ -2556,8 +3260,8 @@ function applyBattleActionInternal(
             effectCode: pendingTarget.effectCode,
             payload: pendingTarget.payload,
             source: { type: 'skill', id: finalSkillId, pieceId: piece.instanceId },
-            candidates: pendingTarget.targetCandidates || pendingTarget.candidates,
-            fixedCandidates: Array.isArray(pendingTarget.targetCandidates || pendingTarget.candidates),
+            candidates: pendingCandidates,
+            fixedCandidates: Array.isArray(pendingCandidates),
             selectionMode: pendingTarget.selectionMode,
             minSelections: pendingTarget.minSelections,
             maxSelections: pendingTarget.maxSelections,
@@ -2583,14 +3287,16 @@ function applyBattleActionInternal(
       let skillMessage = `${pieceName}使用了${skillDef.name || finalSkillId}（充能技能，消耗${cost}点充能）`;
       
       // 如果有目标，添加目标信息
-      if (action.targetPieceId) {
-        const targetPiece = next.pieces.find(p => p.instanceId === action.targetPieceId);
-        if (targetPiece) {
-          const targetName = targetPiece.name || targetPiece.templateId;
-          skillMessage += `，目标是${targetName}`;
+      if (!skillDef.concealTargetInBattleLog) {
+        if (finalTargetPieceId) {
+          const targetPiece = next.pieces.find(p => p.instanceId === finalTargetPieceId);
+          if (targetPiece) {
+            const targetName = targetPiece.name || targetPiece.templateId;
+            skillMessage += `，目标是${targetName}`;
+          }
+        } else if (action.targetX !== undefined && action.targetY !== undefined) {
+          skillMessage += `，目标位置是(${action.targetX}, ${action.targetY})`;
         }
-      } else if (action.targetX !== undefined && action.targetY !== undefined) {
-        skillMessage += `，目标位置是(${action.targetX}, ${action.targetY})`;
       }
       
       // 添加技能执行结果消息
@@ -2613,7 +3319,7 @@ function applyBattleActionInternal(
       // 不再设置 hasUsedChargeSkill，允许一回合使用多个技能
 
       // 触发whenever规则（每一步行动后检测）
-      const wheneverResult = globalTriggerSystem.checkTriggers(next, {
+      const wheneverResult = getActiveTriggerSystem().checkTriggers(next, {
         type: "whenever",
         sourcePiece: piece,
         playerId: action.playerId,
@@ -2646,7 +3352,7 @@ function applyBattleActionInternal(
         throw new BattleRuleError("Only the current player can end the turn")
       }
 
-      const next = safeCloneBattleState(state)
+      const next = cloneBattleStateForEffectExecution(state)
 
       if (!continuation.skipEndTurnTrigger) {
       // 触发所有回合结束效果：一次调用，checkTriggers 内部自行迭代棋子规则、玩家规则、手牌 reactive 卡牌
@@ -2656,7 +3362,7 @@ function applyBattleActionInternal(
         turnNumber: next.turn.turnNumber,
         playerId: action.playerId
       }
-      const endTurnResult = globalTriggerSystem.checkTriggers(next, endTurnContext);
+      const endTurnResult = getActiveTriggerSystem().checkTriggers(next, endTurnContext);
 
       appendTriggerMessages(next, endTurnResult, action.playerId)
       if (setPendingInteraction(next, endTurnResult, endTurnContext, {
@@ -2666,7 +3372,7 @@ function applyBattleActionInternal(
       }
 
       // 触发whenever规则（每一步行动后检测）
-      const wheneverResult = globalTriggerSystem.checkTriggers(next, {
+      const wheneverResult = getActiveTriggerSystem().checkTriggers(next, {
         type: "whenever",
         playerId: action.playerId,
         turnNumber: next.turn.turnNumber
@@ -2689,6 +3395,10 @@ function applyBattleActionInternal(
           });
         });
       }
+
+      // This tag is scoped to the placement turn even when it was never used.
+      // Clear every storage location before handing authority to the next turn.
+      clearDeploymentFirstMoveFree(next)
 
       // 在回合结束阶段的最后时刻，处理当前玩家棋子的状态效果持续时间扣除和规则移除
       next.pieces.forEach(piece => {
@@ -2758,7 +3468,7 @@ function applyBattleActionInternal(
     }
 
     case "surrender": {
-      const next = safeCloneBattleState(state)
+      const next = cloneBattleStateForEffectExecution(state)
       if (next.players.length !== 2) {
         throw new BattleRuleError('Surrender requires exactly two battle players', 'INVALID_SURRENDER_PLAYER')
       }
@@ -2767,7 +3477,7 @@ function applyBattleActionInternal(
     }
 
     case "pendingOptionSelect": {
-      const next = safeCloneBattleState(state)
+      const next = cloneBattleStateForEffectExecution(state)
       const pending = next.pendingOptionSelection
       if (!pending) throw new BattleRuleError('[pendingOptionSelect] validated pending session disappeared')
       if (pending.transaction) {
@@ -2782,7 +3492,7 @@ function applyBattleActionInternal(
     }
 
     case "pendingTargetSelect": {
-      const next = safeCloneBattleState(state)
+      const next = cloneBattleStateForEffectExecution(state)
       const pending = next.pendingTargetSelection
       if (!pending) {
         throw new BattleRuleError('[pendingTargetSelect] validated pending session disappeared')
@@ -2841,7 +3551,7 @@ function applyBattleActionInternal(
       if (pending.effectCode) {
         let fn: any
         try {
-          const compileEffect = dynamicCodeRuntime.compileExpression<(math: Math, date: DateConstructor) => unknown>({
+          const compileEffect = getRuleDynamicCodeRuntime().compileExpression<(math: Math, date: DateConstructor) => unknown>({
             surface: 'pendingEffectCode', contentId: pending.selectionId || 'pending-target',
             contentVersion: String(pending.stateRevision ?? 0),
             code: '(function(Math, Date) { return (' + pending.effectCode + '); })', entry: 'serialized function(ctx)',
@@ -2864,7 +3574,7 @@ function applyBattleActionInternal(
             payload: pending.payload,
           }) || { success: true }
         } catch (execErr) {
-          if (isSuspendableActionPending(execErr)) throw execErr
+          if (isEffectChainPendingSignal(execErr)) throw execErr
           throw new BattleRuleError('[STAGE6] effectCode execution error: ' + (execErr instanceof Error ? execErr.message : String(execErr)))
         }
       }
@@ -2891,7 +3601,7 @@ function applyBattleActionInternal(
         throw new BattleRuleError("It is not this player's turn")
       }
 
-      const next = safeCloneBattleState(state)
+      const next = cloneBattleStateForEffectExecution(state)
       const playerMeta = getPlayerMeta(next, action.playerId)
 
       // 找到手牌
@@ -2900,8 +3610,14 @@ function applyBattleActionInternal(
       if (cardIdx === -1) throw new BattleRuleError("手牌中找不到该卡牌")
       const cardInstance = playerMeta.hand[cardIdx]
 
-      // 加载卡牌定义（先查文件，再查战局自定义卡）
-      const cardDef = loadCardById(cardInstance.cardId, true) ?? next.customCards?.[cardInstance.cardId] ?? null
+      // 权威链会对静态或自定义定义执行结构校验；detached 调用仍保留 soft-null。
+      const cardDef = loadCardForBattle(next, cardInstance.cardId, {
+        forceReload: true,
+        metadata: {
+          sourceId: cardInstance.instanceId,
+          skillId: cardInstance.cardId,
+        },
+      })
       if (!cardDef) throw new BattleRuleError(`卡牌定义找不到: ${cardInstance.cardId}`)
       if (cardDef.type !== 'active' && cardDef.type !== 'reactive') throw new BattleRuleError("该卡牌为被动卡，无法手动打出")
 
@@ -2921,7 +3637,7 @@ function applyBattleActionInternal(
       }
       const beforeCardPlayResult = continuation.skipBeforeCardPlay
         ? { success: true, messages: [], blocked: false } as TriggerResult
-        : globalTriggerSystem.checkTriggers(next, beforeCardPlayContext);
+        : getActiveTriggerSystem().checkTriggers(next, beforeCardPlayContext);
       assertNoUnhandledInteraction(beforeCardPlayResult, 'beforeCardPlay')
 
       // 检查是否有规则阻止了卡牌使用
@@ -3011,7 +3727,7 @@ function applyBattleActionInternal(
         cardId: cardInstance.cardId,
         cardInstanceId: cardInstance.instanceId,
       }
-      const afterCardPlayResult = globalTriggerSystem.checkTriggers(next, afterCardPlayContext)
+      const afterCardPlayResult = getActiveTriggerSystem().checkTriggers(next, afterCardPlayContext)
       assertNoUnhandledInteraction(afterCardPlayResult, 'afterCardPlay')
 
       // 处理触发效果的消息
@@ -3027,7 +3743,7 @@ function applyBattleActionInternal(
       }
 
       // 触发 whenever
-      const wheneverResult = globalTriggerSystem.checkTriggers(next, { type: "whenever", playerId: action.playerId })
+      const wheneverResult = getActiveTriggerSystem().checkTriggers(next, { type: "whenever", playerId: action.playerId })
       assertNoUnhandledInteraction(wheneverResult, 'whenever')
 
       return next
@@ -3064,11 +3780,19 @@ function createSuspendableActionTransaction(
   }
 }
 
+function applySuspendableChildAction(state: BattleState, action: BattleAction): BattleState {
+  return runSuspendableActionTransaction(
+    state,
+    state,
+    createSuspendableActionTransaction(state, action),
+  )
+}
+
 function transactionReplayState(
   state: BattleState,
   transaction: SuspendableActionTransaction,
 ): BattleState {
-  const replay = safeCloneBattleState(state)
+  const replay = cloneBattleStateForEffectExecution(state)
   replay.pendingOptionSelection = undefined
   replay.pendingTargetSelection = undefined
   replay.targetingRevision = transaction.baseTargetingRevision
@@ -3227,7 +3951,10 @@ function runSuspendableActionTransaction(
   const transactionRuntime = new SuspendableActionRuntime(runtimeAnswers)
   const outerRuleRuntime = getActiveRuleRuntime()
   const outerRuntimeSnapshot = outerRuleRuntime?.snapshot()
-  const triggerSnapshot = globalTriggerSystem.snapshotTransactionState()
+  const triggerSystem = getActiveTriggerSystem()
+  const triggerSnapshot = triggerSystem.snapshotTransactionState()
+  const activeEffectChain = getActiveEffectChain(replayState) ?? getActiveEffectChain(authorityState)
+  const effectChainSnapshot = activeEffectChain?.snapshot()
   let replayRuleRuntime = outerRuleRuntime
   if (transaction.runtimeCheckpoint) {
     replayRuleRuntime = new RuleRuntime({
@@ -3237,6 +3964,7 @@ function runSuspendableActionTransaction(
     })
     replayRuleRuntime.restore(transaction.runtimeCheckpoint.snapshot)
   }
+  const replayRuleRuntimeSnapshot = replayRuleRuntime?.snapshot()
   for (const answer of transaction.answers) {
     const bound = answer.input.timeoutRandomBound
     if (!replayRuleRuntime || !Number.isSafeInteger(bound) || Number(bound) <= 0) continue
@@ -3245,6 +3973,7 @@ function runSuspendableActionTransaction(
       Number(bound),
     )
   }
+  let rolledBackOnCancel = false
   const execute = () => withSuspendableActionRuntime(transactionRuntime, () => {
     let reduced = applyBattleActionInternal(replayState, replayActionEnvelope(transaction))
     const directPending = reduced.pendingOptionSelection
@@ -3307,6 +4036,7 @@ function runSuspendableActionTransaction(
       if (resolvedInput.cancelled) {
         if (directTarget.rollbackOnCancel) {
           transactionRuntime.assertReplayComplete()
+          rolledBackOnCancel = true
           return safeCloneBattleState(authorityState)
         }
         reduced.pendingTargetSelection = undefined
@@ -3349,6 +4079,11 @@ function runSuspendableActionTransaction(
       directTargetStage += 1
       directTarget = reduced.pendingTargetSelection
     }
+    // A content-authored catch block must not turn a suspended nested
+    // EffectBatch into a successful authoritative action. Re-raise any
+    // process-local chain signal while the suspendable transaction can still
+    // convert it into a root-prestate pending session.
+    activeEffectChain?.assertHealthy()
     transactionRuntime.assertReplayComplete()
     return reduced
   })
@@ -3356,22 +4091,47 @@ function runSuspendableActionTransaction(
     const reduced = replayRuleRuntime && replayRuleRuntime !== outerRuleRuntime
       ? withRuleRuntime(replayRuleRuntime, execute)
       : execute()
+    if (rolledBackOnCancel) {
+      if (outerRuleRuntime && outerRuntimeSnapshot) outerRuleRuntime.restore(outerRuntimeSnapshot)
+      if (replayRuleRuntime && replayRuleRuntimeSnapshot) {
+        replayRuleRuntime.restore(replayRuleRuntimeSnapshot)
+      }
+      triggerSystem.restoreTransactionState(triggerSnapshot)
+      if (activeEffectChain && effectChainSnapshot) activeEffectChain.restore(effectChainSnapshot)
+      return reduced
+    }
     if (outerRuleRuntime && replayRuleRuntime && replayRuleRuntime !== outerRuleRuntime) {
       outerRuleRuntime.restore(replayRuleRuntime.snapshot())
     }
     return reduced
   } catch (error) {
     if (outerRuleRuntime && outerRuntimeSnapshot) outerRuleRuntime.restore(outerRuntimeSnapshot)
-    globalTriggerSystem.restoreTransactionState(triggerSnapshot)
-    if (!isSuspendableActionPending(error)) throw error
+    if (replayRuleRuntime && replayRuleRuntimeSnapshot) {
+      replayRuleRuntime.restore(replayRuleRuntimeSnapshot)
+    }
+    triggerSystem.restoreTransactionState(triggerSnapshot)
+    let authoritativeError = error
+    try {
+      activeEffectChain?.assertHealthy()
+    } catch (chainSignal) {
+      // The first latched fatal/pending signal outranks any later value thrown
+      // by authored catch/finally code.
+      authoritativeError = chainSignal
+    }
+    if (!isEffectChainPendingSignal(authoritativeError)) throw authoritativeError
+    const pendingError = authoritativeError
+    activeEffectChain?.acknowledgePending(pendingError)
     const rootActionType = (transaction.rootAction as { type?: string } | undefined)?.type
+    // A timeout owns the complete forced progression, including deployment,
+    // summon, free-move skipping, end-turn and the next begin-turn chain.
+    // Never return an already-expired interactive session from that root action.
     const shouldAutoResolveTimeout = rootActionType === 'turnTimeout'
-      && error.key.eventType === 'endTurn'
     if (shouldAutoResolveTimeout) {
+      if (activeEffectChain && effectChainSnapshot) activeEffectChain.restore(effectChainSnapshot)
       let input: SuspendableInteractionInput
-      if (error.prompt.canCancel !== false) {
-        input = error.prompt.kind === 'option' && error.prompt.cancelValue !== undefined
-          ? { selectedOption: error.prompt.cancelValue }
+      if (pendingError.prompt.canCancel !== false) {
+        input = pendingError.prompt.kind === 'option' && pendingError.prompt.cancelValue !== undefined
+          ? { selectedOption: pendingError.prompt.cancelValue }
           : { cancelled: true }
       } else {
         if (!replayRuleRuntime) {
@@ -3380,17 +4140,24 @@ function runSuspendableActionTransaction(
             'PENDING_TIMEOUT_RUNTIME_REQUIRED',
           )
         }
-        if (error.prompt.kind === 'option') {
-          const candidates = uniqueSuspendableTimeoutCandidates(error.prompt.options || [])
+        if (pendingError.prompt.kind === 'option') {
+          const candidates = uniqueSuspendableTimeoutCandidates(
+            (pendingError.prompt.options || []).map(option => {
+              if (!option || typeof option !== 'object') return option
+              if ('value' in option) return (option as { value: unknown }).value
+              if ('id' in option) return (option as { id: unknown }).id
+              return option
+            }),
+          )
           if (candidates.length === 0) {
             throw new BattleRuleError(
               'Timed-out mandatory transaction option has no legal candidates',
               'PENDING_TIMEOUT_NO_CANDIDATES',
             )
           }
-          if (error.prompt.selectionMode === 'multi') {
-            const minSelections = Number.isSafeInteger(error.prompt.minSelections)
-              ? Math.max(0, error.prompt.minSelections!)
+          if (pendingError.prompt.selectionMode === 'multi') {
+            const minSelections = Number.isSafeInteger(pendingError.prompt.minSelections)
+              ? Math.max(0, pendingError.prompt.minSelections!)
               : 1
             if (candidates.length < minSelections) {
               throw new BattleRuleError(
@@ -3407,12 +4174,18 @@ function runSuspendableActionTransaction(
             input = { selectedOption: candidates[index], timeoutRandomBound: candidates.length }
           }
         } else {
-          input = mandatoryTimeoutTargetInput(authorityState, transaction, error.key, error.prompt, replayRuleRuntime)
+          input = mandatoryTimeoutTargetInput(
+            authorityState,
+            transaction,
+            pendingError.key,
+            pendingError.prompt,
+            replayRuleRuntime,
+          )
         }
       }
       const resumed = {
         ...transaction,
-        answers: [...transaction.answers, { key: error.key, input }],
+        answers: [...transaction.answers, { key: pendingError.key, input }],
         currentInteraction: undefined,
       }
       return runSuspendableActionTransaction(
@@ -3422,8 +4195,8 @@ function runSuspendableActionTransaction(
       )
     }
     return setSuspendableTransactionPending(authorityState, transaction, {
-      key: error.key,
-      prompt: error.prompt,
+      key: pendingError.key,
+      prompt: pendingError.prompt,
     })
   }
 }
@@ -3472,17 +4245,32 @@ export function applyBattleAction(
   action: BattleAction,
 ): BattleState {
   assertBattleNotTerminal(state)
+  const activeEffectChain = getActiveEffectChain(state)
   const actionIndex = Array.isArray(state.extensions?.debugBattle?.actionLog)
     ? state.extensions.debugBattle.actionLog.length
     : 0
   const hasPending = !!state.pendingOptionSelection || !!state.pendingTargetSelection
-  const reduced = hasPending
-    ? applyBattleActionInternal(state, action)
-    : runSuspendableActionTransaction(
-        state,
-        state,
-        createSuspendableActionTransaction(state, action),
-      )
+  let reduced: BattleState
+  try {
+    reduced = hasPending
+      ? applyBattleActionInternal(state, action)
+      : runSuspendableActionTransaction(
+          state,
+          state,
+          createSuspendableActionTransaction(state, action),
+        )
+  } catch (error) {
+    let authoritativeError = error
+    try {
+      activeEffectChain?.assertHealthy()
+    } catch (chainSignal) {
+      // Legacy/JSON pending sessions bypass the suspendable transaction
+      // catch. Preserve the same first-signal-wins rule at their shared
+      // reducer boundary so authored catch/finally code cannot mask it.
+      authoritativeError = chainSignal
+    }
+    throw authoritativeError
+  }
   const advancesTargetingRevision = !isTurnTimerSystemAction(action)
     || action.type === 'turnTimeout'
   let next = advancesTargetingRevision
@@ -3493,7 +4281,616 @@ export function applyBattleAction(
     next = { ...next, pendingOptionSelection: finalizePendingOptionSession(next.pendingOptionSelection, revision) }
   }
   finalizeBattleTerminal(next, action, { actionIndex })
+  if (activeEffectChain) uninstallEffectChain(next, activeEffectChain)
   return next
+}
+
+export type TemplateSummonStatus = Readonly<Record<string, unknown>>
+
+export interface TemplateSummonSource {
+  id: string
+  name?: string
+  rules?: readonly unknown[]
+  initialStatusTags?: readonly TemplateSummonStatus[]
+  statusTags?: readonly TemplateSummonStatus[]
+}
+
+export interface TemplateSummonBatchDependencies<
+  TTemplate extends TemplateSummonSource = TemplateSummonSource,
+> {
+  getPieceById: (id: string) => TTemplate | null | undefined
+  createPieceInstance: (
+    template: TTemplate,
+    ownerPlayerId: string,
+    faction: TemplateSummonSpec['faction'],
+    x: number,
+    y: number,
+    index: number,
+  ) => PieceInstance
+}
+
+export interface TemplateSummonBatchMetadata {
+  batchId: string
+  chainId: string
+  parentBatchId?: string
+  depth: number
+  enqueueSequence?: number
+}
+
+export interface TemplateSummonItemResult extends TemplateSummonBatchMetadata {
+  success: boolean
+  inputIndex: number
+  piece?: PieceInstance
+  message?: string
+  blocked?: boolean
+}
+
+export interface TemplateSummonBatchResult extends TemplateSummonBatchMetadata {
+  success: boolean
+  pieces: PieceInstance[]
+  results: TemplateSummonItemResult[]
+  message?: string
+  blocked?: boolean
+}
+
+export interface ResolveTemplateSummonBatchOptions {
+  blockedPolicy?: 'fatal' | 'return'
+}
+
+type IndexedTemplateSummon<TTemplate extends TemplateSummonSource> = {
+  inputIndex: number
+  spec: TemplateSummonSpec
+  template: TTemplate
+}
+
+type PreparedTemplateSummon<TTemplate extends TemplateSummonSource> = IndexedTemplateSummon<TTemplate> & {
+  piece: PieceInstance
+  finalX: number
+  finalY: number
+}
+
+function templateSummonMetadata(
+  context: EffectBatchContext<'summon'>,
+): TemplateSummonBatchMetadata {
+  return {
+    batchId: context.batchId,
+    chainId: context.chainId,
+    parentBatchId: context.parentBatchId,
+    depth: context.depth,
+    enqueueSequence: context.enqueueSequence,
+  }
+}
+
+function failedTemplateSummonBatch(
+  context: EffectBatchContext<'summon'>,
+  inputCount: number,
+  message: string,
+  blocked = false,
+): TemplateSummonBatchResult {
+  const metadata = templateSummonMetadata(context)
+  return {
+    success: false,
+    pieces: [],
+    results: Array.from({ length: inputCount }, (_, inputIndex) => ({
+      success: false,
+      inputIndex,
+      message,
+      blocked,
+      ...metadata,
+    })),
+    message,
+    blocked,
+    ...metadata,
+  }
+}
+
+function templateSummonFatal(
+  chain: EffectChain,
+  context: EffectBatchContext<'summon'>,
+  request: SummonRequest,
+  message: string,
+  cause?: unknown,
+): EffectChainFatalError {
+  return new EffectChainFatalError(
+    'RVB_EFFECT_CHAIN_STATE_INVALID',
+    message,
+    {
+      actionId: context.actionId,
+      chainId: context.chainId,
+      batchId: context.batchId,
+      parentBatchId: context.parentBatchId,
+      kind: 'summon',
+      depth: context.depth,
+      enqueueSequence: context.enqueueSequence,
+      originStage: context.originStage,
+      processed: chain.processedBatches,
+      limit: chain.limits.maxBatches,
+      turn: context.turn,
+      rootSeed: context.rootSeed,
+      sourceId: request.sourceId,
+      skillId: request.skillId,
+      detached: chain.detached,
+      budget: 'state',
+    },
+    cause,
+  )
+}
+function compareSummonText(left: string, right: string): number {
+  if (left < right) return -1
+  if (left > right) return 1
+  return 0
+}
+
+
+interface BattleMutationCheckpoint {
+  readonly snapshot: BattleState
+  readonly references: ReadonlyMap<string, object>
+}
+
+function checkpointPath(parent: string, key: string | number): string {
+  return parent + '/' + String(key).replace(/~/g, '~0').replace(/\//g, '~1')
+}
+
+function captureBattleReferences(
+  value: unknown,
+  path: string,
+  references: Map<string, object>,
+): void {
+  if (!value || typeof value !== 'object') return
+  references.set(path, value)
+  if (Array.isArray(value)) {
+    value.forEach((entry, index) => captureBattleReferences(
+      entry,
+      checkpointPath(path, index),
+      references,
+    ))
+    return
+  }
+  for (const [key, entry] of Object.entries(value)) {
+    captureBattleReferences(entry, checkpointPath(path, key), references)
+  }
+}
+
+function captureBattleMutationCheckpoint(battle: BattleState): BattleMutationCheckpoint {
+  const references = new Map<string, object>()
+  captureBattleReferences(battle, '$', references)
+  return {
+    snapshot: safeCloneBattleState(battle),
+    references,
+  }
+}
+
+function restoreCheckpointValue(
+  snapshot: unknown,
+  path: string,
+  references: ReadonlyMap<string, object>,
+): unknown {
+  if (!snapshot || typeof snapshot !== 'object') return snapshot
+  if (Array.isArray(snapshot)) {
+    const referenced = references.get(path)
+    const target = Array.isArray(referenced) ? referenced : []
+    snapshot.forEach((entry, index) => {
+      target[index] = restoreCheckpointValue(entry, checkpointPath(path, index), references)
+    })
+    target.length = snapshot.length
+    return target
+  }
+
+  const referenced = references.get(path)
+  const target = referenced && !Array.isArray(referenced)
+    ? referenced as Record<string, unknown>
+    : {}
+  const source = snapshot as Record<string, unknown>
+  for (const key of Object.keys(target)) {
+    if (!Object.prototype.hasOwnProperty.call(source, key)) delete target[key]
+  }
+  for (const [key, entry] of Object.entries(source)) {
+    target[key] = restoreCheckpointValue(entry, checkpointPath(path, key), references)
+  }
+  return target
+}
+
+function restoreBattleMutationCheckpoint(
+  battle: BattleState,
+  checkpoint: BattleMutationCheckpoint,
+): void {
+  const restored = restoreCheckpointValue(checkpoint.snapshot, '$', checkpoint.references)
+  if (restored !== battle) {
+    throw new BattleRuleError(
+      'Battle mutation checkpoint lost the root object identity',
+      'RVB_EFFECT_CHAIN_STATE_INVALID',
+    )
+  }
+}
+
+function compareTemplateSummons(
+  left: { inputIndex: number; spec: TemplateSummonSpec },
+  right: { inputIndex: number; spec: TemplateSummonSpec },
+): number {
+  return compareSummonText(left.spec.templateId, right.spec.templateId)
+    || compareSummonText(left.spec.ownerPlayerId, right.spec.ownerPlayerId)
+    || compareSummonText(left.spec.faction, right.spec.faction)
+    || left.spec.x - right.spec.x
+    || left.spec.y - right.spec.y
+    || (left.spec.index ?? 1) - (right.spec.index ?? 1)
+    || left.inputIndex - right.inputIndex
+}
+
+function templateSummonRequestKey(spec: TemplateSummonSpec): string {
+  return JSON.stringify([
+    spec.templateId,
+    spec.ownerPlayerId,
+    spec.faction,
+    spec.x,
+    spec.y,
+    spec.index ?? 1,
+  ])
+}
+
+function summonPositionKey(x: number, y: number): string {
+  return String(x) + ':' + String(y)
+}
+
+function validateSummonPosition(
+  battle: BattleState,
+  x: number,
+  y: number,
+  reserved: Set<string>,
+  fatal: (message: string) => never,
+): void {
+  if (!Number.isSafeInteger(x) || !Number.isSafeInteger(y)) {
+    fatal('Summon position must use finite integer coordinates')
+  }
+  if (x < 0 || y < 0 || x >= battle.map.width || y >= battle.map.height) {
+    fatal('Summon position is outside the battle map bounds')
+  }
+  const tile = battle.map.tiles.find(candidate => candidate.x === x && candidate.y === y)
+  if (!tile) fatal('Summon position does not exist on the battle map')
+  if (tile.props.walkable !== true) fatal('Summon position is not walkable')
+  if (battle.pieces.some(piece => piece.currentHp > 0 && piece.x === x && piece.y === y)) {
+    fatal('Summon position is occupied by an active piece')
+  }
+  const key = summonPositionKey(x, y)
+  if (reserved.has(key)) fatal('Summon position is already reserved by this batch')
+  reserved.add(key)
+}
+
+function cloneTemplateStatus(status: TemplateSummonStatus): PieceStatusTag {
+  return JSON.parse(JSON.stringify(status)) as PieceStatusTag
+}
+
+function prepareTemplatePiece<TTemplate extends TemplateSummonSource>(
+  battle: BattleState,
+  entry: IndexedTemplateSummon<TTemplate>,
+  dependencies: TemplateSummonBatchDependencies<TTemplate>,
+  fatal: (message: string, cause?: unknown) => never,
+): PreparedTemplateSummon<TTemplate> {
+  const { spec, template } = entry
+  let piece: PieceInstance
+  try {
+    piece = dependencies.createPieceInstance(
+      template,
+      spec.ownerPlayerId,
+      spec.faction,
+      spec.x,
+      spec.y,
+      spec.index ?? 1,
+    )
+  } catch (error) {
+    fatal('Template summon factory failed for ' + spec.templateId, error)
+  }
+
+  if (!piece || typeof piece.instanceId !== 'string' || piece.instanceId.length === 0) {
+    fatal('Template summon factory returned a piece without a stable instanceId')
+  }
+
+  piece.templateId = spec.templateId
+  piece.ownerPlayerId = spec.ownerPlayerId
+  piece.faction = spec.faction
+  piece.x = spec.x
+  piece.y = spec.y
+  piece.isCore = false
+  piece.skills = Array.isArray(piece.skills) ? piece.skills : []
+  piece.buffs = Array.isArray(piece.buffs) ? piece.buffs : []
+  piece.debuffs = Array.isArray(piece.debuffs) ? piece.debuffs : []
+  piece.ruleTags = Array.isArray(piece.ruleTags) ? piece.ruleTags : []
+  piece.statusTags = Array.isArray(piece.statusTags) ? piece.statusTags : []
+  piece.rules = Array.isArray(piece.rules) ? piece.rules : []
+
+  const templateStatuses = Array.isArray(template.initialStatusTags)
+    ? template.initialStatusTags
+    : Array.isArray(template.statusTags)
+      ? template.statusTags
+      : []
+  const existingStatusKeys = new Set(piece.statusTags.map(status => (
+    String(status?.id ?? '') + ':' + String(status?.type ?? '')
+  )))
+  for (const status of templateStatuses) {
+    const key = String(status?.id ?? '') + ':' + String(status?.type ?? '')
+    if (!existingStatusKeys.has(key)) {
+      piece.statusTags.push(cloneTemplateStatus(status))
+      existingStatusKeys.add(key)
+    }
+  }
+
+  for (const ruleId of Array.isArray(template.rules) ? template.rules : []) {
+    if (typeof ruleId !== 'string' || ruleId.length === 0) {
+      fatal('Template ' + spec.templateId + ' declares an invalid rule identifier')
+    }
+    let loadedRule: TriggerRule | null = null
+    try {
+      loadedRule = loadRuleById(ruleId, FORCE_RULE_RELOAD)
+    } catch (error) {
+      fatal('Template rule ' + ruleId + ' failed to load', error)
+    }
+    if (!loadedRule) fatal('Template rule ' + ruleId + ' could not be loaded')
+    const existingIndex = piece.rules.findIndex(rule => rule?.id === ruleId)
+    if (existingIndex >= 0) piece.rules[existingIndex] = loadedRule
+    else piece.rules.push(loadedRule)
+  }
+
+  hydratePreparedPieceDefinitions(battle, piece, fatal)
+
+  return {
+    ...entry,
+    piece,
+    finalX: spec.x,
+    finalY: spec.y,
+  }
+}
+
+function summonTriggerContext(
+  battle: BattleState,
+  request: SummonRequest,
+  context: EffectBatchContext<'summon'>,
+  chain: EffectChain,
+  entry: PreparedTemplateSummon<TemplateSummonSource>,
+  type: 'beforePieceSummoned' | 'afterPieceSummoned',
+): TriggerContext {
+  const sourcePiece = request.sourceId
+    ? battle.pieces.find(piece => piece.instanceId === request.sourceId)
+    : undefined
+  return {
+    type,
+    playerId: entry.spec.ownerPlayerId,
+    sourcePiece: type === 'afterPieceSummoned' ? entry.piece : sourcePiece,
+    skillId: request.skillId,
+    targetPosition: type === 'beforePieceSummoned'
+      ? { x: entry.finalX, y: entry.finalY }
+      : undefined,
+    targetX: type === 'beforePieceSummoned' ? entry.finalX : undefined,
+    targetY: type === 'beforePieceSummoned' ? entry.finalY : undefined,
+    pieceTemplateId: entry.spec.templateId,
+    faction: entry.spec.faction,
+    damageQueue: createDamageQueueWriter(chain),
+    healQueue: createHealQueueWriter(chain),
+    effectChainId: context.chainId,
+    effectBatchId: context.batchId,
+    parentEffectBatchId: context.parentBatchId,
+    effectBatchKind: 'summon',
+    effectDepth: context.depth,
+    effectEnqueueSequence: context.enqueueSequence,
+    originStage: context.originStage,
+  }
+}
+
+/**
+ * RED-139 internal:template SummonBatch handler.
+ *
+ * It is deliberately dependency-injected so the shared EffectChain scheduler can
+ * call it without exposing arbitrary PieceInstance injection to SkillCode.
+ */
+export function resolveTemplateSummonBatch<TTemplate extends TemplateSummonSource>(
+  battle: BattleState,
+  request: SummonRequest,
+  context: EffectBatchContext<'summon'>,
+  chain: EffectChain,
+  dependencies: TemplateSummonBatchDependencies<TTemplate>,
+  options: ResolveTemplateSummonBatchOptions = {},
+): TemplateSummonBatchResult {
+  const chainSnapshot = chain.snapshot()
+  const battleCheckpoint = captureBattleMutationCheckpoint(battle)
+  const triggerSystem = getActiveTriggerSystem()
+  const triggerSnapshot = triggerSystem.snapshotTransactionState()
+  const ruleRuntime = getActiveRuleRuntime()
+  const ruleRuntimeSnapshot = ruleRuntime?.snapshot()
+  const restoreTransaction = (): void => {
+    restoreBattleMutationCheckpoint(battle, battleCheckpoint)
+    triggerSystem.restoreTransactionState(triggerSnapshot)
+    if (ruleRuntime && ruleRuntimeSnapshot) ruleRuntime.restore(ruleRuntimeSnapshot)
+  }
+  const fatal = (message: string, cause?: unknown): never => {
+    throw templateSummonFatal(chain, context, request, message, cause)
+  }
+
+  try {
+    if (request.contentId !== 'internal:template') {
+      fatal('Template summon handler rejects contentId ' + String(request.contentId))
+    }
+    if (!Array.isArray(request.summons) || request.summons.length === 0) {
+      fatal('Template SummonBatch must contain at least one request')
+    }
+    if (request.summons.some(summon => summon.recipe !== 'template')) {
+      fatal('Template summon handler accepts only the template recipe')
+    }
+
+    const indexed = (request.summons as readonly TemplateSummonSpec[])
+      .map((spec, inputIndex) => ({ spec, inputIndex }))
+      .sort(compareTemplateSummons)
+    const requestKeys = new Set<string>()
+    for (const entry of indexed) {
+      const key = templateSummonRequestKey(entry.spec)
+      if (requestKeys.has(key)) fatal('Duplicate template summon request')
+      requestKeys.add(key)
+    }
+
+    const initialReservations = new Set<string>()
+    const validated: IndexedTemplateSummon<TTemplate>[] = indexed.map(entry => {
+      const { spec } = entry
+      const owner = battle.players.find(player => player.playerId === spec.ownerPlayerId)
+      if (!owner) fatal('Summon owner player was not found: ' + spec.ownerPlayerId)
+      const ownerFaction = (owner as unknown as { faction?: unknown }).faction
+      if (typeof ownerFaction === 'string' && ownerFaction !== spec.faction) {
+        fatal('Summon faction does not match owner player')
+      }
+      if (!Number.isSafeInteger(spec.index ?? 1) || (spec.index ?? 1) < 1) {
+        fatal('Summon index must be a positive integer')
+      }
+      const template = dependencies.getPieceById(spec.templateId)
+      const resolvedTemplate = template ?? fatal('Piece template was not found: ' + spec.templateId)
+      validateSummonPosition(battle, spec.x, spec.y, initialReservations, fatal)
+      return { ...entry, template: resolvedTemplate }
+    })
+
+    const prepared = validated.map(entry => prepareTemplatePiece(battle, entry, dependencies, fatal))
+    const existingIds = new Set([
+      ...battle.pieces.map(piece => piece.instanceId),
+      ...(battle.graveyard ?? []).map(piece => piece.instanceId),
+    ])
+    for (const entry of prepared) {
+      if (existingIds.has(entry.piece.instanceId)) {
+        fatal('Summon instanceId is not unique: ' + entry.piece.instanceId)
+      }
+      existingIds.add(entry.piece.instanceId)
+    }
+
+    const stablePrepared = prepared.slice().sort((left, right) => (
+      compareSummonText(left.piece.instanceId, right.piece.instanceId)
+    ))
+
+    for (const entry of stablePrepared) {
+      const beforePieceSummonedContext = {
+        ...summonTriggerContext(
+          battle,
+          request,
+          context,
+          chain,
+          entry,
+          'beforePieceSummoned',
+        ),
+        type: 'beforePieceSummoned' as const,
+      }
+      const beforeResult = triggerSystem.checkTriggers(battle, beforePieceSummonedContext)
+      if (beforeResult.needsOptionSelection || beforeResult.needsTargetSelection) {
+        throw new BattleRuleError(
+          '[beforePieceSummoned] interactive trigger is unsupported at this call site',
+          'INTERACTIVE_TRIGGER_UNSUPPORTED',
+        )
+      }
+      if (beforeResult.blocked) {
+        const message = beforeResult.messages[0] ?? 'Summon was blocked'
+        if (options.blockedPolicy === 'return') {
+          restoreTransaction()
+          chain.restore(chainSnapshot)
+          return failedTemplateSummonBatch(context, request.summons.length, message, true)
+        }
+        fatal('Queued template summon was blocked: ' + message)
+      }
+
+      const finalPosition = resolveSummonRedirectPosition(
+        beforePieceSummonedContext,
+        fatal,
+      )
+      entry.finalX = finalPosition.x
+      entry.finalY = finalPosition.y
+      entry.piece.x = finalPosition.x
+      entry.piece.y = finalPosition.y
+    }
+
+    const finalReservations = new Set<string>()
+    for (const entry of stablePrepared) {
+      validateSummonPosition(
+        battle,
+        entry.finalX,
+        entry.finalY,
+        finalReservations,
+        fatal,
+      )
+    }
+
+    battle.pieces.push(...stablePrepared.map(entry => entry.piece))
+
+    for (const entry of stablePrepared) {
+      const afterResult = triggerSystem.checkTriggers(
+        battle,
+        summonTriggerContext(
+          battle,
+          request,
+          context,
+          chain,
+          entry,
+          'afterPieceSummoned',
+        ),
+      )
+      if (afterResult.needsOptionSelection || afterResult.needsTargetSelection) {
+        throw new BattleRuleError(
+          '[afterPieceSummoned] interactive trigger is unsupported at this call site',
+          'INTERACTIVE_TRIGGER_UNSUPPORTED',
+        )
+      }
+      for (const message of afterResult.messages) {
+        if (!battle.actions) battle.actions = []
+        battle.actions.push({
+          type: 'triggerEffect',
+          playerId: entry.spec.ownerPlayerId,
+          turn: battle.turn.turnNumber,
+          payload: { message },
+        })
+      }
+    }
+
+    const metadata = templateSummonMetadata(context)
+    const results = new Array<TemplateSummonItemResult>(prepared.length)
+    for (const entry of prepared) {
+      results[entry.inputIndex] = {
+        success: true,
+        inputIndex: entry.inputIndex,
+        piece: entry.piece,
+        message: entry.piece.name + ' \u88ab\u53ec\u5524\u5230 ('
+          + String(entry.piece.x) + ', ' + String(entry.piece.y) + ')',
+        ...metadata,
+      }
+    }
+    return {
+      success: true,
+      pieces: stablePrepared.map(entry => entry.piece),
+      results,
+      message: results.length === 1
+        ? results[0].message
+        : String(results.length) + ' pieces were summoned',
+      ...metadata,
+    }
+  } catch (error) {
+    restoreTransaction()
+    if (isEffectChainPendingSignal(error)) throw error
+    if (isEffectChainFatalError(error)) throw error
+    throw templateSummonFatal(
+      chain,
+      context,
+      request,
+      'Template SummonBatch failed',
+      error,
+    )
+  }
+}
+
+export function createTemplateSummonBatchHandler<TTemplate extends TemplateSummonSource>(
+  battle: BattleState,
+  dependencies: TemplateSummonBatchDependencies<TTemplate>,
+  options: ResolveTemplateSummonBatchOptions = {},
+): (
+  request: SummonRequest,
+  context: EffectBatchContext<'summon'>,
+  chain: EffectChain,
+) => TemplateSummonBatchResult {
+  return (request, context, chain) => resolveTemplateSummonBatch(
+    battle,
+    request,
+    context,
+    chain,
+    dependencies,
+    options,
+  )
 }
 
 // 召唤棋子接口
@@ -3518,84 +4915,146 @@ export interface SummonPieceResult {
  * 召唤棋子到棋盘
  * 触发 beforePieceSummoned 和 afterPieceSummoned 触发器
  */
-export function summonPiece(
+type SummonPieceFactory<TTemplate extends TemplateSummonSource> = (
+  template: TTemplate,
+  ownerPlayerId: string,
+  faction: "red" | "blue",
+  x: number,
+  y: number,
+  index: number,
+) => PieceInstance
+
+function failedDetachedTemplateSummon(
+  error: EffectChainFatalError,
+  inputCount: number,
+): TemplateSummonBatchResult {
+  const errorContext = error.context
+  const metadata: TemplateSummonBatchMetadata = {
+    batchId: errorContext.batchId ?? errorContext.chainId + ':summon:failed',
+    chainId: errorContext.chainId,
+    parentBatchId: errorContext.parentBatchId,
+    depth: errorContext.depth ?? 0,
+    enqueueSequence: errorContext.enqueueSequence,
+  }
+  return {
+    success: false,
+    pieces: [],
+    results: Array.from({ length: inputCount }, (_, inputIndex) => ({
+      success: false,
+      inputIndex,
+      message: error.message,
+      ...metadata,
+    })),
+    message: error.message,
+    ...metadata,
+  }
+}
+
+function executeTemplateSummonFacade<TTemplate extends TemplateSummonSource>(
+  battle: BattleState,
+  options: readonly SummonPieceOptions[],
+  getPieceById: (id: string) => TTemplate | null | undefined,
+  createPieceInstance: SummonPieceFactory<TTemplate>,
+): TemplateSummonBatchResult {
+  const activeChain = getActiveEffectChain(battle)
+  const ruleRuntime = getActiveRuleRuntime()
+  const chain = activeChain ?? createEffectChain({
+    actionId: 'detached:template-summon',
+    chainId: 'detached:template-summon',
+    turn: battle.turn.turnNumber,
+    rootSeed: ruleRuntime?.rootSeed ?? null,
+    detached: true,
+  })
+  chain.assertFacadeAllowed('summon')
+
+  const cleanup = activeChain ? undefined : installEffectChain(battle, chain)
+  try {
+    const summons: TemplateSummonSpec[] = options.map(option => ({
+      recipe: 'template',
+      templateId: option.templateId,
+      ownerPlayerId: option.ownerPlayerId,
+      faction: option.faction,
+      x: option.x,
+      y: option.y,
+      index: option.index,
+    }))
+    createSummonQueueWriter(chain, 'internal:template').push({ summons })
+    const dependencies: TemplateSummonBatchDependencies<TTemplate> = {
+      getPieceById,
+      createPieceInstance: (template, ownerPlayerId, faction, x, y, index) => (
+        createPieceInstance(
+          template,
+          ownerPlayerId,
+          faction as "red" | "blue",
+          x,
+          y,
+          index,
+        )
+      ),
+    }
+    const executions = drainBattleEffectChain(
+      battle,
+      chain,
+      createTemplateSummonBatchHandler(
+        battle,
+        dependencies,
+        { blockedPolicy: 'return' },
+      ),
+    )
+    const execution = [...executions].reverse().find(candidate => (
+      candidate.kind === 'summon'
+      && candidate.request.kind === 'summon'
+      && candidate.request.contentId === 'internal:template'
+    ))
+    if (!execution) {
+      throw new BattleRuleError(
+        'Template summon facade did not receive a SummonBatch result',
+        'RVB_EFFECT_CHAIN_STATE_INVALID',
+      )
+    }
+    return execution.result as TemplateSummonBatchResult
+  } catch (error) {
+    if (chain.detached && isEffectChainFatalError(error)) {
+      return failedDetachedTemplateSummon(error, options.length)
+    }
+    throw error
+  } finally {
+    cleanup?.()
+  }
+}
+
+export function summonPiece<TTemplate extends TemplateSummonSource>(
   battle: BattleState,
   options: SummonPieceOptions,
-  getPieceById: (id: string) => any,
-  createPieceInstance: (template: any, ownerPlayerId: string, faction: "red" | "blue", x: number, y: number, index: number) => PieceInstance
-): SummonPieceResult {
-  const { templateId, faction, ownerPlayerId, x, y, index = 1 } = options
+  getPieceById: (id: string) => TTemplate | null | undefined,
+  createPieceInstance: SummonPieceFactory<TTemplate>,
+): SummonPieceResult
+export function summonPiece<TTemplate extends TemplateSummonSource>(
+  battle: BattleState,
+  options: readonly SummonPieceOptions[],
+  getPieceById: (id: string) => TTemplate | null | undefined,
+  createPieceInstance: SummonPieceFactory<TTemplate>,
+): TemplateSummonBatchResult
+export function summonPiece<TTemplate extends TemplateSummonSource>(
+  battle: BattleState,
+  options: SummonPieceOptions | readonly SummonPieceOptions[],
+  getPieceById: (id: string) => TTemplate | null | undefined,
+  createPieceInstance: SummonPieceFactory<TTemplate>,
+): SummonPieceResult | TemplateSummonBatchResult {
+  const input = Array.isArray(options) ? options : [options]
+  const batch = executeTemplateSummonFacade(
+    battle,
+    input as readonly SummonPieceOptions[],
+    getPieceById,
+    createPieceInstance,
+  )
+  if (Array.isArray(options)) return batch
 
-  // 获取棋子模板
-  const template = getPieceById(templateId)
-  if (!template) {
-    return { success: false, message: `棋子模板未找到: ${templateId}` }
-  }
-
-  // 触发召唤前触发器
-  const beforeSummonResult = globalTriggerSystem.checkTriggers(battle, {
-    type: "beforePieceSummoned",
-    playerId: ownerPlayerId,
-    targetPosition: { x, y },
-    pieceTemplateId: templateId,
-    faction
-  })
-  if (beforeSummonResult.needsOptionSelection || beforeSummonResult.needsTargetSelection) {
-    throw new BattleRuleError('[beforePieceSummoned] interactive trigger is unsupported at this call site', 'INTERACTIVE_TRIGGER_UNSUPPORTED')
-  }
-
-  if (beforeSummonResult.blocked) {
-    return { success: false, message: "召唤被阻止", blocked: true }
-  }
-
-  // 创建棋子实例
-  const newPiece = createPieceInstance(template, ownerPlayerId, faction, x, y, index)
-  newPiece.isCore = false
-
-  // 将棋子添加到棋盘
-  battle.pieces.push(newPiece)
-
-  // 将棋子的规则加载到全局触发器系统
-  if (template.rules && Array.isArray(template.rules)) {
-    template.rules.forEach((ruleId: string) => {
-      const rule = loadRuleById(ruleId, FORCE_RULE_RELOAD)
-      if (rule) {
-        if (!newPiece.rules) newPiece.rules = []
-        if (!newPiece.rules.some((r: any) => r.id === rule.id)) {
-          newPiece.rules.push(rule)
-        }
-      }
-    })
-  }
-
-  // 触发召唤后触发器
-  const afterSummonResult = globalTriggerSystem.checkTriggers(battle, {
-    type: "afterPieceSummoned",
-    playerId: ownerPlayerId,
-    sourcePiece: newPiece,
-    pieceTemplateId: templateId,
-    faction
-  })
-  if (afterSummonResult.needsOptionSelection || afterSummonResult.needsTargetSelection) {
-    throw new BattleRuleError('[afterPieceSummoned] interactive trigger is unsupported at this call site', 'INTERACTIVE_TRIGGER_UNSUPPORTED')
-  }
-
-  // 处理触发效果的消息
-  if (afterSummonResult.success && afterSummonResult.messages.length > 0) {
-    afterSummonResult.messages.forEach(message => {
-      if (!battle.actions) battle.actions = []
-      battle.actions.push({
-        type: "triggerEffect",
-        playerId: ownerPlayerId,
-        turn: battle.turn.turnNumber,
-        payload: { message }
-      })
-    })
-  }
-
+  const first = batch.results[0]
   return {
-    success: true,
-    piece: newPiece,
-    message: `${newPiece.name} 被召唤到 (${x}, ${y})`
+    success: first?.success ?? false,
+    piece: first?.piece,
+    message: first?.message ?? batch.message,
+    blocked: first?.blocked ?? batch.blocked,
   }
 }

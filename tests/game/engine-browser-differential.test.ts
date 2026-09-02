@@ -2,6 +2,7 @@
 import { readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { resolve } from 'node:path'
+import { TextDecoder, TextEncoder } from 'node:util'
 import { runInNewContext } from 'node:vm'
 
 import { describe, expect, it, vi } from 'vitest'
@@ -27,22 +28,32 @@ vi.mock('@/lib/game/skill-repository', () => ({
 }))
 
 import { mulberry32, setRng } from '@/lib/game/rng'
+import {
+  hashBattleState,
+  recordBattleInitialization,
+  runBattleAction,
+} from '@/lib/game/battle-runner'
+import { RuleRuntime } from '@/lib/game/rule-runtime'
 import type { SkillDefinition } from '@/lib/game/skills'
+import { prepareAction } from '@/lib/game/targeting'
 import type { TargetRef } from '@/lib/game/targeting'
 import { applyBattleAction } from '@/lib/game/turn'
-import type { BattleAction } from '@/lib/game/turn'
+import type { BattleAction, BattleState } from '@/lib/game/turn'
 import { makePiece, makeState } from '../helpers/minimal-state'
+import { pinTestBattleState } from './profile-test-identity'
 
 const FIXTURE_NAME = 'normal-move-with-blocker'
 const FIXTURE_SEED = 0x5eed64
 
 type BrowserEngine = {
   applyBattleAction: typeof applyBattleAction
+  runBattleAction: typeof runBattleAction
   globalTriggerSystem: {
     addRules: (rules: any[]) => void
     checkTriggers: (state: any, context: any) => { success: boolean }
     clearRules: () => void
   }
+  hashBattleState: typeof hashBattleState
   mulberry32: typeof mulberry32
   setRng: typeof setRng
 }
@@ -66,6 +77,8 @@ function loadBrowserEngine(): BrowserEngine {
     process,
     require: createRequire(import.meta.url),
     setTimeout,
+    TextDecoder,
+    TextEncoder,
   }
 
   runInNewContext(bundleSource, context, { filename: bundlePath })
@@ -79,6 +92,280 @@ function makeFixture() {
 
   return {
     action: { type: 'move' as const, playerId: 'player-red', pieceId: 'mover', toX: 2, toY: 1 },
+    state,
+  }
+}
+
+const PROGRESSIVE_FIXTURE_SEED = 0x138b0
+const PROGRESSIVE_MODE = 'progressive-reserve-v1'
+const PROGRESSIVE_PLAYERS = ['player-red', 'player-blue'] as const
+
+function makeProgressiveCore(
+  instanceId: string,
+  ownerPlayerId: typeof PROGRESSIVE_PLAYERS[number],
+  x: number | null,
+  y: number | null,
+) {
+  return {
+    ...makePiece({
+      instanceId,
+      ownerPlayerId,
+      faction: ownerPlayerId === 'player-red' ? 'red' : 'blue',
+      x: x ?? 0,
+      y: y ?? 0,
+      currentHp: 12,
+      maxHp: 12,
+      moveRange: 2,
+    }),
+    name: instanceId,
+    isCore: true,
+    x,
+    y,
+    buffs: [],
+    debuffs: [],
+    ruleTags: [],
+  }
+}
+
+function makeProgressiveRunnerFixture(): BattleState {
+  const redVanguard = makeProgressiveCore('red-vanguard', PROGRESSIVE_PLAYERS[0], 0, 0)
+  const blueVanguard = makeProgressiveCore('blue-vanguard', PROGRESSIVE_PLAYERS[1], 11, 0)
+  const redReserve = makeProgressiveCore('red-reserve', PROGRESSIVE_PLAYERS[0], null, null)
+  const state = makeState({
+    pieces: [redVanguard, blueVanguard] as any,
+    currentPlayerId: PROGRESSIVE_PLAYERS[0],
+    phase: 'start',
+    width: 12,
+    height: 9,
+  }) as any
+  state.gameStartFired = true
+  state.deployment = {
+    mode: PROGRESSIVE_MODE,
+    status: 'awaiting-reserve-deploy',
+    playerIds: [...PROGRESSIVE_PLAYERS],
+    choices: {},
+    locks: {
+      [PROGRESSIVE_PLAYERS[0]]: { locked: false },
+      [PROGRESSIVE_PLAYERS[1]]: { locked: false },
+    },
+    startedAt: 1_750_000_000_000,
+    deadlineAt: 1_750_000_030_000,
+    revision: 7,
+    initialPositions: {
+      [redVanguard.instanceId]: { x: redVanguard.x, y: redVanguard.y },
+      [blueVanguard.instanceId]: { x: blueVanguard.x, y: blueVanguard.y },
+    },
+    openingVanguardsInitialized: true,
+    reserves: {
+      [PROGRESSIVE_PLAYERS[0]]: [redReserve],
+      [PROGRESSIVE_PLAYERS[1]]: [],
+    },
+    reserveCounts: {
+      [PROGRESSIVE_PLAYERS[0]]: 1,
+      [PROGRESSIVE_PLAYERS[1]]: 0,
+    },
+    activePlayerId: PROGRESSIVE_PLAYERS[0],
+    offerTurnNumber: 1,
+    offerPieceIds: [redReserve.instanceId],
+    legalPositions: [{ x: 5, y: 6 }],
+  }
+  pinTestBattleState(state, PROGRESSIVE_FIXTURE_SEED)
+  recordBattleInitialization(
+    state,
+    new RuleRuntime({ rootSeed: PROGRESSIVE_FIXTURE_SEED }),
+    [...PROGRESSIVE_PLAYERS],
+  )
+  return state
+}
+
+function cloneJson<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value)) as T
+}
+
+function runtimeCursors(state: BattleState): Record<string, number> {
+  return cloneJson((state.extensions as any)?.debugBattle?.authority?.runtimeCursors ?? {})
+}
+
+function captureRuleError(run: () => unknown): Record<string, unknown> {
+  try {
+    run()
+  } catch (error) {
+    const ruleError = error as any
+    return cloneJson({
+      code: ruleError?.code,
+      name: ruleError?.name,
+      determinism: ruleError?.determinism,
+    })
+  }
+  throw new Error('Expected the progressive deployment command to be rejected')
+}
+
+function progressiveStateContract(state: BattleState) {
+  const deployment = state.deployment
+  return cloneJson({
+    deployment: deployment && {
+      mode: deployment.mode,
+      status: deployment.status,
+      revision: deployment.revision,
+      openingVanguardsInitialized: deployment.openingVanguardsInitialized,
+      activePlayerId: deployment.activePlayerId,
+      offerPieceIds: deployment.offerPieceIds,
+      reserveCounts: deployment.reserveCounts,
+      reservePieceIds: Object.fromEntries(Object.entries(deployment.reserves ?? {})
+        .map(([playerId, pieces]) => [playerId, pieces.map(piece => piece.instanceId)])),
+    },
+    pieces: state.pieces.map(piece => ({
+      instanceId: piece.instanceId,
+      ownerPlayerId: piece.ownerPlayerId,
+      isCore: piece.isCore,
+      currentHp: piece.currentHp,
+      x: piece.x,
+      y: piece.y,
+      statusTags: piece.statusTags,
+    })).sort((left, right) => left.instanceId.localeCompare(right.instanceId)),
+    turn: state.turn,
+    terminalResult: state.terminalResult,
+    runtimeCursors: runtimeCursors(state),
+  })
+}
+
+function makeDemonSummonFixture() {
+  const anchor = makePiece({
+    instanceId: 'differential-demon-anchor',
+    templateId: 'red-anchor',
+    ownerPlayerId: 'player-red',
+    faction: 'red',
+    x: 0,
+    y: 0,
+    currentHp: 6,
+    maxHp: 20,
+    attack: 3,
+  })
+  Object.assign(anchor, { name: '献祭者' })
+  const state = makeState({
+    pieces: [anchor],
+    currentPlayerId: 'player-red',
+    phase: 'action',
+    width: 4,
+    height: 4,
+  }) as any
+  const red = state.players.find((player: any) => player.playerId === 'player-red')
+  red.hand = [{
+    cardId: 'demon-summon-5',
+    instanceId: 'differential-demon-card',
+    actionPointCost: 3,
+  }]
+  red.discardPile = []
+  red.actionPoints = 3
+  state.extensions.kiljaedanPiece = {
+    instanceId: 'differential-kiljaedan-hidden',
+    templateId: 'kiljaedan',
+    name: '基尔加丹',
+    ownerPlayerId: 'player-red',
+    faction: 'red',
+    currentHp: 1,
+    maxHp: 17,
+    attack: 4,
+    defense: 3,
+    moveRange: 4,
+    x: 0,
+    y: 0,
+    skills: [],
+    rules: [],
+    statusTags: [],
+  }
+
+  const draft = {
+    type: 'playCard' as const,
+    playerId: 'player-red',
+    cardInstanceId: 'differential-demon-card',
+    clientActionId: 'red139-browser-demon-damage-summon',
+  }
+  const prepared = prepareAction(state, draft)
+  if (prepared.kind !== 'needTarget') {
+    throw new Error(`Expected demon-summon-5 target preparation, received ${prepared.kind}`)
+  }
+  const action: BattleAction = {
+    ...draft,
+    targetPieceId: anchor.instanceId,
+    targetX: anchor.x,
+    targetY: anchor.y,
+    extraTargets: [{ x: 2, y: 2 }],
+    selectionId: prepared.selectionId,
+    stateRevision: prepared.stateRevision,
+  }
+
+  return { action, state }
+}
+
+function makeMultiSummonOrderingFixture() {
+  const caster = makePiece({
+    instanceId: 'differential-multi-summoner',
+    templateId: 'red139-multi-summoner',
+    ownerPlayerId: 'player-red',
+    faction: 'red',
+    x: 0,
+    y: 0,
+  }) as any
+  caster.name = '多重召唤者'
+  caster.skills = [{
+    skillId: 'red139-multi-summon-order',
+    currentCooldown: 0,
+    usesRemaining: -1,
+  }]
+  const state = makeState({
+    pieces: [caster],
+    currentPlayerId: 'player-red',
+    phase: 'action',
+    width: 11,
+    height: 11,
+  }) as any
+  state.players[0].actionPoints = 1
+  state.skillsById['red139-multi-summon-order'] = {
+    id: 'red139-multi-summon-order',
+    name: 'RED-139 多重召唤排序夹具',
+    description: '验证 sealed declared SummonBatch 的跨运行时稳定排序。',
+    kind: 'active',
+    type: 'normal',
+    cooldownTurns: 0,
+    maxCharges: 0,
+    powerMultiplier: 1,
+    actionPointCost: 1,
+    summonCapability: {
+      version: 1,
+      recipe: 'source-mirror',
+      maxSummons: 2,
+      allowedVariants: ['summon'],
+      instanceIdPrefix: 'red139-multi-clone-',
+      maxHp: 1,
+      attack: 0,
+      defense: 0,
+      moveRange: 0,
+      noKillCharge: true,
+      resetBoundSkillCooldown: true,
+      rules: ['rule-naruto-clone-immobile'],
+      status: {
+        idPrefix: 'red139-multi-clone-tag-',
+        name: '多重召唤夹具',
+        type: 'red139-multi-clone',
+        visible: false,
+        remainingDuration: -1,
+        remainingUses: -1,
+        intensity: 1,
+        stacks: 1,
+        relatedRules: ['rule-naruto-clone-immobile'],
+      },
+    },
+    code: "function executeSkill(context) { context.summonQueue.push({ sourceId: context.piece.instanceId, summons: [{ x: 1, y: 10, variant: 'summon' }, { x: 10, y: 0, variant: 'summon' }] }); return { success: true, message: 'multi summon fixture' }; }",
+    previewCode: 'function calculatePreview() { return { description: \'fixture\', expectedValues: {} }; }',
+  }
+  return {
+    action: {
+      type: 'useBasicSkill' as const,
+      playerId: 'player-red',
+      pieceId: caster.instanceId,
+      skillId: 'red139-multi-summon-order',
+    },
     state,
   }
 }
@@ -104,6 +391,183 @@ describe('game engine Node/browser differential fixture', () => {
       seed: FIXTURE_SEED,
       result: nodeResult,
     })
+  })
+
+  it('rejects stale and missing progressive deployment revisions identically without state or RNG mutation', () => {
+    const browser = loadBrowserEngine()
+    const source = makeProgressiveRunnerFixture()
+    const staleRevision = source.deployment!.revision - 1
+
+    expect(browser.runBattleAction).toBeTypeOf('function')
+    expect(browser.hashBattleState).toBeTypeOf('function')
+
+    for (const expectedDeploymentRevision of [staleRevision, undefined]) {
+      const nodeState = cloneJson(source)
+      const browserState = cloneJson(source)
+      const action = {
+        type: 'deployReservePiece',
+        playerId: PROGRESSIVE_PLAYERS[0],
+        expectedDeploymentRevision,
+        pieceId: 'red-reserve',
+        toX: 5,
+        toY: 6,
+        clientActionId: expectedDeploymentRevision === undefined
+          ? 'browser-progressive-missing-revision'
+          : 'browser-progressive-stale-revision',
+      } as unknown as BattleAction
+      const nodeBefore = {
+        hash: hashBattleState(nodeState),
+        cursors: runtimeCursors(nodeState),
+        contract: progressiveStateContract(nodeState),
+      }
+      const browserBefore = {
+        hash: browser.hashBattleState(browserState),
+        cursors: runtimeCursors(browserState),
+        contract: progressiveStateContract(browserState),
+      }
+
+      const nodeError = captureRuleError(() =>
+        runBattleAction(nodeState, action, { rootSeed: PROGRESSIVE_FIXTURE_SEED }))
+      const browserError = captureRuleError(() =>
+        browser.runBattleAction(browserState, action, { rootSeed: PROGRESSIVE_FIXTURE_SEED }))
+
+      expect(nodeError).toMatchObject({ code: 'PROGRESSIVE_DEPLOYMENT_STALE_REVISION' })
+      expect(browserError).toEqual(nodeError)
+      expect(hashBattleState(nodeState)).toBe(nodeBefore.hash)
+      expect(browser.hashBattleState(browserState)).toBe(browserBefore.hash)
+      expect(runtimeCursors(nodeState)).toEqual(nodeBefore.cursors)
+      expect(runtimeCursors(browserState)).toEqual(browserBefore.cursors)
+      expect(progressiveStateContract(nodeState)).toEqual(nodeBefore.contract)
+      expect(progressiveStateContract(browserState)).toEqual(browserBefore.contract)
+      expect(browserBefore).toEqual(nodeBefore)
+    }
+  })
+
+  it('executes progressive reserve deploy and tagged first move through the tracked bundle with the Node state hash', () => {
+    const browser = loadBrowserEngine()
+    const source = makeProgressiveRunnerFixture()
+    const nodeState = cloneJson(source)
+    const browserState = cloneJson(source)
+    const deployAction: BattleAction = {
+      type: 'deployReservePiece',
+      playerId: PROGRESSIVE_PLAYERS[0],
+      expectedDeploymentRevision: source.deployment!.revision,
+      pieceId: 'red-reserve',
+      toX: 5,
+      toY: 6,
+      clientActionId: 'browser-progressive-deploy',
+    }
+
+    const nodeDeployed = runBattleAction(nodeState, deployAction, {
+      rootSeed: PROGRESSIVE_FIXTURE_SEED,
+    })
+    const browserDeployed = browser.runBattleAction(browserState, deployAction, {
+      rootSeed: PROGRESSIVE_FIXTURE_SEED,
+    })
+
+    expect(browserDeployed.stateHash).toBe(nodeDeployed.stateHash)
+    expect(browser.hashBattleState(browserDeployed.state)).toBe(hashBattleState(nodeDeployed.state))
+    expect(progressiveStateContract(browserDeployed.state))
+      .toEqual(progressiveStateContract(nodeDeployed.state))
+    expect(cloneJson(browserDeployed.trace?.deployment)).toEqual(cloneJson(nodeDeployed.trace?.deployment))
+    expect(browserDeployed.trace?.deployment).toMatchObject({
+      command: 'deploy',
+      mode: PROGRESSIVE_MODE,
+      status: 'complete',
+      openingVanguardsInitialized: true,
+      lastDeployedPieceId: 'red-reserve',
+      deployedPosition: { x: 5, y: 6 },
+    })
+    expect(nodeDeployed.state.turn.phase).toBe('action')
+    expect(nodeDeployed.state.pieces.find(piece => piece.instanceId === 'red-reserve')?.statusTags)
+      .toContainEqual(expect.objectContaining({
+        type: 'deployment-first-move-free',
+        grantedTurnNumber: 1,
+      }))
+
+    const moveAction: BattleAction = {
+      type: 'move',
+      playerId: PROGRESSIVE_PLAYERS[0],
+      pieceId: 'red-reserve',
+      toX: 5,
+      toY: 5,
+    }
+    const nodeMoved = runBattleAction(nodeDeployed.state, moveAction, {
+      rootSeed: PROGRESSIVE_FIXTURE_SEED,
+    })
+    const browserMoved = browser.runBattleAction(browserDeployed.state, moveAction, {
+      rootSeed: PROGRESSIVE_FIXTURE_SEED,
+    })
+
+    expect(browserMoved.stateHash).toBe(nodeMoved.stateHash)
+    expect(browser.hashBattleState(browserMoved.state)).toBe(hashBattleState(nodeMoved.state))
+    expect(progressiveStateContract(browserMoved.state))
+      .toEqual(progressiveStateContract(nodeMoved.state))
+    expect(browserMoved.trace?.deployment).toBeUndefined()
+    expect(nodeMoved.state.turn.phase).toBe('action')
+    expect(nodeMoved.state.players.find(player => player.playerId === PROGRESSIVE_PLAYERS[0])?.actionPoints)
+      .toBe(nodeDeployed.state.players.find(player => player.playerId === PROGRESSIVE_PLAYERS[0])?.actionPoints)
+    expect(nodeMoved.state.pieces.find(piece => piece.instanceId === 'red-reserve')?.statusTags)
+      .not.toContainEqual(expect.objectContaining({ type: 'deployment-first-move-free' }))
+  })
+
+  it('keeps the real demon-summon-5 damage→summon EffectChain identical in Node and browser', () => {
+    const nodeFixture = makeDemonSummonFixture()
+    const browserFixture = structuredClone(nodeFixture)
+    const browser = loadBrowserEngine()
+
+    const nodeResult = runBattleAction(nodeFixture.state, nodeFixture.action, { rootSeed: FIXTURE_SEED })
+    const browserResult = browser.runBattleAction(browserFixture.state, browserFixture.action, {
+      rootSeed: FIXTURE_SEED,
+    })
+
+    expect(browserResult).toEqual(nodeResult)
+    expect(browserResult.state.pieces.some((piece: any) => piece.instanceId === 'differential-demon-anchor'))
+      .toBe(false)
+    expect(browserResult.state.graveyard.find((piece: any) => piece.instanceId === 'differential-demon-anchor'))
+      .toMatchObject({ currentHp: 0, attack: 4 })
+    expect(browserResult.state.pieces.find((piece: any) => piece.instanceId === 'differential-kiljaedan-hidden'))
+      .toMatchObject({ templateId: 'kiljaedan', currentHp: 17, x: 2, y: 2 })
+    expect(browserResult.state.extensions?.kiljaedanPiece).toBeUndefined()
+    expect(browserResult.state.players.find((player: any) => player.playerId === 'player-red'))
+      .toMatchObject({ actionPoints: 0, discardPile: ['demon-summon-5'] })
+  })
+
+  it('keeps an intentionally unsorted multi-request declared SummonBatch identical in Node and browser', () => {
+    const nodeFixture = makeMultiSummonOrderingFixture()
+    const browserFixture = structuredClone(nodeFixture)
+    const browser = loadBrowserEngine()
+
+    const nodeResult = runBattleAction(nodeFixture.state, nodeFixture.action, { rootSeed: FIXTURE_SEED })
+    const browserResult = browser.runBattleAction(browserFixture.state, browserFixture.action, {
+      rootSeed: FIXTURE_SEED,
+    })
+
+    expect({
+      stateHash: browserResult.stateHash,
+      actionHash: browserResult.actionHash,
+      trace: browserResult.trace,
+    }).toEqual({
+      stateHash: nodeResult.stateHash,
+      actionHash: nodeResult.actionHash,
+      trace: nodeResult.trace,
+    })
+    expect(browserResult.state.pieces.map((piece: any) => ({
+      instanceId: piece.instanceId,
+      x: piece.x,
+      y: piece.y,
+      ruleIds: (piece.rules || []).map((rule: any) => rule.id),
+    }))).toEqual(nodeResult.state.pieces.map(piece => ({
+      instanceId: piece.instanceId,
+      x: piece.x,
+      y: piece.y,
+      ruleIds: (piece.rules || []).map(rule => rule.id),
+    })))
+    const clones = nodeResult.state.pieces
+      .filter(piece => piece.instanceId.startsWith('red139-multi-clone-'))
+      .sort((left, right) => left.instanceId < right.instanceId ? -1 : left.instanceId > right.instanceId ? 1 : 0)
+    expect(clones).toHaveLength(2)
+    expect(clones.map(piece => [piece.x, piece.y])).toEqual([[10, 0], [1, 10]])
   })
 
   it('executes all four trigger consumer categories in the approved order', () => {

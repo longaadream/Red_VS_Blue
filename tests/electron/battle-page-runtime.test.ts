@@ -462,6 +462,87 @@ describe('battle page runtime source', () => {
     }))
   })
 
+  it('submits a legal dropped move once and rejects non-highlighted or invalid drops', () => {
+    const html = readBattlePage()
+    const doAction = vi.fn()
+    const setStatusMsg = vi.fn()
+    const closePieceContextMenu = vi.fn()
+    const context = vm.createContext({ doAction, setStatusMsg, closePieceContextMenu, Set, Number })
+
+    vm.runInContext(`
+      let G = {
+        pieces: [
+          { instanceId: 'piece-1', ownerPlayerId: 'player-red', currentHp: 10, x: 1, y: 1 },
+          { instanceId: 'piece-2', ownerPlayerId: 'player-blue', currentHp: 10, x: 2, y: 2 },
+        ],
+      }
+      let myPlayerId = 'player-red'
+      let selectedPieceId = 'piece-1'
+      let pendingMove = true
+      let validMoves = new Set(['2,1'])
+      let pendingActionFeedback = null
+      let targetSubmissionPending = null
+      let pendingSkill = null
+      let pendingCardAction = null
+      ${runtimeFunction(html, 'moveSelectedPieceToCell')}
+    `, context)
+
+    expect(vm.runInContext("moveSelectedPieceToCell('piece-1', 2, 1)", context)).toBe(true)
+    expect(doAction).toHaveBeenCalledTimes(1)
+    expect(doAction).toHaveBeenCalledWith({ type: 'move', playerId: 'player-red', pieceId: 'piece-1', toX: 2, toY: 1 })
+    expect(vm.runInContext("moveSelectedPieceToCell('piece-1', 2, 1)", context)).toBe(false)
+    expect(doAction).toHaveBeenCalledTimes(1)
+
+    vm.runInContext('pendingMove = true; validMoves = new Set()', context)
+    expect(vm.runInContext("moveSelectedPieceToCell('piece-1', 2, 2)", context)).toBe(false)
+    expect(vm.runInContext("moveSelectedPieceToCell('piece-1', null, null)", context)).toBe(false)
+    expect(doAction).toHaveBeenCalledTimes(1)
+    expect(setStatusMsg).toHaveBeenCalledWith('无法移动到该位置')
+  })
+
+  it('automatically queries move cells for an eligible selection and clears them for target mode', () => {
+    const html = readBattlePage()
+    const queryMoveCells = vi.fn(() => new Set(['2,1']))
+    const context = vm.createContext({
+      window: { BattleLegalActions: { queryMoveCells } },
+      BattleLegalActions: { queryMoveCells },
+      GameEngine: {},
+      Set,
+    })
+
+    vm.runInContext(`
+      let G = {
+        pieces: [{ instanceId: 'piece-1', ownerPlayerId: 'player-red', currentHp: 10, x: 1, y: 1 }],
+        players: [{ playerId: 'player-red' }],
+        turn: { currentPlayerId: 'player-red', phase: 'action' },
+      }
+      let myPlayerId = 'player-red'
+      let selectedPieceId = 'piece-1'
+      let pendingMove = false
+      let validMoves = new Set()
+      let pendingSkill = null
+      let pendingCardAction = null
+      let pendingActionFeedback = null
+      let targetSubmissionPending = null
+      let placingMode = false
+      const SPECTATE_MODE = false
+      const TRAINING_MODE = false
+      function progressiveDeploymentPending() { return false }
+      function _updatePendingSkillTargets() {}
+      ${runtimeFunction(html, 'refreshBattleLegalActions')}
+    `, context)
+
+    vm.runInContext('refreshBattleLegalActions()', context)
+    expect(queryMoveCells).toHaveBeenCalledTimes(1)
+    expect(vm.runInContext('pendingMove', context)).toBe(true)
+    expect(vm.runInContext("validMoves.has('2,1')", context)).toBe(true)
+
+    vm.runInContext("pendingSkill = { skillId: 'skill-1' }; refreshBattleLegalActions()", context)
+    expect(queryMoveCells).toHaveBeenCalledTimes(1)
+    expect(vm.runInContext('pendingMove', context)).toBe(false)
+    expect(vm.runInContext('validMoves.size', context)).toBe(0)
+  })
+
   it('defers and coalesces pending-action presentation until the next animation frame', () => {
     const html = readBattlePage()
     let boardRenders = 0
@@ -515,6 +596,86 @@ describe('battle page runtime source', () => {
     frames.shift()?.()
     expect(boardRenders).toBe(0)
     expect(actionBarRenders).toBe(1)
+  })
+
+  it('keeps the original action pending and requests a correlated resync after feedback timeout', () => {
+    const html = readBattlePage()
+    let timeoutCallback: (() => void) | undefined
+    const recover = vi.fn()
+    const status = vi.fn()
+    const context = vm.createContext({
+      performance: { now: () => 10 },
+      setTimeout: (callback: () => void) => { timeoutCallback = callback; return 9 },
+      clearTimeout: () => undefined,
+      setStatusMsg: status,
+      renderActionBar: () => undefined,
+      requestAuthorityRecovery: recover,
+    })
+
+    vm.runInContext(`
+      const PENDING_ACTION_TIMEOUT_MS = 8000
+      let selectedPieceId = 'piece-1'
+      let pendingActionFeedback = null
+      let pendingActionFeedbackTimer = null
+      ${runtimeFunction(html, 'beginPendingActionFeedback')}
+    `, context)
+
+    expect(vm.runInContext("beginPendingActionFeedback({ type: 'move', clientActionId: 'action-timeout-1' })", context)).toBe(true)
+    timeoutCallback?.()
+
+    expect(vm.runInContext('pendingActionFeedback.clientActionId', context)).toBe('action-timeout-1')
+    expect(vm.runInContext('pendingActionFeedback.timedOut', context)).toBe(true)
+    expect(vm.runInContext('pendingActionFeedbackTimer', context)).toBeNull()
+    expect(recover).toHaveBeenCalledWith('action-timeout', 'action-timeout-1')
+    expect(status).toHaveBeenCalledWith(expect.stringContaining('请勿重复操作'))
+    expect(vm.runInContext("beginPendingActionFeedback({ type: 'move', clientActionId: 'action-timeout-2' })", context)).toBe(false)
+  })
+
+  it('settles a timed-out pending action from every matching late receipt status without replaying it', () => {
+    const html = readBattlePage()
+    const recover = vi.fn()
+    const context = vm.createContext({
+      clearTimeout: () => undefined,
+      recordAuthorityPerformance: () => undefined,
+      clearTargetInteraction: () => true,
+      renderActionBar: () => undefined,
+      setStatusMsg: () => undefined,
+      requestAuthorityRecovery: recover,
+    })
+
+    vm.runInContext(`
+      let pendingActionFeedback = null
+      let pendingActionFeedbackTimer = null
+      let targetSubmissionPending = null
+      ${runtimeFunction(html, 'clearPendingActionFeedback')}
+      ${runtimeFunction(html, 'applyAuthorityReceipt')}
+    `, context)
+
+    for (const status of ['applied', 'duplicate', 'rejected', 'resyncRequired']) {
+      const clientActionId = `late-${status}`
+      context.__receipt = {
+        clientActionId,
+        status,
+        authorityVersion: 4,
+        code: status === 'resyncRequired' ? 'ROOM_VERSION_CONFLICT' : undefined,
+        message: status === 'rejected' ? '服务端拒绝了原指令' : undefined,
+      }
+      vm.runInContext(`
+        pendingActionFeedback = {
+          clientActionId: ${JSON.stringify(clientActionId)},
+          type: 'move',
+          startedAt: 0,
+          timedOut: true,
+        }
+        pendingActionFeedbackTimer = null
+      `, context)
+
+      expect(vm.runInContext('applyAuthorityReceipt(__receipt)', context)).toBe(true)
+      expect(vm.runInContext('pendingActionFeedback', context)).toBeNull()
+    }
+
+    expect(recover).toHaveBeenCalledTimes(1)
+    expect(recover).toHaveBeenCalledWith('ROOM_VERSION_CONFLICT')
   })
 
   it('applies the successful training authority receipt before rendering', async () => {
@@ -667,7 +828,8 @@ describe('battle page runtime source', () => {
       ${runtimeFunction(html, 'render')}
       ${runtimeFunction(html, 'applyBattleTransition')}
       globalThis.__applied = applyBattleTransition({
-        protocolVersion: 2,
+        protocolVersion: 3,
+        authorityBuildId: 'rvb-authority-v3-chunked-sha256-1',
         roomId: 'room-1',
         fromVersion: 1,
         toVersion: 2,
@@ -738,7 +900,8 @@ describe('battle page runtime source', () => {
       ${runtimeFunction(html, 'render')}
       ${runtimeFunction(html, 'applyBattleTransition')}
       globalThis.__applied = applyBattleTransition({
-        protocolVersion: 2,
+        protocolVersion: 3,
+        authorityBuildId: 'rvb-authority-v3-chunked-sha256-1',
         roomId: 'room-1',
         fromVersion: 1,
         toVersion: 2,

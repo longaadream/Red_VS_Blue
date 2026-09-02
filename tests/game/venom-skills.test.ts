@@ -107,6 +107,7 @@ describe('Venom data contract', () => {
 
     expect(piece).toMatchObject({
       id: 'red-venom',
+      image: 'venom.jpg',
       name: '毒液',
       faction: 'evil',
       stats: { maxHp: 14, attack: 3, defense: 1, moveRange: 4 },
@@ -119,6 +120,8 @@ describe('Venom data contract', () => {
     })
 
     expect(getPieceById('red-venom')).toMatchObject({ id: 'red-venom', faction: 'evil' })
+    expect([...readFileSync(join(process.cwd(), 'public', 'venom.jpg')).subarray(0, 3)])
+      .toEqual([0xff, 0xd8, 0xff])
     expect([
       getSkillById('venom-corrosion')?.id,
       getSkillById('venom-host-transfer')?.id,
@@ -200,6 +203,15 @@ describe('宿主转移', () => {
     venom.skills = [{ skillId: skill.id, currentCooldown: 0, usesRemaining: -1 }]
     const target = makePiece({ instanceId: 'target', ownerPlayerId: 'player-blue', x: 4, y: 3 })
     const state = makeState({ pieces: [venom, target], width: 10, height: 10 }) as any
+    venom.statusTags = [{
+      id: 'deployment-first-move-free',
+      type: 'deployment-first-move-free',
+      name: '本回合首次移动免费',
+      visible: true,
+      grantedTurnNumber: state.turn.turnNumber,
+      currentDuration: 1,
+      currentUses: 1,
+    }]
     state.skillsById[skill.id] = skill
     state.players[0].actionPoints = 2
 
@@ -208,6 +220,12 @@ describe('宿主转移', () => {
     }) as any) as any
     expect(next.players[0].actionPoints).toBe(1)
     expect(next.pieces.find((piece: any) => piece.instanceId === 'venom').skills[0].currentCooldown).toBe(1)
+    expect(next.pieces.find((piece: any) => piece.instanceId === 'venom').statusTags)
+      .toContainEqual(expect.objectContaining({
+        type: 'deployment-first-move-free',
+        grantedTurnNumber: state.turn.turnNumber,
+        currentUses: 1,
+      }))
 
     const invalid = makeState({ pieces: [venom], width: 10, height: 10 }) as any
     invalid.skillsById[skill.id] = skill

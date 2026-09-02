@@ -1,5 +1,7 @@
 export type PieceId = string
 
+export const DEPLOYMENT_FIRST_MOVE_FREE_STATUS = 'deployment-first-move-free' as const
+
 export type Faction = "red" | "blue" | "neutral" | "good" | "evil" | "light" | "dark"
 
 export type PieceRarity = "common" | "rare" | "epic" | "legendary"
@@ -49,6 +51,10 @@ export interface PieceTemplate {
   initialStatusTags?: PieceStatusTag[]
   isDefault?: boolean
   relatedCards?: string[]
+  /** Data-driven setup effect executed while progressive reserves are initialized. */
+  progressiveDeployment?: {
+    reserveInitializationSkillId: string
+  }
 }
 
 export interface PieceInstance {

@@ -1,14 +1,18 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  PENDING_RESPONSE_DURATION_MS,
   TURN_BURN_WINDOW_MS,
   TURN_FAST_DURATION_MS,
   createRunningTurnTimer,
   getFullRoundNumber,
   getNormalTurnDurationMs,
+  projectPendingTimer,
   projectTurnTimer,
   syncTurnTimerAfterAcceptedAction,
 } from '@/lib/game/turn-timer'
+import { finalizePendingOptionSession } from '@/lib/game/pending-interaction'
+import { finalizePendingTargetSession } from '@/lib/game/targeting'
 import { makeState } from '../helpers/minimal-state'
 
 describe('RED-36 growing authoritative turn timer', () => {
@@ -58,21 +62,26 @@ describe('RED-36 growing authoritative turn timer', () => {
 
   it('starts for pending input before action phase but rejects idle non-action phases', () => {
     const waitingState = makeState({ turnNumber: 2, phase: 'start' })
-    waitingState.pendingOptionSelection = {
+    waitingState.pendingOptionSelection = finalizePendingOptionSession({
       playerId: 'player-blue',
       title: 'Resolve begin-turn effect',
       options: ['resolve'],
-    }
+    }, waitingState.targetingRevision ?? 0)
 
     expect(createRunningTurnTimer(waitingState, 2_000)).toMatchObject({
       status: 'running',
-      ownerPlayerId: 'player-blue',
+      ownerPlayerId: 'player-red',
       inputOwnerPlayerId: 'player-blue',
       turnOwnerPlayerId: 'player-red',
       turnNumber: 2,
       startedAt: 2_000,
       remainingMs: 45_000,
       deadlineAt: 47_000,
+      pendingResponse: {
+        ownerPlayerId: 'player-blue',
+        durationMs: PENDING_RESPONSE_DURATION_MS,
+        deadlineAt: 17_000,
+      },
     })
 
     const idleStart = makeState({ phase: 'start' })
@@ -98,17 +107,17 @@ describe('RED-36 growing authoritative turn timer', () => {
     })
   })
 
-  it('transfers the running clock to the current pending input owner', () => {
+  it('freezes the turn clock and starts a fresh 15-second off-turn response clock', () => {
     const state = makeState({ turnNumber: 3, phase: 'action' })
     state.turnTimer = createRunningTurnTimer(state, 0, {
       'player-red': 2,
       'player-blue': 1,
     })
-    state.pendingOptionSelection = {
+    state.pendingOptionSelection = finalizePendingOptionSession({
       playerId: 'player-blue',
       title: 'Respond',
       options: ['accept'],
-    }
+    }, state.targetingRevision ?? 0)
 
     const waitingForBlue = syncTurnTimerAfterAcceptedAction(state, {
       receivedAt: 1_000,
@@ -118,21 +127,39 @@ describe('RED-36 growing authoritative turn timer', () => {
     })
 
     expect(waitingForBlue).toMatchObject({
-      ownerPlayerId: 'player-blue',
+      ownerPlayerId: 'player-red',
       inputOwnerPlayerId: 'player-blue',
       turnOwnerPlayerId: 'player-red',
-      acceptedGameplayAction: false,
-      durationMs: getNormalTurnDurationMs(3),
-      fast: false,
+      acceptedGameplayAction: true,
+      durationMs: TURN_FAST_DURATION_MS,
+      remainingMs: 19_000,
+      pendingResponse: {
+        ownerPlayerId: 'player-blue',
+        durationMs: PENDING_RESPONSE_DURATION_MS,
+        startedAt: 5_000,
+        deadlineAt: 20_000,
+        timeoutResolution: { kind: 'cancel' },
+      },
       noOpStreaks: {
         'player-red': 0,
         'player-blue': 1,
       },
     })
+    expect(projectTurnTimer(waitingForBlue, 12_000)).toMatchObject({
+      ownerPlayerId: 'player-red',
+      remainingMs: 19_000,
+      paused: true,
+    })
+    expect(projectPendingTimer(waitingForBlue, 12_000)).toMatchObject({
+      ownerPlayerId: 'player-blue',
+      durationMs: PENDING_RESPONSE_DURATION_MS,
+      remainingMs: 8_000,
+      deadlineAt: 20_000,
+    })
 
     // The responder completes the pending input, so authority returns to red.
-    // Red must resume its original 20-second fast budget after spending 1 second,
-    // not receive a fresh timer from repeated pending transfers.
+    // Red resumes the exact budget frozen when the response began. Time spent
+    // resolving the response does not consume that budget.
     state.turnTimer = waitingForBlue
     state.pendingOptionSelection = undefined
     const returnedToRed = syncTurnTimerAfterAcceptedAction(state, {
@@ -148,7 +175,115 @@ describe('RED-36 growing authoritative turn timer', () => {
       deadlineAt: 26_000,
       fast: true,
       acceptedGameplayAction: true,
-      noOpStreaks: { 'player-red': 0, 'player-blue': 0 },
+      noOpStreaks: { 'player-red': 0, 'player-blue': 1 },
+    })
+    expect(returnedToRed?.pendingResponse).toBeUndefined()
+  })
+
+  it('gives each newly created off-turn pending session a fresh response clock', () => {
+    const state = makeState({ turnNumber: 3, phase: 'action' })
+    state.turnTimer = createRunningTurnTimer(state, 0)
+    state.pendingOptionSelection = finalizePendingOptionSession({
+      playerId: 'player-blue',
+      title: 'First response',
+      options: ['continue'],
+    }, 0)
+    state.turnTimer = syncTurnTimerAfterAcceptedAction(state, {
+      receivedAt: 5_000,
+      resumedAt: 5_000,
+      actorPlayerId: 'player-red',
+      acceptedActionType: 'move',
+    })
+    expect(state.turnTimer?.pendingResponse?.deadlineAt).toBe(20_000)
+
+    state.pendingOptionSelection = finalizePendingOptionSession({
+      playerId: 'player-blue',
+      title: 'Second response',
+      options: ['finish'],
+    }, 1)
+    state.turnTimer = syncTurnTimerAfterAcceptedAction(state, {
+      receivedAt: 10_000,
+      resumedAt: 12_000,
+      actorPlayerId: 'player-blue',
+      acceptedActionType: 'pendingOptionSelect',
+    })
+
+    expect(state.turnTimer).toMatchObject({
+      remainingMs: 40_000,
+      pendingResponse: {
+        startedAt: 12_000,
+        deadlineAt: 27_000,
+        durationMs: PENDING_RESPONSE_DURATION_MS,
+      },
+    })
+  })
+
+  it('keeps consuming the ordinary clock when the turn owner owns the pending input', () => {
+    const state = makeState({ turnNumber: 3, phase: 'action' })
+    state.turnTimer = createRunningTurnTimer(state, 0)
+    state.pendingOptionSelection = finalizePendingOptionSession({
+      playerId: 'player-red',
+      title: 'Own pending',
+      options: ['resolve'],
+    }, 0)
+
+    state.turnTimer = syncTurnTimerAfterAcceptedAction(state, {
+      receivedAt: 6_000,
+      resumedAt: 8_000,
+      actorPlayerId: 'player-red',
+      acceptedActionType: 'move',
+    })
+
+    expect(state.turnTimer).toMatchObject({
+      ownerPlayerId: 'player-red',
+      inputOwnerPlayerId: 'player-red',
+      remainingMs: 39_000,
+      deadlineAt: 47_000,
+    })
+    expect(state.turnTimer?.pendingResponse).toBeUndefined()
+    expect(projectTurnTimer(state.turnTimer, 10_000)).toMatchObject({
+      remainingMs: 37_000,
+      paused: false,
+    })
+  })
+
+  it('stamps the first stable legal option as a mandatory timeout default', () => {
+    const state = makeState({ turnNumber: 3, phase: 'action' })
+    state.pendingOptionSelection = finalizePendingOptionSession({
+      playerId: 'player-blue',
+      title: 'Mandatory response',
+      options: [
+        { label: 'Second label', value: 'first-stable-value' },
+        { label: 'First label', value: 'second-stable-value' },
+      ],
+      canCancel: false,
+    }, 0)
+
+    expect(createRunningTurnTimer(state, 3_000).pendingResponse?.timeoutResolution).toEqual({
+      kind: 'option',
+      selectedOption: 'first-stable-value',
+    })
+  })
+
+  it('stamps the first stable legal target as a mandatory timeout default', () => {
+    const state = makeState({ turnNumber: 3, phase: 'action' })
+    state.pendingTargetSelection = finalizePendingTargetSession(state, {
+      playerId: 'player-blue',
+      ownerPlayerId: 'player-blue',
+      title: 'Mandatory target response',
+      targetType: 'cell',
+      fixedCandidates: true,
+      candidates: [
+        { type: 'cell', x: 2, y: 1 },
+        { type: 'cell', x: 3, y: 1 },
+      ],
+      canCancel: false,
+    }, 0)
+
+    expect(createRunningTurnTimer(state, 3_000).pendingResponse?.timeoutResolution).toEqual({
+      kind: 'target',
+      targetX: 2,
+      targetY: 1,
     })
   })
 })

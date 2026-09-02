@@ -2,9 +2,43 @@ import { describe, expect, it } from 'vitest'
 
 import { createBattlePublicPatch } from '@/lib/game/battle-public-patch'
 import { toPublicBattleState } from '@/lib/game/deployment'
-import { makeState } from '../helpers/minimal-state'
+import { makePiece, makeState } from '../helpers/minimal-state'
 
 describe('battle public pending projection', () => {
+  it('keeps invisible piece status data private to its owner', () => {
+    const state = makeState({ pieces: [makePiece({ ownerPlayerId: 'player-red' })] })
+    const piece = state.pieces[0]
+    piece.ownerPlayerId = 'player-red'
+    piece.statusTags = [
+      { id: 'public-active', type: 'public-active', visible: true },
+      { id: 'secret-choice', type: 'secret-choice', visible: false, targetPieceId: 'secret-ally' },
+    ] as never
+
+    expect(toPublicBattleState(state, 'player-red').pieces[0].statusTags)
+      .toContainEqual(expect.objectContaining({ id: 'secret-choice', targetPieceId: 'secret-ally' }))
+    expect(toPublicBattleState(state, 'player-blue').pieces[0].statusTags)
+      .toEqual([{ id: 'public-active', type: 'public-active', visible: true }])
+    expect(toPublicBattleState(state).pieces[0].statusTags)
+      .toEqual([{ id: 'public-active', type: 'public-active', visible: true }])
+  })
+
+  it('redacts invisible status data after a piece enters the graveyard', () => {
+    const piece = makePiece({ instanceId: 'fallen-aizen', ownerPlayerId: 'player-red' })
+    piece.statusTags = [
+      { id: 'public-active', type: 'public-active', visible: true },
+      { id: 'secret-choice', type: 'secret-choice', visible: false, targetPieceId: 'secret-ally' },
+    ] as never
+    const state = makeState({ pieces: [] })
+    state.graveyard = [piece] as never
+
+    expect(toPublicBattleState(state, 'player-red').graveyard[0].statusTags)
+      .toContainEqual(expect.objectContaining({ id: 'secret-choice', targetPieceId: 'secret-ally' }))
+    expect(toPublicBattleState(state, 'player-blue').graveyard[0].statusTags)
+      .toEqual([{ id: 'public-active', type: 'public-active', visible: true }])
+    expect(toPublicBattleState(state).graveyard[0].statusTags)
+      .toEqual([{ id: 'public-active', type: 'public-active', visible: true }])
+  })
+
   it('keeps option candidates private to the pending owner', () => {
     const state = makeState()
     state.pendingOptionSelection = {

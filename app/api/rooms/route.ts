@@ -1,12 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getPlayerSeat, getRoomStore, type Room } from '@/lib/game/room-store'
 import { assertSelectableMapId, getMapSelectionErrorPayload } from '@/lib/game/map-selection'
+import {
+  assertGameProfileCompatibleV1,
+  getGameProfileErrorPayloadV1,
+  getServerGameProfileIdentityV1,
+} from '@/lib/content-pipeline/runtime/profile-game-identity'
+
+function profileErrorResponse(error: unknown): NextResponse {
+  const profileError = getGameProfileErrorPayloadV1(error)
+  if (!profileError) throw error
+  return NextResponse.json({
+    success: false,
+    error: profileError.message,
+    code: profileError.code,
+    context: profileError.context,
+  }, { status: profileError.status })
+}
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => ({}))
     const { mode, hostId, playerName, mapId } = body
 
+    const profileIdentity = assertGameProfileCompatibleV1(body.profileIdentity)
+    const serverProfileIdentity = getServerGameProfileIdentityV1()
     if (mode !== 'pve') {
       return NextResponse.json({ error: 'Only mode=pve is supported via REST' }, { status: 400 })
     }
@@ -41,6 +59,7 @@ export async function POST(req: NextRequest) {
       ready: true,
       hasSelectedPieces: false,
       selectedPieces: [],
+      profileIdentity,
     }]
     // Add bot player (blue)
     room.players.push({
@@ -54,6 +73,7 @@ export async function POST(req: NextRequest) {
       isBot: true,
       hasSelectedPieces: false,
       selectedPieces: [],
+      profileIdentity: serverProfileIdentity,
     })
     room.hostId = hostId
     room.mapId = selectedMapId
@@ -61,8 +81,11 @@ export async function POST(req: NextRequest) {
     room.maxPlayers = 2
 
     await roomStore.setRoom(roomId, room)
-    return NextResponse.json({ id: roomId, status: room.status, mapId: selectedMapId })
+    return NextResponse.json({ id: roomId, status: room.status, mapId: selectedMapId, profileIdentity: serverProfileIdentity })
   } catch (error) {
+    if (getGameProfileErrorPayloadV1(error)) {
+      return profileErrorResponse(error)
+    }
     const mapError = getMapSelectionErrorPayload(error)
     if (mapError) {
       return NextResponse.json({
@@ -81,6 +104,7 @@ export async function GET(req: NextRequest) {
   try {
     const roomStore = getRoomStore()
     const rooms = await roomStore.getAllRooms()
+    const profileIdentity = getServerGameProfileIdentityV1()
 
     const roomList = rooms.map(room => ({
       id: room.id,
@@ -103,9 +127,10 @@ export async function GET(req: NextRequest) {
       createdAt: room.createdAt,
       visibility: room.visibility || 'public',
       inviteCode: room.inviteCode,
+      profileIdentity,
     }))
 
-    return NextResponse.json({ rooms: roomList })
+    return NextResponse.json({ rooms: roomList, profileIdentity })
   } catch (error) {
     console.error('[GET /api/rooms] Error fetching rooms:', error)
     return NextResponse.json({ error: String(error) }, { status: 500 })

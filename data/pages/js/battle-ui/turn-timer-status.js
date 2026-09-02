@@ -11,28 +11,38 @@
   function create(options) {
     const input = options || {}
     const timer = input.timer
+    const pendingTimer = input.pendingTimer
     const now = Number(input.now)
-    const visible = !!timer && timer.status === 'running' && Number.isFinite(now)
+    const activeTimer = pendingTimer && pendingTimer.status === 'running' ? pendingTimer : timer
+    const visible = !!activeTimer && activeTimer.status === 'running' && Number.isFinite(now)
     if (!visible) {
       return {
         visible: false,
         remainingSeconds: 0,
         clockText: '--:--',
+        frozenClockText: '--:--',
         burning: false,
         fast: false,
         label: '回合计时',
       }
     }
 
-    const remainingMs = Math.max(0, Number(timer.deadlineAt) - now)
+    const responseActive = activeTimer === pendingTimer
+    const remainingMs = Math.max(0, Number(activeTimer.deadlineAt) - now)
     const remainingSeconds = Math.ceil(remainingMs / 1000)
-    const burning = timer.burning === true || now >= Number(timer.burnStartsAt)
-    const fast = timer.fast === true
-    const label = fast ? '快速烧绳' : (burning ? '烧绳阶段' : '回合计时')
+    const burning = !responseActive && (timer.burning === true || now >= Number(timer.burnStartsAt))
+    const fast = !responseActive && timer.fast === true
+    const frozenSeconds = timer && timer.paused
+      ? Math.ceil(Math.max(0, Number(timer.remainingMs) || 0) / 1000)
+      : 0
+    const label = responseActive
+      ? '响应计时（回合计时已冻结 ' + formatClock(frozenSeconds) + '）'
+      : fast ? '快速烧绳' : (burning ? '烧绳阶段' : '回合计时')
     return {
       visible: true,
       remainingSeconds,
       clockText: formatClock(remainingSeconds),
+      frozenClockText: responseActive ? formatClock(frozenSeconds) : '--:--',
       burning,
       fast,
       label,

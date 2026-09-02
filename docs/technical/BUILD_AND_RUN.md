@@ -386,8 +386,24 @@ Windows 输出目录：
 
 服务端 `win-unpacked` 当前仅用于内部候选、打包态安全检查和生命周期烟测，不是公开
 发行物；它不进入 `build:electron` 或 `build:all`，也没有安装器、签名或自动更新承诺。
-普通 Windows 玩家开服仍由客户端内嵌本地服务承担。完整决策边界见
-[`ADR-0003`](../decisions/ADR-0003-electron-server-packaging.md)。
+普通 Windows 玩家开服仍由客户端内嵌本地服务承担。当前 internal-only 候选的历史边界见
+[`ADR-0003`](../decisions/ADR-0003-electron-server-packaging.md)；取代后的公开发行方向见下节。
+
+#### RED-140 设计边界：尚无公开 Server 产物
+
+[RED-140](https://linear.app/redvsblue/issue/RED-140/冻结自治服务器发行边界运行状态与本地管理-api-v1)
+已经在设计层接受由
+[`ADR-0021`](../decisions/ADR-0021-autonomous-server-operations.md) 取代 ADR-0003 的
+internal-only 产品方向。未来公开 Server 的支持矩阵为 Windows 10 22H2 x64 与
+Windows 11 x64；对 Windows 10 的应用兼容支持不代表微软继续提供常规系统安全支持。
+
+公开候选必须由 [RED-148](https://linear.app/redvsblue/issue/RED-148/实现-windows-自治服务器安装签名更新与二进制回退流水线)
+实现并验证按用户 NSIS 安装器、update ZIP、Authenticode-signed runtime catalog、签名 release
+manifest、受控更新、备份和
+二进制回退门禁。在 RED-148 完成这些门禁前，现有 `build:electron:server`、
+`win-unpacked`、包验证器和 smoke 仍只产生内部证据，不得作为公开下载、安装或更新证据。
+公开构建、签名、安装、更新和回退的精确命令及候选记录也由 RED-148 在真实实现后补充；
+本设计章节不预先虚构命令，也不表示公开产物已经存在。
 
 `build:electron:server` 会在清理 staging 前自动运行 Server 产物验证器，逐 SHA-256
 核对 Electron main、管理面板、Next standalone 与静态资源、`public`、`data`、
@@ -661,3 +677,108 @@ Server 不属于 RED-18 的实现差异。
 没有执行会写出完整资源包的人工操作。回退 RED-18 的最终提交会保留主线 Electron 43.4
 和 Server 入口，但会撤销 editor-builder 26.15.3、ASAR、NSIS 及资源验证器，并重新暴露
 本任务所清理的构建工具链风险；回退后的旧构建不得发布。
+
+## 11. RED-118：统一内容发布链与 Windows candidate
+
+内容 Snapshot/Patch 现在统一走：
+
+```text
+build -> sign（非 Local Dev） -> validate -> resolve -> smoke -> report
+```
+
+推荐入口：
+
+```powershell
+npm.cmd run rvb -- build RED-118 snapshot --source <目录> --output <归档> --package-id <id> --version <SemVer> --display-name <名称> --publisher-id <publisher-id>
+npm.cmd run rvb -- build RED-118 patch --source <目录> --output <补丁归档> --package-id <id> --version <SemVer> --display-name <名称> --publisher-id <publisher-id> --parent-profile-hash <父Profile哈希> --operations-file <operations.json>
+npm.cmd run rvb -- validate RED-118 --archive <补丁归档> --base bundled --channel qa --trusted-key-id <publisher-key-id>
+npm.cmd run rvb -- resolve RED-118 --base bundled --patch <签名补丁> --channel qa --trusted-key-id <publisher-key-id>
+npm.cmd run rvb -- sign RED-118 --input <归档> --key-file <外部私钥> --output <签名归档> --channel qa
+npm.cmd run rvb -- smoke RED-118 --base bundled --patch <签名补丁> --seed 118 --channel qa --trusted-key-id <publisher-key-id>
+```
+
+命令使用结构化 argv，返回稳定退出码，并在
+`output/validation/RED-118/<run-id>/` 写 JSON 与 Markdown 报告。报告包含 package hash、
+resolved Profile hash、authority content hash、engine/content ABI、capabilities、signature/key ID、seed、
+失败 stage 及拒绝路径/content ID；
+不包含私钥正文或私钥路径。`scripts/build-resource-pack.js` 只用于旧调用方兼容，运行时会输出
+deprecated 警告并转发到同一 `rvb build` 实现。参数解析失败也以退出码 2 写标准报告；报告中的
+command 只保留脱敏后的结构，不记录原始 argv 或 key path。Patch 不能脱离父 Profile 单独验证：
+`validate` 必须通过 `--base` 和必要的重复 `--patch` 参数提供完整前置链。
+
+channel 约束：
+
+- `local-dev` 允许 unsigned/dev-only 输出。
+- `qa` 与 `community` 必须使用仓库外部的签名私钥；validate/resolve/smoke 还必须显式传入
+  `--trusted-key-id` allow-list，不能把“签名有效”等同于“publisher 受信”。
+- `stable` 必须使用外部私钥并显式提供人工确认；RED-118 candidate 不生成、不保存也不使用
+  真实 Stable 私钥。Stable 的人工确认与显式 publisher allow-list 任一缺失都必须 fail closed。
+
+Editor 的可写源、归档、临时密钥和报告位于 Electron `userData/content-authoring/`。renderer 只能
+通过封闭的 `content-operation` IPC 请求 build/validate/resolve/sign/smoke；main process 会校验
+调用窗口、字段集合及所有路径都在 authoring workspace 内；内容操作和旧数据 list/read/write/open
+IPC 的现存路径都做 realpath 校验并拒绝 symlink/junction 穿越，再交给已打包的
+`content-pipeline-worker.cjs`。操作通过有界串行队列执行，
+不会并发改写同一 authoring workspace。Portable/安装版 Editor 不调用系统 Node，也不依赖源码
+checkout。
+
+RED-118 内容候选可单独执行：
+
+```powershell
+npm.cmd run candidate:content-pipeline
+```
+
+完整 Windows candidate 由 `candidate` validation profile 编排内容候选、Server/Client/Editor
+正式打包和 `smoke:electron:windows -- server client editor profile`。它通过 candidate pointer 把
+同一 Base+图片 Patch+PVE 节点 Patch fixture 及其精确 hash 交给 CLI、打包 Editor、Client 和 Server；
+候选 fixture 的 build/sign/validate/resolve/smoke、篡改和渠道拒绝均先经过真实 CLI argv 适配器，
+再从逐操作落盘报告取得候选身份。Portable 与隔离安装后的 NSIS Editor 都在源码 checkout 外、无系统
+Node 的 PATH 下实际执行 build/sign/validate/resolve/fixed-seed smoke 全链。候选还验证 QA/Community 临时密钥、
+篡改拒绝、密钥轮换、Client/Server 激活/重启/回退，以及固定 seed PVE 的正式终局、奖励和
+结束状态。临时私钥在系统临时目录创建并在候选退出前删除；正式发布、上传、合并和真实 Stable
+签名仍需人工单独批准。
+
+candidate 全量测试前只把受跟踪的 frozen desktop `game-engine.js` 逐字节复制为被忽略的 Android
+测试镜像；它不运行会改写 frozen bundle 的生成器，也不把 Android 打包误写成 RED-118 验收范围。
+
+该 candidate 使用 `npm.cmd run lint:content-pipeline` 对 RED-118 全部代码执行空 suppressions lint；
+全量 Vitest 在候选中限制为两个 worker，降低 Windows 打包 fixture 与 Git fixture 的磁盘争用，测试集合
+和单测超时合同不变。
+`standard` profile 仍保留仓库全量 `npm.cmd run lint`。当前 `origin/main` 的全量 lint 会在
+ESLint flat config 中因 `import/no-anonymous-default-export` 所属 plugin 未挂载而失败，该基础设施
+问题不在 RED-118 允许路径内，不能通过本任务修改或隐藏。
+
+回退时停止新的内容构建，保留证据和最近已验证版本，把 Client/Server 的 `active.json` 切回
+`previousStable` 后回退 RED-118 提交。不得通过删除版本目录或绕过签名校验完成回退。
+
+## 12. RED-161：Windows LAN 内置 PostgreSQL
+
+玩家客户端的 LAN 房主不需要安装 PostgreSQL、创建数据库或执行 PowerShell 初始化。以下开发入口会
+自动下载并校验固定版本的官方 Windows x64 binary archive，裁剪到 `_client-postgres/`，再启动
+Electron：
+
+```powershell
+npm.cmd run dev:electron:client -- --rvb-dev-profile=player-one
+```
+
+首次下载约 317 MiB，但只把约 96 MiB 的 PostgreSQL runtime、server license 和命令行工具第三方许可证
+写入客户端构建；缓存目录和 staging 不进入
+Git。正式构建执行同一准备步骤并把运行时放入 `resources/postgres/`：
+
+```powershell
+npm.cmd run prepare:embedded-postgres
+node scripts/verify-embedded-postgres-package.mjs _client-postgres
+npm.cmd run build:electron:client
+```
+
+玩家选择本机 LAN 后，Electron 才会在 `<userData>/postgres/16/data` 初始化 PostgreSQL cluster，生成
+随机 SCRAM 密码并通过 `safeStorage` 加密到 `credential.bin`。数据库只监听 `127.0.0.1` 动态端口；
+Colyseus 仍监听 LAN 地址。远程加入者只启动 Profile 进程，不启动 PostgreSQL 或 Colyseus。
+
+官方 Server、K8s、CI 或已有数据库的开发环境通过 `RVB_POSTGRES_URL` 指定外部 PostgreSQL；该变量
+存在时内置数据库不会启动。兼容读取 `DATABASE_URL`，但协议必须是 `postgres:` 或 `postgresql:`，
+SQLite URL 会被拒绝。不要把密码写入日志或仓库。
+
+Electron 使用 PostgreSQL 官方 `pg_ctl` 启动实例；它会在 Windows 上为数据库子进程移除管理员权限，
+因此不要求玩家创建服务或额外本地账户，也支持从提权后的客户端开服。应用不会改用 SQLite、
+PGlite、trust 认证或内存数据库。

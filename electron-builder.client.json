@@ -5,6 +5,7 @@
   "extraMetadata": {
     "main": "electron-client/dist/main.js"
   },
+  "npmRebuild": false,
   "files": [
     "electron-client/dist/**",
     "electron-client/admin/**",
@@ -14,6 +15,8 @@
   ],
   "extraResources": [
     { "from": "_client-stage",       "to": "app/standalone" },
+    { "from": "_client-colyseus",    "to": "app/standalone/colyseus" },
+    { "from": "_client-postgres",    "to": "postgres" },
     { "from": "_client-stage/node_modules", "to": "app/standalone/node_modules" },
     { "from": "public",              "to": "app/public" },
     { "from": "data",                "to": "app/data" },

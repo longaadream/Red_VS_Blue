@@ -131,6 +131,32 @@ describe('Windows Electron client runtime', () => {
     expect(singleInstanceLock).toBeGreaterThan(profileConfiguration)
   })
 
+  test('uses a distinct initialized SQLite database for every named development profile', () => {
+    const defaultUserData = path.resolve('C:/Users/test/AppData/Roaming/RED vs BLUE')
+    const first = resolveDevelopmentProfile(
+      ['electron.exe', '--rvb-dev-profile=player-one'],
+      false,
+      defaultUserData,
+    )!
+    const second = resolveDevelopmentProfile(
+      ['electron.exe', '--rvb-dev-profile=player-two'],
+      false,
+      defaultUserData,
+    )!
+    const firstDatabase = path.join(first.userDataPath, 'game.db')
+    const secondDatabase = path.join(second.userDataPath, 'game.db')
+    const source = read('electron-client/main.ts')
+    const startLocalServer = source.slice(
+      source.indexOf('async function startLocalServer('),
+      source.indexOf('type JsonObject ='),
+    )
+
+    expect(firstDatabase).not.toBe(secondDatabase)
+    expect(startLocalServer).toContain("const dbPath = path.join(userData, 'game.db')")
+    expect(startLocalServer).toMatch(/if \(app\.isPackaged \|\| developmentProfile\)[\s\S]*?initDatabase\(dbPath, appRoot\)/)
+    expect(startLocalServer).toMatch(/else \{\s*databaseUrl = `file:\$\{path\.join\(appRoot, 'prisma', 'dev\.db'\)\}`/)
+  })
+
   test('shows identity initialization and save failures instead of swallowing them', () => {
     const page = read('data/pages/index.html')
 
@@ -146,13 +172,25 @@ describe('Windows Electron client runtime', () => {
   test('starts the packaged host on every interface with candidate authority features enabled', () => {
     const clientMain = read('electron-client/main.ts')
     const serverMain = read('electron/main.ts')
+    const profileRuntime = clientMain.slice(
+      clientMain.indexOf('async function startLocalServer('),
+      clientMain.indexOf('type JsonObject ='),
+    )
+    const gameAuthority = clientMain.slice(
+      clientMain.indexOf('async function startLocalGameAuthorityOnce('),
+      clientMain.indexOf('function findServerEntry('),
+    )
 
-    for (const source of [clientMain, serverMain]) {
-      expect(source).toContain("HOSTNAME: '0.0.0.0'")
+    expect(gameAuthority).toContain("RVB_COLYSEUS_HOST: '0.0.0.0'")
+    expect(serverMain).toContain("HOSTNAME: '0.0.0.0'")
+    for (const source of [gameAuthority, serverMain]) {
       expect(source).toContain("RVB_BATTLE_AUTHORITY_V2: '1'")
       expect(source).toContain("RVB_BATTLE_ASYNC_JOURNAL: '1'")
       expect(source).toContain("RVB_TURN_TIMER_ENABLED: '1'")
     }
+    expect(profileRuntime).toContain("HOSTNAME: '0.0.0.0'")
+    expect(profileRuntime).toContain("DISABLE_WS: '1'")
+    expect(profileRuntime).toContain("RVB_BATTLE_AUTHORITY_V2: '0'")
     expect(clientMain).not.toContain("HOSTNAME: '127.0.0.1'")
   })
 
@@ -161,7 +199,8 @@ describe('Windows Electron client runtime', () => {
     const websocket = read('data/pages/js/ws-client.js')
 
     expect(utilities).toMatch(/26\\\./)
-    expect(websocket).toMatch(/26\\\./)
+    expect(websocket).toContain("if (base && !/^[a-z]+:\\/\\//i.test(base)) base = 'http://' + base")
+    expect(websocket).not.toContain("base = 'https://' + base")
   })
 
 })

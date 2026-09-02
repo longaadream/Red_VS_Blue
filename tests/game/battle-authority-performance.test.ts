@@ -20,6 +20,7 @@ import type {
 import { RuleRuntime } from '@/lib/game/rule-runtime'
 import type { BattleAction, BattleState } from '@/lib/game/turn'
 import { makePiece, makeState } from '../helpers/minimal-state'
+import { createTestServerBattleState, pinTestBattleState } from './profile-test-identity'
 
 const PLAYERS = ['player-red', 'player-blue'] as const
 const ROOT_SEED = 0x52454431
@@ -340,6 +341,7 @@ function makeDeploymentRoom(id = 'red109-legacy-benchmark'): Room {
       { x: piece.x, y: piece.y },
     ])),
   }
+  pinTestBattleState(state, ROOT_SEED)
   recordBattleInitialization(state, new RuleRuntime({ rootSeed: ROOT_SEED }), [...PLAYERS])
 
   return {
@@ -356,11 +358,7 @@ function makeDeploymentRoom(id = 'red109-legacy-benchmark'): Room {
     version: 1,
     battleAuthorityVersion: 1,
     battleAuthorityTransitionHash: 'a'.repeat(64),
-    battleState: {
-      type: 'server-state',
-      seed: ROOT_SEED,
-      state,
-    } as any,
+    battleState: createTestServerBattleState(state, ROOT_SEED),
   }
 }
 

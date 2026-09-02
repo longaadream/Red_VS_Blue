@@ -98,9 +98,11 @@ activation transaction；安装、回退与激活事务互斥。
 
 ## 5. 活动对局 lease
 
-任何 `status === "in-progress"` 的权威房间（包括由同一 RoomStore 承载的 PVE active battle）都是
-authority Profile lease。`authority-restart` 的 plan 和 commit 都重新查询 lease；只要存在 lease，就返回
-稳定错误 `409 PROFILE_IN_USE`，不创建/提交新指针。等待室和已结束房间不持有 lease。
+RED-116 起，任何仍有占位玩家的 `waiting` / `ready` 权威房间（包括真人或由同一 RoomStore 承载的
+Bot）都持有 authority Profile lease，`in-progress` 房间则始终持有 lease。`authority-restart` 的 plan
+和 commit 都重新查询 lease；只要存在 lease，就返回稳定错误 `409 PROFILE_IN_USE`，不创建/提交新指针。
+真人与 Bot 全部离开后，空的等待/准备房间释放 lease；已结束房间不持有活动 authority lease。具体握手与
+存档固定合同见 [Resolved Profile 房间握手与对局固定](./RESOLVED_PROFILE_ROOM_HANDSHAKE.md)。
 
 RED-115 不实现新的 PVE Runner，也不把旧浏览器 localStorage PVE 原型提升为 v1 权威 Run。后续 Runner
 必须把 active battle 放入同一服务端 lease 边界，且固定 `authorityContentHash`。

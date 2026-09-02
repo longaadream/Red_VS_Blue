@@ -10,7 +10,9 @@ import {
   scheduleRoomDeploymentTimeout,
 } from '@/lib/game/room-battle-actions'
 import type { Room } from '@/lib/game/room-store'
+import { createTestServerBattleState, pinTestBattleState } from './profile-test-identity'
 import { RuleRuntime } from '@/lib/game/rule-runtime'
+import { loadRuleById } from '@/lib/game/skills'
 import { makePiece, makeState } from '../helpers/minimal-state'
 
 const PLAYERS = ['player-red', 'player-blue'] as const
@@ -80,6 +82,7 @@ function makeDeploymentRoom(id = 'deployment-room', deadlineAt = 46_000): Room {
       { x: piece.x, y: piece.y },
     ])),
   }
+  pinTestBattleState(state, ROOT_SEED)
   recordBattleInitialization(state, new RuleRuntime({ rootSeed: ROOT_SEED }), [...PLAYERS])
 
   return {
@@ -94,13 +97,153 @@ function makeDeploymentRoom(id = 'deployment-room', deadlineAt = 46_000): Room {
     currentTurnIndex: 0,
     actions: [],
     version: 1,
-    battleState: {
-      type: 'server-state',
-      seed: ROOT_SEED,
-      state,
-    } as any,
+    battleState: createTestServerBattleState(state, ROOT_SEED) as any,
   }
 }
+
+function makeWatcherDeploymentRoom(id = 'watcher-deployment-room', deadlineAt = 5_000): Room {
+  const room = makeDeploymentRoom(id, deadlineAt)
+  const state = (room.battleState as any).state
+  const watcher = state.pieces.find((piece: any) => piece.instanceId === 'piece-1')
+  const watcherRule = loadRuleById('rule-watcher-form', true)
+  if (!watcher || !watcherRule) throw new Error('Watcher deployment fixture could not load')
+  watcher.templateId = 'blue-watcher'
+  watcher.name = '观者'
+  watcher.rules = [watcherRule]
+  return room
+}
+
+function makeProgressiveDeploymentRoom(id = 'progressive-deployment-room'): Room {
+  const reservePiece = (instanceId: string, ownerPlayerId: string, faction: 'red' | 'blue') => ({
+    ...makePiece({ instanceId, ownerPlayerId, faction, x: 0, y: 0, moveRange: 2 }),
+    isCore: true,
+    name: instanceId,
+    x: null,
+    y: null,
+    buffs: [],
+    debuffs: [],
+    ruleTags: [],
+  })
+  const redReserve = reservePiece('red-reserve', PLAYERS[0], 'red')
+  const blueReserve = reservePiece('blue-reserve', PLAYERS[1], 'blue')
+  const redVanguard = {
+    ...makePiece({
+      instanceId: 'red-vanguard',
+      ownerPlayerId: PLAYERS[0],
+      faction: 'red',
+      x: 5,
+      y: 4,
+    }),
+    isCore: true,
+  }
+  const blueVanguard = {
+    ...makePiece({
+      instanceId: 'blue-vanguard',
+      ownerPlayerId: PLAYERS[1],
+      faction: 'blue',
+      x: 5,
+      y: 3,
+    }),
+    isCore: true,
+  }
+  const state = makeState({
+    pieces: [redVanguard, blueVanguard],
+    currentPlayerId: PLAYERS[0],
+    phase: 'start',
+  }) as any
+  state.gameStartFired = true
+  state.deployment = {
+    mode: 'progressive-reserve-v1',
+    status: 'awaiting-reserve-deploy',
+    playerIds: [...PLAYERS],
+    choices: {},
+    locks: {},
+    startedAt: 1_000,
+    deadlineAt: 46_000,
+    revision: 1,
+    initialPositions: {
+      [redVanguard.instanceId]: { x: redVanguard.x, y: redVanguard.y },
+      [blueVanguard.instanceId]: { x: blueVanguard.x, y: blueVanguard.y },
+    },
+    reserves: {
+      [PLAYERS[0]]: [redReserve],
+      [PLAYERS[1]]: [blueReserve],
+    },
+    reserveCounts: { [PLAYERS[0]]: 1, [PLAYERS[1]]: 1 },
+    activePlayerId: PLAYERS[0],
+    offerTurnNumber: 1,
+    offerPieceIds: [redReserve.instanceId],
+    legalPositions: [{ x: 0, y: 0 }],
+  }
+  pinTestBattleState(state, ROOT_SEED)
+  recordBattleInitialization(state, new RuleRuntime({ rootSeed: ROOT_SEED }), [...PLAYERS])
+
+  return {
+    id,
+    name: id,
+    status: 'in-progress',
+    players: [
+      { id: PLAYERS[0], name: 'Red', seat: 'red', alignment: 'light' },
+      { id: PLAYERS[1], name: 'Blue', seat: 'blue', alignment: 'dark' },
+    ],
+    spectators: [],
+    currentTurnIndex: 0,
+    actions: [],
+    version: 1,
+    battleState: createTestServerBattleState(state, ROOT_SEED) as any,
+  }
+}
+
+describe('RED-138 progressive deployment room authority', () => {
+  it('projects the private offer only to its owner and commits directly into tagged action play', async () => {
+    const store = new MemoryRoomStore(makeProgressiveDeploymentRoom())
+    const clock = { now: () => 2_000 }
+    const ownerBefore = createPublicBattleSnapshot(store.room, PLAYERS[0], clock).state
+    const opponentBefore = createPublicBattleSnapshot(store.room, PLAYERS[1], clock).state
+    const beforeAp = (store.room.battleState as any).state.players
+      .find((player: any) => player.playerId === PLAYERS[0]).actionPoints
+
+    expect(ownerBefore.deployment?.offerPieceIds).toEqual(['red-reserve'])
+    expect(ownerBefore.deployment?.legalPositions).toEqual([{ x: 0, y: 0 }])
+    expect(ownerBefore.deployment?.reserves).toEqual({})
+    expect(opponentBefore.deployment?.offerPieceIds).toEqual([])
+    expect(opponentBefore.deployment?.legalPositions).toEqual([])
+    expect(JSON.stringify(opponentBefore)).not.toContain('red-reserve')
+
+    const deployed = await dispatchRoomBattleAction(store, store.room.id, PLAYERS[0], {
+      type: 'deployReservePiece',
+      playerId: PLAYERS[0],
+      expectedDeploymentRevision: ownerBefore.deployment!.revision,
+      pieceId: 'red-reserve',
+      toX: 0,
+      toY: 0,
+      clientActionId: 'progressive-deploy-red',
+    }, { clock })
+
+    expect(deployed.kind).toBe('applied')
+    expect(deployed.snapshot.state.deployment).toMatchObject({
+      status: 'turn-ready',
+    })
+    const authorityState = (store.room.battleState as any).state
+    expect(authorityState.pieces).toContainEqual(expect.objectContaining({
+      instanceId: 'red-reserve',
+      isCore: true,
+      x: 0,
+      y: 0,
+      statusTags: [expect.objectContaining({
+        type: 'deployment-first-move-free',
+        grantedTurnNumber: authorityState.turn.turnNumber,
+      })],
+    }))
+    expect(authorityState.deployment.reserves[PLAYERS[0]]).toEqual([])
+    expect(authorityState.players.find((player: any) => player.playerId === PLAYERS[0]).actionPoints)
+      .toBe(beforeAp)
+
+    expect(authorityState.turn.phase).toBe('action')
+    expect(authorityState.deployment.status).toBe('turn-ready')
+    expect(store.writes).toBe(1)
+  })
+})
 
 describe('RED-31 authoritative deployment room actions', () => {
   it('accepts a late deployment lock without settling timeout when the timer flag is disabled', async () => {
@@ -243,6 +386,50 @@ describe('RED-31 authoritative deployment room actions', () => {
       [PLAYERS[0]]: { pieceId: null },
       [PLAYERS[1]]: { pieceId: null },
     })
+  })
+
+  it('accepts the authoritative Watcher option created by deployment timeout after the deadline', async () => {
+    const room = makeWatcherDeploymentRoom()
+    const store = new MemoryRoomStore(room)
+
+    await dispatchRoomBattleAction(store, room.id, PLAYERS[1], {
+      type: 'deploymentLock',
+      playerId: PLAYERS[1],
+      clientActionId: 'blue-lock-before-watcher-timeout',
+    }, { clock: { now: () => 2_000 } })
+    await dispatchRoomBattleAction(store, room.id, undefined, {
+      type: 'deploymentTimeout',
+      now: 5_000,
+      clientActionId: 'watcher-deployment-timeout',
+    }, {
+      allowSystem: true,
+      clock: { now: () => 5_000 },
+    })
+
+    const timedOutState = (store.room.battleState as any).state
+    const pending = timedOutState.pendingOptionSelection
+    expect(pending).toMatchObject({
+      playerId: PLAYERS[0],
+      source: { type: 'rule', id: 'rule-watcher-form', pieceId: 'piece-1' },
+    })
+    expect(pending.transaction.rootAction).toMatchObject({ type: 'deploymentTimeout' })
+
+    const result = await dispatchRoomBattleAction(store, room.id, PLAYERS[0], {
+      type: 'pendingOptionSelect',
+      playerId: PLAYERS[0],
+      selectedOption: 'calm',
+      selectionId: pending.selectionId,
+      stateRevision: pending.stateRevision,
+      clientActionId: 'watcher-calm-after-deployment-timeout',
+    } as any, { clock: { now: () => 5_001 } })
+    const completed = (store.room.battleState as any).state
+
+    expect(result.kind).toBe('applied')
+    expect(completed.pendingOptionSelection).toBeUndefined()
+    expect(completed.deployment.status).toBe('complete')
+    expect(completed.turn).toMatchObject({ currentPlayerId: PLAYERS[0], phase: 'action' })
+    expect(completed.players.find((player: any) => player.playerId === PLAYERS[0])?.hand)
+      .toContainEqual(expect.objectContaining({ cardId: 'watcher-calm' }))
   })
 
 

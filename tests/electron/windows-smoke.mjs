@@ -1,11 +1,9 @@
-import { execFileSync, spawn } from 'node:child_process'
-import { createHash } from 'node:crypto'
-import { cpSync, existsSync, mkdtempSync, readFileSync, rmSync, unlinkSync, writeFileSync } from 'node:fs'
+import { execFileSync, spawn, spawnSync } from 'node:child_process'
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, unlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 
-import { ed25519 } from '@noble/curves/ed25519.js'
-import AdmZip from 'adm-zip'
+import { Client as ColyseusClient } from '@colyseus/sdk'
 
 const root = path.resolve(import.meta.dirname, '..', '..')
 const applications = {
@@ -45,74 +43,36 @@ function assert(condition, message) {
   if (!condition) throw new Error(message)
 }
 
-function sha256Hex(bytes) {
-  return createHash('sha256').update(bytes).digest('hex')
-}
-
-function canonicalJson(value) {
-  if (value === null || typeof value === 'boolean' || typeof value === 'string') {
-    return JSON.stringify(value)
+function loadContentCandidateFixture() {
+  const pointerPath = path.join(
+    root,
+    'output',
+    'validation',
+    'RED-118',
+    'content-candidate-latest.json',
+  )
+  if (!existsSync(pointerPath)) {
+    execFileSync(process.execPath, [
+      path.join(root, 'scripts', 'rvb.mjs'),
+      'content-candidate',
+      'RED-118',
+    ], { cwd: root, windowsHide: true, stdio: 'pipe', timeout: 180000 })
   }
-  if (typeof value === 'number') {
-    assert(Number.isFinite(value), 'Canonical JSON fixture numbers must be finite')
-    return Object.is(value, -0) ? '0' : String(value)
-  }
-  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`
-  assert(value && typeof value === 'object', `Unsupported canonical JSON value: ${typeof value}`)
-  return `{${Object.keys(value).sort().map((key) => (
-    `${JSON.stringify(key)}:${canonicalJson(value[key])}`
-  )).join(',')}}`
-}
-
-function createSignedAuthorityPatchArchive(parentProfileHash) {
-  const payloadPath = 'data/rules/red-115-windows-smoke.json'
-  const payload = Buffer.from(JSON.stringify({
-    schemaVersion: 'rvb-red-115-windows-smoke/v1',
-    marker: 'profile-b',
-  }))
-  const secretKey = Uint8Array.from({ length: 32 }, (_value, index) => index + 1)
-  const publicKey = Buffer.from(ed25519.getPublicKey(secretKey))
-  const keyId = sha256Hex(publicKey)
-  const manifest = {
-    schemaVersion: 'rvb-pack/v1',
-    packageId: 'red-115-windows-smoke',
-    version: '1.0.0',
-    displayName: 'RED-115 Windows smoke Profile B',
-    publisher: { id: 'red-115-smoke', keyId },
-    compatibility: { engineAbi: 'rvb-engine/v1', contentAbi: 'rvb-content/v1' },
-    capabilities: ['game-data'],
-    files: [{
-      path: payloadPath,
-      mediaType: 'application/json',
-      size: payload.byteLength,
-      sha256: sha256Hex(payload),
-    }],
-    kind: 'patch',
-    parentProfileHash,
-    operations: [{ op: 'add', targetPath: payloadPath, sourcePath: payloadPath }],
-  }
-  const packageHash = sha256Hex(Buffer.concat([
-    Buffer.from('RVB_PACK_IDENTITY_V1\0'),
-    Buffer.from(canonicalJson(manifest)),
-  ]))
-  const signatureMessage = Buffer.concat([
-    Buffer.from('RVB_PACK_SIGNATURE_V1\0'),
-    Buffer.from(packageHash, 'hex'),
-  ])
-  const signature = Buffer.from(ed25519.sign(signatureMessage, secretKey)).toString('hex')
-  const envelope = {
-    schemaVersion: 'rvb-pack-signature/v1',
-    algorithm: 'Ed25519',
-    keyId,
-    publicKey: publicKey.toString('hex'),
-    packageHash,
-    signature,
-  }
-  const zip = new AdmZip()
-  zip.addFile('manifest.json', Buffer.from(JSON.stringify(manifest)))
-  zip.addFile('signature.json', Buffer.from(JSON.stringify(envelope)))
-  zip.addFile(payloadPath, payload)
-  return { archive: zip.toBuffer(), payloadPath, packageHash }
+  const candidate = JSON.parse(readFileSync(pointerPath, 'utf8'))
+  assert(
+    candidate.schemaVersion === 'rvb-red-118-candidate-pointer/v1'
+      && candidate.status === 'PASS'
+      && /^[0-9a-f]{64}$/.test(candidate.finalProfileHash)
+      && /^[0-9a-f]{64}$/.test(candidate.authorityContentHash)
+      && /^[0-9a-f]{64}$/.test(candidate.qaKeyId)
+      && candidate.contentAbi === 'rvb-content/v1'
+      && existsSync(candidate.fixture?.image?.sourceDir)
+      && existsSync(candidate.fixture?.image?.signedArchive)
+      && existsSync(candidate.fixture?.pve?.sourceDir)
+      && existsSync(candidate.fixture?.pve?.signedArchive),
+    `Invalid RED-118 content candidate pointer: ${pointerPath}`,
+  )
+  return candidate
 }
 
 async function getJson(url) {
@@ -191,6 +151,13 @@ async function evaluate(target, expression, awaitPromise = true, timeoutMs = 300
   }
 }
 
+async function evaluateFireAndForget(target, expression) {
+  const connection = await connectTarget(target)
+  connection.evaluateFireAndForget(expression)
+  await delay(50)
+  connection.close()
+}
+
 async function waitForPackStatus(application, predicate, timeoutMs = 120000) {
   const deadline = Date.now() + timeoutMs
   let observed = null
@@ -207,6 +174,40 @@ async function waitForPackStatus(application, predicate, timeoutMs = 120000) {
     await delay(250)
   }
   throw new Error(`Profile status did not converge: ${JSON.stringify(observed)}`)
+}
+
+let nextRendererNavigationId = 0
+
+async function beginProfileNavigation(target, expression) {
+  const marker = `red118-navigation-${process.pid}-${Date.now()}-${++nextRendererNavigationId}`
+  await evaluateFireAndForget(
+    target,
+    `window.__rvbRed118NavigationMarker = ${JSON.stringify(marker)}; void (${expression})`,
+  )
+  return marker
+}
+
+async function waitForGameRendererAfterNavigation(application, marker, timeoutMs = 30000) {
+  const deadline = Date.now() + timeoutMs
+  let observedTargets = []
+  while (Date.now() < deadline) {
+    try {
+      const targets = await getJson(`http://127.0.0.1:${application.debugPort}/json`)
+      observedTargets = targets.map(({ title, type, url }) => ({ title, type, url }))
+      const target = targets.find(candidate => candidate.url.startsWith('rvb-client://app/index.html'))
+      if (target) {
+        const state = await evaluate(target, `({
+          markerCleared: window.__rvbRed118NavigationMarker !== ${JSON.stringify(marker)},
+          readyState: document.readyState
+        })`, true, 5000)
+        if (state?.markerCleared === true && state.readyState === 'complete') return target
+      }
+    } catch {}
+    await delay(250)
+  }
+  throw new Error(
+    `Game renderer did not finish navigation for ${marker}: ${JSON.stringify(observedTargets)}`,
+  )
 }
 
 async function waitForActivationTransaction(activePath, targetProfileHash, timeoutMs = 15000) {
@@ -302,12 +303,11 @@ function stopApplication(application) {
 
 async function isReachable(port) {
   try {
-    const result = await callGameRpc(
-      `ws://127.0.0.1:${port}/ws/rooms/__lobby`,
-      'system.health',
-      {},
-    )
-    return result.ok === true && result.data?.protocol === 'rvb-ws'
+    const response = await fetch(`http://127.0.0.1:${port}/healthz`, {
+      signal: AbortSignal.timeout(2000),
+    })
+    const result = await response.json()
+    return response.ok && result.ok === true && ['rvb-ws', 'rvb-colyseus'].includes(result.protocol)
   } catch {
     return false
   }
@@ -344,6 +344,8 @@ async function probeGameWebSocket(url) {
         type: 'subscribe',
         roomId: '__lobby',
         playerId: 'red53-windows-smoke',
+        protocolVersion: 3,
+        authorityBuildId: 'rvb-authority-v3-chunked-sha256-1',
       }))
       socket.send(JSON.stringify({
         type: 'rpc',
@@ -500,12 +502,16 @@ async function launch(application, timeoutMs = 30000) {
     `--remote-debugging-port=${application.debugPort}`,
     ...(application.launchArguments ?? []),
   ], {
+    cwd: application.workingDirectory,
     detached: true,
     stdio: process.env.RVB_SMOKE_CHILD_STDIO === 'inherit' ? 'inherit' : 'ignore',
     windowsHide: true,
     env: application.userDataDir
-      ? { ...process.env, RVB_ELECTRON_USER_DATA_DIR: path.resolve(application.userDataDir) }
-      : process.env,
+      ? {
+          ...(application.environment ?? process.env),
+          RVB_ELECTRON_USER_DATA_DIR: path.resolve(application.userDataDir),
+        }
+      : (application.environment ?? process.env),
   })
   child.unref()
   const launchedPid = child.pid
@@ -523,8 +529,15 @@ async function launch(application, timeoutMs = 30000) {
   return { target, rendererBoundary }
 }
 
-async function smokeServer() {
+async function smokeServer(expectedIdentity = null, sharedUserDataDir = null) {
   const application = applications.server
+  const originalUserDataDir = application.userDataDir
+  const configuredUserDataDir = sharedUserDataDir ?? process.env.RVB_SMOKE_USER_DATA_DIR
+  const userDataDir = configuredUserDataDir
+    ? path.resolve(configuredUserDataDir)
+    : mkdtempSync(path.join(tmpdir(), 'rvb-server-windows-smoke-'))
+  const ownsUserDataDir = !configuredUserDataDir
+  application.userDataDir = userDataDir
   let result = null
   try {
     const { target, rendererBoundary } = await launch(application, 90000)
@@ -535,9 +548,15 @@ async function smokeServer() {
       await delay(250)
     }
     assert(initial?.running === true && initial.port === 3000 && await isReachable(3000), `Server did not become ready on port 3000: ${JSON.stringify(initial)}`)
+    const resourcePackStatus = await evaluate(target, `window.electronAPI.getResourcePackStatus()`)
     const health = await callGameRpc(
       'ws://127.0.0.1:3000/ws/rooms/__lobby',
       'system.health',
+      {},
+    )
+    const catalogIdentity = await callGameRpc(
+      'ws://127.0.0.1:3000/ws/rooms/__lobby',
+      'catalog.identity',
       {},
     )
     const rooms = await callGameRpc(
@@ -552,6 +571,25 @@ async function smokeServer() {
       health.ok === true && health.data?.protocol === 'rvb-ws',
       'Public same-port WebSocket system.health failed: ' + JSON.stringify(health),
     )
+    if (expectedIdentity) {
+      assert(
+        catalogIdentity.data?.profileIdentity?.resolvedProfileHash === expectedIdentity.resolvedProfileHash
+          && catalogIdentity.data?.profileIdentity?.authorityContentHash === expectedIdentity.authorityContentHash
+          && catalogIdentity.data?.profileIdentity?.engineAbi === expectedIdentity.engineAbi,
+        `Standalone Server Profile identity mismatch: ${JSON.stringify(catalogIdentity.data?.profileIdentity)}`,
+      )
+      assert(
+        resourcePackStatus?.state?.stable?.resolvedProfileHash === expectedIdentity.resolvedProfileHash
+          && resourcePackStatus.state.stable.authorityContentHash === expectedIdentity.authorityContentHash
+          && resourcePackStatus.state.stable.compatibility?.engineAbi === expectedIdentity.engineAbi
+          && resourcePackStatus.state.stable.compatibility?.contentAbi === expectedIdentity.contentAbi
+          && resourcePackStatus.server?.profile?.resolvedProfileHash === expectedIdentity.resolvedProfileHash
+          && resourcePackStatus.server.profile.authorityContentHash === expectedIdentity.authorityContentHash
+          && resourcePackStatus.server.profile.compatibility?.engineAbi === expectedIdentity.engineAbi
+          && resourcePackStatus.server.profile.compatibility?.contentAbi === expectedIdentity.contentAbi,
+        `Standalone Server runtime Profile reference mismatch: ${JSON.stringify(resourcePackStatus)}`,
+      )
+    }
     assert(
       rooms.ok === true && Array.isArray(rooms.data?.rooms),
       'Public same-port WebSocket rooms.list failed: ' + JSON.stringify(rooms),
@@ -597,9 +635,12 @@ async function smokeServer() {
       rendererBoundary,
       websocketRpc: {
         health,
+        catalogIdentity,
         rooms,
       },
       publicWebSocket,
+      profileIdentity: catalogIdentity.data?.profileIdentity,
+      resourcePackStatus,
       rejectedNavigation,
       stopped: true,
       port3000Reachable: false,
@@ -608,6 +649,9 @@ async function smokeServer() {
   } finally {
     stopApplication(application)
     stopDebugTarget(application.debugPort)
+    await waitForExecutableCleanup([application.executable, ...(application.helperExecutables ?? [])])
+    application.userDataDir = originalUserDataDir
+    if (ownsUserDataDir) rmSync(userDataDir, { recursive: true, force: true })
   }
 
   const candidateExecutables = [application.executable, ...(application.helperExecutables ?? [])]
@@ -621,7 +665,7 @@ async function smokeServer() {
   console.log(JSON.stringify({ ...result, exitedCleanly: true, processCountsAfterExit }))
 }
 
-async function smokeClient() {
+async function smokeClient(expectedIdentity = null, sharedUserDataDir = null) {
   const application = applications.client
   const sourcePackageRoot = path.dirname(application.executable)
   const isolatedPackageBase = mkdtempSync(path.join(tmpdir(), 'rvb-client-package-smoke-'))
@@ -636,12 +680,13 @@ async function smokeClient() {
   const originalExecutable = application.executable
   const originalHelperExecutables = application.helperExecutables
   const originalUserDataDir = application.userDataDir
-  const configuredUserDataDir = process.env.RVB_SMOKE_USER_DATA_DIR
+  const configuredUserDataDir = sharedUserDataDir ?? process.env.RVB_SMOKE_USER_DATA_DIR
   const userDataDir = configuredUserDataDir
     ? path.resolve(configuredUserDataDir)
     : mkdtempSync(path.join(tmpdir(), 'rvb-client-windows-smoke-'))
   const ownsUserDataDir = !configuredUserDataDir
   application.userDataDir = userDataDir
+  let smokeError = null
   try {
     assert(existsSync(sourcePackageRoot), `Missing source client package: ${sourcePackageRoot}`)
     cpSync(sourcePackageRoot, isolatedPackageRoot, { recursive: true })
@@ -651,7 +696,10 @@ async function smokeClient() {
       `Client smoke package must be outside the repository: ${isolatedPackageRoot}`,
     )
     application.executable = path.join(isolatedPackageRoot, 'RED vs BLUE.exe')
-    application.helperExecutables = [path.join(isolatedPackageRoot, 'resources', 'node.exe')]
+    application.helperExecutables = [
+      path.join(isolatedPackageRoot, 'resources', 'node.exe'),
+      path.join(isolatedPackageRoot, 'resources', 'postgres', 'pgsql', 'bin', 'postgres.exe'),
+    ]
     assert(
       existsSync(path.join(isolatedPackageRoot, 'resources', 'app', 'standalone', 'node_modules', 'next', 'package.json')),
       'Isolated client package is missing the standalone Next.js runtime',
@@ -671,7 +719,19 @@ async function smokeClient() {
     })`, true, 20000)
     assert(tlsProbe === 'rejected', `Client unexpectedly accepted an invalid HTTPS certificate: ${tlsProbe}`)
     connection.evaluateFireAndForget(`window.electronAPI.openLocalGame()`)
-    const gameTarget = await waitForTargets(application.debugPort, (candidate) => candidate.url.startsWith('rvb-client://app/index.html'))
+    await delay(2_000)
+    connection.evaluateFireAndForget(`Promise.all([
+      window.electronAPI.openLocalGame(),
+      window.electronAPI.openLocalGame(),
+    ])`)
+    // A cold machine may spend tens of seconds in Windows Defender scanning,
+    // runtime integrity verification and first-cluster initdb. This is startup
+    // work, not the gameplay latency budget.
+    const gameTarget = await waitForTargets(
+      application.debugPort,
+      candidate => candidate.url.startsWith('rvb-client://app/index.html'),
+      60_000,
+    )
     connection.close()
     let gameBridgeReady = false
     for (let attempt = 0; attempt < 40; attempt += 1) {
@@ -713,62 +773,119 @@ async function smokeClient() {
     }))`)
     assert(packagedAssets.every(([, ok, size]) => ok && size > 0), `Client packaged assets are incomplete: ${JSON.stringify(packagedAssets)}`)
     assert(mode.ready === true && mode.isLocal === true, `Client local mode is not ready: ${JSON.stringify(mode)}`)
+    assert(
+      mode.profileIdentity
+        && mode.profileIdentity.schemaVersion === 'rvb-game-profile-identity/v1'
+        && typeof mode.profileIdentity.resolvedProfileHash === 'string'
+        && typeof mode.profileIdentity.authorityContentHash === 'string',
+      `Client did not publish its recovered Profile identity through trusted IPC: ${JSON.stringify(mode)}`,
+    )
+    assert(
+      mode.localAuthorityProfileIdentity
+        && mode.localAuthorityProfileIdentity.schemaVersion === 'rvb-game-profile-identity/v1',
+      `Client did not publish the running authority Profile identity: ${JSON.stringify(mode)}`,
+    )
+    const rendererProfileIdentity = await evaluate(
+      gameTarget,
+      `getLocalGameProfileIdentity(${JSON.stringify(mode.localUrl)})`,
+    )
+    assert(
+      JSON.stringify(rendererProfileIdentity) === JSON.stringify(mode.localAuthorityProfileIdentity),
+      `Client renderer did not consume the running authority Profile identity: ${JSON.stringify({ rendererProfileIdentity, authorityProfileIdentity: mode.localAuthorityProfileIdentity })}`,
+    )
     const localGatewayPort = mode.localUrl ? Number(new URL(mode.localUrl).port) : 38521
     assert(await isReachable(localGatewayPort), 'Client local gateway is not reachable')
     const localBaseUrl = `http://127.0.0.1:${localGatewayPort}`
     const legacyPlayerRestResponse = await fetch(`${localBaseUrl}/api/rooms`, {
       signal: AbortSignal.timeout(2000),
     })
-    const legacyPlayerRestBody = await legacyPlayerRestResponse.json()
+    const legacyPlayerRestBody = await legacyPlayerRestResponse.text()
     assert(
-      legacyPlayerRestResponse.status === 410 && legacyPlayerRestBody.code === 'PLAYER_REST_DISABLED',
-      `Legacy player REST boundary was not disabled: ${legacyPlayerRestResponse.status} ${JSON.stringify(legacyPlayerRestBody)}`,
+      legacyPlayerRestResponse.status === 404,
+      `Legacy player REST boundary was not disabled: ${legacyPlayerRestResponse.status} ${legacyPlayerRestBody.slice(0, 200)}`,
     )
-    const roomWsUrl = `ws://127.0.0.1:${localGatewayPort}/ws/rooms/__lobby`
-    const roomsBeforeCreate = await callGameRpc(
-      roomWsUrl,
-      'rooms.list',
-      {},
+    const catalogIdentityResponse = await fetch(`${localBaseUrl}/catalog/identity`, {
+      signal: AbortSignal.timeout(2000),
+    })
+    const catalogIdentity = { ok: catalogIdentityResponse.ok, data: await catalogIdentityResponse.json() }
+    assert(
+      JSON.stringify(catalogIdentity.data?.profileIdentity) === JSON.stringify(mode.localAuthorityProfileIdentity)
+        && JSON.stringify(catalogIdentity.data?.profileIdentity) === JSON.stringify(rendererProfileIdentity),
+      `Client IPC, renderer, and authority Profile identities diverged: ${JSON.stringify({ catalogIdentity: catalogIdentity.data?.profileIdentity, modeAuthorityIdentity: mode.localAuthorityProfileIdentity, rendererProfileIdentity })}`,
     )
+    const resourcePackStatus = await evaluate(gameTarget, `window.electronAPI.packList()`)
+    assert(
+      catalogIdentity.ok === true
+        && typeof catalogIdentity.data?.profileIdentity?.resolvedProfileHash === 'string'
+        && typeof catalogIdentity.data?.profileIdentity?.authorityContentHash === 'string',
+      `Fresh client did not expose its resolved Profile identity: ${JSON.stringify(catalogIdentity)}`,
+    )
+    if (expectedIdentity) {
+      assert(
+        catalogIdentity.data.profileIdentity.resolvedProfileHash === expectedIdentity.resolvedProfileHash
+          && catalogIdentity.data.profileIdentity.authorityContentHash === expectedIdentity.authorityContentHash
+          && catalogIdentity.data.profileIdentity.engineAbi === expectedIdentity.engineAbi,
+        `Packaged Client Profile identity mismatch: ${JSON.stringify(catalogIdentity.data.profileIdentity)}`,
+      )
+      assert(
+        resourcePackStatus?.state?.stable?.resolvedProfileHash === expectedIdentity.resolvedProfileHash
+          && resourcePackStatus.state.stable.authorityContentHash === expectedIdentity.authorityContentHash
+          && resourcePackStatus.state.stable.compatibility?.engineAbi === expectedIdentity.engineAbi
+          && resourcePackStatus.state.stable.compatibility?.contentAbi === expectedIdentity.contentAbi
+          && resourcePackStatus.server?.profile?.resolvedProfileHash === expectedIdentity.resolvedProfileHash
+          && resourcePackStatus.server.profile.authorityContentHash === expectedIdentity.authorityContentHash
+          && resourcePackStatus.server.profile.compatibility?.engineAbi === expectedIdentity.engineAbi
+          && resourcePackStatus.server.profile.compatibility?.contentAbi === expectedIdentity.contentAbi,
+        `Packaged Client runtime Profile reference mismatch: ${JSON.stringify(resourcePackStatus)}`,
+      )
+    }
+    const roomsBeforeCreateResponse = await fetch(`${localBaseUrl}/rooms`, {
+      signal: AbortSignal.timeout(2000),
+    })
+    const roomsBeforeCreate = { ok: roomsBeforeCreateResponse.ok, data: await roomsBeforeCreateResponse.json() }
     assert(
       roomsBeforeCreate.ok === true
         && Array.isArray(roomsBeforeCreate.data?.rooms)
         && roomsBeforeCreate.data.rooms.length === 0,
       `Fresh client database did not return an empty room list: ${JSON.stringify(roomsBeforeCreate)}`,
     )
-    const createdRoom = await callGameRpc(
-      `ws://127.0.0.1:${localGatewayPort}/ws/rooms/__lobby`,
-      'rooms.create',
-      {
-        hostId: 'red126-windows-smoke',
-        name: 'RED-126 Windows smoke room',
-        mapId: 'winding-pass',
-        visibility: 'public',
-      },
-    )
+    const colyseusClient = new ColyseusClient(`ws://127.0.0.1:${localGatewayPort}`)
+    const smokeRoom = await colyseusClient.create('battle', {
+      product: true,
+      playerId: 'red161-windows-smoke',
+      playerName: 'RED-161 Windows smoke',
+      name: 'RED-161 Windows smoke room',
+      mapId: 'winding-pass',
+      visibility: 'public',
+      profileIdentity: catalogIdentity.data.profileIdentity,
+    })
+    const createdRoom = {
+      ok: true,
+      data: { id: smokeRoom.roomId, mapId: 'winding-pass' },
+    }
     assert(
       createdRoom.ok === true
         && typeof createdRoom.data?.id === 'string'
         && createdRoom.data?.mapId === 'winding-pass',
       `Fresh client database could not create a room: ${JSON.stringify(createdRoom)}`,
     )
-    const roomsAfterCreate = await callGameRpc(
-      roomWsUrl,
-      'rooms.list',
-      {},
-    )
+    const roomsAfterCreateResponse = await fetch(`${localBaseUrl}/rooms`, {
+      signal: AbortSignal.timeout(2000),
+    })
+    const roomsAfterCreate = { ok: roomsAfterCreateResponse.ok, data: await roomsAfterCreateResponse.json() }
     assert(
       roomsAfterCreate.ok === true
         && Array.isArray(roomsAfterCreate.data?.rooms)
         && roomsAfterCreate.data.rooms.some((room) => room.id === createdRoom.data.id),
       `Created room was not persisted in the client database: ${JSON.stringify(roomsAfterCreate)}`,
     )
+    await smokeRoom.leave()
     const pieceGallery = await verifyPieceGallery(application.debugPort, gameTarget)
     const battle = await verifyBattleTerminalError(application.debugPort, pieceGallery.target)
     assert(battle.runtime.readyState === 'complete', `Battle page did not finish loading: ${JSON.stringify(battle.runtime)}`)
     assert(battle.runtime.messageColor === 'rgb(248, 113, 113)', `Battle page did not style its terminal error: ${JSON.stringify(battle.runtime)}`)
     assert(battle.runtime.spinnerDisplay === 'none', `Battle page kept spinning after a terminal error: ${JSON.stringify(battle.runtime)}`)
-    await evaluate(battle.target, 'window.close(); true', false)
+    await evaluateFireAndForget(battle.target, 'window.close()')
     assert(await waitForDebuggerExit(application.debugPort), 'Client left its main Electron process after its last window closed')
     assert(await waitForUnreachable(localGatewayPort), 'Client left its local gateway listening after exit')
     const candidateExecutables = [application.executable, ...(application.helperExecutables ?? [])]
@@ -785,30 +902,43 @@ async function smokeClient() {
       homepageWindowBoundary,
       packagedAssets,
       localMode: mode,
+      profileIdentity: catalogIdentity.data.profileIdentity,
+      resourcePackStatus,
       databaseProbe: { roomsBeforeCreate, createdRoom, roomsAfterCreate },
-      legacyPlayerRest: { status: legacyPlayerRestResponse.status, body: legacyPlayerRestBody },
+      legacyPlayerRest: { status: legacyPlayerRestResponse.status },
       pieceGallery: { all: pieceGallery.all, light: pieceGallery.light, dark: pieceGallery.dark },
       battleRuntime: battle.runtime,
       exitedCleanly: true,
       processCountsAfterExit,
     }))
+  } catch (error) {
+    smokeError = error
+    throw error
   } finally {
     stopApplication(application)
     stopDebugTarget(application.debugPort)
     application.executable = originalExecutable
     application.helperExecutables = originalHelperExecutables
     application.userDataDir = originalUserDataDir
-    if (ownsUserDataDir) rmSync(userDataDir, { recursive: true, force: true })
-    rmSync(isolatedPackageBase, { recursive: true, force: true })
+    try {
+      if (ownsUserDataDir) rmSync(userDataDir, { recursive: true, force: true })
+      rmSync(isolatedPackageBase, { recursive: true, force: true })
+    } catch (cleanupError) {
+      if (!smokeError) throw cleanupError
+      console.error(`[RVB smoke] Cleanup also failed after the primary error: ${cleanupError instanceof Error ? cleanupError.message : cleanupError}`)
+    }
   }
 }
 
-async function smokeProfileActivation() {
+async function smokeProfileActivation(candidate, sharedUserDataDir = null) {
   const application = applications.client
   const sourcePackageRoot = path.dirname(application.executable)
-  const isolatedPackageBase = mkdtempSync(path.join(tmpdir(), 'rvb-red115-profile-package-'))
+  const isolatedPackageBase = mkdtempSync(path.join(tmpdir(), 'rvb-red118-profile-package-'))
   const isolatedPackageRoot = path.join(isolatedPackageBase, 'win-unpacked')
-  const userDataDir = mkdtempSync(path.join(tmpdir(), 'rvb-red115-profile-user-'))
+  const userDataDir = sharedUserDataDir
+    ? path.resolve(sharedUserDataDir)
+    : mkdtempSync(path.join(tmpdir(), 'rvb-red118-profile-user-'))
+  const ownsUserDataDir = !sharedUserDataDir
   const originalExecutable = application.executable
   const originalHelperExecutables = application.helperExecutables
   const originalUserDataDir = application.userDataDir
@@ -837,20 +967,65 @@ async function smokeProfileActivation() {
     const profileAHash = initial.status.state.stable.resolvedProfileHash
     assert(initial.status.state.stable.kind === 'bundled-base', 'Profile A must start as Bundled Base')
 
-    const fixture = createSignedAuthorityPatchArchive(profileAHash)
-    const installed = await evaluate(
+    assert(
+      profileAHash === candidate.baseProfileHash,
+      `Candidate Base identity mismatch: ${profileAHash} / ${candidate.baseProfileHash}`,
+    )
+    const imageArchive = readFileSync(candidate.fixture.image.signedArchive)
+    const imageInstalled = await evaluate(
       initialGameTarget,
-      `window.electronAPI.packImportData(${JSON.stringify(fixture.archive.toString('base64'))}, 'red-115-profile-b.zip')`,
+      `window.electronAPI.packImportData(${JSON.stringify(imageArchive.toString('base64'))}, 'red-118-image-patch.rvbpack')`,
       true,
       60000,
     )
-    assert(installed?.ok === true, `Profile B installation failed: ${JSON.stringify(installed)}`)
-    assert(installed.reloadMode === 'authority-restart', `Profile B did not require authority restart: ${JSON.stringify(installed)}`)
-    const profileBHash = installed.profile?.resolvedProfileHash
-    assert(typeof profileBHash === 'string' && profileBHash !== profileAHash, 'Profile B hash must differ from A')
-
-    const installedStatus = await waitForPackStatus(application, (status) => (
+    assert(imageInstalled?.ok === true, `Image Profile installation failed: ${JSON.stringify(imageInstalled)}`)
+    assert(
+      imageInstalled.reloadMode === 'presentation-refresh',
+      `Image Profile did not use presentation refresh: ${JSON.stringify(imageInstalled)}`,
+    )
+    const imageProfileHash = imageInstalled.profile?.resolvedProfileHash
+    assert(
+      imageProfileHash === candidate.imageProfileHash,
+      `Installed image Profile mismatch: ${imageProfileHash} / ${candidate.imageProfileHash}`,
+    )
+    const imageInstalledStatus = await waitForPackStatus(application, (status) => (
       status?.state?.stable?.resolvedProfileHash === profileAHash
+      && status.state?.candidate?.resolvedProfileHash === imageProfileHash
+    ))
+    const imageActivationMarker = await beginProfileNavigation(
+      imageInstalledStatus.target,
+      `window.electronAPI.packActivate(${JSON.stringify(imageProfileHash)})`,
+    )
+    await waitForPackStatus(application, (status) => (
+      status?.state?.stable?.resolvedProfileHash === imageProfileHash
+      && status.state?.previousStable?.resolvedProfileHash === profileAHash
+      && status.state?.candidate === null
+      && status.state?.activation === null
+      && status.server?.healthy === true
+    ))
+    const imageActivatedTarget = await waitForGameRendererAfterNavigation(
+      application,
+      imageActivationMarker,
+    )
+    const pveArchive = readFileSync(candidate.fixture.pve.signedArchive)
+    const installed = await evaluate(
+      imageActivatedTarget,
+      `window.electronAPI.packImportData(${JSON.stringify(pveArchive.toString('base64'))}, 'red-118-pve-patch.rvbpack')`,
+      true,
+      60000,
+    )
+    assert(installed?.ok === true, `PVE Profile installation failed: ${JSON.stringify(installed)}`)
+    assert(
+      installed.reloadMode === 'authority-restart',
+      `PVE Profile did not require authority restart: ${JSON.stringify(installed)}`,
+    )
+    const profileBHash = installed.profile?.resolvedProfileHash
+    assert(
+      profileBHash === candidate.finalProfileHash,
+      `Installed final Profile mismatch: ${profileBHash} / ${candidate.finalProfileHash}`,
+    )
+    const installedStatus = await waitForPackStatus(application, (status) => (
+      status?.state?.stable?.resolvedProfileHash === imageProfileHash
       && status.state?.candidate?.resolvedProfileHash === profileBHash
     ))
     const activePath = path.join(userDataDir, 'resource-pack', 'active.json')
@@ -864,10 +1039,9 @@ async function smokeProfileActivation() {
     )
     faultedPayloadBytes = readFileSync(faultedPayloadPath)
 
-    await evaluate(
+    await evaluateFireAndForget(
       installedStatus.target,
-      `window.electronAPI.packActivate(${JSON.stringify(profileBHash)}); true`,
-      false,
+      `void window.electronAPI.packActivate(${JSON.stringify(profileBHash)})`,
     )
     const interruptedActivation = await waitForActivationTransaction(activePath, profileBHash)
     stopApplication(application)
@@ -889,31 +1063,30 @@ async function smokeProfileActivation() {
       30000,
     )
     const recovered = await waitForPackStatus(application, (status) => (
-      status?.state?.stable?.resolvedProfileHash === profileAHash
+      status?.state?.stable?.resolvedProfileHash === imageProfileHash
       && status.state?.candidate?.resolvedProfileHash === profileBHash
       && status.state?.activation === null
       && status.state?.lastFailure?.code === 'ACTIVATION_INTERRUPTED'
       && status.state?.lastFailure?.stage === 'startup-recovery'
       && status.state?.lastFailure?.targetProfileHash === profileBHash
       && status.server?.healthy === true
-      && status.server?.profile?.resolvedProfileHash === profileAHash
+      && status.server?.profile?.resolvedProfileHash === imageProfileHash
     ))
 
-    await evaluate(
+    await evaluateFireAndForget(
       recovered.target,
-      `window.electronAPI.packActivate(${JSON.stringify(profileBHash)}); true`,
-      false,
+      `void window.electronAPI.packActivate(${JSON.stringify(profileBHash)})`,
     )
     const failedActivation = await waitForActivationTransaction(activePath, profileBHash)
     unlinkSync(faultedPayloadPath)
 
     const failed = await waitForPackStatus(application, (status) => (
-      status?.state?.stable?.resolvedProfileHash === profileAHash
+      status?.state?.stable?.resolvedProfileHash === imageProfileHash
       && status.state?.candidate?.resolvedProfileHash === profileBHash
       && status.state?.activation === null
       && status.state?.lastFailure?.targetProfileHash === profileBHash
       && status.server?.healthy === true
-      && status.server?.profile?.resolvedProfileHash === profileAHash
+      && status.server?.profile?.resolvedProfileHash === imageProfileHash
     ))
     assert(
       failed.status.state.lastFailure.stage === 'candidate-server-health',
@@ -925,38 +1098,85 @@ async function smokeProfileActivation() {
     )
 
     writeFileSync(faultedPayloadPath, faultedPayloadBytes)
+    assert(
+      readFileSync(faultedPayloadPath).equals(faultedPayloadBytes),
+      `Faulted Profile payload did not restore byte-for-byte: ${faultedRelativePath}`,
+    )
     faultedPayloadPath = null
     faultedPayloadBytes = null
 
-    await evaluate(
+    const restoredInstall = await evaluate(
       failed.target,
-      `window.electronAPI.packActivate(${JSON.stringify(profileBHash)}); true`,
-      false,
+      `window.electronAPI.packImportData(${JSON.stringify(pveArchive.toString('base64'))}, 'red-118-pve-patch-restored.rvbpack')`,
+      true,
+      60000,
+    )
+    assert(
+      restoredInstall?.ok === true
+        && restoredInstall.profile?.resolvedProfileHash === profileBHash,
+      `Restored PVE Profile did not pass canonical re-import verification: ${JSON.stringify(restoredInstall)}`,
+    )
+    const restored = await waitForPackStatus(application, (status) => (
+      status?.state?.stable?.resolvedProfileHash === imageProfileHash
+      && status.state?.candidate?.resolvedProfileHash === profileBHash
+      && status.state?.activation === null
+      && status.server?.healthy === true
+      && status.server?.profile?.resolvedProfileHash === imageProfileHash
+    ))
+
+    const finalActivationMarker = await beginProfileNavigation(
+      restored.target,
+      `window.electronAPI.packActivate(${JSON.stringify(profileBHash)})`,
     )
     const activated = await waitForPackStatus(application, (status) => (
       status?.state?.stable?.resolvedProfileHash === profileBHash
-      && status.state?.previousStable?.resolvedProfileHash === profileAHash
+      && status.state?.previousStable?.resolvedProfileHash === imageProfileHash
       && status.state?.candidate === null
       && status.state?.activation === null
       && status.server?.healthy === true
       && status.server?.profile?.resolvedProfileHash === profileBHash
     ))
+    const activatedTarget = await waitForGameRendererAfterNavigation(
+      application,
+      finalActivationMarker,
+    )
 
-    await evaluate(
-      activated.target,
-      "window.electronAPI.packRollback('previous-stable'); true",
-      false,
+    const previousRollbackMarker = await beginProfileNavigation(
+      activatedTarget,
+      "window.electronAPI.packRollback('previous-stable')",
     )
     const rolledBack = await waitForPackStatus(application, (status) => (
-      status?.state?.stable?.resolvedProfileHash === profileAHash
+      status?.state?.stable?.resolvedProfileHash === imageProfileHash
       && status.state?.previousStable?.resolvedProfileHash === profileBHash
       && status.state?.candidate === null
       && status.state?.activation === null
       && status.server?.healthy === true
-      && status.server?.profile?.resolvedProfileHash === profileAHash
+      && status.server?.profile?.resolvedProfileHash === imageProfileHash
     ))
+    const rolledBackTarget = await waitForGameRendererAfterNavigation(
+      application,
+      previousRollbackMarker,
+    )
 
-    await evaluate(rolledBack.target, 'window.close(); true', false)
+    const finalRollbackMarker = await beginProfileNavigation(
+      rolledBackTarget,
+      "window.electronAPI.packRollback('previous-stable')",
+    )
+    const finalActivated = await waitForPackStatus(application, (status) => (
+      status?.state?.stable?.resolvedProfileHash === profileBHash
+      && status.state?.previousStable?.resolvedProfileHash === imageProfileHash
+      && status.state?.candidate === null
+      && status.state?.activation === null
+      && status.server?.healthy === true
+      && status.server?.profile?.resolvedProfileHash === profileBHash
+      && status.server?.profile?.authorityContentHash === candidate.authorityContentHash
+    ))
+    const finalActivatedTarget = await waitForGameRendererAfterNavigation(
+      application,
+      finalRollbackMarker,
+    )
+
+    await evaluateFireAndForget(finalActivatedTarget, 'window.close()')
     const processCountsAfterExit = await waitForExecutableCleanup([
       application.executable,
       ...(application.helperExecutables ?? []),
@@ -969,8 +1189,12 @@ async function smokeProfileActivation() {
       entry: 'profile',
       rendererBoundary,
       profileAHash,
+      imageProfileHash,
       profileBHash,
-      packageHash: fixture.packageHash,
+      finalProfileHash: candidate.finalProfileHash,
+      authorityContentHash: candidate.authorityContentHash,
+      imagePackageHash: candidate.imagePackageHash,
+      pvePackageHash: candidate.pvePackageHash,
       interruptedActivationId: interruptedActivation.activationId,
       stableAfterInterruptRecovery: recovered.status.state.stable.resolvedProfileHash,
       serverAfterInterruptRecovery: recovered.status.server.profile.resolvedProfileHash,
@@ -981,9 +1205,18 @@ async function smokeProfileActivation() {
       stableAfterSuccess: activated.status.state.stable.resolvedProfileHash,
       stableAfterRollback: rolledBack.status.state.stable.resolvedProfileHash,
       serverAfterRollback: rolledBack.status.server.profile.resolvedProfileHash,
+      stableForFourEntryParity: finalActivated.status.state.stable.resolvedProfileHash,
+      serverForFourEntryParity: finalActivated.status.server.profile.resolvedProfileHash,
       exitedCleanly: true,
       processCountsAfterExit,
     }))
+    return {
+      resolvedProfileHash: candidate.finalProfileHash,
+      authorityContentHash: candidate.authorityContentHash,
+      engineAbi: candidate.engineAbi,
+      contentAbi: candidate.contentAbi,
+      baseProfileHash: profileAHash,
+    }
   } finally {
     if (faultedPayloadPath && faultedPayloadBytes && !existsSync(faultedPayloadPath)) {
       writeFileSync(faultedPayloadPath, faultedPayloadBytes)
@@ -993,36 +1226,474 @@ async function smokeProfileActivation() {
     application.executable = originalExecutable
     application.helperExecutables = originalHelperExecutables
     application.userDataDir = originalUserDataDir
-    rmSync(userDataDir, { recursive: true, force: true })
+    if (ownsUserDataDir) rmSync(userDataDir, { recursive: true, force: true })
     rmSync(isolatedPackageBase, { recursive: true, force: true })
   }
 }
 
-async function smokeEditor() {
-  const application = applications.editor
+async function rollbackSharedCandidateToBase(expectedIdentity, userDataDir) {
+  const application = applications.client
+  const originalUserDataDir = application.userDataDir
+  application.userDataDir = path.resolve(userDataDir)
   try {
+    const { target } = await launch(application, 45000)
+    await evaluate(target, 'window.electronAPI.openLocalGame(); true', false)
+    await waitForTargets(
+      application.debugPort,
+      (candidate) => candidate.url.startsWith('rvb-client://app/index.html'),
+      30000,
+    )
+    const active = await waitForPackStatus(application, (status) => (
+      status?.state?.stable?.resolvedProfileHash === expectedIdentity.resolvedProfileHash
+      && status.server?.healthy === true
+      && status.server?.profile?.resolvedProfileHash === expectedIdentity.resolvedProfileHash
+    ))
+    const baseRollbackMarker = await beginProfileNavigation(
+      active.target,
+      "window.electronAPI.packRollback('bundled-base')",
+    )
+    const rolledBack = await waitForPackStatus(application, (status) => (
+      status?.state?.stable?.resolvedProfileHash === expectedIdentity.baseProfileHash
+      && status.state?.candidate === null
+      && status.state?.activation === null
+      && status.server?.healthy === true
+      && status.server?.profile?.resolvedProfileHash === expectedIdentity.baseProfileHash
+    ))
+    const rolledBackTarget = await waitForGameRendererAfterNavigation(
+      application,
+      baseRollbackMarker,
+    )
+    await evaluateFireAndForget(rolledBackTarget, 'window.close()')
+    assert(
+      await waitForDebuggerExit(application.debugPort),
+      'Final Base rollback left the Client process reachable',
+    )
+    console.log(JSON.stringify({
+      entry: 'profile-base-rollback',
+      fromProfileHash: expectedIdentity.resolvedProfileHash,
+      stableAfterRollback: rolledBack.status.state.stable.resolvedProfileHash,
+      serverAfterRollback: rolledBack.status.server.profile.resolvedProfileHash,
+      exitedCleanly: true,
+    }))
+  } finally {
+    stopApplication(application)
+    stopDebugTarget(application.debugPort)
+    application.userDataDir = originalUserDataDir
+  }
+}
+
+function assertOwnedChild(ownerRoot, candidatePath, label) {
+  const owner = path.resolve(ownerRoot)
+  const candidate = path.resolve(candidatePath)
+  const relative = path.relative(owner, candidate)
+  assert(
+    relative.length > 0
+      && !relative.startsWith('..' + path.sep)
+      && !path.isAbsolute(relative),
+    `${label} must stay under its owned temporary root: ${candidate}`,
+  )
+  return candidate
+}
+
+const EDITOR_UNINSTALL_ROOTS = [
+  'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall',
+  'HKLM\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall',
+]
+
+function editorUninstallRegistrations() {
+  const systemRoot = process.env.SystemRoot || 'C:\\Windows'
+  const registryTool = path.join(systemRoot, 'System32', 'reg.exe')
+  const matches = []
+  for (const registryRoot of EDITOR_UNINSTALL_ROOTS) {
+    const probe = spawnSync(registryTool, [
+      'query', registryRoot, '/s', '/f', 'RED vs BLUE Editor',
+    ], {
+      encoding: 'utf8',
+      windowsHide: true,
+      timeout: 15000,
+    })
+    if (probe.error) throw probe.error
+    if (probe.status === 0) matches.push(registryRoot)
+    else if (probe.status !== 1) {
+      throw new Error(`Editor uninstall registry probe failed (${registryRoot}): ${probe.status}`)
+    }
+  }
+  return matches
+}
+
+async function waitForEditorUnregistered(timeoutMs = 60000) {
+  const deadline = Date.now() + timeoutMs
+  let observed = editorUninstallRegistrations()
+  while (observed.length > 0 && Date.now() < deadline) {
+    await delay(250)
+    observed = editorUninstallRegistrations()
+  }
+  return observed
+}
+
+async function waitForPathRemoval(targetPath, timeoutMs = 60000) {
+  const deadline = Date.now() + timeoutMs
+  while (existsSync(targetPath) && Date.now() < deadline) await delay(250)
+  return !existsSync(targetPath)
+}
+
+function hermeticEditorEnvironment(emptyPathDirectory) {
+  const environment = { ...process.env }
+  for (const key of Object.keys(environment)) {
+    const upper = key.toUpperCase()
+    if (
+      upper === 'PATH'
+      || upper === 'NODE'
+      || upper === 'NODE_PATH'
+      || upper === 'NODE_OPTIONS'
+      || upper === 'ELECTRON_RUN_AS_NODE'
+      || upper === 'APP_ROOT_DIR'
+      || upper === 'INIT_CWD'
+      || upper === 'PWD'
+      || upper.startsWith('RVB_')
+      || upper.startsWith('NPM_')
+    ) delete environment[key]
+  }
+  environment.Path = path.resolve(emptyPathDirectory)
+  return environment
+}
+
+function assertNoNodeOnPath(environment, workingDirectory) {
+  const systemRoot = process.env.SystemRoot || 'C:\\Windows'
+  const whereTool = path.join(systemRoot, 'System32', 'where.exe')
+  const probe = spawnSync(whereTool, ['/Q', 'node.exe'], {
+    cwd: workingDirectory,
+    env: environment,
+    windowsHide: true,
+    stdio: 'ignore',
+    timeout: 10000,
+  })
+  if (probe.error) throw probe.error
+  assert(probe.status === 1, `Editor hermetic PATH exposed node.exe (where exit ${probe.status})`)
+}
+
+async function smokeEditorDistribution(candidate, distribution) {
+  const application = applications.editor
+  const originalExecutable = application.executable
+  const originalLaunchArguments = application.launchArguments
+  const originalWorkingDirectory = application.workingDirectory
+  const originalEnvironment = application.environment
+  const userDataDir = path.resolve(distribution.userDataDir)
+  const authoringRoot = path.join(userDataDir, 'content-authoring')
+  const keyFile = path.join(authoringRoot, 'keys', 'qa.key')
+  try {
+    application.executable = path.resolve(distribution.executable)
+    application.launchArguments = [`--user-data-dir=${userDataDir}`]
+    application.workingDirectory = path.resolve(distribution.workingDirectory)
+    application.environment = distribution.environment
+    const imageSource = path.join(authoringRoot, 'sources', 'candidate-image')
+    const pveSource = path.join(authoringRoot, 'sources', 'candidate-pve')
+    mkdirSync(path.dirname(imageSource), { recursive: true })
+    mkdirSync(path.dirname(keyFile), { recursive: true })
+    cpSync(candidate.fixture.image.sourceDir, imageSource, { recursive: true })
+    cpSync(candidate.fixture.pve.sourceDir, pveSource, { recursive: true })
+    writeFileSync(keyFile, `${'31'.repeat(32)}\n`, 'utf8')
+
     const startedAt = Date.now()
     const { target, rendererBoundary } = await launch(application, 300000)
     const startupMilliseconds = Date.now() - startedAt
     const counts = await evaluate(target, `Promise.all(['pieces', 'skills', 'cards', 'rules'].map(async (directory) => [directory, (await window.editorAPI.listFiles(directory)).length]))`)
     assert(counts.every(([, count]) => count > 0), `Editor could not list packaged data files: ${JSON.stringify(counts)}`)
-    await evaluate(target, 'window.close(); true', false)
-    assert(await waitForDebuggerExit(application.debugPort), 'Editor portable process did not exit after its window closed')
-    console.log(JSON.stringify({ entry: 'editor', portableArtifact: application.executable, startupMilliseconds, rendererBoundary, dataFileCounts: Object.fromEntries(counts), exitedCleanly: true }))
+    const visibleOperations = await evaluate(target, `({
+      tabs: [...document.querySelectorAll('[data-pipeline-operation]')].map((node) => node.dataset.pipelineOperation),
+      forms: [...document.querySelectorAll('[data-operation-form]')].map((node) => node.dataset.operationForm),
+      actions: [...document.querySelectorAll('[data-run-operation]')].map((node) => node.dataset.runOperation)
+    })`)
+    const expectedOperations = ['build', 'sign', 'validate', 'resolve', 'smoke']
+    assert(
+      expectedOperations.every(operation => visibleOperations.tabs.includes(operation)
+        && visibleOperations.forms.includes(operation)
+        && visibleOperations.actions.includes(operation)),
+      `Packaged Editor does not expose the full visible operation chain: ${JSON.stringify(visibleOperations)}`,
+    )
+    const imageBuild = await evaluate(target, `window.editorAPI.contentOperation(${JSON.stringify({
+      operation: 'build',
+      taskId: 'RED-118',
+      channel: 'local-dev',
+      ...candidate.fixture.image.build,
+      source: 'sources/candidate-image',
+      output: 'archives/image-unsigned.rvbpack',
+      compressionLevel: 9,
+    })})`, true, 180000)
+    assert(imageBuild?.ok === true, `Packaged Editor image build failed: ${JSON.stringify(imageBuild)}`)
+    assert(
+      imageBuild.report?.identity?.packageHash === candidate.imageUnsignedPackageHash,
+      `CLI/Editor image build hash mismatch: ${candidate.imageUnsignedPackageHash} / ${imageBuild.report?.identity?.packageHash}`,
+    )
+    const imageSign = await evaluate(target, `window.editorAPI.contentOperation(${JSON.stringify({
+      operation: 'sign',
+      taskId: 'RED-118',
+      channel: 'qa',
+      input: 'archives/image-unsigned.rvbpack',
+      output: 'archives/image-qa.rvbpack',
+      keyFile: 'keys/qa.key',
+    })})`, true, 180000)
+    assert(
+      imageSign?.ok === true
+        && imageSign.report?.identity?.packageHash === candidate.imagePackageHash
+        && imageSign.report?.identity?.publisherKeyId === candidate.qaKeyId,
+      `Packaged Editor image sign parity failed: ${JSON.stringify(imageSign)}`,
+    )
+    const imageValidation = await evaluate(target, `window.editorAPI.contentOperation(${JSON.stringify({
+      operation: 'validate',
+      taskId: 'RED-118',
+      channel: 'qa',
+      archive: 'archives/image-qa.rvbpack',
+      base: 'bundled',
+      patches: [],
+      trustedKeyIds: [candidate.qaKeyId],
+    })})`, true, 180000)
+    assert(imageValidation?.ok === true, `Packaged Editor image validation failed: ${JSON.stringify(imageValidation)}`)
+
+    const pveBuild = await evaluate(target, `window.editorAPI.contentOperation(${JSON.stringify({
+      operation: 'build',
+      taskId: 'RED-118',
+      channel: 'local-dev',
+      ...candidate.fixture.pve.build,
+      source: 'sources/candidate-pve',
+      output: 'archives/pve-unsigned.rvbpack',
+      compressionLevel: 0,
+    })})`, true, 180000)
+    assert(
+      pveBuild?.ok === true
+        && pveBuild.report?.identity?.packageHash === candidate.pveUnsignedPackageHash,
+      `Packaged Editor PVE build parity failed: ${JSON.stringify(pveBuild)}`,
+    )
+    const pveSign = await evaluate(target, `window.editorAPI.contentOperation(${JSON.stringify({
+      operation: 'sign',
+      taskId: 'RED-118',
+      channel: 'qa',
+      input: 'archives/pve-unsigned.rvbpack',
+      output: 'archives/pve-qa.rvbpack',
+      keyFile: 'keys/qa.key',
+    })})`, true, 180000)
+    assert(
+      pveSign?.ok === true
+        && pveSign.report?.identity?.packageHash === candidate.pvePackageHash,
+      `Packaged Editor PVE sign parity failed: ${JSON.stringify(pveSign)}`,
+    )
+    const pveValidation = await evaluate(target, `window.editorAPI.contentOperation(${JSON.stringify({
+      operation: 'validate',
+      taskId: 'RED-118',
+      channel: 'qa',
+      archive: 'archives/pve-qa.rvbpack',
+      base: 'bundled',
+      patches: ['archives/image-qa.rvbpack'],
+      trustedKeyIds: [candidate.qaKeyId],
+    })})`, true, 180000)
+    assert(pveValidation?.ok === true, `Packaged Editor PVE validation failed: ${JSON.stringify(pveValidation)}`)
+    const editorResolve = await evaluate(target, `window.editorAPI.contentOperation(${JSON.stringify({
+      operation: 'resolve',
+      taskId: 'RED-118',
+      channel: 'qa',
+      base: 'bundled',
+      patches: ['archives/image-qa.rvbpack', 'archives/pve-qa.rvbpack'],
+      trustedKeyIds: [candidate.qaKeyId],
+    })})`, true, 180000)
+    assert(
+      editorResolve?.ok === true
+        && editorResolve.report?.identity?.resolvedProfileHash === candidate.finalProfileHash
+        && editorResolve.report?.identity?.authorityContentHash === candidate.authorityContentHash
+        && editorResolve.report?.identity?.engineAbi === candidate.engineAbi
+        && editorResolve.report?.identity?.contentAbi === candidate.contentAbi,
+      `CLI/Editor resolved Profile identity mismatch: ${JSON.stringify(editorResolve)}`,
+    )
+    const editorSmoke = await evaluate(target, `window.editorAPI.contentOperation(${JSON.stringify({
+      operation: 'smoke',
+      taskId: 'RED-118',
+      channel: 'qa',
+      base: 'bundled',
+      patches: ['archives/image-qa.rvbpack', 'archives/pve-qa.rvbpack'],
+      trustedKeyIds: [candidate.qaKeyId],
+      seed: candidate.seed,
+    })})`, true, 180000)
+    assert(
+      editorSmoke?.ok === true
+        && editorSmoke.report?.identity?.resolvedProfileHash === candidate.finalProfileHash
+        && editorSmoke.report?.smoke?.terminalResult?.status === 'finished'
+        && editorSmoke.report?.smoke?.endOutcome === 'completed',
+      `Packaged Editor PVE smoke failed: ${JSON.stringify(editorSmoke)}`,
+    )
+    rmSync(keyFile, { force: true })
+    await evaluateFireAndForget(target, 'window.close()')
+    assert(
+      await waitForDebuggerExit(application.debugPort),
+      `Editor ${distribution.kind} process did not exit after its window closed`,
+    )
+    console.log(JSON.stringify({
+      entry: `editor-${distribution.kind}`,
+      distribution: distribution.kind,
+      artifact: application.executable,
+      startupMilliseconds,
+      rendererBoundary,
+      dataFileCounts: Object.fromEntries(counts),
+      visibleOperations,
+      sourceCheckoutUnavailable: true,
+      systemNodeUnavailable: true,
+      cliImagePackageHash: candidate.imagePackageHash,
+      editorImagePackageHash: imageSign.report.identity.packageHash,
+      cliPvePackageHash: candidate.pvePackageHash,
+      editorPvePackageHash: pveSign.report.identity.packageHash,
+      cliResolvedProfileHash: candidate.finalProfileHash,
+      editorResolvedProfileHash: editorResolve.report.identity.resolvedProfileHash,
+      authorityContentHash: editorResolve.report.identity.authorityContentHash,
+      capabilities: editorResolve.report.identity.capabilities,
+      signature: editorResolve.report.identity.signature,
+      seed: editorSmoke.report.seed,
+      terminalResult: editorSmoke.report.smoke.terminalResult,
+      finalRunHash: editorSmoke.report.smoke.finalRunHash,
+      reportPath: editorSmoke.reportPath,
+      exitedCleanly: true,
+    }))
   } finally {
     stopApplication(application)
     stopDebugTarget(application.debugPort)
+    const processCountsAfterExit = await waitForExecutableCleanup([application.executable], 30000)
+    application.executable = originalExecutable
+    application.launchArguments = originalLaunchArguments
+    application.workingDirectory = originalWorkingDirectory
+    application.environment = originalEnvironment
+    rmSync(keyFile, { force: true })
+    assert(
+      Object.values(processCountsAfterExit).every(count => count === 0),
+      `Editor ${distribution.kind} left residual processes: ${JSON.stringify(processCountsAfterExit)}`,
+    )
+  }
+}
+
+async function smokeEditor(candidate) {
+  const smokeRoot = mkdtempSync(path.join(tmpdir(), 'rvb-red118-editor-distributions-'))
+  const relativeSmokeRoot = path.relative(root, smokeRoot)
+  assert(
+    relativeSmokeRoot.startsWith('..' + path.sep) || path.isAbsolute(relativeSmokeRoot),
+    `Editor distribution smoke must run outside the source checkout: ${smokeRoot}`,
+  )
+  const portableRoot = assertOwnedChild(smokeRoot, path.join(smokeRoot, 'portable'), 'Portable root')
+  const portableUserData = assertOwnedChild(smokeRoot, path.join(smokeRoot, 'portable-user'), 'Portable user data')
+  const nsisUserData = assertOwnedChild(smokeRoot, path.join(smokeRoot, 'nsis-user'), 'NSIS user data')
+  const workingDirectory = assertOwnedChild(smokeRoot, path.join(smokeRoot, 'working'), 'Editor working directory')
+  const emptyPathDirectory = assertOwnedChild(smokeRoot, path.join(smokeRoot, 'empty-path'), 'Empty PATH directory')
+  const installRoot = assertOwnedChild(smokeRoot, path.join(smokeRoot, 'installed'), 'NSIS install root')
+  const portableSource = applications.editor.executable
+  const portableExecutable = path.join(portableRoot, path.basename(portableSource))
+  const installer = path.join(root, 'dist', 'editor', 'RED vs BLUE Editor Setup 0.1.0.exe')
+  const installedExecutable = path.join(installRoot, 'RED vs BLUE Editor.exe')
+  const uninstaller = path.join(installRoot, 'Uninstall RED vs BLUE Editor.exe')
+  let cleanupSucceeded = false
+  let installerStarted = false
+  mkdirSync(portableRoot, { recursive: true })
+  mkdirSync(portableUserData, { recursive: true })
+  mkdirSync(nsisUserData, { recursive: true })
+  mkdirSync(workingDirectory, { recursive: true })
+  mkdirSync(emptyPathDirectory, { recursive: true })
+  assert(existsSync(portableSource), `Missing Editor portable candidate: ${portableSource}`)
+  assert(existsSync(installer), `Missing Editor NSIS candidate: ${installer}`)
+  assert(editorUninstallRegistrations().length === 0, 'A pre-existing RED vs BLUE Editor installation would make the NSIS smoke destructive')
+  cpSync(portableSource, portableExecutable)
+  const environment = hermeticEditorEnvironment(emptyPathDirectory)
+  assertNoNodeOnPath(environment, workingDirectory)
+
+  try {
+    await smokeEditorDistribution(candidate, {
+      kind: 'portable',
+      executable: portableExecutable,
+      userDataDir: portableUserData,
+      workingDirectory,
+      environment,
+    })
+
+    installerStarted = true
+    execFileSync(installer, [
+      '/S',
+      '/currentuser',
+      '/no-desktop-shortcut',
+      `/D=${installRoot}`,
+    ], {
+      cwd: workingDirectory,
+      windowsHide: true,
+      stdio: 'pipe',
+      timeout: 300000,
+    })
+    assert(existsSync(installedExecutable), `NSIS did not install the Editor executable: ${installedExecutable}`)
+    assert(existsSync(uninstaller), `NSIS did not install its owned uninstaller: ${uninstaller}`)
+    assertOwnedChild(installRoot, installedExecutable, 'Installed Editor executable')
+    assertOwnedChild(installRoot, uninstaller, 'Installed Editor uninstaller')
+    assert(editorUninstallRegistrations().length > 0, 'NSIS did not create its current-user uninstall registration')
+
+    await smokeEditorDistribution(candidate, {
+      kind: 'nsis',
+      executable: installedExecutable,
+      userDataDir: nsisUserData,
+      workingDirectory,
+      environment,
+    })
+  } finally {
+    let cleanupFailure = null
+    try {
+      if (existsSync(uninstaller)) {
+        execFileSync(uninstaller, ['/S', '/currentuser'], {
+          cwd: workingDirectory,
+          windowsHide: true,
+          stdio: 'pipe',
+          timeout: 300000,
+        })
+      } else if (installerStarted && editorUninstallRegistrations().length > 0) {
+        throw new Error(`NSIS registered the Editor without the expected owned uninstaller: ${uninstaller}`)
+      }
+      const installRemoved = await waitForPathRemoval(installRoot)
+      const registrations = await waitForEditorUnregistered()
+      assert(installRemoved, `NSIS uninstall left its install directory: ${installRoot}`)
+      assert(registrations.length === 0, `NSIS uninstall left registrations: ${registrations.join(', ')}`)
+      cleanupSucceeded = true
+      console.log(JSON.stringify({
+        entry: 'editor-nsis-lifecycle',
+        installer,
+        isolatedInstallRoot: installRoot,
+        uninstallRegistrationRemoved: true,
+        installDirectoryRemoved: true,
+      }))
+    } catch (error) {
+      cleanupFailure = error
+    }
+    if (cleanupSucceeded) rmSync(smokeRoot, { recursive: true, force: true })
+    else console.error(`[RVB smoke] Retained failed NSIS evidence at ${smokeRoot}`)
+    if (cleanupFailure) throw cleanupFailure
   }
 }
 
 const requested = process.argv.slice(2)
-const entries = requested.length > 0 ? requested : ['server', 'client', 'editor']
-for (const entry of entries) {
-  if (entry === 'server') await smokeServer()
-  else if (entry === 'client') await smokeClient()
-  else if (entry === 'profile') await smokeProfileActivation()
-  else if (entry === 'editor') await smokeEditor()
-  else throw new Error(`Unknown entry: ${entry}`)
+const selectedEntries = requested.length > 0
+  ? requested
+  : ['profile', 'server', 'client', 'editor']
+const candidate = selectedEntries.some(entry => entry === 'profile' || entry === 'editor')
+  ? loadContentCandidateFixture()
+  : null
+const sharedUserDataDir = selectedEntries.includes('profile')
+  ? mkdtempSync(path.join(tmpdir(), 'rvb-red118-four-entry-user-'))
+  : null
+const entries = selectedEntries.includes('profile')
+  ? ['profile', ...selectedEntries.filter(entry => entry !== 'profile')]
+  : selectedEntries
+let expectedIdentity = null
+try {
+  for (const entry of entries) {
+    if (entry === 'server') await smokeServer(expectedIdentity, sharedUserDataDir)
+    else if (entry === 'client') await smokeClient(expectedIdentity, sharedUserDataDir)
+    else if (entry === 'profile') {
+      expectedIdentity = await smokeProfileActivation(candidate, sharedUserDataDir)
+    } else if (entry === 'editor') await smokeEditor(candidate)
+    else throw new Error(`Unknown entry: ${entry}`)
+  }
+} finally {
+  if (expectedIdentity && sharedUserDataDir) {
+    await rollbackSharedCandidateToBase(expectedIdentity, sharedUserDataDir)
+  }
+  if (sharedUserDataDir) rmSync(sharedUserDataDir, { recursive: true, force: true })
 }
 
 process.exit(0)

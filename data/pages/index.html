@@ -6,6 +6,7 @@
   <title>RED vs BLUE</title>
   <script src="js/pack-fetch.js"></script>
   <script src="js/server-utils.js"></script>
+  <script src="js/colyseus-sdk.js"></script>
   <script src="js/ws-client.js"></script>
   <script src="js/lan-discover.js"></script>
   <script src="js/crypto-lib.js"></script>
@@ -14,89 +15,232 @@
     * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      background: #0f172a;
+      background:
+        radial-gradient(circle at 6% 45%, rgba(127, 29, 29, .18), transparent 31%),
+        radial-gradient(circle at 94% 48%, rgba(30, 64, 175, .18), transparent 33%),
+        #070d1a;
       color: #e2e8f0;
-      min-height: 100vh;
-      padding: 0 0 calc(56px + env(safe-area-inset-bottom));
+      min-height: 100svh;
+      overflow-x: hidden;
+    }
+
+    button { font: inherit; }
+    button:focus-visible {
+      outline: 2px solid #93c5fd;
+      outline-offset: 3px;
+    }
+    ::selection { background: #b91c1c; color: #fff; }
+
+    /* ── Game shell ── */
+    .game-shell {
+      width: min(100%, 1520px);
+      min-height: 100svh;
+      margin: 0 auto;
+      padding: clamp(16px, 2.4vw, 32px) clamp(16px, 3.2vw, 48px) calc(clamp(16px, 2.4vw, 32px) + env(safe-area-inset-bottom));
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr) auto;
+      gap: clamp(14px, 2vh, 22px);
     }
 
     /* ── Header ── */
     .header {
-      background: linear-gradient(135deg, #1e1b2e 0%, #0f172a 100%);
-      border-bottom: 1px solid #1e293b;
-      padding: 20px 20px 16px;
       display: flex;
       align-items: center;
       justify-content: space-between;
+      min-width: 0;
     }
-    .brand { display: flex; align-items: baseline; gap: 6px; }
-    .brand-red { font-size: 22px; font-weight: 900; color: #ef4444; letter-spacing: 1px; }
-    .brand-vs  { font-size: 14px; font-weight: 700; color: #64748b; }
-    .brand-blue{ font-size: 22px; font-weight: 900; color: #3b82f6; letter-spacing: 1px; }
-    .version   { font-size: 11px; color: #475569; }
+    .brand { display: flex; align-items: baseline; gap: 8px; line-height: 1; }
+    .brand-red, .brand-blue { font-size: clamp(24px, 3vw, 38px); font-weight: 900; letter-spacing: -.03em; }
+    .brand-red { color: #ef4444; }
+    .brand-vs  { font-size: clamp(12px, 1.3vw, 16px); font-weight: 800; color: #94a3b8; }
+    .brand-blue { color: #3b82f6; }
 
     /* ── User pill ── */
     .user-pill {
-      background: #1e293b;
-      border: 1px solid #334155;
-      border-radius: 20px;
-      padding: 5px 12px;
+      background: #111b2e;
+      border: 1px solid #475569;
+      border-radius: 999px;
+      padding: 9px 14px;
+      color: #e2e8f0;
       font-size: 13px;
       display: flex;
       align-items: center;
-      gap: 6px;
+      gap: 8px;
       cursor: pointer;
     }
-    .user-dot { width: 7px; height: 7px; border-radius: 50%; background: #22c55e; }
+    .user-pill:hover { background: #18243a; border-color: #64748b; }
+    .user-dot { width: 7px; height: 7px; border-radius: 50%; background: #f59e0b; }
+    .user-elo { color: #94a3b8; font-size: 11px; }
 
-    /* ── Sections ── */
-    .section { padding: 20px 16px 4px; }
-    .section-label {
-      font-size: 11px;
-      font-weight: 700;
-      color: #475569;
-      letter-spacing: 1.5px;
-      text-transform: uppercase;
-      margin-bottom: 10px;
+    /* ── Primary workspace ── */
+    .menu-workspace {
+      min-height: 0;
+      display: grid;
+      grid-template-columns: minmax(220px, 0.72fr) minmax(0, 1.7fr);
+      gap: clamp(14px, 2vw, 26px);
+      align-items: stretch;
     }
-
-    /* ── Menu items ── */
-    .menu-item {
+    .mode-nav, .mode-stage {
+      min-width: 0;
+      background: rgba(10, 18, 33, .92);
+      border: 1px solid #334155;
+      border-radius: 16px;
+    }
+    .mode-nav { padding: clamp(10px, 1.4vw, 16px); }
+    .mode-tabs {
+      height: 100%;
+      display: grid;
+      grid-template-rows: repeat(4, minmax(0, 1fr));
+      gap: 8px;
+    }
+    .mode-tab {
+      width: 100%;
       display: flex;
       align-items: center;
-      gap: 14px;
-      background: #1e293b;
+      gap: 12px;
+      background: transparent;
+      border: 1px solid transparent;
+      border-radius: 12px;
+      padding: 12px 14px;
+      color: #cbd5e1;
+      cursor: pointer;
+      text-align: left;
+      transition: background-color .16s ease-out, border-color .16s ease-out, color .16s ease-out;
+    }
+    .mode-tab:hover { background: #131f33; border-color: #334155; color: #fff; }
+    .mode-tab.is-active {
+      background: #29151d;
+      border-color: #ef4444;
+      color: #fff;
+    }
+    .mode-mark {
+      width: 42px;
+      height: 42px;
+      border-radius: 10px;
+      display: grid;
+      place-items: center;
+      flex-shrink: 0;
+      background: #172237;
+      color: #94a3b8;
+      font-size: 11px;
+      font-weight: 900;
+      letter-spacing: .04em;
+    }
+    .mode-tab.is-active .mode-mark { background: #7f1d1d; color: #fecaca; }
+    .mode-label { display: grid; gap: 4px; min-width: 0; }
+    .mode-name { font-size: clamp(15px, 1.5vw, 19px); font-weight: 800; }
+    .mode-hint { color: #94a3b8; font-size: 12px; line-height: 1.35; }
+
+    .mode-stage { padding: clamp(20px, 3vw, 40px); overflow: hidden; }
+    .mode-panel { height: 100%; }
+    .mode-panel[hidden] { display: none; }
+    .panel-layout { height: 100%; display: flex; flex-direction: column; }
+    .panel-header { margin-bottom: clamp(18px, 3vh, 30px); }
+    .panel-title { font-size: clamp(26px, 3.3vw, 44px); line-height: 1.08; letter-spacing: -.03em; color: #f8fafc; }
+    .panel-description { margin-top: 10px; max-width: 52ch; color: #94a3b8; font-size: 14px; line-height: 1.55; }
+    .action-stack { flex: 1; display: grid; gap: 10px; align-content: center; }
+    .action-button {
+      width: 100%;
+      min-height: 78px;
+      display: grid;
+      grid-template-columns: 58px minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 16px;
+      padding: 13px 16px;
       border: 1px solid #334155;
       border-radius: 12px;
-      padding: 14px 16px;
-      margin-bottom: 8px;
+      background: #111b2e;
+      color: #e2e8f0;
       cursor: pointer;
-      transition: background .15s, border-color .15s;
-      text-decoration: none;
-      color: inherit;
-      -webkit-user-select: none;
+      text-align: left;
+      transition: background-color .16s ease-out, border-color .16s ease-out;
     }
-    .menu-item:active { background: #263348; border-color: #475569; }
-    .menu-item.primary { border-color: #ef4444; background: #1e1521; }
-    .menu-item.primary:active { background: #2d1a2a; }
-    .menu-item.online { border-color: #3b82f6; background: #111827; }
-    .menu-item.online:active { background: #1a2540; }
-    .item-icon {
-      width: 40px; height: 40px;
+    .action-button:hover { background: #17243a; border-color: #64748b; }
+    .action-button.action-feature { border-color: #3b82f6; background: #0f1d35; }
+    .action-button.action-feature:hover { background: #132848; border-color: #60a5fa; }
+    .action-code {
+      width: 58px;
+      height: 48px;
+      display: grid;
+      place-items: center;
       border-radius: 10px;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 20px;
-      flex-shrink: 0;
+      background: #1e293b;
+      color: #93c5fd;
+      font-size: 12px;
+      font-weight: 900;
     }
-    .icon-red  { background: rgba(239,68,68,.15); }
-    .icon-blue { background: rgba(59,130,246,.15); }
-    .icon-gray { background: rgba(100,116,139,.15); }
+    .action-copy { min-width: 0; display: grid; gap: 4px; }
+    .action-title { color: #f8fafc; font-size: clamp(16px, 1.8vw, 21px); font-weight: 800; }
+    .action-description { color: #94a3b8; font-size: 12px; line-height: 1.4; }
+    .action-arrow { color: #64748b; font-size: 22px; line-height: 1; }
 
-    .item-text { flex: 1; }
-    .item-title { font-size: 15px; font-weight: 600; margin-bottom: 2px; }
-    .item-desc  { font-size: 12px; color: #64748b; }
+    /* ── Secondary tools ── */
+    .utility-bar {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 1px;
+      overflow: hidden;
+      border: 1px solid #334155;
+      border-radius: 14px;
+      background: #334155;
+    }
+    .utility-button {
+      min-width: 0;
+      min-height: 54px;
+      border: 0;
+      background: #0d1729;
+      color: #cbd5e1;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      padding: 10px 14px;
+      transition: background-color .16s ease-out, color .16s ease-out;
+    }
+    .utility-button:hover { background: #162238; color: #fff; }
+    .utility-title { font-size: 14px; font-weight: 800; white-space: nowrap; }
+    .utility-meta { color: #64748b; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-    .item-arrow { color: #475569; font-size: 16px; }
+    @media (max-width: 760px) {
+      .game-shell { min-height: 100svh; grid-template-rows: auto auto auto; padding: 16px 12px calc(16px + env(safe-area-inset-bottom)); }
+      .menu-workspace { grid-template-columns: 1fr; }
+      .mode-tabs { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: none; }
+      .mode-tab { min-height: 70px; padding: 10px; }
+      .mode-mark { width: 36px; height: 36px; }
+      .mode-hint { display: none; }
+      .mode-stage { padding: 20px 14px; }
+      .panel-layout { min-height: 390px; }
+      .action-button { min-height: 74px; grid-template-columns: 50px minmax(0, 1fr) auto; gap: 12px; padding: 12px; }
+      .action-code { width: 50px; height: 44px; }
+      .utility-button { flex-direction: column; gap: 3px; text-align: center; }
+      .utility-meta { max-width: 100%; }
+    }
+
+    @media (orientation: landscape) and (max-height: 500px) {
+      .game-shell { min-height: 100svh; padding: 10px 14px calc(10px + env(safe-area-inset-bottom)); gap: 8px; }
+      .brand-red, .brand-blue { font-size: 24px; }
+      .user-pill { padding: 6px 11px; }
+      .menu-workspace { grid-template-columns: minmax(210px, .72fr) minmax(0, 1.7fr); gap: 10px; }
+      .mode-nav { padding: 8px; }
+      .mode-tabs { grid-template-columns: 1fr; grid-template-rows: repeat(4, minmax(0, 1fr)); gap: 4px; }
+      .mode-tab { min-height: 0; padding: 6px 10px; }
+      .mode-mark { width: 32px; height: 32px; border-radius: 8px; }
+      .mode-name { font-size: 14px; }
+      .mode-hint { display: none; }
+      .mode-stage { padding: 13px 16px; }
+      .panel-header { margin-bottom: 8px; }
+      .panel-title { font-size: 22px; }
+      .panel-description { margin-top: 4px; font-size: 11px; }
+      .action-stack { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; }
+      .action-button { min-height: 0; grid-template-columns: 1fr; align-content: center; gap: 4px; padding: 8px 10px; }
+      .action-code { display: none; }
+      .action-title { font-size: 14px; }
+      .action-description { font-size: 10px; }
+      .action-arrow { display: none; }
+      .utility-button { min-height: 38px; padding: 6px 10px; }
+      .utility-meta { display: none; }
+    }
 
     /* ── Connect overlay ── */
     .overlay {
@@ -187,135 +331,136 @@
   </style>
 </head>
 <body>
+  <div class="game-shell">
+    <header class="header">
+      <h1 class="brand">
+        <span class="brand-red">RED</span>
+        <span class="brand-vs">vs</span>
+        <span class="brand-blue">BLUE</span>
+      </h1>
+      <button id="userPill" class="user-pill" type="button" onclick="openIdentitySheet()" aria-label="打开账号管理">
+        <span class="user-dot" id="userDot"></span>
+        <span id="userName">玩家</span>
+        <span class="user-elo" id="userElo"></span>
+      </button>
+    </header>
 
-  <!-- Header -->
-  <div class="header">
-    <div class="brand">
-      <span class="brand-red">RED</span>
-      <span class="brand-vs">vs</span>
-      <span class="brand-blue">BLUE</span>
-    </div>
-    <div id="userPill" class="user-pill" onclick="openIdentitySheet()" style="cursor:pointer">
-      <div class="user-dot" id="userDot" style="background:#f59e0b"></div>
-      <span id="userName">玩家</span>
-      <span id="userElo" style="font-size:11px;color:#64748b;margin-left:6px"></span>
-    </div>
+    <main class="menu-workspace">
+      <nav class="mode-nav" aria-label="主要游戏模式">
+        <div class="mode-tabs" role="tablist" aria-label="游戏模式" onkeydown="handleMenuKey(event)">
+          <button class="mode-tab is-active" data-mode="online" aria-selected="true" aria-controls="mode-online" id="tab-online" role="tab" type="button" onclick="selectMenuMode('online')">
+            <span class="mode-mark" aria-hidden="true">VS</span>
+            <span class="mode-label"><span class="mode-name">联机对战</span><span class="mode-hint">创建或加入多人房间</span></span>
+          </button>
+          <button class="mode-tab" data-mode="adventure" aria-selected="false" aria-controls="mode-adventure" id="tab-adventure" role="tab" type="button" tabindex="-1" onclick="selectMenuMode('adventure')">
+            <span class="mode-mark" aria-hidden="true">PVE</span>
+            <span class="mode-label"><span class="mode-name">开始冒险</span><span class="mode-hint">进入独立 PVE 模式</span></span>
+          </button>
+          <button class="mode-tab" data-mode="training" aria-selected="false" aria-controls="mode-training" id="tab-training" role="tab" type="button" tabindex="-1" onclick="selectMenuMode('training')">
+            <span class="mode-mark" aria-hidden="true">TRN</span>
+            <span class="mode-label"><span class="mode-name">训练营</span><span class="mode-hint">熟悉棋子与战斗机制</span></span>
+          </button>
+          <button class="mode-tab" data-mode="codex" aria-selected="false" aria-controls="mode-codex" id="tab-codex" role="tab" type="button" tabindex="-1" onclick="selectMenuMode('codex')">
+            <span class="mode-mark" aria-hidden="true">MAP</span>
+            <span class="mode-label"><span class="mode-name">棋子与地图</span><span class="mode-hint">浏览游戏资料与战场</span></span>
+          </button>
+        </div>
+      </nav>
+
+      <section class="mode-stage" aria-live="polite">
+        <div class="mode-panel" id="mode-online" data-mode-panel="online" role="tabpanel" aria-labelledby="tab-online">
+          <div class="panel-layout">
+            <header class="panel-header">
+              <h2 class="panel-title">联机对战</h2>
+              <p class="panel-description">选择连接方式，创建战局或加入其他玩家。</p>
+            </header>
+            <div class="action-stack">
+              <button class="action-button action-feature" type="button" onclick="showHostSheet()">
+                <span class="action-code" aria-hidden="true">主机</span>
+                <span class="action-copy"><span class="action-title">我当主机</span><span class="action-description">创建房间，邀请好友加入</span></span>
+                <span class="action-arrow" aria-hidden="true">›</span>
+              </button>
+              <button class="action-button" type="button" onclick="showJoinSheet()">
+                <span class="action-code" aria-hidden="true">好友</span>
+                <span class="action-copy"><span class="action-title">连接主机</span><span class="action-description">扫描并加入好友的房间</span></span>
+                <span class="action-arrow" aria-hidden="true">›</span>
+              </button>
+              <button class="action-button" type="button" onclick="showConnectSheet()">
+                <span class="action-code" aria-hidden="true">在线</span>
+                <span class="action-copy"><span class="action-title">连接游戏服务器</span><span class="action-description" id="serverStatusDesc">进入在线大厅，与更多玩家对战</span></span>
+                <span class="action-arrow" aria-hidden="true">›</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="mode-panel" id="mode-adventure" data-mode-panel="adventure" role="tabpanel" aria-labelledby="tab-adventure" hidden>
+          <div class="panel-layout">
+            <header class="panel-header">
+              <h2 class="panel-title">开始冒险</h2>
+              <p class="panel-description">进入独立 PVE 模式，在完整战斗流程中挑战 AI。</p>
+            </header>
+            <div class="action-stack">
+              <button class="action-button action-feature" id="pveBtn" type="button" onclick="startPve()">
+                <span class="action-code" aria-hidden="true">PVE</span>
+                <span class="action-copy"><span class="action-title">踏上冒险</span><span class="action-description" id="pveBtnDesc">对阵 AI，开始独立 PVE 冒险</span></span>
+                <span class="action-arrow" id="pveBtnArrow" aria-hidden="true">›</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="mode-panel" id="mode-training" data-mode-panel="training" role="tabpanel" aria-labelledby="tab-training" hidden>
+          <div class="panel-layout">
+            <header class="panel-header">
+              <h2 class="panel-title">训练营</h2>
+              <p class="panel-description">离线练习棋子、技能和战斗操作，不影响正式对局。</p>
+            </header>
+            <div class="action-stack">
+              <button class="action-button action-feature" type="button" onclick="goToTraining()">
+                <span class="action-code" aria-hidden="true">训练</span>
+                <span class="action-copy"><span class="action-title">进入训练营</span><span class="action-description">自由测试阵容与战斗机制</span></span>
+                <span class="action-arrow" aria-hidden="true">›</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="mode-panel" id="mode-codex" data-mode-panel="codex" role="tabpanel" aria-labelledby="tab-codex" hidden>
+          <div class="panel-layout">
+            <header class="panel-header">
+              <h2 class="panel-title">棋子与地图</h2>
+              <p class="panel-description">查看棋子属性、技能说明和可用战场。</p>
+            </header>
+            <div class="action-stack">
+              <button class="action-button action-feature" type="button" onclick="loadPage('pieces.html')">
+                <span class="action-code" aria-hidden="true">棋子</span>
+                <span class="action-copy"><span class="action-title">棋子图鉴</span><span class="action-description">查看所有棋子属性与技能</span></span>
+                <span class="action-arrow" aria-hidden="true">›</span>
+              </button>
+              <button class="action-button" type="button" onclick="loadPage('maps.html')">
+                <span class="action-code" aria-hidden="true">地图</span>
+                <span class="action-copy"><span class="action-title">地图图鉴</span><span class="action-description">浏览所有游戏地图</span></span>
+                <span class="action-arrow" aria-hidden="true">›</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="utility-bar" aria-label="次级工具">
+      <button class="utility-button" type="button" onclick="openRecordsSheet()">
+        <span class="utility-title">战绩</span><span class="utility-meta" id="recordsSummary">本地对战记录</span>
+      </button>
+      <button class="utility-button" type="button" onclick="loadPage('pack.html')">
+        <span class="utility-title">资源包</span><span class="utility-meta" id="packDesc">管理游戏内容</span>
+      </button>
+      <button class="utility-button" type="button" onclick="loadPage('developer-tools.html')">
+        <span class="utility-title">开发者中心</span><span class="utility-meta">固定种子与赛后 Trace</span>
+      </button>
+    </footer>
   </div>
-
-  <!-- 本地联机 -->
-  <div class="section">
-    <div class="section-label">本地联机</div>
-    <div class="menu-item" style="border-color:#10b981;background:#0a1a14;cursor:pointer" onclick="showHostSheet()">
-      <div class="item-icon" style="background:rgba(16,185,129,.15)">🏠</div>
-      <div class="item-text">
-        <div class="item-title">我当主机</div>
-        <div class="item-desc">本机启动内置服务器，好友扫描加入</div>
-      </div>
-      <span class="item-arrow">›</span>
-    </div>
-    <div class="menu-item" style="border-color:#6366f1;background:#0d0d1a;cursor:pointer" onclick="showJoinSheet()">
-      <div class="item-icon" style="background:rgba(99,102,241,.15)">📡</div>
-      <div class="item-text">
-        <div class="item-title">连接主机</div>
-        <div class="item-desc">扫描局域网，连接好友的主机</div>
-      </div>
-      <span class="item-arrow">›</span>
-    </div>
-  </div>
-
-  <!-- 服务器联机 -->
-  <div class="section">
-    <div class="section-label">服务器联机</div>
-    <div class="menu-item online" style="cursor:pointer" onclick="showConnectSheet()">
-      <div class="item-icon icon-blue">🌐</div>
-      <div class="item-text">
-        <div class="item-title">连接游戏服务器</div>
-        <div class="item-desc" id="serverStatusDesc">输入服务器地址，与更多玩家联机</div>
-      </div>
-      <span class="item-arrow">›</span>
-    </div>
-  </div>
-
-  <!-- 账号 -->
-  <div class="section">
-    <div class="section-label">账号</div>
-    <div class="menu-item" style="cursor:pointer" onclick="openIdentitySheet()">
-      <div class="item-icon icon-gray">👤</div>
-      <div class="item-text">
-        <div class="item-title">账号管理</div>
-        <div class="item-desc">查看 ID、助记词备份、导入账号</div>
-      </div>
-      <span class="item-arrow">›</span>
-    </div>
-    <div class="menu-item" style="cursor:pointer" onclick="openRecordsSheet()">
-      <div class="item-icon icon-gray">📊</div>
-      <div class="item-text">
-        <div class="item-title">战绩查询</div>
-        <div class="item-desc" id="recordsSummary">本地对战记录</div>
-      </div>
-      <span class="item-arrow">›</span>
-    </div>
-  </div>
-
-  <!-- 单机 -->
-  <div class="section">
-    <div class="section-label">单机</div>
-    <div class="menu-item primary" style="cursor:pointer" onclick="goToTraining()">
-      <div class="item-icon icon-red">🏋️</div>
-      <div class="item-text">
-        <div class="item-title">训练营</div>
-        <div class="item-desc">离线对战练习，无需联网</div>
-      </div>
-      <span class="item-arrow">›</span>
-    </div>
-    <div class="menu-item" style="border-color:#f59e0b;background:#1a1205;cursor:pointer" id="pveBtn" onclick="startPve()">
-      <div class="item-icon" style="background:rgba(245,158,11,.16)">PVE</div>
-      <div class="item-text">
-        <div class="item-title">单人练习 (PVE)</div>
-        <div class="item-desc" id="pveBtnDesc">对阵 AI，测试完整对战流程</div>
-      </div>
-      <span class="item-arrow" id="pveBtnArrow">›</span>
-    </div>
-    <div class="menu-item" style="cursor:pointer" onclick="loadPage('pieces.html')">
-      <div class="item-icon icon-gray">📖</div>
-      <div class="item-text">
-        <div class="item-title">棋子图鉴</div>
-        <div class="item-desc">查看所有棋子属性与技能</div>
-      </div>
-      <span class="item-arrow">›</span>
-    </div>
-    <div class="menu-item" style="cursor:pointer" onclick="loadPage('maps.html')">
-      <div class="item-icon icon-gray">🗺️</div>
-      <div class="item-text">
-        <div class="item-title">地图图鉴</div>
-        <div class="item-desc">浏览所有游戏地图</div>
-      </div>
-      <span class="item-arrow">›</span>
-    </div>
-    <div class="menu-item" style="cursor:pointer" onclick="loadPage('pack.html')">
-      <div class="item-icon icon-gray">📦</div>
-      <div class="item-text">
-        <div class="item-title">资源包管理</div>
-        <div class="item-desc" id="packDesc">导入更新包，无需重装应用</div>
-      </div>
-      <span class="item-arrow">›</span>
-    </div>
-    <div class="menu-item" style="border-color:#0ea5e9;background:#081923;cursor:pointer" onclick="loadPage('developer-tools.html')">
-      <div class="item-icon" style="background:rgba(14,165,233,.15)">🛠️</div>
-      <div class="item-text">
-        <div class="item-title">开发者中心</div>
-        <div class="item-desc">局外固定种子场景与赛后 Trace</div>
-      </div>
-      <span class="item-arrow">›</span>
-    </div>
-  </div>
-
-  <!-- Pack mismatch warning -->
-  <div id="packMismatchWarn" style="display:none;margin:0 16px 8px;background:#1a1106;border:1px solid #b45309;border-radius:10px;padding:10px 14px;font-size:13px;color:#fbbf24">
-    ⚠️ 资源包与服务器不匹配，请前往 <a href="pack.html" style="color:#60a5fa;text-decoration:underline">资源包管理</a> 重新导入
-  </div>
-
-  <div style="height:calc(24px + env(safe-area-inset-bottom))"></div>
 
   <!-- ── Connect Sheet ── -->
   <div class="overlay" id="connectOverlay" onclick="closeOverlay('connectOverlay')">
@@ -591,7 +736,7 @@
       if (!_hostServerUrl) return
       RvBUtils.saveServerConfig({ mode: 'local', url: _hostServerUrl })
       closeHostSheet()
-      await checkPackAndGo(_hostServerUrl, 'local')
+      await checkProfileAndGo(_hostServerUrl, 'local')
     }
 
     // ── 加入游戏 (LAN scan) ───────────────────────────────────────────────────
@@ -696,12 +841,43 @@
     async function connectLanServer(url) {
       RvBUtils.saveServerConfig({ mode: 'lan', url: url })
       closeLanSheet()
-      await checkPackAndGo(url, 'lan')
+      await checkProfileAndGo(url, 'lan')
     }
 
     // ── Page loading ──────────────────────────────────────────────────────────
     function loadPage(pageName) { window.location.href = pageName }
     function escHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;') }
+
+    function selectMenuMode(mode) {
+      const tabs = Array.from(document.querySelectorAll('[data-mode]'))
+      const panels = Array.from(document.querySelectorAll('[data-mode-panel]'))
+      if (!tabs.some(tab => tab.dataset.mode === mode)) return
+
+      tabs.forEach(tab => {
+        const active = tab.dataset.mode === mode
+        tab.classList.toggle('is-active', active)
+        tab.setAttribute('aria-selected', String(active))
+        tab.tabIndex = active ? 0 : -1
+      })
+      panels.forEach(panel => {
+        panel.hidden = panel.dataset.modePanel !== mode
+      })
+    }
+
+    function handleMenuKey(event) {
+      if (!['ArrowDown', 'ArrowUp', 'ArrowRight', 'ArrowLeft', 'Home', 'End'].includes(event.key)) return
+      const tabs = Array.from(document.querySelectorAll('[data-mode]'))
+      const currentIndex = tabs.indexOf(document.activeElement)
+      if (currentIndex < 0) return
+      event.preventDefault()
+      const nextIndex = event.key === 'Home'
+        ? 0
+        : event.key === 'End'
+          ? tabs.length - 1
+          : (currentIndex + (event.key === 'ArrowDown' || event.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length
+      selectMenuMode(tabs[nextIndex].dataset.mode)
+      tabs[nextIndex].focus()
+    }
 
     // ── Training ──────────────────────────────────────────────────────────────
     async function goToTraining() {
@@ -742,12 +918,13 @@
       if (btn) btn.textContent = '⏳'
       if (desc) desc.textContent = '创建 PVE 房间中…'
       try {
-        const room = await RvBWs.requestAt(serverUrl, 'rooms.create', { mode: 'pve', hostId, hostName: playerName, mapId: 'large-hole-arena' }, 7000)
+        const profileIdentity = await getLocalGameProfileIdentity(serverUrl)
+        const room = await RvBWs.requestAt(serverUrl, 'rooms.create', { mode: 'pve', hostId, hostName: playerName, mapId: 'large-hole-arena', profileIdentity }, 7000)
         const params = new URLSearchParams({ roomId: room.id, playerId: hostId, playerName })
         window.location.href = 'piece-selection.html?' + params
       } catch (e) {
         if (btn) btn.textContent = '›'
-        if (desc) desc.textContent = '对阵 AI，测试完整对战流程'
+        if (desc) desc.textContent = '对阵 AI，开始独立 PVE 冒险'
         alert('创建 PVE 房间失败：' + ((e && e.message) || e))
       }
     }
@@ -804,7 +981,9 @@
       let result
       try {
         const health = await RvBWs.requestAt(cleanUrl, 'system.health', {}, 10000)
-        if (!health || health.protocol !== 'rvb-ws') throw new Error('服务器未返回 RED vs BLUE WS 协议')
+        if (!health || !['rvb-colyseus', 'rvb-ws'].includes(health.protocol)) {
+          throw new Error('服务器未返回 RED vs BLUE 联机协议')
+        }
         RvBUtils.saveServerConfig({ mode: RvBUtils.getServerModeForUrl(cleanUrl), url: cleanUrl })
         result = { success: true, url: cleanUrl }
       } catch (error) {
@@ -814,9 +993,9 @@
         closeOverlay('connectOverlay')
         document.getElementById('serverStatusDesc').textContent = '已连接：' + result.url.replace(/^https?:\/\//, '').slice(0, 30)
         if (btn) { btn.textContent = '校验资源包…'; btn.disabled = true }
-        await checkPackAndGo(result.url, 'remote')
+        await checkProfileAndGo(result.url, 'remote')
       } else {
-        err.textContent = '\u65e0\u6cd5\u5efa\u7acb WebSocket \u8fde\u63a5\uff1a' + ((result.error && result.error.message) || '\u8fde\u63a5\u5931\u8d25')
+        err.textContent = '\u65e0\u6cd5\u5efa\u7acb\u6e38\u620f\u670d\u52a1\u8fde\u63a5\uff1a' + ((result.error && result.error.message) || '\u8fde\u63a5\u5931\u8d25')
         err.style.display = 'block'
         document.getElementById('forceConnectUrl').value = cleanUrl
         document.getElementById('forceConnectArea').style.display = 'block'
@@ -831,7 +1010,7 @@
       RvBUtils.saveServerConfig({ mode: 'remote', url: cleanUrl })
       closeOverlay('connectOverlay')
       document.getElementById('serverStatusDesc').textContent = '已连接：' + cleanUrl.replace(/^https?:\/\//, '').slice(0, 30)
-      await checkPackAndGo(cleanUrl, 'remote')
+      await checkProfileAndGo(cleanUrl, 'remote')
     }
 
     function closeOverlay(id) { document.getElementById(id).classList.remove('show') }
@@ -1142,22 +1321,6 @@
       document.getElementById('recordsOverlay').classList.remove('show')
     }
 
-    // ── Pack hash check ───────────────────────────────────────────────────────
-    async function checkPackMd5(serverUrl) {
-      if (window.RvBBridge && /^http:\/\/(localhost|127\.0\.0\.1):7878\b/.test(serverUrl || '')) return
-      try {
-        const data = await RvBWs.requestAt(serverUrl, 'catalog.identity', {}, 3000)
-        const serverMd5 = data.meta?.md5
-        const clientMd5 = localStorage.getItem('rvb_pack_md5')
-        const warn = document.getElementById('packMismatchWarn')
-        if (warn && serverMd5 && clientMd5 && serverMd5 !== clientMd5) {
-          warn.style.display = 'block'
-        } else if (warn) {
-          warn.style.display = 'none'
-        }
-      } catch {}
-    }
-
     function goLobby(mode, serverUrl) {
       if (!mode) {
         window.location.href = 'lobby.html?v=' + Date.now()
@@ -1169,25 +1332,59 @@
       params.set('v', Date.now().toString())
       window.location.href = 'lobby.html?' + params.toString()
     }
+    async function getLocalGameProfileIdentity(serverUrl) {
+      let identity
+      if (
+        window.electronAPI
+        && typeof window.electronAPI.getMode === 'function'
+      ) {
+        const mode = await window.electronAPI.getMode()
+        const normalizeUrl = value => String(value || '').trim().replace(/\/+$/, '')
+        const isLocalAuthority = normalizeUrl(serverUrl) === normalizeUrl(mode && mode.localUrl)
+        identity = mode && (isLocalAuthority ? mode.localAuthorityProfileIdentity : mode.profileIdentity)
+      } else {
+        // A standalone browser build has no separate installed-profile runtime.
+        // Its playable content is served by the selected Colyseus authority.
+        const localRuntimeUrl = serverUrl
+        const catalog = await RvBWs.requestCatalogIdentityAt(localRuntimeUrl, 'local-profile-runtime')
+        identity = catalog && catalog.profileIdentity
+      }
 
-    async function checkPackAndGo(serverUrl, mode) {
-      if (window.RvBBridge && /^http:\/\/(localhost|127\.0\.0\.1):7878\b/.test(serverUrl || '')) {
-        goLobby(mode, serverUrl)
-        return
+      const keys = identity && typeof identity === 'object' && !Array.isArray(identity)
+        ? Object.keys(identity).sort().join(',')
+        : ''
+      if (
+        keys !== 'authorityContentHash,engineAbi,resolvedProfileHash,runnerRevision,schemaVersion'
+        || identity.schemaVersion !== 'rvb-game-profile-identity/v1'
+        || typeof identity.engineAbi !== 'string'
+        || typeof identity.runnerRevision !== 'string'
+        || !/^[a-f0-9]{64}$/.test(identity.resolvedProfileHash)
+        || !/^[a-f0-9]{64}$/.test(identity.authorityContentHash)
+      ) {
+        throw new Error('本地 Profile Identity 无效，请打开“资源包管理”检查安装状态')
+      }
+      try { localStorage.setItem('rvb_game_profile_identity', JSON.stringify(identity)) } catch {}
+      return identity
+    }
+
+
+    async function checkProfileAndGo(serverUrl, mode) {
+      try {
+        await getLocalGameProfileIdentity(serverUrl)
+      } catch (error) {
+        alert('无法进入大厅：' + ((error && error.message) || error))
+        return false
       }
       try {
-        const data = await RvBWs.requestAt(serverUrl, 'catalog.identity', {}, 3000)
-        const serverMd5 = data.meta?.md5
-        const clientMd5 = localStorage.getItem('rvb_pack_md5')
-        if (serverMd5 && clientMd5 && serverMd5 !== clientMd5) {
-          try { localStorage.setItem('rvb_pack_mismatch', '1') } catch {}
-        } else {
-          try { localStorage.removeItem('rvb_pack_mismatch') } catch {}
+        const data = await RvBWs.requestCatalogIdentityAt(serverUrl, 'remote-server')
+        if (data && data.profileIdentity) {
+          try { localStorage.setItem('rvb_server_profile_identity', JSON.stringify(data.profileIdentity)) } catch {}
         }
-        goLobby(mode, serverUrl)
-      } catch {
-        goLobby(mode, serverUrl)
+      } catch (error) {
+        console.warn('[profile] remote catalog identity preflight failed', error)
       }
+      goLobby(mode, serverUrl)
+      return true
     }
 
     function updatePackBadge() {

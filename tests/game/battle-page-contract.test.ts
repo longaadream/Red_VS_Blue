@@ -77,6 +77,20 @@ describe('battle page route contract', () => {
     }
   })
 
+  it('feeds the authoritative response timer into the shared battle clock view', () => {
+    const battlePage = readPage('battle.html')
+
+    expect(battlePage).toContain('let authoritativePendingTimer = null')
+    expect(battlePage).toContain('authoritativePendingTimer = pendingTimer || null')
+    expect(battlePage).toContain('pendingTimer: authoritativePendingTimer')
+    expect(battlePage).toContain('msg.pendingTimer')
+    expect(battlePage).toContain('id="turnClockFrozen"')
+    expect(battlePage).toContain("frozenClock.textContent = '回合冻结 ' + view.frozenClockText")
+    expect(battlePage).toContain("authoritativePendingTimer ? '响应 ' + view.clockText : view.clockText")
+    expect(battlePage).toContain("clock.parentElement?.classList.toggle('pending-timer-active', !!authoritativePendingTimer)")
+    expect(battlePage).toContain('.turn-summary-secondary.pending-timer-active')
+  })
+
   it('renders the authoritative terminal result without judging or submitting gameOver locally', () => {
     const battlePage = readPage('battle.html')
 
@@ -93,7 +107,7 @@ describe('battle page route contract', () => {
     expect(battlePage).toContain('已忽略非权威 Relay 恢复状态')
   })
 
-  it('keeps one responsive HUD, board-anchored piece menu, and unsectioned curved hand', () => {
+  it('keeps one responsive HUD, opposite-edge piece dock, and unsectioned curved hand', () => {
     const battlePage = readPage('battle.html')
     const responsiveCss = readFileSync(resolve(pagesDir, 'css/battle-responsive.css'), 'utf8')
     const contextCss = readFileSync(resolve(pagesDir, 'css/battle-context-ui.css'), 'utf8')
@@ -116,8 +130,8 @@ describe('battle page route contract', () => {
     expect(battlePage).not.toContain('arcHandContainer')
     expect(battlePage).toContain('--hand-arc-angle:')
     expect(contextCss).toContain('.piece-context-menu')
-    expect(contextCss).toMatch(/\.piece-context-menu\s*\{[\s\S]*?max-width:\s*min\(520px, calc\(100% - 16px\)\)/)
-    expect(contextCss).toMatch(/\.piece-context-skills\s*\{[\s\S]*?max-width:\s*100%[\s\S]*?overflow-x:\s*auto/)
+    expect(contextCss).toMatch(/\.piece-context-menu\s*\{[\s\S]*?width:\s*min\(188px, calc\(100% - 16px\)\)/)
+    expect(contextCss).toMatch(/\.piece-context-skills\s*\{[\s\S]*?flex-direction:\s*column[\s\S]*?overflow-y:\s*auto/)
     expect(contextCss).toContain('var(--hand-arc-angle')
     expect(battlePage).not.toContain('class="hand-panel"')
     expect(battlePage).not.toContain('class="hand-label"')
@@ -141,12 +155,20 @@ describe('battle page route contract', () => {
     expect(battlePage).toMatch(/function setTrainingToolsOpen\(open[\s\S]*?aria-expanded[\s\S]*?aria-hidden/)
     expect(battlePage).toMatch(/const active = !targetSubmissionPending && !!\(pendingSkill \|\| pendingCardAction\)[\s\S]*?if \(active\) \{\s*closePieceContextMenu\(\)/)
     expect(battlePage).toMatch(/function setTrainingToolsOpen\(open[\s\S]*?if \(next\) closePieceContextMenu\(\)/)
-    expect(battlePage).toMatch(/const draftAction[^\n]+\s*closePieceContextMenu\(\)\s*await doAction\(draftAction\)/)
+    expect(battlePage).toMatch(/const draftAction[^\n]+\s*closePieceContextMenu\(\)/)
+    expect(battlePage).toMatch(/BattleLegalActions\.probeSkillTarget\([\s\S]*?enterActionTargetMode\(draftAction, localTargetProbe\.preparation\)/)
+    expect(battlePage).toMatch(/if \(localTargetProbe[\s\S]*?await doAction\(draftAction\)/)
     expect(battlePage).toMatch(/function closePieceInfo\(\)[\s\S]*?style\.display = 'none'[\s\S]*?renderPieceContextMenu\(selected \|\| null\)/)
-    expect(battlePage).toMatch(/dispatchBattleIntent\(\{type:\\?'toggle-move\\?'\}\)/)
-    expect(battlePage).toMatch(/const isTargeting = !!pendingMove \|\| !!pendingSkill/)
-    expect(battlePage).toMatch(/function selectPiece\(instanceId\)[\s\S]*?pendingMove = false[\s\S]*?renderPieceContextMenu\(sp\)/)
-    expect(battlePage).toMatch(/function toggleMove\(\)[\s\S]*?renderPieceContextMenu\(pendingMove \? null : sp\)/)
+    expect(battlePage).not.toMatch(/dispatchBattleIntent\(\{type:\\?'toggle-move\\?'\}\)/)
+    expect(battlePage).not.toContain('class="piece-context-skill is-move"')
+    expect(battlePage).toMatch(/const isTargeting = !!pendingSkill \|\| !!pendingCardAction/)
+    expect(battlePage).toMatch(/function refreshBattleLegalActions\(\)[\s\S]*?queryMoveCells[\s\S]*?pendingMove = validMoves\.size > 0/)
+    expect(battlePage).toMatch(/function selectPiece\(instanceId\)[\s\S]*?dismissedPieceContextId = null[\s\S]*?render\(\)/)
+    expect(battlePage).toMatch(/function dismissPieceContextMenu\(\)[\s\S]*?dismissedPieceContextId = menu\.dataset\.pieceId[\s\S]*?closePieceContextMenu\(\)/)
+    expect(battlePage).toMatch(/function positionPieceContextMenu\(\)[\s\S]*?layout\.placeEdgeDock[\s\S]*?menu\.dataset\.side = placement\.side/)
+    expect(battlePage).toContain('aria-label="收起技能栏"')
+    expect(battlePage).toMatch(/document\.addEventListener\('pointerdown',[\s\S]*?#pieceContextMenu[\s\S]*?dismissPieceContextMenu\(\)/)
+    expect(battlePage).toMatch(/document\.addEventListener\('wheel',[\s\S]*?#boardStage3d[\s\S]*?dismissPieceContextMenu\(\)/)
     expect(battlePage).toContain('const disabled = !availability.available')
     expect(battlePage).toMatch(/function resolveSkillAvailability\(piece, skillOrId\)[\s\S]*?actionLow[\s\S]*?chargeLow/)
     expect(responsiveCss).not.toContain('@media (max-width: 760px)')
@@ -155,6 +177,7 @@ describe('battle page route contract', () => {
     expect(contextCss).toMatch(/orientation: landscape[\s\S]*?\.training-popover \.tb-btn[\s\S]*?min-height:\s*44px/)
     expect(mobileCss).toMatch(/\.board-view-button\s*\{[\s\S]*?min-height:\s*42px/)
     expect(mobileCss).toMatch(/\.piece-context-skill\s*\{[\s\S]*?min-height:\s*44px/)
+    expect(contextCss).toMatch(/orientation:\s*landscape[\s\S]*?\.piece-context-menu\s*\{[\s\S]*?width:\s*148px/)
     expect(mobileCss).toMatch(/\.training-setup-sheet\s*\{[\s\S]*?max-height:\s*calc\(100dvh - 16px\)/)
     expect(mobileCss).toMatch(/\.training-setup-grid\s*\{[\s\S]*?overflow-y:\s*auto/)
   })
@@ -501,7 +524,8 @@ new Script([
     for (const [index, message] of messages.entries()) {
       expect(message).toMatchObject({
         type: 'action',
-        protocolVersion: 2,
+        protocolVersion: 3,
+        authorityBuildId: 'rvb-authority-v3-chunked-sha256-1',
         roomId: 'room-red109',
         clientActionId: `client-${index + 1}`,
         expectedAuthorityVersion: 7,
@@ -515,6 +539,31 @@ new Script([
     expect(messages[2].command).toMatchObject({ type: 'move', clientActionId: 'client-3' })
     expect(messages[3]).toMatchObject({ seq: 1, prevStateHash: 'hash-7' })
     expect(messages[3].command).toMatchObject({ type: 'playCard', clientActionId: 'client-4' })
+  })
+
+  it('does not stamp or submit an action while the authoritative conflict resync gate is active', async () => {
+    const battlePage = readPage('battle.html')
+    const statusMessages: string[] = []
+    let stamped = false
+    let sent = false
+    const context = createContext({
+      RvBWs: {
+        isAuthoritySyncing: () => true,
+        send: () => { sent = true },
+      },
+      withClientActionId: () => {
+        stamped = true
+        return { type: 'move', clientActionId: 'should-not-exist' }
+      },
+      setStatusMsg: (message: string) => statusMessages.push(message),
+    })
+    new Script(readNamedAsyncFunction(battlePage, 'doAction')).runInContext(context)
+
+    await new Script("doAction({ type: 'move', playerId: 'player-red', pieceId: 'caster', toX: 2, toY: 3 })").runInContext(context)
+
+    expect(stamped).toBe(false)
+    expect(sent).toBe(false)
+    expect(statusMessages.at(-1)).toBe('正在同步服务端状态，请等待完成后重新操作')
   })
 
   it('keeps target submission single-flight and clears transient targeting on every authoritative exit', () => {
@@ -565,6 +614,18 @@ new Script([
     expect(battlePage).toContain('\`<div class="pi-section-label">技能</div>\` + skillsHtml')
   })
 
+  it('renders registered status SVGs in piece detail without undefined optional metadata', () => {
+    const battlePage = readPage('battle.html')
+
+    expect(battlePage).toContain(
+      "const iconPath = t.iconPath || t.assetPath || meta.assetPath || 'images/effect-icons/fallback.svg'",
+    )
+    expect(battlePage).toContain('class="pi-status-icon-image" src="${escHtml(iconPath)}"')
+    expect(battlePage).toContain("const description = t.description || meta.description || ''")
+    expect(battlePage).toContain("description ? `<span class=\"pi-status-desc\">${escHtml(description)}</span>` : ''")
+    expect(battlePage).not.toContain('escHtml(t.icon || meta.glyph)')
+  })
+
   it('exposes accessible target feedback and a mobile target mode that removes obstructing detail UI', () => {
     const battlePage = readPage('battle.html')
 
@@ -597,7 +658,7 @@ new Script([
 
     expect(battlePage).toContain('id="orientationGuard"')
     expect(battlePage).toContain('请旋转设备')
-    expect(battlePage).toContain('@media (orientation: portrait) and (max-width: 760px)')
+    expect(battlePage).toContain('@media (orientation: portrait)')
     expect(battlePage).toContain('@media (orientation: landscape) and (max-width: 1000px) and (max-height: 500px)')
     expect(battlePage).toContain('--mobile-landscape-min: 844px')
     expect(battlePage).toContain('--mobile-landscape-recommended: 932px')
@@ -628,5 +689,92 @@ new Script([
     expect(battlePage).not.toContain('publishRelayAuthorityResult')
     expect(battlePage).not.toContain("RvBWs.send({ type: 'stateUpdate'")
     expect(browserEngine).toContain('toPublicBattleState')
+  })
+
+  it('submits RED-138 deployment only from authoritative projected cells', () => {
+    const battlePage = readPage('battle.html')
+    const submittedActions: unknown[] = []
+    const statusMessages: string[] = []
+    const context = createContext({
+      G: {
+        pieces: [],
+        deployment: {
+          mode: 'progressive-reserve-v1',
+          status: 'awaiting-reserve-deploy',
+          revision: 17,
+          activePlayerId: 'player-red',
+          legalPositions: [{ x: 2, y: 3 }],
+        },
+      },
+      myPlayerId: 'player-red',
+      SPECTATE_MODE: false,
+      targetSubmissionPending: false,
+      pendingActionFeedback: null,
+      localDeploymentChoiceId: 'tyrande-1',
+      pendingOptionSelectionForOther: () => false,
+      doAction: (action: unknown) => submittedActions.push(action),
+      setStatusMsg: (message: string) => statusMessages.push(message),
+    })
+    new Script(readNamedFunction(battlePage, 'onCellClick')).runInContext(context)
+
+    new Script('onCellClick(1, 1)').runInContext(context)
+    expect(submittedActions).toEqual([])
+    expect(statusMessages.at(-1)).toBe('请选择权威高亮的部署格')
+
+    new Script('onCellClick(2, 3)').runInContext(context)
+    expect(JSON.parse(JSON.stringify(submittedActions.at(-1)))).toEqual({
+      type: 'deployReservePiece',
+      playerId: 'player-red',
+      expectedDeploymentRevision: 17,
+      pieceId: 'tyrande-1',
+      toX: 2,
+      toY: 3,
+    })
+
+  })
+
+  it('keeps progressive reserve deployment non-modal and returns directly to normal tagged movement', () => {
+    const battlePage = readPage('battle.html')
+    const reserveSelection = readNamedFunction(battlePage, 'selectReserveDeploymentPiece')
+    const authorityCells = readNamedFunction(battlePage, 'authorityCellSet')
+
+    expect(battlePage).toContain('id="deploymentChoices"')
+    expect(battlePage).toContain('role="radiogroup"')
+    expect(battlePage).not.toContain('id="deploymentSkip"')
+    expect(battlePage).not.toContain("type: 'deploymentSkipFreeMove'")
+    expect(battlePage).not.toContain("type: 'deploymentFreeMove'")
+    expect(battlePage).not.toContain("'awaiting-free-move'")
+    expect(battlePage.match(/expectedDeploymentRevision: deployment\.revision/g)).toHaveLength(2)
+    expect(battlePage).toMatch(
+      /function selectReserveDeploymentPiece\(pieceId\)[\s\S]*?!legalPositions\.length[\s\S]*?type: 'deployReservePiece'[\s\S]*?pieceId: pieceId/,
+    )
+    expect(reserveSelection).not.toContain('Math.random')
+    expect(authorityCells).not.toMatch(/manhattan/i)
+    expect(battlePage).toContain("pieceHasVisibleStatusTag(_selPiece, 'deployment-first-move-free')")
+    expect(battlePage).toContain('本回合首移 0 AP')
+  })
+
+  it('shows authoritative reserve-candidate stats and opens read-only accessible details', () => {
+    const battlePage = readPage('battle.html')
+
+    expect(battlePage).toContain('function showDeploymentPieceInfo(pieceId, trigger, preserveKeyword)')
+    expect(battlePage).toContain('function resolveDeploymentOfferPiece(pieceId)')
+    expect(battlePage).toContain("G.pieceStatsByTemplateId[offer.templateId]")
+    expect(battlePage).toContain('HP / 攻击 / 防御 / 移动')
+    expect(battlePage).toContain('属性与技能')
+    expect(battlePage).toContain('aria-label="查看候选棋子的属性与技能"')
+    expect(battlePage).toContain('aria-labelledby="pieceInfoName"')
+    expect(battlePage).toContain('aria-label="关闭棋子详情"')
+    expect(battlePage).toContain('function handlePieceInfoModalKeydown(event)')
+    expect(battlePage).toMatch(/handlePieceInfoModalKeydown[\s\S]*?event\.key === 'Escape'/)
+    expect(battlePage).toMatch(/handlePieceInfoModalKeydown[\s\S]*?event\.key !== 'Tab'/)
+
+    const inspectSource = readNamedFunction(battlePage, 'showDeploymentPieceInfo')
+    expect(inspectSource).not.toContain('localDeploymentChoiceId =')
+    expect(inspectSource).not.toContain('doAction(')
+    expect(inspectSource).not.toContain('expectedDeploymentRevision')
+    expect(battlePage).toMatch(
+      /function reconcileDeploymentPieceInfo[\s\S]*?deployment\.revision !== currentPieceInfoDeploymentRevision[\s\S]*?closePieceInfo/,
+    )
   })
 })

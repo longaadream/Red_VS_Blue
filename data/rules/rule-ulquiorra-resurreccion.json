@@ -1,0 +1,7 @@
+{
+  "id": "rule-ulquiorra-resurreccion",
+  "name": "归刃·黑翼大魔",
+  "description": "归刃进度达到3后，于乌尔奇奥拉的回合开始时归刃。",
+  "trigger": { "type": "beginTurn" },
+  "skillCode": "var piece = context.rulePiece; if (!piece || piece.currentHp <= 0 || context.playerId !== piece.ownerPlayerId) return { success: false, message: '' }; if (piece.statusTags && piece.statusTags.some(function(tag) { return tag.id === 'ulquiorra-resurreccion-' + piece.instanceId; })) return { success: false, message: '' }; var progress = piece.statusTags && piece.statusTags.find(function(tag) { return tag.type === 'ulquiorra-resurreccion-progress'; }); if (!progress || (progress.intensity || 0) < 3) return { success: false, message: '' }; piece.attack += 1; piece.moveRange += 1; removeStatusEffectById(piece.instanceId, progress.id); addSkillById(piece.instanceId, 'ulquiorra-black-cero'); addStatusEffectById(piece.instanceId, { id: 'ulquiorra-resurreccion-' + piece.instanceId, type: 'resurreccion', name: '归刃', visible: true, currentDuration: -1, currentUses: -1, intensity: 1, stacks: 1 }); return { success: true, message: piece.name + '归刃为黑翼大魔' };"
+}

@@ -8,6 +8,7 @@
   <script src="js/server-utils.js"></script>
   <script src="js/crypto-lib.js"></script>
   <script src="js/identity.js"></script>
+  <script src="js/colyseus-sdk.js"></script>
   <script src="js/ws-client.js"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
@@ -346,6 +347,20 @@
       return !!(window.RvBUtils && RvBUtils.getActiveServerMode && RvBUtils.getActiveServerMode() === 'remote')
     }
 
+    function requireGameProfileIdentity() {
+      const stored = localStorage.getItem('rvb_game_profile_identity')
+      if (!stored) {
+        throw new Error('Resolved Profile identity is unavailable. Return to the lobby and reconnect the resource pack.')
+      }
+      try {
+        const identity = JSON.parse(stored)
+        if (!identity || typeof identity !== 'object' || Array.isArray(identity)) throw new Error('invalid')
+        return identity
+      } catch {
+        throw new Error('Resolved Profile identity is invalid. Return to the lobby and reconnect the resource pack.')
+      }
+    }
+
     // RvBUtils loaded from js/server-utils.js
     const getServerUrl = () => RvBUtils.getServerUrl()
 
@@ -615,7 +630,7 @@
     }
 
     async function sendRoomAction(payload) {
-      const body = Object.assign({ roomId }, payload)
+      const body = Object.assign({}, payload, { roomId, profileIdentity: requireGameProfileIdentity() })
       await waitForSelectionWs(5000)
       return RvBWs.request('rooms.action', body, 7000)
     }

@@ -225,9 +225,11 @@ describe('RED-129 提里奥圣盾生命周期', () => {
     }) as any
 
     const start = globalTriggerSystem.checkTriggers(state, {
-      type: 'gameStart',
+      type: 'afterPieceSummoned',
       playerId: 'player-red',
-      turnNumber: 1,
+      sourcePiece: tirion,
+      pieceTemplateId: tirion.templateId,
+      faction: tirion.faction,
     } as any)
     expect(start.success).toBe(true)
     expect(tirion.statusTags).toContainEqual(expect.objectContaining({ type: 'divine-shield' }))

@@ -3,6 +3,7 @@ import type { BattleAction, BattleState, PlayerId } from './turn'
 export const TURN_BURN_WINDOW_MS = 15_000
 export const TURN_FAST_DURATION_MS = 20_000
 export const TURN_TIMEOUT_FORFEIT_STREAK = 3
+export const PENDING_RESPONSE_DURATION_MS = 15_000
 
 export function isTurnTimerEnabled(): boolean {
   const configured = String(process.env.RVB_TURN_TIMER_ENABLED ?? '').trim().toLowerCase()
@@ -32,6 +33,28 @@ export interface TurnTimerInputWindowState {
   acceptedGameplayAction: boolean
 }
 
+export type PendingTimeoutResolution =
+  | { kind: 'cancel' }
+  | { kind: 'option'; selectedOption: unknown }
+  | {
+      kind: 'target'
+      targetPieceId?: string
+      targetX?: number
+      targetY?: number
+      extraTargets?: Array<{ pieceId?: string; x?: number; y?: number }>
+    }
+
+export interface PendingResponseTimerState {
+  status: 'running'
+  ownerPlayerId: PlayerId
+  selectionId: string
+  stateRevision: number
+  durationMs: typeof PENDING_RESPONSE_DURATION_MS
+  startedAt: number
+  deadlineAt: number
+  timeoutResolution: PendingTimeoutResolution
+}
+
 export interface TurnTimerState {
   status: 'running' | 'stopped'
   ownerPlayerId: PlayerId
@@ -48,8 +71,10 @@ export interface TurnTimerState {
   burnPhase: 'normal' | 'burning'
   fast: boolean
   acceptedGameplayAction: boolean
-  /** Per-input-owner budgets retained while a pending response temporarily transfers control. */
+  /** Ordinary turn budgets retained across pause/resume boundaries. */
   inputWindows: Record<PlayerId, TurnTimerInputWindowState>
+  /** Independent response clock. While present, the ordinary turn budget is frozen. */
+  pendingResponse?: PendingResponseTimerState
   noOpStreaks: Record<PlayerId, number>
   lastPausedAt?: number
   lastResumedAt?: number
@@ -71,6 +96,18 @@ export interface TurnTimerProjection {
   burning: boolean
   fast: boolean
   status: TurnTimerState['status']
+  paused: boolean
+}
+
+export interface PendingTimerProjection {
+  ownerPlayerId: PlayerId
+  selectionId: string
+  stateRevision: number
+  durationMs: number
+  remainingMs: number
+  remainingSeconds: number
+  deadlineAt: number
+  status: PendingResponseTimerState['status']
 }
 
 const monotonicGlobal = globalThis as typeof globalThis & {
@@ -112,7 +149,12 @@ export function getNormalTurnDurationMs(turnNumber: number): number {
 
 export function getCurrentInputOwnerPlayerId(state: BattleState): PlayerId {
   return state.pendingOptionSelection?.playerId
+    ?? state.pendingTargetSelection?.ownerPlayerId
     ?? state.pendingTargetSelection?.playerId
+    ?? (state.deployment?.mode === 'progressive-reserve-v1'
+      && state.deployment.status === 'awaiting-reserve-deploy'
+      ? state.deployment.activePlayerId
+      : undefined)
     ?? state.turn.currentPlayerId
 }
 function getEffectiveTurn(state: BattleState): BattleState['turn'] {
@@ -130,22 +172,25 @@ export function createRunningTurnTimer(
   noOpStreaks: Record<PlayerId, number> = state.turnTimer?.noOpStreaks ?? {},
 ): TurnTimerState {
   const hasPendingInput = !!state.pendingOptionSelection || !!state.pendingTargetSelection
-  if (state.turn.phase !== 'action' && !hasPendingInput) {
+  const hasProgressiveDeploymentInput = state.deployment?.mode === 'progressive-reserve-v1'
+    && state.deployment.status === 'awaiting-reserve-deploy'
+  if (state.turn.phase !== 'action' && !hasPendingInput && !hasProgressiveDeploymentInput) {
     throw new Error(
       'A turn timer may only start while the server is waiting in action phase or for pending input')
   }
   const effectiveTurn = getEffectiveTurn(state)
   const turnOwnerPlayerId = effectiveTurn.currentPlayerId
-  const ownerPlayerId = getCurrentInputOwnerPlayerId(state)
+  const inputOwnerPlayerId = getCurrentInputOwnerPlayerId(state)
   const normalizedStreaks = normalizeNoOpStreaks(state, noOpStreaks)
-  const inputWindow = createInputWindow(state, ownerPlayerId, normalizedStreaks)
+  const inputWindow = createInputWindow(state, turnOwnerPlayerId, normalizedStreaks)
   const { durationMs, fast } = inputWindow
   const deadlineAt = now + durationMs
+  const pendingResponse = createPendingResponseTimer(state, now)
   return {
     status: 'running',
-    ownerPlayerId,
+    ownerPlayerId: turnOwnerPlayerId,
     turnOwnerPlayerId,
-    inputOwnerPlayerId: ownerPlayerId,
+    inputOwnerPlayerId,
     turnNumber: effectiveTurn.turnNumber,
     fullRound: getFullRoundNumber(effectiveTurn.turnNumber),
     durationMs,
@@ -157,8 +202,9 @@ export function createRunningTurnTimer(
     fast,
     acceptedGameplayAction: false,
     inputWindows: {
-      [ownerPlayerId]: inputWindow,
+      [turnOwnerPlayerId]: inputWindow,
     },
+    ...(pendingResponse ? { pendingResponse } : {}),
     noOpStreaks: normalizedStreaks,
     lastResumedAt: now,
   }
@@ -169,7 +215,8 @@ export function projectTurnTimer(
   now: number,
 ): TurnTimerProjection | undefined {
   if (!timer) return undefined
-  const remainingMs = timer.status === 'running'
+  const paused = !!timer.pendingResponse
+  const remainingMs = timer.status === 'running' && !paused
     ? Math.max(0, timer.deadlineAt - now)
     : Math.max(0, timer.remainingMs)
   return {
@@ -183,9 +230,29 @@ export function projectTurnTimer(
     remainingSeconds: Math.ceil(remainingMs / 1_000),
     deadlineAt: timer.deadlineAt,
     burnStartsAt: timer.burnStartsAt,
-    burning: timer.burnPhase === 'burning' || remainingMs <= TURN_BURN_WINDOW_MS,
+    burning: !paused && (timer.burnPhase === 'burning' || remainingMs <= TURN_BURN_WINDOW_MS),
     fast: timer.fast,
     status: timer.status,
+    paused,
+  }
+}
+
+export function projectPendingTimer(
+  timer: TurnTimerState | undefined,
+  now: number,
+): PendingTimerProjection | undefined {
+  const pending = timer?.status === 'running' ? timer.pendingResponse : undefined
+  if (!pending) return undefined
+  const remainingMs = Math.max(0, pending.deadlineAt - now)
+  return {
+    ownerPlayerId: pending.ownerPlayerId,
+    selectionId: pending.selectionId,
+    stateRevision: pending.stateRevision,
+    durationMs: pending.durationMs,
+    remainingMs,
+    remainingSeconds: Math.ceil(remainingMs / 1_000),
+    deadlineAt: pending.deadlineAt,
+    status: pending.status,
   }
 }
 
@@ -199,6 +266,7 @@ export function isAcceptedGameplayAction(action: BattleAction): boolean {
     case 'pendingOptionSelect':
     case 'pendingTargetSelect':
     case 'cancelPendingSelection':
+    case 'deployReservePiece':
       return true
     default:
       return false
@@ -208,6 +276,7 @@ export function isAcceptedGameplayAction(action: BattleAction): boolean {
 export function isTurnTimerSystemAction(action: BattleAction): boolean {
   return action.type === 'turnTimerSync'
     || action.type === 'turnTimerBurn'
+    || action.type === 'pendingTimeout'
     || action.type === 'turnTimeout'
 }
 
@@ -223,13 +292,16 @@ export function syncTurnTimerAfterAcceptedAction(
   const previous = state.turnTimer
   const inputWindows = previous ? normalizeInputWindows(previous) : {}
   const currentRemainingMs = previous
-    ? Math.min(
+    ? previous.pendingResponse
+      ? previous.remainingMs
+      : Math.min(
         previous.remainingMs,
         Math.max(0, previous.deadlineAt - input.receivedAt),
       )
     : 0
   const streaks = normalizeNoOpStreaks(state, previous?.noOpStreaks ?? {})
   const actorMatchesOwner = !!previous
+    && !previous.pendingResponse
     && normalizePlayerId(input.actorPlayerId) === normalizePlayerId(previous.ownerPlayerId)
   const acceptedGameplayAction = !!input.acceptedActionType
     && actorMatchesOwner
@@ -272,29 +344,38 @@ export function syncTurnTimerAfterAcceptedAction(
     return createRunningTurnTimer(state, input.resumedAt, streaks)
   }
 
-  const sameInputOwner = normalizePlayerId(previous.ownerPlayerId) === normalizePlayerId(nextInputOwnerPlayerId)
-  const nextWindow = inputWindows[nextInputOwnerPlayerId]
-    ?? createInputWindow(state, nextInputOwnerPlayerId, streaks)
-  const remainingMs = sameInputOwner ? currentRemainingMs : nextWindow.remainingMs
-  inputWindows[nextInputOwnerPlayerId] = {
+  const turnOwnerPlayerId = effectiveTurn.currentPlayerId
+  const nextWindow = inputWindows[turnOwnerPlayerId]
+    ?? createInputWindow(state, turnOwnerPlayerId, streaks)
+  const remainingMs = normalizePlayerId(previous.turnOwnerPlayerId) === normalizePlayerId(turnOwnerPlayerId)
+    ? currentRemainingMs
+    : nextWindow.remainingMs
+  inputWindows[turnOwnerPlayerId] = {
     ...nextWindow,
     remainingMs,
   }
+  const nextPendingResponse = isOffTurnPending(state)
+    ? samePendingResponse(previous.pendingResponse, state)
+      ? previous.pendingResponse
+      : createPendingResponseTimer(state, input.resumedAt)
+    : undefined
   const deadlineAt = input.resumedAt + remainingMs
   return {
     ...previous,
     status: 'running',
-    ownerPlayerId: nextInputOwnerPlayerId,
+    ownerPlayerId: turnOwnerPlayerId,
+    turnOwnerPlayerId,
     inputOwnerPlayerId: nextInputOwnerPlayerId,
     durationMs: nextWindow.durationMs,
     remainingMs,
-    startedAt: sameInputOwner ? previous.startedAt : input.resumedAt,
+    startedAt: previous.startedAt,
     deadlineAt,
     burnStartsAt: deadlineAt - TURN_BURN_WINDOW_MS,
     burnPhase: nextWindow.burnPhase,
     fast: nextWindow.fast,
     acceptedGameplayAction: nextWindow.acceptedGameplayAction,
     inputWindows,
+    ...(nextPendingResponse ? { pendingResponse: nextPendingResponse } : { pendingResponse: undefined }),
     noOpStreaks: streaks,
     lastPausedAt: input.receivedAt,
     lastResumedAt: input.resumedAt,
@@ -304,6 +385,7 @@ export function syncTurnTimerAfterAcceptedAction(
 
 export function markTurnTimerBurning(state: BattleState, now: number): TurnTimerState {
   const timer = requireRunningTimer(state)
+  if (timer.pendingResponse) throw new Error('Turn burn phase cannot advance while the turn clock is frozen')
   if (now < timer.burnStartsAt) throw new Error('Turn burn phase cannot start before its authoritative threshold')
   if (timer.burnPhase === 'burning') return timer
   const remainingMs = Math.max(0, timer.deadlineAt - now)
@@ -323,6 +405,7 @@ export function markTurnTimerBurning(state: BattleState, now: number): TurnTimer
 
 export function recordTurnTimeout(state: BattleState, now: number): TurnTimerState {
   const timer = requireRunningTimer(state)
+  if (timer.pendingResponse) throw new Error('Turn timeout cannot run while a pending response clock is active')
   if (now < timer.deadlineAt) throw new Error('Turn timeout cannot run before the authoritative deadline')
   const noAcceptedGameplayAction = !timer.acceptedGameplayAction
   const countsTowardNoOpStreak = noAcceptedGameplayAction
@@ -363,11 +446,141 @@ function requireRunningTimer(state: BattleState): TurnTimerState {
   if (
     timer.turnNumber !== effectiveTurn.turnNumber
     || normalizePlayerId(timer.turnOwnerPlayerId) !== normalizePlayerId(effectiveTurn.currentPlayerId)
-    || normalizePlayerId(timer.ownerPlayerId) !== normalizePlayerId(getCurrentInputOwnerPlayerId(state))
+    || normalizePlayerId(timer.inputOwnerPlayerId) !== normalizePlayerId(getCurrentInputOwnerPlayerId(state))
   ) {
     throw new Error('Turn timer does not match the current authoritative input owner')
   }
   return timer
+}
+
+function isOffTurnPending(state: BattleState): boolean {
+  const pending = state.pendingOptionSelection ?? state.pendingTargetSelection
+  if (!pending) return false
+  return normalizePlayerId(pendingOwnerPlayerId(pending)) !== normalizePlayerId(getEffectiveTurn(state).currentPlayerId)
+}
+
+function samePendingResponse(
+  response: PendingResponseTimerState | undefined,
+  state: BattleState,
+): boolean {
+  const pending = state.pendingOptionSelection ?? state.pendingTargetSelection
+  return !!response
+    && !!pending
+    && response.selectionId === pending.selectionId
+    && response.stateRevision === pending.stateRevision
+    && normalizePlayerId(response.ownerPlayerId) === normalizePlayerId(pendingOwnerPlayerId(pending))
+}
+
+function createPendingResponseTimer(
+  state: BattleState,
+  now: number,
+): PendingResponseTimerState | undefined {
+  if (!isOffTurnPending(state)) return undefined
+  const pending = state.pendingOptionSelection ?? state.pendingTargetSelection
+  if (!pending || !pending.selectionId || !Number.isSafeInteger(pending.stateRevision)) {
+    throw new Error('Off-turn pending response must be finalized before its timer starts')
+  }
+  return {
+    status: 'running',
+    ownerPlayerId: pendingOwnerPlayerId(pending),
+    selectionId: pending.selectionId,
+    stateRevision: pending.stateRevision!,
+    durationMs: PENDING_RESPONSE_DURATION_MS,
+    startedAt: now,
+    deadlineAt: now + PENDING_RESPONSE_DURATION_MS,
+    timeoutResolution: createPendingTimeoutResolution(state),
+  }
+}
+
+function createPendingTimeoutResolution(state: BattleState): PendingTimeoutResolution {
+  const option = state.pendingOptionSelection
+  if (option) {
+    if (option.canCancel !== false) return { kind: 'cancel' }
+    const candidates = uniqueValues((option.options ?? []).map(candidateValue))
+    const minimum = option.selectionMode === 'multi'
+      ? Math.max(0, Number.isSafeInteger(option.minSelections) ? option.minSelections! : 1)
+      : 1
+    if (candidates.length < minimum) {
+      throw new Error('Timed-out mandatory pending option has no legal deterministic default')
+    }
+    return {
+      kind: 'option',
+      selectedOption: option.selectionMode === 'multi' ? candidates.slice(0, minimum) : candidates[0],
+    }
+  }
+
+  const target = state.pendingTargetSelection
+  if (!target) throw new Error('Pending response timer requires an active pending session')
+  if (target.canCancel !== false) return { kind: 'cancel' }
+  const candidates = uniqueTargets(target.candidates ?? [])
+  const selectionMode = target.selectionMode || ((target.maxSelections ?? target.max ?? 1) > 1 ? 'multi' : 'single')
+  const minimum = selectionMode === 'multi'
+    ? Math.max(1, target.minSelections ?? target.min ?? 1)
+    : 1
+  if (candidates.length < minimum) {
+    throw new Error('Timed-out mandatory pending target has no legal deterministic default')
+  }
+  const selected = candidates.slice(0, minimum)
+  const primary = selected[0]
+  return {
+    kind: 'target',
+    ...(primary.type === 'piece'
+      ? { targetPieceId: primary.pieceId }
+      : { targetX: primary.x, targetY: primary.y }),
+    ...(selected.length > 1
+      ? {
+          extraTargets: selected.slice(1).map(candidate => candidate.type === 'piece'
+            ? { pieceId: candidate.pieceId }
+            : { x: candidate.x, y: candidate.y }),
+        }
+      : {}),
+  }
+}
+
+function candidateValue(candidate: unknown): unknown {
+  if (!candidate || typeof candidate !== 'object') return candidate
+  if ('value' in candidate) return (candidate as { value: unknown }).value
+  if ('id' in candidate) return (candidate as { id: unknown }).id
+  return candidate
+}
+
+function pendingOwnerPlayerId(
+  pending: NonNullable<BattleState['pendingOptionSelection'] | BattleState['pendingTargetSelection']>,
+): PlayerId {
+  return 'ownerPlayerId' in pending && pending.ownerPlayerId
+    ? pending.ownerPlayerId
+    : pending.playerId
+}
+
+function uniqueValues(values: unknown[]): unknown[] {
+  const seen = new Set<string>()
+  return values.filter(value => {
+    const key = stableValue(value)
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+}
+
+function uniqueTargets<T extends { type: 'piece'; pieceId: string } | { type: 'cell'; x: number; y: number }>(
+  targets: T[],
+): T[] {
+  const seen = new Set<string>()
+  return targets.filter(target => {
+    const key = target.type === 'piece' ? `piece:${target.pieceId}` : `cell:${target.x}:${target.y}`
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+}
+
+function stableValue(value: unknown): string {
+  if (value === undefined) return 'undefined'
+  if (value === null || typeof value !== 'object') return JSON.stringify(value)
+  if (Array.isArray(value)) return `[${value.map(stableValue).join(',')}]`
+  return `{${Object.keys(value as Record<string, unknown>).sort().map(key => (
+    `${JSON.stringify(key)}:${stableValue((value as Record<string, unknown>)[key])}`
+  )).join(',')}}`
 }
 
 function createInputWindow(

@@ -1,16 +1,19 @@
 import { describe, expect, it } from 'vitest'
 
-import { hashPublicBattleState } from '@/lib/game/battle-public-patch'
-import { hashBattleState } from '@/lib/game/battle-trace'
+import { createBattlePublicPatch, hashPublicBattleState } from '@/lib/game/battle-public-patch'
+import { toPublicBattleState } from '@/lib/game/deployment'
+import { hashBattleState, hashBattleStateForProtocol } from '@/lib/game/battle-trace'
 import {
   assertBattleAuthorityRestoreCheckpoint,
   buildBattleAuthorityTransition,
   createBattleAuthorityGenesisHash,
+  hashBattleAuthorityAction,
   hashBattleAuthorityTransition,
   replayBattleAuthorityTransitions,
   type BattleAuthorityTransitionRecord,
 } from '@/lib/game/battle-transition'
 import type { ServerBattleState } from '@/lib/game/battle-storage'
+import { createTestServerBattleState } from './profile-test-identity'
 import type { BattleAction, BattleState } from '@/lib/game/turn'
 
 describe('RED-109 battle authority recovery', () => {
@@ -155,11 +158,56 @@ describe('RED-109 battle authority recovery', () => {
     expect(() => assertBattleAuthorityRestoreCheckpoint('broken-room', 2, undefined))
       .toThrow('checkpoint missing')
   })
+
+  it('restores a persisted v2 chain but rejects a v3 transition mixed into that chain', () => {
+    const roomId = 'legacy-v2-chain'
+    const checkpoint = storageAt(0)
+    const versionOne = storageAt(1)
+    const legacy = legacyTransition(roomId, checkpoint, versionOne)
+    const checkpointStateHash = hashBattleStateForProtocol(checkpoint.state as BattleState, 2)
+    const checkpointPublicHash = hashPublicBattleState(
+      toPublicBattleState(checkpoint.state as BattleState),
+      2,
+    )
+    const checkpointTransitionHash = createBattleAuthorityGenesisHash({
+      roomId,
+      protocolVersion: 2,
+      stateHash: checkpointStateHash,
+      publicHash: checkpointPublicHash,
+    })
+
+    expect(replayBattleAuthorityTransitions({
+      roomId,
+      checkpointStorage: checkpoint,
+      checkpointProtocolVersion: 2,
+      checkpointVersion: 0,
+      checkpointStateHash,
+      checkpointPublicHash,
+      checkpointTransitionHash,
+      targetVersion: 1,
+      targetTransitionHash: legacy.transitionHash,
+      transitions: [legacy],
+    })).toEqual(versionOne)
+
+    const current = transition(roomId, 0, checkpoint, versionOne)
+    expect(() => replayBattleAuthorityTransitions({
+      roomId,
+      checkpointStorage: checkpoint,
+      checkpointProtocolVersion: 2,
+      checkpointVersion: 0,
+      checkpointStateHash,
+      checkpointPublicHash,
+      checkpointTransitionHash,
+      targetVersion: 1,
+      targetTransitionHash: current.transitionHash,
+      transitions: [current],
+    })).toThrow('transition gap')
+  })
 })
 
 function checkpointInput(roomId: string, storage: ServerBattleState) {
   const checkpointStateHash = hashBattleState(storage.state as BattleState)
-  const checkpointPublicHash = hashPublicBattleState(storage.state as BattleState)
+  const checkpointPublicHash = hashPublicBattleState(toPublicBattleState(storage.state as BattleState))
   return {
     roomId,
     checkpointStorage: storage,
@@ -175,16 +223,12 @@ function checkpointInput(roomId: string, storage: ServerBattleState) {
 }
 
 function storageAt(revision: number): ServerBattleState {
-  return {
-    type: 'server-state',
-    seed: 109,
-    state: {
-      pieces: [],
-      players: [],
-      turn: { turnNumber: 1, phase: 'action', currentPlayerId: 'player-red' },
-      authorityTestRevision: revision,
-    },
-  }
+  return createTestServerBattleState({
+    pieces: [],
+    players: [],
+    turn: { turnNumber: 1, phase: 'action', currentPlayerId: 'player-red' },
+    authorityTestRevision: revision,
+  })
 }
 
 function transition(
@@ -204,11 +248,72 @@ function transition(
     command,
     previousStorage: previous,
     nextStorage: next,
-    previousPublicState: previous.state as BattleState,
-    nextPublicState: next.state as BattleState,
+    previousPublicState: toPublicBattleState(previous.state as BattleState),
+    nextPublicState: toPublicBattleState(next.state as BattleState),
     preStateHash: hashBattleState(previous.state as BattleState),
     postStateHash: hashBattleState(next.state as BattleState),
     previousTransitionHash,
     now: fromVersion,
   })
+}
+
+function legacyTransition(
+  roomId: string,
+  previous: ServerBattleState,
+  next: ServerBattleState,
+): BattleAuthorityTransitionRecord {
+  const clientActionId = 'legacy-recovery-1'
+  const playerId = 'player-red'
+  const command = { type: 'beginPhase', clientActionId } as BattleAction
+  const commands = [command]
+  const preStateHash = hashBattleStateForProtocol(previous.state as BattleState, 2)
+  const postStateHash = hashBattleStateForProtocol(next.state as BattleState, 2)
+  const previousPublicState = toPublicBattleState(previous.state as BattleState)
+  const nextPublicState = toPublicBattleState(next.state as BattleState)
+  const prePublicHash = hashPublicBattleState(previousPublicState, 2)
+  const postPublicHash = hashPublicBattleState(nextPublicState, 2)
+  const previousTransitionHash = createBattleAuthorityGenesisHash({
+    roomId,
+    protocolVersion: 2,
+    stateHash: preStateHash,
+    publicHash: prePublicHash,
+  })
+  const base = {
+    protocolVersion: 2 as const,
+    roomId,
+    fromVersion: 0,
+    toVersion: 1,
+    clientActionId,
+    playerId,
+    command,
+    commands,
+    internalPatch: createBattlePublicPatch(previous, next),
+    publicPatch: createBattlePublicPatch(previousPublicState, nextPublicState),
+    preStateHash,
+    postStateHash,
+    prePublicHash,
+    postPublicHash,
+    actionHash: hashBattleAuthorityAction({
+      protocolVersion: 2,
+      roomId,
+      clientActionId,
+      playerId,
+      commands,
+    }),
+    previousTransitionHash,
+    receipt: {
+      protocolVersion: 2 as const,
+      roomId,
+      clientActionId,
+      status: 'applied' as const,
+      authorityVersion: 1,
+    },
+    traces: [],
+    replayFrames: [],
+    createdAt: 0,
+  }
+  return {
+    ...base,
+    transitionHash: hashBattleAuthorityTransition(base),
+  }
 }

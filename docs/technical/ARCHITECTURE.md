@@ -4,6 +4,9 @@
 
 基线：`594977b`（2026-08-12）
 架构约定更新：2026-08-18（RED-34）
+自治服务器约定更新：2026-08-31（RED-140，设计基线
+`f51a5eed2a37be6491841a19393b0725ad188554`；收尾同步
+`6e6ae8dd88928dc285c0cbb7a5be7e3c121ae9a2`）
 
 首要公开测试模式：先完成 LAN Windows/Electron；Android 后续按 RED-81 迁移到同一权威状态标准
 
@@ -27,6 +30,7 @@
 | Next 服务层   | `app/`、`instrumentation.ts`                                     | 静态/Admin HTTP、状态页、训练/PVE、玩家 WebSocket | 玩家大厅/房间/目录/战斗统一 WS；旧玩家 REST 返回 410 |
 | 游戏规则层      | `lib/game/`                                                     | 状态创建、动作执行、技能、触发器、地图和回放                | 类型重复、模块级缓存和全局触发器               |
 | 房间/持久化层    | `lib/game/room-store.ts`、`lib/game/battle-storage.ts`、`prisma/` | 房间状态序列化、SQLite 存取、旧格式兼容               | 外层存档无正式格式版本和迁移链                |
+| PVE Run 持久化层 | `lib/pve/run-store.ts`、`lib/pve/profile-lifecycle.ts` | strict Run aggregate、revision CAS、authority reconciliation evidence/tombstone | 当前 `<userData>/pve-runs` 尚未迁入 RED-140 committed generation |
 | Electron 层 | `electron/`、`electron-client/`、`electron-editor/`               | 进程、窗口、本地服务器和 IPC                      | IPC 是字符串协议，没有共享类型              |
 | Android 层  | `android-client/`、`android/`、`mobile-server/`                   | 移动端框架重塑中；后续目标为同一权威 Runner | RED-34 不维护旧 action-log 入口，移动端接入另行验收 |
 | Relay 层    | `relay-server/`                                                 | 遗留房间与消息转发                             | host 客户端权威已禁用；旧 standalone Relay 需重建为权威服务后才可用于战斗 |
@@ -43,6 +47,12 @@
 
 失败行为：子进程、端口、standalone 资源或注入代理失败均可能导致应用不能进入可用状态。目前没有覆盖整条链的自动冒烟测试。
 
+当前 `win-unpacked` 仍只是内部 QA 候选。RED-140 已接受把独立 Windows Server 扩展为公开自治
+Server 的目标架构，但安装器、签名、监督器、备份、更新和候选验证尚未实现；在 RED-148 完成并经
+人工发布批准前，不得把现有目录产物称为公开发行物。目标发行与运维边界见
+[ADR-0021](../decisions/ADR-0021-autonomous-server-operations.md) 和
+[Server Operations v1](./SERVER_OPERATIONS_V1.md)。
+
 ### 3.2 Windows/Electron 玩家客户端标准流程
 
 1. Electron 客户端从 `electron-client/main.ts::app.whenReady()` 启动并加载打包页面资源。
@@ -53,7 +63,12 @@
 6. `dispatchRoomBattleAction()` 用 `RoomStore.setRoomIfVersion()` CAS 保存房间，成功后才广播 `stateUpdate`；终局状态与房间 `finished` 在同一次写入中提交。
 7. 客户端 `applyServerState()` 替换本地状态并重新渲染。
 
-RED-127 起不再提供玩家 HTTP 后备入口。大厅、目录、房间、选将、战斗与恢复全部走同源 WebSocket；旧玩家 REST 在实际服务边界返回 410，静态资源和 `/api/admin/**` 继续使用 HTTP。决策见 [ADR-0020](../decisions/ADR-0020-unified-player-websocket-transport.md)。
+RED-127 起不再提供玩家 HTTP 后备入口。大厅、目录、房间、选将、战斗与恢复全部走同源 WebSocket；
+旧玩家 REST 在实际服务边界返回 410，静态资源继续使用 HTTP。RED-127 中
+`/api/admin/**` 只描述历史非自治边界；RED-140 自治发行不得把它或任何 management route 注册到
+玩家 listener，唯一 operator 入口是 trusted IPC，child adapter 仅在独立 loopback `/v1/**`。
+决策见 [ADR-0020](../decisions/ADR-0020-unified-player-websocket-transport.md) 与
+[ADR-0021](../decisions/ADR-0021-autonomous-server-operations.md)。
 
 ### 3.3 Android 开服：当前遗留与迁移目标
 
@@ -72,6 +87,7 @@ RED-81 的目标不是让 Android 原样运行 Next/Prisma，而是让隐藏 Web
 | 模式 | 当前权威 | 动作执行位置 | 持久化位置 |
 | --- | --- | --- | --- |
 | Windows 开服 | Next/WS 服务端中的房间状态 | `runBattleAction()` → `applyBattleAction()` | Prisma `Room.battleState` |
+| Windows PVE（RED-117） | `PveRunStoreV1` strict aggregate | `PveServiceV1` → 正式 Battle Runner | 当前 JSON Run Store；RED-140 目标为 committed data generation 内唯一 `pve-runs` root |
 | Android 开服（当前遗留） | `mobile-server-entry.ts` 的 action log | 客户端按 `seq` 调用浏览器 Runner 回放；宿主不裁决完整结果 | WebView 内存日志；RED-81 将删除 |
 | Relay | 同合同的远端权威房间服务 | 浏览器只发送 action 并消费 `stateUpdate` | 旧 host 权威 Relay 被客户端拒绝，需重建服务后启用 |
 | Training | `battle.html?mode=training` 的客户端内存状态 | 浏览器 `trainingApiFetch()` → `GameEngine.applyBattleAction()` | 仅页面内存 |
@@ -116,6 +132,11 @@ RED-81 的目标不是让 Android 原样运行 Next/Prisma，而是让隐藏 Web
 - 不兼容公开测试前的旧存档；兼容承诺从新版本化存档格式开始。
 - 先恢复稳定运行和可观察性，再做模块拆分。
 - 动态代码由一个受信任内容运行时集中编译并按 `{surface,id,version,codeHash}` 缓存、精准失效；编译函数只存内存。若未来运行不受信任脚本，必须另建独立隔离方案。
+- 独立 Windows 自治 Server 的整体生命周期、进程、文件、备份和应用更新只有 Electron main 一个
+  写权威；renderer 只通过受信 preload IPC 消费版本化状态，Next/RoomRuntime 只提供准入、健康、
+  durable 水位和房间观察值。
+- 自治 Server 的本地管理面与玩家 WebSocket 分离：只允许 loopback transport 加每进程随机
+  capability，不信任 Host、Origin、X-Forwarded-For，也不复用静态 `admin-secret-key`。
 
 ## 8. 延期愿景索引
 
@@ -124,12 +145,14 @@ RED-81 的目标不是让 Android 原样运行 Next/Prisma，而是让隐藏 Web
 | 模块 | 已确认方向 | 当前处理 |
 | --- | --- | --- |
 | 存档与恢复 | 掉线暂停；参与者持有记录；不兼容公开测试前旧存档 | 延期，先恢复运行基线 |
-| 身份与签名 | 玩家命令和服务端结果分别签名；服务器身份可备份、迁移和撤销 | High Risk，另建威胁模型 |
+| 身份与签名 | RED-140 已冻结本服 UUID、release manifest 签名与备份迁移；跨服证明、账号恢复和撤销网络仍延期 | 本服最小闭环见 ADR-0021；跨服能力仍需独立 High Risk 威胁模型 |
 | 加密与随机 | 存档/传输加密；隐藏信息隔离；随机过程最终可审计 | High Risk，暂不选算法 |
 | 服务器规则 | 服务器规则自治；规则/数据 hash 一致才开局；规则脚本需沙箱 | High Risk，先验证现有规则引擎 |
 | 回放与账号 | 正常终局自动匿名回放；账号私钥可加密备份 | 长期产品模块 |
 
-详细字段、密码算法、密钥生命周期、沙箱 ABI 和托管方式都不是当前承诺。需要处理某模块时，再从已确认方向开始做不超过 1～3 天的小任务。
+ADR-0021 已固定 Windows Server 发行清单的 Ed25519 签名、Authenticode、密钥轮换和本服 UUID；
+它不批准玩家账号密钥、跨服信任、撤销网络、端到端加密或规则脚本沙箱。后者的详细字段、算法和
+托管方式仍不是当前承诺，必须另建 High Risk 任务。
 
 ## 9. Demo 边界
 
@@ -151,6 +174,8 @@ RED-81 的目标不是让 Android 原样运行 Next/Prisma，而是让隐藏 Web
 - `GAME_LOGIC_SYSTEM.md`：权威边界、接口、流程图、Android 迁移和动态代码执行说明。
 - `DEBUGGING.md`：故障基线、日志、测试和复现流程。
 - `MODULE_STATUS.md`：当前状态、风险和后续任务优先级。
+- `SERVER_OPERATIONS_V1.md`：自治 Server 生命周期、管理 API、发行身份、备份和更新合同。
+- `ADR-0021-autonomous-server-operations.md`：公开自治 Server 的产品、发行与安全决策。
 
 ## 11. RED-109 低延迟权威管线
 
@@ -161,8 +186,41 @@ RED-109 将 Windows LAN 普通动作从“完整 Room JSON CAS + 完整 stateUpd
 
 初始 checkpoint 建立后，在线裁决只读取每房间内存权威。Prisma/SQLite 在单一后台 writer 中按序保存
 Transition Δ、receipt 和周期 checkpoint；其 `durableAuthorityVersion` 可以落后于在线版本，失败时显式
-进入 degraded。候选不承诺断电前尚未 durable 的动作零丢失，但数据库写锁不再阻塞游戏 ACK。
+区分瞬时恢复和永久 degraded。SQLite 使用 WAL；锁/事务超时保留队首 job 并退避重试，但单个 job
+最多 5 次或 10 秒，超过后只暂停该房间并继续其他房间。审计、hash、约束、损坏、I/O 或队列溢出
+立即暂停对应房间。WAL 不是应用层持久化队列，因此仍不承诺强杀/断电前尚未
+durable 的动作零丢失，但数据库写锁不再阻塞游戏 ACK。
+
+内部和公开数组 patch 对尾部做逐项追加/逆序删除，避免累计 `actions` 每次整体复制。协议 v3 另为内部
+和各接收者公开状态维护 32 项固定块的确定性哈希索引，普通动作只重算受影响块与根；客户端完整快照
+仍只用于初始化、重连和 hash 恢复。checkpoint、换回合、每 20 个版本和终局会执行全量哈希审计。
+v2 持久化链只允许完整恢复，不允许与 v3 继续混写；客户端订阅和动作必须匹配 v3 build。
 
 规则/技能 JSON 默认按服务进程缓存；显式内容刷新会清缓存。每步 Trace 进入 append-only journal，热状态
 只保留确定性游标和序号，终局再物化完整 Trace v2。具体协议、恢复、性能门槛和回退见
 `docs/decisions/ADR-0017-authority-transition-pipeline.md`。
+
+## 12. RED-140 Windows 自治 Server 合同
+
+RED-140 只冻结跨模块合同，不改变当前运行时。获准的 v1 目标同时支持 Windows 10 22H2 x64 与
+Windows 11 x64；Windows 10 的应用兼容承诺不表示微软仍为其提供常规系统安全支持。公开形态包含
+per-user assisted NSIS、update ZIP 与 signed runtime catalog；`win-unpacked` 继续只供内部 QA，
+不提供公开 Portable、Windows Service、开机自启或静默更新。
+
+整体生命周期使用 `stopped | starting | ready | maintenance | draining | stopping | degraded |
+failed | updating | rollback-required`。`ready` 不是“进程存在”，而是 process、真实玩家 WS 101/
+`system.health`、DB schema、管理 API、持久化、RoomRuntime、PVE Run Store、Profile 与 release
+tuple 全部通过；单个房间 durable 失败保持房间级 degraded，不应拖死其他房间或自动把全服改成
+degraded。全局 DB/PVE Store transient unavailable 只有在 integrity、唯一 writer 与 committed
+generation 仍可证明时才 degraded/closed；corrupt、集合不完整、未知 schema 或无可信唯一 writer
+必须 failed/closed。
+
+应用更新固定走 room + PVE maintenance、blocker/drain、verified backup、side-by-side
+stage/migrate/health、原子 commit 和 reopen。Profile 激活仍由 RED-115 的独立状态机负责；活动 PVE
+battle 复用其 lease，Run persistence/reconciliation 复用 RED-117，房间身份复用 RED-116，玩家协议
+复用 RED-127，FIFO/WAL/有限重试和 durable 水位复用 RED-131。RED-117 当前
+`<userData>/pve-runs` 只是迁移输入；目标 live Store 与 audit evidence/tombstone 必须在 deployment
+pointer 选择的 data generation 内一起备份/恢复，不能双写、merge 或重算。backup 的 active Profile
+只作为 verified immutable package + identity，restore 必须走 RED-115 candidate/health/commit/recovery，
+不得复制 `active.json`。具体 schema、转换、错误、
+超时、数据根、威胁与故障矩阵以 [Server Operations v1](./SERVER_OPERATIONS_V1.md) 为唯一合同。

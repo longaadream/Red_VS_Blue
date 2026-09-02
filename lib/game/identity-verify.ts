@@ -44,6 +44,8 @@ export interface BattleSubscribeAuthEnvelope {
     type: 'battle-subscribe'
     roomId: string
     playerId: string
+    protocolVersion: number
+    authorityBuildId: string
     timestamp: number
   }
   signature: string
@@ -114,7 +116,13 @@ export async function verifyBattleActionAuth(
 
 export async function verifyBattleSubscribeAuth(
   candidate: unknown,
-  expected: { roomId: string; playerId?: string; now?: number },
+  expected: {
+    roomId: string
+    playerId?: string
+    protocolVersion?: number
+    authorityBuildId?: string
+    now?: number
+  },
 ): Promise<{ playerId: string; publicKey: string }> {
   if (!candidate || typeof candidate !== 'object') {
     throw new BattleSubscribeAuthError('SUBSCRIBE_AUTH_REQUIRED', 'A signed WebSocket identity is required')
@@ -138,6 +146,10 @@ export async function verifyBattleSubscribeAuth(
     || !playerId
     || playerId !== expectedPlayerId
     || roomId !== normalizeIdentityPart(expected.roomId)
+    || (expected.protocolVersion !== undefined
+      && payload.protocolVersion !== expected.protocolVersion)
+    || (expected.authorityBuildId !== undefined
+      && payload.authorityBuildId !== expected.authorityBuildId)
     || !Number.isSafeInteger(payload.timestamp)
   ) {
     throw new BattleSubscribeAuthError('SUBSCRIBE_AUTH_INVALID', 'Signed WebSocket identity does not match the subscription')

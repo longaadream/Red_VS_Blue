@@ -1,6 +1,8 @@
 import { getBattleStorage, withServerSkills, withoutServerSkills } from './battle-storage'
 import {
   appendBattleReplayFrame,
+  canonicalBattleStateForHash,
+  createBattleStateHashIndex,
   getOrCreateDebugMetadata,
   getBattleRootSeed,
   hashBattleState,
@@ -12,12 +14,23 @@ import {
   type DebugBattleMetadata,
 } from './battle-trace'
 import {
+  createBattleStateHashPatch,
+  updateBattleStateHashIndex,
+  type BattleStateHashIndex,
+} from './battle-state-hash'
+import {
+  createRuleExecutionContext,
+  getRuleExecutionTriggerSystem,
   RuleRuntime,
+  withRuleExecutionContext,
+  getActiveRuleRuntime,
   withRuleRuntime,
+  type RuleExecutionContext,
 } from './rule-runtime'
 import type { BattleAction, BattleState } from './turn'
 import { applyBattleAction, assertBattleNotTerminal, safeCloneBattleState } from './turn'
-import { globalTriggerSystem } from './triggers'
+import { globalTriggerSystem, TriggerSystem } from './triggers'
+import { createEffectChain, withEffectChain } from './effect-batch'
 
 export {
   hashBattleState,
@@ -36,10 +49,13 @@ export interface BattleActionResult {
   duplicate?: boolean
   trace?: BattleActionTrace
   replayFrame?: BattleReplayFrame
+  stateHashIndex?: BattleStateHashIndex
 }
 
 export interface RunBattleActionOptions {
   rootSeed?: number
+  stateHashIndex?: BattleStateHashIndex
+  ruleExecutionContext?: RuleExecutionContext
 }
 
 export interface BattleReplayInput {
@@ -68,9 +84,10 @@ export function runBattleAction(
   if (explicitActionId && metadata.appliedActionIds.includes(explicitActionId)) {
     return {
       state,
-      stateHash: hashBattleState(state),
+      stateHash: options.stateHashIndex?.rootHash ?? hashBattleState(state),
       actionHash: hashStable(action),
       duplicate: true,
+      stateHashIndex: options.stateHashIndex,
     }
   }
 
@@ -105,18 +122,61 @@ export function runBattleAction(
   // runtime cache, not authoritative battle state, so it must not alter the
   // cross-platform pre-action hash.
   const canonicalState = withoutServerSkills(state) as BattleState
-  const preStateHash = hashBattleState(canonicalState)
+  const canonicalHashState = canonicalBattleStateForHash(canonicalState)
+  const preStateHashIndex = options.stateHashIndex ?? createBattleStateHashIndex(canonicalState)
+  const preStateHash = preStateHashIndex.rootHash
+  const triggerSystem = options.ruleExecutionContext?.triggerSystem
+    ?? getRuleExecutionTriggerSystem(globalTriggerSystem)
+  const triggerSnapshot = triggerSystem.snapshotTransactionState()
 
   try {
     const clonedState = cloneBattleStateForAction(state, metadata)
-    const hydratedState = withServerSkills(clonedState) as BattleState
-    const apply = () => applyBattleAction(hydratedState, action)
-    const applied = runtime ? withRuleRuntime(runtime, apply) : apply()
-    const next = withoutServerSkills(applied) as BattleState
-    const postStateHash = hashBattleState(next)
+    const serializedRuleEffects = captureSerializableRuleEffects(clonedState)
+    const apply = () => {
+      const effectChain = createEffectChain({
+        actionId,
+        chainId: `effect-chain:${actionId}`,
+        turn: state.turn?.turnNumber ?? 0,
+        rootSeed: runtime?.rootSeed ?? null,
+        createBatchId: ({ kind, batchSequence }) => {
+          if (!runtime) return `${kind}-batch-${actionIndex}-${batchSequence}`
+          const batchRuntime = getActiveRuleRuntime() ?? runtime
+          return batchRuntime.nextInstanceId(`${kind}-batch`, `${kind}-batch`)
+        },
+      })
+      return withEffectChain(
+        clonedState,
+        effectChain,
+        () => {
+          const hydratedState = withServerSkills(clonedState) as BattleState
+          return withEffectChain(hydratedState, effectChain, () => {
+            const nextState = applyBattleAction(hydratedState, action)
+            effectChain.assertHealthy()
+            return nextState
+          })
+        },
+      )
+    }
+    const applyWithDeterminism = () => runtime ? withRuleRuntime(runtime, apply) : apply()
+    const applied = options.ruleExecutionContext
+      ? withRuleExecutionContext(options.ruleExecutionContext, applyWithDeterminism)
+      : applyWithDeterminism()
+    const next = withoutRuntimeRuleEffects(
+      withoutServerSkills(applied) as BattleState,
+      serializedRuleEffects,
+    )
+    const canonicalNextHashState = canonicalBattleStateForHash(next)
+    const stateHashIndex = updateBattleStateHashIndex(
+      preStateHashIndex,
+      canonicalNextHashState,
+      createBattleStateHashPatch(canonicalHashState, canonicalNextHashState),
+      hashStable,
+    ).index
+    const postStateHash = stateHashIndex.rootHash
     const nextMetadata = getOrCreateDebugMetadata(next)
     if (explicitActionId) nextMetadata.appliedActionIds.push(explicitActionId)
 
+    const tracedDeploymentAction = deploymentTraceAction(state, next, action)
     const trace: BattleActionTrace = {
       index: actionIndex,
       rootSeed: runtime?.rootSeed ?? null,
@@ -128,16 +188,24 @@ export function runBattleAction(
       preStateHash,
       postStateHash,
       randomStreams: runtime?.randomTrace(true) ?? [],
-      deployment: isDeploymentAction(action) && next.deployment ? {
-        command: deploymentCommand(action),
+      deployment: tracedDeploymentAction && next.deployment ? {
+        command: deploymentCommand(tracedDeploymentAction),
+        mode: next.deployment.mode,
+        status: next.deployment.status,
         choices: copyDeploymentChoices(next.deployment.choices),
         locks: copyDeploymentLocks(next.deployment.locks),
-        timedOutPlayerIds: action.type === 'deploymentTimeout'
+        timedOutPlayerIds: tracedDeploymentAction.type === 'deploymentTimeout'
           ? next.deployment.playerIds.filter(playerId => next.deployment?.locks[playerId]?.reason === 'timeout')
           : undefined,
         finalPositions: copyDeploymentPositions(next.deployment.finalPositions),
         deadlineAt: next.deployment.deadlineAt,
         revision: next.deployment.revision,
+        openingVanguardsInitialized: next.deployment.openingVanguardsInitialized,
+        activePlayerId: next.deployment.activePlayerId,
+        offerPieceIds: next.deployment.offerPieceIds ? [...next.deployment.offerPieceIds] : undefined,
+        reserveCounts: next.deployment.reserveCounts ? { ...next.deployment.reserveCounts } : undefined,
+        lastDeployedPieceId: next.deployment.lastDeployedPieceId,
+        deployedPosition: committedProgressiveDeploymentPosition(state, next, tracedDeploymentAction),
       } : undefined,
     }
     nextMetadata.actionLog.push(trace)
@@ -162,8 +230,10 @@ export function runBattleAction(
       actionHash,
       trace,
       replayFrame,
+      stateHashIndex,
     }
   } catch (error) {
+    triggerSystem.restoreTransactionState(triggerSnapshot)
     if (!runtime) throw error
     // A rejected command is atomic: its random and clock reads are diagnostic
     // only and must not advance the committed cursor chain.
@@ -176,6 +246,102 @@ export function runBattleAction(
 }
 
 /**
+ * Rule definitions are hydrated with executable callbacks only while an action
+ * is running. Keep those callbacks out of the authoritative result so direct
+ * engine consumers and JSON-backed room stores observe the same state shape.
+ */
+type SerializableRuleEffectSnapshot = Map<string, Map<string, unknown>>
+
+function ruleEntityKey(kind: 'piece' | 'player', entity: any, index: number): string {
+  const stableId = kind === 'piece' ? entity?.instanceId : entity?.playerId
+  return `${kind}:${typeof stableId === 'string' && stableId ? stableId : `index:${index}`}`
+}
+
+function ruleOccurrenceKey(rule: any, index: number, occurrences: Map<string, number>): string {
+  const base = typeof rule?.id === 'string' && rule.id
+    ? `id:${rule.id}`
+    : `index:${index}`
+  const occurrence = occurrences.get(base) ?? 0
+  occurrences.set(base, occurrence + 1)
+  return `${base}:occurrence:${occurrence}`
+}
+
+function captureSerializableRuleEffects(state: BattleState): SerializableRuleEffectSnapshot {
+  const snapshot: SerializableRuleEffectSnapshot = new Map()
+  const captureEntities = (entities: readonly any[], kind: 'piece' | 'player') => {
+    entities.forEach((entity, entityIndex) => {
+      if (!Array.isArray(entity?.rules)) return
+      const descriptors = new Map<string, unknown>()
+      const occurrences = new Map<string, number>()
+      entity.rules.forEach((rule: any, ruleIndex: number) => {
+        const ruleKey = ruleOccurrenceKey(rule, ruleIndex, occurrences)
+        if (!rule || typeof rule !== 'object' || Array.isArray(rule)) return
+        if (!Object.prototype.hasOwnProperty.call(rule, 'effect')) return
+        const effect = rule.effect
+        if (effect === undefined || typeof effect === 'function') return
+        descriptors.set(ruleKey, cloneRuntimeValue(effect))
+      })
+      if (descriptors.size > 0) {
+        snapshot.set(ruleEntityKey(kind, entity, entityIndex), descriptors)
+      }
+    })
+  }
+  captureEntities(state.pieces, 'piece')
+  captureEntities(state.graveyard, 'piece')
+  captureEntities(state.players, 'player')
+  return snapshot
+}
+
+function withoutRuntimeRuleEffects(
+  state: BattleState,
+  serializedRuleEffects: SerializableRuleEffectSnapshot,
+): BattleState {
+  const stripRules = (rules: unknown, entityKey: string): unknown => {
+    if (!Array.isArray(rules)) return rules
+    let changed = false
+    const occurrences = new Map<string, number>()
+    const descriptors = serializedRuleEffects.get(entityKey)
+    const stripped = rules.map((rule, ruleIndex) => {
+      const ruleKey = ruleOccurrenceKey(rule, ruleIndex, occurrences)
+      if (
+        !rule
+        || typeof rule !== 'object'
+        || Array.isArray(rule)
+        || typeof (rule as Record<string, unknown>).effect !== 'function'
+      ) {
+        return rule
+      }
+      const serializableRule = { ...(rule as Record<string, unknown>) }
+      if (descriptors?.has(ruleKey)) {
+        serializableRule.effect = cloneRuntimeValue(descriptors.get(ruleKey))
+      } else {
+        delete serializableRule.effect
+      }
+      changed = true
+      return serializableRule
+    })
+    return changed ? stripped : rules
+  }
+
+  const stripEntityRules = <T extends { rules?: unknown }>(
+    entity: T,
+    kind: 'piece' | 'player',
+    index: number,
+  ): T => {
+    const rules = stripRules(entity.rules, ruleEntityKey(kind, entity, index))
+    return rules === entity.rules ? entity : { ...entity, rules }
+  }
+  const pieces = state.pieces.map((piece, index) => stripEntityRules(piece, 'piece', index))
+  const graveyard = state.graveyard.map((piece, index) => stripEntityRules(piece, 'piece', index))
+  const players = state.players.map((player, index) => stripEntityRules(player, 'player', index))
+  const changed = pieces.some((piece, index) => piece !== state.pieces[index])
+    || graveyard.some((piece, index) => piece !== state.graveyard[index])
+    || players.some((player, index) => player !== state.players[index])
+
+  return changed ? { ...state, pieces, graveyard, players } : state
+}
+
+/**
  * Execute one authoritative transition while restoring process-level trigger
  * registry state afterwards. This is the synchronous isolation boundary used
  * by headless search/simulation; it does not save or broadcast the result.
@@ -185,27 +351,27 @@ export function runBattleActionIsolated(
   action: BattleAction,
   options: RunBattleActionOptions = {},
 ): BattleActionResult {
-  const ruleRegistry = globalTriggerSystem.getRules()
-  const rules = [...ruleRegistry]
-  const ruleSnapshots = rules.map(rule => ({
+  const sourceTriggerSystem = options.ruleExecutionContext?.triggerSystem
+    ?? getRuleExecutionTriggerSystem(globalTriggerSystem)
+  const sourceRules = [...sourceTriggerSystem.getRules()]
+  const sourceRuleSnapshots = sourceRules.map(rule => ({
     rule,
     snapshot: cloneRuntimeValue(rule),
   }))
-  const triggerInternals = globalTriggerSystem as unknown as {
-    rules?: typeof ruleRegistry
-    nextRootEventId?: number
-  }
-  const nextRootEventId = triggerInternals.nextRootEventId
+  const isolatedTriggerSystem = new TriggerSystem()
+  isolatedTriggerSystem.addRules(sourceRules.map(rule => cloneRuntimeValue(rule)))
   try {
-    return runBattleAction(state, action, options)
+    return runBattleAction(state, action, {
+      ...options,
+      ruleExecutionContext: createRuleExecutionContext(isolatedTriggerSystem),
+    })
   } finally {
-    for (const { rule, snapshot } of ruleSnapshots) {
+    // Dynamic effects can close over their source rule object. Restore those
+    // objects without mutating the owning TriggerSystem registry or event IDs.
+    for (const { rule, snapshot } of sourceRuleSnapshots) {
       for (const key of Object.keys(rule)) delete (rule as unknown as Record<string, unknown>)[key]
       Object.assign(rule, cloneRuntimeValue(snapshot))
     }
-    ruleRegistry.splice(0, ruleRegistry.length, ...rules)
-    triggerInternals.rules = ruleRegistry
-    if (nextRootEventId !== undefined) triggerInternals.nextRootEventId = nextRootEventId
   }
 }
 
@@ -258,13 +424,42 @@ function copyDeploymentLocks(
 }
 
 function isDeploymentAction(action: BattleAction): boolean {
-  return action.type === 'deploymentChoice' || action.type === 'deploymentLock' || action.type === 'deploymentTimeout'
+  return action.type === 'deploymentChoice'
+    || action.type === 'deploymentLock'
+    || action.type === 'deploymentTimeout'
+    || action.type === 'deployReservePiece'
 }
 
-function deploymentCommand(action: BattleAction): 'select' | 'lock' | 'timeout' {
-  if (action.type === 'deploymentTimeout') return 'timeout'
+function deploymentCommand(
+  action: BattleAction,
+): 'select' | 'lock' | 'timeout' | 'deploy' {
+  if (action.type === 'deploymentTimeout' || action.type === 'turnTimeout') return 'timeout'
   if (action.type === 'deploymentLock') return 'lock'
+  if (action.type === 'deployReservePiece') return 'deploy'
   return 'select'
+}
+
+function deploymentTraceAction(
+  state: BattleState,
+  next: BattleState,
+  action: BattleAction,
+): BattleAction | undefined {
+  if (isDeploymentAction(action)) return action
+  if (
+    action.type === 'turnTimeout'
+    && (state.deployment?.mode === 'progressive-reserve-v1'
+      || next.deployment?.mode === 'progressive-reserve-v1')
+  ) return action
+  if (
+    action.type !== 'pendingOptionSelect'
+    && action.type !== 'pendingTargetSelect'
+    && action.type !== 'cancelPendingSelection'
+  ) return undefined
+  const pending = state.pendingOptionSelection ?? state.pendingTargetSelection
+  const rootAction = pending?.transaction?.rootAction as BattleAction | undefined
+  if (!rootAction) return undefined
+  if (isDeploymentAction(rootAction)) return rootAction
+  return rootAction.type === 'turnTimeout' ? rootAction : undefined
 }
 
 
@@ -275,6 +470,24 @@ function copyDeploymentPositions(
   return Object.fromEntries(
     Object.entries(positions).map(([pieceId, position]) => [pieceId, { ...position }]),
   )
+}
+
+function committedProgressiveDeploymentPosition(
+  previousState: BattleState,
+  state: BattleState,
+  action: BattleAction,
+): { x: number; y: number } | undefined {
+  if (action.type !== 'deployReservePiece' && action.type !== 'turnTimeout') return undefined
+  const pieceId = action.type === 'deployReservePiece' ? action.pieceId : undefined
+  const previousActionCount = previousState.actions?.length ?? 0
+  const committed = [...(state.actions ?? []).slice(previousActionCount)].reverse().find(entry =>
+    entry.type === 'deployReservePiece'
+    && (pieceId === undefined || entry.payload?.pieceId === pieceId))
+  const x = committed?.payload?.toX
+  const y = committed?.payload?.toY
+  return Number.isSafeInteger(x) && Number.isSafeInteger(y)
+    ? { x: x as number, y: y as number }
+    : undefined
 }
 
 export function replayBattle(input: BattleReplayInput): BattleReplayResult {

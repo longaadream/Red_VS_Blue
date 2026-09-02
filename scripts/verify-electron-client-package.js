@@ -12,10 +12,17 @@ const REQUIRED_FILES = [
   'resources/app/standalone/ws-same-port-server.cjs',
   'resources/app/standalone/node_modules/@prisma/client/package.json',
   'resources/app/standalone/node_modules/.prisma/client/index.js',
+  'resources/app/standalone/colyseus/colyseus-server.mjs',
   'resources/app/www/index.html',
   'resources/app/init-db.js',
   'resources/app/node_modules/adm-zip/package.json',
   'resources/node.exe',
+  'resources/postgres/runtime-manifest.json',
+  'resources/postgres/pgsql/bin/postgres.exe',
+  'resources/postgres/pgsql/bin/initdb.exe',
+  'resources/postgres/pgsql/bin/pg_ctl.exe',
+  'resources/postgres/licenses/server_license.txt',
+  'resources/postgres/licenses/commandlinetools_3rd_party_licenses.txt',
 ]
 
 const REQUIRED_DIRECTORIES = [

@@ -31,10 +31,70 @@ describe('RED-127 player networking boundary', () => {
     expect(room).not.toMatch(/if \(shouldUseRelayMode\(\)\) \{[\s\S]*?btn\.disabled = true/)
   })
 
-  it('uses WebSocket health and content identity for connection checks', () => {
+  it('uses the Colyseus endpoint health and content identity for connection checks', () => {
     const index = readFileSync(resolve('data/pages/index.html'), 'utf8')
     const discovery = readFileSync(resolve('data/pages/js/lan-discover.js'), 'utf8')
-    expect(index).toContain("'catalog.identity'")
+    const websocket = readFileSync(resolve('data/pages/js/ws-client.js'), 'utf8')
+    expect(index).toContain('RvBWs.requestCatalogIdentityAt')
+    expect(websocket).toContain("if (method === 'catalog.identity') return fetchJson(base + '/catalog/identity', timeoutMs)")
     expect(discovery).not.toContain('fetch(')
+  })
+})
+
+describe('RED-116 Electron lobby profile bridge', () => {
+  it('pins the local Profile Identity before navigating to the server lobby', () => {
+    const index = readFileSync(resolve('data/pages/index.html'), 'utf8')
+    const start = index.indexOf('async function checkProfileAndGo')
+    const end = index.indexOf('function updatePackBadge', start)
+    const body = index.slice(start, end)
+
+    expect(start).toBeGreaterThanOrEqual(0)
+    expect(body).toContain('await getLocalGameProfileIdentity(serverUrl)')
+    expect(body.indexOf('await getLocalGameProfileIdentity(serverUrl)'))
+      .toBeLessThan(body.indexOf('goLobby(mode, serverUrl)'))
+    expect(body).toContain("RvBWs.requestCatalogIdentityAt(serverUrl, 'remote-server')")
+    expect(body).toContain("console.warn('[profile] remote catalog identity preflight failed', error)")
+  })
+
+  it('uses the live Electron Profile Identity before any standalone cache fallback', () => {
+    const lobby = readFileSync(resolve('data/pages/lobby.html'), 'utf8')
+    const readerStart = lobby.indexOf('function readStoredGameProfileIdentity')
+    const readerEnd = lobby.indexOf('async function getLocalGameProfileIdentity', readerStart)
+    const reader = lobby.slice(readerStart, readerEnd)
+    const getterStart = readerEnd
+    const getterEnd = lobby.indexOf('function summarizeGameProfileIdentity', getterStart)
+    const getter = lobby.slice(getterStart, getterEnd)
+
+    expect(readerStart).toBeGreaterThanOrEqual(0)
+    expect(reader).toContain("localStorage.getItem('rvb_game_profile_identity')")
+    expect(reader).toContain('isGameProfileIdentity')
+    expect(getter).toContain('readStoredGameProfileIdentity()')
+    expect(getter.indexOf('window.electronAPI'))
+      .toBeLessThan(getter.indexOf('readStoredGameProfileIdentity()'))
+  })
+
+  it('resolves the client local runtime through trusted game IPC', () => {
+    const websocket = readFileSync(resolve('data/pages/js/ws-client.js'), 'utf8')
+    expect(websocket).toContain("if (method === 'catalog.identity') return fetchJson(base + '/catalog/identity', timeoutMs)")
+
+    for (const page of ['index.html', 'lobby.html']) {
+      const source = readFileSync(resolve('data/pages', page), 'utf8')
+      const start = source.indexOf('async function getLocalGameProfileIdentity')
+      const end = source.indexOf(
+        page === 'index.html' ? 'async function checkProfileAndGo' : 'function summarizeGameProfileIdentity',
+        start,
+      )
+      const getter = source.slice(start, end)
+
+      expect(getter).toContain('window.electronAPI.getMode')
+      expect(getter).toContain('mode.localAuthorityProfileIdentity')
+      expect(getter).toContain('mode.profileIdentity')
+      expect(getter).not.toContain('mode.profileRuntimeUrl')
+      expect(getter).not.toContain('getResourcePackStatus')
+      if (page === 'lobby.html') {
+        expect(getter.indexOf('window.electronAPI.getMode'))
+          .toBeLessThan(getter.indexOf('readStoredGameProfileIdentity()'))
+      }
+    }
   })
 })

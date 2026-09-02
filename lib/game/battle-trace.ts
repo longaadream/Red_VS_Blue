@@ -1,5 +1,10 @@
+import type { GameProfileIdentityV1 } from '../content-pipeline/runtime/profile-game-identity'
 import type { RuleRuntime, RandomStreamTrace } from './rule-runtime'
 import type { BattleState } from './turn'
+import {
+  buildBattleStateHashIndex as buildChunkedBattleStateHashIndex,
+  type BattleStateHashIndex,
+} from './battle-state-hash'
 
 export const BATTLE_REPLAY_FORMAT = 'rvb-battle-replay/v2' as const
 
@@ -50,6 +55,7 @@ const SHA256_ROUND_CONSTANTS = [
 export interface BattleActionTrace {
   index: number
   rootSeed: number | null
+  profileIdentity?: GameProfileIdentityV1
   actionId: string
   actionHash: string
   tick: number
@@ -62,7 +68,11 @@ export interface BattleActionTrace {
 }
 
 export interface DeploymentTraceEvidence {
-  command?: 'initialize' | 'select' | 'lock' | 'timeout'
+  command?: 'initialize' | 'select' | 'lock' | 'timeout' | 'deploy'
+  mode?: 'legacy-reroll-v1' | 'progressive-reserve-v1'
+  status?: BattleState['deployment'] extends infer _Deployment
+    ? NonNullable<BattleState['deployment']>['status']
+    : never
   initialPositions?: Record<string, { x: number; y: number }>
   choices?: Record<string, { pieceId: string | null }>
   locks?: Record<string, { locked: boolean; reason?: 'player' | 'timeout' }>
@@ -70,6 +80,13 @@ export interface DeploymentTraceEvidence {
   finalPositions?: Record<string, { x: number; y: number }>
   deadlineAt?: number
   revision?: number
+  openingVanguardsInitialized?: boolean
+  activePlayerId?: string
+  offerPieceIds?: string[]
+  reserveCounts?: Record<string, number>
+  lastDeployedPieceId?: string
+  /** Actual committed landing cell after before-summon redirection. */
+  deployedPosition?: { x: number; y: number }
   authorityVersion?: number
 }
 
@@ -111,6 +128,8 @@ export interface BattleReplayContentSnapshot {
 
 export interface BattleReplayArchive {
   format: typeof BATTLE_REPLAY_FORMAT
+  profileIdentity: GameProfileIdentityV1
+  rootSeed: number
   initialStateHash: string
   initialCheckpointHash: string
   initialState: BattleState
@@ -120,6 +139,7 @@ export interface BattleReplayArchive {
 
 export interface BattleTraceAuthorityRuntime {
   rootSeed?: number
+  profileIdentity?: GameProfileIdentityV1
   actionCount: number
   replayFrameCount: number
   runtimeCursors: Record<string, number>
@@ -131,6 +151,116 @@ export interface DebugBattleMetadata {
   commandLog: Array<Record<string, unknown>>
   replay?: BattleReplayArchive
   authority?: BattleTraceAuthorityRuntime
+}
+
+export const BATTLE_PROFILE_PIN_SCHEMA_V1 = 'rvb-battle-profile-pin/v1' as const
+
+export interface BattleProfilePinV1 {
+  readonly schemaVersion: typeof BATTLE_PROFILE_PIN_SCHEMA_V1
+  readonly profileIdentity: GameProfileIdentityV1
+  readonly rootSeed: number
+}
+
+export function pinBattleProfileIdentityV1(
+  state: BattleState,
+  profileIdentity: GameProfileIdentityV1,
+  rootSeed: number,
+): BattleProfilePinV1 {
+  const expected = createBattleProfilePin(profileIdentity, rootSeed)
+  const existing = state.extensions?.battleProfile
+  if (existing !== undefined && stableJson(existing) !== stableJson(expected)) {
+    throw pinnedProfileError('Battle state profile pin does not match the requested identity')
+  }
+  const extensions = state.extensions ?? {}
+  extensions.battleProfile = expected
+  state.extensions = extensions
+
+  const metadata = state.extensions?.debugBattle as Partial<DebugBattleMetadata> | undefined
+  if (metadata) {
+    for (const entry of metadata.actionLog ?? []) {
+      const trace = entry as Partial<BattleActionTrace>
+      trace.profileIdentity = expected.profileIdentity
+      trace.rootSeed = expected.rootSeed
+    }
+    if (metadata.authority) {
+      metadata.authority.profileIdentity = expected.profileIdentity
+      metadata.authority.rootSeed = expected.rootSeed
+    }
+    if (metadata.replay) {
+      metadata.replay.profileIdentity = expected.profileIdentity
+      metadata.replay.rootSeed = expected.rootSeed
+    }
+  }
+  return expected
+}
+
+export function readBattleProfilePinV1(state: BattleState): BattleProfilePinV1 | undefined {
+  const candidate = state.extensions?.battleProfile
+  if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) return undefined
+  const pin = candidate as Record<string, unknown>
+  const identity = pin.profileIdentity
+  if (
+    Object.keys(pin).sort().join(',') !== 'profileIdentity,rootSeed,schemaVersion'
+    || pin.schemaVersion !== BATTLE_PROFILE_PIN_SCHEMA_V1
+    || !Number.isSafeInteger(pin.rootSeed)
+    || Number(pin.rootSeed) < 0
+    || Number(pin.rootSeed) > 0xffff_ffff
+    || !isGameProfileIdentity(identity)
+  ) return undefined
+  return {
+    schemaVersion: BATTLE_PROFILE_PIN_SCHEMA_V1,
+    profileIdentity: { ...(identity as GameProfileIdentityV1) },
+    rootSeed: Number(pin.rootSeed) >>> 0,
+  }
+}
+
+export function assertBattleProfilePinV1(
+  state: BattleState,
+  profileIdentity: GameProfileIdentityV1,
+  rootSeed: number,
+): BattleProfilePinV1 {
+  const actual = readBattleProfilePinV1(state)
+  const expected = createBattleProfilePin(profileIdentity, rootSeed)
+  if (!actual || stableJson(actual) !== stableJson(expected)) {
+    throw pinnedProfileError('Battle state profile pin is missing or does not match its storage envelope')
+  }
+  return actual
+}
+
+function createBattleProfilePin(
+  profileIdentity: GameProfileIdentityV1,
+  rootSeed: number,
+): BattleProfilePinV1 {
+  if (!isGameProfileIdentity(profileIdentity)) {
+    throw pinnedProfileError('Battle profile identity is invalid')
+  }
+  if (!Number.isSafeInteger(rootSeed) || rootSeed < 0 || rootSeed > 0xffff_ffff) {
+    throw pinnedProfileError('Battle root seed is invalid')
+  }
+  return {
+    schemaVersion: BATTLE_PROFILE_PIN_SCHEMA_V1,
+    profileIdentity: { ...profileIdentity },
+    rootSeed: rootSeed >>> 0,
+  }
+}
+
+function isGameProfileIdentity(value: unknown): value is GameProfileIdentityV1 {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false
+  const identity = value as Record<string, unknown>
+  return Object.keys(identity).sort().join(',')
+    === 'authorityContentHash,engineAbi,resolvedProfileHash,runnerRevision,schemaVersion'
+    && identity.schemaVersion === 'rvb-game-profile-identity/v1'
+    && typeof identity.engineAbi === 'string'
+    && identity.engineAbi.length > 0
+    && identity.runnerRevision === 'rvb-battle-runner/v1'
+    && typeof identity.resolvedProfileHash === 'string'
+    && SHA256_HEX_PATTERN.test(identity.resolvedProfileHash)
+    && typeof identity.authorityContentHash === 'string'
+    && SHA256_HEX_PATTERN.test(identity.authorityContentHash)
+}
+
+function pinnedProfileError(message: string): Error {
+  return Object.assign(new Error(message), { code: 'PINNED_PROFILE_UNAVAILABLE' })
 }
 
 export function stableJson(value: unknown): string {
@@ -279,7 +409,23 @@ export function hashStable(value: unknown): string {
 }
 
 export function hashBattleState(state: BattleState): string {
-  return hashStable(withoutDebugMetadata(state))
+  return createBattleStateHashIndex(state).rootHash
+}
+
+export function hashLegacyBattleState(state: BattleState): string {
+  return hashStable(canonicalBattleStateForHash(state))
+}
+
+export function hashBattleStateForProtocol(state: BattleState, protocolVersion: 2 | 3): string {
+  return protocolVersion === 2 ? hashLegacyBattleState(state) : hashBattleState(state)
+}
+
+export function createBattleStateHashIndex(state: BattleState): BattleStateHashIndex {
+  return buildChunkedBattleStateHashIndex(canonicalBattleStateForHash(state), hashStable)
+}
+
+export function canonicalBattleStateForHash(state: BattleState): BattleState {
+  return withoutDebugMetadata(state)
 }
 
 export function getBattleRootSeed(state: BattleState): number | undefined {
@@ -299,6 +445,8 @@ export function recordBattleInitialization(
   playerIds: string[],
 ): BattleActionTrace {
   const metadata = getOrCreateDebugMetadata(state)
+  const profilePin = readBattleProfilePinV1(state)
+  if (!profilePin) throw pinnedProfileError('Battle initialization requires a pinned profile')
   const action = { type: 'initializeBattle', playerIds: [...playerIds] }
   const actionHash = hashStable(action)
   const content = createBattleReplayContentSnapshot(state)
@@ -307,6 +455,7 @@ export function recordBattleInitialization(
   const trace: BattleActionTrace = {
     index: metadata.actionLog.length,
     rootSeed: runtime.rootSeed,
+    profileIdentity: profilePin.profileIdentity,
     actionId: 'system-initialize',
     actionHash,
     tick: 0,
@@ -317,16 +466,24 @@ export function recordBattleInitialization(
     randomStreams: runtime.randomTrace(true),
     deployment: state.deployment ? {
       command: 'initialize',
+      mode: state.deployment.mode,
+      status: state.deployment.status,
       initialPositions: copyPositions(state.deployment.initialPositions),
       locks: copyLocks(state.deployment.locks),
       deadlineAt: state.deployment.deadlineAt,
       revision: state.deployment.revision,
+      openingVanguardsInitialized: state.deployment.openingVanguardsInitialized,
+      activePlayerId: state.deployment.activePlayerId,
+      offerPieceIds: state.deployment.offerPieceIds ? [...state.deployment.offerPieceIds] : undefined,
+      reserveCounts: state.deployment.reserveCounts ? { ...state.deployment.reserveCounts } : undefined,
+      lastDeployedPieceId: state.deployment.lastDeployedPieceId,
     } : undefined,
   }
   metadata.actionLog.push(trace)
   metadata.commandLog[trace.index] = sanitizeBattleTraceValue(action) as Record<string, unknown>
   metadata.authority = {
     rootSeed: runtime.rootSeed,
+    profileIdentity: profilePin.profileIdentity,
     actionCount: trace.index + 1,
     replayFrameCount: 0,
     runtimeCursors: runtimeCursorsFromTrace(trace),
@@ -334,6 +491,8 @@ export function recordBattleInitialization(
   const initialState = createBattleReplayCheckpoint(canonicalState)
   metadata.replay = {
     format: BATTLE_REPLAY_FORMAT,
+    profileIdentity: profilePin.profileIdentity,
+    rootSeed: profilePin.rootSeed,
     initialStateHash: postStateHash,
     initialCheckpointHash: hashStable(initialState),
     initialState,
@@ -341,6 +500,41 @@ export function recordBattleInitialization(
     frames: [],
   }
   return trace
+}
+
+/**
+ * Internal setup actions (for example the initial turn-timer sync) run before
+ * the room owns an authority checkpoint. They must become part of that
+ * checkpoint rather than appearing as replay frame 0. Rebase only the replay
+ * baseline; initialization/action trace history remains available for audits.
+ */
+export function rebaseBattleReplayForAuthorityCheckpoint(state: BattleState): void {
+  const metadata = getOrCreateDebugMetadata(state)
+  const profilePin = readBattleProfilePinV1(state)
+  if (!profilePin || !metadata.replay || !metadata.authority) {
+    throw pinnedProfileError('Battle authority checkpoint requires initialized replay metadata')
+  }
+  const canonicalState = withoutReplayRuntimeCaches(state)
+  const initialState = createBattleReplayCheckpoint(canonicalState)
+  metadata.replay = {
+    ...metadata.replay,
+    profileIdentity: profilePin.profileIdentity,
+    rootSeed: profilePin.rootSeed,
+    initialStateHash: hashBattleState(canonicalState),
+    initialCheckpointHash: hashStable(initialState),
+    initialState,
+    content: mergeBattleReplayContentSnapshot(
+      metadata.replay.content,
+      createBattleReplayContentSnapshot(state),
+    ),
+    frames: [],
+  }
+  metadata.authority = {
+    ...metadata.authority,
+    profileIdentity: profilePin.profileIdentity,
+    rootSeed: profilePin.rootSeed,
+    replayFrameCount: 0,
+  }
 }
 
 
@@ -397,7 +591,14 @@ function isSensitiveTraceKey(key: string): boolean {
 
 export function readSanitizedBattleActionTrace(state: BattleState): Array<Record<string, unknown>> {
   const metadata = readDebugMetadata(state)
+  const profilePin = readBattleProfilePinV1(state)
+  if (!profilePin) throw pinnedProfileError('Battle trace has no pinned profile')
   return metadata.actionLog.map((entry, index) => {
+    const recorded = entry as Partial<BattleActionTrace>
+    if (
+      recorded.rootSeed !== profilePin.rootSeed
+      || stableJson(recorded.profileIdentity) !== stableJson(profilePin.profileIdentity)
+    ) throw pinnedProfileError('Battle trace profile pin does not match the battle state')
     const sanitizedEntry = sanitizeBattleTraceValue(entry)
     const trace: Record<string, unknown> = sanitizedEntry && typeof sanitizedEntry === 'object' && !Array.isArray(sanitizedEntry)
       ? { ...(sanitizedEntry as Record<string, unknown>) }
@@ -413,7 +614,40 @@ export function readSanitizedBattleActionTrace(state: BattleState): Array<Record
 export function readSanitizedBattleReplay(state: BattleState): BattleReplayArchive | undefined {
   const replay = readDebugMetadata(state).replay
   if (!replay || replay.format !== BATTLE_REPLAY_FORMAT) return undefined
+  const profilePin = readBattleProfilePinV1(state)
+  if (!profilePin) throw pinnedProfileError('Battle replay has no pinned profile')
+  if (
+    replay.rootSeed !== profilePin.rootSeed
+    || stableJson(replay.profileIdentity) !== stableJson(profilePin.profileIdentity)
+  ) {
+    throw pinnedProfileError('Battle replay profile pin does not match the battle state')
+  }
   return sanitizeBattleTraceValue(replay) as BattleReplayArchive
+}
+
+export function assertBattleTraceProfilePinV1(state: BattleState): void {
+  const profilePin = readBattleProfilePinV1(state)
+  const metadata = state.extensions?.debugBattle as Partial<DebugBattleMetadata> | undefined
+  if (
+    !profilePin
+    || !metadata
+    || !Array.isArray(metadata.actionLog)
+    || metadata.actionLog.length === 0
+    || !metadata.authority
+    || !metadata.replay
+  ) {
+    throw pinnedProfileError('Battle Trace, Replay, or authority header is missing its pinned profile')
+  }
+  if (
+    metadata.authority.rootSeed !== profilePin.rootSeed
+    || stableJson(metadata.authority.profileIdentity) !== stableJson(profilePin.profileIdentity)
+  ) {
+    throw pinnedProfileError('Battle authority header profile pin does not match the battle state')
+  }
+  readSanitizedBattleActionTrace(state)
+  if (!readSanitizedBattleReplay(state)) {
+    throw pinnedProfileError('Battle Replay is missing its pinned profile')
+  }
 }
 
 export function createBattleReplayCheckpoint(state: BattleState): BattleState {
@@ -433,6 +667,19 @@ export function appendBattleReplayFrame(
   trace: BattleActionTrace,
 ): BattleReplayFrame | undefined {
   const metadata = getOrCreateDebugMetadata(nextState)
+  const profilePin = readBattleProfilePinV1(nextState)
+  if (profilePin) {
+    trace.profileIdentity = profilePin.profileIdentity
+    trace.rootSeed = profilePin.rootSeed
+    if (metadata.authority) {
+      metadata.authority.profileIdentity = profilePin.profileIdentity
+      metadata.authority.rootSeed = profilePin.rootSeed
+    }
+    if (metadata.replay) {
+      metadata.replay.profileIdentity = profilePin.profileIdentity
+      metadata.replay.rootSeed = profilePin.rootSeed
+    }
+  }
   const replay = metadata.replay
   if (!replay || replay.format !== BATTLE_REPLAY_FORMAT) return undefined
 
@@ -470,7 +717,8 @@ export function appendBattleReplayFrame(
 
 function createBattleReplayContentSnapshot(state: BattleState): BattleReplayContentSnapshot {
   const skillIds = new Set<string>()
-  const replayPieces = [...(state.pieces ?? []), ...(state.graveyard ?? [])]
+  const reservePieces = Object.values(state.deployment?.reserves ?? {}).flat()
+  const replayPieces = [...(state.pieces ?? []), ...reservePieces, ...(state.graveyard ?? [])]
   for (const piece of replayPieces) {
     for (const skill of piece.skills ?? []) {
       if (skill?.skillId) skillIds.add(skill.skillId)
@@ -614,9 +862,24 @@ export function materializeBattleTraceForTerminal(
   const traces = history.flatMap(entry => entry.trace ? [entry.trace] : [])
   const commands = history.flatMap(entry => entry.command ? [entry.command] : [])
   const frames = history.flatMap(entry => entry.replayFrame ? [entry.replayFrame] : [])
+  if (metadata.replay) {
+    for (let index = 0; index < frames.length; index += 1) {
+      const frame = frames[index]
+      if (frame.index !== index) {
+        throw new Error(`Trace frame index is not contiguous at ${index}`)
+      }
+      const expectedPreStateHash = index === 0
+        ? metadata.replay.initialStateHash
+        : frames[index - 1].postStateHash
+      if (frame.preStateHash !== expectedPreStateHash) {
+        throw new Error(`Trace frame state hash chain is not contiguous at ${index}`)
+      }
+    }
+  }
   metadata.actionLog = [...initializationTraces, ...traces]
   metadata.commandLog = [...initializationCommands, ...commands]
   if (metadata.replay) metadata.replay = { ...metadata.replay, frames }
+  if (metadata.authority) metadata.authority.replayFrameCount = frames.length
   metadata.appliedActionIds = traces.map(trace => trace.actionId).filter(Boolean)
   return state
 }

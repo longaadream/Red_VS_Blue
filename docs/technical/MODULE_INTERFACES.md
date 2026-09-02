@@ -4,6 +4,8 @@
 
 基线：`594977b`
 
+接口约定更新：2026-08-31（RED-141，基线 `4bca9fd3b4c903ee275eac5dfa6175f467dd53b0`）
+
 本文件记录当前真实接口。标为“愿景”的内容尚未实现。
 
 本文面向开发和调试，按模块查阅即可；人工审查入口统一放在 `MODULE_STATUS.md`。
@@ -77,7 +79,7 @@
 
 - 入口：`lib/game/rule-runtime.ts::RuleRuntime`、`withRuleRuntime()`、`withRuleRuntimeCheckpoint()`。
 - 职责：根种子规范化、命名流派生与 cursor、规则时钟、实例 ID、动态规则 `Math`/`Date` 能力。
-- 稳定流：`deployment`、`deployment-reroll`、`turn-order`、`skill/effect`；实例 ID 为 `instance-id/<namespace>`。
+- 稳定流：legacy 的 `deployment`、`deployment-reroll`，渐进部署的 `progressive-deployment/opening-piece/<normalizedPlayerId>`、`progressive-deployment/opening-cell/<normalizedPlayerId>`、`progressive-deployment/offer/<normalizedPlayerId>`、`progressive-deployment/fallback/<normalizedPlayerId>`，以及 `turn-order`、`skill/effect`；四条渐进流都使用规范化 playerId 后缀并隔离双方 cursor，实例 ID 为 `instance-id/<namespace>`。
 - 约束：规则执行保持同步；预检必须使用 checkpoint；视觉随机不得进入权威 seed、状态或 hash。
 - 兼容：`rng()` 在 runtime 激活时路由至 `skill/effect`，未激活时保留旧适配器。
 - 决策：[ADR-0004](../decisions/ADR-0004-deterministic-rule-runtime.md)。
@@ -94,22 +96,23 @@
 - 错误响应包含稳定的 `code`、`message` 与 `context`；HTTP 与 WebSocket 复用同一错误载荷。
 - `lib/game/room-battle-start.ts` 在启动前重新检查双方阵容与房间冻结的 `mapId`，并通过房间版本号原子提交战斗状态；只有双方合法锁定且地图属于受控目录、可部署时才进入初始化。校验发生在 seed 与随机消费之前，`BattleState.map.id` 必须等于 `Room.mapId`。
 
-### 部署房间协调器（RED-31）
+### 渐进部署房间协调器（RED-138）
 
-- 入口：`lib/game/room-battle-actions.ts::dispatchRoomBattleAction()`、`scheduleRoomDeploymentTimeout()` 与 `createPublicBattleSnapshot()`。
-- 职责：验证 viewer/动作玩家、在 45 秒期限前后选择实际命令、调用唯一规则 Runner、通过 `Room.version` CAS 提交并生成公开快照。
-- 状态命令：`deploymentChoice` 可在锁定前替换/取消；`deploymentLock` 不可撤销；`deploymentTimeout` 仅允许权威服务端时钟发出。
-- 并发：玩家同时锁定或玩家锁定与超时竞争时，失败的 CAS 重新读取最新房间；最终位置只提交一次，`authorityVersion` 单调递增。
-- 公开边界：`lib/game/deployment.ts::toPublicBattleState()` 对玩家和观战者公开相同双方坐标与锁定状态，清除选择和 `appliedActionIds`，未完成前同时清除最终位置和完整 action trace；只有权威 `terminalResult` 已提交后才公开脱敏完整 trace。
-- 传输：房间 HTTP、WebSocket 和 Relay 使用 `{ state, seed, stateHash, authorityVersion }`；`viewerPlayerId` 只做提交权限校验，不参与站位隐藏。
-- 身份：实际进入权威战斗的玩家命令必须携带 Ed25519 签名信封，覆盖 room/player/完整 action/timestamp；HTTP、LAN WS 与桌面/Android 本机权威服务验证后才执行。独立 `relay-server` 在 RED-119 中没有 battle command、host state update 或 host/guest 战斗权威角色。header/body/subscribe 中的同名字符串不能单独授权命令。
-- 房间投影：`createPublicRoomSnapshot()` 覆盖普通 room GET、重复 start 与其他完整房间响应，不能绕过 battle API 读取 pending choice 或进行中对局的 debug trace；终局 trace 只经终局 battle snapshot 暴露。
-- Relay：持有房间的桌面与 Android 本机权威流程在正式初始化前重新验证已持久化的 `Room.mapId`，从 authority version 1 开始。Next `/api/relay-battle-init` 与 Android `handleRelayBattleInit` 则是不持有 `Room` 的无状态兼容 bootstrap：只在 seed 前重新校验调用方已经冻结的 ID，不读写房间，当前没有 UI 调用方，也不作为房间冻结证据。独立 Relay 只在赛前持久化该 ID 并转发真实房间的 `roomUpdate`；RED-119 不恢复已被现行架构禁止的 host-authority 完整战斗执行或状态恢复。
+- 入口：`lib/game/room-battle-actions.ts::dispatchRoomBattleAction()`、`scheduleRoomBattleTimeout()` 与 `createPublicBattleSnapshot()`。
+- 职责：验证 viewer/动作玩家，调用唯一规则 Runner，通过 `Room.version` CAS 提交 `deployReservePiece`、普通战斗动作与系统 `turnTimeout`，并生成接收者公开快照。
+- 状态命令：自己的回合由权威端生成至多 3 枚候选；`deployReservePiece` 必须携带精确的 `expectedDeploymentRevision`，并在克隆、随机和修改前校验。`deployReservePiece` 原子确认候选与合法格，after-summon 队列后先判终局；未终局时给本次核心添加仅部署当前回合有效的 `deployment-first-move-free` statusTag，并直接进入正常行动。第一次成功普通 `move` 由权威 reducer 以 0 AP 提交并原子消费标签，未使用标签在 `endTurn` 交接前清除。没有安全格时服务端确定性随机落到空可行走格；没有空格则失败关闭。
+- 并发：玩家动作与超时竞争时，失败的 CAS 重新读取最新房间；同一候选只提交一次，`authorityVersion` 与部署 revision 单调递增。缺失、非安全整数或旧 revision 以 `PROGRESSIVE_DEPLOYMENT_STALE_REVISION` 在零状态/hash/cursor 污染下拒绝，不复制或丢失核心实例。
+- 公开边界：`lib/game/deployment.ts::toPublicBattleState()` 只向 `activePlayerId` 投影 offer 与合法落点；对手和观战者只得到公开状态及每方预备区数量。实际部署后，`visible=true` 的免费首移 statusTag 作为普通棋子公开状态展示。正式 WebSocket 的重连、开战和超时完整快照必须按每个接收者分别投影，不能复用动作发起者的单一快照；内部直接调用 Next Battle GET 时也必须复用同一投影函数。
+- 传输：正式玩家命令、完整快照与重连恢复只走房间 WebSocket，并使用 `{ state, seed, stateHash, authorityVersion }`。Next Battle GET 仅是内部兼容/测试处理器，实际运行时玩家 `/api/rooms/**` 返回 410，不能作为 HTTP 后备；内部直接调用 GET 时，只有 `x-battle-subscribe-auth` 中通过 `verifyBattleSubscribeAuth` 的 battle-subscribe Ed25519 JSON 信封才能建立 owner 投影。无信封、仅 `x-player-id` / `viewerPlayerId` 声明或签名玩家同时伪造 query/header 都不能提升权限，前两者按观战者投影，畸形或坏签名稳定返回 401。WebSocket 订阅遵守同一签名身份语义。
+- 身份：实际进入权威战斗的玩家命令必须携带 Ed25519 签名信封，覆盖 room/player/完整 action/timestamp；LAN WS 与桌面本机权威服务验证后才执行，内部直接调用的 Next Battle POST 也复用该校验但不是玩家后备入口。独立 `relay-server` 在 RED-119 中没有 battle command、host state update 或 host/guest 战斗权威角色。header/body/subscribe 中的同名字符串不能单独授权命令。
+- 房间投影：`createPublicRoomSnapshot()` 覆盖内部直接调用的 room GET、重复 start 与其他完整房间响应，不能绕过 battle 投影读取私有 offer、合法格或进行中对局的 debug trace；正式玩家房间读取仍只走 WebSocket，终局 trace 只经终局 battle snapshot 暴露。
+- Relay：持有房间的桌面本机权威流程在正式初始化前重新验证已持久化的 `Room.mapId`，从 authority version 1 开始。Next `/api/relay-battle-init` 与 Android `handleRelayBattleInit` 则是不持有 `Room` 的无状态兼容 bootstrap：只在 seed 前重新校验调用方已经冻结的 ID，不读写房间，当前没有 UI 调用方，也不作为房间冻结证据。独立 Relay 只在赛前持久化该 ID 并转发真实房间的 `roomUpdate`；RED-119 不恢复已被现行架构禁止的 host-authority 完整战斗执行或状态恢复。
+- Android：当前内嵌房间仍广播 legacy `action-log`，没有 RED-138 所需的签名 viewer 私有投影。RED-81 完成前只保留 legacy 状态解释能力；`progressive-reserve-v1` 属于 unsupported，不得作为 RED-138 发布、跨端一致性或隐私验收路径。
 - 独立 Relay 的赛前接口与 LAN RPC 分离：`lobby.html`、`room.html`、`piece-selection.html` 在 remote 模式通过 `/api/maps`、`/api/lobby` 与 `/api/rooms/:id[/actions|/spectate]` 完成目录、创建、读取、加入、阵营确认、选人、观战和删除；不得连接 `__lobby` 或发送 `rooms.*` RPC。赛前 WebSocket 只订阅真实 `roomId` 接收 `roomUpdate`，本任务的 standalone 验收止于双方进入选人且 `mapId` 冻结。
 - 创建者由独立 Relay 建房接口直接登记为 host，随后用 `claim-faction` 固化内容阵营；访客 `join` 同步固化内容阵营。`waiting`/`selecting` 页面切换不得写状态或提前开始战斗。
 - 独立 Relay 的 Prisma/PostgreSQL `Room.mapId` 是兼容旧行的可空列；迁移顺序必须是“不含 `mapId` 的既有三表 baseline”后接“只新增可空 `Room.mapId` 的增量迁移”。全新库依次部署两条；旧 `db push` 库先备份、把 baseline 标记为已应用，再部署增量，禁止生产试跑或重建表。代码回退停止读写该列但保留列；删除列仅允许在备份后另行人工批准。
-- 错误：非法、重复锁定、伪造身份和过期命令不得写状态/版本/cursor；错误上下文含 room、player、phase、action ID、seed 和 authority version。
-- 决策：[ADR-0009](../decisions/ADR-0009-authoritative-deployment-lock.md)。
+- 错误：非法、重复、伪造身份和过期命令不得写状态/版本/cursor；错误上下文含 room、player、phase、action ID、seed 和 authority version。
+- 决策：[ADR-0024](../decisions/ADR-0024-progressive-reserve-deployment.md)。旧 `deploymentChoice` / `deploymentLock` 协议仅保留给 `legacy-reroll-v1`，见 [ADR-0009](../decisions/ADR-0009-authoritative-deployment-lock.md)。
 
 ### PVP alignment lock (RED-56)
 
@@ -144,48 +147,56 @@
 
 ## 5. 触发器系统
 
-- 入口：`lib/game/triggers.ts::TriggerSystem`、`globalTriggerSystem`。
+- 入口：`lib/game/triggers.ts::TriggerSystem`、`lib/game/room-rule-runtime.ts::RoomRuleRuntimeRegistry`。
 - 职责：注册规则并在游戏事件上执行触发器。
 - 输入：触发事件、战斗状态和上下文。
 - 输出：触发结果/修改后的状态。
 - 调用方：技能、战斗初始化、回合规则。
 - 调用：具体规则和技能效果。
-- 状态变化：可间接修改任意规则状态；注册表是进程级状态。
-- 错误：触发器异常可能向上抛，也可能被调用层记录后忽略。
+- 状态变化：在线路径的规则注册表、限制计数和缓存按 roomId 隔离；同步 `RuleExecutionContext` 把同一
+  房间实例传入 Runner、战斗初始化、回合与技能深层调用。`globalTriggerSystem` 仅为离线/浏览器兼容后备。
+- 恢复/关闭：新房间创建空运行时；旧房间首次 restore 只复制一次历史全局规则快照。相同 roomId 的
+  create/restore 幂等返回同一实例；close 清空规则和缓存、关闭房间 FIFO，之后拒绝隐式复活。RED-141
+  提供该原语；终局/删除生产编排、durable 屏障和竞态收口属于 RED-143。
+- 错误：触发器异常向权威调用边界抛出；失败房间的规则计数、pending 和缓存不得污染其他房间。
 - 日志：`triggers.ts` 本地日志。
-- 测试：`debug-battle.test.ts` 有部分所有权场景。
-- 已知问题：跨房间隔离待确认。
-- 最小调试：在单个触发事件前后导出注册规则 ID、房间 ID 和状态 hash。
+- 测试：`room-runtime-isolation.test.ts` 覆盖 100 次双房交错、异常/计数/pending/缓存隔离、FIFO、背压、
+  inspect 与 close；`turn.test.ts`、`turn-timer-room.test.ts` 覆盖兼容路径。
+- 最小调试：`inspectRoomRuleRuntime(roomId)` 只读返回 generation、active event、queue/pending depth 和
+  closed reason；再结合规则 ID、roomId、seed 与前后 state hash 定位。
 
 ## 6. WebSocket 服务
 
 - 入口：`lib/ws-server.ts::startWsServer()`。
-- 职责：房间连接、玩家消息、开始游戏、执行动作和广播状态。
-- 输入：字符串 JSON 消息，如 `action`、房间/选择消息。
-- 输出：`stateUpdate`、房间状态或错误消息。
+- 职责：统一承载玩家健康探测、目录、大厅/房间、选择、战斗命令、权威回执、patch、快照与恢复。
+- 输入：`/ws/rooms/{roomId}` 上的版本化 RPC 或战斗命令；RPC 使用 `requestId`，战斗写入另用
+  `clientActionId` 保证权威幂等。
+- 输出：结构化 RPC 结果、权威 receipt、recipient-specific patch、完整恢复快照或结构化错误。
 - 调用方：`instrumentation.ts`；客户端 `RvBWs`。
-- 调用：`RoomStore`、战斗初始化、`runBattleAction()`。
+- 调用：`RoomStore`、战斗初始化、`dispatchRoomBattleAction()`。
 - 状态变化：内存连接表、房间、Prisma 状态和广播序列。
-- 错误：解析、房间不存在、规则异常、数据库异常；错误 envelope 不统一。
+- 错误：协议/build/Profile、房间、规则、版本或持久化错误使用稳定 code；同一连接内相同
+  `requestId` 与相同 payload 重放原结果，不同 payload 返回 `RPC_REQUEST_ID_CONFLICT`。
 - 日志：控制台和局部捕获。
-- 测试：没有确认到 WS 集成测试。
-- 已知问题：部分空 catch；协议无公共版本；种子生成与初始化顺序不统一。
+- 测试：`tests/ws-server.test.ts` 及权威 transition/transport 套件；`tests/roster-transports.test.ts` 另覆盖签名身份、按接收者的部署隐私投影及 HTTP/WS 协调器一致性。
+- 管理边界：玩家 WS 不承载 Server 运维命令、备份、更新或管理 capability。RED-140 的管理面必须
+  使用独立 loopback transport。
 - 最小调试：记录 roomId、connection/player、message type、action ID、seed、前后 hash。
 
-## 7. 房间 HTTP 动作 API
+## 7. 旧玩家 HTTP 动作 API（仅内部兼容/测试实现）
 
-- 入口：`app/api/rooms/[roomId]/battle/route.ts::POST`。
-- 职责：WebSocket 之外执行房间动作并广播。
-- 输入：URL roomId 和请求 JSON 动作。
-- 输出：新状态或 HTTP 错误响应。
-- 调用方：浏览器/客户端 HTTP 后备路径。
+- 入口：`app/api/rooms/[roomId]/battle/route.ts::GET/POST`。
+- 职责：供路由级测试和受控内部调用直接复用房间动作、签名 viewer 投影与广播逻辑；不构成正式玩家传输。
+- 旧 `/api/ping`、目录和 `/api/rooms/**` 玩家入口由 ADR-0020/RED-127 在实际同端口运行边界
+  统一返回 HTTP 410 与 `PLAYER_REST_DISABLED`；不存在玩家 HTTP fallback。
 - 调用：`dispatchRoomBattleAction()`、`RoomStore.setRoomIfVersion()`、WS 广播。
-- 状态变化：房间战斗状态和数据库修订号。
-- 错误：无效 JSON、房间不存在、规则/数据库错误；持续 CAS 竞争返回 `ROOM_VERSION_CONFLICT`（409），终局后的竞争动作返回 `BATTLE_ALREADY_TERMINAL`（400）。
-- 日志：API 控制台输出。
-- 测试：`tests/roster-transports.test.ts` 覆盖 HTTP/WS 同状态与并发双投降；终局守卫另见 `tests/game/terminal-transport.test.ts`。
-- 已知问题：HTTP 与 WS 的选择错误 envelope 仍不完全相同；真实 Prisma 多实例竞争尚无 E2E。
-- 最小调试：使用同一房间快照分别走 WS/HTTP，比较状态 hash。
+- 错误：持续 CAS 竞争返回 `ROOM_VERSION_CONFLICT`（409），终局后的竞争动作返回 `BATTLE_ALREADY_TERMINAL`（400）。
+- 测试：`tests/roster-transports.test.ts` 覆盖 HTTP/WS 同状态、部署隐私投影与并发双投降；终局守卫另见 `tests/game/terminal-transport.test.ts`。
+- `app/api/rooms/**` 中仍保留的历史 route 不能作为新客户端、玩家 fallback 或管理功能的调用依据。
+- 静态资源、WebSocket Upgrade 与管理 HTTP 是不同边界。RED-140 批准的
+  `rvb-server-operations/v1` 不得挂到公开玩家端口、复用这些 route 或信任静态
+  `admin-secret-key`。
+- 回退玩家传输时必须整体回退 ADR-0020，不能只恢复页面 fallback。
 
 ## 8. RoomStore 和战斗存储
 
@@ -222,12 +233,13 @@
 
 - 展示输入：`battle-ui/battle-view-model.js::create()` 把完整快照、已选对象和规则层返回的合法集合投影为最小模型；训练、LAN、relay 不进入投影字段。
 - 合法集合：`battle-ui/battle-legal-actions.js` 只调用浏览器 `GameEngine` 的克隆/验证入口，不包含移动距离、技能范围、伤害或结算公式。
-- 组合器：`battle-ui/battle-presentation.js` 将同一个模型对象传入 renderer 与 DOM，并统一输出 `select-piece`、`select-skill`、`activate-cell`、`inspect-piece` 和 `cancel-target` 意图。
+- 组合器：`battle-ui/battle-presentation.js` 将同一个模型对象传入 renderer 与 DOM，并统一输出 `select-piece`、`select-skill`、`activate-cell`、`drop-piece`、`inspect-piece` 和 `cancel-target` 意图。
 - Three.js：`battle-renderer-3d.js` 的公共生命周期是 `init(options)`、`update(model)`、`resize()`、`resetView()`、`projectCell()`、`screenToCell()`、`dispose()`；只负责棋盘内表现。`resetView()` 只恢复镜头，不修改战局状态。
 - DOM：`battle-ui/battle-dom-ui.js` 负责 HUD 与桌面选中棋子的只读特殊状态悬浮摘要；PR #55 的紧凑生命/负面状态摘要留在棋盘表现层，完整技能与状态继续由 `battle.html` 的详情 modal/sheet 展示。状态悬浮摘要只消费展示模型中的完整可见状态，不递减持续时间或复制规则；进入移动/目标态即隐藏。`battle-context-layout.js` 只计算棋子菜单锚点、HUD 上侧安全区和现有 `handCards` 容器的弧形变量，不创建第二份手牌或规则状态。
-- 响应式布局（RED-51）：`battle-responsive.css` 负责共享/桌面重排，`battle-responsive-mobile.css` 隔离 760px 及以下规则，`battle-context-ui.css` 负责透明 HUD、棋子附近技能菜单、桌面状态悬浮摘要和单源弧形手牌；棋盘舞台绝对定位并铺满战场视口，现有 `handCards` 直接承载卡牌流，以底部透明浮层覆盖在棋盘上，不再分配独立布局高度，也不设置手牌面板、标题或空状态区域。手牌浮层空白区域不接收指针，只有真实卡牌接收点击，因此棋盘拖拽/缩放仍可从空白处开始。训练修改入口是棋盘内可展开/收起的锚定悬浮菜单。选中棋子先显示轻量菜单，进入移动或目标选择后立即收起，避免遮挡路线；菜单内显式 i 按钮打开完整技能与状态详情，桌面也可右键。900px 以下低高横屏与 760px 以下触屏隐藏桌面状态摘要，详情统一使用菜单 i 和底部 sheet。训练开局列表内部滚动以保持操作按钮可达；布局层不得复制行动合法性、目标或费用规则。
-- 坐标与手势（RED-68）：`battle-tactical-geometry.js` 只定义固定单轴 45°、35° FOV 的弱透视镜头、低椭圆棋子尺寸、屏幕拖拽到地面坐标的换算与镜头目标夹取；不读取战局状态，也不包含合法性或结算规则。renderer 以 canvas 的 CSS 边界完成指针反投影，优先命中真实地砖几何并以扩展平面覆盖格缝；在 resize/DPR、平移、缩放、镜头复位或棋子移动后发出 `viewport-change`，页面据 `projectCell()` 重算菜单锚点。粗指针的初始缩放遍历透视边缘并保留 1 CSS px 余量，保证所有投影格子的最小轴至少 44 CSS px；10px 累计位移后才从点按切换为拖动。单指拖动使用屏幕射线与地面的交点差，双指缩放和 `resetView()` 都保留同一 `projectCell()` / `screenToCell()` 合同。
-- 2.5D 与移动布局（RED-68）：棋盘材质、0.72 单位台面厚度、只在前沿可见的立面、棋子轮廓和红蓝阵营环集中在 `battle-tactical-table.css` 与 renderer 表现常量中；棋子最大平面占格约 72% × 56%，厚度 10%，地形仅以有限高度层级表达。战局顶端只保留无独立盒子的双方信息，棋盘舞台不再叠加 CSS 外框，按钮继续使用既有 battle UI，只由响应式层保证触摸尺寸与排布。760px 及以下竖屏直接保留可操作战局并使用安全区、44px 控件和底部 sheet；目标态隐藏手牌与非必要 HUD，但保留取消与权威目标高亮。该层不得复制游戏规则或引入新的全局状态。
+- 响应式布局（RED-51、RED-162）：`battle-responsive.css` 负责共享/桌面重排，`battle-responsive-mobile.css` 隔离 760px 及以下规则，`battle-context-ui.css` 负责透明 HUD、对侧边缘技能栏、桌面状态悬浮摘要和单源弧形手牌；棋盘舞台绝对定位并铺满战场视口，现有 `handCards` 直接承载卡牌流，以底部透明浮层覆盖在棋盘上，不再分配独立布局高度，也不设置手牌面板、标题或空状态区域。手牌浮层空白区域不接收指针，只有真实卡牌接收点击，因此棋盘拖拽/缩放仍可从空白处开始。训练修改入口是棋盘内可展开/收起的锚定悬浮菜单。选中可行动的己方棋子后，页面立即通过 `battle-legal-actions.js` 查询移动合法集并显示高亮，不再在技能菜单中提供二次“移动”按钮；技能栏不改变棋盘尺寸或镜头，依据棋子屏幕投影停靠到对侧边缘，并在中心线附近使用迟滞避免换边抖动。任意栏外按下、棋子拖动、空白平移或棋盘滚轮缩放都会收起技能栏，但保留棋子选中态与移动高亮。栏内显式 i 按钮打开完整技能与状态详情，并提供收起按钮；桌面也可右键。低高横屏使用 148px 紧凑纵向布局，技能触控目标仍至少 44px。900px 以下低高横屏与 760px 以下触屏隐藏桌面状态摘要，详情统一使用菜单 i 和底部 sheet。训练开局列表内部滚动以保持操作按钮可达；布局层不得复制行动合法性、目标或费用规则。
+- 坐标与手势（RED-68、RED-162）：`battle-tactical-geometry.js` 只定义固定单轴 45°、35° FOV 的弱透视镜头、低椭圆棋子尺寸、屏幕拖拽到地面坐标的换算与镜头目标夹取；不读取战局状态，也不包含合法性或结算规则。renderer 以 canvas 的 CSS 边界完成指针反投影，优先命中真实地砖几何并以扩展平面覆盖格缝；在 resize/DPR、平移、缩放、镜头复位或棋子移动后发出 `viewport-change`，页面据 `projectCell()` 重算菜单锚点。粗指针的初始缩放遍历透视边缘并保留 1 CSS px 余量，保证所有投影格子的最小轴至少 44 CSS px；10px 累计位移后才从点按切换为拖动。移动态从已选棋子开始的单指拖动优先于镜头平移，renderer 只显示跟手位置并在释放时输出 `drop-piece`；页面仅按 `BattleLegalActions` 返回的高亮集合接收落点，再发送既有 `move` action，权威规则层仍执行最终校验。未命中已选棋子的空白单指拖动继续平移镜头，双指缩放和 `resetView()` 都保留同一 `projectCell()` / `screenToCell()` 合同；`pointercancel`、第二指针、窗口失焦和 `dispose()` 必须取消棋子拖动且不得提交。
+- 2.5D 与移动布局（RED-68、RED-166）：棋盘材质、0.72 单位台面厚度、只在前沿可见的立面、棋子轮廓和红蓝阵营环集中在 `battle-tactical-table.css` 与 renderer 表现常量中；棋子最大平面占格约 72% × 56%，厚度 10%，地形仅以有限高度层级表达。战局顶端只保留无独立盒子的双方信息，棋盘舞台不再叠加 CSS 外框，按钮继续使用既有 battle UI，只由响应式层保证触摸尺寸与排布。所有竖屏尺寸都由全屏旋转提示阻止战斗操作；旋转为横屏后恢复棋盘、44px 控件和底部 sheet。目标态隐藏手牌与非必要 HUD，但保留取消与权威目标高亮。该层不得复制游戏规则或引入新的全局状态。
+- 动作历史（RED-166）：`battle-action-history.js` 只消费展示模型中的权威 `presentationEvents`，按根事件折叠子事件、去重并保留至多 20 个根动作，默认渲染最近 5 个图标。它由 `BattlePresentation` 统一 mount/update/resize/dispose，使用 renderer 的 `projectCell()` 在既有 `floatLayer` 做短时来源—目标—路径高亮；不发送意图或游戏命令，也不修改战局状态。右侧浮窗、状态摘要、目标模式、系统弹窗、窄宽或低高横屏会令 52px dock 收为单个 44px 日志按钮，完整文字日志继续作为二级入口。
 - 动效与反馈（RED-69）：`battle-tactical-table.css` 与 `battle-renderer-3d.js` 共享 100/140/240/280ms 的 press/fast/action/result 节奏和同名缓动；renderer 以 `owner:property` 控制器保证同一属性只有一个可中断动效，并以权威状态哈希/序号派生的 `motionEventKey`（缺失时使用确定性展示签名）去重。页面只把单一待确认命令映射为 `BattleViewModel.interaction.pendingPieceId/pendingCommandId`，8 秒超时、断线、服务端拒绝、权威展示投影前进和页面卸载都显式清理；完全重复或仅诊断字段变化的快照不解除 single-flight。当前 `PublicBattleSnapshot` 不含 accepted `clientActionId`，因此投影前进仍是近似确认而非精确命令 ACK，公共接口修复由 RED-99 跟踪。合法性、伤害、治疗、状态和死亡仍完全来自前后权威快照。目标格同时进入且不因普通重绘重播，移动从当前可见位置重定向，所有 piece/status/highlight/floater/controller 都在移除或 `dispose()` 时释放。`prefers-reduced-motion` 取消位移、缩放和下沉，仅保留 100–140ms 静态轮廓/淡入淡出及结果文本。
 - 待选拒绝恢复（RED-97 与 RED-69 合并语义）：服务端拒绝普通命令时，页面结束待确认反馈并清理临时目标交互；若被拒绝的是 pendingTargetSelect 或 pendingOptionSelect，且当前权威快照仍保留对应选择会话，则只结束待确认动效并解除本地提交锁，保留选择 UI 供玩家重试。选择 UI 仅在权威会话结束、回合切换、实体失效、断线或明确取消时清理。
 - 规则权威：页面控制器把意图转换为现有 action；非法操作仍由规则层/服务端最终拒绝。
@@ -301,20 +313,51 @@
   很小的 sender 判定模块，语义由同一测试矩阵锁定。
 - 最小调试：记录 channel、请求 ID、参数摘要、结果类型和异常栈，禁止记录密钥。
 
-### 10.1 Electron 资源包存储
+### 10.1 Electron Content Profile 存储
 
-- 入口：客户端 `pack-import-from-path`/`pack-import-data`，服务端 dashboard 资源包导入，
-  以及 `lib/resource-pack.ts::syncResourcePack()`。
-- 存储：`userData/resource-pack/versions/<sha256>/` 为不可变版本，`active.json` 是唯一活动
-  指针；旧版固定 `resource-pack/data` 只在尚不存在指针时作为读取兼容回退。
-- 激活类型：仅 `data/**/*.json` 与 `images/**/*.{jpg,jpeg,png,webp}`；内置 HTML/JS/CSS/SVG
-  不接受热更新。
-- 事务边界：ZIP 中央目录、预算、entry 类型、manifest 和内容全部验证成功后，staging 才
-  重命名为版本目录并原子切换指针。失败不改变当前活动版本。
-- 测试：`tests/electron/resource-pack-security.test.ts` 覆盖路径穿越、绝对/盘符/反斜杠路径、
-  大小写冲突、符号链接、非法 JSON、预算、活动内容隔离、失败不切换和清除回退。
-- 回退：优先把 `active.json.version` 切回 `previousVersion`；代码回退使用 RED-24 PR revert，
-  不删除已有版本目录。
+- 唯一当前合同是 RED-115 的 `<userData>/resource-pack` Profile store：
+  `packages/<packageHash>` 保存验证过的包，`profiles/<resolvedProfileHash>` 保存不可变完整
+  snapshot，`active.json` 使用 `rvb-profile-state/v1` 记录 stable/candidate/previousStable、
+  activation、失败与 revision。
+- Electron 只协调生命周期；manifest/schema/signature/resolution 统一由 Content Pipeline core
+  处理。安装、激活、previous-stable 和 Bundled Base 回退不得由应用 updater 直接修改指针。
+- authority restart 复用 admission fence、Profile lease、durable drain、candidate health、原子
+  commit 与崩溃恢复。应用二进制更新与 Profile 激活是两个状态机，只共享 RED-140 的全局
+  operation coordinator。
+- 身份和房间 pin 复用 RED-116 的 `engineAbi + runnerRevision + authorityContentHash` 硬门禁；
+  `resolvedProfileHash` 用于完整资源/provenance/诊断。
+- 完整边界见 `CONTENT_PROFILE_V1_RUNTIME.md` 与 `RESOLVED_PROFILE_ROOM_HANDSHAKE.md`。
+
+### 10.2 RED-118 内容工具与 Editor 边界
+
+- 共享入口：`lib/content-pipeline/tooling/operation.ts::runContentPipelineOperationV1()`；CLI、Editor worker
+  和候选脚本都只适配参数、路径和展示，不复制 frozen manifest/hash/schema 或 Profile resolver。
+- 协议：`rvb-content-operation/v1` 的操作集合为 build、validate、resolve、sign、smoke。
+  返回 `ContentToolingResultV1`，包含稳定退出码、结构化 refusal、身份 hash、capabilities、
+  signature/key ID、seed、报告路径和可选输出归档。
+- CLI：`scripts/rvb.mjs` 解析结构化 argv 后调用同一入口；禁止通过字符串拼接 shell 命令执行
+  内容操作。旧 `scripts/build-resource-pack.js` 仅转换历史参数并打印 deprecated 警告。
+- Editor：preload 只暴露 `contentOperation(request)`。main process 在读取业务字段前验证精确
+  Editor sender，再用 closed-key request normalizer 拒绝 executable、script、argv、未知字段和
+  authoring workspace 外路径。路径先做 lexical confinement，再对已存在的每级组件做
+  `lstat`/`realpath` 校验并拒绝 symlink/junction；不存在的写入目标从最近的真实父目录验证。
+- 进程：通过 Electron `utilityProcess.fork()` 启动随 Editor 打包的
+  `content-pipeline-worker.cjs`；worker 不接受通用命令，也不启动系统 Node 或读取源码 checkout。
+- 并发：main process 使用最大 16 个待处理请求的串行队列；队列满时 fail closed，避免并发操作
+  覆盖同一 archive、report 或 authoring source。
+- 工作区：Editor 只写 `userData/content-authoring/{sources,archives,keys,reports}`。源数据首次从
+  内置 `data/` 复制，运行时产物与安装目录分离。
+- 签名：Local Dev 可 unsigned/dev-only；QA/Stable/Community 只接受外部密钥，并要求调用方显式
+  提供 trusted publisher key ID allow-list。Stable 还需要显式人工确认；两个条件分别 fail closed。
+  私钥文件只在 sign 操作期间读取；解码后的可变字节在 `finally` 中清零。JavaScript 的不可变
+  `keyText` 字符串不能证明原地清零，因此实现承诺是不把私钥正文、原始 argv 或 key path 写入报告，
+  并在 candidate 退出时删除隔离临时密钥文件，而不是声称字符串已清零。
+- 验证：Patch validate 必须携带 Base 和完整前置 Patch 链。相同 fixture 的 CLI/Editor build 必须
+  得到相同 package hash；打包 Windows smoke 要由 Editor 执行 build/sign/validate/resolve/smoke
+  全链，并显示 resolved Profile/authority hash、engine/content ABI、capabilities、signature、seed、
+  stage、refusal path/content ID 和报告位置。
+- 回退：先把 Client/Server active Profile 切回 `previousStable`，再回退适配层、Editor worker
+  和 CLI 变更；冻结的 manifest/hash/schema 核心和已验证版本不随该回退删除。
 
 ## 11. Android 资源构建
 
@@ -389,19 +432,26 @@ interface ServerCore {
 
 ### 部署状态展示
 
-- 权威阶段为 `deployment.status = awaiting-locks`。
-- 客户端只依据服务端下发的 `deployment.deadlineAt` 计算剩余秒数，不自行延长或重置期限。
-- 未锁定玩家的选择继续保持私有；公开快照只包含锁定状态和可公开结果。
+- RED-31 的 `deployment.status = awaiting-locks`、独立 45 秒期限与私有重投选择只适用于 `legacy-reroll-v1`。
+- 新建对局使用 `turn-ready → awaiting-reserve-deploy → turn-ready/complete`；部署和召唤交互完成后直接进入正常行动，不存在独立免费移动子状态或动作。客户端只依据当前成长回合的服务端 deadline 显示剩余时间，不自行延长或重置。
+- offer 和合法落点只对当前输入玩家可见；公开快照包含阶段、预备区数量、已实际上场的公开结果及该棋子 `visible=true` 的免费首移 statusTag。
 
 ### 单端口网络传输
 
+本段中 RED-31 早期 `/api/ping` 探针描述已被 ADR-0020/RED-127 与 RED-140 的实际同端口边界
+取代；保留的同 origin/同 port 约束继续有效。
+
 - 客户端只配置并持久化一个规范化的 `serverUrl`；HTTP 与 WebSocket 始终使用该地址的同一协议主机和端口。
-- HTTP 健康检查使用 `/api/ping`，WebSocket 地址由客户端直接派生为 `/ws/rooms/{roomId}`；不得保存、探测或猜测 `wsPort`、`wsBaseUrl`。
+- HTTP 层健康检查对真实玩家 `/ws` 路径发起 Upgrade 并要求 101；Upgrade 后发送
+  `system.health`，校验 protocol/build/Profile 才算玩家 WebSocket healthy。地址仍由
+  `serverUrl` 派生；不得保存、探测或猜测 `wsPort`、`wsBaseUrl`。
 - 旧版 `rvb_ws_port` 及其 URL/来源缓存会被清除，且不能影响连接目标；不再兼容双端口客户端或配置。
 - Next.js 开发与 standalone 服务在创建 HTTP(S) server 前加载 `scripts/ws-same-port-server.cjs`，把游戏 `/ws` Upgrade 交给 `noServer` WebSocket 服务，同时保留 Next HMR Upgrade。
 - Electron 主机直接在一个公开端口运行 standalone，不再创建内部 HTTP/WS 端口或公开代理；Android 与 Relay 也在各自唯一的 HTTP 服务端口处理 WebSocket Upgrade。
-- `/api/ws-info` 仅作为诊断接口返回 `{ transport: 'same-origin', path: '/ws/rooms/{roomId}' }`，不得暴露或参与选择内部端口。
-- LAN/UDP/快速扫描只发现可通过 `/api/ping` 访问的完整 HTTP origin，加入后 WebSocket 必须连接该 origin，而不是第二个地址。
+- `/api/ws-info` 是历史诊断 route，不参与健康、发现或地址选择；合规玩家客户端不调用它，实际
+  player REST disable 边界可返回 410。
+- LAN/UDP/快速扫描只发现完整 origin；候选 origin 必须通过同 origin 的真实 WS 101 Upgrade 与
+  `system.health` 才可加入，不能调用 `/api/ping` 或尝试第二个地址。
 - 传输模式按服务器地址判定：本机与私网地址走 LAN 权威主机；公网地址走 Relay，显式 `relay=1` 仅用于本机 Relay 调试，二者都遵守同端口 URL 规则。
 
 ## RED-36 2026-08-20 接口修订
@@ -412,7 +462,7 @@ interface ServerCore {
 - `BattleState.turnTimer`：保存规则期限和 streak；`turnTimerSync | turnTimerBurn | turnTimeout` 是内部系统动作，客户端提交会以 `TURN_TIMER_SYSTEM_ACTION_FORBIDDEN` 拒绝且不写房间。
 - `dispatchRoomBattleAction()`：进入异步读取前采样逻辑接收时间；每房间串行冻结逻辑时钟，完成规则、唯一 CAS、快照构造和发送入队后恢复。传输层只获得真实提交版本，CAS 冲突不发布 speculative 快照，且处理跨越 15 秒阈值不会造成烧绳投影反转。进程重启恢复不在 RED-36 范围内。
 - 计时跟随当前输入所有者，并从 action 延续到 end，覆盖 pending 与“回合结束时”输入，直到下一回合真正开始；pending 返回活动玩家时恢复原剩余预算。主动结束回合产生的 pending 继续使用当前预算；action phase 超时若在强制 `endTurn` 时才产生 pending，则取消该输入并推进下一回合，不新增预算。end phase 输入超时也直接推进，不能重复执行 endTurn 触发。只有当前 owner 被接受的玩法动作才清零自己的 streak。
-- `scheduleRoomBattleTimeout()`：仅在显式 `RVB_TURN_TIMER_ENABLED=1` 时启用 deadline，并按部署期限、烧绳阈值和回合期限安排下一次唤醒；未设置或 `0` 时清除既有任务、隐藏计时投影，且晚到玩家动作不会被替换成 timeout。系统事件仍通过 Runner 与房间版本 CAS，烧绳/超时各只提交一次；超时进入 bot action phase 时调用 bot-turn 回调。
+- `scheduleRoomBattleTimeout()`：仅在显式 `RVB_TURN_TIMER_ENABLED=1` 时启用 deadline，并按烧绳阈值和当前成长回合期限安排下一次唤醒；渐进候选与部署共用该期限，超时自动完成必要部署并直接继续既有超时流程。未设置或 `0` 时清除既有任务、隐藏计时投影，且晚到玩家动作不会被替换成 timeout。系统事件仍通过 Runner 与房间版本 CAS，烧绳/超时各只提交一次；超时进入 bot action phase 时调用 bot-turn 回调。
 - 第三次连续无操作超时复用 RED-34 `terminalResult(reason = timeout-surrender)`，房间与终局在同一次 CAS 中变为 `finished`。
 
 ### 客户端显示边界
@@ -425,27 +475,103 @@ interface ServerCore {
 
 - 协调入口：`lib/game/room-battle-actions.ts::dispatchRoomBattleAction()`；所有 LAN 玩家、pending、计时器和机器人命令必须由此进入。
 - 排队：`lib/game/room-authority-queue.ts` 按 roomId 严格 FIFO，并对等待数量实施背压；房间之间不共享队列。
-- 协议：`lib/game/battle-transition.ts` 定义 v2 command envelope、精确 receipt、公开 pending 投影、Transition 和检查点恢复。
+- 规则运行时：`lib/game/room-rule-runtime.ts` 把 `TriggerSystem`、规则/技能/动态代码缓存与 roomId 绑定。
+  `room-battle-start.ts` 在同房间 FIFO 内 create/restore，`room-battle-actions.ts` 在读取已有房间后 restore；
+  两者向 Battle Runner 显式注入同一 `RuleExecutionContext`。单房错误或 pending 不影响其他房间，跨房可并行。
+- 协议：`lib/game/battle-transition.ts` 定义 v3 command envelope、固定 authority build、精确 receipt、公开 pending 投影、Transition 和检查点恢复；完整 v2 链仅作恢复兼容，禁止与 v3 追加混写。
 - 版本：`Room.version` 是房间元数据乐观锁；`Room.battleAuthorityVersion` 是连续战斗版本。传输与 patch 只能使用后者。
 - 在线权威：显式开启 async journal 后，`RoomStore.getRoom()` 优先读取进程内 Room Actor；
   `commitBattleAuthorityTransition()` 在 ACK 前验证版本、前链、receipt 关联、重算 action/transition hash，
   并核对缓存前态与 Runner 独立产出的 canonical pre/post hash/trace 证据，再同步提交内存版本、receipt、
   Δ 和 hash 链。完整内部/公开 Δ 回放与 `nextStorage` 等价比较由同一 journal writer 在落库前严格串行
   审计一次；审计失败将房间 degraded、丢弃 durable job 并拒绝后续异步提交。普通动作不读写 Prisma。
-- 后台持久化：`lib/server/battle-authority-async-journal.ts` 提供单 writer、有界队列、有界重试、按房间
+- 后台持久化：`lib/server/battle-authority-async-journal.ts` 提供单 writer、有界队列、可恢复错误分类、按房间
   durable 水位和 degraded 状态；`lib/server/battle-authority-persistence.ts` 在后台原子推进 DB 版本并写
-  Transition、Receipt 和可选 Checkpoint。SQLite `busy_timeout=500 ms`、Prisma `maxWait=250 ms` 与
-  transaction `timeout=1250 ms` 先限制底层写，journal 2 秒只作为最终安全线；安全线触发会 degraded/abort，
-  但在旧 adapter 实际结束前绝不开始下一房间，避免 `Promise.race` 造成并发 SQLite writer。终局完整
-  Trace 在 Transition 构造前物化，在线 patch/hash、checkpoint 与恢复使用同一状态。
-- 启动/关闭：v2 初始检查点是进入 in-progress 的必要条件；创建失败必须 CAS 回滚，version 0 的半启动
+  Transition、Receipt 和可选 Checkpoint。SQLite 首次写前设置 WAL，每笔写设置 `busy_timeout=500 ms`；
+  Prisma `maxWait=250 ms`、transaction `timeout=1250 ms` 和 journal 2 秒安全线限制底层写。锁、等待和
+  timeout 保留当前 job，按 25/100/250 ms 后以 250 ms 封顶退避，最多尝试 5 次或等待 10 秒；达到上限
+  只 degraded 该房间并继续其他房间。旧 adapter 实际结束前绝不重试或开始下一写。审计/hash/版本、
+  约束、损坏、I/O 和队列溢出立即 degraded 并暂停该房间新动作。终局完整 Trace 在
+  Transition 构造前物化，在线 patch/hash、checkpoint 与恢复使用同一状态。
+- 补丁：`lib/game/battle-public-patch.ts` 对数组共同前缀递归 diff，尾部逐项 `set` 追加、逆序 `remove`；
+  应用器只允许 `set` 到 `index === length`，拒绝稀疏索引，继续兼容旧整数组 `set`。普通回执不携带回放
+  帧或完整快照；checkpoint 仍只在换回合、终局和每 20 个权威版本建立。
+- 哈希：`lib/game/battle-state-hash.ts` 把顶层数组固定切成 32 项块，根绑定算法版本、字段名、数组长度、
+  chunk size 与块 hash；Coordinator 缓存内部/接收者公开索引，普通 Δ 只更新受影响块。初始化、恢复、
+  checkpoint、换回合、每 20 个版本与终局执行全量重算，偏差报告字段并 fail closed。
+- 启动/关闭：v3 初始检查点是进入 in-progress 的必要条件；创建失败必须 CAS 回滚，version 0 的半启动
   房间再次进入启动入口时先补检查点并 hydrate actor。`battle-authority-shutdown.ts` 在关闭 journal ingress、
   停止 WS 后排空全局 writer，并核对每个 actor 的 durable 水位。Electron 通过子进程 IPC 等待该结果，
   SIGINT/SIGTERM 使用同一流程；6 秒总上限后才进入强制停止兜底。
 - 删除：`RoomStore.removeRoom()` 在删除前排空该房间；失败返回 false，WS、主 HTTP 与管理员批量清理入口
   必须返回错误和准确的失败房间，不能广播或响应删除成功。
 - 客户端：`data/pages/battle.html` 只应用接收者公开 patch、显示权威候选并发送选择；候选仅投影给 pending owner，对手/观者只看公开等待信封；版本/hash 不匹配时单飞请求完整快照。
-- 功能开关：候选默认 fail closed；`RVB_BATTLE_AUTHORITY_V2=1` 启用 v2，额外设置
+- 功能开关：候选默认 fail closed；历史命名的 `RVB_BATTLE_AUTHORITY_V2=1` 启用当前 v3 authority，额外设置
   `RVB_BATTLE_ASYNC_JOURNAL=1` 才启用内存先确认；只关 async flag 即回退 ACK 前原子 DB 提交。
   `RVB_TURN_TIMER_ENABLED=1` 才安排部署/回合计时唤醒。`RVB_FORCE_RULE_RELOAD=1` 强制逐动作规则重载；`RVB_BATTLE_DEBUG_LOGS=1` 开启热路径调试日志。
 - 错误：重复 ID 返回 duplicate receipt；旧版本返回 resyncRequired + 完整快照；version > 0 缺检查点、版本断层、pre/post state/public hash、action hash 或 transition hash 链损坏都必须显式失败。
+
+## RED-117 PVE Flow 接口
+
+- `openRuntimeVerifiedSnapshotV1()`：打开 active Profile 的精确 verified `ResolvedSnapshotViewV1`；PVE create/read/command 不得直接读取当前 data root。
+- `createPveContentSnapshotV1(view, registry)`：从一个 verified Snapshot 构建 strict PVE content graph，并对外部 runtime ID 做封闭 registry 校验。
+- `createInitialPveRunV1()`、`stabilizePveRunV1()`、`runPveFlowV1()`：唯一的声明式 Run 状态转换入口；Run 只固定 `authorityContentHash`，自动 branch/checkpoint 有界且失败原子。
+- `createPveBattleV1()`、`applyPveBattleActionV1()`、`settlePveBattleV1()`：复用正式 Battle setup/Runner；终局只读取 `BattleState.terminalResult`，客户端终局字段一律拒绝。
+- `PveRunStoreV1`：保存 versioned Run aggregate，按 Run revision CAS；authority 改变时先归档完整 battle evidence 和 tombstone，再清理临时 Run。
+- `PveServiceV1`：组合 active Snapshot、Runner、Adapter 与 Store，向 `/api/pve/**` 返回最小公开投影。浏览器只提交 server legal commands。
+- Profile activation：active PVE battle 纳入 lease；commit/release/recovery 在 admission 关闭时完成 PVE authority reconciliation，失败保持 fail closed。
+- 完整协议、Prototype 路径与回退见 [PVE_FLOW.md](./PVE_FLOW.md)。
+
+## RED-140 自治 Server 运维与发行接口
+
+RED-140 是已接受的目标合同，不表示当前运行时已经实现。唯一详细规范为
+[`SERVER_OPERATIONS_V1.md`](./SERVER_OPERATIONS_V1.md)；后续实现不得在各模块自行发明字段。
+
+- **Owner**：Electron main 独占 OS、process、file、backup、restore、application update 和整体
+  lifecycle 写能力；Next child 只提供 admission、room/PVE ingress drain、Profile health、
+  RoomRuntime、RED-117 PVE Run Store 只读观察与 main 委托的 authority reconciliation；renderer
+  只通过受信 preload IPC 读状态和提交命令。
+- **IPC**：固定 `rvb-server-operations:v1:*` channel，经现有 trusted sender 包装；preload 只暴露
+  `getState / execute / cancel / getOperation / listRooms / getRoom` 与
+  `listBackups / checkUpdates / planCleanup / approve / subscribe`，不暴露 raw IPC、管理 key、
+  process handle/control primitive 或文件路径。`getState().process.pid` 可以作为只读诊断字段返回，
+  但永远不是 command target，也不能用于跳过 childInstanceId/absence 验证。
+- **管理 transport**：独立 `127.0.0.1:<ephemeral>` listener；先按真实 socket peer 判 loopback，再
+  constant-time 校验每次 child spawn 新生成的 256-bit capability。它不使用玩家 WS、公开
+  `/api/*`、CORS、Host/Origin/X-Forwarded-For 或静态 admin key。
+- **旧 Profile transport 迁移**：RED-115 的 Store/lock/plan/rebind/commit/release/recovery 保持唯一
+  实现；受信 IPC 经 loopback `/v1/profile/**` 直接调用同一 core，不代理公开
+  `/api/content-profile/**` 或创建第二状态/static key。旧 routes 和 `/api/ping` 不在玩家 listener
+  注册，按 RED-127 返回 410；尚依赖它们的 standalone 候选不符合 RED-140。
+- **旧 cleanup transport 迁移**：ADR-0020/RED-127 对 `/api/admin/**` 的历史范围说明不适用于
+  RED-140 自治发行；`/api/admin/rooms/cleanup` 不得注册到玩家 listener。唯一写路径是 trusted
+  IPC -> main coordinator -> capability-protected loopback `POST /v1/rooms/cleanup`，不得保留公开
+  REST/static-key 旁路。
+- **命令**：所有 mutation 带 `requestId`、durable `operationId` 和
+  `expectedStateRevision`；accept record 在副作用前同时冻结 `sourceStateRevision` 与映射后的
+  `sourceServiceIntent`；全局 single-flight，同 ID/同 canonical payload 重放结果，同 ID/不同
+  payload 拒绝，renderer 超时不取消 operation。
+- **房间观察**：只能适配 RED-131 的 room FIFO、journal、WAL、有限重试、restore/drain 与 durable
+  水位。单房 degraded 只形成房间 warning；全局 DB/PVE transient unavailable 只有在 integrity 与
+  唯一 writer 仍可证明时进入顶层 `degraded`，corrupt/集合不完整/未知 schema/无可信 writer 进入
+  `failed`。RED-141 的 runtime inspect 是只读适配层：由现有 FIFO 的 running/pending/active event/
+  closed reason 映射冻结的 `queue` 字段，不为管理面复制或持久化第二份运行时状态。
+- **PVE 观察**：`ready` 只从 RED-117 `rvb-pve-run-aggregate/v1` active aggregate、archived evidence
+  与 tombstone 计算 Run/active battle/aggregate-set 状态；unavailable/migrating/incompatible/corrupt
+  使用 closed branch 且 counts/IDs/hash 全为 null，不得回显 stale 集合。active PVE battle 是独立
+  Profile lease 和 maintenance blocker，不计入 room lease。room cleanup/普通 GC 不得删除 PVE 数据。
+- **终局屏障**：只有 `terminalBarrier=durable` 且
+  `durableAuthorityVersion >= terminalAuthorityVersion` 的终局才能交给本服竞技账本。
+- **发行身份**：`rvb-release-identity/v1` 固定 app、commit、NSIS/update ZIP/runtime catalog、
+  runtime inventory、platform/arch、battle protocol/build、engine/runner、bundled Profile、DB
+  schema、PVE aggregate 与 authority tombstone 的 readable/migratable schema、同一 migration set、
+  management API 与签名身份；
+  mutable active Profile 另列，不能改变 release identity。
+- **Restore 安全门禁**：maintenance 源先 normal drain/stop；所有来源在任何 stage/Profile/pointer
+  mutation 前证明 process tree、player/management ports、DB/PVE writer/ingress absent，并取得唯一
+  data-root lock。backup 只携带与 manifest identity 对应的 immutable Profile package；恢复只能经
+  RED-115 Bundled Base bootstrap（空 root）及 install/plan/health/commit/recovery，禁止复制
+  `resource-pack/active.json`。
+- **竞技命名空间**：serverId 是备份保留的本机随机 UUID，seasonId 是其子命名空间；它不提供
+  跨服密码学证明。恢复同一 serverId 视为迁移，本机 data-root lock 只阻止同 root 双写；跨主机
+  split-brain 不在 v1 保证内，平行副本不受支持，克隆必须显式重置身份。

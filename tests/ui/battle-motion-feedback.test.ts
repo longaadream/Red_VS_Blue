@@ -59,22 +59,25 @@ describe('RED-69 battle motion contract', () => {
     expect(renderer).not.toContain('items.forEach((item, index)')
   })
 
-  it('binds pending, rejection, timeout, disconnect, and dispose recovery to presentation state only', () => {
+  it('keeps timeout and disconnect recovery correlated without discarding pending presentation state', () => {
     const battlePage = readPage('battle.html')
 
     expect(battlePage).toContain('pendingActionFeedback')
     expect(battlePage).toContain('PENDING_ACTION_TIMEOUT_MS')
     expect(battlePage).toContain("rejectPendingActionFeedback('server-rejected'")
-    expect(battlePage).toContain("rejectPendingActionFeedback('action-timeout'")
-    expect(battlePage).toContain("rejectPendingActionFeedback('disconnect'")
+    expect(battlePage).not.toContain("rejectPendingActionFeedback('action-timeout'")
+    expect(battlePage).not.toContain("rejectPendingActionFeedback('disconnect'")
+    expect(battlePage).toContain("requestAuthorityRecovery('action-timeout', action.clientActionId)")
+    expect(battlePage).toContain("requestAuthorityRecovery('pending-action-reconnect', pendingActionFeedback.clientActionId)")
     expect(battlePage).toMatch(/function disposeBattlePage\(\)[\s\S]*?clearPendingActionFeedback\('page-dispose'/)
     expect(battlePage).toMatch(/interaction:\s*\{[\s\S]*?pendingPieceId:/)
   })
 
-  it('keeps one pending command until an exact RED-109 receipt, then recovers after reject, timeout, and disconnect', () => {
+  it('keeps one pending command until an exact receipt and preserves it across timeout recovery', () => {
     const battlePage = readPage('battle.html')
     const statusMessages: string[] = []
     const clearReasons: string[] = []
+    const recoveryRequests: string[][] = []
     let timeoutCallback: (() => void) | null = null
     let context: ReturnType<typeof createContext>
     context = createContext({
@@ -95,6 +98,7 @@ describe('RED-69 battle motion contract', () => {
       },
       clearTimeout: () => undefined,
       setStatusMsg: (message: string) => statusMessages.push(message),
+      requestAuthorityRecovery: (...args: string[]) => recoveryRequests.push(args),
       renderBoard: () => undefined,
       renderActionBar: () => undefined,
       render: () => undefined,
@@ -163,19 +167,15 @@ new Script("beginPendingActionFeedback({ type: 'move', pieceId: 'piece-a', clien
     expect(new Script('pendingActionFeedback').runInContext(context)).toBeNull()
     expect(new Script('targetSubmissionPending.clientActionId').runInContext(context)).toBe('target-1')
     expect(clearReasons).toHaveLength(clearCountBeforePreservedRejection)
-
-
     new Script("beginPendingActionFeedback({ type: 'move', pieceId: 'piece-a', clientActionId: 'move-3' })").runInContext(context)
-    new Script("rejectPendingActionFeedback('disconnect')").runInContext(context)
-    expect(new Script('pendingActionFeedback').runInContext(context)).toBeNull()
-    expect(clearReasons).toContain('disconnect')
-
-    new Script("beginPendingActionFeedback({ type: 'move', pieceId: 'piece-a', clientActionId: 'move-4' })").runInContext(context)
     expect(timeoutCallback).not.toBeNull()
     ;(timeoutCallback as unknown as () => void)()
-    expect(new Script('pendingActionFeedback').runInContext(context)).toBeNull()
-    expect(clearReasons).toContain('action-timeout')
+    expect(new Script('pendingActionFeedback.clientActionId').runInContext(context)).toBe('move-3')
+    expect(new Script('pendingActionFeedback.timedOut').runInContext(context)).toBe(true)
+    expect(clearReasons).not.toContain('action-timeout')
+    expect(recoveryRequests).toEqual([['action-timeout', 'move-3']])
     expect(statusMessages).toContain('上一条指令仍在等待权威确认')
+    expect(statusMessages).toContain('指令回执延迟，正在同步服务端状态，请勿重复操作')
   })
 
   it('blocks piece switching while a RED-69 command remains pending', () => {

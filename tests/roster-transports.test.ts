@@ -3,14 +3,28 @@ import { createServer, type IncomingMessage, type Server } from 'node:http'
 import type { Duplex } from 'node:stream'
 import { NextRequest } from 'next/server'
 import { WebSocket, WebSocketServer, type RawData } from 'ws'
-import type { Room } from '../lib/game/room-store'
+import type { Room, Spectator } from '../lib/game/room-store'
 import { SELECTABLE_MAP_IDS } from '../lib/game/map-selection'
+import {
+  BATTLE_AUTHORITY_BUILD_ID,
+  BATTLE_AUTHORITY_PROTOCOL_VERSION,
+} from '../lib/game/battle-public-patch'
+import { createInitialBattleForPlayers } from '../lib/game/battle-setup'
+import type { PieceTemplate } from '../lib/game/piece'
+import { getServerGameProfileIdentityV1 } from '../lib/content-pipeline/runtime/profile-game-identity'
+import { createTestServerBattleState } from './game/profile-test-identity'
 
 type JsonObject = Record<string, unknown>
 type TestIdentity = { id: string; publicKey: string; privateKey: CryptoKey }
+type BattleSubscribePayloadOverrides = Partial<{
+  protocolVersion: number
+  authorityBuildId: string
+}>
 
 let firstIdentity: TestIdentity
 let secondIdentity: TestIdentity
+let spectatorIdentity: TestIdentity
+let unregisteredIdentity: TestIdentity
 
 function bytesToHex(bytes: Uint8Array): string {
   return Array.from(bytes).map(byte => byte.toString(16).padStart(2, '0')).join('')
@@ -38,9 +52,63 @@ async function signBattleAction(identity: TestIdentity, roomId: string, action: 
   return { publicKey: identity.publicKey, payload, signature: bytesToHex(new Uint8Array(signature)) }
 }
 
+async function signBattleSubscribe(
+  identity: TestIdentity,
+  roomId: string,
+  overrides: BattleSubscribePayloadOverrides = {},
+) {
+  const payload = {
+    type: 'battle-subscribe',
+    roomId,
+    playerId: identity.id,
+    protocolVersion: BATTLE_AUTHORITY_PROTOCOL_VERSION,
+    authorityBuildId: BATTLE_AUTHORITY_BUILD_ID,
+    timestamp: Date.now(),
+    ...overrides,
+  }
+  const signature = await globalThis.crypto.subtle.sign(
+    'Ed25519',
+    identity.privateKey,
+    new TextEncoder().encode(JSON.stringify(payload)),
+  )
+  return { publicKey: identity.publicKey, payload, signature: bytesToHex(new Uint8Array(signature)) }
+}
+
+async function createBattleSubscribeMessage(
+  identity: TestIdentity,
+  roomId: string,
+  options: {
+    payloadOverrides?: BattleSubscribePayloadOverrides
+    topLevelOverrides?: JsonObject
+  } = {},
+): Promise<JsonObject> {
+  const auth = await signBattleSubscribe(identity, roomId, options.payloadOverrides)
+  return {
+    type: 'subscribe',
+    roomId,
+    playerId: identity.id,
+    protocolVersion: BATTLE_AUTHORITY_PROTOCOL_VERSION,
+    authorityBuildId: BATTLE_AUTHORITY_BUILD_ID,
+    profileIdentity,
+    ...auth,
+    ...options.topLevelOverrides,
+  }
+}
+
+async function sendBattleSubscribe(
+  client: WebSocket,
+  identity: TestIdentity,
+  roomId: string,
+  options?: Parameters<typeof createBattleSubscribeMessage>[2],
+): Promise<void> {
+  client.send(JSON.stringify(await createBattleSubscribeMessage(identity, roomId, options)))
+}
+
 const memoryStore = vi.hoisted(() => {
   const rooms = new Map<string, Room>()
   let writes = 0
+  let casAttempts = 0
+  let casCommits = 0
   let readBarrier: { remaining: number; promise: Promise<void>; release: () => void } | null = null
 
 
@@ -56,6 +124,8 @@ const memoryStore = vi.hoisted(() => {
       readBarrier = null
       rooms.clear()
       writes = 0
+      casAttempts = 0
+      casCommits = 0
     },
     armReadBarrier(participants: number) {
       let release = () => {}
@@ -71,6 +141,9 @@ const memoryStore = vi.hoisted(() => {
     },
     writeCount() {
       return writes
+    },
+    casStats() {
+      return { attempts: casAttempts, commits: casCommits }
     },
     async getRoom(roomId: string) {
       const room = rooms.get(normalize(roomId))
@@ -110,12 +183,23 @@ const memoryStore = vi.hoisted(() => {
       writes += 1
     },
     async setRoomIfVersion(roomId: string, room: Room, expectedVersion: number) {
+      casAttempts += 1
       const id = normalize(roomId)
       const current = rooms.get(id)
       if (!current || current.version !== expectedVersion) return false
       rooms.set(id, { ...copy(room), id, version: expectedVersion + 1 })
       writes += 1
+      casCommits += 1
       return true
+    },
+    async addSpectator(roomId: string, spectator: Spectator) {
+      const id = normalize(roomId)
+      const current = rooms.get(id)
+      if (!current) return
+      const spectators = (current.spectators ?? []).filter(item => item.id !== spectator.id)
+      spectators.push(copy(spectator))
+      rooms.set(id, { ...current, spectators })
+      writes += 1
     },
   }
 })
@@ -129,8 +213,15 @@ import { POST as roomActionPost } from '../app/api/rooms/[roomId]/actions/route'
 import { POST as publicRoomJoinPost } from '../app/api/rooms/[roomId]/join/route'
 import { GET as battleGet, POST as battlePost } from '../app/api/rooms/[roomId]/battle/route'
 import { GET as roomGet, POST as roomPost } from '../app/api/rooms/[roomId]/route'
-import { POST as roomsPost } from '../app/api/rooms/route'
-import { startWsServer } from '../lib/ws-server'
+import { GET as roomsGet, POST as roomsPost } from '../app/api/rooms/route'
+import { broadcastBattleSnapshot, startWsServer } from '../lib/ws-server'
+import {
+  clearRoomBattleTimeout,
+  createPublicBattleSnapshot,
+  scheduleRoomBattleTimeout,
+} from '../lib/game/room-battle-actions'
+
+const profileIdentity = getServerGameProfileIdentityV1()
 
 const lightRoster = [
   'ana',
@@ -142,6 +233,9 @@ const lightRoster = [
   'blue-watcher',
   'hashirama-edo',
 ]
+
+const privateProjectionRoster = lightRoster.map(templateId =>
+  templateId === 'blue-watcher' ? 'tracer' : templateId)
 
 const darkRoster = [
   'arthas',
@@ -168,8 +262,8 @@ function room(
     name: id,
     status: 'ready',
     players: [
-      { id: 'alice', name: 'Alice', seat: 'red', faction: 'red', alignment: 'light' },
-      { id: 'bob', name: 'Bob', seat: 'blue', faction: 'blue', alignment: secondAlignment },
+      { id: 'alice', name: 'Alice', seat: 'red', faction: 'red', alignment: 'light', profileIdentity },
+      { id: 'bob', name: 'Bob', seat: 'blue', faction: 'blue', alignment: secondAlignment, profileIdentity },
     ],
     spectators: [],
     currentTurnIndex: 0,
@@ -182,8 +276,8 @@ function room(
 function signedRoom(id: string, secondAlignment: 'light' | 'dark' = 'dark'): Room {
   const next = room(id, secondAlignment)
   next.players = [
-    { id: firstIdentity.id, name: 'Signed Alice', seat: 'red', faction: 'red', alignment: 'light' },
-    { id: secondIdentity.id, name: 'Signed Bob', seat: 'blue', faction: 'blue', alignment: secondAlignment },
+    { id: firstIdentity.id, name: 'Signed Alice', seat: 'red', faction: 'red', alignment: 'light', profileIdentity },
+    { id: secondIdentity.id, name: 'Signed Bob', seat: 'blue', faction: 'blue', alignment: secondAlignment, profileIdentity },
   ]
   return next
 }
@@ -250,6 +344,67 @@ async function receiveType(client: WebSocket, expectedType: string): Promise<Jso
   throw new Error(`Timed out waiting for WebSocket message ${expectedType}`)
 }
 
+function waitForTypeMatching(
+  client: WebSocket,
+  expectedType: string,
+  predicate: (message: JsonObject) => boolean,
+  label: string,
+  timeoutMs = 5_000,
+): Promise<JsonObject> {
+  return new Promise((resolve, reject) => {
+    const observed: Array<{
+      type: unknown
+      authorityVersion: unknown
+      lastDeployedPieceId: unknown
+      reason: unknown
+      code: unknown
+      deploymentStatus: unknown
+      deploymentRevision: unknown
+      offerPieceIds: unknown
+      pieceCount: number | undefined
+      lastActionType: unknown
+    }> = []
+    const cleanup = () => {
+      clearTimeout(timeout)
+      client.off('message', onMessage)
+      client.off('error', onError)
+    }
+    const onMessage = (raw: RawData) => {
+      const message = JSON.parse(raw.toString()) as JsonObject
+      const state = message.state as JsonObject | undefined
+      const deployment = state?.deployment as JsonObject | undefined
+      const actions = state?.actions as JsonObject[] | undefined
+      observed.push({
+        type: message.type,
+        authorityVersion: message.authorityVersion,
+        lastDeployedPieceId: deployment?.lastDeployedPieceId,
+        reason: message.reason,
+        code: message.code,
+        deploymentStatus: deployment?.status,
+        deploymentRevision: deployment?.revision,
+        offerPieceIds: deployment?.offerPieceIds,
+        pieceCount: (state?.pieces as unknown[] | undefined)?.length,
+        lastActionType: actions?.at(-1)?.type,
+      })
+      if (message.type !== expectedType || !predicate(message)) return
+      cleanup()
+      resolve(message)
+    }
+    const onError = (error: Error) => {
+      cleanup()
+      reject(error)
+    }
+    const timeout = setTimeout(() => {
+      cleanup()
+      reject(new Error(
+        `Timed out waiting for matching WebSocket message ${expectedType} (${label}); observed ${JSON.stringify(observed)}`,
+      ))
+    }, timeoutMs)
+    client.on('message', onMessage)
+    client.once('error', onError)
+  })
+}
+
 function collectMessages(client: WebSocket) {
   const history = new Map<string, JsonObject>()
   const waiters = new Map<string, (message: JsonObject) => void>()
@@ -292,13 +447,13 @@ async function httpCreate(mapId: unknown, hostId = 'alice') {
   const request = new NextRequest('http://localhost/api/rooms', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ mode: 'pve', hostId, playerName: 'Alice', mapId }),
+    body: JSON.stringify({ mode: 'pve', hostId, playerName: 'Alice', mapId, profileIdentity }),
   })
   const response = await roomsPost(request)
   return { status: response.status, body: await response.json() as JsonObject }
 }
 
-async function wsCreate(mapId: unknown) {
+async function wsCreate(mapId: unknown, submittedProfile: unknown = profileIdentity) {
   const client = await openClient()
   try {
     const response = receiveJson(client)
@@ -306,7 +461,7 @@ async function wsCreate(mapId: unknown) {
       type: 'rpc',
       requestId: 'create-fixed-map',
       method: 'rooms.create',
-      data: { hostId: 'alice', name: 'Fixed map room', mapId },
+      data: { hostId: 'alice', name: 'Fixed map room', mapId, profileIdentity: submittedProfile },
     }))
     return await response
   } finally {
@@ -318,13 +473,18 @@ async function httpSelect(roomId: string, playerId: string, templateIds: string[
   const request = new NextRequest(`http://localhost/api/rooms/${roomId}/actions`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ action: 'select-pieces', playerId, alignment, pieces: pieces(templateIds), mapId: payloadMapId }),
+    body: JSON.stringify({ action: 'select-pieces', playerId, alignment, pieces: pieces(templateIds), mapId: payloadMapId, profileIdentity }),
   })
   const response = await roomActionPost(request, { params: Promise.resolve({ roomId }) })
   return { status: response.status, body: await response.json() as JsonObject }
 }
 
-async function httpDynamicRoomAction(roomId: string, action: 'join' | 'claim-faction' | 'toggle-ready' | 'select-pieces', payloadMapId?: unknown) {
+async function httpDynamicRoomAction(
+  roomId: string,
+  action: 'join' | 'claim-faction' | 'toggle-ready' | 'select-pieces',
+  payloadMapId?: unknown,
+  submittedProfile: unknown = profileIdentity,
+) {
   const request = new NextRequest(`http://localhost/api/rooms/${roomId}/actions`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -334,6 +494,7 @@ async function httpDynamicRoomAction(roomId: string, action: 'join' | 'claim-fac
       playerName: 'Alice',
       alignment: 'light',
       mapId: payloadMapId,
+      profileIdentity: submittedProfile,
       ...(action === 'select-pieces' ? { pieces: pieces(lightRoster) } : {}),
     }),
   })
@@ -345,7 +506,7 @@ async function publicHttpJoin(roomId: string, playerId = 'charlie') {
   const request = new NextRequest(`http://localhost/api/rooms/${roomId}/join`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ playerId, playerName: 'Charlie', alignment: 'light' }),
+    body: JSON.stringify({ playerId, playerName: 'Charlie', alignment: 'light', profileIdentity }),
   })
   const response = await publicRoomJoinPost(request, { params: Promise.resolve({ roomId }) })
   return { status: response.status, body: await response.json() as JsonObject }
@@ -355,7 +516,7 @@ async function httpStart(roomId: string, playerId: string, payloadMapId?: unknow
   const request = new NextRequest(`http://localhost/api/rooms/${roomId}/actions`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ action: 'start-game', playerId, mapId: payloadMapId }),
+    body: JSON.stringify({ action: 'start-game', playerId, mapId: payloadMapId, profileIdentity }),
   })
   const response = await roomActionPost(request, { params: Promise.resolve({ roomId }) })
   return { status: response.status, body: await response.json() as JsonObject }
@@ -365,7 +526,7 @@ async function legacyHttpStart(roomId: string) {
   const request = new NextRequest(`http://localhost/api/rooms/${roomId}`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ action: 'start' }),
+    body: JSON.stringify({ action: 'start', profileIdentity }),
   })
   const response = await roomPost(request, { params: Promise.resolve({ roomId }) })
   return { status: response.status, body: await response.json() as JsonObject }
@@ -375,7 +536,7 @@ async function legacyHttpJoin(roomId: string, playerId: string, alignment: 'ligh
   const request = new NextRequest(`http://localhost/api/rooms/${roomId}`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ action: 'join', playerId, alignment }),
+    body: JSON.stringify({ action: 'join', playerId, alignment, profileIdentity }),
   })
   const response = await roomPost(request, { params: Promise.resolve({ roomId }) })
   return { status: response.status, body: await response.json() as JsonObject }
@@ -389,7 +550,7 @@ async function wsSelect(roomId: string, playerId: string, templateIds: string[],
       type: 'rpc',
       requestId: `${roomId}-${playerId}`,
       method: 'rooms.action',
-      data: { roomId, action: 'select-pieces', playerId, alignment, pieces: pieces(templateIds), mapId: payloadMapId },
+      data: { roomId, action: 'select-pieces', playerId, alignment, pieces: pieces(templateIds), mapId: payloadMapId, profileIdentity },
     }))
     return await response
   } finally {
@@ -413,7 +574,41 @@ async function wsGet(roomId: string) {
   }
 }
 
-async function wsRoomAction(roomId: string, playerId: string, action: string, payload: JsonObject = {}) {
+async function httpRoomDetail(roomId: string) {
+  const request = new NextRequest(`http://localhost/api/rooms/${roomId}`)
+  const response = await roomGet(request, { params: Promise.resolve({ roomId }) })
+  return { status: response.status, body: await response.json() as JsonObject }
+}
+
+async function httpRoomsList() {
+  const request = new NextRequest('http://localhost/api/rooms')
+  const response = await roomsGet(request)
+  return { status: response.status, body: await response.json() as JsonObject }
+}
+
+async function wsRpc(method: string, data: JsonObject = {}) {
+  const client = await openClient()
+  try {
+    const response = receiveJson(client)
+    client.send(JSON.stringify({
+      type: 'rpc',
+      requestId: `public-${method}`,
+      method,
+      data,
+    }))
+    return await response
+  } finally {
+    client.close()
+  }
+}
+
+async function wsRoomAction(
+  roomId: string,
+  playerId: string,
+  action: string,
+  payload: JsonObject = {},
+  submittedProfile: unknown = profileIdentity,
+) {
   const client = await openClient()
   try {
     const response = receiveJson(client)
@@ -421,7 +616,7 @@ async function wsRoomAction(roomId: string, playerId: string, action: string, pa
       type: 'rpc',
       requestId: `${roomId}-${action}`,
       method: 'rooms.action',
-      data: { ...payload, roomId, playerId, action },
+      data: { ...payload, roomId, playerId, action, profileIdentity: submittedProfile },
     }))
     return await response
   } finally {
@@ -448,8 +643,27 @@ async function httpBattleAction(
   const response = await battlePost(request, { params: Promise.resolve({ roomId }) })
   return { status: response.status, body: await response.json() as JsonObject }
 }
-async function httpBattleSnapshot(roomId: string, viewerPlayerId: string) {
-  const request = new NextRequest(`http://localhost/api/rooms/${roomId}/battle?viewerPlayerId=${viewerPlayerId}`)
+async function httpBattleSnapshot(
+  roomId: string,
+  options: {
+    viewerPlayerId?: string
+    headerViewerPlayerId?: string
+    identity?: TestIdentity
+    authHeader?: string
+  } = {},
+) {
+  const auth = options.identity ? await signBattleSubscribe(options.identity, roomId) : undefined
+  const query = options.viewerPlayerId
+    ? `?viewerPlayerId=${encodeURIComponent(options.viewerPlayerId)}`
+    : ''
+  const request = new NextRequest(`http://localhost/api/rooms/${roomId}/battle${query}`, {
+    headers: {
+      ...(options.headerViewerPlayerId ? { 'x-player-id': options.headerViewerPlayerId } : {}),
+      ...(options.authHeader || auth
+        ? { 'x-battle-subscribe-auth': options.authHeader ?? JSON.stringify(auth) }
+        : {}),
+    },
+  })
   const response = await battleGet(request, { params: Promise.resolve({ roomId }) })
   return { status: response.status, body: await response.json() as JsonObject }
 }
@@ -460,24 +674,52 @@ async function httpRoomSnapshot(roomId: string) {
 }
 
 
-async function wsBattleAction(roomId: string, playerId: string, action: JsonObject, identity?: TestIdentity, responseType = 'stateUpdate') {
+async function wsBattleAction(
+  roomId: string,
+  playerId: string,
+  action: JsonObject,
+  identity: TestIdentity,
+  responseType = 'stateUpdate',
+  signAction = true,
+) {
   const client = await openClient()
   try {
-    client.send(JSON.stringify({ type: 'subscribe', roomId, playerId }))
+    await sendBattleSubscribe(client, identity, roomId, {
+      topLevelOverrides: { playerId },
+    })
     await receiveType(client, 'subscribed')
     await receiveType(client, 'stateUpdate')
-    const auth = identity ? await signBattleAction(identity, roomId, action) : undefined
-    client.send(JSON.stringify({ type: 'action', action, auth }))
+    const auth = signAction ? await signBattleAction(identity, roomId, action) : undefined
+    client.send(JSON.stringify({
+      type: 'action',
+      protocolVersion: BATTLE_AUTHORITY_PROTOCOL_VERSION,
+      authorityBuildId: BATTLE_AUTHORITY_BUILD_ID,
+      action,
+      auth,
+    }))
     return await receiveType(client, responseType)
   } finally {
     client.close()
   }
 }
 
-async function wsBattleSnapshot(roomId: string, viewerPlayerId: string) {
+async function wsBattleSnapshot(roomId: string, identity: TestIdentity) {
   const client = await openClient()
   try {
-    client.send(JSON.stringify({ type: 'subscribe', roomId, playerId: viewerPlayerId }))
+    client.send(JSON.stringify({
+      type: 'rpc',
+      requestId: `${roomId}-${identity.id}-spectate`,
+      method: 'rooms.spectate',
+      data: {
+        roomId,
+        spectatorId: identity.id,
+        spectatorName: 'Spectator',
+        profileIdentity,
+      },
+    }))
+    const registration = await receiveJson(client)
+    if (registration.ok !== true) throw new Error(`Spectator registration failed: ${JSON.stringify(registration)}`)
+    await sendBattleSubscribe(client, identity, roomId)
     await receiveType(client, 'subscribed')
     return await receiveType(client, 'stateUpdate')
   } finally {
@@ -485,10 +727,57 @@ async function wsBattleSnapshot(roomId: string, viewerPlayerId: string) {
   }
 }
 
+async function registerSpectator(client: WebSocket, roomId: string, identity: TestIdentity): Promise<void> {
+  client.send(JSON.stringify({
+    type: 'rpc',
+    requestId: `${roomId}-${identity.id}-register`,
+    method: 'rooms.spectate',
+    data: {
+      roomId,
+      spectatorId: identity.id,
+      spectatorName: 'Spectator',
+      profileIdentity,
+    },
+  }))
+  const registration = await receiveType(client, 'rpcResult')
+  if (registration.ok !== true) throw new Error(`Spectator registration failed: ${JSON.stringify(registration)}`)
+}
+
+async function subscribeBattleClient(
+  client: WebSocket,
+  roomId: string,
+  identity: TestIdentity,
+  expectedInitialType: 'stateUpdate' | 'battleUnavailable',
+): Promise<JsonObject> {
+  await sendBattleSubscribe(client, identity, roomId)
+  await receiveType(client, 'subscribed')
+  return receiveType(client, expectedInitialType)
+}
+
+async function sendSubscribedBattleAction(
+  client: WebSocket,
+  identity: TestIdentity,
+  roomId: string,
+  expectedAuthorityVersion: number,
+  action: JsonObject,
+): Promise<void> {
+  const auth = await signBattleAction(identity, roomId, action)
+  client.send(JSON.stringify({
+    type: 'action',
+    protocolVersion: BATTLE_AUTHORITY_PROTOCOL_VERSION,
+    authorityBuildId: BATTLE_AUTHORITY_BUILD_ID,
+    expectedAuthorityVersion,
+    action,
+    auth,
+  }))
+}
+
 describe('Demo roster HTTP/WebSocket integration', () => {
   beforeAll(async () => {
     firstIdentity = await createTestIdentity()
     secondIdentity = await createTestIdentity()
+    spectatorIdentity = await createTestIdentity()
+    unregisteredIdentity = await createTestIdentity()
     await startWsServer()
     if (!globalWithWsServer.__rvbWss || !globalWithWsServer.__rvbWsUpgradeHandler) {
       throw new Error('WebSocket Upgrade handler did not start')
@@ -524,6 +813,122 @@ describe('Demo roster HTTP/WebSocket integration', () => {
   })
 
   beforeEach(() => memoryStore.reset())
+
+  it('rejects WebSocket room creation without a profile before store mutation', async () => {
+    const result = await wsCreate('winding-pass', null)
+
+    expect(result).toMatchObject({
+      ok: false,
+      status: 409,
+      code: 'PROFILE_REQUIRED',
+    })
+    expect(memoryStore.writeCount()).toBe(0)
+  })
+
+  it('rejects WebSocket join when an existing player has no confirmed profile', async () => {
+    const legacyRoom = room('profile-ws-legacy-join')
+    legacyRoom.status = 'waiting'
+    legacyRoom.players = [legacyRoom.players[0]]
+    delete legacyRoom.players[0].profileIdentity
+    memoryStore.seed(legacyRoom)
+    const before = memoryStore.snapshot(legacyRoom.id)
+
+    const result = await wsRoomAction(legacyRoom.id, 'charlie', 'join', { playerName: 'Charlie' })
+
+    expect(result).toMatchObject({ ok: false, status: 409, code: 'PROFILE_REQUIRED' })
+    expect(memoryStore.snapshot(legacyRoom.id)).toEqual(before)
+    expect(memoryStore.writeCount()).toBe(0)
+  })
+
+  it('reports one server identity across HTTP room list/detail and WebSocket catalog/list/detail', async () => {
+    memoryStore.seed(room('profile-public'))
+
+    const httpList = await httpRoomsList()
+    const httpDetail = await httpRoomDetail('profile-public')
+    const wsCatalog = await wsRpc('catalog.identity')
+    const wsList = await wsRpc('rooms.list')
+    const wsDetail = await wsGet('profile-public')
+
+    expect(httpList).toMatchObject({
+      status: 200,
+      body: { profileIdentity },
+    })
+    expect((httpList.body.rooms as JsonObject[]).find(item => item.id === 'profile-public')).toMatchObject({
+      profileIdentity,
+    })
+    expect(httpDetail).toMatchObject({
+      status: 200,
+      body: { profileIdentity },
+    })
+    expect(wsCatalog).toMatchObject({
+      ok: true,
+      data: { profileIdentity },
+    })
+    expect(((wsList.data as JsonObject).rooms as JsonObject[]).find(item => item.id === 'profile-public')).toMatchObject({
+      profileIdentity,
+    })
+    expect(wsDetail).toMatchObject({
+      ok: true,
+      data: { profileIdentity },
+    })
+  })
+
+  it.each([
+    ['missing', null, 'PROFILE_REQUIRED'],
+    ['malformed', 'invalid', 'PROFILE_INVALID'],
+    ['engine', { ...profileIdentity, engineAbi: `${profileIdentity.engineAbi}-other` }, 'ENGINE_ABI_MISMATCH'],
+    ['runner', { ...profileIdentity, runnerRevision: `${profileIdentity.runnerRevision}-other` }, 'RUNNER_REVISION_MISMATCH'],
+    [
+      'authority-content',
+      {
+        ...profileIdentity,
+        authorityContentHash: `${profileIdentity.authorityContentHash[0] === '0' ? '1' : '0'}${profileIdentity.authorityContentHash.slice(1)}`,
+      },
+      'PROFILE_HASH_MISMATCH',
+    ],
+  ] as const)('rejects %s profile identity consistently before HTTP or WebSocket mutation', async (
+    label,
+    submittedProfile,
+    expectedCode,
+  ) => {
+    const httpRoomId = `profile-http-${label}`
+    memoryStore.seed(room(httpRoomId))
+    const beforeHttp = memoryStore.snapshot(httpRoomId)
+    const http = await httpDynamicRoomAction(
+      httpRoomId,
+      'toggle-ready',
+      undefined,
+      submittedProfile,
+    )
+
+    expect(http).toMatchObject({
+      status: 409,
+      body: { success: false, code: expectedCode },
+    })
+    expect(memoryStore.snapshot(httpRoomId)).toEqual(beforeHttp)
+    expect(memoryStore.writeCount()).toBe(0)
+
+    memoryStore.reset()
+    const wsRoomId = `profile-ws-${label}`
+    memoryStore.seed(room(wsRoomId))
+    const beforeWs = memoryStore.snapshot(wsRoomId)
+    const ws = await wsRoomAction(
+      wsRoomId,
+      'alice',
+      'toggle-ready',
+      {},
+      submittedProfile,
+    )
+
+    expect(ws).toMatchObject({
+      ok: false,
+      status: 409,
+      code: expectedCode,
+    })
+    expect(ws.context).toEqual(http.body.context)
+    expect(memoryStore.snapshot(wsRoomId)).toEqual(beforeWs)
+    expect(memoryStore.writeCount()).toBe(0)
+  })
 
   it.each(SELECTABLE_MAP_IDS)('persists selectable map %s at HTTP and WebSocket room creation boundaries', async mapId => {
     const http = await httpCreate(mapId)
@@ -754,7 +1159,7 @@ describe('Demo roster HTTP/WebSocket integration', () => {
     expect(started.status).toBe('in-progress')
 
     const existingStorage = started.battleState as unknown as {
-      seed: number
+      rootSeed: number
       state: { map: { id: string } }
     }
     const resumable: Room = {
@@ -777,12 +1182,12 @@ describe('Demo roster HTTP/WebSocket integration', () => {
       body: {
         success: true,
         started: false,
-        room: { battleState: { seed: existingStorage.seed, state: { map: { id: 'winding-pass' } } } },
+        room: { battleState: { rootSeed: existingStorage.rootSeed, state: { map: { id: 'winding-pass' } } } },
       },
     })
     expect(legacyHttp).toMatchObject({
       status: 200,
-      body: { battleState: { seed: existingStorage.seed, state: { map: { id: 'winding-pass' } } } },
+      body: { battleState: { rootSeed: existingStorage.rootSeed, state: { map: { id: 'winding-pass' } } } },
     })
     expect(afterHttp).toEqual(beforeHttp)
     expect(afterHttp?.mapId).toBe(mapId)
@@ -800,7 +1205,7 @@ describe('Demo roster HTTP/WebSocket integration', () => {
       ok: true,
       data: {
         status: 'in-progress',
-        battleState: { seed: existingStorage.seed, state: { map: { id: 'winding-pass' } } },
+        battleState: { rootSeed: existingStorage.rootSeed, state: { map: { id: 'winding-pass' } } },
       },
     })
     expect(afterWs).toEqual(beforeWs)
@@ -809,7 +1214,7 @@ describe('Demo roster HTTP/WebSocket integration', () => {
     expect(memoryStore.writeCount()).toBe(0)
   })
 
-  it('locks a deterministic keep-all deployment for the PVE bot', async () => {
+  it('starts PVE bot rooms with two vanguards and only the active human offer', async () => {
     const created = await httpCreate('large-hole-arena', firstIdentity.id)
     const roomId = String(created.body.id)
 
@@ -822,185 +1227,341 @@ describe('Demo roster HTTP/WebSocket integration', () => {
     expect(selected.status).toBe(200)
 
     const started = memoryStore.snapshot(roomId)
-    const awaitingState = (started?.battleState as unknown as {
+    const state = (started?.battleState as unknown as {
       state: {
+        pieces: Array<{
+          instanceId: string
+          templateId: string
+          ownerPlayerId: string
+          isCore?: boolean
+          x: number | null
+          y: number | null
+        }>
         deployment: {
+          mode?: string
           status: string
+          activePlayerId?: string
+          offerPieceIds?: string[]
+          reserves?: Record<string, Array<{ instanceId: string; templateId: string }>>
+          reserveCounts?: Record<string, number>
           choices: Record<string, { pieceId: string | null }>
           locks: Record<string, { locked: boolean; reason?: string }>
+          initialPositions: Record<string, { x: number; y: number }>
         }
         gameStartFired?: boolean
         extensions?: { playerAlignments?: Record<string, 'light' | 'dark'> }
       }
     })?.state
-    expect(awaitingState.deployment).toMatchObject({
-      status: 'awaiting-locks',
+
+    expect(state.deployment).toMatchObject({
+      mode: 'progressive-reserve-v1',
+      status: 'awaiting-reserve-deploy',
+      activePlayerId: firstIdentity.id,
       choices: {},
-      locks: { bot: { locked: true, reason: 'player' } },
+      locks: {},
+      reserveCounts: { [firstIdentity.id]: 7, bot: 6 },
     })
-    expect(awaitingState.gameStartFired).toBeFalsy()
-    expect(awaitingState.extensions?.playerAlignments).toEqual({ [firstIdentity.id]: 'light', bot: 'dark' })
+    expect(state.deployment.offerPieceIds).toHaveLength(3)
+    expect(Object.keys(state.deployment.initialPositions)).toHaveLength(2)
+    expect(state.pieces).toHaveLength(2)
+    expect(state.pieces.every(piece => piece.isCore === true)).toBe(true)
+    expect(state.pieces.map(piece => piece.ownerPlayerId).sort()).toEqual([firstIdentity.id, 'bot'].sort())
+    expect(state.pieces.every(piece => Number.isInteger(piece.x) && Number.isInteger(piece.y))).toBe(true)
+    expect(new Set(state.pieces.map(piece => `${piece.x},${piece.y}`)).size).toBe(2)
+    expect(state.gameStartFired).toBe(true)
+    expect(state.extensions?.playerAlignments).toEqual({ [firstIdentity.id]: 'light', bot: 'dark' })
 
-    const completed = await httpBattleAction(roomId, firstIdentity.id, {
-      type: 'deploymentLock',
-      playerId: firstIdentity.id,
-      clientActionId: 'alice-pve-keep',
-    }, firstIdentity.id, firstIdentity)
-    expect(completed.status).toBe(200)
-
-    const completedState = (memoryStore.snapshot(roomId)?.battleState as unknown as {
-      state: {
-        deployment: { status: string }
-        gameStartFired?: boolean
-        turn: { phase: string }
-        pendingTargetSelection?: {
-          playerId: string
-          selectionId: string
-          stateRevision: number
-          source?: { id?: string }
-          suspendedTurn?: { currentPlayerId: string; turnNumber: number; phase: string }
-          transaction?: { currentInteraction?: { consumerId?: string; eventType?: string } }
-        }
-        extensions?: { playerAlignments?: Record<string, 'light' | 'dark'> }
-      }
-    }).state
-    expect(completedState.deployment.status).toBe('awaiting-locks')
-    expect(completedState.gameStartFired).toBeFalsy()
-    expect(completedState.turn.phase).toBe('start')
-    expect(completedState.pendingTargetSelection).toBeUndefined()
-
-    const watcherState = (memoryStore.snapshot(roomId)?.battleState as unknown as {
-      state: {
-        turn: { phase: string }
-        deployment: { status: string }
-        gameStartFired?: boolean
-        pendingOptionSelection?: {
-          playerId: string
-          selectionId: string
-          stateRevision: number
-          canCancel?: boolean
-          source?: { id?: string }
-          suspendedTurn?: { currentPlayerId: string; turnNumber: number; phase: string }
-        }
-      }
-    }).state
-    expect(watcherState.turn.phase).toBe('start')
-    expect(watcherState.deployment.status).toBe('awaiting-locks')
-    expect(watcherState.gameStartFired).toBeFalsy()
-    expect(watcherState.pendingOptionSelection).toMatchObject({
-      playerId: firstIdentity.id,
-      canCancel: false,
-      source: { id: 'rule-watcher-form' },
-    })
-
-    const watcher = watcherState.pendingOptionSelection!
-    expect(watcherState.pendingOptionSelection?.suspendedTurn).toMatchObject({
-      currentPlayerId: firstIdentity.id,
-      turnNumber: 1,
-      phase: 'start',
-    })
-    const resolved = await httpBattleAction(roomId, firstIdentity.id, {
-      type: 'pendingOptionSelect',
-      playerId: firstIdentity.id,
-      selectedOption: 'calm',
-      selectionId: watcher.selectionId,
-      stateRevision: watcher.stateRevision,
-      clientActionId: 'alice-pve-watcher-calm',
-    }, firstIdentity.id, firstIdentity)
-    expect(resolved.status).toBe(200)
-
-    const actionState = (memoryStore.snapshot(roomId)?.battleState as unknown as {
-      state: {
-        turn: { phase: string }
-        deployment: { status: string }
-        gameStartFired?: boolean
-        pendingOptionSelection?: unknown
-        pendingTargetSelection?: unknown
-      }
-    }).state
-    expect(actionState.turn.phase).toBe('action')
-    expect(actionState.deployment.status).toBe('complete')
-    expect(actionState.gameStartFired).toBe(true)
-    expect(actionState.pendingOptionSelection).toBeUndefined()
-    expect(actionState.pendingTargetSelection).toBeUndefined()
-
-    const ended = await httpBattleAction(roomId, firstIdentity.id, {
-      type: 'endTurn',
-      playerId: firstIdentity.id,
-      clientActionId: 'alice-pve-end-turn',
-    }, firstIdentity.id, firstIdentity)
-    expect(ended.status).toBe(200)
-
-    const anchorState = (memoryStore.snapshot(roomId)?.battleState as unknown as {
-      state: {
-        turn: { currentPlayerId: string; turnNumber: number; phase: string }
-        pendingTargetSelection?: {
-          playerId: string
-          selectionId: string
-          stateRevision: number
-          canCancel?: boolean
-          candidates?: Array<{ type: string; x?: number; y?: number }>
-          source?: { id?: string }
-          suspendedTurn?: { currentPlayerId: string; turnNumber: number; phase: string }
-          transaction?: { currentInteraction?: { eventType?: string } }
-        }
-        extensions?: {
-          minatoAnchors?: Array<{ sourceId: string; ownerPlayerId?: string; x: number; y: number }>
-        }
-      }
-    }).state
-    expect(anchorState.pendingTargetSelection).toMatchObject({
-      playerId: firstIdentity.id,
-      canCancel: false,
-      source: { id: 'rule-minato-anchor-end-turn' },
-    })
-    expect(anchorState.pendingTargetSelection?.suspendedTurn).toMatchObject({
-      currentPlayerId: firstIdentity.id,
-      turnNumber: 1,
-      phase: 'action',
-    })
-    expect(anchorState.pendingTargetSelection?.transaction?.currentInteraction).toMatchObject({
-      eventType: 'endTurn',
-    })
-    expect(anchorState.extensions?.minatoAnchors || []).toEqual([])
-
-    const anchor = anchorState.pendingTargetSelection!
-    const anchorCell = anchor.candidates?.find(candidate => candidate.type === 'cell')
-    if (!anchorCell || typeof anchorCell.x !== 'number' || typeof anchorCell.y !== 'number') {
-      throw new Error('Expected a legal Minato anchor cell after the owning player ends their turn')
-    }
-    const anchored = await httpBattleAction(roomId, firstIdentity.id, {
-      type: 'pendingTargetSelect',
-      playerId: firstIdentity.id,
-      targetX: anchorCell.x,
-      targetY: anchorCell.y,
-      selectionId: anchor.selectionId,
-      stateRevision: anchor.stateRevision,
-      clientActionId: 'alice-pve-place-minato-anchor',
-    }, firstIdentity.id, firstIdentity)
-    expect(anchored.status).toBe(200)
-
-    const anchoredState = (memoryStore.snapshot(roomId)?.battleState as unknown as {
-      state: {
-        turn: { currentPlayerId: string; turnNumber: number; phase: string }
-        pendingTargetSelection?: unknown
-        extensions?: {
-          minatoAnchors?: Array<{ sourceId: string; ownerPlayerId?: string; x: number; y: number }>
-        }
-      }
-    }).state
-    expect(anchoredState.turn).toMatchObject({
-      currentPlayerId: firstIdentity.id,
-      turnNumber: 1,
-      phase: 'end',
-    })
-    expect(anchoredState.pendingTargetSelection).toBeUndefined()
-    expect(anchoredState.extensions?.minatoAnchors).toContainEqual(expect.objectContaining({
-      ownerPlayerId: firstIdentity.id,
-      x: anchorCell.x,
-      y: anchorCell.y,
-    }))
+    const ownerDeployment = createPublicBattleSnapshot(started!, firstIdentity.id).state.deployment
+    const botDeployment = createPublicBattleSnapshot(started!, 'bot').state.deployment
+    expect(ownerDeployment?.offerPieceIds).toHaveLength(3)
+    expect(ownerDeployment?.legalPositions?.length).toBeGreaterThan(0)
+    expect(botDeployment?.offerPieceIds).toEqual([])
+    expect(botDeployment?.legalPositions).toEqual([])
   })
+
+  it('drives three bot turns through the WebSocket queue and RoomStore CAS authority', async () => {
+    const previousAuthorityV2 = process.env.RVB_BATTLE_AUTHORITY_V2
+    const previousTurnTimer = process.env.RVB_TURN_TIMER_ENABLED
+    process.env.RVB_BATTLE_AUTHORITY_V2 = 'false'
+    process.env.RVB_TURN_TIMER_ENABLED = 'false'
+    const roomId = 'fixed-seed-live-bot-cas'
+    const rootSeed = 0x138b07
+    const client = await openClient()
+    const warningSpy = vi.spyOn(console, 'warn')
+
+    const inertRoster = (prefix: 'human' | 'bot'): PieceTemplate[] =>
+      Array.from({ length: 8 }, (_, index) => ({
+        id: `${prefix}-ws-piece-${index + 1}`,
+        name: `${prefix} ws piece ${index + 1}`,
+        faction: prefix === 'human' ? 'good' : 'evil',
+        rarity: 'common',
+        stats: { maxHp: 100, attack: 0, defense: 0, moveRange: 0 },
+        skills: [],
+      }))
+
+    try {
+      const humanRoster = inertRoster('human')
+      const botRoster = inertRoster('bot')
+      const initial = await createInitialBattleForPlayers(
+        [firstIdentity.id, 'bot'],
+        [...humanRoster, ...botRoster],
+        [
+          { playerId: firstIdentity.id, pieces: humanRoster, faction: 'red', alignment: 'light' },
+          { playerId: 'bot', pieces: botRoster, faction: 'blue', alignment: 'dark' },
+        ],
+        'large-hole-arena',
+        {
+          firstPlayerId: firstIdentity.id,
+          rootSeed,
+          deploymentEnabled: true,
+          deploymentMode: 'progressive-reserve-v1',
+          deploymentStartedAt: 1_750_000_000_000,
+        },
+      )
+      if (!initial) throw new Error('Expected a fixed-seed progressive bot fixture')
+      memoryStore.seed({
+        id: roomId,
+        name: roomId,
+        status: 'in-progress',
+        players: [
+          {
+            id: firstIdentity.id,
+            name: 'Human',
+            seat: 'red',
+            faction: 'red',
+            alignment: 'light',
+            profileIdentity,
+          },
+          {
+            id: 'bot',
+            name: 'Bot',
+            seat: 'blue',
+            faction: 'blue',
+            alignment: 'dark',
+            isBot: true,
+            profileIdentity,
+          },
+        ],
+        spectators: [],
+        currentTurnIndex: 0,
+        actions: [],
+        mapId: 'large-hole-arena',
+        version: 1,
+        firstPlayerId: firstIdentity.id,
+        battleState: createTestServerBattleState(
+          initial as unknown as Record<string, unknown>,
+          rootSeed,
+        ),
+      })
+
+      let ownerSnapshot = await subscribeBattleClient(
+        client,
+        roomId,
+        firstIdentity,
+        'stateUpdate',
+      )
+      const casBaseline = memoryStore.casStats()
+      const completedBotTurns: number[] = []
+
+      for (let cycle = 0; cycle < 3; cycle += 1) {
+        const beforeState = ownerSnapshot.state as JsonObject
+        const beforeTurn = beforeState.turn as JsonObject
+        const beforeDeployment = beforeState.deployment as JsonObject
+        const humanTurnNumber = Number(beforeTurn.turnNumber)
+        const offeredPieceId = (beforeDeployment.offerPieceIds as string[] | undefined)?.[0]
+        const safePosition = (
+          beforeDeployment.legalPositions as Array<{ x: number; y: number }> | undefined
+        )?.[0]
+        if (!offeredPieceId) throw new Error(`Missing human reserve offer in cycle ${cycle + 1}`)
+
+        expect(beforeTurn).toMatchObject({
+          currentPlayerId: firstIdentity.id,
+          phase: 'start',
+        })
+        expect(beforeDeployment).toMatchObject({
+          status: 'awaiting-reserve-deploy',
+          activePlayerId: firstIdentity.id,
+        })
+
+        const humanDeployment = {
+          type: 'deployReservePiece',
+          playerId: firstIdentity.id,
+          expectedDeploymentRevision: beforeDeployment.revision,
+          pieceId: offeredPieceId,
+          ...(safePosition ? { toX: safePosition.x, toY: safePosition.y } : {}),
+          clientActionId: `human-deploy-${cycle + 1}`,
+        }
+        const deployedPromise = waitForTypeMatching(
+          client,
+          'stateUpdate',
+          message => {
+            const state = message.state as JsonObject | undefined
+            const deployment = state?.deployment as JsonObject | undefined
+            const turn = state?.turn as JsonObject | undefined
+            return Number(message.authorityVersion) > Number(ownerSnapshot.authorityVersion)
+              && deployment?.lastDeployedPieceId === offeredPieceId
+              && turn?.currentPlayerId === firstIdentity.id
+              && turn?.phase === 'action'
+          },
+          `human deployment ${cycle + 1}`,
+          12_000,
+        )
+        await sendSubscribedBattleAction(
+          client,
+          firstIdentity,
+          roomId,
+          Number(ownerSnapshot.authorityVersion),
+          humanDeployment,
+        )
+        const humanActionSnapshot = await deployedPromise
+        const humanActionState = humanActionSnapshot.state as JsonObject
+        const humanPiece = (humanActionState.pieces as JsonObject[]).find(
+          piece => piece.instanceId === offeredPieceId,
+        )
+        expect(humanPiece?.statusTags).toEqual(expect.arrayContaining([
+          expect.objectContaining({
+            type: 'deployment-first-move-free',
+            grantedTurnNumber: humanTurnNumber,
+          }),
+        ]))
+
+        const humanEndPromise = waitForTypeMatching(
+          client,
+          'stateUpdate',
+          message => {
+            const state = message.state as JsonObject | undefined
+            const turn = state?.turn as JsonObject | undefined
+            return Number(message.authorityVersion) > Number(humanActionSnapshot.authorityVersion)
+              && turn?.currentPlayerId === firstIdentity.id
+              && turn?.turnNumber === humanTurnNumber
+              && turn?.phase === 'end'
+          },
+          `human end phase ${cycle + 1}`,
+          12_000,
+        )
+        const endTurnAction = {
+          type: 'endTurn',
+          playerId: firstIdentity.id,
+          clientActionId: `human-end-${cycle + 1}`,
+        }
+        await sendSubscribedBattleAction(
+          client,
+          firstIdentity,
+          roomId,
+          Number(humanActionSnapshot.authorityVersion),
+          endTurnAction,
+        )
+        const humanEndSnapshot = await humanEndPromise
+
+        const expectedBotTurn = humanTurnNumber + 1
+        const expectedNextHumanTurn = humanTurnNumber + 2
+        const botActionPromise = waitForTypeMatching(
+          client,
+          'stateUpdate',
+          message => {
+            const state = message.state as JsonObject | undefined
+            const turn = state?.turn as JsonObject | undefined
+            const actions = state?.actions as JsonObject[] | undefined
+            return turn?.currentPlayerId === 'bot'
+              && turn?.phase === 'action'
+              && turn?.turnNumber === expectedBotTurn
+              && actions?.some(action =>
+                action.type === 'deployReservePiece'
+                && action.playerId === 'bot'
+                && action.turn === expectedBotTurn) === true
+          },
+          `bot action phase ${cycle + 1}`,
+          12_000,
+        )
+        const nextHumanPromise = waitForTypeMatching(
+          client,
+          'stateUpdate',
+          message => {
+            const state = message.state as JsonObject | undefined
+            const turn = state?.turn as JsonObject | undefined
+            const deployment = state?.deployment as JsonObject | undefined
+            return turn?.currentPlayerId === firstIdentity.id
+              && turn?.turnNumber === expectedNextHumanTurn
+              && deployment?.status === 'awaiting-reserve-deploy'
+              && deployment?.activePlayerId === firstIdentity.id
+          },
+          `next human turn ${cycle + 1}`,
+          12_000,
+        )
+        await sendSubscribedBattleAction(
+          client,
+          firstIdentity,
+          roomId,
+          Number(humanEndSnapshot.authorityVersion),
+          {
+            type: 'beginPhase',
+            clientActionId: `human-begin-${cycle + 1}`,
+          },
+        )
+
+        const [botActionSnapshot, nextHumanSnapshot] = await Promise.all([
+          botActionPromise,
+          nextHumanPromise,
+        ])
+        const botActionState = botActionSnapshot.state as JsonObject
+        const botDeployment = botActionState.deployment as JsonObject
+        const botDeployedPieceId = String(botDeployment.lastDeployedPieceId ?? '')
+        const botDeployedPiece = (botActionState.pieces as JsonObject[]).find(
+          piece => piece.instanceId === botDeployedPieceId,
+        )
+        expect(botDeployedPieceId).not.toBe('')
+        expect(botDeployedPiece?.statusTags).toEqual(expect.arrayContaining([
+          expect.objectContaining({
+            type: 'deployment-first-move-free',
+            grantedTurnNumber: expectedBotTurn,
+          }),
+        ]))
+
+        ownerSnapshot = nextHumanSnapshot
+        const committedRoom = memoryStore.snapshot(roomId)
+        const committedState = (
+          committedRoom?.battleState as unknown as { state?: JsonObject } | undefined
+        )?.state
+        if (!committedState) throw new Error('Missing committed authority state after bot turn')
+        const actions = committedState.actions as JsonObject[] | undefined
+        expect(actions?.filter(action =>
+          action.type === 'deployReservePiece'
+          && action.playerId === 'bot'
+          && action.turn === expectedBotTurn)).toHaveLength(1)
+        expect(actions?.map(action => action.type)).not.toContain('deploymentFreeMove')
+        expect(actions?.map(action => action.type)).not.toContain('deploymentSkipFreeMove')
+        expect((committedState.pieces as JsonObject[]).every(piece =>
+          !(piece.statusTags as JsonObject[] | undefined)?.some(
+            tag => tag.type === 'deployment-first-move-free',
+          ))).toBe(true)
+        expect(committedRoom?.version).toBe(Number(ownerSnapshot.authorityVersion))
+        completedBotTurns.push(expectedBotTurn)
+      }
+
+      expect(completedBotTurns).toEqual([2, 4, 6])
+      const casAfter = memoryStore.casStats()
+      expect(casAfter.commits - casBaseline.commits).toBeGreaterThanOrEqual(18)
+      expect(casAfter.attempts - casBaseline.attempts).toBe(
+        casAfter.commits - casBaseline.commits,
+      )
+      const fatalBotWarnings = warningSpy.mock.calls
+        .map(parts => parts.map(String).join(' '))
+        .filter(message =>
+          message.includes('bot action phase has no deterministic plan')
+          || message.includes('bot structural input has no deterministic action')
+          || message.includes('bot action batch ended before the authority phase advanced')
+          || message.includes('bot decision step guard reached')
+          || message.includes('[WS] runBotTurn error'))
+      expect(fatalBotWarnings).toEqual([])
+    } finally {
+      warningSpy.mockRestore()
+      client.close()
+      if (previousAuthorityV2 === undefined) delete process.env.RVB_BATTLE_AUTHORITY_V2
+      else process.env.RVB_BATTLE_AUTHORITY_V2 = previousAuthorityV2
+      if (previousTurnTimer === undefined) delete process.env.RVB_TURN_TIMER_ENABLED
+      else process.env.RVB_TURN_TIMER_ENABLED = previousTurnTimer
+    }
+  }, 45_000)
 
   it('returns equivalent stable errors and leaves state untouched', async () => {
     memoryStore.seed(room('http-invalid'))
@@ -1089,8 +1650,21 @@ describe('Demo roster HTTP/WebSocket integration', () => {
     const battleState = started.battleState as unknown as {
       state: {
         map: { id: string }
-        pieces: Array<{ templateId: string; ownerPlayerId: string; isCore?: boolean }>
-        deployment: { status: string }
+        pieces: Array<{
+          templateId: string
+          ownerPlayerId: string
+          isCore?: boolean
+          x: number | null
+          y: number | null
+        }>
+        deployment: {
+          mode?: string
+          status: string
+          activePlayerId?: string
+          offerPieceIds?: string[]
+          reserves?: Record<string, unknown[]>
+          reserveCounts?: Record<string, number>
+        }
         gameStartFired?: boolean
         extensions?: {
           playerAlignments?: Record<string, 'light' | 'dark'>
@@ -1098,16 +1672,21 @@ describe('Demo roster HTTP/WebSocket integration', () => {
       }
     }
     expect(battleState.state.map.id).toBe('winding-pass')
-    expect(battleState.state.deployment.status).toBe('awaiting-locks')
-    expect(battleState.state.gameStartFired).toBeFalsy()
+    expect(battleState.state.deployment).toMatchObject({
+      mode: 'progressive-reserve-v1',
+      status: 'awaiting-reserve-deploy',
+      activePlayerId: 'alice',
+      reserveCounts: { alice: 7, bob: 7 },
+    })
+    expect(battleState.state.deployment.offerPieceIds).toHaveLength(3)
+    expect(battleState.state.gameStartFired).toBe(true)
     const battlePieces = battleState.state.pieces
-    expect(battlePieces).toHaveLength(16)
+    expect(battlePieces).toHaveLength(2)
     expect(battlePieces.every(piece => piece.isCore === true)).toBe(true)
-    expect(battlePieces.filter(piece => piece.templateId === lightRoster[0])).toEqual(expect.arrayContaining([
-      expect.objectContaining({ ownerPlayerId: 'alice' }),
-      expect.objectContaining({ ownerPlayerId: 'bob' }),
-    ]))
-    expect(battlePieces.filter(piece => piece.templateId === lightRoster[0])).toHaveLength(2)
+    expect(battlePieces.map(piece => piece.ownerPlayerId).sort()).toEqual(['alice', 'bob'])
+    expect(battlePieces.every(piece => lightRoster.includes(piece.templateId))).toBe(true)
+    expect(battlePieces.every(piece => Number.isInteger(piece.x) && Number.isInteger(piece.y))).toBe(true)
+    expect(new Set(battlePieces.map(piece => `${piece.x},${piece.y}`)).size).toBe(2)
     expect(battleState.state.extensions?.playerAlignments).toEqual({
       alice: 'light',
       bob: 'light',
@@ -1172,37 +1751,652 @@ describe('Demo roster HTTP/WebSocket integration', () => {
     expect(memoryStore.snapshot('duplicate-seats')?.battleState).toBeUndefined()
   })
 
-  it('publishes one identical public deployment snapshot to both players and spectators', async () => {
-    memoryStore.seed(room('public-deployment', 'light'))
-    await httpSelect('public-deployment', 'alice', lightRoster)
-    await wsSelect('public-deployment', 'bob', lightRoster)
+  it('projects progressive deployment choices only to the active owner across HTTP and reconnect', async () => {
+    memoryStore.seed(signedRoom('public-deployment', 'light'))
+    await httpSelect('public-deployment', firstIdentity.id, lightRoster)
+    await wsSelect('public-deployment', secondIdentity.id, lightRoster)
 
-    const alice = await httpBattleSnapshot('public-deployment', 'alice')
-    const bob = await httpBattleSnapshot('public-deployment', 'bob')
-    const spectator = await wsBattleSnapshot('public-deployment', 'spectator')
+    const alice = await httpBattleSnapshot('public-deployment', {
+      identity: firstIdentity,
+      viewerPlayerId: secondIdentity.id,
+      headerViewerPlayerId: secondIdentity.id,
+    })
+    const bob = await httpBattleSnapshot('public-deployment', { identity: secondIdentity })
+    const httpSpectator = await httpBattleSnapshot('public-deployment')
+    const forgedAlice = await httpBattleSnapshot('public-deployment', {
+      viewerPlayerId: firstIdentity.id,
+      headerViewerPlayerId: firstIdentity.id,
+    })
+    const signedBobClaimingAlice = await httpBattleSnapshot('public-deployment', {
+      identity: secondIdentity,
+      viewerPlayerId: firstIdentity.id,
+      headerViewerPlayerId: firstIdentity.id,
+    })
+    const spectator = await wsBattleSnapshot('public-deployment', spectatorIdentity)
 
     expect(alice.status).toBe(200)
     expect(bob.status).toBe(200)
-    expect(bob.body.state).toEqual(alice.body.state)
-    expect(spectator.state).toEqual(alice.body.state)
+    expect(httpSpectator.status).toBe(200)
+    expect(forgedAlice.status).toBe(200)
+    expect(signedBobClaimingAlice.status).toBe(200)
+    expect(spectator.state).toEqual(bob.body.state)
     expect(spectator.authorityVersion).toBe(alice.body.authorityVersion)
+    expect(bob.body.authorityVersion).toBe(alice.body.authorityVersion)
 
     const state = alice.body.state as {
       pieces: Array<{ isCore?: boolean }>
       deployment: {
+        mode?: string
         status: string
         choices: Record<string, unknown>
         locks: Record<string, { locked: boolean }>
+        reserveCounts?: Record<string, number>
+        reserves?: Record<string, unknown[]>
+        offerPieceIds?: string[]
+        offerPieces?: unknown[]
+        legalPositions?: Array<{ x: number; y: number }>
       }
       extensions?: { debugBattle?: { actionLog?: Array<{ deployment?: { choices?: unknown } }> } }
     }
-    expect(state.pieces.filter(piece => piece.isCore)).toHaveLength(16)
+    const hiddenStates = [
+      bob.body.state,
+      httpSpectator.body.state,
+      forgedAlice.body.state,
+      signedBobClaimingAlice.body.state,
+      spectator.state,
+    ] as typeof state[]
+    expect(state.pieces.filter(piece => piece.isCore)).toHaveLength(2)
     expect(state.deployment).toMatchObject({
-      status: 'awaiting-locks',
+      mode: 'progressive-reserve-v1',
+      status: 'awaiting-reserve-deploy',
       choices: {},
-      locks: { alice: { locked: false }, bob: { locked: false } },
+      locks: {},
+      reserveCounts: { [firstIdentity.id]: 7, [secondIdentity.id]: 7 },
+      reserves: {},
     })
+    expect(state.deployment.offerPieceIds).toHaveLength(3)
+    expect(state.deployment.offerPieces).toHaveLength(3)
+    expect(state.deployment.legalPositions?.length).toBeGreaterThan(0)
+    for (const projected of hiddenStates) {
+      expect(projected.deployment.offerPieceIds).toEqual([])
+      expect(projected.deployment.offerPieces).toEqual([])
+      expect(projected.deployment.legalPositions).toEqual([])
+      expect(projected.deployment).not.toHaveProperty('freeMovePositions')
+      expect(projected.deployment).not.toHaveProperty('freeMovePieceId')
+      expect(projected.deployment.reserves).toEqual({})
+      expect(projected.deployment.reserveCounts).toEqual(state.deployment.reserveCounts)
+    }
+
+    const invalidAuth = await signBattleSubscribe(firstIdentity, 'public-deployment')
+    invalidAuth.signature = `${invalidAuth.signature[0] === '0' ? '1' : '0'}${invalidAuth.signature.slice(1)}`
+    const invalidSignature = await httpBattleSnapshot('public-deployment', {
+      authHeader: JSON.stringify(invalidAuth),
+    })
+    const malformedAuth = await httpBattleSnapshot('public-deployment', {
+      authHeader: '{not-json',
+    })
+    const mismatchedProtocolAuth = await signBattleSubscribe(firstIdentity, 'public-deployment', {
+      protocolVersion: BATTLE_AUTHORITY_PROTOCOL_VERSION + 1,
+    })
+    const mismatchedBuildAuth = await signBattleSubscribe(firstIdentity, 'public-deployment', {
+      authorityBuildId: `${BATTLE_AUTHORITY_BUILD_ID}-mismatch`,
+    })
+    const mismatchedProtocol = await httpBattleSnapshot('public-deployment', {
+      authHeader: JSON.stringify(mismatchedProtocolAuth),
+    })
+    const mismatchedBuild = await httpBattleSnapshot('public-deployment', {
+      authHeader: JSON.stringify(mismatchedBuildAuth),
+    })
+    expect(invalidSignature).toMatchObject({
+      status: 401,
+      body: { code: 'SUBSCRIBE_AUTH_INVALID' },
+    })
+    expect(malformedAuth).toMatchObject({
+      status: 401,
+      body: { code: 'SUBSCRIBE_AUTH_INVALID' },
+    })
+    for (const rejected of [mismatchedProtocol, mismatchedBuild]) {
+      expect(rejected).toMatchObject({
+        status: 401,
+        body: { code: 'SUBSCRIBE_AUTH_INVALID' },
+      })
+      expect(rejected.body.state).toBeUndefined()
+      expect(JSON.stringify(rejected.body)).not.toContain('offerPieceIds')
+      expect(JSON.stringify(rejected.body)).not.toContain('offerPieces')
+    }
+
     expect(state.extensions?.debugBattle?.actionLog?.every(entry => entry.deployment?.choices === undefined)).toBe(true)
+    const wrongProfile = {
+      ...profileIdentity,
+      authorityContentHash: `${profileIdentity.authorityContentHash[0] === '0' ? '1' : '0'}${profileIdentity.authorityContentHash.slice(1)}`,
+    }
+    const beforeRejectedSpectator = memoryStore.snapshot('public-deployment')
+    const writesBeforeRejectedSpectator = memoryStore.writeCount()
+    const rejectedSpectator = await wsRpc('rooms.spectate', {
+      roomId: 'public-deployment',
+      spectatorId: 'wrong-profile-spectator',
+      spectatorName: 'Wrong profile',
+      profileIdentity: wrongProfile,
+    })
+
+    expect(rejectedSpectator).toMatchObject({
+      ok: false,
+      status: 409,
+      code: 'PROFILE_HASH_MISMATCH',
+    })
+    expect(memoryStore.snapshot('public-deployment')).toEqual(beforeRejectedSpectator)
+    expect(memoryStore.writeCount()).toBe(writesBeforeRejectedSpectator)
+
+    const impersonatingClient = await openClient()
+    try {
+      await sendBattleSubscribe(impersonatingClient, firstIdentity, 'public-deployment', {
+        topLevelOverrides: { profileIdentity: wrongProfile },
+      })
+      const subscriptionError = await receiveType(impersonatingClient, 'subscriptionError')
+      expect(subscriptionError).toMatchObject({
+        status: 409,
+        code: 'PROFILE_HASH_MISMATCH',
+      })
+    } finally {
+      impersonatingClient.close()
+    }
+
+    const unregisteredClient = await openClient()
+    try {
+      await sendBattleSubscribe(unregisteredClient, unregisteredIdentity, 'public-deployment')
+      const subscriptionError = await receiveType(unregisteredClient, 'subscriptionError')
+      expect(subscriptionError).toMatchObject({
+        error: 'Signed battle subscriber is not a room participant or spectator',
+      })
+    } finally {
+      unregisteredClient.close()
+    }
+
+  })
+
+  it('requires signed WebSocket subscriptions and trusts only the verified payload identity and compatibility', async () => {
+    const roomId = 'signed-subscribe-matrix'
+    memoryStore.seed(signedRoom(roomId, 'light'))
+    await httpSelect(roomId, firstIdentity.id, lightRoster)
+    await wsSelect(roomId, secondIdentity.id, lightRoster)
+
+    const ownerSnapshot = await httpBattleSnapshot(roomId, { identity: firstIdentity })
+    const opponentSnapshot = await httpBattleSnapshot(roomId, { identity: secondIdentity })
+    expect(ownerSnapshot.status).toBe(200)
+    expect(opponentSnapshot.status).toBe(200)
+    const receiveScenarioType = async (client: WebSocket, type: string, scenario: string) => {
+      try {
+        return await receiveType(client, type)
+      } catch (error) {
+        throw new Error(`${scenario}: ${error instanceof Error ? error.message : String(error)}`)
+      }
+    }
+
+    const unsignedClient = await openClient()
+    try {
+      unsignedClient.send(JSON.stringify({
+        type: 'subscribe',
+        roomId,
+        playerId: firstIdentity.id,
+        protocolVersion: BATTLE_AUTHORITY_PROTOCOL_VERSION,
+        authorityBuildId: BATTLE_AUTHORITY_BUILD_ID,
+        profileIdentity,
+      }))
+      const error = await receiveScenarioType(unsignedClient, 'subscriptionError', 'unsigned subscribe')
+      expect(error).toMatchObject({
+        status: 401,
+        code: 'SUBSCRIBE_AUTH_REQUIRED',
+      })
+      expect(error.state).toBeUndefined()
+    } finally {
+      unsignedClient.close()
+    }
+
+    const invalidSignatureClient = await openClient()
+    try {
+      const invalidMessage = await createBattleSubscribeMessage(firstIdentity, roomId)
+      const signature = invalidMessage.signature
+      if (typeof signature !== 'string') throw new Error('Expected signed subscription message')
+      invalidMessage.signature = (signature[0] === '0' ? '1' : '0') + signature.slice(1)
+      invalidSignatureClient.send(JSON.stringify(invalidMessage))
+      const error = await receiveScenarioType(invalidSignatureClient, 'subscriptionError', 'invalid signature')
+      expect(error).toMatchObject({
+        status: 401,
+        code: 'SUBSCRIBE_AUTH_INVALID',
+      })
+      expect(error.state).toBeUndefined()
+    } finally {
+      invalidSignatureClient.close()
+    }
+
+    const forgedClaimClient = await openClient()
+    try {
+      await sendBattleSubscribe(forgedClaimClient, secondIdentity, roomId, {
+        topLevelOverrides: { playerId: firstIdentity.id },
+      })
+      await receiveScenarioType(forgedClaimClient, 'subscribed', 'forged top-level player claim')
+      const update = await receiveScenarioType(forgedClaimClient, 'stateUpdate', 'forged top-level player projection')
+      expect(update.state).toEqual(opponentSnapshot.body.state)
+      const deployment = (update.state as JsonObject).deployment as JsonObject
+      expect(deployment.offerPieceIds).toEqual([])
+      expect(deployment.offerPieces).toEqual([])
+      expect(deployment.legalPositions).toEqual([])
+      expect(deployment).not.toHaveProperty('freeMovePositions')
+      expect(deployment).not.toHaveProperty('freeMovePieceId')
+    } finally {
+      forgedClaimClient.close()
+    }
+
+    const topLevelMismatches: JsonObject[] = [
+      { protocolVersion: BATTLE_AUTHORITY_PROTOCOL_VERSION + 1 },
+      { authorityBuildId: BATTLE_AUTHORITY_BUILD_ID + '-mismatch' },
+    ]
+    for (const topLevelOverrides of topLevelMismatches) {
+      const client = await openClient()
+      try {
+        await sendBattleSubscribe(client, firstIdentity, roomId, { topLevelOverrides })
+        const error = await receiveScenarioType(client, 'battleProtocolUnsupported', 'top-level compatibility mismatch')
+        expect(error).toMatchObject({
+          code: 'BATTLE_PROTOCOL_UNSUPPORTED',
+          expectedProtocolVersion: BATTLE_AUTHORITY_PROTOCOL_VERSION,
+          expectedAuthorityBuildId: BATTLE_AUTHORITY_BUILD_ID,
+          receivedProtocolVersion: topLevelOverrides.protocolVersion ?? BATTLE_AUTHORITY_PROTOCOL_VERSION,
+          receivedAuthorityBuildId: topLevelOverrides.authorityBuildId ?? BATTLE_AUTHORITY_BUILD_ID,
+        })
+        expect(error.state).toBeUndefined()
+        expect(JSON.stringify(error)).not.toContain('offerPieceIds')
+        expect(JSON.stringify(error)).not.toContain('offerPieces')
+      } finally {
+        client.close()
+      }
+    }
+
+    const incompatiblePayloads: BattleSubscribePayloadOverrides[] = [
+      { protocolVersion: BATTLE_AUTHORITY_PROTOCOL_VERSION + 1 },
+      { authorityBuildId: BATTLE_AUTHORITY_BUILD_ID + '-mismatch' },
+    ]
+    for (const payloadOverrides of incompatiblePayloads) {
+      const client = await openClient()
+      try {
+        await sendBattleSubscribe(client, firstIdentity, roomId, { payloadOverrides })
+        const scenario = payloadOverrides.protocolVersion === undefined
+          ? 'signed payload build mismatch'
+          : 'signed payload protocol mismatch'
+        const error = await receiveScenarioType(client, 'subscriptionError', scenario)
+        expect(error).toMatchObject({
+          status: 401,
+          code: 'SUBSCRIBE_AUTH_INVALID',
+        })
+        expect(error.state).toBeUndefined()
+        expect(JSON.stringify(error)).not.toContain('offerPieceIds')
+        expect(JSON.stringify(error)).not.toContain('offerPieces')
+      } finally {
+        client.close()
+      }
+    }
+  }, 15_000)
+
+  it('keeps the last initial battle snapshot at one authority version projected per recipient', async () => {
+    const previousAuthorityV2 = process.env.RVB_BATTLE_AUTHORITY_V2
+    process.env.RVB_BATTLE_AUTHORITY_V2 = 'false'
+    const roomId = 'start-private-projection'
+    const ownerClient = await openClient()
+    const opponentClient = await openClient()
+    const spectatorClient = await openClient()
+    try {
+      const preStartRoom = signedRoom(roomId, 'light')
+      preStartRoom.spectators = [{
+        id: spectatorIdentity.id,
+        name: 'Spectator',
+        joinedAt: 0,
+        profileIdentity,
+      }]
+      memoryStore.seed(preStartRoom)
+      await httpSelect(roomId, firstIdentity.id, privateProjectionRoster)
+      await subscribeBattleClient(ownerClient, roomId, firstIdentity, 'battleUnavailable')
+      await subscribeBattleClient(opponentClient, roomId, secondIdentity, 'battleUnavailable')
+      await subscribeBattleClient(spectatorClient, roomId, spectatorIdentity, 'battleUnavailable')
+      const ownerMessages = collectMessages(ownerClient)
+      const opponentMessages = collectMessages(opponentClient)
+      const spectatorMessages = collectMessages(spectatorClient)
+
+      const started = await wsSelect(roomId, secondIdentity.id, privateProjectionRoster)
+      expect(started).toMatchObject({ ok: true, data: { success: true } })
+      const [ownerUpdate, opponentUpdate, spectatorUpdate] = await Promise.all([
+        ownerMessages.waitFor('stateUpdate'),
+        opponentMessages.waitFor('stateUpdate'),
+        spectatorMessages.waitFor('stateUpdate'),
+      ])
+      const ownerDeployment = (ownerUpdate.state as JsonObject).deployment as JsonObject
+      const opponentDeployment = (opponentUpdate.state as JsonObject).deployment as JsonObject
+      const spectatorDeployment = (spectatorUpdate.state as JsonObject).deployment as JsonObject
+
+      expect(ownerDeployment.offerPieceIds).toHaveLength(3)
+      expect((ownerDeployment.legalPositions as unknown[]).length).toBeGreaterThan(0)
+      for (const hidden of [opponentDeployment, spectatorDeployment]) {
+        expect(hidden.offerPieceIds).toEqual([])
+        expect(hidden.offerPieces).toEqual([])
+        expect(hidden.legalPositions).toEqual([])
+        expect(hidden).not.toHaveProperty('freeMovePositions')
+        expect(hidden).not.toHaveProperty('freeMovePieceId')
+      }
+      expect(opponentUpdate.authorityVersion).toBe(ownerUpdate.authorityVersion)
+      expect(spectatorUpdate.authorityVersion).toBe(ownerUpdate.authorityVersion)
+      ownerMessages.stop()
+      opponentMessages.stop()
+      spectatorMessages.stop()
+    } finally {
+      ownerClient.close()
+      opponentClient.close()
+      spectatorClient.close()
+      if (previousAuthorityV2 === undefined) delete process.env.RVB_BATTLE_AUTHORITY_V2
+      else process.env.RVB_BATTLE_AUTHORITY_V2 = previousAuthorityV2
+    }
+  })
+
+  it('projects an applied reserve deployment broadcast separately to every live recipient', async () => {
+    const previousAuthorityV2 = process.env.RVB_BATTLE_AUTHORITY_V2
+    process.env.RVB_BATTLE_AUTHORITY_V2 = 'false'
+    const roomId = 'action-private-projection'
+    const ownerClient = await openClient()
+    const opponentClient = await openClient()
+    const spectatorClient = await openClient()
+    try {
+      memoryStore.seed(signedRoom(roomId, 'light'))
+      await httpSelect(roomId, firstIdentity.id, privateProjectionRoster)
+      await wsSelect(roomId, secondIdentity.id, privateProjectionRoster)
+      await registerSpectator(spectatorClient, roomId, spectatorIdentity)
+      const [ownerInitial] = await Promise.all([
+        subscribeBattleClient(ownerClient, roomId, firstIdentity, 'stateUpdate'),
+        subscribeBattleClient(opponentClient, roomId, secondIdentity, 'stateUpdate'),
+        subscribeBattleClient(spectatorClient, roomId, spectatorIdentity, 'stateUpdate'),
+      ])
+      const initialDeployment = (ownerInitial.state as JsonObject).deployment as JsonObject
+      const initialAuthorityVersion = Number(ownerInitial.authorityVersion)
+      const pieceId = (initialDeployment.offerPieceIds as string[])[0]
+      const position = (initialDeployment.legalPositions as Array<{ x: number; y: number }>)[0]
+      if (!pieceId || !position) throw new Error('Expected owner-only reserve offer and safe position')
+
+      const isAppliedDeployment = (message: JsonObject) => {
+        const state = message.state as JsonObject | undefined
+        const deployment = state?.deployment as JsonObject | undefined
+        return Number(message.authorityVersion) > initialAuthorityVersion
+          && deployment?.lastDeployedPieceId === pieceId
+      }
+      const updatesPromise = Promise.all([
+        waitForTypeMatching(ownerClient, 'stateUpdate', isAppliedDeployment, 'owner'),
+        waitForTypeMatching(opponentClient, 'stateUpdate', isAppliedDeployment, 'opponent'),
+        waitForTypeMatching(spectatorClient, 'stateUpdate', isAppliedDeployment, 'spectator'),
+      ])
+      const response = await httpBattleAction(roomId, firstIdentity.id, {
+        type: 'deployReservePiece',
+        playerId: firstIdentity.id,
+        expectedDeploymentRevision: initialDeployment.revision as number,
+        pieceId,
+        toX: position.x,
+        toY: position.y,
+        clientActionId: 'broadcast-private-deploy',
+      }, firstIdentity.id, firstIdentity)
+      const [ownerUpdate, opponentUpdate, spectatorUpdate] = await updatesPromise
+      expect(response.status).toBe(200)
+      expect(response.body).toMatchObject({ ok: true, duplicate: false })
+      expect(response.body).toHaveProperty('state')
+      const responseDeployment = ((response.body.state as JsonObject | undefined)?.deployment as JsonObject | undefined)
+      expect(responseDeployment?.lastDeployedPieceId).toBe(pieceId)
+      expect(ownerUpdate.authorityVersion).toBe(response.body.authorityVersion)
+      expect(ownerUpdate.state).toEqual(response.body.state)
+      const ownerDeployment = (ownerUpdate.state as JsonObject).deployment as JsonObject
+      expect(ownerDeployment.lastDeployedPieceId).toBe(pieceId)
+      expect(ownerDeployment.offerPieceIds).toEqual([])
+      expect(ownerDeployment.legalPositions).toEqual([])
+      expect(ownerDeployment).not.toHaveProperty('freeMovePieceId')
+      for (const update of [opponentUpdate, spectatorUpdate]) {
+        const hidden = (update.state as JsonObject).deployment as JsonObject
+        expect(hidden.lastDeployedPieceId).toBe(pieceId)
+        expect(hidden.offerPieceIds).toEqual([])
+        expect(hidden.offerPieces).toEqual([])
+        expect(hidden.legalPositions).toEqual([])
+        expect(hidden).not.toHaveProperty('freeMovePositions')
+        expect(hidden.freeMovePieceId).toBeUndefined()
+      }
+    } finally {
+      ownerClient.close()
+      opponentClient.close()
+      spectatorClient.close()
+      if (previousAuthorityV2 === undefined) delete process.env.RVB_BATTLE_AUTHORITY_V2
+      else process.env.RVB_BATTLE_AUTHORITY_V2 = previousAuthorityV2
+    }
+  }, 15_000)
+
+  it('keeps reserve deployment private when the applied action enters through WebSocket', async () => {
+    const previousAuthorityV2 = process.env.RVB_BATTLE_AUTHORITY_V2
+    process.env.RVB_BATTLE_AUTHORITY_V2 = 'false'
+    const roomId = 'ws-action-private-projection'
+    const ownerClient = await openClient()
+    const opponentClient = await openClient()
+    const spectatorClient = await openClient()
+    try {
+      memoryStore.seed(signedRoom(roomId, 'light'))
+      await httpSelect(roomId, firstIdentity.id, privateProjectionRoster)
+      await wsSelect(roomId, secondIdentity.id, privateProjectionRoster)
+      await registerSpectator(spectatorClient, roomId, spectatorIdentity)
+      const [ownerInitial] = await Promise.all([
+        subscribeBattleClient(ownerClient, roomId, firstIdentity, 'stateUpdate'),
+        subscribeBattleClient(opponentClient, roomId, secondIdentity, 'stateUpdate'),
+        subscribeBattleClient(spectatorClient, roomId, spectatorIdentity, 'stateUpdate'),
+      ])
+      const initialDeployment = (ownerInitial.state as JsonObject).deployment as JsonObject
+      const initialAuthorityVersion = Number(ownerInitial.authorityVersion)
+      const pieceId = (initialDeployment.offerPieceIds as string[])[0]
+      const position = (initialDeployment.legalPositions as Array<{ x: number; y: number }>)[0]
+      if (!pieceId || !position) throw new Error('Expected owner-only reserve offer and safe position')
+      const action = {
+        type: 'deployReservePiece',
+        playerId: firstIdentity.id,
+        expectedDeploymentRevision: initialDeployment.revision as number,
+        pieceId,
+        toX: position.x,
+        toY: position.y,
+        clientActionId: 'ws-broadcast-private-deploy',
+      }
+      const auth = await signBattleAction(firstIdentity, roomId, action)
+      const isAppliedDeployment = (message: JsonObject) => {
+        const state = message.state as JsonObject | undefined
+        const deployment = state?.deployment as JsonObject | undefined
+        return Number(message.authorityVersion) > initialAuthorityVersion
+          && deployment?.lastDeployedPieceId === pieceId
+      }
+      const updatesPromise = Promise.all([
+        waitForTypeMatching(ownerClient, 'stateUpdate', isAppliedDeployment, 'owner', 12_000),
+        waitForTypeMatching(opponentClient, 'stateUpdate', isAppliedDeployment, 'opponent', 12_000),
+        waitForTypeMatching(spectatorClient, 'stateUpdate', isAppliedDeployment, 'spectator', 12_000),
+      ])
+      ownerClient.send(JSON.stringify({
+        type: 'action',
+        protocolVersion: BATTLE_AUTHORITY_PROTOCOL_VERSION,
+        authorityBuildId: BATTLE_AUTHORITY_BUILD_ID,
+        expectedAuthorityVersion: initialAuthorityVersion,
+        action,
+        auth,
+      }))
+      const [ownerUpdate, opponentUpdate, spectatorUpdate] = await updatesPromise
+      const ownerDeployment = (ownerUpdate.state as JsonObject).deployment as JsonObject
+      expect(ownerDeployment.lastDeployedPieceId).toBe(pieceId)
+      expect(ownerDeployment.offerPieceIds).toEqual([])
+      expect(ownerDeployment.legalPositions).toEqual([])
+      expect(ownerDeployment).not.toHaveProperty('freeMovePieceId')
+      for (const update of [opponentUpdate, spectatorUpdate]) {
+        const hidden = (update.state as JsonObject).deployment as JsonObject
+        expect(hidden.lastDeployedPieceId).toBe(pieceId)
+        expect(hidden.offerPieceIds).toEqual([])
+        expect(hidden.offerPieces).toEqual([])
+        expect(hidden.legalPositions).toEqual([])
+        expect(hidden).not.toHaveProperty('freeMovePositions')
+        expect(hidden.freeMovePieceId).toBeUndefined()
+      }
+    } finally {
+      ownerClient.close()
+      opponentClient.close()
+      spectatorClient.close()
+      if (previousAuthorityV2 === undefined) delete process.env.RVB_BATTLE_AUTHORITY_V2
+      else process.env.RVB_BATTLE_AUTHORITY_V2 = previousAuthorityV2
+    }
+  }, 15_000)
+
+  it('projects the timeout-generated next-player offer only to that player', async () => {
+    const previousAuthorityV2 = process.env.RVB_BATTLE_AUTHORITY_V2
+    const previousTimerFlag = process.env.RVB_TURN_TIMER_ENABLED
+    process.env.RVB_BATTLE_AUTHORITY_V2 = 'false'
+    process.env.RVB_TURN_TIMER_ENABLED = 'true'
+    const roomId = 'timeout-private-projection'
+    const ownerClient = await openClient()
+    const nextPlayerClient = await openClient()
+    const spectatorClient = await openClient()
+    try {
+      memoryStore.seed(signedRoom(roomId, 'light'))
+      await httpSelect(roomId, firstIdentity.id, lightRoster)
+      await wsSelect(roomId, secondIdentity.id, lightRoster)
+      await registerSpectator(spectatorClient, roomId, spectatorIdentity)
+      await Promise.all([
+        subscribeBattleClient(ownerClient, roomId, firstIdentity, 'stateUpdate'),
+        subscribeBattleClient(nextPlayerClient, roomId, secondIdentity, 'stateUpdate'),
+        subscribeBattleClient(spectatorClient, roomId, spectatorIdentity, 'stateUpdate'),
+      ])
+
+      const expiredRoom = memoryStore.snapshot(roomId)
+      if (!expiredRoom?.battleState) throw new Error('Expected a started timed battle')
+      const authorityState = (expiredRoom.battleState as unknown as {
+        state: {
+          turnTimer?: {
+            deadlineAt: number
+            burnStartsAt: number
+            burnPhase: 'normal' | 'burning'
+          }
+        }
+      }).state
+      if (!authorityState.turnTimer) throw new Error('Expected an authoritative turn timer')
+      authorityState.turnTimer.deadlineAt = 0
+      authorityState.turnTimer.burnStartsAt = 0
+      authorityState.turnTimer.burnPhase = 'burning'
+      memoryStore.seed(expiredRoom)
+
+      const updates = Promise.all([
+        receiveType(ownerClient, 'stateUpdate'),
+        receiveType(nextPlayerClient, 'stateUpdate'),
+        receiveType(spectatorClient, 'stateUpdate'),
+      ])
+      await scheduleRoomBattleTimeout(memoryStore, roomId, {
+        onCommitted: () => broadcastBattleSnapshot(roomId),
+      })
+      const [expiredOwner, nextPlayer, spectator] = await updates
+      const ownerDeployment = (expiredOwner.state as JsonObject).deployment as JsonObject
+      const nextDeployment = (nextPlayer.state as JsonObject).deployment as JsonObject
+      const spectatorDeployment = (spectator.state as JsonObject).deployment as JsonObject
+
+      expect(nextDeployment).toMatchObject({
+        status: 'awaiting-reserve-deploy',
+        activePlayerId: secondIdentity.id,
+      })
+      expect(nextDeployment.offerPieceIds).toHaveLength(3)
+      expect((nextDeployment.legalPositions as unknown[]).length).toBeGreaterThan(0)
+      for (const hidden of [ownerDeployment, spectatorDeployment]) {
+        expect(hidden.offerPieceIds).toEqual([])
+        expect(hidden.offerPieces).toEqual([])
+        expect(hidden.legalPositions).toEqual([])
+        expect(hidden).not.toHaveProperty('freeMovePositions')
+        expect(hidden).not.toHaveProperty('freeMovePieceId')
+      }
+    } finally {
+      clearRoomBattleTimeout(roomId)
+      ownerClient.close()
+      nextPlayerClient.close()
+      spectatorClient.close()
+      if (previousAuthorityV2 === undefined) delete process.env.RVB_BATTLE_AUTHORITY_V2
+      else process.env.RVB_BATTLE_AUTHORITY_V2 = previousAuthorityV2
+      if (previousTimerFlag === undefined) delete process.env.RVB_TURN_TIMER_ENABLED
+      else process.env.RVB_TURN_TIMER_ENABLED = previousTimerFlag
+    }
+  }, 15_000)
+
+  it('reports pinned battle corruption consistently across HTTP and WebSocket transports', async () => {
+    const roomId = 'pinned-transport'
+    memoryStore.seed(signedRoom(roomId, 'light'))
+    await httpSelect(roomId, firstIdentity.id, lightRoster)
+    await wsSelect(roomId, secondIdentity.id, lightRoster)
+    const validRoom = memoryStore.snapshot(roomId)
+    if (!validRoom?.battleState) throw new Error('Expected a started battle')
+
+    const withoutTrace = (input: Room): Room => {
+      const next = JSON.parse(JSON.stringify(input)) as Room
+      const storage = next.battleState as unknown as {
+        state: { extensions?: { debugBattle?: unknown } }
+      }
+      if (storage.state.extensions) delete storage.state.extensions.debugBattle
+      return next
+    }
+
+    memoryStore.reset()
+    memoryStore.seed(withoutTrace(validRoom))
+    const command = {
+      type: 'deploymentLock',
+      playerId: firstIdentity.id,
+      clientActionId: 'pinned-http-action',
+    }
+    const httpSnapshot = await httpBattleSnapshot(roomId, { identity: firstIdentity })
+    const httpAction = await httpBattleAction(
+      roomId,
+      firstIdentity.id,
+      command,
+      firstIdentity.id,
+      firstIdentity,
+    )
+    expect(httpSnapshot).toMatchObject({
+      status: 409,
+      body: { code: 'PINNED_PROFILE_UNAVAILABLE', context: expect.any(Object) },
+    })
+    expect(httpAction).toMatchObject({
+      status: 409,
+      body: { code: 'PINNED_PROFILE_UNAVAILABLE', context: expect.any(Object) },
+    })
+
+    const snapshotClient = await openClient()
+    try {
+      await sendBattleSubscribe(snapshotClient, firstIdentity, roomId)
+      expect(await receiveType(snapshotClient, 'subscriptionError')).toMatchObject({
+        status: 409,
+        code: 'PINNED_PROFILE_UNAVAILABLE',
+        context: expect.any(Object),
+      })
+    } finally {
+      snapshotClient.close()
+    }
+    expect(memoryStore.writeCount()).toBe(0)
+
+    memoryStore.reset()
+    memoryStore.seed(validRoom)
+    const actionClient = await openClient()
+    try {
+      await sendBattleSubscribe(actionClient, firstIdentity, roomId)
+      await receiveType(actionClient, 'subscribed')
+      await receiveType(actionClient, 'stateUpdate')
+      memoryStore.seed(withoutTrace(validRoom))
+      const auth = await signBattleAction(firstIdentity, roomId, command)
+      actionClient.send(JSON.stringify({
+        type: 'action',
+        protocolVersion: BATTLE_AUTHORITY_PROTOCOL_VERSION,
+        authorityBuildId: BATTLE_AUTHORITY_BUILD_ID,
+        action: command,
+        auth,
+      }))
+      expect(await receiveType(actionClient, 'actionError')).toMatchObject({
+        status: 409,
+        code: 'PINNED_PROFILE_UNAVAILABLE',
+        context: expect.any(Object),
+      })
+    } finally {
+      actionClient.close()
+    }
+    expect(memoryStore.writeCount()).toBe(0)
   })
 
   it('rejects same-ID HTTP and WebSocket impersonation without changing room state or version', async () => {
@@ -1227,8 +2421,9 @@ describe('Demo roster HTTP/WebSocket integration', () => {
       'forged-deployment',
       firstIdentity.id,
       action,
-      undefined,
+      firstIdentity,
       'actionError',
+      false,
     )
 
     expect(forgedHttp).toMatchObject({ status: 401, body: { code: 'BATTLE_AUTH_REQUIRED' } })
@@ -1237,27 +2432,23 @@ describe('Demo roster HTTP/WebSocket integration', () => {
     expect(memoryStore.writeCount()).toBe(writesBefore)
   })
 
-  it('projects pending choices out of room GET and repeated start responses', async () => {
+  it('projects reserve instances and active offers out of room GET and repeated start responses', async () => {
     memoryStore.seed(signedRoom('room-projection', 'light'))
     await httpSelect('room-projection', firstIdentity.id, lightRoster)
     await wsSelect('room-projection', secondIdentity.id, lightRoster)
     const internal = memoryStore.snapshot('room-projection')
     const state = (internal?.battleState as unknown as {
-      state: { pieces: Array<{ instanceId: string; ownerPlayerId: string; isCore?: boolean }> }
+      state: {
+        deployment: {
+          offerPieceIds?: string[]
+          legalPositions?: Array<{ x: number; y: number }>
+          reserves?: Record<string, unknown[]>
+        }
+      }
     }).state
-    const selectedCore = state.pieces.find(piece => piece.ownerPlayerId === firstIdentity.id && piece.isCore)
-    if (!selectedCore) throw new Error('Expected a selectable signed-player core piece')
-
-    const choice = {
-      type: 'deploymentChoice',
-      playerId: firstIdentity.id,
-      pieceId: selectedCore.instanceId,
-      clientActionId: 'private-room-choice',
-    }
-    const chosen = await httpBattleAction(
-      'room-projection', firstIdentity.id, choice, firstIdentity.id, firstIdentity,
-    )
-    expect(chosen.status).toBe(200)
+    expect(state.deployment.offerPieceIds).toHaveLength(3)
+    expect(state.deployment.legalPositions?.length).toBeGreaterThan(0)
+    expect(state.deployment.reserves?.[firstIdentity.id]?.length).toBe(7)
 
     const roomResponse = await httpRoomSnapshot('room-projection')
     const startResponse = await httpStart('room-projection', firstIdentity.id)
@@ -1274,7 +2465,14 @@ describe('Demo roster HTTP/WebSocket integration', () => {
       (((wsStartResponse.data as JsonObject).battleState as JsonObject).state as JsonObject),
     ]
     for (const projected of projectedStates) {
-      expect((projected.deployment as JsonObject).choices).toEqual({})
+      const deployment = projected.deployment as JsonObject
+      expect(deployment.choices).toEqual({})
+      expect(deployment.reserves).toEqual({})
+      expect(deployment.offerPieceIds).toEqual([])
+      expect(deployment.offerPieces).toEqual([])
+      expect(deployment.legalPositions).toEqual([])
+      expect(deployment).not.toHaveProperty('freeMovePositions')
+      expect(deployment).not.toHaveProperty('freeMovePieceId')
       expect(((projected.extensions as JsonObject).debugBattle as JsonObject).actionLog).toEqual([])
     }
   })
@@ -1288,7 +2486,27 @@ describe('Demo roster HTTP/WebSocket integration', () => {
 
     memoryStore.seed({ ...source, id: 'http-deployment', version: 1 })
     memoryStore.seed({ ...source, id: 'ws-deployment', version: 1 })
-    const action = { type: 'deploymentChoice', playerId: firstIdentity.id, pieceId: null, clientActionId: 'alice-keep' }
+    const sourceState = (source.battleState as unknown as {
+      state: {
+        deployment: {
+          revision: number
+          offerPieceIds?: string[]
+          legalPositions?: Array<{ x: number; y: number }>
+        }
+      }
+    }).state
+    const pieceId = sourceState.deployment.offerPieceIds?.[0]
+    const position = sourceState.deployment.legalPositions?.[0]
+    if (!pieceId || !position) throw new Error('Expected an authoritative reserve offer and safe position')
+    const action = {
+      type: 'deployReservePiece',
+      playerId: firstIdentity.id,
+      expectedDeploymentRevision: sourceState.deployment.revision,
+      pieceId,
+      toX: position.x,
+      toY: position.y,
+      clientActionId: 'alice-deploy-reserve',
+    }
 
     const http = await httpBattleAction('http-deployment', firstIdentity.id, action, firstIdentity.id, firstIdentity)
     const ws = await wsBattleAction('ws-deployment', firstIdentity.id, action, firstIdentity)
@@ -1311,7 +2529,7 @@ describe('Demo roster HTTP/WebSocket integration', () => {
     const client = await openClient()
     const messages = collectMessages(client)
     try {
-      client.send(JSON.stringify({ type: 'subscribe', roomId: 'terminal-race', playerId: secondIdentity.id }))
+      await sendBattleSubscribe(client, secondIdentity, 'terminal-race')
       await messages.waitFor('subscribed')
       await messages.waitFor('stateUpdate')
 
@@ -1339,7 +2557,13 @@ describe('Demo roster HTTP/WebSocket integration', () => {
         firstIdentity.id,
         firstIdentity,
       )
-      client.send(JSON.stringify({ type: 'action', action: wsAction, auth: wsAuth }))
+      client.send(JSON.stringify({
+        type: 'action',
+        protocolVersion: BATTLE_AUTHORITY_PROTOCOL_VERSION,
+        authorityBuildId: BATTLE_AUTHORITY_BUILD_ID,
+        action: wsAction,
+        auth: wsAuth,
+      }))
 
       const [httpResult, update] = await Promise.all([httpResultPromise, terminalUpdate])
       expect([200, 400]).toContain(httpResult.status)

@@ -104,16 +104,40 @@ export interface DeploymentLock {
   reason?: 'player' | 'timeout'
 }
 
+export type DeploymentMode = 'legacy-reroll-v1' | 'progressive-reserve-v1'
+export type DeploymentStatus =
+  | 'awaiting-locks'
+  | 'awaiting-reserve-deploy'
+  | 'turn-ready'
+  | 'complete'
+
+export interface DeploymentOfferPiece {
+  instanceId: string
+  templateId: string
+  name: string
+}
+
 export interface DeploymentState {
-  status: 'awaiting-locks' | 'complete'
+  mode?: DeploymentMode
+  status: DeploymentStatus
   playerIds: PlayerId[]
   choices: Record<PlayerId, DeploymentChoice>
   locks: Record<PlayerId, DeploymentLock>
   startedAt: number
   deadlineAt: number
   revision: number
+  /** Set only after both seeded opening summons and their trigger queues finish. */
+  openingVanguardsInitialized?: boolean
   initialPositions: Record<string, DeploymentPosition>
   finalPositions?: Record<string, DeploymentPosition>
+  reserves?: Record<PlayerId, PieceInstance[]>
+  reserveCounts?: Record<PlayerId, number>
+  activePlayerId?: PlayerId
+  offerTurnNumber?: number
+  offerPieceIds?: string[]
+  offerPieces?: DeploymentOfferPiece[]
+  legalPositions?: DeploymentPosition[]
+  lastDeployedPieceId?: string
 }
 
 export interface BattleState {
@@ -191,6 +215,15 @@ export type BattleAction =
       clientActionId?: string
     }
   | {
+      type: "deployReservePiece"
+      playerId: PlayerId
+      expectedDeploymentRevision: number
+      pieceId: string
+      toX?: number
+      toY?: number
+      clientActionId?: string
+    }
+  | {
       type: "turnTimerSync"
       receivedAt: number
       now: number
@@ -207,6 +240,16 @@ export type BattleAction =
       type: "turnTimeout"
       now: number
       clientActionId?: string
+    }
+  | {
+      type: "pendingTimeout"
+      now: number
+      clientActionId?: string
+      expectedTurnNumber?: number
+      expectedDeadlineAt?: number
+      expectedInputOwnerPlayerId?: PlayerId
+      expectedPendingSelectionId?: string
+      expectedPendingStateRevision?: number
     }
   | {
       type: "move"

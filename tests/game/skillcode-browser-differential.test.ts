@@ -2,6 +2,7 @@
 import { readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { resolve } from 'node:path'
+import { TextDecoder, TextEncoder } from 'node:util'
 import { runInNewContext } from 'node:vm'
 
 import { describe, expect, it, vi } from 'vitest'
@@ -43,6 +44,8 @@ function loadBrowserRuntime(): Runtime {
     process,
     require: createRequire(import.meta.url),
     setTimeout,
+    TextDecoder,
+    TextEncoder,
   }
 
   runInNewContext(bundleSource, context, { filename: bundlePath })
@@ -133,18 +136,18 @@ function executeRuleSkillCode(runtime: Runtime): SkillCodeTraceEvidence {
 
 function executeRuleTriggerSkill(runtime: Runtime): SkillCodeTraceEvidence {
   seedSkillCodeRuntime(runtime, SURFACE_SEEDS.ruleTriggerSkill)
-  const piece = makePiece({ instanceId: 'blessing-owner' }) as any
-  piece.statusTags = [{ id: 'divine-blessing-buff', type: 'divine-blessing-buff', intensity: 4 }]
-  const rule = runtime.loadRuleById('rule-divine-blessing', true)
-  if (!rule) throw new Error('rule-divine-blessing did not load')
+  const piece = makePiece({ instanceId: 'hardy-block-owner' }) as any
+  piece.statusTags = [{ id: 'hardy-block', type: 'hardy-block' }]
+  const rule = runtime.loadRuleById('rule-hardy-block', true)
+  if (!rule) throw new Error('rule-hardy-block did not load')
   piece.rules = [rule]
   const state = makeState({ pieces: [piece] }) as any
   const context: any = {
-    type: 'beforeDamageDealt',
+    type: 'afterDamageTaken',
     playerId: 'player-red',
     sourcePiece: piece,
     piece,
-    damage: 3,
+    damage: 4,
   }
   const result = runtime.checkTriggers(state, context)
 
@@ -152,11 +155,12 @@ function executeRuleTriggerSkill(runtime: Runtime): SkillCodeTraceEvidence {
     runtime,
     'rule-trigger-skill',
     'ruleTriggerSkill',
-    { type: 'dispatchTrigger', eventType: context.type, playerId: context.playerId, sourcePieceId: piece.instanceId, damage: 3 },
+    { type: 'dispatchTrigger', eventType: context.type, playerId: context.playerId, sourcePieceId: piece.instanceId, damage: 4 },
     state,
     normalizeEventChain(result),
     {
       blocked: result.blocked,
+      attack: piece.attack,
       damage: context.damage,
       statusTags: piece.statusTags,
       success: result.success,

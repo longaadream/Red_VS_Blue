@@ -1,5 +1,20 @@
-import { getBattleStorage, type ServerBattleState } from './battle-storage'
-import { createBattlePublicPatch, hashPublicBattleState } from './battle-public-patch'
+import type { GameProfileIdentityV1 } from '../content-pipeline/runtime/profile-game-identity'
+import {
+  createServerBattleStateV1,
+  getBattleStorage,
+  SERVER_BATTLE_STORAGE_SCHEMA_V1,
+  withoutServerSkills,
+  type ServerBattleState,
+} from './battle-storage'
+import {
+  BATTLE_AUTHORITY_BUILD_ID,
+  BATTLE_AUTHORITY_PROTOCOL_VERSION,
+  createBattlePublicPatch,
+} from './battle-public-patch'
+import {
+  projectBattlePresentationEvents,
+  type BattlePresentationEvent,
+} from './battle-presentation-events'
 import { hashBattleState, runBattleAction, type BattleActionResult } from './battle-runner'
 import {
   systemDeploymentRuleClock,
@@ -8,7 +23,11 @@ import {
 } from './deployment'
 import {
   compactBattleTraceForAuthority,
+  canonicalBattleStateForHash,
+  createBattleStateHashIndex,
+  hashStable,
   materializeBattleTraceForTerminal,
+  pinBattleProfileIdentityV1,
   stampPendingDeploymentAuthorityVersion,
 } from './battle-trace'
 import {
@@ -16,23 +35,50 @@ import {
   checkpointReasonForTransition,
   createBattleAuthorityReceipt,
   isBattleAuthorityV2Enabled,
+  readBattleAuthorityTransitionPublicHashIndex,
   roomBattleAuthorityVersion,
   type BattleAuthorityCheckpointRecord,
   type BattleAuthorityReceipt,
   type BattleAuthorityTransitionRecord,
 } from './battle-transition'
+import {
+  assertBattleStateHashIndex,
+  buildBattleStateHashIndex,
+  updateBattleStateHashIndex,
+  type BattleStateHashIndex,
+} from './battle-state-hash'
 import { roomAuthorityQueue, type RoomAuthorityEventContext } from './room-authority-queue'
+import { restoreRoomRuleRuntime, type RoomRuleRuntime } from './room-rule-runtime'
 import type { Room } from './room-store'
 import { assertActionPlayer } from './targeting'
 import {
+  getCurrentInputOwnerPlayerId,
   isAcceptedGameplayAction,
   isTurnTimerEnabled,
+  projectPendingTimer,
   projectTurnTimer,
+  type PendingTimerProjection,
   type TurnTimerProjection,
 } from './turn-timer'
 import type { BattleAction, BattleState } from './turn'
 
 const MAX_ROOM_ACTION_ATTEMPTS = 5
+
+function toTimerSafePublicBattleState(state: BattleState, viewerPlayerId?: string): BattleState {
+  const projected = toPublicBattleState(state, viewerPlayerId)
+  // The response timer has a dedicated projection. Its predeclared default is
+  // server-private and must not ride inside the generic battle-state payload.
+  if (projected.turnTimer?.pendingResponse) delete projected.turnTimer.pendingResponse
+  return projected
+}
+
+interface VersionedBattleStateHashIndex {
+  authorityVersion: number
+  index: BattleStateHashIndex
+}
+
+const authorityStateHashIndexes = new Map<string, VersionedBattleStateHashIndex>()
+const publicStateHashIndexes = new Map<string, VersionedBattleStateHashIndex>()
 
 export interface DeploymentRoomStore {
   getRoom(roomId: string): Promise<Room | undefined>
@@ -62,24 +108,33 @@ export interface DeploymentRoomStore {
     authorityVersion: number
     pending: number
     lastError?: string
+    lastErrorContext?: Record<string, unknown>
   }
+  terminalAuthorityPersistencePolicy?: 'background' | 'durable-barrier'
   drainBattleAuthorityPersistence?(roomId?: string): Promise<void>
 }
 
 export interface PublicBattleSnapshot {
+  protocolVersion: typeof BATTLE_AUTHORITY_PROTOCOL_VERSION
+  authorityBuildId: typeof BATTLE_AUTHORITY_BUILD_ID
   state: BattleState
   seed: number
+  rootSeed: number
+  profileIdentity: GameProfileIdentityV1
   stateHash: string
   authorityVersion: number
   serverNow: number
   durableAuthorityVersion?: number
   persistenceStatus?: 'durable' | 'pending' | 'degraded'
   turnTimer?: TurnTimerProjection
+  pendingTimer?: PendingTimerProjection
+  /** Ephemeral player-facing events; never part of state patches or public hashes. */
+  presentationEvents?: BattlePresentationEvent[]
 }
 
 export interface DispatchRoomBattleActionResult {
   kind: 'applied' | 'duplicate' | 'expired' | 'resyncRequired'
-  expiredReason?: 'deployment' | 'turn'
+  expiredReason?: 'deployment' | 'pending' | 'turn'
   snapshot: PublicBattleSnapshot
   /** Final authoritative result, including an internal timer sync when needed. */
   actionResult: BattleActionResult
@@ -93,6 +148,7 @@ export interface DispatchRoomBattleActionResult {
   previousAuthorityState?: BattleState
   nextAuthorityState?: BattleState
   timings?: BattleAuthorityTimings
+  presentationEvents?: BattlePresentationEvent[]
 }
 
 export interface BattleAuthorityTimings {
@@ -104,7 +160,8 @@ export interface BattleAuthorityTimings {
 
 export interface PublicBattleTransitionUpdate {
   type: 'battleTransition'
-  protocolVersion: 2
+  protocolVersion: typeof BATTLE_AUTHORITY_PROTOCOL_VERSION
+  authorityBuildId: typeof BATTLE_AUTHORITY_BUILD_ID
   roomId: string
   fromVersion: number
   toVersion: number
@@ -119,18 +176,22 @@ export interface PublicBattleTransitionUpdate {
   durableAuthorityVersion?: number
   persistenceStatus?: 'durable' | 'pending' | 'degraded'
   turnTimer?: TurnTimerProjection
+  pendingTimer?: PendingTimerProjection
   timings?: BattleAuthorityTimings
+  presentationEvents: BattlePresentationEvent[]
 }
 
 export interface PreResumeDeliveryContext {
   kind: 'applied' | 'expired'
-  expiredReason?: 'deployment' | 'turn'
+  expiredReason?: 'deployment' | 'pending' | 'turn'
   actionHash?: string
 }
 
 export interface DispatchRoomBattleActionOptions {
   allowSystem?: boolean
   expectedAuthorityVersion?: number
+  /** Candidate persistence checkpoint cadence; legacy callers retain the existing default. */
+  checkpointInterval?: number
   clock?: DeploymentRuleClock
   /**
    * Runs after the single authoritative commit while the room clock is frozen.
@@ -146,11 +207,15 @@ export interface ScheduleBattleTimeoutOptions {
   clock?: DeploymentRuleClock
   onCommitted?: (snapshot: PublicBattleSnapshot) => void | Promise<void>
   onTransitionCommitted?: (result: DispatchRoomBattleActionResult) => void | Promise<void>
-  onBotTurnReady?: (snapshot: PublicBattleSnapshot) => void | Promise<void>
+  onBotTurnReady?: (
+    snapshot: PublicBattleSnapshot,
+    authorityState: BattleState,
+  ) => void | Promise<void>
 }
 
 export type ScheduleDeploymentTimeoutOptions = ScheduleBattleTimeoutOptions
 type TurnTimeoutAction = Extract<BattleAction, { type: 'turnTimeout' }>
+type PendingTimeoutAction = Extract<BattleAction, { type: 'pendingTimeout' }>
 
 export class RoomBattleActionError extends Error {
   code: string
@@ -161,6 +226,95 @@ export class RoomBattleActionError extends Error {
     this.name = 'RoomBattleActionError'
     this.code = code
     this.context = context
+  }
+}
+
+type BattleAuthorityPersistenceInspection = ReturnType<
+  NonNullable<DeploymentRoomStore['inspectBattleAuthorityPersistence']>
+>
+
+function battleAuthorityPersistenceDegradedError(
+  roomId: string,
+  persistence: BattleAuthorityPersistenceInspection,
+): RoomBattleActionError {
+  console.error('[battle-authority-persistence] action rejected while the journal is degraded', {
+    roomId,
+    authorityVersion: persistence.authorityVersion,
+    durableAuthorityVersion: persistence.durableAuthorityVersion,
+    pending: persistence.pending,
+    lastError: persistence.lastError,
+    lastErrorContext: persistence.lastErrorContext,
+  })
+  return new RoomBattleActionError(
+    'BATTLE_AUTHORITY_PERSISTENCE_DEGRADED',
+    'Battle authority persistence is degraded; the room is paused until the server recovers',
+    {
+      roomId,
+      persistenceStatus: persistence.status,
+      authorityVersion: persistence.authorityVersion,
+      durableAuthorityVersion: persistence.durableAuthorityVersion,
+      pendingPersistenceJobs: persistence.pending,
+    },
+  )
+}
+
+function startTerminalBattleAuthorityDrain(
+  store: DeploymentRoomStore,
+  roomId: string,
+  authorityVersion: number,
+  clientActionId?: string,
+): void {
+  if (!store.drainBattleAuthorityPersistence) return
+  let drain: Promise<void>
+  try {
+    drain = store.drainBattleAuthorityPersistence(roomId)
+  } catch (error) {
+    drain = Promise.reject(error)
+  }
+  void drain.catch(error => {
+    console.error('[battle-authority-persistence] terminal background drain failed', {
+      roomId,
+      authorityVersion,
+      clientActionId,
+      errorName: error instanceof Error ? error.name : 'Error',
+      errorMessage: error instanceof Error ? error.message : String(error),
+      errorCause: error instanceof Error && error.cause
+        ? (error.cause instanceof Error ? error.cause.message : String(error.cause))
+        : undefined,
+    })
+  })
+}
+
+async function settleTerminalBattleAuthorityPersistence(
+  store: DeploymentRoomStore,
+  roomId: string,
+  authorityVersion: number,
+  clientActionId?: string,
+): Promise<{ waitedForDurability: boolean; waitedMs: number }> {
+  if (!store.drainBattleAuthorityPersistence) {
+    return { waitedForDurability: false, waitedMs: 0 }
+  }
+
+  if (store.terminalAuthorityPersistencePolicy === 'durable-barrier') {
+    const startedAt = monotonicNow()
+    await store.drainBattleAuthorityPersistence(roomId)
+    return {
+      waitedForDurability: true,
+      waitedMs: monotonicNow() - startedAt,
+    }
+  }
+
+  startTerminalBattleAuthorityDrain(store, roomId, authorityVersion, clientActionId)
+  return { waitedForDurability: false, waitedMs: 0 }
+}
+
+function assertBattleAuthorityPersistenceAvailable(
+  store: DeploymentRoomStore,
+  roomId: string,
+): void {
+  const persistence = store.inspectBattleAuthorityPersistence?.(roomId)
+  if (persistence?.status === 'degraded') {
+    throw battleAuthorityPersistenceDegradedError(roomId, persistence)
   }
 }
 
@@ -185,17 +339,33 @@ export function createPublicBattleSnapshot(
 ): PublicBattleSnapshot {
   const storage = getBattleStorage(room)
   if (!storage) throw new RoomBattleActionError('BATTLE_NOT_STARTED', 'Battle not started')
-  const state = toPublicBattleState(storage.state as BattleState, viewerPlayerId)
+  const state = toTimerSafePublicBattleState(storage.state as BattleState, viewerPlayerId)
   const serverNow = getRoomAuthorityNow(room.id, clock)
-  return {
+  const authorityVersion = roomBattleAuthorityVersion(room)
+  const publicIndex = cachePublicStateHashIndex(
+    room.id,
+    viewerPlayerId,
+    authorityVersion,
     state,
-    seed: storage.seed,
-    stateHash: hashBattleState(state),
-    authorityVersion: roomBattleAuthorityVersion(room),
+  )
+  return {
+    protocolVersion: BATTLE_AUTHORITY_PROTOCOL_VERSION,
+    authorityBuildId: BATTLE_AUTHORITY_BUILD_ID,
+    state,
+    seed: storage.rootSeed,
+    rootSeed: storage.rootSeed,
+    profileIdentity: storage.profileIdentity,
+    stateHash: publicIndex.rootHash,
+    authorityVersion,
     serverNow,
     durableAuthorityVersion: room.battleAuthorityDurableVersion,
     persistenceStatus: room.battleAuthorityPersistenceStatus,
-    turnTimer: state.terminalResult || !isTurnTimerEnabled() ? undefined : projectTurnTimer(state.turnTimer, serverNow),
+    turnTimer: state.terminalResult || !isTurnTimerEnabled()
+      ? undefined
+      : projectTurnTimer((storage.state as BattleState).turnTimer, serverNow),
+    pendingTimer: state.terminalResult || !isTurnTimerEnabled()
+      ? undefined
+      : projectPendingTimer((storage.state as BattleState).turnTimer, serverNow),
   }
 }
 
@@ -209,27 +379,46 @@ export function createPublicBattleTransitionUpdate(
   if (!transition || !result.previousAuthorityState || !result.nextAuthorityState || !result.receipt) {
     return undefined
   }
-  const previous = toPublicBattleState(result.previousAuthorityState, viewerPlayerId)
-  const next = toPublicBattleState(result.nextAuthorityState, viewerPlayerId)
+  const previous = toTimerSafePublicBattleState(result.previousAuthorityState, viewerPlayerId)
+  const next = toTimerSafePublicBattleState(result.nextAuthorityState, viewerPlayerId)
   const serverNow = getRoomAuthorityNow(roomId, clock)
+  const patch = createBattlePublicPatch(previous, next)
+  const previousIndex = getPublicStateHashIndex(
+    roomId,
+    viewerPlayerId,
+    transition.fromVersion,
+    previous,
+  )
+  const nextIndex = updateBattleStateHashIndex(previousIndex, next, patch, hashStable).index
+  publicStateHashIndexes.set(publicHashCacheKey(roomId, viewerPlayerId), {
+    authorityVersion: transition.toVersion,
+    index: nextIndex,
+  })
   return {
     type: 'battleTransition',
-    protocolVersion: 2,
+    protocolVersion: BATTLE_AUTHORITY_PROTOCOL_VERSION,
+    authorityBuildId: BATTLE_AUTHORITY_BUILD_ID,
     roomId: roomId.trim().toLowerCase(),
     fromVersion: transition.fromVersion,
     toVersion: transition.toVersion,
-    prePublicHash: hashPublicBattleState(previous),
-    postPublicHash: hashPublicBattleState(next),
-    patch: createBattlePublicPatch(previous, next),
+    prePublicHash: previousIndex.rootHash,
+    postPublicHash: nextIndex.rootHash,
+    patch,
     receipt: result.receipt,
     pending: transition.pending,
     seed: result.snapshot.seed,
-    stateHash: hashBattleState(next),
+    stateHash: nextIndex.rootHash,
     serverNow,
     durableAuthorityVersion: result.snapshot.durableAuthorityVersion,
     persistenceStatus: result.snapshot.persistenceStatus,
-    turnTimer: next.terminalResult || !isTurnTimerEnabled() ? undefined : projectTurnTimer(next.turnTimer, serverNow),
+    turnTimer: next.terminalResult || !isTurnTimerEnabled()
+      ? undefined
+      : projectTurnTimer(result.nextAuthorityState.turnTimer, serverNow),
+    pendingTimer: next.terminalResult || !isTurnTimerEnabled()
+      ? undefined
+      : projectPendingTimer(result.nextAuthorityState.turnTimer, serverNow),
     timings: result.timings,
+    presentationEvents: result.presentationEvents ?? [],
   }
 }
 
@@ -240,17 +429,32 @@ export function createPublicBattleResyncSnapshot(
   clock: DeploymentRuleClock = systemDeploymentRuleClock,
 ): PublicBattleSnapshot | undefined {
   if (!result.transition || !result.nextAuthorityState) return undefined
-  const state = toPublicBattleState(result.nextAuthorityState, viewerPlayerId)
+  const state = toTimerSafePublicBattleState(result.nextAuthorityState, viewerPlayerId)
   const serverNow = getRoomAuthorityNow(roomId, clock)
+  const publicIndex = cachePublicStateHashIndex(
+    roomId,
+    viewerPlayerId,
+    result.transition.toVersion,
+    state,
+  )
   return {
+    protocolVersion: BATTLE_AUTHORITY_PROTOCOL_VERSION,
+    authorityBuildId: BATTLE_AUTHORITY_BUILD_ID,
     state,
     seed: result.snapshot.seed,
-    stateHash: hashBattleState(state),
+    rootSeed: result.snapshot.rootSeed,
+    profileIdentity: result.snapshot.profileIdentity,
+    stateHash: publicIndex.rootHash,
     authorityVersion: result.transition.toVersion,
     serverNow,
     durableAuthorityVersion: result.snapshot.durableAuthorityVersion,
     persistenceStatus: result.snapshot.persistenceStatus,
-    turnTimer: state.terminalResult || !isTurnTimerEnabled() ? undefined : projectTurnTimer(state.turnTimer, serverNow),
+    turnTimer: state.terminalResult || !isTurnTimerEnabled()
+      ? undefined
+      : projectTurnTimer(result.nextAuthorityState.turnTimer, serverNow),
+    pendingTimer: state.terminalResult || !isTurnTimerEnabled()
+      ? undefined
+      : projectPendingTimer(result.nextAuthorityState.turnTimer, serverNow),
   }
 }
 
@@ -260,11 +464,14 @@ export function createPublicRoomSnapshot(room: Room): Room {
   const snapshot = createPublicBattleSnapshot(room)
   const publicStorage: ServerBattleState = {
     type: 'server-state',
-    seed: snapshot.seed,
+    storageSchemaVersion: SERVER_BATTLE_STORAGE_SCHEMA_V1,
+    profileIdentity: storage.profileIdentity,
+    rootSeed: storage.rootSeed,
     state: snapshot.state,
   }
   return {
     ...room,
+    status: snapshot.state.terminalResult?.status === 'finished' ? 'finished' : room.status,
     battleState: publicStorage as unknown as Room['battleState'],
   }
 }
@@ -288,7 +495,7 @@ export async function dispatchRoomBattleAction(
   const receivedAt = projectRoomAuthorityNow(normalizedRoomId, wallArrival)
   const requestedClientActionId = actionClientActionId(action)
   const eventContext: RoomAuthorityEventContext = {
-    kind: isSystemTimerAction(action) ? 'timer' : 'player',
+    kind: roomAuthorityEventKind(action, viewerPlayerId, options.allowSystem === true),
     actionId: requestedClientActionId,
     playerId: 'playerId' in action ? action.playerId : viewerPlayerId ?? undefined,
     authorityVersion: options.expectedAuthorityVersion,
@@ -296,11 +503,13 @@ export async function dispatchRoomBattleAction(
 
   return withPausedRoomAuthorityClock(normalizedRoomId, clock, async () => {
     queueMs = monotonicNow() - performanceStartedAt
+    let roomRuleRuntime: RoomRuleRuntime | undefined
     for (let attempt = 0; attempt < MAX_ROOM_ACTION_ATTEMPTS; attempt += 1) {
       const room = await store.getRoom(normalizedRoomId)
       if (!room) throw new RoomBattleActionError('ROOM_NOT_FOUND', 'Room not found', { roomId: normalizedRoomId })
       const storage = getBattleStorage(room)
       if (!storage) throw new RoomBattleActionError('BATTLE_NOT_STARTED', 'Battle not started', { roomId: normalizedRoomId })
+      roomRuleRuntime ??= restoreRoomRuleRuntime(normalizedRoomId)
       const state = storage.state as BattleState
       if (!Number.isSafeInteger(room.version) || Number(room.version) < 0) {
         throw new RoomBattleActionError(
@@ -365,6 +574,7 @@ export async function dispatchRoomBattleAction(
             receipt,
           }
         }
+        assertBattleAuthorityPersistenceAvailable(store, normalizedRoomId)
         if (
           options.expectedAuthorityVersion !== undefined
           && options.expectedAuthorityVersion !== authorityVersion
@@ -404,16 +614,28 @@ export async function dispatchRoomBattleAction(
       }
 
       const timerEnabled = isTurnTimerEnabled()
+      const continuesPendingInteraction =
+        (action.type === 'pendingOptionSelect' && !!state.pendingOptionSelection)
+        || (action.type === 'pendingTargetSelect' && !!state.pendingTargetSelection)
+        || (action.type === 'cancelPendingSelection'
+          && (!!state.pendingOptionSelection || !!state.pendingTargetSelection))
       const deploymentExpired = timerEnabled
         && action.type !== 'deploymentTimeout'
+        && !continuesPendingInteraction
         && state.deployment?.status === 'awaiting-locks'
         && receivedAt >= state.deployment.deadlineAt
       const turnExpired = timerEnabled
         && !deploymentExpired
+        && !state.turnTimer?.pendingResponse
         && action.type !== 'turnTimeout'
         && state.deployment?.status !== 'awaiting-locks'
         && state.turnTimer?.status === 'running'
         && receivedAt >= state.turnTimer.deadlineAt
+      const pendingExpired = timerEnabled
+        && !deploymentExpired
+        && action.type !== 'pendingTimeout'
+        && state.turnTimer?.pendingResponse?.status === 'running'
+        && receivedAt >= state.turnTimer.pendingResponse.deadlineAt
 
       const actionToApply: BattleAction = deploymentExpired
         ? {
@@ -421,6 +643,12 @@ export async function dispatchRoomBattleAction(
             now: receivedAt,
             clientActionId: `system-deployment-timeout:${normalizedRoomId}:${state.deployment!.deadlineAt}`,
           }
+        : pendingExpired
+        ? createPendingTimeoutAction(
+            state,
+            receivedAt,
+            `system-pending-timeout:${normalizedRoomId}:${state.turnTimer!.pendingResponse!.selectionId}:${state.turnTimer!.pendingResponse!.deadlineAt}`,
+          )
         : turnExpired
         ? createTurnTimeoutAction(
             state,
@@ -429,10 +657,26 @@ export async function dispatchRoomBattleAction(
           )
         : normalizeSystemActionTime(action, receivedAt)
 
+      const runtimeTransactionSnapshot = roomRuleRuntime.snapshotTransactionState()
+      let retainRuntimeTransaction = false
+      try {
       let submittedActionResult: BattleActionResult
       try {
         const rulesStartedAt = monotonicNow()
-        submittedActionResult = runBattleAction(state, actionToApply, { rootSeed: storage.seed })
+        submittedActionResult = runBattleAction(state, actionToApply, {
+          rootSeed: storage.rootSeed,
+          stateHashIndex: getAuthorityStateHashIndex(
+            normalizedRoomId,
+            authorityVersion,
+            state,
+          ),
+          ruleExecutionContext: roomRuleRuntime.executionContext,
+        })
+        pinBattleProfileIdentityV1(
+          submittedActionResult.state,
+          storage.profileIdentity,
+          storage.rootSeed,
+        )
         rulesMs += monotonicNow() - rulesStartedAt
       } catch (error) {
         const decorated = decorateRoomActionError(error, normalizedRoomId, room, storage, actionToApply, viewerPlayerId)
@@ -468,6 +712,14 @@ export async function dispatchRoomBattleAction(
       }
 
       let actionResult = submittedActionResult
+      const presentationEvents = submittedActionResult.trace
+        ? projectBattlePresentationEvents({
+            actionId: submittedActionResult.trace.actionId,
+            command: actionToApply,
+            beforeState: state,
+            afterState: submittedActionResult.state,
+          })
+        : []
       let syncAction: BattleAction | undefined
       if (timerEnabled && shouldSyncTurnTimer(state, submittedActionResult.state, actionToApply)) {
         const resumedAt = getRoomAuthorityNow(normalizedRoomId, clock)
@@ -485,7 +737,16 @@ export async function dispatchRoomBattleAction(
         }
         try {
           const syncRulesStartedAt = monotonicNow()
-          actionResult = runBattleAction(submittedActionResult.state, syncAction, { rootSeed: storage.seed })
+        actionResult = runBattleAction(submittedActionResult.state, syncAction, {
+          rootSeed: storage.rootSeed,
+          stateHashIndex: submittedActionResult.stateHashIndex,
+          ruleExecutionContext: roomRuleRuntime.executionContext,
+        })
+        pinBattleProfileIdentityV1(
+          actionResult.state,
+          storage.profileIdentity,
+          storage.rootSeed,
+        )
           rulesMs += monotonicNow() - syncRulesStartedAt
         } catch (error) {
           const decorated = decorateRoomActionError(error, normalizedRoomId, room, storage, syncAction, viewerPlayerId)
@@ -532,16 +793,16 @@ export async function dispatchRoomBattleAction(
         nextAuthorityState = canonicalMaterializedState
         actionResult = { ...actionResult, state: canonicalMaterializedState }
       }
-      const previousPublicState = toPublicBattleState(previousAuthorityState)
-      const nextPublicState = toPublicBattleState(nextAuthorityState)
+      const previousPublicState = toTimerSafePublicBattleState(previousAuthorityState)
+      const nextPublicState = toTimerSafePublicBattleState(nextAuthorityState)
       const committedState = authorityV2 && !isTerminal
         ? compactBattleTraceForAuthority(nextAuthorityState)
         : nextAuthorityState
-      const nextStorage: ServerBattleState = {
-        type: 'server-state',
-        seed: storage.seed,
-        state: committedState,
-      }
+      const nextStorage = createServerBattleStateV1(
+        storage.profileIdentity,
+        storage.rootSeed,
+        committedState,
+      )
       const transitionPlayerId = 'playerId' in action
         ? action.playerId
         : viewerPlayerId ?? 'system'
@@ -570,18 +831,26 @@ export async function dispatchRoomBattleAction(
             traces,
             replayFrames,
             previousTransitionHash: room.battleAuthorityTransitionHash,
+            previousPublicHashIndex: getPublicStateHashIndex(
+              normalizedRoomId,
+              undefined,
+              authorityVersion,
+              previousPublicState,
+            ),
             now: receivedAt,
           })
         : undefined
-      const expired = deploymentExpired || turnExpired
+      const expired = deploymentExpired || pendingExpired || turnExpired
       if (transition && expired) {
         transition.receipt = createBattleAuthorityReceipt({
           roomId: normalizedRoomId,
           clientActionId: requestedClientActionId!,
           status: 'rejected',
           authorityVersion: nextAuthorityVersion,
-          code: turnExpired ? 'TURN_EXPIRED' : 'DEPLOYMENT_EXPIRED',
-          message: turnExpired
+          code: pendingExpired ? 'PENDING_RESPONSE_EXPIRED' : turnExpired ? 'TURN_EXPIRED' : 'DEPLOYMENT_EXPIRED',
+          message: pendingExpired
+            ? 'Pending response deadline elapsed; the authoritative timeout was committed instead.'
+            : turnExpired
             ? 'Turn deadline elapsed; the authoritative timeout was committed instead.'
             : 'Deployment deadline elapsed; the authoritative timeout was committed instead.',
         })
@@ -589,10 +858,11 @@ export async function dispatchRoomBattleAction(
 
       const baseCheckpoint: BattleAuthorityCheckpointRecord | undefined = transition && authorityVersion === 0
         ? {
-            protocolVersion: 2,
+            protocolVersion: BATTLE_AUTHORITY_PROTOCOL_VERSION,
+            authorityBuildId: BATTLE_AUTHORITY_BUILD_ID,
             roomId: normalizedRoomId,
             authorityVersion,
-            seed: storage.seed,
+            seed: storage.rootSeed,
             storage: previousTransitionStorage,
             stateHash: transition.preStateHash,
             publicHash: transition.prePublicHash,
@@ -603,14 +873,20 @@ export async function dispatchRoomBattleAction(
         : undefined
       let checkpoint: BattleAuthorityCheckpointRecord | undefined
       if (transition) {
-        const reason = checkpointReasonForTransition(state, nextAuthorityState, nextAuthorityVersion)
+        const reason = checkpointReasonForTransition(
+          state,
+          nextAuthorityState,
+          nextAuthorityVersion,
+          options.checkpointInterval,
+        )
         if (reason) {
           const checkpointStorage = nextStorage
           checkpoint = {
-            protocolVersion: 2,
+            protocolVersion: BATTLE_AUTHORITY_PROTOCOL_VERSION,
+            authorityBuildId: BATTLE_AUTHORITY_BUILD_ID,
             roomId: normalizedRoomId,
             authorityVersion: nextAuthorityVersion,
-            seed: storage.seed,
+            seed: storage.rootSeed,
             storage: checkpointStorage,
             stateHash: transition.postStateHash,
             publicHash: transition.postPublicHash,
@@ -618,6 +894,29 @@ export async function dispatchRoomBattleAction(
             reason,
             createdAt: receivedAt,
           }
+          if (!actionResult.stateHashIndex) {
+            throw new Error(
+              `Battle authority state hash index missing in ${normalizedRoomId} at ${nextAuthorityVersion}`,
+            )
+          }
+          assertBattleStateHashIndex(
+            canonicalBattleStateForHash(withoutServerSkills(nextAuthorityState) as BattleState),
+            actionResult.stateHashIndex,
+            hashStable,
+            `battle authority checkpoint ${normalizedRoomId}@${nextAuthorityVersion}`,
+          )
+          const transitionPublicIndex = readBattleAuthorityTransitionPublicHashIndex(transition)
+          if (!transitionPublicIndex) {
+            throw new Error(
+              `Battle authority public hash index missing in ${normalizedRoomId} at ${nextAuthorityVersion}`,
+            )
+          }
+          assertBattleStateHashIndex(
+            nextPublicState,
+            transitionPublicIndex,
+            hashStable,
+            `battle authority public checkpoint ${normalizedRoomId}@${nextAuthorityVersion}`,
+          )
         }
       }
 
@@ -643,21 +942,24 @@ export async function dispatchRoomBattleAction(
           })
         : await store.setRoomIfVersion(normalizedRoomId, nextRoom, metadataVersion)
       persistenceMs += monotonicNow() - persistenceStartedAt
-      if (!committed) continue
-      if (isTerminal && transition && store.drainBattleAuthorityPersistence) {
-        try {
-          const terminalDrainStartedAt = monotonicNow()
-          await store.drainBattleAuthorityPersistence(normalizedRoomId)
-          persistenceMs += monotonicNow() - terminalDrainStartedAt
-        } catch (error) {
-          console.error('[battle-authority-persistence] terminal journal drain failed', {
-            roomId: normalizedRoomId,
+      if (!committed) {
+        if (authorityV2) assertBattleAuthorityPersistenceAvailable(store, normalizedRoomId)
+        continue
+      }
+      retainRuntimeTransaction = true
+      if (transition && actionResult.stateHashIndex) {
+        authorityStateHashIndexes.set(normalizedRoomId, {
+          authorityVersion: nextAuthorityVersion,
+          index: actionResult.stateHashIndex,
+        })
+        const publicIndex = readBattleAuthorityTransitionPublicHashIndex(transition)
+        if (publicIndex) {
+          publicStateHashIndexes.set(publicHashCacheKey(normalizedRoomId, undefined), {
             authorityVersion: nextAuthorityVersion,
-            error: error instanceof Error ? error.message : String(error),
+            index: publicIndex,
           })
         }
       }
-
       const persistence = transition
         ? store.inspectBattleAuthorityPersistence?.(normalizedRoomId)
         : undefined
@@ -669,13 +971,27 @@ export async function dispatchRoomBattleAction(
             battleAuthorityPersistenceStatus: persistence?.status,
           }
         : { ...nextRoom, version: nextAuthorityVersion }
-      const snapshot = createPublicBattleSnapshot(committedRoom, viewerPlayerId ?? undefined, clock)
+      let snapshotRoom = committedRoom
+      if (isTerminal && transition) {
+        const terminalPersistence = await settleTerminalBattleAuthorityPersistence(
+          store,
+          normalizedRoomId,
+          nextAuthorityVersion,
+          requestedClientActionId,
+        )
+        persistenceMs += terminalPersistence.waitedMs
+        if (terminalPersistence.waitedForDurability) {
+          snapshotRoom = await store.getRoom(normalizedRoomId) ?? committedRoom
+        }
+      }
+      const snapshot = createPublicBattleSnapshot(snapshotRoom, viewerPlayerId ?? undefined, clock)
       if (isTerminal) clearRoomBattleTimeout(normalizedRoomId)
       let delivered = false
       if (options.onCommittedBeforeTimerResume) {
         await options.onCommittedBeforeTimerResume(snapshot, {
           kind: expired ? 'expired' : 'applied',
           ...(deploymentExpired ? { expiredReason: 'deployment' as const } : {}),
+          ...(pendingExpired ? { expiredReason: 'pending' as const } : {}),
           ...(turnExpired ? { expiredReason: 'turn' as const } : {}),
           actionHash: submittedActionResult.actionHash,
         })
@@ -684,6 +1000,7 @@ export async function dispatchRoomBattleAction(
       return {
         kind: expired ? 'expired' : 'applied',
         ...(deploymentExpired ? { expiredReason: 'deployment' as const } : {}),
+        ...(pendingExpired ? { expiredReason: 'pending' as const } : {}),
         ...(turnExpired ? { expiredReason: 'turn' as const } : {}),
         snapshot,
         actionResult,
@@ -699,9 +1016,16 @@ export async function dispatchRoomBattleAction(
           persistenceMs: roundTiming(persistenceMs),
           totalMs: roundTiming(monotonicNow() - performanceStartedAt),
         },
+        presentationEvents,
+      }
+      } finally {
+        if (!retainRuntimeTransaction) {
+          roomRuleRuntime.restoreTransactionState(runtimeTransactionSnapshot)
+        }
       }
     }
 
+    assertBattleAuthorityPersistenceAvailable(store, normalizedRoomId)
     throw new RoomBattleActionError(
       'ROOM_VERSION_CONFLICT',
       'Battle action could not commit because the room changed concurrently',
@@ -754,11 +1078,8 @@ export async function scheduleRoomBattleTimeout(
         if (!result.finalSnapshotAlreadyDelivered && !result.transition) {
           await options.onCommitted?.(result.snapshot)
         }
-        if (
-          result.snapshot.state.turn.phase === 'action'
-          && result.snapshot.state.turn.currentPlayerId === 'bot'
-        ) {
-          await options.onBotTurnReady?.(result.snapshot)
+        if (getCurrentInputOwnerPlayerId(result.actionResult.state).trim().toLowerCase() === 'bot') {
+          await options.onBotTurnReady?.(result.snapshot, result.actionResult.state)
         }
       }
       await scheduleRoomBattleTimeout(store, normalizedRoomId, options)
@@ -772,7 +1093,8 @@ export async function scheduleRoomBattleTimeout(
           turn: state.turnTimer?.turnNumber,
           deadlineAt: state.deployment?.status === 'awaiting-locks'
             ? state.deployment.deadlineAt
-            : state.turnTimer?.deadlineAt,
+            : state.turnTimer?.pendingResponse?.deadlineAt ?? state.turnTimer?.deadlineAt,
+          pendingSelectionId: state.turnTimer?.pendingResponse?.selectionId,
           noAcceptedGameplayAction: state.turnTimer ? !state.turnTimer.acceptedGameplayAction : undefined,
           noOpStreak: state.turnTimer?.noOpStreaks[state.turnTimer.ownerPlayerId],
           code,
@@ -903,6 +1225,31 @@ function createTurnTimeoutAction(
   }
 }
 
+function createPendingTimeoutAction(
+  state: BattleState,
+  now: number,
+  clientActionId: string,
+): PendingTimeoutAction {
+  const timer = state.turnTimer
+  const response = timer?.pendingResponse
+  if (!timer || !response) {
+    throw new RoomBattleActionError(
+      'PENDING_TIMER_MISSING',
+      'Cannot schedule a pending timeout without a running response timer',
+    )
+  }
+  return {
+    type: 'pendingTimeout',
+    now,
+    clientActionId,
+    expectedTurnNumber: timer.turnNumber,
+    expectedDeadlineAt: response.deadlineAt,
+    expectedInputOwnerPlayerId: response.ownerPlayerId,
+    expectedPendingSelectionId: response.selectionId,
+    expectedPendingStateRevision: response.stateRevision,
+  }
+}
+
 function matchesTurnTimeoutExpectation(
   state: BattleState,
   action: TurnTimeoutAction,
@@ -927,6 +1274,26 @@ function matchesTurnTimeoutExpectation(
     && pending.pendingStateRevision === action.expectedPendingStateRevision
 }
 
+function matchesPendingTimeoutExpectation(
+  state: BattleState,
+  action: PendingTimeoutAction,
+): boolean {
+  if (action.expectedTurnNumber === undefined) return true
+  const timer = state.turnTimer
+  const response = timer?.pendingResponse
+  const pending = state.pendingOptionSelection ?? state.pendingTargetSelection
+  return !!timer
+    && !!response
+    && !!pending
+    && timer.turnNumber === action.expectedTurnNumber
+    && response.deadlineAt === action.expectedDeadlineAt
+    && normalizePlayerId(response.ownerPlayerId) === normalizePlayerId(action.expectedInputOwnerPlayerId)
+    && response.selectionId === action.expectedPendingSelectionId
+    && response.stateRevision === action.expectedPendingStateRevision
+    && pending.selectionId === response.selectionId
+    && pending.stateRevision === response.stateRevision
+}
+
 function nextAuthorityWake(state: BattleState): {
   at: number
   action: (now: number) => BattleAction
@@ -944,6 +1311,17 @@ function nextAuthorityWake(state: BattleState): {
   }
   const timer = state.turnTimer
   if (!timer || timer.status !== 'running') return undefined
+  if (timer.pendingResponse) {
+    const response = timer.pendingResponse
+    return {
+      at: response.deadlineAt,
+      action: now => createPendingTimeoutAction(
+        state,
+        now,
+        `system-pending-timeout:scheduled:${response.selectionId}:${response.deadlineAt}`,
+      ),
+    }
+  }
   if (timer.burnPhase !== 'burning') {
     return {
       at: timer.burnStartsAt,
@@ -964,6 +1342,7 @@ function nextAuthorityWake(state: BattleState): {
 function normalizeSystemActionTime(action: BattleAction, now: number): BattleAction {
   if (action.type === 'deploymentTimeout') return { ...action, now }
   if (action.type === 'turnTimerBurn') return { ...action, now }
+  if (action.type === 'pendingTimeout') return { ...action, now }
   if (action.type === 'turnTimeout') return { ...action, now }
   return action
 }
@@ -988,6 +1367,11 @@ function isAlreadyCommittedSystemAction(state: BattleState, action: BattleAction
       || !state.turnTimer
       || state.turnTimer.status !== 'running'
       || !matchesTurnTimeoutExpectation(state, action)
+  }
+  if (action.type === 'pendingTimeout') {
+    return !!state.terminalResult
+      || !state.turnTimer?.pendingResponse
+      || !matchesPendingTimeoutExpectation(state, action)
   }
   return false
 }
@@ -1025,7 +1409,25 @@ function isSystemTimerAction(action: BattleAction): boolean {
   return action.type === 'deploymentTimeout'
     || action.type === 'turnTimerSync'
     || action.type === 'turnTimerBurn'
+    || action.type === 'pendingTimeout'
     || action.type === 'turnTimeout'
+}
+
+function roomAuthorityEventKind(
+  action: BattleAction,
+  viewerPlayerId: string | null | undefined,
+  allowSystem: boolean,
+): RoomAuthorityEventContext['kind'] {
+  if (isSystemTimerAction(action)) return 'timer'
+  if (
+    action.type === 'pendingOptionSelect'
+    || action.type === 'pendingTargetSelect'
+    || action.type === 'cancelPendingSelection'
+  ) return 'pending'
+  const actorPlayerId = 'playerId' in action ? action.playerId : viewerPlayerId
+  if (typeof actorPlayerId === 'string' && actorPlayerId.trim().toLowerCase() === 'bot') return 'bot'
+  if (allowSystem && !viewerPlayerId) return 'system'
+  return 'player'
 }
 
 function decorateRoomActionError(
@@ -1073,7 +1475,7 @@ function roomActionContext(
     noOpStreak: timer?.noOpStreaks[timer.ownerPlayerId],
     actionId: 'clientActionId' in action ? action.clientActionId : undefined,
     authorityVersion: roomBattleAuthorityVersion(room),
-    seed: storage.seed,
+    seed: storage.rootSeed,
   }
 }
 
@@ -1085,6 +1487,47 @@ function actionClientActionId(action: BattleAction): string | undefined {
 
 function actionIdPart(action: BattleAction): string {
   return actionClientActionId(action) ?? action.type
+}
+
+function getAuthorityStateHashIndex(
+  roomId: string,
+  authorityVersion: number,
+  state: BattleState,
+): BattleStateHashIndex {
+  const normalizedRoomId = roomId.trim().toLowerCase()
+  const cached = authorityStateHashIndexes.get(normalizedRoomId)
+  if (cached?.authorityVersion === authorityVersion) return cached.index
+  const index = createBattleStateHashIndex(withoutServerSkills(state) as BattleState)
+  authorityStateHashIndexes.set(normalizedRoomId, { authorityVersion, index })
+  return index
+}
+
+function getPublicStateHashIndex(
+  roomId: string,
+  viewerPlayerId: string | undefined,
+  authorityVersion: number,
+  state: BattleState,
+): BattleStateHashIndex {
+  const key = publicHashCacheKey(roomId, viewerPlayerId)
+  const cached = publicStateHashIndexes.get(key)
+  if (cached?.authorityVersion === authorityVersion) return cached.index
+  return cachePublicStateHashIndex(roomId, viewerPlayerId, authorityVersion, state)
+}
+
+function cachePublicStateHashIndex(
+  roomId: string,
+  viewerPlayerId: string | undefined,
+  authorityVersion: number,
+  state: BattleState,
+): BattleStateHashIndex {
+  const key = publicHashCacheKey(roomId, viewerPlayerId)
+  const index = buildBattleStateHashIndex(state, hashStable)
+  publicStateHashIndexes.set(key, { authorityVersion, index })
+  return index
+}
+
+function publicHashCacheKey(roomId: string, viewerPlayerId: string | undefined): string {
+  return `${roomId.trim().toLowerCase()}::${normalizePlayerId(viewerPlayerId) || '*'}`
 }
 
 function duplicateResult(state: BattleState): BattleActionResult {

@@ -25,6 +25,9 @@
 ## 计划建立的文档
 
 - [`GAME_LOGIC_SYSTEM.md`](./GAME_LOGIC_SYSTEM.md)：当前游戏逻辑接口、状态流转、运行模式差异和执行流程示意图。
+- [`SKILLCODE_AUTHORING_STANDARD.md`](./SKILLCODE_AUTHORING_STANDARD.md)：SkillCode 六类入口、现役 Helper、pending 重放、确定性与安全编写标准。
+- [`SKILLCODE_ABI_V1.md`](./SKILLCODE_ABI_V1.md)：冻结的 SkillCode ABI v1、六类 surface、能力白名单、资源预算、错误与事务语义。
+- [`SKILLCODE_THREAT_MODEL.md`](./SKILLCODE_THREAT_MODEL.md)：不可信 SkillCode 的威胁、可信边界、安全不变量和验证门禁。
 - `ARCHITECTURE.md`：整体架构和模块依赖关系。
 - `ENGINE_CORE.md`：游戏引擎核心、状态变化和执行流程。
 - `DAMAGE_PIPELINE.md`：RED-33 确定性单体/多目标伤害阶段、日志、连锁保护和生命周期合同。
@@ -39,6 +42,7 @@
 - [`AI_SELF_PLAY.md`](./AI_SELF_PLAY.md)：离线成对自博弈、历史档案、seed 分层、硬门禁、逐局进程隔离、进度与恢复。
 - `ESLINT_BASELINE.md`：零新增 lint 门禁、历史 suppression 基线和清债流程。
 - [`DEVELOPMENT_WORKFLOW.md`](./DEVELOPMENT_WORKFLOW.md)：任务分支 main 基线、本地预检、PR 新鲜度门禁和同步流程。
+- [`COLYSEUS_POSTGRESQL_MIGRATION.md`](./COLYSEUS_POSTGRESQL_MIGRATION.md)：Colyseus BattleRoom、RED-139 Queue 兼容、PostgreSQL 双水位耐久、SQLite 离线迁移及 Windows/K8s 分阶段合同。
 - `MODULE_STATUS.md`：模块现状、负责人、风险和重构进度。
 
 ## 目标架构边界

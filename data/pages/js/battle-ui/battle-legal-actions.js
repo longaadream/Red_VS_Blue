@@ -71,6 +71,23 @@
     }
   }
 
+  function sameMoveAction(left, right) {
+    return !!left && !!right
+      && left.type === 'move'
+      && right.type === 'move'
+      && left.playerId === right.playerId
+      && left.pieceId === right.pieceId
+      && left.toX === right.toX
+      && left.toY === right.toY
+  }
+
+  function hasMatchingPendingMove(state, action) {
+    const pending = state && (state.pendingOptionSelection || state.pendingTargetSelection)
+    if (!pending) return false
+    const pendingAction = (pending.transaction && pending.transaction.rootAction) || pending.pendingAction
+    return sameMoveAction(pendingAction, action)
+  }
+
   function moveActionAccepted(engine, snapshot, action) {
     if (!engine || typeof engine.applyBattleAction !== 'function') return false
     try {
@@ -82,7 +99,8 @@
       const applied = engine.applyBattleAction(state, action)
       const nextState = applied && Array.isArray(applied.pieces) ? applied : state
       const nextPiece = (nextState.pieces || []).find(function (piece) { return piece.instanceId === action.pieceId })
-      return !!nextPiece && (nextPiece.x !== beforeX || nextPiece.y !== beforeY)
+      const moved = !!nextPiece && (nextPiece.x !== beforeX || nextPiece.y !== beforeY)
+      return moved || hasMatchingPendingMove(nextState, action)
     } catch {
       return false
     }
@@ -159,6 +177,7 @@
         return {
           needsTarget: true,
           baseAction: action,
+          preparation: error.preparation,
           range: error.range,
           targetType: error.targetType || '',
           filter: error.filter || '',

@@ -4,7 +4,7 @@
   "faction": "evil",
   "description": "与宿主艾迪·布洛克结合的共生体，以宿主转移和共生拖行重排敌方站位，并用腐蚀将其定身。",
   "rarity": "rare",
-  "image": "venom.png",
+  "image": "venom.jpg",
   "stats": {
     "maxHp": 14,
     "attack": 3,

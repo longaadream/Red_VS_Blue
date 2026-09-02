@@ -1,6 +1,12 @@
+import type { TriggerSystem } from './triggers'
+
 export const RANDOM_STREAM_NAMES = {
   deployment: 'deployment',
   deploymentReroll: 'deployment-reroll',
+  progressiveDeploymentOpeningPiece: 'progressive-deployment/opening-piece',
+  progressiveDeploymentOpeningCell: 'progressive-deployment/opening-cell',
+  progressiveDeploymentOffer: 'progressive-deployment/offer',
+  progressiveDeploymentFallback: 'progressive-deployment/fallback',
   skillEffect: 'skill/effect',
   turnOrder: 'turn-order',
 } as const
@@ -219,6 +225,46 @@ export class RuleRuntime {
       this.streams.set(streamName, stream)
     }
     return stream
+  }
+}
+
+/**
+ * Synchronous dependency scope for one authoritative rule execution.
+ *
+ * The online room pipeline installs a distinct context for every room. The
+ * cache map is intentionally opaque here: rule/skill loaders own their cache
+ * entries, while closing a room can release all of them without importing the
+ * loader modules (and without creating a dependency cycle).
+ */
+export interface RuleExecutionContext {
+  readonly triggerSystem: TriggerSystem
+  readonly cache: Map<symbol, unknown>
+}
+
+export function createRuleExecutionContext(triggerSystem: TriggerSystem): RuleExecutionContext {
+  return { triggerSystem, cache: new Map() }
+}
+
+let activeRuleExecutionContext: RuleExecutionContext | undefined
+
+export function getActiveRuleExecutionContext(): RuleExecutionContext | undefined {
+  return activeRuleExecutionContext
+}
+
+export function getRuleExecutionTriggerSystem(fallback: TriggerSystem): TriggerSystem {
+  return activeRuleExecutionContext?.triggerSystem ?? fallback
+}
+
+export function withRuleExecutionContext<T>(
+  context: RuleExecutionContext,
+  operation: () => T,
+): T {
+  const previousContext = activeRuleExecutionContext
+  activeRuleExecutionContext = context
+  try {
+    return operation()
+  } finally {
+    activeRuleExecutionContext = previousContext
   }
 }
 
