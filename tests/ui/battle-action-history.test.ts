@@ -9,7 +9,7 @@ const pagesDir = resolve(process.cwd(), 'data/pages')
 type RootGroup = {
   rootEventId: string
   root: { eventId: string }
-  children: Array<{ eventId: string }>
+  children: Array<{ eventId: string; kind?: string }>
 }
 
 type ActionHistoryUi = {
@@ -36,19 +36,14 @@ type LocalEvent = {
   }
 }
 
-type HighlightElement = {
-  className: string
-  innerHTML: string
-  setAttribute: ReturnType<typeof vi.fn>
-  remove: () => void
-}
-
 function loadActionHistory() {
   const window: Record<string, unknown> = {}
   const context = createContext({ window, globalThis: window, console, setTimeout, clearTimeout })
   const iconsSource = readFileSync(resolve(pagesDir, 'js/battle-ui/battle-effect-icons.js'), 'utf8')
+  const identitySource = readFileSync(resolve(pagesDir, 'js/battle-ui/battle-action-identity.js'), 'utf8')
   const historySource = readFileSync(resolve(pagesDir, 'js/battle-ui/battle-action-history.js'), 'utf8')
   new Script(iconsSource, { filename: 'battle-effect-icons.js' }).runInContext(context)
+  new Script(identitySource, { filename: 'battle-action-identity.js' }).runInContext(context)
   new Script(historySource, { filename: 'battle-action-history.js' }).runInContext(context)
   return {
     history: window.BattleActionHistory as BrowserModule,
@@ -96,6 +91,26 @@ describe('RED-166 icon action history', () => {
     expect(duplicate[0].children.map((event: { eventId: string }) => event.eventId)).toEqual(['action-1:1'])
   })
 
+  it('replaces a cached actor view when the same root is re-projected for another viewer', () => {
+    const { history } = loadActionHistory()
+    const actorRoot = rootEvent(3, { targetPieceIds: ['secret-target'] })
+    const publicRoot = rootEvent(3, { targetPieceIds: [] })
+    const concealed = {
+      ...publicRoot,
+      eventId: 'action-3:concealed',
+      parentEventId: 'action-3:0',
+      sequence: 1,
+      kind: 'concealed',
+      iconId: 'result-hidden',
+    }
+
+    const actor = history.mergeRoots([], [actorRoot], 20)
+    const opponent = history.mergeRoots(actor, [publicRoot, concealed], 20)
+    expect(opponent[0].root).not.toHaveProperty('targetPieceIds', ['secret-target'])
+    expect(opponent[0].children.map((event: { kind?: string }) => event.kind)).toEqual(['concealed'])
+    expect(JSON.stringify(opponent)).not.toContain('secret-target')
+  })
+
   it('keeps bounded data and renders only the latest five roots in stable newest-first order', () => {
     const { history } = loadActionHistory()
     let roots: RootGroup[] = []
@@ -124,7 +139,7 @@ describe('RED-166 icon action history', () => {
       ],
     }
     const snapshot = JSON.stringify(model)
-    const skillGroup = history.groupEvents([rootEvent(1)])[0]
+    const skillGroup = history.groupEvents([rootEvent(1, { result: null, targetCell: null })])[0]
     const moveGroup = history.groupEvents([rootEvent(2, {
       kind: 'move',
       iconId: 'action-move',
@@ -177,22 +192,11 @@ describe('RED-166 icon action history', () => {
       querySelector: (selector: string) => selector === '.action-history-list' ? list : collapsedButton,
       addEventListener: (type: string, listener: (event: LocalEvent) => void) => listeners.set(type, listener),
       removeEventListener: vi.fn(),
-    }
-    let highlight: HighlightElement | null = null
-    const floatLayer = {
-      querySelector: () => highlight,
-      appendChild: (element: HighlightElement) => { highlight = element },
+      contains: () => false,
     }
     const document = {
       getElementById: (id: string) => id === 'actionHistoryDock' ? dock : null,
-      createElement: () => ({
-        className: '',
-        innerHTML: '',
-        setAttribute: vi.fn(),
-        remove: () => { highlight = null },
-      }),
     }
-    const openLog = vi.fn()
     const window = {
       innerWidth: 1280,
       innerHeight: 720,
@@ -204,33 +208,67 @@ describe('RED-166 icon action history', () => {
       document,
       window,
       icons,
-      onOpenLog: openLog,
       setTimeout: () => 1,
       clearTimeout: vi.fn(),
     })
+    const setHistoryHighlight = vi.fn()
     const model = {
-      pieces: [{ id: 'source', x: 0, y: 0 }, { id: 'target', x: 1, y: 0 }],
+      pieces: [
+        { id: 'source', name: '阿尔萨斯', portraitId: 'arthas.jpg', faction: 'blue', x: 0, y: 0 },
+        { id: 'target', x: 1, y: 0 },
+      ],
+      skillSummariesById: {
+        'arthas-icebound-fortitude': { id: 'arthas-icebound-fortitude', name: '寒冰坚忍' },
+      },
       players: [{ id: 'red', faction: 'red' }],
       selection: { mode: 'inspect' },
-      presentationEvents: [rootEvent(1, { iconId: 'future-action' })],
+      presentationEvents: [rootEvent(1, { kind: 'future', iconId: 'future-action' })],
     }
     const before = JSON.stringify(model)
 
-    ui.mount({ element: dock, floatLayer, projectCell: (x: number, y: number) => ({ left: x * 40, top: y * 40 }) })
+    ui.mount({ element: dock, setHistoryHighlight })
     ui.update(model)
     ui.update(model)
 
     expect(ui.getRoots()).toHaveLength(1)
     expect(list.innerHTML).toContain('images/effect-icons/fallback.svg')
-    expect(list.innerHTML).toContain('aria-label="技能，点击高亮来源与目标"')
+    expect(list.innerHTML).toContain('aria-label="未知动作，点击高亮来源与目标"')
     expect(list.innerHTML.match(/data-history-root-id=/g)).toHaveLength(1)
+    expect(JSON.stringify(model)).toBe(before)
+
+    ui.update({
+      ...model,
+      presentationEvents: [rootEvent(2, {
+        label: '寒冰坚忍',
+        skillId: 'arthas-icebound-fortitude',
+      })],
+    })
+    expect(list.innerHTML).toContain('action-history-root-icon is-portrait')
+    expect(list.innerHTML).toContain('src="images/arthas.jpg"')
+    expect(list.innerHTML).toContain('class="action-history-skill-label"')
+    expect(list.innerHTML).toContain('寒冰坚忍')
+    expect(list.innerHTML).toContain('aria-label="寒冰坚忍，点击高亮来源与目标"')
+    expect(list.innerHTML).not.toContain('使用<br>技能')
     expect(JSON.stringify(model)).toBe(before)
 
     const pointerEvent = { stopPropagation: vi.fn() }
     listeners.get('pointerdown')?.(pointerEvent)
     expect(pointerEvent.stopPropagation).toHaveBeenCalledOnce()
+    const wheelEvent = { stopPropagation: vi.fn() }
+    listeners.get('wheel')?.(wheelEvent)
+    expect(wheelEvent.stopPropagation).toHaveBeenCalledOnce()
 
     const actionButton = { dataset: { historyRootId: 'action-1:0' } }
+    const hoverEvent = {
+      target: {
+        closest: (selector: string) => selector === '[data-history-root-id]' ? actionButton : null,
+      },
+    }
+    listeners.get('pointerover')?.(hoverEvent as never)
+    expect(ui.getActiveRootId()).toBe('action-1:0')
+    listeners.get('pointerout')?.({ relatedTarget: null } as never)
+    expect(ui.getActiveRootId()).toBeNull()
+
     const clickEvent = {
       preventDefault: vi.fn(),
       stopPropagation: vi.fn(),
@@ -243,27 +281,142 @@ describe('RED-166 icon action history', () => {
     expect(clickEvent.preventDefault).toHaveBeenCalledOnce()
     expect(clickEvent.stopPropagation).toHaveBeenCalledOnce()
     expect(ui.getActiveRootId()).toBe('action-1:0')
-    expect((highlight as HighlightElement | null)?.innerHTML).toContain('action-history-path')
+    expect(setHistoryHighlight).toHaveBeenLastCalledWith([
+      expect.objectContaining({ x: 0, y: 0, role: 'source' }),
+      expect.objectContaining({ x: 1, y: 0, role: 'target' }),
+    ])
 
+    const expandEvent = {
+      preventDefault: vi.fn(),
+      stopPropagation: vi.fn(),
+      target: {
+        closest: (selector: string) => selector === '.action-history-collapsed-button' ? collapsedButton : null,
+      },
+    }
+    ui.update({
+      ...model,
+      presentationEvents: Array.from({ length: 7 }, (_, index) => rootEvent(index + 1)),
+    })
+    expect(list.innerHTML.match(/data-history-root-id=/g)).toHaveLength(5)
+    listeners.get('click')?.(expandEvent as never)
+    expect(classNames.has('is-user-expanded')).toBe(true)
+    expect(list.innerHTML.match(/data-history-root-id=/g)).toHaveLength(7)
+    expect(collapsedButton.setAttribute).toHaveBeenCalledWith('aria-label', '收起动作历史')
+
+    ui.update({ ...model, selection: { mode: 'target' } })
+    expect(classNames.has('is-collapsed')).toBe(true)
+    expect(classNames.has('is-user-expanded')).toBe(false)
+    ui.update(model)
+    expect(classNames.has('is-collapsed')).toBe(false)
+    expect(classNames.has('is-user-expanded')).toBe(true)
+
+    listeners.get('pointerout')?.({ relatedTarget: null } as never)
+    expect(ui.getActiveRootId()).toBe('action-1:0')
     listeners.get('click')?.(clickEvent)
     expect(ui.getActiveRootId()).toBeNull()
-    expect(highlight).toBeNull()
-    expect(openLog).not.toHaveBeenCalled()
+    expect(setHistoryHighlight).toHaveBeenLastCalledWith([])
   })
 
-  it('keeps the full text log as the compact button secondary action', () => {
+  it('renders voluntary movement as subject-predicate only while retaining its board path data', () => {
+    const source = readFileSync(resolve(pagesDir, 'js/battle-ui/battle-action-history.js'), 'utf8')
+    expect(source).toContain("if (event.kind === 'move') return ''")
+
+    const { history } = loadActionHistory()
+    const group = history.groupEvents([rootEvent(8, {
+      kind: 'move',
+      iconId: 'action-move',
+      targetPieceIds: ['target'],
+      targetCell: { x: 5, y: 4 },
+      result: { fromX: 2, fromY: 4, toX: 5, toY: 4 },
+    })])[0]
+    expect(history.highlightCells(group, { pieces: [] })).toEqual([
+      { x: 2, y: 4, role: 'source' },
+      { x: 5, y: 4, role: 'target' },
+    ])
+  })
+
+  it('renders the caster portrait with the authoritative skill name instead of a generic skill icon', () => {
+    const source = readFileSync(resolve(pagesDir, 'js/battle-ui/battle-action-history.js'), 'utf8')
+    expect(source).toContain('resolveIdentity(group.root)')
+    expect(source).toContain('action-history-predicate is-skill-release')
+    expect(source).toContain('action-history-skill-label')
+    expect(source).toMatch(/rootMark = isSkillRelease[\s\S]*?renderPortrait\(identity\)/)
+  })
+
+  it('delegates history highlights to the mounted battlefield renderer', () => {
+    const window: Record<string, unknown> = {}
+    const context = createContext({ window, globalThis: window, console })
+    new Script(
+      readFileSync(resolve(pagesDir, 'js/battle-ui/battle-presentation.js'), 'utf8'),
+      { filename: 'battle-presentation.js' },
+    ).runInContext(context)
+    const renderer = {
+      init: vi.fn(),
+      setHistoryHighlight: vi.fn(),
+      dispose: vi.fn(),
+    }
+    const historyUi = { mount: vi.fn(), dispose: vi.fn() }
+    const presentation = (window.BattlePresentation as {
+      create: (options: Record<string, unknown>) => {
+        mount: (options: Record<string, unknown>) => void
+        dispose: () => void
+      }
+    }).create({ renderer, domUi: { dispose: vi.fn() }, historyUi })
+    const floatLayer = {}
+    const historyDock = {}
+
+    presentation.mount({ boardContainer: {}, floatLayer, historyDock })
+    const mounted = historyUi.mount.mock.calls[0]?.[0] as {
+      element: unknown
+      setHistoryHighlight: (cells: Array<Record<string, unknown>>) => void
+    }
+    expect(mounted.element).toBe(historyDock)
+    mounted.setHistoryHighlight([{ x: 4, y: 3, role: 'source' }])
+    expect(renderer.setHistoryHighlight).toHaveBeenCalledWith([{ x: 4, y: 3, role: 'source' }])
+    presentation.dispose()
+  })
+
+  it('expands the new action history and gates the old text log behind an explicit debug flag', () => {
     const page = readFileSync(resolve(pagesDir, 'battle.html'), 'utf8')
     const css = readFileSync(resolve(pagesDir, 'css/battle-context-ui.css'), 'utf8')
 
     expect(page).toContain('id="actionHistoryDock"')
     expect(page).toContain('BattleActionHistory.create')
-    expect(page).toContain('onOpenLog: openLog')
-    expect(page).toContain("params.get('qa') === 'RED-166'")
-    expect(page).toContain('red166QaPresentationEvents(snapshot)')
-    expect(page).toContain('aria-label="打开战斗日志"')
+    expect(page).not.toContain('onOpenLog: openLog')
+    expect(page).not.toContain("params.get('qa') === 'RED-166'")
+    expect(page).not.toContain('red166QaPresentationEvents')
+    expect(page).toContain('Engine.projectBattlePresentationEvents({')
+    expect(page).toContain('Engine.projectBattlePresentationEventsForViewer(')
+    const browserEngine = readFileSync(resolve(pagesDir, 'js/game-engine.js'), 'utf8')
+    expect(browserEngine).toContain('projectBattlePresentationEvents')
+    expect(browserEngine).toContain('projectBattlePresentationEventsForViewer')
+    expect(page).toContain('id="btnDebugBattleLog" hidden')
+    expect(page).toContain("params.get('debugBattleLog') === '1'")
+    expect(page).toContain('if (!DEBUG_BATTLE_LOG) return')
+    expect(page).toContain('id="opponentHandStack"')
+    expect(page).toContain('Math.min(10, Math.max(0, Math.trunc(opponentHandCount)))')
+    expect(page).toContain('19 / (visibleCardBacks - 1)')
+    expect(page).toContain('class="opponent-hand-count" aria-hidden="true">\' + visibleCardBacks')
     expect(css).toMatch(/\.action-history-dock\s*\{[\s\S]*?width:\s*52px/)
     expect(css).toMatch(/\.action-history-collapsed-button\s*\{[\s\S]*?width:\s*44px;[\s\S]*?height:\s*44px/)
-    expect(css).toMatch(/\.action-history-highlight\s*\{[\s\S]*?pointer-events:\s*none/)
-    expect(css).toMatch(/@media \(prefers-reduced-motion:\s*reduce\)[\s\S]*?\.action-history-point\s*\{\s*animation:\s*none/)
+    expect(css).toContain('.action-history-dock.is-user-expanded')
+    expect(css).toMatch(/\.action-history-dock\.is-user-expanded\s*\{[\s\S]*?max-height:[^;]+- 72px\)/)
+    expect(css).toMatch(/\.action-history-dock\.is-user-expanded \.action-history-list\s*\{[\s\S]*?max-height:[^;]+- 142px\)/)
+    expect(css).toMatch(/\.action-history-dock\.is-user-expanded \.action-history-list\s*\{[\s\S]*?overflow-y:\s*auto;[\s\S]*?overscroll-behavior:\s*contain/)
+    expect(css).toContain('.action-history-sentence')
+    expect(css).toContain('.opponent-hand-stack')
+    expect(css).toContain('.opponent-hand-count')
+    expect(css).not.toContain('.action-history-highlight')
+  })
+
+  it('ships distinct predicate assets for damage, AP/CP and all three hand mutations', () => {
+    const icons = readFileSync(resolve(pagesDir, 'js/battle-ui/battle-effect-icons.js'), 'utf8')
+    for (const asset of [
+      'verb-damage.svg', 'verb-action-points.svg', 'verb-charge-points.svg',
+      'verb-card-gain.svg', 'verb-card-discard.svg', 'verb-card-change.svg', 'complement-hidden.svg',
+    ]) {
+      expect(icons).toContain(asset)
+      expect(readFileSync(resolve(pagesDir, 'images/effect-icons', asset), 'utf8')).toContain('<svg')
+    }
   })
 })

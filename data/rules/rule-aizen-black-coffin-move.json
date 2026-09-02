@@ -3,5 +3,5 @@
   "name": "黑棺·禁锢",
   "description": "黑棺中的角色无法移动。",
   "trigger": { "type": "beforeMove" },
-  "skillCode": "var piece = context.rulePiece; if (!piece || !context.sourcePiece || context.sourcePiece.instanceId !== piece.instanceId) return { success: false, message: '' }; var tag = piece.statusTags && piece.statusTags.find(function(item) { return item.type === 'aizen-black-coffin'; }); if (!tag) { removeRuleById(piece.instanceId, 'rule-aizen-black-coffin-move'); return { success: false, message: '' }; } return { success: true, blocked: true, message: piece.name + '被黑棺禁锢，无法移动' };"
+  "skillCode": "var piece = context.rulePiece; if (!piece || !context.sourcePiece || context.sourcePiece.instanceId !== piece.instanceId) return { success: false, message: '' }; var tag = piece.statusTags && piece.statusTags.find(function(item) { return item.type === 'imprisoned' && item.id === 'aizen-black-coffin-' + item.sourceId + '-' + piece.instanceId; }); if (!tag) { removeRuleById(piece.instanceId, 'rule-aizen-black-coffin-move'); return { success: false, message: '' }; } return { success: true, blocked: true, message: piece.name + '被黑棺禁锢，无法移动' };"
 }

@@ -48,6 +48,17 @@ export interface SpatialBattleState {
   pieces: readonly SpatialPiece[]
 }
 
+/**
+ * Skill displacement deliberately has different path rules from normal moves,
+ * but every successful landing shares these board invariants.
+ */
+export interface SkillLandingOptions {
+  /** Pieces moved by the same atomic effect are treated as vacating their old cells. */
+  movingPieceIds?: readonly string[]
+  /** Cells already promised to an earlier or enclosing effect in the same action. */
+  reservedCells?: readonly GridPosition[]
+}
+
 export interface ProjectileTraceOptions {
   /** Do not report the firing piece as a collision if the origin is occupied. */
   excludePieceId?: string
@@ -193,6 +204,73 @@ export function getLivingOccupantAt<TPiece extends SpatialPiece>(
     && piece.x === position.x
     && piece.y === position.y
     && (excludeInstanceId === undefined || piece.instanceId !== excludeInstanceId))
+}
+
+export function isLegalSkillLanding(
+  state: SpatialBattleState,
+  position: GridPosition,
+  options: SkillLandingOptions = {},
+): boolean {
+  const tile = state.map.tiles.find(candidate => candidate.x === position.x && candidate.y === position.y)
+  if (!tile?.props?.walkable) return false
+
+  const reserved = new Set((options.reservedCells ?? []).map(gridPositionKey))
+  if (reserved.has(gridPositionKey(position))) return false
+
+  const movingPieceIds = new Set(options.movingPieceIds ?? [])
+  return !state.pieces.some(piece => piece.currentHp > 0
+    && piece.x === position.x
+    && piece.y === position.y
+    && !movingPieceIds.has(String(piece.instanceId ?? '')))
+}
+
+/** Stable filtering: preserves authored candidate priority and removes duplicates. */
+export function getLegalSkillLandingCells(
+  state: SpatialBattleState,
+  candidates: readonly GridPosition[],
+  options: SkillLandingOptions = {},
+): GridPosition[] {
+  const seen = new Set<string>()
+  return candidates.filter(candidate => {
+    const key = gridPositionKey(candidate)
+    if (seen.has(key)) return false
+    seen.add(key)
+    return isLegalSkillLanding(state, candidate, options)
+  })
+}
+
+/** Exact destinations cancel when the one requested cell is no longer legal. */
+export function resolveExactSkillLanding(
+  state: SpatialBattleState,
+  destination: GridPosition,
+  options: SkillLandingOptions = {},
+): GridPosition | undefined {
+  return isLegalSkillLanding(state, destination, options) ? { ...destination } : undefined
+}
+
+/** Nearby/random effects can supply their deterministic priority order and take the first legal cell. */
+export function resolveOrderedSkillLanding(
+  state: SpatialBattleState,
+  candidates: readonly GridPosition[],
+  options: SkillLandingOptions = {},
+): GridPosition | undefined {
+  const [landing] = getLegalSkillLandingCells(state, candidates, options)
+  return landing ? { ...landing } : undefined
+}
+
+/**
+ * Allocates a complete formation or nothing. Partial movement is never committed.
+ * Candidate order and mover order are both authoritative and deterministic.
+ */
+export function allocateSkillFormation(
+  state: SpatialBattleState,
+  movingPieceIds: readonly string[],
+  candidates: readonly GridPosition[],
+  options: Omit<SkillLandingOptions, 'movingPieceIds'> = {},
+): GridPosition[] | undefined {
+  const legal = getLegalSkillLandingCells(state, candidates, { ...options, movingPieceIds })
+  if (legal.length < movingPieceIds.length) return undefined
+  return legal.slice(0, movingPieceIds.length).map(position => ({ ...position }))
 }
 
 /**

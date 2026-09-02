@@ -15,6 +15,6 @@
   "actionPointCost": 1,
   "range": "single",
   "requiresTarget": true,
-  "targeting": { "steps": [{ "kind": "target", "type": "piece", "filter": "enemy", "range": 6 }], "availability": [{ "type": "sourceStatus", "statusType": "ulquiorra-resurreccion", "present": true, "message": "尚未归刃" }] },
+  "targeting": { "steps": [{ "kind": "target", "type": "piece", "filter": "enemy", "range": 6 }], "availability": [{ "type": "sourceStatus", "statusType": "resurreccion", "present": true, "message": "尚未归刃" }] },
   "code": "function executeSkill(context) { var caster = context.piece; var target = selectTarget({ type: 'piece', range: 6, filter: 'enemy' }); if (!target || target.needsTargetSelection) return target; var result = dealDamage(caster, target, caster.attack * 2, 'magical', battle, 'ulquiorra-black-cero'); return { success: true, message: caster.name + '释放黑虚闪，造成' + (result.damage || 0) + '点魔法伤害' }; }"
 }

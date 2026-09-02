@@ -2,7 +2,13 @@
 import type { PieceInstance } from './piece'
 import { getSkillById } from './skill-repository'
 import { getEffectiveChargeCost, loadCardById, loadRuleById } from './skills'
-import { manhattanDistance, traceProjectile } from './spatial'
+import {
+  getLegalSkillLandingCells,
+  gridPositionKey,
+  manhattanDistance,
+  traceProjectile,
+  type GridPosition,
+} from './spatial'
 import type { BattleAction, BattleState } from './turn'
 import type { PendingReactiveCardRef } from './pending-interaction'
 import type {
@@ -739,17 +745,13 @@ function validateSourceSpecificCell(
 
 function hasOpenCardinalLanding(state: BattleState, target: PieceInstance, sourcePieceId?: string): boolean {
   if (target.x == null || target.y == null) return false
-  const targetX = target.x
-  const targetY = target.y
-  return [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => {
-    const x = targetX + dx
-    const y = targetY + dy
-    const tile = state.map.tiles.find(candidate => candidate.x === x && candidate.y === y)
-    if (!tile?.props?.walkable) return false
-    return !state.pieces.some(piece =>
-      piece.currentHp > 0 && piece.instanceId !== sourcePieceId && piece.x === x && piece.y === y,
-    )
-  })
+  const candidates = [[1, 0], [-1, 0], [0, 1], [0, -1]].map(([dx, dy]) => ({
+    x: target.x! + dx,
+    y: target.y! + dy,
+  }))
+  return getLegalSkillLandingCells(state, candidates, {
+    movingPieceIds: sourcePieceId ? [sourcePieceId] : [],
+  }).length > 0
 }
 
 function validateSourceSpecificPiece(
@@ -970,6 +972,40 @@ export function isSinglePieceTargetAction(state: BattleState, draftCommand: Batt
   if ('kind' in source) return false
   const targetSteps = source.steps.filter(step => step.kind === 'target') as TargetSpec[]
   return targetSteps.length === 1 && targetSteps[0].type === 'piece'
+}
+
+/**
+ * Empty cells selected as destinations are reserved while beforeSkillUse and
+ * afterSkillUsed reactions settle. This prevents a reaction from consuming a
+ * cell the enclosing action has already authoritatively promised.
+ */
+export function getReservedSkillLandingCells(
+  state: BattleState,
+  draftCommand: BattleAction | any,
+): GridPosition[] {
+  const source = getSource(state, draftCommand)
+  if ('kind' in source) return []
+  const selected = getSelectedTargets(state, draftCommand)
+  if (!Array.isArray(selected)) return []
+
+  const reserved: GridPosition[] = []
+  let targetIndex = 0
+  for (const step of source.steps) {
+    if (step.kind !== 'target') continue
+    const target = selected[targetIndex]
+    targetIndex += 1
+    if (step.requireUnoccupied && target?.type === 'cell') {
+      reserved.push({ x: target.x, y: target.y })
+    }
+  }
+
+  const seen = new Set<string>()
+  return reserved.filter(position => {
+    const key = gridPositionKey(position)
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
 }
 
 export function prepareAction(state: BattleState, draftCommand: BattleAction | any): ActionPreparation {

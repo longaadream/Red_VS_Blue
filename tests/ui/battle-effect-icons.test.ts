@@ -77,6 +77,20 @@ describe('RED-165 battle effect icon registry', () => {
       visibility: 'board',
     })
     expect(icons.resolveStatusType('freeze')).toMatchObject({ iconId: 'freeze', visibility: 'board' })
+    expect(icons.resolveStatusType('imprisoned')).toMatchObject({
+      iconId: 'imprisoned', assetPath: 'images/effect-icons/imprisoned.svg', label: '禁锢', visibility: 'board',
+    })
+    expect(icons.resolveStatusType('resurreccion')).toMatchObject({
+      iconId: 'resurreccion', assetPath: 'images/effect-icons/resurreccion.svg', label: '归刃', visibility: 'board',
+    })
+    expect(icons.resolveStatusType('damage-buff')).toMatchObject({
+      iconId: 'empowered', assetPath: 'images/effect-icons/empowered.svg', label: '强化', visibility: 'board',
+    })
+    expect(icons.resolveStatusType('damage-multiplier')).toMatchObject({
+      iconId: 'damage-multiplier', assetPath: 'images/effect-icons/damage-multiplier.svg', label: '飞天御剑流', visibility: 'board',
+    })
+    expect(icons.resolveStatusType('aizen-kyoka-active').visibility).toBe('hidden')
+    expect(icons.resolveStatusType('aizen-kyoka-secret').visibility).toBe('hidden')
     expect(icons.resolveStatusType('chidori-immobile').iconId)
       .toBe(icons.resolveStatusType('venom-corrosion-immobile').iconId)
     expect(icons.resolveStatusType('shishio-cooldown-fired').visibility).toBe('hidden')
@@ -106,8 +120,13 @@ describe('RED-165 battle effect icon registry', () => {
   it('resolves every presentation-event action icon without emoji or an empty asset', () => {
     const icons = loadBrowserModule('js/battle-ui/battle-effect-icons.js', 'BattleEffectIcons')
     const actionIconIds = [
-      'action-move', 'action-skill', 'action-charge-skill', 'action-card', 'action-passive',
-      'action-damage', 'action-heal', 'action-death', 'status-add', 'status-remove', 'shield',
+      'action-move', 'action-deploy', 'action-skill', 'action-charge-skill', 'action-card',
+      'action-end-turn', 'action-automatic', 'action-choice', 'action-passive', 'action-block',
+      'action-damage', 'action-heal', 'action-force-move', 'action-spawn', 'action-death',
+      'action-eliminated', 'action-action-points', 'action-charge-points', 'action-card-gain',
+      'action-card-discard', 'action-card-change', 'action-tile-change', 'action-tile-effect-add',
+      'action-tile-effect-remove', 'action-stat-change', 'action-redirect', 'status-add',
+      'status-remove', 'result-hidden',
     ]
     for (const iconId of actionIconIds) {
       expect(icons.resolveAction(iconId)).toMatchObject({ iconId })
@@ -126,7 +145,11 @@ describe('RED-165 battle effect icon registry', () => {
     ] as Array<{ assetPath: string }>
     for (const entry of entries) {
       expect(entry.assetPath, entry.assetPath).toMatch(/^images\//)
-      expect(existsSync(resolve(rootDir, 'public', entry.assetPath.replace(/^images\//, ''))), entry.assetPath).toBe(true)
+      const relative = entry.assetPath.replace(/^images\//, '')
+      expect(
+        existsSync(resolve(rootDir, 'public', relative)) || existsSync(resolve(pagesDir, 'images', relative)),
+        entry.assetPath,
+      ).toBe(true)
     }
   })
 
@@ -140,6 +163,12 @@ describe('RED-165 battle effect icon registry', () => {
       presentationEvents: [{
         eventId: 'action-1:0', rootEventId: 'action-1:0', actionId: 'action-1', sequence: 0,
         kind: 'skill', iconId: 'action-skill', actorPlayerId: 'red', sourcePieceId: 'piece-red',
+        presentation: {
+          cue: 'projectile', selectedCell: { x: 0, y: 0 }, pathCells: [{ x: 0, y: 0 }],
+          endPoint: { x: 0, y: 0 }, endReason: 'hit',
+          collisions: [{ kind: 'piece', x: 0, y: 0, pieceId: 'piece-red', blocking: true }],
+          areaCells: [{ x: 0, y: 0 }], ignored: 'not-public',
+        },
         priority: 100, skippable: true, message: '客户端不消费这段日志文字',
       }],
       snapshot: {
@@ -168,6 +197,12 @@ describe('RED-165 battle effect icon registry', () => {
     expect(model.selection.piece.statuses[1]).toMatchObject({ iconId: 'fallback' })
     expect(model.presentationEvents).toEqual([expect.objectContaining({
       eventId: 'action-1:0', kind: 'skill', iconId: 'action-skill', sourcePieceId: 'piece-red',
+      presentation: {
+        cue: 'projectile', selectedCell: { x: 0, y: 0 }, pathCells: [{ x: 0, y: 0 }],
+        endPoint: { x: 0, y: 0 }, endReason: 'hit',
+        collisions: [{ kind: 'piece', x: 0, y: 0, pieceId: 'piece-red', blocking: true }],
+        areaCells: [{ x: 0, y: 0 }],
+      },
     })])
     expect(model.presentationEvents[0]).not.toHaveProperty('message')
   })

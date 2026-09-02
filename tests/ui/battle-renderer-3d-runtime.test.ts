@@ -21,6 +21,7 @@ type ThreeNode = {
   children: ThreeNode[]
   visible: boolean
   material?: ThreeMaterial
+  geometry?: { getAttribute(name: string): { array: ArrayLike<number> } }
   position: { x: number; y: number; z: number }
   scale: { x: number; y: number; z: number }
   userData: Record<string, unknown>
@@ -35,13 +36,25 @@ type RendererApi = {
   resize(): void
   resetView(): void
   projectCell(x: number, y: number, elevation?: number): { clientX: number; clientY: number }
+  setHistoryHighlight(cells: Array<{ x: number; y: number; role: 'source' | 'target' }>): void
   screenToCell(clientX: number, clientY: number): { x: number; y: number } | null
+  showPresentationAreaFlash(cells: Array<{ x: number; y: number }>): void
+  clearPresentationAreaFlash(): void
+  showPresentationPath(path: { source?: { x: number; y: number }; end?: { x: number; y: number }; selected?: { x: number; y: number } }): void
+  clearPresentationPath(): void
   getMotionDiagnostics(): {
     activeAnimations: string[]
     playedEventCount: number
     floaterCount: number
     pendingPieceIds: string[]
-    highlightCounts: { move: number; skill: number; place: number; selected: number }
+    pendingAppearanceCues: string[]
+    presentationAreaCellCount: number
+    presentationPath: {
+      source: { x: number; y: number } | null
+      end: { x: number; y: number } | null
+      selected: { x: number; y: number } | null
+    } | null
+    highlightCounts: { move: number; skill: number; place: number; selected: number; historyPoints: number; historyPaths: number }
   }
   getPerformanceDiagnostics(): {
     renderCount: number
@@ -92,6 +105,8 @@ type RuntimeStatusFixture = {
 
 type RuntimePieceFixture = {
   id: string
+  templateId?: string
+  portraitId?: string
   name: string
   faction: string
   ownerPlayerId: string
@@ -386,6 +401,129 @@ describe('RED-68 BattleRenderer3D runtime', () => {
     harness.renderer.dispose()
   })
 
+  it('builds projectile and aim geometry in the board world plane using the authoritative endpoint', () => {
+    const harness = createHarness(1280, 720, false)
+    const model = runtimeModel()
+    const authorityBefore = JSON.stringify(model)
+    harness.renderer.init({ container: harness.container })
+    harness.renderer.update(model)
+    harness.frame(16)
+    const scene = harness.renderers[0].scene!
+
+    harness.renderer.showPresentationPath({
+      source: { x: 2, y: 2 },
+      selected: { x: 2, y: 3 },
+      end: { x: 2, y: 5 },
+    })
+    harness.frame(80)
+
+    const group = scene.children.find(child => child.userData.presentationPath === true)!
+    const trajectory = group.children.find(child => child.userData.presentationPathRole === 'trajectory')!
+    const aim = group.children.find(child => child.userData.presentationPathRole === 'selected-aim')!
+    const positions = Array.from(trajectory.geometry!.getAttribute('position').array)
+    const xs = positions.filter((_, index) => index % 3 === 0)
+    const ys = positions.filter((_, index) => index % 3 === 1)
+    const zs = positions.filter((_, index) => index % 3 === 2)
+
+    expect(trajectory.userData.sourceCell).toEqual({ x: 2, y: 2 })
+    expect(trajectory.userData.endCell).toEqual({ x: 2, y: 5 })
+    expect(Math.min(...xs)).toBeCloseTo(1.965, 3)
+    expect(Math.max(...xs)).toBeCloseTo(2.035, 3)
+    expect(Math.min(...zs)).toBeCloseTo(2, 5)
+    expect(Math.max(...zs)).toBeCloseTo(5, 5)
+    expect(new Set(ys.map(value => value.toFixed(3)))).toEqual(new Set(['0.148']))
+    expect(aim.userData.selectedCell).toEqual({ x: 2, y: 3 })
+    expect(harness.renderer.getMotionDiagnostics().presentationPath).toEqual({
+      source: { x: 2, y: 2 },
+      end: { x: 2, y: 5 },
+      selected: { x: 2, y: 3 },
+    })
+    expect(JSON.stringify(model)).toBe(authorityBefore)
+
+    harness.renderer.clearPresentationPath()
+    expect(scene.children).not.toContain(group)
+    expect(harness.renderer.getMotionDiagnostics().presentationPath).toBeNull()
+
+    harness.renderer.showPresentationPath({ selected: { x: 4, y: 4 } })
+    const aimOnlyGroup = scene.children.find(child => child.userData.presentationPath === true)!
+    expect(aimOnlyGroup.children).toHaveLength(1)
+    expect(aimOnlyGroup.children[0].userData.presentationPathRole).toBe('selected-aim')
+    expect(harness.renderer.getMotionDiagnostics().presentationPath).toEqual({
+      source: null,
+      end: null,
+      selected: { x: 4, y: 4 },
+    })
+    harness.renderer.clearPresentationPath()
+    harness.renderer.dispose()
+  })
+
+  it('flashes area cells with board-aligned overlays without breaking instanced terrain', () => {
+    const harness = createHarness(1280, 720, false)
+    const model = runtimeModel()
+    const authorityBefore = JSON.stringify(model)
+    harness.renderer.init({ container: harness.container })
+    harness.renderer.update(model)
+    harness.frame(16)
+    const scene = harness.renderers[0].scene!
+    const terrainBatches = scene.children.filter(child => child.isInstancedMesh)
+    const originalTerrainMaterials = terrainBatches.map(batch => batch.material)
+
+    harness.renderer.showPresentationAreaFlash([
+      { x: 2, y: 2 }, { x: 2, y: 3 }, { x: 2, y: 4 }, { x: 2, y: 3 },
+    ])
+    for (let index = 0; index < 4; index += 1) harness.frame(40)
+    expect(harness.renderer.getMotionDiagnostics().presentationAreaCellCount).toBe(3)
+    const flashes = scene.children.filter(child => child.userData.presentationAreaFlash === true)
+    expect(flashes).toHaveLength(3)
+    flashes.forEach((flash) => {
+      expect(flash.material!.emissive.getHex()).toBe(0xf97316)
+      expect(flash.material!.emissiveIntensity).toBeGreaterThan(0)
+    })
+    expect(flashes.map(flash => flash.userData.presentationAreaCell)).toEqual([
+      { x: 2, y: 2 }, { x: 2, y: 3 }, { x: 2, y: 4 },
+    ])
+    terrainBatches.forEach((batch, index) => expect(batch.material).toBe(originalTerrainMaterials[index]))
+    expect(JSON.stringify(model)).toBe(authorityBefore)
+
+    harness.renderer.clearPresentationAreaFlash()
+    expect(harness.renderer.getMotionDiagnostics().presentationAreaCellCount).toBe(0)
+    flashes.forEach(flash => expect(scene.children).not.toContain(flash))
+    harness.renderer.dispose()
+  })
+
+  it('draws action-history points and paths in the Three.js world parallel to the board plane', () => {
+    const harness = createHarness(1280, 720, false)
+    const model = runtimeModel()
+    harness.renderer.init({ container: harness.container })
+    harness.renderer.update(model)
+    harness.renderer.setHistoryHighlight([
+      { x: 2, y: 3, role: 'source' },
+      { x: 8, y: 3, role: 'target' },
+      { x: 8, y: 7, role: 'target' },
+    ])
+    harness.frame()
+
+    const diagnostics = harness.renderer.getMotionDiagnostics()
+    expect(diagnostics.highlightCounts.historyPoints).toBe(3)
+    expect(diagnostics.highlightCounts.historyPaths).toBe(2)
+    const historyGroup = harness.renderers[0].scene!.children.find((child) => child.userData.historyHighlight === true)
+    expect(historyGroup).toBeTruthy()
+    const paths = historyGroup!.children.filter((child) => child.userData.historyRole === 'path') as Array<ThreeNode & {
+      geometry: { attributes: { position: { array: ArrayLike<number> } } }
+    }>
+    expect(paths).toHaveLength(2)
+    for (const path of paths) {
+      const positions = Array.from(path.geometry.attributes.position.array)
+      expect(positions[1]).toBeCloseTo(positions[4], 6)
+    }
+
+    harness.renderer.setHistoryHighlight([])
+    expect(harness.renderer.getMotionDiagnostics().highlightCounts.historyPoints).toBe(0)
+    expect(harness.renderer.getMotionDiagnostics().highlightCounts.historyPaths).toBe(0)
+    expect(harness.renderers[0].scene!.children).not.toContain(historyGroup)
+    harness.renderer.dispose()
+  })
+
   it('executes projection, hit, DPR, touch gestures, reset, flash recovery, and rule-state isolation', () => {
     const harness = createHarness()
     const intents: Array<Record<string, unknown>> = []
@@ -664,6 +802,10 @@ describe('RED-68 BattleRenderer3D runtime', () => {
     harness.renderer.update(pendingModel)
     for (let index = 0; index < 10; index += 1) harness.frame(16)
     expect(harness.renderer.getMotionDiagnostics().pendingPieceIds).toEqual([pieceId])
+    const pendingFeedback = group.children.find((child) => child.userData.motionRole === 'feedback-ring')!
+    const pendingBody = group.children.find((child) => child.material && child.material.emissiveIntensity === 0.24)!
+    expect(pendingFeedback.material!.opacity).toBe(0.58)
+    expect(pendingBody).toBeTruthy()
 
     const firstTarget = structuredClone(model)
     firstTarget.pieces[0].x += 3
@@ -693,6 +835,36 @@ describe('RED-68 BattleRenderer3D runtime', () => {
     for (let index = 0; index < 20; index += 1) harness.frame(16)
     expect(group.position.x).toBeCloseTo(secondTarget.pieces[0].x, 3)
     expect(harness.renderer.getMotionDiagnostics().playedEventCount).toBe(2)
+    harness.renderer.dispose()
+  })
+
+  it('uses a dedicated authoritative summon/revive animation and preserves pending feedback', () => {
+    const harness = createHarness(844, 390, false)
+    const model = runtimeModel()
+    model.pieces[0].templateId = 'base-form'
+    harness.renderer.init({ container: harness.container })
+    harness.renderer.update(model)
+    harness.frame(16)
+
+    const summoned = structuredClone(model)
+    summoned.pieces.push({
+      ...structuredClone(model.pieces[0]),
+      id: 'summoned-piece',
+      templateId: 'summoned-form',
+      x: model.pieces[0].x + 1,
+    })
+    summoned.interaction = { pendingPieceId: 'summoned-piece', pendingCommandId: 'summon-1' }
+    harness.renderer.animateAction({ type: 'battleTransition', motionEventKey: 'summon-1' }, model, summoned)
+    expect(harness.renderer.getMotionDiagnostics().pendingAppearanceCues).toEqual(['summoned-piece:summon'])
+    harness.renderer.update(summoned)
+    expect(harness.renderer.getMotionDiagnostics().activeAnimations).toContain('piece:summoned-piece:summon')
+    for (let index = 0; index < 20; index += 1) harness.frame(16)
+    const summonedGroup = harness.renderers[0].scene!.children.find((child) => child.userData.pieceId === 'summoned-piece')!
+    const pendingBody = summonedGroup.children.find((child) => child.material && child.material.emissiveIntensity === 0.24)
+    const pendingRing = summonedGroup.children.find((child) => child.userData.motionRole === 'feedback-ring')
+    expect(pendingBody).toBeTruthy()
+    expect(pendingRing).toBeTruthy()
+    expect(pendingRing!.material!.opacity).toBeGreaterThanOrEqual(0.58)
     harness.renderer.dispose()
   })
 

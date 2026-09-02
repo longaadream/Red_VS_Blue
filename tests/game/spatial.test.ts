@@ -1,12 +1,16 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  allocateSkillFormation,
   getLegalNormalMoveTargets,
+  getLegalSkillLandingCells,
   getLivingOccupantAt,
   getManhattanArea,
   getOrthogonalLineCells,
   getSquareArea,
   manhattanDistance,
+  resolveExactSkillLanding,
+  resolveOrderedSkillLanding,
 } from '@/lib/game/spatial'
 import { makeMap, makePiece, makeTile } from '../helpers/minimal-state'
 
@@ -124,5 +128,46 @@ describe('occupancy and normal movement tools', () => {
     expect(legal.has('1,0')).toBe(true)
     expect(legal.has('2,0')).toBe(false)
     expect(legal.has('3,0')).toBe(false)
+  })
+})
+
+describe('RED-174 shared skill landing tools', () => {
+  it('exact landing cancels for occupied, reserved, or unwalkable cells', () => {
+    const occupant = makePiece({ instanceId: 'occupant', x: 1, y: 1 })
+    const map = makeMap(4, 3)
+    map.tiles = map.tiles.map(tile => tile.x === 3 && tile.y === 1 ? makeTile(3, 1, false) : tile)
+    const state = { map, pieces: [occupant] }
+
+    expect(resolveExactSkillLanding(state, { x: 1, y: 1 })).toBeUndefined()
+    expect(resolveExactSkillLanding(state, { x: 2, y: 1 }, { reservedCells: [{ x: 2, y: 1 }] })).toBeUndefined()
+    expect(resolveExactSkillLanding(state, { x: 3, y: 1 })).toBeUndefined()
+    expect(resolveExactSkillLanding(state, { x: 0, y: 2 })).toEqual({ x: 0, y: 2 })
+  })
+
+  it('nearby landing preserves candidate priority while skipping illegal and duplicate cells', () => {
+    const occupant = makePiece({ instanceId: 'occupant', x: 1, y: 0 })
+    const state = { map: makeMap(4, 3), pieces: [occupant] }
+    const candidates = [{ x: 1, y: 0 }, { x: 2, y: 0 }, { x: 2, y: 0 }, { x: 3, y: 0 }]
+
+    expect(getLegalSkillLandingCells(state, candidates, { reservedCells: [{ x: 2, y: 0 }] }))
+      .toEqual([{ x: 3, y: 0 }])
+    expect(resolveOrderedSkillLanding(state, candidates, { reservedCells: [{ x: 2, y: 0 }] }))
+      .toEqual({ x: 3, y: 0 })
+  })
+
+  it('formation treats every mover as vacating its old cell and commits only a complete allocation', () => {
+    const first = makePiece({ instanceId: 'first', x: 0, y: 0 })
+    const second = makePiece({ instanceId: 'second', x: 1, y: 0 })
+    const blocker = makePiece({ instanceId: 'blocker', x: 2, y: 0 })
+    const state = { map: makeMap(4, 2), pieces: [first, second, blocker] }
+    const candidates = [{ x: 1, y: 0 }, { x: 2, y: 0 }, { x: 3, y: 0 }]
+
+    expect(allocateSkillFormation(state, ['first', 'second'], candidates)).toEqual([
+      { x: 1, y: 0 },
+      { x: 3, y: 0 },
+    ])
+    expect(allocateSkillFormation(state, ['first', 'second'], candidates, {
+      reservedCells: [{ x: 3, y: 0 }],
+    })).toBeUndefined()
   })
 })
