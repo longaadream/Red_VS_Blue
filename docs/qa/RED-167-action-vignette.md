@@ -14,7 +14,7 @@
 1. 启动页面 QA 服务。
 2. 打开 `battle.html?mode=training&qa=RED-167` 并开始训练战斗。
 3. 页面依次演示弹射物、指向技能、范围闪烁、位移和召唤；控制台执行 `window.__RVB_RED167_REPLAY__()` 可重播。
-4. 弹射物阶段确认虚线瞄准格与实际终点可分离，图标抵达实际 `endPoint`；路径被挡或飞越点击格时仍使用结算轨迹。
+4. 弹射物阶段确认虚线瞄准格与实际终点可分离，轨迹延伸到实际 `endPoint`；路径被挡或飞越点击格时仍使用结算轨迹。轨迹和虚线必须位于真实棋盘世界平面，不得用平行于屏幕的 DOM 线模拟。
 5. 演出期间点按战场，确认当前动作在 100ms 内收束，并且该次点击不触发棋盘选择、移动或技能。
 6. 切换右上角 1×/2×，确认顺序不变、耗时缩短；将系统设置为“减少动态效果”后刷新，确认只显示 100–140ms 静态结果帧。
 7. 在窄高横屏复查状态条、44px 速度按钮与区域闪烁没有遮挡主要棋盘操作。
@@ -25,12 +25,12 @@
 - 队列、略过、2×、减弱动态和 DOM 清理：`tests/ui/battle-action-vignette.test.ts`；其中固定 16 棋子、160 个根动作并推进 180 秒的压力场景确认队列归零、无残留计时器。
 - renderer 召唤/复活与 pending 高亮：`tests/ui/battle-renderer-3d-runtime.test.ts`
 - 页面/生命周期边界：`tests/game/battle-ui-boundary.test.ts`、`tests/game/battle-page-contract.test.ts`
-- 最新主基线相关回归：8 个测试文件共 95 项通过；`npm.cmd run typecheck` 与 `npm.cmd run check:encoding` 通过。
+- 最新主基线相关回归：8 个相关测试文件共 113 项通过；`npm.cmd run typecheck`、定向 ESLint、3 个浏览器脚本语法检查与 `npm.cmd run check:encoding` 通过。
 
 ## 浏览器证据（Playwright CLI）
 
-- 1280×720 弹射物：`output/playwright/RED-167-projectile-text-skill.png`。实测 `selectedCell` 投影为 `left=968.624px`，权威 `endPoint` 为 `left=1056.26px`，移动标识终点变量为 `1057.04px`，没有回退到点击格；技能根动作的状态条和移动标识均显示“使用技能”，且移动标识不含占位图标。
-- 1280×720 范围闪烁：`output/playwright/RED-167-area-flash.png`。演出层处于 `is-cue-area`，以一整片柔和光晕覆盖 3 个权威 `areaCells`；独立格子光圈、来源/瞄准/终点光圈、路径与动作移动标识数量均为 0。
+- 1280×720 弹射物：`output/playwright/RED-167-projectile-text-skill.png`。renderer 在固定棋盘平面高度创建 1 条指向权威 `endPoint` 的 3D ribbon 与 1 个 `selectedCell` 世界空间中心虚线；轨迹两端不读取高低地形高度，因此严格平行于棋盘格轴，高地只产生自然遮挡而不会把线段抬歪。DOM 棋盘图层的轨迹、文字和图标数量均为 0。“使用技能”文字只显示在顶部状态条与历史记录。
+- 1280×720 范围闪烁：`output/playwright/RED-167-area-flash.png`。演出层处于 `is-cue-area`，不创建任何 DOM 或额外 3D 覆盖面；renderer 临时克隆并点亮 3 块真实地砖的材质，几何、位置和缩放完全不变，收束时恢复原材质。因此方向、透视、厚度与遮挡直接继承棋盘本身，不存在额外边框角度；棋盘 DOM 的路径、文字和图标数量均为 0。
 - 844×390、`prefers-reduced-motion: reduce`：`output/playwright/RED-167-reduced-motion-mobile-landscape.png`。截图时演出阶段为可见的 `static`，速度按钮为 44×44px。
 - 略过输入：真实页面派发可取消的 `pointerdown` 后 10.5ms 内同步进入 `settle`；`defaultPrevented=true`、派发返回 `false`、战场父节点收到的穿透事件数为 0。收尾计时目标为 60ms，低于 100ms 验收上限。
 - 控制台仅出现静态 QA 服务基线缺失资源：`js/game-engine-runtime.js` 与 `data/skills/evil-explosion.json` 的 404；未发现 RED-167 运行时异常。

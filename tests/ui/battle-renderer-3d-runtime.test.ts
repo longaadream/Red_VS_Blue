@@ -19,6 +19,7 @@ type ThreeNode = {
   children: ThreeNode[]
   visible: boolean
   material?: ThreeMaterial
+  geometry?: { getAttribute(name: string): { array: ArrayLike<number> } }
   position: { x: number; y: number; z: number }
   scale: { x: number; y: number; z: number }
   userData: Record<string, unknown>
@@ -34,12 +35,22 @@ type RendererApi = {
   resetView(): void
   projectCell(x: number, y: number, elevation?: number): { clientX: number; clientY: number }
   screenToCell(clientX: number, clientY: number): { x: number; y: number } | null
+  showPresentationAreaFlash(cells: Array<{ x: number; y: number }>): void
+  clearPresentationAreaFlash(): void
+  showPresentationPath(path: { source?: { x: number; y: number }; end?: { x: number; y: number }; selected?: { x: number; y: number } }): void
+  clearPresentationPath(): void
   getMotionDiagnostics(): {
     activeAnimations: string[]
     playedEventCount: number
     floaterCount: number
     pendingPieceIds: string[]
     pendingAppearanceCues: string[]
+    presentationAreaCellCount: number
+    presentationPath: {
+      source: { x: number; y: number } | null
+      end: { x: number; y: number } | null
+      selected: { x: number; y: number } | null
+    } | null
     highlightCounts: { move: number; skill: number; place: number; selected: number }
   }
   dispose(): void
@@ -346,6 +357,105 @@ function distance(a: { clientX: number; clientY: number }, b: { clientX: number;
 }
 
 describe('RED-68 BattleRenderer3D runtime', () => {
+  it('builds projectile and aim geometry in the board world plane using the authoritative endpoint', () => {
+    const harness = createHarness(1280, 720, false)
+    const model = runtimeModel()
+    const authorityBefore = JSON.stringify(model)
+    harness.renderer.init({ container: harness.container })
+    harness.renderer.update(model)
+    harness.frame(16)
+    const scene = harness.renderers[0].scene!
+    const raisedEndTile = scene.children.find(
+      child => child.userData.tileX === 2 && child.userData.tileZ === 5,
+    )!
+    raisedEndTile.userData.surfaceY = 0.52
+
+    harness.renderer.showPresentationPath({
+      source: { x: 2, y: 2 },
+      selected: { x: 2, y: 3 },
+      end: { x: 2, y: 5 },
+    })
+    harness.frame(80)
+
+    const group = scene.children.find(child => child.userData.presentationPath === true)!
+    const trajectory = group.children.find(child => child.userData.presentationPathRole === 'trajectory')!
+    const aim = group.children.find(child => child.userData.presentationPathRole === 'selected-aim')!
+    const positions = Array.from(trajectory.geometry!.getAttribute('position').array)
+    const xs = positions.filter((_, index) => index % 3 === 0)
+    const ys = positions.filter((_, index) => index % 3 === 1)
+    const zs = positions.filter((_, index) => index % 3 === 2)
+
+    expect(trajectory.userData.sourceCell).toEqual({ x: 2, y: 2 })
+    expect(trajectory.userData.endCell).toEqual({ x: 2, y: 5 })
+    expect(Math.min(...xs)).toBeCloseTo(1.965, 3)
+    expect(Math.max(...xs)).toBeCloseTo(2.035, 3)
+    expect(Math.min(...zs)).toBeCloseTo(2, 5)
+    expect(Math.max(...zs)).toBeCloseTo(5, 5)
+    expect(new Set(ys.map(value => value.toFixed(3)))).toEqual(new Set(['0.148']))
+    expect(aim.userData.selectedCell).toEqual({ x: 2, y: 3 })
+    expect(harness.renderer.getMotionDiagnostics().presentationPath).toEqual({
+      source: { x: 2, y: 2 },
+      end: { x: 2, y: 5 },
+      selected: { x: 2, y: 3 },
+    })
+    expect(JSON.stringify(model)).toBe(authorityBefore)
+
+    harness.renderer.clearPresentationPath()
+    expect(scene.children).not.toContain(group)
+    expect(harness.renderer.getMotionDiagnostics().presentationPath).toBeNull()
+
+    harness.renderer.showPresentationPath({ selected: { x: 4, y: 4 } })
+    const aimOnlyGroup = scene.children.find(child => child.userData.presentationPath === true)!
+    expect(aimOnlyGroup.children).toHaveLength(1)
+    expect(aimOnlyGroup.children[0].userData.presentationPathRole).toBe('selected-aim')
+    expect(harness.renderer.getMotionDiagnostics().presentationPath).toEqual({
+      source: null,
+      end: null,
+      selected: { x: 4, y: 4 },
+    })
+    harness.renderer.clearPresentationPath()
+    harness.renderer.dispose()
+  })
+
+  it('flashes the real 3D tile materials so area presentation cannot diverge from board orientation', () => {
+    const harness = createHarness(1280, 720, false)
+    const model = runtimeModel()
+    const authorityBefore = JSON.stringify(model)
+    harness.renderer.init({ container: harness.container })
+    harness.renderer.update(model)
+    harness.frame(16)
+    const scene = harness.renderers[0].scene!
+    const tiles = [2, 3, 4].map(z => scene.children.find(
+      child => child.userData.tileX === 2 && child.userData.tileZ === z,
+    ) as ThreeNode & { geometry: unknown })
+    const originalMaterials = tiles.map(tile => tile.material)
+    const originalGeometry = tiles.map(tile => tile.geometry)
+    const originalTransforms = tiles.map(tile => ({
+      position: { ...tile.position },
+      scale: { ...tile.scale },
+    }))
+
+    harness.renderer.showPresentationAreaFlash([
+      { x: 2, y: 2 }, { x: 2, y: 3 }, { x: 2, y: 4 }, { x: 2, y: 3 },
+    ])
+    for (let index = 0; index < 4; index += 1) harness.frame(40)
+    expect(harness.renderer.getMotionDiagnostics().presentationAreaCellCount).toBe(3)
+    tiles.forEach((tile, index) => {
+      expect(tile.material).not.toBe(originalMaterials[index])
+      expect(tile.geometry).toBe(originalGeometry[index])
+      expect(tile.position).toEqual(originalTransforms[index].position)
+      expect(tile.scale).toEqual(originalTransforms[index].scale)
+      expect(tile.material!.emissive.getHex()).toBe(0xf97316)
+      expect(tile.material!.emissiveIntensity).toBeGreaterThan(0)
+    })
+    expect(JSON.stringify(model)).toBe(authorityBefore)
+
+    harness.renderer.clearPresentationAreaFlash()
+    expect(harness.renderer.getMotionDiagnostics().presentationAreaCellCount).toBe(0)
+    tiles.forEach((tile, index) => expect(tile.material).toBe(originalMaterials[index]))
+    harness.renderer.dispose()
+  })
+
   it('executes projection, hit, DPR, touch gestures, reset, flash recovery, and rule-state isolation', () => {
     const harness = createHarness()
     const intents: Array<Record<string, unknown>> = []

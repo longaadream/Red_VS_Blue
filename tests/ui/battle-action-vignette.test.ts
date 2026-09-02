@@ -295,6 +295,10 @@ describe('RED-167 action vignette queue', () => {
       },
     }
     const documentObject = { createElement: () => new FakeElement() }
+    const showAreaFlash = vi.fn()
+    const clearAreaFlash = vi.fn()
+    const showPath = vi.fn()
+    const clearPath = vi.fn()
     const vignette = vignetteModule.create({
       document: documentObject,
       window: windowObject,
@@ -306,7 +310,10 @@ describe('RED-167 action vignette queue', () => {
     vignette.mount({
       boardContainer: board,
       floatLayer,
-      projectCell: (x: number, y: number) => ({ left: x * 10, top: y * 10 }),
+      showAreaFlash,
+      clearAreaFlash,
+      showPath,
+      clearPath,
     })
     vignette.update({ presentationEvents: [], pieces: [], turn: { isViewerTurn: false } })
     vignette.update({
@@ -336,14 +343,20 @@ describe('RED-167 action vignette queue', () => {
     const layer = floatLayer.children[0]
     expect(layer.hidden).toBe(false)
     vi.advanceTimersByTime(120)
-    expect(layer.innerHTML).toContain('--vignette-to-x:40px')
-    expect(layer.innerHTML).toContain('left:10px;top:0px')
-    expect(layer.innerHTML).toContain('battle-vignette-action-icon is-text')
+    expect(showPath).toHaveBeenCalledWith({
+      source: { x: 0, y: 0 },
+      end: { x: 4, y: 0 },
+      selected: { x: 1, y: 0 },
+    })
+    expect(layer.innerHTML).not.toContain('battle-vignette-path-segment')
+    expect(layer.innerHTML).not.toContain('battle-vignette-point')
+    expect(layer.innerHTML).not.toContain('battle-vignette-action-icon')
+    expect(layer.innerHTML).not.toContain('<img')
     expect(layer.innerHTML).toContain('使用技能')
     vi.advanceTimersByTime(300)
-    expect(layer.innerHTML.match(/battle-vignette-result/g)).toHaveLength(2)
-    expect(layer.innerHTML).toContain('battle-vignette-result" style="left:40px;top:0px')
-    expect(layer.innerHTML).not.toContain('battle-vignette-result" style="left:10px;top:0px')
+    expect(layer.innerHTML).not.toContain('battle-vignette-result')
+    expect(layer.innerHTML).not.toContain('<img')
+    expect(layer.innerHTML).not.toContain('>4<')
 
     const speedPointerEvent = {
       target: { closest: () => ({ dataset: { vignetteControl: 'speed' } }) },
@@ -391,13 +404,21 @@ describe('RED-167 action vignette queue', () => {
         },
       })],
     })
+    showAreaFlash.mockClear()
+    showPath.mockClear()
     vi.advanceTimersByTime(120)
     expect(layer.className).toContain('is-cue-area')
-    expect(layer.innerHTML.match(/battle-vignette-area-flash/g)).toHaveLength(1)
+    expect(showAreaFlash).toHaveBeenCalledWith([
+      { x: 2, y: 0 }, { x: 2, y: 1 }, { x: 2, y: 2 },
+    ])
+    expect(showPath).toHaveBeenCalledWith({ selected: { x: 2, y: 1 } })
     expect(layer.innerHTML).not.toContain('battle-vignette-point')
+    expect(layer.innerHTML).not.toContain('battle-vignette-area-flash')
     expect(layer.innerHTML).not.toContain('battle-vignette-path-segment')
     expect(layer.innerHTML).not.toContain('battle-vignette-action-icon')
     vignette.dispose()
+    expect(clearAreaFlash).toHaveBeenCalled()
+    expect(clearPath).toHaveBeenCalled()
     expect(floatLayer.children).toHaveLength(0)
     expect(vi.getTimerCount()).toBe(0)
   })

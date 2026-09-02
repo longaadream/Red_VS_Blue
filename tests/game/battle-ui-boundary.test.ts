@@ -334,6 +334,10 @@ describe('battle presentation boundary', () => {
       screenToCell: vi.fn(() => ({ x: 1, y: 0 })),
       dispose: vi.fn(),
       animateAction: vi.fn(),
+      showPresentationAreaFlash: vi.fn(),
+      clearPresentationAreaFlash: vi.fn(),
+      showPresentationPath: vi.fn(),
+      clearPresentationPath: vi.fn(),
     }
     const domUi = { update: vi.fn(), dispose: vi.fn() }
     const vignetteUi = { mount: vi.fn(), update: vi.fn(), resize: vi.fn(), dispose: vi.fn() }
@@ -357,6 +361,15 @@ describe('battle presentation boundary', () => {
     expect(renderer.update).toHaveBeenCalledWith(model)
     expect(domUi.update).toHaveBeenCalledWith(model)
     expect(vignetteUi.mount).toHaveBeenCalledTimes(2)
+    const vignetteMount = vignetteUi.mount.mock.calls[1][0]
+    vignetteMount.showAreaFlash([{ x: 1, y: 0 }])
+    vignetteMount.clearAreaFlash()
+    vignetteMount.showPath({ source: { x: 0, y: 0 }, end: { x: 2, y: 0 } })
+    vignetteMount.clearPath()
+    expect(renderer.showPresentationAreaFlash).toHaveBeenCalledWith([{ x: 1, y: 0 }])
+    expect(renderer.clearPresentationAreaFlash).toHaveBeenCalledTimes(1)
+    expect(renderer.showPresentationPath).toHaveBeenCalledWith({ source: { x: 0, y: 0 }, end: { x: 2, y: 0 } })
+    expect(renderer.clearPresentationPath).toHaveBeenCalledTimes(1)
     expect(vignetteUi.update).toHaveBeenCalledWith(model)
     expect(vignetteUi.resize).toHaveBeenCalledTimes(2)
     expect(vignetteUi.dispose).toHaveBeenCalledTimes(2)

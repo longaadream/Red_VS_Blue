@@ -259,19 +259,6 @@
     return { source: source, selected: selected, end: end, path: path, area: area, targets: targetCells }
   }
 
-  function uniquePoints(points) {
-    const seen = new Set()
-    return (points || []).flatMap(function (point) {
-      const x = finite(point && point.x)
-      const y = finite(point && point.y)
-      if (x == null || y == null) return []
-      const key = x + ',' + y
-      if (seen.has(key)) return []
-      seen.add(key)
-      return [{ x: x, y: y }]
-    })
-  }
-
   function create(options) {
     const input = options || {}
     const doc = input.document || root.document
@@ -283,7 +270,10 @@
     let boardContainer = null
     let floatLayer = null
     let layer = null
-    let projectCell = null
+    let showAreaFlash = null
+    let clearAreaFlash = null
+    let showPath = null
+    let clearPath = null
     let model = null
     let currentPhase = null
     let currentGroup = null
@@ -304,6 +294,8 @@
       onIdle: function () {
         currentPhase = null
         currentGroup = null
+        if (clearAreaFlash) clearAreaFlash()
+        if (clearPath) clearPath()
         if (layer) layer.hidden = true
       },
     })
@@ -317,134 +309,32 @@
         : { assetPath: 'images/effect-icons/fallback.svg', label: '未知动作', color: '#94a3b8' }
     }
 
-    function projected(point, elevation) {
-      if (!point || typeof projectCell !== 'function') return null
-      return projectCell(point.x, point.y, elevation == null ? 0.92 : elevation)
-    }
-
-    function pointMarkup(point, className) {
-      const screen = projected(point)
-      if (!screen) return ''
-      return '<i class="' + className + '" style="left:' + screen.left + 'px;top:' + screen.top + 'px"></i>'
-    }
-
-    function pathMarkup(source, path, end) {
-      const points = uniquePoints([source].concat(path || [], end || []))
-        .map(function (point) { return projected(point) })
-        .filter(Boolean)
-      let markup = ''
-      for (let index = 1; index < points.length; index += 1) {
-        const from = points[index - 1]
-        const to = points[index]
-        const dx = to.left - from.left
-        const dy = to.top - from.top
-        const distance = Math.sqrt(dx * dx + dy * dy)
-        const angle = Math.atan2(dy, dx) * 180 / Math.PI
-        markup += '<i class="battle-vignette-path-segment" style="left:' + from.left + 'px;top:' + from.top
-          + 'px;width:' + distance + 'px;transform:rotate(' + angle + 'deg)"></i>'
-      }
-      return markup
-    }
-
-    function areaFlashMarkup(points) {
-      const screens = uniquePoints(points).map(function (point) { return projected(point) }).filter(Boolean)
-      if (!screens.length) return ''
-      const lefts = screens.map(function (point) { return point.left })
-      const tops = screens.map(function (point) { return point.top })
-      const paddingX = 34
-      const paddingY = 26
-      const left = Math.min.apply(Math, lefts) - paddingX
-      const top = Math.min.apply(Math, tops) - paddingY
-      const width = Math.max.apply(Math, lefts) - Math.min.apply(Math, lefts) + paddingX * 2
-      const height = Math.max.apply(Math, tops) - Math.min.apply(Math, tops) + paddingY * 2
-      return '<i class="battle-vignette-area-flash" style="left:' + left + 'px;top:' + top
-        + 'px;width:' + width + 'px;height:' + height + 'px"></i>'
-    }
-
-    function resultBadge(event) {
-      const result = event && event.result || {}
-      const values = [result.amount, result.absorbed, result.count, result.stacks]
-      for (let index = 0; index < values.length; index += 1) {
-        const value = finite(values[index])
-        if (value != null && value !== 0) return String(Math.abs(value))
-      }
-      return ''
-    }
-
-    function resultMarkup(group, targets) {
-      const events = (group.children && group.children.length ? group.children : [group.root])
-      const fallbackAnchors = uniquePoints(targets)
-      const entries = []
-      events.forEach(function (event) {
-        const eventAnchors = uniquePoints([].concat(
-          (event.targetPieceIds || []).map(function (pieceId) { return pieceCell(model, pieceId) }),
-          event.targetCell || [],
-        ))
-        const anchors = eventAnchors.length ? eventAnchors : fallbackAnchors.slice(0, 1)
-        anchors.forEach(function (point) { entries.push({ event: event, point: point }) })
-      })
-      if (!entries.length) return ''
-      const stacks = new Map()
-      return entries.slice(0, 6).map(function (entry) {
-        const event = entry.event
-        const point = entry.point
-        const screen = projected(point, 1.12)
-        if (!screen) return ''
-        const meta = resolveIcon(event)
-        const badge = resultBadge(event)
-        const pointKey = point.x + ',' + point.y
-        const stackIndex = stacks.get(pointKey) || 0
-        stacks.set(pointKey, stackIndex + 1)
-        const left = screen.left + stackIndex * 24
-        const top = screen.top - stackIndex * 8
-        return '<span class="battle-vignette-result" style="left:' + left + 'px;top:' + top
-          + 'px;--vignette-accent:' + escapeHtml(meta.color || '#f8fafc') + '">'
-          + '<img src="' + escapeHtml(meta.assetPath) + '" alt="">'
-          + (badge ? '<b>' + escapeHtml(badge) + '</b>' : '') + '</span>'
-      }).join('')
-    }
-
     function render() {
       if (!layer || !currentGroup || !model) return
       const rootEvent = currentGroup.root
       const meta = resolveIcon(rootEvent)
       const cells = eventCells(currentGroup, model)
-      const sourceScreen = projected(cells.source, 1.02)
-      const endScreen = projected(cells.end || cells.selected || cells.targets[0], 1.02)
       const cue = rootEvent.presentation && rootEvent.presentation.cue || 'directional'
       const usesSkillText = rootEvent.kind === 'skill' || rootEvent.kind === 'chargeSkill'
       const actionLabel = usesSkillText ? '使用技能' : (meta.label || '战场动作')
       const resultVisible = currentPhase === 'result' || currentPhase === 'settle' || currentPhase === 'static'
       const pathVisible = currentPhase === 'path' || resultVisible
       const travelVisible = pathVisible && cue !== 'area'
-      const actionIcon = sourceScreen && endScreen
-        ? '<span class="battle-vignette-action-icon' + (usesSkillText ? ' is-text' : '')
-          + '" style="--vignette-from-x:' + sourceScreen.left
-          + 'px;--vignette-from-y:' + sourceScreen.top + 'px;--vignette-to-x:' + endScreen.left
-          + 'px;--vignette-to-y:' + endScreen.top + 'px;--vignette-accent:' + escapeHtml(meta.color || '#f8fafc')
-          + '">' + (usesSkillText
-            ? '<span>使用技能</span>'
-            : '<img src="' + escapeHtml(meta.assetPath) + '" alt="">') + '</span>'
-        : ''
-      const areaMarkup = cue === 'area'
-        ? areaFlashMarkup(cells.area.length ? cells.area : cells.targets)
-        : ''
-      const pointMarkers = cue === 'area' ? ''
-        : pointMarkup(cells.source, 'battle-vignette-point is-source')
-          + pointMarkup(cells.selected, 'battle-vignette-point is-selected-aim')
-          + pointMarkup(cells.end || cells.targets[0], 'battle-vignette-point is-end')
+      const areaCells = cells.area.length ? cells.area : cells.targets
+      if (cue === 'area' && pathVisible) {
+        if (showPath) showPath({ selected: cells.selected })
+        if (showAreaFlash) showAreaFlash(areaCells)
+      } else {
+        if (clearAreaFlash) clearAreaFlash()
+        if (travelVisible && showPath) {
+          showPath({ source: cells.source, end: cells.end || cells.targets[0], selected: cells.selected })
+        } else if (clearPath) clearPath()
+      }
       layer.hidden = false
       layer.className = 'battle-vignette-layer is-phase-' + currentPhase + ' is-cue-' + cue
       layer.dataset.phase = currentPhase
       layer.dataset.rootId = currentGroup.rootEventId
       layer.innerHTML = '<div class="battle-vignette-veil" aria-hidden="true"></div>'
-        + '<div class="battle-vignette-graphics" aria-hidden="true">'
-        + pointMarkers
-        + (travelVisible ? pathMarkup(cells.source, cells.path, cells.end || cells.targets[0]) : '')
-        + (travelVisible ? actionIcon : '')
-        + (pathVisible ? areaMarkup : '')
-        + (resultVisible ? resultMarkup(currentGroup, [cells.end].concat(cells.targets)) : '')
-        + '</div>'
         + '<div class="battle-vignette-status" role="status" aria-live="polite">'
         + '<span class="battle-vignette-label">'
         + (usesSkillText ? '' : '<img src="' + escapeHtml(meta.assetPath) + '" alt="">')
@@ -494,7 +384,10 @@
       const mountInput = mountOptions || {}
       boardContainer = mountInput.boardContainer || null
       floatLayer = mountInput.floatLayer || null
-      projectCell = typeof mountInput.projectCell === 'function' ? mountInput.projectCell : null
+      showAreaFlash = typeof mountInput.showAreaFlash === 'function' ? mountInput.showAreaFlash : null
+      clearAreaFlash = typeof mountInput.clearAreaFlash === 'function' ? mountInput.clearAreaFlash : null
+      showPath = typeof mountInput.showPath === 'function' ? mountInput.showPath : null
+      clearPath = typeof mountInput.clearPath === 'function' ? mountInput.clearPath : null
       if (!doc || !doc.createElement || !floatLayer || !floatLayer.appendChild) return
       layer = doc.createElement('div')
       layer.className = 'battle-vignette-layer'
@@ -517,6 +410,8 @@
 
     function dispose() {
       queue.dispose()
+      if (clearAreaFlash) clearAreaFlash()
+      if (clearPath) clearPath()
       if (win && win.removeEventListener) win.removeEventListener('click', consumeTrailingClick, true)
       if (layer) {
         layer.removeEventListener('pointerdown', handlePointerDown)
@@ -526,7 +421,10 @@
       boardContainer = null
       floatLayer = null
       layer = null
-      projectCell = null
+      showAreaFlash = null
+      clearAreaFlash = null
+      showPath = null
+      clearPath = null
       model = null
       currentPhase = null
       currentGroup = null

@@ -54,6 +54,18 @@
           boardContainer: mountInput.boardContainer,
           floatLayer: mountInput.floatLayer || null,
           projectCell: function (x, y, elevation) { return renderer.projectCell(x, y, elevation) },
+          showAreaFlash: function (cells) {
+            if (renderer.showPresentationAreaFlash) renderer.showPresentationAreaFlash(cells)
+          },
+          clearAreaFlash: function () {
+            if (renderer.clearPresentationAreaFlash) renderer.clearPresentationAreaFlash()
+          },
+          showPath: function (path) {
+            if (renderer.showPresentationPath) renderer.showPresentationPath(path)
+          },
+          clearPath: function () {
+            if (renderer.clearPresentationPath) renderer.clearPresentationPath()
+          },
         })
       }
       mounted = true
