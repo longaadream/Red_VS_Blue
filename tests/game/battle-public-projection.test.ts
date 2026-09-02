@@ -5,6 +5,25 @@ import { toPublicBattleState } from '@/lib/game/deployment'
 import { makePiece, makeState } from '../helpers/minimal-state'
 
 describe('battle public pending projection', () => {
+  it('keeps only the viewer hand visible and uses the same redaction for spectators', () => {
+    const state = makeState()
+    state.players[0].hand = [{
+      cardId: 'red-secret', instanceId: 'red-secret-1', ownerPlayerId: 'player-red',
+    }]
+    state.players[1].hand = [{
+      cardId: 'blue-secret', instanceId: 'blue-secret-1', ownerPlayerId: 'player-blue',
+    }]
+
+    const red = toPublicBattleState(state, 'player-red')
+    expect(red.players[0].hand[0]).toMatchObject({ cardId: 'red-secret', instanceId: 'red-secret-1' })
+    expect(red.players[1].hand[0]).toEqual({
+      cardId: 'hidden', instanceId: 'hidden-card-0', ownerPlayerId: 'player-blue',
+    })
+    for (const player of toPublicBattleState(state).players) {
+      expect(player.hand[0]).toMatchObject({ cardId: 'hidden', instanceId: 'hidden-card-0' })
+    }
+  })
+
   it('keeps invisible piece status data private to its owner', () => {
     const state = makeState({ pieces: [makePiece({ ownerPlayerId: 'player-red' })] })
     const piece = state.pieces[0]

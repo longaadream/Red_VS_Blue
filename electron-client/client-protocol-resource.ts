@@ -82,8 +82,14 @@ export function resolveClientProtocolFile({
   const htmlFile = resolveExistingFile(htmlRoot, segments)
   if (htmlFile) return htmlFile
 
-  // Built-in SVGs are trusted app assets; activatable resource packs remain raster-only.
-  if (!isPackaged && /^images\/.+\.(?:gif|jpe?g|png|svg|webp)$/i.test(relativePath)) {
+  // Status and tile-effect SVGs are trusted application assets stored outside the
+  // staged page root in both development and packaged builds.
+  if (/^images\/(?:effect-icons|tile-effects)\/[a-z0-9-]+\.svg$/i.test(relativePath)) {
+    return resolveExistingFile(path.join(appRoot, 'public'), segments.slice(1))
+  }
+
+  // Development may additionally read legacy raster art from repository public/.
+  if (!isPackaged && /^images\/.+\.(?:gif|jpe?g|png|webp)$/i.test(relativePath)) {
     return resolveExistingFile(path.join(appRoot, 'public'), segments.slice(1))
   }
 

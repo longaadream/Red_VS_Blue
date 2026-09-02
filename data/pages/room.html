@@ -306,6 +306,9 @@
           }
         })
         RvBWs.connect(roomId, playerId, shouldUseRelayMode() ? 'relay' : 'lan')
+        if (typeof RvBWs.waitForConnection === 'function') {
+          RvBWs.waitForConnection(5000).catch(reject)
+        }
       }).finally(() => { roomWsConnecting = null })
       return roomWsConnecting
     }

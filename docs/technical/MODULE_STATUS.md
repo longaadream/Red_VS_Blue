@@ -33,11 +33,12 @@
 | 权威目标选择 | 已核对/已测试 | `targeting.ts::prepareAction()` | 真实远端服务与断线场景仍缺 | 补真实双端 WS E2E |
 | 触发器 | 部分核对 | `triggers.ts::globalTriggerSystem` | 进程级单例、并发隔离未知 | 多房间隔离测试 |
 | 权威终局 | 已核对/已测试 | `terminal.ts::finalizeBattleTerminal()` | 真实 Prisma 多实例与断线 E2E 尚缺 | 补候选环境双客户端验证 |
-| LAN WebSocket | 部分核对 | `ws-server.ts::startWsServer()` | 协议/错误无版本，空 catch | WS 集成测试与日志上下文 |
+| Colyseus 玩家权威 | RED-170 已实现/待人工候选 | `lib/server/colyseus/battle-room.ts` | 不提供跨进程 live migration | 双机完整一局与进程故障人工验收 |
+| Legacy LAN WebSocket | 历史兼容 | `ws-server.ts::startWsServer()` | 与 Colyseus 并行会产生双权威 | 仅 `ENABLE_LEGACY_PLAYER_WS=1` 诊断开启，后续删除 |
 | HTTP 动作 API | 已核对/已测试 | `rooms/[roomId]/battle::POST` | 错误 envelope 与 WS 仍有差异 | 统一版本化错误合同 |
 | Prisma RoomStore | 部分核对 | `RoomStore` | 外层无格式版本，字段读取重置 | 定义新格式并做 round-trip |
 | Electron 服务端 | 未运行 | `electron/main.ts` | 最后版本重大故障、启动链复杂 | 第一优先级冒烟基线 |
-| Electron 客户端 | 未运行 | `electron-client/main.ts` | 本地服务和静态资源分支复杂 | LAN 加入房间冒烟测试 |
+| Electron 客户端 | RED-170 自动回归/待双机 | `electron-client/main.ts` | 本机活动局不提供跨进程续局 | 自动本机栈启动、三次恢复熔断/手动重试、双机 Host & Play 完整一局与 kill fault |
 | Android 客户端/服务端 | 正式产物/未验证 | `android-client`、`MobileHttpServer`、`mobile-server-entry.ts` | 生成物漂移；服务端外壳与 Windows 重复 | 双向开服冒烟和共享 Server Core |
 | 浏览器战斗 UI | 已核对/历史遗留 | `data/pages/battle.html` | 超大跨层文件、全局 `G` | 先记录状态边界，再逐步抽离 |
 | Relay | 遗留权威已禁用 | `relay-server` | standalone 服务尚未实现权威状态合同 | 重建服务后再启用在线战斗 |

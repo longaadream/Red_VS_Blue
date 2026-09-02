@@ -6,7 +6,7 @@
   "private": true,
   "main": "electron/dist/main.js",
   "scripts": {
-    "dev": "node --require ./scripts/ws-same-port-server.cjs ./node_modules/next/dist/bin/next dev",
+    "dev": "next dev",
     "dev:colyseus": "tsx scripts/run-colyseus-server.mjs",
     "qa:colyseus": "tsx scripts/run-colyseus-qa-server.mjs",
     "qa:colyseus-pages": "node scripts/run-colyseus-pages-qa.mjs",
@@ -14,7 +14,7 @@
     "prepare:embedded-postgres": "node scripts/prepare-embedded-postgres.mjs",
     "verify:embedded-postgres": "node scripts/verify-embedded-postgres-package.mjs",
     "build": "prisma generate && node scripts/build-tailwind.mjs && next build && node -e \"const fs=require('fs'),path=require('path');function cp(s,d){fs.mkdirSync(d,{recursive:true});for(const e of fs.readdirSync(s,{withFileTypes:true})){const ss=path.join(s,e.name),dd=path.join(d,e.name);e.isDirectory()?cp(ss,dd):fs.copyFileSync(ss,dd)}}cp('.next/static','.next/standalone/.next/static');cp('public','.next/standalone/public');console.log('Static assets copied to standalone.')\"",
-    "start": "node --require ./scripts/ws-same-port-server.cjs ./node_modules/next/dist/bin/next start",
+    "start": "next start",
     "lint": "eslint . --max-warnings 0",
     "lint:content-pipeline": "eslint lib/content-pipeline/tooling electron-editor/main.ts electron-editor/preload.ts electron-editor/content-pipeline-ipc.ts electron-editor/content-pipeline-worker.ts scripts/rvb.mjs scripts/build-resource-pack.js tests/content-pipeline/tooling.test.ts tests/electron/editor-content-pipeline.test.ts tests/electron/windows-smoke.mjs --max-warnings 0 --suppressions-location tests/content-pipeline/empty-eslint-suppressions.json",
     "lint:prune": "eslint . --max-warnings 0 --prune-suppressions",

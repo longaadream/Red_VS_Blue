@@ -15,6 +15,7 @@ import { findFreePort } from './local-port'
 import { resolveClientProtocolFile } from './client-protocol-resource'
 import { EmbeddedPostgresController } from './embedded-postgres'
 import {
+  LocalAuthorityRecoveryBudget,
   LOCAL_GAME_OPEN_CANCELLED,
   LocalGameLifecycleGate,
 } from './local-game-lifecycle'
@@ -40,6 +41,9 @@ const CLIENT_SCHEME = 'rvb-client'
 const BATTLE_AUTHORITY_SHUTDOWN_REQUEST = 'rvb:battle-authority:shutdown'
 const BATTLE_AUTHORITY_SHUTDOWN_RESULT = 'rvb:battle-authority:shutdown-result'
 const SERVER_GRACEFUL_SHUTDOWN_TIMEOUT_MS = 6_500
+const LOCAL_AUTHORITY_AUTO_RECOVERY_MAX_ATTEMPTS = 3
+const LOCAL_AUTHORITY_AUTO_RECOVERY_DELAYS_MS = [250, 750, 1_500] as const
+const LOCAL_AUTHORITY_RECOVERY_READY_TIMEOUT_MS = 5_000
 const PROFILE_ARCHIVE_MAX_BYTES = 32 * 1024 * 1024
 const PROFILE_ADMIN_KEY = randomBytes(32).toString('hex')
 let allowAppExit = false
@@ -423,6 +427,7 @@ async function killServer(requireDurable = false, invalidateOpening = true): Pro
     }
     if (gameServerProcess) {
       const gameProc = gameServerProcess
+      expectedAuthorityExits.add(gameProc)
       await stopChildProcessGracefully(gameProc, requireDurable)
       localGameReady = false
       localAuthorityProfileIdentity = null
@@ -449,6 +454,7 @@ function forceKillServer(): void {
   localAuthorityProfileIdentity = null
   if (gameServerProcess) {
     const gameProc = gameServerProcess
+    expectedAuthorityExits.add(gameProc)
     gameServerProcess = null
     killProcessTree(gameProc)
   }
@@ -498,10 +504,35 @@ let localProfileIdentity: GameProfileIdentity | null = null
 let localAuthorityProfileIdentity: GameProfileIdentity | null = null
 let lastServerExitCode: number | null = null
 let lastServerStderr = ''
+const expectedAuthorityExits = new WeakSet<ChildProcess>()
+const localAuthorityRecoveryBudget = new LocalAuthorityRecoveryBudget(
+  LOCAL_AUTHORITY_AUTO_RECOVERY_MAX_ATTEMPTS,
+)
+let localAuthorityRecoveryPromise: Promise<void> | null = null
+let localAuthorityNotice: string | null = null
+let localAuthorityRecoveryStatus: 'ready' | 'recovering' | 'manual-required' = 'ready'
 type ProfileProcessBinding = {
   reference?: DesktopProfileReference
   profileRoot: string
   activationId?: string
+}
+
+function appendAuthorityDiagnostic(stream: 'lifecycle' | 'stdout' | 'stderr', value: unknown): void {
+  try {
+    const logDir = path.join(getUserData(), 'logs')
+    const logPath = path.join(logDir, 'authority.log')
+    fs.mkdirSync(logDir, { recursive: true })
+    if (fs.existsSync(logPath) && fs.statSync(logPath).size > 2 * 1024 * 1024) {
+      const contents = fs.readFileSync(logPath)
+      fs.writeFileSync(logPath, contents.subarray(Math.max(0, contents.length - 1024 * 1024)))
+    }
+    const safeValue = String(value)
+      .replace(/postgres(?:ql)?:\/\/[^@\s]+@/gi, 'postgresql://<redacted>@')
+      .slice(-6000)
+    fs.appendFileSync(logPath, `[${new Date().toISOString()}] [${stream}] ${safeValue}\n`, 'utf8')
+  } catch (error) {
+    console.warn('[client] failed to persist authority diagnostic:', error)
+  }
 }
 
 function stableProfileBinding(): ProfileProcessBinding {
@@ -681,15 +712,28 @@ function getEmbeddedPostgres(): EmbeddedPostgresController {
     findFreePort,
     protectSecret: plaintext => safeStorage.encryptString(plaintext),
     unprotectSecret: encrypted => safeStorage.decryptString(encrypted),
+    onHealthStateChange: state => {
+      const detail = state.detail ? ` detail=${state.detail}` : ''
+      const message = `postgres health state=${state.state} failures=${state.consecutiveFailures}${detail}`
+      if (state.state === 'healthy') console.info(`[client] ${message}`)
+      else console.warn(`[client] ${message}`)
+      appendAuthorityDiagnostic('lifecycle', message)
+    },
     onUnexpectedExit: (code, signal) => {
-      console.error(`[client] embedded PostgreSQL exited unexpectedly: code=${code ?? 'null'} signal=${signal ?? 'null'}`)
+      console.error(`[client] embedded PostgreSQL process loss confirmed: code=${code ?? 'null'} signal=${signal ?? 'null'}`)
       localGameReady = false
       localAuthorityProfileIdentity = null
       if (gameServerProcess) {
         const gameProc = gameServerProcess
+        expectedAuthorityExits.add(gameProc)
         gameServerProcess = null
+        appendAuthorityDiagnostic(
+          'lifecycle',
+          `terminating authority pid=${gameProc.pid ?? 'unknown'} initiator=postgres-health reason=confirmed-postgres-process-loss`,
+        )
         killProcessTree(gameProc)
       }
+      void recoverUnexpectedLocalAuthorityExit(code)
     },
   })
   return embeddedPostgres
@@ -730,9 +774,12 @@ function localAuthorityStartupErrorMessage(error: unknown): string {
   return '本机战斗服务启动失败，请查看客户端日志。'
 }
 
-async function startLocalGameAuthorityOnce(profileBinding?: ProfileProcessBinding): Promise<void> {
+async function startLocalGameAuthorityOnce(
+  profileBinding?: ProfileProcessBinding,
+  readyTimeoutMs = 20_000,
+): Promise<void> {
   if (gameServerProcess) {
-    if (!localGameReady) localGameReady = await waitForGameAuthorityReady(actualGamePort, 5000)
+    if (!localGameReady) localGameReady = await waitForGameAuthorityReady(actualGamePort, readyTimeoutMs)
     if (localGameReady) {
       try {
         localAuthorityProfileIdentity = await fetchAuthorityProfileIdentity(actualGamePort)
@@ -781,7 +828,9 @@ async function startLocalGameAuthorityOnce(profileBinding?: ProfileProcessBindin
 
   lastServerExitCode = null
   lastServerStderr = ''
+  appendAuthorityDiagnostic('lifecycle', `starting authority on port ${actualGamePort}`)
   if (gameServerProcess.stdout) {
+    gameServerProcess.stdout.on('data', data => appendAuthorityDiagnostic('stdout', data))
     attachSafeLogForwarder(gameServerProcess.stdout, process.stdout, {
       runtime: 'electron-client',
       stream: 'stdout',
@@ -792,6 +841,7 @@ async function startLocalGameAuthorityOnce(profileBinding?: ProfileProcessBindin
   if (gameServerProcess.stderr) {
     gameServerProcess.stderr.on('data', data => {
       lastServerStderr = (lastServerStderr + data.toString()).slice(-3000)
+      appendAuthorityDiagnostic('stderr', data)
     })
     attachSafeLogForwarder(gameServerProcess.stderr, process.stderr, {
       runtime: 'electron-client',
@@ -802,17 +852,24 @@ async function startLocalGameAuthorityOnce(profileBinding?: ProfileProcessBindin
   }
   const spawned = gameServerProcess
   spawned.on('error', error => console.error('[client] Colyseus authority error:', error))
-  spawned.on('exit', code => {
+  spawned.on('exit', (code, signal) => {
+    const expectedExit = expectedAuthorityExits.has(spawned)
+    expectedAuthorityExits.delete(spawned)
     lastServerExitCode = code
     if (gameServerProcess === spawned) {
       gameServerProcess = null
       localGameReady = false
       localAuthorityProfileIdentity = null
     }
-    console.log(`[client] Colyseus authority exited: ${code}`)
+    console.log(`[client] Colyseus authority exited: code=${code ?? 'null'} signal=${signal ?? 'null'}`)
+    appendAuthorityDiagnostic(
+      'lifecycle',
+      `authority exited: pid=${spawned.pid ?? 'unknown'} code=${code ?? 'null'} signal=${signal ?? 'null'} expected=${expectedExit}`,
+    )
     if (lastServerStderr) console.error('[client] last Colyseus stderr:', lastServerStderr.slice(-500))
+    if (!expectedExit) void recoverUnexpectedLocalAuthorityExit(code)
   })
-  localGameReady = await waitForGameAuthorityReady(actualGamePort)
+  localGameReady = await waitForGameAuthorityReady(actualGamePort, readyTimeoutMs)
   if (!localGameReady) {
     console.error(`[client] Colyseus/PostgreSQL authority did not become ready on port ${actualGamePort}`)
     return
@@ -826,12 +883,104 @@ async function startLocalGameAuthorityOnce(profileBinding?: ProfileProcessBindin
   }
 }
 
-async function startLocalGameAuthority(profileBinding?: ProfileProcessBinding): Promise<void> {
+function discardUnhealthyAuthorityProcess(): void {
+  if (!gameServerProcess) return
+  const processToDiscard = gameServerProcess
+  expectedAuthorityExits.add(processToDiscard)
+  gameServerProcess = null
+  localGameReady = false
+  localAuthorityProfileIdentity = null
+  appendAuthorityDiagnostic('lifecycle', `discarding unhealthy authority pid=${processToDiscard.pid ?? 'unknown'}`)
+  killProcessTree(processToDiscard)
+}
+
+function recoverUnexpectedLocalAuthorityExit(code: number | null, manual = false): Promise<void> {
+  if (localAuthorityRecoveryPromise) return localAuthorityRecoveryPromise
+  const recovery = (async () => {
+    if (manual) {
+      localAuthorityRecoveryBudget.rearm()
+      appendAuthorityDiagnostic('lifecycle', 'manual recovery rearmed automatic recovery budget')
+    }
+    const playerContext = await classifyAuthorityPlayerContext()
+    const localMatchAborted = playerContext === 'local-match'
+    if (localMatchAborted) {
+      abortLocalMatchToMainMenu(
+        `本局已终止：本机战斗服务意外退出（code ${code ?? 'unknown'}）。服务将在后台尝试恢复。`,
+      )
+    }
+    if (localGameLifecycle.shutdownInProgress || allowAppExit) return
+
+    while (!localGameLifecycle.shutdownInProgress && !allowAppExit) {
+      const claimed = localAuthorityRecoveryBudget.claimAttempt()
+      if (!claimed) {
+        localAuthorityRecoveryStatus = 'manual-required'
+        localAuthorityNotice = localMatchAborted
+          ? '上一局已终止；本机服务连续恢复 3 次失败，请在主菜单手动重试。'
+          : '本机服务连续恢复 3 次失败，已停止自动恢复；需要使用时请手动重试。'
+        appendAuthorityDiagnostic('lifecycle', 'automatic recovery exhausted; manual retry required')
+        return
+      }
+
+      localAuthorityRecoveryStatus = 'recovering'
+      localAuthorityNotice = localMatchAborted
+        ? `上一局已终止；正在后台恢复本机服务（${claimed.attempt}/${claimed.maxAttempts}）。`
+        : `正在后台恢复本机服务（${claimed.attempt}/${claimed.maxAttempts}）。`
+      appendAuthorityDiagnostic(
+        'lifecycle',
+        `automatic recovery attempt ${claimed.attempt}/${claimed.maxAttempts}`,
+      )
+      await new Promise(resolve => setTimeout(
+        resolve,
+        LOCAL_AUTHORITY_AUTO_RECOVERY_DELAYS_MS[claimed.attempt - 1] ?? 1_500,
+      ))
+
+      // The exit event may run while the failed startup still owns the
+      // single-flight promise. Wait for that attempt to release ownership,
+      // otherwise a retry only awaits the failed attempt and never spawns.
+      const failedStartup = localGameStartupPromise
+      if (failedStartup) await failedStartup.catch(() => undefined)
+      await Promise.resolve()
+      if (gameServerProcess && !localGameReady) discardUnhealthyAuthorityProcess()
+
+      try {
+        await startStableLocalServerAndRecover(undefined, LOCAL_AUTHORITY_RECOVERY_READY_TIMEOUT_MS)
+      } catch (error) {
+        console.error('[client] bounded Colyseus authority recovery attempt failed:', error)
+        appendAuthorityDiagnostic(
+          'lifecycle',
+          `automatic recovery attempt ${claimed.attempt} failed: ${error instanceof Error ? error.message : String(error)}`,
+        )
+      }
+
+      if (localGameReady && gameServerProcess) {
+        localAuthorityRecoveryBudget.recordSuccess()
+        localAuthorityRecoveryStatus = 'ready'
+        localAuthorityNotice = localMatchAborted
+          ? '上一局已终止；本机服务已恢复，可以重新创建房间。'
+          : null
+        appendAuthorityDiagnostic('lifecycle', `automatic recovery succeeded on attempt ${claimed.attempt}`)
+        return
+      }
+
+      localAuthorityRecoveryBudget.recordFailure()
+      appendAuthorityDiagnostic('lifecycle', `automatic recovery attempt ${claimed.attempt} did not become ready`)
+    }
+  })()
+  localAuthorityRecoveryPromise = recovery
+  return recovery.finally(() => {
+    if (localAuthorityRecoveryPromise === recovery) localAuthorityRecoveryPromise = null
+  })
+}
+
+async function startLocalGameAuthority(
+  profileBinding?: ProfileProcessBinding,
+  readyTimeoutMs?: number,
+): Promise<void> {
   if (localGameStartupPromise) {
     await localGameStartupPromise
     return
   }
-  const startup = startLocalGameAuthorityOnce(profileBinding)
+  const startup = startLocalGameAuthorityOnce(profileBinding, readyTimeoutMs)
   localGameStartupPromise = startup
   try {
     await startup
@@ -1651,10 +1800,13 @@ function assertLocalGameOpeningCurrent(expectedGeneration: number): void {
   localGameLifecycle.assertOpeningCurrent(expectedGeneration)
 }
 
-async function startStableLocalServerAndRecover(expectedGeneration?: number): Promise<void> {
+async function startStableLocalServerAndRecover(
+  expectedGeneration?: number,
+  authorityReadyTimeoutMs?: number,
+): Promise<void> {
   await startStableProfileServerAndRecover(expectedGeneration)
   if (expectedGeneration !== undefined) assertLocalGameOpeningCurrent(expectedGeneration)
-  await startLocalGameAuthority(stableProfileBinding())
+  await startLocalGameAuthority(stableProfileBinding(), authorityReadyTimeoutMs)
   if (expectedGeneration !== undefined) assertLocalGameOpeningCurrent(expectedGeneration)
 }
 
@@ -1882,9 +2034,10 @@ function loadOnlineGame(serverUrl: string): void {
 
 let connectWin: BrowserWindow | null = null
 
-function openConnectWindow(): void {
+function openConnectWindow(errorMessage?: string): void {
   if (connectWin && !connectWin.isDestroyed()) {
     connectWin.focus()
+    if (errorMessage) showConnectWindowError(connectWin, errorMessage)
     return
   }
   const win = new BrowserWindow({
@@ -1903,8 +2056,72 @@ function openConnectWindow(): void {
   const connectPath = path.join(getConnectRoot(), 'index.html')
   restrictWindowNavigation(win, (url) => isFileUrlWithinRoot(url, getConnectRoot()))
   win.loadURL(`file:///${connectPath.replace(/\\/g, '/')}?v=${Date.now()}`)
+  if (errorMessage) win.webContents.once('did-finish-load', () => showConnectWindowError(win, errorMessage))
   connectWin = win
   win.on('closed', () => { connectWin = null })
+}
+
+function showConnectWindowError(win: BrowserWindow, message: string): void {
+  void win.webContents.executeJavaScript(`
+    (function () {
+      var error = document.getElementById('err');
+      if (!error) return;
+      error.textContent = ${JSON.stringify(message)};
+      error.style.display = 'block';
+    })();
+  `).catch(error => console.error('[client] failed to show authority abort reason:', error))
+}
+
+type AuthorityPlayerContext = 'idle' | 'remote-match' | 'local-match'
+
+async function classifyAuthorityPlayerContext(): Promise<AuthorityPlayerContext> {
+  if (!mainWin || mainWin.isDestroyed()) return 'idle'
+  let currentUrl: URL
+  try { currentUrl = new URL(mainWin.webContents.getURL()) }
+  catch { return 'idle' }
+  if (!currentUrl.pathname.endsWith('/battle.html')) return 'idle'
+  if (currentUrl.searchParams.get('mode') === 'training') return 'local-match'
+
+  try {
+    const selection = await mainWin.webContents.executeJavaScript(`
+      (function () {
+        var config = window.RvBUtils && typeof window.RvBUtils.getServerConfig === 'function'
+          ? window.RvBUtils.getServerConfig()
+          : null;
+        return {
+          mode: config && config.mode || localStorage.getItem('rvb_lobby_server_mode') || '',
+          url: config && config.url || localStorage.getItem('rvb_server_url') || ''
+        };
+      })();
+    `) as { mode?: unknown; url?: unknown }
+    if (selection?.mode === 'remote') return 'remote-match'
+    if (selection?.mode === 'local') return 'local-match'
+    const selectedUrl = new URL(String(selection?.url ?? ''))
+    const selectedPort = selectedUrl.port || (selectedUrl.protocol === 'https:' ? '443' : '80')
+    const selectedHost = selectedUrl.hostname.toLowerCase()
+    if (
+      selectedPort === String(actualGamePort)
+      && (selectedHost === '127.0.0.1' || selectedHost === 'localhost')
+    ) return 'local-match'
+    if (selection?.url) return 'remote-match'
+  } catch (error) {
+    console.warn('[client] failed to classify active battle authority; treating it as local:', error)
+  }
+  // An unknown battle target is fail-closed: only a confidently identified
+  // remote match may ignore local-authority loss.
+  return 'local-match'
+}
+
+function abortLocalMatchToMainMenu(message: string): void {
+  localAuthorityNotice = message
+  if (connectWin && !connectWin.isDestroyed()) {
+    connectWin.close()
+    connectWin = null
+  }
+  // During initial background startup there is no match window to abort. The
+  // main startup path will open the menu after the bounded attempt finishes.
+  if (!mainWin || mainWin.isDestroyed()) return
+  loadLocalGame()
 }
 
 // ─── IPC ─────────────────────────────────────────────────────────────────────
@@ -1945,6 +2162,7 @@ handleTrusted('open-local-game', ['connect'], async () => {
   }
   if (localGameOpenPromise) return await localGameOpenPromise
   const openingGeneration = localGameLifecycle.beginOpening()
+  localAuthorityRecoveryBudget.rearm()
   const opening = (async (): Promise<{ ok: boolean; error?: string }> => {
     clearOnlineServerUrl()
     try {
@@ -1960,6 +2178,9 @@ handleTrusted('open-local-game', ['connect'], async () => {
       const detail = lastServerStderr ? '\n' + lastServerStderr.slice(-500) : ''
       return { ok: false, error: exitMsg + detail }
     }
+    localAuthorityRecoveryBudget.recordSuccess()
+    localAuthorityRecoveryStatus = 'ready'
+    localAuthorityNotice = null
     if (connectWin && !connectWin.isDestroyed()) {
       connectWin.close()
       connectWin = null
@@ -1975,6 +2196,34 @@ handleTrusted('open-local-game', ['connect'], async () => {
   }
 })
 
+handleTrusted('ensure-local-authority', ['game'], async () => {
+  if (localGameLifecycle.shutdownInProgress) {
+    return { ok: false, error: '本机服务正在停止，请稍后重试。' }
+  }
+  if (localGameReady && gameServerProcess) {
+    return { ok: true, notice: localAuthorityNotice }
+  }
+  try {
+    await recoverUnexpectedLocalAuthorityExit(null, true)
+    if (!localGameReady || !gameServerProcess) {
+      const detail = lastServerStderr ? lastServerStderr.slice(-500) : undefined
+      return {
+        ok: false,
+        error: localAuthorityNotice ?? localAuthorityStartupErrorMessage(detail ?? 'authority not ready'),
+        recovery: { status: localAuthorityRecoveryStatus, ...localAuthorityRecoveryBudget.snapshot() },
+      }
+    }
+    localAuthorityNotice = null
+    return {
+      ok: true,
+      recovery: { status: localAuthorityRecoveryStatus, ...localAuthorityRecoveryBudget.snapshot() },
+    }
+  } catch (error) {
+    console.error('[client] explicit local authority retry failed:', error)
+    return { ok: false, error: localAuthorityStartupErrorMessage(error) }
+  }
+})
+
 // 查询当前模式
 handleTrusted('get-mode', ['game'], () => ({
   isLocal: localGameReady,
@@ -1982,6 +2231,11 @@ handleTrusted('get-mode', ['game'], () => ({
   profileRuntimeUrl: `http://127.0.0.1:${actualLocalPort}`,
   profileIdentity: localProfileIdentity,
   localAuthorityProfileIdentity,
+  localAuthorityNotice,
+  localAuthorityRecovery: {
+    status: localAuthorityRecoveryStatus,
+    ...localAuthorityRecoveryBudget.snapshot(),
+  },
   ready: localGameReady,
 }))
 
@@ -1989,7 +2243,12 @@ handleTrusted('get-mode', ['game'], () => ({
 handleTrusted('restart-server', ['admin'], async () => {
   await killServer()
   await new Promise(resolve => setTimeout(resolve, 1000))
+  localAuthorityRecoveryBudget.rearm()
   await startStableLocalServerAndRecover()
+  if (localGameReady) {
+    localAuthorityRecoveryBudget.recordSuccess()
+    localAuthorityRecoveryStatus = 'ready'
+  }
   return { ok: localGameReady }
 })
 
@@ -2012,7 +2271,17 @@ handleTrusted('get-host-info', ['game'], () => {
       if (iface.family === 'IPv4' && !iface.internal) ips.push(iface.address)
     }
   }
-  return { port: actualGamePort, ips, running: gameServerProcess !== null && localGameReady, ready: localGameReady }
+  return {
+    port: actualGamePort,
+    ips,
+    running: gameServerProcess !== null && localGameReady,
+    ready: localGameReady,
+    notice: localAuthorityNotice,
+    recovery: {
+      status: localAuthorityRecoveryStatus,
+      ...localAuthorityRecoveryBudget.snapshot(),
+    },
+  }
 })
 
 // ─── UDP LAN 主机广播与发现 ───────────────────────────────────────────────────
@@ -2172,21 +2441,23 @@ app.whenReady().then(async () => {
   }
 
   try {
-    // Remote joiners only need the lightweight Profile service. The bundled
-    // PostgreSQL/Colyseus authority starts lazily when the player chooses LAN host.
-    await startStableProfileServerAndRecover()
+    // Host & Play and Training both depend on the local authority. Prepare the
+    // complete stack once at application startup so the normal player path is
+    // the main menu, not a server-selection gate.
+    await startStableLocalServerAndRecover()
+    if (localGameReady) {
+      localAuthorityRecoveryBudget.recordSuccess()
+      localAuthorityRecoveryStatus = 'ready'
+    } else {
+      localAuthorityRecoveryStatus = 'manual-required'
+      localAuthorityNotice = '本机服务尚未就绪；打开“我当主机”即可手动重试。'
+    }
   } catch (error) {
-    console.error('[profile] startup recovery failed; admission remains closed:', error)
-    return
+    localAuthorityRecoveryStatus = 'manual-required'
+    localAuthorityNotice = localAuthorityStartupErrorMessage(error)
+    console.error('[client] automatic local service startup failed:', error)
   }
-  // 暂时强制使用本地服务器，跳过在线服务器
-  openConnectWindow()
-  // const savedUrl = getOnlineServerUrl()
-  // if (savedUrl) {
-  //   loadOnlineGame(savedUrl)
-  // } else {
-  //   openConnectWindow()
-  // }
+  loadLocalGame()
 })
 
 app.on('window-all-closed', () => {

@@ -3,6 +3,8 @@
 > RED-138 取代说明：本文涉及公开初始/最终站位、个人重投与独立 45 秒部署锁定的条款只适用于 `legacy-reroll-v1` 和缺少 mode 的历史状态。新建对局默认使用 [ADR-0024](./ADR-0024-progressive-reserve-deployment.md) 的渐进部署，候选、落位和免费移动共用当前成长回合时限。
 >
 > RED-164 取代说明：本文第 4 条关于“计时始终跟随 input owner”及回合外 pending 超时结束活动回合的语义，已由 [ADR-0025](./ADR-0025-off-turn-pending-response-timer.md) 取代。回合外 pending 现在冻结普通回合计时并使用独立 15 秒响应计时。
+>
+> RED-170 时长取代说明：计时所有权与结算语义不变，但正常回合改为 90/120/150/180/210 秒、快速回合改为 40 秒；最终 15 秒烧绳不变。见 [ADR-0027](./ADR-0027-colyseus-single-session-match-lifecycle.md)。
 
 - 状态：Proposed（等待 RED-36 人工验收）
 - 日期：2026-08-20

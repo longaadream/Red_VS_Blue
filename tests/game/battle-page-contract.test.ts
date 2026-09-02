@@ -133,6 +133,9 @@ describe('battle page route contract', () => {
     expect(battlePage).toContain("authoritativePendingTimer ? '响应 ' + view.clockText : view.clockText")
     expect(battlePage).toContain("clock.parentElement?.classList.toggle('pending-timer-active', !!authoritativePendingTimer)")
     expect(battlePage).toContain('.turn-summary-secondary.pending-timer-active')
+    expect(battlePage).not.toContain('deploymentStatusTimer = setInterval')
+    expect(battlePage).toContain('function scheduleDeadlineStatusRefresh()')
+    expect(battlePage).toContain('deadlineStatusTimer = setTimeout')
   })
 
   it('renders the authoritative terminal result without judging or submitting gameOver locally', () => {
@@ -796,6 +799,15 @@ new Script([
     expect(authorityCells).not.toMatch(/manhattan/i)
     expect(battlePage).toContain("pieceHasVisibleStatusTag(_selPiece, 'deployment-first-move-free')")
     expect(battlePage).toContain('本回合首移 0 AP')
+  })
+
+  it('keeps deployment candidate nodes stable while only the countdown refreshes', () => {
+    const battlePage = readPage('battle.html')
+
+    expect(battlePage).toContain("let deploymentChoicesRenderKey = ''")
+    expect(battlePage).toContain('if (nextChoicesKey !== deploymentChoicesRenderKey)')
+    expect(battlePage).toContain('deploymentChoicesRenderKey = nextChoicesKey')
+    expect(battlePage).toContain('renderTurnTimerStatus()')
   })
 
   it('shows authoritative reserve-candidate stats and opens read-only accessible details', () => {

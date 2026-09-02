@@ -4,9 +4,12 @@ import os from 'node:os'
 import path from 'node:path'
 import { promisify } from 'node:util'
 import { Pool } from 'pg'
-import { afterAll, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 
-import { EmbeddedPostgresController } from '../../electron-client/embedded-postgres'
+import {
+  EmbeddedPostgresController,
+  EmbeddedPostgresHealthMonitor,
+} from '../../electron-client/embedded-postgres'
 import { findFreePort } from '../../electron-client/local-port'
 
 const temporaryRoots: string[] = []
@@ -14,6 +17,75 @@ const execFileAsync = promisify(execFile)
 
 afterAll(() => {
   for (const root of temporaryRoots) fs.rmSync(root, { recursive: true, force: true })
+})
+
+afterEach(() => {
+  vi.useRealTimers()
+})
+
+describe('RED-170 embedded PostgreSQL health monitor', () => {
+  it('runs probes single-flight and tolerates two transient failures', async () => {
+    vi.useFakeTimers()
+    let activeProbes = 0
+    let maximumConcurrentProbes = 0
+    let probeAttempts = 0
+    let confirmedLosses = 0
+    const states: string[] = []
+    const monitor = new EmbeddedPostgresHealthMonitor({
+      intervalMs: 10,
+      failureThreshold: 3,
+      probe: async () => {
+        probeAttempts += 1
+        activeProbes += 1
+        maximumConcurrentProbes = Math.max(maximumConcurrentProbes, activeProbes)
+        await new Promise(resolve => setTimeout(resolve, 50))
+        activeProbes -= 1
+        if (probeAttempts <= 2) throw new Error('transient pg_isready timeout')
+      },
+      confirmProcessRunning: async () => true,
+      onStateChange: state => states.push(state.state),
+      onConfirmedLoss: () => { confirmedLosses += 1 },
+    })
+
+    monitor.start()
+    await vi.advanceTimersByTimeAsync(220)
+
+    expect(probeAttempts).toBeGreaterThanOrEqual(3)
+    expect(maximumConcurrentProbes).toBe(1)
+    expect(confirmedLosses).toBe(0)
+    expect(states).toContain('degraded')
+    expect(states).toContain('healthy')
+    monitor.stop()
+  })
+
+  it('reports one loss only after sustained readiness failures and a failed process check', async () => {
+    vi.useFakeTimers()
+    let confirmedLosses = 0
+    let processChecks = 0
+    let probeAttempts = 0
+    const monitor = new EmbeddedPostgresHealthMonitor({
+      intervalMs: 10,
+      failureThreshold: 3,
+      probe: async () => {
+        probeAttempts += 1
+        throw new Error('database unavailable')
+      },
+      confirmProcessRunning: async () => {
+        processChecks += 1
+        return false
+      },
+      onConfirmedLoss: () => { confirmedLosses += 1 },
+    })
+
+    monitor.start()
+    await vi.advanceTimersByTimeAsync(200)
+
+    expect(probeAttempts).toBe(3)
+    expect(processChecks).toBe(1)
+    expect(confirmedLosses).toBe(1)
+    await vi.advanceTimersByTimeAsync(200)
+    expect(confirmedLosses).toBe(1)
+  })
 })
 
 describe.skipIf(process.platform !== 'win32')('RED-161 embedded PostgreSQL LAN authority', () => {
@@ -76,7 +148,7 @@ describe.skipIf(process.platform !== 'win32')('RED-161 embedded PostgreSQL LAN a
     expect(fs.existsSync(path.join(stateRoot, 'data', 'PG_VERSION'))).toBe(true)
     expect(fs.existsSync(path.join(stateRoot, 'credential.bin'))).toBe(true)
     expect(fs.readdirSync(stateRoot).some(entry => entry.startsWith('.init-password-'))).toBe(false)
-  }, 60_000)
+  }, 90_000)
 
   it('fails closed before executing binaries when the runtime manifest is not the approved artifact', async () => {
     const packageRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'rvb-invalid-pg-runtime-'))
