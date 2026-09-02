@@ -350,10 +350,16 @@ describe('battle presentation boundary', () => {
     }
     const domUi = { update: vi.fn(), dispose: vi.fn() }
     const vignetteUi = { mount: vi.fn(), update: vi.fn(), resize: vi.fn(), dispose: vi.fn() }
+    const historyUi = { mount: vi.fn(), update: vi.fn(), resize: vi.fn(), dispose: vi.fn() }
     const onIntent = vi.fn()
-    const boundary = presentation.create({ renderer, domUi, vignetteUi, onIntent })
-    const mount = { boardContainer: {}, floatLayer: {} }
-    const model = { board: { width: 3, height: 2 }, pieces: [], legal: {} }
+    const boundary = presentation.create({ renderer, domUi, vignetteUi, historyUi, onIntent })
+    const mount = { boardContainer: {}, floatLayer: {}, historyDock: {} }
+    const model = {
+      board: { width: 3, height: 2 },
+      pieces: [],
+      legal: {},
+      presentationEvents: [{ eventId: 'action-1:0', rootEventId: 'action-1:0' }],
+    }
 
     boundary.mount(mount)
     boundary.mount(mount)
@@ -369,6 +375,10 @@ describe('battle presentation boundary', () => {
     expect(domUi.dispose).toHaveBeenCalledTimes(2)
     expect(renderer.update).toHaveBeenCalledWith(model)
     expect(domUi.update).toHaveBeenCalledWith(model)
+    expect(historyUi.mount).toHaveBeenCalledTimes(2)
+    expect(historyUi.update).toHaveBeenCalledWith(model)
+    expect(historyUi.resize).toHaveBeenCalledTimes(2)
+    expect(historyUi.dispose).toHaveBeenCalledTimes(2)
     expect(vignetteUi.mount).toHaveBeenCalledTimes(2)
     const vignetteMount = vignetteUi.mount.mock.calls[1][0]
     vignetteMount.showAreaFlash([{ x: 1, y: 0 }])

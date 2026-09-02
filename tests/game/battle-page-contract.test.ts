@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { Script, createContext } from 'node:vm'
 
+import { buildSync } from 'esbuild'
 import { describe, expect, it } from 'vitest'
 
 const pagesDir = resolve(process.cwd(), 'data/pages')
@@ -104,6 +105,26 @@ describe('battle page route contract', () => {
     expect(trainingAction).toContain('beforeState: oldG')
     expect(trainingAction).toContain('afterState: newG')
     expect(trainingAction).toContain('latestBattlePresentationEvents =')
+  })
+
+  it('keeps the browser presentation-event bundle byte-aligned with its TypeScript source', () => {
+    const banner = '/* eslint-disable @typescript-eslint/no-unused-vars, @typescript-eslint/no-unused-expressions -- generated browser bundle */'
+    const generated = buildSync({
+      entryPoints: [resolve(process.cwd(), 'lib/game/battle-presentation-events.ts')],
+      bundle: true,
+      platform: 'browser',
+      format: 'iife',
+      globalName: 'BattlePresentationEvents',
+      minify: true,
+      banner: { js: banner },
+      write: false,
+    }).outputFiles[0].text
+    const committed = readFileSync(
+      resolve(pagesDir, 'js/battle-ui/battle-presentation-events.js'),
+      'utf8',
+    )
+
+    expect(committed.replace(/\r\n/g, '\n')).toBe(generated.replace(/\r\n/g, '\n'))
   })
 
   it('feeds the authoritative response timer into the shared battle clock view', () => {
