@@ -573,6 +573,9 @@ describe('RED-122 rvb-ai-zimse-v1 mirror self-play evaluation', () => {
         failure: match.failure?.kind ?? null,
         failureAgentId: match.failure?.reproduction.agentId ?? null,
         failureAction: match.failure?.reproduction.action ?? null,
+        failureErrorCode: match.failure?.reproduction.errorCode ?? null,
+        failureErrorMessage: match.failure?.reproduction.errorMessage ?? null,
+        durationMs: match.durationMs,
         actionTypes,
         skillUses,
         livingPieces: finalState?.pieces.filter(piece => piece.currentHp > 0).reduce((counts, piece) => {

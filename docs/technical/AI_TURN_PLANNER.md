@@ -33,12 +33,16 @@ planner 与 self-play 的结构动作白名单必须认识该候选。它不能�
 终局护栏约束。每次权威提交后必须从新状态重新枚举，不能把旧 `expectedDeploymentRevision` 或候选
 带到下一步。
 
-桌面 WebSocket 实时 bot 不使用搜索结果为部署位置估值：它固定提交 AI Environment 稳定排序后的
+简单难度的实时 bot 不使用搜索结果为部署位置估值：它固定提交 AI Environment 稳定排序后的
 第一个 `reserve-deployment`，随后直接进入既有 pending 或普通行动逻辑。部署核心的
 `deployment-first-move-free` statusTag 只由权威普通移动 reducer 决定 0 AP 结果；planner 不新增
 专用 action，也不复制扣费或标签规则。这是可回放的流程存活策略，不修改任何 utility 权重，也不作为 AI 强度或 RED-138
 节奏体验的验收基准。RED-117 formal PVE adapter 与 Android mobile-server 仍使用
 `legacy-reroll-v1`。
+
+RED-122 普通难度接入 `planZeroStageAction()`，对每个合法部署候选隔离模拟一次并按部署后局面选择；
+每次只提交一个动作并从最新状态重算，不沿用简单难度的批次。当前玩家入口为 Colyseus BattleRoom，
+而非 legacy raw WS。两档映射和计时/护栏边界见 [AI_ZERO_STAGE](./AI_ZERO_STAGE.md)。
 
 ## 搜索、安全与确定性
 

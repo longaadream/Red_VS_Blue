@@ -443,17 +443,17 @@ function collectMessages(client: WebSocket) {
   }
 }
 
-async function httpCreate(mapId: unknown, hostId = 'alice') {
+async function httpCreate(mapId: unknown, hostId = 'alice', difficulty?: unknown) {
   const request = new NextRequest('http://localhost/api/rooms', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ mode: 'pve', hostId, playerName: 'Alice', mapId, profileIdentity }),
+    body: JSON.stringify({ mode: 'pve', difficulty, hostId, playerName: 'Alice', mapId, profileIdentity }),
   })
   const response = await roomsPost(request)
   return { status: response.status, body: await response.json() as JsonObject }
 }
 
-async function wsCreate(mapId: unknown, submittedProfile: unknown = profileIdentity) {
+async function wsCreate(mapId: unknown, submittedProfile: unknown = profileIdentity, pve?: { mode: 'pve'; difficulty?: unknown }) {
   const client = await openClient()
   try {
     const response = receiveJson(client)
@@ -461,7 +461,7 @@ async function wsCreate(mapId: unknown, submittedProfile: unknown = profileIdent
       type: 'rpc',
       requestId: 'create-fixed-map',
       method: 'rooms.create',
-      data: { hostId: 'alice', name: 'Fixed map room', mapId, profileIdentity: submittedProfile },
+      data: { hostId: 'alice', name: 'Fixed map room', mapId, profileIdentity: submittedProfile, ...pve },
     }))
     return await response
   } finally {
@@ -813,6 +813,30 @@ describe('Demo roster HTTP/WebSocket integration', () => {
   })
 
   beforeEach(() => memoryStore.reset())
+
+  it.each([undefined, 'easy', 'normal'])('persists the server PvE profile for HTTP difficulty %s', async difficulty => {
+    const result = await httpCreate('open-expanse', 'alice', difficulty)
+    expect(result.status).toBe(200)
+    const created = await memoryStore.getRoom(String(result.body.id))
+    expect(created?.players.find(player => player.isBot)?.botDifficulty).toBe(difficulty ?? 'easy')
+  })
+
+  it('rejects unknown HTTP difficulty before any room write', async () => {
+    const result = await httpCreate('open-expanse', 'alice', 'hard')
+    expect(result).toMatchObject({ status: 400, body: { code: 'PVE_DIFFICULTY_INVALID' } })
+    expect(memoryStore.writeCount()).toBe(0)
+  })
+
+  it.each([undefined, 'easy', 'normal'])('persists the server PvE profile for WS difficulty %s', async difficulty => {
+    const result = await wsCreate('open-expanse', profileIdentity, { mode: 'pve', difficulty })
+    expect(result).toMatchObject({ ok: true, data: { players: [expect.objectContaining({ isBot: true, botDifficulty: difficulty ?? 'easy' })] } })
+  })
+
+  it('rejects unknown WS difficulty before any room write', async () => {
+    const result = await wsCreate('open-expanse', profileIdentity, { mode: 'pve', difficulty: 'hard' })
+    expect(result).toMatchObject({ ok: false })
+    expect(memoryStore.writeCount()).toBe(0)
+  })
 
   it('rejects WebSocket room creation without a profile before store mutation', async () => {
     const result = await wsCreate('winding-pass', null)

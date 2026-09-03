@@ -171,6 +171,121 @@ describe('zero-stage static evaluator', () => {
     expect(improved.components.terrainValue.raw).toBeGreaterThan(baseline.components.terrainValue.raw)
   })
 
+  it('treats progressive deployment as one step and values the deployed piece free-move pursuit', () => {
+    const state = makeState({
+      width: 15,
+      height: 1,
+      pieces: [
+        makePiece({ instanceId: 'red-vanguard', ownerPlayerId: 'player-red', x: 0, y: 0 }),
+        makePiece({ instanceId: 'blue-vanguard', ownerPlayerId: 'player-blue', x: 14, y: 0 }),
+      ],
+    }) as any
+    state.pieces.forEach((piece: any) => { piece.isCore = true })
+    state.deployment = {
+      mode: 'progressive-reserve-v1',
+      status: 'awaiting-reserve-deploy',
+      playerIds: ['player-red', 'player-blue'],
+      choices: {},
+      initialPositions: {},
+      locks: { 'player-red': { locked: false }, 'player-blue': { locked: false } },
+      startedAt: 0,
+      deadlineAt: 45_000,
+      revision: 3,
+      openingVanguardsInitialized: true,
+      reserveCounts: { 'player-red': 2, 'player-blue': 2 },
+      activePlayerId: 'player-red',
+      offerTurnNumber: 1,
+    }
+    const mobile = {
+      protocolVersion: 1,
+      id: 'deploy-mobile-at-6',
+      kind: 'reserve-deployment',
+      action: {
+        type: 'deployReservePiece', playerId: 'player-red', pieceId: 'red-mobile',
+        expectedDeploymentRevision: 3, toX: 6, toY: 0,
+      },
+    } satisfies CandidateAction
+    const staticNearer = {
+      protocolVersion: 1,
+      id: 'deploy-static-at-7',
+      kind: 'reserve-deployment',
+      action: {
+        type: 'deployReservePiece', playerId: 'player-red', pieceId: 'red-static',
+        expectedDeploymentRevision: 3, toX: 7, toY: 0,
+      },
+    } satisfies CandidateAction
+    const simulations = new Map<string, number>()
+    const environment: AIEnvironment = {
+      ...aiEnvironmentV1,
+      listLegalActions: () => [staticNearer, mobile],
+      simulate: (current, input) => {
+        const selected = 'action' in input ? input : mobile
+        simulations.set(selected.id, (simulations.get(selected.id) ?? 0) + 1)
+        const action = selected.action as Extract<CandidateAction['action'], { type: 'deployReservePiece' }>
+        const deployed = makePiece({
+          instanceId: action.pieceId,
+          ownerPlayerId: 'player-red',
+          x: action.toX,
+          y: action.toY,
+          moveRange: action.pieceId === 'red-mobile' ? 3 : 1,
+          statusTags: [{
+            id: 'deployment-first-move-free', type: 'deployment-first-move-free',
+            name: '本回合首次移动免费', currentDuration: 1, currentUses: 1, visible: true,
+          }],
+        }) as any
+        deployed.isCore = true
+        const next = structuredClone(current) as any
+        next.pieces.push(deployed)
+        next.deployment.status = 'turn-ready'
+        next.deployment.reserveCounts['player-red'] -= 1
+        return accepted(next, selected)
+      },
+    }
+
+    const decision = planZeroStageAction(state, 'player-red', ROOT_SEED, { environment })
+
+    expect(decision.nextAction?.id).toBe(mobile.id)
+    expect(decision.nodesVisited).toBe(2)
+    expect(decision.candidatesConsidered).toBe(2)
+    expect(Object.fromEntries(simulations)).toEqual({
+      'deploy-mobile-at-6': 1,
+      'deploy-static-at-7': 1,
+    })
+  })
+
+  it('replaces projected deployment pursuit with the committed free-move position', () => {
+    const deployed = makeState({
+      width: 15,
+      height: 1,
+      pieces: [
+        makePiece({ instanceId: 'red-vanguard', ownerPlayerId: 'player-red', x: 0, y: 0 }),
+        makePiece({
+          instanceId: 'red-deployed', ownerPlayerId: 'player-red', x: 6, y: 0, moveRange: 3,
+          statusTags: [{
+            id: 'deployment-first-move-free', type: 'deployment-first-move-free',
+            currentDuration: 1, currentUses: 1, visible: true,
+          }],
+        }),
+        makePiece({ instanceId: 'blue-vanguard', ownerPlayerId: 'player-blue', x: 14, y: 0 }),
+      ],
+    }) as any
+    deployed.pieces.forEach((piece: any) => { piece.isCore = true })
+    const withoutFreeMove = structuredClone(deployed) as any
+    withoutFreeMove.pieces[1].statusTags = []
+    const afterFreeMove = structuredClone(deployed) as any
+    afterFreeMove.pieces[1].x = 9
+    afterFreeMove.pieces[1].statusTags = []
+
+    const projected = evaluateZeroStageState(aiEnvironmentV1.observe(deployed, 'player-red'))
+    const unprojected = evaluateZeroStageState(aiEnvironmentV1.observe(withoutFreeMove, 'player-red'))
+    const committed = evaluateZeroStageState(aiEnvironmentV1.observe(afterFreeMove, 'player-red'))
+
+    expect(projected.components.enemyProximity.raw).toBeGreaterThan(unprojected.components.enemyProximity.raw)
+    expect(projected.components.futureAttackPotential.raw)
+      .toBeGreaterThan(unprojected.components.futureAttackPotential.raw)
+    expect(committed.components.enemyProximity.raw).toBeGreaterThan(projected.components.enemyProximity.raw)
+  })
+
   it('devalues remote pieces and rewards advancing toward the center and enemy objective', () => {
     const remote = makeState({
       width: 11,

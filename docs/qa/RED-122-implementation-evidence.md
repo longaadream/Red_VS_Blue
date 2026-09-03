@@ -6,7 +6,7 @@
 
 分支：`codex/RED-122-zero-stage-ai`
 
-基线：`origin/main@44d72960496a0da1068cd6d58b0eb0286188ca82`（2026-08-29 提交前刷新并 merge）
+当前上传基线：`origin/main@60b775db2e6440208e68c912eb3b0b28e2e16ddf`（2026-09-03 提交前刷新并 merge）。下方标明旧 SHA 的性能数据保留为历史证据，不冒充当前基线结果。
 
 ## 实现范围
 
@@ -17,7 +17,17 @@
 - 第 8 个动作仍通过护栏强制结束，避免无界长回合。
 - AI transition 对合法接收但公开观察完全不变的技能、移动或卡牌标记 `blocked=true`；零阶段记录但不估价、不选择，防止沉默或打坐动作重复触发。
 - 候选估价使用不含历史 replay/action-log 载荷和完整 state diff 的 evaluation transition；仅保留与权威 `actionCount` 等长的轻量日志占位，从而维持终局 action index。它仍调用原 `runBattleActionIsolated()`，完整保留 gameplay state 与 RNG authority。最终正式动作继续走完整 transition。
-- 未修改技能、卡牌、玩法数值、胜负、随机、UI、网络、存档或 PvE 奖励。
+- 未修改技能、卡牌、玩法数值、胜负、随机、存档或 PvE 奖励；经用户追加批准，当前版本接通 UI、HTTP/旧 WS 与实际 Colyseus PvE 入口。
+
+## 2026-09-03 PvE 上线接入与渐进部署 v7
+
+- 主菜单提供“简单 · sample-v1”和“普通 · zimse-v1”；旧请求省略难度时仍为简单。
+- 客户端只发送 `easy`/`normal`，服务器固定映射为 `simple-v1`/`rvb-ai-zimse-v1`，不接收任意 agent 或权重配置。
+- Colyseus PvE 房间由服务器占用蓝方 Bot 座位并锁定默认阵容；真人不能加入 `bot` 座位。Bot 的部署、pending 与行动都走原权威 dispatch；普通难度每次权威变更后重新完整枚举，房间调度只保存回合动作计数 continuation。
+- profile v7 把渐进部署继续视为单步策略。公开的首次免费移动范围只按 50% 折算为追敌潜力，真实移动到位后的评分严格高于未兑现潜力，没有增加第二层动作。
+- 实际 SDK 回归使用固定 root seed `1001`，简单和普通均完成自动部署与完整 Bot 回合并把控制权交还真人；3 个 Colyseus 文件共 9 项通过，耗时 `80.47s`。零阶段/PvE/权威旧 WS 核心回归 5 文件 92 项通过；planner 16 项通过；Colyseus 构建通过。
+- 2026-09-03 三个随机 seed `3304753545`、`4071025389`、`2101381254` 的评测中，仅第一局形成有效终局（第 18 回合胜，墙钟约 780.81 秒）；另两局分别因 simple 端动作护栏和拒绝移动中止。因此仍不能宣称满足“高概率 20 回合、除极低概率外 40 回合、每局约 10 分钟”。
+- 当前同步后的 `typecheck` 仍被 main 的 `tests/game/sonic-roster.test.ts` 4 个类型错误阻断；Lint 仍在配置加载期缺少 `import` 插件；相关最小回归、编码检查、baseline、diff 检查均通过。完整 suite 的本轮结果见上传 PR，若失败则逐项记录而不更新快照。
 
 ## 固定局面证据
 

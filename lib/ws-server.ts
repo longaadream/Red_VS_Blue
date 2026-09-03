@@ -2,6 +2,7 @@ import type { IncomingMessage } from 'node:http'
 import type { Duplex } from 'node:stream'
 import { WebSocketServer, WebSocket } from 'ws'
 import { assignNextSeat, getPlayerSeat, normalizePlayerAlignment, roomStore } from './game/room-store'
+import { getPveAiProfile, planPveBotAction, pveBotTurnKey } from './game/pve-ai'
 import { getBattleStorage, withServerSkills } from './game/battle-storage'
 import {
   createPublicBattleSnapshot,
@@ -10,6 +11,7 @@ import {
   createPublicRoomSnapshot,
   dispatchRoomBattleAction,
   scheduleRoomBattleTimeout,
+  runWithRoomBattleAuthorityPaused,
   type DispatchRoomBattleActionResult,
   type PublicBattleSnapshot,
 } from './game/room-battle-actions'
@@ -71,6 +73,7 @@ const _g = globalThis as unknown as {
   __rvbBattleAuthorityShutdownInstalled?: boolean
   __rvbBotTurnTimers?: Map<string, ReturnType<typeof setTimeout>>
   __rvbBotTurnsRunning?: Set<string>
+  __rvbBotTurnProgress?: Map<string, { key: string; accepted: number }>
 }
 
 const roomClients = (_g.__rvbRoomClients ??= new Map<string, Set<WebSocket>>())
@@ -78,6 +81,9 @@ const playerWs = (_g.__rvbPlayerWs ??= new Map<string, WebSocket>())
 const wsIdentities = (_g.__rvbWsIdentities ??= new WeakMap<WebSocket, { roomId: string; playerId?: string }>())
 const botTurnTimers = (_g.__rvbBotTurnTimers ??= new Map<string, ReturnType<typeof setTimeout>>())
 const botTurnsRunning = (_g.__rvbBotTurnsRunning ??= new Set<string>())
+// Scheduler continuation only, never gameplay state. Retained while pending
+// human input interrupts a bot turn; only successful commits increment it.
+const botTurnProgress = (_g.__rvbBotTurnProgress ??= new Map<string, { key: string; accepted: number }>())
 let _wss: WebSocketServer | null = _g.__rvbWss ?? null
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -751,16 +757,18 @@ async function restartWsServer(): Promise<void> {
                 const now = Date.now()
                 const hostId = String(data.hostId || '').trim().toLowerCase()
                 const isPve = data.mode === 'pve'
+                const botProfile = isPve ? getPveAiProfile(data.difficulty) : undefined
                 const initialPlayers: any[] = []
                 if (isPve) {
                   // Auto-add bot as blue player so room is immediately full
                   initialPlayers.push({
                     id: 'bot',
-                    name: 'AI Bot',
+                    name: botProfile!.name,
                     joinedAt: now,
                     faction: 'blue' as const,
                     alignment: 'dark' as const,
                     isBot: true,
+                    botDifficulty: botProfile!.difficulty,
                     profileIdentity: getServerGameProfileIdentityV1(),
                     hasSelectedPieces: false,
                     selectedPieces: [],
@@ -1209,10 +1217,20 @@ async function runBotTurn(roomId: string): Promise<void> {
       const latestRoom = await roomStore.getRoom(normalizedRoomId)
       const latestStorage = latestRoom && getBattleStorage(latestRoom)
       const storedState = latestStorage?.state as BattleState | undefined
-      if (!latestRoom || !latestStorage || !storedState) break
+      if (!latestRoom || !latestStorage || !storedState) {
+        botTurnProgress.delete(normalizedRoomId)
+        break
+      }
 
       const latestState = withServerSkills(storedState) as BattleState
+      const turnKey = pveBotTurnKey(latestState, latestStorage.rootSeed)
+      if (botTurnProgress.get(normalizedRoomId)?.key !== turnKey || latestState.terminalResult) {
+        botTurnProgress.delete(normalizedRoomId)
+      }
       if (!isBotInputReady(latestState)) break
+      const normalDifficulty = getPveAiProfile(latestRoom.players.find(player => player.id === 'bot')?.botDifficulty).difficulty === 'normal'
+      const progress = botTurnProgress.get(normalizedRoomId) ?? { key: turnKey, accepted: 0 }
+      if (normalDifficulty) botTurnProgress.set(normalizedRoomId, progress)
 
       const hasPendingInput = !!(
         latestState.pendingOptionSelection
@@ -1221,10 +1239,19 @@ async function runBotTurn(roomId: string): Promise<void> {
       const actionTurnKey = latestState.turn.currentPlayerId.trim().toLowerCase()
         + ':'
         + String(latestState.turn.turnNumber)
-      const usesActionBatch = latestState.turn.phase === 'action' && !hasPendingInput
+      const usesActionBatch = !normalDifficulty && latestState.turn.phase === 'action' && !hasPendingInput
       let draft: BattleAction | undefined
 
-      if (usesActionBatch) {
+      if (normalDifficulty) {
+        const plan = await runWithRoomBattleAuthorityPaused(normalizedRoomId, async () => (
+          planPveBotAction(latestState, 'bot', latestStorage.rootSeed, 'normal', progress.accepted)
+        ))
+        draft = plan?.actions[0]
+        if (!draft) {
+          console.warn('[WS] normal PvE has no legal scored action', { roomId: normalizedRoomId, turn: latestState.turn.turnNumber })
+          break
+        }
+      } else if (usesActionBatch) {
         if (actionBatchTurnKey !== actionTurnKey) {
           const plan = planBotActions(latestState, 'bot')
           if (!plan || plan.kind !== 'action' || plan.actions.length === 0) {
@@ -1258,7 +1285,9 @@ async function runBotTurn(roomId: string): Promise<void> {
         draft = plan.actions[0]
       }
 
-      const currentAction = prepareLegalBotAction(latestState, draft, 'bot')
+      // Normal already chose a complete strict candidate. Do not re-target its
+      // skill via the simple policy; the versioned authority validates it again.
+      const currentAction = normalDifficulty ? draft : prepareLegalBotAction(latestState, draft, 'bot')
       if (!currentAction) {
         console.warn('[WS] skipped stale bot plan action', {
           roomId: normalizedRoomId,
@@ -1281,7 +1310,13 @@ async function runBotTurn(roomId: string): Promise<void> {
         if (usesActionBatch) actionBatch?.unshift(draft)
         continue
       }
-      if (result.actionResult.state.terminalResult) break
+      if (normalDifficulty && result.kind === 'applied') progress.accepted += 1
+      if (result.actionResult.state.terminalResult) {
+        botTurnProgress.delete(normalizedRoomId)
+        break
+      }
+      // Let pending human input and queued network messages run between choices.
+      if (normalDifficulty) await new Promise<void>(resolve => setImmediate(resolve))
     }
 
     if (decisionStep >= BOT_MAX_DECISION_STEPS) {

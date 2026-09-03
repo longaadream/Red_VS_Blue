@@ -9,6 +9,10 @@ import {
   BATTLE_AUTHORITY_PROTOCOL_VERSION,
 } from '@/lib/game/battle-public-patch'
 import { getDemoPieceIds, getPieceById } from '@/lib/game/piece-repository'
+import { planBotActions } from '@/lib/game/ai'
+import { getCurrentInputOwnerPlayerId } from '@/lib/game/turn-timer'
+import type { BattleState } from '@/lib/game/turn'
+import * as ruleRuntime from '@/lib/game/rule-runtime'
 import { createInitialCheckpoint } from '@/lib/server/colyseus/candidate-battle-store'
 import { createColyseusBattleServer } from '@/lib/server/colyseus/create-colyseus-server'
 import { createDevelopmentBattleRoom } from '@/lib/server/colyseus/development-battle-fixture'
@@ -16,6 +20,7 @@ import {
   BATTLE_COMMAND_MESSAGE,
   BATTLE_RECEIPT_MESSAGE,
   BATTLE_SNAPSHOT_MESSAGE,
+  BATTLE_RESYNC_MESSAGE,
   PRODUCT_ROOM_RPC_MESSAGE,
   PRODUCT_ROOM_UPDATE_MESSAGE,
 } from '@/lib/server/colyseus/battle-room-protocol'
@@ -24,6 +29,97 @@ import { PostgresAuthorityJournal } from '@/lib/server/postgres/postgres-authori
 import { FakeAuthorityRepository } from './fake-authority-repository'
 
 describe('RED-161 Colyseus product room', () => {
+  it('defaults old PvE requests to easy and rejects invalid difficulty or a human bot seat', async () => {
+    const repository = new FakeAuthorityRepository()
+    const journal = new PostgresAuthorityJournal(repository)
+    const candidate = createColyseusBattleServer({ repository, journal })
+    const port = await availablePort()
+    await candidate.server.listen(port, '127.0.0.1')
+    const client = new ColyseusClient(`ws://127.0.0.1:${port}`)
+    const profileIdentity = getServerGameProfileIdentityV1()
+    let room: ColyseusClientRoom | undefined
+    try {
+      await expect(client.create('battle', { product: true, mode: 'pve', difficulty: 'hard', playerId: 'human', profileIdentity }))
+        .rejects.toThrow()
+      expect(await fetch(`http://127.0.0.1:${port}/rooms`).then(response => response.json())).toEqual({ rooms: [] })
+      room = await client.create('battle', { product: true, mode: 'pve', playerId: 'human', profileIdentity })
+      const initial = await requestRoomRpc(room, 'rooms.get', {})
+      expect(initial.players).toEqual(expect.arrayContaining([expect.objectContaining({ id: 'bot', botDifficulty: 'easy' })]))
+      await expect(client.joinById(room.roomId, { playerId: 'bot', profileIdentity })).rejects.toThrow('Bot seats are server controlled')
+    } finally {
+      if (room) await room.leave()
+      await candidate.server.gracefullyShutdown(false)
+    }
+  })
+
+  it.each(['easy', 'normal'])('creates PvE %s, locks the bot roster and returns control after its turn', async difficulty => {
+    // Fix only the external seed source; planners, rules and network are real.
+    const seedSource = vi.spyOn(ruleRuntime, 'createRootSeed').mockReturnValue(1001)
+    const repository = new FakeAuthorityRepository()
+    const journal = new PostgresAuthorityJournal(repository, { maxBatchSize: 8, maxDwellMs: 25 })
+    const candidate = createColyseusBattleServer({ repository, journal })
+    const port = await availablePort()
+    await candidate.server.listen(port, '127.0.0.1')
+    const client = new ColyseusClient(`ws://127.0.0.1:${port}`)
+    const profileIdentity = getServerGameProfileIdentityV1()
+    let room: ColyseusClientRoom | undefined
+    try {
+      room = await client.create('battle', { product: true, mode: 'pve', difficulty, playerId: 'human', playerName: 'Human', profileIdentity })
+      const initial = await requestRoomRpc(room, 'rooms.get', { roomId: room.roomId })
+      expect(initial).toMatchObject({ visibility: 'private', players: expect.arrayContaining([
+        expect.objectContaining({ id: 'bot', seat: 'blue', isBot: true, botDifficulty: difficulty }),
+        expect.objectContaining({ id: 'human', seat: 'red', alignment: 'light' }),
+      ]) })
+      const started = nextMessage(room, BATTLE_SNAPSHOT_MESSAGE)
+      await requestRoomRpc(room, 'rooms.action', { action: 'select-pieces', playerId: 'human', alignment: 'light', pieces: rosterFor('good'), profileIdentity })
+      let snapshot = await started
+      expect(snapshot.state.turn.currentPlayerId).toBe('human')
+      const setup = await requestRoomRpc(room, 'rooms.get', { roomId: room.roomId })
+      expect(setup.players).toEqual(expect.arrayContaining([expect.objectContaining({ id: 'bot', rosterLocked: true, selectedPiecesCount: 8 })]))
+      for (let step = 0; step < 12 && getCurrentInputOwnerPlayerId(snapshot.state as BattleState) === 'human'; step += 1) {
+        const humanState = snapshot.state as BattleState
+        const deployment = snapshot.state.deployment
+        const position = deployment.legalPositions?.[0]
+        const hasPendingInput = humanState.pendingOptionSelection || humanState.pendingTargetSelection
+        const action = !hasPendingInput && humanState.deployment?.status === 'awaiting-reserve-deploy'
+          ? { type: 'deployReservePiece', pieceId: deployment.offerPieceIds?.[0] ?? deployment.offerPieces?.[0]?.instanceId,
+              expectedDeploymentRevision: deployment.revision, ...(position ? { toX: position.x, toY: position.y } : {}) }
+          : humanState.turn.phase === 'action' && !hasPendingInput
+          ? { type: 'endTurn', playerId: 'human' }
+          : planBotActions(humanState, 'human')?.actions[0]
+        expect(action, `human input at step ${step}`).toBeDefined()
+        const clientActionId = `pve-${difficulty}-human-${step}`
+        const receipt = nextMessage(room, BATTLE_RECEIPT_MESSAGE, message => message.receipt?.clientActionId === clientActionId)
+        room.send(BATTLE_COMMAND_MESSAGE, {
+          protocolVersion: BATTLE_AUTHORITY_PROTOCOL_VERSION, authorityBuildId: BATTLE_AUTHORITY_BUILD_ID,
+          roomId: room.roomId, playerId: 'human', expectedAuthorityVersion: snapshot.authorityVersion, clientActionId,
+          command: { ...action, playerId: 'human', clientActionId },
+        })
+        expect(await receipt, `${difficulty} human step ${step}`).toMatchObject({ kind: 'applied' })
+        const refreshed = nextMessage(room, BATTLE_SNAPSHOT_MESSAGE)
+        room.send(BATTLE_RESYNC_MESSAGE, {})
+        snapshot = await refreshed
+      }
+      await vi.waitFor(() => {
+        const actions = repository.batches.flat().map(job => job.transition.command)
+        expect(actions).toEqual(expect.arrayContaining([
+          expect.objectContaining({ type: 'deployReservePiece', playerId: 'bot' }),
+          expect.objectContaining({ type: 'endTurn', playerId: 'bot' }),
+        ]))
+      }, { timeout: 90_000, interval: 100 })
+      let restored = await repository.restoreRoom(room.roomId)
+      await vi.waitFor(async () => {
+        restored = await repository.restoreRoom(room!.roomId)
+        expect((restored?.room.battleState as unknown as { state: { turn: { currentPlayerId: string } } }).state.turn.currentPlayerId).toBe('human')
+      }, { timeout: 10_000, interval: 50 })
+      expect(restored?.room.players.find(player => player.isBot)?.botDifficulty).toBe(difficulty)
+    } finally {
+      if (room) await room.leave()
+      await candidate.server.gracefullyShutdown(false)
+      seedSource.mockRestore()
+    }
+  }, 120_000)
+
   it('isolates an incompatible durable room instead of crashing authority startup', async () => {
     const repository = new FakeAuthorityRepository()
     const incompatibleRoom = structuredClone(createDevelopmentBattleRoom('incompatible-profile-room'))

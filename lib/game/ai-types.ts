@@ -501,7 +501,7 @@ export interface AiTurnPlan {
   trace: AiPlannerTraceEntry[]
 }
 
-export const ZERO_STAGE_AI_PROFILE_VERSION = 6 as const
+export const ZERO_STAGE_AI_PROFILE_VERSION = 7 as const
 
 export type ZeroStageStaticComponentKey =
   | 'coreSurvival'

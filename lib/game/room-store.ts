@@ -1,6 +1,7 @@
 import { randomInt } from 'node:crypto'
 import type { GameProfileIdentityV1 } from '../content-pipeline/runtime/profile-game-identity'
 import type { BattleState } from './turn'
+import type { PveDifficulty } from './pve-ai'
 import { prisma } from '../db'
 import { isPlayerSeat, normalizeContentAlignment, type ContentAlignment, type PlayerSeat } from './match-identity'
 import { isBattleAuthorityAsyncJournalEnabled } from './battle-transition'
@@ -74,6 +75,8 @@ export interface Player {
   rosterManifestVersion?: string
   ready?: boolean
   isBot?: boolean
+  /** Server-owned PvE profile selector; absent legacy rooms use easy. */
+  botDifficulty?: PveDifficulty
 }
 
 // 观战者类型

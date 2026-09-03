@@ -1,4 +1,5 @@
 import { resolveZeroStageConfig } from './ai-profiles'
+import { DEPLOYMENT_FIRST_MOVE_FREE_STATUS } from './piece'
 import type {
   AIObservation,
   AIObservedPiece,
@@ -31,6 +32,16 @@ const distance = (left: AIObservedPiece, right: AIObservedPiece) => {
   const a = position(left)
   const b = position(right)
   return a && b ? pointDistance(a, b) : Number.POSITIVE_INFINITY
+}
+const pursuitDistance = (source: AIObservedPiece, steps: number) => {
+  const hasDeploymentFirstMoveFree = source.statusTags.some(tag => (
+    tag.type === DEPLOYMENT_FIRST_MOVE_FREE_STATUS
+    && (tag.currentUses ?? 1) > 0
+  ))
+  // Unused mobility is only potential; actually advancing should be worth more.
+  return hasDeploymentFirstMoveFree
+    ? Math.max(0, steps - Math.max(0, source.moveRange) * 0.5)
+    : steps
 }
 const cellKey = (x: number, y: number) => `${x},${y}`
 
@@ -159,7 +170,7 @@ function strategicPosition(
 
 function futureAttackPotential(sources: AIObservedPiece[], targets: AIObservedPiece[]) {
   return targets.reduce((total, target) => total + Math.max(0, ...sources.map(source => {
-    const steps = distance(source, target)
+    const steps = pursuitDistance(source, distance(source, target))
     if (!Number.isFinite(steps)) return 0
     const projectedRange = Math.max(1, source.moveRange + 1)
     const proximity = projectedRange / Math.max(projectedRange, steps)
@@ -193,12 +204,12 @@ function enemyProximityPotential(
       ? Math.max(1, Math.sqrt(distanceScale) * 4)
       : Math.max(1, distanceScale)
   const proximity = (source: AIObservedPiece, target: AIObservedPiece) => {
-    const steps = walkableDistance(source, target)
+    const steps = pursuitDistance(source, walkableDistance(source, target))
     if (!Number.isFinite(steps)) return 0
     return 1 - Math.min(1, steps / pursuitDistanceScale)
   }
   const reachesStagingRange = (source: AIObservedPiece, target: AIObservedPiece) => {
-    const steps = walkableDistance(source, target)
+    const steps = pursuitDistance(source, walkableDistance(source, target))
     const stagingRange = Math.max(1, source.moveRange + 1)
     return Number.isFinite(steps) && steps <= stagingRange
   }

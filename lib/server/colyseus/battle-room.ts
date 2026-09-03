@@ -7,7 +7,11 @@ import {
   getServerGameProfileIdentityV1,
 } from '@/lib/content-pipeline/runtime/profile-game-identity'
 import { hashBattleState } from '@/lib/game/battle-runner'
-import { getBattleStorage } from '@/lib/game/battle-storage'
+import { getBattleStorage, withServerSkills } from '@/lib/game/battle-storage'
+import { prepareLegalBotAction } from '@/lib/game/ai'
+import { getPveAiProfile, planPveBotAction, pveBotTurnKey } from '@/lib/game/pve-ai'
+import { getCurrentInputOwnerPlayerId } from '@/lib/game/turn-timer'
+import type { BattleAction, BattleState } from '@/lib/game/turn'
 import { assertSelectableMapId, getSelectableMapCatalog } from '@/lib/game/map-selection'
 import { isPlayerSeat, normalizeContentAlignment, type PlayerSeat } from '@/lib/game/match-identity'
 import { getAllPieces } from '@/lib/game/piece-repository'
@@ -18,6 +22,7 @@ import {
   dispatchRoomBattleAction,
   clearRoomBattleTimeout,
   scheduleRoomBattleTimeout,
+  runWithRoomBattleAuthorityPaused,
   type DispatchRoomBattleActionResult,
   type PublicBattleSnapshot,
 } from '@/lib/game/room-battle-actions'
@@ -27,6 +32,7 @@ import {
   getDemoRosterReadiness,
   getRosterErrorPayload,
   lockDemoRosterInStore,
+  lockDefaultBotRosterInStore,
 } from '@/lib/game/roster-contract'
 import { loadCardById } from '@/lib/game/skills'
 import { getAllSkills } from '@/lib/game/skill-repository'
@@ -63,6 +69,8 @@ export interface BattleRoomCreateOptions {
   name?: string
   mapId?: string
   visibility?: 'public' | 'private'
+  mode?: string
+  difficulty?: unknown
 }
 
 export interface BattleRoomJoinOptions {
@@ -96,6 +104,9 @@ export function createBattleRoomClass(dependencies: BattleRoomDependencies) {
     private readonly sessionByPlayer = new Map<string, string>()
     private readonly rpcCache = new Map<string, RpcCacheRecord>()
     private unsubscribeDurable?: () => void
+    private botJob?: Promise<void>
+    private disposed = false
+    private botProgress = { key: '', accepted: 0, batch: undefined as BattleAction[] | undefined }
 
     async onCreate(options: BattleRoomCreateOptions): Promise<void> {
       this.productMode = options?.product === true
@@ -135,15 +146,20 @@ export function createBattleRoomClass(dependencies: BattleRoomDependencies) {
         // and version-zero persistence all use one exact identifier.
         this.roomId = normalizeRequiredId(options.battleId ?? this.roomId, 'battleId')
         const mapId = assertSelectableMapId(options.mapId ?? 'open-expanse')
+        const botProfile = options.mode === 'pve' ? getPveAiProfile(options.difficulty) : undefined
         const room: GameRoom = {
           id: this.roomId,
           name: normalizeRoomName(options.name, this.roomId),
           status: 'waiting',
           createdAt: Date.now(),
           maxPlayers: 2,
-          players: [],
+          players: botProfile ? [{
+            id: 'bot', name: botProfile.name, seat: 'blue', faction: 'blue', alignment: 'dark',
+            isBot: true, botDifficulty: botProfile.difficulty, ready: true,
+            profileIdentity: getServerGameProfileIdentityV1(),
+          }] : [],
           mapId,
-          visibility: options.visibility === 'private' ? 'private' : 'public',
+          visibility: botProfile || options.visibility === 'private' ? 'private' : 'public',
           spectators: [],
           currentTurnIndex: 0,
           actions: [],
@@ -212,6 +228,8 @@ export function createBattleRoomClass(dependencies: BattleRoomDependencies) {
     }
 
     async onDispose(): Promise<void> {
+      this.disposed = true
+      await this.botJob
       clearRoomBattleTimeout(this.roomId)
       this.unsubscribeDurable?.()
       if (this.authorityStore) await this.authorityStore.drainBattleAuthorityPersistence(this.roomId)
@@ -226,6 +244,9 @@ export function createBattleRoomClass(dependencies: BattleRoomDependencies) {
       const store = this.requireProductStore()
       const room = await this.requireProductRoom()
       let player = room.players.find(candidate => candidate.id.toLowerCase() === playerId)
+      if (player?.isBot || playerId === 'bot') {
+        throw Object.assign(new Error('Bot seats are server controlled'), { code: 'BATTLE_PLAYER_FORBIDDEN' })
+      }
       if (!player) {
         if (room.status !== 'waiting' && room.status !== 'ready') {
           throw Object.assign(new Error('Player is not seated in this battle'), { code: 'BATTLE_PLAYER_FORBIDDEN' })
@@ -239,7 +260,7 @@ export function createBattleRoomClass(dependencies: BattleRoomDependencies) {
           joinedAt: Date.now(),
           seat,
           faction: seat,
-          alignment: normalizeContentAlignment(options.alignment),
+          alignment: normalizeContentAlignment(options.alignment) ?? (room.players.some(candidate => candidate.isBot) ? 'light' : undefined),
           profileIdentity,
         }
         room.players.push(player)
@@ -389,7 +410,7 @@ export function createBattleRoomClass(dependencies: BattleRoomDependencies) {
           alignment: normalizeContentAlignment(data.alignment),
           pieces: data.pieces,
         })
-        room = locked.room
+        room = await lockDefaultBotRosterInStore(store, this.roomId) ?? locked.room
         if (getDemoRosterReadiness(room).ready) await this.startProductBattle()
         else await this.broadcastProductRoom()
         const finalRoom = await this.requireProductRoom()
@@ -626,12 +647,80 @@ export function createBattleRoomClass(dependencies: BattleRoomDependencies) {
       await scheduleRoomBattleTimeout(this.authorityStore, this.roomId, {
         setTimeout: (handler, delayMs) => this.clock.setTimeout(() => { void handler() }, delayMs),
         onTransitionCommitted: result => this.publishAuthorityResult(result),
+        onBotTurnReady: () => this.queueBotInput(),
         onCommitted: async snapshot => {
           this.applySnapshotProjection(snapshot)
           await this.broadcastBattleSnapshot(snapshot)
           if (this.productMode) await this.broadcastProductRoom()
         },
       })
+      await this.queueBotInput()
+    }
+
+    private async queueBotInput(): Promise<void> {
+      if (this.disposed || !this.authorityStore || this.botJob) return
+      const room = await this.requireGameRoom()
+      const state = getBattleStorage(room)?.state as BattleState | undefined
+      if (!state || state.terminalResult || getCurrentInputOwnerPlayerId(state).toLowerCase() !== 'bot'
+        || !room.players.some(player => player.id === 'bot' && player.isBot)) return
+      // Recheck after await so simultaneous timer/command callbacks stay single-flight.
+      if (this.disposed || this.botJob) return
+      // Flush the human command receipt before synchronous candidate evaluation.
+      this.botJob = new Promise<void>(resolve => setTimeout(resolve, 50))
+        .then(() => this.runBotInput())
+        .finally(() => { this.botJob = undefined })
+    }
+
+    private async runBotInput(): Promise<void> {
+      try {
+        for (let step = 0; step < 64 && !this.disposed; step += 1) {
+          const room = await this.requireGameRoom()
+          const storage = getBattleStorage(room)
+          if (!storage) return
+          const state = withServerSkills(storage.state as BattleState) as BattleState
+          const key = pveBotTurnKey(state, storage.rootSeed)
+          if (this.botProgress.key !== key) this.botProgress = { key, accepted: 0, batch: undefined }
+          if (state.terminalResult || getCurrentInputOwnerPlayerId(state).toLowerCase() !== 'bot') return
+          const profile = getPveAiProfile(room.players.find(player => player.id === 'bot')?.botDifficulty)
+          const usesBatch = profile.difficulty === 'easy' && state.turn.phase === 'action'
+            && !state.pendingOptionSelection && !state.pendingTargetSelection
+            && state.deployment?.status !== 'awaiting-reserve-deploy'
+          const draft = await runWithRoomBattleAuthorityPaused(this.roomId, async () => {
+            if (usesBatch && this.botProgress.batch) return this.botProgress.batch.shift()
+            const plan = planPveBotAction(state, 'bot', storage.rootSeed, profile.difficulty, this.botProgress.accepted)
+            if (usesBatch) {
+              this.botProgress.batch = [...(plan?.actions ?? [])]
+              return this.botProgress.batch.shift()
+            }
+            return plan?.actions[0]
+          })
+          if (!draft) throw new Error('PvE bot has no action for its current input')
+          const action = profile.difficulty === 'normal' ? draft : prepareLegalBotAction(state, draft, 'bot')
+          if (!action) {
+            if (usesBatch) continue
+            throw new Error('PvE structural action is no longer legal')
+          }
+          const expectedAuthorityVersion = Number(room.battleAuthorityVersion ?? 0)
+          const result = await dispatchRoomBattleAction(this.authorityStore!, this.roomId, 'bot', {
+            ...action,
+            clientActionId: `system-bot:${this.roomId}:${expectedAuthorityVersion}:${step}:${action.type}`,
+          } as BattleAction, { expectedAuthorityVersion, checkpointInterval: 16 })
+          if (result.kind === 'resyncRequired') {
+            if (usesBatch) this.botProgress.batch?.unshift(draft)
+            continue
+          }
+          if (result.kind === 'applied') this.botProgress.accepted += 1
+          await this.publishAuthorityResult(result)
+          if (result.actionResult.state.terminalResult) return
+          // Give transport receipts/patches an I/O window between full searches.
+          await new Promise<void>(resolve => setTimeout(resolve, 50))
+        }
+        if (!this.disposed) throw new Error('PvE bot decision step guard reached')
+      } catch (error) {
+        console.error('[colyseus] PvE bot stopped', { roomId: this.roomId, turnKey: this.botProgress.key, accepted: this.botProgress.accepted, error })
+      } finally {
+        if (!this.disposed) await this.scheduleAuthorityTimeout()
+      }
     }
 
     private async publishAuthorityResult(result: DispatchRoomBattleActionResult): Promise<void> {
@@ -670,6 +759,8 @@ function publicProductRoom(room: GameRoom) {
       id: player.id,
       accountId: player.accountId,
       name: player.name,
+      isBot: player.isBot === true,
+      botDifficulty: player.isBot ? getPveAiProfile(player.botDifficulty).difficulty : undefined,
       seat: seatOf(player),
       faction: seatOf(player),
       alignment: player.alignment,
