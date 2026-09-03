@@ -2,7 +2,7 @@
 
 ## 定位
 
-零阶段 AI 的正式 agent/profile ID 为 `rvb-ai-zimse-v1`。它是无需训练、确定且可解释的 player-level 基线，不替代 RED-86 Beam Search，也不注册在线入口或训练联赛，不修改规则、数值、随机、网络或存档。
+零阶段 AI 的正式 agent/profile ID 为 `rvb-ai-zimse-v1`。它是无需训练、确定且可解释的 player-level 基线，不替代 RED-86 Beam Search，不加入训练联赛，不修改规则、数值、随机或存档。经用户批准，它通过现有 Colyseus 权威入口作为 PvE 普通难度提供给玩家，具体边界见下文。
 
 每次调用先从 `aiEnvironmentV1.listLegalActions()` 读取全部严格合法动作，用 RED-86 的通用机制语义稳定排序，再对每个候选各调用一次 `simulate()`，计算动作后局面的静态估价 `F_p(S')`，最后只返回一个 `nextAction`。权威状态接受动作后，调用方必须在新状态重新规划，并通过 `actionsTakenThisTurn` 回传本回合已经提交的动作数。
 

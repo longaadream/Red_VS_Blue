@@ -2,7 +2,7 @@
 
 任务：实现零阶段单步贪心估价与位置潜力 AI 基线
 
-角色：实现者（Codex），schema v3 全枚举与轻量推演优化已通过独立 AI 复核，等待人工验收
+角色：实现者（Codex）。历史 schema v3 曾通过独立 AI 复核；本轮 v7/PvE 新增接入尚待独立审查与人工验收。
 
 分支：`codex/RED-122-zero-stage-ai`
 
@@ -27,7 +27,39 @@
 - profile v7 把渐进部署继续视为单步策略。公开的首次免费移动范围只按 50% 折算为追敌潜力，真实移动到位后的评分严格高于未兑现潜力，没有增加第二层动作。
 - 实际 SDK 回归使用固定 root seed `1001`，简单和普通均完成自动部署与完整 Bot 回合并把控制权交还真人；3 个 Colyseus 文件共 9 项通过，耗时 `80.47s`。零阶段/PvE/权威旧 WS 核心回归 5 文件 92 项通过；planner 16 项通过；Colyseus 构建通过。
 - 2026-09-03 三个随机 seed `3304753545`、`4071025389`、`2101381254` 的评测中，仅第一局形成有效终局（第 18 回合胜，墙钟约 780.81 秒）；另两局分别因 simple 端动作护栏和拒绝移动中止。因此仍不能宣称满足“高概率 20 回合、除极低概率外 40 回合、每局约 10 分钟”。
-- 当前同步后的 `typecheck` 仍被 main 的 `tests/game/sonic-roster.test.ts` 4 个类型错误阻断；Lint 仍在配置加载期缺少 `import` 插件；相关最小回归、编码检查、baseline、diff 检查均通过。完整 suite 的本轮结果见上传 PR，若失败则逐项记录而不更新快照。
+- 当前同步后的 `typecheck` 仍被 main 的 `tests/game/sonic-roster.test.ts` 4 个类型错误阻断；Lint 仍在配置加载期缺少 `import` 插件；相关最小回归、编码检查、baseline、diff 检查均通过。
+
+### 2026-09-04 上传前完整验证
+
+代码提交：`c90bf7257fbc4d5dfaab9353d73f97a92237bf8a`；随后仅补正文档。完整命令：
+
+```text
+npm.cmd test -- --maxWorkers=1 --silent=true --reporter=json --outputFile=output/validation/red122-upload-full-suite.json
+```
+
+结果：200 文件，189 通过 / 11 失败；2193 项，2176 通过 / 14 失败 / 3 跳过，退出码 1。AI zero-stage、PvE、Colyseus 当前接入测试均通过。失败清单（不擅自修改范围外模块，也未更新快照）：
+
+- roster-transports：spectator 与玩家私有手牌投影不应相同，旧全对象相等断言失败（1）。
+- content-core-boundary：未改动的 `battle-presentation-events.ts` 中 11 个内容 ID/核心耦合审计项（1）。
+- electron-client-package：测试 fixture 缺少 Colyseus bundle 和 PostgreSQL runtime/license 资源（1）。
+- battle-page-runtime：`TUTORIAL_MODE` 未定义与 receipt 状态断言（2）。
+- embedded-postgres：测试运行时清单/临时凭据清理场景（2）。
+- ai-semantics：当前内容 manifest 审计（1）。
+- battle-state-hash：缺失 Android `www/js/game-engine.js` 生成 bundle（1）。
+- skillcode-static-audit：清单计数由 21/134 变为 19/141（2）。
+- targeting：当前内容的 preparation hash 与旧期望不符（1）。
+- battle-action-identity：技能名称 fallback 断言（1）。
+- battle-effect-icons：新状态类型覆盖断言（1）。
+
+同次完整运行中的渐进部署镜像自战：root seed `1001`，蓝方在第 9 完整回合以 `core-eliminated` 获胜，剩余 3 枚棋子。共 152 动作，非法/拒绝动作 0，失败 0，总时长 `504.94s`（8 分 25 秒）。共 9820 候选、9482 模拟节点，差额来自既有回合动作护栏；决策 P50 `1882.90ms`、P95 `10208.31ms`、最大 `18096.43ms`。该单个镜像样本不能外推为对 sample 的总体胜率或整局时间承诺。
+
+环境：Windows x64、Node `v24.19.0`、16 个逻辑处理器，CPU 标识 `AMD64 Family 25 Model 117 Stepping 2, AuthenticAMD`；Vitest 单 worker。
+
+- action trace hash：`bf8f3d05d3cb11967d061c7d4d0258c8d6d6f1d006b3a3f11d08d284004ef7a2`
+- final state hash：`b1ee4107262f2655d0a85e1b6ca77e9c2fd4ecc27bc0abfc39ff8cbe0d24e32d`
+- 红/蓝实际 AP 使用：56/49；充能使用：6/5；总移动 38 次。
+
+原始完整报告留在上述本地 `output/validation` 路径，不上传生成产物。以上压缩结果随 PR 上传。仍需人工/独立审查后决定是否合并；本轮不自行合并或发布。
 
 ## 固定局面证据
 
