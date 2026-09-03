@@ -39,6 +39,7 @@
 
 - 入口：`lib/game/spatial.ts::traceProjectile()`；输入只读地图、棋子、起点、单位横纵方向和可选最大距离，输出按距离排序的 `cell → living piece → terrain` 事实以及首个边界事实，不访问时间或随机源，也不修改状态。
 - 地形事实：显式 `bulletPassable`/旧 `bullet` 优先；没有显式值时墙和掩体阻挡、洞穴通过。占据掩体的存活棋子事实先于掩体阻挡事实；技能代码自行决定友军伤害、停止、穿透或忽略地形。
+- 弹道技能的权威选格只校验声明的几何与距离条件，不要求选定方向必须先撞到棋子。释放后才由技能按实际弹道结算；空路径、地形或其他棋子阻挡可以成为无目标效果的已使用动作，仍结算技能资源、冷却、行动记录和使用后触发。
 - 迁移清单：`sleep-dart`、`blackwidow-lethal-strike`、`hellfire-shotgun` 使用共享弹道事实；经人工批准，`death-blossom` 改为自身中心 3×3 的纯范围伤害并使用 `form: area`，不再参与弹道阻挡。
 - 测试：`tests/game/spatial.test.ts`、`tests/game/projectile-trace.test.ts`、`tests/game/movement-contract.test.ts`、`tests/game/turn.test.ts`、`tests/game/ai-movement.test.ts`。
 

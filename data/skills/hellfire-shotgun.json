@@ -24,13 +24,10 @@
         "filter": "all",
         "range": 5,
         "sameRowOrColumn": true,
-        "excludeSourceCell": true,
-        "projectile": {
-          "requiredCollision": "piece-before-blocker"
-        }
+        "excludeSourceCell": true
       }
     ]
   },
-  "code": "function executeSkill(context) { var sourcePiece = context.piece; var targetPosition = selectTarget({ type: 'grid', range: 5, filter: 'all' }); if (!targetPosition || targetPosition.needsTargetSelection) return targetPosition; var dx = targetPosition.x - sourcePiece.x; var dy = targetPosition.y - sourcePiece.y; if ((dx !== 0 && dy !== 0) || (dx === 0 && dy === 0)) return { message: '必须选择同一行或同一列的方向', success: false }; var direction = { x: dx === 0 ? 0 : (dx > 0 ? 1 : -1), y: dy === 0 ? 0 : (dy > 0 ? 1 : -1) }; var events = traceProjectile({ x: sourcePiece.x, y: sourcePiece.y }, direction, { excludePieceId: sourcePiece.instanceId, maxDistance: 5 }); for (var i = 0; i < events.length; i++) { var event = events[i]; if (event.type === 'piece') { var damageValue = Math.max(0, sourcePiece.attack + 4 - event.distance); var result = dealDamage(sourcePiece, event.piece, damageValue, 'physical', battle, context.skill.id); return { success: true, message: sourcePiece.name + '使用地狱火霰弹枪对' + event.piece.name + '造成' + result.damage + '点伤害（距离' + event.distance + '格）' }; } if (event.type === 'terrain' && event.blocksProjectile) return { success: false, message: '攻击被障碍物阻挡' }; } return { success: false, message: '路径上没有目标' }; }",
+  "code": "function executeSkill(context) { var sourcePiece = context.piece; var targetPosition = selectTarget({ type: 'grid', range: 5, filter: 'all' }); if (!targetPosition || targetPosition.needsTargetSelection) return targetPosition; var dx = targetPosition.x - sourcePiece.x; var dy = targetPosition.y - sourcePiece.y; if ((dx !== 0 && dy !== 0) || (dx === 0 && dy === 0)) return { message: '必须选择同一行或同一列的方向', success: false }; var direction = { x: dx === 0 ? 0 : (dx > 0 ? 1 : -1), y: dy === 0 ? 0 : (dy > 0 ? 1 : -1) }; var events = traceProjectile({ x: sourcePiece.x, y: sourcePiece.y }, direction, { excludePieceId: sourcePiece.instanceId, maxDistance: 5 }); for (var i = 0; i < events.length; i++) { var event = events[i]; if (event.type === 'piece') { var damageValue = Math.max(0, sourcePiece.attack + 4 - event.distance); var result = dealDamage(sourcePiece, event.piece, damageValue, 'physical', battle, context.skill.id); return { success: true, message: sourcePiece.name + '使用地狱火霰弹枪对' + event.piece.name + '造成' + result.damage + '点伤害（距离' + event.distance + '格）' }; } if (event.type === 'terrain' && event.blocksProjectile) return { success: true, message: '攻击被障碍物阻挡' }; } return { success: true, message: '路径上没有目标' }; }",
   "previewCode": "function calculatePreview(piece) { return { description: '对路径上的第1个目标造成攻击力+(4-距离)的物理伤害。', expectedValues: { adjacentDamage: piece.attack + 3 } }; }"
 }
