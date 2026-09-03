@@ -217,7 +217,15 @@ describe('RED-166 icon action history', () => {
     const { history, icons } = loadActionHistory()
     const listeners = new Map<string, (event: LocalEvent) => void>()
     const classNames = new Set<string>()
-    const list = { innerHTML: '' }
+    let historyMarkup = ''
+    let historyRenderCount = 0
+    const list = {
+      get innerHTML() { return historyMarkup },
+      set innerHTML(value: string) {
+        historyMarkup = value
+        historyRenderCount += 1
+      },
+    }
     const collapsedButton = { setAttribute: vi.fn() }
     const dock = {
       hidden: true,
@@ -335,8 +343,10 @@ describe('RED-166 icon action history', () => {
         closest: (selector: string) => selector === '[data-history-root-id]' ? actionButton : null,
       },
     }
+    const renderCountBeforeHover = historyRenderCount
     listeners.get('pointerover')?.(hoverEvent as never)
     expect(ui.getActiveRootId()).toBe('action-1:0')
+    expect(historyRenderCount).toBe(renderCountBeforeHover)
     listeners.get('pointerout')?.({ relatedTarget: null } as never)
     expect(ui.getActiveRootId()).toBeNull()
 

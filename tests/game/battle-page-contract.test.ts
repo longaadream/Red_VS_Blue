@@ -300,7 +300,9 @@ describe('battle page route contract', () => {
     expect(tutorialRuntime).toContain("step.advance.type === 'history-item'")
     expect(tutorialRuntime).toContain('hooks.showActionHistory()')
     expect(tutorialRuntime).toContain("const historyDock = document.getElementById('actionHistoryDock')")
-    expect(tutorialRuntime).toContain("historyDock.addEventListener('click', onHistoryClick)")
+    expect(tutorialRuntime).toContain("historyDock.addEventListener('click', onHistoryClick, true)")
+    expect(tutorialRuntime).toContain("'[data-history-root-id][aria-pressed=\"true\"]'")
+    expect(tutorialRuntime).toContain('acceptHistoryTarget(clickedTarget || selectedTarget)')
   })
 
   it('keeps training.html as a compatibility redirect without battle interactions', () => {

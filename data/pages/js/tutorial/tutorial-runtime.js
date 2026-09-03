@@ -86,6 +86,8 @@
       const step = snapshot.step
       if (!step || snapshot.status !== 'active') return
       root.hidden = false
+      root.dataset.stepId = step.id
+      root.dataset.stepIndex = String(snapshot.index)
       root.classList.toggle('is-busy', busy)
       progress.textContent = '场景 ' + step.scene + ' / 4'
       scene.textContent = step.sceneTitle
@@ -152,21 +154,38 @@
 
     const historyDock = document.getElementById('actionHistoryDock')
 
-    function onHistoryClick(event) {
-      if (busy || controller.snapshot().step?.advance.type !== 'history-item') return
-      const target = event.target && event.target.closest
+    function historyTarget(event) {
+      return event.target && event.target.closest
         ? event.target.closest('[data-history-root-id], .action-history-entry, .action-history-item')
         : null
+    }
+
+    function acceptHistoryTarget(target) {
+      if (busy || controller.snapshot().step?.advance.type !== 'history-item') return
       if (!target) return
       const expectedLabel = controller.snapshot().step?.advance.labelIncludes
       const actualLabel = String(target.getAttribute('aria-label') || target.textContent || '')
+      root.dataset.lastHistoryLabel = actualLabel
       if (expectedLabel && !actualLabel.includes(expectedLabel)) {
         hooks.setMessage('这条不是 DM 指的记录，再找找“' + expectedLabel + '”。')
         return
       }
       accept({ type: 'history-item', label: actualLabel })
     }
-    if (historyDock) historyDock.addEventListener('click', onHistoryClick)
+
+    function onHistoryClick(event) {
+      const clickedTarget = historyTarget(event)
+      global.setTimeout(function () {
+        const selectedTarget = historyDock && historyDock.querySelector(
+          '[data-history-root-id][aria-pressed="true"]',
+        )
+        acceptHistoryTarget(clickedTarget || selectedTarget)
+      }, 0)
+    }
+
+    if (historyDock) {
+      historyDock.addEventListener('click', onHistoryClick, true)
+    }
 
     render()
     return Object.freeze({
@@ -182,7 +201,7 @@
       snapshot: controller.snapshot,
       dispose: function () {
         disposed = true
-        if (historyDock) historyDock.removeEventListener('click', onHistoryClick)
+        if (historyDock) historyDock.removeEventListener('click', onHistoryClick, true)
         hooks.setCue(null)
         root.remove()
       },
