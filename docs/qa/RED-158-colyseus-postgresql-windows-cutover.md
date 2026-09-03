@@ -51,7 +51,7 @@ localStorage 战绩和 authority feature flag。任何失败都显式失败，�
 | --- | --- |
 | `npm.cmd run check:main-baseline` | 通过；与 `origin/main` 同 SHA，ahead/behind 均为 0 |
 | `npm.cmd run check:windows-cutover` | 通过；Windows player runtime 仅 Colyseus + PostgreSQL |
-| `npm.cmd run typecheck` | 通过 |
+| `npm.cmd run typecheck` | 本次改动在合并前通过；合入最新 `origin/main` 后，被新引入的 `tests/game/sonic-roster.test.ts` 4 个类型错误阻塞 |
 | RED-158/Windows 关键路径 ESLint | 通过；覆盖适配器、Colyseus room/server、PostgreSQL report、Electron main、打包冒烟和新增测试 |
 | `npm.cmd run test:colyseus` | 5 文件、13 测试全部通过 |
 | `npm.cmd run test:postgres` | 内置 PostgreSQL 集成 1 项通过；外部 `RVB_TEST_POSTGRES_URL` 1 项按环境跳过 |
@@ -164,6 +164,8 @@ Colyseus：
 | `npm.cmd run typecheck` | 通过 |
 | 关键路径 ESLint | 本次新增代码无新告警；仍有既存 `electron-client/main.ts:1966 openConnectWindow` 未使用错误，不在本次范围内 |
 | `check:windows-cutover` / `check:encoding` / `git diff --check` | 通过 |
+| `npm.cmd run build:electron:client` | 通过；PostgreSQL 16.15-2、79 个页面资源、333 个离线数据资源与 46 个离线图片资源校验通过 |
+| `node tests/electron/windows-smoke.mjs client` | 通过；含私有 PostgreSQL、authority 三次有界自动恢复、显式手动恢复、双玩家房间与退出后进程清理 |
 
 整机采样为 CPU 98.8%、约 2 GiB 可用内存时，完整 `test:colyseus` 的 22 项中有 9 项越过既存
 5–60 秒测试等待门限；相同的 product-room 与 PostgreSQL lifecycle 测试隔离运行后 8/8 通过。这一结果

@@ -279,6 +279,17 @@ function findExecutableProcessIds(executable, commandLineFragment) {
   }
 }
 
+async function waitForExecutableProcessIds(executable, commandLineFragment, timeoutMs = 30_000) {
+  const deadline = Date.now() + timeoutMs
+  let processIds = []
+  while (Date.now() < deadline) {
+    processIds = findExecutableProcessIds(executable, commandLineFragment)
+    if (processIds.length > 0) return processIds
+    await delay(250)
+  }
+  return processIds
+}
+
 async function waitForExecutableCleanup(executables, timeoutMs = 10000) {
   const deadline = Date.now() + timeoutMs
   let counts = Object.fromEntries(executables.map((executable) => [executable, null]))
@@ -516,7 +527,7 @@ async function smokeClient(expectedIdentity = null, sharedUserDataDir = null) {
     const disabledAuthorityEntry = `${authorityEntry}.smoke-disabled`
     const recoveryMarker = `rvb-recovery-marker-${Date.now()}`
     await evaluate(gameTarget, `window.__rvbRecoverySmokeMarker = ${JSON.stringify(recoveryMarker)}; true`)
-    const authorityPids = findExecutableProcessIds(
+    const authorityPids = await waitForExecutableProcessIds(
       path.join(isolatedPackageRoot, 'resources', 'node.exe'),
       'colyseus-server.mjs',
     )
