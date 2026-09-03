@@ -382,6 +382,33 @@ describe('Sonic roster mechanics', () => {
     expect(result.pieces.find(piece => piece.instanceId === 'path-enemy')?.currentHp).toBe(11)
   })
 
+  it('limits Sonic spin dash to the four cardinal directions in both selector and execution', () => {
+    const definition = JSON.parse(readFileSync(resolve(process.cwd(), 'data/skills/sonic-spin-dash.json'), 'utf8'))
+    const sonic = makePiece({
+      instanceId: 'sonic', templateId: 'sonic', ownerPlayerId: 'player-red', x: 2, y: 2,
+      skills: [{ skillId: definition.id, currentCooldown: 0 } as any] as any,
+    })
+    const state = makeState({ pieces: [sonic], width: 8, height: 8 })
+    state.skillsById[definition.id] = definition
+    state.players[0].actionPoints = 2
+
+    const prepared = prepareAction(state, {
+      type: 'useBasicSkill', playerId: 'player-red', pieceId: 'sonic', skillId: definition.id,
+    })
+    expect(prepared.kind).toBe('needTarget')
+    if (prepared.kind !== 'needTarget') return
+    expect(prepared.candidates).toContainEqual({ type: 'cell', x: 2, y: 7 })
+    expect(prepared.candidates).toContainEqual({ type: 'cell', x: 7, y: 2 })
+    expect(prepared.candidates).not.toContainEqual({ type: 'cell', x: 3, y: 3 })
+
+    const direct = executeSkillFunction(definition, {
+      piece: sonic, target: null, targetPosition: { x: 4, y: 4 },
+      targets: [{ info: null, pos: { x: 4, y: 4 } }], skill: definition, battle: state,
+    } as any, state) as any
+    expect(direct).toMatchObject({ success: false, message: '请选择5格内上下左右方向' })
+    expect(sonic).toMatchObject({ x: 2, y: 2 })
+  })
+
   it('presents exactly the two perpendicular endpoint cells instead of an option popup', () => {
     const definition = JSON.parse(readFileSync(resolve(process.cwd(), 'data/skills/shadow-ride-sweep.json'), 'utf8'))
     const shadow = makePiece({
