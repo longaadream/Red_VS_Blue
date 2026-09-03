@@ -1,0 +1,7 @@
+{
+  "id": "rule-sonic-free-move",
+  "name": "音速",
+  "description": "己方回合开始时获得一次既有的部署首次免费移动状态。",
+  "trigger": { "type": "beginTurn" },
+  "skillCode": "var piece=context.rulePiece;if(!piece||context.playerId!==piece.ownerPlayerId)return {success:false,message:''};piece.statusTags=piece.statusTags||[];var free=(piece.statusTags||[]).find(function(t){return t.type==='deployment-first-move-free';});if(!free){free={id:'sonic-free-normal-move-'+piece.instanceId,type:'deployment-first-move-free',name:'本回合首次移动免费',visible:true};piece.statusTags.push(free);}free.grantedTurnNumber=battle.turn.turnNumber;free.currentDuration=1;free.currentUses=1;return {success:true,message:piece.name+'获得了本回合首次免费移动'};"
+}

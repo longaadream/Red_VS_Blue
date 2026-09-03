@@ -1,0 +1,7 @@
+{
+  "id": "rule-momentum-gain",
+  "name": "动能积累",
+  "description": "拥有动能核心的棋子完成普通移动后，按实际移动格数积累动能。",
+  "trigger": { "type": "afterMove" },
+  "skillCode": "var piece=context.rulePiece;if(!piece||!context.sourcePiece||context.sourcePiece.instanceId!==piece.instanceId)return {success:false,message:''};var tag=(piece.statusTags||[]).find(function(t){return t.type==='momentum-core';});if(!tag)return {success:false,message:''};var action=(battle.actions||[]).slice().reverse().find(function(a){return a.type==='move'&&a.payload&&a.payload.pieceId===piece.instanceId;});if(!action||!action.payload)return {success:false,message:''};var distance=Math.abs((action.payload.toX||0)-(action.payload.fromX||0))+Math.abs((action.payload.toY||0)-(action.payload.fromY||0));if(distance<=0)return {success:false,message:''};tag.stacks=(tag.stacks||0)+distance;piece.momentum=tag.stacks;return {success:true,message:piece.name+'获得'+distance+'点动能（'+tag.stacks+'）'};"
+}

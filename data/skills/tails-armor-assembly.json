@@ -1,0 +1,15 @@
+{
+  "id": "tails-armor-assembly",
+  "name": "护甲组装",
+  "description": "一次选择两个不同模块，创造一张永久护甲手牌（AP2）；可对自己或一名友军使用。恢复模块：每回合结束回复3点生命；攻击模块：攻击+3；高速模块：每回合获得一次免费普通移动；硬化模块：防御+2。护甲可叠加且持续整场对局。",
+  "icon": "🧰",
+  "kind": "active",
+  "type": "super",
+  "cooldownTurns": 3,
+  "maxCharges": 0,
+  "chargeCost": 2,
+  "powerMultiplier": 1,
+  "actionPointCost": 0,
+  "targeting": {"steps": []},
+  "code": "function executeSkill(context){var c=context.piece,b=context.battle,modules=[{label:'恢复模块',value:'heal'},{label:'攻击模块',value:'attack'},{label:'高速模块',value:'speed'},{label:'硬化模块',value:'defense'}],choice=selectOption({title:'护甲组装：选择两个不同模块',options:modules,selectionMode:'multi',minSelections:2,maxSelections:2});if(choice&&choice.needsOptionSelection)return choice;if(!Array.isArray(choice)||choice.length!==2||choice[0]===choice[1])return {success:false,message:'必须选择两个不同模块'};var selected=[String(choice[0]),String(choice[1])].sort(),id='armor-'+selected.join('-');if(modules.filter(function(m){return selected.indexOf(m.value)!==-1;}).length!==2)return {success:false,message:'模块选择无效'};if(!b.customCards)b.customCards={};b.customCards[id]={id:id,name:'组合护甲（'+selected.join(' + ')+'）',description:'对一名友军使用，永久获得所选模块效果。',type:'active',actionPointCost:2,code:`function executeCard(context){var t=selectTarget({type:'piece',range:99,filter:'ally'});if(!t||t.needsTargetSelection)return t;var ms='${selected.join(',')}'.split(',');t.statusTags=t.statusTags||[];ms.forEach(function(m){if(m==='heal'){t.statusTags.push({id:'periodic-heal-'+t.instanceId+'-'+Date.now(),type:'periodic-heal',name:'恢复模块',stacks:1,relatedRules:['rule-tails-armor-recovery']});addRuleById(t.instanceId,'rule-tails-armor-recovery');}if(m==='attack'){t.attack=(t.attack||0)+3;}if(m==='speed'){t.statusTags.push({id:'free-normal-move-every-turn-'+t.instanceId+'-'+Date.now(),type:'free-normal-move-every-turn',name:'高速模块',stacks:1,relatedRules:['rule-sonic-free-move']});addRuleById(t.instanceId,'rule-sonic-free-move');}if(m==='defense'){t.defense=(t.defense||0)+2;}});return {success:true,message:'获得组合护甲效果'};}`};if(!addCardToHand(id,c.ownerPlayerId))return {success:false,message:'无法创建组合护甲手牌'};return {success:true,message:'创造了组合护甲手牌'};}"
+}

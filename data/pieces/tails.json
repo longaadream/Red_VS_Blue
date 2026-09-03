@@ -1,0 +1,6 @@
+{
+  "id": "tails", "name": "塔尔斯", "faction": "good", "rarity": "epic", "description": "机动支援 / 位移救援", "image": "tails.png",
+  "stats": { "maxHp": 10, "attack": 3, "defense": 1, "moveRange": 5, "speed": 5 },
+  "initialStatusTags": [{ "id": "tails-momentum-core", "type": "momentum-core", "name": "动能", "stacks": 0, "visible": true, "skillIds": ["tails-mechanical-support"], "relatedRules": ["rule-momentum-gain", "rule-momentum-consume"] }],
+  "skills": [{ "skillId": "tails-twin-flight", "level": 1 }, { "skillId": "tails-mechanical-support", "level": 1 }, { "skillId": "tails-armor-assembly", "level": 1 }], "isDefault": false
+}
