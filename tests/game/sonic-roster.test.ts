@@ -62,9 +62,9 @@ describe('Sonic roster mechanics', () => {
     expect(prepared.candidates).not.toContainEqual({ type: 'cell', x: 1, y: 1 })
   })
 
-  it('only asks for a ride sweep side after Shadow reaches five momentum', () => {
+  it('records a board-side selection only after Shadow reaches five momentum', () => {
     const definition = JSON.parse(readFileSync(resolve(process.cwd(), 'data/skills/shadow-ride-sweep.json'), 'utf8'))
-    const executeAtMomentum = (momentum: number, selectedOption?: string) => {
+    const executeAtMomentum = (momentum: number) => {
       const shadow = makePiece({
         instanceId: 'shadow', templateId: 'shadow', ownerPlayerId: 'player-red', x: 1, y: 1, attack: 5,
       }) as any
@@ -78,7 +78,6 @@ describe('Sonic roster mechanics', () => {
         target: null,
         targetPosition: { x: 4, y: 1 },
         targets: [{ info: null, pos: { x: 4, y: 1 } }],
-        selectedOption,
         skill: definition,
         battle: state,
       } as any, state)
@@ -90,11 +89,15 @@ describe('Sonic roster mechanics', () => {
     expect(belowThreshold.state.pieces.find(piece => piece.instanceId === 'enemy')?.currentHp).toBe(15)
 
     const atThreshold = executeAtMomentum(5)
-    expect(atThreshold.result.needsOptionSelection).toBe(true)
-    expect(atThreshold.result.options.map((option: any) => option.value)).toEqual(['left', 'right'])
-
-    const resolved = executeAtMomentum(5, 'left')
-    expect(resolved.result.success).toBe(true)
+    expect(atThreshold.result.success).toBe(true)
+    expect(atThreshold.result.needsOptionSelection).toBeUndefined()
+    expect((atThreshold.state.pieces[0] as any).statusTags).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: 'shadow-ride-sweep-side',
+        left: { x: 4, y: 0 },
+        right: { x: 4, y: 2 },
+      }),
+    ]))
   })
 
   it('applies existing silence and immobilize effects with Shadow chaos control', () => {
@@ -329,9 +332,9 @@ describe('Sonic roster mechanics', () => {
   })
 
   it.each([
-    ['left', 1, 9, 0],
-    ['right', 9, 1, 10],
-  ])('fires ride sweep up to four cells along the %s perpendicular ray', (selectedOption, targetY, oppositeY, beyondY) => {
+    ['left', 4, 1, 9, 0],
+    ['right', 6, 9, 1, 10],
+  ])('fires ride sweep up to four cells along the %s perpendicular ray', (side, selectionY, targetY, oppositeY, beyondY) => {
     const definition = JSON.parse(readFileSync(resolve(process.cwd(), 'data/skills/shadow-ride-sweep.json'), 'utf8'))
     const shadow = makePiece({
       instanceId: 'shadow', templateId: 'shadow', ownerPlayerId: 'player-red', x: 1, y: 5, attack: 9,
@@ -351,32 +354,43 @@ describe('Sonic roster mechanics', () => {
       instanceId: 'beyond-enemy', ownerPlayerId: 'player-blue', x: 2, y: beyondY, currentHp: 20, maxHp: 20,
     })
     const state = makeState({ pieces: [shadow, pathEnemy, sideEnemy, oppositeEnemy, beyondEnemy], width: 7, height: 11 })
+    shadow.statusTags = [{ type: 'momentum-core', stacks: 5, skillIds: [definition.id] }]
+    attachRule(shadow, 'rule-momentum-consume')
+    shadow.skills = [{ skillId: definition.id, currentCooldown: 0, usesRemaining: -1 }]
+    state.skillsById[definition.id] = definition
+    state.players[0].actionPoints = 10
 
-    const result = executeSkillFunction(definition, {
-      piece: shadow,
-      target: null,
-      targetPosition: { x: 4, y: 5 },
-      targets: [{ info: null, pos: { x: 4, y: 5 } }],
-      selectedOption,
-      skill: definition,
-      battle: state,
-    } as any, state) as any
+    const prepared = prepareAction(state, {
+      type: 'useBasicSkill', playerId: 'player-red', pieceId: 'shadow', skillId: definition.id,
+    })
+    if (prepared.kind !== 'needTarget') throw new Error('骑射横扫未请求冲刺终点')
+    const selectingSide = applyBattleAction(state, {
+      type: 'useBasicSkill', playerId: 'player-red', pieceId: 'shadow', skillId: definition.id,
+      targetX: 4, targetY: 5, selectionId: prepared.selectionId, stateRevision: prepared.stateRevision,
+    })
+    const pending = selectingSide.pendingTargetSelection
+    if (!pending) throw new Error('骑射横扫未请求侧射地格')
+    const result = applyBattleAction(selectingSide, {
+      type: 'pendingTargetSelect', playerId: 'player-red', targetX: 4, targetY: selectionY,
+      selectionId: pending.selectionId, stateRevision: pending.stateRevision,
+    })
 
-    expect(result.success).toBe(true)
-    expect(result.message).toContain(`垂直射击${selectedOption === 'left' ? '左侧' : '右侧'}命中`)
-    expect(state.pieces.find(piece => piece.instanceId === 'side-enemy')?.currentHp).toBe(15)
-    expect(state.pieces.find(piece => piece.instanceId === 'opposite-enemy')?.currentHp).toBe(20)
-    expect(state.pieces.find(piece => piece.instanceId === 'beyond-enemy')?.currentHp).toBe(20)
-    expect(state.pieces.find(piece => piece.instanceId === 'path-enemy')?.currentHp).toBe(11)
+    expect(result.actions?.some((action: any) => String(action.payload?.message || '').includes(`垂直射击${side === 'left' ? '左侧' : '右侧'}命中`))).toBe(true)
+    expect(result.pieces.find(piece => piece.instanceId === 'side-enemy')?.currentHp).toBe(15)
+    expect(result.pieces.find(piece => piece.instanceId === 'opposite-enemy')?.currentHp).toBe(20)
+    expect(result.pieces.find(piece => piece.instanceId === 'beyond-enemy')?.currentHp).toBe(20)
+    expect(result.pieces.find(piece => piece.instanceId === 'path-enemy')?.currentHp).toBe(11)
   })
 
-  it('preserves perpendicular fire through the target-then-option client flow', () => {
+  it('presents exactly the two perpendicular endpoint cells instead of an option popup', () => {
     const definition = JSON.parse(readFileSync(resolve(process.cwd(), 'data/skills/shadow-ride-sweep.json'), 'utf8'))
     const shadow = makePiece({
       instanceId: 'shadow', templateId: 'shadow', ownerPlayerId: 'player-red', x: 1, y: 5, attack: 5,
       skills: [{ skillId: definition.id, currentCooldown: 0, usesRemaining: -1 } as any] as any,
     }) as any
     shadow.momentum = 5
+    shadow.statusTags = [{ type: 'momentum-core', stacks: 5, skillIds: [definition.id] }]
+    attachRule(shadow, 'rule-momentum-consume')
     const sideEnemy = makePiece({
       instanceId: 'side-enemy', ownerPlayerId: 'player-blue', x: 2, y: 1, currentHp: 20, maxHp: 20,
     })
@@ -390,23 +404,28 @@ describe('Sonic roster mechanics', () => {
     expect(prepared.kind).toBe('needTarget')
     if (prepared.kind !== 'needTarget') return
 
-    const optionPending = applyBattleAction(state, {
+    const targetPending = applyBattleAction(state, {
       type: 'useBasicSkill', playerId: 'player-red', pieceId: 'shadow', skillId: definition.id,
       targetX: 4, targetY: 5,
       selectionId: prepared.selectionId, stateRevision: prepared.stateRevision,
     })
-    expect(optionPending.pendingOptionSelection?.options.map((option: any) => option.value)).toEqual(['left', 'right'])
-    const pending = optionPending.pendingOptionSelection
+    expect(targetPending.pendingOptionSelection).toBeUndefined()
+    const pending = targetPending.pendingTargetSelection
     if (!pending) throw new Error('Ride sweep did not suspend for its perpendicular direction')
+    expect(pending.title).toContain('选择冲刺方向左侧或右侧地格')
+    expect(pending.candidates).toEqual([
+      { type: 'cell', x: 4, y: 4 },
+      { type: 'cell', x: 4, y: 6 },
+    ])
 
-    const resolved = applyBattleAction(optionPending, {
-      type: 'pendingOptionSelect', playerId: 'player-red', selectedOption: 'left',
+    const resolved = applyBattleAction(targetPending, {
+      type: 'pendingTargetSelect', playerId: 'player-red', targetX: 4, targetY: 4,
       selectionId: pending.selectionId, stateRevision: pending.stateRevision,
     })
 
-    expect(resolved.pendingOptionSelection).toBeUndefined()
+    expect(resolved.pendingTargetSelection).toBeUndefined()
     expect(resolved.pieces.find(piece => piece.instanceId === 'side-enemy')?.currentHp).toBe(15)
-    expect((resolved.pieces.find(piece => piece.instanceId === 'shadow') as any)?.momentum).toBe(5)
+    expect((resolved.pieces.find(piece => piece.instanceId === 'shadow') as any)?.momentum).toBe(0)
   })
 
   it('pierces pieces but stops the perpendicular ray at cover and walls', () => {
@@ -420,15 +439,27 @@ describe('Sonic roster mechanics', () => {
     const cover = state.map.tiles.find(tile => tile.x === 2 && tile.y === 2)!
     cover.props = { ...cover.props, type: 'cover', walkable: true, bulletPassable: false }
 
-    const result = executeSkillFunction(definition, {
-      piece: shadow, target: null, targetPosition: { x: 4, y: 5 }, targets: [{ info: null, pos: { x: 4, y: 5 } }],
-      selectedOption: 'left', skill: definition, battle: state,
-    } as any, state) as any
+    shadow.statusTags = [{ type: 'momentum-core', stacks: 5, skillIds: [definition.id] }]
+    attachRule(shadow, 'rule-momentum-consume')
+    shadow.skills = [{ skillId: definition.id, currentCooldown: 0, usesRemaining: -1 }]
+    state.skillsById[definition.id] = definition
+    state.players[0].actionPoints = 10
+    const prepared = prepareAction(state, { type: 'useBasicSkill', playerId: 'player-red', pieceId: 'shadow', skillId: definition.id })
+    if (prepared.kind !== 'needTarget') throw new Error('骑射横扫未请求冲刺终点')
+    const selectingSide = applyBattleAction(state, {
+      type: 'useBasicSkill', playerId: 'player-red', pieceId: 'shadow', skillId: definition.id,
+      targetX: 4, targetY: 5, selectionId: prepared.selectionId, stateRevision: prepared.stateRevision,
+    })
+    const pending = selectingSide.pendingTargetSelection
+    if (!pending) throw new Error('骑射横扫未请求侧射地格')
+    const result = applyBattleAction(selectingSide, {
+      type: 'pendingTargetSelect', playerId: 'player-red', targetX: 4, targetY: 4,
+      selectionId: pending.selectionId, stateRevision: pending.stateRevision,
+    })
 
-    expect(result.success).toBe(true)
-    expect(first.currentHp).toBe(15)
-    expect(second.currentHp).toBe(15)
-    expect(blocked.currentHp).toBe(20)
+    expect(result.pieces.find(piece => piece.instanceId === 'first')?.currentHp).toBe(15)
+    expect(result.pieces.find(piece => piece.instanceId === 'second')?.currentHp).toBe(15)
+    expect(result.pieces.find(piece => piece.instanceId === 'blocked')?.currentHp).toBe(20)
   })
 
   it.each(['wall', 'trap'])('rejects a ride sweep whose path crosses a %s', (terrainType) => {
