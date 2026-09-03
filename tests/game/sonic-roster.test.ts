@@ -304,6 +304,9 @@ describe('Sonic roster mechanics', () => {
 
   it('creates the selected permanent armor card through Tails’s charge skill', () => {
     const definition = JSON.parse(readFileSync(resolve(process.cwd(), 'data/skills/tails-armor-assembly.json'), 'utf8'))
+    for (const moduleDetail of ['恢复模块：每回合结束回复3点生命', '攻击模块：攻击+3', '高速模块：每回合获得一次免费普通移动', '硬化模块：防御+2', '可对自己或一名友军使用', '护甲可叠加且持续整场对局']) {
+      expect(definition.description).toContain(moduleDetail)
+    }
     const tails = makePiece({
       instanceId: 'tails', templateId: 'tails', ownerPlayerId: 'player-red',
       skills: [{ skillId: definition.id, currentCooldown: 0, usesRemaining: -1 } as any] as any,
