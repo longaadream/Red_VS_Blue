@@ -1674,6 +1674,7 @@
                 <span class="piece-context-identity">
                   <span id="pieceContextName" class="piece-context-name"></span>
                   <span id="pieceContextHp" class="piece-context-hp"></span>
+                  <span id="pieceContextMomentum" class="piece-context-momentum" hidden></span>
                 </span>
                 <span class="piece-context-actions">
                   <button type="button" class="piece-context-info" onclick="if(selectedPieceId)dispatchBattleIntent({type:'inspect-piece',pieceId:selectedPieceId})" aria-label="查看棋子完整技能与状态" title="完整技能与状态">i</button>
@@ -2113,6 +2114,7 @@
       'lethal-toxin': { label: '致命毒素' },
       'blizzard': { label: '暴风雪' },
       'sticky-bomb': { label: '黏弹' },
+      'tails-flight-reservation': { label: '双尾飞行预留' },
     })
     function tileEffectMeta(effect) {
       const tileType = (effect && (effect.tileType || effect.type)) || ''
@@ -2814,6 +2816,13 @@
         }
       } catch (_) {}
       return {}
+    }
+    function pieceHasMomentumSkillForDisplay(piece) {
+      return pieceDispSkills(piece).some(sk => skillDefOf(skillIdOf(sk)).momentumSkill === true)
+    }
+    function pieceMomentumValue(piece) {
+      const value = Number(piece && piece.momentum)
+      return Number.isFinite(value) ? Math.max(0, value) : 0
     }
     function skillUsesCharge(skillData) {
       return (skillData && (skillData.chargeCost || 0) > 0) || false
@@ -5535,7 +5544,7 @@
         ontouchstart="startPressTimer(event,'${iid}')"
         ontouchend="clearPressTimer()" ontouchmove="clearPressTimer()"
         oncontextmenu="event.preventDefault();showPieceInfo('${iid}')">
-        <button class="piece-info-btn" onclick="event.stopPropagation();showPieceInfo('${iid}')">鈸?/button>
+        <button type="button" class="piece-info-btn" aria-label="查看${escHtml(displayName)}完整技能与状态" title="完整技能与状态" onclick="event.stopPropagation();showPieceInfo('${iid}')">i</button>
         ${imgSrc ? `<img src="${imgSrc}" onerror="this.style.display='none'" style="width:100%;height:40px;object-fit:cover;border-radius:5px;margin-bottom:3px">` : ''}
         <div class="piece-card-name">${escHtml(displayName)}</div>
         <div class="piece-card-hp">${dispHp}/${mhp} HP</div>
@@ -5701,6 +5710,10 @@
       const displayName = piece.name || (template && template.name) || piece.templateId
       document.getElementById('pieceContextName').textContent = displayName
       document.getElementById('pieceContextHp').textContent = pieceDispHp(piece) + '/' + pieceMaxHp(piece)
+      const momentumDisplay = document.getElementById('pieceContextMomentum')
+      const showsMomentum = pieceHasMomentumSkillForDisplay(piece)
+      momentumDisplay.hidden = !showsMomentum
+      momentumDisplay.textContent = showsMomentum ? '动能 ' + pieceMomentumValue(piece) : ''
       menu.dataset.pieceId = piece.instanceId
 
       const skillButtons = skills.length ? skills.map(sk => {

@@ -93,5 +93,16 @@
   "rule-watcher-form",
   "rule-watcher-rage-dealt",
   "rule-watcher-rage-taken",
-  "rule-watcher-shield"
+  "rule-watcher-shield",
+  "rule-momentum-gain",
+  "rule-momentum-consume",
+  "rule-sonic-free-move",
+  "rule-tails-armor-recovery",
+  "rule-tails-flight-resolve",
+  "rule-tails-flight-immune",
+  "rule-tails-flight-inoperable",
+  "rule-tails-flight-inoperable-skill",
+  "rule-shadow-chaos-spear-restore",
+  "rule-tails-flight-reservation-block",
+  "rule-tails-flight-immune-target"
 ]

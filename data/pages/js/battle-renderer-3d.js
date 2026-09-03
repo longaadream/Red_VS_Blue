@@ -78,6 +78,7 @@
     'blizzard': Object.freeze({ color: 0x67e8f9, colorCss: '#cffafe', bg: 'rgba(14,116,144,.72)', border: '#67e8f9', icon: 'images/tile-effects/blizzard.svg' }),
     'shishio-burn': Object.freeze({ color: 0xfb4934, colorCss: '#fdba74', bg: 'rgba(124,45,18,.75)', border: '#fb4934', icon: 'images/tile-effects/shishio-burn.svg' }),
     'sticky-bomb': Object.freeze({ color: 0xfacc15, colorCss: '#fef08a', bg: 'rgba(113,63,18,.78)', border: '#facc15', icon: 'images/tile-effects/sticky-bomb.svg' }),
+    'tails-flight-reservation': Object.freeze({ color: 0x60a5fa, colorCss: '#bfdbfe', bg: 'rgba(30,58,138,.78)', border: '#60a5fa', icon: 'images/tile-effects/flying-raijin-anchor.svg' }),
     fallback: Object.freeze({ color: 0x94a3b8, colorCss: '#e5e7eb', bg: 'rgba(15,23,42,.76)', border: '#94a3b8', icon: 'images/tile-effects/fallback.svg' }),
   })
   const TILE_EFFECT_ICON_SLOTS = Object.freeze([

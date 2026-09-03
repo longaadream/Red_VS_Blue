@@ -1,0 +1,6 @@
+{
+  "id": "shadow", "name": "夏特", "faction": "evil", "rarity": "legendary", "description": "爆发刺客 / 时空操控", "image": "shadow.png",
+  "stats": { "maxHp": 12, "attack": 5, "defense": 1, "moveRange": 5, "speed": 5 },
+  "initialStatusTags": [{ "id": "shadow-momentum-core", "type": "momentum-core", "name": "动能", "stacks": 0, "visible": true, "skillIds": ["shadow-ride-sweep"], "relatedRules": ["rule-momentum-gain", "rule-momentum-consume"] }],
+  "skills": [{ "skillId": "shadow-chaos-spear", "level": 1 }, { "skillId": "shadow-ride-sweep", "level": 1 }, { "skillId": "shadow-chaos-control", "level": 1 }], "isDefault": false
+}

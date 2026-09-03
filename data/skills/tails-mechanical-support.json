@@ -1,0 +1,20 @@
+{
+  "id": "tails-mechanical-support",
+  "name": "机械支援",
+  "description": "选择7格内友军，回复5点生命；随后可选择移除其任意一个效果。动能4时治疗+2；动能8时目标本回合普通移动免费。",
+  "keywords": ["动能"],
+  "momentumSkill": true,
+  "icon": "🔧",
+  "kind": "active",
+  "type": "normal",
+  "cooldownTurns": 2,
+  "maxCharges": 0,
+  "powerMultiplier": 1,
+  "actionPointCost": 1,
+  "targeting": {
+    "steps": [
+      {"kind":"target","type":"piece","filter":"ally","range":7,"distanceMetric":"manhattan"}
+    ]
+  },
+  "code": "function executeSkill(context){var c=context.piece,t=selectTarget({type:'piece',range:7,filter:'ally'});if(!t||t.needsTargetSelection)return t;var m=c.momentum||0,heal=5+(m>=4?2:0),r=healDamage(c,t,heal,context.battle,context.skill.id);t.statusTags=t.statusTags||[];var finish=function(removed){if(m>=8){var free=t.statusTags.find(function(tag){return tag.type==='deployment-first-move-free';});if(!free){free={id:'mechanical-support-free-move-'+t.instanceId,type:'deployment-first-move-free',name:'本回合首次移动免费',visible:true};t.statusTags.push(free);}free.grantedTurnNumber=context.battle.turn.turnNumber;free.currentDuration=1;free.currentUses=1;}return {success:true,message:'回复'+r.heal+'点生命'+(removed?'，移除了'+(removed.name||removed.type||'一个效果'):'')+(m>=8?'，本回合首次移动免费':'')};};if(t.statusTags.length===0)return finish(null);var choices=t.statusTags.map(function(tag,index){return {label:(tag.name||tag.type||'效果')+'（'+(index+1)+'）',value:String(index)};}),chosen=selectOption({title:'机械支援：选择要解除的效果',options:choices});if(chosen&&chosen.needsOptionSelection)return chosen;var index=Number(chosen);if(!Number.isInteger(index)||index<0||index>=t.statusTags.length)return {success:false,message:'选择的效果无效'};return finish(t.statusTags.splice(index,1)[0]);}"
+}
