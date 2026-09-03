@@ -71,6 +71,10 @@ player intent
 和 Terminal Barrier。恢复时验证协议/build、版本、action/state/public/transition hash 链、receipt 关联及
 Checkpoint 重放一致性。存在缺口或篡改时房间不可恢复，战报也不可读取。
 
+Windows 本机 authority 启动将 PostgreSQL 的瞬时连接超时、恢复中和资源压力视为可重试状态；认证、配置、
+schema 或完整性错误仍立即失败。Electron 的就绪 watchdog 必须覆盖数据库连接重试窗口，不得用短于正常资源
+加载时间的恢复窗口杀死仍在启动的 authority 进程。
+
 ## 6. 战报
 
 `PostgresAuthorityRepository.readBattleReport()` 从初始 Checkpoint 重放完整 Transition，并核对终局 Trace、

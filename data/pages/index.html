@@ -1347,6 +1347,33 @@
       }
     }
 
+    function _recordsLoadErrorMarkup(message) {
+      return '<div role="alert" style="color:#ef4444;text-align:center;padding:20px">' + message + '<br><button type="button" onclick="retryRecordsSheet()" style="min-height:44px;margin-top:12px;padding:10px 16px;border:1px solid #7f1d1d;border-radius:8px;background:#450a0a;color:#fecaca;cursor:pointer">重试</button></div>'
+    }
+
+    async function retryRecordsSheet() {
+      const list = document.getElementById('recordsList')
+      const localMode = window.RvBUtils
+        && typeof RvBUtils.getActiveServerMode === 'function'
+        && RvBUtils.getActiveServerMode() === 'local'
+      if (localMode && window.electronAPI && typeof window.electronAPI.ensureLocalAuthority === 'function') {
+        list.innerHTML = '<div style="color:#64748b;text-align:center;padding:20px">正在恢复本机 PostgreSQL 战斗服务…</div>'
+        try {
+          const result = await window.electronAPI.ensureLocalAuthority()
+          if (!result || result.ok !== true) {
+            console.warn('[battle-reports] local authority recovery unavailable', result)
+            list.innerHTML = _recordsLoadErrorMarkup('本机战斗服务仍未就绪')
+            return
+          }
+        } catch (error) {
+          console.warn('[battle-reports] local authority recovery failed', error)
+          list.innerHTML = _recordsLoadErrorMarkup('本机战斗服务恢复失败')
+          return
+        }
+      }
+      await openRecordsSheet()
+    }
+
     async function openRecordsSheet() {
       document.getElementById('recordsOverlay').classList.add('show')
       const list = document.getElementById('recordsList')
@@ -1358,7 +1385,7 @@
         records = (await _loadRecords()).slice().sort((a, b) => b.timestamp - a.timestamp)
       } catch (error) {
         console.warn('[battle-reports] sheet load unavailable', error)
-        list.innerHTML = '<div role="alert" style="color:#ef4444;text-align:center;padding:20px">权威战绩读取失败<br><button type="button" onclick="openRecordsSheet()" style="min-height:44px;margin-top:12px;padding:10px 16px;border:1px solid #7f1d1d;border-radius:8px;background:#450a0a;color:#fecaca;cursor:pointer">重试</button></div>'
+        list.innerHTML = _recordsLoadErrorMarkup('权威战绩读取失败')
         return
       }
       const elo = _calcAuthorityElo(records)

@@ -76,6 +76,54 @@ interface ProductRoomMetadata {
   visibility?: string
 }
 
+export const POSTGRES_CONNECTION_TIMEOUT_MS = 30_000
+const POSTGRES_STARTUP_MAX_ATTEMPTS = 5
+const POSTGRES_STARTUP_MAX_RETRY_DELAY_MS = 5_000
+
+interface PostgresStartupOptions {
+  logger?: Pick<Console, 'error'>
+  sleep?: (delayMs: number) => Promise<void>
+}
+
+function isTransientPostgresStartupError(error: unknown): boolean {
+  const details = error && typeof error === 'object'
+    ? error as { code?: unknown; message?: unknown }
+    : {}
+  const code = typeof details.code === 'string' ? details.code : ''
+  if (code.startsWith('08') || ['53300', '53400', '57P03', '58000', '58030'].includes(code)) return true
+  const message = typeof details.message === 'string' ? details.message : String(error)
+  return /connection (?:terminated|timeout|refused|reset)|timed? ?out|ECONN(?:REFUSED|RESET)|database system is starting up|too many (?:clients|connections)/i.test(message)
+}
+
+export async function preparePostgresAuthority(
+  repository: Pick<BattleServerRepository, 'initializeSchema' | 'healthCheck'>,
+  options: PostgresStartupOptions = {},
+): Promise<void> {
+  const logger = options.logger ?? console
+  const sleep = options.sleep ?? (delayMs => new Promise(resolve => setTimeout(resolve, delayMs)))
+  for (let attempt = 1; attempt <= POSTGRES_STARTUP_MAX_ATTEMPTS; attempt += 1) {
+    try {
+      await repository.initializeSchema()
+      await repository.healthCheck()
+      return
+    } catch (error) {
+      if (!isTransientPostgresStartupError(error) || attempt === POSTGRES_STARTUP_MAX_ATTEMPTS) throw error
+      const details = error && typeof error === 'object'
+        ? error as { code?: unknown; message?: unknown }
+        : {}
+      const retryInMs = Math.min(500 * (2 ** (attempt - 1)), POSTGRES_STARTUP_MAX_RETRY_DELAY_MS)
+      logger.error('[colyseus-postgres] startup connection unavailable; retrying', {
+        attempt,
+        maxAttempts: POSTGRES_STARTUP_MAX_ATTEMPTS,
+        retryInMs,
+        code: typeof details.code === 'string' ? details.code : undefined,
+        message: typeof details.message === 'string' ? details.message : String(error),
+      })
+      await sleep(retryInMs)
+    }
+  }
+}
+
 export function createColyseusBattleServer(options: CreateColyseusBattleServerOptions = {}) {
   // This runtime is the only Windows player-authority boundary.
   process.env.RVB_TURN_TIMER_ENABLED ??= '1'
@@ -119,8 +167,7 @@ export function createColyseusBattleServer(options: CreateColyseusBattleServerOp
     greet: false,
     beforeListen: async () => {
       try {
-        await repository.initializeSchema()
-        await repository.healthCheck()
+        await preparePostgresAuthority(repository, { logger })
         ready = true
         healthError = undefined
       } catch (error) {
@@ -286,7 +333,10 @@ function createRepository(options: CreateColyseusBattleServerOptions): PostgresA
   const pool = new Pool({
     connectionString,
     max: options.poolMax ?? numberFromEnv(process.env.RVB_POSTGRES_POOL_MAX, 8),
-    connectionTimeoutMillis: 2_000,
+    connectionTimeoutMillis: numberFromEnv(
+      process.env.RVB_POSTGRES_CONNECTION_TIMEOUT_MS,
+      POSTGRES_CONNECTION_TIMEOUT_MS,
+    ),
     idleTimeoutMillis: 30_000,
     application_name: 'red-vs-blue-colyseus',
   })

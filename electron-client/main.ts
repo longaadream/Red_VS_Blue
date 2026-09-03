@@ -41,7 +41,10 @@ const BATTLE_AUTHORITY_SHUTDOWN_RESULT = 'rvb:battle-authority:shutdown-result'
 const SERVER_GRACEFUL_SHUTDOWN_TIMEOUT_MS = 6_500
 const LOCAL_AUTHORITY_AUTO_RECOVERY_MAX_ATTEMPTS = 3
 const LOCAL_AUTHORITY_AUTO_RECOVERY_DELAYS_MS = [250, 750, 1_500] as const
-const LOCAL_AUTHORITY_RECOVERY_READY_TIMEOUT_MS = 5_000
+// A saturated Windows host can spend tens of seconds loading the packaged
+// authority before it can even request its first PostgreSQL connection. Keep
+// the watchdog bounded, but do not confuse slow startup with process failure.
+const LOCAL_AUTHORITY_READY_TIMEOUT_MS = 240_000
 const PROFILE_ARCHIVE_MAX_BYTES = 32 * 1024 * 1024
 const PROFILE_ADMIN_KEY = randomBytes(32).toString('hex')
 let allowAppExit = false
@@ -774,7 +777,7 @@ function localAuthorityStartupErrorMessage(error: unknown): string {
 
 async function startLocalGameAuthorityOnce(
   profileBinding?: ProfileProcessBinding,
-  readyTimeoutMs = 20_000,
+  readyTimeoutMs = LOCAL_AUTHORITY_READY_TIMEOUT_MS,
 ): Promise<void> {
   if (gameServerProcess) {
     if (!localGameReady) localGameReady = await waitForGameAuthorityReady(actualGamePort, readyTimeoutMs)
@@ -939,7 +942,7 @@ function recoverUnexpectedLocalAuthorityExit(code: number | null, manual = false
       if (gameServerProcess && !localGameReady) discardUnhealthyAuthorityProcess()
 
       try {
-        await startStableLocalServerAndRecover(undefined, LOCAL_AUTHORITY_RECOVERY_READY_TIMEOUT_MS)
+        await startStableLocalServerAndRecover(undefined, LOCAL_AUTHORITY_READY_TIMEOUT_MS)
       } catch (error) {
         console.error('[client] bounded Colyseus authority recovery attempt failed:', error)
         appendAuthorityDiagnostic(

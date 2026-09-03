@@ -140,6 +140,12 @@ Colyseus：
   配置。新建私有 cluster 现固定 `UTF8 + C locale`，并将只用于首次 `initdb` 的预算从 30 秒提高为 90 秒；
   已有 cluster 不重建、不迁移。真实 PostgreSQL 用例验证 `datctype=C`、loopback/SCRAM、重启持久化和崩溃
   探测全部通过。
+- 提交 `90080b1` 的实包在 14:55 再次复现：PostgreSQL 14:55:09 已 ready，但 Colyseus 加载资源约 14 秒后，
+  `initializeSchema()` 被连接池 2 秒预算中断；自动恢复随后每次只等待 5 秒，早于资源加载完成便杀死仍在启动
+  的 authority，三次后进入 manual-required。修复后单次 PostgreSQL 连接预算为 30 秒，瞬时连接类错误最多
+  进行 5 次指数退避重试，Electron 初始与恢复就绪 watchdog 统一为 240 秒；认证、schema 与完整性错误不重试。
+  战绩错误态的“重试”在本机模式下会先通过受信任 IPC 重新激活 authority 恢复预算，ready 后再读取战报；
+  远程模式不会启动本机服务。
 
 浏览器证据：
 
@@ -152,10 +158,16 @@ Colyseus：
 | --- | --- |
 | `tests/electron/embedded-postgres.test.ts` | 6/6 通过；含真实 Windows PostgreSQL 首次初始化、重启持久化和崩溃探测 |
 | `tests/integration/postgres` | 内置 PostgreSQL 集成 1 项通过；外部 URL 1 项按环境跳过 |
-| `tests/colyseus/product-room.test.ts` | 5/5 通过 |
+| 启动恢复定向回归 | 3 文件、25/25 通过；覆盖瞬时 PostgreSQL 重试、永久错误立即失败、240 秒统一 watchdog 与 UI 恢复入口 |
+| `tests/colyseus/product-room.test.ts` + PostgreSQL pool lifecycle | 2 文件、8/8 通过 |
 | 动作历史与首页战绩 UI 回归 | 2 文件、18/18 通过 |
-| `npm.cmd run typecheck` / 关键路径 ESLint | 通过 |
+| `npm.cmd run typecheck` | 通过 |
+| 关键路径 ESLint | 本次新增代码无新告警；仍有既存 `electron-client/main.ts:1966 openConnectWindow` 未使用错误，不在本次范围内 |
 | `check:windows-cutover` / `check:encoding` / `git diff --check` | 通过 |
+
+整机采样为 CPU 98.8%、约 2 GiB 可用内存时，完整 `test:colyseus` 的 22 项中有 9 项越过既存
+5–60 秒测试等待门限；相同的 product-room 与 PostgreSQL lifecycle 测试隔离运行后 8/8 通过。这一结果
+作为慢机器压力证据保留，不把完整套件记为通过，也不通过放宽游戏行为断言掩盖超时。
 
 ## 两台 Windows 人工验收（阻塞最终产品验收）
 
