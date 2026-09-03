@@ -1,5 +1,5 @@
 import { execFileSync, spawn, spawnSync } from 'node:child_process'
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, unlinkSync, writeFileSync } from 'node:fs'
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, unlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 
@@ -22,7 +22,7 @@ const applications = {
     userDataDir: process.env.RVB_SMOKE_USER_DATA_DIR
       ? path.resolve(process.env.RVB_SMOKE_USER_DATA_DIR)
       : null,
-    title: '连接服务器',
+    title: 'RED vs BLUE',
     debugPort: 19222,
   },
   editor: {
@@ -270,6 +270,21 @@ function countExecutableProcesses(executable) {
     return Number.isInteger(count) ? count : null
   } catch {
     return null
+  }
+}
+
+function findExecutableProcessIds(executable, commandLineFragment) {
+  const escapedExecutable = executable.replaceAll("'", "''")
+  const escapedFragment = commandLineFragment.replaceAll("'", "''")
+  const script = `Get-CimInstance Win32_Process | Where-Object { $_.ExecutablePath -eq '${escapedExecutable}' -and $_.CommandLine -like '*${escapedFragment}*' } | Select-Object -ExpandProperty ProcessId`
+  try {
+    return execFileSync('powershell.exe', ['-NoProfile', '-Command', script], {
+      encoding: 'utf8',
+      timeout: 5000,
+      windowsHide: true,
+    }).trim().split(/\s+/).map(Number).filter(Number.isInteger)
+  } catch {
+    return []
   }
 }
 
@@ -708,7 +723,15 @@ async function smokeClient(expectedIdentity = null, sharedUserDataDir = null) {
       existsSync(path.join(isolatedPackageRoot, 'resources', 'app', 'standalone', 'node_modules', 'ws', 'package.json')),
       'Isolated client package is missing the standalone WebSocket runtime',
     )
-    const { target, rendererBoundary } = await launch(application)
+    // A fresh packaged client initializes a brand-new bundled PostgreSQL data
+    // directory before opening the main menu. On Windows, copying the package
+    // into the isolated smoke directory plus security scanning can exceed the
+    // generic 30-second renderer timeout even while startup is progressing.
+    const { target, rendererBoundary } = await launch(application, 90000)
+    assert(
+      rendererBoundary.url.startsWith('rvb-client://app/index.html'),
+      `Client did not open the main menu directly: ${JSON.stringify(rendererBoundary)}`,
+    )
     const connection = await connectTarget(target)
     const tlsProbe = await connection.evaluate(`new Promise((resolve) => {
       const controller = new AbortController()
@@ -718,20 +741,7 @@ async function smokeClient(expectedIdentity = null, sharedUserDataDir = null) {
         .finally(() => clearTimeout(timer))
     })`, true, 20000)
     assert(tlsProbe === 'rejected', `Client unexpectedly accepted an invalid HTTPS certificate: ${tlsProbe}`)
-    connection.evaluateFireAndForget(`window.electronAPI.openLocalGame()`)
-    await delay(2_000)
-    connection.evaluateFireAndForget(`Promise.all([
-      window.electronAPI.openLocalGame(),
-      window.electronAPI.openLocalGame(),
-    ])`)
-    // A cold machine may spend tens of seconds in Windows Defender scanning,
-    // runtime integrity verification and first-cluster initdb. This is startup
-    // work, not the gameplay latency budget.
-    const gameTarget = await waitForTargets(
-      application.debugPort,
-      candidate => candidate.url.startsWith('rvb-client://app/index.html'),
-      60_000,
-    )
+    const gameTarget = target
     connection.close()
     let gameBridgeReady = false
     for (let attempt = 0; attempt < 40; attempt += 1) {
@@ -743,6 +753,80 @@ async function smokeClient(expectedIdentity = null, sharedUserDataDir = null) {
     }
     assert(gameBridgeReady, 'Client game preload bridge did not become ready')
     const mode = await evaluate(gameTarget, `window.electronAPI.getMode()`)
+    assert(mode?.ready === true, `Client local authority was not ready after automatic startup: ${JSON.stringify(mode)}`)
+
+    const authorityEntry = path.join(
+      isolatedPackageRoot,
+      'resources',
+      'app',
+      'standalone',
+      'colyseus',
+      'colyseus-server.mjs',
+    )
+    const disabledAuthorityEntry = `${authorityEntry}.smoke-disabled`
+    const recoveryMarker = `rvb-recovery-marker-${Date.now()}`
+    await evaluate(gameTarget, `window.__rvbRecoverySmokeMarker = ${JSON.stringify(recoveryMarker)}; true`)
+    const authorityPids = findExecutableProcessIds(
+      path.join(isolatedPackageRoot, 'resources', 'node.exe'),
+      'colyseus-server.mjs',
+    )
+    assert(authorityPids.length === 1, `Expected one packaged authority process: ${JSON.stringify(authorityPids)}`)
+
+    let exhaustedRecovery = null
+    let recoveryTarget = gameTarget
+    renameSync(authorityEntry, disabledAuthorityEntry)
+    try {
+      stopProcessTree(authorityPids[0])
+      const recoveryDeadline = Date.now() + 20_000
+      while (Date.now() < recoveryDeadline) {
+        try {
+          recoveryTarget = await waitForTargets(
+            application.debugPort,
+            candidate => candidate.url.startsWith('rvb-client://app/index.html'),
+            2_000,
+          )
+          const observed = await evaluate(recoveryTarget, `window.electronAPI.getMode()`)
+          if (observed?.localAuthorityRecovery?.status === 'manual-required') {
+            exhaustedRecovery = observed
+            break
+          }
+        } catch {}
+        await delay(250)
+      }
+      assert(
+        exhaustedRecovery?.ready === false
+          && exhaustedRecovery.localAuthorityRecovery.attempts === 3
+          && exhaustedRecovery.localAuthorityRecovery.maxAttempts === 3
+          && exhaustedRecovery.localAuthorityRecovery.blocked === true,
+        `Client authority recovery did not stop after three attempts: ${JSON.stringify(exhaustedRecovery)}`,
+      )
+      const markerAfterRecovery = await evaluate(recoveryTarget, 'window.__rvbRecoverySmokeMarker || null')
+      assert(
+        markerAfterRecovery === recoveryMarker,
+        `Silent authority recovery reloaded the main menu: ${JSON.stringify({ recoveryMarker, markerAfterRecovery })}`,
+      )
+    } finally {
+      if (existsSync(disabledAuthorityEntry)) renameSync(disabledAuthorityEntry, authorityEntry)
+    }
+
+    const manualRecovery = await evaluate(
+      recoveryTarget,
+      'window.electronAPI.ensureLocalAuthority()',
+      true,
+      30_000,
+    )
+    assert(
+      manualRecovery?.ok === true
+        && manualRecovery.recovery?.status === 'ready'
+        && manualRecovery.recovery?.attempts === 0
+        && manualRecovery.recovery?.blocked === false,
+      `Explicit authority retry did not rearm and recover: ${JSON.stringify(manualRecovery)}`,
+    )
+    const markerAfterManualRecovery = await evaluate(recoveryTarget, 'window.__rvbRecoverySmokeMarker || null')
+    assert(
+      markerAfterManualRecovery === recoveryMarker,
+      'Manual authority recovery reloaded the main menu',
+    )
     const homepageWindowBoundary = await evaluate(gameTarget, `new Promise((resolve) => {
       const childWindow = window.open('https://example.com/red55-popup-probe', '_blank')
       setTimeout(() => resolve({
@@ -766,7 +850,10 @@ async function smokeClient(expectedIdentity = null, sharedUserDataDir = null) {
       'index.html',
       'js/server-utils.js',
       'data/pieces/ana.json',
-      'images/terrain/floor.webp'
+      'images/terrain/floor.webp',
+      'images/effect-icons/empowered.svg',
+      'images/effect-icons/damage-multiplier.svg',
+      'images/tile-effects/blizzard.svg'
     ].map(async (relativePath) => {
       const response = await fetch(new URL(relativePath, location.href))
       return [relativePath, response.ok, (await response.arrayBuffer()).byteLength]
@@ -902,6 +989,11 @@ async function smokeClient(expectedIdentity = null, sharedUserDataDir = null) {
       homepageWindowBoundary,
       packagedAssets,
       localMode: mode,
+      boundedAuthorityRecovery: {
+        exhausted: exhaustedRecovery.localAuthorityRecovery,
+        manual: manualRecovery.recovery,
+        rendererPreserved: markerAfterManualRecovery === recoveryMarker,
+      },
       profileIdentity: catalogIdentity.data.profileIdentity,
       resourcePackStatus,
       databaseProbe: { roomsBeforeCreate, createdRoom, roomsAfterCreate },
@@ -950,13 +1042,7 @@ async function smokeProfileActivation(candidate, sharedUserDataDir = null) {
     application.helperExecutables = [path.join(isolatedPackageRoot, 'resources', 'node.exe')]
     application.userDataDir = userDataDir
 
-    const { target: connectTargetDescriptor, rendererBoundary } = await launch(application, 45000)
-    await evaluate(connectTargetDescriptor, 'window.electronAPI.openLocalGame(); true', false)
-    const initialGameTarget = await waitForTargets(
-      application.debugPort,
-      (candidate) => candidate.url.startsWith('rvb-client://app/index.html'),
-      30000,
-    )
+    const { target: initialGameTarget, rendererBoundary } = await launch(application, 45000)
 
     const initial = await waitForPackStatus(application, (status) => (
       status?.ok === true
@@ -1055,13 +1141,7 @@ async function smokeProfileActivation(candidate, sharedUserDataDir = null) {
       `Interrupted candidate left residual processes: ${JSON.stringify(processCountsAfterInterrupt)}`,
     )
 
-    const { target: recoveryConnectTarget } = await launch(application, 45000)
-    await evaluate(recoveryConnectTarget, 'window.electronAPI.openLocalGame(); true', false)
-    await waitForTargets(
-      application.debugPort,
-      (candidate) => candidate.url.startsWith('rvb-client://app/index.html'),
-      30000,
-    )
+    await launch(application, 45000)
     const recovered = await waitForPackStatus(application, (status) => (
       status?.state?.stable?.resolvedProfileHash === imageProfileHash
       && status.state?.candidate?.resolvedProfileHash === profileBHash
@@ -1236,13 +1316,7 @@ async function rollbackSharedCandidateToBase(expectedIdentity, userDataDir) {
   const originalUserDataDir = application.userDataDir
   application.userDataDir = path.resolve(userDataDir)
   try {
-    const { target } = await launch(application, 45000)
-    await evaluate(target, 'window.electronAPI.openLocalGame(); true', false)
-    await waitForTargets(
-      application.debugPort,
-      (candidate) => candidate.url.startsWith('rvb-client://app/index.html'),
-      30000,
-    )
+    await launch(application, 45000)
     const active = await waitForPackStatus(application, (status) => (
       status?.state?.stable?.resolvedProfileHash === expectedIdentity.resolvedProfileHash
       && status.server?.healthy === true

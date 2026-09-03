@@ -668,7 +668,7 @@ describe('game engine Node/browser differential fixture', () => {
     expect(result.pieces.find(piece => piece.instanceId === 'enemy')?.currentHp).toBe(89)
   })
 
-  it('does not offer shotgun directions hidden behind blocking cover in the tracked browser bundle', () => {
+  it('offers and commits shotgun directions blocked by cover in the tracked browser bundle', () => {
     const browser = loadBrowserEngine()
     const caster = makePiece({ instanceId: 'caster', ownerPlayerId: 'player-red', x: 2, y: 2, attack: 10 })
     const target = makePiece({ instanceId: 'target', ownerPlayerId: 'player-blue', x: 4, y: 2 })
@@ -699,9 +699,25 @@ describe('game engine Node/browser differential fixture', () => {
     const candidates = preparation.candidates
       .filter((ref): ref is Extract<TargetRef, { type: 'cell' }> => ref.type === 'cell')
       .map(ref => `${ref.x},${ref.y}`)
-    expect(candidates).not.toContain('3,2')
-    expect(candidates).not.toContain('4,2')
-    expect(candidates).not.toContain('5,2')
+    expect(candidates).toEqual(expect.arrayContaining(['3,2', '4,2', '5,2']))
+
+    const beforeHp = state.pieces.find(piece => piece.instanceId === 'target')?.currentHp
+    const beforeAp = state.players.find(player => player.playerId === 'player-red')?.actionPoints
+    const next = browser.applyBattleAction(state, {
+      type: 'useBasicSkill',
+      playerId: 'player-red',
+      pieceId: 'caster',
+      skillId: skill.id,
+      targetX: 5,
+      targetY: 2,
+      selectionId: preparation.selectionId,
+      stateRevision: preparation.stateRevision,
+    } as BattleAction)
+
+    expect(next.pieces.find(piece => piece.instanceId === 'target')?.currentHp).toBe(beforeHp)
+    expect(next.players.find(player => player.playerId === 'player-red')?.actionPoints).toBe((beforeAp ?? 0) - 1)
+    expect(next.pieces.find(piece => piece.instanceId === 'caster')?.skills[0]?.currentCooldown).toBe(1)
+    expect(next.actions?.some(entry => entry.type === 'useBasicSkill')).toBe(true)
   })
 
   it('keeps the tracked browser bundle in sync with Muru hand multi-select pending metadata', () => {

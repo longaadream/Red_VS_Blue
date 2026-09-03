@@ -167,6 +167,23 @@ describe('Electron client protocol resource resolution', () => {
     })).toBeNull()
   })
 
+  test('serves trusted built-in status and tile-effect SVGs in packaged builds', () => {
+    const roots = createRoots()
+
+    expect(resolveClientProtocolFile({
+      ...roots,
+      activePackRoot: null,
+      isPackaged: true,
+      relativePath: 'images/effect-icons/divine-shield.svg',
+    })).toBe(path.join(roots.appRoot, 'public', 'effect-icons', 'divine-shield.svg'))
+    expect(resolveClientProtocolFile({
+      ...roots,
+      activePackRoot: null,
+      isPackaged: true,
+      relativePath: 'images/tile-effects/amaterasu.svg',
+    })).toBe(path.join(roots.appRoot, 'public', 'tile-effects', 'amaterasu.svg'))
+  })
+
   test.each([
     '../data/pieces/manifest.json',
     'data/../pieces/manifest.json',

@@ -1,5 +1,7 @@
 # ADR-0025：回合外 Pending 使用独立响应计时
 
+> RED-170 时长取代说明：本 ADR 的独立计时所有权、冻结和结算语义不变，固定响应窗口由 15 秒翻倍为 30 秒。见 [ADR-0027](./ADR-0027-colyseus-single-session-match-lifecycle.md)。
+
 状态：已批准
 日期：2026-09-01
 关联任务：[RED-164](https://linear.app/redvsblue/issue/RED-164/为回合外-pending-增加独立-15-秒响应计时器)

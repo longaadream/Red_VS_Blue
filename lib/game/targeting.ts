@@ -6,7 +6,6 @@ import {
   getLegalSkillLandingCells,
   gridPositionKey,
   manhattanDistance,
-  traceProjectile,
   type GridPosition,
 } from './spatial'
 import type { BattleAction, BattleState } from './turn'
@@ -23,10 +22,6 @@ export type TargetRef =
   | { type: 'cell'; x: number; y: number }
 
 export type TargetFilter = 'enemy' | 'ally' | 'all' | 'self'
-
-export interface ProjectileTargetingRequirement {
-  requiredCollision: 'piece-before-blocker'
-}
 
 export interface TargetConstraint {
   type: 'piece' | 'cell'
@@ -55,7 +50,6 @@ export interface TargetConstraint {
   ignoreOccupantSelectedTargetIndex?: number
   requireEnemyWithinRange?: number
   distanceFromSelectedTarget?: { index: number; range: number }
-  projectile?: ProjectileTargetingRequirement
   targetRuleIds?: string[]
 }
 
@@ -174,7 +168,6 @@ export interface PendingTargetStep {
   ignoreOccupantSelectedTargetIndex?: number
   requireEnemyWithinRange?: number
   distanceFromSelectedTarget?: { index: number; range: number }
-  projectile?: ProjectileTargetingRequirement
 }
 
 export interface PendingTargetSelectionSession {
@@ -230,7 +223,6 @@ interface TargetSpec {
   allowSourceOccupantOptions?: unknown[]
   sameRowOrColumn?: boolean
   excludeSourceCell?: boolean
-  projectile?: ProjectileTargetingRequirement
   excludeSourcePiece?: boolean
   forbiddenColumns?: number[]
   forbiddenTargetStatuses?: string[]
@@ -375,9 +367,6 @@ function getDeclaredSteps(definition: any, kind: 'skill' | 'card'): SelectionSte
         distanceFromSelectedTarget: Number.isInteger(raw.distanceFromSelectedTarget?.index)
           && typeof raw.distanceFromSelectedTarget?.range === 'number'
           ? { index: raw.distanceFromSelectedTarget.index, range: raw.distanceFromSelectedTarget.range }
-          : undefined,
-        projectile: raw.projectile?.requiredCollision === 'piece-before-blocker'
-          ? { requiredCollision: 'piece-before-blocker' }
           : undefined,
       })
     }
@@ -664,7 +653,6 @@ function constraintFor(
     allowSourceOccupant: spec.allowSourceOccupant || spec.allowSourceOccupantOptions?.some(
       option => Object.is(option, selectedOption),
     ),
-    projectile: spec.projectile,
     targetRuleIds: selectedTargets.length === 0 ? source.targetRuleIds : undefined,
   }
   return constraint
@@ -803,37 +791,6 @@ function validateTargetRules(
   return undefined
 }
 
-function validateProjectileRequirement(
-  state: BattleState,
-  constraint: TargetConstraint,
-  ref: Extract<TargetRef, { type: 'cell' }>,
-): TargetValidationIssue | undefined {
-  if (constraint.projectile?.requiredCollision !== 'piece-before-blocker') return undefined
-  const sourcePiece = getSourcePiece(state, constraint)
-  if (!sourcePiece || sourcePiece.x == null || sourcePiece.y == null) {
-    return issue('TARGET_SOURCE_MISSING', 'A positioned source is required for projectile targeting')
-  }
-  const direction = {
-    x: Math.sign(ref.x - sourcePiece.x),
-    y: Math.sign(ref.y - sourcePiece.y),
-  }
-  if (Math.abs(direction.x) + Math.abs(direction.y) !== 1) {
-    return issue('TARGET_NOT_ORTHOGONAL', 'Projectile direction must be cardinal')
-  }
-
-  const events = traceProjectile(state, { x: sourcePiece.x, y: sourcePiece.y }, direction, {
-    excludePieceId: sourcePiece.instanceId,
-    maxDistance: constraint.range,
-  })
-  for (const event of events) {
-    if (event.type === 'piece') return undefined
-    if (event.type === 'terrain' && event.blocksProjectile) {
-      return issue('TARGET_SOURCE_CONSTRAINT_FAILED', 'Blocking terrain appears before any living piece')
-    }
-  }
-  return issue('TARGET_SOURCE_CONSTRAINT_FAILED', 'No living piece is in the selected projectile direction')
-}
-
 export function validateTargetRef(
   state: BattleState,
   constraint: TargetConstraint,
@@ -916,8 +873,6 @@ export function validateTargetRef(
     )
     if (occupied) return issue('TARGET_OCCUPIED', `Cell (${ref.x},${ref.y}) is occupied`)
   }
-  const projectileIssue = validateProjectileRequirement(state, constraint, ref)
-  if (projectileIssue) return projectileIssue
   return validateSourceSpecificCell(state, constraint, ref)
 }
 
@@ -1191,7 +1146,6 @@ function pendingConstraint(pending: PendingTargetSelectionSession): TargetConstr
     requireExtensionCell: activeStep?.requireExtensionCell,
     ignoreOccupantSelectedTargetIndex: activeStep?.ignoreOccupantSelectedTargetIndex,
     requireEnemyWithinRange: activeStep?.requireEnemyWithinRange,
-    projectile: activeStep?.projectile,
   }
 }
 

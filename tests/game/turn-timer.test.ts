@@ -17,16 +17,16 @@ import { makeState } from '../helpers/minimal-state'
 
 describe('RED-36 growing authoritative turn timer', () => {
   it.each([
-    [1, 1, 45_000],
-    [4, 2, 45_000],
-    [5, 3, 60_000],
-    [8, 4, 60_000],
-    [9, 5, 75_000],
-    [12, 6, 75_000],
-    [13, 7, 90_000],
-    [16, 8, 90_000],
-    [17, 9, 105_000],
-    [80, 40, 105_000],
+    [1, 1, 90_000],
+    [4, 2, 90_000],
+    [5, 3, 120_000],
+    [8, 4, 120_000],
+    [9, 5, 150_000],
+    [12, 6, 150_000],
+    [13, 7, 180_000],
+    [16, 8, 180_000],
+    [17, 9, 210_000],
+    [80, 40, 210_000],
   ])('maps turn %i to complete round %i and %i ms', (turnNumber, round, durationMs) => {
     expect(getFullRoundNumber(turnNumber)).toBe(round)
     expect(getNormalTurnDurationMs(turnNumber)).toBe(durationMs)
@@ -40,9 +40,9 @@ describe('RED-36 growing authoritative turn timer', () => {
       ownerPlayerId: 'player-red',
       turnNumber: 5,
       fullRound: 3,
-      durationMs: 60_000,
-      deadlineAt: 70_000,
-      burnStartsAt: 55_000,
+      durationMs: 120_000,
+      deadlineAt: 130_000,
+      burnStartsAt: 115_000,
       fast: false,
       burnPhase: 'normal',
       noOpStreaks: {
@@ -50,11 +50,11 @@ describe('RED-36 growing authoritative turn timer', () => {
         'player-blue': 0,
       },
     })
-    expect(projectTurnTimer(timer, 54_999)).toMatchObject({
+    expect(projectTurnTimer(timer, 114_999)).toMatchObject({
       remainingMs: 15_001,
       burning: false,
     })
-    expect(projectTurnTimer(timer, 55_000)).toMatchObject({
+    expect(projectTurnTimer(timer, 115_000)).toMatchObject({
       remainingMs: TURN_BURN_WINDOW_MS,
       burning: true,
     })
@@ -75,12 +75,12 @@ describe('RED-36 growing authoritative turn timer', () => {
       turnOwnerPlayerId: 'player-red',
       turnNumber: 2,
       startedAt: 2_000,
-      remainingMs: 45_000,
-      deadlineAt: 47_000,
+      remainingMs: 90_000,
+      deadlineAt: 92_000,
       pendingResponse: {
         ownerPlayerId: 'player-blue',
         durationMs: PENDING_RESPONSE_DURATION_MS,
-        deadlineAt: 17_000,
+        deadlineAt: 32_000,
       },
     })
 
@@ -92,7 +92,7 @@ describe('RED-36 growing authoritative turn timer', () => {
       .toThrow(/action phase or for pending input/)
   })
 
-  it('uses a 20-second fast rope only for a player carrying a no-op timeout streak', () => {
+  it('uses a doubled 40-second fast rope only for a player carrying a no-op timeout streak', () => {
     const state = makeState({ turnNumber: 3, phase: 'action' })
     const timer = createRunningTurnTimer(state, 4_000, {
       'player-red': 1,
@@ -101,13 +101,13 @@ describe('RED-36 growing authoritative turn timer', () => {
 
     expect(timer).toMatchObject({
       durationMs: TURN_FAST_DURATION_MS,
-      deadlineAt: 24_000,
-      burnStartsAt: 9_000,
+      deadlineAt: 44_000,
+      burnStartsAt: 29_000,
       fast: true,
     })
   })
 
-  it('freezes the turn clock and starts a fresh 15-second off-turn response clock', () => {
+  it('freezes the turn clock and starts a fresh doubled off-turn response clock', () => {
     const state = makeState({ turnNumber: 3, phase: 'action' })
     state.turnTimer = createRunningTurnTimer(state, 0, {
       'player-red': 2,
@@ -132,12 +132,12 @@ describe('RED-36 growing authoritative turn timer', () => {
       turnOwnerPlayerId: 'player-red',
       acceptedGameplayAction: true,
       durationMs: TURN_FAST_DURATION_MS,
-      remainingMs: 19_000,
+      remainingMs: 39_000,
       pendingResponse: {
         ownerPlayerId: 'player-blue',
         durationMs: PENDING_RESPONSE_DURATION_MS,
         startedAt: 5_000,
-        deadlineAt: 20_000,
+        deadlineAt: 35_000,
         timeoutResolution: { kind: 'cancel' },
       },
       noOpStreaks: {
@@ -147,14 +147,14 @@ describe('RED-36 growing authoritative turn timer', () => {
     })
     expect(projectTurnTimer(waitingForBlue, 12_000)).toMatchObject({
       ownerPlayerId: 'player-red',
-      remainingMs: 19_000,
+      remainingMs: 39_000,
       paused: true,
     })
     expect(projectPendingTimer(waitingForBlue, 12_000)).toMatchObject({
       ownerPlayerId: 'player-blue',
       durationMs: PENDING_RESPONSE_DURATION_MS,
-      remainingMs: 8_000,
-      deadlineAt: 20_000,
+      remainingMs: 23_000,
+      deadlineAt: 35_000,
     })
 
     // The responder completes the pending input, so authority returns to red.
@@ -171,8 +171,8 @@ describe('RED-36 growing authoritative turn timer', () => {
     expect(returnedToRed).toMatchObject({
       ownerPlayerId: 'player-red',
       durationMs: TURN_FAST_DURATION_MS,
-      remainingMs: 19_000,
-      deadlineAt: 26_000,
+      remainingMs: 39_000,
+      deadlineAt: 46_000,
       fast: true,
       acceptedGameplayAction: true,
       noOpStreaks: { 'player-red': 0, 'player-blue': 1 },
@@ -194,7 +194,7 @@ describe('RED-36 growing authoritative turn timer', () => {
       actorPlayerId: 'player-red',
       acceptedActionType: 'move',
     })
-    expect(state.turnTimer?.pendingResponse?.deadlineAt).toBe(20_000)
+    expect(state.turnTimer?.pendingResponse?.deadlineAt).toBe(35_000)
 
     state.pendingOptionSelection = finalizePendingOptionSession({
       playerId: 'player-blue',
@@ -209,10 +209,10 @@ describe('RED-36 growing authoritative turn timer', () => {
     })
 
     expect(state.turnTimer).toMatchObject({
-      remainingMs: 40_000,
+      remainingMs: 85_000,
       pendingResponse: {
         startedAt: 12_000,
-        deadlineAt: 27_000,
+        deadlineAt: 42_000,
         durationMs: PENDING_RESPONSE_DURATION_MS,
       },
     })
@@ -237,12 +237,12 @@ describe('RED-36 growing authoritative turn timer', () => {
     expect(state.turnTimer).toMatchObject({
       ownerPlayerId: 'player-red',
       inputOwnerPlayerId: 'player-red',
-      remainingMs: 39_000,
-      deadlineAt: 47_000,
+      remainingMs: 84_000,
+      deadlineAt: 92_000,
     })
     expect(state.turnTimer?.pendingResponse).toBeUndefined()
     expect(projectTurnTimer(state.turnTimer, 10_000)).toMatchObject({
-      remainingMs: 37_000,
+      remainingMs: 82_000,
       paused: false,
     })
   })
