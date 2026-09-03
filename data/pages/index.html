@@ -86,8 +86,50 @@
       border: 1px solid #334155;
       border-radius: 16px;
     }
-    .mode-nav { padding: clamp(10px, 1.4vw, 16px); }
+    .mode-nav {
+      padding: clamp(10px, 1.4vw, 16px);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .tutorial-shortcut {
+      width: 100%;
+      min-height: 88px;
+      display: grid;
+      grid-template-columns: 46px minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 14px;
+      border: 1px solid #a16207;
+      border-radius: 12px;
+      background: #24190d;
+      box-shadow: inset 3px 0 0 #f59e0b;
+      color: #fef3c7;
+      cursor: pointer;
+      text-align: left;
+      transition: background-color .16s ease-out, border-color .16s ease-out;
+    }
+    .tutorial-shortcut:hover { background: #30200c; border-color: #f59e0b; }
+    .tutorial-shortcut__mark {
+      width: 46px;
+      height: 46px;
+      display: grid;
+      place-items: center;
+      border-radius: 10px;
+      background: #78350f;
+      color: #fde68a;
+      font-size: 11px;
+      font-weight: 900;
+      letter-spacing: .04em;
+    }
+    .tutorial-shortcut__copy { min-width: 0; display: grid; gap: 3px; }
+    .tutorial-shortcut__kicker { color: #fbbf24; font-size: 10px; font-weight: 900; letter-spacing: .08em; }
+    .tutorial-shortcut__title { color: #fffbeb; font-size: 17px; font-weight: 900; }
+    .tutorial-shortcut__description { color: #d6b981; font-size: 11px; line-height: 1.35; }
+    .tutorial-shortcut__arrow { color: #fbbf24; font-size: 22px; line-height: 1; }
     .mode-tabs {
+      min-height: 0;
+      flex: 1;
       height: 100%;
       display: grid;
       grid-template-rows: repeat(4, minmax(0, 1fr));
@@ -205,6 +247,7 @@
     @media (max-width: 760px) {
       .game-shell { min-height: 100svh; grid-template-rows: auto auto auto; padding: 16px 12px calc(16px + env(safe-area-inset-bottom)); }
       .menu-workspace { grid-template-columns: 1fr; }
+      .tutorial-shortcut { min-height: 76px; }
       .mode-tabs { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: none; }
       .mode-tab { min-height: 70px; padding: 10px; }
       .mode-mark { width: 36px; height: 36px; }
@@ -223,6 +266,10 @@
       .user-pill { padding: 6px 11px; }
       .menu-workspace { grid-template-columns: minmax(210px, .72fr) minmax(0, 1.7fr); gap: 10px; }
       .mode-nav { padding: 8px; }
+      .tutorial-shortcut { min-height: 52px; grid-template-columns: 36px minmax(0, 1fr) auto; gap: 8px; padding: 6px 10px; }
+      .tutorial-shortcut__mark { width: 36px; height: 36px; border-radius: 8px; }
+      .tutorial-shortcut__kicker, .tutorial-shortcut__description { display: none; }
+      .tutorial-shortcut__title { font-size: 14px; }
       .mode-tabs { grid-template-columns: 1fr; grid-template-rows: repeat(4, minmax(0, 1fr)); gap: 4px; }
       .mode-tab { min-height: 0; padding: 6px 10px; }
       .mode-mark { width: 32px; height: 32px; border-radius: 8px; }
@@ -347,6 +394,15 @@
 
     <main class="menu-workspace">
       <nav class="mode-nav" aria-label="主要游戏模式">
+        <button class="tutorial-shortcut" id="tutorialShortcut" type="button" onclick="goToTutorial()" aria-describedby="tutorialEntryDescription">
+          <span class="tutorial-shortcut__mark" aria-hidden="true">D20</span>
+          <span class="tutorial-shortcut__copy">
+            <span class="tutorial-shortcut__kicker">第一次来？</span>
+            <span class="tutorial-shortcut__title">新手教程</span>
+            <span class="tutorial-shortcut__description" id="tutorialEntryDescription">社团跑团 · Red VS Blue · 约 8 分钟</span>
+          </span>
+          <span class="tutorial-shortcut__arrow" aria-hidden="true">›</span>
+        </button>
         <div class="mode-tabs" role="tablist" aria-label="游戏模式" onkeydown="handleMenuKey(event)">
           <button class="mode-tab is-active" data-mode="online" aria-selected="true" aria-controls="mode-online" id="tab-online" role="tab" type="button" onclick="selectMenuMode('online')">
             <span class="mode-mark" aria-hidden="true">VS</span>
@@ -417,12 +473,7 @@
               <p class="panel-description">离线练习棋子、技能和战斗操作，不影响正式对局。</p>
             </header>
             <div class="action-stack">
-              <button class="action-button action-feature" type="button" onclick="goToTutorial()">
-                <span class="action-code" aria-hidden="true">跑团</span>
-                <span class="action-copy"><span class="action-title">开始新手教程</span><span class="action-description" id="tutorialEntryDescription">社团跑团 · Red VS Blue · 约 8 分钟</span></span>
-                <span class="action-arrow" aria-hidden="true">›</span>
-              </button>
-              <button class="action-button" type="button" onclick="goToTraining()">
+              <button class="action-button action-feature" type="button" onclick="goToTraining()">
                 <span class="action-code" aria-hidden="true">自由</span>
                 <span class="action-copy"><span class="action-title">自由训练</span><span class="action-description">自行选择双方阵容与地图，不带教学步骤</span></span>
                 <span class="action-arrow" aria-hidden="true">›</span>

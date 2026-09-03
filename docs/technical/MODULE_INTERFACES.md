@@ -583,6 +583,7 @@ RED-140 是已接受的目标合同，不表示当前运行时已经实现。唯
 ## RED-95 新手教程接口
 
 - `data/tutorial/first-session.json` 是第一局的声明式内容源，固定世界观、阵容、种子、摆位、教学格与对白；第二局和 AI 不属于该 schema。
+- 大厅把新手教程作为模式导航上方的常驻快捷入口；它不要求先切换到“训练营”，训练营面板只保留自由训练入口。
 - `RvBTutorialScenario.prepareInitialState()` 从普通训练战斗中保留乌瑟尔、死神、黑百合三个现有场上实例，并将现有安度因实例放入预备区；它不创建教程专用棋子，也不改写规则层数值。
 - `RvBTutorialScenario.openPlayerDeployment()` 只在脚本开场结束后开启一次真实 `progressive-reserve-v1` 部署输入。部署命令继续由规则层验证候选、revision、落点和免费首移状态。
 - `RvBTutorialController` 是无 DOM 的顺序控制器。只有当前步骤匹配的权威动作、指定动作日志或指定地形点击才能推进；非法动作在进入训练权威转换前被拒绝。
