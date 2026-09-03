@@ -16,6 +16,9 @@ import {
   createPublicBattleTransitionUpdate,
   createPublicRoomSnapshot,
   dispatchRoomBattleAction,
+  clearRoomBattleTimeout,
+  scheduleRoomBattleTimeout,
+  type DispatchRoomBattleActionResult,
   type PublicBattleSnapshot,
 } from '@/lib/game/room-battle-actions'
 import { startBattleFromLockedRosters } from '@/lib/game/room-battle-start'
@@ -40,6 +43,7 @@ import {
   BATTLE_COMMAND_MESSAGE,
   BATTLE_DURABLE_MESSAGE,
   BATTLE_RECEIPT_MESSAGE,
+  BATTLE_RECEIPT_REQUEST_MESSAGE,
   BATTLE_RESYNC_MESSAGE,
   BATTLE_SNAPSHOT_MESSAGE,
   BATTLE_TRANSITION_MESSAGE,
@@ -92,6 +96,7 @@ export function createBattleRoomClass(dependencies: BattleRoomDependencies) {
     private productStore?: ProductBattleStore
     private productMode = false
     private readonly playerBySession = new Map<string, string>()
+    private readonly sessionByPlayer = new Map<string, string>()
     private readonly rpcCache = new Map<string, RpcCacheRecord>()
     private unsubscribeDurable?: () => void
 
@@ -101,6 +106,7 @@ export function createBattleRoomClass(dependencies: BattleRoomDependencies) {
       this.onMessage(BATTLE_COMMAND_MESSAGE, (client, message) => this.handleBattleCommand(client, message))
       this.onMessage(BATTLE_RESYNC_MESSAGE, client => this.sendBattleSnapshot(client))
       this.onMessage(PRODUCT_ROOM_RPC_MESSAGE, (client, message) => this.handleProductRpc(client, message))
+      this.onMessage(BATTLE_RECEIPT_REQUEST_MESSAGE, (client, message) => this.handleBattleReceiptRequest(client, message))
 
       if (options?.restore === true) {
         this.productMode = true
@@ -122,6 +128,7 @@ export function createBattleRoomClass(dependencies: BattleRoomDependencies) {
         this.subscribeDurability()
         await this.publishProductRoom(room)
         await this.setPrivate(room.visibility === 'private')
+        await this.scheduleAuthorityTimeout()
         return
       }
 
@@ -179,10 +186,15 @@ export function createBattleRoomClass(dependencies: BattleRoomDependencies) {
       const room = await this.requireGameRoom()
       this.applyRoomProjection(room)
       this.subscribeDurability()
+      await this.scheduleAuthorityTimeout()
     }
 
     async onJoin(client: Client, options: BattleRoomJoinOptions): Promise<void> {
       const playerId = normalizeRequiredId(options?.playerId, 'playerId')
+      const activeSessionId = this.sessionByPlayer.get(playerId)
+      if (activeSessionId && activeSessionId !== client.sessionId) {
+        throw Object.assign(new Error('Player is already connected'), { code: 'BATTLE_PLAYER_ALREADY_CONNECTED' })
+      }
       if (this.productMode) {
         await this.joinProductPlayer(client, playerId, options)
         return
@@ -191,17 +203,34 @@ export function createBattleRoomClass(dependencies: BattleRoomDependencies) {
       if (!room.players.some(player => player.id.toLowerCase() === playerId)) {
         throw Object.assign(new Error('Player is not seated in this battle'), { code: 'BATTLE_PLAYER_FORBIDDEN' })
       }
-      if ([...this.playerBySession.values()].includes(playerId)) {
-        throw Object.assign(new Error('Player is already connected'), { code: 'BATTLE_PLAYER_ALREADY_CONNECTED' })
+      this.bindSession(client, playerId)
+    }
+
+    async onDrop(client: Client): Promise<void> {
+      await this.allowReconnection(client, 30)
+    }
+
+    async onReconnect(client: Client): Promise<void> {
+      const playerId = this.playerBySession.get(client.sessionId)
+      if (!playerId || this.sessionByPlayer.get(playerId) !== client.sessionId) {
+        throw Object.assign(new Error('Reconnected session is not seated'), { code: 'BATTLE_SESSION_NOT_SEATED' })
       }
-      this.playerBySession.set(client.sessionId, playerId)
+      client.send('subscribed', { type: 'subscribed', role: await this.roleFor(playerId) })
+      if (this.productMode) await this.broadcastProductRoom()
+      await this.sendBattleSnapshot(client)
+      await this.scheduleAuthorityTimeout()
     }
 
     onLeave(client: Client): void {
+      const playerId = this.playerBySession.get(client.sessionId)
       this.playerBySession.delete(client.sessionId)
+      if (playerId && this.sessionByPlayer.get(playerId) === client.sessionId) {
+        this.sessionByPlayer.delete(playerId)
+      }
     }
 
     async onDispose(): Promise<void> {
+      clearRoomBattleTimeout(this.roomId)
       this.unsubscribeDurable?.()
       if (this.authorityStore) await this.authorityStore.drainBattleAuthorityPersistence(this.roomId)
     }
@@ -243,21 +272,23 @@ export function createBattleRoomClass(dependencies: BattleRoomDependencies) {
         player.accountId = normalizeOptionalId(options.accountId) ?? player.accountId
       }
       await store.setRoom(this.roomId, room)
-      this.playerBySession.set(client.sessionId, playerId)
+      this.bindSession(client, playerId)
       client.send('subscribed', { type: 'subscribed', role: room.hostId === playerId ? 'host' : 'guest' })
       await this.broadcastProductRoom()
       if (room.status === 'in-progress' || room.status === 'finished') await this.sendBattleSnapshot(client)
     }
 
-    private async handleProductRpc(client: Client, message: unknown): Promise<void> {
+    private async handleProductRpc(client: Client, message: unknown): Promise<unknown> {
       if (!this.productMode) {
-        client.send(PRODUCT_ROOM_RPC_RESULT_MESSAGE, rpcFailure('', 'PRODUCT_ROOM_REQUIRED', 'Product room RPC is unavailable'))
-        return
+        throw Object.assign(new Error('Product room RPC is unavailable'), { code: 'PRODUCT_ROOM_REQUIRED' })
       }
       const payload = message && typeof message === 'object' ? message as Record<string, unknown> : {}
-      const requestId = normalizeRequiredId(payload.requestId, 'requestId')
       const method = String(payload.method ?? '')
       const data = payload.data && typeof payload.data === 'object' ? payload.data as Record<string, unknown> : {}
+      // Native Colyseus request/response does not need an application requestId.
+      // Keep the old branch temporarily for already-built setup pages during rollout.
+      if (!payload.requestId) return this.dispatchProductRpc(client, method, data)
+      const requestId = normalizeRequiredId(payload.requestId, 'requestId')
       const cacheKey = `${client.sessionId}:${requestId}`
       const fingerprint = JSON.stringify([method, data])
       const cached = this.rpcCache.get(cacheKey)
@@ -269,7 +300,7 @@ export function createBattleRoomClass(dependencies: BattleRoomDependencies) {
         } else {
           cached.waiters += 1
         }
-        return
+        return undefined
       }
       if (this.rpcCache.size >= 512) this.rpcCache.delete(this.rpcCache.keys().next().value!)
       const record: RpcCacheRecord = { fingerprint, waiters: 0 }
@@ -297,6 +328,7 @@ export function createBattleRoomClass(dependencies: BattleRoomDependencies) {
           context: rosterError?.context ?? details.context,
         })
       }
+      return undefined
     }
 
     private async dispatchProductRpc(
@@ -416,6 +448,7 @@ export function createBattleRoomClass(dependencies: BattleRoomDependencies) {
       this.applyRoomProjection(result.room)
       await this.broadcastProductRoom()
       await this.broadcastBattleSnapshot(createPublicBattleSnapshot(result.room))
+      await this.scheduleAuthorityTimeout()
     }
 
     private async handleBattleCommand(client: Client, message: unknown): Promise<void> {
@@ -457,6 +490,7 @@ export function createBattleRoomClass(dependencies: BattleRoomDependencies) {
           }
         }
         if (this.productMode) await this.broadcastProductRoom()
+        await this.scheduleAuthorityTimeout()
       } catch (error) {
         const failure = error instanceof Error ? error : new Error(String(error))
         client.send(BATTLE_RECEIPT_MESSAGE, createColyseusRejectedReceipt({
@@ -466,6 +500,26 @@ export function createBattleRoomClass(dependencies: BattleRoomDependencies) {
           authorityVersion: this.state.authorityVersion,
           durableAuthorityVersion: this.state.durableAuthorityVersion,
         }))
+      }
+    }
+
+    private async handleBattleReceiptRequest(client: Client, message: unknown): Promise<unknown> {
+      const playerId = this.requireSessionPlayer(client)
+      if (!this.authorityStore) {
+        throw Object.assign(new Error('Battle has not started'), { code: 'BATTLE_NOT_STARTED' })
+      }
+      const payload = message && typeof message === 'object' ? message as Record<string, unknown> : {}
+      const clientActionId = normalizeRequiredId(payload.clientActionId, 'clientActionId')
+      const receipt = await this.authorityStore.getBattleAuthorityReceipt(this.roomId, clientActionId)
+      const room = await this.requireGameRoom()
+      const snapshot = createPublicBattleSnapshot(room, playerId)
+      return {
+        clientActionId,
+        outcome: receipt
+          ? (receipt.status === 'rejected' || receipt.status === 'resyncRequired' ? 'rejected' : 'applied')
+          : 'unknown',
+        receipt,
+        snapshot: { type: 'stateUpdate', ...snapshot },
       }
     }
 
@@ -572,6 +626,44 @@ export function createBattleRoomClass(dependencies: BattleRoomDependencies) {
         this.state.durableAuthorityVersion = version
         this.broadcast(BATTLE_DURABLE_MESSAGE, { battleId: this.roomId, durableAuthorityVersion: version })
       })
+    }
+
+    private bindSession(client: Client, playerId: string): void {
+      this.playerBySession.set(client.sessionId, playerId)
+      this.sessionByPlayer.set(playerId, client.sessionId)
+    }
+
+    private async roleFor(playerId: string): Promise<'host' | 'guest'> {
+      if (!this.productMode) return 'guest'
+      const room = await this.requireProductRoom()
+      return room.hostId?.toLowerCase() === playerId ? 'host' : 'guest'
+    }
+
+    private async scheduleAuthorityTimeout(): Promise<void> {
+      if (!this.authorityStore) return
+      await scheduleRoomBattleTimeout(this.authorityStore, this.roomId, {
+        setTimeout: (handler, delayMs) => this.clock.setTimeout(() => { void handler() }, delayMs),
+        onTransitionCommitted: result => this.publishAuthorityResult(result),
+        onCommitted: async snapshot => {
+          this.applySnapshotProjection(snapshot)
+          await this.broadcastBattleSnapshot(snapshot)
+          if (this.productMode) await this.broadcastProductRoom()
+        },
+      })
+    }
+
+    private async publishAuthorityResult(result: DispatchRoomBattleActionResult): Promise<void> {
+      this.applySnapshotProjection(result.snapshot, result.transition?.transitionHash)
+      if (result.transition) {
+        for (const recipient of this.clients) {
+          const recipientPlayerId = this.playerBySession.get(recipient.sessionId)
+          const update = createPublicBattleTransitionUpdate(result, this.roomId, recipientPlayerId)
+          if (update) recipient.send(BATTLE_TRANSITION_MESSAGE, update)
+        }
+      } else {
+        await this.broadcastBattleSnapshot(result.snapshot)
+      }
+      if (this.productMode) await this.broadcastProductRoom()
     }
   }
 }

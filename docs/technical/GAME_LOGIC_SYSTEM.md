@@ -1,6 +1,6 @@
 # 游戏逻辑系统接口与执行流程
 
-更新：2026-09-01（RED-158 Phase F）
+更新：2026-09-03（RED-158 Phase F 主线同步）
 
 ## 1. 核心结论
 
@@ -23,8 +23,8 @@ UI action draft
   → dispatchRoomBattleAction
   → Battle Runner / Reducer / Trigger Runtime
   → receipt + transition + trace/hash evidence
-  → PostgreSQL authority journal
-  → Colyseus public state and receipt
+  ├→ Colyseus public state and APPLIED receipt
+  └→ PostgreSQL authority journal → DURABLE watermark
 ```
 
 准入先验证 room/player、座位、Profile/content hash、协议、build 和 expected authority version。规则失败、
@@ -68,12 +68,19 @@ Demo 开局为双方各一个确定性随机先锋，其余普通核心进入预
 
 ## 7. 计时器和机器人
 
-权威时钟由服务端注入。计时同步、烧绳、超时和机器人命令与玩家动作进入同一房间 FIFO。玩家动作与
+权威时钟由服务端注入。正常回合时长按完整轮次为 90/120/150/180/210 秒，快速回合为 40 秒，
+回合外 pending 响应窗口为 30 秒，最后 15 秒进入烧绳。计时同步、烧绳、超时和机器人命令与玩家动作进入同一房间 FIFO。玩家动作与
 超时竞争时只有一个版本提交；失败的 speculative 结果不能广播。
 
 客户端只显示公开 deadline/serverNow，不拥有超时授权，也不能通过刷新延长时间。
 
-## 8. 终局与战报
+## 8. 表现事件边界
+
+`battle-presentation-events.ts` 在成功权威命令后生成按查看者投影的动作事件；动作历史和小剧场只消费
+这些投影。历史高亮、播放速度、弹道/范围演出和缺失资源兜底不进入 `BattleState`、hash、journal 或
+规则判断，也不发送新的玩家意图。
+
+## 9. 终局与战报
 
 `finalizeBattleTerminal()` 生成唯一 `terminalResult`。终局转换必须进入 PostgreSQL，并在 journal drain 后写
 Terminal Barrier。`readBattleReport()` 随后从初始 Checkpoint 重放全部转换，验证：
@@ -85,7 +92,7 @@ Terminal Barrier。`readBattleReport()` 随后从初始 Checkpoint 重放全部�
 
 任何一项失败都不返回报告。
 
-## 9. 失败语义
+## 10. 失败语义
 
 | 层 | 失败处理 | 必要证据 |
 | --- | --- | --- |
@@ -97,7 +104,7 @@ Terminal Barrier。`readBattleReport()` 随后从初始 Checkpoint 重放全部�
 | 战报 | 失败关闭 | 第一处断链/篡改/缺失 barrier |
 | 浏览器 | 停止提交并显示稳定错误 | authority origin、roomId、最后版本 |
 
-## 10. 源码索引
+## 11. 源码索引
 
 | 主题 | 入口 |
 | --- | --- |
@@ -113,7 +120,7 @@ Terminal Barrier。`readBattleReport()` 随后从初始 Checkpoint 重放全部�
 | 页面适配 | `data/pages/js/colyseus-client.js` |
 | 战斗页面 | `data/pages/battle.html` |
 
-## 11. 验证
+## 12. 验证
 
 最小回归依次运行 Colyseus client/room 测试、规则相关测试、PostgreSQL 集成、类型检查、Windows 打包与
 双客户端人工验收。测试命令和完整步骤见 [BUILD_AND_RUN.md](./BUILD_AND_RUN.md)。

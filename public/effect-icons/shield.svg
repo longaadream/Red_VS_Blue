@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="护盾">
+  <circle cx="32" cy="32" r="29" fill="#0b1d35" stroke="#60a5fa" stroke-width="4"/>
+  <path d="M32 11 49 18v13c0 12-7 20-17 24-10-4-17-12-17-24V18Z" fill="#1d4ed8" stroke="#dbeafe" stroke-width="4" stroke-linejoin="round"/>
+  <path d="M32 17v31c7-4 11-10 11-18v-8Z" fill="#60a5fa"/>
+</svg>

@@ -138,4 +138,34 @@ describe('Tracer Recall option resolution', () => {
     expect((configured.extensions as any).recallData).toEqual([])
   })
 
+  it('cancels Recall and consumes the snapshot when the exact saved cell is occupied', () => {
+    const trigger = loadSkill('recall-move-trigger')
+    const tracer = makePiece({
+      instanceId: 'blocked-tracer', templateId: 'tracer', ownerPlayerId: 'player-red',
+      x: 4, y: 3, currentHp: 3, maxHp: 15,
+    }) as any
+    const blocker = makePiece({ instanceId: 'recall-blocker', ownerPlayerId: 'player-blue', x: 2, y: 1 }) as any
+    const actor = makePiece({ instanceId: 'enemy-actor', ownerPlayerId: 'player-blue', x: 5, y: 4 }) as any
+    const state = makeState({ pieces: [tracer, blocker, actor], width: 7, height: 6 }) as any
+    state.extensions.recallData = [{
+      pieceId: tracer.instanceId,
+      ownerPlayerId: tracer.ownerPlayerId,
+      targetCount: 1,
+      actionCount: 0,
+      snapshot: { x: 2, y: 1, hp: 11 },
+    }]
+
+    executeSkillFunction(trigger, {
+      piece: tracer,
+      sourcePiece: actor,
+      battle: state,
+      target: null,
+      targetPosition: null,
+      skill: { id: trigger.id, name: trigger.name, type: trigger.type, powerMultiplier: 1 },
+    } as any, state)
+
+    expect(tracer).toMatchObject({ x: 4, y: 3, currentHp: 3 })
+    expect(state.extensions.recallData).toEqual([])
+  })
+
 })

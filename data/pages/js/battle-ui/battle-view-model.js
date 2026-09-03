@@ -59,16 +59,29 @@
     const seen = new Set()
     const tags = visibleTags !== undefined ? visibleTags : piece.statusTags
     ;[].concat(tags || [], piece.buffs || [], piece.debuffs || []).forEach(function (status) {
-      if (!status || status.visible === false) return
+      if (!status) return
       const item = typeof status === 'string' ? { id: status, name: status } : status
+      const iconRegistry = root.BattleEffectIcons
+      const meta = iconRegistry && typeof iconRegistry.resolveStatus === 'function'
+        ? iconRegistry.resolveStatus(item)
+        : null
+      if (item.visible === false || (meta && meta.visibility === 'hidden')) return
       const id = String(item.id || item.type || item.name || statusLabel(item))
+      const type = String(item.type || item.id || item.name || id)
       const key = id + ':' + String(item.sourceId || '')
       if (seen.has(key)) return
       seen.add(key)
       statuses.push({
         id: id,
-        label: statusLabel(item),
+        type: type,
+        label: String(item.name || item.label || (meta && meta.label) || statusLabel(item)),
         description: String(item.description || item.message || ''),
+        iconId: meta ? meta.iconId : 'fallback',
+        iconPath: meta ? meta.assetPath : 'images/effect-icons/fallback.svg',
+        category: meta ? meta.category : 'unknown',
+        tone: meta ? meta.tone : 'neutral',
+        color: meta ? meta.color : '#94a3b8',
+        visibility: meta ? meta.visibility : 'detail',
         stacks: firstNumber([item.stacks], 0),
         duration: firstNumber([
           item.remainingDuration,
@@ -148,6 +161,7 @@
         charge: numberOr(player.chargePoints, 0),
         maxCharge: numberOr(player.maxChargePoints, numberOr(player.maxCharge, 0)),
       },
+      handCount: Array.isArray(player.hand) ? player.hand.length : numberOr(player.handCount, 0),
       statusSummary: normalizeStatuses(player),
     }
   }
@@ -160,6 +174,114 @@
       x: numberOr(effect.x, 0),
       y: numberOr(effect.y, 0),
     }
+  }
+
+  function normalizeSkillSummaries(value) {
+    const summaries = {}
+    Object.keys(value || {}).forEach(function (key) {
+      const skill = value[key]
+      if (!skill || typeof skill !== 'object') return
+      const id = String(skill.id || key)
+      const summary = {
+        id: id,
+        name: String(skill.name || id),
+      }
+      summaries[String(key)] = summary
+      summaries[id] = summary
+    })
+    return summaries
+  }
+
+  const PRESENTATION_CUES = new Set(['directional', 'projectile', 'area', 'displacement', 'summon'])
+  const PRESENTATION_END_REASONS = new Set(['hit', 'blocked', 'boundary', 'range-expired', 'resolved'])
+  const PRESENTATION_COLLISIONS = new Set(['piece', 'terrain', 'boundary'])
+
+  function normalizePresentationPoint(value) {
+    if (!value || !Number.isFinite(Number(value.x)) || !Number.isFinite(Number(value.y))) return null
+    return { x: Number(value.x), y: Number(value.y) }
+  }
+
+  function normalizePresentationPoints(value) {
+    return (Array.isArray(value) ? value : []).flatMap(function (point) {
+      const normalized = normalizePresentationPoint(point)
+      return normalized ? [normalized] : []
+    })
+  }
+
+  function normalizePresentation(value) {
+    if (!value || typeof value !== 'object' || !PRESENTATION_CUES.has(String(value.cue || ''))) return null
+    const selectedCell = normalizePresentationPoint(value.selectedCell)
+    const endPoint = normalizePresentationPoint(value.endPoint)
+    const endReason = PRESENTATION_END_REASONS.has(String(value.endReason || ''))
+      ? String(value.endReason)
+      : null
+    const collisions = (Array.isArray(value.collisions) ? value.collisions : []).flatMap(function (collision) {
+      const point = normalizePresentationPoint(collision)
+      const kind = String(collision && collision.kind || '')
+      if (!point || !PRESENTATION_COLLISIONS.has(kind)) return []
+      return [{
+        kind: kind,
+        x: point.x,
+        y: point.y,
+        pieceId: collision.pieceId ? String(collision.pieceId) : null,
+        terrainType: collision.terrainType ? String(collision.terrainType) : null,
+        blocking: collision.blocking === true,
+      }]
+    })
+    return {
+      cue: String(value.cue),
+      ...(selectedCell ? { selectedCell: selectedCell } : {}),
+      pathCells: normalizePresentationPoints(value.pathCells),
+      ...(endPoint ? { endPoint: endPoint } : {}),
+      ...(endReason ? { endReason: endReason } : {}),
+      collisions: collisions.map(function (collision) {
+        const normalized = {
+          kind: collision.kind,
+          x: collision.x,
+          y: collision.y,
+          blocking: collision.blocking,
+        }
+        if (collision.pieceId) normalized.pieceId = collision.pieceId
+        if (collision.terrainType) normalized.terrainType = collision.terrainType
+        return normalized
+      }),
+      areaCells: normalizePresentationPoints(value.areaCells),
+    }
+  }
+
+  function normalizePresentationEvents(value) {
+    if (!Array.isArray(value)) return []
+    return value.flatMap(function (event) {
+      if (!event || typeof event !== 'object' || !event.eventId || !event.rootEventId || !event.kind) return []
+      return [{
+        eventId: String(event.eventId),
+        rootEventId: String(event.rootEventId),
+        parentEventId: event.parentEventId ? String(event.parentEventId) : null,
+        actionId: String(event.actionId || ''),
+        sequence: numberOr(event.sequence, 0),
+        kind: String(event.kind),
+        iconId: String(event.iconId || 'fallback'),
+        label: event.label ? String(event.label) : null,
+        actorPlayerId: event.actorPlayerId ? String(event.actorPlayerId) : null,
+        sourcePieceId: event.sourcePieceId ? String(event.sourcePieceId) : null,
+        skillId: event.skillId ? String(event.skillId) : null,
+        cardId: event.cardId ? String(event.cardId) : null,
+        ruleId: event.ruleId ? String(event.ruleId) : null,
+        targetPieceIds: Array.isArray(event.targetPieceIds) ? event.targetPieceIds.map(String) : [],
+        targetPlayerIds: Array.isArray(event.targetPlayerIds) ? event.targetPlayerIds.map(String) : [],
+        targetCell: event.targetCell && Number.isFinite(Number(event.targetCell.x)) && Number.isFinite(Number(event.targetCell.y))
+          ? { x: Number(event.targetCell.x), y: Number(event.targetCell.y) }
+          : null,
+        statusId: event.statusId ? String(event.statusId) : null,
+        statusType: event.statusType ? String(event.statusType) : null,
+        result: event.result && typeof event.result === 'object' ? Object.assign({}, event.result) : null,
+        presentation: normalizePresentation(event.presentation),
+        complement: event.complement && typeof event.complement === 'object' ? Object.assign({}, event.complement) : null,
+        visibility: event.visibility ? String(event.visibility) : 'public',
+        priority: numberOr(event.priority, 0),
+        skippable: event.skippable !== false,
+      }]
+    }).sort(function (left, right) { return left.sequence - right.sequence })
   }
 
   function create(options) {
@@ -200,6 +322,8 @@
       },
       pieces: pieces,
       effects: ((snapshot.extensions && snapshot.extensions.tileEffects) || []).map(normalizeEffect),
+      skillSummariesById: normalizeSkillSummaries(input.skillsById || snapshot.skillsById),
+      presentationEvents: normalizePresentationEvents(input.presentationEvents),
       players: players,
       viewer: viewer,
       turn: {
@@ -229,5 +353,10 @@
     }
   }
 
-  root.BattleViewModel = { create: create, normalizeCells: normalizeCells }
+  root.BattleViewModel = {
+    create: create,
+    normalizeCells: normalizeCells,
+    normalizeSkillSummaries: normalizeSkillSummaries,
+    normalizePresentationEvents: normalizePresentationEvents,
+  }
 })(typeof window !== 'undefined' ? window : globalThis)

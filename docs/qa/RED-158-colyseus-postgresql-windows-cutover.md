@@ -4,7 +4,8 @@
 - 风险：High
 - base_branch：`main`
 - base_sha：`efe712d08278592c548fce774a738b9a8207b0e5`
-- 状态：实现完成；等待独立审查和两台 Windows 客户端人工验收
+- latest_main_sync_sha：`de8b697150ade3de90b3c56a952a2d29306bdc44`
+- 状态：实现与最新 main 同步完成；等待独立审查、空闲机器性能复测和两台 Windows 客户端人工验收
 - 不在范围：Android、`relay-server/`、玩法数值、经济规则、随机算法
 
 ## 目标与最终决定
@@ -63,6 +64,40 @@ localStorage 战绩和 authority feature flag。任何失败都显式失败，�
 
 全仓 `npm.cmd run lint` 仍被仓库既有 suppressions/测试 lint 债务阻塞；任务关键路径单独 ESLint 已通过，
 且构建生成目录已加入 lint ignore。没有把既有 `any` 债务批量改写或加入新 suppressions 来掩盖失败。
+
+## 2026-09-03 最新 main 同步验证
+
+刷新 `origin/main` 后，本分支从旧基线落后 66 个提交。为避免改写已经发布到 PR 的历史，将
+`de8b697150ade3de90b3c56a952a2d29306bdc44` 合并进 RED-158 分支，并按最终切换合同解决冲突：保留
+Colyseus 原生重连、PostgreSQL authority、建房 `creationKey` 单飞和最新 main 的战斗表现/UI；没有恢复
+`instrumentation.ts`、raw WebSocket、Prisma/SQLite 或旧玩家 API。同步后的增量修复还删除了选将页残留的
+`RvBWs.waitForConnection` 分支，并让页面合同测试兼容 Windows CRLF。
+
+| 验证 | 结果 |
+| --- | --- |
+| `npm.cmd run check:windows-cutover` | 通过；删除路径、依赖、旧开关和玩家 raw WebSocket 门禁均通过 |
+| `npm.cmd run typecheck` | 通过 |
+| `npm.cmd run check:encoding` / `git diff --check` | 通过 |
+| RED-158 关键路径 ESLint（空 suppressions） | 20 个客户端、Colyseus、PostgreSQL、门禁和回归测试文件通过 |
+| RED-158/RED-170 定向回归 | 11 文件、115 测试全部通过；含大厅、建房去重、rejoin、100 次断线重连、receipt、页面与 pool 生命周期 |
+| `npm.cmd run test:postgres -- --maxWorkers=1 --reporter=dot` | 内置 PostgreSQL 1 项通过；外部 URL 1 项按环境跳过 |
+| `npm.cmd run build:colyseus` | 通过 |
+| `npm.cmd run build:electron:client` | 通过；Next、Colyseus bundle、PostgreSQL 16.15-2、Electron package 与资源验证完成 |
+| `node tests/electron/windows-smoke.mjs client` | 通过；真实启动候选并验证单飞建房、双 client 入房、旧 API 404、资源一致和零残留进程 |
+| `npm.cmd ls prisma @prisma/client @prisma/engines --all` | 空；无 Prisma 包 |
+
+全量测试本次执行结果为 174 文件中 167 通过、1 跳过、6 文件失败（1884 通过、1 跳过、7 失败）。逐项收敛后：
+
+- RED-158 合并产生的页面顺序断言已修复，定向 3/3 通过；
+- AI environment 的 5 秒超时在隔离重跑时 1/1 通过；
+- 4 项内容/表现基线失败的测试与被测文件相对 `origin/main` 均为零 diff，属于当前 main 的既有基线漂移，
+  本任务不修改这些范围；
+- Colyseus 20+ action 延迟门槛在主机 CPU 100% 时重复失败：最近一次 server P95 115.123ms、P99
+  164.899ms，client P95 158.267ms、P99 214.674ms。没有放宽门槛；候选请求 QA 前必须在空闲机器上重跑
+  `npm.cmd run test:colyseus -- --maxWorkers=1 --reporter=dot` 并满足 P95/P99 合同。
+
+因此，功能切换、持久化、打包和进程 smoke 证据已更新到最新 main；性能候选门禁仍明确标记为待复测，
+不能用 2026-09-01 的旧基线结果替代。
 
 ## 打包候选双客户端证据
 

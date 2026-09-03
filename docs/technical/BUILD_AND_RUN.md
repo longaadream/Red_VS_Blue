@@ -1,6 +1,6 @@
 # Windows 构建与运行
 
-更新：2026-09-01（RED-158 Phase F）
+更新：2026-09-03（RED-158 Phase F 主线同步）
 
 ## 环境
 
@@ -68,8 +68,12 @@ npm.cmd run dev:electron:client
 4. 编译 Electron main process；
 5. 启动 Client。
 
-普通加入不会启动本机 authority。玩家选择本机开服时，Client 才在应用数据目录初始化 PostgreSQL，
-随后启动 Colyseus，并把可连接 origin 提供给页面。
+Client 启动时在应用数据目录初始化或复用 PostgreSQL，随后准备 Colyseus 并直接打开主菜单。本机
+Host & Play、训练与 PVE 复用该 authority；选择远端服务器只改变玩家对局连接目标，不让本机 authority
+接管远端房间。
+
+本机 authority 意外退出时，每轮最多自动恢复三次；预算耗尽后进入 `manual-required`，必须由玩家显式
+重试。普通断线由 Colyseus native reconnection 恢复同一 session，不创建替代房间或重复座位。
 
 ## Windows 打包
 

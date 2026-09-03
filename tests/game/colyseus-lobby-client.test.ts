@@ -32,6 +32,11 @@ class FakeLobbyRoom {
     }))
   }
 
+  async request(type: string) {
+    if (type !== 'roomRpc') throw new Error(`unsupported request: ${type}`)
+    return { id: this.roomId, status: 'waiting', players: [] }
+  }
+
   async leave() {}
 }
 

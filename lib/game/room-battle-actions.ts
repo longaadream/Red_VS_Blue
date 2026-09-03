@@ -11,6 +11,11 @@ import {
   BATTLE_AUTHORITY_PROTOCOL_VERSION,
   createBattlePublicPatch,
 } from './battle-public-patch'
+import {
+  projectBattlePresentationEvents,
+  projectBattlePresentationEventsForViewer,
+  type BattlePresentationEvent,
+} from './battle-presentation-events'
 import { hashBattleState, runBattleAction, type BattleActionResult } from './battle-runner'
 import {
   systemDeploymentRuleClock,
@@ -123,6 +128,8 @@ export interface PublicBattleSnapshot {
   persistenceStatus?: 'durable' | 'pending' | 'degraded'
   turnTimer?: TurnTimerProjection
   pendingTimer?: PendingTimerProjection
+  /** Ephemeral player-facing events; never part of state patches or public hashes. */
+  presentationEvents?: BattlePresentationEvent[]
 }
 
 export interface DispatchRoomBattleActionResult {
@@ -141,6 +148,7 @@ export interface DispatchRoomBattleActionResult {
   previousAuthorityState?: BattleState
   nextAuthorityState?: BattleState
   timings?: BattleAuthorityTimings
+  presentationEvents?: BattlePresentationEvent[]
 }
 
 export interface BattleAuthorityTimings {
@@ -170,6 +178,7 @@ export interface PublicBattleTransitionUpdate {
   turnTimer?: TurnTimerProjection
   pendingTimer?: PendingTimerProjection
   timings?: BattleAuthorityTimings
+  presentationEvents: BattlePresentationEvent[]
 }
 
 export interface PreResumeDeliveryContext {
@@ -196,6 +205,8 @@ export interface DispatchRoomBattleActionOptions {
 
 export interface ScheduleBattleTimeoutOptions {
   clock?: DeploymentRuleClock
+  /** Room-owned scheduler (for example Colyseus `this.clock`). */
+  setTimeout?: (handler: () => void | Promise<void>, delayMs: number) => AuthorityTimer
   onCommitted?: (snapshot: PublicBattleSnapshot) => void | Promise<void>
   onTransitionCommitted?: (result: DispatchRoomBattleActionResult) => void | Promise<void>
   onBotTurnReady?: (
@@ -309,7 +320,7 @@ function assertBattleAuthorityPersistenceAvailable(
   }
 }
 
-type AuthorityTimer = ReturnType<typeof setTimeout>
+export type AuthorityTimer = ReturnType<typeof setTimeout> | { clear(): void }
 interface RoomAuthorityClockState {
   excludedMs: number
   pausedAtWall?: number
@@ -409,6 +420,10 @@ export function createPublicBattleTransitionUpdate(
       ? undefined
       : projectPendingTimer(result.nextAuthorityState.turnTimer, serverNow),
     timings: result.timings,
+    presentationEvents: projectBattlePresentationEventsForViewer(
+      result.presentationEvents ?? [],
+      viewerPlayerId,
+    ),
   }
 }
 
@@ -693,6 +708,14 @@ export async function dispatchRoomBattleAction(
       }
 
       let actionResult = submittedActionResult
+      const presentationEvents = submittedActionResult.trace
+        ? projectBattlePresentationEvents({
+            actionId: submittedActionResult.trace.actionId,
+            command: actionToApply,
+            beforeState: state,
+            afterState: submittedActionResult.state,
+          })
+        : []
       let syncAction: BattleAction | undefined
       if (timerEnabled && shouldSyncTurnTimer(state, submittedActionResult.state, actionToApply)) {
         const resumedAt = getRoomAuthorityNow(normalizedRoomId, clock)
@@ -975,6 +998,7 @@ export async function dispatchRoomBattleAction(
           persistenceMs: roundTiming(persistenceMs),
           totalMs: roundTiming(monotonicNow() - performanceStartedAt),
         },
+        presentationEvents,
       }
       } finally {
         if (!retainRuntimeTransaction) {
@@ -1012,7 +1036,8 @@ export async function scheduleRoomBattleTimeout(
   const nextWake = nextAuthorityWake(state)
   if (!nextWake) return
   const delay = Math.max(0, nextWake.at - authorityClock.now())
-  const timer = setTimeout(async () => {
+  const scheduleTimeout = options.setTimeout ?? ((handler, timeoutMs) => setTimeout(handler, timeoutMs))
+  const timer = scheduleTimeout(async () => {
     const firedAt = authorityClock.now()
     if (firedAt < nextWake.at) {
       await scheduleRoomBattleTimeout(store, normalizedRoomId, options)
@@ -1040,7 +1065,6 @@ export async function scheduleRoomBattleTimeout(
           await options.onBotTurnReady?.(result.snapshot, result.actionResult.state)
         }
       }
-      await scheduleRoomBattleTimeout(store, normalizedRoomId, options)
     } catch (error) {
       const code = (error as { code?: unknown })?.code
       if (code !== 'ROOM_NOT_FOUND' && code !== 'BATTLE_NOT_STARTED') {
@@ -1059,9 +1083,19 @@ export async function scheduleRoomBattleTimeout(
           error: error instanceof Error ? error.message : String(error),
         })
       }
+    } finally {
+      try {
+        await scheduleRoomBattleTimeout(store, normalizedRoomId, options)
+      } catch (error) {
+        console.warn('[battle-timeout] failed to re-arm authority timer', {
+          roomId: normalizedRoomId,
+          code: (error as { code?: unknown })?.code,
+          error: error instanceof Error ? error.message : String(error),
+        })
+      }
     }
   }, delay)
-  ;(timer as AuthorityTimer & { unref?: () => void }).unref?.()
+  ;(timer as ReturnType<typeof setTimeout> & { unref?: () => void }).unref?.()
   authorityTimers.set(normalizedRoomId, timer)
 }
 
@@ -1072,7 +1106,8 @@ export function clearRoomBattleTimeout(roomId: string): void {
   const normalizedRoomId = roomId.trim().toLowerCase()
   const timer = authorityTimers.get(normalizedRoomId)
   if (!timer) return
-  clearTimeout(timer)
+  if (typeof (timer as { clear?: unknown }).clear === 'function') (timer as { clear(): void }).clear()
+  else clearTimeout(timer as ReturnType<typeof setTimeout>)
   authorityTimers.delete(normalizedRoomId)
 }
 

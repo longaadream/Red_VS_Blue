@@ -1,6 +1,6 @@
 # 模块接口地图
 
-更新：2026-09-01（RED-158 Phase F）
+更新：2026-09-03（RED-158 Phase F 主线同步）
 
 本文只描述 Windows 当前接口。玩家联机权威由 Colyseus 承载，耐久数据由 PostgreSQL 承载；
 Android 与独立 Relay 不在本次 Windows 迁移合同内。
@@ -9,7 +9,7 @@ Android 与独立 Relay 不在本次 Windows 迁移合同内。
 
 | 边界 | 入口 | 合同 |
 | --- | --- | --- |
-| Windows 宿主 | `electron-client/main.ts` | Profile HTTP 服务随应用启动；创建本机房间时按需启动嵌入式 PostgreSQL 与 Colyseus |
+| Windows 宿主 | `electron-client/main.ts` | 启动时准备 Profile HTTP、嵌入式 PostgreSQL 与 Colyseus；本机入口复用同一 authority |
 | 页面联机适配 | `data/pages/js/colyseus-client.js` | 只使用 Colyseus SDK 和同源 HTTP；房间加入直接调用 `joinById` |
 | 房间权威 | `lib/server/colyseus/battle-room.ts` | BattleRoom 是玩家命令、房间状态与重连恢复的唯一在线入口 |
 | 房间目录 | `lib/server/colyseus/create-colyseus-server.ts` | `GET /rooms` 返回去重目录；`GET /rooms/:roomId` 精确读取单个房间 |
@@ -51,6 +51,10 @@ PVP Demo 阵容由 `lib/game/roster-contract.ts` 校验：玩家必须从已锁�
 
 客户端收到 receipt/transition 后验证连续版本和公开 hash。失配时请求 Colyseus 完整状态恢复，不调用
 HTTP 战斗命令或本地规则来补算在线状态。
+
+`RvBColyseus` 在页面切换间保存 reconnection token，并优先恢复同一 Room session；不得以新的
+`joinById` 代替断线恢复。直接 receipt 丢失时使用 `battleReceiptRequest` 按
+`clientActionId` 查询 applied/rejected/unknown，等待超时后必须解除本地 pending。
 
 ## 4. 权威规则执行
 
@@ -105,13 +109,15 @@ Trace 与 PostgreSQL journal 使用同一权威状态/hash，不由 UI 重新生
 - UI 不执行在线对局核心规则，不重算终局，不补造 receipt/transition/Trace。
 - 版本或 hash 不匹配时停止提交并触发完整状态恢复。
 - 训练模式可以使用浏览器规则引擎，但不得把训练状态写入在线权威或战报。
+- 动作历史、小剧场、棋盘高亮与 1×/2× 播放速度只消费查看者可见的 presentation events，不进入规则状态或网络命令。
 
 ## 8. 渐进部署与回合计时
 
 渐进部署由 `dispatchRoomBattleAction()` 协调。部署候选携带精确 revision；过期、缺失或非安全整数的
 revision 在复制、随机和写状态前拒绝。候选与合法落点只投影给当前玩家，实际部署结果才进入公开状态。
 
-`lib/game/turn-timer.ts` 定义可注入的权威时钟。计时器事件与玩家命令进入同一房间 FIFO；烧绳与超时
+`lib/game/turn-timer.ts` 定义可注入的权威时钟。正常回合为 90/120/150/180/210 秒，快速回合为
+40 秒，回合外 pending 响应为 30 秒，最后 15 秒烧绳。计时器事件与玩家命令进入同一房间 FIFO；烧绳与超时
 只能由服务端生成。客户端只显示 `serverNow` 与公开期限，刷新或重连不能延长期限。
 
 ## 9. Profile 与内容身份

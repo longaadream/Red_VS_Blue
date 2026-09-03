@@ -3,80 +3,44 @@
 
   const MAX_BOARD_STATUSES = 2
 
-  // Display-only priority. This never changes status rules, stacks, or duration.
-  const NEGATIVE_STATUS_PRIORITY = [
-    {
-      keys: ['stun', 'sleep', 'freeze', 'frozen', '眩晕', '麻醉', '冰冻'],
-      priority: 500,
-      color: '#e879f9',
-      glyph: '◆',
-      description: '控制类负面状态，具体限制以当前权威快照为准。',
-    },
-    {
-      keys: ['silence', 'anti-heal', 'healing-reduction', '沉默', '禁疗'],
-      priority: 400,
-      color: '#fb7185',
-      glyph: '×',
-      description: '能力或治疗受限状态，具体效果以当前权威快照为准。',
-    },
-    {
-      keys: ['immobile', 'root', 'slow', 'cripple', '无法移动', '定身', '减速'],
-      priority: 300,
-      color: '#facc15',
-      glyph: '↓',
-      description: '行动或移动受限状态，具体效果以当前权威快照为准。',
-    },
-    {
-      keys: ['bleed', 'bleeding', 'burn', 'poison', 'toxin', 'amaterasu', '流血', '灼烧', '中毒', '天照'],
-      priority: 200,
-      color: '#fb923c',
-      glyph: '•',
-      description: '持续伤害类负面状态，具体结算以当前权威快照为准。',
-    },
-    {
-      keys: ['weak', 'vulnerable', 'curse', 'debuff', '虚弱', '易伤', '诅咒'],
-      priority: 100,
-      color: '#a78bfa',
-      glyph: '!',
-      description: '其他高优先级负面状态，具体效果以当前权威快照为准。',
-    },
-  ]
-
   const DEFAULT_DETAIL = {
     priority: 0,
     color: '#94a3b8',
     glyph: '•',
     description: '状态详情由当前权威快照提供。',
     negative: false,
-  }
-
-  function statusSearchText(status) {
-    return [status && status.id, status && status.type, status && status.label, status && status.name]
-      .filter(Boolean)
-      .join(' ')
-      .toLowerCase()
+    visibility: 'board',
   }
 
   function resolve(status) {
-    const searchText = statusSearchText(status)
-    const configured = NEGATIVE_STATUS_PRIORITY.find(function (entry) {
-      return entry.keys.some(function (key) { return searchText.includes(key) })
-    })
-    return configured
-      ? Object.assign({}, configured, { negative: true })
+    const registry = root.BattleEffectIcons
+    return registry && typeof registry.resolveStatus === 'function'
+      ? registry.resolveStatus(status)
       : DEFAULT_DETAIL
   }
 
-  function boardSummary(statuses) {
+  function boardEntries(statuses) {
     return (statuses || [])
       .map(function (status, index) {
         return { status: status, meta: resolve(status), index: index }
       })
-      .filter(function (entry) { return entry.meta.negative })
+      .filter(function (entry) { return entry.meta.visibility === 'board' })
       .sort(function (left, right) {
         return right.meta.priority - left.meta.priority || left.index - right.index
       })
-      .slice(0, MAX_BOARD_STATUSES)
+  }
+
+  function boardOverview(statuses) {
+    const all = boardEntries(statuses)
+    return {
+      items: all.slice(0, MAX_BOARD_STATUSES),
+      all: all,
+      overflowCount: Math.max(0, all.length - MAX_BOARD_STATUSES),
+    }
+  }
+
+  function boardSummary(statuses) {
+    return boardOverview(statuses).items
   }
 
   function durationValue(status) {
@@ -105,8 +69,9 @@
 
   root.BattleStatusPresentation = {
     MAX_BOARD_STATUSES: MAX_BOARD_STATUSES,
-    negativePriority: NEGATIVE_STATUS_PRIORITY,
     resolve: resolve,
+    boardEntries: boardEntries,
+    boardOverview: boardOverview,
     boardSummary: boardSummary,
     durationValue: durationValue,
     detailText: detailText,

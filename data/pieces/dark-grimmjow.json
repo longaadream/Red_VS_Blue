@@ -1,0 +1,24 @@
+{
+  "id": "dark-grimmjow",
+  "name": "葛力姆乔·贾卡杰克",
+  "faction": "evil",
+  "description": "以回合外追猎和多段攻击逼迫敌人，并在首次死亡时归刃。",
+  "rarity": "legendary",
+  "image": "grimmjow.jpg",
+  "stats": { "maxHp": 5, "attack": 4, "defense": 0, "moveRange": 4 },
+  "skills": [
+    { "skillId": "grimmjow-destruction-instinct", "level": 1 },
+    { "skillId": "grimmjow-hunting-instinct", "level": 1 },
+    { "skillId": "grimmjow-gran-rey-cero", "level": 1 },
+    { "skillId": "grimmjow-resurreccion", "level": 1 }
+  ],
+  "transformedSkills": [
+    { "skillId": "grimmjow-panther-claw", "triggeredBy": "grimmjow-resurreccion" }
+  ],
+  "rules": [
+    "rule-grimmjow-hunt-after-move",
+    "rule-grimmjow-hunt-after-skill",
+    "rule-grimmjow-resurreccion"
+  ],
+  "isDefault": false
+}

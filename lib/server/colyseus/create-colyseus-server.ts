@@ -43,6 +43,7 @@ export interface CreateColyseusBattleServerOptions {
     runtime: string
     database: string
   }
+  logger?: Pick<Console, 'error'>
 }
 
 interface HealthResponse {
@@ -87,6 +88,7 @@ export function createColyseusBattleServer(options: CreateColyseusBattleServerOp
     database: 'postgresql',
   }
   const productCreationClaims = new Map<string, ProductCreationClaim>()
+  const logger = options.logger ?? console
   const BattleRoom = createBattleRoomClass({
     repository,
     journal,
@@ -236,10 +238,20 @@ export function createColyseusBattleServer(options: CreateColyseusBattleServerOp
     if (roomsRestored) return []
     roomsRestored = true
     const roomIds = await repository.listRestorableRoomIds?.() ?? []
+    const restoredRoomIds: string[] = []
     for (const battleId of roomIds) {
-      await matchMaker.createRoom(BATTLE_ROOM_TYPE, { product: true, restore: true, battleId })
+      try {
+        await matchMaker.createRoom(BATTLE_ROOM_TYPE, { product: true, restore: true, battleId })
+        restoredRoomIds.push(battleId)
+      } catch (error) {
+        logger.error('[colyseus] durable room restore skipped', {
+          battleId,
+          code: (error as Error & { code?: string }).code,
+          message: error instanceof Error ? error.message : String(error),
+        })
+      }
     }
-    return roomIds
+    return restoredRoomIds
   }
   return { server, repository, journal, restoreProductRooms }
 }
@@ -278,7 +290,20 @@ function createRepository(options: CreateColyseusBattleServerOptions): PostgresA
     idleTimeoutMillis: 30_000,
     application_name: 'red-vs-blue-colyseus',
   })
+  attachPostgresPoolErrorHandler(pool)
   return new PostgresAuthorityRepository(pool)
+}
+
+export function attachPostgresPoolErrorHandler(
+  pool: Pick<Pool, 'on'>,
+  logger: Pick<Console, 'error'> = console,
+): void {
+  pool.on('error', error => {
+    logger.error('[colyseus-postgres] idle pool client error', {
+      code: (error as Error & { code?: string }).code,
+      message: error.message,
+    })
+  })
 }
 
 function numberFromEnv(value: string | undefined, fallback: number): number {

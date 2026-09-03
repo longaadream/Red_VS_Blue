@@ -38,6 +38,7 @@ function fixtureSnapshot(statusTags: Array<Record<string, unknown>>) {
 describe('battle piece health and negative-status summary', () => {
   it('shows the authoritative deployment first-move tag through the generic status UI', () => {
     const window: Record<string, unknown> = {}
+    loadBrowserModule('js/battle-ui/battle-effect-icons.js', 'BattleEffectIcons', window)
     const statusPresentation = loadBrowserModule(
       'js/battle-ui/battle-status-presentation.js',
       'BattleStatusPresentation',
@@ -60,20 +61,26 @@ describe('battle piece health and negative-status summary', () => {
       selectedPieceId: 'piece-red',
     })
 
-    expect(model.selection.piece.statusSummary).toEqual([{
+    expect(model.selection.piece.statusSummary).toHaveLength(1)
+    expect(model.selection.piece.statusSummary[0]).toMatchObject({
       id: 'deployment-first-move-free',
+      type: 'deployment-first-move-free',
       label: '本回合首次移动免费',
+      iconId: 'free-move',
+      iconPath: 'images/effect-icons/free-move.svg',
+      visibility: 'board',
       description: '',
       stacks: 0,
       duration: 1,
       uses: 1,
       intensity: 0,
-    }])
+    })
     expect(statusPresentation.detailText(firstMoveTag)).toBe('剩余：1回合 · 剩余：1次')
   })
 
-  it('keeps every authoritative status in detail while selecting at most two negative summaries', () => {
+  it('keeps every player-facing status board-reachable while selecting two compact icon slots', () => {
     const window: Record<string, unknown> = {}
+    loadBrowserModule('js/battle-ui/battle-effect-icons.js', 'BattleEffectIcons', window)
     const statusPresentation = loadBrowserModule(
       'js/battle-ui/battle-status-presentation.js',
       'BattleStatusPresentation',
@@ -81,7 +88,7 @@ describe('battle piece health and negative-status summary', () => {
     )
     const viewModel = loadBrowserModule('js/battle-ui/battle-view-model.js', 'BattleViewModel', window)
     const rawStatuses = [
-      { id: 'bleeding-1', type: 'bleeding', name: 'Bleeding', remainingDuration: 2, stacks: 3, visible: true },
+      { id: 'amaterasu-1', type: 'amaterasu-burn', name: 'Amaterasu', remainingDuration: 2, stacks: 3, visible: true },
       { id: 'calm-shield-1', type: 'calm-shield', name: 'Calm Shield', currentDuration: 2, stacks: 1, visible: true },
       { id: 'anti-heal-1', type: 'anti-heal', name: 'Anti-heal', duration: 3, stacks: 1, visible: true },
       { id: 'sleep-1', type: 'sleep', name: 'Sleep', currentDuration: 2, stacks: 1, visible: true },
@@ -96,11 +103,12 @@ describe('battle piece health and negative-status summary', () => {
     })
     const details = model.selection.piece.statusSummary
     const board = statusPresentation.boardSummary(details)
+    const overview = statusPresentation.boardOverview(details)
 
     expect(details).toHaveLength(5)
     expect(details[0]).toMatchObject({
-      id: 'bleeding-1',
-      label: 'Bleeding',
+      id: 'amaterasu-1',
+      label: 'Amaterasu',
       stacks: 3,
       duration: 2,
       description: '',
@@ -110,13 +118,18 @@ describe('battle piece health and negative-status summary', () => {
     expect(details.map((status: { duration: number }) => status.duration)).toEqual([2, 2, 3, 2, 1])
     expect(board.map((entry: { status: { id: string } }) => entry.status.id)).toEqual(['sleep-1', 'freeze-1'])
     expect(board).toHaveLength(statusPresentation.MAX_BOARD_STATUSES)
+    expect(overview.all).toHaveLength(5)
+    expect(overview.overflowCount).toBe(3)
     expect(rawStatuses).toEqual(inputBefore)
   })
 
-  it('renders 0/1/2/3+ negative states without empty markers or horizontal overflow', () => {
+  it('renders 0/1/2 compact slots and reports overflow for 3+ visible states', () => {
+    const window: Record<string, unknown> = {}
+    loadBrowserModule('js/battle-ui/battle-effect-icons.js', 'BattleEffectIcons', window)
     const statusPresentation = loadBrowserModule(
       'js/battle-ui/battle-status-presentation.js',
       'BattleStatusPresentation',
+      window,
     )
     const negatives = [
       { id: 'sleep', label: 'Sleep', stacks: 1, duration: 2 },
@@ -131,6 +144,7 @@ describe('battle piece health and negative-status summary', () => {
       statusPresentation.boardSummary(negatives.slice(0, 2)).length,
       statusPresentation.boardSummary(negatives).length,
     ]).toEqual([0, 1, 2, 2])
+    expect(statusPresentation.boardOverview(negatives).overflowCount).toBe(2)
     expect(statusPresentation.detailText(negatives[3])).toContain('3层')
     expect(statusPresentation.detailText(negatives[3])).toContain('2回合')
   })
@@ -139,6 +153,8 @@ describe('battle piece health and negative-status summary', () => {
     const battlePage = readFileSync(resolve(pagesDir, 'battle.html'), 'utf8')
     const renderer = readFileSync(resolve(pagesDir, 'js/battle-renderer-3d.js'), 'utf8')
     const domUi = readFileSync(resolve(pagesDir, 'js/battle-ui/battle-dom-ui.js'), 'utf8')
+    const tacticalCss = readFileSync(resolve(pagesDir, 'css/battle-tactical-table.css'), 'utf8')
+    const popoverCss = tacticalCss.match(/\.piece-board-status-popover\s*\{[\s\S]*?\}/)?.[0] || ''
 
     expect(battlePage).toContain('js/battle-ui/battle-status-presentation.js')
     expect(battlePage).toContain('BattleStatusPresentation.boardSummary')
@@ -154,6 +170,9 @@ describe('battle piece health and negative-status summary', () => {
     expect(renderer).toContain('obj.portraitLoading = true')
     expect(renderer).toMatch(/loadTexture\(portraitSrc,[\s\S]*?obj\.portraitLoaded = true/)
     expect(renderer).toContain("console.error('[battle-renderer] Failed to load piece portrait'")
+    expect(popoverCss).toContain('border: 0')
+    expect(popoverCss).toContain('background: transparent')
+    expect(popoverCss).toContain('box-shadow: none')
     expect(renderer).not.toContain('texture stays default')
     expect(renderer).toContain('loadCallbacks: [onLoad]')
     expect(renderer).toContain('entry.loadCallbacks.push(onLoad)')

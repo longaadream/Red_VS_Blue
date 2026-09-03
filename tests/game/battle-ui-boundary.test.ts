@@ -69,6 +69,11 @@ describe('battle presentation boundary', () => {
       viewerId: 'player-red',
       selectedPieceId: 'piece-red',
       interactionMode: 'move',
+      skillsById: {
+        'arthas-icebound-fortitude': {
+          id: 'arthas-icebound-fortitude', name: '寒冰坚忍', code: 'not projected',
+        },
+      },
       legal,
     }
 
@@ -90,9 +95,13 @@ describe('battle presentation boundary', () => {
       ],
       selection: { pieceId: 'piece-red', mode: 'move' },
       players: [{ name: 'A deliberately long tactical player name' }],
+      skillSummariesById: {
+        'arthas-icebound-fortitude': { id: 'arthas-icebound-fortitude', name: '寒冰坚忍' },
+      },
       turn: { remainingSeconds: 89 },
       legal: { moveCells: [{ x: 1, y: 0 }], targetCells: [{ x: 1, y: 0 }], placementCells: [] },
     })
+    expect(trainingModel.skillSummariesById['arthas-icebound-fortitude']).not.toHaveProperty('code')
   })
 
   it('projects the template-declared portrait asset for pieces added after training starts', () => {
@@ -261,16 +270,10 @@ describe('battle presentation boundary', () => {
   })
 
 
-  it('renders every selected-piece status in a non-blocking overlay and hides it outside inspect mode', () => {
+  it('does not render a persistent selected-piece status sidebar', () => {
     const domUi = loadBrowserModule('js/battle-ui/battle-dom-ui.js', 'BattleDomUI')
-    const overlay = {
-      hidden: true,
-      dataset: {} as Record<string, string>,
-      innerHTML: '',
-      setAttribute: vi.fn(),
-    }
     const document = {
-      getElementById: vi.fn((id: string) => id === 'selectedStatusOverlay' ? overlay : null),
+      getElementById: vi.fn(() => null),
     }
     const ui = domUi.create({ document })
     const model = {
@@ -279,7 +282,15 @@ describe('battle presentation boundary', () => {
         piece: {
           id: 'piece-red',
           name: 'Red Warrior',
-          statuses: [{ id: 'freeze', label: '冰冻', duration: 2, description: '无法行动' }],
+          statuses: [{
+            id: 'freeze',
+            type: 'freeze',
+            label: '冰冻',
+            iconPath: 'images/tile-effects/blizzard.svg',
+            stacks: 3,
+            duration: 2,
+            description: '无法行动',
+          }],
         },
       },
       turn: {
@@ -295,19 +306,7 @@ describe('battle presentation boundary', () => {
 
     ui.update(model)
 
-    expect(document.getElementById).toHaveBeenCalledWith('selectedStatusOverlay')
-    expect(overlay.hidden).toBe(false)
-    expect(overlay.dataset.pieceId).toBe('piece-red')
-    expect(overlay.innerHTML).toContain('Red Warrior')
-    expect(overlay.innerHTML).toContain('冰冻')
-    expect(overlay.innerHTML).toContain('2回合')
-    expect(overlay.setAttribute).toHaveBeenCalledWith('aria-live', 'polite')
-
-    ui.update({
-      ...model,
-      selection: { ...model.selection, mode: 'move' },
-    })
-    expect(overlay.hidden).toBe(true)
+    expect(document.getElementById).not.toHaveBeenCalledWith('selectedStatusOverlay')
   })
 
   it('sends the identical model to Three.js and DOM and owns repeatable mount/dispose', () => {
@@ -321,12 +320,23 @@ describe('battle presentation boundary', () => {
       screenToCell: vi.fn(() => ({ x: 1, y: 0 })),
       dispose: vi.fn(),
       animateAction: vi.fn(),
+      showPresentationAreaFlash: vi.fn(),
+      clearPresentationAreaFlash: vi.fn(),
+      showPresentationPath: vi.fn(),
+      clearPresentationPath: vi.fn(),
     }
     const domUi = { update: vi.fn(), dispose: vi.fn() }
+    const vignetteUi = { mount: vi.fn(), update: vi.fn(), resize: vi.fn(), dispose: vi.fn() }
+    const historyUi = { mount: vi.fn(), update: vi.fn(), resize: vi.fn(), dispose: vi.fn() }
     const onIntent = vi.fn()
-    const boundary = presentation.create({ renderer, domUi, onIntent })
-    const mount = { boardContainer: {}, floatLayer: {} }
-    const model = { board: { width: 3, height: 2 }, pieces: [], legal: {} }
+    const boundary = presentation.create({ renderer, domUi, vignetteUi, historyUi, onIntent })
+    const mount = { boardContainer: {}, floatLayer: {}, historyDock: {} }
+    const model = {
+      board: { width: 3, height: 2 },
+      pieces: [],
+      legal: {},
+      presentationEvents: [{ eventId: 'action-1:0', rootEventId: 'action-1:0' }],
+    }
 
     boundary.mount(mount)
     boundary.mount(mount)
@@ -342,6 +352,23 @@ describe('battle presentation boundary', () => {
     expect(domUi.dispose).toHaveBeenCalledTimes(2)
     expect(renderer.update).toHaveBeenCalledWith(model)
     expect(domUi.update).toHaveBeenCalledWith(model)
+    expect(historyUi.mount).toHaveBeenCalledTimes(2)
+    expect(historyUi.update).toHaveBeenCalledWith(model)
+    expect(historyUi.resize).toHaveBeenCalledTimes(2)
+    expect(historyUi.dispose).toHaveBeenCalledTimes(2)
+    expect(vignetteUi.mount).toHaveBeenCalledTimes(2)
+    const vignetteMount = vignetteUi.mount.mock.calls[1][0]
+    vignetteMount.showAreaFlash([{ x: 1, y: 0 }])
+    vignetteMount.clearAreaFlash()
+    vignetteMount.showPath({ source: { x: 0, y: 0 }, end: { x: 2, y: 0 } })
+    vignetteMount.clearPath()
+    expect(renderer.showPresentationAreaFlash).toHaveBeenCalledWith([{ x: 1, y: 0 }])
+    expect(renderer.clearPresentationAreaFlash).toHaveBeenCalledTimes(1)
+    expect(renderer.showPresentationPath).toHaveBeenCalledWith({ source: { x: 0, y: 0 }, end: { x: 2, y: 0 } })
+    expect(renderer.clearPresentationPath).toHaveBeenCalledTimes(1)
+    expect(vignetteUi.update).toHaveBeenCalledWith(model)
+    expect(vignetteUi.resize).toHaveBeenCalledTimes(2)
+    expect(vignetteUi.dispose).toHaveBeenCalledTimes(2)
     expect(onIntent).toHaveBeenCalledWith({ type: 'select-piece', pieceId: 'piece-red' })
     expect(onIntent).toHaveBeenCalledWith({ type: 'drop-piece', pieceId: 'piece-red', x: 1, y: 0 })
     expect(onIntent).toHaveBeenCalledWith({ type: 'viewport-change' })
@@ -404,6 +431,35 @@ describe('battle presentation boundary', () => {
 
     expect(Array.from(moves)).toEqual([])
     expect(engine.getLegalNormalMoveTargetsForPlayer).toHaveBeenCalledWith(snapshot, 'player-red', 'piece-red')
+  })
+
+  it('highlights a move that is suspended by an out-of-turn pending response', () => {
+    const legalActions = loadBrowserModule('js/battle-ui/battle-legal-actions.js', 'BattleLegalActions')
+    const snapshot = fixtureSnapshot()
+    const engine = {
+      getLegalNormalMoveTargetsForPlayer: vi.fn(() => [{ x: 1, y: 0 }, { x: 2, y: 0 }]),
+      safeCloneBattleState: (state: unknown) => structuredClone(state),
+      applyBattleAction: vi.fn((state, action) => ({
+        ...state,
+        pendingTargetSelection: {
+          playerId: 'player-blue',
+          transaction: {
+            rootAction: action.toX === 1
+              ? { type: 'move', playerId: action.playerId, pieceId: action.pieceId, toX: 1, toY: 0 }
+              : { type: 'move', playerId: action.playerId, pieceId: action.pieceId, toX: 9, toY: 9 },
+          },
+        },
+      })),
+    }
+
+    const moves = legalActions.queryMoveCells({
+      snapshot,
+      playerId: 'player-red',
+      pieceId: 'piece-red',
+      engine,
+    })
+
+    expect(Array.from(moves)).toEqual(['1,0'])
   })
 
   it('does not treat a repeated same-step target request as a legal skill target', () => {

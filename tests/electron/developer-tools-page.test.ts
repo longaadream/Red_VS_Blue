@@ -44,10 +44,10 @@ describe('out-of-match developer center', () => {
 
     expect(battle).toContain('js/developer-tools/match-trace.js')
     expect(battle).toContain('storeCompletedMatchTrace')
+    const transitionStateApply = battle.search(/applyServerState\(\r?\n\s+nextState,/)
+    expect(transitionStateApply).toBeGreaterThan(-1)
     expect(battle.indexOf('latestAuthorityStateHash = msg.stateHash || latestAuthorityStateHash'))
-      .toBeLessThan(
-        battle.indexOf('applyServerState(\n          nextState,'),
-      )
+      .toBeLessThan(transitionStateApply)
     expect(battle).toMatch(/function handleGameOver\(\)[\s\S]*?storeCompletedMatchTrace\(\)/)
     expect(battle).toContain('下载比赛 Trace')
     expect(battle).not.toContain('debugPanel')

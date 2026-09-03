@@ -37,11 +37,108 @@ export type EmbeddedPostgresOptions = {
   removeFile?: (filePath: string) => void
   portHint?: number
   onUnexpectedExit?: (code: number | null, signal: NodeJS.Signals | null) => void
+  onHealthStateChange?: (state: EmbeddedPostgresHealthState) => void
 }
 
 export type EmbeddedPostgresConnection = {
   url: string
   port: number
+}
+
+export type EmbeddedPostgresHealthState = {
+  state: 'healthy' | 'degraded' | 'lost'
+  consecutiveFailures: number
+  detail?: string
+}
+
+export type EmbeddedPostgresHealthMonitorOptions = {
+  intervalMs: number
+  failureThreshold: number
+  probe: () => Promise<void>
+  confirmProcessRunning: () => Promise<boolean>
+  onStateChange?: (state: EmbeddedPostgresHealthState) => void
+  onConfirmedLoss: () => void
+}
+
+/**
+ * Schedules the next readiness probe only after the previous probe and any
+ * liveness confirmation have completed. Readiness degradation alone is not
+ * authority loss: the owning postgres process must independently be gone.
+ */
+export class EmbeddedPostgresHealthMonitor {
+  private timer: NodeJS.Timeout | null = null
+  private stopped = true
+  private failures = 0
+  private lastState: EmbeddedPostgresHealthState['state'] | null = null
+
+  constructor(private readonly options: EmbeddedPostgresHealthMonitorOptions) {}
+
+  start(): void {
+    this.stop()
+    this.stopped = false
+    this.failures = 0
+    this.lastState = null
+    this.emit('healthy')
+    this.schedule()
+  }
+
+  stop(): void {
+    this.stopped = true
+    if (this.timer) clearTimeout(this.timer)
+    this.timer = null
+  }
+
+  private emit(state: EmbeddedPostgresHealthState['state'], detail?: string): void {
+    if (this.lastState === state && !detail) return
+    this.lastState = state
+    this.options.onStateChange?.({
+      state,
+      consecutiveFailures: this.failures,
+      ...(detail ? { detail } : {}),
+    })
+  }
+
+  private schedule(): void {
+    if (this.stopped) return
+    this.timer = setTimeout(() => {
+      this.timer = null
+      void this.runProbe()
+    }, this.options.intervalMs)
+    this.timer.unref?.()
+  }
+
+  private async runProbe(): Promise<void> {
+    if (this.stopped) return
+    try {
+      await this.options.probe()
+      this.failures = 0
+      this.emit('healthy')
+    } catch (error) {
+      this.failures += 1
+      const detail = error instanceof Error ? error.message : String(error)
+      this.emit('degraded', detail)
+      if (this.failures >= this.options.failureThreshold) {
+        let processRunning = true
+        try {
+          processRunning = await this.options.confirmProcessRunning()
+        } catch (confirmationError) {
+          // An inconclusive confirmation must not terminate a healthy authority.
+          this.emit(
+            'degraded',
+            `readiness failed; process check inconclusive: ${confirmationError instanceof Error ? confirmationError.message : String(confirmationError)}`,
+          )
+        }
+        if (!processRunning) {
+          this.emit('lost', detail)
+          this.stop()
+          this.options.onConfirmedLoss()
+          return
+        }
+        this.failures = 0
+      }
+    }
+    this.schedule()
+  }
 }
 
 function commandError(command: string, error: unknown, stderr = ''): Error {
@@ -125,8 +222,7 @@ export class EmbeddedPostgresController {
   private stopping = false
   private connection: EmbeddedPostgresConnection | null = null
   private startPromise: Promise<EmbeddedPostgresConnection> | null = null
-  private healthTimer: NodeJS.Timeout | null = null
-  private healthFailures = 0
+  private healthMonitor: EmbeddedPostgresHealthMonitor | null = null
   private runtimeVerified = false
 
   constructor(private readonly options: EmbeddedPostgresOptions) {
@@ -356,36 +452,53 @@ export class EmbeddedPostgresController {
   }
 
   private startHealthMonitor(): void {
-    if (this.healthTimer) clearInterval(this.healthTimer)
-    this.healthFailures = 0
-    this.healthTimer = setInterval(() => {
-      if (this.stopping || !this.connection) return
-      execFile(this.executable('pg_isready'), [
-        '-h', '127.0.0.1', '-p', String(this.connection.port), '-q',
-      ], {
+    this.healthMonitor?.stop()
+    this.healthMonitor = new EmbeddedPostgresHealthMonitor({
+      intervalMs: 1_000,
+      failureThreshold: 3,
+      probe: async () => {
+        if (this.stopping || !this.connection) return
+        await runCommand(this.executable('pg_isready'), [
+          '-h', '127.0.0.1', '-p', String(this.connection.port), '-q',
+        ], this.commandEnv(), 1_000)
+      },
+      confirmProcessRunning: async () => this.queryPostgresProcessRunning(),
+      onStateChange: state => this.options.onHealthStateChange?.(state),
+      onConfirmedLoss: () => {
+        if (this.stopping || !this.connection) return
+        this.connection = null
+        this.options.onUnexpectedExit?.(null, null)
+      },
+    })
+    this.healthMonitor.start()
+  }
+
+  private queryPostgresProcessRunning(): Promise<boolean> {
+    return new Promise((resolve, reject) => {
+      execFile(this.executable('pg_ctl'), ['status', '-D', this.dataDir], {
         env: this.commandEnv(),
         windowsHide: true,
         timeout: 3_000,
       }, error => {
         if (!error) {
-          this.healthFailures = 0
+          resolve(true)
           return
         }
-        this.healthFailures += 1
-        if (this.healthFailures < 2 || this.stopping || !this.connection) return
-        this.connection = null
-        if (this.healthTimer) clearInterval(this.healthTimer)
-        this.healthTimer = null
-        this.options.onUnexpectedExit?.(null, null)
+        // pg_ctl uses a numeric non-zero status when the cluster has no owner.
+        // Spawn errors and timeouts are inconclusive and must fail safe.
+        if (typeof error.code === 'number' && !error.killed) {
+          resolve(false)
+          return
+        }
+        reject(commandError('pg_ctl status', error))
       })
-    }, 2_000)
-    this.healthTimer.unref?.()
+    })
   }
 
   async stop(): Promise<void> {
     this.stopping = true
-    if (this.healthTimer) clearInterval(this.healthTimer)
-    this.healthTimer = null
+    this.healthMonitor?.stop()
+    this.healthMonitor = null
     try {
       if (fs.existsSync(path.join(this.dataDir, 'postmaster.pid'))) {
         console.info('[postgres] Stopping bundled PostgreSQL with fast shutdown')
@@ -401,8 +514,8 @@ export class EmbeddedPostgresController {
   }
 
   forceStop(): void {
-    if (this.healthTimer) clearInterval(this.healthTimer)
-    this.healthTimer = null
+    this.healthMonitor?.stop()
+    this.healthMonitor = null
     this.connection = null
     this.stopping = true
     try {

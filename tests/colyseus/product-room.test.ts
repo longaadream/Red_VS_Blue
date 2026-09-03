@@ -1,7 +1,7 @@
 import { createServer } from 'node:net'
 
 import { Client as ColyseusClient, type Room as ColyseusClientRoom } from '@colyseus/sdk'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import { getServerGameProfileIdentityV1 } from '@/lib/content-pipeline/runtime/profile-game-identity'
 import {
@@ -17,7 +17,6 @@ import {
   BATTLE_RECEIPT_MESSAGE,
   BATTLE_SNAPSHOT_MESSAGE,
   PRODUCT_ROOM_RPC_MESSAGE,
-  PRODUCT_ROOM_RPC_RESULT_MESSAGE,
   PRODUCT_ROOM_UPDATE_MESSAGE,
 } from '@/lib/server/colyseus/battle-room-protocol'
 import { PostgresAuthorityJournal } from '@/lib/server/postgres/postgres-authority-journal'
@@ -26,6 +25,42 @@ import type { PostgresBattleReportSummaryV1, PostgresBattleReportV1 } from '@/li
 import { FakeAuthorityRepository } from './fake-authority-repository'
 
 describe('RED-161 Colyseus product room', () => {
+  it('isolates an incompatible durable room instead of crashing authority startup', async () => {
+    const repository = new FakeAuthorityRepository()
+    const incompatibleRoom = structuredClone(createDevelopmentBattleRoom('incompatible-profile-room'))
+    const incompatibleCheckpoint = createInitialCheckpoint(incompatibleRoom)
+    const storage = incompatibleRoom.battleState as unknown as {
+      profileIdentity: { authorityContentHash: string }
+    }
+    storage.profileIdentity.authorityContentHash = '0'.repeat(64)
+    await repository.initializeRoom(incompatibleRoom, incompatibleCheckpoint)
+
+    const healthyRoom = createDevelopmentBattleRoom('healthy-restored-room')
+    await repository.initializeRoom(healthyRoom, createInitialCheckpoint(healthyRoom))
+    const logger = { error: vi.fn() }
+    const journal = new PostgresAuthorityJournal(repository, { maxBatchSize: 8, maxDwellMs: 25 })
+    const candidate = createColyseusBattleServer({ repository, journal, logger })
+    const port = await availablePort()
+    await candidate.server.listen(port, '127.0.0.1')
+
+    try {
+      await expect(candidate.restoreProductRooms()).resolves.toEqual(['healthy-restored-room'])
+      await expect(fetch(`http://127.0.0.1:${port}/healthz`).then(response => response.json()))
+        .resolves.toMatchObject({ ok: true, protocol: 'rvb-colyseus' })
+      await expect(fetch(`http://127.0.0.1:${port}/rooms`).then(response => response.json()))
+        .resolves.toEqual({ rooms: [expect.objectContaining({ id: 'healthy-restored-room' })] })
+      expect(logger.error).toHaveBeenCalledWith(
+        '[colyseus] durable room restore skipped',
+        expect.objectContaining({
+          battleId: 'incompatible-profile-room',
+          code: 'PINNED_PROFILE_UNAVAILABLE',
+        }),
+      )
+    } finally {
+      await candidate.server.gracefullyShutdown(false)
+    }
+  }, 20_000)
+
   it('re-registers a durable PostgreSQL room so players can joinById after authority restart', async () => {
     const repository = new FakeAuthorityRepository()
     const profileIdentity = getServerGameProfileIdentityV1()
@@ -161,6 +196,24 @@ describe('RED-161 Colyseus product room', () => {
       const activePlayerId = redInitial.state.turn.currentPlayerId
       const activeRoom = activePlayerId === 'player-red' ? redRoom : blueRoom
       const activeState = activePlayerId === 'player-red' ? redInitial.state : blueInitial.state
+      activeRoom.reconnection.minUptime = 0
+      activeRoom.reconnection.minDelay = 10
+      activeRoom.reconnection.maxDelay = 50
+      const resumedSnapshot = nextMessage(activeRoom, BATTLE_SNAPSHOT_MESSAGE)
+      const resumed = nextReconnect(activeRoom)
+      void activeRoom.leave(false)
+      await resumed
+      await expect(resumedSnapshot).resolves.toMatchObject({
+        authorityVersion: 0,
+        stateHash: activePlayerId === 'player-red' ? redInitial.stateHash : blueInitial.stateHash,
+        state: { deployment: activeState.deployment },
+        turnTimer: {
+          status: 'running',
+          deadlineAt: activePlayerId === 'player-red'
+            ? redInitial.turnTimer?.deadlineAt
+            : blueInitial.turnTimer?.deadlineAt,
+        },
+      })
       const deployment = activeState.deployment
       const pieceId = deployment.offerPieceIds?.[0] ?? deployment.offerPieces?.[0]?.instanceId
       expect(pieceId).toBeTruthy()
@@ -284,12 +337,17 @@ async function requestRoomRpc(
   method: string,
   data: Record<string, unknown>,
 ): Promise<TestRoomSnapshot> {
-  const requestId = `${method}:${Math.random().toString(36).slice(2)}`
-  const response = nextMessage(room, PRODUCT_ROOM_RPC_RESULT_MESSAGE, message => message?.requestId === requestId)
-  room.send(PRODUCT_ROOM_RPC_MESSAGE, { requestId, method, data })
-  const message = await response
-  if (!message.ok) throw new Error(message.error || `RPC ${method} failed`)
-  return message.data as TestRoomSnapshot
+  return room.request(PRODUCT_ROOM_RPC_MESSAGE, { method, data }, { timeout: 5_000 }) as Promise<TestRoomSnapshot>
+}
+
+function nextReconnect(room: ColyseusClientRoom): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => reject(new Error('Timed out waiting for native reconnection')), 5_000)
+    room.onReconnect.once(() => {
+      clearTimeout(timeout)
+      resolve()
+    })
+  })
 }
 
 function nextMessage(
@@ -311,13 +369,14 @@ function nextMessage(
 interface TestProtocolMessage {
   [key: string]: unknown
   authorityVersion?: number
+  stateHash?: string
   data?: unknown
   error?: string
   ok?: boolean
   receipt?: { clientActionId?: string; status?: string }
   requestId?: string
   room?: { status?: string }
-  turnTimer?: { status?: string; remainingSeconds?: number }
+  turnTimer?: { status?: string; deadlineAt?: number; remainingSeconds?: number }
   state: {
     deployment: {
       legalPositions?: Array<{ x: number; y: number }>

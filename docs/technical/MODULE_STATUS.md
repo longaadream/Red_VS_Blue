@@ -1,6 +1,6 @@
 # 模块状态与验收入口
 
-更新：2026-09-01（RED-158 Phase F）
+更新：2026-09-03（RED-158 Phase F 主线同步）
 
 ## Windows 当前状态
 
@@ -11,9 +11,9 @@
 | Colyseus 房间权威 | 已实现并有真实 SDK 测试 | `lib/server/colyseus/**` | 双 Windows 人工联机 |
 | PostgreSQL journal/恢复 | 已实现 | `lib/server/postgres/**` | 外部测试库集成与故障演练 |
 | 战报/Trace/hash | 已实现并有篡改回归 | Repository + report HTTP | 双 Windows 终局战报体验 |
-| Electron Client | 已切换为唯一 Windows 产品 | `electron-client/main.ts` | 候选打包/安装/退出冒烟 |
+| Electron Client | 已切换为唯一 Windows 产品；启动时准备本机 authority | `electron-client/main.ts` | 候选打包/安装/退出冒烟 |
 | 嵌入式 PostgreSQL | 已实现 SCRAM、持久化和清理失败关闭 | `electron-client/embedded-postgres.ts` | 候选包真实运行 |
-| 页面联机适配 | 已切换为 `RvBColyseus` | `data/pages/js/colyseus-client.js` | 双端交互和断线恢复 |
+| 页面联机适配 | 已切换为 `RvBColyseus`；原 session 重连与精确 receipt 查询有自动回归 | `data/pages/js/colyseus-client.js` | 双端交互和断线恢复 |
 | Android | 本任务不修改 | Android 自身任务 | 后续独立合同 |
 | 独立 Relay | 本任务不修改 | `relay-server/` | 后续独立合同 |
 

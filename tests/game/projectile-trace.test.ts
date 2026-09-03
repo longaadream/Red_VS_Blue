@@ -24,12 +24,19 @@ import type { SkillDefinition } from '@/lib/game/skills'
 import { executeSkillFunction } from '@/lib/game/skills'
 import { traceProjectile } from '@/lib/game/spatial'
 import { prepareAction, targetRefKey } from '@/lib/game/targeting'
+import { applyBattleAction } from '@/lib/game/turn'
+import type { BattleState } from '@/lib/game/turn'
+import { globalTriggerSystem } from '@/lib/game/triggers'
 import { makePiece, makeState } from '../helpers/minimal-state'
 
 const PROJECTILE_SKILL_IDS = [
   'sleep-dart',
   'blackwidow-lethal-strike',
   'hellfire-shotgun',
+] as const
+const EMPTY_FIRE_SKILL_IDS = [
+  'hellfire-shotgun',
+  'venom-symbiote-drag',
 ] as const
 beforeEach(() => {
   vi.spyOn(console, 'log').mockImplementation(() => undefined)
@@ -46,6 +53,20 @@ function namedPiece(overrides: Parameters<typeof makePiece>[0]) {
   const piece = makePiece(overrides) as any
   piece.name = overrides?.instanceId || piece.instanceId
   return piece
+}
+
+function withTargetCredentials(state: BattleState, action: Record<string, any>) {
+  const draft = { ...action }
+  delete draft.targetPieceId
+  delete draft.targetX
+  delete draft.targetY
+  const prepared = prepareAction(state, draft as any)
+  if (prepared.kind !== 'needTarget') throw new Error(`Expected target selection: ${JSON.stringify(prepared)}`)
+  return {
+    ...action,
+    selectionId: prepared.selectionId,
+    stateRevision: prepared.stateRevision,
+  }
 }
 
 function setTerrain(state: any, x: number, type: 'floor' | 'wall' | 'cover' | 'hole', bulletPassable: boolean) {
@@ -241,14 +262,15 @@ describe('projectile targeting and presentation contract', () => {
     const keys = new Set(prepared.kind === 'needTarget' ? prepared.candidates.map(targetRefKey) : [])
     expect(keys.has('cell:2,2')).toBe(false)
     expect(keys.has('cell:3,3')).toBe(false)
-    if (skillId !== 'hellfire-shotgun') expect(keys.has('cell:3,2')).toBe(true)
+    expect(keys.has('cell:3,2')).toBe(true)
   })
 
-  it('only highlights shotgun directions containing a piece before blocking terrain', () => {
+  it.each(EMPTY_FIRE_SKILL_IDS)('keeps empty and terrain-blocked cardinal directions selectable for %s', (skillId) => {
     const caster = namedPiece({ instanceId: 'caster', ownerPlayerId: 'player-red', x: 2, y: 2 })
-    const rightTarget = namedPiece({ instanceId: 'right-target', ownerPlayerId: 'player-blue', x: 4, y: 2 })
-    const state = makeState({ pieces: [caster, rightTarget], width: 6, height: 5 }) as any
-    const skill = loadSkill('hellfire-shotgun')
+    const state = makeState({ pieces: [caster], width: 6, height: 5 }) as any
+    const blocker = state.map.tiles.find((tile: any) => tile.x === 3 && tile.y === 2)
+    blocker.props = { ...blocker.props, type: 'wall', walkable: false, bulletPassable: false }
+    const skill = loadSkill(skillId)
     state.skillsById[skill.id] = skill
     caster.skills = [{ skillId: skill.id, currentCooldown: 0, usesRemaining: -1 }]
 
@@ -258,8 +280,47 @@ describe('projectile targeting and presentation contract', () => {
     expect(prepared.kind).toBe('needTarget')
     const candidates = prepared.kind === 'needTarget' ? prepared.candidates : []
 
-    expect(candidates).not.toHaveLength(0)
-    expect(candidates.every(ref => ref.type === 'cell' && ref.y === 2 && ref.x > 2)).toBe(true)
+    expect(new Set(candidates.map(targetRefKey))).toEqual(new Set([
+      'cell:0,2', 'cell:1,2', 'cell:3,2', 'cell:4,2', 'cell:5,2',
+      'cell:2,0', 'cell:2,1', 'cell:2,3', 'cell:2,4',
+    ]))
+  })
+
+  it.each(EMPTY_FIRE_SKILL_IDS)('commits empty and terrain-blocked %s releases without target effects', (skillId) => {
+    for (const blocked of [false, true]) {
+      const caster = namedPiece({ instanceId: 'caster', ownerPlayerId: 'player-red', x: 0, y: 0 })
+      caster.skills = [{ skillId, currentCooldown: 0, usesRemaining: -1 }]
+      const state = makeState({ pieces: [caster], width: 6, height: 1, currentPlayerId: 'player-red', phase: 'action' }) as any
+      const skill = loadSkill(skillId)
+      state.skillsById[skillId] = skill
+      state.players[0].actionPoints = 2
+      if (blocked) setTerrain(state, 2, 'wall', false)
+
+      const beforePiece = JSON.parse(JSON.stringify(caster))
+      vi.mocked(globalTriggerSystem.checkTriggers).mockClear()
+      const next = applyBattleAction(state, withTargetCredentials(state, {
+        type: 'useBasicSkill', playerId: 'player-red', pieceId: 'caster', skillId,
+        targetX: 5, targetY: 0,
+      }) as any) as any
+
+      expect(next.players[0].actionPoints).toBe(1)
+      expect(next.pieces).toHaveLength(1)
+      expect(next.pieces[0]).toMatchObject({
+        instanceId: beforePiece.instanceId,
+        x: beforePiece.x,
+        y: beforePiece.y,
+        currentHp: beforePiece.currentHp,
+        statusTags: beforePiece.statusTags,
+      })
+      expect(next.pieces[0].skills[0].currentCooldown).toBe(1)
+      expect(next.actions.filter((entry: any) => entry.type === 'useBasicSkill')).toHaveLength(1)
+      const actionRecord = next.actions.find((entry: any) => entry.type === 'useBasicSkill')
+      expect(actionRecord).toMatchObject({
+        payload: { skillId, pieceId: 'caster' },
+      })
+      expect(actionRecord).not.toHaveProperty('outcome')
+      expect(vi.mocked(globalTriggerSystem.checkTriggers).mock.calls.filter(([, context]) => context.type === 'afterSkillUsed')).toHaveLength(1)
+    }
   })
 
   it('contains no migrated projectile skill IDs in engine or authoritative targeting code', () => {

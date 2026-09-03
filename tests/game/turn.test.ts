@@ -455,6 +455,36 @@ describe('projectile target validation', () => {
 })
 
 describe('interrupted skill release', () => {
+  it('releases a skill once against a generic before-skill replacement target', () => {
+    const caster = makePiece({ instanceId: 'rewrite-caster', ownerPlayerId: 'player-red', x: 0, y: 0 })
+    const original = makePiece({ instanceId: 'rewrite-original', ownerPlayerId: 'player-blue', x: 1, y: 0, faction: 'blue' })
+    const replacement = makePiece({ instanceId: 'rewrite-replacement', ownerPlayerId: 'player-blue', x: 0, y: 1, faction: 'blue' })
+    ;(caster as any).skills = [{ skillId: 'rewrite-test', currentCooldown: 0, usesRemaining: -1 }]
+    const state = makeState({ pieces: [caster, original, replacement], currentPlayerId: 'player-red', phase: 'action' }) as any
+    state.skillsById['rewrite-test'] = {
+      id: 'rewrite-test', name: 'Rewrite Test', description: '', kind: 'active', type: 'normal',
+      cooldownTurns: 2, maxCharges: 0, powerMultiplier: 1, actionPointCost: 1,
+      range: 'single', requiresTarget: true,
+      targeting: { steps: [{ kind: 'target', type: 'piece', filter: 'enemy', range: 3 }] },
+      code: "function executeSkill(context) { context.battle.extensions.hitTarget = context.target.instanceId; context.battle.extensions.releases = (context.battle.extensions.releases || 0) + 1; return { success: true }; }",
+    }
+    vi.mocked(globalTriggerSystem.checkTriggers).mockImplementation((_, context: any) => (
+      context.type === 'beforeSkillUse'
+        ? { success: true, messages: [], blocked: false, targetReplacementPieceId: replacement.instanceId }
+        : TRIGGER_OK
+    ) as any)
+
+    const next = applyBattleAction(state, withTargetCredentials(state, {
+      type: 'useBasicSkill', playerId: 'player-red', pieceId: caster.instanceId,
+      skillId: 'rewrite-test', targetPieceId: original.instanceId,
+    }) as any) as any
+
+    expect(next.extensions).toMatchObject({ hitTarget: replacement.instanceId, releases: 1 })
+    expect(next.players[0].actionPoints).toBe(1)
+    expect(next.pieces.find((piece: any) => piece.instanceId === caster.instanceId).skills[0].currentCooldown).toBe(2)
+    vi.mocked(globalTriggerSystem.checkTriggers).mockImplementation(() => TRIGGER_OK)
+  })
+
   it('resumes a pending skill trigger without replaying before consumers', () => {
     const caster = makePiece({ instanceId: 'pending-caster', ownerPlayerId: 'player-red', x: 0, y: 0 })
     const state = makeState({ pieces: [caster], currentPlayerId: 'player-red', phase: 'action' }) as any

@@ -1,0 +1,16 @@
+{
+  "id": "dark-aizen",
+  "name": "蓝染惣右介",
+  "faction": "evil",
+  "description": "以镜花水月误导敌人，并用灵压压制弱者的控制型角色。",
+  "rarity": "legendary",
+  "image": "aizen.jpg",
+  "stats": { "maxHp": 9, "attack": 4, "defense": 0, "moveRange": 4 },
+  "skills": [
+    { "skillId": "aizen-kyoka-suiguetsu", "level": 1 },
+    { "skillId": "aizen-shunpo", "level": 1 },
+    { "skillId": "aizen-black-coffin", "level": 1 }
+  ],
+  "rules": ["rule-aizen-kyoka-rewrite", "rule-aizen-kyoka-expire"],
+  "isDefault": false
+}

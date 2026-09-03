@@ -1,0 +1,6 @@
+<!-- Derived from Lucide move-right; Lucide ISC license applies. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#e2e8f0" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" role="img">
+  <title>强制位移或传送</title>
+  <path d="M18 8L22 12L18 16" />
+  <path d="M2 12H22" />
+</svg>

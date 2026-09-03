@@ -1,0 +1,20 @@
+{
+  "id": "aizen-kyoka-suiguetsu",
+  "name": "镜花水月",
+  "description": "秘密选择4格内1名友军。对方下回合以单体技能指定该角色时，可将目标转移给蓝染3格内另1名敌人。",
+  "keywords": [],
+  "targetText": "4格内1名友军",
+  "effectTags": ["秘密", "目标转移"],
+  "icon": "🌫️",
+  "kind": "active",
+  "type": "normal",
+  "cooldownTurns": 1,
+  "maxCharges": 0,
+  "powerMultiplier": 1,
+  "actionPointCost": 1,
+  "range": "single",
+  "requiresTarget": true,
+  "concealTargetInBattleLog": true,
+  "targeting": { "steps": [{ "kind": "target", "type": "piece", "filter": "ally", "range": 4 }] },
+  "code": "function executeSkill(context) { var caster = context.piece; var ally = selectTarget({ type: 'piece', range: 4, filter: 'ally' }); if (!ally || ally.needsTargetSelection) return ally; caster.statusTags = (caster.statusTags || []).filter(function(tag) { return tag.type !== 'aizen-kyoka-active' && tag.type !== 'aizen-kyoka-secret'; }); var opponent = battle.players.find(function(player) { return player.playerId !== caster.ownerPlayerId; }); caster.statusTags.push({ id: 'aizen-kyoka-active-' + caster.instanceId, type: 'aizen-kyoka-active', name: '镜花水月', visible: false, currentUses: 1, stacks: 1 }); caster.statusTags.push({ id: 'aizen-kyoka-secret-' + caster.instanceId, type: 'aizen-kyoka-secret', name: '镜花水月·秘密目标', visible: false, currentUses: 1, stacks: 1, targetPieceId: ally.instanceId, opponentPlayerId: opponent && opponent.playerId }); return { success: true, message: caster.name + '发动镜花水月' }; }"
+}

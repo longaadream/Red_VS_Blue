@@ -17,6 +17,8 @@
     const input = options || {}
     const renderer = input.renderer
     const domUi = input.domUi
+    const historyUi = input.historyUi || null
+    const vignetteUi = input.vignetteUi || null
     const onIntent = typeof input.onIntent === 'function' ? input.onIntent : function () {}
     let mounted = false
     let currentModel = null
@@ -25,6 +27,8 @@
       if (!intent || !INTENT_TYPES.has(intent.type)) {
         throw new Error('Unsupported battle UI intent: ' + String(intent && intent.type))
       }
+      if (intent.type === 'viewport-change' && vignetteUi && vignetteUi.resize) vignetteUi.resize()
+      if (intent.type === 'viewport-change' && historyUi && historyUi.resize) historyUi.resize()
       onIntent(intent)
     }
 
@@ -38,6 +42,31 @@
         floatLayer: mountInput.floatLayer || null,
         onIntent: dispatch,
       })
+      if (historyUi && historyUi.mount) {
+        historyUi.mount({
+          element: mountInput.historyDock || null,
+          setHistoryHighlight: function (cells) { return renderer.setHistoryHighlight(cells) },
+        })
+      }
+      if (vignetteUi && vignetteUi.mount) {
+        vignetteUi.mount({
+          boardContainer: mountInput.boardContainer,
+          floatLayer: mountInput.floatLayer || null,
+          projectCell: function (x, y, elevation) { return renderer.projectCell(x, y, elevation) },
+          showAreaFlash: function (cells) {
+            if (renderer.showPresentationAreaFlash) renderer.showPresentationAreaFlash(cells)
+          },
+          clearAreaFlash: function () {
+            if (renderer.clearPresentationAreaFlash) renderer.clearPresentationAreaFlash()
+          },
+          showPath: function (path) {
+            if (renderer.showPresentationPath) renderer.showPresentationPath(path)
+          },
+          clearPath: function () {
+            if (renderer.clearPresentationPath) renderer.clearPresentationPath()
+          },
+        })
+      }
       mounted = true
     }
 
@@ -46,6 +75,8 @@
       currentModel = model
       renderer.update(model)
       domUi.update(model)
+      if (vignetteUi && vignetteUi.update) vignetteUi.update(model)
+      if (historyUi && historyUi.update) historyUi.update(model)
     }
 
     function animateAction(action, previousModel, nextModel) {
@@ -56,7 +87,12 @@
       if (mounted && renderer.spawnFloater) renderer.spawnFloater(x, y, text, color, big, options)
     }
 
-    function resize() { if (mounted) renderer.resize() }
+    function resize() {
+      if (!mounted) return
+      renderer.resize()
+      if (vignetteUi && vignetteUi.resize) vignetteUi.resize()
+      if (historyUi && historyUi.resize) historyUi.resize()
+    }
     function resetView() { if (mounted && renderer.resetView) renderer.resetView() }
     function projectCell(x, y, elevation) { return renderer.projectCell(x, y, elevation) }
     function screenToCell(clientX, clientY) { return renderer.screenToCell(clientX, clientY) }
@@ -65,6 +101,8 @@
       if (!mounted) return
       renderer.dispose()
       domUi.dispose()
+      if (vignetteUi && vignetteUi.dispose) vignetteUi.dispose()
+      if (historyUi && historyUi.dispose) historyUi.dispose()
       mounted = false
       currentModel = null
     }

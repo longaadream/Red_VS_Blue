@@ -1,12 +1,12 @@
 # Red VS Blue 当前架构
 
-更新：2026-09-01（RED-158 Phase F）
+更新：2026-09-03（RED-158 Phase F 主线同步）
 
 ## 1. 结论
 
-Windows 玩家产品只有 Electron Client。它承载静态页面与 Profile HTTP 服务；玩家选择本机开服时，
-Electron 按需启动应用私有的 PostgreSQL 实例和 Colyseus authority。远端玩家只连接 authority origin，
-不会启动本机数据库或房间服务。
+Windows 玩家产品只有 Electron Client。它承载静态页面与 Profile HTTP 服务，并在启动时准备应用私有的
+PostgreSQL 实例和 Colyseus authority；本机训练、PVE 与 Host & Play 复用这套进程。选择远端服务器时，
+玩家对局只连接所选 authority origin，本机预热的 authority 不接管或镜像远端对局。
 
 Windows 联机和战报没有第二套实现：
 
@@ -24,11 +24,10 @@ Android 与独立 Relay 属于其他交付边界，不能作为 Windows 的运�
 Electron Client
 ├─ Profile HTTP process
 ├─ packaged static pages
-└─ on local hosting only
-   ├─ embedded PostgreSQL
-   └─ Colyseus authority
-      ├─ HTTP: health, room catalog, battle reports
-      └─ BattleRoom: admission, commands, state, reconnect
+├─ embedded PostgreSQL
+└─ Colyseus authority
+   ├─ HTTP: health, room catalog, battle reports
+   └─ BattleRoom: admission, commands, state, reconnect
 ```
 
 客户端只持有一个规范化 authority origin。LAN 发现、手工地址和邀请加入都先验证同源
@@ -54,16 +53,21 @@ player intent
   → per-room FIFO
   → deterministic Battle Runner
   → next state + receipt + transition + trace/hash evidence
-  → PostgreSQL transaction/journal
-  → Colyseus receipt and viewer-specific public state
+  ├→ Colyseus APPLIED receipt and viewer-specific public state
+  └→ bounded PostgreSQL journal → durable watermark
 ```
 
 命令必须带 `clientActionId` 和期望 authority version。重复 ID 幂等返回；旧版本要求恢复；超前版本、
 错误协议/build/Profile、未入座玩家或非法规则动作均失败关闭。失败不得推进版本或随机 cursor。
 
+页面切换时，`RvBColyseus` 使用 sessionStorage 中的 Colyseus reconnection token 恢复原 session，不再次
+`joinById` 占座。瞬时掉线通过原 Room 的 native reconnection 恢复；直接 receipt 丢失时按原
+`clientActionId` 查询精确结果。所有等待均有界，失败后解除本地 pending 并显示稳定错误。
+
 ## 5. 耐久与恢复
 
-对局从 version-zero Checkpoint 开始。PostgreSQL 保存连续版本前缀，周期性与终局 Checkpoint，终局 Trace
+对局从 version-zero Checkpoint 开始。普通 APPLIED 不等待 PostgreSQL；客户端通过
+`authorityVersion - durableAuthorityVersion` 观察尚未耐久的尾部。PostgreSQL 保存连续版本前缀，周期性与终局 Checkpoint，终局 Trace
 和 Terminal Barrier。恢复时验证协议/build、版本、action/state/public/transition hash 链、receipt 关联及
 Checkpoint 重放一致性。存在缺口或篡改时房间不可恢复，战报也不可读取。
 

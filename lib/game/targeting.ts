@@ -1,8 +1,13 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- RED-59 validates legacy data-authored definitions and action envelopes at runtime. */
 import type { PieceInstance } from './piece'
 import { getSkillById } from './skill-repository'
-import { getEffectiveChargeCost, loadCardById } from './skills'
-import { manhattanDistance, traceProjectile } from './spatial'
+import { getEffectiveChargeCost, loadCardById, loadRuleById } from './skills'
+import {
+  getLegalSkillLandingCells,
+  gridPositionKey,
+  manhattanDistance,
+  type GridPosition,
+} from './spatial'
 import type { BattleAction, BattleState } from './turn'
 import type { PendingReactiveCardRef } from './pending-interaction'
 import type {
@@ -17,10 +22,6 @@ export type TargetRef =
   | { type: 'cell'; x: number; y: number }
 
 export type TargetFilter = 'enemy' | 'ally' | 'all' | 'self'
-
-export interface ProjectileTargetingRequirement {
-  requiredCollision: 'piece-before-blocker'
-}
 
 export interface TargetConstraint {
   type: 'piece' | 'cell'
@@ -48,7 +49,8 @@ export interface TargetConstraint {
   requireExtensionCell?: { path: string; sourceIdField?: string }
   ignoreOccupantSelectedTargetIndex?: number
   requireEnemyWithinRange?: number
-  projectile?: ProjectileTargetingRequirement
+  distanceFromSelectedTarget?: { index: number; range: number }
+  targetRuleIds?: string[]
 }
 
 export type TargetValidationCode =
@@ -63,6 +65,7 @@ export type TargetValidationCode =
   | 'TARGET_SOURCE_CELL_FORBIDDEN'
   | 'TARGET_NOT_ORTHOGONAL'
   | 'TARGET_SOURCE_CONSTRAINT_FAILED'
+  | 'TARGET_RULE_FAILED'
   | 'TARGET_REFERENCE_MISMATCH'
 
 export interface TargetValidationIssue {
@@ -164,7 +167,7 @@ export interface PendingTargetStep {
   requireExtensionCell?: { path: string; sourceIdField?: string }
   ignoreOccupantSelectedTargetIndex?: number
   requireEnemyWithinRange?: number
-  projectile?: ProjectileTargetingRequirement
+  distanceFromSelectedTarget?: { index: number; range: number }
 }
 
 export interface PendingTargetSelectionSession {
@@ -220,7 +223,6 @@ interface TargetSpec {
   allowSourceOccupantOptions?: unknown[]
   sameRowOrColumn?: boolean
   excludeSourceCell?: boolean
-  projectile?: ProjectileTargetingRequirement
   excludeSourcePiece?: boolean
   forbiddenColumns?: number[]
   forbiddenTargetStatuses?: string[]
@@ -230,6 +232,7 @@ interface TargetSpec {
   requireExtensionCell?: { path: string; sourceIdField?: string }
   ignoreOccupantSelectedTargetIndex?: number
   requireEnemyWithinRange?: number
+  distanceFromSelectedTarget?: { index: number; range: number }
 }
 
 interface OptionSpec {
@@ -246,6 +249,18 @@ interface TargetSource {
   ownerPlayerId: string
   sourcePieceId?: string
   steps: SelectionStepSpec[]
+  targetRuleIds?: string[]
+}
+
+function targetRuleIdsFromDefinition(definition: any): string[] {
+  const tags = Array.isArray(definition?.statusTag)
+    ? definition.statusTag
+    : definition?.statusTag ? [definition.statusTag] : []
+  const ids = tags.flatMap((tag: any) => [
+    typeof tag?.rule === 'string' ? tag.rule : undefined,
+    ...(Array.isArray(tag?.rules) ? tag.rules : []),
+  ]).filter((id: unknown): id is string => typeof id === 'string' && id.length > 0)
+  return [...new Set<string>(ids)]
 }
 
 function issue(code: TargetValidationCode, message: string): TargetValidationIssue {
@@ -349,8 +364,9 @@ function getDeclaredSteps(definition: any, kind: 'skill' | 'card'): SelectionSte
           : undefined,
         ignoreOccupantSelectedTargetIndex: Number.isInteger(raw.ignoreOccupantSelectedTargetIndex) ? raw.ignoreOccupantSelectedTargetIndex : undefined,
         requireEnemyWithinRange: typeof raw.requireEnemyWithinRange === 'number' ? raw.requireEnemyWithinRange : undefined,
-        projectile: raw.projectile?.requiredCollision === 'piece-before-blocker'
-          ? { requiredCollision: 'piece-before-blocker' }
+        distanceFromSelectedTarget: Number.isInteger(raw.distanceFromSelectedTarget?.index)
+          && typeof raw.distanceFromSelectedTarget?.range === 'number'
+          ? { index: raw.distanceFromSelectedTarget.index, range: raw.distanceFromSelectedTarget.range }
           : undefined,
       })
     }
@@ -504,7 +520,13 @@ function getSource(state: BattleState, action: any): TargetSource | InvalidActio
     if (!steps) {
       return { kind: 'invalid', code: 'TARGET_DECLARATION_MISSING', message: `Skill ${action.skillId} requires a declarative selection contract` }
     }
-    return { actionId: action.skillId, ownerPlayerId: playerId, sourcePieceId: sourcePiece.instanceId, steps }
+    return {
+      actionId: action.skillId,
+      ownerPlayerId: playerId,
+      sourcePieceId: sourcePiece.instanceId,
+      steps,
+      targetRuleIds: targetRuleIdsFromDefinition(definition),
+    }
   }
 
   if (action.type === 'playCard') {
@@ -631,7 +653,7 @@ function constraintFor(
     allowSourceOccupant: spec.allowSourceOccupant || spec.allowSourceOccupantOptions?.some(
       option => Object.is(option, selectedOption),
     ),
-    projectile: spec.projectile,
+    targetRuleIds: selectedTargets.length === 0 ? source.targetRuleIds : undefined,
   }
   return constraint
 }
@@ -695,22 +717,29 @@ function validateSourceSpecificCell(
     }
   }
 
+  if (constraint.distanceFromSelectedTarget) {
+    const selected = constraint.selectedTargets?.[constraint.distanceFromSelectedTarget.index]
+    const selectedPosition = selected?.type === 'piece'
+      ? state.pieces.find(piece => piece.instanceId === selected.pieceId && piece.currentHp > 0)
+      : selected
+    if (!selectedPosition || selectedPosition.x == null || selectedPosition.y == null
+      || manhattanDistance(selectedPosition, ref) > constraint.distanceFromSelectedTarget.range) {
+      return issue('TARGET_SOURCE_CONSTRAINT_FAILED', 'Target cell is too far from the selected target')
+    }
+  }
+
   return undefined
 }
 
 function hasOpenCardinalLanding(state: BattleState, target: PieceInstance, sourcePieceId?: string): boolean {
   if (target.x == null || target.y == null) return false
-  const targetX = target.x
-  const targetY = target.y
-  return [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => {
-    const x = targetX + dx
-    const y = targetY + dy
-    const tile = state.map.tiles.find(candidate => candidate.x === x && candidate.y === y)
-    if (!tile?.props?.walkable) return false
-    return !state.pieces.some(piece =>
-      piece.currentHp > 0 && piece.instanceId !== sourcePieceId && piece.x === x && piece.y === y,
-    )
-  })
+  const candidates = [[1, 0], [-1, 0], [0, 1], [0, -1]].map(([dx, dy]) => ({
+    x: target.x! + dx,
+    y: target.y! + dy,
+  }))
+  return getLegalSkillLandingCells(state, candidates, {
+    movingPieceIds: sourcePieceId ? [sourcePieceId] : [],
+  }).length > 0
 }
 
 function validateSourceSpecificPiece(
@@ -733,35 +762,33 @@ function validateSourceSpecificPiece(
   return undefined
 }
 
-function validateProjectileRequirement(
-  state: BattleState,
-  constraint: TargetConstraint,
-  ref: Extract<TargetRef, { type: 'cell' }>,
+function validateTargetRules(
+  source: PieceInstance,
+  target: PieceInstance,
+  ruleIds: readonly string[],
 ): TargetValidationIssue | undefined {
-  if (constraint.projectile?.requiredCollision !== 'piece-before-blocker') return undefined
-  const sourcePiece = getSourcePiece(state, constraint)
-  if (!sourcePiece || sourcePiece.x == null || sourcePiece.y == null) {
-    return issue('TARGET_SOURCE_MISSING', 'A positioned source is required for projectile targeting')
-  }
-  const direction = {
-    x: Math.sign(ref.x - sourcePiece.x),
-    y: Math.sign(ref.y - sourcePiece.y),
-  }
-  if (Math.abs(direction.x) + Math.abs(direction.y) !== 1) {
-    return issue('TARGET_NOT_ORTHOGONAL', 'Projectile direction must be cardinal')
+  for (const ruleId of ruleIds) {
+    const rule = loadRuleById(ruleId)
+    const validation = rule?.targetValidation
+    if (!validation) return issue('TARGET_RULE_FAILED', `Target rule ${ruleId} is unavailable`)
+    if (validation.type !== 'comparePieceNumber') {
+      return issue('TARGET_RULE_FAILED', `Target rule ${ruleId} is unsupported`)
+    }
+    const sourceValue = Number((source as any)[validation.sourceField])
+    const targetValue = Number((target as any)[validation.targetField])
+    if (!Number.isFinite(sourceValue) || !Number.isFinite(targetValue)) {
+      return issue('TARGET_RULE_FAILED', validation.message || `Target rule ${ruleId} could not compare its fields`)
+    }
+    const passed = validation.operator === 'gt' ? sourceValue > targetValue
+      : validation.operator === 'gte' ? sourceValue >= targetValue
+        : validation.operator === 'lt' ? sourceValue < targetValue
+          : validation.operator === 'lte' ? sourceValue <= targetValue
+            : validation.operator === 'eq' ? sourceValue === targetValue
+              : sourceValue !== targetValue
+    if (!passed) return issue('TARGET_RULE_FAILED', validation.message || `Target rule ${ruleId} failed`)
   }
 
-  const events = traceProjectile(state, { x: sourcePiece.x, y: sourcePiece.y }, direction, {
-    excludePieceId: sourcePiece.instanceId,
-    maxDistance: constraint.range,
-  })
-  for (const event of events) {
-    if (event.type === 'piece') return undefined
-    if (event.type === 'terrain' && event.blocksProjectile) {
-      return issue('TARGET_SOURCE_CONSTRAINT_FAILED', 'Blocking terrain appears before any living piece')
-    }
-  }
-  return issue('TARGET_SOURCE_CONSTRAINT_FAILED', 'No living piece is in the selected projectile direction')
+  return undefined
 }
 
 export function validateTargetRef(
@@ -802,7 +829,12 @@ export function validateTargetRef(
     if (constraint.sameRowOrColumn && sourcePiece && sourcePiece.x !== target.x && sourcePiece.y !== target.y) {
       return issue('TARGET_NOT_ORTHOGONAL', 'Target must be in the same row or column as the source')
     }
-    return validateSourceSpecificPiece(state, constraint, target)
+    const sourceIssue = validateSourceSpecificPiece(state, constraint, target)
+    if (sourceIssue) return sourceIssue
+    if (sourcePiece && constraint.targetRuleIds?.length) {
+      return validateTargetRules(sourcePiece, target, constraint.targetRuleIds)
+    }
+    return undefined
   }
 
   const tile = state.map.tiles.find(candidate => candidate.x === ref.x && candidate.y === ref.y)
@@ -841,8 +873,6 @@ export function validateTargetRef(
     )
     if (occupied) return issue('TARGET_OCCUPIED', `Cell (${ref.x},${ref.y}) is occupied`)
   }
-  const projectileIssue = validateProjectileRequirement(state, constraint, ref)
-  if (projectileIssue) return projectileIssue
   return validateSourceSpecificCell(state, constraint, ref)
 }
 
@@ -859,6 +889,18 @@ function enumerateCandidates(
   }
 }
 
+/** Authoritative candidate IDs for generic before-skill target replacement rules. */
+export function enumeratePrimaryPieceTargetIds(state: BattleState, draftCommand: BattleAction | any): string[] {
+  const source = getSource(state, draftCommand)
+  if ('kind' in source) return []
+  const primary = source.steps.find(step => step.kind === 'target')
+  if (!primary || primary.kind !== 'target' || primary.type !== 'piece') return []
+  const constraint = constraintFor(source, primary, source.steps.indexOf(primary), [], draftCommand.selectedOption)
+  return enumerateCandidates(state, constraint).candidates.flatMap(candidate => (
+    candidate.type === 'piece' ? [candidate.pieceId] : []
+  ))
+}
+
 function validateCredential(
   state: BattleState,
   action: any,
@@ -873,6 +915,52 @@ function validateCredential(
     return { kind: 'invalid', code: 'TARGET_SELECTION_ID_MISMATCH', message: 'Target selection ID does not match this action and state' }
   }
   return undefined
+}
+
+/**
+ * Reports whether an action definition resolves through exactly one piece-target step.
+ * This deliberately uses the normalized targeting source so legacy selectTarget skill
+ * code and declarative targeting.steps definitions share the same trigger semantics.
+ */
+export function isSinglePieceTargetAction(state: BattleState, draftCommand: BattleAction | any): boolean {
+  const source = getSource(state, draftCommand)
+  if ('kind' in source) return false
+  const targetSteps = source.steps.filter(step => step.kind === 'target') as TargetSpec[]
+  return targetSteps.length === 1 && targetSteps[0].type === 'piece'
+}
+
+/**
+ * Empty cells selected as destinations are reserved while beforeSkillUse and
+ * afterSkillUsed reactions settle. This prevents a reaction from consuming a
+ * cell the enclosing action has already authoritatively promised.
+ */
+export function getReservedSkillLandingCells(
+  state: BattleState,
+  draftCommand: BattleAction | any,
+): GridPosition[] {
+  const source = getSource(state, draftCommand)
+  if ('kind' in source) return []
+  const selected = getSelectedTargets(state, draftCommand)
+  if (!Array.isArray(selected)) return []
+
+  const reserved: GridPosition[] = []
+  let targetIndex = 0
+  for (const step of source.steps) {
+    if (step.kind !== 'target') continue
+    const target = selected[targetIndex]
+    targetIndex += 1
+    if (step.requireUnoccupied && target?.type === 'cell') {
+      reserved.push({ x: target.x, y: target.y })
+    }
+  }
+
+  const seen = new Set<string>()
+  return reserved.filter(position => {
+    const key = gridPositionKey(position)
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
 }
 
 export function prepareAction(state: BattleState, draftCommand: BattleAction | any): ActionPreparation {
@@ -1058,7 +1146,6 @@ function pendingConstraint(pending: PendingTargetSelectionSession): TargetConstr
     requireExtensionCell: activeStep?.requireExtensionCell,
     ignoreOccupantSelectedTargetIndex: activeStep?.ignoreOccupantSelectedTargetIndex,
     requireEnemyWithinRange: activeStep?.requireEnemyWithinRange,
-    projectile: activeStep?.projectile,
   }
 }
 

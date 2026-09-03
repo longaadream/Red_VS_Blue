@@ -55,6 +55,10 @@ describe('RED-161 default player transport', () => {
     expect(main).toContain("path.join(process.resourcesPath, 'postgres', 'pgsql')")
     expect(main).toContain('safeStorage.encryptString(plaintext)')
     expect(main).toContain('await embeddedPostgres.stop()')
+    expect(main).toContain('expectedAuthorityExits.add(gameProc)')
+    expect(main).toContain('reason=confirmed-postgres-process-loss')
+    expect(main).toContain('void recoverUnexpectedLocalAuthorityExit(code)')
+    expect(main).toContain('signal=${signal ?? \'null\'}')
     expect(main).toContain("localUrl: `http://127.0.0.1:${actualGamePort}`")
     expect(main).toContain("var url = 'http://127.0.0.1:${actualGamePort}';")
     expect(packageJson.scripts['build:electron:client']).toContain('npm run build:colyseus')
@@ -71,14 +75,47 @@ describe('RED-161 default player transport', () => {
     expect(builder.extraResources).toContainEqual({ from: '_client-postgres', to: 'postgres' })
   })
 
-  it('starts the LAN database lazily while remote joiners only start the Profile service', async () => {
+  it('removes legacy raw player WebSocket authority from dev/start and candidate startup', async () => {
+    const packageJson = JSON.parse(await readFile(path.join(ROOT, 'package.json'), 'utf8'))
     const main = await readFile(path.join(ROOT, 'electron-client', 'main.ts'), 'utf8')
-    const readyHandler = main.slice(main.indexOf('app.whenReady().then'), main.indexOf("app.on('window-all-closed'"))
-    const openLocalHandler = main.slice(main.indexOf("handleTrusted('open-local-game'"), main.indexOf("handleTrusted('get-mode'"))
 
-    expect(readyHandler).toContain('await startStableProfileServerAndRecover()')
-    expect(readyHandler).not.toContain('await startStableLocalServerAndRecover()')
-    expect(openLocalHandler).toContain('await startStableLocalServerAndRecover(openingGeneration)')
+    expect(packageJson.scripts.dev).toBe('next dev')
+    expect(packageJson.scripts.start).toBe('next start')
+    await expect(readFile(path.join(ROOT, 'instrumentation.ts'), 'utf8')).rejects.toThrow()
+    expect(main).not.toContain('DISABLE_WS')
+  })
+
+  it('bounds authority recovery to three attempts and keeps non-match recovery silent', async () => {
+    const main = await readFile(path.join(ROOT, 'electron-client', 'main.ts'), 'utf8')
+    expect(main).toContain('if (!expectedExit) void recoverUnexpectedLocalAuthorityExit(code)')
+    expect(main).toContain('const LOCAL_AUTHORITY_AUTO_RECOVERY_MAX_ATTEMPTS = 3')
+    expect(main).toContain('localAuthorityRecoveryBudget.claimAttempt()')
+    expect(main).toContain('localAuthorityRecoveryBudget.recordFailure()')
+    expect(main).toContain('localAuthorityRecoveryBudget.recordSuccess()')
+    expect(main).toContain('localAuthorityRecoveryBudget.rearm()')
+    expect(main).toContain("'manual-required'")
+    const recovery = main.slice(
+      main.indexOf('function recoverUnexpectedLocalAuthorityExit('),
+      main.indexOf('async function startLocalGameAuthority(', main.indexOf('function recoverUnexpectedLocalAuthorityExit(')),
+    )
+    expect(recovery).not.toContain('loadLocalGame()')
+    expect(main).not.toContain('setInterval(recoverUnexpectedLocalAuthorityExit')
+  })
+
+  it('prepares the local authority automatically and opens the main menu without the connection gate', async () => {
+    const main = await readFile(path.join(ROOT, 'electron-client', 'main.ts'), 'utf8')
+    const index = await readFile(path.join(ROOT, 'data', 'pages', 'index.html'), 'utf8')
+    const readyHandler = main.slice(main.indexOf('app.whenReady().then'), main.indexOf("app.on('window-all-closed'"))
+
+    expect(readyHandler).toContain('await startStableLocalServerAndRecover()')
+    expect(readyHandler).toContain('loadLocalGame()')
+    expect(readyHandler).not.toContain('openConnectWindow()')
+    expect(main).toContain("handleTrusted('ensure-local-authority', ['game']")
+    expect(main).toContain("path.join(logDir, 'authority.log')")
+    expect(main).toContain("'postgresql://<redacted>@'")
+    expect(index).toContain('async function retryHostService()')
+    expect(index).toContain('await showHostSheet(true)')
+    expect(index).toContain("forceRetry === true")
   })
 
   it('shows a stable fail-closed diagnostic when the bundled authority cannot start', async () => {
