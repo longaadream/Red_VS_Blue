@@ -455,6 +455,11 @@
             <header class="panel-header">
               <h2 class="panel-title">开始冒险</h2>
               <p class="panel-description">进入独立 PVE 模式，在完整战斗流程中挑战 AI。</p>
+              <label for="pveDifficulty" style="display:block;margin-top:16px;color:#94a3b8">对手难度</label>
+              <select id="pveDifficulty" style="margin-top:8px;padding:10px 12px;background:#0f172a;color:#e2e8f0;border:1px solid #334155;border-radius:8px">
+                <option value="easy" selected>简单 · sample-v1</option>
+                <option value="normal">普通 · zimse-v1</option>
+              </select>
             </header>
             <div class="action-stack">
               <button class="action-button action-feature" id="pveBtn" type="button" onclick="startPve()">
@@ -989,6 +994,7 @@
 
     // ── PVE single-player ─────────────────────────────────────────────────────
     async function startPve() {
+      const difficulty = document.getElementById('pveDifficulty').value
       if (window.electronAPI && typeof window.electronAPI.ensureLocalAuthority === 'function') {
         const result = await window.electronAPI.ensureLocalAuthority()
         if (!result?.ok) {
@@ -1014,7 +1020,7 @@
       if (desc) desc.textContent = '创建 PVE 房间中…'
       try {
         const profileIdentity = await getLocalGameProfileIdentity(serverUrl)
-        const room = await RvBWs.requestAt(serverUrl, 'rooms.create', { mode: 'pve', hostId, hostName: playerName, mapId: 'large-hole-arena', profileIdentity }, 7000)
+        const room = await RvBWs.requestAt(serverUrl, 'rooms.create', { mode: 'pve', difficulty, hostId, hostName: playerName, mapId: 'large-hole-arena', profileIdentity }, 7000)
         const params = new URLSearchParams({ roomId: room.id, playerId: hostId, playerName })
         window.location.href = 'piece-selection.html?' + params
       } catch (e) {

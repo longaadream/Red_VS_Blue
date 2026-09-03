@@ -364,3 +364,7 @@ export function aiPlanTraceHash(plan: AiTurnPlan): string {
     trace: plan.trace,
   })
 }
+
+// The zero-stage selector shares the same player-level planning boundary: one
+// authoritative action is returned and callers replan after the accepted state.
+export { planZeroStageAction, zeroStageDecisionTraceHash } from './ai-zero-stage-agent'

@@ -6,6 +6,15 @@ import { describe, expect, it } from 'vitest'
 const page = readFileSync(resolve(process.cwd(), 'data/pages/index.html'), 'utf8')
 
 describe('RED-171 game-style main menu layout contract', () => {
+  it('offers the two PvE difficulties and forwards the chosen value', () => {
+    expect(page).toContain('for="pveDifficulty"')
+    expect(page).toContain('<option value="easy" selected>简单 · sample-v1</option>')
+    expect(page).toContain('<option value="normal">普通 · zimse-v1</option>')
+    expect(page).toContain("const difficulty = document.getElementById('pveDifficulty').value")
+    expect(page).toContain("{ mode: 'pve', difficulty,")
+    const transport = readFileSync(resolve(process.cwd(), 'data/pages/js/ws-client.js'), 'utf8')
+    expect(transport).toContain('difficulty: payload.difficulty,')
+  })
   it('establishes the four-mode navigation with online play selected by default', () => {
     expect(page).toContain('class="game-shell"')
     expect(page).toContain('role="tablist" aria-label="游戏模式"')

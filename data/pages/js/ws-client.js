@@ -381,6 +381,7 @@
         mapId: payload.mapId,
         visibility: payload.visibility,
         mode: payload.mode,
+        difficulty: payload.difficulty,
         playerId: hostId,
         playerName: payload.hostName || payload.playerName,
         profileIdentity: payload.profileIdentity || storedProfileIdentity(),

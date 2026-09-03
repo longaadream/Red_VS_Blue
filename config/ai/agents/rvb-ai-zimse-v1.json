@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 7,
+  "agentId": "rvb-ai-zimse-v1",
+  "kind": "zero-stage",
+  "description": "Aggressive one-step legal-action evaluator that values the position created by spending resources, prioritizes enemy cores, and advances into high-potential positions.",
+  "candidateMode": "all-legal",
+  "maxActionsPerTurn": 8,
+  "terminal": {
+    "win": 1000000,
+    "loss": -1000000,
+    "draw": 0
+  },
+  "weights": {
+    "coreSurvival": 200000,
+    "survival": 10000,
+    "graveyard": 10000,
+    "health": 80000,
+    "combatPower": 300,
+    "shield": 30000,
+    "resources": 0,
+    "actionability": 150,
+    "deploymentReadiness": 500000,
+    "turnProgress": 0,
+    "lethalOpportunity": 5000,
+    "attackPressure": 2000,
+    "status": 400,
+    "positionSafety": 2500,
+      "strategicPosition": 5000,
+    "enemyProximity": 80000,
+    "futureAttackPotential": 2000,
+    "supportPotential": 400,
+      "mobilityPotential": 500,
+    "terrainValue": 700
+  }
+}

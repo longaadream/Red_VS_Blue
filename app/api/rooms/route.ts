@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { getPveAiProfile, PveDifficultyError } from '@/lib/game/pve-ai'
 import { getPlayerSeat, getRoomStore, type Room } from '@/lib/game/room-store'
 import { assertSelectableMapId, getMapSelectionErrorPayload } from '@/lib/game/map-selection'
 import {
@@ -32,6 +33,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'hostId is required' }, { status: 400 })
     }
     const selectedMapId = assertSelectableMapId(mapId)
+    const botProfile = getPveAiProfile(body.difficulty)
 
     const roomStore = getRoomStore()
     const roomId = 'pve-' + hostId.slice(0, 8) + '-' + Date.now().toString(36)
@@ -64,13 +66,14 @@ export async function POST(req: NextRequest) {
     // Add bot player (blue)
     room.players.push({
       id: 'bot',
-      name: 'AI',
+      name: botProfile.name,
       seat: 'blue' as const,
       faction: 'blue' as const,
       alignment: 'dark' as const,
       joinedAt: Date.now(),
       ready: true,
       isBot: true,
+      botDifficulty: botProfile.difficulty,
       hasSelectedPieces: false,
       selectedPieces: [],
       profileIdentity: serverProfileIdentity,
@@ -81,8 +84,11 @@ export async function POST(req: NextRequest) {
     room.maxPlayers = 2
 
     await roomStore.setRoom(roomId, room)
-    return NextResponse.json({ id: roomId, status: room.status, mapId: selectedMapId, profileIdentity: serverProfileIdentity })
+    return NextResponse.json({ id: roomId, status: room.status, mapId: selectedMapId, difficulty: botProfile.difficulty, profileIdentity: serverProfileIdentity })
   } catch (error) {
+    if (error instanceof PveDifficultyError) {
+      return NextResponse.json({ error: error.message, code: error.code }, { status: 400 })
+    }
     if (getGameProfileErrorPayloadV1(error)) {
       return profileErrorResponse(error)
     }

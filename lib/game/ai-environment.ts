@@ -1,4 +1,12 @@
-import { getBattleRootSeed, hashBattleState, hashStable, stableJson } from './battle-trace'
+import {
+  compactBattleTraceForAuthority,
+  getBattleRootSeed,
+  getOrCreateDebugMetadata,
+  hashBattleState,
+  hashStable,
+  readDebugMetadata,
+  stableJson,
+} from './battle-trace'
 import { runBattleActionIsolated } from './battle-runner'
 import {
   getEmptyWalkableDeploymentPositions,
@@ -8,6 +16,7 @@ import {
 } from './deployment'
 import { assertPendingOptionCancellation, validatePendingOptionSubmission } from './pending-interaction'
 import { getSkillById } from './skill-repository'
+import { loadCardById } from './skills'
 import { getLegalNormalMoveTargetsForPlayer } from './spatial'
 import {
   assertPendingTargetCancellation,
@@ -23,6 +32,7 @@ import {
   AI_ENVIRONMENT_V2_PROTOCOL_VERSION,
   type AIDecisionSpaceV2,
   type AIEnvironment,
+  type AIActionResourceCost,
   type AIEnvironmentCapabilities,
   type AIEnvironmentError,
   type AIEnvironmentV2,
@@ -124,7 +134,7 @@ function observedStatusTag(tag: unknown): AIObservedStatusTag | undefined {
     return undefined
   }
   const projected: AIObservedStatusTag = { id: source.id, type: source.type }
-  const stringKeys = ['name'] as const
+  const stringKeys = ['name', 'sourcePlayerId'] as const
   const numberKeys = [
     'currentDuration', 'remainingDuration', 'currentUses', 'intensity', 'stacks',
     'value', 'extraValue', 'centerX', 'centerY', 'damage',
@@ -536,6 +546,40 @@ export function listLegalAIActions(state: BattleState, playerId: string): Candid
   return sortCandidates(actions)
 }
 
+const ZERO_RESOURCE_COST: AIActionResourceCost = Object.freeze({ actionPoints: 0, chargePoints: 0 })
+
+function nonNegativeCost(value: unknown): number {
+  return typeof value === 'number' && Number.isFinite(value) ? Math.max(0, value) : 0
+}
+
+/** Reads only the formal resource costs used by the authority runner. */
+export function getAIActionResourceCost(
+  state: BattleState,
+  playerId: string,
+  input: CandidateAction | BattleAction,
+): AIActionResourceCost {
+  const action = 'action' in input ? input.action : input
+  if (action.type === 'move') return { actionPoints: 1, chargePoints: 0 }
+  if (action.type === 'useBasicSkill' || action.type === 'useChargeSkill') {
+    const definition = state.skillsById?.[action.skillId] || getSkillById(action.skillId)
+    if (!definition) return { ...ZERO_RESOURCE_COST }
+    return {
+      actionPoints: nonNegativeCost(definition.actionPointCost),
+      chargePoints: action.type === 'useChargeSkill' ? nonNegativeCost(definition.chargeCost) : 0,
+    }
+  }
+  if (action.type === 'playCard') {
+    const player = state.players.find(item => samePlayer(item.playerId, playerId))
+    const card = player?.hand.find(item => item.instanceId === action.cardInstanceId)
+    const definition = card ? loadCardById(card.cardId) ?? state.customCards?.[card.cardId] : undefined
+    return {
+      actionPoints: nonNegativeCost(card?.actionPointCost ?? definition?.actionPointCost),
+      chargePoints: 0,
+    }
+  }
+  return { ...ZERO_RESOURCE_COST }
+}
+
 function traceState(state: BattleState): Record<string, unknown> {
   const cloned = cloneSerializable(state) as unknown as Record<string, unknown>
   delete cloned.skillsById
@@ -579,6 +623,23 @@ function transitionTrace(before: BattleState, after: BattleState, actionTrace?: 
   }
 }
 
+const PUBLICLY_BLOCKABLE_ACTION_TYPES = new Set<BattleAction['type']>([
+  'move', 'useBasicSkill', 'useChargeSkill', 'playCard',
+])
+
+function publiclyBlockedTransition(before: BattleState, after: BattleState, action: BattleAction) {
+  if (!PUBLICLY_BLOCKABLE_ACTION_TYPES.has(action.type)) return false
+  const playerId = 'playerId' in action && typeof action.playerId === 'string'
+    ? action.playerId
+    : before.turn.currentPlayerId
+  if (!playerId) return false
+  const withoutTargetingRevision = (candidate: BattleState) => {
+    const observation = observeBattleForAI(candidate, playerId)
+    return { ...observation, stateRevision: 0 }
+  }
+  return stableJson(withoutTargetingRevision(before)) === stableJson(withoutTargetingRevision(after))
+}
+
 function stableError(error: unknown): AIEnvironmentError {
   const value = error as {
     code?: unknown
@@ -596,6 +657,39 @@ function stableError(error: unknown): AIEnvironmentError {
   }
 }
 
+function evaluationSimulationState(state: BattleState): BattleState {
+  const metadata = readDebugMetadata(state)
+  const extensions = { ...(state.extensions ?? {}) }
+  extensions.debugBattle = {
+    appliedActionIds: [...metadata.appliedActionIds],
+    actionLog: [...metadata.actionLog],
+    commandLog: [...metadata.commandLog],
+    authority: metadata.authority ? {
+      ...metadata.authority,
+      runtimeCursors: { ...metadata.authority.runtimeCursors },
+    } : undefined,
+  }
+  const compacted = compactBattleTraceForAuthority({ ...state, extensions })
+  const compactedMetadata = getOrCreateDebugMetadata(compacted)
+  // Authority compaction normally clears duplicate-command history because
+  // persisted commands are independently versioned. Speculative evaluation
+  // must retain it so explicit action IDs behave exactly like the full path.
+  compactedMetadata.appliedActionIds = [...metadata.appliedActionIds]
+  return compacted
+}
+
+function restoreEvaluationTerminalActionIndex(result: ReturnType<typeof runBattleActionIsolated>): void {
+  const settledAt = result.state.terminalResult?.settledAt
+  const actionIndex = result.trace?.index
+  if (!settledAt || actionIndex === undefined || settledAt.actionIndex === actionIndex) return
+
+  // finalizeBattleTerminal stores this same result object in the observable
+  // terminal event payload, so update the shared settlement in place.
+  settledAt.actionIndex = actionIndex
+  result.stateHash = hashBattleState(result.state)
+  if (result.trace) result.trace.postStateHash = result.stateHash
+}
+
 export function simulateAITransition(
   state: BattleState,
   input: CandidateAction | BattleAction,
@@ -603,7 +697,11 @@ export function simulateAITransition(
 ): TransitionResult {
   const action = 'action' in input ? input.action : input
   const rootSeed = context.rootSeed ?? getBattleRootSeed(state)
-  const preStateHash = hashBattleState(state)
+  const evaluationMode = context.simulationMode === 'evaluation'
+  const simulationState = evaluationMode
+    ? evaluationSimulationState(state)
+    : state
+  let preStateHash = evaluationMode ? undefined : hashBattleState(simulationState)
   try {
     if (rootSeed === undefined) {
       throw new AIEnvironmentContractError(
@@ -611,9 +709,25 @@ export function simulateAITransition(
         'A root seed or initialized battle trace is required for deterministic simulation',
       )
     }
-    const result = runBattleActionIsolated(state, action, { rootSeed })
-    const trace = transitionTrace(state, result.state, result.trace)
-    const transitionHash = hashStable({
+    const result = runBattleActionIsolated(simulationState, action, {
+      rootSeed,
+      stateHashIndex: context.stateHashIndex,
+    })
+    if (evaluationMode) restoreEvaluationTerminalActionIndex(result)
+    preStateHash ??= result.trace?.preStateHash ?? hashBattleState(simulationState)
+    const trace: AITransitionTrace = evaluationMode
+      ? { actionTrace: result.trace, actionLog: [], stateChanges: [] }
+      : transitionTrace(simulationState, result.state, result.trace)
+    if (publiclyBlockedTransition(simulationState, result.state, action)) trace.blocked = true
+    const transitionHash = hashStable(evaluationMode ? {
+      protocolVersion: AI_ENVIRONMENT_PROTOCOL_VERSION,
+      mode: 'evaluation',
+      accepted: true,
+      action,
+      preStateHash,
+      stateHash: result.stateHash,
+      blocked: trace.blocked === true,
+    } : {
       protocolVersion: AI_ENVIRONMENT_PROTOCOL_VERSION,
       accepted: true,
       action,
@@ -631,9 +745,13 @@ export function simulateAITransition(
     }
   } catch (caught) {
     const error = stableError(caught)
-    const trace = transitionTrace(state, state)
+    preStateHash ??= hashBattleState(simulationState)
+    const trace = evaluationMode
+      ? { actionLog: [], stateChanges: [] }
+      : transitionTrace(simulationState, simulationState)
     const transitionHash = hashStable({
       protocolVersion: AI_ENVIRONMENT_PROTOCOL_VERSION,
+      ...(evaluationMode ? { mode: 'evaluation' } : {}),
       accepted: false,
       action,
       preStateHash,
@@ -643,7 +761,7 @@ export function simulateAITransition(
     return {
       protocolVersion: AI_ENVIRONMENT_PROTOCOL_VERSION,
       accepted: false,
-      state,
+      state: simulationState,
       stateHash: preStateHash,
       transitionHash,
       error,

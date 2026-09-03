@@ -33,12 +33,16 @@ planner 与 self-play 的结构动作白名单必须认识该候选。它不能�
 终局护栏约束。每次权威提交后必须从新状态重新枚举，不能把旧 `expectedDeploymentRevision` 或候选
 带到下一步。
 
-桌面 WebSocket 实时 bot 不使用搜索结果为部署位置估值：它固定提交 AI Environment 稳定排序后的
+简单难度的实时 bot 不使用搜索结果为部署位置估值：它固定提交 AI Environment 稳定排序后的
 第一个 `reserve-deployment`，随后直接进入既有 pending 或普通行动逻辑。部署核心的
 `deployment-first-move-free` statusTag 只由权威普通移动 reducer 决定 0 AP 结果；planner 不新增
 专用 action，也不复制扣费或标签规则。这是可回放的流程存活策略，不修改任何 utility 权重，也不作为 AI 强度或 RED-138
 节奏体验的验收基准。RED-117 formal PVE adapter 与 Android mobile-server 仍使用
 `legacy-reroll-v1`。
+
+RED-122 普通难度接入 `planZeroStageAction()`，对每个合法部署候选隔离模拟一次并按部署后局面选择；
+每次只提交一个动作并从最新状态重算，不沿用简单难度的批次。当前玩家入口为 Colyseus BattleRoom，
+而非 legacy raw WS。两档映射和计时/护栏边界见 [AI_ZERO_STAGE](./AI_ZERO_STAGE.md)。
 
 ## 搜索、安全与确定性
 
@@ -109,6 +113,12 @@ manifest 是内容准入来源而非规划器私有名单，其 hash 继续由 R
 | RED-86 planner | 24/24 样本非法动作 0 | 24/24 完成 | 每样本固定上限 8，总计范围 24–192 |
 
 这个对照只记录合法性、回合完成和可观察节点，不推导或虚构胜率目标。旧 `generateBotActions()` 继续作为受控回归入口；新规划器没有替换权威提交，也没有第二套规则合法性实现。RED-138 的最小实时 bot 部署策略同样只证明流程可操作，不进入这个强度对照。
+
+## RED-122 零阶段选择器
+
+`ai-planner.ts` 同时重新导出正式 ID 为 `rvb-ai-zimse-v1` 的 `planZeroStageAction()` 和 `zeroStageDecisionTraceHash()`。它们复用同一个 player-level 权威边界，但不改变本文件的 RED-86 Beam Search：零阶段选择器对全部严格合法动作做稳定语义排序，并对每个动作各执行一次隔离模拟，直接比较动作后 `F(S')`，只返回一个 `nextAction`，要求权威状态更新后重新调用。调用方同时回传本回合已提交动作数；默认第 8 个动作只允许权威 `endTurn`，防止单步正收益造成无界长回合。
+
+位置价值与未来攻击、支援、机动和生存潜力直接属于静态估价；`resources` 将未使用费用视为当前回合的机会成本，同分优先费用更高的合法动作。攻击、追敌移动、技能和结束回合等全部严格合法策略都实际模拟后再比较；被沉默或打坐阻止的候选只淘汰自身，不会占据名额而阻止其他策略受测。候选估价通过 AI 环境的 `simulationMode: evaluation` 压缩历史 replay 与诊断 diff，但继续调用同一隔离规则 runner；最终动作仍走完整权威 transition。零阶段不生成费用不足候选，也不枚举第二层动作。算法、权重、诊断和限制详见 [`AI_ZERO_STAGE.md`](./AI_ZERO_STAGE.md)。
 
 ## 回退
 

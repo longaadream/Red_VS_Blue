@@ -4,6 +4,7 @@ import type { BattleAction, BattleActionLog, BattleState, TurnState } from './tu
 import type { TerminalResult } from './terminal'
 import type { TargetRef } from './targeting'
 import type { BattleActionTrace } from './battle-trace'
+import type { BattleStateHashIndex } from './battle-state-hash'
 
 export const AI_ENVIRONMENT_PROTOCOL_VERSION = 1 as const
 
@@ -61,6 +62,7 @@ export interface AIObservedStatusTag {
   id: string
   type: string
   name?: string
+  sourcePlayerId?: string
   currentDuration?: number
   remainingDuration?: number
   currentUses?: number
@@ -171,6 +173,8 @@ export interface AITransitionTrace {
   actionTrace?: BattleActionTrace
   actionLog: BattleActionLog[]
   stateChanges: AIStateDiffEntry[]
+  /** Authority accepted the command, but a public before-action rule blocked its core effect. */
+  blocked?: boolean
 }
 
 export interface AIEnvironmentError {
@@ -208,6 +212,13 @@ export type TransitionResult =
 
 export interface AISimulationContext {
   rootSeed?: number
+  /** Reusable canonical pre-state index shared by every candidate in one decision. */
+  stateHashIndex?: BattleStateHashIndex
+  /**
+   * Evaluation mode preserves gameplay/RNG semantics while omitting historical
+   * replay diagnostics from the isolated input used for speculative scoring.
+   */
+  simulationMode?: 'full' | 'evaluation'
 }
 
 export type AIObservationScope =
@@ -226,6 +237,11 @@ export interface AIEnvironment {
   ): TransitionResult
   isTerminal(state: BattleState): boolean
   stateKey(state: BattleState, scope: AIObservationScope): string
+}
+
+export interface AIActionResourceCost {
+  actionPoints: number
+  chargePoints: number
 }
 
 export const AI_ENVIRONMENT_V2_PROTOCOL_VERSION = 2 as const
@@ -483,4 +499,83 @@ export interface AiTurnPlan {
   stateDuplicates: number
   stopReason: AiPlannerStopReason
   trace: AiPlannerTraceEntry[]
+}
+
+export const ZERO_STAGE_AI_PROFILE_VERSION = 7 as const
+
+export type ZeroStageStaticComponentKey =
+  | 'coreSurvival'
+  | 'survival'
+  | 'graveyard'
+  | 'health'
+  | 'combatPower'
+  | 'shield'
+  | 'resources'
+  | 'actionability'
+  | 'deploymentReadiness'
+  | 'turnProgress'
+  | 'lethalOpportunity'
+  | 'attackPressure'
+  | 'status'
+  | 'positionSafety'
+  | 'strategicPosition'
+  | 'enemyProximity'
+  | 'futureAttackPotential'
+  | 'supportPotential'
+  | 'mobilityPotential'
+  | 'terrainValue'
+
+export interface ZeroStageConfig {
+  version: typeof ZERO_STAGE_AI_PROFILE_VERSION
+  candidateMode: 'all-legal'
+  maxActionsPerTurn: number
+  terminal: Readonly<{ win: number; loss: number; draw: number }>
+  weights: Readonly<Record<ZeroStageStaticComponentKey, number>>
+}
+
+export interface ZeroStageStaticComponent {
+  raw: number
+  weight: number
+  contribution: number
+}
+
+export interface ZeroStageStaticEvaluation {
+  total: number
+  terminalOutcome?: 'win' | 'loss' | 'draw'
+  components: Readonly<Record<ZeroStageStaticComponentKey, ZeroStageStaticComponent>>
+}
+
+export interface ZeroStageCandidateTrace {
+  candidateId: string
+  action: BattleAction
+  staticValue?: number
+  evaluation?: ZeroStageStaticEvaluation
+  actionCost: AIActionResourceCost
+  compatibility: AiCompatibility
+  blocked?: boolean
+  pruned?: string
+  rejected?: string
+}
+
+export type ZeroStageStopReason = 'selected' | 'terminal' | 'no-legal-actions' | 'budget-exhausted'
+export type ZeroStageSelectionReason =
+  | 'only-scored-candidate'
+  | 'terminal-outcome'
+  | 'static-value'
+  | 'resource-cost'
+  | 'end-turn'
+  | 'stable-action'
+  | 'candidate-id'
+
+export interface ZeroStageDecision {
+  configVersion: typeof ZERO_STAGE_AI_PROFILE_VERSION
+  playerId: string
+  stateValue: number
+  nextAction?: CandidateAction
+  nodesVisited: number
+  candidatesConsidered: number
+  budgetExhausted: boolean
+  stopReason: ZeroStageStopReason
+  selectionReason?: ZeroStageSelectionReason
+  trace: ZeroStageCandidateTrace[]
 }
