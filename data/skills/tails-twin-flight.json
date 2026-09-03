@@ -2,7 +2,7 @@
   "id": "tails-twin-flight",
   "name": "双尾飞行",
   "description": "选择4格内另一名友军及两个上下左右相邻、未被占据或预留的7格内空地/掩体落点；预留落点两回合，两者获得持续2回合的免疫与不可操作，随后同时搬运。",
-  "effectTags": ["搬运", "获得动能", "使其他角色获得动能"],
+  "effectTags": ["搬运"],
   "icon": "✈️",
   "kind": "active",
   "type": "normal",

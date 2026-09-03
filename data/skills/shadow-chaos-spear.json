@@ -1,1 +1,22 @@
-{"id":"shadow-chaos-spear","name":"混沌之矛","description":"对一名敌人造成100%攻击力物理伤害，并偷取其2点移动范围至己方下回合开始。","icon":"🔱","kind":"active","type":"normal","cooldownTurns":1,"maxCharges":0,"powerMultiplier":1,"actionPointCost":1,"code":"function executeSkill(context){var c=context.piece,t=selectTarget({type:'piece',range:99,filter:'enemy'});if(!t||t.needsTargetSelection)return t;var r=dealDamage(c,t,c.attack,'physical',context.battle,context.skill.id);var old=(c.statusTags||[]).find(function(tag){return tag.type==='chaos-spear-theft';});if(old)return {success:false,message:'混沌之矛的移速偷取尚未归还'};t.moveRange=(t.moveRange||0)-2;c.moveRange=(c.moveRange||0)+2;c.statusTags=c.statusTags||[];c.statusTags.push({id:'chaos-spear-theft-'+c.instanceId+'-'+t.instanceId,type:'chaos-spear-theft',name:'混沌之矛',targetId:t.instanceId,intensity:2,currentDuration:-1,relatedRules:['rule-shadow-chaos-spear-restore']});addRuleById(c.instanceId,'rule-shadow-chaos-spear-restore');return {success:true,message:'造成'+r.damage+'点伤害并偷取2点移动范围'};}"}
+{
+  "id": "shadow-chaos-spear",
+  "name": "混沌之矛",
+  "description": "对4格内一名敌人造成50%攻击力的物理伤害，并偷取其2点移动范围至己方下回合开始。",
+  "icon": "🔱",
+  "kind": "active",
+  "type": "normal",
+  "cooldownTurns": 1,
+  "maxCharges": 0,
+  "powerMultiplier": 0.5,
+  "actionPointCost": 1,
+  "targeting": {
+    "steps": [{
+      "kind": "target",
+      "type": "piece",
+      "filter": "enemy",
+      "range": 4,
+      "distanceMetric": "manhattan"
+    }]
+  },
+  "code": "function executeSkill(context){var c=context.piece,t=selectTarget({type:'piece',range:4,filter:'enemy'});if(!t||t.needsTargetSelection)return t;var old=(c.statusTags||[]).find(function(tag){return tag.type==='chaos-spear-theft';});if(old)return {success:false,message:'混沌之矛的移速偷取尚未归还'};var r=dealDamage(c,t,Math.floor(c.attack*0.5),'physical',context.battle,context.skill.id);t.moveRange=(t.moveRange||0)-2;c.moveRange=(c.moveRange||0)+2;c.statusTags=c.statusTags||[];c.statusTags.push({id:'chaos-spear-theft-'+c.instanceId+'-'+t.instanceId,type:'chaos-spear-theft',name:'混沌之矛',targetId:t.instanceId,intensity:2,currentDuration:-1,relatedRules:['rule-shadow-chaos-spear-restore']});addRuleById(c.instanceId,'rule-shadow-chaos-spear-restore');return {success:true,message:'造成'+r.damage+'点伤害并偷取2点移动范围'};}"
+}
