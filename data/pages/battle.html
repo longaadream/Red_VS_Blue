@@ -4135,7 +4135,14 @@
       await commitTutorialScriptAction(shot, { quiet: true })
       await commitTutorialScriptAction({ type: 'endTurn', playerId: tutorialDefinition.opponent.playerId }, { quiet: true })
       await commitTutorialScriptAction({ type: 'beginPhase' }, { quiet: true })
-      window.RvBTutorialScenario.openPlayerDeployment(G, tutorialDefinition)
+    }
+
+    function handleTutorialStepCompleted(stepId) {
+      if (stepId === 'review-defense') {
+        window.RvBTutorialScenario.openPlayerDeployment(G, tutorialDefinition)
+        localDeploymentChoiceId = null
+        render()
+      }
     }
 
     function tutorialPause(duration) {
@@ -4185,6 +4192,8 @@
           }
         },
         runOpponentResponse: runTutorialOpponentResponse,
+        onStepCompleted: handleTutorialStepCompleted,
+        showActionHistory: switchPieceInfoToActionHistory,
         setMessage: setStatusMsg,
         exitTutorial: function () { window.location.href = 'index.html' },
       })

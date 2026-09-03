@@ -289,6 +289,20 @@ describe('battle page route contract', () => {
     expect(lobby).not.toMatch(/location\.href\s*=\s*['"]training\.html/)
   })
 
+  it('keeps the tutorial opening review visible before reserve deployment begins', () => {
+    const battlePage = readPage('battle.html')
+    const tutorialRuntime = readFileSync(resolve(pagesDir, 'js/tutorial/tutorial-runtime.js'), 'utf8')
+    const opening = battlePage.match(/async function runTutorialOpening\(\) \{([\s\S]*?)\n    \}/)?.[1] || ''
+
+    expect(opening).not.toContain('openPlayerDeployment')
+    expect(battlePage).toContain("if (stepId === 'review-defense')")
+    expect(battlePage).toContain('RvBTutorialScenario.openPlayerDeployment(G, tutorialDefinition)')
+    expect(tutorialRuntime).toContain("step.advance.type === 'history-item'")
+    expect(tutorialRuntime).toContain('hooks.showActionHistory()')
+    expect(tutorialRuntime).toContain("const historyDock = document.getElementById('actionHistoryDock')")
+    expect(tutorialRuntime).toContain("historyDock.addEventListener('click', onHistoryClick)")
+  })
+
   it('keeps training.html as a compatibility redirect without battle interactions', () => {
     const legacyTrainingPage = readPage('training.html')
     const battlePage = readPage('battle.html')

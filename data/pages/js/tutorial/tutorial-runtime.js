@@ -99,12 +99,18 @@
         button('结束教学', 'is-primary', function () { finish(false) })
         button('留在棋盘练练', '', function () { finish(true) })
       }
+      if (step.advance.type === 'history-item' && hooks && typeof hooks.showActionHistory === 'function') {
+        hooks.showActionHistory()
+      }
       applyCue(step)
     }
 
     async function afterAdvance(result) {
-      render()
       const id = result && result.completedStep && result.completedStep.id
+      if (id && hooks && typeof hooks.onStepCompleted === 'function') {
+        await hooks.onStepCompleted(id)
+      }
+      render()
       if (id === 'end-player-turn-one' || id === 'end-player-turn-two') {
         busy = true
         render()
@@ -144,7 +150,9 @@
       hooks.exitTutorial()
     })
 
-    function onDocumentClick(event) {
+    const historyDock = document.getElementById('actionHistoryDock')
+
+    function onHistoryClick(event) {
       if (busy || controller.snapshot().step?.advance.type !== 'history-item') return
       const target = event.target && event.target.closest
         ? event.target.closest('[data-history-root-id], .action-history-entry, .action-history-item')
@@ -158,7 +166,7 @@
       }
       accept({ type: 'history-item', label: actualLabel })
     }
-    document.addEventListener('click', onDocumentClick, true)
+    if (historyDock) historyDock.addEventListener('click', onHistoryClick)
 
     render()
     return Object.freeze({
@@ -174,7 +182,7 @@
       snapshot: controller.snapshot,
       dispose: function () {
         disposed = true
-        document.removeEventListener('click', onDocumentClick, true)
+        if (historyDock) historyDock.removeEventListener('click', onHistoryClick)
         hooks.setCue(null)
         root.remove()
       },
