@@ -81,7 +81,7 @@ function createWindow(): void {
     minWidth: 900,
     minHeight: 600,
     title: 'RED vs BLUE — 数据编辑器',
-    backgroundColor: '#09090b',
+    backgroundColor: '#0d0f12',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -144,6 +144,39 @@ handleTrusted('write-file', (_e, subdir: string, filename: string, data: unknown
   const file = safePath(subdir, filename, 'write')
   fs.writeFileSync(file, JSON.stringify(data, null, 2) + '\n', 'utf-8')
   return { ok: true }
+})
+
+// ─── IPC: 创建文件并登记 manifest ──────────────────────────────────────────────
+
+handleTrusted('create-file', (_e, subdir: string, id: string, data: unknown) => {
+  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(id)) {
+    throw new Error('ID 只能包含小写字母、数字和单个连字符')
+  }
+  if (!data || Array.isArray(data) || typeof data !== 'object' || (data as { id?: unknown }).id !== id) {
+    throw new Error('JSON 的 id 必须与文件 ID 完全一致')
+  }
+
+  const file = safePath(subdir, `${id}.json`, 'write')
+  const manifestFile = safePath(subdir, 'manifest.json', 'write')
+  if (fs.existsSync(file)) throw new Error(`文件已存在: ${id}.json`)
+
+  const manifest = JSON.parse(fs.readFileSync(manifestFile, 'utf-8')) as unknown
+  if (!Array.isArray(manifest) || !manifest.every(value => typeof value === 'string')) {
+    throw new Error('manifest.json 必须是字符串数组')
+  }
+  if (manifest.includes(id)) throw new Error(`manifest 已包含 ID: ${id}`)
+
+  const nextManifest = [...manifest, id].sort()
+  let created = false
+  try {
+    fs.writeFileSync(file, JSON.stringify(data, null, 2) + '\n', { encoding: 'utf-8', flag: 'wx' })
+    created = true
+    fs.writeFileSync(manifestFile, JSON.stringify(nextManifest, null, 2) + '\n', 'utf-8')
+  } catch (error) {
+    if (created && fs.existsSync(file)) fs.unlinkSync(file)
+    throw error
+  }
+  return { ok: true, filename: `${id}.json` }
 })
 
 // ─── IPC: 在系统编辑器中打开 ───────────────────────────────────────────────────

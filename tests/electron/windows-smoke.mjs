@@ -1473,6 +1473,37 @@ async function smokeEditorDistribution(candidate, distribution) {
     const startupMilliseconds = Date.now() - startedAt
     const counts = await evaluate(target, `Promise.all(['pieces', 'skills', 'cards', 'rules'].map(async (directory) => [directory, (await window.editorAPI.listFiles(directory)).length]))`)
     assert(counts.every(([, count]) => count > 0), `Editor could not list packaged data files: ${JSON.stringify(counts)}`)
+    const jsonAuthoring = await evaluate(target, `(async () => {
+      document.querySelector('[data-new-document="pieces"]').click()
+      document.getElementById('create-id').value = 'red178-smoke-piece'
+      document.getElementById('create-name').value = 'RED-178 Smoke Piece'
+      document.getElementById('create-form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
+      const source = document.querySelector('[data-json-source]')
+      const template = JSON.parse(source.value)
+      template.unknownSmokeField = { preserved: true }
+      source.value = JSON.stringify(template, null, 2)
+      source.dispatchEvent(new Event('input', { bubbles: true }))
+      document.querySelector('[data-save-json]').click()
+      const deadline = Date.now() + 10000
+      while (Date.now() < deadline && document.querySelector('[data-footer-state]').textContent !== '已保存') {
+        await new Promise(resolve => setTimeout(resolve, 50))
+      }
+      const written = await window.editorAPI.readFile('pieces', 'red178-smoke-piece.json')
+      const manifest = await window.editorAPI.readFile('pieces', 'manifest.json')
+      return {
+        templateFields: Object.keys(template),
+        written,
+        manifestIncludesId: manifest.includes('red178-smoke-piece'),
+        saveDisabled: document.querySelector('[data-save-json]').disabled,
+      }
+    })()`, true, 30000)
+    assert(
+      jsonAuthoring.written?.unknownSmokeField?.preserved === true
+        && jsonAuthoring.manifestIncludesId === true
+        && jsonAuthoring.templateFields.includes('stats')
+        && jsonAuthoring.templateFields.includes('skills'),
+      `Packaged Editor JSON authoring failed: ${JSON.stringify(jsonAuthoring)}`,
+    )
     const visibleOperations = await evaluate(target, `({
       tabs: [...document.querySelectorAll('[data-pipeline-operation]')].map((node) => node.dataset.pipelineOperation),
       forms: [...document.querySelectorAll('[data-operation-form]')].map((node) => node.dataset.operationForm),
@@ -1606,6 +1637,7 @@ async function smokeEditorDistribution(candidate, distribution) {
       startupMilliseconds,
       rendererBoundary,
       dataFileCounts: Object.fromEntries(counts),
+      jsonAuthoring,
       visibleOperations,
       sourceCheckoutUnavailable: true,
       systemNodeUnavailable: true,
@@ -1637,6 +1669,35 @@ async function smokeEditorDistribution(candidate, distribution) {
       Object.values(processCountsAfterExit).every(count => count === 0),
       `Editor ${distribution.kind} left residual processes: ${JSON.stringify(processCountsAfterExit)}`,
     )
+  }
+}
+
+async function smokeEditorPortable(candidate) {
+  const smokeRoot = mkdtempSync(path.join(tmpdir(), 'rvb-red178-editor-portable-'))
+  const portableRoot = assertOwnedChild(smokeRoot, path.join(smokeRoot, 'portable'), 'Portable root')
+  const portableUserData = assertOwnedChild(smokeRoot, path.join(smokeRoot, 'portable-user'), 'Portable user data')
+  const workingDirectory = assertOwnedChild(smokeRoot, path.join(smokeRoot, 'working'), 'Editor working directory')
+  const emptyPathDirectory = assertOwnedChild(smokeRoot, path.join(smokeRoot, 'empty-path'), 'Empty PATH directory')
+  const portableSource = applications.editor.executable
+  const portableExecutable = path.join(portableRoot, path.basename(portableSource))
+  mkdirSync(portableRoot, { recursive: true })
+  mkdirSync(portableUserData, { recursive: true })
+  mkdirSync(workingDirectory, { recursive: true })
+  mkdirSync(emptyPathDirectory, { recursive: true })
+  assert(existsSync(portableSource), `Missing Editor portable candidate: ${portableSource}`)
+  cpSync(portableSource, portableExecutable)
+  const environment = hermeticEditorEnvironment(emptyPathDirectory)
+  assertNoNodeOnPath(environment, workingDirectory)
+  try {
+    await smokeEditorDistribution(candidate, {
+      kind: 'portable',
+      executable: portableExecutable,
+      userDataDir: portableUserData,
+      workingDirectory,
+      environment,
+    })
+  } finally {
+    rmSync(smokeRoot, { recursive: true, force: true })
   }
 }
 
@@ -1744,7 +1805,7 @@ const requested = process.argv.slice(2)
 const selectedEntries = requested.length > 0
   ? requested
   : ['profile', 'server', 'client', 'editor']
-const candidate = selectedEntries.some(entry => entry === 'profile' || entry === 'editor')
+const candidate = selectedEntries.some(entry => entry === 'profile' || entry === 'editor' || entry === 'editor-portable')
   ? loadContentCandidateFixture()
   : null
 const sharedUserDataDir = selectedEntries.includes('profile')
@@ -1761,6 +1822,7 @@ try {
     else if (entry === 'profile') {
       expectedIdentity = await smokeProfileActivation(candidate, sharedUserDataDir)
     } else if (entry === 'editor') await smokeEditor(candidate)
+    else if (entry === 'editor-portable') await smokeEditorPortable(candidate)
     else throw new Error(`Unknown entry: ${entry}`)
   }
 } finally {
