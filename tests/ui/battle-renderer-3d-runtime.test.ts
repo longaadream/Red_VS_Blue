@@ -37,6 +37,8 @@ type RendererApi = {
   resetView(): void
   projectCell(x: number, y: number, elevation?: number): { clientX: number; clientY: number }
   setHistoryHighlight(cells: Array<{ x: number; y: number; role: 'source' | 'target' }>): void
+  setTutorialCue(cue: { cells?: Array<{ x: number; y: number }>; path?: Array<{ x: number; y: number }> }): void
+  clearTutorialCue(): void
   screenToCell(clientX: number, clientY: number): { x: number; y: number } | null
   showPresentationAreaFlash(cells: Array<{ x: number; y: number }>): void
   clearPresentationAreaFlash(): void
@@ -54,6 +56,8 @@ type RendererApi = {
       end: { x: number; y: number } | null
       selected: { x: number; y: number } | null
     } | null
+    tutorialCueCellCount: number
+    tutorialCuePathCount: number
     highlightCounts: { move: number; skill: number; place: number; selected: number; historyPoints: number; historyPaths: number }
   }
   getPerformanceDiagnostics(): {
@@ -521,6 +525,38 @@ describe('RED-68 BattleRenderer3D runtime', () => {
     expect(harness.renderer.getMotionDiagnostics().highlightCounts.historyPoints).toBe(0)
     expect(harness.renderer.getMotionDiagnostics().highlightCounts.historyPaths).toBe(0)
     expect(harness.renderers[0].scene!.children).not.toContain(historyGroup)
+    harness.renderer.dispose()
+  })
+
+  it('renders tutorial rings, beams, and routes as disposable Three.js world geometry', () => {
+    const harness = createHarness(1280, 720, false)
+    harness.renderer.init({ container: harness.container })
+    harness.renderer.update(runtimeModel())
+    harness.renderer.setTutorialCue({
+      cells: [{ x: 4, y: 8 }, { x: 6, y: 8 }, { x: 4, y: 8 }],
+      path: [{ x: 17, y: 8 }, { x: 4, y: 8 }],
+    })
+    harness.frame(80)
+
+    const diagnostics = harness.renderer.getMotionDiagnostics()
+    expect(diagnostics.tutorialCueCellCount).toBe(2)
+    expect(diagnostics.tutorialCuePathCount).toBe(1)
+    expect(diagnostics.activeAnimations).toContain('tutorial-cue:pulse')
+    const group = harness.renderers[0].scene!.children.find(child => child.userData.tutorialCue === true)
+    expect(group).toBeTruthy()
+    expect(group!.children.filter(child => child.userData.tutorialCueRole === 'ring')).toHaveLength(2)
+    expect(group!.children.filter(child => child.userData.tutorialCueRole === 'beam')).toHaveLength(2)
+    expect(group!.children.filter(child => child.userData.tutorialCueRole === 'path')).toHaveLength(1)
+
+    const disposeBefore = { ...harness.disposeCounts }
+    harness.renderer.clearTutorialCue()
+    expect(harness.renderer.getMotionDiagnostics()).toMatchObject({
+      tutorialCueCellCount: 0,
+      tutorialCuePathCount: 0,
+    })
+    expect(harness.renderers[0].scene!.children).not.toContain(group)
+    expect(harness.disposeCounts.geometry).toBeGreaterThan(disposeBefore.geometry)
+    expect(harness.disposeCounts.material).toBeGreaterThan(disposeBefore.material)
     harness.renderer.dispose()
   })
 

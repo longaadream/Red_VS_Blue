@@ -283,8 +283,40 @@ describe('battle page route contract', () => {
   it('routes the lobby training entry to battle.html training mode', () => {
     const lobby = readPage('index.html')
 
-    expect(lobby).toContain("window.location.href = 'battle.html?mode=training'")
+    expect(lobby).toContain("window.location.href = 'battle.html?mode=' + mode")
+    expect(lobby).toContain("function goToTraining() { return goToLocalPractice('training') }")
+    expect(lobby).toContain("function goToTutorial() { return goToLocalPractice('tutorial') }")
     expect(lobby).not.toMatch(/location\.href\s*=\s*['"]training\.html/)
+  })
+
+  it('keeps the tutorial opening review visible before reserve deployment begins', () => {
+    const battlePage = readPage('battle.html')
+    const tutorialRuntime = readFileSync(resolve(pagesDir, 'js/tutorial/tutorial-runtime.js'), 'utf8')
+    const opening = battlePage.match(/async function runTutorialOpening\(\) \{([\s\S]*?)\n    \}/)?.[1] || ''
+
+    expect(opening).not.toContain('openPlayerDeployment')
+    expect(battlePage).toContain("if (stepId === 'review-defense')")
+    expect(battlePage).toContain('RvBTutorialScenario.openPlayerDeployment(G, tutorialDefinition)')
+    expect(tutorialRuntime).toContain("step.advance.type === 'history-item'")
+    expect(tutorialRuntime).toContain('hooks.showActionHistory()')
+    expect(tutorialRuntime).toContain("const historyDock = document.getElementById('actionHistoryDock')")
+    expect(tutorialRuntime).toContain("historyDock.addEventListener('click', onHistoryClick, true)")
+    expect(tutorialRuntime).toContain("'[data-history-root-id][aria-pressed=\"true\"]'")
+    expect(tutorialRuntime).toContain('acceptHistoryTarget(clickedTarget || selectedTarget)')
+  })
+
+  it('leaves time to read the opponent action before advancing the tutorial turn', () => {
+    const battlePage = readPage('battle.html')
+    const opponentResponse = readNamedAsyncFunction(battlePage, 'runTutorialOpponentResponse')
+
+    expect(battlePage).toContain('const TUTORIAL_OPPONENT_WINDUP_MS = 650')
+    expect(battlePage).toContain('const TUTORIAL_OPPONENT_RESULT_DWELL_MS = 1400')
+    expect(battlePage).toContain('await tutorialPause(TUTORIAL_OPPONENT_WINDUP_MS)')
+    expect(battlePage).toContain('await tutorialPause(TUTORIAL_OPPONENT_RESULT_DWELL_MS)')
+    expect(opponentResponse).toContain('battleActionVignette.settleAll()')
+    expect(opponentResponse.indexOf('battleActionVignette.settleAll()')).toBeLessThan(
+      opponentResponse.indexOf('await tutorialPause(TUTORIAL_OPPONENT_WINDUP_MS)'),
+    )
   })
 
   it('keeps training.html as a compatibility redirect without battle interactions', () => {
