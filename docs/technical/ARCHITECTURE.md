@@ -81,6 +81,10 @@ schema 或完整性错误仍立即失败。Electron 的就绪 watchdog 必须覆
 Replay Frame 和 Terminal Barrier。只有 online version 与 durable version 相等、终局完整且所有 hash 验证通过
 时才返回报告。页面不保存或生成另一份权威战报。
 
+战绩列表对每局分别执行同一验证：损坏或未达到 durable terminal barrier 的记录会保留在 PostgreSQL 中并写入
+authority 错误日志，但不会计入玩家战绩，也不会阻断其他已验证战报。按 battle ID 直接读取该记录仍然
+fail closed；数据库连接、查询等运行故障不得伪装成空列表。
+
 ## 7. 安全与隐私
 
 - Electron renderer 不暴露 Node、文件系统、进程或任意 IPC。

@@ -146,6 +146,12 @@ Colyseus：
   进行 5 次指数退避重试，Electron 初始与恢复就绪 watchdog 统一为 240 秒；认证、schema 与完整性错误不重试。
   战绩错误态的“重试”在本机模式下会先通过受信任 IPC 重新激活 authority 恢复预算，ready 后再读取战报；
   远程模式不会启动本机服务。
+- 提交 `c4e6ae4` 的实包在 16:01 验收时，内置 PostgreSQL 已于 16:01:19 ready，authority 也于 16:01:27
+  成功监听；失败来自数据库内两局旧记录的 `public hash mismatch`。此前 `listBattleReports()` 用
+  `Promise.all` 全量验证，一条旧坏记录会让整个列表失败，重复读取必然得到相同错误。列表现按单局隔离
+  `BATTLE_REPORT_INTEGRITY_FAILED` / `BATTLE_REPORT_NOT_DURABLE`，保留原始数据库记录并写结构化错误日志，
+  只返回验证通过的战报；直接读取损坏战报仍 fail closed，数据库运行故障仍向上抛出。桌面重试同时改为按
+  实际目标 URL 判断是否为本机 authority，并在恢复后同步当前端口，不再依赖可能过期的 mode 标记。
 
 浏览器证据：
 

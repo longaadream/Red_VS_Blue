@@ -181,11 +181,15 @@ describe.skipIf(!databaseUrl)('RED-160 real PostgreSQL authority integration', (
       await expect(repository.readBattleReport(battleId)).rejects.toMatchObject({
         code: 'BATTLE_REPORT_INTEGRITY_FAILED',
       })
+      await expect(repository.listBattleReports('player-red')).resolves.toEqual([])
       await pool.query(
         'UPDATE battle_transition SET transition_json = $3::jsonb WHERE battle_id = $1 AND to_version = $2',
         [battleId, finalTransition.toVersion, JSON.stringify(finalTransition)],
       )
       await expect(repository.readBattleReport(battleId)).resolves.toMatchObject({ verified: true })
+      await expect(repository.listBattleReports('player-red')).resolves.toEqual([
+        expect.objectContaining({ battleId }),
+      ])
       await restoredJournal.close()
     } finally {
       await pool.query('DELETE FROM battle_room_authority WHERE battle_id = $1', [battleId])

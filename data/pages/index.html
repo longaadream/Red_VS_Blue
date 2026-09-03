@@ -1353,10 +1353,13 @@
 
     async function retryRecordsSheet() {
       const list = document.getElementById('recordsList')
-      const localMode = window.RvBUtils
-        && typeof RvBUtils.getActiveServerMode === 'function'
-        && RvBUtils.getActiveServerMode() === 'local'
-      if (localMode && window.electronAPI && typeof window.electronAPI.ensureLocalAuthority === 'function') {
+      const serverUrl = window.RvBUtils && typeof RvBUtils.getServerUrl === 'function'
+        ? RvBUtils.getServerUrl()
+        : ''
+      const localAuthorityTarget = window.RvBUtils
+        && typeof RvBUtils.getServerModeForUrl === 'function'
+        && RvBUtils.getServerModeForUrl(serverUrl) === 'local'
+      if (localAuthorityTarget && window.electronAPI && typeof window.electronAPI.ensureLocalAuthority === 'function') {
         list.innerHTML = '<div style="color:#64748b;text-align:center;padding:20px">正在恢复本机 PostgreSQL 战斗服务…</div>'
         try {
           const result = await window.electronAPI.ensureLocalAuthority()
@@ -1364,6 +1367,12 @@
             console.warn('[battle-reports] local authority recovery unavailable', result)
             list.innerHTML = _recordsLoadErrorMarkup('本机战斗服务仍未就绪')
             return
+          }
+          if (typeof window.electronAPI.getMode === 'function') {
+            const mode = await window.electronAPI.getMode()
+            if (mode && mode.ready && mode.localUrl && typeof RvBUtils.saveServerConfig === 'function') {
+              RvBUtils.saveServerConfig({ mode: 'local', url: mode.localUrl })
+            }
           }
         } catch (error) {
           console.warn('[battle-reports] local authority recovery failed', error)

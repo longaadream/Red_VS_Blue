@@ -369,7 +369,22 @@ export class PostgresAuthorityRepository implements PostgresAuthorityBatchWriter
        LIMIT $2`,
       [JSON.stringify([{ id: normalizedPlayerId }]), boundedLimit],
     )
-    const reports = await Promise.all(result.rows.map(row => this.readBattleReport(row.battle_id)))
+    const reports = await Promise.all(result.rows.map(async row => {
+      try {
+        return await this.readBattleReport(row.battle_id)
+      } catch (error) {
+        const code = error && typeof error === 'object' && 'code' in error
+          ? String(error.code)
+          : ''
+        if (code !== 'BATTLE_REPORT_INTEGRITY_FAILED' && code !== 'BATTLE_REPORT_NOT_DURABLE') throw error
+        console.error('[postgres-authority] excluded unverified battle report from list', {
+          battleId: normalizeRoomId(row.battle_id),
+          code,
+          message: error instanceof Error ? error.message : String(error),
+        })
+        return undefined
+      }
+    }))
     return reports.filter((report): report is PostgresBattleReportV1 => report !== undefined).map(report => ({
       battleId: report.battleId,
       name: report.room.name,
