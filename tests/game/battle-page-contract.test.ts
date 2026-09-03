@@ -305,6 +305,15 @@ describe('battle page route contract', () => {
     expect(tutorialRuntime).toContain('acceptHistoryTarget(clickedTarget || selectedTarget)')
   })
 
+  it('leaves time to read the opponent action before advancing the tutorial turn', () => {
+    const battlePage = readPage('battle.html')
+
+    expect(battlePage).toContain('const TUTORIAL_OPPONENT_WINDUP_MS = 650')
+    expect(battlePage).toContain('const TUTORIAL_OPPONENT_RESULT_DWELL_MS = 1400')
+    expect(battlePage).toContain('await tutorialPause(TUTORIAL_OPPONENT_WINDUP_MS)')
+    expect(battlePage).toContain('await tutorialPause(TUTORIAL_OPPONENT_RESULT_DWELL_MS)')
+  })
+
   it('keeps training.html as a compatibility redirect without battle interactions', () => {
     const legacyTrainingPage = readPage('training.html')
     const battlePage = readPage('battle.html')

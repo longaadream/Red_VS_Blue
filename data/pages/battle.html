@@ -4149,10 +4149,13 @@
       return new Promise(function (resolve) { setTimeout(resolve, duration) })
     }
 
+    const TUTORIAL_OPPONENT_WINDUP_MS = 650
+    const TUTORIAL_OPPONENT_RESULT_DWELL_MS = 1400
+
     async function runTutorialOpponentResponse(kind) {
       const opponentId = tutorialDefinition.opponent.playerId
       if (G.turn.phase === 'start') await commitTutorialScriptAction({ type: 'beginPhase' })
-      await tutorialPause(220)
+      await tutorialPause(TUTORIAL_OPPONENT_WINDUP_MS)
       if (kind === 'shield-check') {
         const reaper = tutorialPiece('reaper')
         const uther = tutorialPiece('uther')
@@ -4170,7 +4173,7 @@
         await commitTutorialScriptAction(shot)
       }
       render()
-      await tutorialPause(520)
+      await tutorialPause(TUTORIAL_OPPONENT_RESULT_DWELL_MS)
       await commitTutorialScriptAction({ type: 'endTurn', playerId: opponentId }, { quiet: true })
       await commitTutorialScriptAction({ type: 'beginPhase' }, { quiet: true })
       if (G.turn.phase === 'start') await commitTutorialScriptAction({ type: 'beginPhase' }, { quiet: true })
