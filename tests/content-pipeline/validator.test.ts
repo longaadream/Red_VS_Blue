@@ -70,6 +70,7 @@ function sha256(value: Uint8Array): string {
 function mediaType(path: string): PackFileDescriptorV1['mediaType'] {
   if (path.endsWith('.json')) return 'application/json'
   if (path.endsWith('.png')) return 'image/png'
+  if (path.endsWith('.svg')) return 'image/svg+xml'
   if (path.endsWith('.webp')) return 'image/webp'
   return 'image/jpeg'
 }
@@ -830,7 +831,6 @@ describe('Content Pipeline v1 source and JSON safety', () => {
     ['C:/data/cards.json', 'PACK_PATH_INVALID'],
     ['data\\cards.json', 'PACK_PATH_INVALID'],
     ['data/index.html', 'PACK_FORBIDDEN_EXECUTABLE_CONTENT'],
-    ['images/vector.svg', 'PACK_FORBIDDEN_EXECUTABLE_CONTENT'],
   ] as const)('rejects unsafe or active path %s', (path, expectedCode) => {
     const entry = { path, bytes: utf8('{}') }
     expectPipelineError(
@@ -1107,6 +1107,32 @@ describe('Content Pipeline v1 source and JSON safety', () => {
       'PACK_MEDIA_TYPE_INVALID',
       'content',
     )
+  })
+
+  it('accepts static SVG and rejects scripts, handlers, external references, and foreignObject', () => {
+    const safeSvg = {
+      path: 'images/icons/safe.svg',
+      bytes: utf8('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><path d="M0 0h10v10z" fill="#f00"/></svg>'),
+    }
+    expect(validatePackSourceV1(snapshotSource([safeSvg], ['raster-assets']), localDevPolicy).files)
+      .toHaveLength(1)
+
+    for (const body of [
+      '<script>alert(1)</script>',
+      '<path onclick="alert(1)"/>',
+      '<use href="https://example.com/a.svg#x"/>',
+      '<foreignObject><div>active</div></foreignObject>',
+    ]) {
+      const unsafeSvg = {
+        path: 'images/icons/unsafe.svg',
+        bytes: utf8(`<svg xmlns="http://www.w3.org/2000/svg">${body}</svg>`),
+      }
+      expectPipelineError(
+        () => validatePackSourceV1(snapshotSource([unsafeSvg], ['raster-assets']), localDevPolicy),
+        'PACK_MEDIA_TYPE_INVALID',
+        'content',
+      )
+    }
   })
 })
 

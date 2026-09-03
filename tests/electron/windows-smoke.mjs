@@ -1455,6 +1455,7 @@ async function smokeEditorDistribution(candidate, distribution) {
   const userDataDir = path.resolve(distribution.userDataDir)
   const authoringRoot = path.join(userDataDir, 'content-authoring')
   const keyFile = path.join(authoringRoot, 'keys', 'qa.key')
+  const editorSvgFile = path.join(authoringRoot, 'images', 'smoke', 'static-icon.svg')
   try {
     application.executable = path.resolve(distribution.executable)
     application.launchArguments = [`--user-data-dir=${userDataDir}`]
@@ -1464,15 +1465,35 @@ async function smokeEditorDistribution(candidate, distribution) {
     const pveSource = path.join(authoringRoot, 'sources', 'candidate-pve')
     mkdirSync(path.dirname(imageSource), { recursive: true })
     mkdirSync(path.dirname(keyFile), { recursive: true })
+    mkdirSync(path.dirname(editorSvgFile), { recursive: true })
     cpSync(candidate.fixture.image.sourceDir, imageSource, { recursive: true })
     cpSync(candidate.fixture.pve.sourceDir, pveSource, { recursive: true })
     writeFileSync(keyFile, `${'31'.repeat(32)}\n`, 'utf8')
+    writeFileSync(editorSvgFile, '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 8 8"><path d="M0 0h8v8H0z" fill="#f05252"/></svg>', 'utf8')
 
     const startedAt = Date.now()
     const { target, rendererBoundary } = await launch(application, 300000)
     const startupMilliseconds = Date.now() - startedAt
     const counts = await evaluate(target, `Promise.all(['pieces', 'skills', 'cards', 'rules'].map(async (directory) => [directory, (await window.editorAPI.listFiles(directory)).length]))`)
     assert(counts.every(([, count]) => count > 0), `Editor could not list packaged data files: ${JSON.stringify(counts)}`)
+    const workspaceAuthoring = await evaluate(target, `(async () => {
+      const pve = await window.editorAPI.listPveFiles()
+      const assets = await window.editorAPI.listAssets()
+      const preview = await window.editorAPI.readAsset('smoke/static-icon.svg')
+      const staged = await window.editorAPI.prepareWorkspacePackage()
+      return { pve, assets, preview, staged }
+    })()`, true, 60000)
+    assert(
+      workspaceAuthoring.pve.length > 0
+        && workspaceAuthoring.assets.some(file => file.path === 'smoke/static-icon.svg')
+        && workspaceAuthoring.preview.startsWith('data:image/svg+xml;base64,')
+        && workspaceAuthoring.staged.source === 'sources/current-workspace'
+        && workspaceAuthoring.staged.counts.pve > 0
+        && workspaceAuthoring.staged.counts.images > 0
+        && existsSync(path.join(authoringRoot, 'sources', 'current-workspace', 'data', 'pve', 'manifest.json'))
+        && existsSync(path.join(authoringRoot, 'sources', 'current-workspace', 'images', 'smoke', 'static-icon.svg')),
+      `Packaged Editor workspace authoring failed: ${JSON.stringify(workspaceAuthoring)}`,
+    )
     const jsonAuthoring = await evaluate(target, `(async () => {
       document.querySelector('[data-new-document="pieces"]').click()
       document.getElementById('create-id').value = 'red178-smoke-piece'
@@ -1638,6 +1659,7 @@ async function smokeEditorDistribution(candidate, distribution) {
       rendererBoundary,
       dataFileCounts: Object.fromEntries(counts),
       jsonAuthoring,
+      workspaceAuthoring,
       visibleOperations,
       sourceCheckoutUnavailable: true,
       systemNodeUnavailable: true,

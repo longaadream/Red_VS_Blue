@@ -30,7 +30,7 @@ resource-pack/
     .rvb/profile.json
     .rvb/resolution.json
     data/**/*.json
-    images/**/*.{png,jpg,jpeg,webp}
+    images/**/*.{png,jpg,jpeg,svg,webp}
 ```
 
 - `packages/**` 保存通过验证的原始 v1 package，供 Patch parent 重建；相同 hash 的重复写入必须逐字节

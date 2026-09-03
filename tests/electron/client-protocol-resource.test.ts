@@ -32,10 +32,12 @@ function createRoots() {
   fs.writeFileSync(path.join(htmlRoot, 'images', 'terrain', 'floor.webp'), 'page terrain')
   fs.writeFileSync(path.join(activePackRoot, 'data', 'pieces', 'manifest.json'), '["pack"]')
   fs.writeFileSync(path.join(activePackRoot, 'images', 'ana.jpg'), 'pack portrait')
+  fs.writeFileSync(path.join(activePackRoot, 'images', 'safe.svg'), '<svg xmlns="http://www.w3.org/2000/svg"/>')
   fs.writeFileSync(path.join(activePackRoot, '.rvb', 'profile.json'), JSON.stringify({
     files: [
       { descriptor: { path: 'data/pieces/manifest.json' } },
       { descriptor: { path: 'images/ana.jpg' } },
+      { descriptor: { path: 'images/safe.svg' } },
     ],
   }))
   fs.writeFileSync(path.join(activePackRoot, 'images', 'tile-effects', 'amaterasu.svg'), '<svg>pack</svg>')
@@ -127,6 +129,11 @@ describe('Electron client protocol resource resolution', () => {
       isPackaged: false,
       relativePath: 'images/ana.jpg',
     })).toBe(path.join(roots.activePackRoot, 'images', 'ana.jpg'))
+    expect(resolveClientProtocolFile({
+      ...roots,
+      isPackaged: true,
+      relativePath: 'images/safe.svg',
+    })).toBe(path.join(roots.activePackRoot, 'images', 'safe.svg'))
   })
 
   test('hard-fails a declared missing raster but keeps undeclared app art outside Profile identity', () => {

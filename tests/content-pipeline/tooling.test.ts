@@ -66,6 +66,25 @@ function buildRequest(temp: string, sourceDir: string, outputArchive: string, co
 }
 
 describe('RED-118 content pipeline tooling', () => {
+  it('builds a safe SVG as an image/svg+xml payload', async () => {
+    const temp = fixtureRoot('rvb-red178-svg-build-')
+    try {
+      const source = path.join(temp, 'source')
+      const imageDir = path.join(source, 'images', 'icons')
+      mkdirSync(imageDir, { recursive: true })
+      writeFileSync(path.join(imageDir, 'safe.svg'), '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 8 8"><path d="M0 0h8v8H0z"/></svg>')
+      const archive = path.join(temp, 'safe-svg.rvbpack')
+      const result = await runContentPipelineOperationV1(buildRequest(temp, source, archive, 0))
+      expect(result.ok).toBe(true)
+      const manifest = JSON.parse(Buffer.from(readProfileArchiveV1(readFileSync(archive)).manifestBytes).toString('utf8'))
+      expect(manifest.files).toEqual([
+        expect.objectContaining({ path:'images/icons/safe.svg', mediaType:'image/svg+xml' }),
+      ])
+    } finally {
+      rmSync(temp, { recursive: true, force: true })
+    }
+  })
+
   it('drives candidate operations and identity through persisted CLI reports', () => {
     const candidateSource = readFileSync(
       path.join(root, 'lib', 'content-pipeline', 'tooling', 'candidate.ts'),

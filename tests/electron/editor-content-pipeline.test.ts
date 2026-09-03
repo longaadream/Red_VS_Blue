@@ -86,6 +86,24 @@ describe('RED-118 packaged Editor content pipeline boundary', () => {
 })
 
 describe('RED-178 JSON-first content editor', () => {
+  it('exposes recursive PVE, validated image assets, and one-click workspace staging', () => {
+    const main = source('electron-editor/main.ts')
+    const preload = source('electron-editor/preload.ts')
+    const ui = source('electron-editor/ui/index.html')
+
+    for (const channel of ['list-pve-files', 'read-pve-file', 'write-pve-file', 'list-assets', 'read-asset', 'import-asset', 'prepare-workspace-package']) {
+      expect(main).toContain(`handleTrusted('${channel}'`)
+      expect(preload).toContain(`ipcRenderer.invoke('${channel}'`)
+    }
+    expect(ui).toContain('data-tab="pve"')
+    expect(ui).toContain('data-tab="assets"')
+    expect(ui).toContain('PVE 尚未固定专用模型')
+    expect(ui).toContain('支持 PNG / JPG / WebP / 安全 SVG')
+    expect(ui).toContain('data-summary-images')
+    expect(ui).toContain('await api.prepareWorkspacePackage()')
+    expect(ui).toContain('value="sources/current-workspace" readonly')
+  })
+
   it('edits every content collection through fields, code, and complete JSON where applicable', () => {
     const ui = source('electron-editor/ui/index.html')
 

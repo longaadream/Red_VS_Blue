@@ -22,7 +22,8 @@ RED-19 已完成 Electron 运行时升级。项目负责人批准 RED-24 的其�
 2. 所有窗口拒绝新窗口请求、越界主 frame 导航和全部子 frame 导航。iframe 即使加载受信
    URL，也不能获得主进程能力。
 3. 客户端游戏页由只读 `rvb-client://app/` 协议提供。内置 HTML、JS、CSS、SVG 和未知类型
-   永远从随应用分发的根目录读取；资源包只能覆盖 data JSON 和 jpg/jpeg/png/webp 图片。
+   永远从随应用分发的根目录读取；资源包只能覆盖 data JSON 和 jpg/jpeg/png/webp 图片，或通过
+   静态元素/属性白名单验证且不含脚本、事件、外链、CSS、foreignObject 的 SVG 图片。
 4. 资源包保存在 `userData/resource-pack/versions/<archive-sha256>/`。ZIP 中央目录必须在任何
    entry 解压前完成路径、重复/大小写冲突、符号链接/类型、加密状态和声明大小预检。限制为
    压缩体 32 MiB、声明解压总量 128 MiB、单文件 16 MiB、2048 entries。
