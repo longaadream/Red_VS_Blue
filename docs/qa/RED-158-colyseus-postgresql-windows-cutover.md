@@ -76,7 +76,7 @@ Colyseus 原生重连、PostgreSQL authority、建房 `creationKey` 单飞和最
 | 验证 | 结果 |
 | --- | --- |
 | `npm.cmd run check:windows-cutover` | 通过；删除路径、依赖、旧开关和玩家 raw WebSocket 门禁均通过 |
-| `npm.cmd run typecheck` | 通过 |
+| `npm.cmd run typecheck` | RED-158 修改无新增错误；最新 `origin/main` 的 `tests/game/sonic-roster.test.ts` 仍有 4 个既存类型错误 |
 | `npm.cmd run check:encoding` / `git diff --check` | 通过 |
 | RED-158 关键路径 ESLint（空 suppressions） | 20 个客户端、Colyseus、PostgreSQL、门禁和回归测试文件通过 |
 | RED-158/RED-170 定向回归 | 11 文件、115 测试全部通过；含大厅、建房去重、rejoin、100 次断线重连、receipt、页面与 pool 生命周期 |
@@ -172,6 +172,7 @@ Colyseus：
 | `check:windows-cutover` / `check:encoding` / `git diff --check` | 通过 |
 | `npm.cmd run build:electron:client` | 通过；PostgreSQL 16.15-2、79 个页面资源、333 个离线数据资源与 46 个离线图片资源校验通过 |
 | `node tests/electron/windows-smoke.mjs client` | 通过；含私有 PostgreSQL、authority 三次有界自动恢复、显式手动恢复、双玩家房间与退出后进程清理 |
+| 损坏战报隔离回归 | 修改前 PostgreSQL 集成与首页用例均稳定失败；修复后真实 PostgreSQL 1 项通过/外部 URL 1 项跳过，相关 Colyseus/UI 3 文件 14/14 通过 |
 
 整机采样为 CPU 98.8%、约 2 GiB 可用内存时，完整 `test:colyseus` 的 22 项中有 9 项越过既存
 5–60 秒测试等待门限；相同的 product-room 与 PostgreSQL lifecycle 测试隔离运行后 8/8 通过。这一结果
