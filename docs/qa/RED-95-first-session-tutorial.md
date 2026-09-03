@@ -16,7 +16,7 @@
 
 结果：
 
-- 上述 4 个测试文件共 55 项通过。
+- 上述 4 个测试文件共 57 项通过，包含跳过、完成、重玩与持久化状态读写。
 - `npm.cmd run check:encoding` 通过（930 个文本文件）。
 - `npm.cmd run typecheck` 通过。
 - `npm.cmd run check:main-baseline` 通过，分支与 `origin/main` 均为基线 SHA，ahead/behind 为 0/0。

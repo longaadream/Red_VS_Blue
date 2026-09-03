@@ -3,6 +3,25 @@
 
   const STORAGE_KEY = 'rvb_tutorial_first_session_status'
 
+  function saveStatus(storage, scenarioId, status, updatedAt) {
+    if (!storage || (status !== 'completed' && status !== 'skipped')) return false
+    try {
+      storage.setItem(STORAGE_KEY, JSON.stringify({
+        status: status,
+        scenarioId: scenarioId,
+        updatedAt: Number.isFinite(updatedAt) ? updatedAt : Date.now(),
+      }))
+      return true
+    } catch (_) { return false }
+  }
+
+  function readStatus(storage) {
+    try {
+      const saved = JSON.parse(storage && storage.getItem(STORAGE_KEY) || 'null')
+      return saved && (saved.status === 'completed' || saved.status === 'skipped') ? saved : null
+    } catch (_) { return null }
+  }
+
   function createElement(tag, className, text) {
     const node = document.createElement(tag)
     if (className) node.className = className
@@ -43,7 +62,7 @@
     session.textContent = definition.sessionLabel + ' · ' + definition.englishTitle
 
     function persist(status) {
-      try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ status: status, scenarioId: definition.id, updatedAt: Date.now() })) } catch {}
+      saveStatus(global.localStorage, definition.id, status)
     }
 
     function applyCue(step) {
@@ -162,5 +181,10 @@
     })
   }
 
-  global.RvBTutorialRuntime = Object.freeze({ create: createRuntime, storageKey: STORAGE_KEY })
+  global.RvBTutorialRuntime = Object.freeze({
+    create: createRuntime,
+    storageKey: STORAGE_KEY,
+    saveStatus: saveStatus,
+    readStatus: readStatus,
+  })
 })(typeof window !== 'undefined' ? window : globalThis)

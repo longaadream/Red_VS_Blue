@@ -58,6 +58,42 @@ describe('RED-95 tutorial controller', () => {
       { type: 'useBasicSkill', pieceId: 'anduin-1', skillId: 'light-of-the-light', targetPieceId: 'uther-1' }, state,
     )).toBe(true)
   })
+
+  it('supports skip and starts a replay from the first step', () => {
+    const sandbox = loadBrowserModule('tutorial-controller.js')
+    const definition = {
+      id: 'replayable',
+      steps: [
+        { id: 'first', advance: { type: 'continue' } },
+        { id: 'done', advance: { type: 'complete' } },
+      ],
+    }
+    const skipped = sandbox.RvBTutorialController.create(definition)
+    expect(skipped.skip()).toMatchObject({ status: 'skipped', index: 0 })
+    expect(skipped.beforeAction({ type: 'move' }, {}).allowed).toBe(true)
+
+    const replay = sandbox.RvBTutorialController.create(definition)
+    expect(replay.snapshot()).toMatchObject({ status: 'active', index: 0 })
+    expect(replay.accept({ type: 'continue' }, {}).accepted).toBe(true)
+    expect(replay.finish().snapshot).toMatchObject({ status: 'completed', index: 1 })
+  })
+
+  it('persists only completed or skipped states and tolerates corrupt storage', () => {
+    vi.spyOn(Date, 'now').mockReturnValue(456)
+    const sandbox = loadBrowserModule('tutorial-runtime.js')
+    const values = new Map<string, string>()
+    const storage = {
+      getItem: (key: string) => values.get(key) ?? null,
+      setItem: (key: string, value: string) => { values.set(key, value) },
+    }
+    expect(sandbox.RvBTutorialRuntime.saveStatus(storage, 'scenario', 'active')).toBe(false)
+    expect(sandbox.RvBTutorialRuntime.saveStatus(storage, 'scenario', 'skipped')).toBe(true)
+    expect(sandbox.RvBTutorialRuntime.readStatus(storage)).toMatchObject({
+      status: 'skipped', scenarioId: 'scenario', updatedAt: 456,
+    })
+    values.set(sandbox.RvBTutorialRuntime.storageKey, '{bad json')
+    expect(sandbox.RvBTutorialRuntime.readStatus(storage)).toBeNull()
+  })
 })
 
 describe('RED-95 tutorial scenario staging', () => {
