@@ -23,6 +23,12 @@ export type TargetRef =
 
 export type TargetFilter = 'enemy' | 'ally' | 'all' | 'self'
 
+interface StatusRangeOverride {
+  statusType: string
+  minimumStacks: number
+  range: number
+}
+
 export interface TargetConstraint {
   type: 'piece' | 'cell'
   filter: TargetFilter
@@ -215,6 +221,7 @@ interface TargetSpec {
   type: 'piece' | 'cell'
   filter: TargetFilter
   range?: number
+  rangeByStatus?: StatusRangeOverride
   distanceMetric?: 'manhattan' | 'chebyshev'
   minRange?: number
   requireWalkable?: boolean
@@ -338,11 +345,25 @@ function getDeclaredSteps(definition: any, kind: 'skill' | 'card'): SelectionSte
       }
       const type = normalizeTargetType(raw?.type)
       if (!type) return undefined
+      const rangeByStatus = raw.rangeByStatus
+      const validRangeByStatus = typeof rangeByStatus?.statusType === 'string'
+        && rangeByStatus.statusType.length > 0
+        && Number.isFinite(rangeByStatus.minimumStacks)
+        && rangeByStatus.minimumStacks >= 0
+        && Number.isFinite(rangeByStatus.range)
+        && rangeByStatus.range >= 0
+        ? {
+            statusType: rangeByStatus.statusType,
+            minimumStacks: Math.floor(rangeByStatus.minimumStacks),
+            range: Math.floor(rangeByStatus.range),
+          }
+        : undefined
       steps.push({
         kind: 'target',
         type,
         filter: normalizeFilter(raw.filter, raw.type),
         range: typeof raw.range === 'number' ? raw.range : undefined,
+        rangeByStatus: validRangeByStatus,
         minRange: typeof raw.minRange === 'number' ? raw.minRange : undefined,
         distanceMetric: raw.distanceMetric === 'chebyshev' ? 'chebyshev' : 'manhattan',
         requireWalkable: raw.requireWalkable,
@@ -389,6 +410,18 @@ function getDeclaredSteps(definition: any, kind: 'skill' | 'card'): SelectionSte
   }
   if (definition?.requiresTarget === true) return undefined
   return []
+}
+
+function resolveStatusDependentRanges(
+  steps: SelectionStepSpec[],
+  sourcePiece: PieceInstance,
+): SelectionStepSpec[] {
+  return steps.map(step => {
+    if (step.kind !== 'target' || !step.rangeByStatus) return step
+    const status = sourcePiece.statusTags?.find(tag => tag.type === step.rangeByStatus?.statusType)
+    if (Number(status?.stacks || 0) < step.rangeByStatus.minimumStacks) return step
+    return { ...step, range: step.rangeByStatus.range }
+  })
 }
 
 function getDeclaredCardSourcePiece(
@@ -516,10 +549,11 @@ function getSource(state: BattleState, action: any): TargetSource | InvalidActio
     if (definition.type === 'ultimate' && (skillState?.usesRemaining ?? 0) <= 0) {
       return { kind: 'invalid', code: 'ACTION_INVALID', message: `Ultimate skill ${action.skillId} has already been used` }
     }
-    const steps = getDeclaredSteps(definition, 'skill')
-    if (!steps) {
+    const declaredSteps = getDeclaredSteps(definition, 'skill')
+    if (!declaredSteps) {
       return { kind: 'invalid', code: 'TARGET_DECLARATION_MISSING', message: `Skill ${action.skillId} requires a declarative selection contract` }
     }
+    const steps = resolveStatusDependentRanges(declaredSteps, sourcePiece)
     return {
       actionId: action.skillId,
       ownerPlayerId: playerId,

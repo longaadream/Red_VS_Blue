@@ -787,8 +787,12 @@
       cursor: pointer; text-align: left; transition: border-color .15s, background .15s;
     }
     .option-btn:active { border-color: #3b82f6; background: #172554; }
+    .option-btn[aria-pressed="true"] { border-color: #60a5fa; background: #172554; box-shadow: inset 0 0 0 1px rgba(96,165,250,.35); }
     .option-btn-label { font-weight: 600; }
     .option-btn-desc { font-size: 12px; color: #94a3b8; margin-top: 3px; }
+    .option-multi-controls { display: flex; align-items: center; justify-content: space-between; gap: 10px; color: #bfdbfe; font-size: 12px; font-weight: 700; }
+    .option-confirm { background: #166534; border: 1px solid #86efac; border-radius: 10px; color: #dcfce7; padding: 9px 12px; cursor: pointer; }
+    .option-confirm:disabled { cursor: not-allowed; opacity: .45; }
     .option-cancel {
       background: none; border: 1px solid #475569; border-radius: 10px;
       color: #94a3b8; padding: 10px; font-size: 13px;
@@ -1549,6 +1553,10 @@
     <div class="option-sheet">
       <div class="option-title" id="optionPickerTitle">请选择</div>
       <div id="optionPickerList"></div>
+      <div class="option-multi-controls" id="optionPickerMultiControls" hidden>
+        <span id="optionPickerMultiCount" aria-live="polite">已选择 0 / 2</span>
+        <button type="button" class="option-confirm" id="optionPickerMultiConfirm" onclick="confirmOptionPickerSelection()" disabled>确认选择</button>
+      </div>
       <button class="option-cancel" id="optionPickerCancel" onclick="cancelOptionPicker()">取消</button>
     </div>
   </div>
@@ -1678,7 +1686,6 @@
                 <span class="piece-context-identity">
                   <span id="pieceContextName" class="piece-context-name"></span>
                   <span id="pieceContextHp" class="piece-context-hp"></span>
-                  <span id="pieceContextMomentum" class="piece-context-momentum" hidden></span>
                 </span>
                 <span class="piece-context-actions">
                   <button type="button" class="piece-context-info" onclick="if(selectedPieceId)dispatchBattleIntent({type:'inspect-piece',pieceId:selectedPieceId})" aria-label="查看棋子完整技能与状态" title="完整技能与状态">i</button>
@@ -2072,35 +2079,52 @@
           if (occupied) throw new Error('Position is already occupied')
           const ownerPlayerId = body.ownerPlayerId === 'training-blue' ? 'training-blue' : 'training-red'
           const ownerFaction = getTrainingPlayerFaction(ownerPlayerId)
-          const stats = tpl.stats || {}
-          const rules = (tpl.rules || [])
-            .map(function(ruleId) { return Engine.loadRuleById ? Engine.loadRuleById(ruleId, true) : null })
-            .filter(Boolean)
-          next.pieces.push({
-            instanceId: ownerPlayerId + '-' + Date.now() + '-' + Math.floor(Math.random() * 100000),
-            templateId: tpl.id,
-            name: tpl.name,
-            ownerPlayerId: ownerPlayerId,
-            faction: ownerFaction,
-            currentHp: stats.maxHp || 1,
-            maxHp: stats.maxHp || 1,
-            attack: stats.attack || 0,
-            defense: stats.defense || 0,
-            moveRange: stats.moveRange || 3,
-            x: body.x,
-            y: body.y,
-            skills: (tpl.skills || []).map(function(s) { return { skillId: s.skillId || s.id || s, level: s.level || 1, currentCooldown: 0, usesRemaining: -1 } }),
-            buffs: [],
-            debuffs: [],
-            statusTags: [],
-            ruleTags: [],
-            rules: rules,
-          })
+          next.pieces.push(createTrainingPieceFromTemplate(
+            Engine, tpl, ownerPlayerId, ownerFaction, body.x, body.y,
+          ))
           return next
         }
         throw new Error('Unknown operation type: ' + body.type)
       }
       throw new Error('Unsupported training method: ' + method)
+    }
+
+    function createTrainingPieceFromTemplate(Engine, template, ownerPlayerId, faction, x, y) {
+      const stats = template.stats || {}
+      const statusTags = (template.initialStatusTags || []).map(function(tag) {
+        return Object.assign({}, tag, {
+          relatedRules: Array.isArray(tag.relatedRules) ? tag.relatedRules.slice() : undefined,
+        })
+      })
+      const ruleIds = new Set(template.rules || [])
+      statusTags.forEach(function(tag) {
+        ;(tag.relatedRules || []).forEach(function(ruleId) { ruleIds.add(ruleId) })
+      })
+      const rules = Array.from(ruleIds)
+        .map(function(ruleId) { return Engine.loadRuleById ? Engine.loadRuleById(ruleId, true) : null })
+        .filter(Boolean)
+      return {
+        instanceId: ownerPlayerId + '-' + Date.now() + '-' + Math.floor(Math.random() * 100000),
+        templateId: template.id,
+        name: template.name,
+        ownerPlayerId: ownerPlayerId,
+        faction: faction,
+        currentHp: stats.maxHp || 1,
+        maxHp: stats.maxHp || 1,
+        attack: stats.attack || 0,
+        defense: stats.defense || 0,
+        moveRange: stats.moveRange || 3,
+        x: x,
+        y: y,
+        skills: (template.skills || []).map(function(skill) {
+          return { skillId: skill.skillId || skill.id || skill, level: skill.level || 1, currentCooldown: 0, usesRemaining: -1 }
+        }),
+        buffs: [],
+        debuffs: [],
+        statusTags: statusTags,
+        ruleTags: [],
+        rules: rules,
+      }
     }
 
     // ── Training-only state ──
@@ -2179,6 +2203,7 @@
       playerAlignments[myPlayerId] = initialAlignment
     }
     let pendingOptionAction = null  // original action awaiting selectedOption
+    let pendingOptionPickerSelection = { selectionId: null, selectedValues: [] }
     let pendingHandOptionSelection = { selectionId: null, selectedValues: [], submitting: false }
     let targetSubmissionPending = null // one target command waiting for authoritative confirmation
     let pendingBoardTargetSelection = { selectionId: null, selectedPieceIds: [] }
@@ -2307,6 +2332,7 @@
 
     function clearAuthorityConflictInteraction() {
       pendingOptionAction = null
+      pendingOptionPickerSelection = { selectionId: null, selectedValues: [] }
       pendingHandOptionSelection = { selectionId: null, selectedValues: [], submitting: false }
       locallyCancelledSelectionId = null
       _pickerOptions = []
@@ -2824,13 +2850,6 @@
       } catch (_) {}
       return {}
     }
-    function pieceHasMomentumSkillForDisplay(piece) {
-      return pieceDispSkills(piece).some(sk => skillDefOf(skillIdOf(sk)).momentumSkill === true)
-    }
-    function pieceMomentumValue(piece) {
-      const value = Number(piece && piece.momentum)
-      return Number.isFinite(value) ? Math.max(0, value) : 0
-    }
     function skillUsesCharge(skillData) {
       return (skillData && (skillData.chargeCost || 0) > 0) || false
     }
@@ -3339,29 +3358,85 @@
     function showOptionPicker(title, options, originalAction) {
       pendingOptionAction = originalAction
       _pickerOptions = options
+      const selectionId = originalAction && originalAction.selectionId
+      if (pendingOptionPickerSelection.selectionId !== selectionId) {
+        pendingOptionPickerSelection = { selectionId: selectionId || null, selectedValues: [] }
+      }
       document.getElementById('optionPickerTitle').textContent = title || '请选择'
       const cancelButton = document.getElementById('optionPickerCancel')
       const canCancel = !originalAction || originalAction.canCancel !== false
       if (cancelButton) cancelButton.style.display = canCancel ? '' : 'none'
       const list = document.getElementById('optionPickerList')
-      list.innerHTML = options.map((opt, i) =>
-        `<button class="option-btn" data-opt-idx="${i}">
+      const isMulti = originalAction && originalAction.selectionMode === 'multi'
+      const minSelections = isMulti && Number.isSafeInteger(originalAction.minSelections)
+        ? Math.max(0, originalAction.minSelections)
+        : 1
+      const maxSelections = isMulti && Number.isSafeInteger(originalAction.maxSelections)
+        ? Math.max(minSelections, originalAction.maxSelections)
+        : options.length
+      const selectedValues = pendingOptionPickerSelection.selectedValues
+      list.innerHTML = options.map((opt, i) => {
+        const value = opt.value !== undefined ? opt.value : opt
+        const selected = isMulti && selectedValues.some(function(item) { return Object.is(item, value) })
+        return `<button class="option-btn" data-opt-idx="${i}"${isMulti ? ` aria-pressed="${selected}"` : ''}>
           <div class="option-btn-label">${escHtml(opt.label)}</div>
           ${opt.description ? `<div class="option-btn-desc">${escHtml(opt.description)}</div>` : ''}
         </button>`
-      ).join('')
+      }).join('')
+      const multiControls = document.getElementById('optionPickerMultiControls')
+      const multiCount = document.getElementById('optionPickerMultiCount')
+      const multiConfirm = document.getElementById('optionPickerMultiConfirm')
+      if (multiControls) multiControls.hidden = !isMulti
+      if (multiCount) multiCount.textContent = '已选择 ' + selectedValues.length + ' / ' + maxSelections
+      if (multiConfirm) multiConfirm.disabled = !isMulti || selectedValues.length < minSelections || selectedValues.length > maxSelections
       // Use touchend for Android WebView reliability; fallback click for desktop
       list.querySelectorAll('.option-btn').forEach(function(btn) {
         btn.addEventListener('touchend', function(e) {
           e.preventDefault()
           e.stopPropagation()
-          selectOptionChoice(parseInt(this.dataset.optIdx))
+          isMulti ? toggleOptionPickerChoice(parseInt(this.dataset.optIdx)) : selectOptionChoice(parseInt(this.dataset.optIdx))
         }, { passive: false })
         btn.addEventListener('click', function(e) {
-          selectOptionChoice(parseInt(this.dataset.optIdx))
+          isMulti ? toggleOptionPickerChoice(parseInt(this.dataset.optIdx)) : selectOptionChoice(parseInt(this.dataset.optIdx))
         })
       })
       document.getElementById('optionPickerOverlay').classList.add('show')
+    }
+    function toggleOptionPickerChoice(index) {
+      if (!pendingOptionAction || pendingOptionAction.selectionMode !== 'multi') return
+      const opt = _pickerOptions[index]
+      if (!opt) return
+      const value = opt.value !== undefined ? opt.value : opt
+      const selected = pendingOptionPickerSelection.selectedValues.slice()
+      const selectedIndex = selected.findIndex(function(item) { return Object.is(item, value) })
+      if (selectedIndex !== -1) selected.splice(selectedIndex, 1)
+      else {
+        const minSelections = Number.isSafeInteger(pendingOptionAction.minSelections) ? Math.max(0, pendingOptionAction.minSelections) : 1
+        const maxSelections = Number.isSafeInteger(pendingOptionAction.maxSelections) ? Math.max(minSelections, pendingOptionAction.maxSelections) : _pickerOptions.length
+        if (selected.length >= maxSelections) {
+          setStatusMsg('最多选择 ' + maxSelections + ' 个选项')
+          return
+        }
+        selected.push(value)
+      }
+      pendingOptionPickerSelection.selectedValues = selected
+      showOptionPicker(document.getElementById('optionPickerTitle').textContent, _pickerOptions, pendingOptionAction)
+    }
+    function confirmOptionPickerSelection() {
+      if (!pendingOptionAction || pendingOptionAction.selectionMode !== 'multi') return
+      const minSelections = Number.isSafeInteger(pendingOptionAction.minSelections) ? Math.max(0, pendingOptionAction.minSelections) : 1
+      const maxSelections = Number.isSafeInteger(pendingOptionAction.maxSelections) ? Math.max(minSelections, pendingOptionAction.maxSelections) : _pickerOptions.length
+      const selectedValues = pendingOptionPickerSelection.selectedValues.slice()
+      if (selectedValues.length < minSelections || selectedValues.length > maxSelections) {
+        setStatusMsg('请选择 ' + minSelections + ' 至 ' + maxSelections + ' 个选项')
+        return
+      }
+      document.getElementById('optionPickerOverlay').classList.remove('show')
+      const action = Object.assign(prepareFreshSelectionAction(pendingOptionAction), { selectedOption: selectedValues })
+      pendingOptionAction = null
+      pendingOptionPickerSelection = { selectionId: null, selectedValues: [] }
+      _pickerOptions = []
+      doAction(action)
     }
     function selectOptionChoice(index) {
       document.getElementById('optionPickerOverlay').classList.remove('show')
@@ -3373,6 +3448,7 @@
         { selectedOption: opt.value !== undefined ? opt.value : opt },
       )
       pendingOptionAction = null
+      pendingOptionPickerSelection = { selectionId: null, selectedValues: [] }
       _pickerOptions = []
       doAction(action)
     }
@@ -3384,6 +3460,7 @@
       document.getElementById('optionPickerOverlay').classList.remove('show')
       const action = pendingOptionAction
       pendingOptionAction = null
+      pendingOptionPickerSelection = { selectionId: null, selectedValues: [] }
       _pickerOptions = []
       _pendingChoiceShown = null
       pendingSkill = null
@@ -5418,7 +5495,10 @@
             selectionId: pbc.selectionId,
             stateRevision: pbc.stateRevision,
             cancelValue: pbc.cancelValue,
-            canCancel: pbc.canCancel !== false
+            canCancel: pbc.canCancel !== false,
+            selectionMode: pbc.selectionMode,
+            minSelections: pbc.minSelections,
+            maxSelections: pbc.maxSelections,
           })
         }
       } else {
@@ -5865,10 +5945,6 @@
       const displayName = piece.name || (template && template.name) || piece.templateId
       document.getElementById('pieceContextName').textContent = displayName
       document.getElementById('pieceContextHp').textContent = pieceDispHp(piece) + '/' + pieceMaxHp(piece)
-      const momentumDisplay = document.getElementById('pieceContextMomentum')
-      const showsMomentum = pieceHasMomentumSkillForDisplay(piece)
-      momentumDisplay.hidden = !showsMomentum
-      momentumDisplay.textContent = showsMomentum ? '动能 ' + pieceMomentumValue(piece) : ''
       menu.dataset.pieceId = piece.instanceId
 
       const skillButtons = skills.length ? skills.map(sk => {

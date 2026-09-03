@@ -2,9 +2,6 @@
   "id": "turalyon-expedition-order",
   "name": "征讨号令",
   "description": "选择一种圣光手牌获得。",
-  "keywords": [
-    "圣光手牌"
-  ],
   "targetText": "一种圣光手牌",
   "effectTags": [
     "手牌"

@@ -449,6 +449,12 @@ export interface ExtensionCellRequirementDefinition {
   sourceIdField?: string
 }
 
+export interface StatusRangeOverrideDefinition {
+  statusType: string
+  minimumStacks: number
+  range: number
+}
+
 export type SelectionStepDefinition =
   | {
       kind: 'option'
@@ -461,6 +467,7 @@ export type SelectionStepDefinition =
       type: 'piece' | 'grid' | 'cell'
       filter?: 'enemy' | 'ally' | 'all' | 'self'
       range?: number
+      rangeByStatus?: StatusRangeOverrideDefinition
       minRange?: number
       distanceMetric?: 'manhattan' | 'chebyshev'
       requireWalkable?: boolean

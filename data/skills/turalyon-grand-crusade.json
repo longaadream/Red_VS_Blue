@@ -2,7 +2,7 @@
   "id": "turalyon-grand-crusade",
   "name": "圣光大远征",
   "description": "选择1至3个友方核心棋子，再选择6格内的1个空集结点，将其移至集结点及其相邻可落脚空格，并使其获得【圣盾】。",
-  "keywords": ["位移", "圣盾"],
+  "keywords": ["圣盾"],
   "targetText": "1至3个友方核心棋子，然后选择6格内集结点",
   "effectTags": ["位移", "圣盾"],
   "icon": "🏳️",

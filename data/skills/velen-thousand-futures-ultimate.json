@@ -2,10 +2,6 @@
   "id": "velen-thousand-futures-ultimate",
   "name": "万千未来",
   "description": "选择手中1至3张未强化的普通圣光手牌，立即使它们永久强化。每局限用1次。",
-  "keywords": [
-    "圣光手牌",
-    "限用"
-  ],
   "targetText": "手中1至3张未强化的圣光手牌",
   "effectTags": [
     "强化",

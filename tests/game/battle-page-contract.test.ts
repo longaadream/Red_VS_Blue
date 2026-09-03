@@ -114,6 +114,39 @@ describe('battle page route contract', () => {
     expect(battlePage).toContain("loadJsonRequired('./data/pieces/manifest.json', errors)")
   })
 
+  it.each(['sonic', 'shadow', 'tails'])('creates %s training pieces from template-declared initial statuses and rules', (templateId) => {
+    const battlePage = readPage('battle.html')
+    const template = JSON.parse(readFileSync(resolve(process.cwd(), `data/pieces/${templateId}.json`), 'utf8'))
+    const loadedRuleIds: string[] = []
+    const context = createContext({
+      Array,
+      Date: { now: () => 123 },
+      Object,
+      Set,
+    })
+
+    new Script(readNamedFunction(battlePage, 'createTrainingPieceFromTemplate')).runInContext(context)
+    context.template = template
+    context.engine = {
+      loadRuleById(ruleId: string) {
+        loadedRuleIds.push(ruleId)
+        return { id: ruleId }
+      },
+    }
+    new Script("piece = createTrainingPieceFromTemplate(engine, template, 'training-red', 'red', 2, 3)").runInContext(context)
+    const piece = JSON.parse(JSON.stringify(context.piece))
+
+    expect(piece.statusTags).toEqual(expect.arrayContaining([
+      expect.objectContaining({ type: 'momentum-core' }),
+    ]))
+    expect(piece.rules).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: 'rule-momentum-gain' }),
+      expect.objectContaining({ id: 'rule-momentum-consume' }),
+    ]))
+    expect(loadedRuleIds).toEqual(expect.arrayContaining(['rule-momentum-gain', 'rule-momentum-consume']))
+    expect(readNamedFunction(battlePage, 'createTrainingPieceFromTemplate')).not.toContain("templateId === 'sonic'")
+  })
+
   it('mounts the RED-167 vignette inside the shared battle presentation lifecycle', () => {
     const battlePage = readPage('battle.html')
     const vignetteSource = readFileSync(resolve(pagesDir, 'js/battle-ui/battle-action-vignette.js'), 'utf8')
@@ -707,6 +740,18 @@ new Script([
     expect(battlePage.match(/_pendingChoiceShown = null/g)?.length || 0).toBeGreaterThanOrEqual(3)
     expect(battlePage).toMatch(/pendingSelection && pendingSelection\.canCancel === false[\s\S]*?return/)
     expect(battlePage).toContain('id="optionPickerCancel"')
+  })
+
+  it('collects generic multi-option picks before submitting their selected values as an array', () => {
+    const battlePage = readPage('battle.html')
+
+    expect(battlePage).toContain('id="optionPickerMultiControls"')
+    expect(battlePage).toContain('function toggleOptionPickerChoice(index)')
+    expect(battlePage).toContain('function confirmOptionPickerSelection()')
+    expect(battlePage).toContain('selectedOption: selectedValues')
+    expect(battlePage).toContain('selectionMode: pbc.selectionMode')
+    expect(battlePage).toContain('minSelections: pbc.minSelections')
+    expect(battlePage).toContain('maxSelections: pbc.maxSelections')
   })
 
   it('keeps the nearby piece menu action-only while preserving the existing right-click piece detail', () => {
