@@ -88,6 +88,32 @@ describe('battle page route contract', () => {
     }
   })
 
+  it('loads Electron battle data in one Profile-resolved bundle and primes synchronous engine reads', () => {
+    const battlePage = readPage('battle.html')
+    const runtimeSource = readFileSync(resolve(pagesDir, 'js/game-engine-runtime.js'), 'utf8')
+    const windowObject: Record<string, unknown> = {}
+    const context = createContext({ window: windowObject, console, Date, Math })
+
+    new Script(runtimeSource).runInContext(context)
+    const engineRuntime = windowObject.RvBGameEngine as {
+      primeJsonFiles: (files: Record<string, unknown>) => number
+    }
+    expect(engineRuntime.primeJsonFiles({
+      'data/pieces/manifest.json': ['sonic'],
+      'data/pieces/sonic.json': { id: 'sonic' },
+    })).toBe(2)
+    expect(new Script("window.require('fs').readFileSync('data/pieces/sonic.json')").runInContext(context))
+      .toBe('{"id":"sonic"}')
+
+    expect(battlePage).toContain("fetch('./__battle-data.json', { cache: 'no-store' })")
+    expect(battlePage).toContain("payload.schemaVersion !== 'rvb-client-battle-data/v1'")
+    expect(battlePage).toContain('RvBGameEngine.primeJsonFiles(files)')
+    expect(battlePage).toContain("files['data/tutorial/first-session.json']")
+    expect(battlePage).toContain('if (!tutorialDefinition)')
+    expect(battlePage).toContain('if (await loadElectronBattleDataBundle()) return { ok: true, errors: [] }')
+    expect(battlePage).toContain("loadJsonRequired('./data/pieces/manifest.json', errors)")
+  })
+
   it('mounts the RED-167 vignette inside the shared battle presentation lifecycle', () => {
     const battlePage = readPage('battle.html')
     const vignetteSource = readFileSync(resolve(pagesDir, 'js/battle-ui/battle-action-vignette.js'), 'utf8')
@@ -281,12 +307,13 @@ describe('battle page route contract', () => {
     expect(mobileCss).toMatch(/\.training-tools\s*\{[\s\S]*?bottom:\s*calc\(var\(--battle-hand-height\) \+ 10px\)/)
   })
 
-  it('routes the lobby training entry to battle.html training mode', () => {
+  it('routes training through local authority and tutorial directly to its local battle mode', () => {
     const lobby = readPage('index.html')
 
     expect(lobby).toContain("window.location.href = 'battle.html?mode=' + mode")
     expect(lobby).toContain("function goToTraining() { return goToLocalPractice('training') }")
-    expect(lobby).toContain("function goToTutorial() { return goToLocalPractice('tutorial') }")
+    expect(lobby).toContain("function goToTutorial() { window.location.href = 'battle.html?mode=tutorial' }")
+    expect(lobby).not.toContain("goToLocalPractice('tutorial')")
     expect(lobby).not.toMatch(/location\.href\s*=\s*['"]training\.html/)
   })
 

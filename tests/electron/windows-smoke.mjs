@@ -279,6 +279,52 @@ function findExecutableProcessIds(executable, commandLineFragment) {
   }
 }
 
+async function verifyTutorialWithoutAuthority(port, target, timeoutMs = 30000) {
+  const startedAt = Date.now()
+  await evaluate(target, `(() => {
+    window.__rvbTutorialSmokeErrors = []
+    window.addEventListener('error', event => window.__rvbTutorialSmokeErrors.push(String(event.error?.stack || event.message)))
+    window.addEventListener('unhandledrejection', event => window.__rvbTutorialSmokeErrors.push(String(event.reason?.stack || event.reason)))
+    document.getElementById('tutorialShortcut').click()
+    return true
+  })()`, false)
+  const tutorialTarget = await waitForTargets(
+    port,
+    candidate => candidate.url.startsWith('rvb-client://app/battle.html?mode=tutorial'),
+    timeoutMs,
+  )
+  const deadline = Date.now() + timeoutMs
+  let observed = null
+  while (Date.now() < deadline) {
+    try {
+      observed = await evaluate(tutorialTarget, `({
+        readyState: document.readyState,
+        tutorialMode: document.body.classList.contains('tutorial-mode'),
+        loadingDisplay: document.getElementById('loadingOverlay')?.style.display || '',
+        loadingMessage: document.getElementById('loadingMsg')?.textContent || '',
+        loadingColor: document.getElementById('loadingMsg')?.style.color || '',
+        dialogPresent: document.getElementById('tutorialDialog') !== null,
+        scenarioId: window.__RVB_TUTORIAL__?.scenarioId || '',
+        engineReady: !!window.GameEngine?.applyBattleAction,
+        electronApiReady: !!window.electronAPI,
+        runtimeReady: !!window.RvBGameEngine?.ensure,
+        primeReady: !!window.RvBGameEngine?.primeJsonFiles,
+        battleDataLoad: window.__RVB_BATTLE_DATA_LOAD__ || null,
+        smokeErrors: window.__rvbTutorialSmokeErrors || []
+      })`)
+      if (
+        observed.readyState === 'complete'
+          && observed.tutorialMode === true
+          && observed.loadingDisplay === 'none'
+          && observed.dialogPresent === true
+          && observed.scenarioId
+      ) return { target: tutorialTarget, runtime: observed, elapsedMs: Date.now() - startedAt }
+    } catch {}
+    await delay(100)
+  }
+  throw new Error(`Tutorial did not open while authority was unavailable: ${JSON.stringify(observed)}`)
+}
+
 async function waitForExecutableProcessIds(executable, commandLineFragment, timeoutMs = 30_000) {
   const deadline = Date.now() + timeoutMs
   let processIds = []
@@ -535,6 +581,7 @@ async function smokeClient(expectedIdentity = null, sharedUserDataDir = null) {
 
     let exhaustedRecovery = null
     let recoveryTarget = gameTarget
+    let tutorialWithoutAuthority = null
     renameSync(authorityEntry, disabledAuthorityEntry)
     try {
       stopProcessTree(authorityPids[0])
@@ -566,6 +613,14 @@ async function smokeClient(expectedIdentity = null, sharedUserDataDir = null) {
         markerAfterRecovery === recoveryMarker,
         `Silent authority recovery reloaded the main menu: ${JSON.stringify({ recoveryMarker, markerAfterRecovery })}`,
       )
+      tutorialWithoutAuthority = await verifyTutorialWithoutAuthority(application.debugPort, recoveryTarget)
+      await evaluate(tutorialWithoutAuthority.target, "window.location.href = 'rvb-client://app/index.html'; true", false)
+      recoveryTarget = await waitForTargets(
+        application.debugPort,
+        candidate => candidate.url.startsWith('rvb-client://app/index.html'),
+        10_000,
+      )
+      await evaluate(recoveryTarget, `window.__rvbRecoverySmokeMarker = ${JSON.stringify(recoveryMarker)}; true`)
     } finally {
       if (existsSync(disabledAuthorityEntry)) renameSync(disabledAuthorityEntry, authorityEntry)
     }
@@ -789,6 +844,7 @@ async function smokeClient(expectedIdentity = null, sharedUserDataDir = null) {
         manual: manualRecovery.recovery,
         rendererPreserved: markerAfterManualRecovery === recoveryMarker,
       },
+      tutorialWithoutAuthority: tutorialWithoutAuthority.runtime,
       profileIdentity: catalogIdentity.data.profileIdentity,
       resourcePackStatus,
       databaseProbe: {

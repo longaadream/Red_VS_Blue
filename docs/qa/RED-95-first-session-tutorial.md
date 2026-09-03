@@ -42,6 +42,11 @@
 
 大厅入口另以 Chromium 在 1440×900 和 932×430 两种视口复核：新手教程始终位于左侧模式导航顶部；横屏紧凑布局隐藏辅助说明但保留 D20 标记、标题与完整点击区域，四个模式和底部工具均未被遮挡。
 
+RED-158 Windows 人工验收补充：教程是本地固定脚本，不依赖 Colyseus/PostgreSQL。入口已改为直接导航到
+`battle.html?mode=tutorial`，即使本机 authority 尚在启动或恢复失败也不会阻塞教程。Electron 入口以单个
+Profile-resolved bundle 读取战斗 JSON 并预热规则引擎缓存，不再通过自定义协议发出数百次小文件请求；浏览器和
+Android 仍使用原逐文件加载路径。
+
 截图：`docs/qa/RED-95-tutorial-first-session.png`。
 
 ## 人工复核建议

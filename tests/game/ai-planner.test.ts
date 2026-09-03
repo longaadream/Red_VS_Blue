@@ -417,7 +417,7 @@ describe('roster-independent multi-action AI turn planner', () => {
     expect(noActions).toMatchObject({ actions: [], nextAction: undefined, stopReason: 'no-legal-actions' })
   })
 
-  it('records rejected, unsupported, metadata-required, and candidate-limit evidence', () => {
+  it('records rejected, unknown, metadata-required, and candidate-limit evidence', () => {
     const manyMoves = Array.from({ length: 6 }, (_, index) => candidate(
       `move-${index}`,
       'move',
@@ -427,7 +427,6 @@ describe('roster-independent multi-action AI turn planner', () => {
     ))
     const environment = baseEnvironment({
       listLegalActions: () => [
-        candidate('unsupported', 'useBasicSkill', 'red-a', 'basic-skill', { skillId: 'evil-explosion' }),
         candidate('unknown', 'useBasicSkill', 'red-a', 'basic-skill', { skillId: 'not-in-semantic-manifest' }),
         candidate('metadata', 'useBasicSkill', 'red-a', 'basic-skill', { skillId: 'naruto-shadow-clone' }),
         candidate('rejected', 'fixture-rejected'),
@@ -436,7 +435,7 @@ describe('roster-independent multi-action AI turn planner', () => {
       ],
       simulate: (state, input) => {
         const action = 'action' in input ? input : candidate('fixture', input.type)
-        if (['unsupported', 'unknown', 'metadata'].includes(action.id)) throw new Error('semantic fallback must not simulate')
+        if (['unknown', 'metadata'].includes(action.id)) throw new Error('semantic fallback must not simulate')
         if (action.id === 'rejected') return rejected(state, action, 'FIXTURE_REJECTED')
         const next = structuredClone(state)
         if (action.kind === 'end-turn') next.turn.phase = 'end'
@@ -449,7 +448,6 @@ describe('roster-independent multi-action AI turn planner', () => {
     })
 
     expect(plan.trace).toEqual(expect.arrayContaining([
-      expect.objectContaining({ candidateId: 'unsupported', pruned: 'unsupported' }),
       expect.objectContaining({
         candidateId: 'unknown', pruned: 'unsupported',
         pruneDetail: expect.stringContaining('unknown-skills-content'),

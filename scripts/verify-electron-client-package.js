@@ -46,6 +46,7 @@ const OFFLINE_DATA_ENTRIES = [
   'skills',
   'status-effects',
   'tiles',
+  'tutorial',
   'skill-keywords.json',
 ]
 

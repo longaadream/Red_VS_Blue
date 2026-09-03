@@ -985,7 +985,7 @@
     }
 
     function goToTraining() { return goToLocalPractice('training') }
-    function goToTutorial() { return goToLocalPractice('tutorial') }
+    function goToTutorial() { window.location.href = 'battle.html?mode=tutorial' }
 
     // ── PVE single-player ─────────────────────────────────────────────────────
     async function startPve() {

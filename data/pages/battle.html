@@ -3963,9 +3963,78 @@
       }
     }
 
+    function readBundledDirectory(files, directory) {
+      const manifestPath = 'data/' + directory + '/manifest.json'
+      const ids = files[manifestPath]
+      if (!Array.isArray(ids)) throw new Error('批量资源清单无效: ' + manifestPath)
+      const records = Object.create(null)
+      ids.forEach(function(id) {
+        if (typeof id !== 'string' || !/^[a-z0-9][a-z0-9_-]{0,127}$/.test(id)) {
+          throw new Error('批量资源 ID 无效: ' + manifestPath)
+        }
+        const resourcePath = 'data/' + directory + '/' + id + '.json'
+        if (!Object.prototype.hasOwnProperty.call(files, resourcePath)) {
+          throw new Error('批量资源缺失: ' + resourcePath)
+        }
+        records[id] = files[resourcePath]
+      })
+      return records
+    }
+
+    async function loadElectronBattleDataBundle() {
+      if (!window.electronAPI || !window.RvBGameEngine || typeof RvBGameEngine.primeJsonFiles !== 'function') {
+        return false
+      }
+      window.__RVB_BATTLE_DATA_LOAD__ = { stage: 'requesting-bundle', startedAt: Date.now() }
+      const response = await withTimeout(
+        fetch('./__battle-data.json', { cache: 'no-store' }),
+        15000,
+        'Electron battle data bundle',
+      )
+      window.__RVB_BATTLE_DATA_LOAD__.stage = 'reading-bundle'
+      if (!response.ok) throw new Error('HTTP ' + response.status)
+      const payload = await response.json()
+      window.__RVB_BATTLE_DATA_LOAD__.stage = 'validating-bundle'
+      if (!payload || payload.schemaVersion !== 'rvb-client-battle-data/v1'
+        || !payload.files || typeof payload.files !== 'object' || Array.isArray(payload.files)) {
+        throw new Error('Electron 批量资源格式无效')
+      }
+      const files = payload.files
+      const pieces = readBundledDirectory(files, 'pieces')
+      const skills = readBundledDirectory(files, 'skills')
+      const cards = readBundledDirectory(files, 'cards')
+      const glossary = files['data/skill-keywords.json']
+      if (!Array.isArray(glossary)) throw new Error('批量资源词条表无效')
+      const bundledTutorial = files['data/tutorial/first-session.json']
+      if (!bundledTutorial || typeof bundledTutorial !== 'object' || Array.isArray(bundledTutorial)) {
+        throw new Error('批量教程资源无效')
+      }
+      RvBGameEngine.primeJsonFiles(files)
+      Object.assign(PIECES_BY_ID, pieces)
+      Object.assign(skillsById, skills)
+      Object.assign(cardsById, cards)
+      keywordGlossaryByName = Object.fromEntries(glossary.map(item => [item.name, item]))
+      if (TUTORIAL_MODE) tutorialDefinition = bundledTutorial
+      window.__RVB_BATTLE_DATA_LOAD__ = {
+        stage: 'bundle-ready',
+        fileCount: Object.keys(files).length,
+        elapsedMs: Date.now() - window.__RVB_BATTLE_DATA_LOAD__.startedAt,
+      }
+      return true
+    }
+
     async function loadLocalData() {
       const errors = []
       let recoveredFromServer = false
+      try {
+        if (await loadElectronBattleDataBundle()) return { ok: true, errors: [] }
+      } catch (error) {
+        window.__RVB_BATTLE_DATA_LOAD__ = {
+          stage: 'bundle-failed-fallback',
+          error: error && error.message ? error.message : String(error),
+        }
+        console.warn('[battle] Electron batch data unavailable; using individual resources:', error)
+      }
       try {
         try {
           const glossary = await loadJsonOptional('./data/skill-keywords.json', errors)
@@ -4039,8 +4108,10 @@
         if (!trainingLoad.ok) showMsg('本地资源读取异常：' + (trainingLoad.errors[0] || 'unknown'), 'err')
         refreshPlaceTemplates()
         if (TUTORIAL_MODE) {
-          const tutorialErrors = []
-          tutorialDefinition = await loadJsonRequired('./data/tutorial/first-session.json', tutorialErrors)
+          if (!tutorialDefinition) {
+            const tutorialErrors = []
+            tutorialDefinition = await loadJsonRequired('./data/tutorial/first-session.json', tutorialErrors)
+          }
           window.RvBTutorialScenario.validateDefinition(tutorialDefinition)
           await initTraining(tutorialDefinition.mapId, {
             firstPlayerId: tutorialDefinition.opponent.playerId,

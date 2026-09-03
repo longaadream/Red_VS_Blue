@@ -2,7 +2,10 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, test } from 'vitest'
-import { resolveClientProtocolFile } from '../../electron-client/client-protocol-resource'
+import {
+  readClientProtocolBattleData,
+  resolveClientProtocolFile,
+} from '../../electron-client/client-protocol-resource'
 
 const temporaryRoots: string[] = []
 
@@ -24,13 +27,16 @@ function createRoots() {
   fs.mkdirSync(path.join(activePackRoot, '.rvb'), { recursive: true })
   fs.writeFileSync(path.join(htmlRoot, 'index.html'), '<html></html>')
   fs.writeFileSync(path.join(appRoot, 'data', 'pieces', 'manifest.json'), '["development"]')
+  fs.writeFileSync(path.join(appRoot, 'data', 'pieces', 'development.json'), '{"source":"development"}')
   fs.writeFileSync(path.join(appRoot, 'public', 'ana.jpg'), 'development portrait')
   fs.writeFileSync(path.join(appRoot, 'public', 'watcher.jpg'), 'application portrait')
   fs.writeFileSync(path.join(appRoot, 'public', 'effect-icons', 'divine-shield.svg'), '<svg>built in</svg>')
   fs.writeFileSync(path.join(appRoot, 'public', 'tile-effects', 'amaterasu.svg'), '<svg>built in</svg>')
   fs.writeFileSync(path.join(htmlRoot, 'data', 'pieces', 'manifest.json'), '["packaged"]')
+  fs.writeFileSync(path.join(htmlRoot, 'data', 'pieces', 'packaged.json'), '{"source":"packaged"}')
   fs.writeFileSync(path.join(htmlRoot, 'images', 'terrain', 'floor.webp'), 'page terrain')
   fs.writeFileSync(path.join(activePackRoot, 'data', 'pieces', 'manifest.json'), '["pack"]')
+  fs.writeFileSync(path.join(activePackRoot, 'data', 'pieces', 'pack.json'), '{"source":"active-pack"}')
   fs.writeFileSync(path.join(activePackRoot, 'images', 'ana.jpg'), 'pack portrait')
   fs.writeFileSync(path.join(activePackRoot, '.rvb', 'profile.json'), JSON.stringify({
     files: [
@@ -165,6 +171,26 @@ describe('Electron client protocol resource resolution', () => {
       isPackaged: true,
       relativePath: 'images/ana.jpg',
     })).toBeNull()
+  })
+
+  test('reads a Profile-consistent battle data bundle without per-file protocol requests', () => {
+    const roots = createRoots()
+
+    expect(readClientProtocolBattleData({
+      ...roots,
+      activePackRoot: null,
+      isPackaged: true,
+    }, ['pieces'], [])).toEqual({
+      'data/pieces/manifest.json': ['packaged'],
+      'data/pieces/packaged.json': { source: 'packaged' },
+    })
+    expect(readClientProtocolBattleData({
+      ...roots,
+      isPackaged: true,
+    }, ['pieces'], [])).toEqual({
+      'data/pieces/manifest.json': ['pack'],
+      'data/pieces/pack.json': { source: 'active-pack' },
+    })
   })
 
   test('serves trusted built-in status and tile-effect SVGs in packaged builds', () => {

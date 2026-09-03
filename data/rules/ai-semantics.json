@@ -48,15 +48,13 @@
   },
   "manifestHashes": {
     "pieces": "ae8a231449122d73dbb58ce387b098b2a7494a0eafa1558a7398066d8e26d405",
-    "skills": "c1140cbbf934f82c59c1ebc3474417934a37b9c7d6cee3cb73b343c78c60f7a0",
+    "skills": "74e2e75db651653e954085b5cce842ff97a190f1f00df6068df0faf8e4539bd6",
     "cards": "4f15ea0ae15ec28dc71cfa23928a77ce8cc0467d87cc9ad051c9836af41cbf92",
     "rules": "ebb24d3068f635a9807b178de53165e83d8b7c202a1af54f232250ef11419d85",
     "status-effects": "ea3b630e48fcacba6a3a7b66deefe0d0c6f78d421fdd96b5327db1837e3e43ec"
   },
   "unsupported": {
-    "skills": [
-      "evil-explosion"
-    ]
+    "skills": []
   },
   "metadataRequired": {
     "pieces": [

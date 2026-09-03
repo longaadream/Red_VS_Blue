@@ -1,5 +1,5 @@
 import { Pool } from 'pg'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import { hashBattleState } from '@/lib/game/battle-runner'
 import {
@@ -163,6 +163,8 @@ describe.skipIf(!databaseUrl)('RED-160 real PostgreSQL authority integration', (
         && Array.isArray(transition.replayFrames)
         && /^[0-9a-f]{64}$/.test(transition.transitionHash)
       ))).toBe(true)
+      const fullReportRead = vi.spyOn(repository, 'readBattleReport')
+      const databaseReads = vi.spyOn(pool, 'query')
       await expect(repository.listBattleReports('player-red')).resolves.toEqual([
         expect.objectContaining({
           battleId,
@@ -170,6 +172,8 @@ describe.skipIf(!databaseUrl)('RED-160 real PostgreSQL authority integration', (
           transitionHash: barrier.rows[0].transition_hash,
         }),
       ])
+      expect(fullReportRead).not.toHaveBeenCalled()
+      expect(databaseReads).toHaveBeenCalledTimes(4)
 
       const finalTransition = report!.transitions.at(-1)!
       await pool.query(
@@ -181,15 +185,23 @@ describe.skipIf(!databaseUrl)('RED-160 real PostgreSQL authority integration', (
       await expect(repository.readBattleReport(battleId)).rejects.toMatchObject({
         code: 'BATTLE_REPORT_INTEGRITY_FAILED',
       })
+      fullReportRead.mockClear()
+      databaseReads.mockClear()
       await expect(repository.listBattleReports('player-red')).resolves.toEqual([])
+      expect(fullReportRead).not.toHaveBeenCalled()
+      expect(databaseReads).toHaveBeenCalledTimes(4)
       await pool.query(
         'UPDATE battle_transition SET transition_json = $3::jsonb WHERE battle_id = $1 AND to_version = $2',
         [battleId, finalTransition.toVersion, JSON.stringify(finalTransition)],
       )
       await expect(repository.readBattleReport(battleId)).resolves.toMatchObject({ verified: true })
+      fullReportRead.mockClear()
+      databaseReads.mockClear()
       await expect(repository.listBattleReports('player-red')).resolves.toEqual([
         expect.objectContaining({ battleId }),
       ])
+      expect(fullReportRead).not.toHaveBeenCalled()
+      expect(databaseReads).toHaveBeenCalledTimes(4)
       await restoredJournal.close()
     } finally {
       await pool.query('DELETE FROM battle_room_authority WHERE battle_id = $1', [battleId])

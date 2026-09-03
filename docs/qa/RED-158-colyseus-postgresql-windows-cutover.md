@@ -152,6 +152,15 @@ Colyseus：
   `BATTLE_REPORT_INTEGRITY_FAILED` / `BATTLE_REPORT_NOT_DURABLE`，保留原始数据库记录并写结构化错误日志，
   只返回验证通过的战报；直接读取损坏战报仍 fail closed，数据库运行故障仍向上抛出。桌面重试同时改为按
   实际目标 URL 判断是否为本机 authority，并在恢复后同步当前端口，不再依赖可能过期的 mode 标记。
+- 最新实包在 16:38 验收时再次确认 PostgreSQL 于 16:38:37 ready、Colyseus 于 16:38:40 监听，战绩接口也
+  返回 HTTP 200；但包含 132 个 transition 的有效战报与两条隔离旧记录使列表读取实测耗时 6.9–10.3 秒，
+  与页面 8 秒请求预算形成竞态。列表现改为摘要完整性验证，不再为展示一行摘要应用并重算每一步完整状态；
+  仍校验连续版本、数据库冗余列、已存 hash chain、receipt、终局屏障、终局快照与 chain head。摘要查询只从
+  transition JSON 提取小型元数据，不传输动作、补丁、Trace 或 Replay Frame，因此耗时不再随每步状态体积放大。按 battle
+  ID 下载继续执行从初始 Checkpoint 开始的完整重放。新手教程入口同时与本机 authority 启动解耦，数据库恢复
+  较慢或失败时仍可立即进入本地教程。教程实包冒烟随后定位到第二个独立瓶颈：页面通过 Electron 自定义协议并发
+  请求数百个 JSON 小文件，低资源 Windows 上会长时间停在“加载本地资源”。Electron 现改为一次读取约 0.5 MB 的
+  active Profile 战斗数据 bundle，并同时预热规则引擎同步文件缓存；浏览器/Android 逐文件路径保持不变。
 
 浏览器证据：
 
@@ -167,11 +176,11 @@ Colyseus：
 | 启动恢复定向回归 | 3 文件、25/25 通过；覆盖瞬时 PostgreSQL 重试、永久错误立即失败、240 秒统一 watchdog 与 UI 恢复入口 |
 | `tests/colyseus/product-room.test.ts` + PostgreSQL pool lifecycle | 2 文件、8/8 通过 |
 | 动作历史与首页战绩 UI 回归 | 2 文件、18/18 通过 |
-| `npm.cmd run typecheck` | 通过 |
-| 关键路径 ESLint | 本次新增代码无新告警；仍有既存 `electron-client/main.ts:1966 openConnectWindow` 未使用错误，不在本次范围内 |
+| `npm.cmd run typecheck` | 本次改动无新增类型错误；命令仍被 `tests/game/sonic-roster.test.ts` 的 4 个主线既存错误阻断 |
+| 关键路径 ESLint | 通过；仅提示仓库 suppressions 中存在可清理条目 |
 | `check:windows-cutover` / `check:encoding` / `git diff --check` | 通过 |
-| `npm.cmd run build:electron:client` | 通过；PostgreSQL 16.15-2、79 个页面资源、333 个离线数据资源与 46 个离线图片资源校验通过 |
-| `node tests/electron/windows-smoke.mjs client` | 通过；含私有 PostgreSQL、authority 三次有界自动恢复、显式手动恢复、双玩家房间与退出后进程清理 |
+| `npm.cmd run build:electron:client` | 通过；PostgreSQL 16.15-2、83 个页面资源、334 个离线数据资源与 46 个离线图片资源校验通过 |
+| `node tests/electron/windows-smoke.mjs client` | 通过；authority 故意不可用时教程 bundle 677ms 完成并显示对话，另含私有 PostgreSQL、三次有界自动恢复、显式手动恢复、双玩家房间与退出后进程清理 |
 | 损坏战报隔离回归 | 修改前 PostgreSQL 集成与首页用例均稳定失败；修复后真实 PostgreSQL 1 项通过/外部 URL 1 项跳过，相关 Colyseus/UI 3 文件 14/14 通过 |
 
 整机采样为 CPU 98.8%、约 2 GiB 可用内存时，完整 `test:colyseus` 的 22 项中有 9 项越过既存

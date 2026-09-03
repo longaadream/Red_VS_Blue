@@ -34,6 +34,7 @@
         "skills/**",
         "status-effects/**",
         "tiles/**",
+        "tutorial/**",
         "skill-keywords.json"
       ]
     },

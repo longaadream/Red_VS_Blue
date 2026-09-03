@@ -75,15 +75,21 @@ Windows 本机 authority 启动将 PostgreSQL 的瞬时连接超时、恢复中�
 schema 或完整性错误仍立即失败。Electron 的就绪 watchdog 必须覆盖数据库连接重试窗口，不得用短于正常资源
 加载时间的恢复窗口杀死仍在启动的 authority 进程。
 
+Electron 本地训练和教程通过只读 `rvb-client://app/__battle-data.json` 一次取得 active Profile 的战斗及教程 JSON，
+同时填充页面展示表与浏览器规则引擎的同步文件缓存，避免 Windows 自定义协议串行处理数百个小文件。该端点仍
+复用唯一 Profile resolver；任一必需文件缺失或格式错误都整体失败，不得混入 bundled fallback。浏览器和 Android
+继续使用逐文件相对资源路径。
+
 ## 6. 战报
 
 `PostgresAuthorityRepository.readBattleReport()` 从初始 Checkpoint 重放完整 Transition，并核对终局 Trace、
 Replay Frame 和 Terminal Barrier。只有 online version 与 durable version 相等、终局完整且所有 hash 验证通过
 时才返回报告。页面不保存或生成另一份权威战报。
 
-战绩列表对每局分别执行同一验证：损坏或未达到 durable terminal barrier 的记录会保留在 PostgreSQL 中并写入
-authority 错误日志，但不会计入玩家战绩，也不会阻断其他已验证战报。按 battle ID 直接读取该记录仍然
-fail closed；数据库连接、查询等运行故障不得伪装成空列表。
+战绩列表不执行完整状态重放；它批量读取终局记录，并校验数据库冗余列、连续版本、已存 hash chain、receipt、
+Terminal Barrier、终局 Checkpoint 及最终 chain head。损坏或未达到 durable terminal barrier 的记录会
+保留在 PostgreSQL 中并写入 authority 错误日志，但不会计入玩家战绩，也不会阻断其他有效战报。按 battle ID
+下载时仍从初始 Checkpoint 完整重放并 fail closed；数据库连接、查询等运行故障不得伪装成空列表。
 
 ## 7. 安全与隐私
 

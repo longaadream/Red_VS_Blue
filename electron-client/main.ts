@@ -10,7 +10,7 @@ import { pathToFileURL } from 'url'
 import { assertTrustedIpcSender, isFileUrlWithinRoot } from './ipc-trust'
 import { resolveDevelopmentProfile } from './development-profile'
 import { findFreePort } from './local-port'
-import { resolveClientProtocolFile } from './client-protocol-resource'
+import { readClientProtocolBattleData, resolveClientProtocolFile } from './client-protocol-resource'
 import { EmbeddedPostgresController } from './embedded-postgres'
 import {
   LocalAuthorityRecoveryBudget,
@@ -1769,10 +1769,27 @@ async function serveClientProtocolRequest(
       )
     }
     const activePackRoot = fixedActivePackRoot === undefined
-      ? (isActivatableResourcePackPath(relativePath)
+      ? (isActivatableResourcePackPath(relativePath) || relativePath === '__battle-data.json'
           ? resolveActiveResourcePackRoot(getPackRoot())
           : null)
       : fixedActivePackRoot
+    if (relativePath === '__battle-data.json') {
+      const files = readClientProtocolBattleData({
+        htmlRoot: getHtmlRoot(),
+        appRoot: getAppRoot(),
+        activePackRoot,
+        isPackaged: app.isPackaged,
+      })
+      return new Response(JSON.stringify({
+        schemaVersion: 'rvb-client-battle-data/v1',
+        files,
+      }), {
+        headers: {
+          'cache-control': 'no-store',
+          'content-type': 'application/json; charset=utf-8',
+        },
+      })
+    }
     const target = resolveClientProtocolFile({
       relativePath,
       htmlRoot: getHtmlRoot(),

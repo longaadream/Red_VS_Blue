@@ -583,7 +583,11 @@ RED-140 是已接受的目标合同，不表示当前运行时已经实现。唯
 ## RED-95 新手教程接口
 
 - `data/tutorial/first-session.json` 是第一局的声明式内容源，固定世界观、阵容、种子、摆位、教学格与对白；第二局和 AI 不属于该 schema。
-- 大厅把新手教程作为模式导航上方的常驻快捷入口；它不要求先切换到“训练营”，训练营面板只保留自由训练入口。
+- 大厅把新手教程作为模式导航上方的常驻快捷入口；它直接加载本地教程脚本，不等待 Colyseus 或 PostgreSQL
+  authority，也不要求先切换到“训练营”。训练营面板只保留自由训练入口。
+- Electron 教程/训练进入战斗页时从 `rvb-client://app/__battle-data.json` 一次读取 active Profile 的卡牌、棋子、
+  技能、地图、规则、状态、地块、关键词和教程 JSON，并通过 `RvBGameEngine.primeJsonFiles()` 填充同步规则读取缓存。
+  批量端点必须使用与普通资源相同的 Profile resolver；浏览器和 Android 保留逐文件加载回退。
 - `RvBTutorialScenario.prepareInitialState()` 从普通训练战斗中保留乌瑟尔、死神、黑百合三个现有场上实例，并将现有安度因实例放入预备区；它不创建教程专用棋子，也不改写规则层数值。
 - `RvBTutorialScenario.openPlayerDeployment()` 只在脚本开场结束后开启一次真实 `progressive-reserve-v1` 部署输入。部署命令继续由规则层验证候选、revision、落点和免费首移状态。
 - `RvBTutorialController` 是无 DOM 的顺序控制器。只有当前步骤匹配的权威动作、指定动作日志或指定地形点击才能推进；非法动作在进入训练权威转换前被拒绝。
@@ -598,7 +602,10 @@ RED-140 是已接受的目标合同，不表示当前运行时已经实现。唯
 - Windows 宿主 `electron-client/main.ts` 在启动时准备 Profile HTTP、嵌入式 PostgreSQL 与 Colyseus；本机对战入口复用同一 authority。
 - 页面联机适配 `data/pages/js/colyseus-client.js` 只使用 Colyseus SDK 和同源 HTTP；房间加入直接调用 `joinById`。BattleRoom 是玩家命令、房间状态与重连恢复的唯一在线入口。
 - `lib/server/postgres/postgres-authority-repository.ts` 独占连续 Transition、Receipt、Checkpoint、Terminal Barrier 与 Trace 的耐久写入。
-- `readBattleReport()` 按 battle ID 验证失败时保持 fail closed。`listBattleReports(playerId)` 对每局独立验证：损坏或未 durable 的记录保留在 PostgreSQL 并写错误日志，但不计入玩家战绩，也不阻断其他已验证战报；数据库连接或查询故障继续向上抛出。
+- `readBattleReport()` 按 battle ID 执行完整状态重放，验证失败时保持 fail closed。`listBattleReports(playerId)`
+  使用不读取或应用每步完整状态补丁的摘要验证：仍核对冗余列、连续版本、已存 hash chain、receipt、Terminal Barrier、
+  终局 Checkpoint 和 chain head。损坏或未 durable 的记录保留在 PostgreSQL 并写错误日志，但不计入玩家战绩，
+  也不阻断其他有效战报；列表最多返回 100 局且固定为四次批量查询，不按战局数量执行额外查询；数据库连接或
+  查询故障继续向上抛出。
 - Windows 本机瞬时连接故障使用有界重试；认证、schema、配置与完整性错误立即失败。Electron 就绪 watchdog 覆盖数据库重试窗口，但 authority ready 后立即继续。
 - 战绩重试按当前 authority URL 判断是否需要受信 IPC 恢复，并在恢复后同步新的本机端口；远程 authority 失败不会启动本机服务。
-

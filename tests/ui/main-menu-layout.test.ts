@@ -48,6 +48,8 @@ describe('RED-171 game-style main menu layout contract', () => {
     expect(page).toContain('第一次来？')
     expect(page).toContain('id="tutorialEntryDescription"')
     expect(page.match(/onclick="goToTutorial\(\)"/g)).toHaveLength(1)
+    expect(page).toMatch(/function goToTutorial\(\)\s*\{\s*window\.location\.href = 'battle\.html\?mode=tutorial'\s*\}/)
+    expect(page).not.toContain("goToLocalPractice('tutorial')")
   })
 
   it('uses a two-column desktop shell and structural narrow-screen reflow', () => {
