@@ -90,6 +90,7 @@ describe('battle page route contract', () => {
 
   it('mounts the RED-167 vignette inside the shared battle presentation lifecycle', () => {
     const battlePage = readPage('battle.html')
+    const vignetteSource = readFileSync(resolve(pagesDir, 'js/battle-ui/battle-action-vignette.js'), 'utf8')
 
     expect(battlePage).toContain('<script src="js/game-engine.js"></script>')
     expect(battlePage).not.toContain('<script src="js/battle-ui/battle-presentation-events.js"></script>')
@@ -99,6 +100,10 @@ describe('battle page route contract', () => {
     expect(battlePage).toContain('vignetteUi: battleActionVignette')
     expect(battlePage).toContain("const RED167_QA_MODE = params.get('qa') === 'RED-167'")
     expect(battlePage).toContain('window.__RVB_RED167_REPLAY__ = playRed167QaSequence')
+    expect(vignetteSource).toContain("speedControl.className = 'battle-vignette-speed-control'")
+    expect(vignetteSource).toContain('speedControl.hidden = false')
+    expect(vignetteSource).toContain('floatLayer.appendChild(speedControl)')
+    expect(vignetteSource).not.toContain('data-vignette-control="speed"')
   })
 
   it('projects real training actions into the shared RED-167 presentation queue', () => {
@@ -190,9 +195,10 @@ describe('battle page route contract', () => {
     expect(contextCss).not.toContain('.hand-panel')
     expect(contextCss).not.toContain('.hand-label')
     expect(contextCss).toMatch(/\.hand-scroll\s*\{[\s\S]*?background:\s*transparent/)
-    expect(battlePage).toContain('id="selectedStatusOverlay"')
-    expect(contextCss).toMatch(/\.selected-status-overlay\s*\{[\s\S]*?position:\s*absolute[\s\S]*?border:\s*0[\s\S]*?pointer-events:\s*none/)
-    expect(contextCss).toMatch(/\.selected-status-overlay\[hidden\]\s*\{\s*display:\s*none/)
+    expect(battlePage).not.toContain('id="selectedStatusOverlay"')
+    expect(battlePage).toContain('aria-label="查看棋子完整技能与状态"')
+    expect(battlePage).toContain('onclick="switchPieceInfoToActionHistory()">行动记录</button>')
+    expect(battlePage).toMatch(/function switchPieceInfoToActionHistory\(\)[\s\S]*?closePieceInfo\(\{ restoreFocus: false \}\)[\s\S]*?is-user-expanded[\s\S]*?button\.focus\(\)/)
     expect(battlePage).toContain('id="trainingToolsToggle"')
     expect(battlePage).toContain('aria-controls="trainingBar" aria-expanded="false"')
     expect(battlePage).toContain('id="trainingBar" class="training-popover" role="dialog" aria-hidden="true"')
@@ -213,6 +219,7 @@ describe('battle page route contract', () => {
     expect(battlePage).toMatch(/function selectPiece\(instanceId\)[\s\S]*?dismissedPieceContextId = null[\s\S]*?render\(\)/)
     expect(battlePage).toMatch(/function dismissPieceContextMenu\(\)[\s\S]*?dismissedPieceContextId = menu\.dataset\.pieceId[\s\S]*?closePieceContextMenu\(\)/)
     expect(battlePage).toMatch(/function positionPieceContextMenu\(\)[\s\S]*?layout\.placeEdgeDock[\s\S]*?menu\.dataset\.side = placement\.side/)
+    expect(battlePage).toMatch(/function positionPieceContextMenu\(\)[\s\S]*?leftInset[\s\S]*?rightInset/)
     expect(battlePage).toContain('aria-label="收起技能栏"')
     expect(battlePage).toMatch(/document\.addEventListener\('pointerdown',[\s\S]*?#pieceContextMenu[\s\S]*?dismissPieceContextMenu\(\)/)
     expect(battlePage).toMatch(/document\.addEventListener\('wheel',[\s\S]*?#boardStage3d[\s\S]*?dismissPieceContextMenu\(\)/)
@@ -227,6 +234,17 @@ describe('battle page route contract', () => {
     expect(contextCss).toMatch(/orientation:\s*landscape[\s\S]*?\.piece-context-menu\s*\{[\s\S]*?width:\s*148px/)
     expect(mobileCss).toMatch(/\.training-setup-sheet\s*\{[\s\S]*?max-height:\s*calc\(100dvh - 16px\)/)
     expect(mobileCss).toMatch(/\.training-setup-grid\s*\{[\s\S]*?overflow-y:\s*auto/)
+  })
+
+  it('reopens the selected piece skill panel after a committed move', () => {
+    const battlePage = readPage('battle.html')
+    const moveStart = battlePage.indexOf('function moveSelectedPieceToCell(pieceId, x, y)')
+    const moveEnd = battlePage.indexOf('function onCellClick(x, y)', moveStart)
+    const moveHandler = battlePage.slice(moveStart, moveEnd)
+
+    expect(moveHandler).toMatch(/dismissedPieceContextId = null[\s\S]*?doAction\(\{ type: 'move'/)
+    expect(battlePage).toMatch(/function restoreSelectedPieceMenu\(options\)[\s\S]*?input\.reopen[\s\S]*?dismissedPieceContextId = null/)
+    expect(battlePage).toMatch(/restoreSelectedPieceMenu\(\{ reopen: action\.type === 'move' \}\)/)
   })
 
   it('keeps the board dominant in low-height landscape battle layouts', () => {
@@ -265,8 +283,40 @@ describe('battle page route contract', () => {
   it('routes the lobby training entry to battle.html training mode', () => {
     const lobby = readPage('index.html')
 
-    expect(lobby).toContain("window.location.href = 'battle.html?mode=training'")
+    expect(lobby).toContain("window.location.href = 'battle.html?mode=' + mode")
+    expect(lobby).toContain("function goToTraining() { return goToLocalPractice('training') }")
+    expect(lobby).toContain("function goToTutorial() { return goToLocalPractice('tutorial') }")
     expect(lobby).not.toMatch(/location\.href\s*=\s*['"]training\.html/)
+  })
+
+  it('keeps the tutorial opening review visible before reserve deployment begins', () => {
+    const battlePage = readPage('battle.html')
+    const tutorialRuntime = readFileSync(resolve(pagesDir, 'js/tutorial/tutorial-runtime.js'), 'utf8')
+    const opening = battlePage.match(/async function runTutorialOpening\(\) \{([\s\S]*?)\n    \}/)?.[1] || ''
+
+    expect(opening).not.toContain('openPlayerDeployment')
+    expect(battlePage).toContain("if (stepId === 'review-defense')")
+    expect(battlePage).toContain('RvBTutorialScenario.openPlayerDeployment(G, tutorialDefinition)')
+    expect(tutorialRuntime).toContain("step.advance.type === 'history-item'")
+    expect(tutorialRuntime).toContain('hooks.showActionHistory()')
+    expect(tutorialRuntime).toContain("const historyDock = document.getElementById('actionHistoryDock')")
+    expect(tutorialRuntime).toContain("historyDock.addEventListener('click', onHistoryClick, true)")
+    expect(tutorialRuntime).toContain("'[data-history-root-id][aria-pressed=\"true\"]'")
+    expect(tutorialRuntime).toContain('acceptHistoryTarget(clickedTarget || selectedTarget)')
+  })
+
+  it('leaves time to read the opponent action before advancing the tutorial turn', () => {
+    const battlePage = readPage('battle.html')
+    const opponentResponse = readNamedAsyncFunction(battlePage, 'runTutorialOpponentResponse')
+
+    expect(battlePage).toContain('const TUTORIAL_OPPONENT_WINDUP_MS = 650')
+    expect(battlePage).toContain('const TUTORIAL_OPPONENT_RESULT_DWELL_MS = 1400')
+    expect(battlePage).toContain('await tutorialPause(TUTORIAL_OPPONENT_WINDUP_MS)')
+    expect(battlePage).toContain('await tutorialPause(TUTORIAL_OPPONENT_RESULT_DWELL_MS)')
+    expect(opponentResponse).toContain('battleActionVignette.settleAll()')
+    expect(opponentResponse.indexOf('battleActionVignette.settleAll()')).toBeLessThan(
+      opponentResponse.indexOf('await tutorialPause(TUTORIAL_OPPONENT_WINDUP_MS)'),
+    )
   })
 
   it('keeps training.html as a compatibility redirect without battle interactions', () => {

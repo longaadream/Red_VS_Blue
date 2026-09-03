@@ -1,0 +1,21 @@
+{
+  "id": "tails-twin-flight",
+  "name": "双尾飞行",
+  "description": "选择4格内另一名友军及两个上下左右相邻、未被占据或预留的7格内空地/掩体落点；预留落点两回合，两者获得持续2回合的免疫与不可操作，随后同时搬运。",
+  "effectTags": ["搬运", "获得动能", "使其他角色获得动能"],
+  "icon": "✈️",
+  "kind": "active",
+  "type": "normal",
+  "cooldownTurns": 3,
+  "maxCharges": 0,
+  "powerMultiplier": 1,
+  "actionPointCost": 2,
+  "targeting": {
+    "steps": [
+      {"kind":"target","type":"piece","filter":"ally","range":4,"distanceMetric":"manhattan"},
+      {"kind":"target","type":"grid","filter":"all","range":7,"distanceMetric":"manhattan","requireWalkable":true,"requireUnoccupied":true},
+      {"kind":"target","type":"grid","filter":"all","range":7,"distanceMetric":"manhattan","requireWalkable":true,"requireUnoccupied":true}
+    ]
+  },
+  "code": "function executeSkill(context){var c=context.piece,b=context.battle,ally=selectTarget({type:'piece',range:4,filter:'ally'});if(!ally||ally.needsTargetSelection)return ally;if(ally.instanceId===c.instanceId)return {success:false,message:'双尾飞行必须选择另一名友军'};var a=selectTarget({type:'grid',range:7,filter:'all'});if(!a||a.needsTargetSelection)return a;var d=selectTarget({type:'grid',range:7,filter:'all'});if(!d||d.needsTargetSelection)return d;if(Math.abs(a.x-d.x)+Math.abs(a.y-d.y)!==1)return {success:false,message:'两个落点必须上下左右相邻'};var cells=[a,d];for(var i=0;i<cells.length;i++){var tile=b.map.tiles.find(function(t){return t.x===cells[i].x&&t.y===cells[i].y;});if(!tile||!tile.props.walkable||(tile.props.type!=='floor'&&tile.props.type!=='cover')||b.pieces.some(function(p){return p.currentHp>0&&p.x===cells[i].x&&p.y===cells[i].y;}))return {success:false,message:'落点必须是未被占据的空地或掩体'};}if(!b.extensions)b.extensions={};b.extensions.tileEffects=b.extensions.tileEffects||[];if(b.extensions.tileEffects.some(function(e){return e.type==='tails-flight-reservation'&&(e.x===a.x&&e.y===a.y||e.x===d.x&&e.y===d.y);} ))return {success:false,message:'落点已被预留'};var flightId='tails-flight-'+c.instanceId+'-'+b.turn.turnNumber+'-'+a.x+'-'+a.y+'-'+d.x+'-'+d.y;b.extensions.tileEffects.push({id:flightId+'-a',type:'tails-flight-reservation',x:a.x,y:a.y,flightId:flightId},{id:flightId+'-b',type:'tails-flight-reservation',x:d.x,y:d.y,flightId:flightId});c.statusTags=c.statusTags||[];c.statusTags.push({id:flightId,type:'tails-flight-reservation',name:'双尾飞行预留',turns:2,ownerId:c.instanceId,allyId:ally.instanceId,x:a.x,y:a.y,allyX:d.x,allyY:d.y,flightId:flightId,currentDuration:-1,relatedRules:['rule-tails-flight-resolve']});addRuleById(c.instanceId,'rule-tails-flight-resolve');[c,ally].forEach(function(p){p.statusTags=p.statusTags||[];p.statusTags.push({id:flightId+'-immune-'+p.instanceId,type:'immune',name:'免疫',flightId:flightId,stacks:1,currentDuration:2,remainingDuration:2,relatedRules:['rule-tails-flight-immune','rule-tails-flight-immune-target']},{id:flightId+'-inoperable-'+p.instanceId,type:'inoperable',name:'不可操作',flightId:flightId,stacks:1,currentDuration:2,remainingDuration:2,relatedRules:['rule-tails-flight-inoperable','rule-tails-flight-inoperable-skill']});addRuleById(p.instanceId,'rule-tails-flight-immune');addRuleById(p.instanceId,'rule-tails-flight-immune-target');addRuleById(p.instanceId,'rule-tails-flight-inoperable');addRuleById(p.instanceId,'rule-tails-flight-inoperable-skill');});b.players.forEach(function(player){addPlayerRuleById(player.playerId,'rule-tails-flight-reservation-block');});return {success:true,message:'已预留双尾飞行落点'};}"
+}

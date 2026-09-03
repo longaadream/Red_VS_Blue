@@ -1,0 +1,7 @@
+{
+  "id": "rule-tails-flight-immune-target",
+  "name": "双尾飞行免疫（技能）",
+  "description": "预留搬运期间不能被技能选择。",
+  "trigger": { "type": "beforeSkillUse" },
+  "skillCode": "var piece=context.rulePiece;if(!piece||!context.targetPiece||context.targetPiece.instanceId!==piece.instanceId)return {success:false,message:''};if(!(piece.statusTags||[]).some(function(t){return t.type==='immune';})){removeRuleById(piece.instanceId,'rule-tails-flight-immune-target');return {success:false,message:''};}return {success:true,blocked:true,message:piece.name+'处于免疫状态，不能被选择'};"
+}

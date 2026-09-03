@@ -60,8 +60,13 @@
     const boundsHeight = Math.max(0, Number(bounds && bounds.height) || 0)
     const topPadding = Math.max(MENU_PADDING, Number(bounds && bounds.topPadding) || MENU_PADDING)
     const bottomPadding = Math.max(MENU_PADDING, Number(bounds && bounds.bottomPadding) || MENU_PADDING)
-    const midpoint = boundsWidth / 2
-    const hysteresis = Math.min(64, Math.max(28, boundsWidth * 0.05))
+    const leftInset = Math.max(0, Number(bounds && bounds.leftInset) || 0)
+    const rightInset = Math.max(0, Number(bounds && bounds.rightInset) || 0)
+    const safeLeft = Math.min(boundsWidth, leftInset + MENU_PADDING)
+    const safeRight = Math.max(safeLeft, boundsWidth - rightInset - MENU_PADDING)
+    const safeWidth = Math.max(0, safeRight - safeLeft)
+    const midpoint = safeLeft + safeWidth / 2
+    const hysteresis = Math.min(64, Math.max(28, safeWidth * 0.05))
     let side
 
     if (previousSide === 'left' && anchorLeft >= midpoint - hysteresis) side = 'left'
@@ -69,8 +74,8 @@
     else side = anchorLeft >= midpoint ? 'left' : 'right'
 
     const left = side === 'left'
-      ? MENU_PADDING
-      : Math.max(MENU_PADDING, boundsWidth - menuWidth - MENU_PADDING)
+      ? safeLeft
+      : Math.max(safeLeft, safeRight - menuWidth)
     const availableHeight = Math.max(0, boundsHeight - topPadding - bottomPadding)
     const rawTop = topPadding + (availableHeight - menuHeight) / 2
     const top = clamp(rawTop, topPadding, boundsHeight - bottomPadding - menuHeight)

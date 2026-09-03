@@ -78,6 +78,7 @@
     'blizzard': Object.freeze({ color: 0x67e8f9, colorCss: '#cffafe', bg: 'rgba(14,116,144,.72)', border: '#67e8f9', icon: 'images/tile-effects/blizzard.svg' }),
     'shishio-burn': Object.freeze({ color: 0xfb4934, colorCss: '#fdba74', bg: 'rgba(124,45,18,.75)', border: '#fb4934', icon: 'images/tile-effects/shishio-burn.svg' }),
     'sticky-bomb': Object.freeze({ color: 0xfacc15, colorCss: '#fef08a', bg: 'rgba(113,63,18,.78)', border: '#facc15', icon: 'images/tile-effects/sticky-bomb.svg' }),
+    'tails-flight-reservation': Object.freeze({ color: 0x60a5fa, colorCss: '#bfdbfe', bg: 'rgba(30,58,138,.78)', border: '#60a5fa', icon: 'images/tile-effects/flying-raijin-anchor.svg' }),
     fallback: Object.freeze({ color: 0x94a3b8, colorCss: '#e5e7eb', bg: 'rgba(15,23,42,.76)', border: '#94a3b8', icon: 'images/tile-effects/fallback.svg' }),
   })
   const TILE_EFFECT_ICON_SLOTS = Object.freeze([
@@ -115,6 +116,9 @@
   let _historyHighlightGroup = null
   let _historyHighlightPointCount = 0
   let _historyHighlightPathCount = 0
+  let _tutorialCueGroup = null
+  let _tutorialCueCellCount = 0
+  let _tutorialCuePathCount = 0
   const _anims = new Map()             // one controller per owner/property
   const _playedEventKeys = new Set()
   const _playedEventOrder = []
@@ -1518,6 +1522,125 @@
     _scene.add(group)
   }
 
+  function clearTutorialCue() {
+    _cancelAnimationsForPrefix('tutorial-cue:')
+    if (_tutorialCueGroup && _scene) {
+      _scene.remove(_tutorialCueGroup)
+      _tutorialCueGroup.traverse(function (object) {
+        if (object.geometry && object.geometry.dispose) object.geometry.dispose()
+        if (object.material) {
+          ;(Array.isArray(object.material) ? object.material : [object.material]).forEach(function (material) {
+            if (material && material.dispose) material.dispose()
+          })
+        }
+      })
+    }
+    _tutorialCueGroup = null
+    _tutorialCueCellCount = 0
+    _tutorialCuePathCount = 0
+    _invalidate()
+  }
+
+  function _startTutorialPulse(group) {
+    if (_reducedMotion || !group || group !== _tutorialCueGroup) return
+    _startAnimation('tutorial-cue:pulse', {
+      duration: 1.15,
+      easing: EASE.inOut,
+      update: function (_, raw) {
+        const pulse = 0.5 - Math.cos(raw * Math.PI * 2) * 0.5
+        ;(group.userData.rings || []).forEach(function (ring) {
+          const scale = 1 + pulse * 0.13
+          ring.scale.set(scale, scale, scale)
+          ring.material.opacity = 0.72 + pulse * 0.24
+        })
+        ;(group.userData.beams || []).forEach(function (beam) {
+          beam.material.opacity = 0.08 + pulse * 0.08
+        })
+      },
+      complete: function () {
+        if (group === _tutorialCueGroup) _startTutorialPulse(group)
+      },
+    })
+  }
+
+  function setTutorialCue(cue) {
+    clearTutorialCue()
+    if (!_mounted || !_scene || !cue) return
+    const cells = []
+    const seen = new Set()
+    ;(Array.isArray(cue.cells) ? cue.cells : []).forEach(function (cell) {
+      const x = Number(cell && cell.x), z = Number(cell && cell.y)
+      const key = x + ',' + z
+      if (!Number.isInteger(x) || !Number.isInteger(z) || seen.has(key)) return
+      seen.add(key)
+      cells.push({ x: x, z: z })
+    })
+    const path = (Array.isArray(cue.path) ? cue.path : []).map(function (cell) {
+      return { x: Number(cell && cell.x), z: Number(cell && cell.y) }
+    }).filter(function (cell) { return Number.isInteger(cell.x) && Number.isInteger(cell.z) })
+    if (!cells.length && path.length < 2) return
+
+    const group = new THREE.Group()
+    const rings = []
+    const beams = []
+    group.userData.tutorialCue = true
+    group.userData.rings = rings
+    group.userData.beams = beams
+    group.renderOrder = 24
+
+    cells.forEach(function (cell) {
+      const surfaceY = _tileSurfaceHeightAt(cell.x, cell.z)
+      const ring = new THREE.Mesh(
+        new THREE.RingGeometry(0.28, 0.38, 40),
+        new THREE.MeshBasicMaterial({
+          color: 0x86efac, transparent: true, opacity: 0.88,
+          side: THREE.DoubleSide, depthTest: false, depthWrite: false,
+        }),
+      )
+      ring.rotation.x = -Math.PI / 2
+      ring.position.set(cell.x, surfaceY + 0.075, cell.z)
+      ring.renderOrder = 25
+      ring.userData.tutorialCueRole = 'ring'
+      rings.push(ring)
+      group.add(ring)
+
+      const beam = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.25, 0.39, 1.15, 28, 1, true),
+        new THREE.MeshBasicMaterial({
+          color: 0x4ade80, transparent: true, opacity: 0.12,
+          side: THREE.DoubleSide, depthTest: false, depthWrite: false,
+        }),
+      )
+      beam.position.set(cell.x, surfaceY + 0.62, cell.z)
+      beam.renderOrder = 24
+      beam.userData.tutorialCueRole = 'beam'
+      beams.push(beam)
+      group.add(beam)
+    })
+
+    if (path.length >= 2) {
+      const geometry = new THREE.BufferGeometry().setFromPoints(path.map(function (cell) {
+        return new THREE.Vector3(cell.x, _tileSurfaceHeightAt(cell.x, cell.z) + 0.10, cell.z)
+      }))
+      const material = new THREE.LineDashedMaterial({
+        color: 0x86efac, transparent: true, opacity: 0.92,
+        dashSize: 0.22, gapSize: 0.12, depthTest: false, depthWrite: false,
+      })
+      const line = new THREE.Line(geometry, material)
+      line.computeLineDistances()
+      line.renderOrder = 24
+      line.userData.tutorialCueRole = 'path'
+      group.add(line)
+      _tutorialCuePathCount = 1
+    }
+
+    _tutorialCueGroup = group
+    _tutorialCueCellCount = cells.length
+    _scene.add(group)
+    _startTutorialPulse(group)
+    _invalidate()
+  }
+
   // ── Animation ─────────────────────────────────────────────────────────────────
 
   function _cubicBezier(values) {
@@ -2035,6 +2158,8 @@
         end: _presentationPath.end,
         selected: _presentationPath.selected,
       } : null,
+      tutorialCueCellCount: _tutorialCueCellCount,
+      tutorialCuePathCount: _tutorialCuePathCount,
       highlightCounts: {
         move: _hlObjects.move.size,
         skill: _hlObjects.skill.size,
@@ -2499,6 +2624,7 @@
     if (_renderer) _resetPointerState(_renderer.domElement)
     _removeAllListeners()
     _clearHistoryHighlight()
+    clearTutorialCue()
     if (_hpLayer && _hpLayer.parentNode) _hpLayer.remove()
     if (_scene) {
       const geometries = new Set()
@@ -2554,6 +2680,9 @@
     _historyHighlightGroup = null
     _historyHighlightPointCount = 0
     _historyHighlightPathCount = 0
+    _tutorialCueGroup = null
+    _tutorialCueCellCount = 0
+    _tutorialCuePathCount = 0
     _floaterTimers.forEach(function (timer) { clearTimeout(timer) })
     _floaterTimers.clear()
     _floaters.forEach(function (element) { element.remove() })
@@ -2603,6 +2732,8 @@
     resetView,
     projectCell,
     setHistoryHighlight,
+    setTutorialCue,
+    clearTutorialCue,
     screenToCell,
     showPresentationAreaFlash,
     clearPresentationAreaFlash: _clearPresentationAreaFlash,

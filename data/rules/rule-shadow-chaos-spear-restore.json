@@ -1,0 +1,7 @@
+{
+  "id": "rule-shadow-chaos-spear-restore",
+  "name": "混沌之矛归还移速",
+  "description": "下个己方回合开始时归还混沌之矛偷取的移动范围。",
+  "trigger": { "type": "beginTurn" },
+  "skillCode": "var caster=context.rulePiece;if(!caster||context.playerId!==caster.ownerPlayerId)return {success:false,message:''};var tag=(caster.statusTags||[]).find(function(t){return t.type==='chaos-spear-theft';});if(!tag){removeRuleById(caster.instanceId,'rule-shadow-chaos-spear-restore');return {success:false,message:''};}var target=battle.pieces.find(function(p){return p.instanceId===tag.targetId&&p.currentHp>0;});caster.moveRange=(caster.moveRange||0)-(tag.intensity||2);if(target)target.moveRange=(target.moveRange||0)+(tag.intensity||2);caster.statusTags=caster.statusTags.filter(function(t){return t!==tag;});removeRuleById(caster.instanceId,'rule-shadow-chaos-spear-restore');return {success:true,message:'混沌之矛偷取的移动范围已归还'};"
+}
