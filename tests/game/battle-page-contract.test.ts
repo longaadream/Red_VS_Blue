@@ -190,9 +190,10 @@ describe('battle page route contract', () => {
     expect(contextCss).not.toContain('.hand-panel')
     expect(contextCss).not.toContain('.hand-label')
     expect(contextCss).toMatch(/\.hand-scroll\s*\{[\s\S]*?background:\s*transparent/)
-    expect(battlePage).toContain('id="selectedStatusOverlay"')
-    expect(contextCss).toMatch(/\.selected-status-overlay\s*\{[\s\S]*?position:\s*absolute[\s\S]*?border:\s*0[\s\S]*?pointer-events:\s*none/)
-    expect(contextCss).toMatch(/\.selected-status-overlay\[hidden\]\s*\{\s*display:\s*none/)
+    expect(battlePage).not.toContain('id="selectedStatusOverlay"')
+    expect(battlePage).toContain('aria-label="查看棋子完整技能与状态"')
+    expect(battlePage).toContain('onclick="switchPieceInfoToActionHistory()">行动记录</button>')
+    expect(battlePage).toMatch(/function switchPieceInfoToActionHistory\(\)[\s\S]*?closePieceInfo\(\{ restoreFocus: false \}\)[\s\S]*?is-user-expanded[\s\S]*?button\.focus\(\)/)
     expect(battlePage).toContain('id="trainingToolsToggle"')
     expect(battlePage).toContain('aria-controls="trainingBar" aria-expanded="false"')
     expect(battlePage).toContain('id="trainingBar" class="training-popover" role="dialog" aria-hidden="true"')
@@ -213,6 +214,7 @@ describe('battle page route contract', () => {
     expect(battlePage).toMatch(/function selectPiece\(instanceId\)[\s\S]*?dismissedPieceContextId = null[\s\S]*?render\(\)/)
     expect(battlePage).toMatch(/function dismissPieceContextMenu\(\)[\s\S]*?dismissedPieceContextId = menu\.dataset\.pieceId[\s\S]*?closePieceContextMenu\(\)/)
     expect(battlePage).toMatch(/function positionPieceContextMenu\(\)[\s\S]*?layout\.placeEdgeDock[\s\S]*?menu\.dataset\.side = placement\.side/)
+    expect(battlePage).toMatch(/function positionPieceContextMenu\(\)[\s\S]*?leftInset[\s\S]*?rightInset/)
     expect(battlePage).toContain('aria-label="收起技能栏"')
     expect(battlePage).toMatch(/document\.addEventListener\('pointerdown',[\s\S]*?#pieceContextMenu[\s\S]*?dismissPieceContextMenu\(\)/)
     expect(battlePage).toMatch(/document\.addEventListener\('wheel',[\s\S]*?#boardStage3d[\s\S]*?dismissPieceContextMenu\(\)/)
@@ -227,6 +229,17 @@ describe('battle page route contract', () => {
     expect(contextCss).toMatch(/orientation:\s*landscape[\s\S]*?\.piece-context-menu\s*\{[\s\S]*?width:\s*148px/)
     expect(mobileCss).toMatch(/\.training-setup-sheet\s*\{[\s\S]*?max-height:\s*calc\(100dvh - 16px\)/)
     expect(mobileCss).toMatch(/\.training-setup-grid\s*\{[\s\S]*?overflow-y:\s*auto/)
+  })
+
+  it('reopens the selected piece skill panel after a committed move', () => {
+    const battlePage = readPage('battle.html')
+    const moveStart = battlePage.indexOf('function moveSelectedPieceToCell(pieceId, x, y)')
+    const moveEnd = battlePage.indexOf('function onCellClick(x, y)', moveStart)
+    const moveHandler = battlePage.slice(moveStart, moveEnd)
+
+    expect(moveHandler).toMatch(/dismissedPieceContextId = null[\s\S]*?doAction\(\{ type: 'move'/)
+    expect(battlePage).toMatch(/function restoreSelectedPieceMenu\(options\)[\s\S]*?input\.reopen[\s\S]*?dismissedPieceContextId = null/)
+    expect(battlePage).toMatch(/restoreSelectedPieceMenu\(\{ reopen: action\.type === 'move' \}\)/)
   })
 
   it('keeps the board dominant in low-height landscape battle layouts', () => {

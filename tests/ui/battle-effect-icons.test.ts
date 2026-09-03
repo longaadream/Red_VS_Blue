@@ -41,6 +41,16 @@ function discoverLiteralStatusTypes(): string[] {
   return [...types].sort()
 }
 
+function discoverLiteralTileEffectTypes(): string[] {
+  const pattern = /\btileType\s*:\s*['"]([^'"]+)['"]/g
+  const types = new Set<string>()
+  for (const file of jsonFiles(resolve(rootDir, 'data'))) {
+    const source = readFileSync(file, 'utf8')
+    for (const match of source.matchAll(pattern)) types.add(match[1])
+  }
+  return [...types].sort()
+}
+
 describe('RED-165 battle effect icon registry', () => {
   it('classifies every current literal status type instead of silently showing new bookkeeping tags', () => {
     const icons = loadBrowserModule('js/battle-ui/battle-effect-icons.js', 'BattleEffectIcons')
@@ -57,10 +67,11 @@ describe('RED-165 battle effect icon registry', () => {
       expect(meta.assetPath, type).toMatch(/^images\/(?:effect-icons|tile-effects)\/[a-z0-9-]+\.svg$/)
       expect(meta.assetPath, type).not.toMatch(/[\u{1F000}-\u{1FAFF}\uFE0F]/u)
     }
-    const registryEntries = Object.values(icons.statusRegistry) as Array<{ visibility: string }>
+    const registryEntries = Object.values(icons.statusRegistry) as Array<{ visibility: string; label?: string }>
     const playerFacing = registryEntries.filter((meta) => meta.visibility !== 'hidden')
     expect(playerFacing.length).toBeGreaterThan(30)
     expect(playerFacing.every((meta) => meta.visibility === 'board')).toBe(true)
+    expect(playerFacing.every((meta) => typeof meta.label === 'string' && meta.label.trim().length > 0)).toBe(true)
   })
 
   it('keeps named mechanics distinct, shares semantic fallbacks, and hard-hides bookkeeping', () => {
@@ -89,6 +100,12 @@ describe('RED-165 battle effect icon registry', () => {
     expect(icons.resolveStatusType('damage-multiplier')).toMatchObject({
       iconId: 'damage-multiplier', assetPath: 'images/effect-icons/damage-multiplier.svg', label: '飞天御剑流', visibility: 'board',
     })
+    expect(icons.resolveStatusType('icebound-fortitude')).toMatchObject({
+      category: 'shield', label: '寒冰坚忍', visibility: 'board',
+    })
+    expect(icons.resolveStatusType('calm-shield')).toMatchObject({
+      category: 'shield', label: '平静护盾', visibility: 'board',
+    })
     expect(icons.resolveStatusType('aizen-kyoka-active').visibility).toBe('hidden')
     expect(icons.resolveStatusType('aizen-kyoka-secret').visibility).toBe('hidden')
     expect(icons.resolveStatusType('chidori-immobile').iconId)
@@ -97,6 +114,18 @@ describe('RED-165 battle effect icon registry', () => {
     expect(icons.resolveStatusType('shishio-dmg-counter').visibility).toBe('hidden')
     expect(icons.resolveStatusType('hidan-undying-used').visibility).toBe('hidden')
     expect(icons.resolveStatusType('curse-ward-used').visibility).toBe('hidden')
+  })
+
+  it('gives every current literal tile effect a player-facing name', () => {
+    const icons = loadBrowserModule('js/battle-ui/battle-effect-icons.js', 'BattleEffectIcons')
+    const tileEffectTypes = discoverLiteralTileEffectTypes()
+
+    expect(tileEffectTypes.length).toBeGreaterThanOrEqual(6)
+    for (const type of tileEffectTypes) {
+      expect(icons.statusRegistry[type], type).toBeTruthy()
+      expect(icons.resolveStatusType(type).label, type).toEqual(expect.any(String))
+      expect(icons.resolveStatusType(type).label.trim(), type).not.toBe('')
+    }
   })
 
   it('lets authoritative visible false win and gives unknown player-visible statuses a real fallback icon', () => {

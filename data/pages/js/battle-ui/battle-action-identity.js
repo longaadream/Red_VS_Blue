@@ -1,6 +1,8 @@
 ;(function (root) {
   'use strict'
 
+  const reportedMissingSkills = new Set()
+
   function isSkillAction(event) {
     return !!event && (event.kind === 'skill' || event.kind === 'chargeSkill')
   }
@@ -25,6 +27,27 @@
     return normalized ? Array.from(normalized)[0] : '?'
   }
 
+  function skillDisplayName(event, skill) {
+    const skillId = String(event && event.skillId || '')
+    const registeredName = String(skill && skill.name || '').trim()
+    if (registeredName && registeredName !== skillId) return registeredName
+
+    const eventLabel = String(event && event.label || '').trim()
+    if (eventLabel && eventLabel !== skillId) return eventLabel
+
+    const reportKey = String(event && event.eventId || '') + ':' + skillId
+    if (!reportedMissingSkills.has(reportKey)) {
+      reportedMissingSkills.add(reportKey)
+      if (typeof console !== 'undefined' && console.error) {
+        console.error('[battle-action-identity] missing skill display metadata', {
+          eventId: String(event && event.eventId || ''),
+          skillId: skillId,
+        })
+      }
+    }
+    return '未知技能'
+  }
+
   function resolve(event, model) {
     const skillAction = isSkillAction(event)
     const sourcePiece = pieceById(model, event && event.sourcePieceId)
@@ -33,7 +56,7 @@
     const sourceName = String(sourcePiece && sourcePiece.name || '未知棋子')
     return {
       isSkill: skillAction,
-      skillName: skillAction ? String(event && event.label || skill && skill.name || skillId || '技能') : '',
+      skillName: skillAction ? skillDisplayName(event, skill) : '',
       sourceName: sourceName,
       portraitSrc: portraitUrl(sourcePiece && sourcePiece.portraitId),
       portraitFallback: initialFor(sourceName),

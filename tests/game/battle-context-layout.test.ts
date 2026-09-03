@@ -22,7 +22,14 @@ function loadContextLayout() {
     placeEdgeDock(
       anchor: { left: number; top: number },
       menu: { width: number; height: number },
-      bounds: { width: number; height: number; topPadding?: number; bottomPadding?: number },
+      bounds: {
+        width: number
+        height: number
+        topPadding?: number
+        bottomPadding?: number
+        leftInset?: number
+        rightInset?: number
+      },
       previousSide?: string | null,
     ): { left: number; top: number; side: string; originX: number; originY: number }
   }
@@ -106,5 +113,26 @@ describe('battle contextual layout', () => {
       expect(placed.originY).toBeGreaterThanOrEqual(0)
       expect(placed.originY).toBeLessThanOrEqual(220)
     }
+  })
+
+  it('keeps the piece menu outside the left tile panel and expanded right history safe areas', () => {
+    const layout = loadContextLayout()
+    const leftDock = layout.placeEdgeDock(
+      { left: 1100, top: 360 },
+      { width: 188, height: 220 },
+      { width: 1366, height: 768, topPadding: 64, bottomPadding: 150, leftInset: 270, rightInset: 368 },
+    )
+    const rightDock = layout.placeEdgeDock(
+      { left: 320, top: 360 },
+      { width: 188, height: 220 },
+      { width: 1366, height: 768, topPadding: 64, bottomPadding: 150, leftInset: 270, rightInset: 368 },
+    )
+
+    expect(leftDock.side).toBe('left')
+    expect(leftDock.left).toBe(278)
+    expect(rightDock.side).toBe('right')
+    expect(rightDock.left).toBe(802)
+    expect(leftDock.left).toBeGreaterThanOrEqual(270)
+    expect(rightDock.left + 188).toBeLessThanOrEqual(998)
   })
 })
