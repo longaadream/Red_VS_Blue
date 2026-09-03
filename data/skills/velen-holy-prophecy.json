@@ -2,10 +2,6 @@
   "id": "velen-holy-prophecy",
   "name": "圣光预言",
   "description": "选择1张未被预言且未强化的普通圣光手牌。下个己方回合开始时，若它仍在手中，则永久强化。",
-  "keywords": [
-    "圣光手牌",
-    "预言"
-  ],
   "targetText": "手中1张未强化的圣光手牌",
   "effectTags": [
     "强化",

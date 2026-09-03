@@ -2,9 +2,6 @@
   "id": "light-extraction",
   "name": "圣光汲取",
   "description": "选择1个拥有【圣盾】的友方，移除其【圣盾】，获得1张【圣光惩戒】和1张【圣光治疗】。",
-  "keywords": [
-    "圣光"
-  ],
   "targetText": "1个拥有圣盾的友方",
   "effectTags": [
     "圣光",
