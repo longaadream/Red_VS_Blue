@@ -94,7 +94,12 @@ Manifest 不包含 channel、trust、联网资格、构建时间、绝对路径�
 | `data/**/*.json` | `application/json` |
 | `images/**/*.png` | `image/png` |
 | `images/**/*.{jpg,jpeg}` | `image/jpeg` |
+| `images/**/*.svg` | `image/svg+xml` |
 | `images/**/*.webp` | `image/webp` |
+
+SVG 是被动图片载荷，不是通用 XML/网页入口。验证器只接受固定的 SVG 图形元素和属性集合，拒绝
+DOCTYPE/ENTITY、脚本、事件属性、CSS/style、网络或 data/file 引用、`foreignObject`、嵌入对象及
+未知元素/属性。编辑器导入与核心 Pack 验证执行同等的 fail-closed 边界。
 
 文件描述符固定 `path`、正安全整数 `size`、lowercase `sha256` 与匹配扩展名的 `mediaType`。
 

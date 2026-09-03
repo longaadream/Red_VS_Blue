@@ -1455,6 +1455,7 @@ async function smokeEditorDistribution(candidate, distribution) {
   const userDataDir = path.resolve(distribution.userDataDir)
   const authoringRoot = path.join(userDataDir, 'content-authoring')
   const keyFile = path.join(authoringRoot, 'keys', 'qa.key')
+  const editorSvgFile = path.join(authoringRoot, 'images', 'smoke', 'static-icon.svg')
   try {
     application.executable = path.resolve(distribution.executable)
     application.launchArguments = [`--user-data-dir=${userDataDir}`]
@@ -1464,15 +1465,66 @@ async function smokeEditorDistribution(candidate, distribution) {
     const pveSource = path.join(authoringRoot, 'sources', 'candidate-pve')
     mkdirSync(path.dirname(imageSource), { recursive: true })
     mkdirSync(path.dirname(keyFile), { recursive: true })
+    mkdirSync(path.dirname(editorSvgFile), { recursive: true })
     cpSync(candidate.fixture.image.sourceDir, imageSource, { recursive: true })
     cpSync(candidate.fixture.pve.sourceDir, pveSource, { recursive: true })
     writeFileSync(keyFile, `${'31'.repeat(32)}\n`, 'utf8')
+    writeFileSync(editorSvgFile, '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 8 8"><path d="M0 0h8v8H0z" fill="#f05252"/></svg>', 'utf8')
 
     const startedAt = Date.now()
     const { target, rendererBoundary } = await launch(application, 300000)
     const startupMilliseconds = Date.now() - startedAt
     const counts = await evaluate(target, `Promise.all(['pieces', 'skills', 'cards', 'rules'].map(async (directory) => [directory, (await window.editorAPI.listFiles(directory)).length]))`)
     assert(counts.every(([, count]) => count > 0), `Editor could not list packaged data files: ${JSON.stringify(counts)}`)
+    const workspaceAuthoring = await evaluate(target, `(async () => {
+      const pve = await window.editorAPI.listPveFiles()
+      const assets = await window.editorAPI.listAssets()
+      const preview = await window.editorAPI.readAsset('smoke/static-icon.svg')
+      const staged = await window.editorAPI.prepareWorkspacePackage()
+      return { pve, assets, preview, staged }
+    })()`, true, 60000)
+    assert(
+      workspaceAuthoring.pve.length > 0
+        && workspaceAuthoring.assets.some(file => file.path === 'smoke/static-icon.svg')
+        && workspaceAuthoring.preview.startsWith('data:image/svg+xml;base64,')
+        && workspaceAuthoring.staged.source === 'sources/current-workspace'
+        && workspaceAuthoring.staged.counts.pve > 0
+        && workspaceAuthoring.staged.counts.images > 0
+        && existsSync(path.join(authoringRoot, 'sources', 'current-workspace', 'data', 'pve', 'manifest.json'))
+        && existsSync(path.join(authoringRoot, 'sources', 'current-workspace', 'images', 'smoke', 'static-icon.svg')),
+      `Packaged Editor workspace authoring failed: ${JSON.stringify(workspaceAuthoring)}`,
+    )
+    const jsonAuthoring = await evaluate(target, `(async () => {
+      document.querySelector('[data-new-document="pieces"]').click()
+      document.getElementById('create-id').value = 'red178-smoke-piece'
+      document.getElementById('create-name').value = 'RED-178 Smoke Piece'
+      document.getElementById('create-form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
+      const source = document.querySelector('[data-json-source]')
+      const template = JSON.parse(source.value)
+      template.unknownSmokeField = { preserved: true }
+      source.value = JSON.stringify(template, null, 2)
+      source.dispatchEvent(new Event('input', { bubbles: true }))
+      document.querySelector('[data-save-json]').click()
+      const deadline = Date.now() + 10000
+      while (Date.now() < deadline && document.querySelector('[data-footer-state]').textContent !== '已保存') {
+        await new Promise(resolve => setTimeout(resolve, 50))
+      }
+      const written = await window.editorAPI.readFile('pieces', 'red178-smoke-piece.json')
+      const manifest = await window.editorAPI.readFile('pieces', 'manifest.json')
+      return {
+        templateFields: Object.keys(template),
+        written,
+        manifestIncludesId: manifest.includes('red178-smoke-piece'),
+        saveDisabled: document.querySelector('[data-save-json]').disabled,
+      }
+    })()`, true, 30000)
+    assert(
+      jsonAuthoring.written?.unknownSmokeField?.preserved === true
+        && jsonAuthoring.manifestIncludesId === true
+        && jsonAuthoring.templateFields.includes('stats')
+        && jsonAuthoring.templateFields.includes('skills'),
+      `Packaged Editor JSON authoring failed: ${JSON.stringify(jsonAuthoring)}`,
+    )
     const visibleOperations = await evaluate(target, `({
       tabs: [...document.querySelectorAll('[data-pipeline-operation]')].map((node) => node.dataset.pipelineOperation),
       forms: [...document.querySelectorAll('[data-operation-form]')].map((node) => node.dataset.operationForm),
@@ -1606,6 +1658,8 @@ async function smokeEditorDistribution(candidate, distribution) {
       startupMilliseconds,
       rendererBoundary,
       dataFileCounts: Object.fromEntries(counts),
+      jsonAuthoring,
+      workspaceAuthoring,
       visibleOperations,
       sourceCheckoutUnavailable: true,
       systemNodeUnavailable: true,
@@ -1637,6 +1691,35 @@ async function smokeEditorDistribution(candidate, distribution) {
       Object.values(processCountsAfterExit).every(count => count === 0),
       `Editor ${distribution.kind} left residual processes: ${JSON.stringify(processCountsAfterExit)}`,
     )
+  }
+}
+
+async function smokeEditorPortable(candidate) {
+  const smokeRoot = mkdtempSync(path.join(tmpdir(), 'rvb-red178-editor-portable-'))
+  const portableRoot = assertOwnedChild(smokeRoot, path.join(smokeRoot, 'portable'), 'Portable root')
+  const portableUserData = assertOwnedChild(smokeRoot, path.join(smokeRoot, 'portable-user'), 'Portable user data')
+  const workingDirectory = assertOwnedChild(smokeRoot, path.join(smokeRoot, 'working'), 'Editor working directory')
+  const emptyPathDirectory = assertOwnedChild(smokeRoot, path.join(smokeRoot, 'empty-path'), 'Empty PATH directory')
+  const portableSource = applications.editor.executable
+  const portableExecutable = path.join(portableRoot, path.basename(portableSource))
+  mkdirSync(portableRoot, { recursive: true })
+  mkdirSync(portableUserData, { recursive: true })
+  mkdirSync(workingDirectory, { recursive: true })
+  mkdirSync(emptyPathDirectory, { recursive: true })
+  assert(existsSync(portableSource), `Missing Editor portable candidate: ${portableSource}`)
+  cpSync(portableSource, portableExecutable)
+  const environment = hermeticEditorEnvironment(emptyPathDirectory)
+  assertNoNodeOnPath(environment, workingDirectory)
+  try {
+    await smokeEditorDistribution(candidate, {
+      kind: 'portable',
+      executable: portableExecutable,
+      userDataDir: portableUserData,
+      workingDirectory,
+      environment,
+    })
+  } finally {
+    rmSync(smokeRoot, { recursive: true, force: true })
   }
 }
 
@@ -1744,7 +1827,7 @@ const requested = process.argv.slice(2)
 const selectedEntries = requested.length > 0
   ? requested
   : ['profile', 'server', 'client', 'editor']
-const candidate = selectedEntries.some(entry => entry === 'profile' || entry === 'editor')
+const candidate = selectedEntries.some(entry => entry === 'profile' || entry === 'editor' || entry === 'editor-portable')
   ? loadContentCandidateFixture()
   : null
 const sharedUserDataDir = selectedEntries.includes('profile')
@@ -1761,6 +1844,7 @@ try {
     else if (entry === 'profile') {
       expectedIdentity = await smokeProfileActivation(candidate, sharedUserDataDir)
     } else if (entry === 'editor') await smokeEditor(candidate)
+    else if (entry === 'editor-portable') await smokeEditorPortable(candidate)
     else throw new Error(`Unknown entry: ${entry}`)
   }
 } finally {

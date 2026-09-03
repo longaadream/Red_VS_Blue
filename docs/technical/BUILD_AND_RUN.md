@@ -457,7 +457,8 @@ Preload 只暴露列出的 IPC 能力，不暴露原始 `ipcRenderer`。RED-24 �
 
 Electron 客户端游戏页通过只读 `rvb-client://app/` 协议加载内置 HTML/JS/CSS。
 资源包保存在 `userData/resource-pack/versions/<archive-sha256>/`，只有
-`data/**/*.json` 和 `images/**/*.{jpg,jpeg,png,webp}` 可以覆盖同路径的内置资源；
+`data/**/*.json` 和 `images/**/*.{jpg,jpeg,png,svg,webp}` 可以覆盖同路径的内置资源；SVG 必须通过
+静态白名单验证，不得包含脚本、事件处理器、外链、CSS、`foreignObject` 或嵌入对象。
 HTML、JavaScript、CSS、SVG 和未知类型始终从内置包读取。导入完成全部校验和暂存后
 才原子替换 `active.json`，清除资源包只把活动版本设为 `null`，不会删除保留版本。
 

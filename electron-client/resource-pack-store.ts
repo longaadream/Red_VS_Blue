@@ -23,7 +23,7 @@ export interface DesktopProfileState {
 
 export function isActivatableResourcePackPath(relativePath: string): boolean {
   return /^data\/.+\.json$/i.test(relativePath)
-    || /^images\/.+\.(?:jpe?g|png|webp)$/i.test(relativePath)
+    || /^images\/.+\.(?:jpe?g|png|svg|webp)$/i.test(relativePath)
 }
 
 function isReference(value: unknown): value is DesktopProfileReference {

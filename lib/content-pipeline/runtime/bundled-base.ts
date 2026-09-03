@@ -47,6 +47,7 @@ function mediaTypeForExtension(extension: string): PackFileMediaTypeV1 | null {
     case '.jpg':
     case '.jpeg': return 'image/jpeg'
     case '.png': return 'image/png'
+    case '.svg': return 'image/svg+xml'
     case '.webp': return 'image/webp'
     default: return null
   }
