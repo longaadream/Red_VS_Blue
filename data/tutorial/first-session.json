@@ -1,0 +1,238 @@
+{
+  "schemaVersion": "rvb-tutorial/v1",
+  "id": "red-vs-blue-club-session-01",
+  "title": "红蓝大作战",
+  "englishTitle": "Red VS Blue",
+  "sessionLabel": "社团跑团 SESSION 01",
+  "mapId": "large-hole-arena",
+  "rootSeed": 188,
+  "deploymentStartedAt": 1750000000000,
+  "player": {
+    "playerId": "training-red",
+    "alignment": "light",
+    "roster": [
+      "uther",
+      "anduin",
+      "jaina",
+      "tracer",
+      "tyrande",
+      "turalyon",
+      "velen",
+      "blue-tirion-fordring"
+    ]
+  },
+  "opponent": {
+    "playerId": "training-blue",
+    "alignment": "dark",
+    "roster": [
+      "reaper",
+      "red-blackwidow",
+      "red-illidan",
+      "guldan",
+      "dark-aizen",
+      "dark-grimmjow",
+      "dark-ulquiorra",
+      "red-obito"
+    ]
+  },
+  "staging": {
+    "vanguards": [
+      { "templateId": "uther", "x": 6, "y": 7 },
+      { "templateId": "reaper", "x": 8, "y": 7, "currentHp": 1 }
+    ],
+    "keptReserves": {
+      "training-red": ["anduin"],
+      "training-blue": ["red-blackwidow"]
+    },
+    "deploymentCells": {
+      "training-red": { "x": 5, "y": 1 },
+      "training-blue": { "x": 17, "y": 8 }
+    },
+    "freeMoveCell": { "x": 6, "y": 1 },
+    "terrainCells": {
+      "floor": { "x": 6, "y": 8 },
+      "cover": { "x": 4, "y": 8 },
+      "wall": { "x": 0, "y": 8 },
+      "hole": { "x": 10, "y": 8 }
+    }
+  },
+  "steps": [
+    {
+      "id": "club-welcome",
+      "scene": 1,
+      "sceneTitle": "社团开场",
+      "speaker": "社长 / DM",
+      "text": "欢迎参加今晚的社团跑团——《红蓝大作战》。规则书我带了，骰子也没少。你是后手，不过别急，桌上那枚幸运币就是迟到补偿。",
+      "objective": "继续听 DM 介绍本回合的增援",
+      "advance": { "type": "continue" },
+      "cue": { "templates": ["uther", "reaper"] }
+    },
+    {
+      "id": "review-defense",
+      "scene": 1,
+      "sceneTitle": "社团开场",
+      "speaker": "社长 / DM",
+      "text": "刚才死神开了一枪。乌瑟尔有防御，所以没把纸面伤害全吃下去。点右边那条“地狱火霰弹枪”，棋盘会把来源和目标重新标出来。",
+      "objective": "点击右侧“地狱火霰弹枪”，回看这次攻击",
+      "advance": { "type": "history-item", "labelIncludes": "地狱火霰弹枪" },
+      "cue": { "templates": ["reaper", "uther"], "connectTemplates": ["reaper", "uther"] }
+    },
+    {
+      "id": "deploy-anduin",
+      "scene": 2,
+      "sceneTitle": "新成员上桌",
+      "speaker": "社长 / DM",
+      "text": "每个自己的回合开始时，先从候选里派一名后备棋子上场。你第一个自己的回合有 1 点基础行动点；以后每次再轮到你，上限都会加 1，最多 10 点，并在回合开始补满。剩下的不会带到下回合，别想着攒到期末。今晚先让安度因来——治疗位通常比嘴硬靠谱。",
+      "objective": "选择安度因，并部署到绿色标记格",
+      "advance": { "type": "action", "actionType": "deployReservePiece", "templateId": "anduin", "to": { "x": 5, "y": 1 } },
+      "cue": { "cells": [{ "x": 5, "y": 1 }] }
+    },
+    {
+      "id": "play-lucky-coin",
+      "scene": 2,
+      "sceneTitle": "新成员上桌",
+      "speaker": "社长 / DM",
+      "text": "后手多一枚幸运币，打出去能补 1 点行动点。放心，这不是社费报销，是规则真的允许。",
+      "objective": "点击幸运币，再次点击确认打出",
+      "advance": { "type": "action", "actionType": "playCard", "cardId": "lucky-coin" }
+    },
+    {
+      "id": "free-first-move",
+      "scene": 2,
+      "sceneTitle": "新成员上桌",
+      "speaker": "社长 / DM",
+      "text": "刚上场的棋子，本回合第一次移动免费。拖过去也行，先点棋子再点格子也行——总之这一步不收行动点。",
+      "objective": "把安度因免费移动到绿色标记格",
+      "advance": { "type": "action", "actionType": "move", "templateId": "anduin", "to": { "x": 6, "y": 1 } },
+      "cue": { "templates": ["anduin"], "cells": [{ "x": 6, "y": 1 }], "path": [{ "x": 5, "y": 1 }, { "x": 6, "y": 1 }] }
+    },
+    {
+      "id": "cast-divine-shield",
+      "scene": 3,
+      "sceneTitle": "先站稳再还手",
+      "speaker": "社长 / DM",
+      "text": "乌瑟尔已经挨了一枪。先给自己套个圣光盾，它能挡下一次伤害；而且自我施放会返还 1 点行动点，社长批准的合理赖账。",
+      "objective": "让乌瑟尔对自己使用“圣光盾”",
+      "advance": { "type": "action", "actionType": "useBasicSkill", "skillId": "shield-of-light", "templateId": "uther", "targetTemplateId": "uther" },
+      "cue": { "templates": ["uther"] }
+    },
+    {
+      "id": "heal-uther",
+      "scene": 3,
+      "sceneTitle": "先站稳再还手",
+      "speaker": "社长 / DM",
+      "text": "护盾管下一次，治疗管已经掉的血。现在轮到安度因把乌瑟尔扶起来，别让我们的前排带伤写社团总结。",
+      "objective": "让安度因使用“圣光闪耀”治疗乌瑟尔",
+      "advance": { "type": "action", "actionType": "useBasicSkill", "skillId": "light-of-the-light", "templateId": "anduin", "targetTemplateId": "uther" },
+      "cue": { "templates": ["anduin", "uther"], "connectTemplates": ["anduin", "uther"] }
+    },
+    {
+      "id": "end-player-turn-one",
+      "scene": 3,
+      "sceneTitle": "先站稳再还手",
+      "speaker": "社长 / DM",
+      "text": "行动点花完就别硬抠桌缝了。结束回合，让对面帮我们验证一下圣盾是不是货真价实。",
+      "objective": "结束回合",
+      "advance": { "type": "action", "actionType": "endTurn" }
+    },
+    {
+      "id": "review-shield",
+      "scene": 3,
+      "sceneTitle": "先站稳再还手",
+      "speaker": "社长 / DM",
+      "text": "看见没？这一枪被圣盾吃掉了。动作日志里会写清楚是伤害、治疗还是抵挡，不需要另外背一张会计表。",
+      "objective": "点击“地狱火霰弹枪”，查看圣盾抵挡结果",
+      "advance": { "type": "history-item", "labelIncludes": "地狱火霰弹枪" },
+      "cue": { "templates": ["reaper", "uther"], "connectTemplates": ["reaper", "uther"] }
+    },
+    {
+      "id": "kill-reaper",
+      "scene": 4,
+      "sceneTitle": "轮到你翻盘",
+      "speaker": "社长 / DM",
+      "text": "祝福之锤已经转好冷却。死神只剩一点体面了，送他下桌；击杀会给你 1 点充能。",
+      "objective": "用乌瑟尔的“祝福之锤”击杀死神",
+      "advance": { "type": "action", "actionType": "useBasicSkill", "skillId": "blessed-hammer", "templateId": "uther", "targetTemplateId": "reaper" },
+      "cue": { "templates": ["uther", "reaper"], "connectTemplates": ["uther", "reaper"] }
+    },
+    {
+      "id": "spend-charge",
+      "scene": 4,
+      "sceneTitle": "轮到你翻盘",
+      "speaker": "社长 / DM",
+      "text": "右上紫色的是充能点。赐福同时要行动点和充能，两个都够才能放——社团预算也是这么卡人的。",
+      "objective": "使用乌瑟尔的充能技能“赐福”",
+      "advance": { "type": "action", "actionType": "useChargeSkill", "skillId": "divine-blessing", "templateId": "uther" },
+      "cue": { "templates": ["uther"] }
+    },
+    {
+      "id": "end-player-turn-two",
+      "scene": 4,
+      "sceneTitle": "轮到你翻盘",
+      "speaker": "社长 / DM",
+      "text": "好，轮到黑百合做一次错误示范。结束回合，看看掩体为什么不是装饰。",
+      "objective": "结束回合",
+      "advance": { "type": "action", "actionType": "endTurn" },
+      "cue": { "cells": [{ "x": 4, "y": 8 }] }
+    },
+    {
+      "id": "review-cover-block",
+      "scene": 4,
+      "sceneTitle": "轮到你翻盘",
+      "speaker": "社长 / DM",
+      "text": "黑百合那发致命打击撞在掩体上了。没有花哨子弹特效也没关系：点动作记录，3D 棋盘会把射线和阻挡位置重新画出来。",
+      "objective": "点击“致命打击”，回看被掩体阻挡的射线",
+      "advance": { "type": "history-item", "labelIncludes": "致命打击" },
+      "cue": { "templates": ["red-blackwidow"], "cells": [{ "x": 4, "y": 8 }], "connectTemplateToCell": ["red-blackwidow", { "x": 4, "y": 8 }] }
+    },
+    {
+      "id": "inspect-floor",
+      "scene": 4,
+      "sceneTitle": "四种基础地形",
+      "speaker": "社长 / DM",
+      "text": "最后补一眼地形。普通地板能走也能过弹道，是棋盘上最省心的同学。",
+      "objective": "点击绿色标记的普通地板",
+      "advance": { "type": "intent", "intentType": "activate-cell", "cell": { "x": 6, "y": 8 } },
+      "cue": { "cells": [{ "x": 6, "y": 8 }] }
+    },
+    {
+      "id": "inspect-cover",
+      "scene": 4,
+      "sceneTitle": "四种基础地形",
+      "speaker": "社长 / DM",
+      "text": "掩体可以站人，但会挡住弹射物。刚才黑百合已经替我们交过学费了。",
+      "objective": "点击绿色标记的掩体",
+      "advance": { "type": "intent", "intentType": "activate-cell", "cell": { "x": 4, "y": 8 } },
+      "cue": { "cells": [{ "x": 4, "y": 8 }] }
+    },
+    {
+      "id": "inspect-wall",
+      "scene": 4,
+      "sceneTitle": "四种基础地形",
+      "speaker": "社长 / DM",
+      "text": "墙不能走，也不能穿弹道。它的战术思想很朴素：不行就是不行。",
+      "objective": "点击绿色标记的墙壁",
+      "advance": { "type": "intent", "intentType": "activate-cell", "cell": { "x": 0, "y": 8 } },
+      "cue": { "cells": [{ "x": 0, "y": 8 }] }
+    },
+    {
+      "id": "inspect-hole",
+      "scene": 4,
+      "sceneTitle": "四种基础地形",
+      "speaker": "社长 / DM",
+      "text": "洞穴不能落脚，但弹射物能从上面飞过去。别问棋子会不会恐高，规则书没写。",
+      "objective": "点击绿色标记的洞穴",
+      "advance": { "type": "intent", "intentType": "activate-cell", "cell": { "x": 10, "y": 8 } },
+      "cue": { "cells": [{ "x": 10, "y": 8 }] }
+    },
+    {
+      "id": "session-complete",
+      "scene": 4,
+      "sceneTitle": "本次跑团结束",
+      "speaker": "社长 / DM",
+      "text": "入社体验到这里。你已经会花行动点、部署、免费首移、看地形、治疗、套盾、等冷却、拿充能，也知道去哪儿翻动作记录了。没翻桌，算大成功。",
+      "objective": "结束教学，或留在棋盘继续自由练习",
+      "advance": { "type": "complete" }
+    }
+  ]
+}

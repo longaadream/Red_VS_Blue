@@ -465,12 +465,13 @@
       if (activeRootId === rootId) {
         if (highlightTimer != null && cancelTimeout) cancelTimeout(highlightTimer)
         if (scheduleTimeout) highlightTimer = scheduleTimeout(clearHighlight, HIGHLIGHT_TIMEOUT_MS)
-        return render()
+        if (pin) render()
+        return
       }
       activeRootId = rootId
       if (highlightTimer != null && cancelTimeout) cancelTimeout(highlightTimer)
       highlightOverlay()
-      render()
+      if (pin) render()
       if (scheduleTimeout) highlightTimer = scheduleTimeout(clearHighlight, HIGHLIGHT_TIMEOUT_MS)
     }
 

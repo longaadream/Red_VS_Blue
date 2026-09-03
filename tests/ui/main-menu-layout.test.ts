@@ -36,6 +36,20 @@ describe('RED-171 game-style main menu layout contract', () => {
     expect(page).toMatch(/id="userPill"[\s\S]*?onclick="openIdentitySheet\(\)"/)
   })
 
+  it('keeps the first-session tutorial visible without opening the training tab', () => {
+    const shortcutIndex = page.indexOf('id="tutorialShortcut"')
+    const tablistIndex = page.indexOf('class="mode-tabs"')
+    const trainingPanelIndex = page.indexOf('id="mode-training"')
+
+    expect(shortcutIndex).toBeGreaterThan(-1)
+    expect(shortcutIndex).toBeLessThan(tablistIndex)
+    expect(shortcutIndex).toBeLessThan(trainingPanelIndex)
+    expect(page).toMatch(/id="tutorialShortcut"[\s\S]*?onclick="goToTutorial\(\)"/)
+    expect(page).toContain('第一次来？')
+    expect(page).toContain('id="tutorialEntryDescription"')
+    expect(page.match(/onclick="goToTutorial\(\)"/g)).toHaveLength(1)
+  })
+
   it('uses a two-column desktop shell and structural narrow-screen reflow', () => {
     expect(page).toMatch(/\.menu-workspace\s*\{[\s\S]*?grid-template-columns:\s*minmax\(220px,\s*0\.72fr\)\s+minmax\(0,\s*1\.7fr\)/)
     expect(page).toContain('@media (max-width: 760px)')
