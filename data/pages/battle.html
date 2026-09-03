@@ -4155,6 +4155,9 @@
     async function runTutorialOpponentResponse(kind) {
       const opponentId = tutorialDefinition.opponent.playerId
       if (G.turn.phase === 'start') await commitTutorialScriptAction({ type: 'beginPhase' })
+      if (battleActionVignette && battleActionVignette.settleAll) {
+        battleActionVignette.settleAll()
+      }
       await tutorialPause(TUTORIAL_OPPONENT_WINDUP_MS)
       if (kind === 'shield-check') {
         const reaper = tutorialPiece('reaper')

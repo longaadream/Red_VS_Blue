@@ -587,6 +587,7 @@ RED-140 是已接受的目标合同，不表示当前运行时已经实现。唯
 - `RvBTutorialScenario.openPlayerDeployment()` 只在脚本开场结束后开启一次真实 `progressive-reserve-v1` 部署输入。部署命令继续由规则层验证候选、revision、落点和免费首移状态。
 - `RvBTutorialController` 是无 DOM 的顺序控制器。只有当前步骤匹配的权威动作、指定动作日志或指定地形点击才能推进；非法动作在进入训练权威转换前被拒绝。
 - `RvBTutorialRuntime` 只负责对话 DOM、进度、跳过/完成持久化和对手脚本编排。伤害、治疗、护盾、充能及地形阻挡明细统一复用 RED-166 动作日志。
+- 对手脚本行动开始前会收束尚未播完的教程小剧场队列，使固定敌方技能立即成为当前演出；技能仍通过共享权威展示事件进入 RED-167 小剧场，不创建教程专用动画。
 - 教程训练动作通过 `runBattleAction(..., { rootSeed: 188 })` 执行；Runner 返回后重新附加本地 `skillsById` 展示缓存，该缓存不参与权威 hash。
 - `BattleRenderer3D.setTutorialCue({ cells, path })` 在 Three.js 场景中创建世界坐标光圈、光柱与路线；`clearTutorialCue()` 清理资源。DOM 不得复制这些棋盘提示。降低动态效果时提示保持静态。
 - 教程状态使用本地键 `rvb_tutorial_first_session_status` 记录 `completed | skipped`，只改变大厅入口文案，不影响正式战斗状态。

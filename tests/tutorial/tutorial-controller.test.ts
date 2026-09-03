@@ -97,6 +97,17 @@ describe('RED-95 tutorial controller', () => {
 })
 
 describe('RED-95 tutorial scenario staging', () => {
+  it('explains the complete recurring action-point rule before the first player turn', () => {
+    const definition = JSON.parse(readFileSync(resolve(process.cwd(), 'data/tutorial/first-session.json'), 'utf8'))
+    const deploymentStep = definition.steps.find((step: any) => step.id === 'deploy-anduin')
+
+    expect(deploymentStep.text).toContain('第一个自己的回合有 1 点基础行动点')
+    expect(deploymentStep.text).toContain('每次再轮到你，上限都会加 1')
+    expect(deploymentStep.text).toContain('最多 10 点')
+    expect(deploymentStep.text).toContain('回合开始补满')
+    expect(deploymentStep.text).toContain('剩下的不会带到下回合')
+  })
+
   it('trims a normal battle into the staged board and opens the real reserve deployment', () => {
     const sandbox = loadBrowserModule('tutorial-scenario.js')
     const definition = JSON.parse(readFileSync(resolve(process.cwd(), 'data/tutorial/first-session.json'), 'utf8'))
