@@ -484,12 +484,14 @@ describe('battle page runtime source', () => {
       let targetSubmissionPending = null
       let pendingSkill = null
       let pendingCardAction = null
+      let dismissedPieceContextId = 'piece-1'
       ${runtimeFunction(html, 'moveSelectedPieceToCell')}
     `, context)
 
     expect(vm.runInContext("moveSelectedPieceToCell('piece-1', 2, 1)", context)).toBe(true)
     expect(doAction).toHaveBeenCalledTimes(1)
     expect(doAction).toHaveBeenCalledWith({ type: 'move', playerId: 'player-red', pieceId: 'piece-1', toX: 2, toY: 1 })
+    expect(vm.runInContext('dismissedPieceContextId', context)).toBeNull()
     expect(vm.runInContext("moveSelectedPieceToCell('piece-1', 2, 1)", context)).toBe(false)
     expect(doAction).toHaveBeenCalledTimes(1)
 
@@ -498,6 +500,36 @@ describe('battle page runtime source', () => {
     expect(vm.runInContext("moveSelectedPieceToCell('piece-1', null, null)", context)).toBe(false)
     expect(doAction).toHaveBeenCalledTimes(1)
     expect(setStatusMsg).toHaveBeenCalledWith('无法移动到该位置')
+  })
+
+  it('switches from piece details to history without toggling an already-restored expansion off', () => {
+    const html = readBattlePage()
+    const click = vi.fn()
+    const focus = vi.fn()
+    const closePieceInfo = vi.fn()
+    let expanded = true
+    const dock = {
+      hidden: false,
+      querySelector: () => ({ click, focus }),
+      classList: { contains: () => expanded },
+    }
+    const context = vm.createContext({
+      closePieceInfo,
+      document: { getElementById: () => dock },
+      requestAnimationFrame: (callback: () => void) => callback(),
+      setStatusMsg: vi.fn(),
+    })
+    new vm.Script(runtimeFunction(html, 'switchPieceInfoToActionHistory')).runInContext(context)
+
+    vm.runInContext('switchPieceInfoToActionHistory()', context)
+    expect(closePieceInfo).toHaveBeenCalledWith({ restoreFocus: false })
+    expect(click).not.toHaveBeenCalled()
+    expect(focus).toHaveBeenCalledOnce()
+
+    expanded = false
+    vm.runInContext('switchPieceInfoToActionHistory()', context)
+    expect(click).toHaveBeenCalledOnce()
+    expect(focus).toHaveBeenCalledTimes(2)
   })
 
   it('automatically queries move cells for an eligible selection and clears them for target mode', () => {

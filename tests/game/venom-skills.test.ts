@@ -292,7 +292,7 @@ describe('共生拖行', () => {
     expect(enemy).toMatchObject({ x: 2 + dx, y: 2 + dy })
   })
 
-  it('穿过深坑，但被墙壁和空掩体阻挡', () => {
+  it('穿过深坑，撞上墙壁或空掩体时算作已使用但不改变棋子', () => {
     const makeLineState = () => {
       const venom = makePiece({ instanceId: 'venom', ownerPlayerId: 'player-red', x: 0, y: 1 })
       const enemy = makePiece({ instanceId: 'enemy', ownerPlayerId: 'player-blue', x: 4, y: 1 })
@@ -311,12 +311,12 @@ describe('共生拖行', () => {
       const blocked = makeLineState()
       setTile(blocked.state, 2, 1, terrain)
       const before = JSON.stringify(blocked.state.pieces)
-      expect(executeSkill(symbioteDrag(), blocked.state, 'venom', { x: 5, y: 1 }).success).toBe(false)
+      expect(executeSkill(symbioteDrag(), blocked.state, 'venom', { x: 5, y: 1 }).success).toBe(true)
       expect(JSON.stringify(blocked.state.pieces)).toBe(before)
     }
   })
 
-  it('可命中掩体上的敌人，但被路径上的友军阻挡', () => {
+  it('可命中掩体上的敌人，撞上友军时算作已使用但不改变棋子', () => {
     const venom = makePiece({ instanceId: 'venom', ownerPlayerId: 'player-red', x: 0, y: 1 })
     const enemy = makePiece({ instanceId: 'enemy', ownerPlayerId: 'player-blue', x: 4, y: 1 })
     const state = makeState({ pieces: [venom, enemy], width: 6, height: 3 })
@@ -329,15 +329,14 @@ describe('共生拖行', () => {
     enemy.x = 4
     state.pieces.splice(1, 0, ally as any)
     const before = JSON.stringify(state.pieces)
-    expect(executeSkill(symbioteDrag(), state, 'venom', { x: 5, y: 1 }).success).toBe(false)
+    expect(executeSkill(symbioteDrag(), state, 'venom', { x: 5, y: 1 }).success).toBe(true)
     expect(JSON.stringify(state.pieces)).toBe(before)
   })
 
   it.each<[string, DragFailureSetup]>([
     ['相邻敌人', { enemyX: 1, enemyY: 1, targetX: 5, targetY: 1 }],
-    ['斜线方向', { enemyX: 4, enemyY: 1, targetX: 4, targetY: 2 }],
     ['非法落点', { enemyX: 4, enemyY: 1, targetX: 5, targetY: 1, blockLanding: true }],
-  ])('拒绝%s且不改变状态', (_label, setup) => {
+  ])('%s算作已使用但不改变状态', (_label, setup) => {
     const venom = makePiece({ instanceId: 'venom', ownerPlayerId: 'player-red', x: 0, y: 1 })
     const enemy = makePiece({ instanceId: 'enemy', ownerPlayerId: 'player-blue', x: setup.enemyX, y: setup.enemyY })
     const state = makeState({ pieces: [venom, enemy], width: 6, height: 4 })
@@ -346,11 +345,23 @@ describe('共生拖行', () => {
 
     const result = executeSkill(symbioteDrag(), state, 'venom', { x: setup.targetX, y: setup.targetY })
 
+    expect(result.success).toBe(true)
+    expect(JSON.stringify(state)).toBe(before)
+  })
+
+  it('仍拒绝斜线方向且不改变状态', () => {
+    const venom = makePiece({ instanceId: 'venom', ownerPlayerId: 'player-red', x: 0, y: 1 })
+    const enemy = makePiece({ instanceId: 'enemy', ownerPlayerId: 'player-blue', x: 4, y: 1 })
+    const state = makeState({ pieces: [venom, enemy], width: 6, height: 4 })
+    const before = JSON.stringify(state)
+
+    const result = executeSkill(symbioteDrag(), state, 'venom', { x: 4, y: 2 })
+
     expect(result.success).toBe(false)
     expect(JSON.stringify(state)).toBe(before)
   })
 
-  it('成功时消耗1 AP并进入1回合冷却，非法目标不结算资源', () => {
+  it('命中或空发均消耗1 AP并进入1回合冷却', () => {
     const skill = symbioteDrag()
     const venom = makePiece({ instanceId: 'venom', ownerPlayerId: 'player-red', x: 0, y: 1 }) as any
     venom.skills = [{ skillId: skill.id, currentCooldown: 0, usesRemaining: -1 }]
@@ -368,11 +379,12 @@ describe('共生拖行', () => {
     const adjacent = makeState({ pieces: [venom, makePiece({ instanceId: 'adjacent', ownerPlayerId: 'player-blue', x: 1, y: 1 })], width: 6, height: 3 }) as any
     adjacent.skillsById[skill.id] = skill
     adjacent.players[0].actionPoints = 2
-    const before = JSON.stringify(adjacent)
-    expect(() => applyBattleAction(adjacent, withTargetCredentials(adjacent, {
+    const adjacentNext = applyBattleAction(adjacent, withTargetCredentials(adjacent, {
       type: 'useBasicSkill', playerId: 'player-red', pieceId: 'venom', skillId: skill.id, targetX: 5, targetY: 1,
-    }) as any)).toThrow()
-    expect(JSON.stringify(adjacent)).toBe(before)
+    }) as any) as any
+    expect(adjacentNext.players[0].actionPoints).toBe(1)
+    expect(adjacentNext.pieces.find((piece: any) => piece.instanceId === 'venom').skills[0].currentCooldown).toBe(1)
+    expect(adjacentNext.pieces.find((piece: any) => piece.instanceId === 'adjacent')).toMatchObject({ x: 1, y: 1 })
   })
 })
 

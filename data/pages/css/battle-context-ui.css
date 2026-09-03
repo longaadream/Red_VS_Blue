@@ -246,83 +246,6 @@
   backdrop-filter: blur(12px);
 }
 
-.selected-status-overlay {
-  position: absolute;
-  top: calc(var(--battle-hud-offset) + 12px);
-  right: 14px;
-  z-index: 15;
-  width: min(206px, calc(100% - 28px));
-  max-height: calc(100% - var(--battle-hud-offset) - var(--battle-hand-height) - 28px);
-  padding: 9px 10px 10px;
-  overflow-y: auto;
-  border: 0;
-  border-radius: 13px;
-  color: #dbeafe;
-  background: linear-gradient(155deg, rgba(8, 15, 29, 0.72), rgba(15, 23, 42, 0.48));
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.22);
-  backdrop-filter: blur(14px) saturate(1.08);
-  pointer-events: none;
-  scrollbar-width: none;
-}
-
-.selected-status-overlay[hidden] { display: none; }
-.selected-status-overlay::-webkit-scrollbar { display: none; }
-
-.selected-status-heading {
-  display: grid;
-  gap: 2px;
-  margin-bottom: 5px;
-}
-
-.selected-status-heading > span {
-  overflow: hidden;
-  color: #f8fafc;
-  font-size: 10px;
-  font-weight: 800;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.selected-status-heading > strong {
-  color: #94a3b8;
-  font-size: 9px;
-  font-weight: 750;
-  letter-spacing: 0.06em;
-}
-
-.selected-status-heading b {
-  color: #c4b5fd;
-  font-variant-numeric: tabular-nums;
-}
-
-.selected-status-list { display: grid; }
-
-.selected-status-item {
-  display: grid;
-  grid-template-columns: 28px minmax(0, 1fr);
-  gap: 8px;
-  padding: 7px 0;
-  box-shadow: inset 0 1px rgba(148, 163, 184, 0.1);
-}
-
-.selected-status-icon-frame {
-  position: relative;
-  display: grid;
-  place-items: center;
-  width: 26px;
-  height: 26px;
-  border: 1px solid color-mix(in srgb, var(--selected-status-color, #a78bfa) 56%, transparent);
-  border-radius: 8px;
-  background: rgba(2, 6, 23, 0.58);
-  box-shadow: 0 0 10px color-mix(in srgb, var(--selected-status-color, #a78bfa) 24%, transparent);
-}
-
-.selected-status-icon {
-  width: 22px;
-  height: 22px;
-  object-fit: contain;
-}
-
 .status-tag-icon {
   position: relative;
   display: inline-grid;
@@ -353,31 +276,6 @@
   font-weight: 900;
   line-height: 1;
   font-variant-numeric: tabular-nums;
-}
-
-.selected-status-copy {
-  display: grid;
-  gap: 2px;
-  min-width: 0;
-}
-
-.selected-status-copy strong {
-  color: #e9d5ff;
-  font-size: 10px;
-  font-weight: 800;
-}
-
-.selected-status-copy small,
-.selected-status-copy span {
-  color: #94a3b8;
-  font-size: 9px;
-  line-height: 1.35;
-}
-
-.selected-status-zero {
-  padding-top: 6px;
-  color: rgba(148, 163, 184, 0.68);
-  font-size: 10px;
 }
 
 /* RED-166: compact, icon-first authoritative action history. */
@@ -1061,7 +959,6 @@ body.target-mode-active .battle-vignette-speed-control { top: calc(env(safe-area
 }
 
 @media (orientation: landscape) and (max-width: 900px) and (max-height: 500px) {
-  .selected-status-overlay { display: none !important; }
   .action-history-dock { top: calc(var(--battle-hud-offset) + 8px); right: 6px; }
 }
 

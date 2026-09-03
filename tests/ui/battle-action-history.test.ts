@@ -28,6 +28,12 @@ type BrowserModule = {
   create: (options: Record<string, unknown>) => ActionHistoryUi
 }
 
+type ActionIdentityModule = {
+  resolve: (event: Record<string, unknown>, model: Record<string, unknown>) => {
+    skillName: string
+  }
+}
+
 type LocalEvent = {
   preventDefault?: () => void
   stopPropagation: () => void
@@ -48,6 +54,7 @@ function loadActionHistory() {
   return {
     history: window.BattleActionHistory as BrowserModule,
     icons: window.BattleEffectIcons as BrowserModule,
+    identity: window.BattleActionIdentity as ActionIdentityModule,
   }
 }
 
@@ -159,7 +166,7 @@ describe('RED-166 icon action history', () => {
     expect(JSON.stringify(model)).toBe(snapshot)
   })
 
-  it('collapses for target mode, narrow landscape, same-side UI, status summaries, and dialogs', () => {
+  it('keeps the right rail independent from left tile and piece context panels', () => {
     const { history } = loadActionHistory()
 
     expect(history.collapseReasons({ width: 1280, height: 720 })).toEqual([])
@@ -173,7 +180,37 @@ describe('RED-166 icon action history', () => {
       sameSidePopover: true,
       statusOverlay: true,
       dialog: true,
-    })).toEqual(['target-mode', 'same-side-popover', 'status-overlay', 'dialog'])
+    })).toEqual(['target-mode', 'dialog'])
+  })
+
+  it('uses registered display names and never exposes an unknown internal skill id', () => {
+    const { identity } = loadActionHistory()
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const known = identity.resolve(rootEvent(1, {
+      label: 'arthas-icebound-fortitude',
+      skillId: 'arthas-icebound-fortitude',
+    }), {
+      pieces: [{ id: 'source', name: '阿尔萨斯' }],
+      skillSummariesById: {
+        'arthas-icebound-fortitude': { id: 'arthas-icebound-fortitude', name: '寒冰坚忍' },
+      },
+    })
+    const unknown = identity.resolve(rootEvent(2, {
+      label: 'unregistered-secret-skill',
+      skillId: 'unregistered-secret-skill',
+    }), {
+      pieces: [{ id: 'source', name: '未知施法者' }],
+      skillSummariesById: {},
+    })
+
+    expect(known.skillName).toBe('寒冰坚忍')
+    expect(unknown.skillName).toBe('未知技能')
+    expect(unknown.skillName).not.toContain('unregistered-secret-skill')
+    expect(error).toHaveBeenCalledWith(
+      '[battle-action-identity] missing skill display metadata',
+      expect.objectContaining({ eventId: 'action-2:0', skillId: 'unregistered-secret-skill' }),
+    )
+    error.mockRestore()
   })
 
   it('renders unknown icons through the fallback and consumes pointer/click activation locally', () => {
@@ -236,20 +273,54 @@ describe('RED-166 icon action history', () => {
     expect(list.innerHTML.match(/data-history-root-id=/g)).toHaveLength(1)
     expect(JSON.stringify(model)).toBe(before)
 
+    const knownSkillRoot = rootEvent(2, {
+      label: '寒冰坚忍',
+      skillId: 'arthas-icebound-fortitude',
+    })
+    const knownEffectChild = {
+      ...knownSkillRoot,
+      eventId: 'action-2:1',
+      parentEventId: 'action-2:0',
+      sequence: 1,
+      kind: 'statusAdded',
+      iconId: 'status-add',
+      complement: { kind: 'status', type: 'calm-shield' },
+    }
     ui.update({
       ...model,
-      presentationEvents: [rootEvent(2, {
-        label: '寒冰坚忍',
-        skillId: 'arthas-icebound-fortitude',
-      })],
+      presentationEvents: [knownSkillRoot, knownEffectChild],
     })
     expect(list.innerHTML).toContain('action-history-root-icon is-portrait')
     expect(list.innerHTML).toContain('src="images/arthas.jpg"')
     expect(list.innerHTML).toContain('class="action-history-skill-label"')
     expect(list.innerHTML).toContain('寒冰坚忍')
-    expect(list.innerHTML).toContain('aria-label="寒冰坚忍，点击高亮来源与目标"')
+    expect(list.innerHTML).toContain('平静护盾')
+    expect(list.innerHTML).not.toContain('calm-shield')
+    expect(list.innerHTML).toContain('aria-label="寒冰坚忍，包含 1 个结果，点击高亮来源与目标"')
     expect(list.innerHTML).not.toContain('使用<br>技能')
     expect(JSON.stringify(model)).toBe(before)
+
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const unknownRoot = rootEvent(3, { kind: 'move', iconId: 'action-move' })
+    ui.update({
+      ...model,
+      presentationEvents: [unknownRoot, {
+        ...unknownRoot,
+        eventId: 'action-3:1',
+        parentEventId: 'action-3:0',
+        sequence: 1,
+        kind: 'statusAdded',
+        iconId: 'status-add',
+        complement: { kind: 'status', type: 'unregistered-secret-effect' },
+      }],
+    })
+    expect(list.innerHTML).toContain('未知状态')
+    expect(list.innerHTML).not.toContain('unregistered-secret-effect')
+    expect(error).toHaveBeenCalledWith(
+      '[battle-action-history] missing effect display metadata',
+      expect.objectContaining({ eventId: 'action-3:1', effectType: 'unregistered-secret-effect' }),
+    )
+    error.mockRestore()
 
     const pointerEvent = { stopPropagation: vi.fn() }
     listeners.get('pointerdown')?.(pointerEvent)

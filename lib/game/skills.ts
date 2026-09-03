@@ -478,7 +478,6 @@ export type SelectionStepDefinition =
       requireExtensionCell?: ExtensionCellRequirementDefinition
       ignoreOccupantSelectedTargetIndex?: number
       requireEnemyWithinRange?: number
-      projectile?: { requiredCollision: 'piece-before-blocker' }
     }
 
 export interface SelectionContractDefinition {
