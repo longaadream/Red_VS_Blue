@@ -90,6 +90,7 @@ describe('battle page route contract', () => {
 
   it('mounts the RED-167 vignette inside the shared battle presentation lifecycle', () => {
     const battlePage = readPage('battle.html')
+    const vignetteSource = readFileSync(resolve(pagesDir, 'js/battle-ui/battle-action-vignette.js'), 'utf8')
 
     expect(battlePage).toContain('<script src="js/game-engine.js"></script>')
     expect(battlePage).not.toContain('<script src="js/battle-ui/battle-presentation-events.js"></script>')
@@ -99,6 +100,10 @@ describe('battle page route contract', () => {
     expect(battlePage).toContain('vignetteUi: battleActionVignette')
     expect(battlePage).toContain("const RED167_QA_MODE = params.get('qa') === 'RED-167'")
     expect(battlePage).toContain('window.__RVB_RED167_REPLAY__ = playRed167QaSequence')
+    expect(vignetteSource).toContain("speedControl.className = 'battle-vignette-speed-control'")
+    expect(vignetteSource).toContain('speedControl.hidden = false')
+    expect(vignetteSource).toContain('floatLayer.appendChild(speedControl)')
+    expect(vignetteSource).not.toContain('data-vignette-control="speed"')
   })
 
   it('projects real training actions into the shared RED-167 presentation queue', () => {

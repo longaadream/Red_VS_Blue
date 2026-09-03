@@ -792,7 +792,11 @@
 
 .battle-vignette-skip-hint { color: #94a3b8; font-size: 9px; }
 
-.battle-vignette-speed {
+.battle-vignette-speed-control {
+  position: absolute;
+  top: calc(var(--battle-hud-offset) + 10px);
+  left: max(82px, calc(env(safe-area-inset-left) + 68px));
+  z-index: 17;
   display: grid;
   place-items: center;
   width: 44px;
@@ -806,11 +810,16 @@
   font-size: 11px;
   font-weight: 900;
   cursor: pointer;
+  pointer-events: auto;
   touch-action: manipulation;
 }
 
-.battle-vignette-speed:focus-visible { outline: 2px solid #93c5fd; outline-offset: 2px; }
-.battle-vignette-speed:active { transform: scale(0.96); }
+.battle-vignette-speed-control:hover { background: rgba(37, 99, 235, 0.58); }
+.battle-vignette-speed-control:focus-visible { outline: 2px solid #93c5fd; outline-offset: 2px; }
+.battle-vignette-speed-control:active { transform: scale(0.96); }
+
+body.full-map .battle-vignette-speed-control { top: 12px; }
+body.target-mode-active .battle-vignette-speed-control { top: calc(env(safe-area-inset-top) + 66px); }
 
 @keyframes battle-vignette-veil-in {
   from { opacity: 0; }
@@ -1209,6 +1218,10 @@
   }
 
   .battle-vignette-skip-hint { display: none; }
+  .battle-vignette-speed-control {
+    top: calc(var(--battle-hud-offset) + env(safe-area-inset-top) + 9px);
+    left: max(62px, calc(env(safe-area-inset-left) + 60px));
+  }
 }
 
 @media (prefers-reduced-transparency: reduce) {
@@ -1224,6 +1237,10 @@
   }
   .battle-vignette-status {
     background: rgb(8, 15, 29) !important;
+    backdrop-filter: none;
+  }
+  .battle-vignette-speed-control {
+    background: rgb(30, 64, 175) !important;
     backdrop-filter: none;
   }
 }

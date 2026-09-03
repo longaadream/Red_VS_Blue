@@ -275,6 +275,7 @@
     let boardContainer = null
     let floatLayer = null
     let layer = null
+    let speedControl = null
     let showAreaFlash = null
     let clearAreaFlash = null
     let showPath = null
@@ -363,9 +364,7 @@
         + (identity.isSkill ? renderPortrait(identity) : '<img src="' + escapeHtml(meta.assetPath) + '" alt="">')
         + '<span class="battle-vignette-action-name" title="' + escapeHtml(actionLabel) + '">'
         + escapeHtml(actionLabel) + '</span></span>'
-        + '<span class="battle-vignette-skip-hint">点按战场略过</span>'
-        + '<button type="button" class="battle-vignette-speed" data-vignette-control="speed" aria-label="切换演出速度" aria-pressed="'
-        + String(speed === 2) + '">' + speed + '×</button></div>'
+        + '<span class="battle-vignette-skip-hint">点按战场略过</span></div>'
     }
 
     function consume(event) {
@@ -386,16 +385,29 @@
       queue.skip()
     }
 
-    function handleClick(event) {
-      if (!currentGroup) return
-      const control = event.target && typeof event.target.closest === 'function'
-        ? event.target.closest('[data-vignette-control="speed"]')
-        : null
-      consume(event)
-      if (!control) return
-      speed = speed === 2 ? 1 : 2
+    function syncSpeedControl() {
+      if (!speedControl) return
+      const nextSpeed = speed === 2 ? 1 : 2
+      speedControl.innerHTML = speed + '×'
+      speedControl.setAttribute('aria-pressed', String(speed === 2))
+      speedControl.setAttribute('aria-label', '动作演出速度：' + speed + ' 倍，点击切换为 ' + nextSpeed + ' 倍')
+      speedControl.setAttribute('title', '动作演出速度 ' + speed + '×')
+    }
+
+    function setSpeed(nextSpeed) {
+      speed = Number(nextSpeed) === 2 ? 2 : 1
       queue.setSpeed(speed)
-      render()
+      syncSpeedControl()
+      if (currentGroup) render()
+    }
+
+    function handleSpeedPointerDown(event) {
+      consume(event)
+    }
+
+    function handleSpeedClick(event) {
+      consume(event)
+      setSpeed(speed === 2 ? 1 : 2)
     }
 
     function consumeTrailingClick(event) {
@@ -418,8 +430,17 @@
       layer.hidden = true
       layer.setAttribute('data-battle-ui-region', 'action-vignette')
       layer.addEventListener('pointerdown', handlePointerDown)
-      layer.addEventListener('click', handleClick)
       floatLayer.appendChild(layer)
+
+      speedControl = doc.createElement('button')
+      speedControl.className = 'battle-vignette-speed-control'
+      speedControl.hidden = false
+      speedControl.setAttribute('type', 'button')
+      speedControl.setAttribute('data-battle-ui-region', 'action-vignette-speed')
+      speedControl.addEventListener('pointerdown', handleSpeedPointerDown)
+      speedControl.addEventListener('click', handleSpeedClick)
+      syncSpeedControl()
+      floatLayer.appendChild(speedControl)
       if (win && win.addEventListener) win.addEventListener('click', consumeTrailingClick, true)
     }
 
@@ -439,12 +460,17 @@
       if (win && win.removeEventListener) win.removeEventListener('click', consumeTrailingClick, true)
       if (layer) {
         layer.removeEventListener('pointerdown', handlePointerDown)
-        layer.removeEventListener('click', handleClick)
         if (layer.remove) layer.remove()
+      }
+      if (speedControl) {
+        speedControl.removeEventListener('pointerdown', handleSpeedPointerDown)
+        speedControl.removeEventListener('click', handleSpeedClick)
+        if (speedControl.remove) speedControl.remove()
       }
       boardContainer = null
       floatLayer = null
       layer = null
+      speedControl = null
       showAreaFlash = null
       clearAreaFlash = null
       showPath = null
@@ -461,11 +487,7 @@
       dispose: dispose,
       skip: queue.skip,
       settleAll: queue.settleAll,
-      setSpeed: function (nextSpeed) {
-        speed = Number(nextSpeed) === 2 ? 2 : 1
-        queue.setSpeed(speed)
-        if (currentGroup) render()
-      },
+      setSpeed: setSpeed,
       getDiagnostics: queue.getDiagnostics,
     }
   }

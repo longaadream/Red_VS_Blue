@@ -18,6 +18,8 @@ type VignetteModule = {
     update(model: unknown): void
     resize(): void
     settleAll(): void
+    setSpeed(speed: number): void
+    getDiagnostics(): { activeRootId: string | null; pendingRootIds: string[]; speed: number; playedRootCount: number }
     dispose(): void
   }
   constants: { normalDurationMs: number; reducedDurationMs: number; skipSettleMs: number }
@@ -460,6 +462,60 @@ describe('RED-167 action vignette queue', () => {
     expect(clearPath).toHaveBeenCalled()
     expect(floatLayer.children).toHaveLength(0)
     expect(vi.getTimerCount()).toBe(0)
+  })
+
+  it('keeps an idle speed control available and applies its choice without skipping the next vignette', () => {
+    const vignetteModule = loadModule()
+    const floatLayer = new FakeElement()
+    const board = new FakeElement()
+    const documentObject = { createElement: () => new FakeElement() }
+    const vignette = vignetteModule.create({
+      document: documentObject,
+      window: {
+        setTimeout,
+        clearTimeout,
+        matchMedia: () => ({ matches: false }),
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      },
+    })
+
+    vignette.mount({ boardContainer: board, floatLayer })
+
+    const speedControl = floatLayer.children.find(child => child.className === 'battle-vignette-speed-control')
+    expect(speedControl).toBeDefined()
+    expect(speedControl?.hidden).toBe(false)
+    expect(speedControl?.innerHTML).toBe('1×')
+    expect(speedControl?.attributes['aria-pressed']).toBe('false')
+
+    const speedClick = {
+      preventDefault: vi.fn(),
+      stopPropagation: vi.fn(),
+      stopImmediatePropagation: vi.fn(),
+    }
+    speedControl?.dispatch('click', speedClick)
+
+    expect(speedClick.preventDefault).toHaveBeenCalledTimes(1)
+    expect(speedClick.stopPropagation).toHaveBeenCalledTimes(1)
+    expect(speedControl?.innerHTML).toBe('2×')
+    expect(speedControl?.attributes['aria-pressed']).toBe('true')
+    expect(vignette.getDiagnostics().speed).toBe(2)
+
+    vignette.update({ presentationEvents: [], pieces: [], turn: { isViewerTurn: false } })
+    vignette.update({ presentationEvents: [root(91)], pieces: [], turn: { isViewerTurn: false } })
+    expect(vignette.getDiagnostics().activeRootId).toBe('action-91:0')
+
+    speedControl?.dispatch('click', speedClick)
+    expect(vignette.getDiagnostics()).toMatchObject({ activeRootId: 'action-91:0', speed: 1 })
+
+    vignette.setSpeed(2)
+    vi.advanceTimersByTime(vignetteModule.constants.normalDurationMs / 2)
+    expect(vignette.getDiagnostics().activeRootId).toBeNull()
+    expect(speedControl?.hidden).toBe(false)
+    expect(speedControl?.innerHTML).toBe('2×')
+
+    vignette.dispose()
+    expect(floatLayer.children).toHaveLength(0)
   })
 
   it.each([
