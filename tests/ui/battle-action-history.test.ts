@@ -406,6 +406,54 @@ describe('RED-166 icon action history', () => {
     ])
   })
 
+  it('keeps a removed death target visible in history and marks it as dead', () => {
+    const { history, icons } = loadActionHistory()
+    const list = { innerHTML: '' }
+    const collapsedButton = { setAttribute: vi.fn() }
+    const dock = {
+      hidden: true,
+      dataset: {} as Record<string, string>,
+      innerHTML: '',
+      classList: { toggle: vi.fn() },
+      querySelector: (selector: string) => selector === '.action-history-list' ? list : collapsedButton,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      contains: () => false,
+    }
+    const document = {
+      getElementById: (id: string) => id === 'actionHistoryDock' ? dock : null,
+    }
+    const window = {
+      innerWidth: 1280,
+      innerHeight: 720,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      getComputedStyle: () => ({ display: 'none', visibility: 'hidden' }),
+    }
+    const ui = history.create({ document, window, icons, setTimeout: () => 1, clearTimeout: vi.fn() })
+    const source = { id: 'source', name: '绯村剑心', portraitId: 'kenshin.jpg', faction: 'red', x: 1, y: 1, alive: true }
+    const target = { id: 'target', name: '濒死目标', portraitId: 'target.jpg', faction: 'blue', x: 2, y: 1, alive: true }
+    const action = rootEvent(9)
+    const death = {
+      ...action,
+      eventId: 'action-9:2',
+      parentEventId: 'action-9:0',
+      sequence: 2,
+      kind: 'death',
+      iconId: 'action-death',
+      sourcePieceId: null,
+      targetPieceIds: ['target'],
+    }
+
+    ui.mount({ element: dock })
+    ui.update({ pieces: [source, target], players: [], selection: { mode: 'inspect' }, presentationEvents: [] })
+    ui.update({ pieces: [source], players: [], selection: { mode: 'inspect' }, presentationEvents: [action, death] })
+
+    expect(list.innerHTML).toContain('濒死目标')
+    expect(list.innerHTML).toContain('action-history-dead-badge')
+    expect(list.innerHTML).toContain('已死亡')
+  })
+
   it('renders the caster portrait with the authoritative skill name instead of a generic skill icon', () => {
     const source = readFileSync(resolve(pagesDir, 'js/battle-ui/battle-action-history.js'), 'utf8')
     expect(source).toContain('resolveIdentity(group.root)')

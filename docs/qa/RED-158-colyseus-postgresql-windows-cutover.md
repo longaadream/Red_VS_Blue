@@ -114,6 +114,19 @@ Colyseus：
 外部 PostgreSQL URL 未提供，所以外部数据库用例明确记为 skipped；打包候选使用的内置 PostgreSQL
 初始化、持久化、崩溃探测、journal recovery 和 terminal barrier 均已执行通过。
 
+## 2026-09-03 人工验收反馈
+
+- 动作历史原先只从当前 `model.pieces` 解析目标。死亡棋子从后续快照移除后，死亡事件仍有
+  `targetPieceIds`，但目标名称与头像会被渲染为空。动作历史现在保留本局已经公开的棋子显示信息；收到
+  `death` 事件后继续显示目标，并以灰度头像和“已死亡”标记明确状态。回归测试先稳定复现失败，修复后
+  `tests/ui/battle-action-history.test.ts` 13/13 通过。
+- 截图中的战绩加载状态不是 PostgreSQL 进程退出：实包 PostgreSQL、Colyseus 和 Next 进程均在运行，
+  `/battle-reports` 直接探测返回 200 与空结果。5 秒进程采样时整机负载为 100%，PostgreSQL 约占总 CPU
+  0.5%，主要负载来自其他 Chrome/Node 进程；因此本次可见掉帧不能归因于 PostgreSQL。
+- 饱和主机上 `pg_isready` 实测为 0.55–2.42 秒，而当前健康探针超时为 1 秒，所以 authority 日志会出现
+  `degraded` 后又恢复 `healthy` 的假阳性。控制器只有在连续失败且独立确认 PostgreSQL owner 已消失时才
+  判定 authority loss；本轮不放宽该 High Risk 生命周期门禁，后续应单独评估探针预算与诊断降噪。
+
 ## 两台 Windows 人工验收（阻塞最终产品验收）
 
 1. A 开服，A/B 同时进入大厅；连续刷新 10 次，房间目录无重复。
