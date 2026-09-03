@@ -75,13 +75,30 @@ describe('RED-118 packaged Editor content pipeline boundary', () => {
   it('keeps common build fields visible while progressive-disclosing advanced and patch settings', () => {
     const ui = source('electron-editor/ui/index.html')
 
-    expect(ui).toContain('<summary>高级设置</summary>')
-    expect(ui).toContain('<summary>工作区与审计信息</summary>')
+    expect(ui).toContain('<summary>专业设置（一般不用改）</summary>')
+    expect(ui).toContain('<summary>任务与工作区（一般不用改）</summary>')
     expect(ui).toContain('data-patch-settings hidden')
     expect(ui).toContain("patchSettings.hidden = buildMode.value !== 'patch'")
     expect(ui).toContain('id="build-source"')
     expect(ui).toContain('id="build-package-id"')
     expect(ui).toContain('id="build-version"')
+  })
+
+  it('uses content-author language for the default packaging flow', () => {
+    const ui = source('electron-editor/ui/index.html')
+
+    expect(ui).toContain('通常只需要“生成资源包”')
+    expect(ui).toContain('完整资源包（推荐）')
+    expect(ui).toContain('资源包名称')
+    expect(ui).toContain('版本号')
+    expect(ui).toContain('保存位置（工作区内）')
+    expect(ui).toContain('安全检查')
+    expect(ui).toContain('预览合并')
+    expect(ui).toContain('试玩检查')
+    expect(ui).not.toContain('构建 Snapshot / Patch')
+    expect(ui).not.toContain('Publisher ID')
+    expect(ui).not.toContain('Parent Profile hash')
+    expect(ui).not.toContain('可信 Key ID')
   })
 })
 

@@ -163,17 +163,17 @@ dialog{width:min(430px,calc(100vw - 32px));margin:auto;background:var(--surface)
   <div class="tab-panel" id="tab-build">
     <div class="build-panel">
       <div class="build-card">
-        <h3>内容发布链</h3>
-        <p class="pipeline-intro">所有路径均相对于隔离 authoring workspace。QA、Stable 与 Community 验证需要显式可信发布者 Key ID；Stable 还需人工确认。</p>
-        <div class="operation-nav" role="tablist" aria-label="内容流水线操作">
-          <button type="button" class="operation-tab active" data-pipeline-operation="build" role="tab" aria-selected="true" aria-controls="pipeline-form-build">构建</button>
-          <button type="button" class="operation-tab" data-pipeline-operation="sign" role="tab" aria-selected="false" aria-controls="pipeline-form-sign">签名</button>
-          <button type="button" class="operation-tab" data-pipeline-operation="validate" role="tab" aria-selected="false" aria-controls="pipeline-form-validate">验证</button>
-          <button type="button" class="operation-tab" data-pipeline-operation="resolve" role="tab" aria-selected="false" aria-controls="pipeline-form-resolve">解析</button>
-          <button type="button" class="operation-tab" data-pipeline-operation="smoke" role="tab" aria-selected="false" aria-controls="pipeline-form-smoke">冒烟</button>
+        <h3>导出与检查</h3>
+        <p class="pipeline-intro">通常只需要“生成资源包”：系统会把当前 JSON、PVE 内容与贴图整理到一个文件中。其余工具用于正式发布或排查问题。</p>
+        <div class="operation-nav" role="tablist" aria-label="资源包操作">
+          <button type="button" class="operation-tab active" data-pipeline-operation="build" role="tab" aria-selected="true" aria-controls="pipeline-form-build">生成资源包</button>
+          <button type="button" class="operation-tab" data-pipeline-operation="sign" role="tab" aria-selected="false" aria-controls="pipeline-form-sign">添加签名</button>
+          <button type="button" class="operation-tab" data-pipeline-operation="validate" role="tab" aria-selected="false" aria-controls="pipeline-form-validate">安全检查</button>
+          <button type="button" class="operation-tab" data-pipeline-operation="resolve" role="tab" aria-selected="false" aria-controls="pipeline-form-resolve">预览合并</button>
+          <button type="button" class="operation-tab" data-pipeline-operation="smoke" role="tab" aria-selected="false" aria-controls="pipeline-form-smoke">试玩检查</button>
         </div>
         <details class="advanced-settings">
-          <summary>工作区与审计信息</summary>
+          <summary>任务与工作区（一般不用改）</summary>
           <div class="advanced-content grid2">
             <div class="field-group"><label for="pipeline-task-id">Linear 任务</label><input id="pipeline-task-id" name="taskId" type="text" value="RED-178" autocomplete="off"/></div>
             <div class="field-group"><label for="pipeline-workspace">工作区</label><input id="pipeline-workspace" name="workspace" type="text" value="content-authoring" readonly/></div>
@@ -182,7 +182,8 @@ dialog{width:min(430px,calc(100vw - 32px));margin:auto;background:var(--surface)
       </div>
 
       <form class="build-card operation-form active" id="pipeline-form-build" data-operation-form="build">
-        <h3>构建 Snapshot / Patch</h3>
+        <h3>生成资源包</h3>
+        <p class="pipeline-intro">先确认下方内容数量，再填写名称、版本和保存位置。</p>
         <div class="workspace-summary" id="workspace-summary" aria-live="polite">
           <div class="summary-cell"><strong data-summary-data>—</strong><span>常规 JSON</span></div>
           <div class="summary-cell"><strong data-summary-pve>—</strong><span>PVE JSON</span></div>
@@ -190,104 +191,101 @@ dialog{width:min(430px,calc(100vw - 32px));margin:auto;background:var(--surface)
         </div>
         <div class="diff-list" id="workspace-diff">正在检查当前工作区…</div>
         <div class="action-row"><button type="button" class="btn btn-ghost" id="refresh-workspace">刷新打包内容</button></div>
-        <div class="grid2">
-          <div class="field-group">
-            <label for="build-mode">模式</label>
-            <select id="build-mode" name="mode"><option value="snapshot">Snapshot</option><option value="patch">Patch</option></select>
-          </div>
-          <div class="field-group">
-            <label for="build-source">源目录</label>
-            <input id="build-source" name="source" type="text" value="sources/current-workspace" readonly/>
-          </div>
+        <div class="field-group">
+          <label for="build-mode">资源包类型</label>
+          <select id="build-mode" name="mode"><option value="snapshot">完整资源包（推荐）</option><option value="patch">增量更新</option></select>
         </div>
         <div class="grid2">
-          <div class="field-group"><label for="build-output">输出归档</label><input id="build-output" name="output" type="text" value="archives/editor-build.rvbpack" autocomplete="off"/></div>
-          <div class="field-group"><label for="build-package-id">Package ID</label><input id="build-package-id" name="packageId" type="text" value="rvb.editor-build" autocomplete="off"/></div>
+          <div class="field-group"><label for="build-name">资源包名称</label><input id="build-name" name="displayName" type="text" value="Editor Build" autocomplete="off"/></div>
+          <div class="field-group"><label for="build-version">版本号</label><input id="build-version" name="version" type="text" value="0.1.0" autocomplete="off"/></div>
         </div>
-        <div class="grid2">
-          <div class="field-group"><label for="build-name">显示名称</label><input id="build-name" name="displayName" type="text" value="Editor Build" autocomplete="off"/></div>
-          <div class="field-group"><label for="build-version">SemVer</label><input id="build-version" name="version" type="text" value="0.1.0" autocomplete="off"/></div>
-        </div>
+        <div class="field-group"><label for="build-output">保存位置（工作区内）</label><input id="build-output" name="output" type="text" value="archives/editor-build.rvbpack" autocomplete="off"/></div>
         <details class="advanced-settings">
-          <summary>高级设置</summary>
+          <summary>专业设置（一般不用改）</summary>
           <div class="advanced-content">
             <div class="grid2">
-              <div class="field-group"><label for="build-publisher">Publisher ID</label><input id="build-publisher" name="publisherId" type="text" value="rvb.editor" autocomplete="off"/></div>
-              <div class="field-group"><label for="build-capabilities">Capabilities（逗号或换行）</label><input id="build-capabilities" name="capabilities" type="text" value="game-data" autocomplete="off"/></div>
+              <div class="field-group"><label for="build-package-id">资源包标识</label><input id="build-package-id" name="packageId" type="text" value="rvb.editor-build" autocomplete="off"/></div>
+              <div class="field-group"><label for="build-publisher">作者标识</label><input id="build-publisher" name="publisherId" type="text" value="rvb.editor" autocomplete="off"/></div>
             </div>
-            <div class="field-group"><label for="build-desc">描述</label><input id="build-desc" name="description" type="text" value="balance update" autocomplete="off"/></div>
+            <div class="grid2">
+              <div class="field-group"><label for="build-source">自动整理的内容目录</label><input id="build-source" name="source" type="text" value="sources/current-workspace" readonly/></div>
+              <div class="field-group"><label for="build-capabilities">包含的内容类型（自动识别）</label><input id="build-capabilities" name="capabilities" type="text" value="game-data" readonly/></div>
+            </div>
+            <div class="field-group"><label for="build-desc">更新说明</label><input id="build-desc" name="description" type="text" value="balance update" autocomplete="off"/></div>
           </div>
         </details>
         <div class="patch-settings" data-patch-settings hidden>
-          <div class="field-group"><label for="build-parent">Parent Profile hash</label><input id="build-parent" name="parentProfileHash" type="text" autocomplete="off"/></div>
-          <div class="field-group"><label for="build-operations">Patch operations JSON</label><textarea id="build-operations" name="operations" rows="5">[]</textarea></div>
-          <p class="field-help">Patch 需要基线 Profile hash 和非空操作数组。</p>
+          <div class="field-group"><label for="build-parent">基线版本指纹</label><input id="build-parent" name="parentProfileHash" type="text" autocomplete="off"/></div>
+          <div class="field-group"><label for="build-operations">增量操作（JSON）</label><textarea id="build-operations" name="operations" rows="5">[]</textarea></div>
+          <p class="field-help">仅制作增量更新时需要。一般角色、数值和贴图更新请选择“完整资源包”。</p>
         </div>
-        <div class="action-row"><button type="submit" class="btn btn-primary btn-big" id="build-btn" data-run-operation="build" data-idle-label="构建资源包">构建资源包</button></div>
+        <div class="action-row"><button type="submit" class="btn btn-primary btn-big" id="build-btn" data-run-operation="build" data-idle-label="生成资源包">生成资源包</button></div>
       </form>
 
       <form class="build-card operation-form" id="pipeline-form-sign" data-operation-form="sign" hidden>
-        <h3>签名归档</h3>
+        <h3>给资源包添加签名</h3>
+        <p class="pipeline-intro">正式交付前用于证明资源包的作者和内容没有被改动。</p>
         <div class="grid2">
-          <div class="field-group"><label for="sign-input">输入归档</label><input id="sign-input" name="input" type="text" value="archives/editor-build.rvbpack" autocomplete="off"/></div>
-          <div class="field-group"><label for="sign-output">签名输出</label><input id="sign-output" name="output" type="text" value="archives/editor-build-qa.rvbpack" autocomplete="off"/></div>
+          <div class="field-group"><label for="sign-input">要签名的资源包</label><input id="sign-input" name="input" type="text" value="archives/editor-build.rvbpack" autocomplete="off"/></div>
+          <div class="field-group"><label for="sign-output">签名后的保存位置</label><input id="sign-output" name="output" type="text" value="archives/editor-build-qa.rvbpack" autocomplete="off"/></div>
         </div>
         <div class="grid2">
-          <div class="field-group"><label for="sign-key-file">私钥文件</label><input id="sign-key-file" name="keyFile" type="text" value="keys/qa.key" autocomplete="off"/></div>
-          <div class="field-group"><label for="sign-channel">渠道</label><select id="sign-channel" name="channel"><option value="qa">QA</option><option value="community">Community</option><option value="stable">Stable</option></select></div>
+          <div class="field-group"><label for="sign-key-file">签名密钥文件</label><input id="sign-key-file" name="keyFile" type="text" value="keys/qa.key" autocomplete="off"/></div>
+          <div class="field-group"><label for="sign-channel">发布范围</label><select id="sign-channel" name="channel"><option value="qa">测试环境</option><option value="community">社区发布</option><option value="stable">正式发布</option></select></div>
         </div>
-        <label class="inline-check" for="sign-confirm-stable"><input id="sign-confirm-stable" name="confirmStable" type="checkbox"/>我确认执行 Stable 操作</label>
-        <div class="action-row"><button type="submit" class="btn btn-primary btn-big" data-run-operation="sign" data-idle-label="签名归档">签名归档</button></div>
+        <label class="inline-check" for="sign-confirm-stable"><input id="sign-confirm-stable" name="confirmStable" type="checkbox"/>我确认这是正式发布</label>
+        <div class="action-row"><button type="submit" class="btn btn-primary btn-big" data-run-operation="sign" data-idle-label="添加签名">添加签名</button></div>
       </form>
 
       <form class="build-card operation-form" id="pipeline-form-validate" data-operation-form="validate" hidden>
-        <h3>验证归档</h3>
+        <h3>检查资源包是否可用</h3>
         <div class="grid2">
-          <div class="field-group"><label for="validate-archive">待验证归档</label><input id="validate-archive" name="archive" type="text" value="archives/editor-build-qa.rvbpack" autocomplete="off"/></div>
-          <div class="field-group"><label for="validate-base">Base（bundled 或归档路径）</label><input id="validate-base" name="base" type="text" value="bundled" autocomplete="off"/></div>
+          <div class="field-group"><label for="validate-archive">要检查的资源包</label><input id="validate-archive" name="archive" type="text" value="archives/editor-build-qa.rvbpack" autocomplete="off"/></div>
+          <div class="field-group"><label for="validate-base">内置基础内容或资源包</label><input id="validate-base" name="base" type="text" value="bundled" autocomplete="off"/></div>
         </div>
-        <div class="field-group"><label for="validate-patches">前置 Patch（按顺序，逗号或换行）</label><textarea id="validate-patches" name="patches" rows="3"></textarea></div>
+        <div class="field-group"><label for="validate-patches">之前要叠加的更新包（按顺序）</label><textarea id="validate-patches" name="patches" rows="3"></textarea></div>
         <div class="grid2">
-          <div class="field-group"><label for="validate-trusted">可信 Key ID（逗号或换行）</label><textarea id="validate-trusted" name="trustedKeyIds" rows="3"></textarea></div>
-          <div class="field-group"><label for="validate-channel">渠道</label><select id="validate-channel" name="channel"><option value="local-dev">Local Dev</option><option value="qa">QA</option><option value="community">Community</option><option value="stable">Stable</option></select></div>
+          <div class="field-group"><label for="validate-trusted">信任的作者密钥指纹</label><textarea id="validate-trusted" name="trustedKeyIds" rows="3"></textarea></div>
+          <div class="field-group"><label for="validate-channel">检查级别</label><select id="validate-channel" name="channel"><option value="local-dev">仅本机测试</option><option value="qa">测试环境</option><option value="community">社区发布</option><option value="stable">正式发布</option></select></div>
         </div>
-        <label class="inline-check" for="validate-confirm-stable"><input id="validate-confirm-stable" name="confirmStable" type="checkbox"/>我确认执行 Stable 操作</label>
-        <div class="action-row"><button type="submit" class="btn btn-primary btn-big" data-run-operation="validate" data-idle-label="验证归档">验证归档</button></div>
+        <label class="inline-check" for="validate-confirm-stable"><input id="validate-confirm-stable" name="confirmStable" type="checkbox"/>我确认按正式发布标准检查</label>
+        <div class="action-row"><button type="submit" class="btn btn-primary btn-big" data-run-operation="validate" data-idle-label="开始检查">开始检查</button></div>
       </form>
 
       <form class="build-card operation-form" id="pipeline-form-resolve" data-operation-form="resolve" hidden>
-        <h3>解析完整 Profile</h3>
+        <h3>预览最终合并内容</h3>
         <div class="grid2">
-          <div class="field-group"><label for="resolve-base">Base（bundled 或归档路径）</label><input id="resolve-base" name="base" type="text" value="bundled" autocomplete="off"/></div>
-          <div class="field-group"><label for="resolve-channel">渠道</label><select id="resolve-channel" name="channel"><option value="local-dev">Local Dev</option><option value="qa">QA</option><option value="community">Community</option><option value="stable">Stable</option></select></div>
+          <div class="field-group"><label for="resolve-base">基础内容</label><input id="resolve-base" name="base" type="text" value="bundled" autocomplete="off"/></div>
+          <div class="field-group"><label for="resolve-channel">检查级别</label><select id="resolve-channel" name="channel"><option value="local-dev">仅本机测试</option><option value="qa">测试环境</option><option value="community">社区发布</option><option value="stable">正式发布</option></select></div>
         </div>
-        <div class="field-group"><label for="resolve-patches">Patch 链（按顺序，逗号或换行）</label><textarea id="resolve-patches" name="patches" rows="3"></textarea></div>
-        <div class="field-group"><label for="resolve-trusted">可信 Key ID（逗号或换行）</label><textarea id="resolve-trusted" name="trustedKeyIds" rows="3"></textarea></div>
-        <label class="inline-check" for="resolve-confirm-stable"><input id="resolve-confirm-stable" name="confirmStable" type="checkbox"/>我确认执行 Stable 操作</label>
-        <div class="action-row"><button type="submit" class="btn btn-primary btn-big" data-run-operation="resolve" data-idle-label="解析 Profile">解析 Profile</button></div>
+        <div class="field-group"><label for="resolve-patches">按顺序叠加的更新包</label><textarea id="resolve-patches" name="patches" rows="3"></textarea></div>
+        <div class="field-group"><label for="resolve-trusted">信任的作者密钥指纹</label><textarea id="resolve-trusted" name="trustedKeyIds" rows="3"></textarea></div>
+        <label class="inline-check" for="resolve-confirm-stable"><input id="resolve-confirm-stable" name="confirmStable" type="checkbox"/>我确认按正式发布标准预览</label>
+        <div class="action-row"><button type="submit" class="btn btn-primary btn-big" data-run-operation="resolve" data-idle-label="生成预览">生成预览</button></div>
       </form>
 
       <form class="build-card operation-form" id="pipeline-form-smoke" data-operation-form="smoke" hidden>
-        <h3>固定种子 PVE 冒烟</h3>
+        <h3>试玩检查 PVE 流程</h3>
+        <p class="pipeline-intro">用固定随机数重复运行一局流程，方便定位相同问题。</p>
         <div class="grid2">
-          <div class="field-group"><label for="smoke-base">Base（bundled 或归档路径）</label><input id="smoke-base" name="base" type="text" value="bundled" autocomplete="off"/></div>
-          <div class="field-group"><label for="smoke-seed">Seed</label><input id="smoke-seed" name="seed" type="number" min="0" max="4294967295" step="1" value="292604670"/></div>
+          <div class="field-group"><label for="smoke-base">基础内容</label><input id="smoke-base" name="base" type="text" value="bundled" autocomplete="off"/></div>
+          <div class="field-group"><label for="smoke-seed">随机种子（用于复现）</label><input id="smoke-seed" name="seed" type="number" min="0" max="4294967295" step="1" value="292604670"/></div>
         </div>
         <div class="grid2">
-          <div class="field-group"><label for="smoke-channel">渠道</label><select id="smoke-channel" name="channel"><option value="local-dev">Local Dev</option><option value="qa">QA</option><option value="community">Community</option><option value="stable">Stable</option></select></div>
-          <div class="field-group"><label for="smoke-trusted">可信 Key ID（逗号或换行）</label><textarea id="smoke-trusted" name="trustedKeyIds" rows="3"></textarea></div>
+          <div class="field-group"><label for="smoke-channel">检查级别</label><select id="smoke-channel" name="channel"><option value="local-dev">仅本机测试</option><option value="qa">测试环境</option><option value="community">社区发布</option><option value="stable">正式发布</option></select></div>
+          <div class="field-group"><label for="smoke-trusted">信任的作者密钥指纹</label><textarea id="smoke-trusted" name="trustedKeyIds" rows="3"></textarea></div>
         </div>
-        <div class="field-group"><label for="smoke-patches">Patch 链（按顺序，逗号或换行）</label><textarea id="smoke-patches" name="patches" rows="3"></textarea></div>
-        <label class="inline-check" for="smoke-confirm-stable"><input id="smoke-confirm-stable" name="confirmStable" type="checkbox"/>我确认执行 Stable 操作</label>
-        <div class="action-row"><button type="submit" class="btn btn-primary btn-big" data-run-operation="smoke" data-idle-label="运行 PVE 冒烟">运行 PVE 冒烟</button></div>
+        <div class="field-group"><label for="smoke-patches">按顺序叠加的更新包</label><textarea id="smoke-patches" name="patches" rows="3"></textarea></div>
+        <label class="inline-check" for="smoke-confirm-stable"><input id="smoke-confirm-stable" name="confirmStable" type="checkbox"/>我确认按正式发布标准检查</label>
+        <div class="action-row"><button type="submit" class="btn btn-primary btn-big" data-run-operation="smoke" data-idle-label="开始试玩检查">开始试玩检查</button></div>
       </form>
 
       <div class="build-card">
         <div class="status-bar">
-          <h3 style="margin:0">输出</h3>
+          <h3 style="margin:0">操作结果</h3>
           <span id="build-badge" role="status" aria-live="polite"></span>
         </div>
-        <div class="console" id="build-console" role="log" aria-live="polite" aria-relevant="additions"><span class="console-line" style="color:#3f3f46">选择一个操作并填写参数。</span></div>
+        <div class="console" id="build-console" role="log" aria-live="polite" aria-relevant="additions"><span class="console-line" style="color:#3f3f46">选择一项操作，结果会显示在这里。</span></div>
       </div>
     </div>
   </div>
@@ -342,7 +340,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'))
     btn.classList.add('active')
     document.getElementById('tab-' + btn.dataset.tab).classList.add('active')
-    document.getElementById('section-title').textContent = ({ pieces:'棋子数据', skills:'技能数据', cards:'卡牌数据', rules:'规则数据', pve:'PVE 内容', assets:'图片资源', build:'资源包流水线' })[btn.dataset.tab]
+    document.getElementById('section-title').textContent = ({ pieces:'棋子数据', skills:'技能数据', cards:'卡牌数据', rules:'规则数据', pve:'PVE 内容', assets:'图片资源', build:'导出资源包' })[btn.dataset.tab]
     document.getElementById('data-root-label').textContent = btn.dataset.tab === 'assets' ? 'content-authoring/images' : btn.dataset.tab === 'build' ? 'content-authoring/sources/current-workspace' : 'content-authoring/data'
     if (btn.dataset.tab === 'build') document.getElementById('refresh-workspace')?.click()
   })
@@ -645,7 +643,7 @@ initializeAssets().catch(error => toast('图片资源加载失败：' + error.me
   const runButtons = [...document.querySelectorAll('[data-run-operation]')]
   const buildMode = document.getElementById('build-mode')
   const patchSettings = document.querySelector('[data-patch-settings]')
-  const operationLabels = { build: '构建', sign: '签名', validate: '验证', resolve: '解析', smoke: '冒烟' }
+  const operationLabels = { build: '生成资源包', sign: '添加签名', validate: '安全检查', resolve: '预览合并', smoke: '试玩检查' }
   let running = false
 
   async function prepareWorkspace() {
@@ -745,7 +743,7 @@ initializeAssets().catch(error => toast('图片资源加载失败：' + error.me
       const operationsText = field('build-operations')
       const operations = operationsText ? JSON.parse(operationsText) : undefined
       if (mode === 'patch' && (!Array.isArray(operations) || operations.length === 0)) {
-        throw new Error('Patch 构建需要非空 operations JSON 数组。')
+        throw new Error('增量更新需要填写至少一项增量操作。')
       }
       return {
         ...common(operation),

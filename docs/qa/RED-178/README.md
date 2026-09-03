@@ -6,6 +6,7 @@
 - `editor-new-template-900x600.png`: new piece template opened directly in Complete JSON at the minimum window size.
 - `editor-json-error-900x600.png`: malformed JSON with visible line/column feedback and the create action disabled.
 - `editor-packaging-simple-1200x780.png`: the default Snapshot packaging form with advanced and Patch-only parameters collapsed.
+- `editor-packaging-plain-language-1200x780.png`: the revised default packaging flow using content-author wording, a recommended full package option, and collapsed professional settings.
 - `editor-assets-1200x780.png`: image library with a selected static SVG preview, import/replace controls, and copyable pack path.
 - `editor-pve-900x600.png`: arbitrary-depth PVE document open in the schema-neutral Complete JSON editor.
 - `editor-package-content-1200x780.png`: current-workspace staging summary with data/PVE/image counts and added/overwritten paths.
