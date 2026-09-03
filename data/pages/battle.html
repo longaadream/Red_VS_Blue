@@ -630,7 +630,8 @@
     #tileStatusPanel {
       position: absolute;
       top: calc(var(--battle-hud-offset, 56px) + 12px);
-      right: 14px;
+      left: 14px;
+      right: auto;
       z-index: 17;
       display: none;
       flex-direction: column;
@@ -645,7 +646,6 @@
       backdrop-filter: blur(16px) saturate(1.1);
       pointer-events: auto;
     }
-    #selectedStatusOverlay:not([hidden]) ~ #tileStatusPanel { right: 232px; }
     .ts-sheet {
       width: 100%;
       min-height: 0;
@@ -665,7 +665,8 @@
     .ts-heading { min-width: 0; }
     .ts-title { color: #f8fafc; font-size: 11px; font-weight: 850; }
     .ts-coords { margin-top: 1px; color: #64748b; font-size: 9px; font-variant-numeric: tabular-nums; }
-    .ts-close {
+    .ts-actions { display: flex; align-items: center; gap: 4px; }
+    .ts-toggle, .ts-close {
       width: 28px;
       height: 28px;
       flex: 0 0 28px;
@@ -681,7 +682,8 @@
       cursor: pointer;
       transition: transform 140ms cubic-bezier(.23,1,.32,1), background-color 140ms ease;
     }
-    .ts-close:active { transform: scale(.96); background: rgba(148,163,184,.16); }
+    .ts-toggle { font-size: 12px; }
+    .ts-toggle:active, .ts-close:active { transform: scale(.96); background: rgba(148,163,184,.16); }
     .ts-body {
       min-height: 0;
       overflow-y: auto;
@@ -716,6 +718,8 @@
       white-space: nowrap;
     }
     .ts-section-label { padding: 5px 0 3px; }
+    #tileStatusPanel:not(.is-expanded) .ts-details { display: none; }
+    .ts-details { min-height: 0; overflow-y: auto; }
     .ts-effects { display: grid; }
     .ts-effect {
       min-height: 39px;
@@ -751,7 +755,8 @@
     @media (max-width: 760px), (orientation: landscape) and (max-height: 500px) {
       #tileStatusPanel {
         top: calc(var(--battle-hud-offset, 44px) + 8px);
-        right: 8px !important;
+        left: 8px;
+        right: auto;
         width: min(232px, calc(100% - 16px));
         max-height: min(52vh, calc(100% - var(--battle-hud-offset, 44px) - var(--battle-hand-height, 112px) - 18px));
       }
@@ -889,6 +894,12 @@
       margin-bottom: 12px;
     }
     .pi-name { font-size: 17px; font-weight: 800; }
+    .pi-header-actions { display: flex; align-items: center; gap: 6px; }
+    .pi-history {
+      min-height: 32px; padding: 5px 9px; border: 1px solid rgba(96,165,250,.36);
+      border-radius: 8px; background: rgba(30,64,175,.24); color: #bfdbfe;
+      font-size: 11px; font-weight: 800; cursor: pointer;
+    }
     .pi-close {
       background: none; border: none; color: #64748b;
       font-size: 20px; cursor: pointer; padding: 0 4px;
@@ -1518,7 +1529,10 @@
       <div class="pi-sheet">
       <div class="pi-header">
         <div class="pi-name" id="pieceInfoName"></div>
-        <button class="pi-close" type="button" aria-label="关闭棋子详情" onclick="closePieceInfo()">✕</button>
+        <div class="pi-header-actions">
+          <button class="pi-history" type="button" onclick="switchPieceInfoToActionHistory()">行动记录</button>
+          <button class="pi-close" type="button" aria-label="关闭棋子详情" onclick="closePieceInfo()">✕</button>
+        </div>
       </div>
         <div id="pieceInfoContent"></div>
       </div>
@@ -1668,7 +1682,6 @@
               </div>
               <div id="pieceContextSkills" class="piece-context-skills"></div>
             </div>
-            <aside id="selectedStatusOverlay" class="selected-status-overlay" data-battle-ui-region="selected-status" aria-label="选中棋子特殊状态" aria-live="polite" hidden></aside>
             <aside id="actionHistoryDock" class="action-history-dock" data-battle-ui-region="action-history" aria-label="最近动作" hidden></aside>
             <aside id="tileStatusPanel" role="dialog" aria-modal="false" aria-hidden="true" aria-labelledby="tileStatusTitle">
               <div class="ts-sheet">
@@ -1677,7 +1690,10 @@
                     <div class="ts-title" id="tileStatusTitle">地格状态</div>
                     <div class="ts-coords" id="tileStatusCoords"></div>
                   </div>
-                  <button class="ts-close" type="button" aria-label="关闭地格状态" onclick="closeTileStatus()">×</button>
+                  <div class="ts-actions">
+                    <button id="tileStatusExpand" class="ts-toggle" type="button" aria-label="展开地格效果" aria-controls="tileStatusDetails" aria-expanded="false" title="展开地格效果" onclick="toggleTileStatusExpanded()">⌄</button>
+                    <button class="ts-close" type="button" aria-label="关闭地格状态" onclick="closeTileStatus()">×</button>
+                  </div>
                 </div>
                 <div class="ts-body">
                   <div class="ts-terrain">
@@ -1685,7 +1701,9 @@
                     <span class="ts-terrain-value" id="tileStatusTerrain"></span>
                   </div>
                   <div class="ts-section-label" id="tileStatusEffectCount">持续地格效果</div>
-                  <div class="ts-effects" id="tileStatusContent"></div>
+                  <div class="ts-details" id="tileStatusDetails" hidden>
+                    <div class="ts-effects" id="tileStatusContent"></div>
+                  </div>
                 </div>
               </div>
             </aside>
@@ -3628,6 +3646,20 @@
       if (input.restoreFocus !== false && returnFocus && returnFocus.isConnected && typeof returnFocus.focus === 'function') returnFocus.focus()
     }
 
+    function switchPieceInfoToActionHistory() {
+      closePieceInfo({ restoreFocus: false })
+      const dock = document.getElementById('actionHistoryDock')
+      const button = dock && dock.querySelector('.action-history-collapsed-button')
+      if (!dock || dock.hidden || !button) {
+        setStatusMsg('暂无行动记录')
+        return
+      }
+      requestAnimationFrame(function () {
+        if (!dock.classList.contains('is-user-expanded')) button.click()
+        button.focus()
+      })
+    }
+
     function showTileStatus(x, y) {
       if (!G || !G.map) return
       const tile = G.map.tiles.find(function(entry) { return entry.x === x && entry.y === y })
@@ -3658,8 +3690,31 @@
             `</div>`
           }).join('')
         : '<div class="ts-empty">当前没有持续地格效果</div>'
+      if (panel.getAttribute('aria-hidden') === 'true') setTileStatusExpanded(false)
       panel.style.display = 'flex'
       panel.setAttribute('aria-hidden', 'false')
+      schedulePieceContextMenuPosition()
+    }
+
+    function setTileStatusExpanded(expanded) {
+      const panel = document.getElementById('tileStatusPanel')
+      const button = document.getElementById('tileStatusExpand')
+      const details = document.getElementById('tileStatusDetails')
+      const next = !!expanded
+      if (panel) panel.classList.toggle('is-expanded', next)
+      if (button) {
+        button.setAttribute('aria-expanded', String(next))
+        button.setAttribute('aria-label', next ? '收起地格效果' : '展开地格效果')
+        button.setAttribute('title', next ? '收起地格效果' : '展开地格效果')
+        button.textContent = next ? '⌃' : '⌄'
+      }
+      if (details) details.hidden = !next
+      schedulePieceContextMenuPosition()
+    }
+
+    function toggleTileStatusExpanded() {
+      const panel = document.getElementById('tileStatusPanel')
+      setTileStatusExpanded(!(panel && panel.classList.contains('is-expanded')))
     }
 
     function closeTileStatus() {
@@ -3667,6 +3722,7 @@
       if (!panel) return
       panel.style.display = 'none'
       panel.setAttribute('aria-hidden', 'true')
+      setTileStatusExpanded(false)
     }
 
     // ── Load local static data ──
@@ -4163,6 +4219,10 @@
       const previousTurn = previousState && previousState.turn && previousState.turn.currentPlayerId
       const nextTurn = nextState.turn && nextState.turn.currentPlayerId
       if (previousTurn && nextTurn && String(previousTurn).toLowerCase() !== String(nextTurn).toLowerCase()) {
+        if (selected && String(nextTurn).toLowerCase() !== String(myPlayerId || '').toLowerCase()) {
+          selectedPieceId = null
+          dismissedPieceContextId = null
+        }
         clearTargetInteraction('turn-changed', { deferRender: input.deferRender === true })
         validMoves = new Set()
         return '回合已切换，目标选择已清除'
@@ -4989,8 +5049,10 @@
       if (btn) btn.disabled = disabled
     }
 
-    function restoreSelectedPieceMenu() {
+    function restoreSelectedPieceMenu(options) {
+      const input = options || {}
       const sp = G && selectedPieceId ? G.pieces.find(p => p.instanceId === selectedPieceId) : null
+      if (input.reopen && sp) dismissedPieceContextId = null
       pendingMove = false
       validMoves = new Set()
       setMoveButtonClass(false)
@@ -5579,11 +5641,26 @@
       const hudOffset = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--battle-hud-offset')) || 0
       const menuTopPadding = hudOffset + 8
       const handHeight = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--battle-hand-height')) || 0
+      const stageRect = stage.getBoundingClientRect()
+      const tilePanel = document.getElementById('tileStatusPanel')
+      const historyDock = document.getElementById('actionHistoryDock')
+      const tileRect = tilePanel && tilePanel.getAttribute('aria-hidden') !== 'true'
+        ? tilePanel.getBoundingClientRect()
+        : null
+      const historyRect = historyDock && !historyDock.hidden
+        ? historyDock.getBoundingClientRect()
+        : null
+      const leftInset = tileRect ? Math.max(0, tileRect.right - stageRect.left + 8) : 0
+      const rightInset = historyRect
+        ? Math.max(368, stageRect.right - historyRect.left + 8)
+        : 0
       const placement = layout.placeEdgeDock(anchor, { width: menu.offsetWidth, height: menu.offsetHeight }, {
         width: stage.clientWidth,
         height: stage.clientHeight,
         topPadding: menuTopPadding,
         bottomPadding: handHeight + 8,
+        leftInset: leftInset,
+        rightInset: rightInset,
       }, pieceContextDockSide)
       pieceContextDockSide = placement.side
       menu.style.left = placement.left + 'px'
@@ -6118,6 +6195,7 @@
       }
       pendingMove = false
       validMoves = new Set()
+      dismissedPieceContextId = null
       closePieceContextMenu()
       void doAction({ type: 'move', playerId: myPlayerId, pieceId: pieceId, toX: x, toY: y })
       return true
@@ -6595,7 +6673,7 @@
         }
         const interactionFeedback = reconcileBattleInteractionState(oldG, G)
         if (!wasTargetSubmission) { pendingSkill = null; pendingCardAction = null }
-        restoreSelectedPieceMenu()
+        restoreSelectedPieceMenu({ reopen: action.type === 'move' })
         render(); if (G.terminalResult) handleGameOver()
         if (interactionFeedback) setStatusMsg(interactionFeedback)
       } catch (e) {
@@ -6694,7 +6772,7 @@
           if (action.pieceId && G.pieces.some(p => p.instanceId === action.pieceId && p.currentHp > 0)) {
             selectedPieceId = action.pieceId
           } else if (action.type === 'endTurn' || action.type === 'beginPhase') { selectedPieceId = null }
-          pendingSkill = null; pendingCardAction = null; restoreSelectedPieceMenu()
+          pendingSkill = null; pendingCardAction = null; restoreSelectedPieceMenu({ reopen: action.type === 'move' })
           return
         }
 
@@ -6711,7 +6789,7 @@
           if (action.pieceId && G.pieces.some(p => p.instanceId === action.pieceId && p.currentHp > 0)) {
             selectedPieceId = action.pieceId
           } else if (action.type === 'endTurn' || action.type === 'beginPhase') { selectedPieceId = null }
-          pendingSkill = null; pendingCardAction = null; restoreSelectedPieceMenu()
+          pendingSkill = null; pendingCardAction = null; restoreSelectedPieceMenu({ reopen: action.type === 'move' })
           return
         }
 

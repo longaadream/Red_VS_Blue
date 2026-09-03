@@ -28,6 +28,12 @@ type BrowserModule = {
   create: (options: Record<string, unknown>) => ActionHistoryUi
 }
 
+type ActionIdentityModule = {
+  resolve: (event: Record<string, unknown>, model: Record<string, unknown>) => {
+    skillName: string
+  }
+}
+
 type LocalEvent = {
   preventDefault?: () => void
   stopPropagation: () => void
@@ -48,6 +54,7 @@ function loadActionHistory() {
   return {
     history: window.BattleActionHistory as BrowserModule,
     icons: window.BattleEffectIcons as BrowserModule,
+    identity: window.BattleActionIdentity as ActionIdentityModule,
   }
 }
 
@@ -159,7 +166,7 @@ describe('RED-166 icon action history', () => {
     expect(JSON.stringify(model)).toBe(snapshot)
   })
 
-  it('collapses for target mode, narrow landscape, same-side UI, status summaries, and dialogs', () => {
+  it('keeps the right rail independent from left tile and piece context panels', () => {
     const { history } = loadActionHistory()
 
     expect(history.collapseReasons({ width: 1280, height: 720 })).toEqual([])
@@ -173,7 +180,37 @@ describe('RED-166 icon action history', () => {
       sameSidePopover: true,
       statusOverlay: true,
       dialog: true,
-    })).toEqual(['target-mode', 'same-side-popover', 'status-overlay', 'dialog'])
+    })).toEqual(['target-mode', 'dialog'])
+  })
+
+  it('uses registered display names and never exposes an unknown internal skill id', () => {
+    const { identity } = loadActionHistory()
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const known = identity.resolve(rootEvent(1, {
+      label: 'arthas-icebound-fortitude',
+      skillId: 'arthas-icebound-fortitude',
+    }), {
+      pieces: [{ id: 'source', name: '阿尔萨斯' }],
+      skillSummariesById: {
+        'arthas-icebound-fortitude': { id: 'arthas-icebound-fortitude', name: '寒冰坚忍' },
+      },
+    })
+    const unknown = identity.resolve(rootEvent(2, {
+      label: 'unregistered-secret-skill',
+      skillId: 'unregistered-secret-skill',
+    }), {
+      pieces: [{ id: 'source', name: '未知施法者' }],
+      skillSummariesById: {},
+    })
+
+    expect(known.skillName).toBe('寒冰坚忍')
+    expect(unknown.skillName).toBe('未知技能')
+    expect(unknown.skillName).not.toContain('unregistered-secret-skill')
+    expect(error).toHaveBeenCalledWith(
+      '[battle-action-identity] missing skill display metadata',
+      expect.objectContaining({ eventId: 'action-2:0', skillId: 'unregistered-secret-skill' }),
+    )
+    error.mockRestore()
   })
 
   it('renders unknown icons through the fallback and consumes pointer/click activation locally', () => {

@@ -168,8 +168,6 @@
     if (width > 0 && width < COLLAPSE_WIDTH) reasons.push('narrow')
     if (width <= 900 && height > 0 && height <= 500) reasons.push('compact-landscape')
     if (state.interactionMode === 'target' || state.interactionMode === 'place') reasons.push('target-mode')
-    if (state.sameSidePopover) reasons.push('same-side-popover')
-    if (state.statusOverlay) reasons.push('status-overlay')
     if (state.dialog) reasons.push('dialog')
     return reasons
   }
@@ -309,8 +307,9 @@
     function renderSentence(event, rootEvent, isRoot) {
       const meta = resolveIcon(event)
       const isSkillRelease = isRoot && (event.kind === 'skill' || event.kind === 'chargeSkill')
+      const identity = isSkillRelease ? resolveIdentity(event) : null
       const predicate = isSkillRelease
-        ? '<span class="action-history-predicate is-skill-release"><span>释放</span><strong>' + escapeHtml(event.label || event.skillId || '技能') + '</strong></span>'
+        ? '<span class="action-history-predicate is-skill-release"><span>释放</span><strong>' + escapeHtml(identity.skillName) + '</strong></span>'
         : '<span class="action-history-predicate" style="--history-accent:' + escapeHtml(meta.color || '#94a3b8') + '"><img src="' + escapeHtml(meta.assetPath || 'images/effect-icons/fallback.svg') + '" alt=""><span>' + escapeHtml(meta.label || KIND_LABELS[event.kind] || '动作') + '</span></span>'
       return '<span class="action-history-sentence' + (isRoot ? ' is-root' : '') + '">'
         + displaySubject(event, rootEvent)
@@ -360,16 +359,11 @@
     }
 
     function overlayState() {
-      const pieceMenu = doc && doc.getElementById ? doc.getElementById('pieceContextMenu') : null
-      const sameSidePopover = !!(pieceMenu && pieceMenu.classList && pieceMenu.classList.contains('is-open') && pieceMenu.dataset.side === 'right')
-      const status = doc && doc.getElementById ? doc.getElementById('selectedStatusOverlay') : null
       const dialogIds = [
         'pieceInfoModal', 'cardDetailModal', 'optionPickerOverlay', 'trainingSetupOverlay',
-        'resEditorSheet', 'surrenderConfirmOverlay', 'resultOverlay', 'logOverlay', 'tileStatusPanel',
+        'resEditorSheet', 'surrenderConfirmOverlay', 'resultOverlay', 'logOverlay',
       ]
       return {
-        sameSidePopover: sameSidePopover,
-        statusOverlay: visibleByStyle(win, status),
         dialog: dialogIds.some(function (id) {
           return visibleByStyle(win, doc && doc.getElementById ? doc.getElementById(id) : null)
         }),
@@ -383,8 +377,6 @@
         width: win && win.innerWidth,
         height: win && win.innerHeight,
         interactionMode: model && model.selection && model.selection.mode,
-        sameSidePopover: overlays.sameSidePopover,
-        statusOverlay: overlays.statusOverlay,
         dialog: overlays.dialog,
       })
       const forcedCollapsed = reasons.some(function (reason) {
@@ -473,9 +465,9 @@
       if (!root.MutationObserver || !doc || !doc.getElementById) return
       observer = new root.MutationObserver(syncCollapse)
       ;[
-        'pieceContextMenu', 'selectedStatusOverlay', 'pieceInfoModal', 'cardDetailModal',
+        'pieceInfoModal', 'cardDetailModal',
         'optionPickerOverlay', 'trainingSetupOverlay', 'resEditorSheet', 'surrenderConfirmOverlay',
-        'resultOverlay', 'logOverlay', 'tileStatusPanel',
+        'resultOverlay', 'logOverlay',
       ].forEach(function (id) {
         const element = doc.getElementById(id)
         if (element) observer.observe(element, { attributes: true, attributeFilter: ['class', 'style', 'hidden', 'aria-hidden', 'data-side'] })
