@@ -28,6 +28,8 @@ describe('tile status side panel', () => {
     expect(battleHtml).toContain('width: min(248px, calc(100% - 28px))')
     expect(battleHtml).toContain('left: 14px')
     expect(battleHtml).toContain('right: auto')
+    expect(battleHtml).toContain('top: calc(var(--battle-hud-offset, 56px) + 56px)')
+    expect(battleHtml).toContain('top: calc(var(--battle-hud-offset, 44px) + 60px)')
     expect(battleHtml).toContain('#tileStatusPanel:not(.is-expanded) .ts-details')
     expect(battleHtml).toContain('width: min(232px, calc(100% - 16px))')
     expect(battleHtml).not.toContain('UI 20260517')

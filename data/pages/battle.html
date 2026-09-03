@@ -629,14 +629,14 @@
     /* Compact non-modal tile status panel */
     #tileStatusPanel {
       position: absolute;
-      top: calc(var(--battle-hud-offset, 56px) + 12px);
+      top: calc(var(--battle-hud-offset, 56px) + 56px);
       left: 14px;
       right: auto;
       z-index: 17;
       display: none;
       flex-direction: column;
       width: min(248px, calc(100% - 28px));
-      max-height: min(330px, calc(100% - var(--battle-hud-offset, 56px) - var(--battle-hand-height, 128px) - 28px));
+      max-height: min(330px, calc(100% - var(--battle-hud-offset, 56px) - var(--battle-hand-height, 128px) - 72px));
       overflow: hidden;
       border: 0;
       border-radius: 13px;
@@ -754,11 +754,11 @@
     }
     @media (max-width: 760px), (orientation: landscape) and (max-height: 500px) {
       #tileStatusPanel {
-        top: calc(var(--battle-hud-offset, 44px) + 8px);
+        top: calc(var(--battle-hud-offset, 44px) + 60px);
         left: 8px;
         right: auto;
         width: min(232px, calc(100% - 16px));
-        max-height: min(52vh, calc(100% - var(--battle-hud-offset, 44px) - var(--battle-hand-height, 112px) - 18px));
+        max-height: min(52vh, calc(100% - var(--battle-hud-offset, 44px) - var(--battle-hand-height, 112px) - 70px));
       }
     }
 

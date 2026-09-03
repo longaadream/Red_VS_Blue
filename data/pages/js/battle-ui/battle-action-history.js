@@ -205,6 +205,7 @@
     let highlightTimer = null
     let observer = null
     let userExpanded = false
+    const missingEffectDisplayMetadata = new Set()
 
     function resolveIcon(event) {
       if (event && event.statusType && icons && typeof icons.resolveStatusType === 'function') {
@@ -297,7 +298,23 @@
       if (complement.kind === 'option') return '<span class="action-history-complement">“' + escapeHtml(complement.label) + '”</span>'
       if (complement.kind === 'status' || complement.kind === 'tileEffect') {
         const meta = resolveIcon({ statusType: complement.type, iconId: event.iconId })
-        return '<span class="action-history-complement is-effect"><img src="' + escapeHtml(meta.assetPath) + '" alt="">' + escapeHtml(meta.label || complement.type) + '</span>'
+        const explicitLabel = typeof complement.label === 'string' ? complement.label.trim() : ''
+        const registeredLabel = typeof meta.label === 'string' ? meta.label.trim() : ''
+        const displayName = explicitLabel || registeredLabel || (complement.kind === 'tileEffect' ? '未知地格效果' : '未知状态')
+        if (!explicitLabel && !registeredLabel) {
+          const diagnosticKey = String(event.eventId || '') + ':' + String(complement.kind || '') + ':' + String(complement.type || '')
+          if (!missingEffectDisplayMetadata.has(diagnosticKey)) {
+            missingEffectDisplayMetadata.add(diagnosticKey)
+            if (typeof console !== 'undefined' && console.error) {
+              console.error('[battle-action-history] missing effect display metadata', {
+                eventId: String(event.eventId || ''),
+                effectKind: String(complement.kind || ''),
+                effectType: String(complement.type || ''),
+              })
+            }
+          }
+        }
+        return '<span class="action-history-complement is-effect"><img src="' + escapeHtml(meta.assetPath) + '" alt="">' + escapeHtml(displayName) + '</span>'
       }
       if (complement.kind === 'attribute') return '<span class="action-history-complement">' + escapeHtml(complement.attribute) + ' ' + (complement.amount > 0 ? '+' : '') + escapeHtml(complement.amount) + '</span>'
       const badge = resultBadge(event)

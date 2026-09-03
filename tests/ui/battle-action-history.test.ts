@@ -273,20 +273,54 @@ describe('RED-166 icon action history', () => {
     expect(list.innerHTML.match(/data-history-root-id=/g)).toHaveLength(1)
     expect(JSON.stringify(model)).toBe(before)
 
+    const knownSkillRoot = rootEvent(2, {
+      label: '寒冰坚忍',
+      skillId: 'arthas-icebound-fortitude',
+    })
+    const knownEffectChild = {
+      ...knownSkillRoot,
+      eventId: 'action-2:1',
+      parentEventId: 'action-2:0',
+      sequence: 1,
+      kind: 'statusAdded',
+      iconId: 'status-add',
+      complement: { kind: 'status', type: 'calm-shield' },
+    }
     ui.update({
       ...model,
-      presentationEvents: [rootEvent(2, {
-        label: '寒冰坚忍',
-        skillId: 'arthas-icebound-fortitude',
-      })],
+      presentationEvents: [knownSkillRoot, knownEffectChild],
     })
     expect(list.innerHTML).toContain('action-history-root-icon is-portrait')
     expect(list.innerHTML).toContain('src="images/arthas.jpg"')
     expect(list.innerHTML).toContain('class="action-history-skill-label"')
     expect(list.innerHTML).toContain('寒冰坚忍')
-    expect(list.innerHTML).toContain('aria-label="寒冰坚忍，点击高亮来源与目标"')
+    expect(list.innerHTML).toContain('平静护盾')
+    expect(list.innerHTML).not.toContain('calm-shield')
+    expect(list.innerHTML).toContain('aria-label="寒冰坚忍，包含 1 个结果，点击高亮来源与目标"')
     expect(list.innerHTML).not.toContain('使用<br>技能')
     expect(JSON.stringify(model)).toBe(before)
+
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const unknownRoot = rootEvent(3, { kind: 'move', iconId: 'action-move' })
+    ui.update({
+      ...model,
+      presentationEvents: [unknownRoot, {
+        ...unknownRoot,
+        eventId: 'action-3:1',
+        parentEventId: 'action-3:0',
+        sequence: 1,
+        kind: 'statusAdded',
+        iconId: 'status-add',
+        complement: { kind: 'status', type: 'unregistered-secret-effect' },
+      }],
+    })
+    expect(list.innerHTML).toContain('未知状态')
+    expect(list.innerHTML).not.toContain('unregistered-secret-effect')
+    expect(error).toHaveBeenCalledWith(
+      '[battle-action-history] missing effect display metadata',
+      expect.objectContaining({ eventId: 'action-3:1', effectType: 'unregistered-secret-effect' }),
+    )
+    error.mockRestore()
 
     const pointerEvent = { stopPropagation: vi.fn() }
     listeners.get('pointerdown')?.(pointerEvent)
