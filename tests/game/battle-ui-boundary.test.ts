@@ -270,16 +270,10 @@ describe('battle presentation boundary', () => {
   })
 
 
-  it('renders every selected-piece status in a non-blocking overlay and hides it outside inspect mode', () => {
+  it('does not render a persistent selected-piece status sidebar', () => {
     const domUi = loadBrowserModule('js/battle-ui/battle-dom-ui.js', 'BattleDomUI')
-    const overlay = {
-      hidden: true,
-      dataset: {} as Record<string, string>,
-      innerHTML: '',
-      setAttribute: vi.fn(),
-    }
     const document = {
-      getElementById: vi.fn((id: string) => id === 'selectedStatusOverlay' ? overlay : null),
+      getElementById: vi.fn(() => null),
     }
     const ui = domUi.create({ document })
     const model = {
@@ -312,24 +306,7 @@ describe('battle presentation boundary', () => {
 
     ui.update(model)
 
-    expect(document.getElementById).toHaveBeenCalledWith('selectedStatusOverlay')
-    expect(overlay.hidden).toBe(false)
-    expect(overlay.dataset.pieceId).toBe('piece-red')
-    expect(overlay.innerHTML).toContain('Red Warrior')
-    expect(overlay.innerHTML).toContain('冰冻')
-    expect(overlay.innerHTML).toContain('2回合')
-    expect(overlay.innerHTML).toContain('class="selected-status-icon"')
-    expect(overlay.innerHTML).toContain('src="images/tile-effects/blizzard.svg"')
-    expect(overlay.innerHTML).toContain('class="status-icon-badge"')
-    expect(overlay.innerHTML).toContain('>3</b>')
-    expect(overlay.innerHTML).not.toContain('selected-status-dot')
-    expect(overlay.setAttribute).toHaveBeenCalledWith('aria-live', 'polite')
-
-    ui.update({
-      ...model,
-      selection: { ...model.selection, mode: 'move' },
-    })
-    expect(overlay.hidden).toBe(true)
+    expect(document.getElementById).not.toHaveBeenCalledWith('selectedStatusOverlay')
   })
 
   it('sends the identical model to Three.js and DOM and owns repeatable mount/dispose', () => {
