@@ -517,6 +517,7 @@ describe('RED-166 icon action history', () => {
     expect(page).toContain('19 / (visibleCardBacks - 1)')
     expect(page).toContain('class="opponent-hand-count" aria-hidden="true">\' + visibleCardBacks')
     expect(css).toMatch(/\.action-history-dock\s*\{[\s\S]*?width:\s*52px/)
+    expect(css).toMatch(/\.action-history-dock:not\(\.is-user-expanded\) \.action-history-list\s*\{[\s\S]*?grid-template-columns:\s*52px/)
     expect(css).toMatch(/\.action-history-collapsed-button\s*\{[\s\S]*?width:\s*44px;[\s\S]*?height:\s*44px/)
     expect(css).toContain('.action-history-dock.is-user-expanded')
     expect(css).toMatch(/\.action-history-dock\.is-user-expanded\s*\{[\s\S]*?max-height:[^;]+- 72px\)/)

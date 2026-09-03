@@ -297,6 +297,13 @@
   justify-items: end;
 }
 
+/* Keep compact entries anchored to the viewport edge. Skill rows are wider
+   than the 52px rail and must grow leftward instead of expanding the grid
+   track beyond the right side of the window. */
+.action-history-dock:not(.is-user-expanded) .action-history-list {
+  grid-template-columns: 52px;
+}
+
 .action-history-item,
 .action-history-collapsed-button {
   position: relative;

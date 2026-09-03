@@ -124,8 +124,38 @@ Colyseus：
   `/battle-reports` 直接探测返回 200 与空结果。5 秒进程采样时整机负载为 100%，PostgreSQL 约占总 CPU
   0.5%，主要负载来自其他 Chrome/Node 进程；因此本次可见掉帧不能归因于 PostgreSQL。
 - 饱和主机上 `pg_isready` 实测为 0.55–2.42 秒，而当前健康探针超时为 1 秒，所以 authority 日志会出现
-  `degraded` 后又恢复 `healthy` 的假阳性。控制器只有在连续失败且独立确认 PostgreSQL owner 已消失时才
-  判定 authority loss；本轮不放宽该 High Risk 生命周期门禁，后续应单独评估探针预算与诊断降噪。
+  `degraded` 后又恢复 `healthy` 的假阳性。进一步人工验收期间，`postgres.log` 与超时逐项对应地记录了
+  `An existing connection was forcibly closed by the remote host`，并出现一次 Windows error 487 的共享内存
+  分配失败；同一时段本机启动一个 Node 命令也延迟约 40 秒。运行期健康检查现改为读取应用私有 cluster 的
+  `postmaster.pid` 并用 OS 进程存活检查，不再每秒拉起 `pg_isready.exe` 或创建探针连接；启动阶段仍保留
+  `pg_isready`，真实 owner 消失仍在 2 秒 cadence 下失败关闭。
+- 动作简介技能项宽 164px，而未展开 rail 的 CSS Grid 轨道会按内容扩为 164px，从右边界向窗口外延伸，
+  造成只剩灰暗卡片左缘、图标与文案位于视口外。未展开列表现固定为 52px 轨道并保持 item end-aligned，
+  Playwright 在 1584×990 下测得 item `left=1420`、`right=1584`、`width=164`，内容完整向左展开。
+- 首页摘要和战绩弹窗会重复触发同一份 PostgreSQL verified report 全量回放。页面现在按
+  `server origin + playerId` 对成功结果做本页缓存，并合并并发请求；摘要成功后打开弹窗不再重复执行昂贵
+  校验，切换服务器或账号仍会读取独立数据。错误态新增 44px “重试”按钮并保留显式失败，不回退本地战绩。
+  Playwright 行为验证：两次并发加一次后续读取只发出 1 次请求，切换玩家后总请求数变为 2。
+- 简体中文 Windows 首次初始化还稳定复现了 `initdb` 无法为 `Chinese (Simplified)_China.936` 选择文本搜索
+  配置。新建私有 cluster 现固定 `UTF8 + C locale`，并将只用于首次 `initdb` 的预算从 30 秒提高为 90 秒；
+  已有 cluster 不重建、不迁移。真实 PostgreSQL 用例验证 `datctype=C`、loopback/SCRAM、重启持久化和崩溃
+  探测全部通过。
+
+浏览器证据：
+
+- [动作简介右边界](../../output/playwright/red-158-action-history-edge.png)
+- [战绩失败与重试状态](../../output/playwright/red-158-records-error-retry.png)
+
+本轮修复后的自动验证：
+
+| 验证 | 结果 |
+| --- | --- |
+| `tests/electron/embedded-postgres.test.ts` | 6/6 通过；含真实 Windows PostgreSQL 首次初始化、重启持久化和崩溃探测 |
+| `tests/integration/postgres` | 内置 PostgreSQL 集成 1 项通过；外部 URL 1 项按环境跳过 |
+| `tests/colyseus/product-room.test.ts` | 5/5 通过 |
+| 动作历史与首页战绩 UI 回归 | 2 文件、18/18 通过 |
+| `npm.cmd run typecheck` / 关键路径 ESLint | 通过 |
+| `check:windows-cutover` / `check:encoding` / `git diff --check` | 通过 |
 
 ## 两台 Windows 人工验收（阻塞最终产品验收）
 

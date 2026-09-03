@@ -57,4 +57,14 @@ describe('RED-171 game-style main menu layout contract', () => {
       expect(page).toMatch(new RegExp(`function ${handler}\\(`))
     }
   })
+
+  it('reuses one verified PostgreSQL report read across the summary and records sheet', () => {
+    expect(page).toContain('var _recordsLoadInFlight = null')
+    expect(page).toContain('var _recordsCache = null')
+    expect(page).toMatch(/if \(_recordsCache && _recordsCache\.key === cacheKey\) return _recordsCache\.records\.slice\(\)/)
+    expect(page).toMatch(/if \(_recordsLoadInFlight && _recordsLoadInFlight\.key === cacheKey\) return _recordsLoadInFlight\.promise/)
+    expect(page).toMatch(/_recordsCache = \{ key: cacheKey, records \}/)
+    expect(page).toMatch(/if \(_recordsLoadInFlight && _recordsLoadInFlight\.promise === promise\) _recordsLoadInFlight = null/)
+    expect(page).toMatch(/role="alert"[\s\S]*?权威战绩读取失败[\s\S]*?openRecordsSheet\(\)[\s\S]*?重试/)
+  })
 })

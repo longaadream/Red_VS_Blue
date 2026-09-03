@@ -1276,25 +1276,40 @@
     }
 
     // ── PostgreSQL authority battle reports ───────────────────────────────────
+    var _recordsLoadInFlight = null
+    var _recordsCache = null
+
     async function _loadRecords() {
       const identity = window.RvBIdentity && RvBIdentity.getIdentity ? RvBIdentity.getIdentity() : null
       if (!identity || !identity.id || !window.RvBColyseus || typeof RvBColyseus.requestAt !== 'function') return []
       const serverUrl = window.RvBUtils && RvBUtils.getServerUrl ? RvBUtils.getServerUrl() : ''
       if (!serverUrl) return []
-      const payload = await RvBColyseus.requestAt(serverUrl, 'battleReports.list', { playerId: identity.id }, 8000)
-      return (payload.reports || []).map(report => {
-        const me = (report.players || []).find(player => player.id === identity.id)
-        const opponent = (report.players || []).find(player => player.id !== identity.id)
-        const winner = report.terminalResult && report.terminalResult.winnerPlayerId
-        return {
-          battleId: report.battleId,
-          timestamp: Date.parse(report.committedAt),
-          result: winner ? (winner === identity.id ? 'win' : 'loss') : 'draw',
-          myFaction: me && me.seat,
-          opponentName: (opponent && opponent.name) || '对手',
-          transitionHash: report.transitionHash,
-        }
-      })
+      const cacheKey = serverUrl.replace(/\/+$/, '') + '|' + String(identity.id).toLowerCase()
+      if (_recordsCache && _recordsCache.key === cacheKey) return _recordsCache.records.slice()
+      if (_recordsLoadInFlight && _recordsLoadInFlight.key === cacheKey) return _recordsLoadInFlight.promise
+
+      const promise = RvBColyseus.requestAt(serverUrl, 'battleReports.list', { playerId: identity.id }, 8000)
+        .then(payload => (payload.reports || []).map(report => {
+          const me = (report.players || []).find(player => player.id === identity.id)
+          const opponent = (report.players || []).find(player => player.id !== identity.id)
+          const winner = report.terminalResult && report.terminalResult.winnerPlayerId
+          return {
+            battleId: report.battleId,
+            timestamp: Date.parse(report.committedAt),
+            result: winner ? (winner === identity.id ? 'win' : 'loss') : 'draw',
+            myFaction: me && me.seat,
+            opponentName: (opponent && opponent.name) || '对手',
+            transitionHash: report.transitionHash,
+          }
+        }))
+      _recordsLoadInFlight = { key: cacheKey, promise }
+      try {
+        const records = await promise
+        _recordsCache = { key: cacheKey, records }
+        return records.slice()
+      } finally {
+        if (_recordsLoadInFlight && _recordsLoadInFlight.promise === promise) _recordsLoadInFlight = null
+      }
     }
 
     function _calcAuthorityElo(records) {
@@ -1342,7 +1357,8 @@
       try {
         records = (await _loadRecords()).slice().sort((a, b) => b.timestamp - a.timestamp)
       } catch (error) {
-        list.innerHTML = '<div style="color:#ef4444;text-align:center;padding:20px">权威战绩读取失败</div>'
+        console.warn('[battle-reports] sheet load unavailable', error)
+        list.innerHTML = '<div role="alert" style="color:#ef4444;text-align:center;padding:20px">权威战绩读取失败<br><button type="button" onclick="openRecordsSheet()" style="min-height:44px;margin-top:12px;padding:10px 16px;border:1px solid #7f1d1d;border-radius:8px;background:#450a0a;color:#fecaca;cursor:pointer">重试</button></div>'
         return
       }
       const elo = _calcAuthorityElo(records)

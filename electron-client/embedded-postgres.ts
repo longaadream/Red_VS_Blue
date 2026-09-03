@@ -6,6 +6,8 @@ import { createHash, randomBytes } from 'crypto'
 const POSTGRES_USER = 'rvb'
 const POSTGRES_DATABASE = 'rvb_colyseus'
 const STARTUP_TIMEOUT_MS = 30_000
+const INITIALIZATION_TIMEOUT_MS = 90_000
+const HEALTH_PROBE_INTERVAL_MS = 2_000
 const POSTGRES_VERSION = '16.15-2'
 const POSTGRES_SOURCE_URL = 'https://get.enterprisedb.com/postgresql/postgresql-16.15-2-windows-x64-binaries.zip'
 const POSTGRES_ARCHIVE_SHA256 = '840b9d265f6ab6c0a971c1d8e9096de564950d38dc2a5ccd98c8820179ecf115'
@@ -355,9 +357,13 @@ export class EmbeddedPostgresController {
         '--username', POSTGRES_USER,
         '--pwfile', passwordFile,
         '--encoding', 'UTF8',
+        // Windows legacy code-page locales (for example zh-CN CP936) do not
+        // always map to a PostgreSQL text search configuration. Keep the
+        // private cluster deterministic and UTF-8 on every Windows locale.
+        '--no-locale',
         '--auth-host', 'scram-sha-256',
         '--auth-local', 'scram-sha-256',
-      ], this.commandEnv())
+      ], this.commandEnv(), INITIALIZATION_TIMEOUT_MS)
     } catch (error) {
       initializationError = error
     } finally {
@@ -454,13 +460,17 @@ export class EmbeddedPostgresController {
   private startHealthMonitor(): void {
     this.healthMonitor?.stop()
     this.healthMonitor = new EmbeddedPostgresHealthMonitor({
-      intervalMs: 1_000,
-      failureThreshold: 3,
+      // Runtime pg_isready subprocesses produced false failures on a busy
+      // Windows host and killed probe connections mid-handshake. Startup still
+      // performs a real readiness check; runtime ownership can be monitored
+      // without spawning a process or opening another database connection.
+      intervalMs: HEALTH_PROBE_INTERVAL_MS,
+      failureThreshold: 1,
       probe: async () => {
         if (this.stopping || !this.connection) return
-        await runCommand(this.executable('pg_isready'), [
-          '-h', '127.0.0.1', '-p', String(this.connection.port), '-q',
-        ], this.commandEnv(), 1_000)
+        if (!await this.queryPostgresProcessRunning()) {
+          throw new Error('Bundled PostgreSQL owner process is not running')
+        }
       },
       confirmProcessRunning: async () => this.queryPostgresProcessRunning(),
       onStateChange: state => this.options.onHealthStateChange?.(state),
@@ -474,25 +484,29 @@ export class EmbeddedPostgresController {
   }
 
   private queryPostgresProcessRunning(): Promise<boolean> {
-    return new Promise((resolve, reject) => {
-      execFile(this.executable('pg_ctl'), ['status', '-D', this.dataDir], {
-        env: this.commandEnv(),
-        windowsHide: true,
-        timeout: 3_000,
-      }, error => {
-        if (!error) {
-          resolve(true)
-          return
-        }
-        // pg_ctl uses a numeric non-zero status when the cluster has no owner.
-        // Spawn errors and timeouts are inconclusive and must fail safe.
-        if (typeof error.code === 'number' && !error.killed) {
-          resolve(false)
-          return
-        }
-        reject(commandError('pg_ctl status', error))
-      })
-    })
+    const pidPath = path.join(this.dataDir, 'postmaster.pid')
+    let pidText: string
+    try {
+      pidText = fs.readFileSync(pidPath, 'utf8').split(/\r?\n/, 1)[0] ?? ''
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return Promise.resolve(false)
+      return Promise.reject(commandError('PostgreSQL owner PID read', error))
+    }
+    const pid = Number.parseInt(pidText.trim(), 10)
+    if (!Number.isSafeInteger(pid) || pid <= 0) {
+      return Promise.reject(new Error('Bundled PostgreSQL owner PID is invalid'))
+    }
+    try {
+      process.kill(pid, 0)
+      return Promise.resolve(true)
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code
+      if (code === 'ESRCH') return Promise.resolve(false)
+      // A protected but existing process still owns the cluster. Treat access
+      // denial as alive and fail safe on any other inconclusive OS error.
+      if (code === 'EPERM') return Promise.resolve(true)
+      return Promise.reject(commandError('PostgreSQL owner process check', error))
+    }
   }
 
   async stop(): Promise<void> {
