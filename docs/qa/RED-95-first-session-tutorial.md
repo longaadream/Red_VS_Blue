@@ -18,8 +18,8 @@
 结果：
 
 - 上述 6 个测试文件共 87 项通过，包含小剧场队列、跳过、完成、重玩、持久化状态读写，以及“先复盘日志、后开放部署”“对方小剧场不被旧队列遮住”和“对方出手后保留观察时间”的回归约束。
-- `npm.cmd run check:encoding` 通过（930 个文本文件）。
-- `npm.cmd run typecheck` 通过。
+- `npm.cmd run check:encoding` 通过（954 个文本文件）。
+- `npm.cmd run typecheck` 在同步最新 `origin/main` 后被主线新增的 `tests/game/sonic-roster.test.ts` 4 个类型错误阻断（`extensions` / `customCards` 可能为空，以及字符串不能赋给 `TileType`）；本任务未修改该文件，教程相关测试仍通过。
 - `npm.cmd run check:main-baseline` 通过；分支基于记录的 `origin/main` SHA，未落后于该基线。
 - `npm.cmd run lint` 未执行到源码检查：仓库 ESLint 配置引用了未安装的 `eslint-plugin-import`。本任务未修改依赖，保留该环境问题供仓库工具链任务处理。
 
