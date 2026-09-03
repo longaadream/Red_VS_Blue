@@ -1,0 +1,51 @@
+# RED-95 第一局新手教程验收记录
+
+## 范围与风险
+
+- 风险：Medium（训练交互流程、固定规则回放、3D renderer 提示）
+- 范围：大厅教程入口、第一局固定场景、DM 对话、动作限制、行动日志联动、Three.js 世界坐标提示与教程文档。
+- 排除：第二局、AI、正式 PVP 权威路径、核心数值与存档格式。
+- 基线：`main` / `de8b697150ade3de90b3c56a952a2d29306bdc44`
+
+## 自动验证
+
+- `tests/tutorial/tutorial-controller.test.ts`：步骤门禁、卡牌/技能匹配、普通战斗裁剪、现有棋子复用、预备部署与 3D cue 解析。
+- `tests/tutorial/tutorial-replay.test.ts`：用种子 188 走完真实规则回放，覆盖防御减伤、幸运币、部署、免费首移、护盾、治疗、击杀充能、充能技能与地形阻挡。
+- `tests/ui/battle-renderer-3d-runtime.test.ts`：验证教程光圈、光柱与路线属于 Three.js scene，并在清理/销毁时释放。
+- `tests/game/battle-page-contract.test.ts`：验证页面脚本、教程入口和现有训练/部署合同无回归。
+
+结果：
+
+- 上述 4 个测试文件共 55 项通过。
+- `npm.cmd run check:encoding` 通过（930 个文本文件）。
+- `npm.cmd run typecheck` 通过。
+- `npm.cmd run check:main-baseline` 通过，分支与 `origin/main` 均为基线 SHA，ahead/behind 为 0/0。
+- `npm.cmd run lint` 未执行到源码检查：仓库 ESLint 配置引用了未安装的 `eslint-plugin-import`。本任务未修改依赖，保留该环境问题供仓库工具链任务处理。
+
+## 浏览器验证
+
+在 `battle.html?mode=tutorial` 使用 Chromium 实际操作：
+
+1. 固定开场由死神攻击乌瑟尔，行动日志显示技能、伤害、死神被动治疗和行动点变化。
+2. 点击指定日志可在 3D 棋盘回看来源、目标和路线。
+3. 部署面板只显示现有安度因实例，点击 3D 高亮格后完成权威部署。
+4. 幸运币把行动点从 1 增加到 2。
+5. 安度因从（5, 1）免费移动到（6, 1）后行动点仍为 2，免费首移状态消失。
+6. Renderer 诊断在移动提示阶段报告 `tutorialCueCellCount: 1`、`activeAnimations: ["tutorial-cue:pulse"]`，确认提示位于 3D renderer 生命周期内。
+7. 乌瑟尔自我施放圣光盾后返还 1 AP；安度因治疗将乌瑟尔从 11/15 恢复到 15/15。
+8. 下一次地狱火霰弹枪记录为 `finalDamage: 0`、`blocked: true`，随后祝福之锤击杀死神并获得 1 点充能，赐福再消耗该充能。
+9. 黑百合的致命打击日志明确记录“被地形阻挡”；依次点击地板、掩体、墙和洞穴后抵达教程结束页。
+10. “留在棋盘练练”隐藏对话并写入 `completed`，不离开当前棋盘。
+
+截图：`docs/qa/RED-95-tutorial-first-session.png`。
+
+## 人工复核建议
+
+- 在桌面应用窗口完整完成一次教程，重点感受对话框是否遮挡主要棋盘目标。
+- 用鼠标与触屏各完成一次部署和免费首移。
+- 开启系统“减少动态效果”后确认光圈保持可见但不脉冲。
+- 完成和跳过各一次，确认大厅入口都显示“重新参加新手教程”。
+
+## 回退
+
+移除大厅 `mode=tutorial` 入口和 `battle.html` 教程加载分支即可回到原训练流程；教程数据、控制器、样式和 renderer cue API 均为独立增量，不改变正式战斗协议。

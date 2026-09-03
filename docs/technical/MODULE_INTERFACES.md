@@ -579,3 +579,14 @@ RED-140 是已接受的目标合同，不表示当前运行时已经实现。唯
 - **竞技命名空间**：serverId 是备份保留的本机随机 UUID，seasonId 是其子命名空间；它不提供
   跨服密码学证明。恢复同一 serverId 视为迁移，本机 data-root lock 只阻止同 root 双写；跨主机
   split-brain 不在 v1 保证内，平行副本不受支持，克隆必须显式重置身份。
+
+## RED-95 新手教程接口
+
+- `data/tutorial/first-session.json` 是第一局的声明式内容源，固定世界观、阵容、种子、摆位、教学格与对白；第二局和 AI 不属于该 schema。
+- `RvBTutorialScenario.prepareInitialState()` 从普通训练战斗中保留乌瑟尔、死神、黑百合三个现有场上实例，并将现有安度因实例放入预备区；它不创建教程专用棋子，也不改写规则层数值。
+- `RvBTutorialScenario.openPlayerDeployment()` 只在脚本开场结束后开启一次真实 `progressive-reserve-v1` 部署输入。部署命令继续由规则层验证候选、revision、落点和免费首移状态。
+- `RvBTutorialController` 是无 DOM 的顺序控制器。只有当前步骤匹配的权威动作、指定动作日志或指定地形点击才能推进；非法动作在进入训练权威转换前被拒绝。
+- `RvBTutorialRuntime` 只负责对话 DOM、进度、跳过/完成持久化和对手脚本编排。伤害、治疗、护盾、充能及地形阻挡明细统一复用 RED-166 动作日志。
+- 教程训练动作通过 `runBattleAction(..., { rootSeed: 188 })` 执行；Runner 返回后重新附加本地 `skillsById` 展示缓存，该缓存不参与权威 hash。
+- `BattleRenderer3D.setTutorialCue({ cells, path })` 在 Three.js 场景中创建世界坐标光圈、光柱与路线；`clearTutorialCue()` 清理资源。DOM 不得复制这些棋盘提示。降低动态效果时提示保持静态。
+- 教程状态使用本地键 `rvb_tutorial_first_session_status` 记录 `completed | skipped`，只改变大厅入口文案，不影响正式战斗状态。

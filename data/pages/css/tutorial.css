@@ -1,0 +1,130 @@
+.tutorial-dialog {
+  position: fixed;
+  left: clamp(14px, 2vw, 28px);
+  bottom: clamp(104px, 15vh, 148px);
+  z-index: 72;
+  width: min(440px, calc(100vw - 28px));
+  color: #e5e7eb;
+  border: 1px solid rgba(134, 239, 172, 0.34);
+  border-radius: 18px;
+  background:
+    linear-gradient(135deg, rgba(17, 24, 39, 0.97), rgba(7, 16, 29, 0.94)),
+    rgba(7, 16, 29, 0.95);
+  box-shadow: 0 20px 58px rgba(0, 0, 0, 0.46), 0 0 34px rgba(34, 197, 94, 0.08);
+  padding: 16px 18px 17px;
+  backdrop-filter: blur(16px);
+}
+
+.tutorial-dialog[hidden] { display: none; }
+
+.tutorial-dialog__topline {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+}
+
+.tutorial-dialog__session { color: #86efac; }
+.tutorial-dialog__progress { color: #94a3b8; margin-left: auto; }
+
+.tutorial-dialog__skip {
+  border: 0;
+  background: transparent;
+  color: #64748b;
+  cursor: pointer;
+  padding: 3px 0 3px 7px;
+  font: inherit;
+  letter-spacing: 0;
+}
+
+.tutorial-dialog__skip:hover,
+.tutorial-dialog__skip:focus-visible { color: #cbd5e1; outline: none; }
+
+.tutorial-dialog__scene {
+  color: #f8fafc;
+  font-size: 19px;
+  font-weight: 850;
+  line-height: 1.2;
+  margin-bottom: 7px;
+}
+
+.tutorial-dialog__speaker {
+  display: inline-flex;
+  border-radius: 999px;
+  background: rgba(34, 197, 94, 0.14);
+  color: #bbf7d0;
+  padding: 4px 9px;
+  font-size: 11px;
+  font-weight: 750;
+}
+
+.tutorial-dialog__text {
+  margin: 10px 0 13px;
+  color: #cbd5e1;
+  font-size: 14px;
+  line-height: 1.62;
+}
+
+.tutorial-dialog__objective {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 9px;
+  align-items: baseline;
+  border-left: 2px solid #4ade80;
+  background: rgba(15, 23, 42, 0.72);
+  border-radius: 0 9px 9px 0;
+  padding: 8px 10px;
+  font-size: 12px;
+}
+
+.tutorial-dialog__objective span { color: #64748b; white-space: nowrap; }
+.tutorial-dialog__objective strong { color: #f1f5f9; font-weight: 700; }
+
+.tutorial-dialog__actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 13px; }
+
+.tutorial-dialog__button {
+  min-height: 34px;
+  border: 1px solid #334155;
+  border-radius: 9px;
+  background: #172033;
+  color: #cbd5e1;
+  padding: 7px 12px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.tutorial-dialog__button.is-primary {
+  border-color: #4ade80;
+  background: #15803d;
+  color: #f0fdf4;
+}
+
+.tutorial-dialog__button:hover { filter: brightness(1.08); }
+.tutorial-dialog__button:focus-visible { outline: 2px solid #86efac; outline-offset: 2px; }
+.tutorial-dialog.is-busy { border-color: rgba(250, 204, 21, 0.38); }
+
+body.tutorial-mode #trainingTools,
+body.tutorial-mode #btnSwitchPov,
+body.tutorial-mode #btnResetCD,
+body.tutorial-mode #btnSurrender { display: none !important; }
+
+@media (max-width: 720px) {
+  .tutorial-dialog {
+    left: 10px;
+    bottom: 94px;
+    width: calc(100vw - 20px);
+    border-radius: 14px;
+    padding: 13px 14px 14px;
+  }
+  .tutorial-dialog__scene { font-size: 16px; }
+  .tutorial-dialog__text { font-size: 13px; line-height: 1.5; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tutorial-dialog *, .tutorial-dialog { scroll-behavior: auto !important; transition: none !important; }
+}

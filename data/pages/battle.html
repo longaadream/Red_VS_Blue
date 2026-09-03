@@ -28,6 +28,9 @@
   <script src="js/battle-ui/turn-timer-status.js"></script>
   <script src="js/battle-renderer-3d.js"></script>
   <script src="js/battle-ui/battle-presentation.js"></script>
+  <script src="js/tutorial/tutorial-scenario.js"></script>
+  <script src="js/tutorial/tutorial-controller.js"></script>
+  <script src="js/tutorial/tutorial-runtime.js"></script>
   <style>
     :root {
       --bg: #0f172a; --bg2: #1e293b; --border: #334155;
@@ -1467,6 +1470,7 @@
     }
   </style>
   <link rel="stylesheet" href="css/battle-tactical-table.css" />
+  <link rel="stylesheet" href="css/tutorial.css" />
 </head>
 <body>
 
@@ -1804,11 +1808,13 @@
     let myPlayerId = (params.get('playerId') || '').trim().toLowerCase()
     const myAccountId = (params.get('accountId') || params.get('account') || '').trim().toLowerCase()
     const myPlayerName = params.get('playerName') || '玩家'
-    const TRAINING_MODE = params.get('mode') === 'training'
+    const TUTORIAL_MODE = params.get('mode') === 'tutorial'
+    const TRAINING_MODE = params.get('mode') === 'training' || TUTORIAL_MODE
     const SPECTATE_MODE = params.get('mode') === 'spectate'
     const RED43_QA_MODE = params.get('qa') === 'RED-43'
     const RED167_QA_MODE = params.get('qa') === 'RED-167'
     const DEBUG_BATTLE_LOG = params.get('debugBattleLog') === '1'
+    if (TUTORIAL_MODE) document.body.classList.add('tutorial-mode')
     const debugBattleLogButton = document.getElementById('btnDebugBattleLog')
     if (debugBattleLogButton) debugBattleLogButton.hidden = !DEBUG_BATTLE_LOG
     if (RED43_QA_MODE) document.body.classList.add('red43-qa')
@@ -1849,6 +1855,8 @@
     }
 
     let trainingSetupConfig = null
+    let tutorialDefinition = null
+    let tutorialRuntime = null
     function getTemplateFactionForBattleFaction(faction) {
       return faction === 'red' ? 'evil' : faction === 'blue' ? 'good' : faction
     }
@@ -1993,7 +2001,7 @@
         if (!firstPieces.length || !secondPieces.length) {
           throw new Error('训练棋子资源未加载，请返回后重试')
         }
-        const state = await Engine.createInitialBattleForPlayers(
+        let state = await Engine.createInitialBattleForPlayers(
           ['training-red', 'training-blue'],
           [],
           [
@@ -2007,18 +2015,26 @@
         state.pieces.forEach(function(piece) { piece.isCore = true })
         state.skillsById = Object.assign({}, skillsById || {}, state.skillsById || {})
         state.players = state.players.map(function(player) {
-          return Object.assign({}, player, {
-            faction: player.playerId === firstPlayerId ? firstEngineFaction : secondEngineFaction,
+          const common = { faction: player.playerId === firstPlayerId ? firstEngineFaction : secondEngineFaction }
+          return Object.assign({}, player, TUTORIAL_MODE ? common : Object.assign(common, {
             actionPoints: player.playerId === firstPlayerId ? 10 : 0,
             maxActionPoints: 10,
-          })
+          }))
         })
-        state.turn.currentPlayerId = firstPlayerId
+        if (TUTORIAL_MODE) state = window.RvBTutorialScenario.prepareInitialState(state, tutorialDefinition)
+        else state.turn.currentPlayerId = firstPlayerId
         return state
       }
       if (method === 'PUT') {
         if (!body || !body.action || !body.battleState) throw new Error('Missing action or battleState')
-        const next = Engine.applyBattleAction(Engine.safeCloneBattleState(body.battleState), body.action)
+        const cloned = Engine.safeCloneBattleState(body.battleState)
+        const next = TUTORIAL_MODE && tutorialDefinition
+          ? Engine.runBattleAction(cloned, body.action, { rootSeed: tutorialDefinition.rootSeed }).state
+          : Engine.applyBattleAction(cloned, body.action)
+        // runBattleAction deliberately strips the presentation-only skill cache
+        // from its authoritative result; the browser needs it again for the
+        // next target preview and for rendering skill details.
+        next.skillsById = Object.assign({}, skillsById || {}, next.skillsById || {})
         next.pieces = next.pieces.filter(function(piece, index, self) {
           return index === self.findIndex(function(p) { return p.instanceId === piece.instanceId })
         })
@@ -4021,16 +4037,29 @@
     async function init() {
       if (TRAINING_MODE) {
         document.getElementById('btnSurrender').style.display = 'none'
-        document.getElementById('btnSwitchPov').style.display = ''
-        document.getElementById('btnResetCD').style.display = ''
+        document.getElementById('btnSwitchPov').style.display = TUTORIAL_MODE ? 'none' : ''
+        document.getElementById('btnResetCD').style.display = TUTORIAL_MODE ? 'none' : ''
         const trainingTools = document.getElementById('trainingTools')
-        if (trainingTools) trainingTools.style.display = ''
+        if (trainingTools) trainingTools.style.display = TUTORIAL_MODE ? 'none' : ''
         setTrainingToolsOpen(false)
-        document.getElementById('roomNameLabel').textContent = '训练营'
+        document.getElementById('roomNameLabel').textContent = TUTORIAL_MODE ? 'Red VS Blue · 社团跑团' : '训练营'
         showMsg('加载本地资源...')
         const trainingLoad = await loadLocalData()
         if (!trainingLoad.ok) showMsg('本地资源读取异常：' + (trainingLoad.errors[0] || 'unknown'), 'err')
         refreshPlaceTemplates()
+        if (TUTORIAL_MODE) {
+          const tutorialErrors = []
+          tutorialDefinition = await loadJsonRequired('./data/tutorial/first-session.json', tutorialErrors)
+          window.RvBTutorialScenario.validateDefinition(tutorialDefinition)
+          await initTraining(tutorialDefinition.mapId, {
+            firstPlayerId: tutorialDefinition.opponent.playerId,
+            firstFaction: 'red',
+            secondFaction: 'blue',
+            firstTemplateIds: tutorialDefinition.opponent.roster,
+            secondTemplateIds: tutorialDefinition.player.roster,
+          })
+          return
+        }
         showTrainingSetup()
         return
       }
@@ -4055,8 +4084,118 @@
       await initBattle()
     }
 
+    function tutorialPiece(templateId, state) {
+      return window.RvBTutorialScenario.findBoardPiece(state || G, templateId)
+    }
+
+    async function prepareTutorialTargetAction(action, target) {
+      const Engine = await window.RvBGameEngine.ensure()
+      try {
+        Engine.applyBattleAction(Engine.safeCloneBattleState(G), action)
+      } catch (error) {
+        const preparation = error && error.preparation
+        if (error && error.needsTargetSelection && preparation) {
+          return Object.assign({}, action, target, {
+            selectionId: preparation.selectionId,
+            stateRevision: preparation.stateRevision,
+          })
+        }
+        throw error
+      }
+      return Object.assign({}, action, target)
+    }
+
+    async function commitTutorialScriptAction(rawAction, options) {
+      const Engine = await window.RvBGameEngine.ensure()
+      const action = withClientActionId(rawAction)
+      const oldG = G
+      const newG = await trainingApiFetch('PUT', { action: action, battleState: G })
+      appendTrainingPresentationEvents(Engine, action, oldG, newG)
+      if (_use3d && battlePresentation && !(options && options.quiet)) {
+        battlePresentation.animateAction(
+          Object.assign({}, action, { motionEventKey: 'tutorial:' + action.clientActionId }),
+          createBattlePresentationModel(oldG),
+          createBattlePresentationModel(newG),
+        )
+      }
+      G = newG
+      spawnStateFloaters(oldG, G)
+      flushActionLog(oldG, G)
+      return action
+    }
+
+    async function runTutorialOpening() {
+      await commitTutorialScriptAction({ type: 'beginPhase' }, { quiet: true })
+      const reaper = tutorialPiece('reaper')
+      const uther = tutorialPiece('uther')
+      const shot = await prepareTutorialTargetAction({
+        type: 'useBasicSkill', playerId: tutorialDefinition.opponent.playerId,
+        pieceId: reaper.instanceId, skillId: 'hellfire-shotgun',
+      }, { targetX: uther.x, targetY: uther.y })
+      await commitTutorialScriptAction(shot, { quiet: true })
+      await commitTutorialScriptAction({ type: 'endTurn', playerId: tutorialDefinition.opponent.playerId }, { quiet: true })
+      await commitTutorialScriptAction({ type: 'beginPhase' }, { quiet: true })
+      window.RvBTutorialScenario.openPlayerDeployment(G, tutorialDefinition)
+    }
+
+    function tutorialPause(duration) {
+      return new Promise(function (resolve) { setTimeout(resolve, duration) })
+    }
+
+    async function runTutorialOpponentResponse(kind) {
+      const opponentId = tutorialDefinition.opponent.playerId
+      if (G.turn.phase === 'start') await commitTutorialScriptAction({ type: 'beginPhase' })
+      await tutorialPause(220)
+      if (kind === 'shield-check') {
+        const reaper = tutorialPiece('reaper')
+        const uther = tutorialPiece('uther')
+        const shot = await prepareTutorialTargetAction({
+          type: 'useBasicSkill', playerId: opponentId,
+          pieceId: reaper.instanceId, skillId: 'hellfire-shotgun',
+        }, { targetX: uther.x, targetY: uther.y })
+        await commitTutorialScriptAction(shot)
+      } else {
+        const widow = tutorialPiece('red-blackwidow')
+        const shot = await prepareTutorialTargetAction({
+          type: 'useBasicSkill', playerId: opponentId,
+          pieceId: widow.instanceId, skillId: 'blackwidow-lethal-strike',
+        }, { targetX: 0, targetY: 8 })
+        await commitTutorialScriptAction(shot)
+      }
+      render()
+      await tutorialPause(520)
+      await commitTutorialScriptAction({ type: 'endTurn', playerId: opponentId }, { quiet: true })
+      await commitTutorialScriptAction({ type: 'beginPhase' }, { quiet: true })
+      if (G.turn.phase === 'start') await commitTutorialScriptAction({ type: 'beginPhase' }, { quiet: true })
+      myPlayerId = tutorialDefinition.player.playerId
+      myFaction = getTrainingPlayerFaction(myPlayerId)
+      selectedPieceId = null
+      clearTargetInteraction('tutorial-opponent-finished')
+      refreshTrainingPresentationEvents(window.GameEngine)
+      render()
+    }
+
+    function mountTutorialRuntime() {
+      if (tutorialRuntime) tutorialRuntime.dispose()
+      tutorialRuntime = window.RvBTutorialRuntime.create(tutorialDefinition, {
+        getState: function () { return G },
+        setCue: function (cue) {
+          if (window.BattleRenderer3D && window.BattleRenderer3D.setTutorialCue) {
+            window.BattleRenderer3D.setTutorialCue(cue)
+          }
+        },
+        runOpponentResponse: runTutorialOpponentResponse,
+        setMessage: setStatusMsg,
+        exitTutorial: function () { window.location.href = 'index.html' },
+      })
+      window.__RVB_TUTORIAL__ = {
+        scenarioId: tutorialDefinition.id,
+        snapshot: function () { return tutorialRuntime && tutorialRuntime.snapshot() },
+      }
+    }
+
     async function initTraining(mapId, setupConfig) {
-      showMsg('初始化训练营...')
+      showMsg(TUTORIAL_MODE ? '社长正在摆棋盘...' : '初始化训练营...')
       placingMode = false
       const btnPlace = document.getElementById('btnPlace')
       if (btnPlace) btnPlace.style.background = '#2d1a4e'
@@ -4066,9 +4205,10 @@
         trainingBattlePresentationChains = []
         latestBattlePresentationEvents = []
         G = await trainingApiFetch('POST', Object.assign({ mapId: mapId || undefined }, config))
-        myPlayerId = G.turn.currentPlayerId
+        myPlayerId = TUTORIAL_MODE ? tutorialDefinition.player.playerId : G.turn.currentPlayerId
+        if (TUTORIAL_MODE) await runTutorialOpening()
         // Auto-advance past start phase so training enters action phase immediately
-        if (G.turn && G.turn.phase === 'start') {
+        if (!TUTORIAL_MODE && G.turn && G.turn.phase === 'start') {
           try {
             const Engine = await window.RvBGameEngine.ensure()
             const beforeBegin = G
@@ -4079,7 +4219,7 @@
             console.error('[training] failed to enter action phase', error)
           }
         }
-        myPlayerId = G.turn.currentPlayerId
+        myPlayerId = TUTORIAL_MODE ? tutorialDefinition.player.playerId : G.turn.currentPlayerId
         refreshTrainingPresentationEvents(window.GameEngine)
         myFaction = getTrainingPlayerFaction(myPlayerId)
         selectedPieceId = null
@@ -4089,10 +4229,12 @@
         syncTrainingPlayerOptionLabels()
         refreshPlaceTemplates()
         render()
-        addLog('训练营开始 - ' + trainingPlayerLabel(myPlayerId), 'turn')
+        addLog(TUTORIAL_MODE ? '社团跑团开始 - Red VS Blue' : '训练营开始 - ' + trainingPlayerLabel(myPlayerId), 'turn')
         const btn = document.getElementById('btnSwitchPov')
         if (btn) btn.textContent = '切换视角 ' + trainingPlayerLabel(myPlayerId)
+        if (TUTORIAL_MODE) mountTutorialRuntime()
       } catch (e) {
+        console.error('[training] initialization failed', e)
         showMsg('初始化失败：' + e.message, 'err')
         document.getElementById('loadingMsg').style.color = '#f87171'
       }
@@ -6182,7 +6324,11 @@
         schedulePieceContextMenuPosition()
         return
       }
-      if (intent.type === 'activate-cell') return onCellClick(intent.x, intent.y)
+      if (intent.type === 'activate-cell') {
+        const result = onCellClick(intent.x, intent.y)
+        if (TUTORIAL_MODE && tutorialRuntime) tutorialRuntime.afterIntent(intent)
+        return result
+      }
       if (intent.type === 'inspect-piece') return showPieceInfo(intent.pieceId)
       if (intent.type === 'select-piece') return selectPiece(intent.pieceId)
       if (intent.type === 'clear-selection') return clearPieceSelection()
@@ -6656,6 +6802,17 @@
         G = newG
         spawnStateFloaters(oldG, G)
         flushActionLog(oldG, G)
+        if (
+          TUTORIAL_MODE
+          && action.type === 'deployReservePiece'
+          && G.turn && G.turn.phase === 'start'
+          && (!G.deployment || G.deployment.status === 'complete')
+        ) {
+          const beforeBegin = G
+          const beginAction = withClientActionId({ type: 'beginPhase' })
+          G = await trainingApiFetch('PUT', { action: beginAction, battleState: G })
+          appendTrainingPresentationEvents(Engine, beginAction, beforeBegin, G)
+        }
         if (action.type === 'endTurn') {
           if (G.turn && G.turn.phase === 'end') {
             try {
@@ -6667,7 +6824,7 @@
               console.error('[training] failed to advance the next action phase', error)
             }
           }
-          myPlayerId = G.turn.currentPlayerId
+          myPlayerId = TUTORIAL_MODE ? tutorialDefinition.player.playerId : G.turn.currentPlayerId
           myFaction = getTrainingPlayerFaction(myPlayerId)
           refreshTrainingPresentationEvents(Engine)
           const btn = document.getElementById('btnSwitchPov')
@@ -6689,6 +6846,9 @@
         restoreSelectedPieceMenu({ reopen: action.type === 'move' })
         render(); if (G.terminalResult) handleGameOver()
         if (interactionFeedback) setStatusMsg(interactionFeedback)
+        if (TUTORIAL_MODE && tutorialRuntime) {
+          await tutorialRuntime.afterAcceptedAction(action, oldG)
+        }
       } catch (e) {
         let rejectionFeedback = ''
         if (e.needsTargetSelection) {
@@ -6736,6 +6896,13 @@
     }
 
     async function doAction(action) {
+      if (typeof TUTORIAL_MODE !== 'undefined' && TUTORIAL_MODE && tutorialRuntime) {
+        const tutorialGuard = tutorialRuntime.beforeAction(action, G)
+        if (!tutorialGuard.allowed) {
+          setStatusMsg(tutorialGuard.message)
+          return
+        }
+      }
       if (
         typeof progressiveDeploymentPending === 'function'
         && progressiveDeploymentPending(G)

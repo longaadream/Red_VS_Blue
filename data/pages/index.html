@@ -417,9 +417,14 @@
               <p class="panel-description">离线练习棋子、技能和战斗操作，不影响正式对局。</p>
             </header>
             <div class="action-stack">
-              <button class="action-button action-feature" type="button" onclick="goToTraining()">
-                <span class="action-code" aria-hidden="true">训练</span>
-                <span class="action-copy"><span class="action-title">进入训练营</span><span class="action-description">自由测试阵容与战斗机制</span></span>
+              <button class="action-button action-feature" type="button" onclick="goToTutorial()">
+                <span class="action-code" aria-hidden="true">跑团</span>
+                <span class="action-copy"><span class="action-title">开始新手教程</span><span class="action-description" id="tutorialEntryDescription">社团跑团 · Red VS Blue · 约 8 分钟</span></span>
+                <span class="action-arrow" aria-hidden="true">›</span>
+              </button>
+              <button class="action-button" type="button" onclick="goToTraining()">
+                <span class="action-code" aria-hidden="true">自由</span>
+                <span class="action-copy"><span class="action-title">自由训练</span><span class="action-description">自行选择双方阵容与地图，不带教学步骤</span></span>
                 <span class="action-arrow" aria-hidden="true">›</span>
               </button>
             </div>
@@ -902,7 +907,7 @@
     }
 
     // ── Training ──────────────────────────────────────────────────────────────
-    async function goToTraining() {
+    async function goToLocalPractice(mode) {
       if (window.electronAPI && typeof window.electronAPI.ensureLocalAuthority === 'function') {
         const result = await window.electronAPI.ensureLocalAuthority()
         if (!result?.ok) {
@@ -925,8 +930,11 @@
           return
         }
       }
-      window.location.href = 'battle.html?mode=training'
+      window.location.href = 'battle.html?mode=' + mode
     }
+
+    function goToTraining() { return goToLocalPractice('training') }
+    function goToTutorial() { return goToLocalPractice('tutorial') }
 
     // ── PVE single-player ─────────────────────────────────────────────────────
     async function startPve() {
@@ -1434,6 +1442,17 @@
       }
     }
 
+    function updateTutorialEntry() {
+      const description = document.getElementById('tutorialEntryDescription')
+      if (!description) return
+      try {
+        const saved = JSON.parse(localStorage.getItem('rvb_tutorial_first_session_status') || 'null')
+        if (saved && (saved.status === 'completed' || saved.status === 'skipped')) {
+          description.textContent = '重新参加社团跑团 · Red VS Blue'
+        }
+      } catch {}
+    }
+
     // ── Service Worker ────────────────────────────────────────────────────────
     // 版本标识，方便确认运行的是最新构建
     console.log('[RVB] build=v4-room-ready proto=' + location.protocol)
@@ -1474,6 +1493,7 @@
       }
       refreshUserUI()
       updatePackBadge()
+      updateTutorialEntry()
       // Show connected server in server section if saved
       const saved = getSavedUrl()
       if (saved) {
