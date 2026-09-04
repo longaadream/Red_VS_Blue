@@ -150,20 +150,20 @@
       "scene": 4,
       "sceneTitle": "轮到你翻盘",
       "speaker": "社长 / DM",
-      "text": "祝福之锤已经转好冷却。死神只剩一点体面了，送他下桌；击杀会给你 1 点充能。",
+      "text": "祝福之锤已经转好冷却。死神只剩一点体面了，送他下桌；正式棋子阵亡会在原地留下可争夺的充能结晶。",
       "objective": "用乌瑟尔的“祝福之锤”击杀死神",
       "advance": { "type": "action", "actionType": "useBasicSkill", "skillId": "blessed-hammer", "templateId": "uther", "targetTemplateId": "reaper" },
       "cue": { "templates": ["uther", "reaper"], "connectTemplates": ["uther", "reaper"] }
     },
     {
-      "id": "spend-charge",
+      "id": "collect-charge-crystal",
       "scene": 4,
       "sceneTitle": "轮到你翻盘",
       "speaker": "社长 / DM",
-      "text": "右上紫色的是充能点。赐福同时要行动点和充能，两个都够才能放——社团预算也是这么卡人的。",
-      "objective": "使用乌瑟尔的充能技能“赐福”",
-      "advance": { "type": "action", "actionType": "useChargeSkill", "skillId": "divine-blessing", "templateId": "uther" },
-      "cue": { "templates": ["uther"] }
+      "text": "紫色结晶不会自动进账，而且双方都能抢。让乌瑟尔用普通移动进入死神阵亡的位置，把它变成队伍的 1 点充能。",
+      "objective": "让乌瑟尔普通移动到死神阵亡格，拾取充能结晶",
+      "advance": { "type": "action", "actionType": "move", "templateId": "uther", "to": { "x": 8, "y": 7 } },
+      "cue": { "templates": ["uther"], "cells": [{ "x": 8, "y": 7 }], "path": [{ "x": 6, "y": 7 }, { "x": 8, "y": 7 }] }
     },
     {
       "id": "end-player-turn-two",
@@ -184,6 +184,16 @@
       "objective": "点击“致命打击”，回看被掩体阻挡的射线",
       "advance": { "type": "history-item", "labelIncludes": "致命打击" },
       "cue": { "templates": ["red-blackwidow"], "cells": [{ "x": 4, "y": 8 }], "connectTemplateToCell": ["red-blackwidow", { "x": 4, "y": 8 }] }
+    },
+    {
+      "id": "spend-charge",
+      "scene": 4,
+      "sceneTitle": "轮到你翻盘",
+      "speaker": "社长 / DM",
+      "text": "右上紫色的是刚才拾取的队伍充能。赐福同时要行动点和充能，两个都够才能放——社团预算也是这么卡人的。",
+      "objective": "使用乌瑟尔的充能技能“赐福”",
+      "advance": { "type": "action", "actionType": "useChargeSkill", "skillId": "divine-blessing", "templateId": "uther" },
+      "cue": { "templates": ["uther"] }
     },
     {
       "id": "inspect-floor",

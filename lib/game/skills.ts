@@ -17,6 +17,7 @@ import {
 const getActiveTriggerSystem = () => getRuleExecutionTriggerSystem(globalTriggerSystem)
 import { getDataRoot, getUserDataDir } from '@/lib/app-paths'
 import { manhattanDistance, traceProjectile as traceProjectilePath } from './spatial'
+import { dropChargeCrystal } from './charge-crystals'
 import { DynamicCodeRuntime, dynamicCodeRuntime as globalDynamicCodeRuntime } from './dynamic-code-runtime'
 import {
   EffectChain,
@@ -3267,6 +3268,11 @@ function resolveDeathBatch(
       if (attacker && (typeof sourceId !== 'string' || sourceId.length === 0)) {
         rejection('DeathBatch source must have a stable instanceId')
       }
+      const dropsChargeCrystal = canonical.isCore === true
+        && !(canonical as PieceInstance & { noKillCharge?: boolean }).noKillCharge
+      if (dropsChargeCrystal && (!Number.isSafeInteger(canonical.x) || !Number.isSafeInteger(canonical.y))) {
+        rejection('Finalized formal piece requires a stable death coordinate')
+      }
       return {
         piece: canonical,
         targetId,
@@ -3275,9 +3281,10 @@ function resolveDeathBatch(
         attacker,
         sourceId,
         sourceOwnerPlayerId: attacker?.ownerPlayerId,
-        killerPlayerId: candidate.killerPlayerId,
-        killCreditId: candidate.killerPlayerId ?? attacker?.ownerPlayerId,
         skillId: candidate.skillId,
+        dropsChargeCrystal,
+        deathX: canonical.x,
+        deathY: canonical.y,
       }
     })
     .sort((left, right) => compareEffectTarget(left.piece, right.piece))
@@ -3383,8 +3390,36 @@ function resolveDeathBatch(
     ...battle.pieces.filter(piece => !removedIds.has(piece.instanceId)),
   )
   battle.graveyard ??= []
+  const droppedCrystals: Array<{
+    candidate: typeof frozen[number]
+    crystal: ReturnType<typeof dropChargeCrystal>
+  }> = []
   for (const candidate of finalizable) {
     battle.graveyard.push(candidate.piece)
+  }
+
+  for (const candidate of finalizable) {
+    if (!candidate.dropsChargeCrystal) continue
+    const crystal = dropChargeCrystal(battle, {
+      id: `charge-crystal:${context.batchId}:${candidate.targetId}`,
+      sourcePieceId: candidate.targetId,
+      x: candidate.deathX!,
+      y: candidate.deathY!,
+    })
+    droppedCrystals.push({ candidate, crystal })
+    battle.actions ??= []
+    battle.actions.push({
+      type: 'chargeCrystalDropped',
+      playerId: 'neutral',
+      turn: battle.turn.turnNumber,
+      payload: {
+        message: `${candidate.piece.name || candidate.piece.templateId} 阵亡，在 (${crystal.x}, ${crystal.y}) 留下了充能结晶`,
+        crystalId: crystal.id,
+        sourcePieceId: candidate.targetId,
+        x: crystal.x,
+        y: crystal.y,
+      },
+    })
   }
 
   const assertPostFinalizationIntegrity = (stage: string): void => {
@@ -3449,30 +3484,21 @@ function resolveDeathBatch(
     }
   }
   assertPostFinalizationIntegrity('finalization')
-
-  const chargeEvents: Array<{ attacker?: PieceInstance; playerId: string }> = []
-  for (const candidate of finalizable) {
-    const killCreditId = candidate.killCreditId
-    if (!killCreditId) continue
-    const grantsKillCharge = !(candidate.piece as PieceInstance & { noKillCharge?: boolean }).noKillCharge
-    if (candidate.piece.ownerPlayerId === killCreditId || !grantsKillCharge) continue
-    const player = battle.players.find(entry => entry.playerId === killCreditId)
-    if (!player) continue
-    player.chargePoints += 1
-    chargeEvents.push({ attacker: candidate.attacker, playerId: killCreditId })
-  }
-  for (const charge of chargeEvents) {
+  for (const { candidate, crystal } of droppedCrystals) {
     checkSynchronousTriggers(battle, {
-      type: 'afterChargeGained',
-      piece: charge.attacker,
-      sourcePiece: charge.attacker,
-      amount: 1,
-      playerId: charge.playerId,
+      type: 'afterChargeCrystalDropped',
+      piece: candidate.piece,
+      sourcePiece: candidate.piece,
+      targetPiece: candidate.attacker,
+      skillId: candidate.skillId,
+      targetX: crystal.x,
+      targetY: crystal.y,
       ...legacy,
       ...queues,
     })
-    assertPostFinalizationIntegrity('afterChargeGained')
+    assertPostFinalizationIntegrity('afterChargeCrystalDropped')
   }
+
   return {
     batchId: context.batchId,
     chainId: context.chainId,

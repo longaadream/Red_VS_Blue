@@ -263,7 +263,11 @@ describe('RED-33 deterministic damage pipeline', () => {
     ])
     expect(state.pieces).toEqual([])
     expect(state.graveyard.map((piece: any) => piece.instanceId)).toEqual(['core-blue', 'core-red'])
-    expect(state.players.find((player: any) => player.playerId === 'player-red').chargePoints).toBe(1)
+    expect(state.players.find((player: any) => player.playerId === 'player-red').chargePoints).toBe(0)
+    expect(state.extensions.tileEffects).toEqual([
+      expect.objectContaining({ tileType: 'charge-crystal', sourceId: 'core-blue', x: 0, y: 0 }),
+      expect.objectContaining({ tileType: 'charge-crystal', sourceId: 'core-red', x: 0, y: 0 }),
+    ])
   })
 
   it('produces the same final state hash when batch input order changes', () => {
@@ -285,7 +289,7 @@ describe('RED-33 deterministic damage pipeline', () => {
     expect(reverse.state).toEqual(forward.state)
   })
 
-  it('awards summon kill charge once unless the summon explicitly opts out', () => {
+  it('does not drop charge crystals for non-core summons', () => {
     const attacker = makePiece({ instanceId: 'summon-attacker', ownerPlayerId: 'player-red' }) as any
     const defaultSummon = makePiece({ instanceId: 'summon-default', ownerPlayerId: 'player-blue', currentHp: 1, maxHp: 1 }) as any
     const excludedSummon = makePiece({ instanceId: 'summon-excluded', ownerPlayerId: 'player-blue', currentHp: 1, maxHp: 1 }) as any
@@ -297,7 +301,8 @@ describe('RED-33 deterministic damage pipeline', () => {
     const result = dealDamage(attacker, [excludedSummon, defaultSummon], 1, 'true', state, 'summon-charge')
 
     expect(result.results.map((entry: any) => entry.isKilled)).toEqual([true, true])
-    expect(state.players.find((player: any) => player.playerId === 'player-red').chargePoints).toBe(1)
+    expect(state.players.find((player: any) => player.playerId === 'player-red').chargePoints).toBe(0)
+    expect(state.extensions.tileEffects ?? []).toEqual([])
     expect(state.graveyard.map((piece: any) => piece.instanceId)).toEqual(['summon-default', 'summon-excluded'])
   })
 

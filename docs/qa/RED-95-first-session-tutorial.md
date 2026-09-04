@@ -10,7 +10,7 @@
 ## 自动验证
 
 - `tests/tutorial/tutorial-controller.test.ts`：步骤门禁、卡牌/技能匹配、普通战斗裁剪、现有棋子复用、预备部署与 3D cue 解析。
-- `tests/tutorial/tutorial-replay.test.ts`：用种子 188 走完真实规则回放，覆盖防御减伤、幸运币、部署、免费首移、护盾、治疗、击杀充能、充能技能与地形阻挡。
+- `tests/tutorial/tutorial-replay.test.ts`：用种子 188 走完真实规则回放，覆盖防御减伤、幸运币、部署、免费首移、护盾、治疗、击杀掉落结晶、普通移动拾取、充能技能与地形阻挡。
 - `tests/ui/battle-renderer-3d-runtime.test.ts`：验证教程光圈、光柱与路线属于 Three.js scene，并在清理/销毁时释放。
 - `tests/ui/battle-action-history.test.ts`：验证悬停预览不重建记录节点，随后的真实点击仍可固定 3D 高亮。
 - `tests/game/battle-page-contract.test.ts`：验证页面脚本、教程入口和现有训练/部署合同无回归。
@@ -35,7 +35,7 @@
 5. 安度因从（5, 1）免费移动到（6, 1）后行动点仍为 2，免费首移状态消失。
 6. Renderer 诊断在移动提示阶段报告 `tutorialCueCellCount: 1`、`activeAnimations: ["tutorial-cue:pulse"]`，确认提示位于 3D renderer 生命周期内。
 7. 乌瑟尔自我施放圣光盾后返还 1 AP；安度因治疗将乌瑟尔从 11/15 恢复到 15/15。
-8. 下一次地狱火霰弹枪记录为 `finalDamage: 0`、`blocked: true`，随后祝福之锤击杀死神并获得 1 点充能，赐福再消耗该充能。
+8. 下一次地狱火霰弹枪记录为 `finalDamage: 0`、`blocked: true`，随后祝福之锤击杀死神并在死亡格留下结晶；乌瑟尔普通移动进入该格后队伍获得 1 点充能，并在下一个己方回合用赐福消耗。
    对方回合会先收束之前尚未完成的小剧场，在出手前停顿 650ms，再用共享 RED-167 小剧场播放敌方技能；技能结算后保留 1400ms，再切回玩家回合，确保演出、3D 释放、受击和飘字反馈可以看完。
 9. 黑百合的致命打击日志明确记录“被地形阻挡”；依次点击地板、掩体、墙和洞穴后抵达教程结束页。
 10. “留在棋盘练练”隐藏对话并写入 `completed`，不离开当前棋盘。

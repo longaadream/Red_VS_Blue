@@ -74,6 +74,7 @@ import {
   type SuspendableInteractionPrompt,
 } from './suspendable-action-transaction'
 import { getNormalMoveRejection, manhattanDistance } from "./spatial"
+import { collectChargeCrystalsAt } from './charge-crystals'
 import {
   PROGRESSIVE_DEPLOYMENT_MODE,
   getEmptyWalkableDeploymentPositions,
@@ -2653,6 +2654,42 @@ function applyBattleActionInternal(
           deploymentFirstMoveFree,
         }
       })
+
+      const collectedCrystals = collectChargeCrystalsAt(next, finalToX, finalToY)
+      if (collectedCrystals.length > 0) {
+        playerMeta.chargePoints += collectedCrystals.length
+        next.actions.push({
+          type: 'chargeCrystalPickedUp',
+          playerId: action.playerId,
+          turn: next.turn.turnNumber,
+          payload: {
+            message: `${pieceName} 拾取了 ${collectedCrystals.length} 个充能结晶，队伍获得 ${collectedCrystals.length} CP`,
+            pieceId: piece.instanceId,
+            crystalIds: collectedCrystals.map(crystal => crystal.id),
+            amount: collectedCrystals.length,
+            x: finalToX,
+            y: finalToY,
+          },
+        })
+        const chargeResult = getActiveTriggerSystem().checkTriggers(next, {
+          type: 'afterChargeGained',
+          piece,
+          sourcePiece: piece,
+          amount: collectedCrystals.length,
+          playerId: action.playerId,
+        })
+        assertNoUnhandledInteraction(chargeResult, 'afterChargeGained')
+        if (chargeResult.success) {
+          chargeResult.messages.forEach(message => {
+            next.actions!.push({
+              type: 'triggerEffect',
+              playerId: action.playerId,
+              turn: next.turn.turnNumber,
+              payload: { message },
+            })
+          })
+        }
+      }
 
       // 触发移动后的规则
       const moveResult = getActiveTriggerSystem().checkTriggers(next, {

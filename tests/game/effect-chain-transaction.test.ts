@@ -1246,6 +1246,7 @@ describe('RED-139 authoritative EffectChain transactions', () => {
       dealDamage(source, [finalized, revived], 1, 'true', context.battle, 'death-post-finalization-root');
       return { success: true };
     }`, 1)
+    state.pieces.find(piece => piece.instanceId === 'transaction-target')!.isCore = true
     const revivedPiece = makePiece({
       instanceId: 'transaction-revived',
       ownerPlayerId: 'player-blue',
@@ -1271,7 +1272,7 @@ describe('RED-139 authoritative EffectChain transactions', () => {
     })
     const mutationRule = addRule(
       'death-post-finalization-mutation-' + fixtureKey,
-      'afterChargeGained',
+      'afterChargeCrystalDropped',
       (battle) => {
         attemptedRuntime = getActiveRuleRuntime()
         attemptedScope = battle
@@ -1324,7 +1325,7 @@ describe('RED-139 authoritative EffectChain transactions', () => {
       currentCooldown: 0,
     })
     expect(reviveEvents).toEqual(['transaction-revived'])
-    expect(observedChargePoints).toEqual([1])
+    expect(observedChargePoints).toEqual([0])
     expectRuntimeReset(attemptedRuntime)
     expect(attemptedRuntime?.snapshot().lastRandomAccess).toBeUndefined()
     expect(getActiveEffectChain(attemptedScope!)).toBeUndefined()

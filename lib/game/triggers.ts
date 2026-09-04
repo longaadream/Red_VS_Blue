@@ -142,6 +142,7 @@ export type TriggerType =
   | "afterStatusApplied"    // 状态效果被施加到棋子后
   | "afterStatusRemoved"    // 状态效果从棋子移除后
   | "afterChargeGained"     // 充能点获得后
+  | "afterChargeCrystalDropped" // 正式棋子死亡结晶提交后
   | "afterDamageBlocked"    // 伤害被规则/护盾格挡后（如圣盾）
   | "afterHealBlocked"      // 治疗被规则格挡后
   | "gameStart"             // 战斗开始时（只触发一次，用于初始发牌等效果）
