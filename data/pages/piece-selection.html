@@ -44,6 +44,26 @@
       font-size: 11px; font-weight: 700; color: #475569;
       letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 10px;
     }
+    .deck-builder {
+      width: min(1120px, 100%); margin: 14px auto 0; padding: 12px 14px;
+      display: grid; gap: 9px; background: rgba(30,41,59,.72);
+      border: 1px solid rgba(148,163,184,.18); border-radius: 12px;
+    }
+    .deck-builder-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .deck-builder-title { font-size: 13px; font-weight: 800; margin-right: auto; }
+    .deck-builder select, .deck-builder input {
+      min-height: 36px; border: 1px solid #475569; border-radius: 8px;
+      background: #0f172a; color: #e2e8f0; padding: 7px 9px; font-size: 13px;
+    }
+    .deck-builder select { flex: 1; min-width: 180px; }
+    .deck-builder input { flex: 1; min-width: 150px; }
+    .deck-btn {
+      min-height: 36px; border: 1px solid #475569; border-radius: 8px;
+      background: #1e293b; color: #e2e8f0; padding: 7px 11px; font-weight: 700; cursor: pointer;
+    }
+    .deck-btn.primary { border-color: #3b82f6; color: #bfdbfe; }
+    .deck-btn.danger { border-color: #7f1d1d; color: #fca5a5; }
+    .deck-builder-status { min-height: 16px; color: #94a3b8; font-size: 11px; }
 
     .piece-grid {
       display: grid;
@@ -274,6 +294,22 @@
   </div>
   <div id="alignmentLockNotice" class="alignment-lock-notice">阵营将在大厅准备后锁定</div>
 
+  <section class="deck-builder" aria-label="预设棋组">
+    <div class="deck-builder-row">
+      <div class="deck-builder-title">预设棋组</div>
+      <select id="deckPresetSelect" aria-label="选择预设棋组" onchange="loadSelectedPreset()">
+        <option value="">选择一套预设…</option>
+      </select>
+      <button class="deck-btn danger" type="button" onclick="deleteSelectedPreset()">删除</button>
+    </div>
+    <div class="deck-builder-row">
+      <input id="deckPresetName" maxlength="24" placeholder="棋组名称" aria-label="棋组名称">
+      <button class="deck-btn primary" type="button" onclick="savePreset()">保存当前 8 枚</button>
+      <button class="deck-btn" type="button" onclick="newPreset()">新建</button>
+    </div>
+    <div id="deckPresetStatus" class="deck-builder-status">预设仅保存在本机，选中后可直接载入。</div>
+  </section>
+
   <!-- Piece list -->
   <div class="section">
     <div class="section-label" id="sectionLabel">可用棋子</div>
@@ -371,6 +407,9 @@
     let factionClaimed = false
     let initialFactionClaimFinished = false
     let pieceLoadError = ''
+    const DECK_PRESET_STORAGE_KEY = 'rvb_piece_deck_presets'
+    const DECK_PRESET_SCHEMA_VERSION = 1
+    let editingPresetId = ''
 
     const LOCAL_PIECE_LOAD_TIMEOUT_MS = 2000
     const SERVER_PIECE_LOAD_TIMEOUT_MS = 2500
@@ -723,6 +762,119 @@
         if (!pieceLoadError) pieceLoadError = '棋子资源加载失败：' + errorReason(error)
       }
       renderPieces()
+      renderPresetOptions()
+    }
+
+    function currentAlignmentKey() {
+      return playerAlignment === 'dark' || playerAlignment === 'evil' ? 'evil' : 'good'
+    }
+
+    function readPresetStore() {
+      try {
+        const parsed = JSON.parse(localStorage.getItem(DECK_PRESET_STORAGE_KEY) || 'null')
+        if (!parsed || parsed.version !== DECK_PRESET_SCHEMA_VERSION || !Array.isArray(parsed.presets)) {
+          return { version: DECK_PRESET_SCHEMA_VERSION, presets: [] }
+        }
+        return {
+          version: DECK_PRESET_SCHEMA_VERSION,
+          presets: parsed.presets.filter(function (preset) {
+            return preset && typeof preset.id === 'string' && typeof preset.name === 'string'
+              && (preset.alignment === 'good' || preset.alignment === 'evil')
+              && Array.isArray(preset.pieceIds)
+          })
+        }
+      } catch {
+        return { version: DECK_PRESET_SCHEMA_VERSION, presets: [] }
+      }
+    }
+
+    function writePresetStore(store) {
+      localStorage.setItem(DECK_PRESET_STORAGE_KEY, JSON.stringify({
+        version: DECK_PRESET_SCHEMA_VERSION,
+        presets: store.presets
+      }))
+    }
+
+    function setPresetStatus(message, error) {
+      const node = document.getElementById('deckPresetStatus')
+      if (!node) return
+      node.textContent = message
+      node.style.color = error ? '#f87171' : '#94a3b8'
+    }
+
+    function renderPresetOptions() {
+      const select = document.getElementById('deckPresetSelect')
+      if (!select) return
+      const alignment = currentAlignmentKey()
+      const presets = readPresetStore().presets.filter(function (preset) { return preset.alignment === alignment })
+      select.innerHTML = '<option value="">选择一套预设…</option>' + presets.map(function (preset) {
+        return '<option value="' + escapeHtml(preset.id) + '">' + escapeHtml(preset.name) + '</option>'
+      }).join('')
+      if (editingPresetId && presets.some(function (preset) { return preset.id === editingPresetId })) {
+        select.value = editingPresetId
+      } else {
+        editingPresetId = ''
+      }
+    }
+
+    function loadSelectedPreset() {
+      const select = document.getElementById('deckPresetSelect')
+      const preset = readPresetStore().presets.find(function (entry) { return entry.id === (select && select.value) })
+      if (!preset) { newPreset(); return }
+      const availableIds = new Set(PIECE_TEMPLATES.map(function (piece) { return piece.id }))
+      const validIds = preset.pieceIds.filter(function (id) { return availableIds.has(id) })
+      editingPresetId = preset.id
+      document.getElementById('deckPresetName').value = preset.name
+      selectedIds = new Set(validIds)
+      updateConfirmBar()
+      renderPieces()
+      setPresetStatus(validIds.length === 8
+        ? '已载入「' + preset.name + '」。'
+        : '该预设有棋子已不可用，请补齐到 8 枚后重新保存。', validIds.length !== 8)
+    }
+
+    function newPreset() {
+      editingPresetId = ''
+      const select = document.getElementById('deckPresetSelect')
+      if (select) select.value = ''
+      const name = document.getElementById('deckPresetName')
+      if (name) { name.value = ''; name.focus() }
+      setPresetStatus('新棋组：选择 8 枚同阵营棋子并命名后保存。')
+    }
+
+    function savePreset() {
+      const name = String(document.getElementById('deckPresetName').value || '').trim()
+      const pieceIds = Array.from(selectedIds)
+      if (!name) { setPresetStatus('请先输入棋组名称。', true); return }
+      if (pieceIds.length !== 8 || new Set(pieceIds).size !== 8) {
+        setPresetStatus('预设棋组必须包含 8 枚不重复棋子。', true); return
+      }
+      const available = new Set(PIECE_TEMPLATES.map(function (piece) { return piece.id }))
+      if (!pieceIds.every(function (id) { return available.has(id) })) {
+        setPresetStatus('预设中包含当前阵营不可用的棋子。', true); return
+      }
+      const store = readPresetStore()
+      const id = editingPresetId || ('deck-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 7))
+      const preset = { id: id, name: name.slice(0, 24), alignment: currentAlignmentKey(), pieceIds: pieceIds, updatedAt: Date.now() }
+      const index = store.presets.findIndex(function (entry) { return entry.id === id })
+      if (index === -1) store.presets.push(preset)
+      else store.presets[index] = preset
+      writePresetStore(store)
+      editingPresetId = id
+      renderPresetOptions()
+      setPresetStatus('已保存「' + preset.name + '」。')
+    }
+
+    function deleteSelectedPreset() {
+      if (!editingPresetId) { setPresetStatus('请先选择要删除的预设。', true); return }
+      const store = readPresetStore()
+      const preset = store.presets.find(function (entry) { return entry.id === editingPresetId })
+      if (!preset || !confirm('删除预设「' + preset.name + '」？')) return
+      store.presets = store.presets.filter(function (entry) { return entry.id !== editingPresetId })
+      writePresetStore(store)
+      newPreset()
+      renderPresetOptions()
+      setPresetStatus('预设已删除。')
     }
 
     function factionIcon(f) {
@@ -884,7 +1036,7 @@
               <span class="skill-name">${sk.name || sk.id}${sk._derived ? ' <span style="color:#a855f7;font-size:11px">衍生</span>' : ''}</span>
               <span class="skill-type-badge ${typeCls[sk.type] || ''}">${typeLabel[sk.type] || sk.type || '主动'}</span>
             </div>
-            <div class="skill-meta">行动点：${sk.actionPointCost || 0} | 冷却：${sk.cooldownTurns || 0} 回合${sk.range ? ' | 范围：' + sk.range : ''}${sk._derived && sk._trigger ? ' | 由 ' + sk._trigger + ' 获得' : ''}</div>
+            <div class="skill-meta">行动点：${sk.actionPointCost || 0}${sk.chargeCost ? ' | 充能点：' + sk.chargeCost : ''} | 冷却：${sk.cooldownTurns || 0} 回合${sk.range ? ' | 范围：' + sk.range : ''}${sk._derived && sk._trigger ? ' | 由 ' + sk._trigger + ' 获得' : ''}</div>
             <div class="skill-desc">${sk.description || '暂无描述'}</div>
           </div>`)
           .join('')

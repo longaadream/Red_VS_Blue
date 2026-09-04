@@ -643,7 +643,9 @@ function statusDraft(snapshot: StatusSnapshot, added: boolean, command: Record<s
     kind: added ? 'statusAdded' : 'statusRemoved',
     iconId: added ? 'status-add' : 'status-remove',
     actorPlayerId: text(command.playerId),
-    ...(text(command.pieceId) ? { sourcePieceId: text(command.pieceId) } : {}),
+    ...(snapshot.entityKind === 'piece' && text(command.pieceId)
+      ? { sourcePieceId: text(command.pieceId) }
+      : {}),
     ...target,
     statusId: snapshot.statusId,
     statusType: snapshot.statusType,

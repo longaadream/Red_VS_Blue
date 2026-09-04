@@ -5,5 +5,5 @@
     { "id": "sonic-free-normal-move", "type": "free-normal-move-every-turn", "name": "音速", "stacks": 1, "relatedRules": ["rule-sonic-free-move"] },
     { "id": "sonic-momentum-core", "type": "momentum-core", "name": "动能", "stacks": 0, "visible": true, "skillIds": ["sonic-spin-dash", "sonic-homing-attack"], "relatedRules": ["rule-momentum-gain", "rule-momentum-consume"] }
   ],
-  "skills": [{ "skillId": "sonic-spin-dash", "level": 1 }, { "skillId": "sonic-homing-attack", "level": 1 }, { "skillId": "sonic-super-form", "level": 1 }], "isDefault": false
+  "skills": [{ "skillId": "sonic-free-move-passive", "level": 1 }, { "skillId": "sonic-spin-dash", "level": 1 }, { "skillId": "sonic-homing-attack", "level": 1 }, { "skillId": "sonic-super-form", "level": 1 }], "isDefault": false
 }

@@ -1989,6 +1989,7 @@
     }
     async function trainingApiFetch(method, body) {
       const Engine = await window.RvBGameEngine.ensure()
+      const tutorialActive = typeof TUTORIAL_MODE !== 'undefined' && TUTORIAL_MODE
       if (method === 'POST') {
         const firstPlayerId = body && body.firstPlayerId === 'training-blue' ? 'training-blue' : 'training-red'
         const secondPlayerId = firstPlayerId === 'training-red' ? 'training-blue' : 'training-red'
@@ -2018,19 +2019,19 @@
         state.skillsById = Object.assign({}, skillsById || {}, state.skillsById || {})
         state.players = state.players.map(function(player) {
           const common = { faction: player.playerId === firstPlayerId ? firstEngineFaction : secondEngineFaction }
-          return Object.assign({}, player, TUTORIAL_MODE ? common : Object.assign(common, {
+          return Object.assign({}, player, tutorialActive ? common : Object.assign(common, {
             actionPoints: player.playerId === firstPlayerId ? 10 : 0,
             maxActionPoints: 10,
           }))
         })
-        if (TUTORIAL_MODE) state = window.RvBTutorialScenario.prepareInitialState(state, tutorialDefinition)
+        if (tutorialActive) state = window.RvBTutorialScenario.prepareInitialState(state, tutorialDefinition)
         else state.turn.currentPlayerId = firstPlayerId
         return state
       }
       if (method === 'PUT') {
         if (!body || !body.action || !body.battleState) throw new Error('Missing action or battleState')
         const cloned = Engine.safeCloneBattleState(body.battleState)
-        const next = TUTORIAL_MODE && tutorialDefinition
+        const next = tutorialActive && tutorialDefinition
           ? Engine.runBattleAction(cloned, body.action, { rootSeed: tutorialDefinition.rootSeed }).state
           : Engine.applyBattleAction(cloned, body.action)
         // runBattleAction deliberately strips the presentation-only skill cache
@@ -3576,7 +3577,7 @@
           </div>
           <div class="pi-skill-desc">${escHtml(desc)}</div>
           ${keywords.length ? `<div class="keyword-badges pi-keywords">${keywords.map(name => keywordBadgeHtml(name, 'piece', activePieceKeyword)).join('')}</div>` : ''}
-          ${metaParts.length ? `<div class="pi-skill-meta">${metaParts.join(' 路 ')}</div>` : ''}
+          ${metaParts.length ? `<div class="pi-skill-meta">${metaParts.join(' · ')}</div>` : ''}
         </div>`
       }).join('')
       : '<div style="color:#475569;font-size:12px;padding:8px 0">该棋子没有技能</div>'
@@ -3586,18 +3587,13 @@
       const relatedCardIds = tmplForCards.relatedCards || []
       let relatedCardsHtml = ''
       if (relatedCardIds.length > 0) {
-        relatedCardsHtml = `<div class="pi-section-label" style="margin-top:10px">相关卡牌</div>` +
+        relatedCardsHtml = `<div class="pi-section-label" style="margin-top:10px">相关卡牌</div><div class="pi-related-hand-cards">` +
           relatedCardIds.map(cid => {
             const cd = cardsById[cid] || (G.customCards && G.customCards[cid]) || {}
-            return `<div class="pi-skill" style="border-color:#334155">
-              <div class="pi-skill-header">
-                <span class="pi-skill-icon">${cd.icon || '*'}</span>
-                <span class="pi-skill-name">${escHtml(cd.name || cid)}</span>
-                <span class="pi-skill-badge">${cd.type === 'reactive' ? '触发' : '手牌'}</span>
-              </div>
-              <div class="pi-skill-desc">${escHtml(cd.description || '暂无描述')}</div>
+            return `<div class="card-item pi-related-card-face" aria-label="${escHtml((cd.name || cid) + '，行动点 ' + (cd.actionPointCost ?? 0))}">
+              ${renderHandCardFace({ cardId: cid }, cd)}
             </div>`
-          }).join('')
+          }).join('') + '</div>'
       }
 
       document.getElementById('pieceInfoContent').innerHTML =
@@ -6024,7 +6020,6 @@
 
       container.innerHTML = hand.map((card, index) => {
         const def = getCardDisplayDefinition(card.cardId)
-        const description = cardDisplayDescription(card, def)
         const cardPresentation = card.presentation && typeof card.presentation === 'object' ? card.presentation : {}
         const isContentEnhanced = cardPresentation.variant === 'enhanced'
         const cost = card.actionPointCost ?? def.actionPointCost ?? 0
@@ -6043,21 +6038,6 @@
         if (isReactive) cls += ' card-reactive'
         if (isContentEnhanced) cls += ' card-content-enhanced'
 
-        const gemCls = cost === 0 ? 'free' : ''
-        const icon = escHtml(String(def.name || card.cardId || '牌').slice(0, 1))
-        const typeLabel = def.type === 'reactive' ? '触发' : def.type === 'passive' ? '持续' : '主动'
-        const artSrc = cardArtSource(card.cardId, def.image)
-        const artContent = artSrc
-          ? `<img src="${artSrc}" style="width:100%;height:100%;object-fit:cover;border-radius:8px 8px 0 0" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><span style="display:none;font-size:28px;width:100%;height:100%;align-items:center;justify-content:center">${icon}</span>`
-          : `<span style="font-size:28px">${icon}</span>`
-        const contentBadge = typeof cardPresentation.badge === 'string' && cardPresentation.badge
-          ? '<span class="card-content-badge">' + escHtml(cardPresentation.badge) + '</span>'
-          : ''
-
-        const cdTurnsCard = def.cooldownTurns ?? def.cooldown ?? 0
-        const cdHtml = cdTurnsCard > 0
-          ? `<span style="font-size:8px;color:#475569"> CD${cdTurnsCard}</span>` : ''
-
         const cid = escHtml(card.instanceId)
         const cdid = escHtml(card.cardId)
         const cardName = def.name || card.cardId
@@ -6071,16 +6051,36 @@
           ontouchstart="startCardPressTimer(event,'${cid}','${cdid}')"
           ontouchend="clearPressTimer()" ontouchmove="clearPressTimer()"
           oncontextmenu="event.preventDefault();showCardDetail('${cid}','${cdid}')">
-          <div class="card-mana-gem ${gemCls}">${cost}</div>
-          <div class="card-art">${artContent}${contentBadge}</div>
-          <div class="card-name-banner">${escHtml(def.name || card.cardId)}</div>
-          <div class="card-body">
-            <div class="card-desc">${escHtml(description)}</div>
-            <div class="card-type-badge">${typeLabel}${cdHtml}</div>
-          </div>
+          ${renderHandCardFace(card, def)}
         </button>`
       }).join('')
       renderPendingHandSelectionControls()
+    }
+
+    function renderHandCardFace(card, definition) {
+      const def = definition || {}
+      const cardId = card && card.cardId || def.id || ''
+      const presentation = card && card.presentation && typeof card.presentation === 'object' ? card.presentation : {}
+      const cost = card && card.actionPointCost != null ? card.actionPointCost : (def.actionPointCost ?? 0)
+      const gemCls = cost === 0 ? 'free' : ''
+      const icon = escHtml(String(def.name || cardId || '牌').slice(0, 1))
+      const artSrc = cardArtSource(cardId, def.image)
+      const artContent = artSrc
+        ? `<img src="${artSrc}" style="width:100%;height:100%;object-fit:cover;border-radius:8px 8px 0 0" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><span style="display:none;font-size:28px;width:100%;height:100%;align-items:center;justify-content:center">${icon}</span>`
+        : `<span style="font-size:28px">${icon}</span>`
+      const contentBadge = typeof presentation.badge === 'string' && presentation.badge
+        ? '<span class="card-content-badge">' + escHtml(presentation.badge) + '</span>'
+        : ''
+      const typeLabel = def.type === 'reactive' ? '触发' : def.type === 'passive' ? '持续' : '主动'
+      const cdTurns = def.cooldownTurns ?? def.cooldown ?? 0
+      const cdHtml = cdTurns > 0 ? `<span style="font-size:8px;color:#475569"> CD${cdTurns}</span>` : ''
+      return `<div class="card-mana-gem ${gemCls}">${cost}</div>
+        <div class="card-art">${artContent}${contentBadge}</div>
+        <div class="card-name-banner">${escHtml(def.name || cardId)}</div>
+        <div class="card-body">
+          <div class="card-desc">${escHtml(cardDisplayDescription(card || { cardId: cardId }, def) || '暂无描述')}</div>
+          <div class="card-type-badge">${typeLabel}${cdHtml}</div>
+        </div>`
     }
 
     function onCardClick(cardInstanceId, cardId) {
@@ -6777,6 +6777,9 @@
 
       const draftAction = { type: actionType, playerId: myPlayerId, pieceId: selectedPieceId, skillId: skId }
       closePieceContextMenu()
+      if (TUTORIAL_MODE && skId === 'shield-of-light' && sp.templateId === 'uther') {
+        draftAction.targetPieceId = sp.instanceId
+      }
       const localTargetProbe = window.BattleLegalActions && typeof GameEngine !== 'undefined'
         ? BattleLegalActions.probeSkillTarget({
             snapshot: G,
@@ -6873,6 +6876,7 @@
 
     async function trainingDoAction(action) {
       if (!G) return
+      const tutorialActive = typeof TUTORIAL_MODE !== 'undefined' && TUTORIAL_MODE
       try {
         const Engine = await window.RvBGameEngine.ensure()
         const wasTargetSubmission = !!targetSubmissionPending
@@ -6892,7 +6896,7 @@
         spawnStateFloaters(oldG, G)
         flushActionLog(oldG, G)
         if (
-          TUTORIAL_MODE
+          tutorialActive
           && action.type === 'deployReservePiece'
           && G.turn && G.turn.phase === 'start'
           && (!G.deployment || G.deployment.status === 'complete')
@@ -6913,7 +6917,7 @@
               console.error('[training] failed to advance the next action phase', error)
             }
           }
-          myPlayerId = TUTORIAL_MODE ? tutorialDefinition.player.playerId : G.turn.currentPlayerId
+          myPlayerId = tutorialActive ? tutorialDefinition.player.playerId : G.turn.currentPlayerId
           myFaction = getTrainingPlayerFaction(myPlayerId)
           refreshTrainingPresentationEvents(Engine)
           const btn = document.getElementById('btnSwitchPov')
@@ -6935,7 +6939,7 @@
         restoreSelectedPieceMenu({ reopen: action.type === 'move' })
         render(); if (G.terminalResult) handleGameOver()
         if (interactionFeedback) setStatusMsg(interactionFeedback)
-        if (TUTORIAL_MODE && tutorialRuntime) {
+        if (tutorialActive && tutorialRuntime) {
           await tutorialRuntime.afterAcceptedAction(action, oldG)
         }
       } catch (e) {
@@ -7419,7 +7423,15 @@
       const hasThreeRenderer = !!(window.THREE && window.BattleRenderer3D)
       const renderer = hasThreeRenderer ? window.BattleRenderer3D : {
         init() {}, update() {}, resize() {}, resetView() {}, projectCell() { return null },
-        setHistoryHighlight() {}, screenToCell() { return null }, dispose() {}, animateAction() {}, spawnFloater() {},
+        setHistoryHighlight(cells) {
+          document.querySelectorAll('.cell.history-source, .cell.history-target').forEach(function (cell) {
+            cell.classList.remove('history-source', 'history-target')
+          })
+          ;(cells || []).forEach(function (entry) {
+            const cell = document.querySelector('.cell[data-x="' + entry.x + '"][data-y="' + entry.y + '"]')
+            if (cell) cell.classList.add(entry.role === 'source' ? 'history-source' : 'history-target')
+          })
+        }, screenToCell() { return null }, dispose() {}, animateAction() {}, spawnFloater() {},
       }
       battleDomUi = BattleDomUI.create({ document, onTurnAnnounce: showTurnAnnounce })
       battleActionHistory = BattleActionHistory.create({

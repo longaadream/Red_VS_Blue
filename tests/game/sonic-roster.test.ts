@@ -53,6 +53,15 @@ describe('Sonic roster mechanics', () => {
     expect(superForm).toMatchObject({ actionPointCost: 0, chargeCost: 3, cooldownTurns: 3 })
   })
 
+  it('lists Sonic\'s once-per-turn free normal movement passive', () => {
+    const sonic = JSON.parse(readFileSync(resolve(process.cwd(), 'data/pieces/sonic.json'), 'utf8'))
+    const passive = JSON.parse(readFileSync(resolve(process.cwd(), 'data/skills/sonic-free-move-passive.json'), 'utf8'))
+
+    expect(sonic.skills).toContainEqual(expect.objectContaining({ skillId: passive.id }))
+    expect(passive).toMatchObject({ kind: 'passive', relatedRules: ['rule-sonic-free-move'] })
+    expect(passive.description).toContain('每个己方回合开始时')
+  })
+
   it('uses the requested Chaos Spear range, damage, and movement theft', () => {
     const definition = JSON.parse(readFileSync(resolve(process.cwd(), 'data/skills/shadow-chaos-spear.json'), 'utf8'))
     const shadow = makePiece({
@@ -309,8 +318,8 @@ describe('Sonic roster mechanics', () => {
       selectionId: first.selectionId, stateRevision: first.stateRevision,
     } as any)
 
-    expect(resolved.extensions.scheduledTransfers).toBeUndefined()
-    expect(resolved.extensions.tileEffects).toEqual(expect.arrayContaining([
+    expect(resolved.extensions!.scheduledTransfers).toBeUndefined()
+    expect(resolved.extensions!.tileEffects).toEqual(expect.arrayContaining([
       expect.objectContaining({ type: 'tails-flight-reservation', x: 4, y: 4 }),
       expect.objectContaining({ type: 'tails-flight-reservation', x: 4, y: 5 }),
     ]))
@@ -461,7 +470,7 @@ describe('Sonic roster mechanics', () => {
     expect(resolved.players[0].hand).toEqual(expect.arrayContaining([
       expect.objectContaining({ cardId: 'armor-attack-heal', actionPointCost: 2 }),
     ]))
-    expect(resolved.customCards['armor-attack-heal']).toMatchObject({ type: 'active', actionPointCost: 2 })
+    expect(resolved.customCards!['armor-attack-heal']).toMatchObject({ type: 'active', actionPointCost: 2 })
   })
 
   it.each([
@@ -670,7 +679,7 @@ describe('Sonic roster mechanics', () => {
     const beyond = makePiece({ instanceId: 'beyond', ownerPlayerId: 'player-blue', x: 4, y: 2, currentHp: 20, maxHp: 20 })
     const state = makeState({ pieces: [shadow, beyond], width: 7, height: 5 })
     const blocker = state.map.tiles.find(tile => tile.x === 3 && tile.y === 2)!
-    blocker.props = { ...blocker.props, type: terrainType, walkable: false }
+    blocker.props = { ...blocker.props, type: terrainType as any, walkable: false }
 
     const result = executeSkillFunction(definition, {
       piece: shadow, target: null, targetPosition: { x: 5, y: 2 }, targets: [{ info: null, pos: { x: 5, y: 2 } }],

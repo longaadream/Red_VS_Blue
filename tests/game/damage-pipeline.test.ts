@@ -301,6 +301,19 @@ describe('RED-33 deterministic damage pipeline', () => {
     expect(state.graveyard.map((piece: any) => piece.instanceId)).toEqual(['summon-default', 'summon-excluded'])
   })
 
+  it('awards the credited player charge when a hand card kills a friendly piece', () => {
+    const cardSource = makePiece({ instanceId: 'red-card-source', ownerPlayerId: 'player-red' }) as any
+    const friendly = makePiece({ instanceId: 'red-friendly', ownerPlayerId: 'player-red', currentHp: 1, maxHp: 1 }) as any
+    const excluded = makePiece({ instanceId: 'red-excluded', ownerPlayerId: 'player-red', currentHp: 1, maxHp: 1 }) as any
+    excluded.noKillCharge = true
+    const state = makeState({ pieces: [cardSource, friendly, excluded] }) as any
+
+    dealDamage(cardSource, friendly, 1, 'true', state, 'friendly-fire-card', false, 'player-red')
+    dealDamage(cardSource, excluded, 1, 'true', state, 'friendly-fire-card', false, 'player-red')
+
+    expect(state.players.find((player: any) => player.playerId === 'player-red').chargePoints).toBe(1)
+  })
+
   it('rejects illegal damage input before triggers and preserves the original state', () => {
     const attacker = makePiece({ instanceId: 'invalid-attacker', ownerPlayerId: 'player-red' }) as any
     const target = makePiece({ instanceId: 'invalid-target', ownerPlayerId: 'player-blue' }) as any
