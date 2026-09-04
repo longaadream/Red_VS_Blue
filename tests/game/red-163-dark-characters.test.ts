@@ -217,7 +217,8 @@ describe('RED-163 dark character contract', () => {
       expect(grimmjow.statusTags).toContainEqual(expect.objectContaining({
         type: 'resurreccion', name: '归刃',
       }))
-      expect(state.players[1].chargePoints).toBe(1)
+      expect(state.players[1].chargePoints).toBe(0)
+      expect(state.extensions.tileEffects ?? []).toEqual([])
 
       const second = dealDamage(enemy, grimmjow, 10, 'true', state, 'second-death')
       expect(second.isKilled).toBe(true)

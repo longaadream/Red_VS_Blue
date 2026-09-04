@@ -164,16 +164,14 @@ it('replays the complete three-turn first-session tutorial through authoritative
   const defeatedReaper = state.pieces.find(candidate => candidate.templateId === 'reaper')
     || state.graveyard.find(candidate => candidate.templateId === 'reaper')
   expect(defeatedReaper?.currentHp).toBe(0)
-  expect(state.players.find(player => player.playerId === PLAYER)!.chargePoints).toBe(chargeBeforeKill + 1)
-  const apBeforeBlessing = state.players.find(player => player.playerId === PLAYER)!.actionPoints
-  const chargeBeforeBlessing = state.players.find(player => player.playerId === PLAYER)!.chargePoints
+  expect(state.players.find(player => player.playerId === PLAYER)!.chargePoints).toBe(chargeBeforeKill)
+  expect(state.extensions?.tileEffects).toContainEqual(expect.objectContaining({
+    tileType: 'charge-crystal', x: 8, y: 7,
+  }))
   state = transition(state, {
-    type: 'useChargeSkill', playerId: PLAYER, pieceId: piece(state, 'uther').instanceId,
-    skillId: 'divine-blessing',
+    type: 'move', playerId: PLAYER, pieceId: piece(state, 'uther').instanceId, toX: 8, toY: 7,
   })
-  const playerAfterBlessing = state.players.find(player => player.playerId === PLAYER)!
-  expect(playerAfterBlessing.actionPoints).toBe(apBeforeBlessing - 1)
-  expect(playerAfterBlessing.chargePoints).toBe(chargeBeforeBlessing - 1)
+  expect(state.players.find(player => player.playerId === PLAYER)!.chargePoints).toBe(chargeBeforeKill + 1)
   state = finishTurn(state, PLAYER)
 
   const widow = piece(state, 'red-blackwidow')
@@ -186,4 +184,13 @@ it('replays the complete three-turn first-session tutorial through authoritative
   expect(String(state.actions?.at(-1)?.payload?.message ?? '')).toContain('地形阻挡')
   state = finishTurn(state, OPPONENT)
   expect(state.turn).toMatchObject({ currentPlayerId: PLAYER, turnNumber: 6, phase: 'action' })
+  const apBeforeBlessing = state.players.find(player => player.playerId === PLAYER)!.actionPoints
+  const chargeBeforeBlessing = state.players.find(player => player.playerId === PLAYER)!.chargePoints
+  state = transition(state, {
+    type: 'useChargeSkill', playerId: PLAYER, pieceId: piece(state, 'uther').instanceId,
+    skillId: 'divine-blessing',
+  })
+  const playerAfterBlessing = state.players.find(player => player.playerId === PLAYER)!
+  expect(playerAfterBlessing.actionPoints).toBe(apBeforeBlessing - 1)
+  expect(playerAfterBlessing.chargePoints).toBe(chargeBeforeBlessing - 1)
 }, 60_000)

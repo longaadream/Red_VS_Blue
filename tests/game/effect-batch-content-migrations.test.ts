@@ -176,7 +176,7 @@ describe('RED-139 approved content migrations', () => {
     expect(healSnapshots).toEqual([{
       victimOnBoard: false,
       victimInGraveyard: true,
-      redCharge: 1,
+      redCharge: 0,
       effectBatchKind: 'heal',
     }])
     expect(reaper.currentHp).toBe(7)

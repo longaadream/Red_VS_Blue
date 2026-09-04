@@ -228,7 +228,7 @@ describe('RED-129 authoritative complex skill behavior', () => {
     expect(result.players[0]).toMatchObject({ actionPoints: 0, chargePoints: 0 })
   })
 
-  it('sets Frostmourne kill charge to exactly two after its 200% strike', () => {
+  it('grants exactly one immediate Frostmourne charge and still drops the victim crystal', () => {
     const arthas = namedPiece({
       instanceId: 'arthas',
       templateId: 'arthas',
@@ -246,6 +246,7 @@ describe('RED-129 authoritative complex skill behavior', () => {
       currentHp: 8,
       maxHp: 8,
     }, '敌人')
+    enemy.isCore = true
     const state = makeState({
       pieces: [arthas, enemy],
       currentPlayerId: 'player-red',
@@ -263,7 +264,10 @@ describe('RED-129 authoritative complex skill behavior', () => {
     const result = runBattleAction(state, action, { rootSeed: ROOT_SEED }).state
 
     expect(result.graveyard.some(piece => piece.instanceId === 'enemy')).toBe(true)
-    expect(result.players[0]).toMatchObject({ actionPoints: 0, chargePoints: 2 })
+    expect(result.players[0]).toMatchObject({ actionPoints: 0, chargePoints: 1 })
+    expect(result.extensions?.tileEffects).toContainEqual(expect.objectContaining({
+      tileType: 'charge-crystal', sourceId: 'enemy', x: 2, y: 1,
+    }))
   })
 
   it('lets Kenshin cross the whole map, lands beside the target, deals 200% true damage, and refunds 1 AP on kill', () => {

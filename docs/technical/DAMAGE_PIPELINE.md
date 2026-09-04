@@ -13,7 +13,7 @@
 | 5 | `beforeDamageShield` | 数值护盾吸收 defense 后伤害；`PieceInstance.shield` 是保留的数值兼容字段 |
 | 6 | `beforeDamageApplied` | 使用最终候选伤害判断致命拦截，不重复计算 defense |
 | 7 | HP commit | 同批所有目标先统一扣 HP |
-| 8 | after / DeathBatch | `afterDamage*` 完成后，致命目标进入一个内生 DeathBatch；全部候选先完成 lifecycle，再统一判定复活并提交墓地/充能 |
+| 8 | after / DeathBatch | `afterDamage*` 完成后，致命目标进入一个内生 DeathBatch；全部候选先完成 lifecycle，再统一判定复活并提交墓地/合法充能结晶 |
 | 9 | follow-up | 当前阶段登记的 typed writer 按共享 enqueue sequence FIFO 处理，直至动作级 chain 清空 |
 
 合法的 0 伤害不派发 after-damage。完整抵挡和完全吸收为 `blocked: true`、`damage: 0`，派发一次 `afterDamageBlocked`。
@@ -47,9 +47,11 @@ context.damageQueue.push({
 
 权威 `runBattleAction()` 在失败时回滚 BattleState、RuleRuntime、TriggerSystem 和 EffectChain 快照；低层 detached helper 不声称具备动作级原子性。当前志志雄自燃自伤与所有反射规则使用 `damageQueue`；收割在 `afterDamageDealt` 登记 `healQueue`，等 Damage after 与内生 DeathBatch 完成后再按共享 FIFO 治疗。
 
-## 生命周期与充能
+## 生命周期与可争夺充能结晶
 
-一次 DamageBatch 中，每个起始存活且 HP Commit 后为 0 的目标冻结进入同一个内生 DeathBatch。所有冻结候选在整个 `beforePieceKilled`、`afterPieceKilled`、`onPieceDied` 阶段都保留在 `battle.pieces`；全部 lifecycle 完成后才统一读取 HP。已恢复为正生命者不进墓地、不提供充能，但兼容保留本次 kill/death 事件。其余候选一次性从战场移除、按稳定顺序进入墓地并提交合法充能；`afterChargeGained` 因此观察到未复活死者已经离场。
+一次 DamageBatch 中，每个起始存活且 HP Commit 后为 0 的目标冻结进入同一个内生 DeathBatch。所有冻结候选在整个 `beforePieceKilled`、`afterPieceKilled`、`onPieceDied` 阶段都保留在 `battle.pieces`；全部 lifecycle 完成后才统一读取 HP。已恢复为正生命者不进墓地、不生成结晶，但兼容保留本次 kill/death 事件。其余候选一次性从战场移除并按稳定顺序进入墓地；其中 `isCore=true` 且未声明 `noKillCharge` 的正式棋子在冻结的死亡坐标生成 `charge-crystal` 公共地格效果。DeathBatch 不再授予通用即时 CP，也不派发 `afterChargeGained`。
+
+结晶保存在 `battle.extensions.tileEffects`，进入公开快照、状态 hash、回放、AI v2 `boardEffects` 及 2D/3D 棋盘展示。整批墓地与结晶提交后按稳定顺序派发 `afterChargeCrystalDropped`，每次派发后继续执行 DeathBatch 完整性检查。只有权威普通 `move` 成功提交后才按最终落点收集：同格全部结晶原子移除，移动方队伍每枚获得 1 CP，并以合计数量派发一次 `afterChargeGained`。部署、召唤、站立、传送和强制位移不调用收集阶段。霜之哀伤的立即 +1 CP 是内容脚本特例，不替代正式受害者的结晶。
 
 玩家级 `mangekyoDeathCount` 是【万花筒】动态充能成本的权威累计值：`max(0, baseChargeCost - mangekyoDeathCount)`。强制移除不经过本管线，不派发死亡事件，也不写入墓地。
 
