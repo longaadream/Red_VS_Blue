@@ -301,6 +301,28 @@ describe('RED-33 deterministic damage pipeline', () => {
     expect(state.graveyard.map((piece: any) => piece.instanceId)).toEqual(['summon-default', 'summon-excluded'])
   })
 
+  it('awards the credited player charge when a hand card kills a friendly piece', () => {
+    const cardSource = makePiece({ instanceId: 'red-card-source', ownerPlayerId: 'player-red' }) as any
+    const friendly = makePiece({ instanceId: 'red-friendly', ownerPlayerId: 'player-red', currentHp: 1, maxHp: 1 }) as any
+    const excluded = makePiece({ instanceId: 'red-excluded', ownerPlayerId: 'player-red', currentHp: 1, maxHp: 1 }) as any
+    excluded.noKillCharge = true
+    const state = makeState({ pieces: [cardSource, friendly, excluded] }) as any
+    state.customCards = {
+      'friendly-fire-card': {
+        id: 'friendly-fire-card', name: 'Friendly Fire', description: '', type: 'active', actionPointCost: 0,
+        code: "function executeCard(context) { var source = context.battle.pieces.find(function(piece) { return piece.instanceId === 'red-card-source'; }); var targets = context.battle.pieces.filter(function(piece) { return piece.instanceId === 'red-friendly' || piece.instanceId === 'red-excluded'; }); dealDamage(source, targets, 1, 'true', context.battle, 'friendly-fire-card'); return { success: true, message: 'resolved' }; }",
+      },
+    }
+    state.players[0].hand = [{ cardId: 'friendly-fire-card', instanceId: 'friendly-fire-card-1', ownerPlayerId: 'player-red', actionPointCost: 0 }]
+
+    const resolved = runBattleAction(state, {
+      type: 'playCard', playerId: 'player-red', cardInstanceId: 'friendly-fire-card-1',
+    }, { rootSeed: 183 }).state
+
+    expect(resolved.players.find((player: any) => player.playerId === 'player-red').chargePoints).toBe(1)
+    expect(resolved.graveyard.map((piece: any) => piece.instanceId)).toEqual(['red-excluded', 'red-friendly'])
+  })
+
   it('rejects illegal damage input before triggers and preserves the original state', () => {
     const attacker = makePiece({ instanceId: 'invalid-attacker', ownerPlayerId: 'player-red' }) as any
     const target = makePiece({ instanceId: 'invalid-target', ownerPlayerId: 'player-blue' }) as any

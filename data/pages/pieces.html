@@ -378,7 +378,7 @@
         const chips = []
         if (skillData.actionPointCost) chips.push(`⚡${skillData.actionPointCost} 行动点`)
         if (skillData.cooldownTurns)   chips.push(`⏱${skillData.cooldownTurns} 回合冷却`)
-        if (skillData.chargeCost)      chips.push(`🔋${skillData.chargeCost}/${skillData.maxCharges || skillData.chargeCost} 充能`)
+        if (skillData.chargeCost)      chips.push(`🔋${skillData.chargeCost} 充能`)
         if (chips.length) {
           const chipEl = document.createElement('div')
           chipEl.style.cssText = 'display:flex;flex-wrap:wrap;gap:4px;margin-top:4px'

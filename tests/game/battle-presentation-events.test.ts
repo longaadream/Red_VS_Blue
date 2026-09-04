@@ -142,6 +142,22 @@ describe('RED-165 authoritative battle presentation events', () => {
     )).not.toThrow()
   })
 
+  it('models player status effects with the player as subject instead of the acting piece', () => {
+    const before = stateWithPieces([piece('source', 'player-red', 10)])
+    const after = structuredClone(before)
+    ;(after.players[0] as any).statusTags = [{ id: 'player-rule', type: 'player-rule', name: '玩家规则', visible: true }]
+
+    const events = project(
+      { type: 'useBasicSkill', playerId: 'player-red', pieceId: 'source', skillId: 'skill-basic' },
+      before,
+      after,
+    )
+    const playerStatus = events.find(event => event.kind === 'statusAdded')
+
+    expect(playerStatus).toMatchObject({ targetPlayerIds: ['player-red'] })
+    expect(playerStatus).not.toHaveProperty('sourcePieceId')
+  })
+
   it('groups settled results under the root in stable authority order without reading localized messages', () => {
     const before = stateWithPieces([
       piece('source', 'player-red', 10),

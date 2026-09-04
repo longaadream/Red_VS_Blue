@@ -140,6 +140,20 @@ describe('Liadrin holy-hand engine', () => {
     expect(ally.statusTags.some((tag: any) => tag.type === 'divine-shield')).toBe(true)
   })
 
+  it('discards only the selected card instance when identical holy cards share a name', () => {
+    const liadrin = makePiece({ instanceId: 'liadrin-single-discard', templateId: 'liadrin', ownerPlayerId: 'player-red', x: 0, y: 0 }) as any
+    const enemy = makePiece({ instanceId: 'single-discard-enemy', ownerPlayerId: 'player-blue', x: 2, y: 0, currentHp: 20, maxHp: 20 }) as any
+    const state = makeState({ pieces: [liadrin, enemy] }) as any
+    state.players[0].hand = [
+      { cardId: 'holy-smite', instanceId: 'same-name-a', ownerPlayerId: 'player-red', name: '圣光惩击' },
+      { cardId: 'holy-smite', instanceId: 'same-name-b', ownerPlayerId: 'player-red', name: '圣光惩击' },
+    ]
+
+    expect(executeSkill('muru-lament', state, liadrin.instanceId, { selectedOption: ['same-name-a'] }).success).toBe(true)
+    expect(state.players[0].hand.map((card: any) => card.instanceId)).toEqual(['same-name-b'])
+    expect(state.players[0].discardPile).toEqual(['holy-smite'])
+  })
+
   it('offers a linear authoritative hand multi-select and resolves four cards exactly once', () => {
     const lament = skill('muru-lament')
     const liadrin = makePiece({

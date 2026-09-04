@@ -78,6 +78,7 @@ function createHarness(options: {
   colyseusConnected?: () => boolean
 }) {
   const page = fs.readFileSync(path.join(root, 'data/pages/piece-selection.html'), 'utf8')
+  const deckPresetsScript = fs.readFileSync(path.join(root, 'data/pages/js/deck-presets.js'), 'utf8')
   const inlineScripts = [...page.matchAll(/<script>([\s\S]*?)<\/script>/g)]
   const script = inlineScripts.at(-1)?.[1]
   if (!script) throw new Error('piece-selection inline script not found')
@@ -141,6 +142,7 @@ function createHarness(options: {
     RvBColyseus,
   })
 
+  vm.runInContext(deckPresetsScript, context)
   vm.runInContext(`${script}\n;globalThis.__pieceSelectionContract = {
     confirmSelection,
     getPieces: () => PIECE_TEMPLATES,
