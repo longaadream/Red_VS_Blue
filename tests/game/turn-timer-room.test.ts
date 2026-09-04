@@ -10,7 +10,8 @@ import {
   type DeploymentRoomStore,
   type PublicBattleSnapshot,
 } from '@/lib/game/room-battle-actions'
-import type { Room } from '@/lib/game/room-store'
+import type { Room } from '@/lib/game/room-model'
+import type { BattleAuthorityReceipt } from '@/lib/game/battle-transition'
 import { RuleRuntime } from '@/lib/game/rule-runtime'
 import { loadRuleById } from '@/lib/game/skills'
 import {
@@ -37,6 +38,7 @@ afterAll(() => {
 class MemoryRoomStore implements DeploymentRoomStore {
   room: Room
   writes = 0
+  readonly receipts = new Map<string, BattleAuthorityReceipt>()
 
   constructor(room: Room, private readonly afterCommit?: (writeNumber: number) => void) {
     this.room = clone(room)
@@ -59,18 +61,54 @@ class MemoryRoomStore implements DeploymentRoomStore {
     this.afterCommit?.(this.writes)
     return true
   }
+
+  async getBattleAuthorityReceipt(_roomId: string, clientActionId: string) {
+    return this.receipts.get(clientActionId)
+  }
+
+  async persistBattleAuthorityReceipt(receipt: BattleAuthorityReceipt) {
+    this.receipts.set(receipt.clientActionId, clone(receipt))
+  }
+
+  inspectBattleAuthorityPersistence() {
+    const authorityVersion = this.room.battleAuthorityVersion ?? 0
+    return { status: 'durable' as const, authorityVersion, durableAuthorityVersion: authorityVersion, pending: 0 }
+  }
+
+  async commitBattleAuthorityTransition(
+    input: Parameters<NonNullable<DeploymentRoomStore['commitBattleAuthorityTransition']>>[0],
+  ): Promise<boolean> {
+    if ((this.room.battleAuthorityVersion ?? 0) !== input.expectedVersion) return false
+    this.room = {
+      ...clone(input.nextRoom),
+      battleAuthorityVersion: input.transition.toVersion,
+      battleAuthorityDurableVersion: input.transition.toVersion,
+      battleAuthorityPersistenceStatus: 'durable',
+      battleAuthorityTransitionHash: input.transition.transitionHash,
+    }
+    this.receipts.set(input.transition.clientActionId, clone(input.transition.receipt))
+    this.writes += 1
+    this.afterCommit?.(this.writes)
+    return true
+  }
 }
 
 class ConflictOnceRoomStore extends MemoryRoomStore {
   attempts = 0
 
-  override async setRoomIfVersion(roomId: string, room: Room, expectedVersion: number): Promise<boolean> {
+  override async commitBattleAuthorityTransition(
+    input: Parameters<NonNullable<DeploymentRoomStore['commitBattleAuthorityTransition']>>[0],
+  ): Promise<boolean> {
     this.attempts += 1
     if (this.attempts === 1) {
-      this.room = { ...clone(this.room), version: expectedVersion + 1 }
+      this.room = {
+        ...clone(this.room),
+        battleAuthorityVersion: input.expectedVersion + 1,
+        battleAuthorityTransitionHash: input.transition.previousTransitionHash,
+      }
       return false
     }
-    return super.setRoomIfVersion(roomId, room, expectedVersion)
+    return super.commitBattleAuthorityTransition(input)
   }
 }
 
@@ -232,8 +270,8 @@ describe('RED-36 authoritative room timer integration', () => {
     expect(store.attempts).toBe(2)
     expect(store.writes).toBe(1)
     expect(delivered).toHaveLength(1)
-    expect(delivered[0].authorityVersion).toBe(3)
-    expect(result.snapshot.authorityVersion).toBe(3)
+    expect(delivered[0].authorityVersion).toBe(2)
+    expect(result.snapshot.authorityVersion).toBe(2)
     expect(delivered[0].stateHash).toBe(result.snapshot.stateHash)
   })
 

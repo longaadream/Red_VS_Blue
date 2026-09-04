@@ -7,7 +7,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 const sourceScript = path.resolve('scripts/check-worktree-environment.mjs')
 const temporaryRoots: string[] = []
 
-const dependencyPackages = ['next', '@prisma/client', 'typescript', 'electron']
+const dependencyPackages = ['next', 'typescript', 'electron']
 
 function writeFile(root: string, relative: string, content = 'fixture') {
   const target = path.join(root, relative)
@@ -107,19 +107,26 @@ describe('worktree environment preflight', () => {
     expect(result.stderr).not.toContain('npm.cmd run build')
   })
 
-  it.each(['electron-client', 'electron-server'])(
-    'reports a distinct standalone recovery for %s',
-    (mode) => {
-      const { root } = createFixture({ standalone: false })
+  it('reports the Electron Client standalone recovery', () => {
+    const { root } = createFixture({ standalone: false })
 
-      const result = runPreflight(root, mode)
+    const result = runPreflight(root, 'electron-client')
 
-      expect(result.status).toBe(1)
-      expect(result.stderr).toContain(path.join('.next', 'standalone', 'server.js'))
-      expect(result.stderr).toContain('npm.cmd run build')
-      expect(result.stderr).not.toContain('npm.cmd ci --foreground-scripts')
-    },
-  )
+    expect(result.status).toBe(1)
+    expect(result.stderr).toContain(path.join('.next', 'standalone', 'server.js'))
+    expect(result.stderr).toContain('npm.cmd run build')
+    expect(result.stderr).not.toContain('npm.cmd ci --foreground-scripts')
+  })
+
+  it('rejects the removed Electron Server mode', () => {
+    const { root } = createFixture()
+
+    const result = runPreflight(root, 'electron-server')
+
+    expect(result.status).toBe(1)
+    expect(result.stderr).toContain('Unsupported mode: electron-server')
+    expect(result.stderr).toContain('Expected one of: electron-client, electron-editor')
+  })
 
   it('allows Electron Editor without a Next standalone build', () => {
     const { root } = createFixture({
@@ -146,7 +153,7 @@ describe('worktree environment preflight', () => {
 
   it('runs the preflight before compilation in all Electron development scripts', () => {
     const packageJson = JSON.parse(fs.readFileSync(path.resolve('package.json'), 'utf8'))
-    for (const role of ['client', 'server', 'editor']) {
+    for (const role of ['client', 'editor']) {
       const command = String(packageJson.scripts[`dev:electron:${role}`] || '')
       expect(command).toContain(`npm run preflight:electron:${role}`)
       expect(command.indexOf(`npm run preflight:electron:${role}`)).toBeLessThan(command.indexOf('tsc'))

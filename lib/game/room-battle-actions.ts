@@ -35,7 +35,6 @@ import {
   buildBattleAuthorityTransition,
   checkpointReasonForTransition,
   createBattleAuthorityReceipt,
-  isBattleAuthorityV2Enabled,
   readBattleAuthorityTransitionPublicHashIndex,
   roomBattleAuthorityVersion,
   type BattleAuthorityCheckpointRecord,
@@ -50,7 +49,7 @@ import {
 } from './battle-state-hash'
 import { roomAuthorityQueue, type RoomAuthorityEventContext } from './room-authority-queue'
 import { restoreRoomRuleRuntime, type RoomRuleRuntime } from './room-rule-runtime'
-import type { Room } from './room-store'
+import type { Room } from './room-model'
 import { assertActionPlayer } from './targeting'
 import {
   getCurrentInputOwnerPlayerId,
@@ -524,82 +523,75 @@ export async function dispatchRoomBattleAction(
           roomActionContext(normalizedRoomId, room, storage, action, viewerPlayerId),
         )
       }
-      const metadataVersion = Number(room.version)
       const authorityVersion = roomBattleAuthorityVersion(room)
 
-      const authorityV2 = isBattleAuthorityV2Enabled()
-        && !!requestedClientActionId
-        && !!store.getBattleAuthorityReceipt
-        && !!store.persistBattleAuthorityReceipt
-        && !!store.commitBattleAuthorityTransition
-      if (isBattleAuthorityV2Enabled() && process.env.NODE_ENV !== 'test' && !authorityV2) {
+      if (
+        !requestedClientActionId
+        || !store.getBattleAuthorityReceipt
+        || !store.persistBattleAuthorityReceipt
+        || !store.commitBattleAuthorityTransition
+      ) {
         throw new RoomBattleActionError(
-          'AUTHORITY_V2_STORE_UNAVAILABLE',
-          'Battle authority v2 requires receipt and transition persistence',
+          'AUTHORITY_STORE_UNAVAILABLE',
+          'Battle authority requires a client action ID, receipts, transitions, and durable persistence',
           roomActionContext(normalizedRoomId, room, storage, action, viewerPlayerId),
         )
       }
-      const previousTransitionStorage = authorityV2
-        ? cloneBattleAuthorityJson(storage)
-        : storage
+      const previousTransitionStorage = cloneBattleAuthorityJson(storage)
 
       try {
         assertRoomActionViewer(room, viewerPlayerId, action, options.allowSystem === true)
       } catch (error) {
         const decorated = decorateRoomActionError(error, normalizedRoomId, room, storage, action, viewerPlayerId)
-        if (authorityV2) {
-          const receipt = createBattleAuthorityReceipt({
-            roomId: normalizedRoomId,
-            clientActionId: requestedClientActionId!,
-            status: 'rejected',
-            authorityVersion,
-            code: (decorated as { code?: string }).code ?? 'BATTLE_ACTION_REJECTED',
-            message: decorated.message,
-          })
-          await store.persistBattleAuthorityReceipt!(receipt)
-          Object.assign(decorated, { receipt })
-        }
+        const receipt = createBattleAuthorityReceipt({
+          roomId: normalizedRoomId,
+          clientActionId: requestedClientActionId,
+          status: 'rejected',
+          authorityVersion,
+          code: (decorated as { code?: string }).code ?? 'BATTLE_ACTION_REJECTED',
+          message: decorated.message,
+        })
+        await store.persistBattleAuthorityReceipt(receipt)
+        Object.assign(decorated, { receipt })
         throw decorated
       }
 
-      if (authorityV2) {
-        const existing = await store.getBattleAuthorityReceipt!(normalizedRoomId, requestedClientActionId!)
-        if (existing) {
-          const receipt = createBattleAuthorityReceipt({
-            roomId: normalizedRoomId,
-            clientActionId: requestedClientActionId!,
-            status: 'duplicate',
-            authorityVersion: existing.authorityVersion,
-            code: existing.code,
-            message: existing.message,
-          })
-          return {
-            kind: 'duplicate',
-            snapshot: createPublicBattleSnapshot(room, viewerPlayerId ?? undefined, clock),
-            actionResult: duplicateResult(state),
-            receipt,
-          }
+      const existing = await store.getBattleAuthorityReceipt(normalizedRoomId, requestedClientActionId)
+      if (existing) {
+        const receipt = createBattleAuthorityReceipt({
+          roomId: normalizedRoomId,
+          clientActionId: requestedClientActionId,
+          status: 'duplicate',
+          authorityVersion: existing.authorityVersion,
+          code: existing.code,
+          message: existing.message,
+        })
+        return {
+          kind: 'duplicate',
+          snapshot: createPublicBattleSnapshot(room, viewerPlayerId ?? undefined, clock),
+          actionResult: duplicateResult(state),
+          receipt,
         }
-        assertBattleAuthorityPersistenceAvailable(store, normalizedRoomId)
-        if (
-          options.expectedAuthorityVersion !== undefined
-          && options.expectedAuthorityVersion !== authorityVersion
-        ) {
-          const receipt = createBattleAuthorityReceipt({
-            roomId: normalizedRoomId,
-            clientActionId: requestedClientActionId!,
-            status: 'resyncRequired',
-            authorityVersion,
-            code: 'AUTHORITY_VERSION_MISMATCH',
-            message: `Expected authority version ${options.expectedAuthorityVersion}, current version is ${authorityVersion}`,
-          })
-          await store.persistBattleAuthorityReceipt!(receipt)
-          return {
-            kind: 'resyncRequired',
-            snapshot: createPublicBattleSnapshot(room, viewerPlayerId ?? undefined, clock),
-            actionResult: duplicateResult(state),
-            receipt,
-          }
+      }
+      assertBattleAuthorityPersistenceAvailable(store, normalizedRoomId)
+      if (
+        options.expectedAuthorityVersion !== undefined
+        && options.expectedAuthorityVersion !== authorityVersion
+      ) {
+        const receipt = createBattleAuthorityReceipt({
+          roomId: normalizedRoomId,
+          clientActionId: requestedClientActionId,
+          status: 'resyncRequired',
+          authorityVersion,
+          code: 'AUTHORITY_VERSION_MISMATCH',
+          message: `Expected authority version ${options.expectedAuthorityVersion}, current version is ${authorityVersion}`,
+        })
+        await store.persistBattleAuthorityReceipt(receipt)
+        return {
+          kind: 'resyncRequired',
+          snapshot: createPublicBattleSnapshot(room, viewerPlayerId ?? undefined, clock),
+          actionResult: duplicateResult(state),
+          receipt,
         }
       }
 
@@ -686,18 +678,16 @@ export async function dispatchRoomBattleAction(
         rulesMs += monotonicNow() - rulesStartedAt
       } catch (error) {
         const decorated = decorateRoomActionError(error, normalizedRoomId, room, storage, actionToApply, viewerPlayerId)
-        if (authorityV2) {
-          const receipt = createBattleAuthorityReceipt({
-            roomId: normalizedRoomId,
-            clientActionId: requestedClientActionId!,
-            status: 'rejected',
-            authorityVersion,
-            code: (decorated as { code?: string }).code ?? 'BATTLE_ACTION_REJECTED',
-            message: decorated.message,
-          })
-          await store.persistBattleAuthorityReceipt!(receipt)
-          Object.assign(decorated, { receipt })
-        }
+        const receipt = createBattleAuthorityReceipt({
+          roomId: normalizedRoomId,
+          clientActionId: requestedClientActionId,
+          status: 'rejected',
+          authorityVersion,
+          code: (decorated as { code?: string }).code ?? 'BATTLE_ACTION_REJECTED',
+          message: decorated.message,
+        })
+        await store.persistBattleAuthorityReceipt(receipt)
+        Object.assign(decorated, { receipt })
         throw decorated
       }
 
@@ -756,23 +746,21 @@ export async function dispatchRoomBattleAction(
           rulesMs += monotonicNow() - syncRulesStartedAt
         } catch (error) {
           const decorated = decorateRoomActionError(error, normalizedRoomId, room, storage, syncAction, viewerPlayerId)
-          if (authorityV2) {
-            const receipt = createBattleAuthorityReceipt({
-              roomId: normalizedRoomId,
-              clientActionId: requestedClientActionId!,
-              status: 'rejected',
-              authorityVersion,
-              code: (decorated as { code?: string }).code ?? 'BATTLE_ACTION_REJECTED',
-              message: decorated.message,
-            })
-            await store.persistBattleAuthorityReceipt!(receipt)
-            Object.assign(decorated, { receipt })
-          }
+          const receipt = createBattleAuthorityReceipt({
+            roomId: normalizedRoomId,
+            clientActionId: requestedClientActionId,
+            status: 'rejected',
+            authorityVersion,
+            code: (decorated as { code?: string }).code ?? 'BATTLE_ACTION_REJECTED',
+            message: decorated.message,
+          })
+          await store.persistBattleAuthorityReceipt(receipt)
+          Object.assign(decorated, { receipt })
           throw decorated
         }
       }
 
-      const nextAuthorityVersion = authorityV2 ? authorityVersion + 1 : metadataVersion + 1
+      const nextAuthorityVersion = authorityVersion + 1
       stampPendingDeploymentAuthorityVersion(actionResult.state, nextAuthorityVersion)
       const previousAuthorityState = state
       const commands = syncAction ? [actionToApply, syncAction] : [actionToApply]
@@ -781,12 +769,10 @@ export async function dispatchRoomBattleAction(
       const replayFrames = [submittedActionResult.replayFrame, syncAction ? actionResult.replayFrame : undefined]
         .filter((frame): frame is NonNullable<typeof frame> => !!frame)
       let nextAuthorityState = actionResult.state
-      if (authorityV2) {
-        nextAuthorityState = cloneBattleAuthorityJson(nextAuthorityState)
-        actionResult = { ...actionResult, state: nextAuthorityState }
-      }
+      nextAuthorityState = cloneBattleAuthorityJson(nextAuthorityState)
+      actionResult = { ...actionResult, state: nextAuthorityState }
       const isTerminal = nextAuthorityState.terminalResult?.status === 'finished'
-      if (authorityV2 && isTerminal && store.readBattleAuthorityHistory) {
+      if (isTerminal && store.readBattleAuthorityHistory) {
         const materializedState = structuredClone(compactBattleTraceForAuthority(nextAuthorityState))
         const existingHistory = await store.readBattleAuthorityHistory(normalizedRoomId)
         const currentHistory = commands.map((command, index) => ({
@@ -801,7 +787,7 @@ export async function dispatchRoomBattleAction(
       }
       const previousPublicState = toTimerSafePublicBattleState(previousAuthorityState)
       const nextPublicState = toTimerSafePublicBattleState(nextAuthorityState)
-      const committedState = authorityV2 && !isTerminal
+      const committedState = !isTerminal
         ? compactBattleTraceForAuthority(nextAuthorityState)
         : nextAuthorityState
       const nextStorage = createServerBattleStateV1(
@@ -812,19 +798,14 @@ export async function dispatchRoomBattleAction(
       const transitionPlayerId = 'playerId' in action
         ? action.playerId
         : viewerPlayerId ?? 'system'
-      const runnerPreStateHash = authorityV2
-        ? submittedActionResult.trace?.preStateHash ?? hashBattleState(state)
-        : undefined
-      const transitionPreStateHash = authorityV2
-        ? Object.hasOwn(state, 'skillsById')
-          ? hashBattleState(state)
-          : runnerPreStateHash!
-        : undefined
-      const transition = authorityV2
-        ? buildBattleAuthorityTransition({
+      const runnerPreStateHash = submittedActionResult.trace?.preStateHash ?? hashBattleState(state)
+      const transitionPreStateHash = Object.hasOwn(state, 'skillsById')
+        ? hashBattleState(state)
+        : runnerPreStateHash
+      const transition = buildBattleAuthorityTransition({
             roomId: normalizedRoomId,
             fromVersion: authorityVersion,
-            clientActionId: requestedClientActionId!,
+            clientActionId: requestedClientActionId,
             playerId: transitionPlayerId,
             command: actionToApply,
             commands,
@@ -845,12 +826,11 @@ export async function dispatchRoomBattleAction(
             ),
             now: receivedAt,
           })
-        : undefined
       const expired = deploymentExpired || pendingExpired || turnExpired
       if (transition && expired) {
         transition.receipt = createBattleAuthorityReceipt({
           roomId: normalizedRoomId,
-          clientActionId: requestedClientActionId!,
+          clientActionId: requestedClientActionId,
           status: 'rejected',
           authorityVersion: nextAuthorityVersion,
           code: pendingExpired ? 'PENDING_RESPONSE_EXPIRED' : turnExpired ? 'TURN_EXPIRED' : 'DEPLOYMENT_EXPIRED',
@@ -930,12 +910,11 @@ export async function dispatchRoomBattleAction(
       const nextRoom: Room = {
         ...room,
         battleState: committedStorage as unknown as Room['battleState'],
-        battleAuthorityTransitionHash: transition?.transitionHash ?? room.battleAuthorityTransitionHash,
+        battleAuthorityTransitionHash: transition.transitionHash,
         ...(isTerminal ? { status: 'finished' as const } : {}),
       }
       const persistenceStartedAt = monotonicNow()
-      const committed = transition
-        ? await store.commitBattleAuthorityTransition!({
+      const committed = await store.commitBattleAuthorityTransition({
             roomId: normalizedRoomId,
             expectedVersion: authorityVersion,
             nextRoom,
@@ -946,10 +925,9 @@ export async function dispatchRoomBattleAction(
             baseCheckpoint,
             checkpoint,
           })
-        : await store.setRoomIfVersion(normalizedRoomId, nextRoom, metadataVersion)
       persistenceMs += monotonicNow() - persistenceStartedAt
       if (!committed) {
-        if (authorityV2) assertBattleAuthorityPersistenceAvailable(store, normalizedRoomId)
+        assertBattleAuthorityPersistenceAvailable(store, normalizedRoomId)
         continue
       }
       retainRuntimeTransaction = true
@@ -969,14 +947,12 @@ export async function dispatchRoomBattleAction(
       const persistence = transition
         ? store.inspectBattleAuthorityPersistence?.(normalizedRoomId)
         : undefined
-      const committedRoom: Room = transition
-        ? {
-            ...nextRoom,
-            battleAuthorityVersion: nextAuthorityVersion,
-            battleAuthorityDurableVersion: persistence?.durableAuthorityVersion,
-            battleAuthorityPersistenceStatus: persistence?.status,
-          }
-        : { ...nextRoom, version: nextAuthorityVersion }
+      const committedRoom: Room = {
+        ...nextRoom,
+        battleAuthorityVersion: nextAuthorityVersion,
+        battleAuthorityDurableVersion: persistence?.durableAuthorityVersion,
+        battleAuthorityPersistenceStatus: persistence?.status,
+      }
       let snapshotRoom = committedRoom
       if (isTerminal && transition) {
         const terminalPersistence = await settleTerminalBattleAuthorityPersistence(
@@ -1012,7 +988,7 @@ export async function dispatchRoomBattleAction(
         actionResult,
         submittedActionResult,
         finalSnapshotAlreadyDelivered: delivered,
-        receipt: transition?.receipt,
+        receipt: transition.receipt,
         transition,
         previousAuthorityState,
         nextAuthorityState,

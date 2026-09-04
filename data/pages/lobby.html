@@ -7,7 +7,7 @@
   <script src="js/pack-fetch.js"></script>
   <script src="js/server-utils.js"></script>
   <script src="js/colyseus-sdk.js"></script>
-  <script src="js/ws-client.js"></script>
+  <script src="js/colyseus-client.js"></script>
   <script src="js/crypto-lib.js"></script>
   <script src="js/identity.js"></script>
   <style>
@@ -309,11 +309,6 @@
     // RvBIdentity loaded from js/identity.js
 
     let pollTimer = null
-    const _lp = new URLSearchParams(window.location.search)
-    function shouldUseRelayMode() {
-      if (_lp.get('relay') === '1' || _lp.get('server') === 'remote') return true
-      return !!(window.RvBUtils && RvBUtils.getActiveServerMode && RvBUtils.getActiveServerMode() === 'remote')
-    }
 
     function goBack() { window.location.href = 'index.html' }
 
@@ -389,39 +384,39 @@
       document.getElementById('userDot').style.background = '#22c55e'
     }
 
-    let lobbyWsReady = false
+    let lobbyColyseusReady = false
     let lobbyWsConnecting = null
     async function ensureLobbyWs() {
-      if (lobbyWsReady && window.RvBWs && RvBWs.isConnected()) return
+      if (lobbyColyseusReady && window.RvBColyseus && RvBColyseus.isConnected()) return
       if (lobbyWsConnecting) return lobbyWsConnecting
       lobbyWsConnecting = new Promise((resolve, reject) => {
-        if (typeof RvBWs === 'undefined') {
-          reject(new Error('WebSocket 客户端未加载'))
+        if (typeof RvBColyseus === 'undefined') {
+          reject(new Error('Colyseus 客户端未加载'))
           return
         }
         const identity = RvBIdentity.getIdentity()
-        const timer = setTimeout(() => reject(new Error('WebSocket 连接超时')), 5000)
-        RvBWs.on('connect', function() {
-          lobbyWsReady = true
+        const timer = setTimeout(() => reject(new Error('Colyseus 连接超时')), 5000)
+        RvBColyseus.on('connect', function() {
+          lobbyColyseusReady = true
           clearTimeout(timer)
           resolve()
         })
-        RvBWs.on('disconnect', function() { lobbyWsReady = false })
-        RvBWs.on('message', function(msg) {
+        RvBColyseus.on('disconnect', function() { lobbyColyseusReady = false })
+        RvBColyseus.on('message', function(msg) {
           if (msg.type === 'lobbyUpdate' && Array.isArray(msg.rooms)) renderRooms(msg.rooms)
         })
-        RvBWs.connect('__lobby', identity.id || 'lobby-' + Date.now(), shouldUseRelayMode() ? 'relay' : 'lan')
+        RvBColyseus.connect('__lobby', identity.id || 'lobby-' + Date.now())
       }).finally(() => { lobbyWsConnecting = null })
       return lobbyWsConnecting
     }
 
-    async function wsRequest(method, data, timeoutMs) {
+    async function colyseusRequest(method, data, timeoutMs) {
       await ensureLobbyWs()
-      return RvBWs.request(method, data || {}, timeoutMs || 6000)
+      return RvBColyseus.request(method, data || {}, timeoutMs || 6000)
     }
 
     async function lobbyRequest(method, data, timeoutMs) {
-      return wsRequest(method, data, timeoutMs)
+      return colyseusRequest(method, data, timeoutMs)
     }
     const GAME_PROFILE_IDENTITY_SCHEMA = 'rvb-game-profile-identity/v1'
     const BATTLE_RUNNER_REVISION = 'rvb-battle-runner/v1'
@@ -480,7 +475,7 @@
           : ''
         if (!profileIdentity) {
           const catalogIdentity = localRuntimeUrl
-            ? await RvBWs.requestCatalogIdentityAt(localRuntimeUrl, 'local-profile-runtime')
+            ? await RvBColyseus.requestCatalogIdentityAt(localRuntimeUrl, 'local-profile-runtime')
             : await lobbyRequest('catalog.identity')
           profileIdentity = catalogIdentity && catalogIdentity.profileIdentity
         }
@@ -561,14 +556,23 @@
     function renderRooms(rooms) {
       const list = document.getElementById('roomList')
       const { id: playerId } = RvBIdentity.getIdentity()
+      const uniqueRooms = []
+      const roomIds = new Set()
+      for (const room of Array.isArray(rooms) ? rooms : []) {
+        if (!room || !room.id || roomIds.has(room.id)) {
+          if (room && room.id) console.warn('[lobby:rooms] 忽略重复房间目录项', room.id)
+          continue
+        }
+        roomIds.add(room.id)
+        uniqueRooms.push(room)
+      }
 
-      const waiting = rooms.filter(r =>
+      const waiting = uniqueRooms.filter(r =>
         (r.status === 'waiting' || r.status === 'open' || !r.status) &&
         (r.visibility === 'public' || r.visibility == null)
       )
-      const remote = shouldUseRelayMode()
-      const selecting = remote ? rooms.filter(r => r.status === 'selecting') : []
-      const inProgress = rooms.filter(r => r.status === 'in-progress' || r.status === 'playing' || (remote && (r.status === 'battle' || r.status === 'waiting_host')))
+      const selecting = uniqueRooms.filter(r => r.status === 'ready')
+      const inProgress = uniqueRooms.filter(r => r.status === 'in-progress')
 
       let html = ''
 
@@ -675,7 +679,6 @@
           + '&playerId=' + encodeURIComponent(playerId)
           + '&playerName=' + encodeURIComponent(playerName)
           + (faction ? '&alignment=' + encodeURIComponent(faction) : '')
-          + (shouldUseRelayMode() ? '&relay=1' : '')
       } catch (e) { alert('加入房间失败：' + formatProfileError(e)) }
     }
 
@@ -687,7 +690,6 @@
         window.location.href = 'battle.html?roomId=' + encodeURIComponent(roomId)
           + '&playerId=' + encodeURIComponent(spectatorId)
           + '&mode=spectate'
-          + (shouldUseRelayMode() ? '&relay=1' : '')
       } catch (e) { alert('观战失败：' + formatProfileError(e)) }
     }
 
@@ -780,28 +782,40 @@
       return mapsLoadPromise
     }
 
+    let createRoomPromise = null
     async function doCreateRoom() {
+      if (createRoomPromise) return createRoomPromise
       const identity = RvBIdentity.getIdentity()
       const { id: hostId, displayName: playerName } = identity
       const publicKey = typeof RvBIdentity.getPublicKey === 'function'
         ? RvBIdentity.getPublicKey() : (identity.publicKey || '')
       const visibility = document.getElementById('visibilityToggle').checked ? 'public' : 'private'
       const errEl = document.getElementById('createErr')
+      const createBtn = document.getElementById('createRoomBtn')
       errEl.style.display = 'none'
-      try {
-        if (!(await loadMaps())) throw new Error('地图目录尚未就绪')
-        const mapId = document.getElementById('mapSelect').value
-        if (!mapId) throw new Error('请选择地图')
-        await reconcileLobbyServerMode()
-        const profileIdentity = await getLocalGameProfileIdentity()
-        const room = await lobbyRequest('rooms.create', { name: playerName + ' 的 1v1 房间', hostId, hostName: playerName, publicKey, mapId, visibility, profileIdentity })
-        if (room.id) { closeCreateSheet(); showFactionPicker(room.id, 'join') }
-        else throw new Error('未返回房间 ID')
-      } catch (e) {
-        const serverUrl = (window.RvBUtils && RvBUtils.getServerUrl && RvBUtils.getServerUrl()) || '未设置'
-        errEl.textContent = '创建失败：' + formatProfileError(e) + '（服务器：' + serverUrl + '）'
-        errEl.style.display = 'block'
-      }
+      createBtn.disabled = true
+      createBtn.textContent = '正在创建…'
+      createRoomPromise = (async () => {
+        try {
+          if (!(await loadMaps())) throw new Error('地图目录尚未就绪')
+          const mapId = document.getElementById('mapSelect').value
+          if (!mapId) throw new Error('请选择地图')
+          await reconcileLobbyServerMode()
+          const profileIdentity = await getLocalGameProfileIdentity()
+          const room = await lobbyRequest('rooms.create', { name: playerName + ' 的 1v1 房间', hostId, hostName: playerName, publicKey, mapId, visibility, profileIdentity })
+          if (room.id) { closeCreateSheet(); showFactionPicker(room.id, 'join') }
+          else throw new Error('未返回房间 ID')
+        } catch (e) {
+          const serverUrl = (window.RvBUtils && RvBUtils.getServerUrl && RvBUtils.getServerUrl()) || '未设置'
+          errEl.textContent = '创建失败：' + formatProfileError(e) + '（服务器：' + serverUrl + '）'
+          errEl.style.display = 'block'
+        } finally {
+          createBtn.textContent = '创建并加入'
+          createBtn.disabled = !mapsLoaded
+          createRoomPromise = null
+        }
+      })()
+      return createRoomPromise
     }
 
     async function joinByCode() {
@@ -912,7 +926,7 @@
       const { roomId, playerId, playerName } = window._rejoinInfo
       const url = RvBUtils.getServerUrl()
       if (!url) { alert('未连接服务器，无法重新加入'); return }
-      window.location.href = 'battle.html?roomId=' + encodeURIComponent(roomId) + '&playerId=' + encodeURIComponent(playerId) + (playerName ? '&playerName=' + encodeURIComponent(playerName) : '') + (shouldUseRelayMode() ? '&relay=1' : '')
+      window.location.href = 'battle.html?roomId=' + encodeURIComponent(roomId) + '&playerId=' + encodeURIComponent(playerId) + (playerName ? '&playerName=' + encodeURIComponent(playerName) : '')
     }
     function dismissRejoin() {
       try { localStorage.removeItem('rvb_active_battle') } catch {}

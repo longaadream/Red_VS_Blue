@@ -18,19 +18,20 @@ function createFixture() {
   const requiredFiles = [
     'resources/app/electron-client/dist/main.js',
     'resources/app/standalone/server.js',
-    'resources/app/init-db.js',
     'resources/app/standalone/node_modules/next/package.json',
-    'resources/app/standalone/node_modules/ws/package.json',
-    'resources/app/standalone/ws-same-port-server.cjs',
-    'resources/app/standalone/node_modules/@prisma/client/package.json',
-    'resources/app/standalone/node_modules/.prisma/client/index.js',
+    'resources/app/standalone/colyseus/colyseus-server.mjs',
     'resources/app/node_modules/adm-zip/package.json',
     'resources/node.exe',
+    'resources/postgres/runtime-manifest.json',
+    'resources/postgres/pgsql/bin/postgres.exe',
+    'resources/postgres/pgsql/bin/initdb.exe',
+    'resources/postgres/pgsql/bin/pg_ctl.exe',
+    'resources/postgres/licenses/server_license.txt',
+    'resources/postgres/licenses/commandlinetools_3rd_party_licenses.txt',
   ]
   const requiredDirectories = [
     'resources/app/public',
     'resources/app/data',
-    'resources/app/prisma',
   ]
 
   for (const relative of requiredFiles) {
@@ -107,6 +108,24 @@ describe('Electron client package verification', () => {
     ).toContain(
       'forbidden packaged file: resources/app/www/data/users.json',
     )
+  })
+
+  it.each([
+    'resources/app/init-db.js',
+    'resources/app/prisma/schema.prisma',
+    'resources/app/standalone/ws-same-port-server.cjs',
+    'resources/app/standalone/node_modules/@prisma/client/package.json',
+    'resources/app/standalone/node_modules/.prisma/client/index.js',
+    'resources/app/node_modules/prisma/package.json',
+  ])('rejects the legacy Windows runtime artifact %s', (relative) => {
+    const { dataSourceRoot, packageRoot, pageSourceRoot, publicSourceRoot } = createFixture()
+    const target = path.join(packageRoot, relative)
+    fs.mkdirSync(path.dirname(target), { recursive: true })
+    fs.writeFileSync(target, 'legacy runtime')
+
+    expect(
+      findClientPackageIssues(packageRoot, pageSourceRoot, dataSourceRoot, publicSourceRoot),
+    ).toContain(`forbidden packaged file: ${relative}`)
   })
 
   it('reports offline data that exists in the package but is stale', () => {

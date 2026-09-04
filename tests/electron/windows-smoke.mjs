@@ -7,15 +7,6 @@ import { Client as ColyseusClient } from '@colyseus/sdk'
 
 const root = path.resolve(import.meta.dirname, '..', '..')
 const applications = {
-  server: {
-    executable: path.join(root, 'dist', 'server-build', 'win-unpacked', 'RED vs BLUE Server.exe'),
-    helperExecutables: [path.join(root, 'dist', 'server-build', 'win-unpacked', 'resources', 'node.exe')],
-    userDataDir: process.env.RVB_SMOKE_USER_DATA_DIR
-      ? path.resolve(process.env.RVB_SMOKE_USER_DATA_DIR)
-      : null,
-    title: 'RED vs BLUE Server',
-    debugPort: 19221,
-  },
   client: {
     executable: path.join(root, 'dist', 'client-build', 'win-unpacked', 'RED vs BLUE.exe'),
     helperExecutables: [path.join(root, 'dist', 'client-build', 'win-unpacked', 'resources', 'node.exe')],
@@ -288,6 +279,63 @@ function findExecutableProcessIds(executable, commandLineFragment) {
   }
 }
 
+async function verifyTutorialWithoutAuthority(port, target, timeoutMs = 30000) {
+  const startedAt = Date.now()
+  await evaluate(target, `(() => {
+    window.__rvbTutorialSmokeErrors = []
+    window.addEventListener('error', event => window.__rvbTutorialSmokeErrors.push(String(event.error?.stack || event.message)))
+    window.addEventListener('unhandledrejection', event => window.__rvbTutorialSmokeErrors.push(String(event.reason?.stack || event.reason)))
+    document.getElementById('tutorialShortcut').click()
+    return true
+  })()`, false)
+  const tutorialTarget = await waitForTargets(
+    port,
+    candidate => candidate.url.startsWith('rvb-client://app/battle.html?mode=tutorial'),
+    timeoutMs,
+  )
+  const deadline = Date.now() + timeoutMs
+  let observed = null
+  while (Date.now() < deadline) {
+    try {
+      observed = await evaluate(tutorialTarget, `({
+        readyState: document.readyState,
+        tutorialMode: document.body.classList.contains('tutorial-mode'),
+        loadingDisplay: document.getElementById('loadingOverlay')?.style.display || '',
+        loadingMessage: document.getElementById('loadingMsg')?.textContent || '',
+        loadingColor: document.getElementById('loadingMsg')?.style.color || '',
+        dialogPresent: document.getElementById('tutorialDialog') !== null,
+        scenarioId: window.__RVB_TUTORIAL__?.scenarioId || '',
+        engineReady: !!window.GameEngine?.applyBattleAction,
+        electronApiReady: !!window.electronAPI,
+        runtimeReady: !!window.RvBGameEngine?.ensure,
+        primeReady: !!window.RvBGameEngine?.primeJsonFiles,
+        battleDataLoad: window.__RVB_BATTLE_DATA_LOAD__ || null,
+        smokeErrors: window.__rvbTutorialSmokeErrors || []
+      })`)
+      if (
+        observed.readyState === 'complete'
+          && observed.tutorialMode === true
+          && observed.loadingDisplay === 'none'
+          && observed.dialogPresent === true
+          && observed.scenarioId
+      ) return { target: tutorialTarget, runtime: observed, elapsedMs: Date.now() - startedAt }
+    } catch {}
+    await delay(100)
+  }
+  throw new Error(`Tutorial did not open while authority was unavailable: ${JSON.stringify(observed)}`)
+}
+
+async function waitForExecutableProcessIds(executable, commandLineFragment, timeoutMs = 30_000) {
+  const deadline = Date.now() + timeoutMs
+  let processIds = []
+  while (Date.now() < deadline) {
+    processIds = findExecutableProcessIds(executable, commandLineFragment)
+    if (processIds.length > 0) return processIds
+    await delay(250)
+  }
+  return processIds
+}
+
 async function waitForExecutableCleanup(executables, timeoutMs = 10000) {
   const deadline = Date.now() + timeoutMs
   let counts = Object.fromEntries(executables.map((executable) => [executable, null]))
@@ -322,78 +370,10 @@ async function isReachable(port) {
       signal: AbortSignal.timeout(2000),
     })
     const result = await response.json()
-    return response.ok && result.ok === true && ['rvb-ws', 'rvb-colyseus'].includes(result.protocol)
+    return response.ok && result.ok === true && result.protocol === 'rvb-colyseus'
   } catch {
     return false
   }
-}
-
-async function probeGameWebSocket(url) {
-  const requestId = 'windows-smoke-rooms-' + process.pid + '-' + Date.now()
-  const socket = new WebSocket(url)
-  return new Promise((resolve, reject) => {
-    let subscribed = null
-    let roomsResult = null
-    const timer = setTimeout(() => {
-      socket.close()
-      reject(new Error('Game WebSocket probe timed out: ' + url))
-    }, 5000)
-    const finish = () => {
-      if (!subscribed || !roomsResult) return
-      clearTimeout(timer)
-      socket.close()
-      resolve({
-        url,
-        subscribed: {
-          roomId: subscribed.roomId,
-          role: subscribed.role,
-        },
-        roomsResult: {
-          ok: roomsResult.ok,
-          rooms: roomsResult.data?.rooms,
-        },
-      })
-    }
-    socket.addEventListener('open', () => {
-      socket.send(JSON.stringify({
-        type: 'subscribe',
-        roomId: '__lobby',
-        playerId: 'red53-windows-smoke',
-        protocolVersion: 3,
-        authorityBuildId: 'rvb-authority-v3-chunked-sha256-1',
-      }))
-      socket.send(JSON.stringify({
-        type: 'rpc',
-        requestId,
-        method: 'rooms.list',
-        data: {},
-      }))
-    }, { once: true })
-    socket.addEventListener('message', (event) => {
-      let message = null
-      try {
-        message = JSON.parse(String(event.data))
-      } catch {
-        return
-      }
-      if (message?.type === 'subscribed' && message.roomId === '__lobby') {
-        subscribed = message
-      }
-      if (message?.type === 'rpcResult' && message.requestId === requestId) {
-        roomsResult = message
-      }
-      finish()
-    })
-    socket.addEventListener('error', () => {
-      clearTimeout(timer)
-      reject(new Error('Game WebSocket connection failed: ' + url))
-    }, { once: true })
-    socket.addEventListener('close', () => {
-      if (subscribed && roomsResult) return
-      clearTimeout(timer)
-      reject(new Error('Game WebSocket closed before the probe completed: ' + url))
-    }, { once: true })
-  })
 }
 
 async function verifyPieceGallery(port, target, timeoutMs = 10000) {
@@ -441,43 +421,6 @@ async function verifyPieceGallery(port, target, timeoutMs = 10000) {
     `Piece gallery dark filter is incorrect: ${JSON.stringify(dark)}`,
   )
   return { target: galleryTarget, all: observed, light, dark }
-}
-
-async function callGameRpc(url, method, data) {
-  const requestId = 'windows-smoke-rpc-' + process.pid + '-' + Date.now()
-  const socket = new WebSocket(url)
-  return new Promise((resolve, reject) => {
-    let finished = false
-    const timer = setTimeout(() => {
-      socket.close()
-      reject(new Error(`Game WebSocket RPC timed out: ${method} ${url}`))
-    }, 5000)
-    socket.addEventListener('open', () => {
-      socket.send(JSON.stringify({ type: 'rpc', requestId, method, data }))
-    }, { once: true })
-    socket.addEventListener('message', (event) => {
-      let message = null
-      try {
-        message = JSON.parse(String(event.data))
-      } catch {
-        return
-      }
-      if (message?.type !== 'rpcResult' || message.requestId !== requestId) return
-      finished = true
-      clearTimeout(timer)
-      socket.close()
-      resolve({ ok: message.ok, data: message.data, error: message.error })
-    })
-    socket.addEventListener('error', () => {
-      clearTimeout(timer)
-      reject(new Error(`Game WebSocket RPC connection failed: ${url}`))
-    }, { once: true })
-    socket.addEventListener('close', () => {
-      if (finished) return
-      clearTimeout(timer)
-      reject(new Error(`Game WebSocket closed before ${method} completed: ${url}`))
-    }, { once: true })
-  })
 }
 
 async function waitForUnreachable(port, timeoutMs = 10000) {
@@ -544,142 +487,6 @@ async function launch(application, timeoutMs = 30000) {
   return { target, rendererBoundary }
 }
 
-async function smokeServer(expectedIdentity = null, sharedUserDataDir = null) {
-  const application = applications.server
-  const originalUserDataDir = application.userDataDir
-  const configuredUserDataDir = sharedUserDataDir ?? process.env.RVB_SMOKE_USER_DATA_DIR
-  const userDataDir = configuredUserDataDir
-    ? path.resolve(configuredUserDataDir)
-    : mkdtempSync(path.join(tmpdir(), 'rvb-server-windows-smoke-'))
-  const ownsUserDataDir = !configuredUserDataDir
-  application.userDataDir = userDataDir
-  let result = null
-  try {
-    const { target, rendererBoundary } = await launch(application, 90000)
-    let initial = null
-    for (let attempt = 0; attempt < 120; attempt += 1) {
-      initial = await evaluate(target, `window.electronAPI.getStatus()`)
-      if (initial.running === true && initial.port === 3000 && await isReachable(3000)) break
-      await delay(250)
-    }
-    assert(initial?.running === true && initial.port === 3000 && await isReachable(3000), `Server did not become ready on port 3000: ${JSON.stringify(initial)}`)
-    const resourcePackStatus = await evaluate(target, `window.electronAPI.getResourcePackStatus()`)
-    const health = await callGameRpc(
-      'ws://127.0.0.1:3000/ws/rooms/__lobby',
-      'system.health',
-      {},
-    )
-    const catalogIdentity = await callGameRpc(
-      'ws://127.0.0.1:3000/ws/rooms/__lobby',
-      'catalog.identity',
-      {},
-    )
-    const rooms = await callGameRpc(
-      'ws://127.0.0.1:3000/ws/rooms/__lobby',
-      'rooms.list',
-      {},
-    )
-    const publicWebSocket = await probeGameWebSocket(
-      'ws://127.0.0.1:3000/ws/rooms/__lobby',
-    )
-    assert(
-      health.ok === true && health.data?.protocol === 'rvb-ws',
-      'Public same-port WebSocket system.health failed: ' + JSON.stringify(health),
-    )
-    if (expectedIdentity) {
-      assert(
-        catalogIdentity.data?.profileIdentity?.resolvedProfileHash === expectedIdentity.resolvedProfileHash
-          && catalogIdentity.data?.profileIdentity?.authorityContentHash === expectedIdentity.authorityContentHash
-          && catalogIdentity.data?.profileIdentity?.engineAbi === expectedIdentity.engineAbi,
-        `Standalone Server Profile identity mismatch: ${JSON.stringify(catalogIdentity.data?.profileIdentity)}`,
-      )
-      assert(
-        resourcePackStatus?.state?.stable?.resolvedProfileHash === expectedIdentity.resolvedProfileHash
-          && resourcePackStatus.state.stable.authorityContentHash === expectedIdentity.authorityContentHash
-          && resourcePackStatus.state.stable.compatibility?.engineAbi === expectedIdentity.engineAbi
-          && resourcePackStatus.state.stable.compatibility?.contentAbi === expectedIdentity.contentAbi
-          && resourcePackStatus.server?.profile?.resolvedProfileHash === expectedIdentity.resolvedProfileHash
-          && resourcePackStatus.server.profile.authorityContentHash === expectedIdentity.authorityContentHash
-          && resourcePackStatus.server.profile.compatibility?.engineAbi === expectedIdentity.engineAbi
-          && resourcePackStatus.server.profile.compatibility?.contentAbi === expectedIdentity.contentAbi,
-        `Standalone Server runtime Profile reference mismatch: ${JSON.stringify(resourcePackStatus)}`,
-      )
-    }
-    assert(
-      rooms.ok === true && Array.isArray(rooms.data?.rooms),
-      'Public same-port WebSocket rooms.list failed: ' + JSON.stringify(rooms),
-    )
-    assert(
-      publicWebSocket.roomsResult.ok === true &&
-        Array.isArray(publicWebSocket.roomsResult.rooms),
-      'Public same-port WebSocket rooms.list failed: ' + JSON.stringify(publicWebSocket),
-    )
-    const rejectedNavigation = await evaluate(target, `new Promise((resolve) => {
-      const original = location.href
-      location.href = 'https://example.com/red19-navigation-probe'
-      setTimeout(() => resolve({ original, current: location.href }), 500)
-    })`)
-    assert(rejectedNavigation.current === rejectedNavigation.original, `Server renderer escaped its trusted file root: ${JSON.stringify(rejectedNavigation)}`)
-    await evaluate(target, `window.electronAPI.stopServer()`)
-    let stopped = false
-    let helperProcessCounts = null
-    for (let attempt = 0; attempt < 40; attempt += 1) {
-      const status = await evaluate(target, `window.electronAPI.getStatus()`)
-      helperProcessCounts = Object.fromEntries(
-        (application.helperExecutables ?? []).map((executable) => [
-          executable,
-          countExecutableProcesses(executable),
-        ]),
-      )
-      if (
-        !status.running &&
-        !(await isReachable(3000)) &&
-        Object.values(helperProcessCounts).every((count) => count === 0)
-      ) {
-        stopped = true
-        break
-      }
-      await delay(250)
-    }
-    assert(
-      stopped,
-      `Server stop did not release port 3000 and its helper process: ${JSON.stringify(helperProcessCounts)}`,
-    )
-    result = {
-      entry: 'server',
-      rendererBoundary,
-      websocketRpc: {
-        health,
-        catalogIdentity,
-        rooms,
-      },
-      publicWebSocket,
-      profileIdentity: catalogIdentity.data?.profileIdentity,
-      resourcePackStatus,
-      rejectedNavigation,
-      stopped: true,
-      port3000Reachable: false,
-      helperProcessCountsAfterStop: helperProcessCounts,
-    }
-  } finally {
-    stopApplication(application)
-    stopDebugTarget(application.debugPort)
-    await waitForExecutableCleanup([application.executable, ...(application.helperExecutables ?? [])])
-    application.userDataDir = originalUserDataDir
-    if (ownsUserDataDir) rmSync(userDataDir, { recursive: true, force: true })
-  }
-
-  const candidateExecutables = [application.executable, ...(application.helperExecutables ?? [])]
-  const processCountsAfterExit = await waitForExecutableCleanup(candidateExecutables)
-  assert(
-    Object.values(processCountsAfterExit).every((count) => count === 0),
-    `Server candidate left residual processes: ${JSON.stringify(processCountsAfterExit)}`,
-  )
-  assert(!(await isReachable(3000)), 'Server candidate left port 3000 reachable after exit')
-  assert(await waitForDebuggerExit(application.debugPort), 'Server Electron process remained reachable after exit')
-  console.log(JSON.stringify({ ...result, exitedCleanly: true, processCountsAfterExit }))
-}
-
 async function smokeClient(expectedIdentity = null, sharedUserDataDir = null) {
   const application = applications.client
   const sourcePackageRoot = path.dirname(application.executable)
@@ -720,8 +527,8 @@ async function smokeClient(expectedIdentity = null, sharedUserDataDir = null) {
       'Isolated client package is missing the standalone Next.js runtime',
     )
     assert(
-      existsSync(path.join(isolatedPackageRoot, 'resources', 'app', 'standalone', 'node_modules', 'ws', 'package.json')),
-      'Isolated client package is missing the standalone WebSocket runtime',
+      existsSync(path.join(isolatedPackageRoot, 'resources', 'app', 'standalone', 'colyseus', 'colyseus-server.mjs')),
+      'Isolated client package is missing the Colyseus authority runtime',
     )
     // A fresh packaged client initializes a brand-new bundled PostgreSQL data
     // directory before opening the main menu. On Windows, copying the package
@@ -766,7 +573,7 @@ async function smokeClient(expectedIdentity = null, sharedUserDataDir = null) {
     const disabledAuthorityEntry = `${authorityEntry}.smoke-disabled`
     const recoveryMarker = `rvb-recovery-marker-${Date.now()}`
     await evaluate(gameTarget, `window.__rvbRecoverySmokeMarker = ${JSON.stringify(recoveryMarker)}; true`)
-    const authorityPids = findExecutableProcessIds(
+    const authorityPids = await waitForExecutableProcessIds(
       path.join(isolatedPackageRoot, 'resources', 'node.exe'),
       'colyseus-server.mjs',
     )
@@ -774,6 +581,7 @@ async function smokeClient(expectedIdentity = null, sharedUserDataDir = null) {
 
     let exhaustedRecovery = null
     let recoveryTarget = gameTarget
+    let tutorialWithoutAuthority = null
     renameSync(authorityEntry, disabledAuthorityEntry)
     try {
       stopProcessTree(authorityPids[0])
@@ -805,6 +613,14 @@ async function smokeClient(expectedIdentity = null, sharedUserDataDir = null) {
         markerAfterRecovery === recoveryMarker,
         `Silent authority recovery reloaded the main menu: ${JSON.stringify({ recoveryMarker, markerAfterRecovery })}`,
       )
+      tutorialWithoutAuthority = await verifyTutorialWithoutAuthority(application.debugPort, recoveryTarget)
+      await evaluate(tutorialWithoutAuthority.target, "window.location.href = 'rvb-client://app/index.html'; true", false)
+      recoveryTarget = await waitForTargets(
+        application.debugPort,
+        candidate => candidate.url.startsWith('rvb-client://app/index.html'),
+        10_000,
+      )
+      await evaluate(recoveryTarget, `window.__rvbRecoverySmokeMarker = ${JSON.stringify(recoveryMarker)}; true`)
     } finally {
       if (existsSync(disabledAuthorityEntry)) renameSync(disabledAuthorityEntry, authorityEntry)
     }
@@ -936,16 +752,29 @@ async function smokeClient(expectedIdentity = null, sharedUserDataDir = null) {
         && roomsBeforeCreate.data.rooms.length === 0,
       `Fresh client database did not return an empty room list: ${JSON.stringify(roomsBeforeCreate)}`,
     )
-    const colyseusClient = new ColyseusClient(`ws://127.0.0.1:${localGatewayPort}`)
-    const smokeRoom = await colyseusClient.create('battle', {
+    const colyseusClient = new ColyseusClient(`http://127.0.0.1:${localGatewayPort}`)
+    const duplicateCreateClient = new ColyseusClient(`http://127.0.0.1:${localGatewayPort}`)
+    const creationOptions = {
       product: true,
-      playerId: 'red161-windows-smoke',
-      playerName: 'RED-161 Windows smoke',
-      name: 'RED-161 Windows smoke room',
+      playerId: 'red158-windows-smoke-host',
+      playerName: 'RED-158 Windows smoke host',
+      name: 'RED-158 Windows smoke room',
       mapId: 'winding-pass',
       visibility: 'public',
+      creationKey: 'red158-packaged-windows-smoke-create',
       profileIdentity: catalogIdentity.data.profileIdentity,
-    })
+    }
+    const concurrentCreateResults = await Promise.allSettled([
+      colyseusClient.create('battle', creationOptions),
+      duplicateCreateClient.create('battle', creationOptions),
+    ])
+    const fulfilledCreates = concurrentCreateResults.filter(result => result.status === 'fulfilled')
+    const rejectedCreates = concurrentCreateResults.filter(result => result.status === 'rejected')
+    assert(
+      fulfilledCreates.length === 1 && rejectedCreates.length === 1,
+      `Concurrent duplicate create did not settle as one room and one rejection: ${concurrentCreateResults.map(result => result.status).join(',')}`,
+    )
+    const smokeRoom = fulfilledCreates[0].value
     const createdRoom = {
       ok: true,
       data: { id: smokeRoom.roomId, mapId: 'winding-pass' },
@@ -960,12 +789,33 @@ async function smokeClient(expectedIdentity = null, sharedUserDataDir = null) {
       signal: AbortSignal.timeout(2000),
     })
     const roomsAfterCreate = { ok: roomsAfterCreateResponse.ok, data: await roomsAfterCreateResponse.json() }
+    const matchingCreatedRooms = Array.isArray(roomsAfterCreate.data?.rooms)
+      ? roomsAfterCreate.data.rooms.filter((room) => room.id === createdRoom.data.id)
+      : []
     assert(
-      roomsAfterCreate.ok === true
-        && Array.isArray(roomsAfterCreate.data?.rooms)
-        && roomsAfterCreate.data.rooms.some((room) => room.id === createdRoom.data.id),
+      roomsAfterCreate.ok === true && matchingCreatedRooms.length === 1,
       `Created room was not persisted in the client database: ${JSON.stringify(roomsAfterCreate)}`,
     )
+    const guestClient = new ColyseusClient(`http://127.0.0.1:${localGatewayPort}`)
+    const guestRoom = await guestClient.joinById(smokeRoom.roomId, {
+      product: true,
+      playerId: 'red158-windows-smoke-guest',
+      playerName: 'RED-158 Windows smoke guest',
+      profileIdentity: catalogIdentity.data.profileIdentity,
+    })
+    const joinedRoomResponse = await fetch(`${localBaseUrl}/rooms/${encodeURIComponent(smokeRoom.roomId)}`, {
+      signal: AbortSignal.timeout(2000),
+    })
+    const joinedRoom = { ok: joinedRoomResponse.ok, data: await joinedRoomResponse.json() }
+    assert(
+      joinedRoom.ok === true
+        && joinedRoom.data?.room?.id === smokeRoom.roomId
+        && joinedRoom.data.room.players?.filter(player => (
+          player.id === 'red158-windows-smoke-host' || player.id === 'red158-windows-smoke-guest'
+        )).length === 2,
+      `Second Windows player could not join the single created room: ${JSON.stringify(joinedRoom)}`,
+    )
+    await guestRoom.leave()
     await smokeRoom.leave()
     const pieceGallery = await verifyPieceGallery(application.debugPort, gameTarget)
     const battle = await verifyBattleTerminalError(application.debugPort, pieceGallery.target)
@@ -994,9 +844,16 @@ async function smokeClient(expectedIdentity = null, sharedUserDataDir = null) {
         manual: manualRecovery.recovery,
         rendererPreserved: markerAfterManualRecovery === recoveryMarker,
       },
+      tutorialWithoutAuthority: tutorialWithoutAuthority.runtime,
       profileIdentity: catalogIdentity.data.profileIdentity,
       resourcePackStatus,
-      databaseProbe: { roomsBeforeCreate, createdRoom, roomsAfterCreate },
+      databaseProbe: {
+        roomsBeforeCreate,
+        concurrentCreate: { fulfilled: fulfilledCreates.length, rejected: rejectedCreates.length },
+        createdRoom,
+        roomsAfterCreate,
+        joinedRoom,
+      },
       legacyPlayerRest: { status: legacyPlayerRestResponse.status },
       pieceGallery: { all: pieceGallery.all, light: pieceGallery.light, dark: pieceGallery.dark },
       battleRuntime: battle.runtime,
@@ -1743,7 +1600,7 @@ async function smokeEditor(candidate) {
 const requested = process.argv.slice(2)
 const selectedEntries = requested.length > 0
   ? requested
-  : ['profile', 'server', 'client', 'editor']
+  : ['profile', 'client', 'editor']
 const candidate = selectedEntries.some(entry => entry === 'profile' || entry === 'editor')
   ? loadContentCandidateFixture()
   : null
@@ -1756,8 +1613,7 @@ const entries = selectedEntries.includes('profile')
 let expectedIdentity = null
 try {
   for (const entry of entries) {
-    if (entry === 'server') await smokeServer(expectedIdentity, sharedUserDataDir)
-    else if (entry === 'client') await smokeClient(expectedIdentity, sharedUserDataDir)
+    if (entry === 'client') await smokeClient(expectedIdentity, sharedUserDataDir)
     else if (entry === 'profile') {
       expectedIdentity = await smokeProfileActivation(candidate, sharedUserDataDir)
     } else if (entry === 'editor') await smokeEditor(candidate)

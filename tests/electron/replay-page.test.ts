@@ -53,7 +53,7 @@ describe('read-only Trace replay viewer', () => {
     expect(script).toContain('currentCooldown')
     expect(script).toContain('usesRemaining')
     expect(script).toContain('textContent')
-    expect(combined).not.toContain('RvBWs')
+    expect(combined).not.toContain('RvBColyseus')
     expect(combined).not.toContain('WebSocket')
     expect(combined).not.toContain('serverFetch')
     expect(combined).not.toContain("fetch(")

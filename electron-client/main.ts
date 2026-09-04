@@ -1,18 +1,16 @@
 import { app, BrowserWindow, dialog, ipcMain, net as electronNet, protocol, safeStorage, session } from 'electron'
-import { spawn, ChildProcess, execFileSync, execSync } from 'child_process'
+import { spawn, ChildProcess, execSync } from 'child_process'
 import * as path from 'path'
 import * as fs from 'fs'
 import * as os from 'os'
 import * as dgram from 'dgram'
 import * as http from 'http'
-import { createRequire } from 'module'
 import { randomBytes } from 'crypto'
-import type WebSocket from 'ws'
 import { pathToFileURL } from 'url'
 import { assertTrustedIpcSender, isFileUrlWithinRoot } from './ipc-trust'
 import { resolveDevelopmentProfile } from './development-profile'
 import { findFreePort } from './local-port'
-import { resolveClientProtocolFile } from './client-protocol-resource'
+import { readClientProtocolBattleData, resolveClientProtocolFile } from './client-protocol-resource'
 import { EmbeddedPostgresController } from './embedded-postgres'
 import {
   LocalAuthorityRecoveryBudget,
@@ -43,7 +41,10 @@ const BATTLE_AUTHORITY_SHUTDOWN_RESULT = 'rvb:battle-authority:shutdown-result'
 const SERVER_GRACEFUL_SHUTDOWN_TIMEOUT_MS = 6_500
 const LOCAL_AUTHORITY_AUTO_RECOVERY_MAX_ATTEMPTS = 3
 const LOCAL_AUTHORITY_AUTO_RECOVERY_DELAYS_MS = [250, 750, 1_500] as const
-const LOCAL_AUTHORITY_RECOVERY_READY_TIMEOUT_MS = 5_000
+// A saturated Windows host can spend tens of seconds loading the packaged
+// authority before it can even request its first PostgreSQL connection. Keep
+// the watchdog bounded, but do not confuse slow startup with process failure.
+const LOCAL_AUTHORITY_READY_TIMEOUT_MS = 240_000
 const PROFILE_ARCHIVE_MAX_BYTES = 32 * 1024 * 1024
 const PROFILE_ADMIN_KEY = randomBytes(32).toString('hex')
 let allowAppExit = false
@@ -62,7 +63,7 @@ type ChildLogErrorSide = 'source' | 'target' | 'write'
 
 type ChildLogForwardingRecord = {
   event: 'electron.child-log-forwarding.error'
-  runtime: 'electron-server' | 'electron-client'
+  runtime: 'electron-client'
   stream: ChildLogStream
   side: ChildLogErrorSide
   code: string
@@ -740,7 +741,7 @@ function getEmbeddedPostgres(): EmbeddedPostgresController {
 }
 
 async function resolveAuthorityDatabaseUrl(): Promise<string> {
-  const external = process.env.RVB_POSTGRES_URL ?? process.env.DATABASE_URL
+  const external = process.env.RVB_POSTGRES_URL
   if (external) {
     let protocol = ''
     try { protocol = new URL(external).protocol }
@@ -776,7 +777,7 @@ function localAuthorityStartupErrorMessage(error: unknown): string {
 
 async function startLocalGameAuthorityOnce(
   profileBinding?: ProfileProcessBinding,
-  readyTimeoutMs = 20_000,
+  readyTimeoutMs = LOCAL_AUTHORITY_READY_TIMEOUT_MS,
 ): Promise<void> {
   if (gameServerProcess) {
     if (!localGameReady) localGameReady = await waitForGameAuthorityReady(actualGamePort, readyTimeoutMs)
@@ -812,8 +813,6 @@ async function startLocalGameAuthorityOnce(
       RVB_COLYSEUS_PORT: String(actualGamePort),
       RVB_COLYSEUS_HOST: '0.0.0.0',
       RVB_POSTGRES_URL: databaseUrl,
-      RVB_BATTLE_AUTHORITY_V2: '1',
-      RVB_BATTLE_ASYNC_JOURNAL: '1',
       RVB_TURN_TIMER_ENABLED: '1',
       APP_ROOT_DIR: appRoot,
       USER_DATA_DIR: getUserData(),
@@ -943,7 +942,7 @@ function recoverUnexpectedLocalAuthorityExit(code: number | null, manual = false
       if (gameServerProcess && !localGameReady) discardUnhealthyAuthorityProcess()
 
       try {
-        await startStableLocalServerAndRecover(undefined, LOCAL_AUTHORITY_RECOVERY_READY_TIMEOUT_MS)
+        await startStableLocalServerAndRecover(undefined, LOCAL_AUTHORITY_READY_TIMEOUT_MS)
       } catch (error) {
         console.error('[client] bounded Colyseus authority recovery attempt failed:', error)
         appendAuthorityDiagnostic(
@@ -1006,32 +1005,12 @@ function findServerEntry(appRoot: string): string | null {
   return candidates.find(p => fs.existsSync(p)) ?? null
 }
 
-function findSamePortPreload(appRoot: string, serverEntry: string): string | null {
-  return [
-    path.join(path.dirname(serverEntry), 'ws-same-port-server.cjs'),
-    path.join(appRoot, 'scripts', 'ws-same-port-server.cjs'),
-  ].find(candidate => fs.existsSync(candidate)) ?? null
-}
-
 function getNodeBin(): string {
   if (app.isPackaged) {
     const candidate = path.join(process.resourcesPath, process.platform === 'win32' ? 'node.exe' : 'node')
     if (fs.existsSync(candidate)) return candidate
   }
   return 'node'
-}
-
-function initDatabase(dbPath: string, appRoot: string): void {
-  const initScript = path.join(appRoot, 'init-db.js')
-  if (!fs.existsSync(initScript)) {
-    throw new Error('[client] init-db.js not found: ' + initScript)
-  }
-  execFileSync(
-    getNodeBin(),
-    [initScript, 'file:' + dbPath],
-    { env: process.env, cwd: appRoot, stdio: 'pipe' },
-  )
-  console.log('[client] Database ready.')
 }
 
 async function startLocalServer(
@@ -1055,48 +1034,24 @@ async function startLocalServer(
   const appRoot = getAppRoot()
   const userData = getUserData()
 
-  let databaseUrl: string
-  if (app.isPackaged || developmentProfile) {
-    const dbPath = path.join(userData, 'game.db')
-    fs.mkdirSync(userData, { recursive: true })
-    initDatabase(dbPath, appRoot)
-    databaseUrl = `file:${dbPath}`
-  } else {
-    databaseUrl = `file:${path.join(appRoot, 'prisma', 'dev.db')}`
-  }
-
   const serverEntry = findServerEntry(appRoot)
   if (!serverEntry) {
     console.warn('[client] server.js not found, offline mode unavailable')
     localServerReady = false
     return
   }
-  const samePortPreload = findSamePortPreload(appRoot, serverEntry)
-  if (!samePortPreload) {
-    console.error(`[client] ws-same-port-server.cjs not found for ${serverEntry}`)
-    localServerReady = false
-    return
-  }
-
-
   const binding = profileBinding ?? stableProfileBinding()
-  serverProcess = spawn(getNodeBin(), ['--require', samePortPreload, serverEntry], {
+  serverProcess = spawn(getNodeBin(), [serverEntry], {
     cwd: path.dirname(serverEntry),
     env: {
       ...process.env,
       PORT: String(actualLocalPort),
       HOSTNAME: '0.0.0.0',
       NODE_ENV: 'production',
-      // This process only serves the installed Profile APIs and presentation
-      // assets. Player rooms/actions belong exclusively to Colyseus below.
-      DISABLE_WS: '1',
-      RVB_PROFILE_EXPECT_WEBSOCKET: '0',
-      RVB_BATTLE_AUTHORITY_V2: '0',
-      RVB_BATTLE_ASYNC_JOURNAL: '0',
-      RVB_TURN_TIMER_ENABLED: '0',
+      // This process only serves Profile HTTP APIs and presentation assets.
+      // Player rooms/actions belong exclusively to Colyseus/PostgreSQL.
       APP_ROOT_DIR: appRoot,
       USER_DATA_DIR: userData,
-      DATABASE_URL: databaseUrl,
       RVB_PROFILE_ADMIN_KEY: PROFILE_ADMIN_KEY,
       RVB_ALLOW_LOCAL_DEV_PROFILES: app.isPackaged ? '0' : '1',
       RVB_PROFILE_ADMISSION_PAUSED: binding?.activationId ?? 'startup-recovery',
@@ -1262,31 +1217,6 @@ async function installProfileArchive(archive: Buffer): Promise<JsonObject> {
     count: Array.isArray(result.profile?.files) ? result.profile.files.length : 0,
     meta: result.reference ?? null,
   }
-}
-
-function probeProfileWebSocket(timeoutMs = 5_000): Promise<void> {
-  return new Promise((resolve, reject) => {
-    let settled = false
-    const modulePath = app.isPackaged
-      ? path.join(getAppRoot(), 'standalone', 'node_modules', 'ws', 'lib', 'websocket.js')
-      : 'ws'
-    const WebSocketClient = createRequire(__filename)(modulePath) as new (address: string) => WebSocket
-    const socket = new WebSocketClient(`ws://127.0.0.1:${actualLocalPort}/ws/rooms/__profile-health__`)
-    const finish = (error?: Error): void => {
-      if (settled) return
-      settled = true
-      clearTimeout(timeout)
-      try { socket.close() } catch {}
-      if (error) reject(error)
-      else resolve()
-    }
-    const timeout = setTimeout(() => finish(new Error('PROFILE_WEBSOCKET_TIMEOUT')), timeoutMs)
-    socket.once('open', () => finish())
-    socket.once('error', error => finish(error instanceof Error ? error : new Error(String(error))))
-    socket.once('unexpected-response', (_request, response) => {
-      finish(new Error(`PROFILE_WEBSOCKET_HTTP_${response.statusCode}`))
-    })
-  })
 }
 
 async function verifyRendererCandidate(
@@ -1627,8 +1557,7 @@ async function activateProfileHash(
       || report.profile?.compatibility?.contentAbi !== plan.target.compatibility.contentAbi
     ) throw new Error('CANDIDATE_SERVER_IDENTITY_OR_HEALTH_MISMATCH')
 
-    stage = 'candidate-websocket-health'
-    await probeProfileWebSocket()
+    stage = 'candidate-profile-http-health'
 
     stage = 'candidate-renderer-preflight'
     await verifyRendererCandidate(
@@ -1840,10 +1769,27 @@ async function serveClientProtocolRequest(
       )
     }
     const activePackRoot = fixedActivePackRoot === undefined
-      ? (isActivatableResourcePackPath(relativePath)
+      ? (isActivatableResourcePackPath(relativePath) || relativePath === '__battle-data.json'
           ? resolveActiveResourcePackRoot(getPackRoot())
           : null)
       : fixedActivePackRoot
+    if (relativePath === '__battle-data.json') {
+      const files = readClientProtocolBattleData({
+        htmlRoot: getHtmlRoot(),
+        appRoot: getAppRoot(),
+        activePackRoot,
+        isPackaged: app.isPackaged,
+      })
+      return new Response(JSON.stringify({
+        schemaVersion: 'rvb-client-battle-data/v1',
+        files,
+      }), {
+        headers: {
+          'cache-control': 'no-store',
+          'content-type': 'application/json; charset=utf-8',
+        },
+      })
+    }
     const target = resolveClientProtocolFile({
       relativePath,
       htmlRoot: getHtmlRoot(),

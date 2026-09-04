@@ -16,7 +16,7 @@ SQLite/Prisma 进程中。单 writer 争用和动作回执等待持久化放大�
 - 大厅、房间、准备、选将、战斗命令、回执和重连恢复统一由 Colyseus `battle` Room 提供。
 - Room 内存状态是在线对局的实时权威；普通动作在规则提交后立即返回 APPLIED，不等待数据库。
 - PostgreSQL journal 以 25 ms / 8 条为默认有界微批；版本 0、终局和显式关键边界强制 durable。
-- Electron 打包并启动独立 Colyseus authority bundle；玩家页面通过兼容适配器保留现有 `RvBWs`
+- Electron 打包并启动独立 Colyseus authority bundle；玩家页面通过兼容适配器保留现有 `RvBColyseus`
   页面接口，但底层不得创建 legacy `/ws/rooms/*` 连接。
 - 目标型技能可以调用与服务端同版本的浏览器规则适配器做只读、非权威的展示预检，以便在第一次
   网络往返前呈现候选目标。预检不得写回状态、消费随机、读取未投影隐藏信息，或预测伤害、触发链、

@@ -86,7 +86,6 @@ function createRuntime(overrides: Record<string, unknown> = {}): Runtime {
     },
     myPlayerId: 'player-blue',
     TRAINING_MODE: false,
-    wsMode: 'lan',
     cardsById: {},
     cardDisplayMetadataById: Object.create(null),
     cardDisplayMetadataRequests: new Map(),

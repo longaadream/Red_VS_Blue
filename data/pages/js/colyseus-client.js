@@ -6,6 +6,7 @@
   var _roomId = null
   var _playerId = null
   var _handlers = {}
+  var _createInFlight = {}
   var _reqSeq = 1
   var _generation = 0
   var _lobbyPollTimer = null
@@ -135,7 +136,7 @@
     var message = payload && typeof payload === 'object'
       ? Object.assign({}, payload, { type: payload.type || type })
       : { type: type, data: payload }
-    if (_authoritySyncing && (type === 'stateUpdate' || type === 'battleSnapshot')) {
+    if (_authoritySyncing && type === 'stateUpdate') {
       message.requestId = _authoritySyncRequestId
       _releaseAuthoritySync()
       _emit('message', message)
@@ -222,7 +223,7 @@
       if (token && typeof _client.reconnect === 'function') {
         try {
           room = await reconnectStoredRoom(_client, token, generation)
-        } catch (reconnectError) {
+        } catch {
           clearReconnectToken()
           if (generation !== _generation || !_shouldReconnect) return false
           room = await _client.joinById(_roomId, joinOptions(_playerId))
@@ -314,13 +315,13 @@
   }
 
   function send(message) {
-    if (_authoritySyncing && message && (message.type === 'action' || message.type === 'gameOver')) {
+    if (_authoritySyncing && message && message.type === 'action') {
       _emit('authoritySyncBlocked', message)
       return false
     }
     if (!_subscribed || !_room) return false
     try {
-      if (message && (message.type === 'action' || message.type === 'gameOver')) {
+      if (message && message.type === 'action') {
         _room.send('battleCommand', message)
       } else if (message && message.type === 'requestBattleSnapshot') {
         _room.send('battleResync', {})
@@ -368,34 +369,64 @@
     if (method === 'catalog.pieces') return fetchJson(base + '/catalog/pieces', timeoutMs)
     if (method === 'catalog.skills') return fetchJson(base + '/catalog/skills', timeoutMs)
     if (method === 'catalog.card') return fetchJson(base + '/catalog/cards/' + encodeURIComponent(String(payload.cardId || '')), timeoutMs)
+    if (method === 'battleReports.get') {
+      var reportPayload = await fetchJson(base + '/battle-reports/' + encodeURIComponent(String(payload.battleId || payload.roomId || '')), timeoutMs)
+      return reportPayload && reportPayload.report ? reportPayload.report : reportPayload
+    }
+    if (method === 'battleReports.list') {
+      return fetchJson(base + '/battle-reports?playerId=' + encodeURIComponent(String(payload.playerId || '')), timeoutMs)
+    }
 
     var client = createClient(base)
     if (method === 'rooms.list') {
       return fetchJson(base + '/rooms', timeoutMs)
     }
+    if (method === 'rooms.get') {
+      var detail = await fetchJson(base + '/rooms/' + encodeURIComponent(String(payload.roomId || '')), timeoutMs)
+      return detail && detail.room ? detail.room : detail
+    }
     if (method === 'rooms.create') {
       var hostId = String(payload.hostId || payload.playerId || '').trim().toLowerCase()
-      var room = await withTimeout(client.create('battle', {
-        product: true,
-        name: payload.name,
-        mapId: payload.mapId,
-        visibility: payload.visibility,
-        mode: payload.mode,
-        playerId: hostId,
-        playerName: payload.hostName || payload.playerName,
-        profileIdentity: payload.profileIdentity || storedProfileIdentity(),
-      }), timeoutMs, method)
+      if (!hostId) throw makeRpcError({ code: 'PLAYER_ID_REQUIRED', error: 'Player ID is required to create a room' })
+      var createFlightKey = base + '|' + hostId
+      if (_createInFlight[createFlightKey]) return _createInFlight[createFlightKey]
+      var creationKey = hostId + ':' + Date.now() + '-' + (_reqSeq++)
+      _createInFlight[createFlightKey] = (async function () {
+        var room = await withTimeout(client.create('battle', {
+          product: true,
+          creationKey: creationKey,
+          name: payload.name,
+          mapId: payload.mapId,
+          visibility: payload.visibility,
+          mode: payload.mode,
+          playerId: hostId,
+          playerName: payload.hostName || payload.playerName,
+          profileIdentity: payload.profileIdentity || storedProfileIdentity(),
+        }), timeoutMs, method)
+        try {
+          return await roomRpc(room, 'rooms.get', { roomId: room.roomId }, timeoutMs)
+        } finally {
+          try { await room.leave() } catch {}
+        }
+      })()
       try {
-        return await roomRpc(room, 'rooms.get', { roomId: room.roomId }, timeoutMs)
+        return await _createInFlight[createFlightKey]
       } finally {
-        try { await room.leave() } catch {}
+        delete _createInFlight[createFlightKey]
       }
     }
     if (method === 'rooms.action' && (payload.action === 'join' || payload.action === 'rejoin')) {
-      var available = await fetchJson(base + '/rooms', timeoutMs)
-      var listing = (available.rooms || []).find(function (candidate) { return candidate.id === payload.roomId })
-      if (!listing) throw new Error('Room not found or no longer joinable')
-      return { success: true, room: listing }
+      var admission = joinOptions(payload.playerId)
+      admission.playerName = payload.playerName || admission.playerName
+      admission.alignment = payload.alignment || admission.alignment
+      admission.profileIdentity = payload.profileIdentity || admission.profileIdentity
+      var joinedRoom = await withTimeout(client.joinById(payload.roomId, admission), timeoutMs, method)
+      try {
+        var joinedSnapshot = await roomRpc(joinedRoom, 'rooms.get', { roomId: payload.roomId }, timeoutMs)
+        return { success: true, room: joinedSnapshot }
+      } finally {
+        try { await joinedRoom.leave() } catch {}
+      }
     }
     if (method === 'rooms.delete') {
       var deleteRoom = await withTimeout(client.joinById(payload.roomId, {
@@ -420,13 +451,41 @@
   async function fetchJson(url, timeoutMs) {
     var controller = new AbortController()
     var timer = setTimeout(function () { controller.abort() }, timeoutMs || 5000)
+    var diagnosticUrl = requestUrlForDiagnostics(url)
     try {
       var response = await fetch(url, { signal: controller.signal, cache: 'no-store' })
       var body = await response.json().catch(function () { return {} })
       if (!response.ok) throw makeRpcError(body)
       return body
+    } catch (error) {
+      if (controller.signal.aborted) {
+        throw makeRpcError({
+          code: 'COLYSEUS_HTTP_TIMEOUT',
+          error: 'Colyseus HTTP request timed out: ' + diagnosticUrl,
+          context: { url: diagnosticUrl, timeoutMs: timeoutMs || 5000 },
+        })
+      }
+      if (error && error.code) throw error
+      throw makeRpcError({
+        code: 'COLYSEUS_HTTP_UNAVAILABLE',
+        error: 'Unable to reach Colyseus HTTP endpoint: ' + diagnosticUrl,
+        context: { url: diagnosticUrl, cause: error && error.message ? error.message : String(error) },
+      })
     } finally {
       clearTimeout(timer)
+    }
+  }
+
+  function requestUrlForDiagnostics(value) {
+    try {
+      var parsed = new URL(value)
+      parsed.username = ''
+      parsed.password = ''
+      parsed.search = ''
+      parsed.hash = ''
+      return parsed.toString().replace(/\/$/, '')
+    } catch {
+      return '[invalid request URL]'
     }
   }
 
@@ -519,7 +578,10 @@
   }
 
   function isTransientCatalogIdentityError(error) {
-    return /(?:timeout|network|fetch|connect|closed)/i.test(catalogIdentityErrorMessage(error))
+    var code = error && error.code ? String(error.code) : ''
+    return code === 'COLYSEUS_HTTP_TIMEOUT'
+      || code === 'COLYSEUS_HTTP_UNAVAILABLE'
+      || /(?:timeout|network|fetch|connect|closed|unavailable|unable to reach)/i.test(catalogIdentityErrorMessage(error))
   }
 
   function serverOriginForDiagnostics(baseUrl) {
@@ -540,7 +602,9 @@
           continue
         }
         var wrapped = new Error('Profile Identity request failed [' + label + '] ' + origin + ' (attempt ' + attempt + '/' + maxAttempts + '): ' + catalogIdentityErrorMessage(error))
-        wrapped.code = error && error.code ? error.code : (transient ? 'PROFILE_IDENTITY_TRANSPORT_FAILED' : 'PROFILE_IDENTITY_REQUEST_FAILED')
+        wrapped.code = transient
+          ? 'PROFILE_IDENTITY_TRANSPORT_FAILED'
+          : (error && error.code ? error.code : 'PROFILE_IDENTITY_REQUEST_FAILED')
         wrapped.context = { scope: label, origin: origin, attempt: attempt, maxAttempts: maxAttempts, reason: catalogIdentityErrorMessage(error) }
         throw wrapped
       }
@@ -551,7 +615,7 @@
   function isConnected() { return _subscribed }
   function isAuthoritySyncing() { return _authoritySyncing }
 
-  window.RvBWs = {
+  window.RvBColyseus = {
     connect: connect,
     disconnect: disconnect,
     send: send,

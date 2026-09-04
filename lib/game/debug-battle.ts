@@ -3,7 +3,7 @@ import { withoutServerSkills } from './battle-storage'
 import { hashBattleState, runBattleAction } from './battle-runner'
 import { loadJsonFilesServer } from './file-loader'
 import type { PieceTemplate } from './piece'
-import { alignmentToPieceFaction, normalizePlayerAlignment } from './room-store'
+import { alignmentToPieceFaction, normalizePlayerAlignment } from './room-model'
 import { createRootSeed } from './rule-runtime'
 import type { BattleState } from './turn'
 

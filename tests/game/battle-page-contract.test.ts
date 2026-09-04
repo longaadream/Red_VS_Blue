@@ -88,6 +88,32 @@ describe('battle page route contract', () => {
     }
   })
 
+  it('loads Electron battle data in one Profile-resolved bundle and primes synchronous engine reads', () => {
+    const battlePage = readPage('battle.html')
+    const runtimeSource = readFileSync(resolve(pagesDir, 'js/game-engine-runtime.js'), 'utf8')
+    const windowObject: Record<string, unknown> = {}
+    const context = createContext({ window: windowObject, console, Date, Math })
+
+    new Script(runtimeSource).runInContext(context)
+    const engineRuntime = windowObject.RvBGameEngine as {
+      primeJsonFiles: (files: Record<string, unknown>) => number
+    }
+    expect(engineRuntime.primeJsonFiles({
+      'data/pieces/manifest.json': ['sonic'],
+      'data/pieces/sonic.json': { id: 'sonic' },
+    })).toBe(2)
+    expect(new Script("window.require('fs').readFileSync('data/pieces/sonic.json')").runInContext(context))
+      .toBe('{"id":"sonic"}')
+
+    expect(battlePage).toContain("fetch('./__battle-data.json', { cache: 'no-store' })")
+    expect(battlePage).toContain("payload.schemaVersion !== 'rvb-client-battle-data/v1'")
+    expect(battlePage).toContain('RvBGameEngine.primeJsonFiles(files)')
+    expect(battlePage).toContain("files['data/tutorial/first-session.json']")
+    expect(battlePage).toContain('if (!tutorialDefinition)')
+    expect(battlePage).toContain('if (await loadElectronBattleDataBundle()) return { ok: true, errors: [] }')
+    expect(battlePage).toContain("loadJsonRequired('./data/pieces/manifest.json', errors)")
+  })
+
   it.each(['sonic', 'shadow', 'tails'])('creates %s training pieces from template-declared initial statuses and rules', (templateId) => {
     const battlePage = readPage('battle.html')
     const template = JSON.parse(readFileSync(resolve(process.cwd(), `data/pieces/${templateId}.json`), 'utf8'))
@@ -183,13 +209,14 @@ describe('battle page route contract', () => {
     expect(battlePage).toContain('winnerPlayerId')
     expect(battlePage).not.toContain('function checkClientGameOver')
     expect(battlePage).not.toMatch(/\bG\.(?:gameOver|winner)\b/)
-    expect(battlePage).not.toMatch(/RvBWs\.send\(\{\s*type:\s*['"]gameOver['"]/)
+    expect(battlePage).not.toMatch(/RvBColyseus\.send\(\{\s*type:\s*['"]gameOver['"]/)
     expect(battlePage).not.toMatch(/msg\.type\s*===\s*['"]gameOver['"]/)
-    expect(battlePage).not.toMatch(/RvBWs\.send\(\{\s*type:\s*['"]stateUpdate['"]/)
-    expect(battlePage).not.toMatch(/wsMode === ['"]relay['"] && wsRole === ['"]host['"] && G/)
-    expect(battlePage).toContain("if (wsMode === 'relay')")
-    expect(battlePage).toContain('已忽略旧 Relay 客户端权威动作')
-    expect(battlePage).toContain('已忽略非权威 Relay 恢复状态')
+    expect(battlePage).not.toMatch(/RvBColyseus\.send\(\{\s*type:\s*['"]stateUpdate['"]/)
+    expect(battlePage).not.toContain('colyseusMode')
+    expect(battlePage).not.toContain("msg.type === 'battleSnapshot'")
+    expect(battlePage).not.toContain("msg.type === 'actionLog'")
+    expect(battlePage).not.toContain("msg.type === 'pendingAction'")
+    expect(battlePage).not.toContain("msg.type === 'hostResume'")
   })
 
   it('keeps one responsive HUD, opposite-edge piece dock, and unsectioned curved hand', () => {
@@ -313,12 +340,13 @@ describe('battle page route contract', () => {
     expect(mobileCss).toMatch(/\.training-tools\s*\{[\s\S]*?bottom:\s*calc\(var\(--battle-hand-height\) \+ 10px\)/)
   })
 
-  it('routes the lobby training entry to battle.html training mode', () => {
+  it('routes training through local authority and tutorial directly to its local battle mode', () => {
     const lobby = readPage('index.html')
 
     expect(lobby).toContain("window.location.href = 'battle.html?mode=' + mode")
     expect(lobby).toContain("function goToTraining() { return goToLocalPractice('training') }")
-    expect(lobby).toContain("function goToTutorial() { return goToLocalPractice('tutorial') }")
+    expect(lobby).toContain("function goToTutorial() { window.location.href = 'battle.html?mode=tutorial' }")
+    expect(lobby).not.toContain("goToLocalPractice('tutorial')")
     expect(lobby).not.toMatch(/location\.href\s*=\s*['"]training\.html/)
   })
 
@@ -387,8 +415,8 @@ describe('battle page route contract', () => {
     const battlePage = readPage('battle.html')
 
     expect(battlePage).toContain('async function loadServerBattleDataFallback()')
-    expect(battlePage).toContain('RvBWs.request(method, data || {}, timeoutMs || 3500)')
-    expect(battlePage).toContain('RvBWs.requestAt(getServerUrl(), method, data || {}, timeoutMs || 3500)')
+    expect(battlePage).toContain('RvBColyseus.request(method, data || {}, timeoutMs || 3500)')
+    expect(battlePage).toContain('RvBColyseus.requestAt(getServerUrl(), method, data || {}, timeoutMs || 3500)')
     expect(battlePage).toContain("fetchServerJson('catalog.pieces')")
     expect(battlePage).toContain("fetchServerJson('catalog.skills')")
     expect(battlePage).toMatch(
@@ -592,7 +620,7 @@ describe('battle page route contract', () => {
     expect(logs.at(-1)).toContain('目标动作缺少有效类型')
   })
 
-  it('submits LAN and Relay actions without executing a local authority preview', async () => {
+  it('submits every multiplayer action through Colyseus without a local authority preview', async () => {
     const battlePage = readPage('battle.html')
     const sentMessages: unknown[] = []
     let actionSequence = 0
@@ -614,11 +642,8 @@ describe('battle page route contract', () => {
       roomId: 'room-red109',
       latestAuthorityVersion: 7,
       latestAuthorityStateHash: 'hash-7',
-      wsMode: 'lan',
-      wsRole: 'guest',
-      wsConnected: true,
-      relaySeq: 0,
-      RvBWs: {
+      colyseusConnected: true,
+      RvBColyseus: {
         isConnected: () => true,
         send: (message: unknown) => sentMessages.push(message),
       },
@@ -645,8 +670,6 @@ new Script([
     await new Script("doAction({ type: 'deploymentLock', playerId: 'player-red' })").runInContext(context)
     await new Script("doAction({ type: 'useBasicSkill', playerId: 'player-red', pieceId: 'caster', skillId: 'shot' })").runInContext(context)
     await new Script("doAction({ type: 'move', playerId: 'player-red', pieceId: 'caster', toX: 2, toY: 3 })").runInContext(context)
-    context.wsMode = 'relay'
-    context.wsRole = 'guest'
     await new Script("doAction({ type: 'playCard', playerId: 'player-red', cardInstanceId: 'choice-card' })").runInContext(context)
 
     const messages = JSON.parse(JSON.stringify(sentMessages)) as Array<Record<string, unknown>>
@@ -667,7 +690,6 @@ new Script([
     expect(messages[0].command).toMatchObject({ type: 'deploymentLock', clientActionId: 'client-1' })
     expect(messages[1].command).toMatchObject({ type: 'useBasicSkill', clientActionId: 'client-2' })
     expect(messages[2].command).toMatchObject({ type: 'move', clientActionId: 'client-3' })
-    expect(messages[3]).toMatchObject({ seq: 1, prevStateHash: 'hash-7' })
     expect(messages[3].command).toMatchObject({ type: 'playCard', clientActionId: 'client-4' })
   })
 
@@ -677,7 +699,7 @@ new Script([
     let stamped = false
     let sent = false
     const context = createContext({
-      RvBWs: {
+      RvBColyseus: {
         isAuthoritySyncing: () => true,
         send: () => { sent = true },
       },
@@ -808,7 +830,7 @@ new Script([
     expect(battlePage).toContain('body.target-mode-active #statusMsg')
   })
 
-  it('exposes deployment selection and irreversible confirmation while keeping relay choices private', () => {
+  it('exposes deployment selection and irreversible confirmation while keeping choices private', () => {
     const battlePage = readPage('battle.html')
     const browserEngine = readPage('js/game-engine.js')
 
@@ -823,13 +845,11 @@ new Script([
     expect(battlePage).toContain('id="deploymentStatus"')
     expect(battlePage).toContain('RvBDeploymentStatus.create')
     expect(battlePage).not.toContain('点击“确认部署”后不可更改')
-    expect(battlePage).toContain('var relayActionAuth = await createBattleActionAuth(action)')
-    expect(battlePage).toContain('RvBWs.send(battleAuthorityCommandMessage(action, relayActionAuth')
-    expect(battlePage).toContain('已忽略旧 Relay 客户端权威动作')
+    expect(battlePage).toContain('var actionAuth = await createBattleActionAuth(action)')
+    expect(battlePage).toContain('RvBColyseus.send(battleAuthorityCommandMessage(action, actionAuth')
+    expect(battlePage).not.toContain('relayActionAuth')
     expect(battlePage).not.toContain('relayAuthorityState')
-    expect(battlePage).not.toContain('runRelayAuthorityAction')
-    expect(battlePage).not.toContain('publishRelayAuthorityResult')
-    expect(battlePage).not.toContain("RvBWs.send({ type: 'stateUpdate'")
+    expect(battlePage).not.toContain("RvBColyseus.send({ type: 'stateUpdate'")
     expect(browserEngine).toContain('toPublicBattleState')
   })
 

@@ -11,14 +11,14 @@ describe('RED-161 default player transport', () => {
     for (const page of PLAYER_PAGES) {
       const source = await readFile(path.join(ROOT, 'data', 'pages', page), 'utf8')
       const sdk = source.indexOf('js/colyseus-sdk.js')
-      const adapter = source.indexOf('js/ws-client.js')
+      const adapter = source.indexOf('js/colyseus-client.js')
       expect(sdk, `${page} SDK tag`).toBeGreaterThan(0)
       expect(adapter, `${page} adapter tag`).toBeGreaterThan(sdk)
     }
   })
 
   it('routes room and battle traffic through Colyseus without the legacy websocket endpoint', async () => {
-    const source = await readFile(path.join(ROOT, 'data', 'pages', 'js', 'ws-client.js'), 'utf8')
+    const source = await readFile(path.join(ROOT, 'data', 'pages', 'js', 'colyseus-client.js'), 'utf8')
     expect(source).toContain('new Colyseus.Client(base)')
     expect(source).toContain("_client.joinById(_roomId")
     expect(source).toContain("_room.send('battleCommand', message)")
@@ -28,7 +28,7 @@ describe('RED-161 default player transport', () => {
   })
 
   it('routes authoritative rejections through the existing action-error interaction flow', async () => {
-    const source = await readFile(path.join(ROOT, 'data', 'pages', 'js', 'ws-client.js'), 'utf8')
+    const source = await readFile(path.join(ROOT, 'data', 'pages', 'js', 'colyseus-client.js'), 'utf8')
     expect(source).toContain("message && message.kind === 'rejected' ? 'actionError' : 'battleReceipt'")
   })
 
@@ -75,21 +75,24 @@ describe('RED-161 default player transport', () => {
     expect(builder.extraResources).toContainEqual({ from: '_client-postgres', to: 'postgres' })
   })
 
-  it('keeps legacy raw player WebSocket authority out of default dev/start and candidate startup', async () => {
+  it('removes legacy raw player WebSocket authority from dev/start and candidate startup', async () => {
     const packageJson = JSON.parse(await readFile(path.join(ROOT, 'package.json'), 'utf8'))
-    const instrumentation = await readFile(path.join(ROOT, 'instrumentation.ts'), 'utf8')
     const main = await readFile(path.join(ROOT, 'electron-client', 'main.ts'), 'utf8')
 
     expect(packageJson.scripts.dev).toBe('next dev')
     expect(packageJson.scripts.start).toBe('next start')
-    expect(instrumentation).toContain("process.env.ENABLE_LEGACY_PLAYER_WS === '1'")
-    expect(main).toContain("DISABLE_WS: '1'")
+    await expect(readFile(path.join(ROOT, 'instrumentation.ts'), 'utf8')).rejects.toThrow()
+    expect(main).not.toContain('DISABLE_WS')
   })
 
   it('bounds authority recovery to three attempts and keeps non-match recovery silent', async () => {
     const main = await readFile(path.join(ROOT, 'electron-client', 'main.ts'), 'utf8')
     expect(main).toContain('if (!expectedExit) void recoverUnexpectedLocalAuthorityExit(code)')
     expect(main).toContain('const LOCAL_AUTHORITY_AUTO_RECOVERY_MAX_ATTEMPTS = 3')
+    expect(main).toContain('const LOCAL_AUTHORITY_READY_TIMEOUT_MS = 240_000')
+    expect(main).toContain('readyTimeoutMs = LOCAL_AUTHORITY_READY_TIMEOUT_MS')
+    expect(main).toContain('startStableLocalServerAndRecover(undefined, LOCAL_AUTHORITY_READY_TIMEOUT_MS)')
+    expect(main).not.toContain('LOCAL_AUTHORITY_RECOVERY_READY_TIMEOUT_MS = 5_000')
     expect(main).toContain('localAuthorityRecoveryBudget.claimAttempt()')
     expect(main).toContain('localAuthorityRecoveryBudget.recordFailure()')
     expect(main).toContain('localAuthorityRecoveryBudget.recordSuccess()')
@@ -200,7 +203,7 @@ describe('RED-161 default player transport', () => {
       .toBeLessThan(lobbyGetter.indexOf('readStoredGameProfileIdentity()'))
   })
 
-  it('keeps SQLite and Prisma out of the new Colyseus authority modules', async () => {
+  it('keeps legacy persistence and RoomStore out of the Colyseus authority modules', async () => {
     const modules = [
       'battle-room.ts',
       'candidate-battle-store.ts',
@@ -209,16 +212,12 @@ describe('RED-161 default player transport', () => {
     ]
     for (const moduleFile of modules) {
       const source = await readFile(path.join(ROOT, 'lib', 'server', 'colyseus', moduleFile), 'utf8')
-      expect(source.toLowerCase(), moduleFile).not.toContain('sqlite')
-      expect(source.toLowerCase(), moduleFile).not.toContain('prisma')
       expect(source, moduleFile).not.toMatch(/import(?!\s+type)[^\n]+room-store/)
     }
   })
 
-  it('keeps the parallel Profile runtime fenced off from every legacy player authority ingress', async () => {
+  it('keeps Profile HTTP-only and makes Colyseus the only player authority', async () => {
     const main = await readFile(path.join(ROOT, 'electron-client', 'main.ts'), 'utf8')
-    const legacyWs = await readFile(path.join(ROOT, 'lib', 'ws-server.ts'), 'utf8')
-    const profileServer = await readFile(path.join(ROOT, 'scripts', 'ws-same-port-server.cjs'), 'utf8')
     const profileHealth = await readFile(path.join(ROOT, 'lib', 'content-pipeline', 'runtime', 'profile-runtime.ts'), 'utf8')
     const profileRuntime = main.slice(
       main.indexOf('async function startLocalServer('),
@@ -229,18 +228,16 @@ describe('RED-161 default player transport', () => {
       main.indexOf('function findServerEntry('),
     )
 
-    expect(profileRuntime).toContain("DISABLE_WS: '1'")
-    expect(profileRuntime).toContain("RVB_PROFILE_EXPECT_WEBSOCKET: '0'")
-    expect(profileRuntime).toContain("RVB_BATTLE_AUTHORITY_V2: '0'")
-    expect(profileRuntime).toContain("RVB_BATTLE_ASYNC_JOURNAL: '0'")
-    expect(profileRuntime).toContain("RVB_TURN_TIMER_ENABLED: '0'")
-    expect(profileHealth).toContain("process.env.RVB_PROFILE_EXPECT_WEBSOCKET !== '0'")
-    expect(profileHealth).toContain('webSocketExpected ? webSocketRunning : !webSocketRunning')
-    expect(gameAuthority).toContain("RVB_BATTLE_AUTHORITY_V2: '1'")
-    expect(gameAuthority).toContain("RVB_BATTLE_ASYNC_JOURNAL: '1'")
+    expect(profileRuntime).not.toContain('DISABLE_WS')
+    expect(profileRuntime).not.toContain('RVB_PROFILE_EXPECT_WEBSOCKET')
+    expect(profileRuntime).not.toContain('RVB_BATTLE_AUTHORITY_V2')
+    expect(profileRuntime).not.toContain('RVB_BATTLE_ASYNC_JOURNAL')
+    expect(profileHealth).not.toContain('webSocket')
+    expect(profileHealth).not.toContain('__rvbWss')
+    expect(gameAuthority).toContain('RVB_POSTGRES_URL: databaseUrl')
     expect(gameAuthority).toContain("RVB_TURN_TIMER_ENABLED: '1'")
-    expect(legacyWs).toMatch(/await quiesceWsServer\(\)\s+if \(process\.env\.DISABLE_WS === '1'\) \{[\s\S]*?return\s+\}/)
-    expect(profileServer).toMatch(/if \(typeof handler !== 'function'\) \{\s+rejectUpgrade\(socket, '503 WebSocket Service Unavailable'\)/)
+    await expect(readFile(path.join(ROOT, 'lib', 'ws-server.ts'), 'utf8')).rejects.toThrow()
+    await expect(readFile(path.join(ROOT, 'scripts', 'ws-same-port-server.cjs'), 'utf8')).rejects.toThrow()
   })
 
   it('opens locally predictable skill targeting without a preparatory network round trip', async () => {

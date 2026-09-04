@@ -5,7 +5,7 @@ import {
   getPieceById,
   isDemoPieceAdmitted,
 } from './piece-repository'
-import type { Player, Room } from './room-store'
+import type { Player, Room } from './room-model'
 
 export const DEMO_ROSTER_SIZE = 8
 export const DEMO_ROSTER_MANIFEST_VERSION = DEMO_PIECE_MANIFEST_VERSION

@@ -13,17 +13,36 @@ import {
 import { findFreePort } from '../../electron-client/local-port'
 
 const temporaryRoots: string[] = []
+const activeControllers = new Set<EmbeddedPostgresController>()
 const execFileAsync = promisify(execFile)
 
 afterAll(() => {
   for (const root of temporaryRoots) fs.rmSync(root, { recursive: true, force: true })
 })
 
-afterEach(() => {
+afterEach(async () => {
   vi.useRealTimers()
+  await Promise.all([...activeControllers].map(controller => controller.stop().catch(() => {})))
+  activeControllers.clear()
 })
 
 describe('RED-170 embedded PostgreSQL health monitor', () => {
+  it('monitors the PostgreSQL owner without spawning runtime readiness probes', () => {
+    const source = fs.readFileSync(path.resolve(__dirname, '../../electron-client/embedded-postgres.ts'), 'utf8')
+    const monitorSource = source.slice(
+      source.indexOf('private startHealthMonitor()'),
+      source.indexOf('async stop()'),
+    )
+    expect(source).toContain('const HEALTH_PROBE_INTERVAL_MS = 2_000')
+    expect(source).toContain('const INITIALIZATION_TIMEOUT_MS = 90_000')
+    expect(source).toContain('], this.commandEnv(), INITIALIZATION_TIMEOUT_MS)')
+    expect(monitorSource).toContain('intervalMs: HEALTH_PROBE_INTERVAL_MS')
+    expect(monitorSource).toContain('failureThreshold: 1')
+    expect(monitorSource).toContain('await this.queryPostgresProcessRunning()')
+    expect(monitorSource).toContain('process.kill(pid, 0)')
+    expect(monitorSource).not.toContain("this.executable('pg_isready')")
+  })
+
   it('runs probes single-flight and tolerates two transient failures', async () => {
     vi.useFakeTimers()
     let activeProbes = 0
@@ -108,14 +127,22 @@ describe.skipIf(process.platform !== 'win32')('RED-161 embedded PostgreSQL LAN a
       unprotectSecret: encrypted => encrypted.toString('utf8'),
       onUnexpectedExit: () => reportUnexpectedExit?.(),
     })
+    activeControllers.add(controller)
 
     const first = await controller.start()
     expect(first.url).toMatch(/^postgresql:\/\/rvb:[^@]+@127\.0\.0\.1:\d+\/rvb_colyseus\?sslmode=disable$/)
     const firstPool = new Pool({ connectionString: first.url, max: 1 })
-    const settings = await firstPool.query<{ listen_addresses: string; password_encryption: string }>(
-      'SELECT current_setting(\'listen_addresses\') AS listen_addresses, current_setting(\'password_encryption\') AS password_encryption',
+    const settings = await firstPool.query<{ listen_addresses: string; password_encryption: string; lc_ctype: string }>(
+      `SELECT current_setting('listen_addresses') AS listen_addresses,
+              current_setting('password_encryption') AS password_encryption,
+              datctype AS lc_ctype
+       FROM pg_database WHERE datname = current_database()`,
     )
-    expect(settings.rows).toEqual([{ listen_addresses: '127.0.0.1', password_encryption: 'scram-sha-256' }])
+    expect(settings.rows).toEqual([{
+      listen_addresses: '127.0.0.1',
+      password_encryption: 'scram-sha-256',
+      lc_ctype: 'C',
+    }])
     const activeHbaLines = fs.readFileSync(path.join(stateRoot, 'data', 'pg_hba.conf'), 'utf8')
       .split(/\r?\n/)
       .map(line => line.replace(/#.*/, '').trim())
@@ -148,7 +175,7 @@ describe.skipIf(process.platform !== 'win32')('RED-161 embedded PostgreSQL LAN a
     expect(fs.existsSync(path.join(stateRoot, 'data', 'PG_VERSION'))).toBe(true)
     expect(fs.existsSync(path.join(stateRoot, 'credential.bin'))).toBe(true)
     expect(fs.readdirSync(stateRoot).some(entry => entry.startsWith('.init-password-'))).toBe(false)
-  }, 90_000)
+  }, 180_000)
 
   it('fails closed before executing binaries when the runtime manifest is not the approved artifact', async () => {
     const packageRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'rvb-invalid-pg-runtime-'))

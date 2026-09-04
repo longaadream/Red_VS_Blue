@@ -9,7 +9,7 @@ const root = path.resolve(__dirname, '..', '..')
 
 type LogForwardingRecord = {
   event: 'electron.child-log-forwarding.error'
-  runtime: 'electron-server' | 'electron-client'
+  runtime: 'electron-client'
   stream: 'stdout' | 'stderr'
   side: 'source' | 'target' | 'write'
   code: string
@@ -107,7 +107,6 @@ function loadSafeLogForwarder(relativePath: string): AttachSafeLogForwarder {
 }
 
 const entries = [
-  ['electron/main.ts', 'electron-server'],
   ['electron-client/main.ts', 'electron-client'],
 ] as const
 
@@ -254,20 +253,12 @@ test.each(entries)('%s routes child stdout and stderr through the safe boundary'
 
   expect(source).not.toMatch(/\.stdout\?\.on\('data', \(d\) => process\.stdout\.write\(d\)\)/)
   expect(source).not.toMatch(/process\.stderr\.write\(d\)/)
-  expect(source.match(/attachSafeLogForwarder\(/g)).toHaveLength(
-    relativePath === 'electron-client/main.ts' ? 5 : 3,
-  )
+  expect(source.match(/attachSafeLogForwarder\(/g)).toHaveLength(5)
   expect(source).toContain(".on('error'")
   expect(source).toContain(".on('exit'")
 })
 
 test('keeps existing non-EPIPE child process failure feedback intact', () => {
-  const server = read('electron/main.ts')
-  expect(server).toContain("spawnedProcess.on('error', (err) => {")
-  expect(server).toContain("dialog.showErrorBox('服务器错误', String(err))")
-  expect(server).toContain('shouldReportServerStartupFailure(code, stoppedByRequest)')
-  expect(server).toContain("'服务器启动失败',")
-
   const client = read('electron-client/main.ts')
   expect(client).toContain("spawnedProcess.on('error', (err) => console.error('[client] server error:', err))")
   expect(client).toContain('if (serverProcess === spawnedProcess)')

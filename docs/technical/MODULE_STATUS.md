@@ -1,161 +1,45 @@
-# 模块状态与后续路线
+# 模块状态与验收入口
 
-状态：RED-9 代码核对稿
+更新：2026-09-03（RED-158 Phase F 主线同步）
 
-基线：`594977b`
+## Windows 当前状态
 
-## 人工审查入口
+| 模块 | 状态 | 当前入口 | 剩余验收 |
+| --- | --- | --- | --- |
+| 核心归约/Runner | 已实现并有自动回归 | `turn.ts`、`battle-runner.ts` | 完整套件与候选环境复核 |
+| 房间 FIFO/运行时隔离 | 已实现并有压力回归 | `room-authority-queue.ts`、`room-rule-runtime.ts` | 独立审查 |
+| Colyseus 房间权威 | 已实现并有真实 SDK 测试 | `lib/server/colyseus/**` | 双 Windows 人工联机 |
+| PostgreSQL journal/恢复 | 已实现 | `lib/server/postgres/**` | 外部测试库集成与故障演练 |
+| 战报/Trace/hash | 已实现并有篡改回归 | Repository + report HTTP | 双 Windows 终局战报体验 |
+| Electron Client | 已切换为唯一 Windows 产品；启动时准备本机 authority | `electron-client/main.ts` | 候选打包/安装/退出冒烟 |
+| 嵌入式 PostgreSQL | 已实现 SCRAM、持久化和清理失败关闭 | `electron-client/embedded-postgres.ts` | 候选包真实运行 |
+| 页面联机适配 | 已切换为 `RvBColyseus`；原 session 重连与精确 receipt 查询有自动回归 | `data/pages/js/colyseus-client.js` | 双端交互和断线恢复 |
+| Android | 本任务不修改 | Android 自身任务 | 后续独立合同 |
+| 独立 Relay | 本任务不修改 | `relay-server/` | 后续独立合同 |
 
-项目负责人当前只需确认四句话，无需一次读完其余技术细节：
+## RED-158 必验项目
 
-1. 当前版本作为故障基线，第一优先级是恢复真实安装、测试和启动链。
-2. Windows/Electron 与 Android 的目标是都能开服和加入，并共享 JS/TS 核心。
-3. 每局由当期服务端负责状态、规则和胜负；服务器可以有自己的规则。
-4. RED-9 只交付代码地图和问题索引，不解决加密、迁移、规则沙箱或公开回放。
+1. 一次建房只产生一个 roomId 和一张目录卡片。
+2. 第二台 Windows 通过该 roomId 直接加入，不出现目录预检超时。
+3. 双方完成阵营/阵容确认并进入战斗。
+4. 双方动作得到连续 receipt/transition 和一致公开 hash。
+5. 终局完成 durable barrier，战报可读取且 Trace/hash 验证通过。
+6. 主机退出后无 PostgreSQL/Colyseus 残留进程；重启后 durable 战报仍可读取。
+7. 静态 cutover 门禁、类型检查、相关自动测试和 Windows 包验证通过。
 
-当前唯一建议进入开发的下一任务：**恢复当前版本的依赖、现有测试和 Windows Electron 启动基线，并记录第一个真实失败点。**
+## 已知风险
 
-状态含义：
+- 这是 High Risk 跨模块切换，需要独立代码审查和人工方案/候选批准。
+- 没有 `RVB_TEST_POSTGRES_URL` 时真实外部 PostgreSQL 集成测试会跳过。
+- 大型 Vitest 套件在高文件并发下可能触发性能 gate 的机器争用，需要同时记录全量结果和聚焦 gate。
+- Android/Relay 与 Windows 当前权威不构成跨平台验收；不能把 Windows 通过扩展成 Android 已完成。
 
-- 已核对：入口和主要调用链已与当前代码核对。
-- 部分核对：可定位实现，但运行或边界尚未验证。
-- 待确认：无法从当前代码或现有测试确定。
-- 历史遗留：仍在仓库/发布链中，但不符合已确认方向。
+## 证据入口
 
-## 1. 模块状态表
+- [RED-158 Windows cutover](../qa/RED-158-colyseus-postgresql-windows-cutover.md)
+- [架构](./ARCHITECTURE.md)
+- [接口地图](./MODULE_INTERFACES.md)
+- [构建与运行](./BUILD_AND_RUN.md)
+- [调试](./DEBUGGING.md)
 
-| 模块 | 状态 | 真实入口 | 主要问题 | 建议下一步 |
-| --- | --- | --- | --- | --- |
-| 核心动作归约 | 已核对/未运行 | `lib/game/turn.ts::applyBattleAction()` | 文件过大、类型重复、动态效果 | 先补规则 harness，不立即拆分 |
-| 战斗初始化 | 部分核对 | `battle-setup.ts::createInitialBattleForPlayers()` | 全局触发器、seed 注入顺序 | 固定 seed 初始化测试 |
-| Runner/回放 | 部分核对 | `battle-runner.ts` | 输入隐式修改、RNG 恢复问题 | 状态 trace 与纯度测试 |
-| 技能/卡牌 | 部分核对 | `skills.ts` | 动态代码、模块缓存、日志分散 | 建最小技能 fixture 测试 |
-| 权威目标选择 | 已核对/已测试 | `targeting.ts::prepareAction()` | 真实远端服务与断线场景仍缺 | 补真实双端 WS E2E |
-| 触发器 | 部分核对 | `triggers.ts::globalTriggerSystem` | 进程级单例、并发隔离未知 | 多房间隔离测试 |
-| 权威终局 | 已核对/已测试 | `terminal.ts::finalizeBattleTerminal()` | 真实 Prisma 多实例与断线 E2E 尚缺 | 补候选环境双客户端验证 |
-| Colyseus 玩家权威 | RED-170 已实现/待人工候选 | `lib/server/colyseus/battle-room.ts` | 不提供跨进程 live migration | 双机完整一局与进程故障人工验收 |
-| Legacy LAN WebSocket | 历史兼容 | `ws-server.ts::startWsServer()` | 与 Colyseus 并行会产生双权威 | 仅 `ENABLE_LEGACY_PLAYER_WS=1` 诊断开启，后续删除 |
-| HTTP 动作 API | 已核对/已测试 | `rooms/[roomId]/battle::POST` | 错误 envelope 与 WS 仍有差异 | 统一版本化错误合同 |
-| Prisma RoomStore | 部分核对 | `RoomStore` | 外层无格式版本，字段读取重置 | 定义新格式并做 round-trip |
-| Electron 服务端 | 未运行 | `electron/main.ts` | 最后版本重大故障、启动链复杂 | 第一优先级冒烟基线 |
-| Electron 客户端 | RED-170 自动回归/待双机 | `electron-client/main.ts` | 本机活动局不提供跨进程续局 | 自动本机栈启动、三次恢复熔断/手动重试、双机 Host & Play 完整一局与 kill fault |
-| Android 客户端/服务端 | 正式产物/未验证 | `android-client`、`MobileHttpServer`、`mobile-server-entry.ts` | 生成物漂移；服务端外壳与 Windows 重复 | 双向开服冒烟和共享 Server Core |
-| 浏览器战斗 UI | 已核对/历史遗留 | `data/pages/battle.html` | 超大跨层文件、全局 `G` | 先记录状态边界，再逐步抽离 |
-| Relay | 遗留权威已禁用 | `relay-server` | standalone 服务尚未实现权威状态合同 | 重建服务后再启用在线战斗 |
-| Training/PVE | 非首要链路 | `app/api/training`、`app/api/pve` | 状态边界与 LAN 不同 | 基线稳定后单独核对 |
-| Electron IPC | 部分核对 | preload + `ipcMain` | 字符串协议、无共享类型 | 定义协议清单和错误 envelope |
-| 构建与运行文档 | 缺失 | `BUILD_AND_RUN.md` | 文件为空 | 故障定位后用真实证据补写 |
-| 自动测试 | 部分存在/已运行 | `tests/game`、`tests/roster-transports.test.ts` | 仍缺存档、真实 Prisma 多实例与移动端 E2E | 按模块补回归与候选验证 |
-
-## 2. 类型状态
-
-`BattleState`/`BattleAction` 至少在以下文件重复：
-
-- `lib/game/turn.ts`：当前规则核心使用。
-- `lib/game/battle-types.ts`：当前确认由 `lib/game/ai.ts` 导入，有效性待确认。
-- `lib/game/training-types.ts`：训练模式自己的相似类型。
-
-当前决定：全部保留并标注调用方，不宣布 `battle-types.ts` 已废弃。未来任务应先生成 import 清单和结构差异，再决定采用共享类型、适配器还是版本化协议。
-
-## 3. 历史问题清单
-
-### P0：阻塞公开测试基线
-
-- 当前版本存在未定位重大运行问题。
-- 没有经过验证的 BUILD_AND_RUN。
-- 本地依赖未安装，现有测试状态未知。
-- Android 生成物是否来自当前源码不可证明。
-
-### P1：严重影响定位
-
-- 不同运行模式使用不同状态权威。
-- 日志和错误缺少统一上下文。
-- 随机、时间和全局触发器不能完整隔离/回放。
-- 存档外层格式无正式版本；新格式兼容边界尚未建立。
-- UI 中存在胜负和部分规则判断。
-
-### P2：协作和维护成本
-
-- 公共类型重复。
-- Electron/WS/Relay 使用不同字符串协议。
-- `battle.html`、`turn.ts`、`skills.ts` 职责集中。
-- 生成资源与源码关系不清。
-- Next 构建忽略 TypeScript build errors。
-
-## 4. 已确认产品与技术方向
-
-1. 首要 Demo 是 LAN Windows/Electron + Android；两端均可开服和加入，同一设备可同时运行独立服务端与客户端角色。
-2. 当前提交作为正式故障基线，不回退到旧版本猜测正确实现。
-3. JS/TS 源代码成为唯一真实源，Android 安装包是可追踪的生成产物。
-4. 不兼容任何公开测试前旧存档；兼容承诺从新的版本化格式开始。
-5. 账号和服务器均去中心化；服务器规则自治，胜负由当期权威服务端裁决。
-6. 文档、测试和日志先行，不进行“重构整个项目”的超大改动。
-7. 存档签名、加密恢复、规则沙箱和公开回放属于已延期愿景，不是 Demo 当前承诺。
-
-## 5. 后续模块队列
-
-以下是队列，不是一次性计划。只有阶段 A 现在进入执行；后续阶段必须重新确认任务合同。
-
-### 阶段 A：恢复基线
-
-1. 记录并固定 Windows/Node/npm/Java/Android 工具链。
-2. 定位当前版本第一个安装、测试、启动或打包失败点。
-3. 完成 Electron server + Electron client 最小 LAN 冒烟。
-4. 完成 Android 加入 Windows LAN 房间的冒烟。
-5. 完成 Android 开服、Windows 加入的反向冒烟。
-6. 用验证证据填写 `BUILD_AND_RUN.md`。
-
-### 阶段 B：提高可观察性
-
-1. 统一启动、连接、动作、存储、广播错误上下文。
-2. 建立脱敏状态导出和状态 hash。
-3. 在 Android 产物写入 commit、构建时间和引擎 hash。
-4. 清点空 catch，并按调用链逐项处理，不做全库机械替换。
-
-### 阶段 C：建立确定性
-
-1. 统一可注入 RNG，确保 seed 在初始化前生效。
-2. 引入可注入 clock。
-3. 统一 action trace 和 replay 格式。
-4. 建立固定 seed 的完整核心流程回归。
-
-### 阶段 D：建立新存档兼容边界
-
-1. 定义新外层存档版本、动作序号、hash 链和 server term 字段。
-2. 建立保存—读取 round-trip 测试。
-3. 从首个公开版本开始维护兼容矩阵。
-4. 公开测试前旧存档明确拒绝，不做静默猜测或迁移。
-
-### 阶段 E：收敛模块边界
-
-1. Windows/Electron 与浏览器已统一服务端胜负归约；移动端在新框架中另行接入，只显示结果。
-2. 核对并收敛重复状态类型。
-3. 建立共享 WS/Electron 协议类型。
-4. 最后再逐步拆分 `battle.html`、`turn.ts` 和 `skills.ts`。
-
-### 延期模块：长期 High Risk 愿景
-
-1. 玩家/服务端身份、双签名动作链和服务端任期。
-2. 端到端加密、隐藏状态、账号和服务器恢复/撤销。
-3. 多方随机贡献、秘密 seed 和终局随机审计包。
-4. 服务器规则下载、脚本沙箱、声明式 UI 和资源配额。
-5. 服务器迁移/备份、数据库导入身份和历史统计规则。
-6. 自动匿名公开回放、视角权限和社交账号加密备份网站。
-
-上述内容各自需要 ADR、威胁模型、安全审查和跨平台测试，不作为第一版 Demo 的整体前置条件。
-
-## 6. 明确不在 RED-9 中处理
-
-- 不修改规则、数值、UI 或存档。
-- 不删除 `battle-types.ts` 或历史生成物。
-- 不升级依赖。
-- 不修复当前重大故障。
-- 不确定 Relay/PVE 的最终产品地位；Android 内嵌服务明确属于公开测试的对等开服范围。
-- 不宣布任何测试、构建或安装包已通过验证。
-
-## 7. 人工确认点
-
-- Android 构建的正式工具链版本。
-- Relay 和 PVE 是否进入公开测试范围。
-- `battle-types.ts` 的历史用途和仍需支持的调用方。
-- 具体密码算法、密钥存储 API、规则沙箱 ABI 和公开回放托管方式；这些尚未选择。
+AI 只能报告“实现完成并等待人工验收”，不能代替项目负责人确认最终产品体验、合并或发布。

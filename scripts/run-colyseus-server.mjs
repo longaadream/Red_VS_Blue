@@ -8,7 +8,7 @@ const host = process.env.RVB_COLYSEUS_HOST?.trim() || '127.0.0.1'
 
 await server.listen(port, host)
 const restoredRoomIds = await restoreProductRooms()
-console.log(`[colyseus] RED-161 product authority listening on ws://${host}:${port}`)
+console.log(`[colyseus] RED-161 product authority listening on http://${host}:${port}`)
 console.log(`[colyseus] health: http://${host}:${port}/healthz`)
 if (restoredRoomIds.length > 0) console.log(`[colyseus] restored ${restoredRoomIds.length} durable room(s)`)
 

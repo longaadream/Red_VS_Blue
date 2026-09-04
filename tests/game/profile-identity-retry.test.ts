@@ -38,14 +38,14 @@ function loadWsClient(outcomes: Outcome[]) {
     console: { ...console, warn: (...args: unknown[]) => warnings.push(args) },
   })
   new Script(
-    readFileSync(resolve(process.cwd(), 'data/pages/js/ws-client.js'), 'utf8'),
-    { filename: 'ws-client.js' },
+    readFileSync(resolve(process.cwd(), 'data/pages/js/colyseus-client.js'), 'utf8'),
+    { filename: 'colyseus-client.js' },
   ).runInContext(context)
 
   return {
     urls,
     warnings,
-    ws: browserWindow.RvBWs as {
+    ws: browserWindow.RvBColyseus as {
       requestCatalogIdentityAt(
         baseUrl: string,
         scope: string,

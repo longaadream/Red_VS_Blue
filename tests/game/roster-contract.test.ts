@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { DEFAULT_PIECES, getDemoPieceIds } from '../../lib/game/piece-repository'
 import type { PieceTemplate } from '../../lib/game/piece'
-import type { Room } from '../../lib/game/room-store'
+import type { Room } from '../../lib/game/room-model'
 import {
   DEMO_ROSTER_MANIFEST_VERSION,
   DEMO_ROSTER_SIZE,

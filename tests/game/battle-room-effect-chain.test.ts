@@ -27,8 +27,6 @@ import { FakeAuthorityRepository } from '../colyseus/fake-authority-repository'
 
 describe('RED-139 real Colyseus BattleRoom boundary', () => {
   it('rejects an attached EffectChain fatal without a transition, then emits a JSON-safe normal transition', async () => {
-    const previousAuthorityFlag = process.env.RVB_BATTLE_AUTHORITY_V2
-    process.env.RVB_BATTLE_AUTHORITY_V2 = '1'
     const roomId = 'red139-colyseus-effect-chain-fatal'
     const repository = new FakeAuthorityRepository()
     const journal = new PostgresAuthorityJournal(repository, {
@@ -160,8 +158,6 @@ describe('RED-139 real Colyseus BattleRoom boundary', () => {
       if (room) await room.leave()
       if (listening) await candidate.server.gracefullyShutdown(false)
       closeRoomRuleRuntime(roomId, 'red139-test-complete')
-      if (previousAuthorityFlag === undefined) delete process.env.RVB_BATTLE_AUTHORITY_V2
-      else process.env.RVB_BATTLE_AUTHORITY_V2 = previousAuthorityFlag
     }
   }, 20_000)
 })

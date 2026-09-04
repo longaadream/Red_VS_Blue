@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { Script, createContext } from 'node:vm'
 
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest'
 
 import { hashPublicBattleState } from '@/lib/game/battle-public-patch'
 import { hashBattleState } from '@/lib/game/battle-runner'
@@ -16,7 +16,6 @@ import {
   type DeploymentRoomStore,
 } from '@/lib/game/room-battle-actions'
 import {
-  isBattleAuthorityV2Enabled,
   replayBattleAuthorityTransitions,
   type BattleAuthorityCheckpointRecord,
   type BattleAuthorityReceipt,
@@ -24,13 +23,12 @@ import {
 } from '@/lib/game/battle-transition'
 import { RuleRuntime } from '@/lib/game/rule-runtime'
 import { DEMO_ROSTER_MANIFEST_VERSION, getDefaultDemoRosterSelection } from '@/lib/game/roster-contract'
-import type { Room } from '@/lib/game/room-store'
+import type { Room } from '@/lib/game/room-model'
 import type { BattleAction } from '@/lib/game/turn'
 import { getServerGameProfileIdentityV1 } from '@/lib/content-pipeline/runtime/profile-game-identity'
 import { makePiece, makeState } from '../helpers/minimal-state'
 import { createTestServerBattleState, pinTestBattleState } from './profile-test-identity'
 
-const originalAuthorityV2Flag = process.env.RVB_BATTLE_AUTHORITY_V2
 const TEST_PROFILE_IDENTITY = getServerGameProfileIdentityV1()
 
 interface BrowserTraceTools {
@@ -64,12 +62,6 @@ function loadBrowserTraceTools(): BrowserTraceTools {
   new Script(source, { filename: 'match-trace.js' }).runInContext(context)
   return (context.window as { RvBDeveloperTools: BrowserTraceTools }).RvBDeveloperTools
 }
-
-beforeAll(() => { process.env.RVB_BATTLE_AUTHORITY_V2 = '1' })
-afterAll(() => {
-  if (originalAuthorityV2Flag === undefined) delete process.env.RVB_BATTLE_AUTHORITY_V2
-  else process.env.RVB_BATTLE_AUTHORITY_V2 = originalAuthorityV2Flag
-})
 
 class AuthorityV2MemoryStore implements DeploymentRoomStore {
   room: Room
@@ -180,14 +172,6 @@ class AuthorityV2MemoryStore implements DeploymentRoomStore {
 }
 
 describe('RED-109 authority v2 coordinator', () => {
-  it('keeps authority v2 disabled unless the candidate flag is explicitly enabled', () => {
-    delete process.env.RVB_BATTLE_AUTHORITY_V2
-    expect(isBattleAuthorityV2Enabled()).toBe(false)
-    process.env.RVB_BATTLE_AUTHORITY_V2 = 'true'
-    expect(isBattleAuthorityV2Enabled()).toBe(true)
-    process.env.RVB_BATTLE_AUTHORITY_V2 = '1'
-  })
-
   it('initializes the version-zero checkpoint with the projected public hash', async () => {
     let currentRoom: Room = {
       id: 'red109-initial-checkpoint',
@@ -401,28 +385,6 @@ describe('RED-109 authority v2 coordinator', () => {
     expect(store.transitions).toHaveLength(1)
     expect(store.room.version).toBe(9)
     expect(store.room.battleAuthorityVersion).toBe(2)
-  })
-
-  it('falls back to the legacy room CAS and metadata version when v2 is disabled', async () => {
-    const previousFlag = process.env.RVB_BATTLE_AUTHORITY_V2
-    process.env.RVB_BATTLE_AUTHORITY_V2 = '0'
-    try {
-      const store = new AuthorityV2MemoryStore(makeRoom())
-      const result = await dispatchRoomBattleAction(store, store.room.id, 'player-red', deploymentChoice('legacy-fallback'), {
-        expectedAuthorityVersion: 1,
-        clock: { now: () => 2_000 },
-      })
-
-      expect(result.kind).toBe('applied')
-      expect(result.transition).toBeUndefined()
-      expect(result.receipt).toBeUndefined()
-      expect(result.snapshot.authorityVersion).toBe(10)
-      expect(store.room.version).toBe(10)
-      expect(store.room.battleAuthorityVersion).toBe(1)
-    } finally {
-      if (previousFlag === undefined) delete process.env.RVB_BATTLE_AUTHORITY_V2
-      else process.env.RVB_BATTLE_AUTHORITY_V2 = previousFlag
-    }
   })
 
   it('atomically supplies a version-zero base checkpoint for an in-progress room migrated to v2', async () => {

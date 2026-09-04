@@ -19,7 +19,7 @@ describe('RED-127 player networking boundary', () => {
     expect(source).not.toContain('HTTP fallback')
   })
 
-  it('uses the same WebSocket room RPC path for LAN and relay', () => {
+  it('uses one Colyseus room path for every authority origin', () => {
     const lobby = readFileSync(resolve('data/pages/lobby.html'), 'utf8')
     const room = readFileSync(resolve('data/pages/room.html'), 'utf8')
     const selection = readFileSync(resolve('data/pages/piece-selection.html'), 'utf8')
@@ -28,14 +28,16 @@ describe('RED-127 player networking boundary', () => {
     expect(room).not.toMatch(/finally\s*\{[\s\S]*?readyBtn'\)\.disabled = false/)
     expect(room).not.toContain('roomJson(')
     expect(selection).not.toContain('falling back to HTTP')
-    expect(room).not.toMatch(/if \(shouldUseRelayMode\(\)\) \{[\s\S]*?btn\.disabled = true/)
+    expect(lobby).not.toContain('shouldUseRelayMode')
+    expect(room).not.toContain('shouldUseRelayMode')
+    expect(selection).not.toContain('shouldUseRelayMode')
   })
 
   it('uses the Colyseus endpoint health and content identity for connection checks', () => {
     const index = readFileSync(resolve('data/pages/index.html'), 'utf8')
     const discovery = readFileSync(resolve('data/pages/js/lan-discover.js'), 'utf8')
-    const websocket = readFileSync(resolve('data/pages/js/ws-client.js'), 'utf8')
-    expect(index).toContain('RvBWs.requestCatalogIdentityAt')
+    const websocket = readFileSync(resolve('data/pages/js/colyseus-client.js'), 'utf8')
+    expect(index).toContain('RvBColyseus.requestCatalogIdentityAt')
     expect(websocket).toContain("if (method === 'catalog.identity') return fetchJson(base + '/catalog/identity', timeoutMs)")
     expect(discovery).not.toContain('fetch(')
   })
@@ -52,7 +54,7 @@ describe('RED-116 Electron lobby profile bridge', () => {
     expect(body).toContain('await getLocalGameProfileIdentity(serverUrl)')
     expect(body.indexOf('await getLocalGameProfileIdentity(serverUrl)'))
       .toBeLessThan(body.indexOf('goLobby(mode, serverUrl)'))
-    expect(body).toContain("RvBWs.requestCatalogIdentityAt(serverUrl, 'remote-server')")
+    expect(body).toContain("RvBColyseus.requestCatalogIdentityAt(serverUrl, 'remote-server')")
     expect(body).toContain("console.warn('[profile] remote catalog identity preflight failed', error)")
   })
 
@@ -74,7 +76,7 @@ describe('RED-116 Electron lobby profile bridge', () => {
   })
 
   it('resolves the client local runtime through trusted game IPC', () => {
-    const websocket = readFileSync(resolve('data/pages/js/ws-client.js'), 'utf8')
+    const websocket = readFileSync(resolve('data/pages/js/colyseus-client.js'), 'utf8')
     expect(websocket).toContain("if (method === 'catalog.identity') return fetchJson(base + '/catalog/identity', timeoutMs)")
 
     for (const page of ['index.html', 'lobby.html']) {

@@ -417,15 +417,15 @@ describe('relay deployment initialization', () => {
     expect(page).not.toContain('publishRelayAuthorityResult')
   })
 
-  it('submits Relay commands through Colyseus and ignores legacy host-authority messages', () => {
+  it('submits every multiplayer command through Colyseus without host-authority compatibility', () => {
     const page = readFileSync(resolve(process.cwd(), 'data/pages/battle.html'), 'utf8')
-    const wsClient = readFileSync(resolve(process.cwd(), 'data/pages/js/ws-client.js'), 'utf8')
+    const wsClient = readFileSync(resolve(process.cwd(), 'data/pages/js/colyseus-client.js'), 'utf8')
 
-    expect(page).toContain('var relayActionAuth = await createBattleActionAuth(action)')
-    expect(page).toContain('RvBWs.send(battleAuthorityCommandMessage(action, relayActionAuth')
+    expect(page).toContain('var actionAuth = await createBattleActionAuth(action)')
+    expect(page).toContain('RvBColyseus.send(battleAuthorityCommandMessage(action, actionAuth')
     expect(page).toContain('expectedAuthorityVersion: Number.isSafeInteger(latestAuthorityVersion)')
-    expect(page).toContain('已忽略旧 Relay 客户端权威动作')
-    expect(page).toContain('已忽略非权威 Relay 恢复状态')
+    expect(page).not.toContain("msg.type === 'pendingAction'")
+    expect(page).not.toContain("msg.type === 'hostResume'")
     expect(page).not.toContain('postLocalRelayInitialization')
     expect(page).not.toContain('verifyRelayBattleActionAuth')
     expect(page).not.toContain('relayAuthorityState')

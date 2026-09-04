@@ -48,6 +48,8 @@ describe('RED-171 game-style main menu layout contract', () => {
     expect(page).toContain('第一次来？')
     expect(page).toContain('id="tutorialEntryDescription"')
     expect(page.match(/onclick="goToTutorial\(\)"/g)).toHaveLength(1)
+    expect(page).toMatch(/function goToTutorial\(\)\s*\{\s*window\.location\.href = 'battle\.html\?mode=tutorial'\s*\}/)
+    expect(page).not.toContain("goToLocalPractice('tutorial')")
   })
 
   it('uses a two-column desktop shell and structural narrow-screen reflow', () => {
@@ -70,5 +72,20 @@ describe('RED-171 game-style main menu layout contract', () => {
     for (const handler of ['showHostSheet', 'showJoinSheet', 'showConnectSheet', 'openIdentitySheet', 'openRecordsSheet']) {
       expect(page).toMatch(new RegExp(`function ${handler}\\(`))
     }
+  })
+
+  it('reuses one verified PostgreSQL report read across the summary and records sheet', () => {
+    expect(page).toContain('var _recordsLoadInFlight = null')
+    expect(page).toContain('var _recordsCache = null')
+    expect(page).toMatch(/if \(_recordsCache && _recordsCache\.key === cacheKey\) return _recordsCache\.records\.slice\(\)/)
+    expect(page).toMatch(/if \(_recordsLoadInFlight && _recordsLoadInFlight\.key === cacheKey\) return _recordsLoadInFlight\.promise/)
+    expect(page).toMatch(/_recordsCache = \{ key: cacheKey, records \}/)
+    expect(page).toMatch(/if \(_recordsLoadInFlight && _recordsLoadInFlight\.promise === promise\) _recordsLoadInFlight = null/)
+    expect(page).toContain('async function retryRecordsSheet()')
+    expect(page).toContain("RvBUtils.getServerModeForUrl(serverUrl) === 'local'")
+    expect(page).toContain('await window.electronAPI.ensureLocalAuthority()')
+    expect(page).toContain("RvBUtils.saveServerConfig({ mode: 'local', url: mode.localUrl })")
+    expect(page).toMatch(/function _recordsLoadErrorMarkup[\s\S]*?role="alert"[\s\S]*?retryRecordsSheet\(\)[\s\S]*?重试/)
+    expect(page).toContain("_recordsLoadErrorMarkup('权威战绩读取失败')")
   })
 })

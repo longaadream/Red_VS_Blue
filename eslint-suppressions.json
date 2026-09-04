@@ -32,42 +32,12 @@
       "count": 6
     }
   },
-  "app/api/debug/battle/route.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 7
-    }
-  },
-  "app/api/lobby/route.ts": {
-    "@typescript-eslint/no-unused-vars": {
-      "count": 1
-    }
-  },
   "app/api/maps/route.ts": {
     "@typescript-eslint/no-unused-vars": {
       "count": 1
     }
   },
   "app/api/pieces/route.ts": {
-    "@typescript-eslint/no-unused-vars": {
-      "count": 1
-    }
-  },
-  "app/api/rooms/[roomId]/actions/route.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 1
-    }
-  },
-  "app/api/rooms/[roomId]/battle/route.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 2
-    }
-  },
-  "app/api/rooms/[roomId]/join/route.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 2
-    }
-  },
-  "app/api/rooms/route.ts": {
     "@typescript-eslint/no-unused-vars": {
       "count": 1
     }
@@ -166,11 +136,6 @@
       "count": 3
     }
   },
-  "data/pages/js/ws-client.js": {
-    "@typescript-eslint/no-unused-vars": {
-      "count": 2
-    }
-  },
   "electron-client/main.ts": {
     "@typescript-eslint/no-unused-vars": {
       "count": 2
@@ -188,16 +153,6 @@
   },
   "electron-editor/preload.ts": {
     "@typescript-eslint/no-explicit-any": {
-      "count": 1
-    }
-  },
-  "electron/main.ts": {
-    "@typescript-eslint/no-unused-vars": {
-      "count": 1
-    }
-  },
-  "electron/resource-pack-store.ts": {
-    "@typescript-eslint/no-require-imports": {
       "count": 1
     }
   },
@@ -248,14 +203,6 @@
   "lib/game/piece.ts": {
     "@typescript-eslint/no-explicit-any": {
       "count": 1
-    }
-  },
-  "lib/game/room-store.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 1
-    },
-    "@typescript-eslint/no-unused-vars": {
-      "count": 3
     }
   },
   "lib/game/rule-loader.ts": {
@@ -313,11 +260,6 @@
   "lib/resource-pack.ts": {
     "@typescript-eslint/no-explicit-any": {
       "count": 1
-    }
-  },
-  "lib/ws-server.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 11
     }
   },
   "mobile-server/db-shim.ts": {
@@ -422,11 +364,6 @@
       "count": 2
     }
   },
-  "scripts/init-db.js": {
-    "@typescript-eslint/no-require-imports": {
-      "count": 2
-    }
-  },
   "scripts/migrate-player-ids.js": {
     "@typescript-eslint/no-require-imports": {
       "count": 2
@@ -465,21 +402,6 @@
   "test-nilasec-fix.js": {
     "@typescript-eslint/no-require-imports": {
       "count": 2
-    }
-  },
-  "test-room-deletion-fix.js": {
-    "@typescript-eslint/no-require-imports": {
-      "count": 1
-    }
-  },
-  "test-room-deletion.js": {
-    "@typescript-eslint/no-require-imports": {
-      "count": 3
-    }
-  },
-  "test-room-storage.js": {
-    "@typescript-eslint/no-require-imports": {
-      "count": 3
     }
   },
   "test-status-json.js": {

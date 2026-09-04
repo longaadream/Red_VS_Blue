@@ -14,16 +14,6 @@
   var LOCAL_SERVER_KEY = 'rvb_local_server_url'
   var LAN_SERVER_KEY = 'rvb_lan_server_url'
   var REMOTE_SERVER_KEY = 'rvb_remote_server_url'
-  var LEGACY_WS_KEYS = ['rvb_ws_port', 'rvb_ws_port_server_url', 'rvb_ws_port_source']
-
-  function clearLegacyWebSocketConfig() {
-    try {
-      LEGACY_WS_KEYS.forEach(function (key) { localStorage.removeItem(key) })
-    } catch {}
-  }
-
-  clearLegacyWebSocketConfig()
-
   function normalizeServerUrl(url) {
     return String(url || '').trim().replace(/\/+$/, '')
   }
@@ -255,7 +245,6 @@
     localStorage.removeItem(LOCAL_SERVER_KEY)
     localStorage.removeItem(LAN_SERVER_KEY)
     localStorage.removeItem(REMOTE_SERVER_KEY)
-    clearLegacyWebSocketConfig()
     if (window.RvBBridge && typeof window.RvBBridge.clearUrl === 'function') {
       window.RvBBridge.clearUrl()
     }

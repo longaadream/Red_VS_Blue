@@ -23,7 +23,7 @@ import type {
   BattleAuthorityReceipt,
   BattleAuthorityTransitionRecord,
 } from '@/lib/game/battle-transition'
-import type { Room } from '@/lib/game/room-store'
+import type { Room } from '@/lib/game/room-model'
 import { getBattleStorage } from '@/lib/game/battle-storage'
 import { TriggerSystem, type TriggerRule } from '@/lib/game/triggers'
 import type { BattleState } from '@/lib/game/turn'
@@ -556,9 +556,7 @@ describe('RED-141 room rule runtime isolation', () => {
   }, 20_000)
 
   it('matches real online dispatch receipts and states for two interleaved 100-transition rooms', async () => {
-    const previousAuthorityFlag = process.env.RVB_BATTLE_AUTHORITY_V2
-    process.env.RVB_BATTLE_AUTHORITY_V2 = '1'
-    try {
+    {
       const soloA = await runOnlineSolo('dispatch-solo-a', 'dispatch-state-a', 1441)
       const soloB = await runOnlineSolo('dispatch-solo-b', 'dispatch-state-b', 1442)
 
@@ -598,16 +596,11 @@ describe('RED-141 room rule runtime isolation', () => {
       expect(interleavedB).toEqual(soloB)
       expect(interleavedA.authorityVersion).toBe(100)
       expect(interleavedB.authorityVersion).toBe(100)
-    } finally {
-      if (previousAuthorityFlag === undefined) delete process.env.RVB_BATTLE_AUTHORITY_V2
-      else process.env.RVB_BATTLE_AUTHORITY_V2 = previousAuthorityFlag
     }
   }, 120_000)
 
   it('keeps real online failures and stalled commits inside the owning room while peers ACK', async () => {
-    const previousAuthorityFlag = process.env.RVB_BATTLE_AUTHORITY_V2
-    process.env.RVB_BATTLE_AUTHORITY_V2 = '1'
-    try {
+    {
       const faultStore = new MultiRoomAuthorityStore([
         onlineRoom('dispatch-fault-a', 'dispatch-fault-state-a', 1451),
         onlineRoom('dispatch-healthy-b', 'dispatch-healthy-state-b', 1452),
@@ -641,16 +634,11 @@ describe('RED-141 room rule runtime isolation', () => {
       expect(concurrentStore.rooms.get(stalledRuntime.roomId)?.battleAuthorityVersion).toBe(0)
       commitBlock.release()
       await expect(stalled).resolves.toMatchObject({ receipt: { status: 'applied', authorityVersion: 1 } })
-    } finally {
-      if (previousAuthorityFlag === undefined) delete process.env.RVB_BATTLE_AUTHORITY_V2
-      else process.env.RVB_BATTLE_AUTHORITY_V2 = previousAuthorityFlag
     }
   }, 20_000)
 
   it('rejects an attached EffectChain fatal before the authority adapter can commit a transition', async () => {
-    const previousAuthorityFlag = process.env.RVB_BATTLE_AUTHORITY_V2
-    process.env.RVB_BATTLE_AUTHORITY_V2 = '1'
-    try {
+    {
       const roomId = 'dispatch-effect-chain-fatal'
       const store = new MultiRoomAuthorityStore([onlineRoom(roomId, roomId, 1471)])
       const runtime = restoreRoomRuleRuntime(roomId)
@@ -683,9 +671,6 @@ describe('RED-141 room rule runtime isolation', () => {
       })
       expect(fatalRule.limits).toEqual({ maxUses: 1, uses: 0, currentCooldown: 0 })
       expect(getActiveEffectChain(persisted)).toBeUndefined()
-    } finally {
-      if (previousAuthorityFlag === undefined) delete process.env.RVB_BATTLE_AUTHORITY_V2
-      else process.env.RVB_BATTLE_AUTHORITY_V2 = previousAuthorityFlag
     }
   })
 

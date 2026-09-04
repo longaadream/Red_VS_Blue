@@ -9,6 +9,7 @@ import { loadCardById } from '@/lib/game/skills'
 import { getAllSkills } from '@/lib/game/skill-repository'
 import { installNativeBattleSha256 } from '@/lib/server/battle-hash'
 import type { PostgresAuthorityBatchWriter } from '@/lib/server/postgres/authority-types'
+import type { PostgresBattleReportReader } from '@/lib/server/postgres/authority-types'
 import {
   PostgresAuthorityJournal,
   type PostgresAuthorityJournalOptions,
@@ -24,7 +25,7 @@ import {
 import { createDevelopmentBattleRoom } from './development-battle-fixture'
 
 export interface BattleServerRepository
-  extends CandidateAuthorityRepository, PostgresAuthorityBatchWriter {
+  extends CandidateAuthorityRepository, PostgresAuthorityBatchWriter, Partial<PostgresBattleReportReader> {
   initializeSchema(): Promise<void>
   healthCheck(): Promise<void>
   listRestorableRoomIds?(): Promise<string[]>
@@ -52,6 +53,7 @@ interface HealthResponse {
 
 interface JsonRequest {
   params?: Record<string, string | undefined>
+  query?: Record<string, unknown>
 }
 
 interface ExpressLikeApp {
@@ -63,12 +65,67 @@ interface ExpressLikeApp {
   get(path: string, handler: (request: JsonRequest, response: HealthResponse) => void | Promise<void>): void
 }
 
+interface ProductCreationClaim {
+  roomId: string
+  expiresAt: number
+}
+
+interface ProductRoomMetadata {
+  product?: boolean
+  room?: unknown
+  visibility?: string
+}
+
+export const POSTGRES_CONNECTION_TIMEOUT_MS = 30_000
+const POSTGRES_STARTUP_MAX_ATTEMPTS = 5
+const POSTGRES_STARTUP_MAX_RETRY_DELAY_MS = 5_000
+
+interface PostgresStartupOptions {
+  logger?: Pick<Console, 'error'>
+  sleep?: (delayMs: number) => Promise<void>
+}
+
+function isTransientPostgresStartupError(error: unknown): boolean {
+  const details = error && typeof error === 'object'
+    ? error as { code?: unknown; message?: unknown }
+    : {}
+  const code = typeof details.code === 'string' ? details.code : ''
+  if (code.startsWith('08') || ['53300', '53400', '57P03', '58000', '58030'].includes(code)) return true
+  const message = typeof details.message === 'string' ? details.message : String(error)
+  return /connection (?:terminated|timeout|refused|reset)|timed? ?out|ECONN(?:REFUSED|RESET)|database system is starting up|too many (?:clients|connections)/i.test(message)
+}
+
+export async function preparePostgresAuthority(
+  repository: Pick<BattleServerRepository, 'initializeSchema' | 'healthCheck'>,
+  options: PostgresStartupOptions = {},
+): Promise<void> {
+  const logger = options.logger ?? console
+  const sleep = options.sleep ?? (delayMs => new Promise(resolve => setTimeout(resolve, delayMs)))
+  for (let attempt = 1; attempt <= POSTGRES_STARTUP_MAX_ATTEMPTS; attempt += 1) {
+    try {
+      await repository.initializeSchema()
+      await repository.healthCheck()
+      return
+    } catch (error) {
+      if (!isTransientPostgresStartupError(error) || attempt === POSTGRES_STARTUP_MAX_ATTEMPTS) throw error
+      const details = error && typeof error === 'object'
+        ? error as { code?: unknown; message?: unknown }
+        : {}
+      const retryInMs = Math.min(500 * (2 ** (attempt - 1)), POSTGRES_STARTUP_MAX_RETRY_DELAY_MS)
+      logger.error('[colyseus-postgres] startup connection unavailable; retrying', {
+        attempt,
+        maxAttempts: POSTGRES_STARTUP_MAX_ATTEMPTS,
+        retryInMs,
+        code: typeof details.code === 'string' ? details.code : undefined,
+        message: typeof details.message === 'string' ? details.message : String(error),
+      })
+      await sleep(retryInMs)
+    }
+  }
+}
+
 export function createColyseusBattleServer(options: CreateColyseusBattleServerOptions = {}) {
-  // This runtime is the authority-v2 product boundary. Keep the flags local to
-  // the process so callers cannot accidentally start Colyseus on the legacy
-  // synchronous persistence path.
-  process.env.RVB_BATTLE_AUTHORITY_V2 ??= '1'
-  process.env.RVB_BATTLE_ASYNC_JOURNAL ??= '1'
+  // This runtime is the only Windows player-authority boundary.
   process.env.RVB_TURN_TIMER_ENABLED ??= '1'
   installNativeBattleSha256()
   const ownsRepository = !options.repository
@@ -78,11 +135,25 @@ export function createColyseusBattleServer(options: CreateColyseusBattleServerOp
     runtime: 'colyseus-postgresql',
     database: 'postgresql',
   }
+  const productCreationClaims = new Map<string, ProductCreationClaim>()
   const logger = options.logger ?? console
   const BattleRoom = createBattleRoomClass({
     repository,
     journal,
     fixtureFactory: options.fixtureFactory ?? createDevelopmentBattleRoom,
+    claimProductCreation: (creationKey, roomId) => {
+      const now = Date.now()
+      for (const [key, claim] of productCreationClaims) {
+        if (claim.expiresAt <= now) productCreationClaims.delete(key)
+      }
+      const existing = productCreationClaims.get(creationKey)
+      if (existing) return existing.roomId
+      productCreationClaims.set(creationKey, { roomId, expiresAt: now + 60_000 })
+      return undefined
+    },
+    releaseProductCreation: (creationKey, roomId) => {
+      if (productCreationClaims.get(creationKey)?.roomId === roomId) productCreationClaims.delete(creationKey)
+    },
   })
   let ready = false
   let healthError: string | undefined
@@ -96,8 +167,7 @@ export function createColyseusBattleServer(options: CreateColyseusBattleServerOp
     greet: false,
     beforeListen: async () => {
       try {
-        await repository.initializeSchema()
-        await repository.healthCheck()
+        await preparePostgresAuthority(repository, { logger })
         ready = true
         healthError = undefined
       } catch (error) {
@@ -151,12 +221,56 @@ export function createColyseusBattleServer(options: CreateColyseusBattleServerOp
       app.get('/catalog/skills', (_request, response) => response.status(200).json({ skills: getAllSkills() }))
       app.get('/rooms', async (_request, response) => {
         const listings = await matchMaker.query({ name: BATTLE_ROOM_TYPE })
-        const rooms = listings
-          .map(listing => listing.metadata as { product?: boolean; room?: unknown; visibility?: string } | undefined)
-          .filter(metadata => metadata?.product === true && metadata.visibility !== 'private')
-          .map(metadata => metadata?.room)
-          .filter(Boolean)
+        const rooms = collectProductRooms(listings, false)
         response.status(200).json({ rooms })
+      })
+      app.get('/rooms/:roomId', async (request, response) => {
+        const roomId = String(request.params?.roomId ?? '').trim().toLowerCase()
+        const listings = await matchMaker.query({ name: BATTLE_ROOM_TYPE })
+        const room = collectProductRooms(listings, true).find(candidate => candidate.id.toLowerCase() === roomId)
+        response.status(room ? 200 : 404).json(room
+          ? { room }
+          : { code: 'ROOM_NOT_FOUND', error: 'Room not found' })
+      })
+      app.get('/battle-reports/:battleId', async (request, response) => {
+        const battleId = String(request.params?.battleId ?? '').trim().toLowerCase()
+        if (!repository.readBattleReport) {
+          response.status(501).json({ code: 'BATTLE_REPORT_UNAVAILABLE', error: 'Battle report store is unavailable' })
+          return
+        }
+        try {
+          const report = await repository.readBattleReport(battleId)
+          response.status(report ? 200 : 404).json(report
+            ? { report }
+            : { code: 'BATTLE_REPORT_NOT_FOUND', error: 'Battle report not found' })
+        } catch (error) {
+          const code = typeof error === 'object' && error && 'code' in error
+            ? String(error.code)
+            : 'BATTLE_REPORT_INTEGRITY_FAILED'
+          response.status(code === 'BATTLE_REPORT_NOT_DURABLE' ? 409 : 500).json({
+            code,
+            error: error instanceof Error ? error.message : String(error),
+          })
+        }
+      })
+      app.get('/battle-reports', async (request, response) => {
+        const playerId = String(request.query?.playerId ?? '').trim()
+        if (!playerId) {
+          response.status(400).json({ code: 'PLAYER_ID_REQUIRED', error: 'playerId is required' })
+          return
+        }
+        if (!repository.listBattleReports) {
+          response.status(501).json({ code: 'BATTLE_REPORT_UNAVAILABLE', error: 'Battle report store is unavailable' })
+          return
+        }
+        try {
+          response.status(200).json({ reports: await repository.listBattleReports(playerId) })
+        } catch (error) {
+          response.status(500).json({
+            code: 'BATTLE_REPORT_INTEGRITY_FAILED',
+            error: error instanceof Error ? error.message : String(error),
+          })
+        }
       })
       app.get('/catalog/cards/:cardId', (request, response) => {
         const card = loadCardById(String(request.params?.cardId ?? ''))
@@ -189,15 +303,40 @@ export function createColyseusBattleServer(options: CreateColyseusBattleServerOp
   return { server, repository, journal, restoreProductRooms }
 }
 
+function collectProductRooms(
+  listings: ReadonlyArray<{ metadata?: unknown }>,
+  includePrivate: boolean,
+): Array<Record<string, unknown> & { id: string }> {
+  const byId = new Map<string, Record<string, unknown> & { id: string }>()
+  for (const listing of listings) {
+    const metadata = listing.metadata as ProductRoomMetadata | undefined
+    if (metadata?.product !== true || (!includePrivate && metadata.visibility === 'private')) continue
+    const room = metadata.room && typeof metadata.room === 'object'
+      ? metadata.room as Record<string, unknown>
+      : undefined
+    const id = typeof room?.id === 'string' ? room.id.trim() : ''
+    if (!id) continue
+    const normalizedId = id.toLowerCase()
+    if (byId.has(normalizedId)) {
+      console.warn('[colyseus:rooms] duplicate room catalog entry ignored', { roomId: normalizedId })
+      continue
+    }
+    byId.set(normalizedId, { ...room, id })
+  }
+  return [...byId.values()]
+}
+
 function createRepository(options: CreateColyseusBattleServerOptions): PostgresAuthorityRepository {
   const connectionString = options.databaseUrl
     ?? process.env.RVB_POSTGRES_URL
-    ?? process.env.DATABASE_URL
     ?? 'postgresql://rvb:rvb@127.0.0.1:5433/rvb_colyseus'
   const pool = new Pool({
     connectionString,
     max: options.poolMax ?? numberFromEnv(process.env.RVB_POSTGRES_POOL_MAX, 8),
-    connectionTimeoutMillis: 2_000,
+    connectionTimeoutMillis: numberFromEnv(
+      process.env.RVB_POSTGRES_CONNECTION_TIMEOUT_MS,
+      POSTGRES_CONNECTION_TIMEOUT_MS,
+    ),
     idleTimeoutMillis: 30_000,
     application_name: 'red-vs-blue-colyseus',
   })

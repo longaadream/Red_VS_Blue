@@ -1,5 +1,5 @@
 import type { BattleAuthorityCheckpointRecord, BattleAuthorityReceipt, BattleAuthorityTransitionRecord } from '@/lib/game/battle-transition'
-import type { Room } from '@/lib/game/room-store'
+import type { Room } from '@/lib/game/room-model'
 import type { PostgresAuthorityTransitionJob, RestoredPostgresAuthorityRoom } from '@/lib/server/postgres/authority-types'
 import type { BattleServerRepository } from '@/lib/server/colyseus/create-colyseus-server'
 

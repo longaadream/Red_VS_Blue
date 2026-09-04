@@ -206,6 +206,31 @@
     let observer = null
     let userExpanded = false
     const missingEffectDisplayMetadata = new Set()
+    const pieceArchive = new Map()
+
+    function rememberPieces(nextModel) {
+      ;((nextModel && nextModel.pieces) || []).forEach(function (piece) {
+        if (!piece || !piece.id) return
+        const pieceId = String(piece.id)
+        pieceArchive.set(pieceId, Object.assign({}, pieceArchive.get(pieceId) || {}, piece))
+      })
+      ;((nextModel && nextModel.presentationEvents) || []).forEach(function (event) {
+        if (!event || event.kind !== 'death') return
+        ;(event.targetPieceIds || []).forEach(function (pieceId) {
+          const archived = pieceArchive.get(String(pieceId))
+          if (archived) pieceArchive.set(String(pieceId), Object.assign({}, archived, { alive: false, visible: false }))
+        })
+      })
+    }
+
+    function pieceForDisplay(pieceId) {
+      return pieceById(model, pieceId) || pieceArchive.get(String(pieceId)) || null
+    }
+
+    function identityModel() {
+      if (!model || pieceArchive.size === 0) return model
+      return Object.assign({}, model, { pieces: Array.from(pieceArchive.values()) })
+    }
 
     function resolveIcon(event) {
       if (event && event.statusType && icons && typeof icons.resolveStatusType === 'function') {
@@ -227,7 +252,7 @@
 
     function resolveIdentity(event) {
       return actionIdentity && typeof actionIdentity.resolve === 'function'
-        ? actionIdentity.resolve(event, model)
+        ? actionIdentity.resolve(event, identityModel())
         : { isSkill: false, skillName: '', sourceName: '', portraitSrc: '', portraitFallback: '?', faction: '' }
     }
 
@@ -244,17 +269,21 @@
     }
 
     function displayPiece(pieceId) {
-      const piece = pieceById(model, pieceId)
+      const piece = pieceForDisplay(pieceId)
       if (!piece) return ''
+      const isDead = piece.alive === false
       const initial = String(piece.name || '?').slice(0, 1)
       const portraitSrc = actionIdentity && typeof actionIdentity.portraitUrl === 'function'
         ? actionIdentity.portraitUrl(piece.portraitId)
         : ''
-      return '<span class="action-history-entity is-piece" data-piece-id="' + escapeHtml(piece.id) + '" title="' + escapeHtml(piece.name) + '">'
+      const title = String(piece.name || '') + (isDead ? '（已死亡）' : '')
+      return '<span class="action-history-entity is-piece' + (isDead ? ' is-dead' : '') + '" data-piece-id="' + escapeHtml(piece.id) + '" title="' + escapeHtml(title) + '">'
         + '<i class="action-history-avatar" data-faction="' + escapeHtml(piece.faction || '') + '"><span aria-hidden="true">' + escapeHtml(initial) + '</span>'
         + (portraitSrc ? '<img src="' + escapeHtml(portraitSrc) + '" alt="" aria-hidden="true" onerror="this.style.display=\'none\'">' : '')
         + '</i>'
-        + '<span>' + escapeHtml(piece.name) + '</span></span>'
+        + '<span>' + escapeHtml(piece.name) + '</span>'
+        + (isDead ? '<b class="action-history-dead-badge">已死亡</b>' : '')
+        + '</span>'
     }
 
     function displayPlayer(playerId) {
@@ -516,6 +545,7 @@
 
     function update(nextModel) {
       if (!nextModel) return
+      rememberPieces(nextModel)
       model = nextModel
       roots = mergeRoots(roots, nextModel.presentationEvents, MAX_ROOTS)
       render()
@@ -548,6 +578,7 @@
       setHistoryHighlight = null
       model = null
       roots = []
+      pieceArchive.clear()
     }
 
     return {

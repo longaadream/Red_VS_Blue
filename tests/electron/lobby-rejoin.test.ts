@@ -102,15 +102,15 @@ function createHarness(options: {
   const script = `${inlineScript(html)}\n;globalThis.__lobbyRejoinContract = {
     checkRejoin,
     rejoinBattle,
-    setWsRequest: (request) => { wsRequest = request },
+    setLobbyRequest: (request) => { lobbyRequest = request },
   }`
   vm.runInContext(script, context)
   const contract = context.__lobbyRejoinContract as {
     checkRejoin: () => Promise<void> | void
     rejoinBattle: () => void
-    setWsRequest: (request: (method: string, data: unknown) => Promise<unknown>) => void
+    setLobbyRequest: (request: (method: string, data: unknown) => Promise<unknown>) => void
   }
-  contract.setWsRequest(async (method, data) => {
+  contract.setLobbyRequest(async (method, data) => {
     expect(method).toBe('rooms.get')
     expect(data).toEqual({ roomId: 'room-58' })
     if (options.roomError) throw options.roomError

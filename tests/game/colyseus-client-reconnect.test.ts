@@ -126,10 +126,10 @@ function loadClient(sessionEntries = new Map<string, string>()) {
     console,
   })
   new Script(
-    readFileSync(resolve(process.cwd(), 'data/pages/js/ws-client.js'), 'utf8'),
-    { filename: 'ws-client.js' },
+    readFileSync(resolve(process.cwd(), 'data/pages/js/colyseus-client.js'), 'utf8'),
+    { filename: 'colyseus-client.js' },
   ).runInContext(context)
-  return (browserWindow as { RvBWs: {
+  return (browserWindow as { RvBColyseus: {
     connect(roomId: string, playerId: string, mode?: string): void
     disconnect(): void
     isConnected(): boolean
@@ -137,7 +137,7 @@ function loadClient(sessionEntries = new Map<string, string>()) {
     requestAuthorityReceiptSync(reason: string, clientActionId: string): boolean
     send(message: Record<string, unknown>): boolean
     on(event: string, handler: (data?: unknown) => void): void
-  } }).RvBWs
+  } }).RvBColyseus
 }
 
 async function finishConnect() {
@@ -154,7 +154,7 @@ afterEach(() => {
 
 describe('Colyseus reconnect and authority resync state machine', () => {
   it('uses the Colyseus SDK for desktop while keeping Android on its explicit legacy protocol', () => {
-    const desktop = readFileSync(resolve('data/pages/js/ws-client.js'), 'utf8')
+    const desktop = readFileSync(resolve('data/pages/js/colyseus-client.js'), 'utf8')
     const android = readFileSync(resolve('android-client/www/js/ws-client.js'), 'utf8')
 
     expect(desktop).toContain('new Colyseus.Client(base)')

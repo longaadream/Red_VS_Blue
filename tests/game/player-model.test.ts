@@ -5,7 +5,7 @@ import {
   assignNextSeat,
   getPlayerSeat,
   normalizePlayerAlignment,
-} from '@/lib/game/room-store'
+} from '@/lib/game/room-model'
 import { areAllies, areEnemies, isMatchPlayerId, isPlayerSeat, normalizeContentAlignment } from '@/lib/game/match-identity'
 
 describe('player seat and alignment model', () => {

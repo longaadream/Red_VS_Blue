@@ -56,7 +56,7 @@ describe('AI semantic contract', () => {
     const output = execFileSync(process.execPath, ['scripts/audit-ai-semantics.mjs'], { cwd: process.cwd(), encoding: 'utf8' })
     const report = JSON.parse(output)
     expect(report.errors).toEqual([])
-    expect(report.counts.unsupported).toBe(1)
+    expect(report.counts.unsupported).toBe(0)
     const registry = JSON.parse(readFileSync(resolve(process.cwd(), 'data/rules/ai-semantics.json'), 'utf8'))
     expect(registry.manifestHashes.skills).toBeTruthy()
     expect(registry.profiles['metadata-required']).toMatchObject({ fallback: 'skip-action', stateSources: expect.any(Array) })

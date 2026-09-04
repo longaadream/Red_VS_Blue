@@ -152,6 +152,24 @@
   }
 
   window.RvBGameEngine = {
+    primeJsonFiles: function (files) {
+      if (!files || typeof files !== 'object' || Array.isArray(files)) {
+        throw new Error('GameEngine 资源包格式无效')
+      }
+      var count = 0
+      Object.keys(files).forEach(function (path) {
+        var normalized = cleanPath(path)
+        if (!/^data\/[a-z0-9-]+\/[a-z0-9_-]+\.json$/.test(normalized)
+          && normalized !== 'data/skill-keywords.json') {
+          throw new Error('GameEngine 资源路径无效: ' + path)
+        }
+        var serialized = JSON.stringify(files[path])
+        if (serialized === undefined) throw new Error('GameEngine 资源内容无效: ' + path)
+        xhrCache[normalized] = serialized
+        count += 1
+      })
+      return count
+    },
     ensure: function () {
       var current = getEngine()
       if (current && current.applyBattleAction) return Promise.resolve(current)

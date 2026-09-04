@@ -10,6 +10,23 @@ export interface ClientProtocolResourceOptions {
   isPackaged: boolean
 }
 
+export type ClientProtocolRootOptions = Omit<ClientProtocolResourceOptions, 'relativePath'>
+
+const BATTLE_DATA_DIRECTORIES = [
+  'cards',
+  'maps',
+  'pieces',
+  'rules',
+  'skills',
+  'status-effects',
+  'tiles',
+] as const
+
+const BATTLE_DATA_SINGLETONS = [
+  'data/skill-keywords.json',
+  'data/tutorial/first-session.json',
+] as const
+
 function resolveExistingFile(root: string, segments: readonly string[]): string | null {
   const resolvedRoot = path.resolve(root)
   const target = path.resolve(resolvedRoot, ...segments)
@@ -94,4 +111,44 @@ export function resolveClientProtocolFile({
   }
 
   return null
+}
+
+export function readClientProtocolBattleData(
+  options: ClientProtocolRootOptions,
+  directories: readonly string[] = BATTLE_DATA_DIRECTORIES,
+  singletons: readonly string[] = BATTLE_DATA_SINGLETONS,
+): Record<string, unknown> {
+  const files: Record<string, unknown> = {}
+  const readJson = (relativePath: string): unknown => {
+    const target = resolveClientProtocolFile({ ...options, relativePath })
+    if (!target) throw new Error(`CLIENT_BATTLE_DATA_MISSING: ${relativePath}`)
+    try {
+      const value: unknown = JSON.parse(fs.readFileSync(target, 'utf8'))
+      files[relativePath] = value
+      return value
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error)
+      throw new Error(`CLIENT_BATTLE_DATA_INVALID: ${relativePath}: ${reason}`)
+    }
+  }
+
+  for (const directory of directories) {
+    if (!/^[a-z0-9][a-z0-9-]{0,63}$/.test(directory)) {
+      throw new Error(`CLIENT_BATTLE_DATA_DIRECTORY_INVALID: ${directory}`)
+    }
+    const manifestPath = `data/${directory}/manifest.json`
+    const manifest = readJson(manifestPath)
+    if (!Array.isArray(manifest)) {
+      throw new Error(`CLIENT_BATTLE_DATA_MANIFEST_INVALID: ${manifestPath}`)
+    }
+    for (const id of manifest) {
+      if (typeof id !== 'string' || !/^[a-z0-9][a-z0-9_-]{0,127}$/.test(id)) {
+        throw new Error(`CLIENT_BATTLE_DATA_ID_INVALID: ${manifestPath}`)
+      }
+      readJson(`data/${directory}/${id}.json`)
+    }
+  }
+
+  for (const relativePath of singletons) readJson(relativePath)
+  return files
 }

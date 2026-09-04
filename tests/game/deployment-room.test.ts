@@ -9,7 +9,8 @@ import {
   type DeploymentRoomStore,
   scheduleRoomDeploymentTimeout,
 } from '@/lib/game/room-battle-actions'
-import type { Room } from '@/lib/game/room-store'
+import type { Room } from '@/lib/game/room-model'
+import type { BattleAuthorityReceipt } from '@/lib/game/battle-transition'
 import { createTestServerBattleState, pinTestBattleState } from './profile-test-identity'
 import { RuleRuntime } from '@/lib/game/rule-runtime'
 import { loadRuleById } from '@/lib/game/skills'
@@ -27,6 +28,7 @@ const ROOT_SEED = 2029
 class MemoryRoomStore implements DeploymentRoomStore {
   room: Room
   writes = 0
+  readonly receipts = new Map<string, BattleAuthorityReceipt>()
 
   constructor(room: Room) {
     this.room = clone(room)
@@ -45,6 +47,35 @@ class MemoryRoomStore implements DeploymentRoomStore {
   async setRoomIfVersion(roomId: string, room: Room, expectedVersion: number): Promise<boolean> {
     if (roomId !== this.room.id || this.room.version !== expectedVersion) return false
     this.room = { ...clone(room), version: expectedVersion + 1 }
+    this.writes += 1
+    return true
+  }
+
+  async getBattleAuthorityReceipt(_roomId: string, clientActionId: string) {
+    return this.receipts.get(clientActionId)
+  }
+
+  async persistBattleAuthorityReceipt(receipt: BattleAuthorityReceipt) {
+    this.receipts.set(receipt.clientActionId, clone(receipt))
+  }
+
+  inspectBattleAuthorityPersistence() {
+    const authorityVersion = this.room.battleAuthorityVersion ?? 0
+    return { status: 'durable' as const, authorityVersion, durableAuthorityVersion: authorityVersion, pending: 0 }
+  }
+
+  async commitBattleAuthorityTransition(
+    input: Parameters<NonNullable<DeploymentRoomStore['commitBattleAuthorityTransition']>>[0],
+  ): Promise<boolean> {
+    if ((this.room.battleAuthorityVersion ?? 0) !== input.expectedVersion) return false
+    this.room = {
+      ...clone(input.nextRoom),
+      battleAuthorityVersion: input.transition.toVersion,
+      battleAuthorityDurableVersion: input.transition.toVersion,
+      battleAuthorityPersistenceStatus: 'durable',
+      battleAuthorityTransitionHash: input.transition.transitionHash,
+    }
+    this.receipts.set(input.transition.clientActionId, clone(input.transition.receipt))
     this.writes += 1
     return true
   }
@@ -284,20 +315,17 @@ describe('RED-31 authoritative deployment room actions', () => {
       }, { clock: { now: () => 2_000 } }),
     ])
 
-    expect([red.snapshot.authorityVersion, blue.snapshot.authorityVersion].sort()).toEqual([2, 3])
-    expect(store.room.version).toBe(3)
+    expect([red.snapshot.authorityVersion, blue.snapshot.authorityVersion].sort()).toEqual([1, 2])
+    expect(store.room.battleAuthorityVersion).toBe(2)
     expect(store.writes).toBe(2)
     const state = (store.room.battleState as any).state
     expect(state.deployment.status).toBe('complete')
     expect(state.turn.phase).toBe('action')
-    expect(state.extensions.debugBattle.actionLog.filter(
-      (entry: any) => entry.deployment?.finalPositions,
-    )).toHaveLength(1)
-    const finalTrace = state.extensions.debugBattle.actionLog.findLast(
-      (entry: any) => entry.deployment?.finalPositions,
-    )
-    expect(finalTrace.deployment.authorityVersion).toBe(3)
-    expect(state.extensions.debugBattle.actionLog.every((entry: any) => !entry.deployment || Number.isSafeInteger(entry.deployment.authorityVersion))).toBe(true)
+    expect([red.transition, blue.transition].filter(transition => transition?.toVersion === 2))
+      .toHaveLength(1)
+    expect([red.nextAuthorityState, blue.nextAuthorityState].find(candidate => (
+      candidate?.deployment?.status === 'complete'
+    ))?.deployment?.revision).toBeGreaterThan(0)
   })
 
   it('atomically commits surrender during deployment and rejects every later command', async () => {
@@ -307,7 +335,8 @@ describe('RED-31 authoritative deployment room actions', () => {
       type: 'surrender',
       playerId: PLAYERS[0],
       reason: 'voluntary',
-    }, { clock: { now: () => 2_000 } })
+      clientActionId: 'deployment-surrender',
+    } as any, { clock: { now: () => 2_000 } })
 
     expect(result.kind).toBe('applied')
     expect(result.snapshot.state.terminalResult).toMatchObject({
@@ -316,7 +345,7 @@ describe('RED-31 authoritative deployment room actions', () => {
       loserPlayerId: PLAYERS[0],
       reason: 'surrender',
     })
-    expect(store.room).toMatchObject({ status: 'finished', version: 2 })
+    expect(store.room).toMatchObject({ status: 'finished', battleAuthorityVersion: 1 })
     expect(store.writes).toBe(1)
 
     await expect(dispatchRoomBattleAction(store, store.room.id, PLAYERS[1], {
@@ -324,7 +353,7 @@ describe('RED-31 authoritative deployment room actions', () => {
       playerId: PLAYERS[1],
       clientActionId: 'late-blue-lock',
     })).rejects.toMatchObject({ code: 'BATTLE_ALREADY_TERMINAL' })
-    expect(store.room).toMatchObject({ status: 'finished', version: 2 })
+    expect(store.room).toMatchObject({ status: 'finished', battleAuthorityVersion: 1 })
     expect(store.writes).toBe(1)
   })
 
@@ -373,7 +402,7 @@ describe('RED-31 authoritative deployment room actions', () => {
     }, { clock: { now: () => 5_000 } })
 
     expect(result.kind).toBe('expired')
-    expect(result.snapshot.authorityVersion).toBe(2)
+    expect(result.snapshot.authorityVersion).toBe(1)
     expect(result.snapshot.state.deployment).toMatchObject({
       status: 'complete',
       locks: {
@@ -453,7 +482,7 @@ describe('RED-31 authoritative deployment room actions', () => {
       expect(store.writes).toBe(1)
       expect((store.room.battleState as any).state.deployment.status).toBe('complete')
       expect(committed).toHaveLength(1)
-      expect((committed[0] as any).authorityVersion).toBe(2)
+      expect((committed[0] as any).authorityVersion).toBe(1)
       await vi.runOnlyPendingTimersAsync()
       expect(store.writes).toBe(1)
     } finally {
@@ -490,7 +519,7 @@ describe('RED-31 authoritative deployment room actions', () => {
     expect(blue).toEqual(spectator)
     expect(red.state.pieces.filter(piece => piece.isCore === true)).toHaveLength(16)
     expect(red.state.deployment?.choices).toEqual({})
-    expect(red.authorityVersion).toBe(1)
+    expect(red.authorityVersion).toBe(0)
   })
 })
 

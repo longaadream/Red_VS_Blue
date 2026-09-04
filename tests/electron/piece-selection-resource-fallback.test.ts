@@ -75,7 +75,7 @@ function createHarness(options: {
   fetchPackJson: (path: string) => Promise<unknown>
   wsRequest: (method: string, data?: Record<string, unknown>, timeoutMs?: number) => Promise<unknown>
   useIntervals?: boolean
-  wsConnected?: () => boolean
+  colyseusConnected?: () => boolean
 }) {
   const page = fs.readFileSync(path.join(root, 'data/pages/piece-selection.html'), 'utf8')
   const inlineScripts = [...page.matchAll(/<script>([\s\S]*?)<\/script>/g)]
@@ -103,9 +103,9 @@ function createHarness(options: {
   }
   const wsRequest = vi.fn(options.wsRequest)
   const wsHandlers = new Map<string, (...args: unknown[]) => unknown>()
-  const RvBWs = {
+  const RvBColyseus = {
     connect: vi.fn(),
-    isConnected: options.wsConnected || (() => true),
+    isConnected: options.colyseusConnected || (() => true),
     on: vi.fn((event: string, handler: (...args: unknown[]) => unknown) => { wsHandlers.set(event, handler) }),
     request: wsRequest,
     send: vi.fn(),
@@ -120,7 +120,7 @@ function createHarness(options: {
       getActiveServerMode: () => 'lan',
       getServerUrl: () => 'http://127.0.0.1:3000',
     },
-    RvBWs,
+    RvBColyseus,
   }
   const context = vm.createContext({
     AbortController,
@@ -138,7 +138,7 @@ function createHarness(options: {
     setTimeout,
     window,
     RvBUtils: window.RvBUtils,
-    RvBWs,
+    RvBColyseus,
   })
 
   vm.runInContext(`${script}\n;globalThis.__pieceSelectionContract = {
@@ -180,14 +180,14 @@ describe('Electron piece-selection resource contract', () => {
   const darkPieces = makePieces('evil', 9)
   const allPieces = [...lightPieces, ...darkPieces]
 
-  test('does not report a saved URL as connected and retries the faction claim after a transient WS timeout', async () => {
+  test('does not report a saved URL as connected and retries the faction claim after a transient Colyseus timeout', async () => {
     vi.useFakeTimers()
     try {
       let connected = false
       const harness = createHarness({
         fetchPackJson: localPack(allPieces),
         useIntervals: true,
-        wsConnected: () => connected,
+        colyseusConnected: () => connected,
         wsRequest: async method => {
           expect(method).toBe('rooms.action')
           return { faction: 'red', alignment: 'light', room: { status: 'selecting' } }
@@ -294,7 +294,7 @@ describe('Electron piece-selection resource contract', () => {
       await loading
 
       expect(harness.contract.getPieces()).toEqual([])
-      expect(harness.element('pieceGrid').innerHTML).toContain('服务器 WS catalog.pieces timeout after 2500ms')
+      expect(harness.element('pieceGrid').innerHTML).toContain('服务器 Colyseus catalog.pieces timeout after 2500ms')
       expect(harness.element('pieceGrid').innerHTML).not.toContain('加载棋子数据')
     } finally {
       vi.useRealTimers()
@@ -313,7 +313,7 @@ describe('Electron piece-selection resource contract', () => {
     await harness.contract.loadPieces()
 
     expect(harness.contract.getPieces()).toEqual([])
-    expect(harness.element('pieceGrid').innerHTML).toContain('服务器 WS catalog.pieces')
+    expect(harness.element('pieceGrid').innerHTML).toContain('服务器 Colyseus catalog.pieces')
     expect(harness.element('pieceGrid').innerHTML).toContain(expectedError)
   })
 

@@ -4,11 +4,7 @@ import { fileURLToPath } from 'node:url'
 
 const modes = {
   'electron-client': {
-    packages: ['next', '@prisma/client', 'typescript', 'electron'],
-    requiresStandalone: true,
-  },
-  'electron-server': {
-    packages: ['next', '@prisma/client', 'typescript', 'electron'],
+    packages: ['next', 'typescript', 'electron'],
     requiresStandalone: true,
   },
   'electron-editor': {

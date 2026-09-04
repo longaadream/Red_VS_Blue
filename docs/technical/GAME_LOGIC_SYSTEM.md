@@ -1,704 +1,126 @@
 # 游戏逻辑系统接口与执行流程
 
-状态：RED-79 当前代码核对稿
+更新：2026-09-03（RED-158 Phase F 主线同步）
 
-核对基线：`b8201dd`（2026-08-17）
+## 1. 核心结论
 
-架构约定更新（2026-08-17）：Windows 的服务端完整状态方案是唯一目标标准；Android 现有 action-log 是 RED-81 将完整删除的遗留实现，不再作为可长期并存的第二套框架。动态代码执行的集中编译与缓存由 RED-82 跟进。
+1. `applyBattleAction()` 是规则归约入口；`runBattleAction()` 负责确定性、hash、幂等和 Trace。
+2. 所有 Windows 在线命令进入 Colyseus BattleRoom，再进入 `dispatchRoomBattleAction()`。
+3. 每个房间拥有独立 FIFO 和 Rule Runtime；不同房间可并行。
+4. PostgreSQL 保存权威连续历史和终局证据。
+5. 浏览器只发送意图、显示服务端投影，不执行在线共享规则。
+6. 战报由 PostgreSQL journal 重放验证生成，不以客户端记录为真源。
 
-适用范围：TypeScript 规则核心、Windows LAN、浏览器战斗页、Relay 与 Android 内嵌服务。
+Android 与独立 Relay 的当前实现不属于此 Windows 接口合同。
 
-本文面向开发、调试和测试人员，集中说明当前游戏逻辑系统的公共接口、权威边界和典型执行顺序。模块细节可继续查阅 [`MODULE_INTERFACES.md`](./MODULE_INTERFACES.md)、[`ENGINE_CORE.md`](./ENGINE_CORE.md) 和 [`ARCHITECTURE.md`](./ARCHITECTURE.md)。
-
-## 1. 阅读约定与核心结论
-
-本文使用三种状态标记：
-
-- **当前实现**：已与核对基线中的源码和相关测试对照。
-- **历史兼容**：仍可被当前代码读取或执行，但不是新增功能应采用的首选边界。
-- **目标设计**：ADR 或架构文档提出的方向，当前尚不可调用。
-
-先记住七个结论：
-
-1. `lib/game/turn.ts::applyBattleAction()` 是规则归约入口；`runBattleAction()` 是需要确定性、hash、幂等和 Action Trace 的权威包装入口。
-2. `RuleRuntime` 用一个根种子派生命名随机流、逻辑时钟和实例 ID；权威初始化必须先创建 seed，后续每个动作必须沿用同一 seed。
-3. `targeting.ts::prepareAction()` 是纯查询合同，返回精确候选和选择凭证；最终提交仍由归约器使用同一验证器复核。
-4. 新建 Demo 房间默认使用渐进部署：双方先各确定性随机召唤 1 枚先锋；此后每个自己的回合若预备区非空，必须先完成 `deployReservePiece`，随后给该核心添加仅当前部署回合有效的免费首移 statusTag，并直接进入正常 action。
-5. Windows LAN 的“服务端执行命令、保存完整状态、广播完整状态”是唯一跨端标准；Android 当前 action-log 只是待由 RED-81 删除的遗留实现。
-6. 胜负由 `lib/game/terminal.ts::finalizeBattleTerminal()` 权威归约；渐进初始化完成后只计算场上存活核心，普通预备区与隐藏基尔加丹不阻止败北，客户端只展示 `terminalResult`。
-7. JSON 中的技能代码使用 `eval` 会产生重复编译成本，但更重要的是它只把内容与主代码分开发布，并没有隔离权限；RED-82 将集中编译、缓存和失效处理。
-
-## 2. 系统总览
-
-### 2.1 模块与依赖关系
-
-实线表示 Windows LAN 主路径；虚线表示查询、兼容或客户端权威路径。
-
-```mermaid
-flowchart LR
-  UI["浏览器战斗页<br/>battle.html"]
-  Transport["房间传输入口<br/>ws-server / HTTP route"]
-  Runner["确定性动作包装<br/>battle-runner.ts"]
-  Runtime["RuleRuntime + Action Trace<br/>rule-runtime / battle-trace"]
-  Reducer["规则归约器<br/>turn.ts"]
-  Domain["规则能力<br/>skills / triggers / targeting / spatial"]
-  Setup["房间开战与初始化<br/>room-battle-start / battle-setup"]
-  Store["RoomStore + battle-storage"]
-  Android["Android action log（遗留）<br/>RED-81 将删除"]
-  Relay["Relay 浏览器客户端"]
-
-  UI -->|action| Transport
-  Transport --> Runner
-  Runner --> Runtime
-  Runner --> Reducer
-  Reducer <--> Domain
-  Setup --> Runtime
-  Setup --> Reducer
-  Runner --> Store
-  Store -->|持久化后广播 stateUpdate| Transport
-  Transport --> UI
-
-  Transport -.->|actionError + preparation| UI
-  UI -.->|action| Android
-  Android -.->|actionLog| UI
-  UI -.->|确定性回放| Runner
-  Relay -->|action| Transport
-  Transport -->|stateUpdate| Relay
-```
-
-### 2.2 运行模式与权威边界
-
-| 运行模式 | 当前共享权威 | 动作执行 | 保存与同步 |
-| --- | --- | --- | --- |
-| Windows LAN WebSocket | Prisma 房间中的 `server-state` | 服务端 `runBattleAction(state, action, { rootSeed })` | `setRoomIfVersion()` CAS 成功后广播完整 `stateUpdate` |
-| Next 房间 HTTP `GET/POST`（内部兼容/测试） | 与 Windows LAN 共用 Room/协调器 | 直接调用 route 时校验 viewer/actor 并复用共享命令服务 | 不属于正式玩家传输；同端口运行时玩家 `/api/rooms/**` 在进入 route 前返回 410 |
-| Android 内嵌房间（当前遗留） | 内存 `action-log` | 浏览器 Runner 生成 trace 并按日志确定性回放；移动服务只校验 trace 形状/链 | 追加带 `seq` 的日志并广播 `actionLog`；RED-81 将完整删除该框架 |
-| 桌面本机 Relay 正式对局 | 同合同的本机权威房间服务 | 浏览器只发送 action | 只消费服务端 `stateUpdate`；旧 host 权威协议被拒绝 |
-| 独立 `relay-server`（RED-119） | 仅赛前 REST 房间状态 | 不执行或恢复战斗；验收止于双方进入选人且 `mapId` 冻结 | 赛前持久化并转发真实房间 `roomUpdate`；不接受浏览器上传 `stateUpdate` |
-| Training / Debug | 各自的训练或调试状态 | 新旧入口并存；部分旧路径可不带 seed | 不等同于房间权威链，不应用来证明跨端一致性 |
-
-> **历史兼容：** `getBattleStorage()` 仍能读取旧 `action-log` 和裸 `BattleState`。这只是恢复兼容，不表示三种格式具有相同的权威语义。
-
-> **RED-138 平台边界：** 正式渐进部署只支持 Windows/Electron 权威房间 WebSocket。Android 当前 action-log 不具备签名 viewer 私有投影，只能继续解释 legacy 遗留状态；RED-81 完成前，`progressive-reserve-v1` 在 Android 上属于 unsupported，不能作为发布、跨端一致性或隐私验收路径。
-
-### 2.3 Windows 与 Android 可以统一到什么程度
-
-结论是：**玩家看到的功能、游戏规则、命令语义和权威状态标准必须相同；操作系统外壳可以采用不同实现。** 当前 Windows 的 `server-state` 与 Android 的 `action-log` 分裂是待删除的历史架构，不是需要保留的平台差异。
-
-| 边界 | 应当共用 | 必须平台适配 |
-| --- | --- | --- |
-| 规则核心 | `BattleState`、`BattleAction`、`runBattleAction()`、Targeting、Spatial、RuleRuntime、Trace | 无 |
-| 命令协议 | actor、request/action ID、root seed、action、结果/error envelope | 传输编码和连接生命周期 |
-| 权威执行 | 同一初始状态、seed 和命令必须产生同一 hash/trace | Windows 在 Node 进程；Android 可在隐藏 WebView 的 browser-safe bundle |
-| 网络 | 相同的订阅、动作、错误和状态消息语义 | Windows Node WebSocket/HTTP；Android Java Socket/Bridge |
-| 存储 | 相同的版本化 `server-state` 格式和恢复合同 | Windows Prisma；Android 本地数据库/文件适配器 |
-| 系统能力 | 通过接口注入 entropy、storage、broadcast、日志 | Node 文件系统与 Android 生命周期/权限不同 |
-
-通俗地说，Windows 像“裁判在服务器上算完比分，再把记分牌发给所有人”；Android 现在则像“只广播每一步操作，让每台手机自己重算比分”。后者更容易因为版本、丢包或恢复顺序不同而分叉，所以不再保留。
-
-| 对比项 | Windows 当前标准 | Android 当前遗留 | Android 迁移后 |
-| --- | --- | --- | --- |
-| 谁计算共享结果 | 房间服务端 | 每个客户端分别回放 | Android 房间宿主中的同一 Runner |
-| 服务端保存什么 | 完整 `server-state` | `actions + seq + seed` | 完整、版本化 `server-state` |
-| 客户端收到什么 | 完整 `stateUpdate` | `battleSnapshot` / `actionLog` | 与 Windows 同语义的状态与错误消息 |
-| 重连恢复 | 读取完整权威状态 | 从 init 开始重放日志 | 读取完整权威状态 |
-| 进程生命周期 | Windows 进程可能退出，由桌面外壳处理 | Android 后台更容易被系统暂停或回收 | Android 前台服务/通知、恢复和持久化适配；不改变规则协议 |
-
-迁移不是把 Next.js、Prisma、Electron 或 Windows 文件系统整个塞进 Android。Android 隐藏 WebView 可运行同一个 browser-safe Runner 并保存完整状态；Java 层只适配 Socket、前台服务、通知、权限、本地存储和系统恢复。这样“发动机和交通规则”相同，只是 Windows 与 Android 使用不同的外壳和启动方式。
-
-RED-81 将删除生产路径中的 `action-log` / `actionLog`、`battleSnapshot.actions/seq` 和客户端按序回放分支，不保留双模式或兼容降级。`BattleActionTrace` 可以作为权威执行后的调试证据继续存在，但它不是状态来源，也不是 action-log 的改名版本。实施顺序是先稳定 Windows 标准，再迁移 Android。
-
-## 3. 核心数据与公共接口
-
-### 3.1 `BattleState`
-
-定义：`lib/game/turn.ts::BattleState`。
-
-| 字段 | 作用 | 主要修改者 |
-| --- | --- | --- |
-| `map` | 棋盘尺寸、格子和地形属性 | 初始化、空间规则 |
-| `pieces` / `graveyard` | 场上与死亡棋子实例 | 移动、伤害、召唤、死亡结算 |
-| `pieceStatsByTemplateId` | 模板基础属性索引 | 初始化 |
-| `skillsById` | 运行时技能定义缓存 | 初始化和服务端/浏览器水合；不属于跨端权威 hash |
-| `players` | AP、充能、手牌、弃牌、玩家规则 | 回合、卡牌、技能、触发器 |
-| `turn` | 当前玩家、回合号、`start/action/end` 和动作标志 | `beginPhase`、`endTurn`、归约器 |
-| `deployment` | 显式 mode、`openingVanguardsInitialized` 屏障、单调 revision、预备区、公开数量、私有候选/落点及 legacy 锁定数据 | 初始化、渐进部署动作或 legacy `deploymentChoice` |
-| `actions` | 面向 UI/调试的战斗日志 | 归约器与效果 |
-| `extensions` | 角色扩展及 `debugBattle` Action Trace | 技能、规则、Runner |
-| `pendingOptionSelection` | 挂起的选项选择 | 规则/技能和恢复动作 |
-| `pendingTargetSelection` | 带来源、步骤、候选和凭证的版本化目标会话 | targeting、规则/技能和恢复动作 |
-| `targetingRevision` | 目标查询的新旧状态修订；成功动作单调加一 | `applyBattleAction()` 外层 |
-| `gameStartFired` | 防止 `gameStart` 重复触发 | 初始化/首个阶段推进 |
-| `_v` | 战斗状态序列化版本 | 克隆和归约器 |
-
-边界：
-
-- `safeCloneBattleState()` 以 JSON 方式克隆，再恢复棋子、墓地和玩家规则的 `effect` 函数，并写入当前 `_v`。
-- Runner 执行前补回服务端技能，执行后剥离顶层 `skillsById`；`hashBattleState()` 还排除 `extensions.debugBattle`。
-- `extensions` 是开放结构，不应把其中任意新字段默认视为稳定网络协议。
-
-### 3.2 `BattleAction`
-
-定义：`lib/game/turn.ts::BattleAction`。
-
-| 动作 | 关键输入 | 主要结果 |
-| --- | --- | --- |
-| `beginPhase` | 无 actor 字段 | 推进 `start → action` 或 `end → 下一回合 start` |
-| `deployReservePiece` | `playerId`、候选 `pieceId`、可选 `toX/toY`、必需 `expectedDeploymentRevision`、可选 `clientActionId` | 先校验 revision，再原子校验当前 offer；有安全格时要求指定合法格，无安全格时权威随机空格；完整结算召唤触发 |
-| `deploymentChoice` / `deploymentLock` | legacy 玩家、选择/锁定、可选 `clientActionId` | 只供 `legacy-reroll-v1` 或历史状态完成旧重投协议 |
-| `move` | 玩家、棋子、`toX/toY` | 共享空间规则校验后移动并通常扣 1 AP；若棋子带有当回合有效的 `deployment-first-move-free`，第一次成功普通移动以 0 AP 提交并原子消费标签 |
-| `useBasicSkill` / `useChargeSkill` | 玩家、棋子、技能、目标/选项 | 校验资源、冷却、选择凭证并执行技能 |
-| `playCard` | 玩家、手牌实例、目标/选项 | 校验 AP、目标和卡牌类型后执行/弃牌 |
-| `endTurn` | `playerId` | 执行结束逻辑并进入 `end` |
-| `grantChargePoints` | 玩家、数量 | 调整充能点 |
-| `surrender` | `playerId` | 由服务端权威提交投降终局；客户端只展示结果 |
-| `pendingOptionSelect` | 玩家、选择值 | 恢复挂起的效果/触发队列 |
-| `pendingTargetSelect` | 玩家、目标和选择凭证 | 复核版本/候选后推进或完成挂起会话 |
-| `cancelPendingSelection` | 玩家、`selectionId/stateRevision` | 仅取消当前、属于该玩家且允许取消的会话 |
-
-技能、卡牌及 pending target 的 `TargetedActionFields` 包含 `selectionId`、`stateRevision`、坐标、目标棋子和附加目标。Runner 还兼容读取 `clientActionId` 或 `requestId` 作为幂等 ID；渐进部署与 legacy 部署命令都在联合类型中显式声明了 `clientActionId`。
-
-### 3.3 Runner、Trace 与回放
-
-定义：`lib/game/battle-runner.ts`、`lib/game/battle-trace.ts`。
-
-```ts
-interface BattleActionResult {
-  state: BattleState
-  stateHash: string
-  actionHash: string
-  duplicate?: boolean
-  trace?: BattleActionTrace
-}
-
-interface BattleReplayResult {
-  initialHash: string
-  finalState: BattleState
-  finalStateHash: string
-  actionHashes: string[]
-  stateHashes: string[]
-  actionsApplied: number
-}
-```
-
-`BattleActionTrace` 记录 `index/rootSeed/actionId/actionHash/tick/turn/playerId`、前后状态 hash、各随机流的起止 cursor，以及可选部署证据。稳定 JSON 和 browser-safe SHA-256 位于 `battle-trace.ts`；这些字段服务于复现和差异定位，不等于数字签名或共识协议。
-### 3.4 确定性规则运行时
-
-定义：`lib/game/rule-runtime.ts`。
-
-| 接口 | 作用 |
-| --- | --- |
-| `RuleRuntime({ rootSeed, cursors, tick })` | 创建动作级同步运行时 |
-| `nextRandom(name)` / `nextInt(name, max)` | 从命名流消费确定性随机数 |
-| `nextInstanceId(namespace, prefix)` | 从 `instance-id/<namespace>` 流创建稳定实例 ID |
-| `clock.now()` | 以 action tick 为基础提供确定性逻辑时间 |
-| `snapshot()` / `restore()` | 保存和恢复随机、时钟及最后访问位置 |
-| `withRuleRuntime(runtime, operation)` | 在同步作用域内激活 runtime |
-| `withRuleRuntimeCheckpoint(operation)` | 执行预检，但无论结果如何都恢复 cursor/时钟 |
-| `getRuleMath()` / `getRuleDate()` | 给动态技能、规则和附加效果注入确定性的 `Math` / `Date` |
-| `createRootSeed()` | 从安全随机源创建 32 位根种子；不可用时失败关闭 |
-
-稳定命名流至少包括 legacy 的 `deployment`、`deployment-reroll`，渐进部署的 `progressive-deployment/opening-piece/<normalizedPlayerId>`、`opening-cell/<normalizedPlayerId>`、`offer/<normalizedPlayerId>`、`fallback/<normalizedPlayerId>`，以及 `turn-order`、`skill/effect`。实例 ID 使用独立命名空间。算法和兼容要求见 [ADR-0004](../decisions/ADR-0004-deterministic-rule-runtime.md)，渐进消费合同见 [ADR-0024](../decisions/ADR-0024-progressive-reserve-deployment.md)。
-
-运行时是进程级同步作用域：规则执行不能跨异步边界持有它。没有 runtime 的训练/兼容入口仍可落到 `lib/game/rng.ts`，但权威房间入口不得依赖该回退。
-
-### 3.5 权威目标选择
-
-定义：`lib/game/targeting.ts`。
-
-| 接口 | 输入 / 输出 |
-| --- | --- |
-| `prepareAction(state, draft)` | 只读状态与动作草稿；返回 `ready | invalid | needOption | needTarget` |
-| `validateTargetRef(state, constraint, ref)` | 用同一约束验证最终棋子/格子引用；成功返回 `undefined` |
-| `assertActionTargetingReady()` | 把 preparation 的非 `ready` 结果转成 `TargetingRuleError` |
-| `assertActionPlayer(expected, action)` | 比较已认证玩家与动作 actor；系统动作可无 `playerId` |
-| `finalizePendingTargetSession()` | 写入会话来源、候选、`selectionId` 和 `stateRevision` |
-| `validatePendingTargetSubmission()` | 拒绝过期、错 ID、错玩家、已解决或非法目标 |
-| `assertPendingTargetCancellation()` | 验证取消权限、版本和会话 ID |
-| `stampTargetingRevision(previous, next)` | 每个成功动作只增加一次目标修订 |
-
-`needTarget` 返回的是精确候选，不是 UI 提示。查询不得运行 reducer、触发器、效果、时间或 RNG；AI、UI 与最终提交复用同一候选/验证合同。无法声明动态目标步骤时以 `TARGET_DECLARATION_MISSING` 失败关闭。当前协议版本为 `TARGET_SELECTION_PROTOCOL_VERSION = 1`；ADR-0005 仍是 Proposed，见 [ADR-0005](../decisions/ADR-0005-authoritative-target-selection.md)。
-
-### 3.6 空间与普通移动
-
-定义：`lib/game/spatial.ts`。
-
-| 接口 | 语义 |
-| --- | --- |
-| `manhattanDistance()` | 默认格子距离；坐标缺失时抛 `RangeError` |
-| `getManhattanArea()` / `getSquareArea()` | 明确区分菱形曼哈顿范围与方形范围 |
-| `getOrthogonalLineCells()` | 返回不含起点、包含终点的横/纵路径；斜线返回 `null` |
-| `getLivingOccupantAt()` | 仅查询场上存活占位 |
-| `getNormalMoveRejection()` | 返回稳定拒绝代码，校验边界、直线、范围、地形和占位 |
-| `getLegalNormalMoveTargetsForPlayer()` | 在阶段、actor、AP、所有权均有效时给 UI/AI 精确普通移动集合 |
-| `traceProjectile()` | 返回有序的 `cell → living piece → terrain` 事实及首个边界事实 |
-
-这些函数不决定具体技能效果。普通移动的权威归约、AI 与浏览器高亮共用它们；技能位移、推拉、传送和弹道停止策略必须显式选择规则，不能暗用普通移动语义。
-
-### 3.7 技能、卡牌与触发器
-
-主要定义：`lib/game/skills.ts`、`lib/game/triggers.ts`。
-
-> **迁移中的历史遗留：** 核对基线仍包含 `lib/game/attached-effect.ts`、第五类触发消费者及 `data/effects/**`，所以本节保留其当前执行顺序；但 [RED-80](https://linear.app/redvsblue/issue/RED-80) 的静态调用图已确认内置内容没有生产入口，现役玩法已经统一使用 Rule + statusTag。RED-80 正在删除该模块、数据、helper 和消费者阶段；不要新增 AttachedEffect 调用。[RED-75](https://linear.app/redvsblue/issue/RED-75) 是随后重跑 Node/浏览器执行面差分的测试任务，不是实际删除实现的任务。
-
-- `SkillDefinition`、卡牌定义和 `TriggerRule` 保存元数据、资源、目标声明、动态代码及优先级。
-- `executeSkillFunction()` / `executeCardFunction()` 在传入的战斗副本上执行数据驱动效果。
-- `dealDamage()` / `healDamage()` 处理数值并派发对应 before/after 事件。
-- `TriggerSystem.checkTriggers(battle, context)` 收集和执行一个事件的消费者；`fireEvent()` 保留父子事件链。
-- `globalTriggerSystem` 是进程级实例；初始化会清理/注册规则，这是当前跨房间隔离的重点风险。
-
-核对基线中的消费者大类顺序为：
-
-1. 全局规则；
-2. 棋子实例规则；
-3. 玩家规则；
-4. reactive 手牌；
-5. AttachedEffect（内置内容不可达，RED-80 正在移除）。
-
-同一类别按 `priority` 降序；未设置视为 0；同优先级保持快照/收集顺序。嵌套事件最大深度 20，每条根事件链最多分发 100 次，超限返回带事件链的阻断错误。规则、响应牌或基线中的遗留附加效果抛异常时会附加 `event/consumer` 上下文并重新抛出，Runner 不提交该命令；规则定义无法重新加载时当前会写日志并跳过。
-
-### 3.8 JSON 动态代码与 `eval`
-
-当前技能、卡牌和规则把一部分可后续开发的效果代码保存在 JSON 中，再由规则模块直接 `eval`。这让内容可以独立于主进程源码更新，但代码仍然在调用它的 Node 或浏览器进程中执行：它能访问传入对象和该进程暴露的能力，因此这不是安全沙箱，也不是进程隔离。注入确定性的 `Math` / `Date` 解决的是复现问题，不会自动限制权限；单纯把 `eval` 换成 `new Function` 也不会改变这一点。动态代码只应加载受信任、经过版本和 hash 校验的项目内容。
-
-核对基线中有 8 个直接 `eval` 调用点，分布在 `rule-loader.ts`、`skills.ts`、`triggers.ts` 和 `turn.ts`。数据面约含 110 段技能代码、16 段卡牌代码与 54 段 Rule `skillCode`；AttachedEffect 的动态代码由 RED-80 删除，不纳入长期方案。本机 Windows Node 的一次冷编译诊断约为技能 4.0 ms、卡牌 0.8 ms、Rule 4.6 ms。这只测“把字符串编译成函数”，不包含状态克隆、执行、日志、hash、浏览器或 Android 成本，因此不能当成整场性能结论。
-
-真正值得优化的是重复次数：一次玩家操作可能先进行 dry-run，目标高亮还会对许多候选格逐个 dry-run，最终提交又执行一次。如果每次都重新 `eval` 同一字符串，几毫秒会被候选数量放大。当前已有规则或卡牌数据缓存，但没有覆盖所有动态代码面的统一“已编译函数缓存”。所以它不是现阶段阻塞 Demo 的最高优先级，却适合在内容接口稳定、RED-80/RED-75 完成后集中处理；对应任务为 RED-82。
-
-RED-82 的目标流程：
+## 2. 执行流程
 
 ```text
-当前：读取 JSON 字符串 → 每次 dry-run / 候选检查 / 正式执行时 eval → 调用
-目标：加载或更新内容 → 校验版本/hash → 集中编译一次 → 按 {surface,id,version,codeHash} 缓存 → 多次调用
-                                            ↘ 内容变化时精准失效并重新编译
+UI action draft
+  → RvBColyseus
+  → Colyseus BattleRoom admission
+  → room authority FIFO
+  → dispatchRoomBattleAction
+  → Battle Runner / Reducer / Trigger Runtime
+  → receipt + transition + trace/hash evidence
+  ├→ Colyseus public state and APPLIED receipt
+  └→ PostgreSQL authority journal → DURABLE watermark
 ```
 
-编译后的函数只保存在进程内存中，不写入 `BattleState`、存档或网络消息。Node 与 browser bundle 必须走同一运行时合同和差分测试；若未来需要加载不受信任的玩家脚本，则应另建真正的隔离方案（独立进程/受限运行时、超时和能力白名单），不能继续把直接 `eval` 当作隔离边界。
+准入先验证 room/player、座位、Profile/content hash、协议、build 和 expected authority version。规则失败、
+签名/身份失败或版本失败只产生拒绝，不得写 Transition 或改变房间状态。
 
-## 4. 主要模块接口卡片
+## 3. Command/Receipt/Transition
 
-### 4.1 规则归约器
+Command envelope 包含：battleId、playerId、clientActionId、expectedAuthorityVersion、协议/build 和 action。
+相同 clientActionId 幂等；不同动作复用同一 ID 稳定拒绝。
 
-- **入口：** `lib/game/turn.ts::applyBattleAction(state, action)`。
-- **合同：** `BattleState + BattleAction → BattleState`；先克隆输入，成功后由外层写入一次 `targetingRevision`。
-- **职责：** 部署门禁、回合/资源校验、普通移动、技能/卡牌、挂起选择、触发器和日志。
-- **错误：** 版本不兼容、规则拒绝、目标选择和效果异常均抛错；未知命令失败关闭。
-- **原子性：** 无效或异常动作不污染调用方状态；预检 checkpoint 不提交随机、时钟和 ID cursor。阻断或交互挂起是规则定义的成功中间状态，不等同于异常回滚。
-- **测试：** `turn.test.ts`、`targeting.test.ts`、`deployment.test.ts`、`movement-contract.test.ts`。
+成功 receipt 绑定 action ID、authority version 和 transition。Transition 绑定 from/to version、动作 hash、
+前后内部/公开 state hash、receipt 和上一条 transition hash。所有字段均使用 canonical JSON 计算。
 
-### 4.2 Runner 与回放
+客户端只接受连续版本。缺口或 hash 不一致时停止提交，并通过 Colyseus 房间状态恢复。
 
-- **入口：** `runBattleAction()`、`replayBattle()`、`getRoomBattleState()`。
-- **顺序：** 只读检查幂等 → 校验/恢复根种子与 cursor → canonical pre-hash → 克隆并补技能 → runtime 内归约 → 剥离技能 → post-hash → 写 trace。
-- **重复请求：** 已提交的显式 action ID 返回原状态和 `duplicate: true`，不新增 trace。
-- **失败：** 输入状态、Action Trace 和已提交 cursor 不变；错误附加 `rootSeed/streamName/cursor/turn/playerId/actionId`。
-- **回放：** 对同一初始状态、seed 和动作序列逐个调用同一 Runner，返回逐动作 action/state hash。
-- **测试：** `debug-battle.test.ts`、`deterministic-runtime.test.ts`。
+## 4. 状态投影
 
-### 4.3 房间开战与初始化
+内部 `BattleState` 可包含私有部署候选、pending 选择、完整 Trace 和规则调试信息。发送给客户端前通过
+`createPublicBattleSnapshot()` 按 viewer 投影：
 
-- **入口：** `lib/game/room-battle-start.ts::startBattleFromLockedRosters()`、`lib/game/battle-setup.ts::createInitialBattleForPlayers()`。
-- **房间合同：** 两名玩家 roster 均锁定后，先验证房间冻结的 `mapId` 属于受控目录且可部署，再生成 root seed 并以 `deploymentEnabled: true` 初始化。
-- **初始化合同：** 玩家数、模板、按玩家选人、地图及 `{ firstPlayerId?, rootSeed?, deploymentEnabled? }`；返回 `Promise<BattleState | null>`。
-- **部署：** 16 枚稳定初始实例都标记 `isCore: true`，但新建对局先把普通核心放入预备区、把基尔加丹移到仪式扩展，再按稳定玩家顺序各抽 1 枚先锋并随机放到空可行走格。预备实例保留身份/属性/规则；召唤物强制 `isCore: false`。
-- **提交：** 房间启动使用 `setRoomIfVersion()` 最多重试三次；常规 WS/HTTP 动作与 PVE bot 状态使用同一 CAS 持久化边界。
-- **错误：** 权威部署缺 seed，或房间地图缺失、已退役、目录外、不可部署时，在 seed/随机消费/状态写入前失败关闭；玩家数不是 2 返回 `null`；数据/效果错误可抛出。
-- **测试：** `deployment.test.ts` 和房间 roster/identity 相关测试。
+- 当前输入 owner 可见自己的精确候选与合法落点；
+- 对手和观战者只见公开等待状态与数量；
+- debug Trace 不进入进行中对局公开状态；
+- 终局 Trace 只通过 verified report/terminal evidence 暴露。
 
-### 4.4 Windows WebSocket 与内部 Next Battle route
+## 5. 渐进部署
 
-- **入口：** 正式玩家入口为 `lib/ws-server.ts::startWsServer()`；`app/api/rooms/[roomId]/battle/route.ts::GET()`、`app/api/rooms/[roomId]/battle/route.ts::POST()` 只供内部兼容与 route 测试直接调用。
-- **动作合同：** `dispatchRoomBattleAction()` 读取 Room 和 `ServerBattleState`，校验签名身份与动作玩家，再调用带 room seed 的 Runner。
-- **成功：** 更新 `room.battleState`，用读取到的 `Room.version` 调用 `setRoomIfVersion()`；只有 CAS 成功才广播 `stateUpdate { state, seed, stateHash, duplicate }`。
-- **失败：** WS 向发送者返回 `actionError`；内部直接调用 HTTP handler 时返回 JSON。持续版本竞争返回 `ROOM_VERSION_CONFLICT`（内部 HTTP 409）；竞争后读到终局返回 `BATTLE_ALREADY_TERMINAL`；选择与普通错误仍可携带 preparation 和 determinism 上下文。
-- **并发边界：** 内部 HTTP handler、WS 与 Bot 的房间写入都受数据库版本 CAS 保护；失败计算被丢弃，不广播也不覆盖已提交终局。正式玩家命令、完整快照与重连恢复只走房间 WebSocket；实际同端口运行时玩家 `/api/rooms/**` 返回 410，HTTP handler 不是后备通道。
-- **测试：** `tests/roster-transports.test.ts` 覆盖同房间 HTTP/WS 双投降竞争；`terminal-transport.test.ts` 与 `battle-command.test.ts` 覆盖守卫、CAS 和 Bot 终局持久化。
+Demo 开局为双方各一个确定性随机先锋，其余普通核心进入预备区。自己的成长回合开始时，若预备区非空，
+服务端生成至多三枚候选和安全格。`deployReservePiece` 必须携带精确 deployment revision。
 
-### 4.5 RoomStore 与战斗存储
+部署、after-summon 触发、终局检查、免费首移标记和回合推进在一个规则转换内完成。版本过期、候选外棋子、
+非法格或错误玩家在随机消费和状态写入前拒绝。
 
-- **入口：** `RoomStore.getRoom()/setRoom()/setRoomIfVersion()`；`getBattleStorage()`、`withServerSkills()`、`withoutServerSkills()`。
-- **格式：** 当前首选外层为 `{ type: "server-state", seed, state }`；兼容旧 action log 和裸状态。
-- **序列化：** 函数与顶层 `skillsById` 被剥离；数据库写入递增 `Room.version`。
-- **版本：** `BattleState._v` 是引擎格式版本；`Room.version` 是数据库修订号；外层战斗存储本身没有正式格式版本。
-- **已知边界：** Room 反序列化会把 `currentTurnIndex` 置 0、`actions` 置空；当前缺完整保存—读取状态等价测试。
+## 6. 目标、选择和触发器
 
-### 4.6 浏览器与 Android
+`prepareAction()` 返回声明式 option/target 候选；UI 不执行技能代码来猜候选。最终提交携带选择凭证，
+归约器再次验证。
 
-- **浏览器出口：** `lib/game/engine-browser-entry.ts` 暴露归约器、Runner、hash、普通移动和旧 RNG 适配器；`data/pages/js/game-engine.js` 是构建产物。
-- **战斗页：** 在线 `battle.html::doAction()` 只生成 `clientActionId`、签名并立即提交动作；不在发送前克隆战局、执行 Runner 或生成客户端 trace。
-- **LAN：** 浏览器提交命令并消费权威 `stateUpdate`；需要目标或选项时，由服务端以 `actionError + preparation` 返回候选和选择凭证。
-- **桌面本机 Relay：** 浏览器只向同合同的本机权威服务发送 action 并等待完整 `stateUpdate`；旧 `pendingAction`/`hostResume` 权威消息被忽略，客户端禁止上传 `stateUpdate`。
-- **独立 `relay-server`：** RED-119 只恢复赛前 REST 与真实房间 `roomUpdate`；不接收 battle action 或 `stateUpdate` 上传，不执行或恢复战斗，也不分配 host-authority。
-- **Training：** `trainingDoAction()` 保留独立训练入口，不属于多人在线传输合同。
-- **Android：** `mobile-server-entry.ts::handleBattleAction()` 仍属于待删除的旧 action-log 框架；在线战斗页不再生成 trace，RED-34 不维护移动端旧 action log。该路径不提供 RED-138 的 viewer 私有投影，Android 只保留 legacy 状态解释能力，渐进部署新局不受支持。
-- **Android 回放：** `battle.html::applyLegacyBattleEntry()` 按 `seq` 调用浏览器 Runner；缺 root seed 或 Runner 时失败关闭。
-- **存储：** Android 房间只在 WebView 内存 `Map`，没有 Prisma 或正式离线恢复协议。
-- **迁移合同：** 上述 Android action-log 路径全部是 RED-81 的删除对象；迁移完成后浏览器只消费宿主计算并保存的完整权威状态，不保留客户端日志回放降级。
+触发器按房间运行时执行并记录 event chain。异常、预算溢出、无效 EffectChain 或不可序列化结果导致整个
+动作回滚，规则 limits/pending/cache 也恢复到动作前。
 
-## 5. 执行流程示例
+## 7. 计时器和机器人
 
-### 5.1 Demo 房间初始化与渐进部署
+权威时钟由服务端注入。正常回合时长按完整轮次为 90/120/150/180/210 秒，快速回合为 40 秒，
+回合外 pending 响应窗口为 30 秒，最后 15 秒进入烧绳。计时同步、烧绳、超时和机器人命令与玩家动作进入同一房间 FIFO。玩家动作与
+超时竞争时只有一个版本提交；失败的 speculative 结果不能广播。
 
-入口是 `startBattleFromLockedRosters()`。双先锋、回合候选、后备落位和先手都属于同一根种子的确定性证据，但分别使用隔离命名流。
+客户端只显示公开 deadline/serverNow，不拥有超时授权，也不能通过刷新延长时间。
 
-```mermaid
-flowchart TD
-  Start["读取房间并检查两名 roster 已锁定"] --> Ready{"合同满足？"}
-  Ready -->|否| Reject["拒绝开战，不写房间"]
-  Ready -->|是| Seed["createRootSeed 生成根种子"]
-  Seed --> Setup["createInitialBattleForPlayers<br/>Room.mapId + deploymentEnabled"]
-  Setup --> Runtime["创建 RuleRuntime"]
-  Runtime --> Stable["稳定排序玩家与核心实例"]
-  Stable --> Reserve["普通核心进入 reserve<br/>KJ 进入 ritual extension"]
-  Reserve --> Vanguard["双方依次消费 opening-piece / opening-cell<br/>各召唤 1 枚先锋"]
-  Vanguard --> Trigger["完成双方 before/afterPieceSummoned"]
-  Trigger --> OpeningTerminal{"双先锋完整队列后终局？"}
-  OpeningTerminal -->|是| OpeningStop["提交终局<br/>跳过 gameStart / offer / 计时器"]
-  OpeningTerminal -->|否| First["红方座位决定先手"]
-  First --> GameStart["首个 beginPhase 触发 gameStart<br/>完成完整触发队列"]
-  GameStart --> GameStartTerminal{"gameStart 队列后终局？"}
-  GameStartTerminal -->|是| GameStartStop["提交终局<br/>停止 offer / 计时器 / 后续随机"]
-  GameStartTerminal -->|否| Offer["生成当前玩家私有 offer"]
-  OpeningStop --> Trace["recordBattleInitialization<br/>写 system-initialize trace"]
-  GameStartStop --> Trace
-  Offer --> Trace
-  Trace --> Save["setRoomIfVersion 保存 server-state"]
-  Save --> Conflict{"Room.version 冲突？"}
-  Conflict -->|是，少于 3 次| Start
-  Conflict -->|是，已达 3 次| Fail["并发启动失败"]
-  Conflict -->|否| Await["等待当前玩家 deployReservePiece"]
-  Await --> Summon["原子落位 + 完整召唤触发"]
-  Summon --> SummonTerminal{"after-summon 队列后终局？"}
-  SummonTerminal -->|是| BattleStop["动作事务提交终局<br/>停止标签授予、回合和随机"]
-  SummonTerminal -->|否| Tag["给本次部署核心添加<br/>deployment-first-move-free"]
-  Tag --> Begin["继续 beginTurn<br/>直接进入正常 action"]
-```
+## 8. 表现事件边界
 
-不变量：
+`battle-presentation-events.ts` 在成功权威命令后生成按查看者投影的动作事件；动作历史和小剧场只消费
+这些投影。历史高亮、播放速度、弹道/范围演出和缺失资源兜底不进入 `BattleState`、hash、journal 或
+规则判断，也不发送新的玩家意图。
 
-- 当前 offer 门禁期间普通战斗动作全部拒绝，失败动作不推进随机 cursor，也不移出预备棋子。
-- 每个自己的回合最多从当前 offer 部署 1 枚；成功前候选实例仍在预备区，成功后只有该实例离开一次。
-- 双方先锋先全部完成再第一次检查核心终局；先锋没有免费首移标签，第一名玩家的第 1 个自己的回合仍能部署 1 枚。
-- `gameStart` 只触发一次；渐进预备棋子只有实际入场时才发 `afterPieceSummoned`。
-- 渐进随机与状态细节由 [ADR-0024](../decisions/ADR-0024-progressive-reserve-deployment.md) 冻结，受控地图选择由 [ADR-0019](../decisions/ADR-0019-selectable-demo-maps.md) 冻结；旧重投由 ADR-0007/0009 仅作 legacy 兼容。
+## 9. 终局与战报
 
-### 5.2 Windows LAN 玩家动作
+`finalizeBattleTerminal()` 生成唯一 `terminalResult`。终局转换必须进入 PostgreSQL，并在 journal drain 后写
+Terminal Barrier。`readBattleReport()` 随后从初始 Checkpoint 重放全部转换，验证：
 
-```mermaid
-sequenceDiagram
-  actor Player as 玩家
-  participant UI as battle.html
-  participant WS as ws-server.ts
-  participant Store as RoomStore
-  participant Runner as battle-runner.ts
-  participant Reducer as turn.ts
+- 版本和 receipt 连续；
+- action、state/public、transition hash；
+- Checkpoint 与重放状态；
+- Trace、Replay Frame、终局和 durable barrier。
 
-  Player->>UI: 点击移动、技能、卡牌或结束回合
-  UI->>UI: 添加 clientActionId 并签名
-  UI->>WS: action + playerId + auth
-  WS->>Store: getRoom + getBattleStorage
-  Store-->>WS: state + root seed
-  WS->>WS: 校验连接身份与 action actor
-  WS->>Runner: runBattleAction(state, action, rootSeed)
-  Runner->>Runner: 恢复 cursor，创建 RuleRuntime，计算 pre-hash
-  Runner->>Reducer: 在 runtime 内 applyBattleAction
-  alt 需要目标或选项
-    Reducer-->>Runner: TargetingRuleError + preparation
-    Runner-->>WS: 权威错误，不提交状态/trace/cursor
-    WS-->>UI: actionError + preparation
-    UI-->>Player: 展示精确候选并补 selectionId/revision
-  else 动作就绪
-    Reducer-->>Runner: next state
-    Runner->>Runner: post-hash + Action Trace
-    Runner-->>WS: state/hash/trace
-    WS->>Store: setRoom
-    Store-->>WS: 保存完成，Room.version + 1
-    WS-->>UI: stateUpdate 完整状态
-    UI->>UI: applyServerState + render
-  end
-```
+任何一项失败都不返回报告。
 
-权威边界：
+## 10. 失败语义
 
-- Windows 客户端只提交命令，不计算或上传下一状态；服务端从已保存状态执行唯一一次权威动作。
-- 浏览器不再生成或上传预演 trace；Windows WS/HTTP 的权威 Runner 自行生成并保存 Action Trace。
-- 保存成功后的 `stateUpdate` 是共享状态。规则失败时 WS 只向发送者回 `actionError + preparation`，不会保存或广播失败状态。
-- 当前常规动作写入没有使用 `setRoomIfVersion()`，所以并发请求仍是已知风险。
-
-### 5.3 技能、卡牌与触发器结算
-
-```mermaid
-flowchart TD
-  Action["Runner 收到技能或卡牌动作"] --> Clone["克隆状态并激活 RuleRuntime"]
-  Clone --> Query["checkpoint 内 prepareAction"]
-  Query --> Prepared{"准备结果"}
-  Prepared -->|invalid| Reject["抛稳定错误<br/>状态/trace/cursor 不提交"]
-  Prepared -->|needOption / needTarget| Select["返回 preparation<br/>不执行效果或支付"]
-  Prepared -->|ready| Before["派发 before 事件"]
-  Before --> Queue["消费者快照<br/>全局 → 棋子 → 玩家 → reactive → attached 遗留"]
-  Queue --> Execute["类别内 priority 降序执行"]
-  Execute --> Outcome{"before 结果"}
-  Outcome -->|blocked| Blocked["提交已完成 before 消费者<br/>不执行核心效果和 after"]
-  Outcome -->|pending| Pending["保存选择会话和剩余队列<br/>后续动作从断点恢复"]
-  Outcome -->|success| Core["支付 AP/充能/次数<br/>执行技能或卡牌主效果并写日志"]
-  Core --> Nested["伤害 / 治疗 / 移动 / 召唤<br/>可派发嵌套事件"]
-  Nested --> After["派发对应 after 事件一次"]
-  After --> Commit["写 next state 与 Action Trace"]
-  Pending --> Resume["pendingOptionSelect / pendingTargetSelect"]
-  Resume --> Execute
-  Execute -->|consumer 抛异常| Rollback["整条命令回滚<br/>附加 trigger + determinism 上下文"]
-```
-
-原子性要点：
-
-- 无效输入在 before/core/after 之前失败。
-- 阻断会保留已完成 before 消费者造成的规则状态和 cursor，但不执行核心支付/效果/日志，也不执行 after。
-- 挂起会保留已完成消费者和会话；恢复时不重复前面的消费者，只有最终核心效果成功后才执行 after。
-- 任意消费者或核心/after 异常都会让整个命令失败；调用方原状态、Action Trace 和已提交 cursor 保持不变。
-- 事件链超深或超预算会带 `eventChain` 证据阻断，避免无限递归。
-
-### 5.4 保存、广播与客户端刷新
-
-```mermaid
-sequenceDiagram
-  participant Runner as runBattleAction
-  participant Storage as ServerBattleState
-  participant Room as Room
-  participant DB as Prisma RoomStore
-  participant WS as broadcastToRoom
-  participant Client as battle.html
-
-  Runner-->>Storage: next state + stateHash + trace
-  Storage->>Room: room.battleState = server-state
-  Room->>DB: setRoom(roomId, room)
-  DB->>DB: 剥离函数/顶层 skillsById 并 JSON 序列化
-  DB->>DB: 持久化并递增 Room.version
-  DB-->>Room: 保存完成
-  Room->>WS: stateUpdate(state, seed, stateHash, duplicate)
-  WS-->>Client: 完整权威快照
-  Client->>Client: 校验 seed、补展示用 skillsById
-  Client->>Client: 对账选择会话、刷新日志和界面
-```
-
-这里有三种不同“版本”，排错时不能混用：
-
-- `BattleState._v`：状态格式兼容版本。
-- `Room.version`：数据库并发修订。
-- `targetingRevision`：选择凭证的新旧状态版本。
-
-### 5.5 Android action-log 遗留流程与迁移边界
-
-Android 内嵌服务与 Windows 完整状态协议不同：
-
-1. 客户端立即提交 `action`；Java `MobileHttpServer` 把请求转给隐藏 WebView 的 `mobile-server-entry.ts`。
-2. `handleBattleAction()` 校验房间和鉴权；若旧客户端仍携带 trace，则检查其格式、seed 及前置 hash 链。
-3. trace 失败诊断写入 `traceValidationError`，但当前仍把动作追加为下一个 `seq`，以免没有重试协议的客户端被冻结。
-4. 服务广播 `actionLog`；各客户端按序调用浏览器 Runner 重放并核对本地 seed；新在线客户端不再提供预演 trace。
-5. 新订阅者收到 `battleSnapshot { actions, total, seed }` 后从 init 条目开始重放。
-
-> **只用于解释待删除代码：** Android 服务没有从自己的权威状态重跑常规动作；它权威记录“发生了哪些日志条目”，客户端各自计算状态。旧 trace 诊断是可选证据，并非服务端权威裁决。该路径只能继续解释 legacy 状态，不能把含私有预备区/候选的 `progressive-reserve-v1` init 日志视为受支持快照。RED-81 完成后，本节应替换成与 5.2 同语义的 Android 权威状态流程。
-
-## 6. 回合、选择与胜负
-
-### 6.1 部署与回合阶段
-
-新建 Demo 房间使用 `TurnPhase = start | action | end` 与渐进部署子状态：
-
-1. 初始化创建 `start` 和 `deployment.status = "turn-ready"`，按模板声明处理预备区例外并完成双方随机先锋；两方触发队列都结束后设置 `openingVanguardsInitialized`，在 `gameStart`、offer、计时器之前第一次检查终局。
-2. 仍未终局时，当前玩家首个 `beginPhase` 先触发一次 `gameStart`；完整触发队列后再次判终局，仍未终局且预备区非空才生成 offer 并进入 `awaiting-reserve-deploy`，尚不开放正常 action。
-3. `deployReservePiece` 先校验 `expectedDeploymentRevision`，再完成原子召唤和触发；after-summon 队列后立即判终局。仍未终局时给本次部署核心添加仅当前部署回合有效的 `deployment-first-move-free` statusTag，随后直接继续 `beginTurn` 并进入正常 `action`。
-4. 该棋子的第一次成功普通 `move` 由同一权威 reducer 以 0 AP 提交并原子消费标签；第二次恢复既有费用。非法、过期、错误玩家或 before-move 阻止不消费；已提交后的 after-move 位移不返还。技能/强制位移不享受或消费。
-5. `endTurn` 在行动权交接前确定性清除当前玩家未使用的部署免费首移标签，然后进入 `end`；下一个 `beginPhase` 切换玩家并建立下一回合的 `start`，重复其部署门禁。
-6. 双方普通预备区都空时 `deployment.status = "complete"`。显式 legacy 状态仍走旧 `awaiting-locks → complete` 路径；渐进模式不创建专用免费移动子状态或动作。
-
-`beginPhase` 是无 `playerId` 的系统动作；网络层只对带 actor 的动作执行 `assertActionPlayer()`。房间、选人、PVE、Relay 和 Electron IPC 仍使用各自的消息字符串，没有一个统一的版本化命令 envelope。
-
-### 6.2 目标与挂起选择
-
-主动技能/卡牌的典型选择流程：
-
-1. `prepareAction()` 根据声明式 `targeting.steps` 返回 `needOption` 或 `needTarget`。
-2. UI 只展示返回的 `candidates`，并保存 `selectionId/stateRevision`。
-3. 最终动作携带凭证和目标；归约器以同一约束再次验证。
-4. 成功命令把 `targetingRevision` 增加一次；状态变化后旧凭证会得到 `TARGET_SELECTION_STALE`。
-5. 多段选择把已选目标保存在 pending session，最后一步之前不执行核心效果。
-6. 错玩家、错 ID、重复提交/取消和不在候选中的目标均以稳定错误码拒绝，且不污染状态。
-
-触发器或效果运行中产生的选择写入 `pendingOptionSelection` / `pendingTargetSelection`。会话存在时，普通动作被 `PENDING_SELECTION_ACTIVE` 拒绝，只允许对应的继续或合法取消命令。
-
-### 6.3 胜负状态
-
-**当前实现（RED-34）：** `lib/game/terminal.ts::finalizeBattleTerminal()` 在完整动作、伤害 batch、死亡/复活与触发链结束后归约一次 `BattleState.terminalResult`。若仍有 pending 选择则延后；主动投降与预留的超时投降原因立即结算。
-
-核心存活按场上具有数值 `x/y`、`currentHp > 0 && isCore === true` 与 `ownerPlayerId` 计算，召唤物、普通预备区和仪式暂存的基尔加丹都不计；双方先锋全部完成前用 `deployment.openingVanguardsInitialized` 屏障暂停该检查。初始化后单方场上无核心立即败北，双方同一边界均无核心为平局；部署 after-summon 队列结束后先判终局，再授予免费首移标签或推进回合/候选/随机。普通移动沿用既有动作完成后的终局边界。第 40 个完整轮次的 `end` 结算先检查核心胜利，再检查轮次平局。终局写入可追踪的 action/turn/phase/round 位置并追加唯一 `terminalResult` 日志。
-
-正式 WebSocket 与内部 Next HTTP handler 都拒绝客户端提交的 `gameOver`、`winner` 或 `terminalResult`，并通过房间版本 CAS 只提交和广播一次权威结果；并发失败方重读后以 `BATTLE_ALREADY_TERMINAL` 拒绝，持续版本竞争以 `ROOM_VERSION_CONFLICT` 拒绝。Bot 使用同语义持久化边界，房间与 `terminalResult` 在一次 CAS 写入中同步为 `finished`。终局后的 gameplay 命令不改变状态；`battle.html` 仅展示服务端结果。
-
-## 7. 失败语义与调试证据
-
-| 层 | 失败语义 | 至少记录 |
+| 层 | 失败处理 | 必要证据 |
 | --- | --- | --- |
-| Targeting | `TargetingRuleError`，含稳定 `code` 和可选 preparation | revision、selectionId、候选、提交目标 |
-| Reducer | `BattleRuleError`、版本错误、效果/触发器异常 | `_v`、deployment、phase/turn、actor、完整 action |
-| Runner | 不提交失败状态/trace/cursor；错误附 determinism | root seed、stream/cursor、actionId、前置 state hash |
-| Trigger | 异常重新抛并附 `triggerContext`；链预算返回阻断错误 | event/root/parent ID、depth、consumer kind/ID、eventChain |
-| WebSocket | 只向发送者回 `actionError` | roomId、connection player、action、错误 envelope |
-| HTTP | 400 JSON；选择与普通错误字段略有差异 | roomId、body 摘要、status、response |
-| RoomStore | Prisma/JSON 错误向上传播；版本竞争返回稳定冲突 | 读取与写入 Room.version、写前/后 hash、CAS 结果 |
-| Android log（遗留） | trace 问题写 `traceValidationError`，不拒绝日志 | seq、seed、pre/post hash、诊断文本；RED-81 后删除本行 |
-| 动态代码 | 编译或执行错误向上传播，当前调用点分散 | surface、内容 ID/version/codeHash、dry-run/正式执行阶段；RED-82 后补缓存命中信息 |
-| 浏览器 | 状态栏、战斗日志、console；部分兼容路径仍有空 catch | 运行模式、最后 seq/action/stateUpdate、截图 |
+| Colyseus 准入 | 拒绝加入/命令 | room/player、Profile/build/protocol |
+| Targeting/Reducer | 拒绝且不修改状态 | action、phase、turn、selection revision |
+| Runner | 回滚 state/runtime/cursor | seed、stream/cursor、pre hash、actionId |
+| FIFO/协调器 | 不发布 speculative 版本 | from/to version、queue depth、receipt |
+| PostgreSQL | 房间不可标记 durable | transaction、battleId、version、hash |
+| 战报 | 失败关闭 | 第一处断链/篡改/缺失 barrier |
+| 浏览器 | 停止提交并显示稳定错误 | authority origin、roomId、最后版本 |
 
-推荐最小复现包：
+## 11. 源码索引
 
-```text
-commit + 运行模式 + roomId
-初始状态或存档 + root seed
-玩家/实体 + deployment/phase/turn
-完整动作序列（含 clientActionId 与选择凭证）
-每步 actionHash + pre/post stateHash + randomStreams
-预期结果 + 实际结果
-服务端日志 + 浏览器日志 + Android 遗留 traceValidationError（若有）+ 截图
-```
-
-## 8. 当前测试覆盖与缺口
-
-### 8.1 已有自动覆盖
-
-| 范围 | 主要测试 |
+| 主题 | 入口 |
 | --- | --- |
-| 归约、移动、阶段、版本、输入不可变、技能/卡牌挂起与异常回滚 | `tests/game/turn.test.ts` |
-| 根种子、命名流、逻辑时间/ID、checkpoint、trace、逐动作回放 hash | `tests/game/deterministic-runtime.test.ts` |
-| 双随机先锋、预备区三选一、安全/后备落位、当回合免费首移 statusTag、固定 cursor、私有投影与 legacy 回归 | `tests/game/progressive-deployment.test.ts`、`tests/game/deployment.test.ts`、`tests/game/deployment-room.test.ts` |
-| 单边/同时核心全灭、复活、召唤物、40 轮、投降、同阵营身份、终局幂等、固定 seed 回放、HTTP/WS 竞争和 Bot CAS | `tests/game/terminal.test.ts`、`tests/game/terminal-transport.test.ts`、`tests/game/battle-command.test.ts`、`tests/roster-transports.test.ts` |
-| 精确候选、纯查询、同一验证器、凭证、pending、多段目标、UI/AI 一致 | `tests/game/targeting.test.ts` |
-| 曼哈顿/方形/直线、占位、普通移动、弹道事实和 UI/服务端集合一致 | `tests/game/spatial.test.ts`、`tests/game/projectile-trace.test.ts`、`tests/game/movement-contract.test.ts` |
-| 消费者大类/priority/快照顺序与队列可见性 | `tests/game/triggers-ordering.test.ts`、`tests/game/combat-trigger-queue-visibility.test.ts` |
-| 调试对局、镜像阵营、房间隔离、Runner 回放、幂等与非法动作原子性 | `tests/game/debug-battle.test.ts` |
-| 浏览器 bundle 与 Node 的固定种子差分、战斗表现边界 | `tests/game/engine-browser-differential.test.ts`、`tests/game/battle-ui-boundary.test.ts` |
-| SkillCode 的 Node/浏览器执行矩阵、差分与静态审计 | `tests/game/skillcode-runtime-matrix.test.ts`、`tests/game/skillcode-browser-differential.test.ts`、`tests/game/skillcode-static-audit.test.ts` |
-| WebSocket 基础连接、ping/pong、坏 JSON 与 RPC 错误 | `tests/ws-server.test.ts` |
+| 规则归约 | `lib/game/turn.ts` |
+| Runner/Trace | `lib/game/battle-runner.ts`、`battle-trace.ts` |
+| 房间协调 | `lib/game/room-battle-actions.ts` |
+| FIFO/运行时 | `room-authority-queue.ts`、`room-rule-runtime.ts` |
+| 目标/空间 | `targeting.ts`、`spatial.ts` |
+| 终局/计时 | `terminal.ts`、`turn-timer.ts` |
+| Colyseus 房间 | `lib/server/colyseus/battle-room.ts` |
+| 目录/报告 HTTP | `lib/server/colyseus/create-colyseus-server.ts` |
+| PostgreSQL | `lib/server/postgres/**` |
+| 页面适配 | `data/pages/js/colyseus-client.js` |
+| 战斗页面 | `data/pages/battle.html` |
 
-RED-80 合并后，触发顺序合同将缩减为“全局 Rule → 棋子 Rule → 玩家 Rule → reactive 手牌”；RED-75 的差分矩阵也会移除 AttachedEffect surface。当前人工构造 `attachedEffects` 的测试只证明遗留执行路径，不代表内置玩法可达。
+## 12. 验证
 
-### 8.2 主要缺口
-
-- 真实 Prisma、多服务实例和客户端断线条件下的终局广播竞争 E2E。
-- `RoomStore` 对完整 `server-state` 的保存—读取等价与迁移测试。
-- 同一快照和动作走正式 WS、内部 HTTP handler、Relay、迁移后 Android 权威 Runner 的跨端最终状态一致性。
-- Android 安装包内生成 bundle 的来源/hash，以及完整开服—保存—重连端到端验证；不再验收 action-log 回放。
-- 动态代码统一缓存的命中、精准失效、编译失败关闭、Node/browser 一致性和候选枚举性能基线。
-- 多房间共享 `globalTriggerSystem` 的压力与隔离测试。
-- RED-77 已清理无定义的 `beforeAttack` 遗留消费者，事件目录审计当前没有未声明、仅消费或无生产者事件；以 [`COMBAT_EVENT_PIPELINE_AUDIT.md`](./COMBAT_EVENT_PIPELINE_AUDIT.md) 为准。
-
-## 9. 源码与决策索引
-
-| 主题 | 当前入口 |
-| --- | --- |
-| 状态、动作、归约 | `lib/game/turn.ts` |
-| 房间开战、双先锋与渐进部署初始化 | `lib/game/room-battle-start.ts`、`lib/game/battle-setup.ts` |
-| 确定性运行时 | `lib/game/rule-runtime.ts` |
-| 稳定 hash 与 Action Trace | `lib/game/battle-trace.ts` |
-| Runner 与回放 | `lib/game/battle-runner.ts` |
-| 权威目标查询 | `lib/game/targeting.ts` |
-| 权威 option 会话与交互续接 | `lib/game/pending-interaction.ts`、`lib/game/turn.ts` |
-| 空间、移动与弹道事实 | `lib/game/spatial.ts` |
-| 技能、卡牌、伤害、治疗 | `lib/game/skills.ts` |
-| 触发器与事件链 | `lib/game/triggers.ts` |
-| AttachedEffect 遗留（RED-80 正在删除） | `lib/game/attached-effect.ts` |
-| 战斗存储兼容 | `lib/game/battle-storage.ts` |
-| Prisma 房间 | `lib/game/room-store.ts` |
-| Windows WebSocket | `lib/ws-server.ts` |
-| 房间 HTTP Battle API | `app/api/rooms/[roomId]/battle/route.ts` |
-| 浏览器引擎出口 | `lib/game/engine-browser-entry.ts` |
-| 浏览器战斗页 | `data/pages/battle.html` |
-| Android 内嵌服务 | `mobile-server/mobile-server-entry.ts`、`android/app/src/main/java/com/redvsblue/client/MobileHttpServer.java` |
-| 动态代码执行面 | `lib/game/rule-loader.ts`、`lib/game/skills.ts`、`lib/game/triggers.ts`、`lib/game/turn.ts` |
-| Android 权威架构迁移 | RED-81（完整删除 action-log，以 Windows server-state 为准） |
-| 动态代码集中编译缓存 | RED-82 |
-| 确定性运行时决策 | `docs/decisions/ADR-0004-deterministic-rule-runtime.md`（Accepted） |
-| 权威目标选择决策 | `docs/decisions/ADR-0005-authoritative-target-selection.md`（Proposed） |
-| 触发顺序决策 | `docs/decisions/ADR-0006-combat-trigger-ordering.md`（Accepted） |
-| 渐进部署决策 | `docs/decisions/ADR-0024-progressive-reserve-deployment.md`（Accepted） |
-| Legacy 确定性部署决策 | `docs/decisions/ADR-0007-deterministic-deployment.md`（Accepted，仅兼容） |
-| 触发器原子性合同 | `docs/technical/COMBAT_TRIGGER_ATOMICITY_CONTRACT.md` |
-| 事件生产/消费审计 | `docs/technical/COMBAT_EVENT_PIPELINE_AUDIT.md` |
-| 战斗表现边界 | `docs/decisions/ADR-0004-battle-presentation-boundary.md`（Proposed） |
-
-## 10. 维护规则
-
-以下变更必须在同一个 PR 中更新本文对应接口表、权威边界和示意图：
-
-- 新增、删除或改变 `BattleAction` / `BattleState` 稳定字段。
-- 改变根种子、命名流、cursor、逻辑时钟、实例 ID、hash 或 trace 结构。
-- 调整开局先锋、渐进/legacy 部署、回合、目标选择、技能/卡牌或触发器执行顺序。
-- 改变 WS、HTTP、Relay、Android 的权威执行者或消息结构。
-- 新增、删除或改变 JSON 动态代码 surface、编译缓存键、失效策略或隔离边界。
-- 改变 RoomStore 序列化、战斗存储外层或版本策略。
-- 把胜负判断从客户端迁移到规则/服务端。
-
-更新时必须重新核对源码入口、对应测试和 ADR 状态，不能只根据历史文档转述。
-
-## RED-31 2026-08-18 规则修订
-
-> RED-138 取代说明：本节“同步部署”中的 `awaiting-locks`、重投选择和独立 45 秒期限只适用于 `legacy-reroll-v1`；新建对局的双先锋与每回合渐进部署以本文 5.1、6.1 和 ADR-0024 为准。座位与先后手条款继续有效。
-
-本节取代本文中由 `turn-order` 随机流决定 Demo PVP 先手、以及部署阶段使用 `awaiting-choices` 的旧说明。
-
-### 座位与先后手
-
-1. 空 PVP 房间的首位玩家等概率随机获得红方或蓝方座位。
-2. 第二位玩家获得剩余座位，座位随房间持久化，刷新和重连不重新抽取。
-3. 开局编排层查找红方玩家，并把其 ID 作为显式 `firstPlayerId` 传入规则引擎。
-4. 因此红方固定为先手、蓝方固定为后手；阵营 `alignment` 与座位保持独立。
-5. Relay lobby/join、桌面服务端和移动端统一由服务端分配座位；所有开局入口都必须校验一红一蓝不变量，客户端不能通过兼容命令覆盖。
-
-`turn-order` 流保留在稳定流名称清单中以兼容其它调用者，但 Demo PVP 房间不再使用它选择先手。
-
-### 同步部署
-
-1. 战斗以房间冻结并通过受控目录校验的公开地图和 `deployment.status = awaiting-locks` 开始。
-2. 双方选择在锁定前保持私有；锁定命令公开该玩家已锁定，但不泄露另一方选择。
-3. 双方均锁定，或服务端 45 秒 `deadlineAt` 到期后，部署一次性结算并进入正式对战。
-4. 所有客户端显示的读秒都从同一个服务端期限推导；本地计时器只负责刷新文本，不拥有规则时间。
-5. 红方结算后仍为第一个行动玩家，蓝方为第二个行动玩家。
-
-回退仅需恢复房间编排层先手选择与客户端展示，不改变核心战斗状态格式。
-
-## RED-84 2026-08-20 接口修订
-
-新增 browser-safe 的 `lib/game/ai-environment.ts::aiEnvironmentV1`，作为通用 AI、批量模拟和后续训练工具的唯一无头规则消费入口。它不取代 `runBattleAction()` 或房间权威提交：候选枚举复用 `prepareAction()` 与普通移动权威查询，transition 复用正式 runner，并在同步边界恢复模块级 TriggerSystem 状态。
-
-接口提供版本化 `observe/listLegalActions/simulate/isTerminal/stateKey`。Observation 是显式玩家投影，不是完整 `BattleState`；对手手牌、隐藏状态、Rule/effect、私有部署选择、其他玩家 pending 内容和 debug trace 均不暴露。多阶段 option/target 会展开为带选择凭证的完整命令，候选使用固定类别和 stable JSON tie-breaker。
-
-`simulate()` 只返回隔离状态、正式 state hash、稳定 transition hash、Action Trace、动作日志增量和状态 diff，不保存房间或广播。没有显式或已记录 root seed 时失败关闭。详细合同见 [`AI_ENVIRONMENT.md`](./AI_ENVIRONMENT.md)，决策见 [`ADR-0013`](../decisions/ADR-0013-headless-ai-environment.md)。
-## RED-36 2026-08-20 规则修订
-
-### 成长时限与快速烧绳
-
-1. 完整轮次由 `ceil(turnNumber / 2)` 得到；RED-170 起，完整轮次 1–2、3–4、5–6、7–8、9+ 的正常回合分别为 90、120、150、180、210 秒。
-2. 每回合最后 15 秒进入一次幂等的 `turnTimerBurn` 阶段。显示可在本地跨过阈值，但权威状态转换和广播只由服务端提交。
-3. 计时段归属于当前输入所有者，而不是固定归属于活动回合玩家；从 action 延续到 end，覆盖 pending 和“回合结束时”选项/目标输入，直到真正切换下一回合。pending 切换 owner 时保存活动玩家已消耗后的预算和烧绳状态，响应完成后恢复而不重置。玩家主动结束回合后产生的 pending 继续使用当前预算；action phase 超时仍执行一次 `endTurn`，但若强制结算才产生 pending，则清除该输入并直接 `beginPhase`，不能在 0 秒后新增预算。已经处于 end phase 的输入超时也直接 `beginPhase`，不重复触发回合结束规则或持续时间扣除。
-4. 只有输入所有者同时也是活动回合玩家、且没有任何被规则接受的玩法动作时超时，自己的连续次数才加一，下一次自己的回合固定为 40 秒。对手 pending 响应超时不伪装成其“自己的回合”，也不污染活动玩家 streak。回合外 pending 的独立响应窗口为 30 秒。
-5. 输入所有者的任一合法玩法动作把自己的连续次数清零，下一次拥有输入时恢复当前完整轮次对应的正常时限。非法动作、失败预检和刷新不能清零或延长期限。
-6. 第三次连续无操作超时复用 RED-34 的 surrender 结算，只生成一次 `timeout-surrender` 并停止计时。
-
-### 权威时间与传输
-
-- 生产规则使用单调 `performance` 时钟；房间协调器可注入伪时钟。测试固定状态、seed、时间和命令序列，不使用真实等待。
-- 协调器在异步读取前记录逻辑到达时间，并用每房间串行锁冻结逻辑权威时钟，直到规则、唯一 CAS、快照构造和 WS/HTTP 结果入队完成；恢复只推进进程内排除偏移，不改写 deadline。CAS 冲突重试不广播未提交版本，跨过 15 秒阈值的处理也不能令客户端烧绳状态反转。
-- RED-36 不包含断线/服务重启时钟恢复；当前逻辑时钟偏移以服务进程为生命周期，后续恢复协议必须持久化或重建该偏移。
-- `stateUpdate`/HTTP 快照包含 `serverNow` 和 `turnTimer` 投影。客户端用服务器期限显示倒计时，只提交签名玩法命令。
-- 新建渐进部署不再有 RED-31 的独立 45 秒门禁：候选与召唤使用当前成长回合期限，私有 offer/落点只投影给当前输入玩家；部署后直接进入正常行动，免费首移是公开 statusTag 而非独立计时阶段。显式 legacy 对局仍保留 45 秒锁定期限与公开站位。
-- 超时推进到 `bot` 的 action phase 时，调度器调用统一 bot-turn 队列，PVE 不会等待机器人自己的 deadline。
-
-实现决策见 [ADR-0014](../decisions/ADR-0014-authoritative-growing-turn-timer.md)，专项验证见 [RED-36 QA](../qa/RED-36-authoritative-turn-timer.md)。
-
-
-## RED-97 2026-08-21 交互生命周期修订
-
-- option 与 target 均使用带 `selectionId` 和 `stateRevision` 的服务端权威会话；非法、过期、重复或错误玩家提交在克隆前拒绝。
-- 可续接事件保存当前消费者、剩余规则队列、冻结响应卡快照和原动作。取消只处理当前消费者，并继续原队列；`canCancel: false` 不得由 UI、AI 或规则核心绕过。
-- 回合阶段、成本、冷却、手牌和成功日志只能在整条交互链完成后提交一次。内部 continuation 只来自已验证会话，客户端同名字段没有授权效果。
-- 不能安全续接的同步触发入口收到交互结果时以 `INTERACTIVE_TRIGGER_UNSUPPORTED` 失败关闭，由当前命令回滚，不再静默吞掉。
-- UI 的一次目标提交若被拒绝但权威会话仍存在，保留选择态并允许重试。详细决策见 [ADR-0015](../decisions/ADR-0015-authoritative-pending-interaction-lifecycle.md)。
+最小回归依次运行 Colyseus client/room 测试、规则相关测试、PostgreSQL 集成、类型检查、Windows 打包与
+双客户端人工验收。测试命令和完整步骤见 [BUILD_AND_RUN.md](./BUILD_AND_RUN.md)。

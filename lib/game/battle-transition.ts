@@ -98,29 +98,10 @@ export interface BattleAuthorityCheckpointRecord {
   createdAt: number
 }
 
-export function isBattleAuthorityV2Enabled(): boolean {
-  const configured = String(process.env.RVB_BATTLE_AUTHORITY_V2 ?? '').trim().toLowerCase()
-  return configured === '1' || configured === 'true' || configured === 'on'
-}
-
-/**
- * Candidate-only RED-109 persistence mode. It deliberately remains separate
- * from the v2 protocol switch so operators can fall back to the atomic Prisma
- * commit without downgrading the client protocol or schema.
- */
-export function isBattleAuthorityAsyncJournalEnabled(): boolean {
-  const configured = String(process.env.RVB_BATTLE_ASYNC_JOURNAL ?? '').trim().toLowerCase()
-  return isBattleAuthorityV2Enabled()
-    && (configured === '1' || configured === 'true' || configured === 'on')
-}
-
 export function roomBattleAuthorityVersion(room: {
-  version?: number
   battleAuthorityVersion?: number
 }): number {
-  const value = isBattleAuthorityV2Enabled()
-    ? room.battleAuthorityVersion ?? room.version ?? 0
-    : room.version ?? 0
+  const value = room.battleAuthorityVersion ?? 0
   if (!Number.isSafeInteger(value) || value < 0) {
     throw authorityEnvelopeError('AUTHORITY_VERSION_MISSING', 'Battle authority version is invalid')
   }
