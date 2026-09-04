@@ -10,6 +10,7 @@
   <script src="js/identity.js"></script>
   <script src="js/colyseus-sdk.js"></script>
   <script src="js/colyseus-client.js"></script>
+  <script src="js/deck-presets.js"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
     body {
@@ -407,8 +408,7 @@
     let factionClaimed = false
     let initialFactionClaimFinished = false
     let pieceLoadError = ''
-    const DECK_PRESET_STORAGE_KEY = 'rvb_piece_deck_presets'
-    const DECK_PRESET_SCHEMA_VERSION = 1
+    const DECK_PRESET_STORAGE_KEY = window.RvBDeckPresets.STORAGE_KEY
     let editingPresetId = ''
 
     const LOCAL_PIECE_LOAD_TIMEOUT_MS = 2000
@@ -766,33 +766,18 @@
     }
 
     function currentAlignmentKey() {
-      return playerAlignment === 'dark' || playerAlignment === 'evil' ? 'evil' : 'good'
+      if (playerAlignment === 'dark' || playerAlignment === 'evil') return 'evil'
+      if (playerAlignment === 'light' || playerAlignment === 'good') return 'good'
+      return null
     }
 
     function readPresetStore() {
-      try {
-        const parsed = JSON.parse(localStorage.getItem(DECK_PRESET_STORAGE_KEY) || 'null')
-        if (!parsed || parsed.version !== DECK_PRESET_SCHEMA_VERSION || !Array.isArray(parsed.presets)) {
-          return { version: DECK_PRESET_SCHEMA_VERSION, presets: [] }
-        }
-        return {
-          version: DECK_PRESET_SCHEMA_VERSION,
-          presets: parsed.presets.filter(function (preset) {
-            return preset && typeof preset.id === 'string' && typeof preset.name === 'string'
-              && (preset.alignment === 'good' || preset.alignment === 'evil')
-              && Array.isArray(preset.pieceIds)
-          })
-        }
-      } catch {
-        return { version: DECK_PRESET_SCHEMA_VERSION, presets: [] }
-      }
+      try { return window.RvBDeckPresets.parse(localStorage.getItem(DECK_PRESET_STORAGE_KEY)) }
+      catch { return window.RvBDeckPresets.emptyStore() }
     }
 
     function writePresetStore(store) {
-      localStorage.setItem(DECK_PRESET_STORAGE_KEY, JSON.stringify({
-        version: DECK_PRESET_SCHEMA_VERSION,
-        presets: store.presets
-      }))
+      localStorage.setItem(DECK_PRESET_STORAGE_KEY, window.RvBDeckPresets.serialize(store))
     }
 
     function setPresetStatus(message, error) {
@@ -819,7 +804,10 @@
 
     function loadSelectedPreset() {
       const select = document.getElementById('deckPresetSelect')
-      const preset = readPresetStore().presets.find(function (entry) { return entry.id === (select && select.value) })
+      const alignment = currentAlignmentKey()
+      const preset = readPresetStore().presets.find(function (entry) {
+        return entry.id === (select && select.value) && entry.alignment === alignment
+      })
       if (!preset) { newPreset(); return }
       const availableIds = new Set(PIECE_TEMPLATES.map(function (piece) { return piece.id }))
       const validIds = preset.pieceIds.filter(function (id) { return availableIds.has(id) })
@@ -845,21 +833,23 @@
     function savePreset() {
       const name = String(document.getElementById('deckPresetName').value || '').trim()
       const pieceIds = Array.from(selectedIds)
+      const alignment = currentAlignmentKey()
+      if (!alignment) { setPresetStatus('请等待阵营锁定后再保存预设。', true); return }
       if (!name) { setPresetStatus('请先输入棋组名称。', true); return }
       if (pieceIds.length !== 8 || new Set(pieceIds).size !== 8) {
         setPresetStatus('预设棋组必须包含 8 枚不重复棋子。', true); return
       }
-      const available = new Set(PIECE_TEMPLATES.map(function (piece) { return piece.id }))
-      if (!pieceIds.every(function (id) { return available.has(id) })) {
+      if (!window.RvBDeckPresets.isValidSelection(pieceIds, alignment, PIECE_TEMPLATES)) {
         setPresetStatus('预设中包含当前阵营不可用的棋子。', true); return
       }
-      const store = readPresetStore()
       const id = editingPresetId || ('deck-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 7))
-      const preset = { id: id, name: name.slice(0, 24), alignment: currentAlignmentKey(), pieceIds: pieceIds, updatedAt: Date.now() }
-      const index = store.presets.findIndex(function (entry) { return entry.id === id })
-      if (index === -1) store.presets.push(preset)
-      else store.presets[index] = preset
-      writePresetStore(store)
+      const preset = { id: id, name: name.slice(0, 24), alignment: alignment, pieceIds: pieceIds, updatedAt: Date.now() }
+      try {
+        writePresetStore(window.RvBDeckPresets.upsert(readPresetStore(), preset))
+      } catch {
+        setPresetStatus('预设保存失败，请检查本机存储权限。', true)
+        return
+      }
       editingPresetId = id
       renderPresetOptions()
       setPresetStatus('已保存「' + preset.name + '」。')
@@ -870,8 +860,12 @@
       const store = readPresetStore()
       const preset = store.presets.find(function (entry) { return entry.id === editingPresetId })
       if (!preset || !confirm('删除预设「' + preset.name + '」？')) return
-      store.presets = store.presets.filter(function (entry) { return entry.id !== editingPresetId })
-      writePresetStore(store)
+      try {
+        writePresetStore(window.RvBDeckPresets.remove(store, editingPresetId))
+      } catch {
+        setPresetStatus('预设删除失败，请检查本机存储权限。', true)
+        return
+      }
       newPreset()
       renderPresetOptions()
       setPresetStatus('预设已删除。')

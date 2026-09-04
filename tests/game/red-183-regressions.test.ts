@@ -55,9 +55,11 @@ describe('RED-183 character rules and selection UI regressions', () => {
     const pieces = readFileSync(resolve(process.cwd(), 'data/pages/pieces.html'), 'utf8')
     const history = readFileSync(resolve(process.cwd(), 'data/pages/js/battle-ui/battle-action-history.js'), 'utf8')
 
-    expect(selection).toContain("DECK_PRESET_SCHEMA_VERSION = 1")
+    expect(selection).toContain('<script src="js/deck-presets.js"></script>')
     expect(selection).toContain('function savePreset()')
     expect(selection).toContain('function deleteSelectedPreset()')
+    expect(selection).toContain("if (!alignment) { setPresetStatus('请等待阵营锁定后再保存预设。', true); return }")
+    expect(selection).toContain('RvBDeckPresets.isValidSelection(pieceIds, alignment, PIECE_TEMPLATES)')
     expect(selection).toContain("' | 充能点：' + sk.chargeCost")
     expect(battle).toContain("metaParts.join(' · ')")
     expect(battle).not.toContain("metaParts.join(' 路 ')")
