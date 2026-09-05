@@ -51,7 +51,7 @@
     "freeMoveCell": { "x": 6, "y": 1 },
     "terrainCells": {
       "floor": { "x": 6, "y": 8 },
-      "cover": { "x": 4, "y": 8 },
+      "cover": { "x": 15, "y": 8 },
       "wall": { "x": 0, "y": 8 },
       "hole": { "x": 10, "y": 8 }
     }
@@ -173,7 +173,7 @@
       "text": "好，轮到黑百合做一次错误示范。结束回合，看看掩体为什么不是装饰。",
       "objective": "结束回合",
       "advance": { "type": "action", "actionType": "endTurn" },
-      "cue": { "cells": [{ "x": 4, "y": 8 }] }
+      "cue": { "cells": [{ "x": 15, "y": 8 }] }
     },
     {
       "id": "review-cover-block",
@@ -183,7 +183,7 @@
       "text": "黑百合那发致命打击撞在掩体上了。没有花哨子弹特效也没关系：点动作记录，3D 棋盘会把射线和阻挡位置重新画出来。",
       "objective": "点击“致命打击”，回看被掩体阻挡的射线",
       "advance": { "type": "history-item", "labelIncludes": "致命打击" },
-      "cue": { "templates": ["red-blackwidow"], "cells": [{ "x": 4, "y": 8 }], "connectTemplateToCell": ["red-blackwidow", { "x": 4, "y": 8 }] }
+      "cue": { "templates": ["red-blackwidow"], "cells": [{ "x": 15, "y": 8 }], "connectTemplateToCell": ["red-blackwidow", { "x": 15, "y": 8 }] }
     },
     {
       "id": "spend-charge",
@@ -212,8 +212,8 @@
       "speaker": "社长 / DM",
       "text": "掩体可以站人，但会挡住弹射物。刚才黑百合已经替我们交过学费了。",
       "objective": "点击绿色标记的掩体",
-      "advance": { "type": "intent", "intentType": "activate-cell", "cell": { "x": 4, "y": 8 } },
-      "cue": { "cells": [{ "x": 4, "y": 8 }] }
+      "advance": { "type": "intent", "intentType": "activate-cell", "cell": { "x": 15, "y": 8 } },
+      "cue": { "cells": [{ "x": 15, "y": 8 }] }
     },
     {
       "id": "inspect-wall",
