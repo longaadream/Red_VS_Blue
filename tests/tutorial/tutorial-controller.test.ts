@@ -97,6 +97,20 @@ describe('RED-95 tutorial controller', () => {
 })
 
 describe('RED-95 tutorial scenario staging', () => {
+  it('highlights the first cover that blocks Black Widow lethal strike', () => {
+    const definition = JSON.parse(readFileSync(resolve(process.cwd(), 'data/tutorial/first-session.json'), 'utf8'))
+    const map = JSON.parse(readFileSync(resolve(process.cwd(), 'data/maps/large-trap-arena.json'), 'utf8'))
+    const widow = definition.staging.deploymentCells['training-blue']
+    const review = definition.steps.find((step: any) => step.id === 'review-cover-block')
+    const row = map.layout[widow.y]
+    const firstBlockingX = Array.from({ length: widow.x }, (_, offset) => widow.x - offset - 1)
+      .find(x => row[x] === 'C' || row[x] === '#')
+
+    expect(firstBlockingX).toBe(15)
+    expect(review.cue.cells).toEqual([{ x: 15, y: 8 }])
+    expect(review.cue.connectTemplateToCell).toEqual(['red-blackwidow', { x: 15, y: 8 }])
+  })
+
   it('explains the complete recurring action-point rule before the first player turn', () => {
     const definition = JSON.parse(readFileSync(resolve(process.cwd(), 'data/tutorial/first-session.json'), 'utf8'))
     const deploymentStep = definition.steps.find((step: any) => step.id === 'deploy-anduin')

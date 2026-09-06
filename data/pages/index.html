@@ -219,7 +219,7 @@
     /* ── Secondary tools ── */
     .utility-bar {
       display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
+      grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 1px;
       overflow: hidden;
       border: 1px solid #334155;
@@ -506,6 +506,9 @@
     </main>
 
     <footer class="utility-bar" aria-label="次级工具">
+      <button class="utility-button" type="button" onclick="loadPage('piece-selection.html?mode=deck-builder')">
+        <span class="utility-title">我的棋组</span><span class="utility-meta">构筑光方 / 暗方阵容</span>
+      </button>
       <button class="utility-button" type="button" onclick="openRecordsSheet()">
         <span class="utility-title">战绩</span><span class="utility-meta" id="recordsSummary">本地对战记录</span>
       </button>

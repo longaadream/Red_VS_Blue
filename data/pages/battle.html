@@ -6112,6 +6112,13 @@
       const ap = myMeta ? myMeta.actionPoints : 0
       if (ap < cost) { setStatusMsg('行动点不足（需要 ' + cost + '，剩余 ' + ap + '）'); return }
 
+      const tutorialCardAction = { type: 'playCard', playerId: myPlayerId, cardInstanceId: cardInstanceId }
+      if (typeof tutorialActionAllowed === 'function' && !tutorialActionAllowed(tutorialCardAction)) {
+        pendingCardAction = null
+        renderHand()
+        return
+      }
+
       // Cancel any pending skill/move
       pendingMove = false
       pendingSkill = null
@@ -6772,14 +6779,7 @@
         return
       }
 
-      clearTargetInteraction('skill-selected')
-      setMoveButtonClass(false)
-
       const draftAction = { type: actionType, playerId: myPlayerId, pieceId: selectedPieceId, skillId: skId }
-      closePieceContextMenu()
-      if (TUTORIAL_MODE && skId === 'shield-of-light' && sp.templateId === 'uther') {
-        draftAction.targetPieceId = sp.instanceId
-      }
       const localTargetProbe = window.BattleLegalActions && typeof GameEngine !== 'undefined'
         ? BattleLegalActions.probeSkillTarget({
             snapshot: G,
@@ -6790,6 +6790,10 @@
             engine: GameEngine,
           })
         : null
+      if (typeof tutorialActionAllowed === 'function' && !tutorialActionAllowed(draftAction)) return
+      clearTargetInteraction('skill-selected')
+      setMoveButtonClass(false)
+      closePieceContextMenu()
       // This is presentation-only prediction: the final targeted command is
       // still validated by the Colyseus authority. The structured rejection
       // fallback handles any client/server content drift.
@@ -6986,6 +6990,14 @@
         renderActionBar()
         if (rejectionFeedback) setStatusMsg(rejectionFeedback)
       }
+    }
+
+    function tutorialActionAllowed(action) {
+      if (typeof TUTORIAL_MODE === 'undefined' || !TUTORIAL_MODE || !tutorialRuntime) return true
+      const tutorialGuard = tutorialRuntime.beforeAction(action, G)
+      if (tutorialGuard.allowed) return true
+      setStatusMsg(tutorialGuard.message)
+      return false
     }
 
     async function doAction(action) {

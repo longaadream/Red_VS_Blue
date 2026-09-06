@@ -55,7 +55,7 @@ export interface TargetConstraint {
   requireExtensionCell?: { path: string; sourceIdField?: string }
   ignoreOccupantSelectedTargetIndex?: number
   requireEnemyWithinRange?: number
-  distanceFromSelectedTarget?: { index: number; range: number }
+  distanceFromSelectedTarget?: { index: number; range: number; minRange?: number }
   targetRuleIds?: string[]
 }
 
@@ -173,7 +173,7 @@ export interface PendingTargetStep {
   requireExtensionCell?: { path: string; sourceIdField?: string }
   ignoreOccupantSelectedTargetIndex?: number
   requireEnemyWithinRange?: number
-  distanceFromSelectedTarget?: { index: number; range: number }
+  distanceFromSelectedTarget?: { index: number; range: number; minRange?: number }
 }
 
 export interface PendingTargetSelectionSession {
@@ -239,7 +239,7 @@ interface TargetSpec {
   requireExtensionCell?: { path: string; sourceIdField?: string }
   ignoreOccupantSelectedTargetIndex?: number
   requireEnemyWithinRange?: number
-  distanceFromSelectedTarget?: { index: number; range: number }
+  distanceFromSelectedTarget?: { index: number; range: number; minRange?: number }
 }
 
 interface OptionSpec {
@@ -387,7 +387,13 @@ function getDeclaredSteps(definition: any, kind: 'skill' | 'card'): SelectionSte
         requireEnemyWithinRange: typeof raw.requireEnemyWithinRange === 'number' ? raw.requireEnemyWithinRange : undefined,
         distanceFromSelectedTarget: Number.isInteger(raw.distanceFromSelectedTarget?.index)
           && typeof raw.distanceFromSelectedTarget?.range === 'number'
-          ? { index: raw.distanceFromSelectedTarget.index, range: raw.distanceFromSelectedTarget.range }
+          ? {
+              index: raw.distanceFromSelectedTarget.index,
+              range: raw.distanceFromSelectedTarget.range,
+              minRange: typeof raw.distanceFromSelectedTarget.minRange === 'number'
+                ? raw.distanceFromSelectedTarget.minRange
+                : undefined,
+            }
           : undefined,
       })
     }
@@ -756,8 +762,12 @@ function validateSourceSpecificCell(
     const selectedPosition = selected?.type === 'piece'
       ? state.pieces.find(piece => piece.instanceId === selected.pieceId && piece.currentHp > 0)
       : selected
-    if (!selectedPosition || selectedPosition.x == null || selectedPosition.y == null
-      || manhattanDistance(selectedPosition, ref) > constraint.distanceFromSelectedTarget.range) {
+    const distance = selectedPosition && selectedPosition.x != null && selectedPosition.y != null
+      ? manhattanDistance(selectedPosition, ref)
+      : undefined
+    if (distance === undefined
+      || distance > constraint.distanceFromSelectedTarget.range
+      || distance < (constraint.distanceFromSelectedTarget.minRange ?? 0)) {
       return issue('TARGET_SOURCE_CONSTRAINT_FAILED', 'Target cell is too far from the selected target')
     }
   }
@@ -1180,6 +1190,7 @@ function pendingConstraint(pending: PendingTargetSelectionSession): TargetConstr
     requireExtensionCell: activeStep?.requireExtensionCell,
     ignoreOccupantSelectedTargetIndex: activeStep?.ignoreOccupantSelectedTargetIndex,
     requireEnemyWithinRange: activeStep?.requireEnemyWithinRange,
+    distanceFromSelectedTarget: activeStep?.distanceFromSelectedTarget,
   }
 }
 

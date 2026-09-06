@@ -15,6 +15,11 @@ type Piece = {
 }
 
 type PageContract = {
+  switchDeckAlignment: (alignment: string) => Promise<void>
+  savePreset: () => void
+  newPreset: () => void
+  choosePresetCard: (index: number) => void
+  getSelectedIds: () => string[]
   confirmSelection: () => Promise<void>
   init: () => Promise<void>
   getPieces: () => Piece[]
@@ -26,6 +31,7 @@ type PageContract = {
 }
 
 type MockElement = {
+  value: string
   classList: {
     add: (name: string) => void
     contains: (name: string) => boolean
@@ -52,6 +58,7 @@ function makePieces(faction: 'good' | 'evil', count: number): Piece[] {
 function createElement(): MockElement {
   const classes = new Set<string>()
   return {
+    value: '',
     classList: {
       add: name => { classes.add(name) },
       contains: name => classes.has(name),
@@ -72,6 +79,7 @@ function createElement(): MockElement {
 }
 
 function createHarness(options: {
+  search?: string
   fetchPackJson: (path: string) => Promise<unknown>
   wsRequest: (method: string, data?: Record<string, unknown>, timeoutMs?: number) => Promise<unknown>
   useIntervals?: boolean
@@ -100,7 +108,7 @@ function createHarness(options: {
   }
   const location = {
     href: 'piece-selection.html',
-    search: '?roomId=room-54&playerId=alice&playerName=Alice&alignment=light',
+    search: options.search ?? '?roomId=room-54&playerId=alice&playerName=Alice&alignment=light',
   }
   const wsRequest = vi.fn(options.wsRequest)
   const wsHandlers = new Map<string, (...args: unknown[]) => unknown>()
@@ -144,6 +152,8 @@ function createHarness(options: {
 
   vm.runInContext(deckPresetsScript, context)
   vm.runInContext(`${script}\n;globalThis.__pieceSelectionContract = {
+    switchDeckAlignment, savePreset, newPreset, choosePresetCard,
+    getSelectedIds: () => Array.from(selectedIds),
     confirmSelection,
     getPieces: () => PIECE_TEMPLATES,
     loadPieces,
@@ -176,6 +186,34 @@ function localPack(pieces: Piece[]) {
     return piece
   }
 }
+
+test('standalone builder saves both alignments and reloads cards without submitting a room action', async () => {
+  const good = makePieces('good', 8)
+  const evil = makePieces('evil', 8)
+  const harness = createHarness({
+    search: '?mode=deck-builder',
+    fetchPackJson: localPack([...good, ...evil]),
+    wsRequest: async () => { throw new Error('builder must not contact a room') },
+  })
+  await harness.contract.init()
+  expect(harness.element('alignmentDarkBtn').disabled).toBe(false)
+  harness.contract.setSelectedIds(good.map(piece => piece.id))
+  harness.element('deckPresetName').value = '光方棋组'
+  await harness.contract.confirmSelection()
+  await harness.contract.switchDeckAlignment('dark')
+  expect(harness.contract.getSelectedIds()).toEqual([])
+  expect(harness.contract.getPieces().every(piece => piece.faction === 'evil')).toBe(true)
+  harness.contract.setSelectedIds(evil.map(piece => piece.id))
+  harness.element('deckPresetName').value = '暗方棋组'
+  harness.contract.savePreset()
+  harness.contract.newPreset()
+  harness.contract.choosePresetCard(0)
+  expect(harness.contract.getSelectedIds()).toEqual(evil.map(piece => piece.id))
+  await harness.contract.switchDeckAlignment('light')
+  harness.contract.choosePresetCard(0)
+  expect(harness.contract.getSelectedIds()).toEqual(good.map(piece => piece.id))
+  expect(harness.wsRequest).not.toHaveBeenCalled()
+})
 
 describe('Electron piece-selection resource contract', () => {
   const lightPieces = makePieces('good', 10)

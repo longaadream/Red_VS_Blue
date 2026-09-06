@@ -12,15 +12,31 @@ function json(path: string) {
 }
 
 describe('RED-183 character rules and selection UI regressions', () => {
+  it('documents the self-cast AP refund on Shield of Light', () => {
+    const shield = JSON.parse(readFileSync(resolve(process.cwd(), 'data/skills/shield-of-light.json'), 'utf8'))
+
+    expect(shield.description).toContain('若对自己使用，回复1点AP')
+    expect(shield.previewCode).toContain('若对自己使用，回复1点AP')
+  })
+
   it('keeps Tails Twin Flight immunity and inoperable buffs at two turns', () => {
     const skill = json('data/skills/tails-twin-flight.json')
+    const resolveRule = json('data/rules/rule-tails-flight-resolve.json')
     expect(skill.description).toContain('持续2回合')
+    expect(skill.description).toContain('作为塔尔斯的落点')
+    expect(skill.description).toContain('相邻的地格作为友军的落点')
+    expect(skill.description).toContain('然后2回合后同步传送')
     expect(skill.code).toContain('currentDuration:2,remainingDuration:2')
     expect(skill.code).toContain('turns:2')
+    expect(skill.targeting.steps[2].distanceFromSelectedTarget).toEqual({ index: 1, range: 1, minRange: 1 })
+    expect(resolveRule.trigger).toEqual({ type: 'endTurn' })
   })
 
   it('uses Manhattan distance for Naruto candidates and execution', () => {
     const skill = json('data/skills/naruto-shadow-clone.json')
+    expect(skill.description).toBe('选择5格内1个空地格并秘密选择一项：召唤1个影分身，或传送到目标格并在原地留下1个影分身。影分身受到1次伤害后消散，不能行动，被击杀时不会提供充能。')
+    expect(skill.previewCode).toContain(skill.description)
+    expect(skill.effectTags).toContain('秘密选择')
     const naruto = makePiece({ instanceId: 'naruto-red183', templateId: 'naruto', ownerPlayerId: 'player-red', x: 1, y: 1 }) as any
     naruto.skills = [{ skillId: skill.id, currentCooldown: 0, usesRemaining: -1 }]
     const state = makeState({ pieces: [naruto], width: 8, height: 8, currentPlayerId: 'player-red', phase: 'action' })
@@ -45,6 +61,8 @@ describe('RED-183 character rules and selection UI regressions', () => {
       '每当一名敌人行动后，若其在格力姆乔4格内，格力姆乔可移动至2格内1个空格；若与其相邻，攻击该敌人2次，每次造成75%攻击力的物理伤害。',
     )
     const recall = json('data/skills/recall.json')
+    expect(recall.description).toContain('秘密选择一个数字')
+    expect(recall.effectTags).toContain('秘密选择')
     expect(recall.concealTargetInBattleLog).toBe(true)
     expect(recall.code).not.toContain("' enemy actions'")
   })
@@ -63,10 +81,12 @@ describe('RED-183 character rules and selection UI regressions', () => {
     expect(selection).toContain("' | 充能点：' + sk.chargeCost")
     expect(battle).toContain("metaParts.join(' · ')")
     expect(battle).not.toContain("metaParts.join(' 路 ')")
+    expect(battle).toContain("typeof tutorialActionAllowed === 'function' && !tutorialActionAllowed(tutorialCardAction)")
+    expect(battle).toContain("typeof tutorialActionAllowed === 'function' && !tutorialActionAllowed(draftAction)")
     expect(pieces).toContain('`🔋${skillData.chargeCost} 充能`')
     expect(pieces).not.toContain('skillData.maxCharges || skillData.chargeCost')
     expect(battle).toContain('function renderHandCardFace(card, definition)')
-    expect(battle).toContain("skId === 'shield-of-light' && sp.templateId === 'uther'")
+    expect(battle).not.toContain('tutorialSelfTarget')
     expect(battle).toContain("cell.classList.add(entry.role === 'source' ? 'history-source' : 'history-target')")
     expect(history).toContain("event.kind === 'statusAdded' || event.kind === 'statusRemoved'")
   })

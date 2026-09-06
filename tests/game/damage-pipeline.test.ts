@@ -319,7 +319,9 @@ describe('RED-33 deterministic damage pipeline', () => {
       type: 'playCard', playerId: 'player-red', cardInstanceId: 'friendly-fire-card-1',
     }, { rootSeed: 183 }).state
 
-    expect(resolved.players.find((player: any) => player.playerId === 'player-red').chargePoints).toBe(1)
+    const resolvedPlayer = resolved.players.find((player: any) => player.playerId === 'player-red')
+    expect(resolvedPlayer).toBeDefined()
+    expect(resolvedPlayer!.chargePoints).toBe(1)
     expect(resolved.graveyard.map((piece: any) => piece.instanceId)).toEqual(['red-excluded', 'red-friendly'])
   })
 
