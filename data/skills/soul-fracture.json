@@ -1,10 +1,13 @@
 {
   "id": "soul-fracture",
   "name": "裂魂",
-  "description": "任意棋子死亡时，获得1张灵魂残片。灵魂残片可用于治疗1个友军2点生命。",
+  "description": "游戏开始时，在本局游戏中每当一个棋子死亡，获得一张灵魂残片。",
   "keywords": [],
   "targetText": "被动",
-  "effectTags": ["手牌", "治疗"],
+  "effectTags": [
+    "手牌",
+    "治疗"
+  ],
   "icon": "👟",
   "kind": "passive",
   "type": "normal",

@@ -25,11 +25,12 @@
       "level": 1
     }
   ],
-  "rules": [
-    "rule-soul-fracture"
-  ],
+  "rules": [],
   "relatedCards": [
     "soul-fragment"
   ],
-  "isDefault": false
+  "isDefault": false,
+  "playerRules": [
+    "rule-soul-fracture-player"
+  ]
 }

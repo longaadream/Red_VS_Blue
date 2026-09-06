@@ -41,6 +41,7 @@ export interface TargetConstraint {
   selectedTargets?: TargetRef[]
   selectedOption?: unknown
   requireWalkable?: boolean
+  forbiddenTileEffectTypes?: string[]
   requireUnoccupied?: boolean
   sameRowOrColumn?: boolean
   excludeSourceCell?: boolean
@@ -159,6 +160,7 @@ export interface PendingTargetStep {
   minRange?: number
   distanceMetric?: 'manhattan' | 'chebyshev'
   requireWalkable?: boolean
+  forbiddenTileEffectTypes?: string[]
   requireUnoccupied?: boolean
   allowSourceOccupant?: boolean
   canCancel?: boolean
@@ -225,6 +227,7 @@ interface TargetSpec {
   distanceMetric?: 'manhattan' | 'chebyshev'
   minRange?: number
   requireWalkable?: boolean
+  forbiddenTileEffectTypes?: string[]
   requireUnoccupied?: boolean
   allowSourceOccupant?: boolean
   allowSourceOccupantOptions?: unknown[]
@@ -368,6 +371,7 @@ function getDeclaredSteps(definition: any, kind: 'skill' | 'card'): SelectionSte
         distanceMetric: raw.distanceMetric === 'chebyshev' ? 'chebyshev' : 'manhattan',
         requireWalkable: raw.requireWalkable,
         requireUnoccupied: raw.requireUnoccupied,
+        forbiddenTileEffectTypes: Array.isArray(raw.forbiddenTileEffectTypes) ? raw.forbiddenTileEffectTypes.filter((value: unknown): value is string => typeof value === 'string') : undefined,
         allowSourceOccupant: raw.allowSourceOccupant,
         allowSourceOccupantOptions: Array.isArray(raw.allowSourceOccupantOptions)
           ? raw.allowSourceOccupantOptions
@@ -917,6 +921,9 @@ export function validateTargetRef(
     )
     if (occupied) return issue('TARGET_OCCUPIED', `Cell (${ref.x},${ref.y}) is occupied`)
   }
+  if (constraint.forbiddenTileEffectTypes?.length && state.extensions?.tileEffects?.some((effect: { type: string; x: number; y: number }) =>
+    constraint.forbiddenTileEffectTypes!.includes(effect.type) && effect.x === ref.x && effect.y === ref.y,
+  )) return issue('TARGET_OCCUPIED', 'The destination is reserved')
   return validateSourceSpecificCell(state, constraint, ref)
 }
 
@@ -1177,6 +1184,7 @@ function pendingConstraint(pending: PendingTargetSelectionSession): TargetConstr
     selectedTargets: pending.selectedTargets || [],
     requireWalkable: activeStep?.requireWalkable ?? (type === 'cell'),
     requireUnoccupied: activeStep?.requireUnoccupied,
+    forbiddenTileEffectTypes: activeStep?.forbiddenTileEffectTypes,
     distanceMetric: activeStep?.distanceMetric || 'manhattan',
     allowSourceOccupant: activeStep?.allowSourceOccupant,
     sameRowOrColumn: activeStep?.sameRowOrColumn,

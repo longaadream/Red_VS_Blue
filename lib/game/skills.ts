@@ -16,7 +16,7 @@ import {
 
 const getActiveTriggerSystem = () => getRuleExecutionTriggerSystem(globalTriggerSystem)
 import { getDataRoot, getUserDataDir } from '@/lib/app-paths'
-import { manhattanDistance, traceProjectile as traceProjectilePath } from './spatial'
+import { manhattanDistance, resolveExactSkillLanding, traceProjectile as traceProjectilePath } from './spatial'
 import { collectChargeCrystalsAt, dropChargeCrystal } from './charge-crystals'
 import { DynamicCodeRuntime, dynamicCodeRuntime as globalDynamicCodeRuntime } from './dynamic-code-runtime'
 import {
@@ -2560,7 +2560,21 @@ function createEffectFunctions(battle: BattleState, sourcePiece: PieceInstance, 
     },
     
     // 传送效果
-    teleport: (x: number, y?: number) => {
+    teleport: (x: number, y?: number, targetPieceId?: string) => {
+      // Explicit target variant shares exact landing validation and never falls back to randomness.
+      if (targetPieceId !== undefined) {
+        const movingPiece = battle.pieces.find(piece => piece.instanceId === targetPieceId && piece.currentHp > 0)
+        if (!movingPiece || movingPiece.x == null || movingPiece.y == null
+          || !Number.isInteger(x) || !Number.isInteger(y)
+          || movingPiece.statusTags?.some(tag => tag.type === 'imprisoned' || tag.type === 'inoperable')) {
+          return { type: 'teleport', success: false }
+        }
+        const destination = resolveExactSkillLanding(battle, { x, y: y! })
+        if (!destination) return { type: 'teleport', success: false }
+        movingPiece.x = destination.x
+        movingPiece.y = destination.y
+        return { type: 'teleport', target: destination, success: true }
+      }
       let targetPos: { x: number, y: number } | undefined;
       
       if (typeof x === "object" && x !== null) {

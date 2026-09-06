@@ -13,6 +13,10 @@
   },
   "skills": [
     {
+      "skillId": "naruto-vanguard",
+      "level": 1
+    },
+    {
       "skillId": "naruto-rasengan",
       "level": 1
     },
@@ -28,5 +32,8 @@
   "rules": [
     "rule-naruto-clone-endturn-charge"
   ],
-  "isDefault": false
+  "isDefault": false,
+  "progressiveDeployment": {
+    "openingVanguardPriority": true
+  }
 }

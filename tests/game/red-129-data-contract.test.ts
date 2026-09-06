@@ -39,7 +39,7 @@ describe('RED-129 complete data contract', () => {
       'light-extraction': { cooldownTurns: 2 },
       'blackwidow-lethal-strike': { cooldownTurns: 1 },
       'blackwidow-lethal-toxin': { actionPointCost: 1 },
-      'rocket-punch': { cooldownTurns: 1, powerMultiplier: 2 },
+      'rocket-punch': { cooldownTurns: 1, powerMultiplier: 2.5 },
       earthshatter: { powerMultiplier: 2 },
       'itachi-totsuka-blade': { cooldownTurns: 2, chargeCost: 3, powerMultiplier: 2 },
       'obito-space-time': { actionPointCost: 5 },
