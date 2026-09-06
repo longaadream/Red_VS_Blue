@@ -291,6 +291,26 @@
 
 .action-history-dock[hidden] { display: none; }
 
+.cell.history-source,
+.cell.history-target {
+  outline: 3px solid #f8fafc;
+  outline-offset: -4px;
+  box-shadow: inset 0 0 0 999px rgba(248, 250, 252, 0.12), 0 0 16px rgba(248, 250, 252, 0.65);
+}
+.cell.history-source { outline-color: #38bdf8; box-shadow: inset 0 0 0 999px rgba(56, 189, 248, 0.16), 0 0 16px rgba(56, 189, 248, 0.7); }
+.cell.history-target { outline-color: #fb7185; box-shadow: inset 0 0 0 999px rgba(251, 113, 133, 0.16), 0 0 16px rgba(251, 113, 133, 0.7); }
+
+.pi-related-hand-cards { display: flex; flex-wrap: wrap; gap: 10px; padding: 4px 2px 8px; }
+.pi-related-card-face.card-item {
+  position: relative;
+  width: 118px;
+  min-width: 118px;
+  height: 164px;
+  transform: none;
+  cursor: default;
+  pointer-events: none;
+}
+
 .action-history-list {
   display: grid;
   gap: 4px;

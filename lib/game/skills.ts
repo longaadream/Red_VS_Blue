@@ -743,7 +743,7 @@ function createCardEffectFunctions(
         }
         targetIds = (Array.isArray(target) ? target : [target]).map(entry => entry?.instanceId)
         baseDamage = applyCardEffectModifiers(authoritativeCardInstance, 'damage', baseDamage)
-        return dealDamage(attacker, target, baseDamage, damageType, battle, skillId, false, undefined, context.selectedOption)
+        return dealDamage(attacker, target, baseDamage, damageType, battle, skillId, false, playerId, context.selectedOption)
       } catch (error) {
         rethrowAttachedEffectContentError(
           battle,

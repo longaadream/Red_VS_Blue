@@ -49,9 +49,11 @@ context.damageQueue.push({
 
 ## 生命周期与可争夺充能结晶
 
-一次 DamageBatch 中，每个起始存活且 HP Commit 后为 0 的目标冻结进入同一个内生 DeathBatch。所有冻结候选在整个 `beforePieceKilled`、`afterPieceKilled`、`onPieceDied` 阶段都保留在 `battle.pieces`；全部 lifecycle 完成后才统一读取 HP。已恢复为正生命者不进墓地、不生成结晶，但兼容保留本次 kill/death 事件。其余候选一次性从战场移除并按稳定顺序进入墓地；其中 `isCore=true` 且未声明 `noKillCharge` 的正式棋子在冻结的死亡坐标生成 `charge-crystal` 公共地格效果。DeathBatch 不再授予通用即时 CP，也不派发 `afterChargeGained`。
+一次 DamageBatch 中，每个起始存活且 HP Commit 后为 0 的目标冻结进入同一个内生 DeathBatch。所有冻结候选在整个 `beforePieceKilled`、`afterPieceKilled`、`onPieceDied` 阶段都保留在 `battle.pieces`；这些阶段不允许恢复其 HP 或改变死亡归类。全部 lifecycle 完成后，候选一次性从战场移除并按稳定顺序进入墓地；其中 `isCore=true` 且未声明 `noKillCharge` 的正式棋子在冻结的死亡坐标生成 `charge-crystal` 公共地格效果。DeathBatch 不再授予通用即时 CP，也不派发 `afterChargeGained`；需要“死后回场”的效果在死亡完整提交后创建新棋子并走召唤流程。
 
-结晶保存在 `battle.extensions.tileEffects`，进入公开快照、状态 hash、回放、AI v2 `boardEffects` 及 2D/3D 棋盘展示。整批墓地与结晶提交后按稳定顺序派发 `afterChargeCrystalDropped`，每次派发后继续执行 DeathBatch 完整性检查。权威普通 `move`、渐进式预备区部署及模板 SummonBatch 成功提交后按棋子最终落点收集：同格全部结晶原子移除，棋子所属队伍每枚获得 1 CP，并以合计数量派发一次 `afterChargeGained`。原地站立、传送、复活、变身和强制位移不调用收集阶段。霜之哀伤的立即 +1 CP 是内容脚本特例，不替代正式受害者的结晶。
+结晶保存在 `battle.extensions.tileEffects`，进入公开快照、状态 hash、回放、AI v2 `boardEffects` 及 2D/3D 棋盘展示。整批墓地与结晶提交后按稳定顺序派发 `afterChargeCrystalDropped`，每次派发后继续执行 DeathBatch 完整性检查。权威普通 `move`、渐进式预备区部署、模板 SummonBatch 及死亡完整提交后的原地重新召唤，都在成功提交后按新棋子最终落点收集：同格全部结晶原子移除，棋子所属队伍每枚获得 1 CP，并以合计数量派发一次 `afterChargeGained`。原地站立、传送、变身和强制位移不调用收集阶段。霜之哀伤的立即 +1 CP 是内容脚本特例，不替代正式受害者的结晶。
+
+结晶生成不再依赖敌我或 `killerPlayerId`：敌对击杀、手牌牺牲友军与其他完整死亡都统一只看受害棋子的 `isCore` / `noKillCharge` 资格。资源归属取决于之后实际拾取结晶的队伍；ADR-0028 的手牌友军击杀即时充能决策已被 RED-185 取代。
 
 玩家级 `mangekyoDeathCount` 是【万花筒】动态充能成本的权威累计值：`max(0, baseChargeCost - mangekyoDeathCount)`。强制移除不经过本管线，不派发死亡事件，也不写入墓地。
 

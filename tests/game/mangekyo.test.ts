@@ -250,7 +250,7 @@ describe('RED-124 friendly death events', () => {
     expect(costs()).toEqual([0, 0, 0])
   })
 
-  it('counts the death event even when onPieceDied immediately revives the character', () => {
+  it('counts the death before onPieceDied creates a new summoned instance', () => {
     const attacker = makePiece({
       instanceId: 'blue-attacker', ownerPlayerId: 'player-blue', x: 0, y: 0,
     }) as any
@@ -259,15 +259,38 @@ describe('RED-124 friendly death events', () => {
     }) as any
     const witness = mangekyoWitness()
     const state = makeState({ pieces: [attacker, ally, witness] }) as any
-    globalTriggerSystem.addRule(eventRule('revive-red-ally', 'onPieceDied', (_battle, context) => {
-      context.sourcePiece.currentHp = 7
-    }) as any)
+    globalTriggerSystem.addRule({
+      id: 'resummon-red-ally',
+      name: 'resummon-red-ally',
+      description: '',
+      trigger: { type: 'onPieceDied' },
+      effect: (_battle: any, context: any) => context.sourcePiece?.instanceId === ally.instanceId
+        ? {
+            success: true,
+            summonAfterDeath: {
+              skillId: 'test-post-death-summon',
+              maxHp: 7,
+              currentHp: 7,
+              attack: ally.attack,
+              defense: ally.defense,
+              moveRange: ally.moveRange,
+              skillIds: [],
+              statusTags: [],
+            },
+          }
+        : { success: false },
+    } as any)
 
     const result = dealDamage(attacker, ally, 5, 'true', state, 'revived-death')
 
-    expect(result).toMatchObject({ isKilled: false, targetHp: 7 })
+    expect(result).toMatchObject({ isKilled: true, targetHp: 0 })
     expect(getMangekyoDeathCount(state, 'player-red')).toBe(1)
-    expect(state.graveyard).toEqual([])
+    expect(state.graveyard).toContainEqual(expect.objectContaining({ instanceId: ally.instanceId, currentHp: 0 }))
+    expect(state.pieces).toContainEqual(expect.objectContaining({
+      instanceId: expect.stringContaining(`${ally.instanceId}:summon:`),
+      currentHp: 7,
+      isCore: false,
+    }))
   })
 
   it('projects public state, patches, hashes, and logs the player death count deterministically', () => {

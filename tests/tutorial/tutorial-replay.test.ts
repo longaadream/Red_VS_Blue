@@ -138,17 +138,20 @@ it('replays the complete three-turn first-session tutorial through authoritative
   expect(state.players.find(player => player.playerId === PLAYER)!.actionPoints).toBe(apBeforeFreeMove)
 
   const utherForShield = piece(state, 'uther')
+  expect(state.players.find(player => player.playerId === PLAYER)!.actionPoints).toBe(2)
   state = transition(state, targeted(state, {
     type: 'useBasicSkill', playerId: PLAYER, pieceId: utherForShield.instanceId,
     skillId: 'shield-of-light', targetPieceId: utherForShield.instanceId,
   }))
   expect(piece(state, 'uther').statusTags.some(tag => tag.type === 'divine-shield')).toBe(true)
+  expect(state.players.find(player => player.playerId === PLAYER)!.actionPoints).toBe(1)
   const hpBeforeHeal = piece(state, 'uther').currentHp
   state = transition(state, targeted(state, {
     type: 'useBasicSkill', playerId: PLAYER, pieceId: piece(state, 'anduin').instanceId,
     skillId: 'light-of-the-light', targetPieceId: piece(state, 'uther').instanceId,
   }))
   expect(piece(state, 'uther').currentHp).toBeGreaterThan(hpBeforeHeal)
+  expect(state.players.find(player => player.playerId === PLAYER)!.actionPoints).toBe(0)
   state = finishTurn(state, PLAYER)
 
   const hpBeforeShieldShot = piece(state, 'uther').currentHp

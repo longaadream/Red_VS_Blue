@@ -268,7 +268,8 @@ describe('battle page route contract', () => {
     expect(battlePage).toMatch(/function setTrainingToolsOpen\(open[\s\S]*?aria-expanded[\s\S]*?aria-hidden/)
     expect(battlePage).toMatch(/const active = !targetSubmissionPending && !!\(pendingSkill \|\| pendingCardAction\)[\s\S]*?if \(active\) \{\s*closePieceContextMenu\(\)/)
     expect(battlePage).toMatch(/function setTrainingToolsOpen\(open[\s\S]*?if \(next\) closePieceContextMenu\(\)/)
-    expect(battlePage).toMatch(/const draftAction[^\n]+\s*closePieceContextMenu\(\)/)
+    expect(battlePage).toMatch(/const draftAction[^\n]+[\s\S]*?tutorialActionAllowed\(draftAction\)[\s\S]*?closePieceContextMenu\(\)/)
+    expect(battlePage).not.toContain('tutorialSelfTarget')
     expect(battlePage).toMatch(/BattleLegalActions\.probeSkillTarget\([\s\S]*?enterActionTargetMode\(draftAction, localTargetProbe\.preparation\)/)
     expect(battlePage).toMatch(/if \(localTargetProbe[\s\S]*?await doAction\(draftAction\)/)
     expect(battlePage).toMatch(/function closePieceInfo\(\)[\s\S]*?style\.display = 'none'[\s\S]*?renderPieceContextMenu\(selected \|\| null\)/)
@@ -305,6 +306,66 @@ describe('battle page route contract', () => {
     expect(moveHandler).toMatch(/dismissedPieceContextId = null[\s\S]*?doAction\(\{ type: 'move'/)
     expect(battlePage).toMatch(/function restoreSelectedPieceMenu\(options\)[\s\S]*?input\.reopen[\s\S]*?dismissedPieceContextId = null/)
     expect(battlePage).toMatch(/restoreSelectedPieceMenu\(\{ reopen: action\.type === 'move' \}\)/)
+  })
+
+  it('enters normal target selection when tutorial Uther chooses self-shield', async () => {
+    const battlePage = readPage('battle.html')
+    const submittedActions: unknown[] = []
+    const enteredTargetModes: unknown[] = []
+    const targetPreparation = {
+      selectionId: 'selection-7',
+      stateRevision: 7,
+      targetType: 'piece',
+      candidates: [{ type: 'piece', pieceId: 'uther-1' }],
+    }
+    const battleLegalActions = {
+      probeSkillTarget: () => ({ needsTarget: true, preparation: targetPreparation }),
+    }
+    const context = createContext({
+      selectedPieceId: 'uther-1',
+      G: { pieces: [{ instanceId: 'uther-1', templateId: 'uther' }] },
+      progressiveDeploymentPending: () => false,
+      targetSubmissionPending: null,
+      skillDefOf: () => ({ type: 'normal' }),
+      skillUsesCharge: () => false,
+      pendingSkill: null,
+      clearTargetInteraction: () => undefined,
+      pendingMove: false,
+      setMoveButtonClass: () => undefined,
+      renderBoard: () => undefined,
+      renderPieceContextMenu: () => undefined,
+      renderActionBar: () => undefined,
+      renderTargetOverlay: () => undefined,
+      setStatusMsg: () => undefined,
+      resolveSkillAvailability: () => ({ available: true }),
+      myPlayerId: 'training-red',
+      TUTORIAL_MODE: true,
+      tutorialActionAllowed: () => true,
+      closePieceContextMenu: () => undefined,
+      window: { BattleLegalActions: battleLegalActions },
+      BattleLegalActions: battleLegalActions,
+      GameEngine: {},
+      skillsById: {},
+      enterActionTargetMode: (...args: unknown[]) => {
+        enteredTargetModes.push(args)
+        return true
+      },
+      doAction: async (action: unknown) => submittedActions.push(action),
+    })
+    new Script(readNamedAsyncFunction(battlePage, 'selectSkillCard')).runInContext(context)
+
+    await new Script("selectSkillCard('shield-of-light')").runInContext(context)
+
+    expect(submittedActions).toEqual([])
+    expect(JSON.parse(JSON.stringify(enteredTargetModes))).toEqual([[
+      {
+        type: 'useBasicSkill',
+        playerId: 'training-red',
+        pieceId: 'uther-1',
+        skillId: 'shield-of-light',
+      },
+      targetPreparation,
+    ]])
   })
 
   it('keeps the board dominant in low-height landscape battle layouts', () => {

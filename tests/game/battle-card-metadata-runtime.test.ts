@@ -153,6 +153,7 @@ function installRenderHand(context: Context) {
     readNamedFunction('syncPendingHandSelection'),
     readNamedFunction('renderPendingHandSelectionControls'),
     readNamedFunction('cardDisplayDescription'),
+    readNamedFunction('renderHandCardFace'),
     readNamedFunction('renderHand'),
   ].join('\n')).runInContext(context)
 }
