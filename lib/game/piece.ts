@@ -48,12 +48,15 @@ export interface PieceTemplate {
   stats: PieceStats
   skills: PieceSkill[]
   rules?: string[]
+  /** Rules granted once to the owner at match setup, independent of deployment or survival. */
+  playerRules?: string[]
   initialStatusTags?: PieceStatusTag[]
   isDefault?: boolean
   relatedCards?: string[]
   /** Data-driven setup effect executed while progressive reserves are initialized. */
   progressiveDeployment?: {
-    reserveInitializationSkillId: string
+    reserveInitializationSkillId?: string
+    openingVanguardPriority?: boolean
   }
 }
 

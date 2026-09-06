@@ -157,9 +157,8 @@ describe('RED-124 Mangekyo data contract', () => {
 
     const obito = loadJson<any>('pieces', 'red-obito.json')
     expect(obito.skills.map((entry: any) => entry.skillId)).toEqual([
-      'obito-kamui',
+      'obito-ally-teleport',
       'obito-space-time',
-      'hashirama-edo-wood-spike',
     ])
     expect(obito.rules).toEqual(['rule-mangekyo-friendly-death'])
     expect(obito.initialStatusTags).toContainEqual(expect.objectContaining({

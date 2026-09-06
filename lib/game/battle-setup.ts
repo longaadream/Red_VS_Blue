@@ -171,6 +171,7 @@ function appendSetupTriggerMessages(
 function initializeProgressiveOpeningVanguards(
   state: BattleState,
   runtime: RuleRuntime,
+  templatesById: ReadonlyMap<string, PieceTemplate>,
 ): void {
   const deployment = state.deployment
   if (deployment?.mode !== 'progressive-reserve-v1' || !deployment.reserves) return
@@ -190,9 +191,12 @@ function initializeProgressiveOpeningVanguards(
     }
 
     const streamPlayerId = normalizeProgressiveStreamPlayerId(playerId)
-    const piece = eligible[runtime.nextInt(
+    const priority = eligible.filter(piece =>
+      templatesById.get(piece.templateId)?.progressiveDeployment?.openingVanguardPriority === true)
+    const openingPool = priority.length > 0 ? priority : eligible
+    const piece = openingPool[runtime.nextInt(
       `${RANDOM_STREAM_NAMES.progressiveDeploymentOpeningPiece}/${streamPlayerId}`,
-      eligible.length,
+      openingPool.length,
     )]
     const emptyWalkableTiles = state.map.tiles
       .filter(tile => tile.props.walkable && !state.pieces.some(candidate =>
@@ -959,6 +963,15 @@ export async function createInitialBattleForPlayers(
       const template = allSelectedPieces.find(t => t.id === piece.templateId)
       if (template) {
         applyInitialRules(piece, template)
+        const owner = state.players.find(player => player.playerId === piece.ownerPlayerId)
+        for (const ruleId of template.playerRules ?? []) {
+          if (!owner) throw new Error(`Initial player rule owner is missing: ${piece.ownerPlayerId}`)
+          owner.rules ??= []
+          if (owner.rules.some(rule => rule.id === ruleId)) continue
+          const rule = loadRuleById(ruleId, FORCE_RULE_RELOAD)
+          if (!rule) throw new Error(`Initial player rule is missing: ${ruleId}`)
+          owner.rules.push(rule)
+        }
       }
     })
 
@@ -977,7 +990,7 @@ export async function createInitialBattleForPlayers(
         new Map(allSelectedPieces.map(template => [template.id, template])),
       )
       if (!runtime) throw new Error('Progressive opening deployment requires a deterministic rule runtime')
-      initializeProgressiveOpeningVanguards(state, runtime)
+      initializeProgressiveOpeningVanguards(state, runtime, new Map(allSelectedPieces.map(template => [template.id, template])))
       // The first board-only core settlement boundary is after both opening
       // summon queues, but before gameStart and the first reserve offer.
       finalizeBattleTerminal(state, { type: 'beginPhase' })

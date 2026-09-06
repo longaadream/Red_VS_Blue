@@ -290,9 +290,11 @@ context.healQueue.push({
 
 ## 7. 空间与特殊移除
 
-### 7.1 `teleport(x, y)` / `teleport({ x, y })`
+### 7.1 `teleport(x, y)` / `teleport({ x, y })` / `teleport(x, y, targetPieceId)`
 
 传送作用于当前技能的 `sourcePiece`，会验证地图范围、地块是否可行走以及目标格是否被占用。显式提供经过选择或算法验证的坐标；无参数调用当前会使用默认目标或确定性随机空格作为兼容回退，新增内容不应依赖这个隐式行为。
+
+RED-189：主技能执行上下文允许第三参数指定场上存活棋子。此分支要求显式整数坐标，拒绝禁锢、无法行动以及非法或占用落点，失败时不做随机回退。阵营与选取范围必须由 targeting 与内容脚本显式校验；地格步骤可声明 forbiddenTileEffectTypes，统一从候选与提交校验中排除指定类型地格效果（例如预留格）。该扩展不改变规则 triggerSkill 的受限能力，也不扩展冻结的沙箱 ABI。技能传送不收集充能结晶，不消耗普通移动的免费首移标签。
 
 ### 7.2 `traceProjectile(origin, direction, options?)`
 

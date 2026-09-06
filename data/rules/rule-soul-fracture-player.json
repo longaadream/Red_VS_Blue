@@ -1,0 +1,9 @@
+{
+  "id": "rule-soul-fracture-player",
+  "name": "裂魂",
+  "description": "本局游戏中，每当一个棋子死亡，该玩家获得1张灵魂残片，与古尔丹是否在场或存活无关。",
+  "trigger": {
+    "type": "onPieceDied"
+  },
+  "skillCode": "if (!context.sourcePiece || !context.playerId) return { success: false }; addCardToHand('soul-fragment', context.playerId); return { success: true, message: '裂魂：' + (context.sourcePiece.name || context.sourcePiece.templateId) + '死亡，你获得1张灵魂残片' };"
+}

@@ -1,0 +1,18 @@
+{
+  "id": "naruto-vanguard",
+  "name": "率先出阵",
+  "description": "当阵容中有鸣人时，鸣人首先上场。",
+  "keywords": [],
+  "targetText": "自身",
+  "effectTags": [
+    "部署"
+  ],
+  "icon": "🍥",
+  "kind": "passive",
+  "type": "normal",
+  "cooldownTurns": 0,
+  "maxCharges": 0,
+  "powerMultiplier": 1,
+  "actionPointCost": 0,
+  "code": "function executeSkill() { return { success: true }; }"
+}
