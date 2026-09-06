@@ -43,7 +43,7 @@ describe('Sonic roster mechanics', () => {
     const expected = {
       'sonic-spin-dash': '获得动能。选择一个正方向五格内的空格并向其冲刺，可穿过无法行走地格，对路径敌人造成150%攻击力的物理伤害。动能3：冲刺最大距离+2。动能5：命中敌人沉默1回合。',
       'shadow-ride-sweep': '获得动能。选择一个正方向上7格内的一个空格并向其冲刺，对路径上敌人造成100%攻击力的物理伤害。动能5：弹射物。冲刺后选择一个垂直于冲刺方向的方向，对路径上每格往该方向4格范围内的所有敌人造成5点伤害，可穿透角色。动能7：路径伤害+2。',
-      'sonic-super-form': '获得两点临时行动点。本回合索尼克使用技能不消耗动能，回合结束后保留。AP：0 CP：3 CD：3',
+      'sonic-super-form': '获得两点临时行动点。本回合索尼克使用技能不消耗动能，回合结束后保留。',
     }
     for (const [skillId, description] of Object.entries(expected)) {
       const definition = JSON.parse(readFileSync(resolve(process.cwd(), `data/skills/${skillId}.json`), 'utf8'))
@@ -51,6 +51,15 @@ describe('Sonic roster mechanics', () => {
     }
     const superForm = JSON.parse(readFileSync(resolve(process.cwd(), 'data/skills/sonic-super-form.json'), 'utf8'))
     expect(superForm).toMatchObject({ actionPointCost: 0, chargeCost: 3, cooldownTurns: 3 })
+  })
+
+  it('lists Sonic\'s once-per-turn free normal movement passive', () => {
+    const sonic = JSON.parse(readFileSync(resolve(process.cwd(), 'data/pieces/sonic.json'), 'utf8'))
+    const passive = JSON.parse(readFileSync(resolve(process.cwd(), 'data/skills/sonic-free-move-passive.json'), 'utf8'))
+
+    expect(sonic.skills).toContainEqual(expect.objectContaining({ skillId: passive.id }))
+    expect(passive).toMatchObject({ kind: 'passive', relatedRules: ['rule-sonic-free-move'] })
+    expect(passive.description).toContain('每个己方回合开始时')
   })
 
   it('uses the requested Chaos Spear range, damage, and movement theft', () => {
@@ -272,8 +281,10 @@ describe('Sonic roster mechanics', () => {
     if (third.kind !== 'needTarget') return
     expect(third.candidates).toContainEqual({ type: 'cell', x: 4, y: 3 })
     expect(third.candidates).toContainEqual({ type: 'cell', x: 5, y: 4 })
-    expect(third.candidates).toContainEqual({ type: 'cell', x: 4, y: 4 })
+    expect(third.candidates).not.toContainEqual({ type: 'cell', x: 4, y: 4 })
     expect(third.candidates).not.toContainEqual({ type: 'cell', x: 6, y: 4 })
+    expect(third.candidates.every(candidate => candidate.type === 'cell'
+      && Math.abs(candidate.x - 4) + Math.abs(candidate.y - 4) === 1)).toBe(true)
   })
 
   it('rejects a forged Double Tail Flight command that selects Tails as the carried ally', () => {
@@ -309,8 +320,8 @@ describe('Sonic roster mechanics', () => {
       selectionId: first.selectionId, stateRevision: first.stateRevision,
     } as any)
 
-    expect(resolved.extensions.scheduledTransfers).toBeUndefined()
-    expect(resolved.extensions.tileEffects).toEqual(expect.arrayContaining([
+    expect(resolved.extensions!.scheduledTransfers).toBeUndefined()
+    expect(resolved.extensions!.tileEffects).toEqual(expect.arrayContaining([
       expect.objectContaining({ type: 'tails-flight-reservation', x: 4, y: 4 }),
       expect.objectContaining({ type: 'tails-flight-reservation', x: 4, y: 5 }),
     ]))
@@ -326,7 +337,7 @@ describe('Sonic roster mechanics', () => {
     ]))
   })
 
-  it('resolves Double Tail Flight only at the second subsequent allied turn start', () => {
+  it('resolves Double Tail Flight when its two-turn effects expire', () => {
     const definition = JSON.parse(readFileSync(resolve(process.cwd(), 'data/skills/tails-twin-flight.json'), 'utf8'))
     const tails = makePiece({
       instanceId: 'tails', templateId: 'tails', ownerPlayerId: 'player-red', x: 1, y: 1,
@@ -345,19 +356,25 @@ describe('Sonic roster mechanics', () => {
       targetPieceId: 'ally', extraTargets: [{ x: 4, y: 4 }, { x: 4, y: 5 }],
       selectionId: first.selectionId, stateRevision: first.stateRevision,
     } as any)
-    const firstAlliedStart = applyBattleAction({
-      ...reserved, turn: { ...reserved.turn, currentPlayerId: 'player-red', phase: 'start', turnNumber: reserved.turn.turnNumber + 2 },
-    }, { type: 'beginPhase' })
-    expect(firstAlliedStart.pieces.find(piece => piece.instanceId === 'tails')).toMatchObject({ x: 1, y: 1 })
-    expect(firstAlliedStart.pieces.find(piece => piece.instanceId === 'tails')?.statusTags).toEqual(expect.arrayContaining([
+    const castingTurnEnd = applyBattleAction({
+      ...reserved, turn: { ...reserved.turn, currentPlayerId: 'player-red', phase: 'action' },
+    }, { type: 'endTurn', playerId: 'player-red' })
+    expect(castingTurnEnd.pieces.find(piece => piece.instanceId === 'tails')).toMatchObject({ x: 1, y: 1 })
+    expect(castingTurnEnd.pieces.find(piece => piece.instanceId === 'tails')?.statusTags).toEqual(expect.arrayContaining([
       expect.objectContaining({ type: 'tails-flight-reservation', turns: 1 }),
+      expect.objectContaining({ type: 'immune', remainingDuration: 1 }),
+      expect.objectContaining({ type: 'inoperable', remainingDuration: 1 }),
     ]))
-    const secondAlliedStart = applyBattleAction({
-      ...firstAlliedStart, turn: { ...firstAlliedStart.turn, currentPlayerId: 'player-red', phase: 'start', turnNumber: firstAlliedStart.turn.turnNumber + 2 },
-    }, { type: 'beginPhase' })
-    expect(secondAlliedStart.pieces.find(piece => piece.instanceId === 'tails')).toMatchObject({ x: 4, y: 4 })
-    expect(secondAlliedStart.pieces.find(piece => piece.instanceId === 'ally')).toMatchObject({ x: 4, y: 5 })
-    expect(secondAlliedStart.pieces.find(piece => piece.instanceId === 'tails')?.statusTags.some((tag: any) => tag.type === 'tails-flight-reservation')).toBe(false)
+    const expiryTurnEnd = applyBattleAction({
+      ...castingTurnEnd,
+      turn: { ...castingTurnEnd.turn, currentPlayerId: 'player-red', phase: 'action', turnNumber: castingTurnEnd.turn.turnNumber + 2 },
+    }, { type: 'endTurn', playerId: 'player-red' })
+    expect(expiryTurnEnd.pieces.find(piece => piece.instanceId === 'tails')).toMatchObject({ x: 4, y: 4 })
+    expect(expiryTurnEnd.pieces.find(piece => piece.instanceId === 'ally')).toMatchObject({ x: 4, y: 5 })
+    for (const moved of ['tails', 'ally']) {
+      expect(expiryTurnEnd.pieces.find(piece => piece.instanceId === moved)?.statusTags.some((tag: any) =>
+        ['tails-flight-reservation', 'immune', 'inoperable'].includes(tag.type))).toBe(false)
+    }
   })
 
   it('lets Mechanical Support remove any selected target effect after healing', () => {
@@ -461,7 +478,7 @@ describe('Sonic roster mechanics', () => {
     expect(resolved.players[0].hand).toEqual(expect.arrayContaining([
       expect.objectContaining({ cardId: 'armor-attack-heal', actionPointCost: 2 }),
     ]))
-    expect(resolved.customCards['armor-attack-heal']).toMatchObject({ type: 'active', actionPointCost: 2 })
+    expect(resolved.customCards!['armor-attack-heal']).toMatchObject({ type: 'active', actionPointCost: 2 })
   })
 
   it.each([
@@ -670,7 +687,7 @@ describe('Sonic roster mechanics', () => {
     const beyond = makePiece({ instanceId: 'beyond', ownerPlayerId: 'player-blue', x: 4, y: 2, currentHp: 20, maxHp: 20 })
     const state = makeState({ pieces: [shadow, beyond], width: 7, height: 5 })
     const blocker = state.map.tiles.find(tile => tile.x === 3 && tile.y === 2)!
-    blocker.props = { ...blocker.props, type: terrainType, walkable: false }
+    blocker.props = { ...blocker.props, type: terrainType as any, walkable: false }
 
     const result = executeSkillFunction(definition, {
       piece: shadow, target: null, targetPosition: { x: 5, y: 2 }, targets: [{ info: null, pos: { x: 5, y: 2 } }],

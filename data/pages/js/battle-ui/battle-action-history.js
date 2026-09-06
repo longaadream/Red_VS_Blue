@@ -315,6 +315,9 @@
       if ((event.kind === 'cardGained' || event.kind === 'cardDiscarded' || event.kind === 'cardChanged') && event.targetPlayerIds && event.targetPlayerIds[0]) {
         return displayPlayer(event.targetPlayerIds[0])
       }
+      if ((event.kind === 'statusAdded' || event.kind === 'statusRemoved') && event.targetPlayerIds && event.targetPlayerIds[0]) {
+        return displayPlayer(event.targetPlayerIds[0])
+      }
       if (event.sourcePieceId) return displayPiece(event.sourcePieceId)
       if (rootEvent && rootEvent.sourcePieceId) return displayPiece(rootEvent.sourcePieceId)
       if (event.cardId && event.kind === 'card') return displayCard(event.cardId)

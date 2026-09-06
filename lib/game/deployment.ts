@@ -88,6 +88,13 @@ export function toPublicBattleState(
   projected.pieces.forEach(redactPrivatePieceStatus)
   ;(projected.graveyard ?? []).forEach(redactPrivatePieceStatus)
   Object.values(projected.deployment?.reserves ?? {}).flat().forEach(redactPrivatePieceStatus)
+  for (const [key, value] of Object.entries(projected.extensions ?? {})) {
+    if (!Array.isArray(value)) continue
+    projected.extensions![key] = value.filter(entry => {
+      if (!entry || typeof entry !== 'object' || entry.projectionVisibility !== 'owner') return true
+      return String(entry.ownerPlayerId ?? '').trim().toLowerCase() === viewerId
+    })
+  }
   const option = projected.pendingOptionSelection
   if (option) {
     const owner = String(option.playerId ?? '').trim().toLowerCase() === viewerId

@@ -107,6 +107,7 @@
 - [`ADR-0008-rule-status-authority.md`](./ADR-0008-rule-status-authority.md)：Rule + statusTag 是棋子效果唯一权威架构，移除 AttachedEffect（RED-80，已接受）。
 - [`ADR-0009-venom-demo-admission.md`](./ADR-0009-venom-demo-admission.md)：将毒液准入 Demo v0.1 暗方候选池（RED-89，已接受）。
 - [`ADR-0010-deterministic-damage-batches.md`](./ADR-0010-deterministic-damage-batches.md)：单体与多目标伤害统一使用确定性 batch 和动作内连锁（RED-33，已接受）。
+- [`ADR-0028-hand-card-friendly-kill-charge.md`](./ADR-0028-hand-card-friendly-kill-charge.md)：手牌友军击杀使用显式出牌玩家归属提供充能，保留 `noKillCharge` 例外（RED-183，已接受）。
 - [`ADR-0011-authoritative-terminal-settlement.md`](./ADR-0011-authoritative-terminal-settlement.md)：服务端在完整动作后一次性提交终局，客户端只显示结果（RED-34，已接受）。
 - [`ADR-0012-ai-observation-semantics.md`](./ADR-0012-ai-observation-semantics.md)：版本化 AI 观察、机制语义与候选动作特征合同（RED-85，提议中）。
 - [`ADR-0013-headless-ai-environment.md`](./ADR-0013-headless-ai-environment.md)：提议以版本化 observation、完整候选和隔离 transition 统一通用 AI 的规则消费边界（RED-84）。

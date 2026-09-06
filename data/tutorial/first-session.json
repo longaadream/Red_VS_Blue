@@ -111,7 +111,7 @@
       "scene": 3,
       "sceneTitle": "先站稳再还手",
       "speaker": "社长 / DM",
-      "text": "乌瑟尔已经挨了一枪。先给自己套个圣光盾，它能挡下一次伤害；而且自我施放会返还 1 点行动点，社长批准的合理赖账。",
+      "text": "你现在有 2 点行动点。让乌瑟尔给自己套圣光盾：先花 2 点，自我施放再返还 1 点，正好留给安度因接着治疗。点技能后，还要在棋盘上点乌瑟尔作为目标。",
       "objective": "让乌瑟尔对自己使用“圣光盾”",
       "advance": { "type": "action", "actionType": "useBasicSkill", "skillId": "shield-of-light", "templateId": "uther", "targetTemplateId": "uther" },
       "cue": { "templates": ["uther"] }
@@ -183,7 +183,7 @@
       "text": "黑百合那发致命打击撞在掩体上了。没有花哨子弹特效也没关系：点动作记录，3D 棋盘会把射线和阻挡位置重新画出来。",
       "objective": "点击“致命打击”，回看被掩体阻挡的射线",
       "advance": { "type": "history-item", "labelIncludes": "致命打击" },
-      "cue": { "templates": ["red-blackwidow"], "cells": [{ "x": 4, "y": 8 }], "connectTemplateToCell": ["red-blackwidow", { "x": 4, "y": 8 }] }
+      "cue": { "templates": ["red-blackwidow"], "cells": [{ "x": 15, "y": 8 }], "connectTemplateToCell": ["red-blackwidow", { "x": 15, "y": 8 }] }
     },
     {
       "id": "inspect-floor",

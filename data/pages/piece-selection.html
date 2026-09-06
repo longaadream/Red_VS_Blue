@@ -10,6 +10,7 @@
   <script src="js/identity.js"></script>
   <script src="js/colyseus-sdk.js"></script>
   <script src="js/colyseus-client.js"></script>
+  <script src="js/deck-presets.js"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
     body {
@@ -44,6 +45,31 @@
       font-size: 11px; font-weight: 700; color: #475569;
       letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 10px;
     }
+    .deck-builder {
+      width: min(1120px, 100%); margin: 14px auto 0; padding: 12px 14px;
+      display: grid; gap: 9px; background: rgba(30,41,59,.72);
+      border: 1px solid rgba(148,163,184,.18); border-radius: 12px;
+    }
+    .deck-builder-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .deck-builder-title { font-size: 13px; font-weight: 800; margin-right: auto; }
+    .deck-builder select, .deck-builder input {
+      min-height: 36px; border: 1px solid #475569; border-radius: 8px;
+      background: #0f172a; color: #e2e8f0; padding: 7px 9px; font-size: 13px;
+    }
+    .deck-builder select { flex: 1; min-width: 180px; }
+    .deck-builder input { flex: 1; min-width: 150px; }
+    .deck-btn {
+      min-height: 36px; border: 1px solid #475569; border-radius: 8px;
+      background: #1e293b; color: #e2e8f0; padding: 7px 11px; font-weight: 700; cursor: pointer;
+    }
+    .deck-btn.primary { border-color: #3b82f6; color: #bfdbfe; }
+    .deck-btn.danger { border-color: #7f1d1d; color: #fca5a5; }
+    .deck-builder-status { min-height: 16px; color: #94a3b8; font-size: 11px; }
+    .deck-gallery { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:10px; }
+    .deck-card { text-align:left; padding:16px; border:1px solid #334155; border-radius:12px; background:#0f172a; color:#e2e8f0; cursor:pointer; }
+    .deck-card[aria-pressed="true"] { border-color:#60a5fa; background:#172b49; }
+    .deck-card strong { display:block; margin-bottom:8px; font-size:16px; }
+    .deck-card span { color:#94a3b8; font-size:12px; line-height:1.7; }
 
     .piece-grid {
       display: grid;
@@ -264,15 +290,32 @@
   <!-- Topbar -->
   <div class="topbar">
     <a class="back-btn" onclick="goBackToLobby()" style="cursor:pointer">返回</a>
-    <div class="topbar-title">选择出战棋子</div>
+    <div class="topbar-title" id="pageTitle">选择出战棋组</div>
     <div id="factionBadge" style="font-size:13px;padding:4px 10px;border-radius:6px;background:#1e293b;border:1px solid #334155;color:#64748b;flex-shrink:0">加载中...</div>
   </div>
 
   <div class="alignment-panel">
-    <button class="alignment-btn light" id="alignmentLightBtn" disabled>光方</button>
-    <button class="alignment-btn dark" id="alignmentDarkBtn" disabled>暗方</button>
+    <button class="alignment-btn light" id="alignmentLightBtn" onclick="switchDeckAlignment('light')" disabled>光方</button>
+    <button class="alignment-btn dark" id="alignmentDarkBtn" onclick="switchDeckAlignment('dark')" disabled>暗方</button>
   </div>
   <div id="alignmentLockNotice" class="alignment-lock-notice">阵营将在大厅准备后锁定</div>
+
+  <section class="deck-builder" aria-label="预设棋组">
+    <div id="deckGallery" class="deck-gallery" aria-label="已保存棋组"></div>
+    <div class="deck-builder-row">
+      <div class="deck-builder-title">预设棋组</div>
+      <select id="deckPresetSelect" aria-label="选择预设棋组" onchange="loadSelectedPreset()">
+        <option value="">选择一套预设…</option>
+      </select>
+      <button class="deck-btn danger" type="button" onclick="deleteSelectedPreset()">删除</button>
+    </div>
+    <div class="deck-builder-row">
+      <input id="deckPresetName" maxlength="24" placeholder="棋组名称" aria-label="棋组名称">
+      <button class="deck-btn primary" type="button" onclick="savePreset()">保存当前 8 枚</button>
+      <button class="deck-btn" type="button" onclick="newPreset()">新建</button>
+    </div>
+    <div id="deckPresetStatus" class="deck-builder-status">预设仅保存在本机，选中后可直接载入。</div>
+  </section>
 
   <!-- Piece list -->
   <div class="section">
@@ -316,6 +359,7 @@
   <script>
     // Back navigation: return to the room while preserving server params.
     function goBackToLobby() {
+      if (deckBuilderMode) { window.location.href = 'index.html'; return }
       if (pollTimer) { clearInterval(pollTimer); pollTimer = null }
       const sp = new URLSearchParams(location.search)
       const rid = sp.get('roomId') || ''
@@ -338,6 +382,8 @@
     // URL params
     const params = new URLSearchParams(location.search)
     const roomId = params.get('roomId') || ''
+    const deckBuilderMode = params.get('mode') === 'deck-builder' && !roomId
+    let alignmentLoading = false
     const playerId = params.get('playerId') || ('anon-' + Date.now())
     const accountId = params.get('accountId') || params.get('account') || ''
     const playerName = params.get('playerName') || '玩家'
@@ -364,13 +410,15 @@
     let pollTimer = null
     let playerFaction = null    // 'red' | 'blue' turn order seat
     let playerAlignment = null  // 'light' | 'dark' content alignment
-    playerAlignment = params.get('alignment') || playerAlignment
+    playerAlignment = params.get('alignment') || (deckBuilderMode ? 'light' : playerAlignment)
     let colyseusReady = false
     let latestRoom = null
     let factionClaimPromise = null
     let factionClaimed = false
     let initialFactionClaimFinished = false
     let pieceLoadError = ''
+    const DECK_PRESET_STORAGE_KEY = window.RvBDeckPresets.STORAGE_KEY
+    let editingPresetId = ''
 
     const LOCAL_PIECE_LOAD_TIMEOUT_MS = 2000
     const SERVER_PIECE_LOAD_TIMEOUT_MS = 2500
@@ -630,6 +678,14 @@
 
     // Fetch player's faction from room data, then load matching pieces
     async function init() {
+      if (deckBuilderMode) {
+        document.getElementById('pageTitle').textContent = '我的棋组 · 开战前构筑'
+        document.getElementById('confirmBtn').textContent = '保存棋组'
+        document.getElementById('serverLabel').textContent = '本机棋组 · 无需连接对局'
+        updateFactionBadge()
+        await loadPieces()
+        return
+      }
       if (window.RvBUtils && RvBUtils.restoreServerFromParams) {
         await RvBUtils.restoreServerFromParams(params)
       }
@@ -663,10 +719,12 @@
       const alignmentLocked = playerAlignment === 'light' || playerAlignment === 'dark' || playerAlignment === 'good' || playerAlignment === 'evil'
       if (lightBtn) lightBtn.classList.toggle('active', playerAlignment === 'light' || playerAlignment === 'good')
       if (darkBtn) darkBtn.classList.toggle('active', playerAlignment === 'dark' || playerAlignment === 'evil')
-      if (lightBtn) lightBtn.disabled = alignmentLocked
-      if (darkBtn) darkBtn.disabled = alignmentLocked
-      if (lockNotice) lockNotice.textContent = alignmentLocked
-        ? '阵营已在大厅锁定，只能选择本阵营棋子'
+      if (lightBtn) lightBtn.disabled = !deckBuilderMode || alignmentLoading
+      if (darkBtn) darkBtn.disabled = !deckBuilderMode || alignmentLoading
+      if (lockNotice) lockNotice.textContent = deckBuilderMode
+        ? '先选择光方或暗方，构筑并保存 8 枚棋子；开战时直接选择一套棋组。'
+        : alignmentLocked
+        ? '阵营已在大厅锁定。可载入棋组，也可在本页自由构筑、调整并保存本阵营的 8 枚棋子。'
         : '正在读取大厅分配的阵营'
       if (!badge) return
       const orderLabel = playerFaction === 'red' ? '座位 red' : playerFaction === 'blue' ? '座位 blue' : null
@@ -723,6 +781,146 @@
         if (!pieceLoadError) pieceLoadError = '棋子资源加载失败：' + errorReason(error)
       }
       renderPieces()
+      renderPresetOptions()
+    }
+
+    function currentAlignmentKey() {
+      if (playerAlignment === 'dark' || playerAlignment === 'evil') return 'evil'
+      if (playerAlignment === 'light' || playerAlignment === 'good') return 'good'
+      return null
+    }
+
+    async function switchDeckAlignment(alignment) {
+      if (!deckBuilderMode || alignmentLoading || !['light', 'dark'].includes(alignment) || alignment === playerAlignment) return
+      alignmentLoading = true
+      playerAlignment = alignment
+      newPreset()
+      updateFactionBadge()
+      try { await loadPieces() }
+      finally { alignmentLoading = false; updateFactionBadge(); updateConfirmBar() }
+    }
+
+    function readPresetStore() {
+      try { return window.RvBDeckPresets.parse(localStorage.getItem(DECK_PRESET_STORAGE_KEY)) }
+      catch { return window.RvBDeckPresets.emptyStore() }
+    }
+
+    function writePresetStore(store) {
+      localStorage.setItem(DECK_PRESET_STORAGE_KEY, window.RvBDeckPresets.serialize(store))
+    }
+
+    function setPresetStatus(message, error) {
+      const node = document.getElementById('deckPresetStatus')
+      if (!node) return
+      node.textContent = message
+      node.style.color = error ? '#f87171' : '#94a3b8'
+    }
+
+    function renderPresetOptions() {
+      const select = document.getElementById('deckPresetSelect')
+      if (!select) return
+      const alignment = currentAlignmentKey()
+      const presets = readPresetStore().presets.filter(function (preset) { return preset.alignment === alignment })
+      select.innerHTML = '<option value="">选择一套预设…</option>' + presets.map(function (preset) {
+        return '<option value="' + escapeHtml(preset.id) + '">' + escapeHtml(preset.name) + '</option>'
+      }).join('')
+      if (editingPresetId && presets.some(function (preset) { return preset.id === editingPresetId })) {
+        select.value = editingPresetId
+      } else {
+        editingPresetId = ''
+      }
+      const gallery = document.getElementById('deckGallery')
+      if (gallery) {
+        gallery.innerHTML = presets.length ? presets.map(function (preset, index) {
+          const names = preset.pieceIds.map(function (id) {
+            const piece = PIECE_TEMPLATES.find(function (entry) { return entry.id === id })
+            return piece ? piece.name : '不可用棋子'
+          }).join(' · ')
+          return '<button type="button" class="deck-card" aria-pressed="' + (preset.id === editingPresetId) + '" onclick="choosePresetCard(' + index + ')"><strong>'
+            + escapeHtml(preset.name) + '</strong><span>' + (alignment === 'evil' ? '暗方' : '光方') + ' · 8 枚棋子<br>' + escapeHtml(names) + '</span></button>'
+        }).join('') : '<p>还没有' + (alignment === 'evil' ? '暗方' : '光方') + '棋组。请选择下方 8 枚棋子，命名后保存。</p>'
+      }
+    }
+
+    function choosePresetCard(index) {
+      const presets = readPresetStore().presets.filter(function (preset) { return preset.alignment === currentAlignmentKey() })
+      if (!presets[index]) return
+      document.getElementById('deckPresetSelect').value = presets[index].id
+      loadSelectedPreset()
+    }
+
+    function loadSelectedPreset() {
+      const select = document.getElementById('deckPresetSelect')
+      const alignment = currentAlignmentKey()
+      const preset = readPresetStore().presets.find(function (entry) {
+        return entry.id === (select && select.value) && entry.alignment === alignment
+      })
+      if (!preset) { newPreset(); return }
+      const availableIds = new Set(PIECE_TEMPLATES.map(function (piece) { return piece.id }))
+      const validIds = preset.pieceIds.filter(function (id) { return availableIds.has(id) })
+      editingPresetId = preset.id
+      document.getElementById('deckPresetName').value = preset.name
+      selectedIds = new Set(validIds)
+      renderPresetOptions()
+      updateConfirmBar()
+      renderPieces()
+      setPresetStatus(validIds.length === 8
+        ? '已载入「' + preset.name + '」。'
+        : '该预设有棋子已不可用，请补齐到 8 枚后重新保存。', validIds.length !== 8)
+    }
+
+    function newPreset() {
+      editingPresetId = ''
+      selectedIds = new Set()
+      renderPieces()
+      updateConfirmBar()
+      const select = document.getElementById('deckPresetSelect')
+      if (select) select.value = ''
+      const name = document.getElementById('deckPresetName')
+      if (name) { name.value = ''; if (name.focus) name.focus() }
+      renderPresetOptions()
+      setPresetStatus('新棋组：选择 8 枚同阵营棋子并命名后保存。')
+    }
+
+    function savePreset() {
+      const name = String(document.getElementById('deckPresetName').value || '').trim()
+      const pieceIds = Array.from(selectedIds)
+      const alignment = currentAlignmentKey()
+      if (!alignment) { setPresetStatus('请等待阵营锁定后再保存预设。', true); return }
+      if (!name) { setPresetStatus('请先输入棋组名称。', true); return }
+      if (pieceIds.length !== 8 || new Set(pieceIds).size !== 8) {
+        setPresetStatus('预设棋组必须包含 8 枚不重复棋子。', true); return
+      }
+      if (!window.RvBDeckPresets.isValidSelection(pieceIds, alignment, PIECE_TEMPLATES)) {
+        setPresetStatus('预设中包含当前阵营不可用的棋子。', true); return
+      }
+      const id = editingPresetId || ('deck-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 7))
+      const preset = { id: id, name: name.slice(0, 24), alignment: alignment, pieceIds: pieceIds, updatedAt: Date.now() }
+      try {
+        writePresetStore(window.RvBDeckPresets.upsert(readPresetStore(), preset))
+      } catch {
+        setPresetStatus('预设保存失败，请检查本机存储权限。', true)
+        return
+      }
+      editingPresetId = id
+      renderPresetOptions()
+      setPresetStatus('已保存「' + preset.name + '」。')
+    }
+
+    function deleteSelectedPreset() {
+      if (!editingPresetId) { setPresetStatus('请先选择要删除的预设。', true); return }
+      const store = readPresetStore()
+      const preset = store.presets.find(function (entry) { return entry.id === editingPresetId })
+      if (!preset || !confirm('删除预设「' + preset.name + '」？')) return
+      try {
+        writePresetStore(window.RvBDeckPresets.remove(store, editingPresetId))
+      } catch {
+        setPresetStatus('预设删除失败，请检查本机存储权限。', true)
+        return
+      }
+      newPreset()
+      renderPresetOptions()
+      setPresetStatus('预设已删除。')
     }
 
     function factionIcon(f) {
@@ -884,7 +1082,7 @@
               <span class="skill-name">${sk.name || sk.id}${sk._derived ? ' <span style="color:#a855f7;font-size:11px">衍生</span>' : ''}</span>
               <span class="skill-type-badge ${typeCls[sk.type] || ''}">${typeLabel[sk.type] || sk.type || '主动'}</span>
             </div>
-            <div class="skill-meta">行动点：${sk.actionPointCost || 0} | 冷却：${sk.cooldownTurns || 0} 回合${sk.range ? ' | 范围：' + sk.range : ''}${sk._derived && sk._trigger ? ' | 由 ' + sk._trigger + ' 获得' : ''}</div>
+            <div class="skill-meta">行动点：${sk.actionPointCost || 0}${sk.chargeCost ? ' | 充能点：' + sk.chargeCost : ''} | 冷却：${sk.cooldownTurns || 0} 回合${sk.range ? ' | 范围：' + sk.range : ''}${sk._derived && sk._trigger ? ' | 由 ' + sk._trigger + ' 获得' : ''}</div>
             <div class="skill-desc">${sk.description || '暂无描述'}</div>
           </div>`)
           .join('')
@@ -958,6 +1156,7 @@
     }
 
     async function confirmSelection() {
+      if (deckBuilderMode) { savePreset(); return }
       const url = getServerUrl()
       if (!url) { alert('服务器未连接'); return }
       if (!playerAlignment) { alert('请先选择光方或暗方'); return }

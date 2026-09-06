@@ -41,6 +41,18 @@ describe('battle public pending projection', () => {
       .toEqual([{ id: 'public-active', type: 'public-active', visible: true }])
   })
 
+  it('keeps Tracer Recall numeric choices private to their owner', () => {
+    const state = makeState() as any
+    state.extensions.recallData = [{
+      pieceId: 'tracer-red', ownerPlayerId: 'player-red', projectionVisibility: 'owner', targetCount: 7, actionCount: 0,
+      snapshot: { x: 1, y: 2, hp: 9 },
+    }]
+
+    expect((toPublicBattleState(state, 'player-red').extensions as any).recallData).toHaveLength(1)
+    expect((toPublicBattleState(state, 'player-blue').extensions as any).recallData).toEqual([])
+    expect((toPublicBattleState(state).extensions as any).recallData).toEqual([])
+  })
+
   it('redacts invisible status data after a piece enters the graveyard', () => {
     const piece = makePiece({ instanceId: 'fallen-aizen', ownerPlayerId: 'player-red' })
     piece.statusTags = [

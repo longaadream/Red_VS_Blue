@@ -51,6 +51,8 @@ context.damageQueue.push({
 
 一次 DamageBatch 中，每个起始存活且 HP Commit 后为 0 的目标冻结进入同一个内生 DeathBatch。所有冻结候选在整个 `beforePieceKilled`、`afterPieceKilled`、`onPieceDied` 阶段都保留在 `battle.pieces`；全部 lifecycle 完成后才统一读取 HP。已恢复为正生命者不进墓地、不提供充能，但兼容保留本次 kill/death 事件。其余候选一次性从战场移除、按稳定顺序进入墓地并提交合法充能；`afterChargeGained` 因此观察到未复活死者已经离场。
 
+充能归属依据 ADR-0028：敌对击杀正常提供 1 点；手牌伤害显式写入 `killerPlayerId` 后，对己方棋子的有效击杀也提供 1 点。普通技能的友军致死不自动扩权，`noKillCharge` 永远排除。
+
 玩家级 `mangekyoDeathCount` 是【万花筒】动态充能成本的权威累计值：`max(0, baseChargeCost - mangekyoDeathCount)`。强制移除不经过本管线，不派发死亡事件，也不写入墓地。
 
 动作入口等整个 EffectChain 清空后由 `finalizeBattleTerminal()` 统一检查终局，因此可以同时观察双方核心全灭并判平局；pending 期间不序列化半个 Batch/queue，而是保留根动作 pre-state，并在回答后从根动作确定性重放。
