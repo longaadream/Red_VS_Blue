@@ -851,7 +851,7 @@ describe('RED-139 DeathBatch', () => {
   beforeEach(() => globalTriggerSystem.clearRules())
   afterEach(() => globalTriggerSystem.clearRules())
 
-  it('freezes simultaneous candidates so A can revive B without suppressing B lifecycle', () => {
+  it('freezes simultaneous candidates so every death completes its lifecycle', () => {
     const attacker = makePiece({ instanceId: 'death-attacker', ownerPlayerId: 'player-red' }) as any
     const alpha = makePiece({
       instanceId: 'death-alpha',
@@ -887,7 +887,6 @@ describe('RED-139 DeathBatch', () => {
             originStage: context.originStage,
           },
         })
-        if (type === 'onPieceDied' && subject === alpha.instanceId) beta.currentHp = 6
       }) as any)
     }
 
@@ -919,11 +918,11 @@ describe('RED-139 DeathBatch', () => {
       killed: entry.isKilled,
       hp: entry.targetHp,
     }))).toEqual([
-      { targetId: 'death-beta', killed: false, hp: 6 },
+      { targetId: 'death-beta', killed: true, hp: 0 },
       { targetId: 'death-alpha', killed: true, hp: 0 },
     ])
-    expect(state.pieces.map((piece: any) => piece.instanceId)).toEqual(['death-attacker', 'death-beta'])
-    expect(state.graveyard.map((piece: any) => piece.instanceId)).toEqual(['death-alpha'])
+    expect(state.pieces.map((piece: any) => piece.instanceId)).toEqual(['death-attacker'])
+    expect(state.graveyard.map((piece: any) => piece.instanceId)).toEqual(['death-alpha', 'death-beta'])
     expect(state.players.find((player: any) => player.playerId === 'player-red').chargePoints).toBe(0)
   })
 

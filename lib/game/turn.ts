@@ -33,7 +33,7 @@ import {
   type PieceStatusTag,
 } from "./piece"
 import type { SkillDefinition } from "./skills"
-import { dealDamage, drainBattleEffectChain, healDamage, hydratePreparedPieceDefinitions, loadRuleById, loadRuleForBattle, loadCardForBattle, loadSkillForBattle, restorePersistedRuleRuntime, rethrowAttachedEffectContentError, executeCardFunction, executeSkillFunction, getEffectiveChargeCost, getRuleDynamicCodeRuntime } from "./skills"
+import { collectChargeCrystalsForPiece, dealDamage, drainBattleEffectChain, healDamage, hydratePreparedPieceDefinitions, loadRuleById, loadRuleForBattle, loadCardForBattle, loadSkillForBattle, restorePersistedRuleRuntime, rethrowAttachedEffectContentError, executeCardFunction, executeSkillFunction, getEffectiveChargeCost, getRuleDynamicCodeRuntime } from "./skills"
 import { globalTriggerSystem, type TriggerContext, type TriggerResult, type TriggerRule } from "./triggers"
 import {
   EffectChainFatalError,
@@ -74,7 +74,6 @@ import {
   type SuspendableInteractionPrompt,
 } from './suspendable-action-transaction'
 import { getNormalMoveRejection, manhattanDistance } from "./spatial"
-import { collectChargeCrystalsAt } from './charge-crystals'
 import {
   PROGRESSIVE_DEPLOYMENT_MODE,
   getEmptyWalkableDeploymentPositions,
@@ -801,50 +800,6 @@ function appendTriggerMessages(
       payload: { message },
     })
   })
-}
-
-function collectChargeCrystalsForPiece(
-  state: BattleState,
-  piece: PieceInstance,
-  playerId: string,
-): number {
-  if (piece.currentHp <= 0 || piece.x === null || piece.y === null || !state.pieces.includes(piece)) return 0
-  const collectedCrystals = collectChargeCrystalsAt(state, piece.x, piece.y)
-  if (collectedCrystals.length === 0) return 0
-
-  const playerMeta = getPlayerMeta(state, playerId)
-  playerMeta.chargePoints += collectedCrystals.length
-  if (!state.actions) state.actions = []
-  const pieceName = piece.name || piece.templateId
-  state.actions.push({
-    type: 'chargeCrystalPickedUp',
-    playerId,
-    turn: state.turn.turnNumber,
-    payload: {
-      message: `${pieceName} 拾取了 ${collectedCrystals.length} 个充能结晶，队伍获得 ${collectedCrystals.length} CP`,
-      pieceId: piece.instanceId,
-      crystalIds: collectedCrystals.map(crystal => crystal.id),
-      amount: collectedCrystals.length,
-      x: piece.x,
-      y: piece.y,
-    },
-  })
-  const chargeResult = getActiveTriggerSystem().checkTriggers(state, {
-    type: 'afterChargeGained',
-    piece,
-    sourcePiece: piece,
-    amount: collectedCrystals.length,
-    playerId,
-  })
-  if (chargeResult.needsOptionSelection || chargeResult.needsTargetSelection) {
-    const kind = chargeResult.needsOptionSelection ? 'option' : 'target'
-    throw new BattleRuleError(
-      `[afterChargeGained] interactive ${kind} trigger is unsupported at this call site`,
-      'INTERACTIVE_TRIGGER_UNSUPPORTED',
-    )
-  }
-  appendTriggerMessages(state, playerId, chargeResult)
-  return collectedCrystals.length
 }
 
 function assertSynchronousSummonTrigger(result: TriggerResult, eventType: string): void {

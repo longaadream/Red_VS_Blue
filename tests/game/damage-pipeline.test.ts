@@ -460,7 +460,7 @@ describe('RED-33 deterministic damage pipeline', () => {
     expect(defender.statusTags).toEqual([expect.objectContaining({ type: 'undead-body' })])
   })
 
-  it('finalizes an on-death revival once without graveyard or kill charge', () => {
+  it('rejects attempts to revive a finalized candidate inside onPieceDied', () => {
     const attacker = makePiece({ instanceId: 'revive-attacker', ownerPlayerId: 'player-red' }) as any
     const defender = makePiece({ instanceId: 'revive-defender', ownerPlayerId: 'player-blue', currentHp: 5, maxHp: 20 }) as any
     const state = makeState({ pieces: [attacker, defender] }) as any
@@ -484,23 +484,9 @@ describe('RED-33 deterministic damage pipeline', () => {
       }),
     ] as any)
 
-    const result = dealDamage(attacker, defender, 5, 'true', state, 'on-death-revive')
-
-    expect(result).toMatchObject({
-      success: true,
-      damage: 5,
-      isKilled: false,
-      targetHp: 7,
-    })
-    expect(state.extensions.lifecycle).toEqual(['kill', 'revive'])
-    expect(state.pieces.map((piece: any) => piece.instanceId)).toContain(defender.instanceId)
-    expect(state.graveyard).toEqual([])
-    expect(state.players.find((player: any) => player.playerId === 'player-red').chargePoints).toBe(0)
-    expect(defender.statusTags).toContainEqual(expect.objectContaining({
-      type: 'deployment-first-move-free',
-      grantedTurnNumber: state.turn.turnNumber,
-      currentUses: 1,
-    }))
+    expect(() => dealDamage(attacker, defender, 5, 'true', state, 'on-death-revive')).toThrow(
+      'DeathBatch onPieceDied cannot revive or heal a finalized candidate',
+    )
   })
 
   it('stops a reflected damage cycle with deterministic chain context', () => {

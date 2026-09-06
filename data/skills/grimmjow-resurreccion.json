@@ -1,10 +1,10 @@
 {
   "id": "grimmjow-resurreccion",
   "name": "归刃·豹王",
-  "description": "首次死亡时，原地以10点生命归刃复活，攻击力+1、移动值+1，并将【王虚的闪光】替换为【豹王之爪】。",
+  "description": "首次死亡结算后，在原地重新召唤10点生命的归刃形态；其攻击力+1、移动值+1，并将【王虚的闪光】替换为【豹王之爪】。",
   "keywords": [],
   "targetText": "被动",
-  "effectTags": ["复活", "变身"],
+  "effectTags": ["死亡", "召唤", "变身"],
   "icon": "🐾",
   "kind": "passive",
   "type": "normal",
