@@ -6,7 +6,7 @@ import { projectBattlePresentationEvents } from '@/lib/game/battle-presentation-
 import { dropChargeCrystal } from '@/lib/game/charge-crystals'
 import { dealDamage } from '@/lib/game/skills'
 import { globalTriggerSystem } from '@/lib/game/triggers'
-import { applyBattleAction } from '@/lib/game/turn'
+import { applyBattleAction, summonPiece } from '@/lib/game/turn'
 import { makePiece, makeState } from '../helpers/minimal-state'
 
 describe('RED-185 contested charge crystals', () => {
@@ -88,7 +88,7 @@ describe('RED-185 contested charge crystals', () => {
     expect(presentationKinds).toContain('chargePoints')
   })
 
-  it('does not passively collect on standing, summoning, or forced relocation', () => {
+  it('does not passively collect on standing or forced relocation', () => {
     const standing = makePiece({ instanceId: 'standing', x: 2, y: 0 }) as any
     let state = makeState({ pieces: [standing] }) as any
     dropChargeCrystal(state, { id: 'persistent', sourcePieceId: 'fallen', x: 2, y: 0 })
@@ -96,7 +96,6 @@ describe('RED-185 contested charge crystals', () => {
     state = applyBattleAction(state, { type: 'endTurn', playerId: 'player-red' }) as any
     state = applyBattleAction(state, { type: 'beginPhase' }) as any
     state = applyBattleAction(state, { type: 'beginPhase' }) as any
-    state.pieces.push(makePiece({ instanceId: 'summoned', x: 2, y: 0 }) as any)
     standing.x = 1
     standing.y = 0
     standing.x = 2
@@ -106,6 +105,38 @@ describe('RED-185 contested charge crystals', () => {
       expect.objectContaining({ id: 'persistent', tileType: 'charge-crystal', x: 2, y: 0 }),
     ])
     expect(state.players.map((player: any) => player.chargePoints)).toEqual([0, 0])
+  })
+
+  it('lets a Kiljaedan-style template summon collect crystals on its landing tile', () => {
+    const state = makeState({ pieces: [] }) as any
+    dropChargeCrystal(state, { id: 'summon-crystal', sourcePieceId: 'fallen', x: 2, y: 0 })
+
+    const result = summonPiece(
+      state,
+      { templateId: 'kiljaedan', ownerPlayerId: 'player-red', faction: 'red', x: 2, y: 0 },
+      id => id === 'kiljaedan' ? { id, name: '基尔加丹', rules: [] } : null,
+      (template, ownerPlayerId, faction, x, y) => ({
+        ...makePiece({
+          instanceId: 'kiljaedan-summoned', templateId: template.id, ownerPlayerId, faction, x, y,
+        }),
+        name: template.name,
+        skills: [],
+        buffs: [],
+        debuffs: [],
+        ruleTags: [],
+      }) as any,
+    )
+
+    expect(result).toMatchObject({ success: true, piece: { instanceId: 'kiljaedan-summoned', x: 2, y: 0 } })
+    expect(state.players.find((player: any) => player.playerId === 'player-red').chargePoints).toBe(1)
+    expect(state.extensions.tileEffects).toEqual([])
+    expect(state.actions).toContainEqual(expect.objectContaining({
+      type: 'chargeCrystalPickedUp',
+      playerId: 'player-red',
+      payload: expect.objectContaining({
+        pieceId: 'kiljaedan-summoned', crystalIds: ['summon-crystal'], amount: 1, x: 2, y: 0,
+      }),
+    }))
   })
 
   it('does not drop for non-core or noKillCharge deaths', () => {

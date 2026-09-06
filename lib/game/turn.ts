@@ -803,6 +803,50 @@ function appendTriggerMessages(
   })
 }
 
+function collectChargeCrystalsForPiece(
+  state: BattleState,
+  piece: PieceInstance,
+  playerId: string,
+): number {
+  if (piece.currentHp <= 0 || piece.x === null || piece.y === null || !state.pieces.includes(piece)) return 0
+  const collectedCrystals = collectChargeCrystalsAt(state, piece.x, piece.y)
+  if (collectedCrystals.length === 0) return 0
+
+  const playerMeta = getPlayerMeta(state, playerId)
+  playerMeta.chargePoints += collectedCrystals.length
+  if (!state.actions) state.actions = []
+  const pieceName = piece.name || piece.templateId
+  state.actions.push({
+    type: 'chargeCrystalPickedUp',
+    playerId,
+    turn: state.turn.turnNumber,
+    payload: {
+      message: `${pieceName} 拾取了 ${collectedCrystals.length} 个充能结晶，队伍获得 ${collectedCrystals.length} CP`,
+      pieceId: piece.instanceId,
+      crystalIds: collectedCrystals.map(crystal => crystal.id),
+      amount: collectedCrystals.length,
+      x: piece.x,
+      y: piece.y,
+    },
+  })
+  const chargeResult = getActiveTriggerSystem().checkTriggers(state, {
+    type: 'afterChargeGained',
+    piece,
+    sourcePiece: piece,
+    amount: collectedCrystals.length,
+    playerId,
+  })
+  if (chargeResult.needsOptionSelection || chargeResult.needsTargetSelection) {
+    const kind = chargeResult.needsOptionSelection ? 'option' : 'target'
+    throw new BattleRuleError(
+      `[afterChargeGained] interactive ${kind} trigger is unsupported at this call site`,
+      'INTERACTIVE_TRIGGER_UNSUPPORTED',
+    )
+  }
+  appendTriggerMessages(state, playerId, chargeResult)
+  return collectedCrystals.length
+}
+
 function assertSynchronousSummonTrigger(result: TriggerResult, eventType: string): void {
   if (!result.needsOptionSelection && !result.needsTargetSelection) return
   throw new BattleRuleError(
@@ -889,6 +933,7 @@ function commitReservePieceSummon(
       toY: deployedPosition.y,
     },
   })
+  collectChargeCrystalsForPiece(state, piece, playerId)
   return piece
 }
 
@@ -2655,41 +2700,7 @@ function applyBattleActionInternal(
         }
       })
 
-      const collectedCrystals = collectChargeCrystalsAt(next, finalToX, finalToY)
-      if (collectedCrystals.length > 0) {
-        playerMeta.chargePoints += collectedCrystals.length
-        next.actions.push({
-          type: 'chargeCrystalPickedUp',
-          playerId: action.playerId,
-          turn: next.turn.turnNumber,
-          payload: {
-            message: `${pieceName} 拾取了 ${collectedCrystals.length} 个充能结晶，队伍获得 ${collectedCrystals.length} CP`,
-            pieceId: piece.instanceId,
-            crystalIds: collectedCrystals.map(crystal => crystal.id),
-            amount: collectedCrystals.length,
-            x: finalToX,
-            y: finalToY,
-          },
-        })
-        const chargeResult = getActiveTriggerSystem().checkTriggers(next, {
-          type: 'afterChargeGained',
-          piece,
-          sourcePiece: piece,
-          amount: collectedCrystals.length,
-          playerId: action.playerId,
-        })
-        assertNoUnhandledInteraction(chargeResult, 'afterChargeGained')
-        if (chargeResult.success) {
-          chargeResult.messages.forEach(message => {
-            next.actions!.push({
-              type: 'triggerEffect',
-              playerId: action.playerId,
-              turn: next.turn.turnNumber,
-              payload: { message },
-            })
-          })
-        }
-      }
+      collectChargeCrystalsForPiece(next, piece, action.playerId)
 
       // 触发移动后的规则
       const moveResult = getActiveTriggerSystem().checkTriggers(next, {
@@ -4874,6 +4885,7 @@ export function resolveTemplateSummonBatch<TTemplate extends TemplateSummonSourc
           payload: { message },
         })
       }
+      collectChargeCrystalsForPiece(battle, entry.piece, entry.spec.ownerPlayerId)
     }
 
     const metadata = templateSummonMetadata(context)
