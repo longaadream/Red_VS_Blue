@@ -5,6 +5,7 @@ import { loadMaps } from '@/config/maps'
 import { buildDefaultSkills, createInitialBattleForPlayers } from '@/lib/game/battle-setup'
 import { runBattleAction } from '@/lib/game/battle-runner'
 import { getPieceById } from '@/lib/game/piece-repository'
+import { traceProjectile } from '@/lib/game/spatial'
 import { prepareAction } from '@/lib/game/targeting'
 import { type BattleAction, type BattleState } from '@/lib/game/turn'
 
@@ -89,9 +90,12 @@ it('replays the complete three-turn first-session tutorial through authoritative
   expect(state.turn).toMatchObject({ currentPlayerId: OPPONENT, turnNumber: 1, phase: 'start' })
   const terrain = (x: number, y: number) => state.map.tiles.find(tile => tile.x === x && tile.y === y)?.props
   expect(terrain(6, 8)).toMatchObject({ type: 'floor', walkable: true, bulletPassable: true })
-  expect(terrain(4, 8)).toMatchObject({ type: 'cover', walkable: true, bulletPassable: false })
+  expect(terrain(15, 8)).toMatchObject({ type: 'cover', walkable: true, bulletPassable: false })
   expect(terrain(0, 8)).toMatchObject({ type: 'wall', walkable: false, bulletPassable: false })
   expect(terrain(10, 8)).toMatchObject({ type: 'hole', walkable: false, bulletPassable: true })
+  const firstBlockingTerrain = traceProjectile(state, { x: 17, y: 8 }, { x: -1, y: 0 })
+    .find(event => event.type === 'terrain' && event.blocksProjectile)
+  expect(firstBlockingTerrain).toMatchObject({ type: 'terrain', x: 15, y: 8, distance: 2 })
 
   const widowReserve = reserve(state, OPPONENT, 'red-blackwidow')
   state = transition(state, {
@@ -167,16 +171,14 @@ it('replays the complete three-turn first-session tutorial through authoritative
   const defeatedReaper = state.pieces.find(candidate => candidate.templateId === 'reaper')
     || state.graveyard.find(candidate => candidate.templateId === 'reaper')
   expect(defeatedReaper?.currentHp).toBe(0)
-  expect(state.players.find(player => player.playerId === PLAYER)!.chargePoints).toBe(chargeBeforeKill + 1)
-  const apBeforeBlessing = state.players.find(player => player.playerId === PLAYER)!.actionPoints
-  const chargeBeforeBlessing = state.players.find(player => player.playerId === PLAYER)!.chargePoints
+  expect(state.players.find(player => player.playerId === PLAYER)!.chargePoints).toBe(chargeBeforeKill)
+  expect(state.extensions?.tileEffects).toContainEqual(expect.objectContaining({
+    tileType: 'charge-crystal', x: 8, y: 7,
+  }))
   state = transition(state, {
-    type: 'useChargeSkill', playerId: PLAYER, pieceId: piece(state, 'uther').instanceId,
-    skillId: 'divine-blessing',
+    type: 'move', playerId: PLAYER, pieceId: piece(state, 'uther').instanceId, toX: 8, toY: 7,
   })
-  const playerAfterBlessing = state.players.find(player => player.playerId === PLAYER)!
-  expect(playerAfterBlessing.actionPoints).toBe(apBeforeBlessing - 1)
-  expect(playerAfterBlessing.chargePoints).toBe(chargeBeforeBlessing - 1)
+  expect(state.players.find(player => player.playerId === PLAYER)!.chargePoints).toBe(chargeBeforeKill + 1)
   state = finishTurn(state, PLAYER)
 
   const widow = piece(state, 'red-blackwidow')
@@ -189,4 +191,13 @@ it('replays the complete three-turn first-session tutorial through authoritative
   expect(String(state.actions?.at(-1)?.payload?.message ?? '')).toContain('地形阻挡')
   state = finishTurn(state, OPPONENT)
   expect(state.turn).toMatchObject({ currentPlayerId: PLAYER, turnNumber: 6, phase: 'action' })
+  const apBeforeBlessing = state.players.find(player => player.playerId === PLAYER)!.actionPoints
+  const chargeBeforeBlessing = state.players.find(player => player.playerId === PLAYER)!.chargePoints
+  state = transition(state, {
+    type: 'useChargeSkill', playerId: PLAYER, pieceId: piece(state, 'uther').instanceId,
+    skillId: 'divine-blessing',
+  })
+  const playerAfterBlessing = state.players.find(player => player.playerId === PLAYER)!
+  expect(playerAfterBlessing.actionPoints).toBe(apBeforeBlessing - 1)
+  expect(playerAfterBlessing.chargePoints).toBe(chargeBeforeBlessing - 1)
 }, 60_000)

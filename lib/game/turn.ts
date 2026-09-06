@@ -33,7 +33,7 @@ import {
   type PieceStatusTag,
 } from "./piece"
 import type { SkillDefinition } from "./skills"
-import { dealDamage, drainBattleEffectChain, healDamage, hydratePreparedPieceDefinitions, loadRuleById, loadRuleForBattle, loadCardForBattle, loadSkillForBattle, restorePersistedRuleRuntime, rethrowAttachedEffectContentError, executeCardFunction, executeSkillFunction, getEffectiveChargeCost, getRuleDynamicCodeRuntime } from "./skills"
+import { collectChargeCrystalsForPiece, dealDamage, drainBattleEffectChain, healDamage, hydratePreparedPieceDefinitions, loadRuleById, loadRuleForBattle, loadCardForBattle, loadSkillForBattle, restorePersistedRuleRuntime, rethrowAttachedEffectContentError, executeCardFunction, executeSkillFunction, getEffectiveChargeCost, getRuleDynamicCodeRuntime } from "./skills"
 import { globalTriggerSystem, type TriggerContext, type TriggerResult, type TriggerRule } from "./triggers"
 import {
   EffectChainFatalError,
@@ -888,6 +888,7 @@ function commitReservePieceSummon(
       toY: deployedPosition.y,
     },
   })
+  collectChargeCrystalsForPiece(state, piece, playerId)
   return piece
 }
 
@@ -2653,6 +2654,8 @@ function applyBattleActionInternal(
           deploymentFirstMoveFree,
         }
       })
+
+      collectChargeCrystalsForPiece(next, piece, action.playerId)
 
       // 触发移动后的规则
       const moveResult = getActiveTriggerSystem().checkTriggers(next, {
@@ -4837,6 +4840,7 @@ export function resolveTemplateSummonBatch<TTemplate extends TemplateSummonSourc
           payload: { message },
         })
       }
+      collectChargeCrystalsForPiece(battle, entry.piece, entry.spec.ownerPlayerId)
     }
 
     const metadata = templateSummonMetadata(context)

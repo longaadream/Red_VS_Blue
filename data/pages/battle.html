@@ -900,7 +900,20 @@
       display: flex; align-items: center; justify-content: space-between;
       margin-bottom: 12px;
     }
+    .pi-title { display: flex; align-items: center; gap: 8px; min-width: 0; }
     .pi-name { font-size: 17px; font-weight: 800; }
+    .pi-identity {
+      display: inline-flex; align-items: center; flex-shrink: 0;
+      min-height: 20px; padding: 2px 7px; border: 1px solid transparent;
+      border-radius: 999px; font-size: 10px; font-weight: 900; letter-spacing: .04em;
+    }
+    .pi-identity.core {
+      color: #fde68a; border-color: rgba(245,158,11,.58); background: rgba(120,53,15,.58);
+      box-shadow: inset 0 1px 0 rgba(254,243,199,.1);
+    }
+    .pi-identity.non-core {
+      color: #cbd5e1; border-color: rgba(100,116,139,.55); background: rgba(30,41,59,.82);
+    }
     .pi-header-actions { display: flex; align-items: center; gap: 6px; }
     .pi-history {
       min-height: 32px; padding: 5px 9px; border: 1px solid rgba(96,165,250,.36);
@@ -1536,7 +1549,10 @@
     <div class="pi-layout">
       <div class="pi-sheet">
       <div class="pi-header">
-        <div class="pi-name" id="pieceInfoName"></div>
+        <div class="pi-title">
+          <div class="pi-name" id="pieceInfoName"></div>
+          <span class="pi-identity" id="pieceInfoIdentity"></span>
+        </div>
         <div class="pi-header-actions">
           <button class="pi-history" type="button" onclick="switchPieceInfoToActionHistory()">行动记录</button>
           <button class="pi-close" type="button" aria-label="关闭棋子详情" onclick="closePieceInfo()">✕</button>
@@ -2143,6 +2159,7 @@
     })
     const PHASE_LABELS = { start:'开始阶段', action:'行动阶段', end:'结束阶段' }
     const TILE_EFFECT_META = Object.freeze({
+      'charge-crystal': { label: '可争夺充能结晶' },
       'amaterasu': { label: '天照黑炎' },
       'flying-raijin-anchor': { label: '飞雷神锚点' },
       'shishio-burn': { label: '志志雄灼烧' },
@@ -3487,6 +3504,17 @@
     }
 
     // ── Piece info modal ──
+    function renderPieceIdentity(piece) {
+      const badge = document.getElementById('pieceInfoIdentity')
+      if (!badge) return
+      const isCore = piece && piece.isCore === true
+      badge.textContent = isCore ? '核心棋子' : '非核心棋子'
+      badge.className = 'pi-identity ' + (isCore ? 'core' : 'non-core')
+      badge.title = isCore
+        ? '计入核心棋子存活与终局判定'
+        : '非核心棋子，不计入核心存活与终局判定'
+      badge.setAttribute('aria-label', badge.textContent + '。' + badge.title)
+    }
     function renderPieceInfoRecord(piece, preserveKeyword) {
       if (!piece) return
       const tmpl = PIECES_BY_ID[piece.templateId] || {}
@@ -3495,6 +3523,7 @@
       const name = piece.name || tmpl.name || piece.templateId
 
       document.getElementById('pieceInfoName').textContent = name
+      renderPieceIdentity(piece)
 
       // Tags (display* aware)
       const tags = pieceDispTags(piece).filter(t => t.visible !== false)
@@ -3637,13 +3666,14 @@
       const authoritativeStats = G.pieceStatsByTemplateId && G.pieceStatsByTemplateId[offer.templateId]
       const stats = authoritativeStats || (template && template.stats)
       if (!template || !stats) {
-        return { error: true, instanceId: offer.instanceId, templateId: offer.templateId, name: offer.name || offer.templateId || '未知棋子' }
+        return { error: true, instanceId: offer.instanceId, templateId: offer.templateId, name: offer.name || offer.templateId || '未知棋子', isCore: true }
       }
       const maxHp = Number(stats.maxHp)
       return {
         instanceId: offer.instanceId,
         templateId: offer.templateId,
         name: offer.name || template.name || offer.templateId,
+        isCore: true,
         stats: {
           maxHp: Number.isFinite(maxHp) ? maxHp : 1,
           attack: stats.attack,
@@ -3663,6 +3693,7 @@
     }
     function renderDeploymentPieceInfoError(piece) {
       document.getElementById('pieceInfoName').textContent = piece.name || '候选棋子'
+      renderPieceIdentity(piece)
       document.getElementById('pieceInfoContent').innerHTML = '<div class="pi-status-none">棋子资料暂时不可用。候选仍可正常选择，请等待资料同步后再查看。</div>'
       document.getElementById('pieceKeywordPanel').innerHTML = ''
       currentPieceKeywords = []

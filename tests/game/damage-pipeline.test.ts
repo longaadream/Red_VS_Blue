@@ -263,7 +263,11 @@ describe('RED-33 deterministic damage pipeline', () => {
     ])
     expect(state.pieces).toEqual([])
     expect(state.graveyard.map((piece: any) => piece.instanceId)).toEqual(['core-blue', 'core-red'])
-    expect(state.players.find((player: any) => player.playerId === 'player-red').chargePoints).toBe(1)
+    expect(state.players.find((player: any) => player.playerId === 'player-red').chargePoints).toBe(0)
+    expect(state.extensions.tileEffects).toEqual([
+      expect.objectContaining({ tileType: 'charge-crystal', sourceId: 'core-blue', x: 0, y: 0 }),
+      expect.objectContaining({ tileType: 'charge-crystal', sourceId: 'core-red', x: 0, y: 0 }),
+    ])
   })
 
   it('produces the same final state hash when batch input order changes', () => {
@@ -285,7 +289,7 @@ describe('RED-33 deterministic damage pipeline', () => {
     expect(reverse.state).toEqual(forward.state)
   })
 
-  it('awards summon kill charge once unless the summon explicitly opts out', () => {
+  it('does not drop charge crystals for non-core summons', () => {
     const attacker = makePiece({ instanceId: 'summon-attacker', ownerPlayerId: 'player-red' }) as any
     const defaultSummon = makePiece({ instanceId: 'summon-default', ownerPlayerId: 'player-blue', currentHp: 1, maxHp: 1 }) as any
     const excludedSummon = makePiece({ instanceId: 'summon-excluded', ownerPlayerId: 'player-blue', currentHp: 1, maxHp: 1 }) as any
@@ -297,14 +301,17 @@ describe('RED-33 deterministic damage pipeline', () => {
     const result = dealDamage(attacker, [excludedSummon, defaultSummon], 1, 'true', state, 'summon-charge')
 
     expect(result.results.map((entry: any) => entry.isKilled)).toEqual([true, true])
-    expect(state.players.find((player: any) => player.playerId === 'player-red').chargePoints).toBe(1)
+    expect(state.players.find((player: any) => player.playerId === 'player-red').chargePoints).toBe(0)
+    expect(state.extensions.tileEffects ?? []).toEqual([])
     expect(state.graveyard.map((piece: any) => piece.instanceId)).toEqual(['summon-default', 'summon-excluded'])
   })
 
-  it('awards the credited player charge when a hand card kills a friendly piece', () => {
+  it('drops a contested crystal without immediate charge when a hand card kills a friendly core', () => {
     const cardSource = makePiece({ instanceId: 'red-card-source', ownerPlayerId: 'player-red' }) as any
     const friendly = makePiece({ instanceId: 'red-friendly', ownerPlayerId: 'player-red', currentHp: 1, maxHp: 1 }) as any
     const excluded = makePiece({ instanceId: 'red-excluded', ownerPlayerId: 'player-red', currentHp: 1, maxHp: 1 }) as any
+    friendly.isCore = true
+    excluded.isCore = true
     excluded.noKillCharge = true
     const state = makeState({ pieces: [cardSource, friendly, excluded] }) as any
     state.customCards = {
@@ -321,7 +328,10 @@ describe('RED-33 deterministic damage pipeline', () => {
 
     const resolvedPlayer = resolved.players.find((player: any) => player.playerId === 'player-red')
     expect(resolvedPlayer).toBeDefined()
-    expect(resolvedPlayer!.chargePoints).toBe(1)
+    expect(resolvedPlayer!.chargePoints).toBe(0)
+    expect(resolved.extensions?.tileEffects).toEqual([
+      expect.objectContaining({ tileType: 'charge-crystal', sourceId: 'red-friendly' }),
+    ])
     expect(resolved.graveyard.map((piece: any) => piece.instanceId)).toEqual(['red-excluded', 'red-friendly'])
   })
 
@@ -479,7 +489,7 @@ describe('RED-33 deterministic damage pipeline', () => {
     expect(defender.statusTags).toEqual([expect.objectContaining({ type: 'undead-body' })])
   })
 
-  it('finalizes an on-death revival once without graveyard or kill charge', () => {
+  it('rejects attempts to revive a finalized candidate inside onPieceDied', () => {
     const attacker = makePiece({ instanceId: 'revive-attacker', ownerPlayerId: 'player-red' }) as any
     const defender = makePiece({ instanceId: 'revive-defender', ownerPlayerId: 'player-blue', currentHp: 5, maxHp: 20 }) as any
     const state = makeState({ pieces: [attacker, defender] }) as any
@@ -503,23 +513,9 @@ describe('RED-33 deterministic damage pipeline', () => {
       }),
     ] as any)
 
-    const result = dealDamage(attacker, defender, 5, 'true', state, 'on-death-revive')
-
-    expect(result).toMatchObject({
-      success: true,
-      damage: 5,
-      isKilled: false,
-      targetHp: 7,
-    })
-    expect(state.extensions.lifecycle).toEqual(['kill', 'revive'])
-    expect(state.pieces.map((piece: any) => piece.instanceId)).toContain(defender.instanceId)
-    expect(state.graveyard).toEqual([])
-    expect(state.players.find((player: any) => player.playerId === 'player-red').chargePoints).toBe(0)
-    expect(defender.statusTags).toContainEqual(expect.objectContaining({
-      type: 'deployment-first-move-free',
-      grantedTurnNumber: state.turn.turnNumber,
-      currentUses: 1,
-    }))
+    expect(() => dealDamage(attacker, defender, 5, 'true', state, 'on-death-revive')).toThrow(
+      'DeathBatch onPieceDied cannot revive or heal a finalized candidate',
+    )
   })
 
   it('stops a reflected damage cycle with deterministic chain context', () => {

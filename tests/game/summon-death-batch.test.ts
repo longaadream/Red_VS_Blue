@@ -851,7 +851,7 @@ describe('RED-139 DeathBatch', () => {
   beforeEach(() => globalTriggerSystem.clearRules())
   afterEach(() => globalTriggerSystem.clearRules())
 
-  it('freezes simultaneous candidates so A can revive B without suppressing B lifecycle', () => {
+  it('freezes simultaneous candidates so every death completes its lifecycle', () => {
     const attacker = makePiece({ instanceId: 'death-attacker', ownerPlayerId: 'player-red' }) as any
     const alpha = makePiece({
       instanceId: 'death-alpha',
@@ -887,7 +887,6 @@ describe('RED-139 DeathBatch', () => {
             originStage: context.originStage,
           },
         })
-        if (type === 'onPieceDied' && subject === alpha.instanceId) beta.currentHp = 6
       }) as any)
     }
 
@@ -919,15 +918,15 @@ describe('RED-139 DeathBatch', () => {
       killed: entry.isKilled,
       hp: entry.targetHp,
     }))).toEqual([
-      { targetId: 'death-beta', killed: false, hp: 6 },
+      { targetId: 'death-beta', killed: true, hp: 0 },
       { targetId: 'death-alpha', killed: true, hp: 0 },
     ])
-    expect(state.pieces.map((piece: any) => piece.instanceId)).toEqual(['death-attacker', 'death-beta'])
-    expect(state.graveyard.map((piece: any) => piece.instanceId)).toEqual(['death-alpha'])
-    expect(state.players.find((player: any) => player.playerId === 'player-red').chargePoints).toBe(1)
+    expect(state.pieces.map((piece: any) => piece.instanceId)).toEqual(['death-attacker'])
+    expect(state.graveyard.map((piece: any) => piece.instanceId)).toEqual(['death-alpha', 'death-beta'])
+    expect(state.players.find((player: any) => player.playerId === 'player-red').chargePoints).toBe(0)
   })
 
-  it('commits the whole graveyard and all charge before stable afterChargeGained events', () => {
+  it('commits the whole graveyard and all crystals without immediate charge events', () => {
     const attacker = makePiece({ instanceId: 'finalize-attacker', ownerPlayerId: 'player-red' }) as any
     const alpha = makePiece({
       instanceId: 'finalize-alpha',
@@ -942,6 +941,8 @@ describe('RED-139 DeathBatch', () => {
       maxHp: 4,
     }) as any
     const state = makeState({ pieces: [attacker, alpha, beta] }) as any
+    alpha.isCore = true
+    beta.isCore = true
     const lifecycleSnapshots: any[] = []
     const chargeSnapshots: any[] = []
 
@@ -970,17 +971,11 @@ describe('RED-139 DeathBatch', () => {
       expect(snapshot.active).toEqual(['finalize-alpha', 'finalize-attacker', 'finalize-beta'])
       expect(snapshot.graveyard).toEqual([])
     }
-    expect(chargeSnapshots).toEqual([
-      {
-        active: ['finalize-attacker'],
-        graveyard: ['finalize-alpha', 'finalize-beta'],
-        charge: 2,
-      },
-      {
-        active: ['finalize-attacker'],
-        graveyard: ['finalize-alpha', 'finalize-beta'],
-        charge: 2,
-      },
+    expect(chargeSnapshots).toEqual([])
+    expect(state.players.find((player: any) => player.playerId === 'player-red').chargePoints).toBe(0)
+    expect(state.extensions.tileEffects).toEqual([
+      expect.objectContaining({ tileType: 'charge-crystal', sourceId: 'finalize-alpha' }),
+      expect.objectContaining({ tileType: 'charge-crystal', sourceId: 'finalize-beta' }),
     ])
   })
 

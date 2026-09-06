@@ -1150,88 +1150,6 @@ describe('RED-139 authoritative EffectChain transactions', () => {
         battle.pieces.push({ ...piece })
       },
     },
-    {
-      name: 'revived ID drift',
-      message: 'revived candidate identity changed',
-      mutate: (battle: BattleState) => {
-        battle.pieces.find(piece => piece.instanceId === 'transaction-revived')!.instanceId = 'mutated-revived-id'
-      },
-    },
-    {
-      name: 'revived owner drift',
-      message: 'revived candidate identity changed',
-      mutate: (battle: BattleState) => {
-        battle.pieces.find(piece => piece.instanceId === 'transaction-revived')!.ownerPlayerId = 'player-red'
-      },
-    },
-    {
-      name: 'revived HP death',
-      message: 'revived candidate revival classification changed',
-      mutate: (battle: BattleState) => {
-        battle.pieces.find(piece => piece.instanceId === 'transaction-revived')!.currentHp = 0
-      },
-    },
-    {
-      name: 'revived HP above frozen maxHp',
-      message: 'revived candidate revival classification changed',
-      mutate: (battle: BattleState) => {
-        const piece = battle.pieces.find(entry => entry.instanceId === 'transaction-revived')!
-        piece.currentHp = piece.maxHp + 1
-      },
-    },
-    {
-      name: 'revived NaN maxHp',
-      message: 'revived candidate maxHp changed',
-      mutate: (battle: BattleState) => {
-        battle.pieces.find(piece => piece.instanceId === 'transaction-revived')!.maxHp = Number.NaN
-      },
-    },
-    {
-      name: 'revived infinite maxHp',
-      message: 'revived candidate maxHp changed',
-      mutate: (battle: BattleState) => {
-        battle.pieces.find(piece => piece.instanceId === 'transaction-revived')!.maxHp = Number.POSITIVE_INFINITY
-      },
-    },
-    {
-      name: 'revived maxHp drift',
-      message: 'revived candidate maxHp changed',
-      mutate: (battle: BattleState) => {
-        battle.pieces.find(piece => piece.instanceId === 'transaction-revived')!.maxHp += 1
-      },
-    },
-    {
-      name: 'revived move to graveyard',
-      message: 'revived candidate membership changed',
-      mutate: (battle: BattleState) => {
-        const index = battle.pieces.findIndex(piece => piece.instanceId === 'transaction-revived')
-        battle.graveyard.push(...battle.pieces.splice(index, 1))
-      },
-    },
-    {
-      name: 'revived same-ID replacement',
-      message: 'revived candidate membership changed',
-      mutate: (battle: BattleState) => {
-        const index = battle.pieces.findIndex(piece => piece.instanceId === 'transaction-revived')
-        battle.pieces[index] = { ...battle.pieces[index] }
-      },
-    },
-    {
-      name: 'revived board duplicate',
-      message: 'revived candidate membership changed',
-      mutate: (battle: BattleState) => {
-        const piece = battle.pieces.find(entry => entry.instanceId === 'transaction-revived')!
-        battle.pieces.push({ ...piece })
-      },
-    },
-    {
-      name: 'revived graveyard duplicate',
-      message: 'revived candidate membership changed',
-      mutate: (battle: BattleState) => {
-        const piece = battle.pieces.find(entry => entry.instanceId === 'transaction-revived')!
-        battle.graveyard.push({ ...piece })
-      },
-    },
   ])('rejects post-finalization corruption from $name and rolls back the root action', ({
     name,
     message,
@@ -1242,36 +1160,18 @@ describe('RED-139 authoritative EffectChain transactions', () => {
     const state = skillState(skillId, `function executeSkill(context) {
       var source = context.battle.pieces.find(function(piece) { return piece.instanceId === 'transaction-source'; });
       var finalized = context.battle.pieces.find(function(piece) { return piece.instanceId === 'transaction-target'; });
-      var revived = context.battle.pieces.find(function(piece) { return piece.instanceId === 'transaction-revived'; });
-      dealDamage(source, [finalized, revived], 1, 'true', context.battle, 'death-post-finalization-root');
+      dealDamage(source, finalized, 1, 'true', context.battle, 'death-post-finalization-root');
       return { success: true };
     }`, 1)
-    const revivedPiece = makePiece({
-      instanceId: 'transaction-revived',
-      ownerPlayerId: 'player-blue',
-      faction: 'blue',
-      x: 2,
-      y: 0,
-      currentHp: 1,
-      maxHp: 10,
-    }) as any
-    revivedPiece.name = 'Transaction Revived'
-    state.pieces.push(revivedPiece)
+    state.pieces.find(piece => piece.instanceId === 'transaction-target')!.isCore = true
     const beforeHash = hashBattleState(state)
     const beforeJson = JSON.stringify(state)
-    const reviveEvents: string[] = []
     const observedChargePoints: number[] = []
     let attemptedRuntime: RuleRuntime | undefined
     let attemptedScope: BattleState | undefined
-    addRule('death-post-finalization-revive-' + fixtureKey, 'onPieceDied', (_battle, context) => {
-      if (context.sourcePiece.instanceId !== 'transaction-revived') return { success: false }
-      context.sourcePiece.currentHp = 5
-      reviveEvents.push(context.sourcePiece.instanceId)
-      return { success: true }
-    })
     const mutationRule = addRule(
       'death-post-finalization-mutation-' + fixtureKey,
-      'afterChargeGained',
+      'afterChargeCrystalDropped',
       (battle) => {
         attemptedRuntime = getActiveRuleRuntime()
         attemptedScope = battle
@@ -1309,8 +1209,8 @@ describe('RED-139 authoritative EffectChain transactions', () => {
         originStage: 'damage:death',
         sourceId: 'transaction-source',
         skillId: 'death-post-finalization-root',
-        targetId: 'transaction-revived',
-        targetIds: ['transaction-revived', 'transaction-target'],
+        targetId: 'transaction-target',
+        targetIds: ['transaction-target'],
       },
     })
     expect((caught as Error).message).toContain(message)
@@ -1323,8 +1223,7 @@ describe('RED-139 authoritative EffectChain transactions', () => {
       cooldownTurns: 2,
       currentCooldown: 0,
     })
-    expect(reviveEvents).toEqual(['transaction-revived'])
-    expect(observedChargePoints).toEqual([1])
+    expect(observedChargePoints).toEqual([0])
     expectRuntimeReset(attemptedRuntime)
     expect(attemptedRuntime?.snapshot().lastRandomAccess).toBeUndefined()
     expect(getActiveEffectChain(attemptedScope!)).toBeUndefined()

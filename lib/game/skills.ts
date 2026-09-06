@@ -17,6 +17,7 @@ import {
 const getActiveTriggerSystem = () => getRuleExecutionTriggerSystem(globalTriggerSystem)
 import { getDataRoot, getUserDataDir } from '@/lib/app-paths'
 import { manhattanDistance, traceProjectile as traceProjectilePath } from './spatial'
+import { collectChargeCrystalsAt, dropChargeCrystal } from './charge-crystals'
 import { DynamicCodeRuntime, dynamicCodeRuntime as globalDynamicCodeRuntime } from './dynamic-code-runtime'
 import {
   EffectChain,
@@ -2713,7 +2714,6 @@ interface DeathBatchResolution {
   batchId: string
   chainId: string
   killedIds: readonly string[]
-  revivedIds: readonly string[]
 }
 
 const DAMAGE_TYPES = new Set<DamageType>(['physical', 'magical', 'true', 'toxin'])
@@ -2973,6 +2973,45 @@ function appendDamageMessages(battle: BattleState, playerId: string, messages: s
   }
 }
 
+type SummonAfterDeathProfile = NonNullable<TriggerResult['summonAfterDeath']>
+
+export function collectChargeCrystalsForPiece(
+  battle: BattleState,
+  piece: PieceInstance,
+  playerId: string,
+): number {
+  if (piece.currentHp <= 0 || piece.x === null || piece.y === null || !battle.pieces.includes(piece)) return 0
+  const collectedCrystals = collectChargeCrystalsAt(battle, piece.x, piece.y)
+  if (collectedCrystals.length === 0) return 0
+
+  const player = battle.players.find(candidate => candidate.playerId === playerId)
+  if (!player) throw new Error(`Charge crystal collector player was not found: ${playerId}`)
+  player.chargePoints += collectedCrystals.length
+  battle.actions ??= []
+  battle.actions.push({
+    type: 'chargeCrystalPickedUp',
+    playerId,
+    turn: battle.turn?.turnNumber ?? 0,
+    payload: {
+      message: `${piece.name || piece.templateId} 拾取了 ${collectedCrystals.length} 个充能结晶，队伍获得 ${collectedCrystals.length} CP`,
+      pieceId: piece.instanceId,
+      crystalIds: collectedCrystals.map(crystal => crystal.id),
+      amount: collectedCrystals.length,
+      x: piece.x,
+      y: piece.y,
+    },
+  })
+  const chargeResult = checkSynchronousTriggers(battle, {
+    type: 'afterChargeGained',
+    piece,
+    sourcePiece: piece,
+    amount: collectedCrystals.length,
+    playerId,
+  })
+  appendDamageMessages(battle, playerId, chargeResult.messages || [])
+  return collectedCrystals.length
+}
+
 function appendHealBlockedMessage(battle: BattleState, healer: PieceInstance, message: string): void {
   battle.actions ??= []
   battle.actions.push({
@@ -3217,6 +3256,139 @@ function prepareDamageTarget(
   }
 }
 
+function validateSummonAfterDeathProfile(
+  profile: SummonAfterDeathProfile,
+  rejection: (message: string, cause?: unknown) => never,
+): void {
+  if (
+    typeof profile.skillId !== 'string'
+    || !profile.skillId
+    ||
+    !Number.isSafeInteger(profile.maxHp)
+    || profile.maxHp <= 0
+    || !Number.isSafeInteger(profile.currentHp)
+    || profile.currentHp <= 0
+    || profile.currentHp > profile.maxHp
+  ) rejection('DeathBatch post-death summon HP profile is invalid')
+  for (const [name, value] of [
+    ['attack', profile.attack],
+    ['defense', profile.defense],
+    ['moveRange', profile.moveRange],
+  ] as const) {
+    if (!Number.isFinite(value)) {
+      rejection(`DeathBatch post-death summon ${name} is invalid`)
+    }
+  }
+  if (!Array.isArray(profile.skillIds) || profile.skillIds.some(id => typeof id !== 'string' || !id)) {
+    rejection('DeathBatch post-death summon skillIds is invalid')
+  }
+  if (profile.statusTags !== undefined && !Array.isArray(profile.statusTags)) {
+    rejection('DeathBatch post-death summon statusTags is invalid')
+  }
+}
+
+function commitSummonAfterDeath(
+  battle: BattleState,
+  candidate: {
+    piece: PieceInstance
+    targetId: string
+    targetOwnerPlayerId: string
+    deathX: number | null
+    deathY: number | null
+    summonAfterDeath?: SummonAfterDeathProfile
+  },
+  context: EffectBatchContext<'death'>,
+  chain: EffectChain,
+  rejection: (message: string, cause?: unknown) => never,
+): PieceInstance | undefined {
+  const profile = candidate.summonAfterDeath
+  if (!profile) return undefined
+  validateSummonAfterDeathProfile(profile, rejection)
+  if (!Number.isSafeInteger(candidate.deathX) || !Number.isSafeInteger(candidate.deathY)) {
+    rejection('DeathBatch post-death summon requires a stable death coordinate')
+  }
+
+  const piece = cloneEffectTransactionValue(candidate.piece)
+  piece.instanceId = `${candidate.targetId}:summon:${context.batchId}`
+  if (
+    battle.pieces.some(entry => entry.instanceId === piece.instanceId)
+    || (battle.graveyard ?? []).some(entry => entry.instanceId === piece.instanceId)
+  ) rejection('DeathBatch post-death summon instanceId is not unique')
+  piece.isCore = false
+  piece.maxHp = profile.maxHp
+  piece.currentHp = profile.currentHp
+  piece.attack = profile.attack
+  piece.defense = profile.defense
+  piece.moveRange = profile.moveRange
+  piece.x = candidate.deathX!
+  piece.y = candidate.deathY!
+  piece.skills = profile.skillIds.map(skillId => ({ skillId, currentCooldown: 0 }))
+  if (piece.displaySkills !== undefined) {
+    piece.displaySkills = profile.skillIds.map(skillId => ({ skillId, currentCooldown: 0 }))
+  }
+  piece.buffs = []
+  piece.debuffs = []
+  piece.shield = 0
+  piece.ruleTags = []
+  piece.statusTags = (profile.statusTags || []).map(tag => cloneEffectTransactionValue(tag))
+  hydratePreparedPieceDefinitions(battle, piece, rejection)
+
+  const beforeContext: Record<string, unknown> = {
+    type: 'beforePieceSummoned',
+    piece: cloneEffectTransactionValue(piece),
+    playerId: piece.ownerPlayerId,
+    sourcePiece: cloneEffectTransactionValue(piece),
+    targetPiece: cloneEffectTransactionValue(piece),
+    target: cloneEffectTransactionValue(piece),
+    skillId: profile.skillId,
+    targetPosition: { x: piece.x, y: piece.y },
+    targetX: piece.x,
+    targetY: piece.y,
+    pieceTemplateId: piece.templateId,
+    faction: piece.faction,
+    ...queueContext(chain, context),
+  }
+  const beforeResult = checkSynchronousTriggers(battle, beforeContext)
+  appendDamageMessages(battle, piece.ownerPlayerId, beforeResult.messages || [])
+  if (beforeResult.blocked) return undefined
+  const finalPosition = resolveSummonRedirectPosition(beforeContext, rejection)
+  if (
+    finalPosition.x < 0
+    || finalPosition.y < 0
+    || finalPosition.x >= battle.map.width
+    || finalPosition.y >= battle.map.height
+  ) rejection('DeathBatch post-death summon position is outside the battle map')
+  const tile = battle.map.tiles.find(entry => entry.x === finalPosition.x && entry.y === finalPosition.y)
+  if (!tile?.props.walkable) rejection('DeathBatch post-death summon position is not walkable')
+  if (battle.pieces.some(entry => entry.currentHp > 0 && entry.x === finalPosition.x && entry.y === finalPosition.y)) {
+    rejection('DeathBatch post-death summon position is occupied')
+  }
+  piece.x = finalPosition.x
+  piece.y = finalPosition.y
+  battle.pieces.push(piece)
+
+  const afterResult = checkSynchronousTriggers(battle, {
+    type: 'afterPieceSummoned',
+    piece,
+    playerId: piece.ownerPlayerId,
+    sourcePiece: piece,
+    targetPiece: piece,
+    target: piece,
+    skillId: profile.skillId,
+    pieceTemplateId: piece.templateId,
+    faction: piece.faction,
+    ...queueContext(chain, context),
+  })
+  appendDamageMessages(battle, piece.ownerPlayerId, afterResult.messages || [])
+  appendDamageMessages(
+    battle,
+    piece.ownerPlayerId,
+    [profile.message || `${piece.name || piece.templateId}在原地重新召唤`],
+  )
+  collectChargeCrystalsForPiece(battle, piece, piece.ownerPlayerId)
+  return piece
+}
+
 function resolveDeathBatch(
   request: DeathRequest,
   context: EffectBatchContext<'death'>,
@@ -3267,6 +3439,11 @@ function resolveDeathBatch(
       if (attacker && (typeof sourceId !== 'string' || sourceId.length === 0)) {
         rejection('DeathBatch source must have a stable instanceId')
       }
+      const dropsChargeCrystal = canonical.isCore === true
+        && !(canonical as PieceInstance & { noKillCharge?: boolean }).noKillCharge
+      if (dropsChargeCrystal && (!Number.isSafeInteger(canonical.x) || !Number.isSafeInteger(canonical.y))) {
+        rejection('Finalized formal piece requires a stable death coordinate')
+      }
       return {
         piece: canonical,
         targetId,
@@ -3275,9 +3452,11 @@ function resolveDeathBatch(
         attacker,
         sourceId,
         sourceOwnerPlayerId: attacker?.ownerPlayerId,
-        killerPlayerId: candidate.killerPlayerId,
-        killCreditId: candidate.killerPlayerId ?? attacker?.ownerPlayerId,
         skillId: candidate.skillId,
+        dropsChargeCrystal,
+        deathX: canonical.x,
+        deathY: canonical.y,
+        summonAfterDeath: undefined as SummonAfterDeathProfile | undefined,
       }
     })
     .sort((left, right) => compareEffectTarget(left.piece, right.piece))
@@ -3360,22 +3539,17 @@ function resolveDeathBatch(
       ...legacy,
       ...queues,
     })
-    if (diedResult.revival) {
-      const { maxHp, currentHp } = diedResult.revival
-      if (!Number.isSafeInteger(maxHp) || maxHp <= 0 || !Number.isSafeInteger(currentHp) || currentHp <= 0 || currentHp > maxHp) {
-        rejection('DeathBatch revival profile is invalid')
-      }
-      candidate.piece.maxHp = maxHp
-      candidate.piece.currentHp = currentHp
-      candidate.targetMaxHp = maxHp
+    if (diedResult.summonAfterDeath) {
+      candidate.summonAfterDeath = diedResult.summonAfterDeath
     }
     assertFrozenCandidateMembership('onPieceDied')
+    if (candidate.piece.currentHp !== 0) {
+      rejection('DeathBatch onPieceDied cannot revive or heal a finalized candidate')
+    }
   }
 
-  const finalizable = frozen.filter(candidate => candidate.piece.currentHp === 0)
-  const revived = frozen.filter(candidate => candidate.piece.currentHp > 0)
+  const finalizable = frozen
   const killedIds = finalizable.map(candidate => candidate.targetId)
-  const revivedIds = revived.map(candidate => candidate.targetId)
   const removedIds = new Set(finalizable.map(candidate => candidate.targetId))
   battle.pieces.splice(
     0,
@@ -3383,8 +3557,36 @@ function resolveDeathBatch(
     ...battle.pieces.filter(piece => !removedIds.has(piece.instanceId)),
   )
   battle.graveyard ??= []
+  const droppedCrystals: Array<{
+    candidate: typeof frozen[number]
+    crystal: ReturnType<typeof dropChargeCrystal>
+  }> = []
   for (const candidate of finalizable) {
     battle.graveyard.push(candidate.piece)
+  }
+
+  for (const candidate of finalizable) {
+    if (!candidate.dropsChargeCrystal) continue
+    const crystal = dropChargeCrystal(battle, {
+      id: `charge-crystal:${context.batchId}:${candidate.targetId}`,
+      sourcePieceId: candidate.targetId,
+      x: candidate.deathX!,
+      y: candidate.deathY!,
+    })
+    droppedCrystals.push({ candidate, crystal })
+    battle.actions ??= []
+    battle.actions.push({
+      type: 'chargeCrystalDropped',
+      playerId: 'neutral',
+      turn: battle.turn.turnNumber,
+      payload: {
+        message: `${candidate.piece.name || candidate.piece.templateId} 阵亡，在 (${crystal.x}, ${crystal.y}) 留下了充能结晶`,
+        crystalId: crystal.id,
+        sourcePieceId: candidate.targetId,
+        x: crystal.x,
+        y: crystal.y,
+      },
+    })
   }
 
   const assertPostFinalizationIntegrity = (stage: string): void => {
@@ -3416,70 +3618,31 @@ function resolveDeathBatch(
         rejection('DeathBatch finalized candidate death classification changed during ' + stage)
       }
     }
-    for (const candidate of revived) {
-      if (
-        candidate.piece.instanceId !== candidate.targetId
-        || candidate.piece.ownerPlayerId !== candidate.targetOwnerPlayerId
-      ) {
-        rejection('DeathBatch revived candidate identity changed during ' + stage)
-      }
-      const activeMatches = battle.pieces.filter(piece => piece.instanceId === candidate.targetId)
-      const graveyardMatches = battle.graveyard.filter(piece => piece.instanceId === candidate.targetId)
-      if (
-        activeMatches.length !== 1
-        || activeMatches[0] !== candidate.piece
-        || graveyardMatches.length !== 0
-      ) {
-        rejection('DeathBatch revived candidate membership changed during ' + stage)
-      }
-      if (
-        !Number.isFinite(candidate.piece.maxHp)
-        || candidate.piece.maxHp <= 0
-        || candidate.piece.maxHp !== candidate.targetMaxHp
-      ) {
-        rejection('DeathBatch revived candidate maxHp changed during ' + stage)
-      }
-      if (
-        !Number.isFinite(candidate.piece.currentHp)
-        || candidate.piece.currentHp <= 0
-        || candidate.piece.currentHp > candidate.targetMaxHp
-      ) {
-        rejection('DeathBatch revived candidate revival classification changed during ' + stage)
-      }
-    }
   }
   assertPostFinalizationIntegrity('finalization')
-
-  const chargeEvents: Array<{ attacker?: PieceInstance; playerId: string }> = []
-  for (const candidate of finalizable) {
-    const killCreditId = candidate.killCreditId
-    if (!killCreditId) continue
-    const grantsKillCharge = !(candidate.piece as PieceInstance & { noKillCharge?: boolean }).noKillCharge
-    const isEnemyKill = candidate.piece.ownerPlayerId !== killCreditId
-    const isHandCardFriendlyKill = candidate.killerPlayerId === killCreditId
-    if ((!isEnemyKill && !isHandCardFriendlyKill) || !grantsKillCharge) continue
-    const player = battle.players.find(entry => entry.playerId === killCreditId)
-    if (!player) continue
-    player.chargePoints += 1
-    chargeEvents.push({ attacker: candidate.attacker, playerId: killCreditId })
-  }
-  for (const charge of chargeEvents) {
+  for (const { candidate, crystal } of droppedCrystals) {
     checkSynchronousTriggers(battle, {
-      type: 'afterChargeGained',
-      piece: charge.attacker,
-      sourcePiece: charge.attacker,
-      amount: 1,
-      playerId: charge.playerId,
+      type: 'afterChargeCrystalDropped',
+      piece: candidate.piece,
+      sourcePiece: candidate.piece,
+      targetPiece: candidate.attacker,
+      skillId: candidate.skillId,
+      targetX: crystal.x,
+      targetY: crystal.y,
       ...legacy,
       ...queues,
     })
-    assertPostFinalizationIntegrity('afterChargeGained')
+    assertPostFinalizationIntegrity('afterChargeCrystalDropped')
   }
+
+  for (const candidate of finalizable) {
+    commitSummonAfterDeath(battle, candidate, context, chain, rejection)
+  }
+
   return {
     batchId: context.batchId,
     chainId: context.chainId,
     killedIds,
-    revivedIds,
   }
 }
 

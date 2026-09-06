@@ -71,6 +71,7 @@
     selected: { color: 0x60a5fa, opacity: 0.70 },
   }
   const TILE_EFFECT_VISUALS = Object.freeze({
+    'charge-crystal': Object.freeze({ color: 0xc084fc, colorCss: '#e9d5ff', bg: 'rgba(88,28,135,.82)', border: '#c084fc', icon: 'images/effect-icons/verb-charge-points.svg' }),
     'flying-raijin-anchor': Object.freeze({ color: 0x38bdf8, colorCss: '#7dd3fc', bg: 'rgba(8,47,73,.78)', border: '#38bdf8', icon: 'images/tile-effects/flying-raijin-anchor.svg' }),
     'shadow-step': Object.freeze({ color: 0xa855f7, colorCss: '#d8b4fe', bg: 'rgba(88,28,135,.72)', border: '#a855f7', icon: 'images/tile-effects/shadow-step.svg' }),
     'lethal-toxin': Object.freeze({ color: 0x4ade80, colorCss: '#86efac', bg: 'rgba(20,83,45,.76)', border: '#4ade80', icon: 'images/tile-effects/lethal-toxin.svg' }),

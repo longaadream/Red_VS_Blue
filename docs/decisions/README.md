@@ -107,7 +107,7 @@
 - [`ADR-0008-rule-status-authority.md`](./ADR-0008-rule-status-authority.md)：Rule + statusTag 是棋子效果唯一权威架构，移除 AttachedEffect（RED-80，已接受）。
 - [`ADR-0009-venom-demo-admission.md`](./ADR-0009-venom-demo-admission.md)：将毒液准入 Demo v0.1 暗方候选池（RED-89，已接受）。
 - [`ADR-0010-deterministic-damage-batches.md`](./ADR-0010-deterministic-damage-batches.md)：单体与多目标伤害统一使用确定性 batch 和动作内连锁（RED-33，已接受）。
-- [`ADR-0028-hand-card-friendly-kill-charge.md`](./ADR-0028-hand-card-friendly-kill-charge.md)：手牌友军击杀使用显式出牌玩家归属提供充能，保留 `noKillCharge` 例外（RED-183，已接受）。
+- [`ADR-0028-hand-card-friendly-kill-charge.md`](./ADR-0028-hand-card-friendly-kill-charge.md)：手牌友军击杀的旧即时充能规则（RED-183，已被 RED-185 的可争夺结晶取代）。
 - [`ADR-0011-authoritative-terminal-settlement.md`](./ADR-0011-authoritative-terminal-settlement.md)：服务端在完整动作后一次性提交终局，客户端只显示结果（RED-34，已接受）。
 - [`ADR-0012-ai-observation-semantics.md`](./ADR-0012-ai-observation-semantics.md)：版本化 AI 观察、机制语义与候选动作特征合同（RED-85，提议中）。
 - [`ADR-0013-headless-ai-environment.md`](./ADR-0013-headless-ai-environment.md)：提议以版本化 observation、完整候选和隔离 transition 统一通用 AI 的规则消费边界（RED-84）。
@@ -124,6 +124,7 @@
 - [`ADR-0025-colyseus-postgresql-authority.md`](./ADR-0025-colyseus-postgresql-authority.md)：Colyseus 房间权威、PostgreSQL 有界微批耐久、SQLite 离线迁移与 Windows/K8s 双部署边界（RED-159，已接受；已按 RED-160/161 落地校准）。
 - [`ADR-0026-dark-character-target-rules.md`](./ADR-0026-dark-character-target-rules.md)：以 statusTag/rule 表达【灵压】，并定义秘密状态、单体技能目标改写与 DeathBatch 复活结果（RED-163，已接受）。
 - [`ADR-0027-colyseus-single-session-match-lifecycle.md`](./ADR-0027-colyseus-single-session-match-lifecycle.md)：Colyseus 原生单会话重连、Room clock、精确 receipt 查询和本机 authority 失败边界（RED-170，已接受）。
+- [`ADR-0028-contested-charge-crystals.md`](./ADR-0028-contested-charge-crystals.md)：正式棋子死亡生成公共永久结晶，仅普通移动可为任一方拾取并转化为队伍 CP（RED-185，已接受）。
 
 以下内容目前作为项目基础方向，后续可根据最新代码分别建立正式 ADR：
 

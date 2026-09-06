@@ -530,7 +530,7 @@ describe('RED-139 old/new hash evidence', () => {
       actionMessagesHash: hashStable(messages),
     }
     expect(final).toMatchObject({
-      reaperHp: 7, victimOnBoard: false, victimInGraveyard: true, redCharge: 1,
+      reaperHp: 7, victimOnBoard: false, victimInGraveyard: true, redCharge: 0,
     })
     if (engine === 'base') {
       expect(events.authority.map(event => event.stage)).toEqual([
@@ -545,7 +545,7 @@ describe('RED-139 old/new hash evidence', () => {
         'afterPieceKilled', 'onPieceDied', 'beforeHealTaken',
       ])
       expect(events.authority[2]).toMatchObject({
-        victimOnBoard: false, victimInGraveyard: true, redCharge: 1, effectBatchKind: 'heal',
+        victimOnBoard: false, victimInGraveyard: true, redCharge: 0, effectBatchKind: 'heal',
       })
       expect(triggerMessages).toContain('刈命者触发了收割')
     }

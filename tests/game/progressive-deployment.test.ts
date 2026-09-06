@@ -14,6 +14,7 @@ import {
   toPublicBattleState,
 } from '@/lib/game/deployment'
 import { getPieceById } from '@/lib/game/piece-repository'
+import { dropChargeCrystal } from '@/lib/game/charge-crystals'
 import type { PieceInstance, PieceTemplate } from '@/lib/game/piece'
 import { getActiveRuleRuntime, RANDOM_STREAM_NAMES, RuleRuntime } from '@/lib/game/rule-runtime'
 import { dealDamage } from '@/lib/game/skills'
@@ -551,6 +552,9 @@ describe('RED-138 progressive reserve deployment', () => {
     const offeredPieceId = initial.deployment!.offerPieceIds![0]
     const position = initial.deployment!.legalPositions![0]
     const beforeAp = initial.players.find(player => player.playerId === PLAYERS[0])!.actionPoints
+    dropChargeCrystal(initial, {
+      id: 'deployment-crystal', sourcePieceId: 'fallen-core', x: position.x, y: position.y,
+    })
 
     const deployAction: BattleAction = {
       type: 'deployReservePiece',
@@ -578,6 +582,16 @@ describe('RED-138 progressive reserve deployment', () => {
       currentUses: 1,
     })
     expect(deployed.players.find(player => player.playerId === PLAYERS[0])?.actionPoints).toBe(beforeAp)
+    expect(deployed.players.find(player => player.playerId === PLAYERS[0])?.chargePoints).toBe(1)
+    expect(deployed.extensions?.tileEffects).toEqual([])
+    expect(deployed.actions).toContainEqual(expect.objectContaining({
+      type: 'chargeCrystalPickedUp',
+      playerId: PLAYERS[0],
+      payload: expect.objectContaining({
+        pieceId: offeredPieceId, crystalIds: ['deployment-crystal'], amount: 1,
+        x: position.x, y: position.y,
+      }),
+    }))
 
     const beforeDuplicateHash = hashBattleState(deployed)
     const beforeDuplicateCursors = committedRuntimeCursors(deployed)

@@ -166,6 +166,39 @@ describe('RED-166 icon action history', () => {
     expect(JSON.stringify(model)).toBe(snapshot)
   })
 
+  it('replays a projectile to its authoritative endpoint instead of the originally selected cell', () => {
+    const { history } = loadActionHistory()
+    const root = rootEvent(3, {
+      targetCell: { x: 16, y: 8 },
+      presentation: {
+        cue: 'projectile',
+        selectedCell: { x: 16, y: 8 },
+        pathCells: [{ x: 16, y: 8 }, { x: 15, y: 8 }],
+        endPoint: { x: 15, y: 8 },
+        endReason: 'blocked',
+      },
+    })
+    const damage = {
+      ...root,
+      eventId: 'action-3:1',
+      parentEventId: 'action-3:0',
+      sequence: 1,
+      kind: 'damage',
+      targetCell: { x: 16, y: 8 },
+    }
+    const group = history.groupEvents([root, damage])[0]
+
+    expect(history.highlightCells(group, {
+      pieces: [
+        { id: 'source', x: 17, y: 8 },
+        { id: 'target', x: 16, y: 8 },
+      ],
+    })).toEqual([
+      expect.objectContaining({ x: 17, y: 8, role: 'source' }),
+      { x: 15, y: 8, role: 'target' },
+    ])
+  })
+
   it('keeps the right rail independent from left tile and piece context panels', () => {
     const { history } = loadActionHistory()
 

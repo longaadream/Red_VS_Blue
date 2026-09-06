@@ -152,7 +152,7 @@ describe('RED-95 tutorial scenario staging', () => {
       offerPieceIds: ['a1'], offerPieces: [{ instanceId: 'a1', templateId: 'anduin' }],
     })
     expect(sandbox.RvBTutorialScenario.resolveCellCue(state, definition, {
-      templates: ['reaper'], terrainKeys: ['cover'], connectTemplateToCell: ['reaper', { x: 4, y: 8 }],
-    })).toEqual({ cells: [{ x: 4, y: 8 }, { x: 8, y: 7 }], path: [{ x: 8, y: 7 }, { x: 4, y: 8 }] })
+      templates: ['reaper'], terrainKeys: ['cover'], connectTemplateToCell: ['reaper', { x: 15, y: 8 }],
+    })).toEqual({ cells: [{ x: 15, y: 8 }, { x: 8, y: 7 }], path: [{ x: 8, y: 7 }, { x: 15, y: 8 }] })
   })
 })

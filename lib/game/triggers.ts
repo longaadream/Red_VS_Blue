@@ -1,5 +1,5 @@
 import type { BattleState } from "./turn"
-import type { PieceInstance } from "./piece"
+import type { PieceInstance, PieceStatusTag } from "./piece"
 import { executeCardFunction, loadCardForBattle, loadRuleForBattle } from './skills'
 import type { PendingReactiveCardRef } from './pending-interaction'
 import {
@@ -142,6 +142,7 @@ export type TriggerType =
   | "afterStatusApplied"    // 状态效果被施加到棋子后
   | "afterStatusRemoved"    // 状态效果从棋子移除后
   | "afterChargeGained"     // 充能点获得后
+  | "afterChargeCrystalDropped" // 正式棋子死亡结晶提交后
   | "afterDamageBlocked"    // 伤害被规则/护盾格挡后（如圣盾）
   | "afterHealBlocked"      // 治疗被规则格挡后
   | "gameStart"             // 战斗开始时（只触发一次，用于初始发牌等效果）
@@ -376,8 +377,18 @@ export interface TriggerResult {
   pendingReactiveCards?: PendingReactiveCardRef[]
   /** Generic before-event rewrite consumed by the authoritative action owner. */
   targetReplacementPieceId?: string
-  /** Explicit revival profile applied by the death batch after onPieceDied. */
-  revival?: { maxHp: number; currentHp: number }
+  /** Creates a new non-core summon after the current piece fully completes DeathBatch. */
+  summonAfterDeath?: {
+    skillId: string
+    maxHp: number
+    currentHp: number
+    attack: number
+    defense: number
+    moveRange: number
+    skillIds: string[]
+    statusTags?: PieceStatusTag[]
+    message?: string
+  }
 }
 
 // 触发系统类
@@ -700,7 +711,7 @@ export class TriggerSystem {
     let pendingRuleSourceId: string | undefined
     let pendingQueue: Array<{ruleId: string, sourceId?: string}> = []
     let targetReplacementPieceId: string | undefined
-    let revival: { maxHp: number; currentHp: number } | undefined
+    let summonAfterDeath: TriggerResult['summonAfterDeath']
 
     if ((battle as any).extensions?.__dryRunSkillPreflight) {
       return { success: false, messages: [], blocked: false } as any
@@ -964,9 +975,8 @@ export class TriggerSystem {
           context.targetPiece = replacement
           targetReplacementPieceId = replacement.instanceId
         }
-        if (result?.revival) revival = {
-          maxHp: Number(result.revival.maxHp),
-          currentHp: Number(result.revival.currentHp),
+        if (result?.summonAfterDeath) {
+          summonAfterDeath = JSON.parse(JSON.stringify(result.summonAfterDeath))
         }
 
         if (result && result.needsOptionSelection) {
@@ -1018,7 +1028,7 @@ export class TriggerSystem {
 
     // 只在没有挂起交互时才执行响应卡（避免乱序）
     if (interactionNeeded) {
-      return this.withEventChain({ success, messages: triggeredEffects, blocked, needsOptionSelection: needsOptionSelection || undefined, options: pendingOptions, title: pendingTitle, playerId: pendingPlayerId, canCancel: pendingCanCancel, cancelValue: pendingCancelValue, selectionMode: pendingSelectionMode, presentation: pendingPresentation, minSelections: pendingMinSelections, maxSelections: pendingMaxSelections, pendingRuleId, pendingRuleSourceId, needsTargetSelection: needsTargetSelection || undefined, targetType: pendingTargetType, range: pendingRange, filter: pendingFilter, pendingQueue: pendingQueue.length > 0 ? pendingQueue : undefined, pendingReactiveCards, targetReplacementPieceId, revival } as any, context)
+      return this.withEventChain({ success, messages: triggeredEffects, blocked, needsOptionSelection: needsOptionSelection || undefined, options: pendingOptions, title: pendingTitle, playerId: pendingPlayerId, canCancel: pendingCanCancel, cancelValue: pendingCancelValue, selectionMode: pendingSelectionMode, presentation: pendingPresentation, minSelections: pendingMinSelections, maxSelections: pendingMaxSelections, pendingRuleId, pendingRuleSourceId, needsTargetSelection: needsTargetSelection || undefined, targetType: pendingTargetType, range: pendingRange, filter: pendingFilter, pendingQueue: pendingQueue.length > 0 ? pendingQueue : undefined, pendingReactiveCards, targetReplacementPieceId, summonAfterDeath } as any, context)
     }
 
     // 4. 按事件开始时冻结的快照执行 reactive 卡牌，恢复规则队列时不得重复扫描。
@@ -1132,7 +1142,7 @@ export class TriggerSystem {
     }
 
 
-    return this.withEventChain({ success, messages: triggeredEffects, blocked, needsOptionSelection: needsOptionSelection || undefined, options: pendingOptions, title: pendingTitle, playerId: pendingPlayerId, pendingRuleId, pendingRuleSourceId, needsTargetSelection: needsTargetSelection || undefined, targetType: pendingTargetType, range: pendingRange, filter: pendingFilter, pendingQueue: undefined, targetReplacementPieceId, revival } as any, context)
+    return this.withEventChain({ success, messages: triggeredEffects, blocked, needsOptionSelection: needsOptionSelection || undefined, options: pendingOptions, title: pendingTitle, playerId: pendingPlayerId, pendingRuleId, pendingRuleSourceId, needsTargetSelection: needsTargetSelection || undefined, targetType: pendingTargetType, range: pendingRange, filter: pendingFilter, pendingQueue: undefined, targetReplacementPieceId, summonAfterDeath } as any, context)
   }
 
   // 条件评估方法已移除，所有条件判断都在技能代码中通过if语句实现

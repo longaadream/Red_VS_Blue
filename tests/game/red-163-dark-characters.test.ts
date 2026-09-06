@@ -192,12 +192,13 @@ describe('RED-163 dark character contract', () => {
     expect(ulquiorra.currentHp).toBe(6)
   })
 
-  it('emits the first death lifecycle then revives Grimmjow once before terminal settlement', () => {
+  it('fully settles Grimmjow death before summoning his transformed form once', () => {
     const grimmjow = makePiece({
       instanceId: 'grimmjow', templateId: 'dark-grimmjow', ownerPlayerId: 'player-red',
       x: 1, y: 1, currentHp: 5, maxHp: 5, attack: 4, moveRange: 4,
     }) as any
     grimmjow.name = '葛力姆乔·贾卡杰克'
+    grimmjow.isCore = true
     grimmjow.rules = [rule('rule-grimmjow-resurreccion')]
     grimmjow.skills = [
       { skillId: 'grimmjow-gran-rey-cero', currentCooldown: 0, usesRemaining: -1 },
@@ -207,23 +208,68 @@ describe('RED-163 dark character contract', () => {
       instanceId: 'killer', ownerPlayerId: 'player-blue', x: 2, y: 1, currentHp: 20, maxHp: 20,
     }) as any
     const state = makeState({ pieces: [grimmjow, enemy] }) as any
+    globalTriggerSystem.addRules([
+      {
+        id: 'observe-grimmjow-before-resummon',
+        name: 'Observe Grimmjow before resummon',
+        description: '',
+        priority: 30,
+        trigger: { type: 'beforePieceSummoned' },
+        effect: (battle: any, context: any) => {
+          if (context.sourcePiece?.templateId !== 'dark-grimmjow') return { success: false }
+          battle.extensions.grimmjowBeforeSummoned = (battle.extensions.grimmjowBeforeSummoned || 0) + 1
+          return { success: true }
+        },
+      },
+      {
+        id: 'observe-grimmjow-after-resummon',
+        name: 'Observe Grimmjow after resummon',
+        description: '',
+        priority: 30,
+        trigger: { type: 'afterPieceSummoned' },
+        effect: (battle: any, context: any) => {
+          if (context.sourcePiece?.templateId !== 'dark-grimmjow') return { success: false }
+          battle.extensions.grimmjowAfterSummoned = (battle.extensions.grimmjowAfterSummoned || 0) + 1
+          return { success: true }
+        },
+      },
+    ])
 
     withRuleRuntime(new RuleRuntime({ rootSeed: 164, tick: 1 }), () => {
       const first = dealDamage(enemy, grimmjow, 5, 'true', state, 'first-death')
-      expect(first).toMatchObject({ isKilled: false, targetHp: 10 })
-      expect(grimmjow).toMatchObject({ currentHp: 10, maxHp: 10, attack: 5, moveRange: 5 })
-      expect(grimmjow.skills).toContainEqual(expect.objectContaining({ skillId: 'grimmjow-panther-claw' }))
-      expect(grimmjow.skills).not.toContainEqual(expect.objectContaining({ skillId: 'grimmjow-gran-rey-cero' }))
-      expect(grimmjow.statusTags).toContainEqual(expect.objectContaining({
+      expect(first).toMatchObject({ isKilled: true, targetHp: 0 })
+      expect(grimmjow.currentHp).toBe(0)
+      expect(state.graveyard).toContain(grimmjow)
+      const transformed = state.pieces.find((piece: any) => piece.templateId === 'dark-grimmjow') as any
+      expect(transformed).toBeDefined()
+      expect(transformed.instanceId).not.toBe(grimmjow.instanceId)
+      expect(transformed).toMatchObject({
+        currentHp: 10, maxHp: 10, attack: 5, moveRange: 5, x: 1, y: 1, isCore: false,
+      })
+      expect(transformed.skills).toContainEqual(expect.objectContaining({ skillId: 'grimmjow-panther-claw' }))
+      expect(transformed.skills).not.toContainEqual(expect.objectContaining({ skillId: 'grimmjow-gran-rey-cero' }))
+      expect(transformed.statusTags).toContainEqual(expect.objectContaining({
         type: 'resurreccion', name: '归刃',
       }))
-      expect(state.players[1].chargePoints).toBe(1)
+      expect(state.players.find((player: any) => player.playerId === 'player-red')?.chargePoints).toBe(1)
+      expect(state.extensions.tileEffects ?? []).toEqual([])
+      expect(state.extensions.grimmjowBeforeSummoned).toBe(1)
+      expect(state.extensions.grimmjowAfterSummoned).toBe(1)
+      expect(state.actions).toContainEqual(expect.objectContaining({
+        type: 'chargeCrystalDropped',
+        payload: expect.objectContaining({ sourcePieceId: grimmjow.instanceId, x: 1, y: 1 }),
+      }))
+      expect(state.actions).toContainEqual(expect.objectContaining({
+        type: 'chargeCrystalPickedUp',
+        playerId: 'player-red',
+        payload: expect.objectContaining({ pieceId: transformed.instanceId, amount: 1, x: 1, y: 1 }),
+      }))
 
-      const second = dealDamage(enemy, grimmjow, 10, 'true', state, 'second-death')
+      const second = dealDamage(enemy, transformed, 10, 'true', state, 'second-death')
       expect(second.isKilled).toBe(true)
     })
-    expect(state.pieces.map((piece: any) => piece.instanceId)).not.toContain('grimmjow')
-    expect(state.graveyard.map((piece: any) => piece.instanceId)).toContain('grimmjow')
+    expect(state.pieces.map((piece: any) => piece.templateId)).not.toContain('dark-grimmjow')
+    expect(state.graveyard.filter((piece: any) => piece.templateId === 'dark-grimmjow')).toHaveLength(2)
   })
 
   it('resumes Kyoka Suigetsu pending selection against the replacement exactly once', () => {
