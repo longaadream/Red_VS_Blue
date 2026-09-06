@@ -134,6 +134,15 @@
       if (source) cells.push(Object.assign(source, { role: 'source' }))
     }
 
+    const presentation = group.root.presentation || {}
+    if (presentation.cue === 'projectile') {
+      const endPoint = presentation.endPoint
+      const endX = finite(endPoint && endPoint.x)
+      const endY = finite(endPoint && endPoint.y)
+      if (endX != null && endY != null) cells.push({ x: endX, y: endY, role: 'target' })
+      return uniqueCells(cells)
+    }
+
     events.forEach(function (event) {
       ;(event.targetPieceIds || []).forEach(function (pieceId) {
         const target = cellOfPiece(model, pieceId)
