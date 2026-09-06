@@ -17,6 +17,14 @@
 
 .tutorial-dialog[hidden] { display: none; }
 
+#tutorialLessonDialog { max-height: calc(100dvh - 180px); overflow-y: auto; }
+#tutorialLessonDialog .tutorial-dialog__actions { flex-wrap: wrap; }
+#tutorialLessonDialog .tutorial-dialog__objective { display: block; }
+#tutorialLessonDialog .tutorial-dialog__scene { margin-top: 0; }
+@media (max-height: 600px) {
+  #tutorialLessonDialog { bottom: 82px; width: min(380px, calc(100vw - 20px)); max-height: calc(100dvh - 140px); }
+}
+
 .tutorial-dialog__topline {
   display: flex;
   align-items: center;

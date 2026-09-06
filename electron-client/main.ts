@@ -1761,6 +1761,12 @@ async function serveClientProtocolRequest(
       return new Response('Not found', { status: 404 })
     }
     const relativePath = segments.join('/')
+    if (relativePath === '__tutorial-profile.json') {
+      if (!localProfileIdentity) return new Response('Local profile is not ready', { status: 503 })
+      return new Response(JSON.stringify(localProfileIdentity), {
+        headers: { 'cache-control': 'no-store', 'content-type': 'application/json; charset=utf-8' },
+      })
+    }
     if (relativePath === '__profile-smoke__.html' && smokeServerUrl) {
       const serverLiteral = JSON.stringify(smokeServerUrl)
       return new Response(

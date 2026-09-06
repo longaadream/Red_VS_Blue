@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>六局练习 · 红蓝大作战</title>
+  <script src="js/tutorial/tutorial-lessons.js"></script>
+  <style>
+    * { box-sizing:border-box } body { margin:0; background:#0c1421; color:#e5eaf1; font:16px/1.6 system-ui,sans-serif }
+    main { max-width:1100px; padding:44px 24px 64px; margin:auto } a { color:#a7f3d0 } h1 { font-size:clamp(28px,5vw,44px); line-height:1.2; margin:24px 0 16px }
+    .intro { max-width:720px; color:#b8c5d5 } .label { color:#86efac; font-size:12px; letter-spacing:2px }
+    .rules { padding:16px 20px; border-left:3px solid #86efac; background:#142435; margin:28px 0 }
+    .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(275px,1fr)); gap:18px }
+    article { border:1px solid #33475d; border-radius:16px; background:#142030; padding:24px; display:flex; flex-direction:column; align-items:flex-start }
+    article h2 { font-size:21px; margin:10px 0 } article p { color:#b8c5d5; margin:0 0 18px }
+    .meta { font-size:13px; color:#9bb1c9; margin-bottom:14px } .start { margin-top:auto; text-decoration:none; background:#166047; color:white; border:1px solid #4da989; border-radius:8px; padding:9px 18px }
+    a:focus-visible { outline:3px solid #86efac; outline-offset:4px } footer { color:#9bb1c9; font-size:13px; margin-top:26px }
+  </style>
+</head>
+<body><main>
+  <a href="index.html">← 返回大厅</a>
+  <h1>六局练习，一步步学会。</h1>
+  <p class="intro">每局都从手把手教学开始：看当前目标，亲手完成操作，再观察结果。学过之后继续实战到胜负结束，社长会持续提醒。课程全部可选，建议从第一局开始。</p>
+  <div class="rules"><strong>一方场上没有存活核心，对局立即结算。</strong><br>自己的场上核心全灭就会输，双方同时全灭则平局。预备棋子和普通召唤物不能代替场上核心。</div>
+  <section class="grid" id="lessons" aria-label="选择教学对局"></section>
+  <footer>场景试作 · 使用现有基础 AI，战术难度仍待调校。第六局为完整阵容本地练习，正式房间准备与回合计时待接入。当前不保存章节成绩，不计入真人战绩。<br><a href="battle.html?mode=tutorial">打开旧版引导</a></footer>
+</main>
+<script>
+  RvBTutorialLessons.all.forEach(function (lesson) {
+    const card = document.createElement('article')
+    const label = document.createElement('div'); label.className = 'label'; label.textContent = '第 ' + lesson.number + ' 局'
+    const title = document.createElement('h2'); title.textContent = lesson.title
+    const copy = document.createElement('p'); copy.textContent = lesson.summary
+    const meta = document.createElement('div'); meta.className = 'meta'; meta.textContent = lesson.size + ' 对 ' + lesson.size + ' · ' + (lesson.standard ? '完整阵容 · 本地练习' : lesson.progressive ? '缩编开局 · 渐进部署' : '教学摆位 · 自主对战')
+    const start = document.createElement('a'); start.className = 'start'; start.href = 'battle.html?mode=tutorial&lesson=' + encodeURIComponent(lesson.id); start.textContent = '进入第 ' + lesson.number + ' 局'
+    card.append(label, title, copy, meta, start); document.getElementById('lessons').appendChild(card)
+  })
+</script></body></html>
