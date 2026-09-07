@@ -14,6 +14,7 @@
     "!node_modules/**"
   ],
   "extraResources": [
+    { "from": "build/branding", "to": "branding", "filter": ["icon.ico", "icon.png"] },
     { "from": "_client-stage",       "to": "app/standalone" },
     { "from": "_client-colyseus",    "to": "app/standalone/colyseus" },
     { "from": "_client-postgres",    "to": "postgres" },
@@ -49,12 +50,15 @@
   ],
   "asar": false,
   "win": {
+    "icon": "build/branding/icon.ico",
     "target": "dir"
   },
   "mac": {
+    "icon": "build/branding/icon.icns",
     "target": "dmg"
   },
   "linux": {
+    "icon": "build/branding/icon.png",
     "target": [
       { "target": "AppImage", "arch": ["x64"] },
       { "target": "tar.gz", "arch": ["x64"] }
