@@ -75,7 +75,14 @@ Host & Play、训练与 PVE 复用该 authority；选择远端服务器只改变
 本机 authority 意外退出时，每轮最多自动恢复三次；预算耗尽后进入 `manual-required`，必须由玩家显式
 重试。普通断线由 Colyseus native reconnection 恢复同一 session，不创建替代房间或重复座位。
 
-## Windows 打包
+## 内容编辑器与静态贴图
+
+`npm.cmd run dev:electron:editor` 启动独立内容编辑器；`npm.cmd run build:electron:editor` 生成候选。
+编辑器支持 JSON-first 编辑、PVE JSON 树及 PNG/JPEG/WebP/SVG 贴图库。资源包中的 SVG 必须通过静态白名单，
+拒绝脚本、事件、外链、CSS、foreignObject 和嵌入对象；这不授予外部 HTML、JavaScript 或 CSS 加载权限。
+可运行 `node tests/electron/windows-smoke.mjs editor-portable` 验证 portable 编辑器候选。
+
+## Windows Client 打包
 
 ```powershell
 npm.cmd run build:electron:client
