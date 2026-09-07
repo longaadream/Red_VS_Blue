@@ -332,7 +332,7 @@ describe('RED-120 Ichigo combat behavior', () => {
     expect(first.currentHp).toBe(25)
 
     executeDirect(loadSkill('ichigo-getsuga-tensho'), state, ichigo, null, { x: 4, y: 0 })
-    expect(first.currentHp).toBe(17)
+    expect(first.currentHp).toBe(18) // floor(5 * 1.5) = 7
     expect(second.currentHp).toBe(30)
   })
 
@@ -352,7 +352,7 @@ describe('RED-120 Ichigo combat behavior', () => {
     state = runBattleAction(state, selectedAction(state, {
       type: 'useBasicSkill', playerId: 'player-red', pieceId: 'ichigo', skillId: 'ichigo-getsuga-tensho',
     }, { x: 5, y: 1 }), { rootSeed: ROOT_SEED }).state
-    expect(state.pieces.find(piece => piece.instanceId === 'enemy')?.currentHp).toBe(42)
+    expect(state.pieces.find(piece => piece.instanceId === 'enemy')?.currentHp).toBe(43)
 
     state = runBattleAction(state, {
       type: 'useChargeSkill', playerId: 'player-red', pieceId: 'ichigo', skillId: 'ichigo-bankai-tensa-zangetsu',
@@ -367,7 +367,7 @@ describe('RED-120 Ichigo combat behavior', () => {
     state = runBattleAction(state, selectedAction(state, {
       type: 'useBasicSkill', playerId: 'player-red', pieceId: 'ichigo', skillId: 'ichigo-black-getsuga-tensho',
     }, { x: 5, y: 1 }), { rootSeed: ROOT_SEED }).state
-    expect(state.pieces.find(piece => piece.instanceId === 'enemy')?.currentHp).toBe(42)
+    expect(state.pieces.find(piece => piece.instanceId === 'enemy')?.currentHp).toBe(43)
     expect(state.players[0].actionPoints).toBe(2)
     expect(state.pieces.find(piece => piece.instanceId === 'ichigo')?.skills[0]).toMatchObject({
       skillId: 'ichigo-black-getsuga-tensho', currentCooldown: 0,
@@ -381,7 +381,7 @@ describe('RED-120 Ichigo combat behavior', () => {
     } as BattleAction, { rootSeed: ROOT_SEED }).state
     expect(state.pendingTargetSelection).toBeUndefined()
     expect(state.pieces.find(piece => piece.instanceId === 'ichigo')).toMatchObject({ x: 0, y: 1 })
-    expect(state.pieces.find(piece => piece.instanceId === 'enemy')?.currentHp).toBe(30)
+    expect(state.pieces.find(piece => piece.instanceId === 'enemy')?.currentHp).toBe(31)
     expect(state.players[0].actionPoints).toBe(0)
     expect(state.pieces.find(piece => piece.instanceId === 'ichigo')?.skills[0].currentCooldown).toBe(1)
     expect(state.extensions?.ichigoBlackGetsugaTeleportByCaster).toBeUndefined()

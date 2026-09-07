@@ -1,4 +1,5 @@
 import type { GameProfileIdentityV1 } from '../content-pipeline/runtime/profile-game-identity'
+import { BATTLE_RUNNER_REVISION_V1 } from './rule-version'
 import type { RuleRuntime, RandomStreamTrace } from './rule-runtime'
 import type { BattleState } from './turn'
 import {
@@ -252,7 +253,7 @@ function isGameProfileIdentity(value: unknown): value is GameProfileIdentityV1 {
     && identity.schemaVersion === 'rvb-game-profile-identity/v1'
     && typeof identity.engineAbi === 'string'
     && identity.engineAbi.length > 0
-    && identity.runnerRevision === 'rvb-battle-runner/v1'
+    && identity.runnerRevision === BATTLE_RUNNER_REVISION_V1
     && typeof identity.resolvedProfileHash === 'string'
     && SHA256_HEX_PATTERN.test(identity.resolvedProfileHash)
     && typeof identity.authorityContentHash === 'string'
@@ -656,6 +657,13 @@ export function createBattleReplayCheckpoint(state: BattleState): BattleState {
     throw new Error('Battle replay checkpoint must be a serializable object')
   }
   delete (checkpoint as Partial<BattleState>).actions
+  // Display checkpoints are not executable saves; incarnation templates remain
+  // in authority state and its hash, without repeating them in every trace frame.
+  const displayState = checkpoint as BattleState
+  for (const piece of [...(displayState.pieces ?? []), ...(displayState.graveyard ?? []),
+    ...Object.values(displayState.deployment?.reserves ?? {}).flat()]) {
+    delete piece.initialDefinition
+  }
   return checkpoint as BattleState
 }
 

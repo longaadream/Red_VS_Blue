@@ -1,3 +1,6 @@
+import { addPieceStatus, removePieceStatus, expireHolderStatuses, type StatusHolder } from './status-lifecycle'
+import { changePiecePositions, type PiecePositionChange } from './position-change'
+import type { PositionChangeKind } from './spatial'
 import type { BattleState } from "./turn"
 import type { PieceInstance } from "./piece"
 import {
@@ -16,7 +19,7 @@ import {
 
 const getActiveTriggerSystem = () => getRuleExecutionTriggerSystem(globalTriggerSystem)
 import { getDataRoot, getUserDataDir } from '@/lib/app-paths'
-import { manhattanDistance, resolveExactSkillLanding, traceProjectile as traceProjectilePath } from './spatial'
+import { getPositionChangeRejection, manhattanDistance, resolveExactSkillLanding, traceProjectile as traceProjectilePath } from './spatial'
 import { collectChargeCrystalsAt, dropChargeCrystal } from './charge-crystals'
 import { DynamicCodeRuntime, dynamicCodeRuntime as globalDynamicCodeRuntime } from './dynamic-code-runtime'
 import {
@@ -35,6 +38,8 @@ import {
   rejectEffectBatch,
   resolveSummonRedirectPosition,
   type DamageRequest,
+  type DamageSource,
+  damageSourcePiece,
   type DeathRequest,
   type DeclaredSummonCapability,
   type DeclaredSummonSpec,
@@ -735,7 +740,7 @@ function createCardEffectFunctions(
       }
     },
 
-    dealDamage: (attacker: PieceInstance, target: PieceInstance | PieceInstance[], baseDamage: number, damageType: DamageType = 'true', _battleState?: BattleState, skillId?: string) => {
+    dealDamage: (attacker: DamageSource, target: PieceInstance | PieceInstance[], baseDamage: number, damageType: DamageType = 'true', _battleState?: BattleState, skillId?: string) => {
       let targetIds: string[] | undefined
       try {
         if (context.cardInstance !== authoritativeCardInstance) {
@@ -815,39 +820,12 @@ function createCardEffectFunctions(
       return player?.hand || []
     },
 
-    addStatusEffectById: (targetPieceId: string, statusObject: any) => {
-      const resolvedStatusObject = {
-        ...statusObject,
-        intensity: applyCardEffectModifiers(
-          context.cardInstance,
-          'statusIntensity',
-          Number(statusObject.intensity || 0),
-          statusObject.type,
-        ),
-      }
-      const targetPiece = battle.pieces.find(p => p.instanceId === targetPieceId)
-      if (targetPiece) {
-        if (!targetPiece.statusTags) targetPiece.statusTags = []
-        targetPiece.statusTags.push({
-          ...resolvedStatusObject,
-          name: statusObject.name || statusObject.type,
-          remainingDuration: statusObject.currentDuration ?? statusObject.remainingDuration,
-          remainingUses: statusObject.currentUses ?? statusObject.remainingUses,
-          relatedRules: statusObject.relatedRules || []
-        })
-        return true
-      }
-      return false
-    },
+    addStatusEffectById: (targetPieceId: string, statusObject: any) => addStatusWithEvents(battle, targetPieceId, {
+      ...statusObject,
+      intensity: applyCardEffectModifiers(context.cardInstance, 'statusIntensity', Number(statusObject.intensity || 0), statusObject.type),
+    }),
 
-    removeStatusEffectById: (targetPieceId: string, statusId: string) => {
-      const targetPiece = battle.pieces.find(p => p.instanceId === targetPieceId)
-      if (targetPiece?.statusTags) {
-        const idx = targetPiece.statusTags.findIndex((t: any) => t.id === statusId)
-        if (idx !== -1) { targetPiece.statusTags.splice(idx, 1); return true }
-      }
-      return false
-    },
+    removeStatusEffectById: (targetPieceId: string, statusId: string) => { return removeStatusWithEvents(battle, targetPieceId, statusId); },
 
     addRuleById: (targetPieceId: string, ruleId: string) => {
       const targetPiece = battle.pieces.find(p => p.instanceId === targetPieceId)
@@ -855,7 +833,7 @@ function createCardEffectFunctions(
         const rule = loadRuleForBattle(battle, ruleId, { sourceId: targetPieceId })
         if (rule) {
           if (!targetPiece.rules) targetPiece.rules = []
-          targetPiece.rules.push(rule)
+          if (!targetPiece.rules.some(existing => existing.id === rule.id)) targetPiece.rules.push(rule)
           return true
         }
       }
@@ -911,28 +889,10 @@ function createCardEffectFunctions(
     },
 
     /** 为玩家添加状态标签 */
-    addPlayerStatusEffectById: (targetPlayerId: string, statusObject: any) => {
-      const player = battle.players.find((p: any) => p.playerId === targetPlayerId) as any
-      if (!player) return false
-      if (!player.statusTags) player.statusTags = []
-      player.statusTags.push({
-        ...statusObject,
-        name: statusObject.name || statusObject.type,
-        remainingDuration: statusObject.currentDuration ?? statusObject.remainingDuration,
-        remainingUses: statusObject.currentUses ?? statusObject.remainingUses,
-        relatedRules: statusObject.relatedRules || []
-      })
-      return true
-    },
+    addPlayerStatusEffectById: (targetPlayerId: string, statusObject: any) => { return addPlayerStatusWithEvents(battle, targetPlayerId, statusObject); },
 
     /** 从玩家移除一个状态标签 */
-    removePlayerStatusEffectById: (targetPlayerId: string, statusId: string) => {
-      const player = battle.players.find((p: any) => p.playerId === targetPlayerId) as any
-      if (!player?.statusTags) return false
-      const idx = player.statusTags.findIndex((t: any) => t.id === statusId)
-      if (idx !== -1) { player.statusTags.splice(idx, 1); return true }
-      return false
-    },
+    removePlayerStatusEffectById: (targetPlayerId: string, statusId: string) => { return removePlayerStatusWithEvents(battle, targetPlayerId, statusId); },
 
     Math: getRuleMath(),
     Date: getRuleDate(),
@@ -1294,7 +1254,7 @@ export function loadRuleById(
         effectFunction = (battle: BattleState, context: any) => {
           try {
             const globalDealDamage = (
-              attacker: PieceInstance,
+              attacker: DamageSource,
               target: PieceInstance | PieceInstance[],
               baseDamage: number,
               damageType: DamageType = 'true',
@@ -1336,42 +1296,10 @@ export function loadRuleById(
             };
 
             // 构建 addStatusEffectById 辅助函数
-            const addStatusEffectById = (targetPieceId: string, status: any) => {
-              const targetPiece = battle.pieces.find(p => p.instanceId === targetPieceId);
-              if (targetPiece) {
-                if (!targetPiece.statusTags) targetPiece.statusTags = [];
-                // 检查是否已存在相同ID的状态
-                const existingIndex = targetPiece.statusTags.findIndex((t: any) => t.id === status.id);
-                if (existingIndex >= 0) {
-                  targetPiece.statusTags[existingIndex] = { ...status, currentDuration: status.currentDuration || -1, currentUses: status.currentUses || -1 };
-                } else {
-                  targetPiece.statusTags.push({ ...status, currentDuration: status.currentDuration || -1, currentUses: status.currentUses || -1 });
-                }
-                return true;
-              }
-              return false;
-            };
+            const addStatusEffectById = (targetPieceId: string, status: any) => { return addStatusWithEvents(battle, targetPieceId, status); };
 
             // 构建 removeStatusEffectById 辅助函数
-            const removeStatusEffectById = (targetPieceId: string, statusId: string) => {
-              const targetPiece = battle.pieces.find(p => p.instanceId === targetPieceId);
-              if (targetPiece?.statusTags) {
-                const idx = targetPiece.statusTags.findIndex((t: any) => t.id === statusId);
-                if (idx !== -1) {
-                  const removedStatus = targetPiece.statusTags[idx];
-                  targetPiece.statusTags.splice(idx, 1);
-                  checkSynchronousTriggers(battle, {
-                    type: "afterStatusRemoved",
-                    sourcePiece: targetPiece,
-                    statusId: statusId,
-                    statusType: removedStatus.type,
-                    playerId: targetPiece.ownerPlayerId
-                  });
-                  return true;
-                }
-              }
-              return false;
-            };
+            const removeStatusEffectById = (targetPieceId: string, statusId: string) => { return removeStatusWithEvents(battle, targetPieceId, statusId); };
 
             // 补充 context.battle，供 skillCode 中的 const battle = context.battle 使用
             if (!context.battle) {
@@ -1395,7 +1323,7 @@ export function loadRuleById(
                 const rule = loadRuleForBattle(battle, ruleId, { sourceId: targetPieceId })
                 if (rule) {
                   if (!targetPiece.rules) targetPiece.rules = []
-                  targetPiece.rules.push(rule)
+                  if (!targetPiece.rules.some(existing => existing.id === rule.id)) targetPiece.rules.push(rule)
                   return true
                 }
               }
@@ -1465,27 +1393,9 @@ export function loadRuleById(
               return targetPiece.skills.length < originalLength
             };
 
-            const addPlayerStatusEffectById = (targetPlayerId: string, statusObject: any) => {
-              const player = battle.players.find((p: any) => p.playerId === targetPlayerId) as any
-              if (!player) return false
-              if (!player.statusTags) player.statusTags = []
-              player.statusTags.push({
-                ...statusObject,
-                name: statusObject.name || statusObject.type,
-                remainingDuration: statusObject.currentDuration ?? statusObject.remainingDuration,
-                remainingUses: statusObject.currentUses ?? statusObject.remainingUses,
-                relatedRules: statusObject.relatedRules || []
-              })
-              return true
-            };
+            const addPlayerStatusEffectById = (targetPlayerId: string, statusObject: any) => { return addPlayerStatusWithEvents(battle, targetPlayerId, statusObject); };
 
-            const removePlayerStatusEffectById = (targetPlayerId: string, statusId: string) => {
-              const player = battle.players.find((p: any) => p.playerId === targetPlayerId) as any
-              if (!player?.statusTags) return false
-              const idx = player.statusTags.findIndex((t: any) => t.id === statusId)
-              if (idx !== -1) { player.statusTags.splice(idx, 1); return true }
-              return false
-            };
+            const removePlayerStatusEffectById = (targetPlayerId: string, statusId: string) => { return removePlayerStatusWithEvents(battle, targetPlayerId, statusId); };
 
             const selectOption = (config: any) => {
               if (context.selectedOption !== undefined) return context.selectedOption;
@@ -1618,45 +1528,8 @@ export function loadRuleById(
                     healDamage: (healer: any, target: any, heal: any, battleState: any, skillId: any) => {
                       return globalHealDamage(healer, target, heal, battle, skillId);
                     },
-                    addStatusEffectById: (targetPieceId: any, statusObject: any) => {
-                      const targetPiece = battle.pieces.find(p => p.instanceId === targetPieceId);
-                      if (targetPiece) {
-                        if (!targetPiece.statusTags) {
-                          targetPiece.statusTags = [];
-                        }
-                        // 状态名称映射表
-                        const newStatus = {
-                          ...statusObject,
-                          name: statusObject.name || statusObject.type,
-                          remainingDuration: statusObject.currentDuration ?? statusObject.remainingDuration,
-                          remainingUses: statusObject.currentUses ?? statusObject.remainingUses,
-                          relatedRules: statusObject.relatedRules || []
-                        };
-                        targetPiece.statusTags.push(newStatus);
-                        return true;
-                      }
-                      return false;
-                    },
-                    removeStatusEffectById: (targetPieceId: any, statusId: any) => {
-                      const targetPiece = battle.pieces.find(p => p.instanceId === targetPieceId);
-                      if (targetPiece && targetPiece.statusTags) {
-                        const statusTagIndex = targetPiece.statusTags.findIndex(tag => tag.id === statusId);
-                        if (statusTagIndex !== -1) {
-                          const removedStatus = targetPiece.statusTags[statusTagIndex];
-                          targetPiece.statusTags.splice(statusTagIndex, 1);
-                          // 触发状态移除后事件
-                          checkSynchronousTriggers(battle, {
-                            type: "afterStatusRemoved",
-                            sourcePiece: targetPiece,
-                            statusId: statusId,
-                            statusType: removedStatus.type,
-                            playerId: targetPiece.ownerPlayerId
-                          });
-                          return true;
-                        }
-                      }
-                      return false;
-                    },
+                    addStatusEffectById: (targetPieceId: any, statusObject: any) => { return addStatusWithEvents(battle, targetPieceId, statusObject); },
+                    removeStatusEffectById: (targetPieceId: any, statusId: any) => { return removeStatusWithEvents(battle, targetPieceId, statusId); },
                     addRuleById: (targetPieceId: any, ruleId: any) => {
                       const targetPiece = battle.pieces.find(p => p.instanceId === targetPieceId);
                       if (targetPiece) {
@@ -1665,7 +1538,7 @@ export function loadRuleById(
                           if (!targetPiece.rules) {
                             targetPiece.rules = [];
                           }
-                          targetPiece.rules.push(rule);
+                          if (!targetPiece.rules.some(existing => existing.id === rule.id)) targetPiece.rules.push(rule);
                           return true;
                         }
                       }
@@ -1710,26 +1583,8 @@ export function loadRuleById(
                       player.skills = player.skills.filter((s: any) => s.skillId !== skillId);
                       return true;
                     },
-                    addPlayerStatusEffectById: (targetPlayerId: string, statusObject: any) => {
-                      const player = battle.players?.find(p => p.playerId === targetPlayerId) as any;
-                      if (!player) return false;
-                      if (!player.statusTags) player.statusTags = [];
-                      player.statusTags.push({
-                        ...statusObject,
-                        name: statusObject.name || statusObject.type,
-                        remainingDuration: statusObject.currentDuration ?? statusObject.remainingDuration,
-                        remainingUses: statusObject.currentUses ?? statusObject.remainingUses,
-                        relatedRules: statusObject.relatedRules || []
-                      });
-                      return true;
-                    },
-                    removePlayerStatusEffectById: (targetPlayerId: string, statusId: string) => {
-                      const player = battle.players?.find(p => p.playerId === targetPlayerId) as any;
-                      if (!player?.statusTags) return false;
-                      const idx = player.statusTags.findIndex((t: any) => t.id === statusId);
-                      if (idx !== -1) { player.statusTags.splice(idx, 1); return true; }
-                      return false;
-                    },
+                    addPlayerStatusEffectById: (targetPlayerId: string, statusObject: any) => { return addPlayerStatusWithEvents(battle, targetPlayerId, statusObject); },
+                    removePlayerStatusEffectById: (targetPlayerId: string, statusId: string) => { return removePlayerStatusWithEvents(battle, targetPlayerId, statusId); },
                     addSkillById: (targetPieceId: any, skillId: any) => {
                       const targetPiece = battle.pieces.find(p => p.instanceId === targetPieceId);
                       if (targetPiece) {
@@ -2106,6 +1961,8 @@ export interface SkillDefinition {
   cooldownTurns: number
   /** 最大充能次数（例如 3 次用完就没了），0 表示不限次数，仅对super技能有效 */
   maxCharges: number
+  /** Explicit per-battle limit, independent of cooldown and revival. */
+  usesPerBattle?: number
   /** 释放一次需要的充能点数，仅对super技能生效 */
   chargeCost?: number
   /** 数据声明的通用充能消耗修正；核心只解释来源和算术，不识别内容关键词。 */
@@ -2566,15 +2423,16 @@ function createEffectFunctions(battle: BattleState, sourcePiece: PieceInstance, 
         const movingPiece = battle.pieces.find(piece => piece.instanceId === targetPieceId && piece.currentHp > 0)
         if (!movingPiece || movingPiece.x == null || movingPiece.y == null
           || !Number.isInteger(x) || !Number.isInteger(y)
-          || movingPiece.statusTags?.some(tag => tag.type === 'imprisoned' || tag.type === 'inoperable')) {
+          || getPositionChangeRejection(movingPiece, 'teleport')
+          || movingPiece.statusTags?.some(tag => tag.type === 'inoperable')) {
           return { type: 'teleport', success: false }
         }
         const destination = resolveExactSkillLanding(battle, { x, y: y! })
         if (!destination) return { type: 'teleport', success: false }
-        movingPiece.x = destination.x
-        movingPiece.y = destination.y
+        changePiecePositions(battle, [{ pieceId: movingPiece.instanceId, ...destination }], 'teleport')
         return { type: 'teleport', target: destination, success: true }
       }
+      if (getPositionChangeRejection(sourcePiece, 'teleport')) return { type: 'teleport', success: false }
       let targetPos: { x: number, y: number } | undefined;
       
       if (typeof x === "object" && x !== null) {
@@ -2598,8 +2456,7 @@ function createEffectFunctions(battle: BattleState, sourcePiece: PieceInstance, 
             const isOccupied = battle.pieces.some(p => p.x === targetPos.x && p.y === targetPos.y && p.currentHp > 0);
             if (!isOccupied) {
               // 执行传送
-              sourcePiece.x = targetPos.x;
-              sourcePiece.y = targetPos.y;
+              changePiecePositions(battle, [{ pieceId: sourcePiece.instanceId, ...targetPos }], 'teleport');
               return { type: "teleport", target: targetPos, success: true };
             } else {
               console.warn(`Teleport failed: Position ${targetPos.x},${targetPos.y} is occupied`);
@@ -2621,8 +2478,7 @@ function createEffectFunctions(battle: BattleState, sourcePiece: PieceInstance, 
           
           if (availableTiles.length > 0) {
             const randomTile = availableTiles[Math.floor(rng() * availableTiles.length)];
-            sourcePiece.x = randomTile.x;
-            sourcePiece.y = randomTile.y;
+            changePiecePositions(battle, [{ pieceId: sourcePiece.instanceId, x: randomTile.x, y: randomTile.y }], 'teleport');
             return { type: "teleport", target: randomTile, success: true };
           } else {
             console.warn("Teleport failed: No available walkable positions");
@@ -2635,7 +2491,7 @@ function createEffectFunctions(battle: BattleState, sourcePiece: PieceInstance, 
     },
     
     // 造成伤害（支持单目标或目标数组；传入数组时 beforeDamageDealt 只触发一次）
-    dealDamage: (attacker: PieceInstance, targetPiece: PieceInstance | PieceInstance[], baseDamage: number, damageType: DamageType = "physical", battleState?: BattleState, skillId?: string, skipBefore = false, killerPlayerId?: string) => {
+    dealDamage: (attacker: DamageSource, targetPiece: PieceInstance | PieceInstance[], baseDamage: number, damageType: DamageType = "physical", battleState?: BattleState, skillId?: string, skipBefore = false, killerPlayerId?: string) => {
       return dealDamage(attacker, targetPiece, baseDamage, damageType, battle, skillId, skipBefore, killerPlayerId, context?.selectedOption);
     },
 
@@ -2657,10 +2513,14 @@ export interface DamageResult {
   targetId: string
   skillId?: string
   damageType: DamageType
+  damageSource: { kind: string; sourceId: string; playerId: string }
   rawDamage: number
   modifiedDamage: number
   defense: number
   shieldAbsorbed: number
+  /** Damage after mitigation, including overkill. */
+  resolvedDamage: number
+  /** HP actually lost, excluding overkill. */
   damage: number
   blocked: boolean
   isKilled: boolean
@@ -2791,7 +2651,7 @@ function queueContext(chain: EffectChain, context: EffectBatchContext): Record<s
 
 function damageContext(
   battle: BattleState,
-  attacker: PieceInstance,
+  attacker: DamageSource,
   skillId: string | undefined,
   extra: Record<string, unknown> = {},
 ): Record<string, unknown> {
@@ -2824,7 +2684,7 @@ function healContext(
 }
 
 function validateDamageTargets(
-  attacker: PieceInstance,
+  attacker: DamageSource,
   targets: readonly PieceInstance[],
   baseDamage: number,
   damageType: DamageType,
@@ -3039,7 +2899,7 @@ function appendHealBlockedMessage(battle: BattleState, healer: PieceInstance, me
 function finiteNonNegativeDamage(
   value: unknown,
   battle: BattleState,
-  attacker: PieceInstance,
+  attacker: DamageSource,
   skillId: string | undefined,
   batchId: string,
   targetId?: string,
@@ -3052,7 +2912,7 @@ function finiteNonNegativeDamage(
       damageContext(battle, attacker, skillId, { batchId, targetId }),
     )
   }
-  return number
+  return Math.floor(number)
 }
 
 function finiteNonNegativeHeal(
@@ -3071,7 +2931,7 @@ function finiteNonNegativeHeal(
       healContext(battle, healer, skillId, { batchId, targetId }),
     )
   }
-  return number
+  return Math.floor(number)
 }
 
 function rethrowInvalidEffectRequest(
@@ -3127,10 +2987,11 @@ function prepareDamageTarget(
     type: 'beforeDamageTaken' as const,
     piece: target,
     sourcePiece: target,
-    targetPiece: request.attacker,
-    target: request.attacker,
+    targetPiece: damageSourcePiece(request.attacker),
+    target: damageSourcePiece(request.attacker),
     damage: sourceDamage,
-    damageType: request.damageType,
+    damageSource: { kind: damageSourcePiece(request.attacker) ? 'piece' : 'kind' in request.attacker ? request.attacker.kind : 'piece', sourceId: request.attacker.instanceId, playerId: request.attacker.ownerPlayerId },
+      damageType: request.damageType,
     skillId: request.skillId,
     selectedOption: request.selectedOption,
     rawDamage: request.baseDamage,
@@ -3154,7 +3015,7 @@ function prepareDamageTarget(
     ? Number(target.defense) || 0
     : 0
   let defendedDamage = 0
-  if (!blocked && modifiedDamage > 0) defendedDamage = Math.max(1, Math.floor(modifiedDamage - defense))
+  if (!blocked && sourceDamage > 0) defendedDamage = Math.max(1, Math.floor(modifiedDamage - defense))
 
   let shieldAbsorbed = 0
   let damageAfterShield = defendedDamage
@@ -3163,9 +3024,10 @@ function prepareDamageTarget(
       type: 'beforeDamageShield' as const,
       piece: target,
       sourcePiece: target,
-      targetPiece: request.attacker,
-      target: request.attacker,
+      targetPiece: damageSourcePiece(request.attacker),
+      target: damageSourcePiece(request.attacker),
       damage: damageAfterShield,
+      damageSource: { kind: damageSourcePiece(request.attacker) ? 'piece' : 'kind' in request.attacker ? request.attacker.kind : 'piece', sourceId: request.attacker.instanceId, playerId: request.attacker.ownerPlayerId },
       damageType: request.damageType,
       skillId: request.skillId,
       selectedOption: request.selectedOption,
@@ -3203,9 +3065,10 @@ function prepareDamageTarget(
       type: 'beforeDamageApplied' as const,
       piece: target,
       sourcePiece: target,
-      targetPiece: request.attacker,
-      target: request.attacker,
+      targetPiece: damageSourcePiece(request.attacker),
+      target: damageSourcePiece(request.attacker),
       damage: damageAfterShield,
+      damageSource: { kind: damageSourcePiece(request.attacker) ? 'piece' : 'kind' in request.attacker ? request.attacker.kind : 'piece', sourceId: request.attacker.instanceId, playerId: request.attacker.ownerPlayerId },
       damageType: request.damageType,
       skillId: request.skillId,
       selectedOption: request.selectedOption,
@@ -3229,8 +3092,9 @@ function prepareDamageTarget(
     blocked = Boolean(appliedResult.blocked) || damageAfterShield === 0
   }
 
-  const finalDamage = blocked ? 0 : damageAfterShield
+  const resolvedDamage = blocked ? 0 : damageAfterShield
   const hpBefore = target.currentHp
+  const finalDamage = Math.min(Math.max(0, hpBefore), resolvedDamage)
   const targetName = target.name || target.templateId
   const attackerName = request.attacker.name || request.attacker.templateId
   const typeName = request.damageType === 'physical'
@@ -3252,11 +3116,13 @@ function prepareDamageTarget(
       sourceId: request.attacker.instanceId,
       targetId: target.instanceId,
       skillId: request.skillId,
+      damageSource: { kind: damageSourcePiece(request.attacker) ? 'piece' : 'kind' in request.attacker ? request.attacker.kind : 'piece', sourceId: request.attacker.instanceId, playerId: request.attacker.ownerPlayerId },
       damageType: request.damageType,
       rawDamage: request.baseDamage,
       modifiedDamage,
       defense,
       shieldAbsorbed,
+      resolvedDamage,
       damage: finalDamage,
       blocked,
       isKilled: false,
@@ -3315,8 +3181,26 @@ function commitSummonAfterDeath(
   chain: EffectChain,
   rejection: (message: string, cause?: unknown) => never,
 ): PieceInstance | undefined {
-  const profile = candidate.summonAfterDeath
+  let profile = candidate.summonAfterDeath
   if (!profile) return undefined
+  if (profile.revive) {
+    const initial = candidate.piece.initialDefinition
+    if (!initial) rejection('Revival requires initial incarnation data from the current rule revision')
+    const multiplier = profile.attackBonusMultiplier ?? 0
+    if (!Number.isFinite(multiplier) || multiplier < 0) rejection('Invalid revival attack bonus')
+    const attackBonus = Math.floor(initial.stats.attack * multiplier)
+    profile = {
+      ...profile,
+      ...initial.stats,
+      currentHp: initial.stats.maxHp,
+      attack: initial.stats.attack + attackBonus,
+      skillIds: initial.skills.map(skill => skill.skillId),
+      statusTags: [...initial.statusTags, ...(attackBonus > 0 ? [{
+        id: 'revival-attack-bonus', type: 'undead-body', name: '亡灵之躯', intensity: attackBonus,
+        currentDuration: -1,
+      }] : [])],
+    }
+  }
   validateSummonAfterDeathProfile(profile, rejection)
   if (!Number.isSafeInteger(candidate.deathX) || !Number.isSafeInteger(candidate.deathY)) {
     rejection('DeathBatch post-death summon requires a stable death coordinate')
@@ -3328,7 +3212,7 @@ function commitSummonAfterDeath(
     battle.pieces.some(entry => entry.instanceId === piece.instanceId)
     || (battle.graveyard ?? []).some(entry => entry.instanceId === piece.instanceId)
   ) rejection('DeathBatch post-death summon instanceId is not unique')
-  piece.isCore = false
+  piece.isCore = profile.revive ? candidate.piece.isCore : false
   piece.maxHp = profile.maxHp
   piece.currentHp = profile.currentHp
   piece.attack = profile.attack
@@ -3337,14 +3221,25 @@ function commitSummonAfterDeath(
   piece.x = candidate.deathX!
   piece.y = candidate.deathY!
   piece.skills = profile.skillIds.map(skillId => ({ skillId, currentCooldown: 0 }))
+  if (profile.revive) {
+    piece.skills = candidate.piece.initialDefinition!.skills.map(skill => ({
+      ...skill,
+      currentCooldown: 0,
+      usesRemaining: candidate.piece.limitedSkillUses?.[skill.skillId]
+        ?? candidate.piece.skills.find(current => current.skillId === skill.skillId)?.usesRemaining
+        ?? skill.usesRemaining,
+    }))
+    piece.rules = candidate.piece.initialDefinition!.rules.map(id => ({ id }))
+  }
   if (piece.displaySkills !== undefined) {
-    piece.displaySkills = profile.skillIds.map(skillId => ({ skillId, currentCooldown: 0 }))
+    piece.displaySkills = piece.skills.map(skill => ({ ...skill }))
   }
   piece.buffs = []
   piece.debuffs = []
   piece.shield = 0
   piece.ruleTags = []
   piece.statusTags = (profile.statusTags || []).map(tag => cloneEffectTransactionValue(tag))
+  if (!profile.revive) delete piece.initialDefinition
   hydratePreparedPieceDefinitions(battle, piece, rejection)
 
   const beforeContext: Record<string, unknown> = {
@@ -3528,7 +3423,7 @@ function resolveDeathBatch(
       type: 'beforePieceKilled',
       piece: candidate.piece,
       sourcePiece: candidate.piece,
-      targetPiece: candidate.attacker,
+      targetPiece: damageSourcePiece(candidate.attacker),
       skillId: candidate.skillId,
       ...legacy,
       ...queues,
@@ -3536,8 +3431,8 @@ function resolveDeathBatch(
     assertFrozenCandidateMembership('beforePieceKilled')
     checkSynchronousTriggers(battle, {
       type: 'afterPieceKilled',
-      piece: candidate.attacker,
-      sourcePiece: candidate.attacker,
+      piece: damageSourcePiece(candidate.attacker),
+      sourcePiece: damageSourcePiece(candidate.attacker),
       targetPiece: candidate.piece,
       skillId: candidate.skillId,
       ...legacy,
@@ -3548,7 +3443,7 @@ function resolveDeathBatch(
       type: 'onPieceDied',
       piece: candidate.piece,
       sourcePiece: candidate.piece,
-      targetPiece: candidate.attacker,
+      targetPiece: damageSourcePiece(candidate.attacker),
       skillId: candidate.skillId,
       ...legacy,
       ...queues,
@@ -3639,7 +3534,7 @@ function resolveDeathBatch(
       type: 'afterChargeCrystalDropped',
       piece: candidate.piece,
       sourcePiece: candidate.piece,
-      targetPiece: candidate.attacker,
+      targetPiece: damageSourcePiece(candidate.attacker),
       skillId: candidate.skillId,
       targetX: crystal.x,
       targetY: crystal.y,
@@ -3699,11 +3594,12 @@ function resolveDamageBatch(
   if (!request.skipBeforeTrigger) {
     const beforeDamageDealtContext = {
       type: 'beforeDamageDealt' as const,
-      piece: request.attacker,
-      sourcePiece: request.attacker,
+      piece: damageSourcePiece(request.attacker),
+      sourcePiece: damageSourcePiece(request.attacker),
       targetPiece: stableTargets[0],
       target: stableTargets[0],
       damage: request.baseDamage,
+      damageSource: { kind: damageSourcePiece(request.attacker) ? 'piece' : 'kind' in request.attacker ? request.attacker.kind : 'piece', sourceId: request.attacker.instanceId, playerId: request.attacker.ownerPlayerId },
       damageType: request.damageType,
       skillId: request.skillId,
       selectedOption: request.selectedOption,
@@ -3740,10 +3636,12 @@ function resolveDamageBatch(
 
   for (const entry of prepared) {
     const shared = {
-      piece: request.attacker,
-      sourcePiece: request.attacker,
+      piece: damageSourcePiece(request.attacker),
+      sourcePiece: damageSourcePiece(request.attacker),
       targetPiece: entry.target,
       damage: entry.result.damage,
+      resolvedDamage: entry.result.resolvedDamage,
+      damageSource: { kind: damageSourcePiece(request.attacker) ? 'piece' : 'kind' in request.attacker ? request.attacker.kind : 'piece', sourceId: request.attacker.instanceId, playerId: request.attacker.ownerPlayerId },
       damageType: request.damageType,
       skillId: request.skillId,
       rawDamage: request.baseDamage,
@@ -3759,7 +3657,7 @@ function resolveDamageBatch(
         type: 'afterDamageBlocked',
         piece: entry.target,
         sourcePiece: entry.target,
-        targetPiece: request.attacker,
+        targetPiece: damageSourcePiece(request.attacker),
       })
       appendDamageMessages(battle, request.attacker.ownerPlayerId, blockedResult.messages || [])
       continue
@@ -3771,7 +3669,7 @@ function resolveDamageBatch(
       type: 'afterDamageTaken',
       piece: entry.target,
       sourcePiece: entry.target,
-      targetPiece: request.attacker,
+      targetPiece: damageSourcePiece(request.attacker),
     })
     appendDamageMessages(
       battle,
@@ -3826,12 +3724,14 @@ function resolveDamageBatch(
         sourceId: request.attacker.instanceId,
         skillId: request.skillId,
         targetId: entry.target.instanceId,
-        damageType: request.damageType,
+        damageSource: { kind: damageSourcePiece(request.attacker) ? 'piece' : 'kind' in request.attacker ? request.attacker.kind : 'piece', sourceId: request.attacker.instanceId, playerId: request.attacker.ownerPlayerId },
+      damageType: request.damageType,
         rawDamage: request.baseDamage,
         modifiedDamage: entry.result.modifiedDamage,
         defense: entry.result.defense,
         shieldAbsorbed: entry.result.shieldAbsorbed,
         finalDamage: entry.result.damage,
+        resolvedDamage: entry.result.resolvedDamage,
         blocked: entry.result.blocked,
         killed: entry.result.isKilled,
       },
@@ -4501,6 +4401,12 @@ export function hydratePreparedPieceDefinitions(
     }
   }
   piece.rules = [...rulesById.values()]
+  piece.initialDefinition ??= {
+    stats: { maxHp: piece.maxHp, attack: piece.attack, defense: piece.defense, moveRange: piece.moveRange },
+    skills: piece.skills.map(skill => ({ ...skill })),
+    rules: piece.rules.map(rule => rule.id),
+    statusTags: cloneEffectTransactionValue(piece.statusTags),
+  }
 
   const skillIds = new Set<string>()
   for (const descriptor of [
@@ -5083,7 +4989,7 @@ function translateDetachedDamageError(error: unknown, chain: EffectChain): never
  * one-target batch; arrays preserve result alignment while resolving by stable ID.
  */
 export function dealDamage(
-  attacker: PieceInstance,
+  attacker: DamageSource,
   target: PieceInstance | PieceInstance[],
   baseDamage: number,
   damageType: DamageType,
@@ -5319,6 +5225,7 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
       context: {
         ...context,
         forceRemoveEnemyPieceById,
+        changePositions: (changes: PiecePositionChange[], kind: PositionChangeKind) => changePiecePositions(battle, changes, kind),
         summonQueue: sealedContent.summonQueue,
       },
       // 源棋子（直接引用，可读写）
@@ -5341,100 +5248,8 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
       ) => traceProjectilePath(battle, origin, direction, options),
 
       // 状态效果函数
-      addStatusEffectById: (targetPieceId: string, statusObject: any) => {
-        // 找到目标棋子
-        const targetPiece = battle.pieces.find(p => p.instanceId === targetPieceId);
-        if (targetPiece) {
-          // 确保statusTags数组存在
-          if (!targetPiece.statusTags) {
-            targetPiece.statusTags = [];
-          }
-
-          // 状态名称映射表
-
-          // 创建状态对象
-          const newStatus = {
-            ...statusObject,
-            id: statusObject.id,
-            type: statusObject.type,
-            name: statusObject.name || statusObject.type,
-            remainingDuration: statusObject.currentDuration ?? statusObject.remainingDuration,
-            remainingUses: statusObject.currentUses ?? statusObject.remainingUses,
-            intensity: statusObject.intensity,
-            stacks: statusObject.stacks,
-            value: statusObject.value, // 添加数值属性值
-            extraValue: statusObject.extraValue, // 添加额外数值属性（如暴风雪的Y坐标）
-            damage: statusObject.damage, // 添加伤害值（如暴风雪的伤害）
-            relatedRules: statusObject.relatedRules || [] // 使用传入的关联规则数组，如果没有则默认为空数组
-          };
-
-          // 添加到状态标签数组
-          targetPiece.statusTags.push(newStatus);
-          // 触发状态施加后事件
-          checkSynchronousTriggers(battle, {
-            type: "afterStatusApplied",
-            sourcePiece: targetPiece,
-            statusId: statusObject.id,
-            playerId: targetPiece.ownerPlayerId
-          });
-          return true;
-        }
-        return false;
-      },
-      removeStatusEffectById: (targetPieceId: string, statusId: string) => {
-        writeLog('[removeStatusEffectById] Called with targetPieceId: ' + targetPieceId + ', statusId: ' + statusId);
-        // 找到目标棋子
-        const targetPiece = battle.pieces.find(p => p.instanceId === targetPieceId);
-        if (targetPiece && targetPiece.statusTags) {
-          // 找到要移除的状态标签
-          const statusTagIndex = targetPiece.statusTags.findIndex(tag => tag.id === statusId);
-          if (statusTagIndex === -1) {
-            return false;
-          }
-          
-          const statusTag = targetPiece.statusTags[statusTagIndex];
-          
-          // 检查并清理相关规则
-          if (statusTag.relatedRules && statusTag.relatedRules.length > 0) {
-            statusTag.relatedRules.forEach(ruleId => {
-              // 检查是否有其他状态标签关联此规则
-              let hasOtherRelatedStatus = false;
-              
-              targetPiece.statusTags.forEach(otherStatusTag => {
-                if (otherStatusTag.id !== statusId && 
-                    otherStatusTag.relatedRules && 
-                    otherStatusTag.relatedRules.includes(ruleId)) {
-                  hasOtherRelatedStatus = true;
-                }
-              });
-              
-              // 如果没有其他状态标签关联此规则，移除规则
-              if (!hasOtherRelatedStatus && targetPiece.rules) {
-                const ruleIndex = targetPiece.rules.findIndex(rule => rule.id === ruleId);
-                if (ruleIndex !== -1) {
-                  battleDebugLog(`Removing rule ${ruleId} because no other status tags are related to it`);
-                  targetPiece.rules.splice(ruleIndex, 1);
-                }
-              }
-            });
-          }
-          
-          // 从状态标签数组中移除指定状态
-          targetPiece.statusTags.splice(statusTagIndex, 1);
-          writeLog('[removeStatusEffectById] Status ' + statusId + ' removed from ' + targetPiece.name + ', triggering afterStatusRemoved');
-          // 触发状态移除后事件
-          const triggerResult = checkSynchronousTriggers(battle, {
-            type: "afterStatusRemoved",
-            sourcePiece: targetPiece,
-            statusId: statusId,
-            statusType: statusTag.type,
-            playerId: targetPiece.ownerPlayerId
-          });
-          writeLog('[removeStatusEffectById] afterStatusRemoved trigger result: ' + JSON.stringify(triggerResult));
-          return true;
-        }
-        return false;
-      },
+      addStatusEffectById: (targetPieceId: string, statusObject: any) => { return addStatusWithEvents(battle, targetPieceId, statusObject); },
+      removeStatusEffectById: (targetPieceId: string, statusId: string) => { return removeStatusWithEvents(battle, targetPieceId, statusId); },
       // 规则管理函数
       addRuleById: (targetPieceId: string, ruleId: string) => {
         battleDebugLog(`[addRuleById] Called with targetPieceId: ${targetPieceId}, ruleId: ${ruleId}`);
@@ -5462,7 +5277,7 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
                   if (!statusTag.relatedRules) {
                     statusTag.relatedRules = [];
                   }
-                  statusTag.relatedRules.push(ruleId);
+                  if (!statusTag.relatedRules.includes(ruleId)) statusTag.relatedRules.push(ruleId);
                 }
               });
             }
@@ -5471,7 +5286,12 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
             if (!targetPiece.rules) {
               targetPiece.rules = [];
             }
-            targetPiece.rules.push(newRule);
+            const existingRule = targetPiece.rules.find(candidate => candidate.id === ruleId);
+            if (existingRule) {
+              existingRule.relatedStatusTags = [...new Set([...(existingRule.relatedStatusTags || []), ...newRule.relatedStatusTags])];
+            } else {
+              targetPiece.rules.push(newRule);
+            }
             battleDebugLog(`[addRuleById] Rule added successfully. Piece now has ${targetPiece.rules.length} rules`);
             return true;
           } else {
@@ -5604,26 +5424,8 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
         player.skills = player.skills.filter((s: any) => s.skillId !== skillId);
         return true;
       },
-      addPlayerStatusEffectById: (targetPlayerId: string, statusObject: any) => {
-        const player = battle.players?.find(p => p.playerId === targetPlayerId) as any;
-        if (!player) return false;
-        if (!player.statusTags) player.statusTags = [];
-        player.statusTags.push({
-          ...statusObject,
-          name: statusObject.name || statusObject.type,
-          remainingDuration: statusObject.currentDuration ?? statusObject.remainingDuration,
-          remainingUses: statusObject.currentUses ?? statusObject.remainingUses,
-          relatedRules: statusObject.relatedRules || []
-        });
-        return true;
-      },
-      removePlayerStatusEffectById: (targetPlayerId: string, statusId: string) => {
-        const player = battle.players?.find(p => p.playerId === targetPlayerId) as any;
-        if (!player?.statusTags) return false;
-        const idx = player.statusTags.findIndex((t: any) => t.id === statusId);
-        if (idx !== -1) { player.statusTags.splice(idx, 1); return true; }
-        return false;
-      },
+      addPlayerStatusEffectById: (targetPlayerId: string, statusObject: any) => { return addPlayerStatusWithEvents(battle, targetPlayerId, statusObject); },
+      removePlayerStatusEffectById: (targetPlayerId: string, statusId: string) => { return removePlayerStatusWithEvents(battle, targetPlayerId, statusId); },
 
       // 工具函数
       Math: getRuleMath(),
@@ -5635,7 +5437,7 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
     const beforeState = {
       enemies: battle.pieces.filter(p => p.ownerPlayerId !== sourcePiece.ownerPlayerId && p.currentHp > 0).map(p => ({ instanceId: p.instanceId, currentHp: p.currentHp })),
       movementBlocked: battle.pieces.flatMap(piece => (
-        Array.isArray(piece.statusTags) && piece.statusTags.some(tag => tag.blocksForcedMovement === true)
+        getPositionChangeRejection(piece, 'teleport')
           ? [{ instanceId: piece.instanceId, x: piece.x, y: piece.y }]
           : []
       )),
@@ -5892,4 +5694,58 @@ export function calculateSkillPreview(skillDef: SkillDefinition, piece: PieceIns
     currentCooldown,
     chargeCost: skillDef.chargeCost
   }
+}
+
+export function statusEventSink(battle: BattleState) {
+  return (piece: PieceInstance, tag: import('./piece').PieceStatusTag, event: 'applied' | 'removed') => {
+    checkSynchronousTriggers(battle, { type: event === 'applied' ? 'afterStatusApplied' : 'afterStatusRemoved',
+      sourcePiece: piece, statusId: tag.id, statusType: tag.type, playerId: piece.ownerPlayerId });
+  };
+}
+export function addStatusWithEvents(battle: BattleState, pieceId: string, status: import('./piece').PieceStatusTag): boolean {
+  const piece = battle.pieces.find(p => p.instanceId === pieceId);
+  return !!piece && addPieceStatus(battle, piece, status, statusEventSink(battle));
+}
+export function removeStatusWithEvents(battle: BattleState, pieceId: string, statusId: string): boolean {
+  const piece = battle.pieces.find(p => p.instanceId === pieceId);
+  return !!piece && removePieceStatus(piece, statusId, statusEventSink(battle));
+}
+
+function playerStatusHolder(battle: BattleState, playerId: string) {
+  const player = battle.players.find(player => player.playerId === playerId)
+  if (!player) return undefined
+  player.statusTags ??= []
+  player.rules ??= []
+  const holder: StatusHolder = {
+    ownerPlayerId: playerId,
+    get statusTags() { return player.statusTags! },
+    set statusTags(tags) { player.statusTags = tags },
+    get rules() { return player.rules! },
+    set rules(rules) { player.rules = rules },
+  }
+  return holder
+}
+
+function playerStatusEventSink(battle: BattleState, playerId: string) {
+  return (_holder: StatusHolder, status: import('./piece').PieceStatusTag, event: 'applied' | 'removed') => {
+    checkSynchronousTriggers(battle, {
+      type: event === 'applied' ? 'afterStatusApplied' : 'afterStatusRemoved',
+      playerId, statusId: status.id, statusType: status.type,
+    })
+  }
+}
+
+export function addPlayerStatusWithEvents(battle: BattleState, playerId: string, status: import('./piece').PieceStatusTag): boolean {
+  const holder = playerStatusHolder(battle, playerId)
+  return !!holder && addPieceStatus(battle, holder, status, playerStatusEventSink(battle, playerId))
+}
+
+export function removePlayerStatusWithEvents(battle: BattleState, playerId: string, statusId: string): boolean {
+  const holder = playerStatusHolder(battle, playerId)
+  return !!holder && removePieceStatus(holder, statusId, playerStatusEventSink(battle, playerId))
+}
+
+export function expirePlayerStatuses(battle: BattleState, playerId: string): void {
+  const holder = playerStatusHolder(battle, playerId)
+  if (holder) expireHolderStatuses(battle, holder, playerStatusEventSink(battle, playerId))
 }

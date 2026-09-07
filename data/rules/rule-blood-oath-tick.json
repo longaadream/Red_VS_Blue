@@ -1,7 +1,9 @@
 {
   "id": "rule-blood-oath-tick",
   "name": "血誓倒计时",
-  "description": "血誓持续时间在飞段自己的回合结束时减少，归零时解除（持续飞段的 3 个己方回合）",
-  "trigger": { "type": "endTurn" },
-  "skillCode": "var piece = context.rulePiece; if (!piece) return { success: false, message: '' }; var tag = piece.statusTags && piece.statusTags.find(function(t) { return t.type === 'blood-oath'; }); if (!tag) { piece.rules = (piece.rules || []).filter(function(r) { return r.id !== 'rule-blood-oath-tick'; }); return { success: false, message: '' }; } var currentPlayerId = battle && battle.turn && battle.turn.currentPlayerId; if (currentPlayerId !== tag.sourcePlayerId) return { success: false, message: '' }; tag.remainingTurns = (tag.remainingTurns !== undefined ? tag.remainingTurns : 3) - 1; tag.remainingDuration = tag.remainingTurns; tag.currentDuration = tag.remainingTurns; if (tag.remainingTurns <= 0) { piece.statusTags = (piece.statusTags || []).filter(function(t) { return t.type !== 'blood-oath'; }); piece.rules = (piece.rules || []).filter(function(r) { return r.id !== 'rule-blood-oath-tick'; }); return { success: true, message: piece.name + '的血誓诅咒已解除' }; } return { success: true, message: piece.name + '的血誓诅咒还剩' + tag.remainingTurns + '回合（飞段视角）' };"
+  "description": "兼容保留的规则标识；血誓由状态持有者回合结束的公共计时统一清理。",
+  "trigger": {
+    "type": "endTurn"
+  },
+  "skillCode": "return { success: false, message: '' };"
 }

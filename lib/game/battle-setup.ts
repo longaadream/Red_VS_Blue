@@ -335,6 +335,12 @@ function cloneInitialStatusTags(pieceTemplate: PieceTemplate): PieceInstance['st
 
 /** 将棋子模板中的 rules 加载到棋子实例上。 */
 function applyInitialRules(piece: PieceInstance, pieceTemplate: PieceTemplate): void {
+  piece.initialDefinition = {
+    stats: { ...pieceTemplate.stats },
+    skills: piece.skills.map(skill => ({ ...skill })),
+    rules: [...(pieceTemplate.rules ?? [])],
+    statusTags: cloneInitialStatusTags(pieceTemplate),
+  }
   const templateRules = pieceTemplate.rules
   if (templateRules && Array.isArray(templateRules)) {
     if (!piece.rules) piece.rules = []

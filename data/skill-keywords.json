@@ -3,8 +3,8 @@
     "id": "true-damage",
     "name": "真实伤害",
     "category": "damage",
-    "shortDescription": "无视防御和常规减伤。",
-    "longDescription": "真实伤害不会被防御抵消，也不按普通伤害结算。",
+    "shortDescription": "无视防御。",
+    "longDescription": "真实伤害无视防御，仍受减伤、护盾、圣盾和免伤影响。",
     "highlight": true
   },
   {
@@ -19,8 +19,8 @@
     "id": "freeze",
     "name": "冰冻",
     "category": "control",
-    "shortDescription": "不能移动或使用技能。",
-    "longDescription": "冰冻期间，目标不能移动，也不能主动使用技能。",
+    "shortDescription": "不能主动走格或使用技能。",
+    "longDescription": "冰冻禁止主动走格和主动使用技能，重复施加时累加持续时间。",
     "highlight": true
   },
   {
@@ -35,16 +35,16 @@
     "id": "root",
     "name": "定身",
     "category": "control",
-    "shortDescription": "不能移动。",
-    "longDescription": "定身期间，目标不能移动，但仍可在规则允许时进行其他行动。",
+    "shortDescription": "不能主动走格。",
+    "longDescription": "定身只限制主动走格；冲刺、传送和外来推拉仍可生效。",
     "highlight": true
   },
   {
     "id": "silence",
     "name": "沉默",
     "category": "control",
-    "shortDescription": "不能使用技能。",
-    "longDescription": "沉默期间，目标不能主动使用技能，但仍可进行其他允许的行动。",
+    "shortDescription": "不能主动使用技能。",
+    "longDescription": "沉默不影响被动效果；重复施加时累加持续时间。",
     "highlight": true
   },
   {
@@ -59,8 +59,8 @@
     "id": "divine-shield",
     "name": "圣盾",
     "category": "defense",
-    "shortDescription": "抵挡一次伤害。",
-    "longDescription": "圣盾通常会抵挡一次伤害，然后被移除。",
+    "shortDescription": "抵挡一次伤害，不叠加。",
+    "longDescription": "圣盾抵挡一次伤害后移除；重复获得圣盾不会增加抵挡次数。",
     "highlight": true
   },
   {
@@ -117,6 +117,14 @@
     "category": "damage",
     "shortDescription": "永久黑炎地格。每经过一格叠1层天照，每回合结束时仍站在其中再叠1层。己方回合结束时，每层对自身造成2点真实伤害。",
     "longDescription": "永久黑炎地格。每经过一格叠1层天照，每回合结束时仍站在其中再叠1层。己方回合结束时，每层对自身造成2点真实伤害。",
+    "highlight": true
+  },
+  {
+    "id": "imprisoned",
+    "name": "禁锢",
+    "category": "control",
+    "shortDescription": "不能改变棋盘位置。",
+    "longDescription": "禁止主动走格、冲刺、传送、推拉和换位，不阻止死亡或强制离场。",
     "highlight": true
   }
 ]

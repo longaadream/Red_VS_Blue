@@ -8,6 +8,7 @@ import {
   hashBattleState,
   hashStable,
   readDebugMetadata,
+  readBattleProfilePinV1,
   sanitizeBattleTraceValue,
   type BattleActionTrace,
   type BattleReplayFrame,
@@ -31,6 +32,7 @@ import type { BattleAction, BattleState } from './turn'
 import { applyBattleAction, assertBattleNotTerminal, safeCloneBattleState } from './turn'
 import { globalTriggerSystem, TriggerSystem } from './triggers'
 import { createEffectChain, withEffectChain } from './effect-batch'
+import { assertRestrictedPositionsUnchanged } from './position-change'
 
 export {
   hashBattleState,
@@ -78,6 +80,7 @@ export function runBattleAction(
   action: BattleAction,
   options: RunBattleActionOptions = {},
 ): BattleActionResult {
+  assertRunnableProfile(state)
   assertBattleNotTerminal(state)
   const explicitActionId = getActionId(action)
   const metadata = readDebugMetadata(state)
@@ -151,6 +154,7 @@ export function runBattleAction(
           const hydratedState = withServerSkills(clonedState) as BattleState
           return withEffectChain(hydratedState, effectChain, () => {
             const nextState = applyBattleAction(hydratedState, action)
+            assertRestrictedPositionsUnchanged(state, nextState)
             effectChain.assertHealthy()
             return nextState
           })
@@ -491,6 +495,7 @@ function committedProgressiveDeploymentPosition(
 }
 
 export function replayBattle(input: BattleReplayInput): BattleReplayResult {
+  assertRunnableProfile(input.initialState)
   const actionHashes: string[] = []
   const stateHashes: string[] = []
   let state = input.initialState
@@ -508,6 +513,15 @@ export function replayBattle(input: BattleReplayInput): BattleReplayResult {
     actionHashes,
     stateHashes,
     actionsApplied: input.actions.length,
+  }
+}
+
+function assertRunnableProfile(state: BattleState): void {
+  // Unpinned local fixtures remain supported; a persisted pin must be understood.
+  if (state.extensions?.battleProfile !== undefined && !readBattleProfilePinV1(state)) {
+    throw Object.assign(new Error('This battle uses an unsupported rule revision; start a new battle.'), {
+      code: 'RUNNER_REVISION_MISMATCH',
+    })
   }
 }
 

@@ -5,6 +5,7 @@ import { hashBattleState } from '@/lib/game/battle-trace'
 import { loadRuleById } from '@/lib/game/skills'
 import { TriggerSystem } from '@/lib/game/triggers'
 import { makePiece, makeState } from '../helpers/minimal-state'
+import { addPieceStatus, expireOwnerStatuses } from '@/lib/game/status-lifecycle'
 
 function requiredRule(id: string) {
   const rule = loadRuleById(id, true)
@@ -106,7 +107,23 @@ describe('RED-80 Rule + statusTag authority', () => {
       { fixture: 'divine-shield', blocked: true, damage: 9, statusTypes: [], ruleIds: [], stateHash: '7a9046418c47f96c0cd4f6df59b001df84a82c31f0bbfe1e11a8af5d8d16097a' },
       { fixture: 'sleep', blocked: true, damage: null, statusTypes: ['sleep'], ruleIds: ['rule-sleep-prevent-move'], stateHash: '1555633d854f487f8325c55252d215553766ebc198b185d34560634e7f394f0d' },
       { fixture: 'watcher-rage', blocked: false, damage: 6, statusTypes: ['rage-stance'], ruleIds: ['rule-watcher-rage-dealt'], stateHash: 'ce1e986a3024fd0f62c64e373cc24a9e3fab47cd97f945845f6e230e1230367f' },
-      { fixture: 'blood-oath', blocked: false, damage: null, statusTypes: [], ruleIds: [], stateHash: 'c64901334059db48a7ad59db08d2caa3eb1d4e2bb6bafbdee577ee0c18ae67fd' },
+      { fixture: 'blood-oath', blocked: false, damage: null, statusTypes: ['blood-oath'], ruleIds: ['rule-blood-oath-tick'], stateHash: 'f5496456f1877b1d2969fab67e9fc85e5a9e1e135d3e4b173ac808c916dfecd4' },
     ])
+  })
+
+  it('keeps Blood Oath through end effects, then clears it at the third holder expiry phase', () => {
+    const piece = makePiece({ instanceId: 'blood-holder', ownerPlayerId: 'player-red' }) as any
+    piece.rules = [requiredRule('rule-hidan-blood-oath-reflect')]
+    const state = makeState({ pieces: [piece] }) as any
+    addPieceStatus(state, piece, { id: 'oath', type: 'blood-oath', currentDuration: 3,
+      relatedRules: ['rule-hidan-blood-oath-reflect'] })
+    for (const turn of [3, 5, 7]) {
+      state.turn.turnNumber = turn
+      new TriggerSystem().checkTriggers(state, { type: 'endTurn', playerId: 'player-red' })
+      expect(piece.statusTags).toHaveLength(1)
+      expireOwnerStatuses(state, 'player-red')
+      expect(piece.statusTags).toHaveLength(turn === 7 ? 0 : 1)
+    }
+    expect(piece.rules).toEqual([])
   })
 })
