@@ -4,13 +4,49 @@ import { createContext, Script } from 'node:vm'
 
 import { describe, expect, it, vi } from 'vitest'
 
+interface TutorialSnapshot { status: string; index: number; total?: number }
+interface TutorialController {
+  beforeAction(action: object, state: object): { allowed: boolean }
+  accept(event: object, state: object): { accepted: boolean }
+  finish(): { accepted: boolean; snapshot: TutorialSnapshot }
+  skip(): TutorialSnapshot
+  snapshot(): TutorialSnapshot
+}
+interface TutorialPiece {
+  instanceId: string; templateId: string; ownerPlayerId: string
+  currentHp: number; maxHp: number; x: number; y: number
+}
+interface ScenarioState {
+  pieces: TutorialPiece[]
+  deployment?: { reserves: Record<string, TutorialPiece[]> }
+  extensions?: { tutorial: unknown }
+  turn?: { currentPlayerId: string; turnNumber: number; phase: string }
+}
+interface TutorialModules {
+  RvBTutorialController: {
+    create(definition: object): TutorialController
+    actionMatches(condition: object, action: object, state: object): boolean
+  }
+  RvBTutorialRuntime: {
+    storageKey: string
+    saveStatus(storage: Pick<Storage, 'getItem' | 'setItem'>, scenarioId: string, status: string): boolean
+    readStatus(storage: Pick<Storage, 'getItem' | 'setItem'>): unknown
+  }
+  RvBTutorialScenario: {
+    prepareInitialState(state: ScenarioState, definition: object): void
+    openPlayerDeployment(state: ScenarioState, definition: object): void
+    resolveCellCue(state: ScenarioState, definition: object, cue: object): unknown
+  }
+}
+
 function loadBrowserModule(file: string) {
-  const sandbox: Record<string, any> = { console, Date, Object, Array, Set, Map, Math }
+  const sandbox: Record<string, unknown> = { console, Date, Object, Array, Set, Map, Math }
   sandbox.window = sandbox
   sandbox.globalThis = sandbox
   const context = createContext(sandbox)
   new Script(readFileSync(resolve(process.cwd(), 'data/pages/js/tutorial', file), 'utf8')).runInContext(context)
-  return sandbox
+  // The script attaches its public API to window in the isolated VM.
+  return sandbox as unknown as TutorialModules
 }
 
 describe('RED-95 tutorial controller', () => {
@@ -101,7 +137,7 @@ describe('RED-95 tutorial scenario staging', () => {
     const definition = JSON.parse(readFileSync(resolve(process.cwd(), 'data/tutorial/first-session.json'), 'utf8'))
     const map = JSON.parse(readFileSync(resolve(process.cwd(), 'data/maps/large-trap-arena.json'), 'utf8'))
     const widow = definition.staging.deploymentCells['training-blue']
-    const review = definition.steps.find((step: any) => step.id === 'review-cover-block')
+    const review = definition.steps.find((step: { id: string }) => step.id === 'review-cover-block')
     const row = map.layout[widow.y]
     const firstBlockingX = Array.from({ length: widow.x }, (_, offset) => widow.x - offset - 1)
       .find(x => row[x] === 'C' || row[x] === '#')
@@ -113,7 +149,7 @@ describe('RED-95 tutorial scenario staging', () => {
 
   it('explains the complete recurring action-point rule before the first player turn', () => {
     const definition = JSON.parse(readFileSync(resolve(process.cwd(), 'data/tutorial/first-session.json'), 'utf8'))
-    const deploymentStep = definition.steps.find((step: any) => step.id === 'deploy-anduin')
+    const deploymentStep = definition.steps.find((step: { id: string }) => step.id === 'deploy-anduin')
 
     expect(deploymentStep.text).toContain('第一个自己的回合有 1 点基础行动点')
     expect(deploymentStep.text).toContain('每次再轮到你，上限都会加 1')
@@ -125,7 +161,7 @@ describe('RED-95 tutorial scenario staging', () => {
   it('trims a normal battle into the staged board and opens the real reserve deployment', () => {
     const sandbox = loadBrowserModule('tutorial-scenario.js')
     const definition = JSON.parse(readFileSync(resolve(process.cwd(), 'data/tutorial/first-session.json'), 'utf8'))
-    const state: any = {
+    const state: ScenarioState = {
       pieces: [
         { instanceId: 'u1', templateId: 'uther', ownerPlayerId: 'training-red', currentHp: 10, maxHp: 10, x: 1, y: 1 },
         { instanceId: 'r1', templateId: 'reaper', ownerPlayerId: 'training-blue', currentHp: 10, maxHp: 10, x: 2, y: 2 },
@@ -140,11 +176,11 @@ describe('RED-95 tutorial scenario staging', () => {
     expect(state.pieces).toHaveLength(3)
     expect(state.pieces[0]).toMatchObject({ instanceId: 'u1', x: 6, y: 7 })
     expect(state.pieces[1]).toMatchObject({ instanceId: 'r1', x: 8, y: 7, currentHp: 1 })
-    expect(state.deployment.reserves['training-red'].map((piece: any) => piece.templateId)).toEqual(['anduin'])
-    expect(state.deployment.reserves['training-blue']).toEqual([])
+    expect(state.deployment!.reserves['training-red'].map((piece) => piece.templateId)).toEqual(['anduin'])
+    expect(state.deployment!.reserves['training-blue']).toEqual([])
     expect(state.pieces).toContainEqual(expect.objectContaining({ instanceId: 'w1', templateId: 'red-blackwidow', x: 17, y: 8 }))
     expect(state.deployment).toMatchObject({ mode: 'legacy-reroll-v1', status: 'complete' })
-    expect(state.extensions.tutorial).toMatchObject({ scenarioId: definition.id, rootSeed: 188, staged: true })
+    expect(state.extensions!.tutorial).toMatchObject({ scenarioId: definition.id, rootSeed: 188, staged: true })
     state.turn = { currentPlayerId: 'training-red', turnNumber: 2, phase: 'start' }
     sandbox.RvBTutorialScenario.openPlayerDeployment(state, definition)
     expect(state.deployment).toMatchObject({

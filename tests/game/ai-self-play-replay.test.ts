@@ -189,7 +189,7 @@ function loadTraceTools() {
   )
   const context = createContext({ window: {} })
   new Script(source, { filename: 'match-trace.js' }).runInContext(context)
-  return (context.window as any).RvBDeveloperTools
+  return (context.window).RvBDeveloperTools
 }
 
 describe('AI self-play recorded-action Trace v2 export', () => {

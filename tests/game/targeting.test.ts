@@ -45,13 +45,13 @@ function targetedSkill(
     id,
     name: id,
     description: '',
-    kind: 'active',
-    type: 'normal',
+    kind: 'active' as const,
+    type: 'normal' as const,
     cooldownTurns: 0,
     maxCharges: 0,
     powerMultiplier: 1,
     actionPointCost: 1,
-    range: 'single',
+    range: 'single' as const,
     requiresTarget: true,
     code,
     ...overrides,
@@ -289,7 +289,7 @@ describe('authoritative target preparation', () => {
   it('executes declared Chebyshev cell candidates with the same distance semantics', () => {
     const caster = makePiece({ instanceId: 'blink-caster', ownerPlayerId: 'player-red', x: 1, y: 1 })
     caster.skills = [{ skillId: 'blink-contract', currentCooldown: 0, usesRemaining: -1 }] as never
-    const state = makeState({ pieces: [caster], width: 5, height: 5 }) as any
+    const state = makeState({ pieces: [caster], width: 5, height: 5 })
     state.skillsById['blink-contract'] = {
       ...targetedSkill('blink-contract', "function executeSkill(context) { var caster = context.piece; var pos = selectTarget({ type: 'grid', range: 2, filter: 'all' }); if (!pos || pos.needsTargetSelection) return pos; caster.x = pos.x; caster.y = pos.y; return { success: true, message: 'blink' }; }"),
       targeting: {
@@ -536,7 +536,7 @@ describe('Demo targeting admission fixture', () => {
     const cardIds = JSON.parse(readFileSync(resolve(process.cwd(), 'data/cards/manifest.json'), 'utf8')) as string[]
     const skillIds = [...new Set(pieceIds.flatMap(pieceId => {
       const piece = JSON.parse(readFileSync(resolve(process.cwd(), `data/pieces/${pieceId}.json`), 'utf8'))
-      return (piece.skills || []).map((skill: any) => skill.skillId as string)
+      return (piece.skills || []).map((skill: { skillId: string }) => skill.skillId)
     }))].sort()
     expect(new Set(pieceIds).size).toBe(pieceIds.length)
     expect(pieceIds).toEqual(expect.arrayContaining(['blue-ichigo', 'red-itachi', 'velen', 'turalyon']))

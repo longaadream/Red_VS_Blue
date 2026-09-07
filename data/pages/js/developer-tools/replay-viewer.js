@@ -46,7 +46,7 @@
     var serialized
     try {
       serialized = JSON.stringify(value, null, 2)
-    } catch (_error) {
+    } catch {
       serialized = String(value)
     }
     maxLength = maxLength || 1000

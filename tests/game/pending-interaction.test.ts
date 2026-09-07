@@ -7,7 +7,7 @@ import { applyBattleAction } from '@/lib/game/turn'
 import type { BattleAction, BattleState } from '@/lib/game/turn'
 import { prepareAction } from '@/lib/game/targeting'
 import { createRunningTurnTimer } from '@/lib/game/turn-timer'
-import { globalTriggerSystem } from '@/lib/game/triggers'
+import { globalTriggerSystem, type TriggerContext } from '@/lib/game/triggers'
 import { makePiece, makeState } from '../helpers/minimal-state'
 
 function minatoWatcherState(phase: 'start' | 'action' = 'action'): BattleState {
@@ -17,9 +17,9 @@ function minatoWatcherState(phase: 'start' | 'action' = 'action'): BattleState {
     ownerPlayerId: 'player-red',
     x: 1,
     y: 1,
-  }) as any
+  })
   minato.name = '波风水门'
-  minato.rules = [loadRuleById('rule-minato-anchor-end-turn', true)]
+  minato.rules = [loadRuleById('rule-minato-anchor-end-turn', true)!]
 
   const watcher = makePiece({
     instanceId: 'watcher',
@@ -27,9 +27,9 @@ function minatoWatcherState(phase: 'start' | 'action' = 'action'): BattleState {
     ownerPlayerId: 'player-red',
     x: 2,
     y: 1,
-  }) as any
+  })
   watcher.name = '观者'
-  watcher.rules = [loadRuleById('rule-watcher-form', true)]
+  watcher.rules = [loadRuleById('rule-watcher-form', true)!]
 
   return makeState({
     pieces: [minato, watcher],
@@ -68,7 +68,7 @@ function beginWatcherSelection(): BattleState {
   return pending
 }
 
-function pendingTargetAction(state: BattleState, overrides: Record<string, unknown> = {}): BattleAction {
+function pendingTargetAction(state: BattleState, overrides: Record<string, unknown> = {}): Extract<BattleAction, { type: 'pendingTargetSelect' }> {
   const pending = state.pendingTargetSelection!
   const target = pending.candidates?.find(candidate => candidate.type === 'cell')
   if (!target || target.type !== 'cell') throw new Error('Expected a legal Minato anchor cell')
@@ -80,7 +80,7 @@ function pendingTargetAction(state: BattleState, overrides: Record<string, unkno
     selectionId: pending.selectionId,
     stateRevision: pending.stateRevision,
     ...overrides,
-  } as BattleAction
+  } as Extract<BattleAction, { type: 'pendingTargetSelect' }>
 }
 
 function chooseWatcher(state: BattleState, selectedOption: 'calm' | 'rage'): BattleState {
@@ -94,7 +94,7 @@ function chooseWatcher(state: BattleState, selectedOption: 'calm' | 'rage'): Bat
   } as BattleAction)
 }
 
-function withPreparedTarget(state: BattleState, action: Record<string, any>): BattleAction {
+function withPreparedTarget(state: BattleState, action: Record<string, unknown>): BattleAction {
   const draft = { ...action }
   delete draft.targetPieceId
   delete draft.targetX
@@ -123,7 +123,7 @@ describe('RED-97 authoritative pending interaction lifecycle', () => {
     expect(completed.turn.phase).toBe('end')
     expect(completed.pendingTargetSelection).toBeUndefined()
     expect(completed.pendingOptionSelection).toBeUndefined()
-    expect((completed.extensions?.minatoAnchors || []).filter((anchor: any) => anchor.sourceId === 'minato')).toHaveLength(1)
+    expect((completed.extensions?.minatoAnchors || []).filter((anchor: { sourceId: string }) => anchor.sourceId === 'minato')).toHaveLength(1)
   })
 
   it('forbids cancelling mandatory Minato and keeps the Watcher begin-turn choice non-cancellable', () => {
@@ -199,8 +199,8 @@ describe('RED-97 authoritative pending interaction lifecycle', () => {
     const candidates = listLegalAIActions(optionPending, 'player-red')
     expect(candidates.map(candidate => candidate.kind)).toEqual(['pending-option', 'pending-option'])
     expect(candidates.every(candidate => {
-      const action = candidate.action as any
-      return action.selectionId === pending.selectionId
+      const action = candidate.action
+      return action.type === 'pendingOptionSelect' && action.selectionId === pending.selectionId
       && action.stateRevision === pending.stateRevision
     })).toBe(true)
   })
@@ -215,9 +215,9 @@ describe('RED-97 authoritative pending interaction lifecycle', () => {
       attack: 10,
       currentHp: 20,
       maxHp: 20,
-    }) as any
+    })
     shishio.name = '志志雄真实'
-    shishio.rules = [loadRuleById('rule-shishio-execute-option', true)]
+    shishio.rules = [loadRuleById('rule-shishio-execute-option', true)!]
     shishio.skills = [{ skillId: 'execute-strike', currentCooldown: 0, usesRemaining: -1 }]
     const target = makePiece({
       instanceId: 'execute-target',
@@ -232,8 +232,8 @@ describe('RED-97 authoritative pending interaction lifecycle', () => {
       pieces: [shishio, target],
       currentPlayerId: 'player-red',
       phase: 'action',
-    }) as any
-    state.players.find((player: any) => player.playerId === 'player-red').actionPoints = 2
+    })
+    state.players.find((player) => player.playerId === 'player-red')!.actionPoints = 2
     state.skillsById['execute-strike'] = {
       id: 'execute-strike',
       name: '处决测试斩',
@@ -288,16 +288,16 @@ describe('RED-97 authoritative pending interaction lifecycle', () => {
       x: 0,
       y: 0,
       attack: 3,
-    }) as any
+    })
     minato.name = '波风水门'
-    minato.rules = [loadRuleById('rule-minato-flying-raijin-trigger', true)]
+    minato.rules = [loadRuleById('rule-minato-flying-raijin-trigger', true)!]
     const attacker = makePiece({
       instanceId: 'raijin-attacker',
       ownerPlayerId: 'player-red',
       x: 1,
       y: 1,
       attack: 2,
-    }) as any
+    })
     attacker.skills = [{ skillId: 'fireball', currentCooldown: 0, usesRemaining: -1 }]
     const target = makePiece({
       instanceId: 'raijin-target',
@@ -307,7 +307,7 @@ describe('RED-97 authoritative pending interaction lifecycle', () => {
       y: 1,
       currentHp: 10,
       maxHp: 10,
-    }) as any
+    })
     target.statusTags = [{
       id: 'test-raijin-mark',
       type: 'flying-raijin-mark',
@@ -320,8 +320,8 @@ describe('RED-97 authoritative pending interaction lifecycle', () => {
       pieces: [minato, attacker, target],
       currentPlayerId: 'player-red',
       phase: 'action',
-    }) as any
-    state.players.find((player: any) => player.playerId === 'player-red').actionPoints = 2
+    })
+    state.players.find((player) => player.playerId === 'player-red')!.actionPoints = 2
     const rootAction = withPreparedTarget(state, {
       type: 'useBasicSkill',
       playerId: 'player-red',
@@ -405,16 +405,16 @@ describe('RED-97 authoritative pending interaction lifecycle', () => {
       x: 5,
       y: 4,
       attack: 3,
-    }) as any
+    })
     minato.name = '波风水门'
-    minato.rules = [loadRuleById('rule-minato-flying-raijin-trigger', true)]
+    minato.rules = [loadRuleById('rule-minato-flying-raijin-trigger', true)!]
     const attacker = makePiece({
       instanceId: 'blocked-raijin-attacker',
       ownerPlayerId: 'player-red',
       x: 0,
       y: 0,
       attack: 2,
-    }) as any
+    })
     attacker.skills = [{ skillId: 'fireball', currentCooldown: 0, usesRemaining: -1 }]
     const target = makePiece({
       instanceId: 'blocked-raijin-target',
@@ -424,7 +424,7 @@ describe('RED-97 authoritative pending interaction lifecycle', () => {
       y: 2,
       currentHp: 10,
       maxHp: 10,
-    }) as any
+    })
     target.statusTags = [{
       id: 'blocked-raijin-mark',
       type: 'flying-raijin-mark',
@@ -448,8 +448,8 @@ describe('RED-97 authoritative pending interaction lifecycle', () => {
       pieces: [minato, attacker, target, ...blockers],
       currentPlayerId: 'player-red',
       phase: 'action',
-    }) as any
-    state.players.find((player: any) => player.playerId === 'player-red').actionPoints = 2
+    })
+    state.players.find((player) => player.playerId === 'player-red')!.actionPoints = 2
     const action = withPreparedTarget(state, {
       type: 'useBasicSkill',
       playerId: 'player-red',
@@ -485,9 +485,9 @@ describe('RED-97 authoritative pending interaction lifecycle', () => {
       x: 0,
       y: 0,
       attack: 3,
-    }) as any
+    })
     minato.name = '波风水门'
-    minato.rules = [loadRuleById('rule-minato-flying-raijin-trigger', true)]
+    minato.rules = [loadRuleById('rule-minato-flying-raijin-trigger', true)!]
     minato.skills = [{ skillId: 'fireball', currentCooldown: 0, usesRemaining: -1 }]
     const target = makePiece({
       instanceId: 'self-caster-marked-target',
@@ -497,7 +497,7 @@ describe('RED-97 authoritative pending interaction lifecycle', () => {
       y: 1,
       currentHp: 10,
       maxHp: 10,
-    }) as any
+    })
     target.statusTags = [{
       id: 'self-caster-raijin-mark',
       type: 'flying-raijin-mark',
@@ -510,8 +510,8 @@ describe('RED-97 authoritative pending interaction lifecycle', () => {
       pieces: [minato, target],
       currentPlayerId: 'player-red',
       phase: 'action',
-    }) as any
-    state.players.find((player: any) => player.playerId === 'player-red').actionPoints = 2
+    })
+    state.players.find((player) => player.playerId === 'player-red')!.actionPoints = 2
     const action = withPreparedTarget(state, {
       type: 'useBasicSkill',
       playerId: 'player-red',
@@ -551,9 +551,9 @@ describe('RED-97 authoritative pending interaction lifecycle', () => {
       x: 1,
       y: 1,
       attack: 3,
-    }) as any
+    })
     minato.name = '波风水门'
-    minato.rules = [loadRuleById('rule-minato-flying-raijin-trigger', true)]
+    minato.rules = [loadRuleById('rule-minato-flying-raijin-trigger', true)!]
     minato.skills = [{ skillId: 'minato-rasengan', currentCooldown: 0, usesRemaining: -1 }]
     const target = makePiece({
       instanceId: 'double-rasengan-target',
@@ -563,14 +563,14 @@ describe('RED-97 authoritative pending interaction lifecycle', () => {
       y: 1,
       currentHp: 20,
       maxHp: 20,
-    }) as any
+    })
     const initial = makeState({
       pieces: [minato, target],
       currentPlayerId: 'player-red',
       phase: 'action',
-    }) as any
+    })
     initial.skillsById = {}
-    initial.players.find((player: any) => player.playerId === 'player-red').actionPoints = 3
+    initial.players.find((player) => player.playerId === 'player-red')!.actionPoints = 3
     const rootSeed = 131027
 
     const first = runBattleAction(initial, withPreparedTarget(initial, {
@@ -677,9 +677,9 @@ describe('RED-97 authoritative pending interaction lifecycle', () => {
       x: 0,
       y: 0,
       attack: 3,
-    }) as any
+    })
     minato.name = '波风水门'
-    minato.rules = [loadRuleById('rule-minato-flying-raijin-trigger', true)]
+    minato.rules = [loadRuleById('rule-minato-flying-raijin-trigger', true)!]
     const ally = makePiece({
       instanceId: 'marked-ally',
       ownerPlayerId: 'player-red',
@@ -687,7 +687,7 @@ describe('RED-97 authoritative pending interaction lifecycle', () => {
       y: 1,
       currentHp: 10,
       maxHp: 10,
-    }) as any
+    })
     ally.statusTags = [{
       id: 'ally-raijin-mark',
       type: 'flying-raijin-mark',
@@ -705,14 +705,14 @@ describe('RED-97 authoritative pending interaction lifecycle', () => {
       attack: 2,
       currentHp: 10,
       maxHp: 10,
-    }) as any
+    })
     enemyCaster.skills = [{ skillId: 'enemy-marked-shot', currentCooldown: 0, usesRemaining: -1 }]
     const state = makeState({
       pieces: [minato, ally, enemyCaster],
       currentPlayerId: 'player-blue',
       phase: 'action',
-    }) as any
-    state.players.find((player: any) => player.playerId === 'player-blue').actionPoints = 2
+    })
+    state.players.find((player) => player.playerId === 'player-blue')!.actionPoints = 2
     state.skillsById['enemy-marked-shot'] = {
       id: 'enemy-marked-shot',
       name: '敌方标记射击',
@@ -777,7 +777,7 @@ describe('RED-97 authoritative pending interaction lifecycle', () => {
         description: '',
         priority: 20,
         trigger: { type: 'beginTurn' },
-        effect: (battle: BattleState, context: any) => {
+        effect: (battle: BattleState, context: TriggerContext) => {
           if (context.selectedOption === undefined) {
             return {
               needsOptionSelection: true,
@@ -787,7 +787,7 @@ describe('RED-97 authoritative pending interaction lifecycle', () => {
               canCancel: false,
             }
           }
-          ;(battle.extensions as any).blockerCount = ((battle.extensions as any).blockerCount || 0) + 1
+          ;(battle.extensions)!.blockerCount = ((battle.extensions)!.blockerCount || 0) + 1
           return { success: true, blocked: true, message: 'blocked' }
         },
       },
@@ -798,11 +798,11 @@ describe('RED-97 authoritative pending interaction lifecycle', () => {
         priority: 10,
         trigger: { type: 'beginTurn' },
         effect: (battle: BattleState) => {
-          ;(battle.extensions as any).afterBlockCount = ((battle.extensions as any).afterBlockCount || 0) + 1
+          ;(battle.extensions)!.afterBlockCount = ((battle.extensions)!.afterBlockCount || 0) + 1
           return { success: true }
         },
       },
-    ] as any)
+    ])
 
     try {
       const pending = applyBattleAction(makeState({ currentPlayerId: 'player-red', phase: 'start' }), { type: 'beginPhase' })
@@ -817,8 +817,8 @@ describe('RED-97 authoritative pending interaction lifecycle', () => {
 
       expect(completed.pendingOptionSelection).toBeUndefined()
       expect(completed.turn.phase).toBe('action')
-      expect((completed.extensions as any).blockerCount).toBe(1)
-      expect((completed.extensions as any).afterBlockCount).toBeUndefined()
+      expect((completed.extensions)!.blockerCount).toBe(1)
+      expect((completed.extensions)!.afterBlockCount).toBeUndefined()
     } finally {
       globalTriggerSystem.clearRules()
       globalTriggerSystem.addRules(previousRules)
@@ -833,7 +833,7 @@ describe('RED-97 authoritative pending interaction lifecycle', () => {
       name: 'Unsupported after damage option',
       description: '',
       trigger: { type: 'afterDamageDealt' },
-      effect: (_battle: BattleState, context: any) => context.selectedOption === 'continue'
+      effect: (_battle: BattleState, context: TriggerContext) => context.selectedOption === 'continue'
         ? { success: true, message: 'continued' }
         : ({
         needsOptionSelection: true,
@@ -841,7 +841,7 @@ describe('RED-97 authoritative pending interaction lifecycle', () => {
         title: 'Unsupported option',
         options: [{ label: 'Continue', value: 'continue' }],
       }),
-    } as any)
+    })
 
     try {
       const attacker = makePiece({
@@ -850,7 +850,7 @@ describe('RED-97 authoritative pending interaction lifecycle', () => {
         x: 1,
         y: 1,
         attack: 2,
-      }) as any
+      })
       attacker.skills = [{ skillId: 'atomic-shot', currentCooldown: 0, usesRemaining: -1 }]
       const target = makePiece({
         instanceId: 'atomic-target',
@@ -865,7 +865,7 @@ describe('RED-97 authoritative pending interaction lifecycle', () => {
         pieces: [attacker, target],
         currentPlayerId: 'player-red',
         phase: 'action',
-      }) as any
+      })
       state.players[0].actionPoints = 2
       state.skillsById['atomic-shot'] = {
         id: 'atomic-shot',
@@ -889,25 +889,25 @@ describe('RED-97 authoritative pending interaction lifecycle', () => {
         targetPieceId: 'atomic-target',
       })
 
-      const pending = applyBattleAction(state, action) as any
+      const pending = applyBattleAction(state, action)
       expect(pending.pendingOptionSelection?.source).toMatchObject({
         type: 'rule',
         id: 'unsupported-after-damage-option',
       })
       expect(pending.players[0].actionPoints).toBe(2)
-      expect(pending.pieces.find((piece: any) => piece.instanceId === 'atomic-target')?.currentHp).toBe(10)
+      expect(pending.pieces.find((piece) => piece.instanceId === 'atomic-target')?.currentHp).toBe(10)
 
       const resolved = applyBattleAction(pending, {
         type: 'pendingOptionSelect',
         playerId: 'player-red',
         selectedOption: 'continue',
-        selectionId: pending.pendingOptionSelection.selectionId,
-        stateRevision: pending.pendingOptionSelection.stateRevision,
-      } as any) as any
+        selectionId: pending.pendingOptionSelection!.selectionId,
+        stateRevision: pending.pendingOptionSelection!.stateRevision,
+      })
       expect(resolved.pendingOptionSelection).toBeUndefined()
       expect(resolved.players[0].actionPoints).toBe(1)
-      expect(resolved.pieces.find((piece: any) => piece.instanceId === 'atomic-target')?.currentHp).toBe(8)
-      expect(resolved.actions.filter((entry: any) => entry.type === 'useBasicSkill')).toHaveLength(1)
+      expect(resolved.pieces.find((piece) => piece.instanceId === 'atomic-target')?.currentHp).toBe(8)
+      expect(resolved.actions!.filter((entry) => entry.type === 'useBasicSkill')).toHaveLength(1)
     } finally {
       globalTriggerSystem.clearRules()
       globalTriggerSystem.addRules(previousRules)
@@ -922,7 +922,7 @@ describe('RED-97 authoritative pending interaction lifecycle', () => {
       name: 'Resume exception probe',
       description: '',
       trigger: { type: 'beginTurn' },
-      effect: (_battle: BattleState, context: any) => {
+      effect: (_battle: BattleState, context: TriggerContext) => {
         if (context.selectedOption === 'explode') throw new Error('resume explosion')
         return {
           needsOptionSelection: true,
@@ -932,14 +932,14 @@ describe('RED-97 authoritative pending interaction lifecycle', () => {
           canCancel: false,
         }
       },
-    } as any)
+    })
 
     try {
       const state = makeState({
         currentPlayerId: 'player-red',
         phase: 'start',
-      }) as any
-      const pending = applyBattleAction(state, { type: 'beginPhase' }) as any
+      })
+      const pending = applyBattleAction(state, { type: 'beginPhase' })
       expect(pending.turn.phase).toBe('start')
       expect(pending.pendingOptionSelection?.source?.id).toBe('resume-exception-probe')
       const pendingSnapshot = JSON.stringify(pending)
@@ -948,9 +948,9 @@ describe('RED-97 authoritative pending interaction lifecycle', () => {
         type: 'pendingOptionSelect',
         playerId: 'player-red',
         selectedOption: 'explode',
-        selectionId: pending.pendingOptionSelection.selectionId,
-        stateRevision: pending.pendingOptionSelection.stateRevision,
-      } as any)).toThrow(/resume explosion/)
+        selectionId: pending.pendingOptionSelection!.selectionId,
+        stateRevision: pending.pendingOptionSelection!.stateRevision,
+      })).toThrow(/resume explosion/)
       expect(JSON.stringify(pending)).toBe(pendingSnapshot)
       expect(pending.turn.phase).toBe('start')
     } finally {
@@ -969,7 +969,7 @@ describe('RED-97 authoritative pending interaction lifecycle', () => {
         description: '',
         priority: 20,
         trigger: { type: 'beginTurn' },
-        effect: (battle: BattleState, context: any) => {
+        effect: (battle: BattleState, context: TriggerContext) => {
           if (context.selectedOption === undefined) {
             return {
               needsOptionSelection: true,
@@ -989,7 +989,7 @@ describe('RED-97 authoritative pending interaction lifecycle', () => {
               canCancel: true,
             }
           }
-          ;(battle.extensions as any).mixedConsumerCount = ((battle.extensions as any).mixedConsumerCount || 0) + 1
+          ;(battle.extensions)!.mixedConsumerCount = ((battle.extensions)!.mixedConsumerCount || 0) + 1
           return { success: true, message: 'mixed complete' }
         },
       },
@@ -1000,15 +1000,15 @@ describe('RED-97 authoritative pending interaction lifecycle', () => {
         priority: 10,
         trigger: { type: 'beginTurn' },
         effect: (battle: BattleState) => {
-          ;(battle.extensions as any).queuedConsumerCount = ((battle.extensions as any).queuedConsumerCount || 0) + 1
+          ;(battle.extensions)!.queuedConsumerCount = ((battle.extensions)!.queuedConsumerCount || 0) + 1
           return { success: true, message: 'queue complete' }
         },
       },
-    ] as any)
+    ])
 
     try {
-      const state = makeState({ currentPlayerId: 'player-red', phase: 'start' }) as any
-      state.players[0].hand = [{ cardId: 'reactive-probe', instanceId: 'reactive-probe-1', actionPointCost: 0 }]
+      const state = makeState({ currentPlayerId: 'player-red', phase: 'start' })
+      state.players[0].hand = [{ cardId: 'reactive-probe', ownerPlayerId: 'player-red', instanceId: 'reactive-probe-1', actionPointCost: 0 }]
       state.customCards = {
         'reactive-probe': {
           id: 'reactive-probe',
@@ -1023,8 +1023,8 @@ describe('RED-97 authoritative pending interaction lifecycle', () => {
 
       const optionPending = applyBattleAction(state, { type: 'beginPhase' })
       expect(optionPending.pendingOptionSelection?.source?.id).toBe('mixed-interaction-probe')
-      expect((optionPending.extensions as any).queuedConsumerCount).toBeUndefined()
-      expect((optionPending.extensions as any).reactiveConsumerCount).toBeUndefined()
+      expect((optionPending.extensions)!.queuedConsumerCount).toBeUndefined()
+      expect((optionPending.extensions)!.reactiveConsumerCount).toBeUndefined()
 
       const option = optionPending.pendingOptionSelection!
       const targetPending = applyBattleAction(optionPending, {
@@ -1049,9 +1049,9 @@ describe('RED-97 authoritative pending interaction lifecycle', () => {
         stateRevision: targetSession.stateRevision,
       })
       expect(completed.turn.phase).toBe('action')
-      expect((completed.extensions as any).mixedConsumerCount).toBe(1)
-      expect((completed.extensions as any).queuedConsumerCount).toBe(1)
-      expect((completed.extensions as any).reactiveConsumerCount).toBe(1)
+      expect((completed.extensions)!.mixedConsumerCount).toBe(1)
+      expect((completed.extensions)!.queuedConsumerCount).toBe(1)
+      expect((completed.extensions)!.reactiveConsumerCount).toBe(1)
     } finally {
       globalTriggerSystem.clearRules()
       globalTriggerSystem.addRules(previousRules)
@@ -1068,7 +1068,7 @@ describe('RED-121 card execution pending boundaries', () => {
       name: 'Active card after-damage choice',
       description: '',
       trigger: { type: 'afterDamageDealt' },
-      effect: (battle: BattleState, context: any) => {
+      effect: (battle: BattleState, context: TriggerContext) => {
         if (context.selectedOption !== 'continue') {
           return {
             needsOptionSelection: true,
@@ -1078,10 +1078,10 @@ describe('RED-121 card execution pending boundaries', () => {
             canCancel: false,
           }
         }
-        ;(battle.extensions as any).activeCardChoiceCount = ((battle.extensions as any).activeCardChoiceCount || 0) + 1
+        ;(battle.extensions)!.activeCardChoiceCount = ((battle.extensions)!.activeCardChoiceCount || 0) + 1
         return { success: true }
       },
-    } as any)
+    })
 
     try {
       const attacker = makePiece({ instanceId: 'active-card-source', ownerPlayerId: 'player-red', x: 1, y: 1 })
@@ -1094,7 +1094,7 @@ describe('RED-121 card execution pending boundaries', () => {
         currentHp: 10,
         maxHp: 10,
       })
-      const state = makeState({ pieces: [attacker, target], currentPlayerId: 'player-red', phase: 'action' }) as any
+      const state = makeState({ pieces: [attacker, target], currentPlayerId: 'player-red', phase: 'action' })
       state.players[0].actionPoints = 2
       state.players[0].hand = [{
         cardId: 'active-card-pending-probe',
@@ -1117,7 +1117,7 @@ describe('RED-121 card execution pending boundaries', () => {
         type: 'playCard',
         playerId: 'player-red',
         cardInstanceId: 'active-card-pending-probe-1',
-      }) as any
+      })
       expect(pending.pendingOptionSelection?.source).toMatchObject({
         type: 'rule',
         id: 'active-card-after-damage-choice',
@@ -1125,24 +1125,24 @@ describe('RED-121 card execution pending boundaries', () => {
       expect(pending.players[0].actionPoints).toBe(2)
       expect(pending.players[0].hand).toHaveLength(1)
       expect(pending.players[0].discardPile).toEqual([])
-      expect(pending.pieces.find((piece: any) => piece.instanceId === 'active-card-target')?.currentHp).toBe(10)
+      expect(pending.pieces.find((piece) => piece.instanceId === 'active-card-target')?.currentHp).toBe(10)
 
       const session = pending.pendingOptionSelection
       const completed = applyBattleAction(pending, {
         type: 'pendingOptionSelect',
         playerId: 'player-red',
         selectedOption: 'continue',
-        selectionId: session.selectionId,
-        stateRevision: session.stateRevision,
-      }) as any
+        selectionId: session!.selectionId,
+        stateRevision: session!.stateRevision,
+      })
       expect(completed.pendingOptionSelection).toBeUndefined()
       expect(completed.players[0].actionPoints).toBe(1)
       expect(completed.players[0].hand).toHaveLength(0)
       expect(completed.players[0].discardPile).toEqual(['active-card-pending-probe'])
-      expect(completed.pieces.find((piece: any) => piece.instanceId === 'active-card-target')?.currentHp).toBe(8)
-      expect((completed.extensions as any).activeCardChoiceCount).toBe(1)
-      expect((completed.extensions as any).activeCardExecutionCount).toBe(1)
-      expect(completed.actions.filter((entry: any) => entry.type === 'playCard')).toHaveLength(1)
+      expect(completed.pieces.find((piece) => piece.instanceId === 'active-card-target')?.currentHp).toBe(8)
+      expect((completed.extensions)!.activeCardChoiceCount).toBe(1)
+      expect((completed.extensions)!.activeCardExecutionCount).toBe(1)
+      expect(completed.actions!.filter((entry) => entry.type === 'playCard')).toHaveLength(1)
     } finally {
       globalTriggerSystem.clearRules()
       globalTriggerSystem.addRules(previousRules)
@@ -1157,7 +1157,7 @@ describe('RED-121 card execution pending boundaries', () => {
       name: 'Active card resume exception',
       description: '',
       trigger: { type: 'afterDamageDealt' },
-      effect: (_battle: BattleState, context: any) => {
+      effect: (_battle: BattleState, context: TriggerContext) => {
         if (context.selectedOption === 'explode') throw new Error('active card resume explosion')
         return {
           needsOptionSelection: true,
@@ -1167,12 +1167,12 @@ describe('RED-121 card execution pending boundaries', () => {
           canCancel: false,
         }
       },
-    } as any)
+    })
 
     try {
       const source = makePiece({ instanceId: 'rollback-card-source', ownerPlayerId: 'player-red', x: 1, y: 1 })
       const target = makePiece({ instanceId: 'rollback-card-target', ownerPlayerId: 'player-blue', faction: 'blue', x: 2, y: 1, currentHp: 10, maxHp: 10 })
-      const state = makeState({ pieces: [source, target], currentPlayerId: 'player-red', phase: 'action' }) as any
+      const state = makeState({ pieces: [source, target], currentPlayerId: 'player-red', phase: 'action' })
       state.players[0].actionPoints = 2
       state.players[0].hand = [{ cardId: 'rollback-card-probe', instanceId: 'rollback-card-probe-1', ownerPlayerId: 'player-red', actionPointCost: 1 }]
       state.customCards = {
@@ -1181,7 +1181,7 @@ describe('RED-121 card execution pending boundaries', () => {
           code: "function executeCard(context) { var source = context.battle.pieces.find(function(piece) { return piece.instanceId === 'rollback-card-source'; }); var target = context.battle.pieces.find(function(piece) { return piece.instanceId === 'rollback-card-target'; }); dealDamage(source, target, 2, 'true', context.battle, 'rollback-card-probe'); return { success: true }; }",
         },
       }
-      const pending = applyBattleAction(state, { type: 'playCard', playerId: 'player-red', cardInstanceId: 'rollback-card-probe-1' }) as any
+      const pending = applyBattleAction(state, { type: 'playCard', playerId: 'player-red', cardInstanceId: 'rollback-card-probe-1' })
       const pendingSnapshot = JSON.stringify(pending)
       const session = pending.pendingOptionSelection
 
@@ -1189,13 +1189,13 @@ describe('RED-121 card execution pending boundaries', () => {
         type: 'pendingOptionSelect',
         playerId: 'player-red',
         selectedOption: 'explode',
-        selectionId: session.selectionId,
-        stateRevision: session.stateRevision,
-      } as any)).toThrow(/active card resume explosion/)
+        selectionId: session!.selectionId,
+        stateRevision: session!.stateRevision,
+      })).toThrow(/active card resume explosion/)
       expect(JSON.stringify(pending)).toBe(pendingSnapshot)
       expect(pending.players[0].actionPoints).toBe(2)
       expect(pending.players[0].hand).toHaveLength(1)
-      expect(pending.pieces.find((piece: any) => piece.instanceId === 'rollback-card-target')?.currentHp).toBe(10)
+      expect(pending.pieces.find((piece) => piece.instanceId === 'rollback-card-target')?.currentHp).toBe(10)
     } finally {
       globalTriggerSystem.clearRules()
       globalTriggerSystem.addRules(previousRules)
@@ -1210,19 +1210,19 @@ describe('RED-121 card execution pending boundaries', () => {
       name: 'Reactive card after-damage choice',
       description: '',
       trigger: { type: 'afterDamageDealt' },
-      effect: (battle: BattleState, context: any) => {
+      effect: (battle: BattleState, context: TriggerContext) => {
         if (context.selectedOption !== 'continue') {
           return { needsOptionSelection: true, playerId: 'player-red', title: 'Continue reactive card', options: [{ label: 'Continue', value: 'continue' }], canCancel: false }
         }
-        ;(battle.extensions as any).reactiveNestedChoiceCount = ((battle.extensions as any).reactiveNestedChoiceCount || 0) + 1
+        ;(battle.extensions)!.reactiveNestedChoiceCount = ((battle.extensions)!.reactiveNestedChoiceCount || 0) + 1
         return { success: true }
       },
-    } as any)
+    })
 
     try {
       const source = makePiece({ instanceId: 'reactive-card-source', ownerPlayerId: 'player-red', x: 1, y: 1 })
       const target = makePiece({ instanceId: 'reactive-card-target', ownerPlayerId: 'player-blue', faction: 'blue', x: 2, y: 1, currentHp: 10, maxHp: 10 })
-      const state = makeState({ pieces: [source, target], currentPlayerId: 'player-red', phase: 'start' }) as any
+      const state = makeState({ pieces: [source, target], currentPlayerId: 'player-red', phase: 'start' })
       state.players[0].hand = [{ cardId: 'reactive-card-pending-probe', instanceId: 'reactive-card-pending-probe-1', ownerPlayerId: 'player-red', actionPointCost: 0 }]
       state.customCards = {
         'reactive-card-pending-probe': {
@@ -1232,21 +1232,21 @@ describe('RED-121 card execution pending boundaries', () => {
         },
       }
 
-      const pending = applyBattleAction(state, { type: 'beginPhase' }) as any
+      const pending = applyBattleAction(state, { type: 'beginPhase' })
       expect(pending.turn.phase).toBe('start')
       expect(pending.pendingOptionSelection?.source?.id).toBe('reactive-card-after-damage-choice')
       expect(pending.players[0].hand).toHaveLength(1)
-      expect(pending.pieces.find((piece: any) => piece.instanceId === 'reactive-card-target')?.currentHp).toBe(10)
+      expect(pending.pieces.find((piece) => piece.instanceId === 'reactive-card-target')?.currentHp).toBe(10)
 
       const session = pending.pendingOptionSelection
-      const completed = applyBattleAction(pending, { type: 'pendingOptionSelect', playerId: 'player-red', selectedOption: 'continue', selectionId: session.selectionId, stateRevision: session.stateRevision }) as any
+      const completed = applyBattleAction(pending, { type: 'pendingOptionSelect', playerId: 'player-red', selectedOption: 'continue', selectionId: session!.selectionId, stateRevision: session!.stateRevision })
       expect(completed.turn.phase).toBe('action')
       expect(completed.pendingOptionSelection).toBeUndefined()
       expect(completed.players[0].hand).toHaveLength(0)
       expect(completed.players[0].discardPile).toEqual(['reactive-card-pending-probe'])
-      expect(completed.pieces.find((piece: any) => piece.instanceId === 'reactive-card-target')?.currentHp).toBe(7)
-      expect((completed.extensions as any).reactiveNestedChoiceCount).toBe(1)
-      expect((completed.extensions as any).reactiveCardExecutionCount).toBe(1)
+      expect(completed.pieces.find((piece) => piece.instanceId === 'reactive-card-target')?.currentHp).toBe(7)
+      expect((completed.extensions)!.reactiveNestedChoiceCount).toBe(1)
+      expect((completed.extensions)!.reactiveCardExecutionCount).toBe(1)
     } finally {
       globalTriggerSystem.clearRules()
       globalTriggerSystem.addRules(previousRules)
@@ -1264,7 +1264,7 @@ describe('RED-121 suspended candidate checkpoints', () => {
       description: 'Requests a range-one cell after movement',
       priority: 1,
       trigger: { type: 'afterMove' },
-      effect: (battle: BattleState, context: any) => {
+      effect: (battle: BattleState, context: TriggerContext) => {
         if (context.targetX === undefined || context.targetY === undefined) {
           return {
             needsTargetSelection: true,
@@ -1276,13 +1276,13 @@ describe('RED-121 suspended candidate checkpoints', () => {
             canCancel: false,
           }
         }
-        ;(battle.extensions as any).afterMoveTarget = {
+        ;(battle.extensions)!.afterMoveTarget = {
           x: context.targetX,
           y: context.targetY,
         }
         return { success: true }
       },
-    } as any)
+    })
 
     try {
       const mover = makePiece({
@@ -1327,7 +1327,7 @@ describe('RED-121 suspended candidate checkpoints', () => {
       expect(completed.pendingTargetSelection).toBeUndefined()
       expect(completed.pieces.find(piece => piece.instanceId === mover.instanceId)).toMatchObject({ x: 2, y: 1 })
       expect(completed.players[0].actionPoints).toBe(state.players[0].actionPoints - 1)
-      expect((completed.extensions as any).afterMoveTarget).toEqual({ x: 3, y: 1 })
+      expect((completed.extensions)!.afterMoveTarget).toEqual({ x: 3, y: 1 })
     } finally {
       globalTriggerSystem.clearRules()
       globalTriggerSystem.addRules(previousRules)
@@ -1342,7 +1342,7 @@ describe('RED-121 legacy direct target transaction adapter', () => {
       ownerPlayerId: 'player-red',
       x: 1,
       y: 1,
-    }) as any
+    })
     caster.skills = [{ skillId: 'legacy-direct-target-probe', currentCooldown: 0, usesRemaining: -1 }]
     const state = makeState({
       pieces: [caster],
@@ -1350,7 +1350,7 @@ describe('RED-121 legacy direct target transaction adapter', () => {
       phase: 'action',
       width: 5,
       height: 5,
-    }) as any
+    })
     state.players[0].actionPoints = 2
     state.skillsById['legacy-direct-target-probe'] = {
       id: 'legacy-direct-target-probe',
@@ -1362,7 +1362,8 @@ describe('RED-121 legacy direct target transaction adapter', () => {
       maxCharges: 0,
       powerMultiplier: 1,
       actionPointCost: 1,
-      range: 0,
+      // This regression deliberately exercises a legacy numeric-range definition.
+      range: 0 as unknown as import('@/lib/game/skills').SkillDefinition['range'],
       requiresTarget: false,
       code: `function executeSkill(context) {
         context.battle.extensions.legacyRootExecutionCount = (context.battle.extensions.legacyRootExecutionCount || 0) + 1;
@@ -1387,7 +1388,7 @@ describe('RED-121 legacy direct target transaction adapter', () => {
       playerId: 'player-red',
       pieceId: caster.instanceId,
       skillId: 'legacy-direct-target-probe',
-    }) as any
+    })
     expect(pending.pendingTargetSelection?.source).toMatchObject({
       type: 'skill',
       id: 'legacy-direct-target-probe',
@@ -1395,7 +1396,7 @@ describe('RED-121 legacy direct target transaction adapter', () => {
     })
     expect(pending.pendingTargetSelection?.candidates).toContainEqual({ type: 'cell', x: 2, y: 1 })
     expect(pending.players[0].actionPoints).toBe(2)
-    expect((pending.extensions as any).legacyRootExecutionCount).toBeUndefined()
+    expect((pending.extensions)!.legacyRootExecutionCount).toBeUndefined()
 
     const session = pending.pendingTargetSelection
     const completed = applyBattleAction(pending, {
@@ -1403,21 +1404,21 @@ describe('RED-121 legacy direct target transaction adapter', () => {
       playerId: 'player-red',
       targetX: 2,
       targetY: 1,
-      selectionId: session.selectionId,
-      stateRevision: session.stateRevision,
-    }) as any
+      selectionId: session!.selectionId,
+      stateRevision: session!.stateRevision,
+    })
     expect(completed.pendingTargetSelection).toBeUndefined()
     expect(completed.players[0].actionPoints).toBe(1)
-    expect((completed.extensions as any).legacyRootExecutionCount).toBe(1)
-    expect((completed.extensions as any).legacyTargetEffectCount).toBe(1)
-    expect((completed.extensions as any).legacyResolvedTarget).toEqual({ x: 2, y: 1 })
-    expect(completed.actions.filter((entry: any) => entry.type === 'useBasicSkill')).toHaveLength(1)
+    expect((completed.extensions)!.legacyRootExecutionCount).toBe(1)
+    expect((completed.extensions)!.legacyTargetEffectCount).toBe(1)
+    expect((completed.extensions)!.legacyResolvedTarget).toEqual({ x: 2, y: 1 })
+    expect(completed.actions!.filter((entry) => entry.type === 'useBasicSkill')).toHaveLength(1)
   })
 
   it('commits the root effect but skips a cancellable post-effect target consumer', () => {
-    const caster = makePiece({ instanceId: 'legacy-cancel-caster', ownerPlayerId: 'player-red', x: 1, y: 1 }) as any
+    const caster = makePiece({ instanceId: 'legacy-cancel-caster', ownerPlayerId: 'player-red', x: 1, y: 1 })
     caster.skills = [{ skillId: 'legacy-cancel-target-probe', currentCooldown: 0, usesRemaining: -1 }]
-    const state = makeState({ pieces: [caster], currentPlayerId: 'player-red', phase: 'action', width: 4, height: 4 }) as any
+    const state = makeState({ pieces: [caster], currentPlayerId: 'player-red', phase: 'action', width: 4, height: 4 })
     state.players[0].actionPoints = 2
     state.skillsById['legacy-cancel-target-probe'] = {
       id: 'legacy-cancel-target-probe',
@@ -1429,7 +1430,8 @@ describe('RED-121 legacy direct target transaction adapter', () => {
       maxCharges: 0,
       powerMultiplier: 1,
       actionPointCost: 1,
-      range: 0,
+      // This regression deliberately exercises a legacy numeric-range definition.
+      range: 0 as unknown as import('@/lib/game/skills').SkillDefinition['range'],
       requiresTarget: false,
       code: `function executeSkill(context) {
         context.battle.extensions.legacyCancelledRootCount = (context.battle.extensions.legacyCancelledRootCount || 0) + 1;
@@ -1450,22 +1452,22 @@ describe('RED-121 legacy direct target transaction adapter', () => {
 
     const pending = applyBattleAction(state, {
       type: 'useBasicSkill', playerId: 'player-red', pieceId: caster.instanceId, skillId: 'legacy-cancel-target-probe',
-    }) as any
+    })
     expect(pending.players[0].actionPoints).toBe(2)
-    expect((pending.extensions as any).legacyCancelledRootCount).toBeUndefined()
+    expect((pending.extensions)!.legacyCancelledRootCount).toBeUndefined()
     const session = pending.pendingTargetSelection
 
     const completed = applyBattleAction(pending, {
       type: 'cancelPendingSelection',
       playerId: 'player-red',
-      selectionId: session.selectionId,
-      stateRevision: session.stateRevision,
-    } as any) as any
+      selectionId: session!.selectionId,
+      stateRevision: session!.stateRevision,
+    })
     expect(completed.pendingTargetSelection).toBeUndefined()
     expect(completed.players[0].actionPoints).toBe(1)
-    expect((completed.extensions as any).legacyCancelledRootCount).toBe(1)
-    expect((completed.extensions as any).legacyCancelledTargetCount).toBeUndefined()
-    expect(completed.actions.filter((entry: any) => entry.type === 'useBasicSkill')).toHaveLength(1)
+    expect((completed.extensions)!.legacyCancelledRootCount).toBe(1)
+    expect((completed.extensions)!.legacyCancelledTargetCount).toBeUndefined()
+    expect(completed.actions!.filter((entry) => entry.type === 'useBasicSkill')).toHaveLength(1)
   })
 })
 
@@ -1475,7 +1477,7 @@ describe('RED-108 authoritative pending timeout resolution', () => {
 
     expect(resolved.pendingTargetSelection).toBeUndefined()
     expect(resolved.pendingOptionSelection).toBeUndefined()
-    expect((resolved.extensions?.minatoAnchors || []).filter((anchor: any) => anchor.sourceId === 'minato')).toHaveLength(1)
+    expect((resolved.extensions?.minatoAnchors || []).filter((anchor: { sourceId: string }) => anchor.sourceId === 'minato')).toHaveLength(1)
     const watcherCards = resolved.players[0].hand
       .filter(card => card.cardId === 'watcher-calm' || card.cardId === 'watcher-rage')
       .map(card => card.cardId)
@@ -1492,9 +1494,9 @@ describe('RED-108 authoritative pending timeout resolution', () => {
     const first = timeoutPending(firstPending, 109)
     const second = timeoutPending(secondPending, 109)
     const firstAnchors = (first.extensions?.minatoAnchors || [])
-      .filter((anchor: any) => anchor.sourceId === 'minato')
+      .filter((anchor: { sourceId: string }) => anchor.sourceId === 'minato')
     const secondAnchors = (second.extensions?.minatoAnchors || [])
-      .filter((anchor: any) => anchor.sourceId === 'minato')
+      .filter((anchor: { sourceId: string }) => anchor.sourceId === 'minato')
 
     expect(firstAnchors).toHaveLength(1)
     expect(secondAnchors).toEqual(firstAnchors)

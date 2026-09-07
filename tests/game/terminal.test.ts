@@ -33,6 +33,7 @@ function reserveCore(instanceId: string, ownerPlayerId: string): PieceInstance {
     y: null,
     skills: [],
     buffs: [],
+    statusTags: [],
     debuffs: [],
     ruleTags: [],
   }

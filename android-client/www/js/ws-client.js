@@ -51,7 +51,7 @@
       storedProfile = localStorage.getItem('rvb_game_profile_identity')
       try {
         profileIdentity = storedProfile ? JSON.parse(storedProfile) : null
-      } catch (e) {
+      } catch {
         throw new Error('Stored game profile identity is malformed')
       }
       if (!profileIdentity || typeof profileIdentity !== 'object' || Array.isArray(profileIdentity)) {
@@ -102,7 +102,7 @@
       socket = new WebSocket(url)
       _ws = socket
       _subscribed = false
-    } catch (e) {
+    } catch {
       _scheduleReconnect(roomId)
       return
     }
@@ -204,7 +204,7 @@
         type: 'requestBattleSnapshot',
         requestId: _authoritySyncRequestId,
       }))
-    } catch (error) {
+    } catch {
       _releaseAuthoritySync()
       return false
     }

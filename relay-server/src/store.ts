@@ -1,3 +1,4 @@
+import type { Prisma } from '@prisma/client'
 import type { ServerWebSocket } from 'bun'
 import type { Room, WsData, ActionEntry } from './types'
 import { db } from './db/client'
@@ -15,6 +16,8 @@ function snapshotRoom(room: Room): Room {
   return structuredClone(room)
 }
 
+// Domain interfaces do not have Prisma JSON index signatures. Keep the existing
+// persistence boundary explicit without cloning or rewriting the stored payload.
 function upsertRoom(room: Room) {
   return db.room.upsert({
     where: { id: room.id },
@@ -24,10 +27,10 @@ function upsertRoom(room: Room) {
       name: room.name,
       mapId: room.mapId ?? null,
       status: room.status,
-      players: room.players as any,
+      players: room.players as unknown as Prisma.InputJsonArray,
       inviteCode: room.inviteCode,
       lastStateBlob: room.lastStateBlob,
-      actionLog: room.actionLog as any,
+      actionLog: room.actionLog as unknown as Prisma.InputJsonArray,
       hostDisconnectedAt: room.hostDisconnectedAt
         ? new Date(room.hostDisconnectedAt)
         : null,
@@ -35,9 +38,9 @@ function upsertRoom(room: Room) {
     update: {
       status: room.status,
       mapId: room.mapId ?? null,
-      players: room.players as any,
+      players: room.players as unknown as Prisma.InputJsonArray,
       lastStateBlob: room.lastStateBlob,
-      actionLog: room.actionLog as any,
+      actionLog: room.actionLog as unknown as Prisma.InputJsonArray,
       hostDisconnectedAt: room.hostDisconnectedAt
         ? new Date(room.hostDisconnectedAt)
         : null,
@@ -72,10 +75,10 @@ export const store = {
         name: room.name,
         mapId: room.mapId ?? null,
         status: room.status,
-        players: room.players as any,
+        players: room.players as unknown as Prisma.InputJsonArray,
         inviteCode: room.inviteCode,
         lastStateBlob: room.lastStateBlob,
-        actionLog: room.actionLog as any,
+        actionLog: room.actionLog as unknown as Prisma.InputJsonArray,
         hostDisconnectedAt: room.hostDisconnectedAt
           ? new Date(room.hostDisconnectedAt)
           : null,
@@ -83,9 +86,9 @@ export const store = {
       update: {
         status: room.status,
         mapId: room.mapId ?? null,
-        players: room.players as any,
+        players: room.players as unknown as Prisma.InputJsonArray,
         lastStateBlob: room.lastStateBlob,
-        actionLog: room.actionLog as any,
+        actionLog: room.actionLog as unknown as Prisma.InputJsonArray,
         hostDisconnectedAt: room.hostDisconnectedAt
           ? new Date(room.hostDisconnectedAt)
           : null,
@@ -141,7 +144,7 @@ export const store = {
     // Persist only the action log update
     db.room.update({
       where: { id: roomId },
-      data: { actionLog: room.actionLog as any },
+      data: { actionLog: room.actionLog as unknown as Prisma.InputJsonArray },
     }).catch(error => console.error(`[store] Failed to persist action log for ${roomId}`, error))
   },
 
@@ -212,11 +215,11 @@ export const store = {
         hostId: r.hostId,
         name: r.name,
         mapId: r.mapId ?? undefined,
-        status: r.status as any,
-        players: (r.players as any) ?? [],
+        status: r.status as Room['status'],
+        players: (r.players as unknown as Room['players']) ?? [],
         inviteCode: r.inviteCode ?? undefined,
         lastStateBlob: r.lastStateBlob ?? undefined,
-        actionLog: (r.actionLog as any) ?? [],
+        actionLog: (r.actionLog as unknown as Room['actionLog']) ?? [],
         hostDisconnectedAt: r.hostDisconnectedAt?.getTime(),
         createdAt: r.createdAt.getTime(),
       })

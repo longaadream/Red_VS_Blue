@@ -20,29 +20,6 @@
   }
 
 
-  function statusLabel(status) {
-    return String(status && (status.label || status.name || status.id || status.type) || '未知状态')
-  }
-
-  function statusIcon(status) {
-    return String(status && (status.iconPath || status.assetPath) || 'images/effect-icons/fallback.svg')
-  }
-
-  function statusBadge(status) {
-    const presentation = root.BattleEffectIcons
-    const values = presentation && typeof presentation.badge === 'function'
-      ? presentation.badge(status)
-      : status || {}
-    const stacks = Number(values.stacks)
-    const uses = Number(values.uses)
-    const duration = Number(values.duration)
-    const intensity = Number(values.intensity)
-    if (Number.isFinite(stacks) && stacks > 1) return String(stacks)
-    if (Number.isFinite(uses) && uses > 0) return String(uses)
-    if (Number.isFinite(duration) && duration > 0) return String(duration)
-    if (Number.isFinite(intensity) && intensity > 1) return String(intensity)
-    return ''
-  }
   function formatTimer(seconds) {
     if (seconds == null || seconds === '' || !Number.isFinite(Number(seconds))) return '--:--'
     const total = Math.max(0, Math.floor(Number(seconds)))

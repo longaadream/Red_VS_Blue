@@ -132,7 +132,7 @@ describe('battle page runtime source', () => {
     })
     new vm.Script(`async ${runtimeFunction(html, 'trainingApiFetch')}`).runInContext(context)
 
-    const state = await (context as any).trainingApiFetch('POST', {
+    const state = await (context).trainingApiFetch('POST', {
       firstPlayerId: 'training-red', firstFaction: 'red', secondFaction: 'blue',
     })
 
@@ -166,14 +166,14 @@ describe('battle page runtime source', () => {
       templateId: 'blue-ichigo',
       skills: [{ skillId: 'ichigo-zangetsu' }, { skillId: 'ichigo-bankai-tensa-zangetsu' }],
     }
-    const displayed = (context as any).pieceInfoDisplaySkills(piece)
+    const displayed = (context).pieceInfoDisplaySkills(piece)
 
-    expect(displayed.map((skill: any) => skill.skillId)).toEqual([
+    expect(displayed.map((skill: { skillId: string }) => skill.skillId)).toEqual([
       'ichigo-zangetsu', 'ichigo-bankai-tensa-zangetsu', 'ichigo-black-getsuga-tensho',
     ])
     expect(displayed[2]).toMatchObject({ derived: true, triggeredBy: 'ichigo-bankai-tensa-zangetsu' })
     expect(piece.skills).toHaveLength(2)
-    expect((context as any).pieceDispSkills(piece).map((skill: any) => skill.skillId))
+    expect((context).pieceDispSkills(piece).map((skill: { skillId: string }) => skill.skillId))
       .not.toContain('ichigo-black-getsuga-tensho')
   })
 
@@ -215,14 +215,14 @@ describe('battle page runtime source', () => {
       'async ' + runtimeFunction(readBattlePage(), 'cancelPendingHandOptionSelection'),
     ].join('\n')).runInContext(context)
 
-    ;(context as any).syncAuthoritativePendingPresentation()
+    ;(context).syncAuthoritativePendingPresentation()
 
     expect(showOptionPicker).not.toHaveBeenCalled()
     expect(overlay.classList.remove).toHaveBeenCalledWith('show')
-    expect((context as any).pendingHandOptionSelection.selectionId).toBe('prophecy-single')
+    expect((context).pendingHandOptionSelection.selectionId).toBe('prophecy-single')
 
-    ;(context as any).togglePendingHandOption('holy-card-1')
-    await (context as any).confirmPendingHandOptionSelection()
+    ;(context).togglePendingHandOption('holy-card-1')
+    await (context).confirmPendingHandOptionSelection()
     expect(doAction).toHaveBeenNthCalledWith(1, {
       type: 'pendingOptionSelect',
       playerId: 'player-red',
@@ -231,7 +231,7 @@ describe('battle page runtime source', () => {
       stateRevision: 7,
     })
 
-    await (context as any).cancelPendingHandOptionSelection()
+    await (context).cancelPendingHandOptionSelection()
     expect(doAction).toHaveBeenNthCalledWith(2, {
       type: 'cancelPendingSelection',
       playerId: 'player-red',
@@ -264,7 +264,7 @@ describe('battle page runtime source', () => {
       ${runtimeFunction(html, 'selectOptionChoice')}
     `, context)
 
-    ;(context as any).selectOptionChoice(0)
+    ;(context).selectOptionChoice(0)
 
     const submitted = doAction.mock.calls[0]?.[0]
     expect(submitted).toEqual({
@@ -442,14 +442,14 @@ describe('battle page runtime source', () => {
       })
     `, context)
 
-    ;(context as any).dispatchBattleIntent({ type: 'confirm-target-selection' })
+    ;(context).dispatchBattleIntent({ type: 'confirm-target-selection' })
     expect(doAction).not.toHaveBeenCalled()
-    expect((context as any).togglePendingBoardTarget(pieces[0])).toBe(true)
-    expect((context as any).togglePendingBoardTarget(pieces[1])).toBe(true)
-    expect((context as any).togglePendingBoardTarget(pieces[2])).toBe(true)
-    expect((context as any).togglePendingBoardTarget(pieces[3])).toBe(false)
+    expect((context).togglePendingBoardTarget(pieces[0])).toBe(true)
+    expect((context).togglePendingBoardTarget(pieces[1])).toBe(true)
+    expect((context).togglePendingBoardTarget(pieces[2])).toBe(true)
+    expect((context).togglePendingBoardTarget(pieces[3])).toBe(false)
 
-    ;(context as any).dispatchBattleIntent({ type: 'confirm-target-selection' })
+    ;(context).dispatchBattleIntent({ type: 'confirm-target-selection' })
     expect(doAction).toHaveBeenCalledOnce()
     expect(doAction).toHaveBeenCalledWith(expect.objectContaining({
       type: 'pendingTargetSelect',

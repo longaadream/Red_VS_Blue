@@ -1,3 +1,4 @@
+import type { ServerBattleState } from '@/lib/game/battle-storage'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { Script, createContext } from 'node:vm'
@@ -463,7 +464,7 @@ describe('RED-109 authority v2 coordinator', () => {
     expect(store.receiptWrites).toBe(1)
     expect(store.room.version).toBe(9)
     expect(store.room.battleAuthorityVersion).toBe(1)
-    expect((store.room.battleState as any).state.deployment.revision).toBe(0)
+    expect((store.room.battleState as unknown as ServerBattleState & { state: { deployment: { revision: number } } }).state.deployment.revision).toBe(0)
   })
 
   it('uses one fully materialized terminal state for transition, live update, checkpoint and restore', async () => {
@@ -515,7 +516,7 @@ describe('RED-109 authority v2 coordinator', () => {
     expect(terminalTransition.postPublicHash).toBe(hashPublicBattleState(spectatorPublic))
     expect(terminalCheckpoint.publicHash).toBe(terminalTransition.postPublicHash)
     expect(terminalCheckpoint.storage.state).toEqual(terminalState)
-    expect((store.room.battleState as any).state).toEqual(terminalState)
+    expect((store.room.battleState as unknown as ServerBattleState).state).toEqual(terminalState)
 
     const liveUpdate = createPublicBattleTransitionUpdate(terminal, room.id, 'player-red', clock)
     expect(liveUpdate?.postPublicHash).toBe(hashPublicBattleState(toPublicBattleState(terminalState, 'player-red')))
@@ -595,13 +596,13 @@ function containsFunction(value: unknown, seen = new WeakSet<object>()): boolean
 function makeRoom(): Room {
   const state = makeState({
     pieces: [
-      Object.assign(makePiece({ instanceId: 'piece-red', ownerPlayerId: 'player-red', faction: 'red', x: 1, y: 1 }), { isCore: true }) as any,
-      Object.assign(makePiece({ instanceId: 'piece-blue', ownerPlayerId: 'player-blue', faction: 'blue', x: 8, y: 8 }), { isCore: true }) as any,
+      Object.assign(makePiece({ instanceId: 'piece-red', ownerPlayerId: 'player-red', faction: 'red', x: 1, y: 1 }), { isCore: true }),
+      Object.assign(makePiece({ instanceId: 'piece-blue', ownerPlayerId: 'player-blue', faction: 'blue', x: 8, y: 8 }), { isCore: true }),
     ],
     phase: 'start',
-  }) as any
+  })
   // Server checkpoints exclude the runtime-only skill cache before the runner hydrates it.
-  delete state.skillsById
+  Reflect.deleteProperty(state, 'skillsById')
   state.deployment = {
     status: 'awaiting-locks',
     playerIds: ['player-red', 'player-blue'],
@@ -618,7 +619,7 @@ function makeRoom(): Room {
       'piece-blue': { x: 8, y: 8 },
     },
   }
-  pinTestBattleState(state, 109)
+  pinTestBattleState(state as unknown as Record<string, unknown>, 109)
   recordBattleInitialization(state, new RuleRuntime({ rootSeed: 109 }), ['player-red', 'player-blue'])
   return {
     id: 'red109-authority-v2',
@@ -634,6 +635,6 @@ function makeRoom(): Room {
     version: 9,
     battleAuthorityVersion: 1,
     battleAuthorityTransitionHash: 'a'.repeat(64),
-    battleState: createTestServerBattleState(state, 109),
+    battleState: createTestServerBattleState(state as unknown as Record<string, unknown>, 109),
   }
 }
