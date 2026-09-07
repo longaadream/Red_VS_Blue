@@ -274,3 +274,4 @@ var SkillGraphCore = (() => {
   }
   return __toCommonJS(skill_graph_exports);
 })();
+globalThis.SkillGraphCore = SkillGraphCore;

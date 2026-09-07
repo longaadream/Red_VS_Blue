@@ -114,7 +114,7 @@ function loadTraceTools() {
     setTimeout: (callback: () => void) => callback(),
   })
   new Script(source, { filename: 'match-trace.js' }).runInContext(context)
-  return (context.window as any).RvBDeveloperTools
+  return (context.window).RvBDeveloperTools
 }
 
 describe('developer tools match trace boundary', () => {
@@ -229,26 +229,26 @@ describe('developer tools match trace boundary', () => {
     let state = runBattleAction(duel.state, {
       type: 'beginPhase',
       clientActionId: 'compact-begin-red',
-    } as any).state
+    }).state
     state = runBattleAction(state, {
       type: 'endTurn',
       playerId: 'debug-red',
       clientActionId: 'compact-end-red',
-    } as any).state
+    }).state
     state = runBattleAction(state, {
       type: 'beginPhase',
       clientActionId: 'compact-begin-blue',
-    } as any).state
+    }).state
     state = runBattleAction(state, {
       type: 'surrender',
       playerId: 'debug-blue',
       reason: 'voluntary',
       clientActionId: 'compact-surrender-blue',
-    } as any).state
+    }).state
 
-    const replay = (state.extensions as any).debugBattle.replay
+    const replay = (state.extensions)!.debugBattle.replay
     expect(replay.frames).toHaveLength(4)
-    expect(replay.frames.every((frame: any) => (
+    expect(replay.frames.every((frame: { inheritsMap?: boolean; postState: object }) => (
       frame.inheritsMap === true && !Object.hasOwn(frame.postState, 'map')
     ))).toBe(true)
 
@@ -269,7 +269,7 @@ describe('developer tools match trace boundary', () => {
       map: expect.objectContaining({ tiles: expect.any(Array) }),
       terminalResult: expect.objectContaining({ reason: 'surrender' }),
     })
-    const watcher = finalState.pieces.find((piece: any) => piece.templateId === 'blue-watcher')
+    const watcher = finalState.pieces.find((piece: { templateId: string }) => piece.templateId === 'blue-watcher')
     expect(watcher.skills).toContainEqual(expect.objectContaining({
       skillId: 'watcher-ultimate',
       currentCooldown: 0,

@@ -11,10 +11,7 @@
   },
   "android-client/www/js/lan-discover.js": {
     "@typescript-eslint/no-unused-expressions": {
-      "count": 4
-    },
-    "@typescript-eslint/no-unused-vars": {
-      "count": 1
+      "count": 3
     }
   },
   "android-client/www/js/pack-fetch.js": {
@@ -22,19 +19,9 @@
       "count": 3
     }
   },
-  "android-client/www/js/ws-client.js": {
-    "@typescript-eslint/no-unused-vars": {
-      "count": 2
-    }
-  },
   "app/api/debug-battle/route.ts": {
     "@typescript-eslint/no-explicit-any": {
       "count": 6
-    }
-  },
-  "app/api/maps/route.ts": {
-    "@typescript-eslint/no-unused-vars": {
-      "count": 1
     }
   },
   "app/api/pieces/route.ts": {
@@ -125,10 +112,7 @@
   },
   "data/pages/js/lan-discover.js": {
     "@typescript-eslint/no-unused-expressions": {
-      "count": 4
-    },
-    "@typescript-eslint/no-unused-vars": {
-      "count": 1
+      "count": 3
     }
   },
   "data/pages/js/pack-fetch.js": {
@@ -138,20 +122,10 @@
   },
   "electron-client/main.ts": {
     "@typescript-eslint/no-unused-vars": {
-      "count": 2
+      "count": 1
     }
   },
   "electron-client/preload.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 1
-    }
-  },
-  "electron-client/resource-pack-store.ts": {
-    "@typescript-eslint/no-require-imports": {
-      "count": 1
-    }
-  },
-  "electron-editor/preload.ts": {
     "@typescript-eslint/no-explicit-any": {
       "count": 1
     }
@@ -179,9 +153,6 @@
   "lib/game/battle-setup.ts": {
     "@typescript-eslint/no-explicit-any": {
       "count": 3
-    },
-    "@typescript-eslint/no-unused-vars": {
-      "count": 1
     }
   },
   "lib/game/battle-types.ts": {
@@ -215,16 +186,13 @@
   },
   "lib/game/skills.ts": {
     "@typescript-eslint/no-explicit-any": {
-      "count": 153
+      "count": 133
     },
     "@typescript-eslint/no-require-imports": {
       "count": 10
     },
     "@typescript-eslint/no-unused-vars": {
-      "count": 17
-    },
-    "prefer-const": {
-      "count": 1
+      "count": 13
     }
   },
   "lib/game/training-types.ts": {
@@ -234,7 +202,7 @@
   },
   "lib/game/triggers.ts": {
     "@typescript-eslint/no-explicit-any": {
-      "count": 40
+      "count": 32
     },
     "@typescript-eslint/no-require-imports": {
       "count": 3
@@ -242,7 +210,7 @@
   },
   "lib/game/turn.ts": {
     "@typescript-eslint/no-explicit-any": {
-      "count": 129
+      "count": 78
     },
     "@typescript-eslint/no-require-imports": {
       "count": 2
@@ -254,12 +222,7 @@
       "count": 3
     },
     "prefer-const": {
-      "count": 4
-    }
-  },
-  "lib/resource-pack.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 1
+      "count": 2
     }
   },
   "mobile-server/db-shim.ts": {
@@ -322,9 +285,6 @@
     }
   },
   "relay-server/src/store.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 8
-    },
     "@typescript-eslint/no-unused-expressions": {
       "count": 1
     }
@@ -347,11 +307,6 @@
   "scripts/build-mobile-server.js": {
     "@typescript-eslint/no-require-imports": {
       "count": 3
-    }
-  },
-  "scripts/build-resource-pack.js": {
-    "@typescript-eslint/no-require-imports": {
-      "count": 5
     }
   },
   "scripts/cleanup-client-resources.js": {
@@ -425,11 +380,6 @@
       "count": 1
     }
   },
-  "tests/game/debug-battle.test.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 7
-    }
-  },
   "tests/game/movement-contract.test.ts": {
     "@typescript-eslint/no-explicit-any": {
       "count": 2
@@ -442,12 +392,12 @@
   },
   "tests/game/turn.test.ts": {
     "@typescript-eslint/no-explicit-any": {
-      "count": 102
+      "count": 78
     }
   },
   "tests/helpers/minimal-state.ts": {
     "@typescript-eslint/no-explicit-any": {
-      "count": 5
+      "count": 3
     }
   }
 }

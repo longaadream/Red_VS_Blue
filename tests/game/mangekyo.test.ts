@@ -98,19 +98,6 @@ function selectedAction(
   return action
 }
 
-function eventRule(id: string, type: string, effect: (battle: any, context: any) => void) {
-  return {
-    id,
-    name: id,
-    description: '',
-    trigger: { type },
-    effect: (battle: any, context: any) => {
-      effect(battle, context)
-      return { success: true }
-    },
-  }
-}
-
 beforeEach(() => globalTriggerSystem.clearRules())
 afterEach(() => globalTriggerSystem.clearRules())
 

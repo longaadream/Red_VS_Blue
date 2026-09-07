@@ -14,7 +14,7 @@ describe('debug battle pipeline', () => {
     expect(duel.players[1].templateIds).toHaveLength(8)
     expect(duel.state.pieces.some(piece => piece.ownerPlayerId === 'debug-red')).toBe(true)
     expect(duel.state.pieces.some(piece => piece.ownerPlayerId === 'debug-blue')).toBe(true)
-    expect((duel.state.extensions as any).debugBattle.actionLog[0]).toMatchObject({
+    expect((duel.state.extensions)!.debugBattle.actionLog[0]).toMatchObject({
       actionId: 'system-initialize',
       rootSeed: 1234,
       preStateHash: expect.any(String),
@@ -23,11 +23,11 @@ describe('debug battle pipeline', () => {
         expect.objectContaining({ name: 'deployment', startCursor: 0 }),
       ]),
     })
-    expect((duel.state.extensions as any).debugBattle.commandLog[0]).toEqual({
+    expect((duel.state.extensions)!.debugBattle.commandLog[0]).toEqual({
       type: 'initializeBattle',
       playerIds: ['debug-red', 'debug-blue'],
     })
-    expect((duel.state.extensions as any).debugBattle.replay).toMatchObject({
+    expect((duel.state.extensions)!.debugBattle.replay).toMatchObject({
       format: 'rvb-battle-replay/v2',
       initialStateHash: expect.any(String),
       initialCheckpointHash: expect.any(String),
@@ -37,7 +37,7 @@ describe('debug battle pipeline', () => {
       }),
       frames: [],
     })
-    expect(JSON.stringify((duel.state.extensions as any).debugBattle.replay))
+    expect(JSON.stringify((duel.state.extensions)!.debugBattle.replay))
       .not.toContain('debugBattle')
   })
 
@@ -69,7 +69,7 @@ describe('debug battle pipeline', () => {
     ])
     const mirrorBefore = hashStable(mirrorRoom.state)
 
-    const firstAfter = runBattleAction(firstRoom.state, { type: 'beginPhase', clientActionId: 'room-a-1' } as any)
+    const firstAfter = runBattleAction(firstRoom.state, { type: 'beginPhase', clientActionId: 'room-a-1' })
 
     expect(firstAfter.stateHash).not.toBe(hashStable(firstRoom.state))
     expect(hashStable(mirrorRoom.state)).toBe(mirrorBefore)
@@ -114,7 +114,7 @@ describe('debug battle pipeline', () => {
     const result = runBattleAction(duel.state, { type: 'beginPhase' })
 
     expect(result.state.turn.currentPlayerId).toBe('debug-red')
-    expect((result.state as any).pendingOptionSelection).toBeUndefined()
+    expect((result.state).pendingOptionSelection).toBeUndefined()
     expect(result.state.actions?.some(action =>
       action.type === 'triggerEffect' &&
       action.playerId === 'debug-red' &&
@@ -133,7 +133,7 @@ describe('debug battle pipeline', () => {
     let state = runBattleAction(duel.state, { type: 'beginPhase' }).state
     expect(state.pendingOptionSelection).toBeUndefined()
 
-    state = runBattleAction(state, { type: 'endTurn', playerId: 'debug-red' } as any).state
+    state = runBattleAction(state, { type: 'endTurn', playerId: 'debug-red' }).state
     state = runBattleAction(state, { type: 'beginPhase' }).state
 
     expect(state.turn).toMatchObject({ currentPlayerId: 'debug-red', phase: 'end' })
@@ -143,7 +143,7 @@ describe('debug battle pipeline', () => {
       phase: 'start',
     })
     expect(state.pendingOptionSelection?.playerId).toBe('debug-blue')
-    expect(state.pendingOptionSelection?.options.map((option: any) => option.id)).toEqual(['calm', 'rage'])
+    expect(state.pendingOptionSelection?.options.map((option) => option.id)).toEqual(['calm', 'rage'])
   })
 
   it('gives lucky coin to the explicit second player', async () => {
@@ -164,17 +164,17 @@ describe('debug battle pipeline', () => {
 
   it('treats repeated client action ids as idempotent duplicates', async () => {
     const duel = await createDebugDuel({ seed: 77, beginPhase: false })
-    const action = { type: 'beginPhase' as const, clientActionId: 'debug-action-1' } as any
+    const action = { type: 'beginPhase' as const, clientActionId: 'debug-action-1' }
 
     const first = runBattleAction(duel.state, action)
     const duplicate = runBattleAction(first.state, action)
 
     expect(duplicate.duplicate).toBe(true)
     expect(duplicate.stateHash).toBe(first.stateHash)
-    expect((duplicate.state.extensions as any).debugBattle.appliedActionIds).toContain('debug-action-1')
-    const replay = (duplicate.state.extensions as any).debugBattle.replay
+    expect((duplicate.state.extensions)!.debugBattle.appliedActionIds).toContain('debug-action-1')
+    const replay = (duplicate.state.extensions)!.debugBattle.replay
     expect(replay.frames).toHaveLength(1)
-    expect((duel.state.extensions as any).debugBattle.replay.frames).toHaveLength(0)
+    expect((duel.state.extensions)!.debugBattle.replay.frames).toHaveLength(0)
     expect(replay.frames[0]).toMatchObject({
       index: 0,
       traceIndex: 1,
@@ -220,7 +220,7 @@ describe('debug battle pipeline', () => {
   it('keeps replay checkpoints atomic when a command is rejected', async () => {
     const duel = await createDebugDuel({ seed: 7300, beginPhase: false })
     const beforeState = JSON.stringify(duel.state)
-    const beforeReplay = JSON.stringify((duel.state.extensions as any).debugBattle.replay)
+    const beforeReplay = JSON.stringify((duel.state.extensions)!.debugBattle.replay)
 
     expect(() => runBattleAction(duel.state, {
       type: 'move',
@@ -229,10 +229,10 @@ describe('debug battle pipeline', () => {
       toX: -1,
       toY: -1,
       clientActionId: 'rejected-replay-command',
-    } as any)).toThrow()
+    })).toThrow()
 
     expect(JSON.stringify(duel.state)).toBe(beforeState)
-    expect(JSON.stringify((duel.state.extensions as any).debugBattle.replay)).toBe(beforeReplay)
+    expect(JSON.stringify((duel.state.extensions)!.debugBattle.replay)).toBe(beforeReplay)
   })
 
   it('records the committed normalized command while removing transport secrets', async () => {
@@ -242,9 +242,9 @@ describe('debug battle pipeline', () => {
       clientActionId: 'trace-command-1',
       authorization: { token: 'must-not-leak' },
       signature: 'must-not-leak',
-    } as any)
+    } as Parameters<typeof runBattleAction>[1] & { authorization: { token: string }; signature: string })
 
-    const metadata = (result.state.extensions as any).debugBattle
+    const metadata = (result.state.extensions)!.debugBattle
     expect(result.trace).not.toHaveProperty('action')
     expect(metadata.commandLog.at(-1)).toEqual({
       type: 'beginPhase',
@@ -255,14 +255,14 @@ describe('debug battle pipeline', () => {
 
   it('keeps new commands aligned when continuing a trace created before command logging', async () => {
     const duel = await createDebugDuel({ seed: 7302, beginPhase: false })
-    const legacyMetadata = (duel.state.extensions as any).debugBattle
+    const legacyMetadata = (duel.state.extensions)!.debugBattle
     delete legacyMetadata.commandLog
 
     const result = runBattleAction(duel.state, {
       type: 'beginPhase',
       clientActionId: 'trace-command-after-upgrade',
-    } as any)
-    const metadata = (result.state.extensions as any).debugBattle
+    })
+    const metadata = (result.state.extensions)!.debugBattle
 
     expect(metadata.commandLog[0]).toBeUndefined()
     expect(metadata.commandLog[1]).toEqual({

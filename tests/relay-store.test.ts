@@ -1,3 +1,4 @@
+import type { Room } from '../relay-server/src/types'
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const dbHarness = vi.hoisted(() => ({
@@ -11,10 +12,17 @@ const dbHarness = vi.hoisted(() => ({
 
 vi.mock('../relay-server/src/db/client', () => ({ db: { room: dbHarness.room } }))
 
-let store: any
+interface RelayStore {
+  getRoom(id: string): Room | undefined
+  persistRoom(room: Room): Promise<void>
+  deleteRoomPersisted(id: string): Promise<void>
+  withRoomLock<T>(id: string, operation: () => Promise<T>): Promise<T>
+}
+
+let store: RelayStore
 
 beforeAll(async () => {
-  const actual = await vi.importActual<any>('../relay-server/src/store')
+  const actual = await vi.importActual<{ store: RelayStore }>('../relay-server/src/store')
   store = actual.store
 })
 

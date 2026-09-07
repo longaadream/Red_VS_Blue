@@ -1,0 +1,30 @@
+name: ESLint
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: eslint-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: ESLint zero-new violations
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      # Match the locked install documented in docs/qa/RED-186/README.md:
+      # Colyseus has an existing optional Zod peer conflict.
+      - run: npm ci --ignore-scripts --legacy-peer-deps
+      - run: npm run lint
+      - run: npm test -- tests/eslint-config.test.ts

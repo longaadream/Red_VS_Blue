@@ -3,6 +3,28 @@
  * 不依赖文件系统或 battle-setup
  */
 import type { BattleState, PlayerId } from '@/lib/game/turn'
+import type { PieceInstance, PieceSkill, PieceStatusTag } from '@/lib/game/piece'
+import type { TriggerRule } from '@/lib/game/triggers'
+
+/** Minimal fixtures omit presentation fields and permit partial status data. */
+export type TestPiece = Pick<PieceInstance,
+  'instanceId' | 'templateId' | 'ownerPlayerId' | 'faction' | 'currentHp' | 'maxHp'
+  | 'attack' | 'defense' | 'moveRange'> & {
+  x: number
+  y: number
+  name?: string
+  actionPoints: number
+  maxActionPoints: number
+  skills: PieceSkill[]
+  rules: TriggerRule[]
+  statusTags: Partial<PieceStatusTag>[]
+  chargePoints: number
+  maxChargePoints: number
+  usedSkills: string[]
+  hasMoved: boolean
+  momentum?: number
+  facing?: string
+}
 
 const FLOOR_TILE = (x: number, y: number) => ({
   x, y,
@@ -21,23 +43,7 @@ export function makeMap(width = 6, height = 5) {
   return { id: 'test-map', name: 'Test Map', width, height, tiles }
 }
 
-export function makePiece(overrides: Partial<{
-  instanceId: string
-  templateId: string
-  ownerPlayerId: PlayerId
-  faction: 'red' | 'blue'
-  x: number
-  y: number
-  currentHp: number
-  maxHp: number
-  attack: number
-  moveRange: number
-  actionPoints: number
-  maxActionPoints: number
-  skills: string[]
-  rules: any[]
-  statusTags: any[]
-}> = {}) {
+export function makePiece(overrides: Partial<Omit<TestPiece, 'statusTags' | 'rules'>> & { statusTags?: Partial<PieceStatusTag>[]; rules?: Array<Partial<TriggerRule> & { id: string }> } = {}): TestPiece {
   return {
     instanceId:      overrides.instanceId      ?? 'piece-1',
     templateId:      overrides.templateId      ?? 'test-piece',
@@ -53,8 +59,8 @@ export function makePiece(overrides: Partial<{
     actionPoints:    overrides.actionPoints     ?? 2,
     maxActionPoints: overrides.maxActionPoints  ?? 2,
     skills:          overrides.skills           ?? [],
-    rules:           overrides.rules            ?? [],
-    statusTags:      overrides.statusTags       ?? [],
+    rules:           (overrides.rules ?? []) as TriggerRule[],
+    statusTags:      overrides.statusTags ?? [],
     chargePoints:    0,
     maxChargePoints: 0,
     usedSkills:      [],
@@ -86,7 +92,7 @@ export function makePlayer(playerId: PlayerId, faction: 'red' | 'blue') {
 }
 
 export function makeState(options: {
-  pieces?: ReturnType<typeof makePiece>[]
+  pieces?: Array<Pick<PieceInstance, 'instanceId' | 'ownerPlayerId' | 'currentHp'>>
   currentPlayerId?: PlayerId
   phase?: 'start' | 'action' | 'end'
   turnNumber?: number

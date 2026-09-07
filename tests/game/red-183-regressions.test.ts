@@ -37,7 +37,7 @@ describe('RED-183 character rules and selection UI regressions', () => {
     expect(skill.description).toBe('选择本棋子5格内1个空地格，并秘密选择一项：召唤1个影分身；或将本棋子传送至目标格，并在原地留下1个影分身。影分身受到1次伤害后消散，不能行动，被击杀时不提供充能。')
     expect(skill.previewCode).toContain(skill.description)
     expect(skill.effectTags).toContain('秘密选择')
-    const naruto = makePiece({ instanceId: 'naruto-red183', templateId: 'naruto', ownerPlayerId: 'player-red', x: 1, y: 1 }) as any
+    const naruto = makePiece({ instanceId: 'naruto-red183', templateId: 'naruto', ownerPlayerId: 'player-red', x: 1, y: 1 })
     naruto.skills = [{ skillId: skill.id, currentCooldown: 0, usesRemaining: -1 }]
     const state = makeState({ pieces: [naruto], width: 8, height: 8, currentPlayerId: 'player-red', phase: 'action' })
     state.skillsById[skill.id] = skill

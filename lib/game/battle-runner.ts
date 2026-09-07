@@ -77,7 +77,7 @@ export interface BattleReplayResult {
 
 export function runBattleAction(
   state: BattleState,
-  action: BattleAction,
+  action: BattleAction & { clientActionId?: string },
   options: RunBattleActionOptions = {},
 ): BattleActionResult {
   assertRunnableProfile(state)
@@ -256,14 +256,17 @@ export function runBattleAction(
  */
 type SerializableRuleEffectSnapshot = Map<string, Map<string, unknown>>
 
-function ruleEntityKey(kind: 'piece' | 'player', entity: any, index: number): string {
+type RuleEntity = { instanceId?: string; playerId?: string; rules?: unknown }
+
+function ruleEntityKey(kind: 'piece' | 'player', entity: RuleEntity, index: number): string {
   const stableId = kind === 'piece' ? entity?.instanceId : entity?.playerId
   return `${kind}:${typeof stableId === 'string' && stableId ? stableId : `index:${index}`}`
 }
 
-function ruleOccurrenceKey(rule: any, index: number, occurrences: Map<string, number>): string {
-  const base = typeof rule?.id === 'string' && rule.id
-    ? `id:${rule.id}`
+function ruleOccurrenceKey(rule: unknown, index: number, occurrences: Map<string, number>): string {
+  const descriptor = rule as { id?: unknown } | null | undefined
+  const base = typeof descriptor?.id === 'string' && descriptor.id
+    ? `id:${descriptor.id}`
     : `index:${index}`
   const occurrence = occurrences.get(base) ?? 0
   occurrences.set(base, occurrence + 1)
@@ -272,16 +275,16 @@ function ruleOccurrenceKey(rule: any, index: number, occurrences: Map<string, nu
 
 function captureSerializableRuleEffects(state: BattleState): SerializableRuleEffectSnapshot {
   const snapshot: SerializableRuleEffectSnapshot = new Map()
-  const captureEntities = (entities: readonly any[], kind: 'piece' | 'player') => {
+  const captureEntities = (entities: readonly RuleEntity[], kind: 'piece' | 'player') => {
     entities.forEach((entity, entityIndex) => {
       if (!Array.isArray(entity?.rules)) return
       const descriptors = new Map<string, unknown>()
       const occurrences = new Map<string, number>()
-      entity.rules.forEach((rule: any, ruleIndex: number) => {
+      entity.rules.forEach((rule: unknown, ruleIndex: number) => {
         const ruleKey = ruleOccurrenceKey(rule, ruleIndex, occurrences)
         if (!rule || typeof rule !== 'object' || Array.isArray(rule)) return
         if (!Object.prototype.hasOwnProperty.call(rule, 'effect')) return
-        const effect = rule.effect
+        const effect = (rule as { effect?: unknown }).effect
         if (effect === undefined || typeof effect === 'function') return
         descriptors.set(ruleKey, cloneRuntimeValue(effect))
       })

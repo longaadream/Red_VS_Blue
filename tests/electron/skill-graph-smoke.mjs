@@ -48,7 +48,7 @@ function call(method,params={}) {
   return new Promise((resolve,reject) => {
     const id=++sequence
     const timer=setTimeout(()=>{socket.removeEventListener('message',onMessage);reject(new Error('CDP timeout: '+method))},20000)
-    const onMessage=event=>{const result=JSON.parse(event.data);if(result.id!==id)return;clearTimeout(timer);socket.removeEventListener('message',onMessage);result.error?reject(new Error(JSON.stringify(result.error))):resolve(result.result)}
+    const onMessage=event=>{const result=JSON.parse(event.data);if(result.id!==id)return;clearTimeout(timer);socket.removeEventListener('message',onMessage);if(result.error){reject(new Error(JSON.stringify(result.error)))}else{resolve(result.result)}}
     socket.addEventListener('message',onMessage);socket.send(JSON.stringify({id,method,params}))
   })
 }
