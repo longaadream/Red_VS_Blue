@@ -311,8 +311,11 @@
     }
 
     function resolveIdentity(event) {
+      const group = roots.find(function (entry) { return entry.rootEventId === event.rootEventId })
       return actionIdentity && typeof actionIdentity.resolve === 'function'
-        ? actionIdentity.resolve(event, identityModel())
+        ? actionIdentity.resolve(event, Object.assign({}, identityModel(), {
+          presentationEvents: group ? [group.root].concat(group.children || []) : [],
+        }))
         : { isSkill: false, skillName: '', sourceName: '', portraitSrc: '', portraitFallback: '?', faction: '' }
     }
 

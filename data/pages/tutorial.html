@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>新人练习 · 红蓝大作战</title>
+  <script src="js/tutorial/tutorial-lessons.js"></script>
+  <link rel="stylesheet" href="css/tabletop/tabletop.css">
+  <link rel="stylesheet" href="css/tutorial.css">
+</head>
+<body data-art-page="tutorial"><main>
+  <nav class="lesson-nav"><a class="back-link" href="index.html">← 返回大厅</a><span>红蓝桌游社 · 新人练习册</span></nav>
+  <header class="lesson-welcome"><div><p class="lesson-eyebrow">摆好棋子，开一局吧！</p><h1>五局练习，一步步学会。</h1>
+  <p class="intro">敌人更少，残局更短。练习关键操作，再亲手赢下每一局。</p></div><div class="lesson-stamp" aria-hidden="true">新 人<br>入 社</div></header>
+  <div class="lesson-table-heading"><span>从第一局开始，也可以选你想练的</span><span aria-hidden="true">选一张练习卡 ↓</span></div>
+  <section class="grid" id="lessons" aria-label="选择教学对局"></section>
+  <div class="rules"><span class="rule-mark" aria-hidden="true">!</span><div><strong>先记住：保护自己的场上核心。</strong><br>一方场上核心全灭即判负，双方同时全灭则平局。预备棋子和普通召唤物不能代替场上核心。</div></div>
+  <footer>本地练习 · 前五局开放，第六局暂未开放。暂不保存章节成绩，不计入真人战绩。<details><summary>关于这版练习</summary><p>第六局将在对战 AI 改善后再开放。</p><a href="battle.html?mode=tutorial">打开旧版引导</a></details></footer>
+</main>
+<script>
+  RvBTutorialLessons.all.forEach(function (lesson) {
+    const card = document.createElement('article')
+    const available = lesson.enabled !== false
+    card.className = 'lesson-card lesson-card--' + lesson.number + (available ? '' : ' is-unavailable')
+    const art = document.createElement('div'); art.className = 'lesson-art'; art.setAttribute('aria-hidden', 'true')
+    const sketches = [
+      ['uther.jpg', 'reaper.jpg', '↗', '出招！'], ['jaina.jpg', 'uther.jpg', '+', '增援！'],
+      ['anduin.jpg', 'uther.jpg', '+', '守住！'], ['uther.jpg', 'reaper.jpg', '↝', '绕过去！'],
+      ['jaina.jpg', 'uther.jpg', '◇', '充能！'], ['uther.jpg', 'reaper.jpg', 'VS', '开局！']
+    ]
+    const sketch = sketches[lesson.number - 1]
+    sketch.slice(0, 2).forEach(function (file, i) { const token = document.createElement('img'); token.src = 'images/' + file; token.alt = ''; token.className = 'lesson-token token-' + i; art.appendChild(token) })
+    const gesture = document.createElement('span'); gesture.className = 'lesson-gesture'; gesture.textContent = sketch[2]
+    const shout = document.createElement('span'); shout.className = 'lesson-shout'; shout.textContent = sketch[3]
+    art.append(gesture, shout)
+    const label = document.createElement('div'); label.className = 'label'; label.textContent = '第 ' + lesson.number + ' 局'
+    const title = document.createElement('h2'); title.textContent = lesson.title
+    const copy = document.createElement('p'); copy.textContent = available ? lesson.summary : '暂未开放，等待对战 AI 改善后再与你见面。'
+    const meta = document.createElement('div'); meta.className = 'meta'; meta.textContent = lesson.size + ' 对 ' + lesson.opponentSize + ' · 敌方初始 ' + lesson.opponentHp + ' 生命 · ' + (lesson.standard || lesson.progressive ? '渐进部署' : '教学残局')
+    const start = document.createElement(available ? 'a' : 'span'); start.className = 'start'
+    if (available) start.href = 'battle.html?mode=tutorial&lesson=' + encodeURIComponent(lesson.id)
+    else start.setAttribute('aria-disabled', 'true')
+    start.textContent = available ? '进入第 ' + lesson.number + ' 局' : '暂未开放'
+    card.append(label, art, title, copy, meta, start); document.getElementById('lessons').appendChild(card)
+  })
+</script></body></html>

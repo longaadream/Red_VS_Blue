@@ -1,7 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
-<defs><pattern id="grain" width="37" height="43" patternUnits="userSpaceOnUse"><path d="M6 8l5 1m13 19 3-1M10 35l2-2" stroke="#736a54" stroke-width=".8" opacity=".1"/><circle cx="29" cy="6" r=".7" fill="#736a54" opacity=".14"/></pattern><radialGradient id="wash"><stop stop-color="#fffef9"/><stop offset="1" stop-color="#ece7d7"/></radialGradient></defs>
-<rect width="256" height="256" fill="url(#wash)"/><rect width="256" height="256" fill="url(#grain)"/>
-<path d="M3 6 Q113 2 250 5 L253 129 249 251 Q137 254 5 250 L3 6" fill="none" stroke="#3c463d" stroke-width="3" opacity=".6"/>
-<path d="M10 14Q101 9 237 13M11 17l1 95" fill="none" stroke="#fff" stroke-width="2" opacity=".35"/>
-<path d="M12 228l9-11m-2 21 12-13M217 16l19 2M178 223q19-4 33-1M47 41l13-1M40 44l8 1M148 96l7 2" fill="none" stroke="#555e50" stroke-width="1.6" opacity=".15"/>
-<g fill="#989783" opacity=".13"><circle cx="50" cy="78" r="1.5"/><circle cx="78" cy="161" r="1.5"/><circle cx="155" cy="120" r="1.5"/><circle cx="198" cy="207" r="1.5"/></g></svg>
+<defs><pattern id="dots" width="12" height="12" patternUnits="userSpaceOnUse"><circle cx="3" cy="3" r="1.5" fill="#514a40" opacity=".22"/></pattern></defs>
+<path fill="#faf6e9" d="M0 0h256v256H0z"/>
+<path fill="#c8bdab" d="m0 214 72 14 95-5 89 12v21H0z"/>
+<path fill="url(#dots)" d="M0 163 75 201 142 220 256 194v62H0z"/>
+<path d="m3 7 93-3 78 2 76-2 2 88-2 70 3 88-84 2-81-3-84 3-1-84 2-71Z" fill="none" stroke="#423c34" stroke-width="5.5" stroke-linejoin="round"/>
+<path d="m17 23 51-3m-48 4-2 25M24 219l14-16m-2 25 16-19m-2 23 10-11M198 225l34-3" fill="none" stroke="#51493e" stroke-width="2.5" stroke-linecap="round" opacity=".45"/>
+</svg>

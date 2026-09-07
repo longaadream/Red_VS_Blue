@@ -420,10 +420,11 @@ function commandCardId(command: Record<string, unknown>, beforeState: BattleStat
     : undefined
 }
 
-function pendingSource(beforeState: BattleState): { id?: string; pieceId?: string; playerId?: string } {
+function pendingSource(beforeState: BattleState): { id?: string; type?: string; pieceId?: string; playerId?: string } {
   const pending = beforeState.pendingOptionSelection ?? beforeState.pendingTargetSelection
   return {
     id: text(pending?.source?.id),
+    type: text(pending?.source?.type),
     pieceId: text(pending?.source?.pieceId),
     playerId: text(pending?.playerId),
   }
@@ -477,12 +478,17 @@ function rootDraft(command: Record<string, unknown>, beforeState: BattleState, c
   const targetPieceIds = commandTargets(command)
   const targetCell = commandCell(command)
   const cardId = commandCardId(command, beforeState)
-  const skillId = text(command.skillId) ?? pending.id
+  const skillId = text(command.skillId) ?? (pending.type === 'skill' ? pending.id : undefined)
+  const ruleId = pending.type === 'rule' ? pending.id : undefined
   const skillName = skillId ? text(beforeState.skillsById?.[skillId]?.name) : undefined
   const sourcePiece = sourcePieceId
     ? beforeState.pieces.find(piece => piece.instanceId === sourcePieceId)
     : undefined
-  const result = command.type === 'move' && targetCell
+  const pendingSelection = beforeState.pendingOptionSelection ?? beforeState.pendingTargetSelection
+  const cancelled = command.type === 'cancelPendingSelection' || (command.type === 'pendingOptionSelect'
+    && pendingSelection && 'cancelValue' in pendingSelection && pendingSelection.cancelValue !== undefined
+    && Object.is(command.selectedOption, pendingSelection.cancelValue))
+  const result: EventDraft['result'] = cancelled ? { cancelled: true } : command.type === 'move' && targetCell
     ? {
         ...(finite(sourcePiece?.x) !== undefined ? { fromX: finite(sourcePiece?.x)! } : {}),
         ...(finite(sourcePiece?.y) !== undefined ? { fromY: finite(sourcePiece?.y)! } : {}),
@@ -500,7 +506,8 @@ function rootDraft(command: Record<string, unknown>, beforeState: BattleState, c
     actorPlayerId,
     ...(sourcePieceId ? { sourcePieceId } : {}),
     ...(skillId ? { skillId } : {}),
-    ...(skillName ? { label: skillName } : {}),
+    ...(ruleId ? { ruleId } : {}),
+    ...(skillName ? { label: skillName } : ruleId ? { label: text(sourcePiece?.rules?.find(rule => rule.id === ruleId)?.name) } : {}),
     ...(cardId ? { cardId } : {}),
     ...(targetPieceIds.length > 0 ? { targetPieceIds } : {}),
     ...(targetCell ? { targetCell } : {}),
@@ -877,6 +884,31 @@ function historyContext(draft: EventDraft, before: BattleState, after: BattleSta
   return { turn: before.turn.turnNumber, pieces, cells }
 }
 
+function pendingSkillDrafts(before: BattleState, after: BattleState, initiatingPieceId?: string): EventDraft[] {
+  const previous = [before.pendingOptionSelection, before.pendingTargetSelection].filter(Boolean)
+  const seen = new Set<string>()
+  return [after.pendingOptionSelection, after.pendingTargetSelection].flatMap(pending => {
+    if (!pending?.source || !['skill', 'rule'].includes(pending.source.type)) return []
+    const sourcePieceId = text(pending.source.pieceId)
+    const skillId = text(pending.source.id)
+    const actorPlayerId = text(pending.playerId)
+    if (!sourcePieceId || sourcePieceId === initiatingPieceId || !skillId || !actorPlayerId) return []
+    const key = text(pending.selectionId) ?? `${actorPlayerId}:${sourcePieceId}:${skillId}`
+    if (seen.has(key) || previous.some(old => old && (
+      text(old.selectionId) ?? `${old.playerId}:${old.source?.pieceId}:${old.source?.id}`
+    ) === key)) return []
+    seen.add(key)
+    return [{
+      kind: 'passive', iconId: 'action-passive', sourcePieceId, actorPlayerId,
+      ...(pending.source.type === 'skill' ? { skillId } : { ruleId: skillId }),
+      label: pending.source.type === 'skill' ? text(after.skillsById[skillId]?.name)
+        : text(after.pieces.find(piece => piece.instanceId === sourcePieceId)?.rules?.find(rule => rule.id === skillId)?.name),
+      result: { pending: true },
+      visibility: 'actorOnly', visibleToPlayerIds: [actorPlayerId], priority: 80, skippable: true,
+    } satisfies EventDraft]
+  })
+}
+
 export function projectBattlePresentationEvents(
   input: BattlePresentationProjectionInput,
 ): BattlePresentationEvent[] {
@@ -913,6 +945,9 @@ export function projectBattlePresentationEvents(
     const viewerId = root.actorPlayerId
     children = children.map(draft => markPrivate(draft, viewerId))
   }
+  // Announce only the responding skill's identity to its chooser, never its
+  // candidates or options. Its eventual resolution remains a separate action.
+  children.push(...pendingSkillDrafts(input.beforeState, input.afterState, root.sourcePieceId))
   const rootEventId = `${actionId}:0`
   return [root, ...children].map((draft, sequence) => ({
     eventId: `${actionId}:${sequence}`,
