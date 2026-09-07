@@ -29,7 +29,7 @@ describe('Tracer Recall option resolution', () => {
       y: 3,
       currentHp: 11,
       maxHp: 15,
-    }) as any
+    })
     tracer.skills = [{
       skillId: 'recall',
       level: 1,
@@ -61,7 +61,7 @@ describe('Tracer Recall option resolution', () => {
 
     const result = runBattleAction(state, action, { rootSeed: 127 }).state
 
-    expect((result.extensions as any).recallData).toEqual([expect.objectContaining({
+    expect((result.extensions)!.recallData).toEqual([expect.objectContaining({
       pieceId: tracer.instanceId,
       ownerPlayerId: 'player-red',
       targetCount: 4,
@@ -81,14 +81,14 @@ describe('Tracer Recall option resolution', () => {
       y: 3,
       currentHp: 11,
       maxHp: 15,
-    }) as any
+    })
     const enemy = makePiece({
       instanceId: 'enemy',
       ownerPlayerId: 'player-blue',
       faction: 'blue',
       x: 7,
       y: 7,
-    }) as any
+    })
     tracer.skills = [{
       skillId: 'recall',
       level: 1,
@@ -125,17 +125,19 @@ describe('Tracer Recall option resolution', () => {
     const triggerContext = {
       piece: activeTracer,
       sourcePiece: activeEnemy,
+      skill: moveTrigger,
+      targetPosition: null,
       target: null,
       playerId: activeEnemy.ownerPlayerId,
       battle: configured,
-    } as any
+    }
     executeSkillFunction(moveTrigger, triggerContext, configured)
-    expect((configured.extensions as any).recallData[0]).toMatchObject({ actionCount: 1 })
+    expect((configured.extensions)!.recallData[0]).toMatchObject({ actionCount: 1 })
     expect(activeTracer).toMatchObject({ x: 5, y: 6, currentHp: 3 })
 
     executeSkillFunction(moveTrigger, triggerContext, configured)
     expect(activeTracer).toMatchObject({ x: 2, y: 3, currentHp: 11 })
-    expect((configured.extensions as any).recallData).toEqual([])
+    expect((configured.extensions)!.recallData).toEqual([])
   })
 
   it('cancels Recall and consumes the snapshot when the exact saved cell is occupied', () => {
@@ -143,11 +145,11 @@ describe('Tracer Recall option resolution', () => {
     const tracer = makePiece({
       instanceId: 'blocked-tracer', templateId: 'tracer', ownerPlayerId: 'player-red',
       x: 4, y: 3, currentHp: 3, maxHp: 15,
-    }) as any
-    const blocker = makePiece({ instanceId: 'recall-blocker', ownerPlayerId: 'player-blue', x: 2, y: 1 }) as any
-    const actor = makePiece({ instanceId: 'enemy-actor', ownerPlayerId: 'player-blue', x: 5, y: 4 }) as any
-    const state = makeState({ pieces: [tracer, blocker, actor], width: 7, height: 6 }) as any
-    state.extensions.recallData = [{
+    })
+    const blocker = makePiece({ instanceId: 'recall-blocker', ownerPlayerId: 'player-blue', x: 2, y: 1 })
+    const actor = makePiece({ instanceId: 'enemy-actor', ownerPlayerId: 'player-blue', x: 5, y: 4 })
+    const state = makeState({ pieces: [tracer, blocker, actor], width: 7, height: 6 })
+    state.extensions!.recallData = [{
       pieceId: tracer.instanceId,
       ownerPlayerId: tracer.ownerPlayerId,
       targetCount: 1,
@@ -162,10 +164,10 @@ describe('Tracer Recall option resolution', () => {
       target: null,
       targetPosition: null,
       skill: { id: trigger.id, name: trigger.name, type: trigger.type, powerMultiplier: 1 },
-    } as any, state)
+    } as import('@/lib/game/skills').SkillExecutionContext, state)
 
     expect(tracer).toMatchObject({ x: 4, y: 3, currentHp: 3 })
-    expect(state.extensions.recallData).toEqual([])
+    expect(state.extensions!.recallData).toEqual([])
   })
 
 })

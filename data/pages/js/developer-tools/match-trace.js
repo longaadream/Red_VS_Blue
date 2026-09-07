@@ -480,7 +480,7 @@
     var parsed
     try {
       parsed = JSON.parse(text)
-    } catch (_error) {
+    } catch {
       throw new Error('Trace JSON is damaged or invalid')
     }
     return assertTraceRecord(parsed)
@@ -515,7 +515,7 @@
       if (!record) return readLocalTrace()
       try {
         return assertTraceRecord(record)
-      } catch (_error) {
+      } catch {
         return null
       }
     }).catch(function () {
@@ -528,7 +528,7 @@
     if (!serialized) return null
     try {
       return assertTraceRecord(JSON.parse(serialized))
-    } catch (_error) {
+    } catch {
       return null
     }
   }
@@ -626,7 +626,7 @@
     try {
       var value = JSON.parse(serialized)
       return value && typeof value === 'object' ? sanitize(value) : null
-    } catch (_error) {
+    } catch {
       return { invalidMarker: true }
     }
   }

@@ -96,8 +96,7 @@ describe('RED-69 battle motion contract', () => {
     const clearReasons: string[] = []
     const recoveryRequests: string[][] = []
     let timeoutCallback: (() => void) | null = null
-    let context: ReturnType<typeof createContext>
-    context = createContext({
+    const context: ReturnType<typeof createContext> = createContext({
       pendingActionFeedback: null,
       pendingActionFeedbackTimer: null,
       authorityPerformanceSamples: [],

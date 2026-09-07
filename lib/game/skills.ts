@@ -93,7 +93,7 @@ export function getEffectiveChargeCost(
   return Math.max(0, cost)
 }
 
-function checkSynchronousTriggers(battle: BattleState, context: any): TriggerResult {
+function checkSynchronousTriggers(battle: BattleState, context: import('./triggers').TriggerContext): TriggerResult {
   const result = getActiveTriggerSystem().checkTriggers(battle, context)
   if (result.needsOptionSelection || result.needsTargetSelection) {
     const kind = result.needsOptionSelection ? 'option' : 'target'
@@ -150,7 +150,7 @@ export function restorePersistedRuleRuntime(
   persistedRule: unknown,
   sourceId: string,
 ): RuntimeTriggerRule {
-  const persistedLimits = (persistedRule as any)?.limits
+  const persistedLimits = (persistedRule as { limits?: unknown } | null | undefined)?.limits
   if (persistedLimits === undefined) return reloadedRule
   if (!persistedLimits || typeof persistedLimits !== 'object' || Array.isArray(persistedLimits)) {
     rethrowAttachedEffectContentError(
@@ -239,7 +239,7 @@ function writeLog(message: string) {
 }
 
 // 效果函数类型
-type EffectFunction = (battle: BattleState, context: any) => { success: boolean; message?: string; blocked?: boolean }
+type EffectFunction = import('./triggers').EffectFunction
 
 // 规则定义类型
 interface RuleDefinition {
@@ -1154,16 +1154,16 @@ function ensureSkillDefinitionForAddition(
   skillId: string,
   sourceId: string,
 ): SkillDefinition | null {
-  const embedded = (battle as any).skillsById?.[skillId]
+  const embedded = battle.skillsById?.[skillId]
   const definition = loadSkillForBattle(battle, skillId, embedded, {
     requireExecutable: true,
     metadata: { sourceId, skillId },
   })
   if (!definition) return null
-  if (!(battle as any).skillsById || typeof (battle as any).skillsById !== 'object') {
-    ;(battle as any).skillsById = {}
+  if (!battle.skillsById || typeof battle.skillsById !== 'object') {
+    ;battle.skillsById = {}
   }
-  ;(battle as any).skillsById[skillId] = definition
+  ;battle.skillsById[skillId] = definition
   return definition
 }
 
@@ -1554,7 +1554,7 @@ export function loadRuleById(
               const skillDef = loadSkillForBattle(
                 battle,
                 skillId,
-                (battle as any).skillsById?.[skillId],
+                battle.skillsById?.[skillId],
                 {
                   requireExecutable: true,
                   metadata: {
@@ -3347,7 +3347,7 @@ function commitSummonAfterDeath(
   piece.statusTags = (profile.statusTags || []).map(tag => cloneEffectTransactionValue(tag))
   hydratePreparedPieceDefinitions(battle, piece, rejection)
 
-  const beforeContext: Record<string, unknown> = {
+  const beforeContext: import('./triggers').TriggerContext = {
     type: 'beforePieceSummoned',
     piece: cloneEffectTransactionValue(piece),
     playerId: piece.ownerPlayerId,
@@ -3413,7 +3413,7 @@ function resolveDeathBatch(
     targetIds: string[]
     sourceId?: string
     skillId?: string
-  } | undefined
+  } | undefined = undefined
   const rejection = (message: string, cause?: unknown): never => {
     const targetIds = frozenDiagnostics?.targetIds ?? (Array.isArray(request.candidates)
       ? request.candidates.map(candidate => candidate?.piece?.instanceId).filter(Boolean) as string[]
@@ -4491,7 +4491,7 @@ export function hydratePreparedPieceDefinitions(
     hydrateRule((descriptor as any)?.id, descriptor)
   }
   for (const status of piece.statusTags || []) {
-    const relatedRules = (status as any)?.relatedRules
+    const relatedRules = status?.relatedRules
     if (relatedRules === undefined) continue
     if (!Array.isArray(relatedRules)) {
       fatal(`Summoned piece ${piece.instanceId} has invalid status relatedRules`)
@@ -4505,7 +4505,7 @@ export function hydratePreparedPieceDefinitions(
   const skillIds = new Set<string>()
   for (const descriptor of [
     ...(piece.skills || []),
-    ...((piece as any).displaySkills || []),
+    ...(piece.displaySkills || []),
   ]) {
     const skillId = typeof descriptor === 'string'
       ? descriptor
@@ -4519,7 +4519,7 @@ export function hydratePreparedPieceDefinitions(
     const definition = loadSkillForBattle(
       battle,
       skillId,
-      (battle as any).skillsById?.[skillId],
+      battle.skillsById?.[skillId],
       { metadata: { sourceId: piece.instanceId, skillId } },
     )
     if (!definition) fatal(`Summoned piece ${piece.instanceId} skill ${skillId} was not found`)
@@ -4764,7 +4764,7 @@ export function resolveDeclaredContentSummonBatch(
 
     // Phase 3: stable before events. Rules may redirect positions, never instances.
     for (const entry of stablePrepared) {
-      const beforeContext: Record<string, unknown> = {
+      const beforeContext: import('./triggers').TriggerContext = {
         ...declaredSummonTriggerContext(
           request,
           context,
@@ -5231,7 +5231,7 @@ export function healDamage(
 
 // 执行技能函数
 export function executeSkillFunction(skillDef: SkillDefinition, context: SkillExecutionContext, battle: BattleState): SkillExecutionResult {
-  const expectedSkillId = String((context as any)?.skill?.id ?? skillDef?.id ?? '')
+  const expectedSkillId = String(context?.skill?.id ?? skillDef?.id ?? '')
   try {
     skillDef = assertSkillDefinition(expectedSkillId, skillDef, { requireExecutable: true })
   } catch (error) {
@@ -5240,9 +5240,9 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
       error,
       `SkillCode ${expectedSkillId || '<empty>'} has an invalid definition during an EffectBatch`,
       {
-        sourceId: (context as any)?.piece?.instanceId,
+        sourceId: context?.piece?.instanceId,
         skillId: expectedSkillId,
-        targetId: (context as any)?.target?.instanceId,
+        targetId: context?.target?.instanceId,
       },
     )
     return { success: false, message: `技能定义无效: ${expectedSkillId || '<empty>'}` }
@@ -5506,10 +5506,10 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
           if (!existingSkill) {
             const newSkill = { skillId: skillId, currentCooldown: 0 };
             targetPiece.skills.push(newSkill);
-            if ((targetPiece as any).displaySkills !== undefined) {
-              const alreadyInDisplay = (targetPiece as any).displaySkills.some((s: any) =>
+            if (targetPiece.displaySkills !== undefined) {
+              const alreadyInDisplay = targetPiece.displaySkills.some(s =>
                 (typeof s === 'string' ? s : s.skillId) === skillId);
-              if (!alreadyInDisplay) (targetPiece as any).displaySkills.push(newSkill);
+              if (!alreadyInDisplay) targetPiece.displaySkills.push(newSkill);
             }
             return true;
           }
@@ -5521,8 +5521,8 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
         if (targetPiece && targetPiece.skills) {
           const originalLength = targetPiece.skills.length;
           targetPiece.skills = targetPiece.skills.filter(skill => skill.skillId !== skillId);
-          if ((targetPiece as any).displaySkills !== undefined) {
-            (targetPiece as any).displaySkills = (targetPiece as any).displaySkills.filter((s: any) =>
+          if (targetPiece.displaySkills !== undefined) {
+            targetPiece.displaySkills = targetPiece.displaySkills.filter(s =>
               (typeof s === 'string' ? s : s.skillId) !== skillId);
           }
           return targetPiece.skills.length < originalLength;
@@ -5573,7 +5573,7 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
           battleDebugLog(`[addPlayerRuleById] Rule not found: ${ruleId}`);
           return false;
         }
-        battleDebugLog(`[addPlayerRuleById] Loaded rule: ${(rule as any).id}`);
+        battleDebugLog(`[addPlayerRuleById] Loaded rule: ${rule.id}`);
         if (!player.rules) player.rules = [];
         if (player.rules.some((r: any) => r.id === ruleId)) {
           battleDebugLog(`[addPlayerRuleById] Rule already exists: ${ruleId}`);
@@ -5700,7 +5700,7 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
           const executeSkill = getSkillExecutionCaches().dynamicCodeRuntime.compileExpression<(environment: typeof skillEnvironment) => SkillExecutionResult>({
             surface: 'skillCode', contentId: skillDef.id, code: fullSkillCode, entry: 'executeSkill(context)',
           });
-          let result = executeSkill(skillEnvironment);
+          const result = executeSkill(skillEnvironment);
           finishSealedContentExecution(battle, sealedContent)
 
           for (const snapshot of beforeState.movementBlocked) {
@@ -5766,7 +5766,7 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
           checkForDamageAndKill(battle, beforeState, sourcePiece, skillDef.id);
 
           // 仅在技能成功时触发 afterSkillUsed（失败技能不计入"释放技能"次数）
-          if (result && result.success && !(battle as any).extensions?.__dryRunSkillPreflight) {
+          if (result && result.success && !battle.extensions?.__dryRunSkillPreflight) {
             const skillUsedResult = checkSynchronousTriggers(battle, {
               type: "afterSkillUsed",
               sourcePiece,

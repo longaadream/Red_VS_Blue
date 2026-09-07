@@ -439,7 +439,8 @@ async function verifyLanLuckyCoinFallback(port, sourceTarget) {
   writeFileSync(red105ScreenshotPath, Buffer.from(screenshot, 'base64'))
   const detailPath = red105ScreenshotPath.replace(/\.png$/i, '-detail.png')
   writeFileSync(detailPath, Buffer.from(detailScreenshot, 'base64'))
-  const { cardClip: _cardClip, ...evidence } = runtime
+  const evidence = { ...runtime }
+  delete evidence.cardClip
   return { ...evidence, screenshotPath: red105ScreenshotPath, screenshotDetailPath: detailPath }
 }
 

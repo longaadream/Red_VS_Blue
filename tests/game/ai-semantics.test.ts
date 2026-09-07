@@ -1,3 +1,4 @@
+import type { BattleAction } from '@/lib/game/turn'
 import { execFileSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
@@ -42,7 +43,7 @@ describe('AI semantic contract', () => {
 
   it('preserves fixed-seed action trace and final state hash when semantic metadata changes', () => {
     const buildState = () => makeState({ pieces: [makePiece({ instanceId: 'red', ownerPlayerId: 'player-red', x: 1, y: 1 }), makePiece({ instanceId: 'blue', ownerPlayerId: 'player-blue', x: 4, y: 1 })] })
-    const action = { type: 'move', playerId: 'player-red', pieceId: 'red', toX: 2, toY: 1, clientActionId: 'semantic-contract-move' } as any
+    const action: BattleAction & { clientActionId: string } = { type: 'move', playerId: 'player-red', pieceId: 'red', toX: 2, toY: 1, clientActionId: 'semantic-contract-move' }
     const beforeRegistry = JSON.parse(readFileSync(resolve(process.cwd(), 'data/rules/ai-semantics.json'), 'utf8'))
     const afterRegistry = { ...beforeRegistry, profiles: { ...beforeRegistry.profiles, automatic: { ...beforeRegistry.profiles.automatic, mechanics: ['move'] } } }
     const first = runBattleAction(buildState(), action, { rootSeed: 8501 })

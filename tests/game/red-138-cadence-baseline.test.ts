@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any -- cadence evidence inspects authority metadata. */
 import { beforeAll, describe, expect, it } from 'vitest'
 
 import { loadMaps } from '@/config/maps'

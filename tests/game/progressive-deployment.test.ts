@@ -952,7 +952,7 @@ describe('RED-138 progressive reserve deployment', () => {
         pieceId: offeredPieceId,
         toX: freeTarget.x,
         toY: freeTarget.y,
-      }, { rootSeed: seed }).state
+      }, { rootSeed: seed })
     } catch (error) {
       rejection = error
     } finally {
