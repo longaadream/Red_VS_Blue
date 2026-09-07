@@ -70,9 +70,7 @@ export interface BattleActionTrace {
 export interface DeploymentTraceEvidence {
   command?: 'initialize' | 'select' | 'lock' | 'timeout' | 'deploy'
   mode?: 'legacy-reroll-v1' | 'progressive-reserve-v1'
-  status?: BattleState['deployment'] extends infer _Deployment
-    ? NonNullable<BattleState['deployment']>['status']
-    : never
+  status?: NonNullable<BattleState['deployment']>['status']
   initialPositions?: Record<string, { x: number; y: number }>
   choices?: Record<string, { pieceId: string | null }>
   locks?: Record<string, { locked: boolean; reason?: 'player' | 'timeout' }>

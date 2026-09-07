@@ -9,7 +9,6 @@ import {
   createDeclaredSummonQueueWriter,
   createEffectChain,
   createHealQueueWriter,
-  createSummonQueueWriter,
   getActiveEffectChain,
   installEffectChain,
   isEffectChainFatalError,
@@ -342,7 +341,8 @@ describe('RED-139 EffectChain core scheduler', () => {
         ...noOpHandlers(),
         damage: (_request, _context, active) => {
           active.latchPending(pending)
-          ;(active as any).batchStack = []
+          // Deliberately corrupt a private stack to exercise the fatal boundary.
+          Reflect.set(active, 'batchStack', [])
           throw pending
         },
       })
@@ -362,7 +362,7 @@ describe('RED-139 EffectChain core scheduler', () => {
   it('rejects a stored unique-piece capability that declares more than one summon', () => {
     const effectChain = chain()
     const before = effectChain.snapshot()
-    let caught: any
+    let caught: unknown
 
     try {
       createDeclaredSummonQueueWriter(effectChain, 'stored-unique-probe', {
@@ -378,7 +378,7 @@ describe('RED-139 EffectChain core scheduler', () => {
       code: 'RVB_EFFECT_CHAIN_SUMMON_CAPABILITY',
       context: expect.objectContaining({ kind: 'summon', skillId: 'stored-unique-probe' }),
     })
-    expect(caught.cause?.message).toContain('maxSummons must be exactly 1')
+    expect(caught).toMatchObject({ cause: { message: expect.stringContaining('maxSummons must be exactly 1') } })
     expect(effectChain.snapshot()).toEqual(before)
   })
   it('rejects an unknown kind before ID allocation or scheduler mutation', () => {

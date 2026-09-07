@@ -1878,6 +1878,13 @@ handleTrusted('pack-list', ['game'], async () => {
 
 let mainWin: BrowserWindow | null = null
 
+function getApplicationIconPath(): string {
+  const root = app.isPackaged
+    ? path.join(process.resourcesPath, 'branding')
+    : path.join(__dirname, '..', '..', 'build', 'branding')
+  return path.join(root, process.platform === 'win32' ? 'icon.ico' : 'icon.png')
+}
+
 function createGameWindow(): BrowserWindow {
   if (mainWin && !mainWin.isDestroyed()) mainWin.close()
 
@@ -1885,6 +1892,7 @@ function createGameWindow(): BrowserWindow {
     width: 1280,
     height: 800,
     title: 'RED vs BLUE',
+    icon: getApplicationIconPath(),
     autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -1919,6 +1927,7 @@ function openAdminWindow(): void {
     width: 500,
     height: 700,
     title: '服务器管理',
+    icon: getApplicationIconPath(),
     parent: mainWin || undefined,
     autoHideMenuBar: true,
     webPreferences: {
@@ -1996,6 +2005,7 @@ function openConnectWindow(errorMessage?: string): void {
     width: 500,
     height: 400,
     title: '连接服务器',
+    icon: getApplicationIconPath(),
     autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -2401,6 +2411,8 @@ process.on('SIGINT', requestApplicationExit)
 process.on('SIGTERM', requestApplicationExit)
 
 app.whenReady().then(async () => {
+  if (process.platform === 'win32') app.setAppUserModelId('com.redvsblue.client')
+  if (process.platform === 'darwin' && !app.isPackaged) app.dock?.setIcon(getApplicationIconPath())
   await setupPackProtocol()
   // 启动时清除上一版本残留的 Service Worker / Cache Storage，避免旧缓存遮蔽新页面
   try {

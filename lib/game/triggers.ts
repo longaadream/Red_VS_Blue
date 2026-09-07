@@ -163,7 +163,7 @@ export interface TriggerCondition {
 export type EffectFunction = (
   battle: BattleState,
   context: any
-) => { success: boolean; message?: string; blocked?: boolean }
+) => Partial<TriggerResult> & { message?: string }
 
 // 触发-效果规则
 export interface TriggerRule {
@@ -713,19 +713,19 @@ export class TriggerSystem {
     let targetReplacementPieceId: string | undefined
     let summonAfterDeath: TriggerResult['summonAfterDeath']
 
-    if ((battle as any).extensions?.__dryRunSkillPreflight) {
-      return { success: false, messages: [], blocked: false } as any
+    if (battle.extensions?.__dryRunSkillPreflight) {
+      return { success: false, messages: [], blocked: false }
     }
 
     const rejectedEvent = this.prepareEventContext(battle, context)
     if (rejectedEvent) return rejectedEvent
 
     // 从 context 中读取恢复状态（用于从 pendingTargetSelect/pendingOptionSelect 恢复执行）
-    const ctxPendingRuleId = (context as any).pendingRuleId as string | undefined
-    const ctxPendingSourceId = (context as any).pendingRuleSourceId as string | undefined
-    const reactiveOnly = (context as any).__reactiveCardsOnly === true
-    const deferredReactiveCards = (context as any).__deferReactiveCards === true
-    const suppliedReactiveCards = (context as any).__pendingReactiveCards as PendingReactiveCardRef[] | undefined
+    const ctxPendingRuleId = context.pendingRuleId as string | undefined
+    const ctxPendingSourceId = context.pendingRuleSourceId as string | undefined
+    const reactiveOnly = context.__reactiveCardsOnly === true
+    const deferredReactiveCards = context.__deferReactiveCards === true
+    const suppliedReactiveCards = context.__pendingReactiveCards as PendingReactiveCardRef[] | undefined
     const pendingReactiveCards: PendingReactiveCardRef[] = suppliedReactiveCards
       ? suppliedReactiveCards.map(card => ({ ...card }))
       : (battle.players || []).flatMap(player => (player.hand || []).flatMap(cardInstance => {
@@ -745,8 +745,8 @@ export class TriggerSystem {
           }]
         }))
 
-    writeLog('[checkTriggers] Checking triggers for: ' + context.type + ', global rules count: ' + this.rules.length + ', players: ' + JSON.stringify(battle.players?.map(p => ({ playerId: p.playerId, rulesCount: (p as any).rules?.length || 0 }))))
-    writeLog('[checkTriggers] Context: ' + JSON.stringify({ type: context.type, statusId: (context as any).statusId, playerId: context.playerId }));
+    writeLog('[checkTriggers] Checking triggers for: ' + context.type + ', global rules count: ' + this.rules.length + ', players: ' + JSON.stringify(battle.players?.map(p => ({ playerId: p.playerId, rulesCount: p.rules?.length || 0 }))))
+    writeLog('[checkTriggers] Context: ' + JSON.stringify({ type: context.type, statusId: context.statusId, playerId: context.playerId }));
 
     // 辅助函数：确保规则的 effect 已加载（不是存根函数）
     function ensureRuleEffect(rule: any): boolean {
@@ -915,9 +915,9 @@ export class TriggerSystem {
           ruleCtx = item.buildCtx(context)
           const mutableBeforeEffect = mutableTriggerContextSnapshot(ruleCtx)
           applyTransactionInputs(ruleCtx, transactionInputs, battle)
-          damageBeforeEffect = Number((ruleCtx as any).damage)
-          ruleOwnerPlayerId = (ruleCtx as any).ruleOwnerPlayerId
-            || (ruleCtx as any).playerId
+          damageBeforeEffect = Number(ruleCtx.damage)
+          ruleOwnerPlayerId = ruleCtx.ruleOwnerPlayerId
+            || ruleCtx.playerId
             || context.playerId
           result = item.rule.effect(battle, ruleCtx)
           writeBackMutableTriggerContext(ruleCtx, context, mutableBeforeEffect)
@@ -958,13 +958,13 @@ export class TriggerSystem {
                 rollbackOnCancel: result.rollbackOnCancel,
                 canCancel: result.canCancel,
                 suspendedTurn: { ...battle.turn },
-                sourcePieceId: (ruleCtx as any).sourcePiece?.instanceId || item.sourceId,
+                sourcePieceId: ruleCtx.sourcePiece?.instanceId || item.sourceId,
                 candidateState: candidateStateSnapshot(),
               })
         }
         if (Number.isFinite(damageBeforeEffect)
           && damageBeforeEffect > 0
-          && Number((context as any).damage) <= 0) {
+          && Number(context.damage) <= 0) {
           blocked = true
         }
         if (typeof result?.targetReplacementPieceId === 'string') {
@@ -1114,7 +1114,7 @@ export class TriggerSystem {
                   rollbackOnCancel: result.rollbackOnCancel,
                   canCancel: result.canCancel,
                   suspendedTurn: { ...battle.turn },
-                  sourcePieceId: (context as any).sourcePiece?.instanceId,
+                  sourcePieceId: context.sourcePiece?.instanceId,
                   candidateState: candidateStateSnapshot(),
                 })
           }
@@ -1188,7 +1188,7 @@ function applyTransactionInputs(
   if (inputs.length === 0) return
   for (const input of inputs) Object.assign(context, input)
   const selectedTargets = inputs.flatMap(input => input.selectedTargets || [])
-  if (selectedTargets.length > 0) (context as any).selectedTargets = selectedTargets
+  if (selectedTargets.length > 0) context.selectedTargets = selectedTargets
   const latestPieceInput = [...inputs].reverse().find(input => input.targetPieceId)
   if (latestPieceInput?.targetPieceId) {
     context.targetPiece = battle.pieces.find(piece => (

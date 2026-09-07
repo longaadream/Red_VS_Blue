@@ -12,14 +12,14 @@
         updatedAt: Number.isFinite(updatedAt) ? updatedAt : Date.now(),
       }))
       return true
-    } catch (_) { return false }
+    } catch { return false }
   }
 
   function readStatus(storage) {
     try {
       const saved = JSON.parse(storage && storage.getItem(STORAGE_KEY) || 'null')
       return saved && (saved.status === 'completed' || saved.status === 'skipped') ? saved : null
-    } catch (_) { return null }
+    } catch { return null }
   }
 
   function createElement(tag, className, text) {

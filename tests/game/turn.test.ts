@@ -21,13 +21,13 @@ vi.mock('@/lib/game/skill-repository', () => ({
 }))
 import { applyBattleAction, BATTLE_STATE_VERSION, summonPiece } from '@/lib/game/turn'
 import { runBattleAction } from '@/lib/game/battle-runner'
-import type { BattleState } from '@/lib/game/turn'
+import type { BattleAction, BattleState } from '@/lib/game/turn'
 import type { PieceInstance } from '@/lib/game/piece'
 import { finalizePendingTargetSession, prepareAction } from '@/lib/game/targeting'
 import { makeState, makePiece, makeTile } from '../helpers/minimal-state'
-import { globalTriggerSystem } from '@/lib/game/triggers'
+import { globalTriggerSystem, type TriggerContext } from '@/lib/game/triggers'
 
-function withTargetCredentials(state: BattleState, action: Record<string, any>): Record<string, any> {
+function withTargetCredentials(state: BattleState, action: Extract<BattleAction, { type: 'useBasicSkill' | 'useChargeSkill' | 'playCard' }>): BattleAction {
   const draft = { ...action }
   delete draft.targetPieceId
   delete draft.targetX
@@ -51,6 +51,7 @@ describe('summon trigger contract', () => {
         y: 3,
       }),
       name: 'Summoned piece',
+      statusTags: [],
       skills: [],
       buffs: [],
       debuffs: [],
@@ -80,7 +81,7 @@ describe('move action', () => {
     const piece = makePiece({ instanceId: 'blocked-move', ownerPlayerId: 'player-red', x: 0, y: 0, moveRange: 3 })
     const state = makeState({ pieces: [piece], currentPlayerId: 'player-red', phase: 'action' })
     vi.mocked(globalTriggerSystem.checkTriggers).mockClear()
-    vi.mocked(globalTriggerSystem.checkTriggers).mockImplementation((_, context: any) =>
+    vi.mocked(globalTriggerSystem.checkTriggers).mockImplementation((_, context: TriggerContext) =>
       context.type === 'beforeMove'
         ? { success: true, messages: ['blocked'], blocked: true }
         : { success: true, messages: [], blocked: false } as any,
@@ -100,7 +101,7 @@ describe('move action', () => {
     const state = makeState({ pieces: [piece], currentPlayerId: 'player-red', phase: 'action' }) as any
     const before = JSON.stringify(state)
     vi.mocked(globalTriggerSystem.checkTriggers).mockClear()
-    vi.mocked(globalTriggerSystem.checkTriggers).mockImplementationOnce((battle: any) => {
+    vi.mocked(globalTriggerSystem.checkTriggers).mockImplementationOnce((battle: BattleState) => {
       battle.players[0].actionPoints = 0
       throw new Error('trigger exploded')
     })
@@ -468,7 +469,7 @@ describe('interrupted skill release', () => {
       targeting: { steps: [{ kind: 'target', type: 'piece', filter: 'enemy', range: 3 }] },
       code: "function executeSkill(context) { context.battle.extensions.hitTarget = context.target.instanceId; context.battle.extensions.releases = (context.battle.extensions.releases || 0) + 1; return { success: true }; }",
     }
-    vi.mocked(globalTriggerSystem.checkTriggers).mockImplementation((_, context: any) => (
+    vi.mocked(globalTriggerSystem.checkTriggers).mockImplementation((_, context: TriggerContext) => (
       context.type === 'beforeSkillUse'
         ? { success: true, messages: [], blocked: false, targetReplacementPieceId: replacement.instanceId }
         : TRIGGER_OK
@@ -495,7 +496,7 @@ describe('interrupted skill release', () => {
     }
     const beforeCalls: any[] = []
     vi.mocked(globalTriggerSystem.checkTriggers).mockClear()
-    vi.mocked(globalTriggerSystem.checkTriggers).mockImplementation((battle: any, context: any) => {
+    vi.mocked(globalTriggerSystem.checkTriggers).mockImplementation((battle: BattleState, context: TriggerContext) => {
       if (context.type === 'beforeSkillUse') {
         beforeCalls.push(context)
         if (context.selectedOption === undefined) return { success: false, messages: [], blocked: false, needsOptionSelection: true, options: ['yes'], title: 'Choose', pendingRuleId: 'pending-rule', pendingRuleSourceId: 'pending-caster' } as any
@@ -555,7 +556,7 @@ describe('interrupted skill release', () => {
     const caster = makePiece({ instanceId: 'caster', ownerPlayerId: 'player-red', x: 0, y: 0 })
     ;(caster as any).skills = [{ skillId: 'paid-fizzle', currentCooldown: 0, usesRemaining: 1 }]
     const state = makeState({ pieces: [caster], currentPlayerId: 'player-red', phase: 'action' }) as any
-    state.players.find((p: any) => p.playerId === 'player-red').actionPoints = 2
+    state.players.find((p: BattleState['players'][number]) => p.playerId === 'player-red').actionPoints = 2
     state.skillsById['paid-fizzle'] = {
       id: 'paid-fizzle',
       name: 'Paid Fizzle',
@@ -571,9 +572,9 @@ describe('interrupted skill release', () => {
       code: "function executeSkill(context) { context.battle.extensions.executed = true; return { success: true, message: 'executed' } }",
     }
 
-    vi.mocked(globalTriggerSystem.checkTriggers).mockImplementationOnce((battle: any, context: any) => {
+    vi.mocked(globalTriggerSystem.checkTriggers).mockImplementationOnce((battle: BattleState, context: TriggerContext) => {
       expect(context.type).toBe('beforeSkillUse')
-      battle.pieces.find((p: any) => p.instanceId === 'caster').currentHp = 0
+      battle.pieces.find((p: PieceInstance) => p.instanceId === 'caster')!.currentHp = 0
       return { success: true, messages: ['Tracer interrupted the release'], blocked: false }
     })
 
@@ -584,10 +585,10 @@ describe('interrupted skill release', () => {
       skillId: 'paid-fizzle',
     } as any) as any
 
-    expect(next.players.find((p: any) => p.playerId === 'player-red').actionPoints).toBe(1)
-    expect(next.pieces.find((p: any) => p.instanceId === 'caster').currentHp).toBe(0)
-    expect(next.pieces.find((p: any) => p.instanceId === 'caster').skills[0].currentCooldown).toBe(2)
-    expect(next.pieces.find((p: any) => p.instanceId === 'caster').skills[0].usesRemaining).toBe(0)
+    expect(next.players.find((p: BattleState['players'][number]) => p.playerId === 'player-red').actionPoints).toBe(1)
+    expect(next.pieces.find((p: PieceInstance) => p.instanceId === 'caster').currentHp).toBe(0)
+    expect(next.pieces.find((p: PieceInstance) => p.instanceId === 'caster').skills[0].currentCooldown).toBe(2)
+    expect(next.pieces.find((p: PieceInstance) => p.instanceId === 'caster').skills[0].usesRemaining).toBe(0)
     expect(next.extensions.executed).toBeUndefined()
     expect(next.actions.some((a: any) => a.type === 'useBasicSkill' && a.payload?.interrupted)).toBe(true)
   })
@@ -598,7 +599,7 @@ describe('card preflight and interrupted release', () => {
     const caster = makePiece({ instanceId: 'caster', ownerPlayerId: 'player-red', x: 0, y: 0 })
     const target = makePiece({ instanceId: 'target', ownerPlayerId: 'player-blue', x: 1, y: 1, faction: 'blue' })
     const state = makeState({ pieces: [caster, target], currentPlayerId: 'player-red', phase: 'action' }) as any
-    const red = state.players.find((p: any) => p.playerId === 'player-red')
+    const red = state.players.find((p: BattleState['players'][number]) => p.playerId === 'player-red')
     red.hand = [{ cardId: 'line-card', instanceId: 'card-1', actionPointCost: 1 }]
     red.actionPoints = 2
     state.customCards = {
@@ -630,7 +631,7 @@ describe('card preflight and interrupted release', () => {
   it('pays AP and discards when the card target dies during beforeCardPlay', () => {
     const target = makePiece({ instanceId: 'target', ownerPlayerId: 'player-blue', x: 1, y: 0, faction: 'blue' })
     const state = makeState({ pieces: [target], currentPlayerId: 'player-red', phase: 'action' }) as any
-    const red = state.players.find((p: any) => p.playerId === 'player-red')
+    const red = state.players.find((p: BattleState['players'][number]) => p.playerId === 'player-red')
     red.hand = [{ cardId: 'paid-card', instanceId: 'card-1', actionPointCost: 1 }]
     red.discardPile = []
     red.actionPoints = 2
@@ -647,9 +648,9 @@ describe('card preflight and interrupted release', () => {
       },
     }
 
-    vi.mocked(globalTriggerSystem.checkTriggers).mockImplementationOnce((battle: any, context: any) => {
+    vi.mocked(globalTriggerSystem.checkTriggers).mockImplementationOnce((battle: BattleState, context: TriggerContext) => {
       expect(context.type).toBe('beforeCardPlay')
-      battle.pieces.find((p: any) => p.instanceId === 'target').currentHp = 0
+      battle.pieces.find((p: PieceInstance) => p.instanceId === 'target')!.currentHp = 0
       return { success: true, messages: ['Target was removed'], blocked: false }
     })
 
@@ -662,11 +663,11 @@ describe('card preflight and interrupted release', () => {
       targetY: 0,
     }) as any) as any
 
-    const nextRed = next.players.find((p: any) => p.playerId === 'player-red')
+    const nextRed = next.players.find((p: BattleState['players'][number]) => p.playerId === 'player-red')
     expect(nextRed.actionPoints).toBe(1)
     expect(nextRed.hand).toEqual([])
     expect(nextRed.discardPile).toEqual(['paid-card'])
-    expect(next.pieces.find((p: any) => p.instanceId === 'target').currentHp).toBe(0)
+    expect(next.pieces.find((p: PieceInstance) => p.instanceId === 'target').currentHp).toBe(0)
     expect(next.extensions.executed).toBeUndefined()
     expect(next.actions.some((a: any) => a.type === 'playCard' && a.payload?.interrupted)).toBe(true)
   })
@@ -674,7 +675,7 @@ describe('card preflight and interrupted release', () => {
   it('resolves multi-target cards with a piece target followed by a grid target', () => {
     const anchor = makePiece({ instanceId: 'anchor', ownerPlayerId: 'player-red', x: 0, y: 0, currentHp: 20, maxHp: 20, attack: 3 })
     const state = makeState({ pieces: [anchor], currentPlayerId: 'player-red', phase: 'action' }) as any
-    const red = state.players.find((p: any) => p.playerId === 'player-red')
+    const red = state.players.find((p: BattleState['players'][number]) => p.playerId === 'player-red')
     red.hand = [{ cardId: 'summon-final', instanceId: 'card-1', actionPointCost: 1 }]
     red.discardPile = []
     red.actionPoints = 3
@@ -717,17 +718,17 @@ describe('card preflight and interrupted release', () => {
     }) as any) as any
 
     expect(next.extensions.kiljaedanPiece).toBeUndefined()
-    const summoned = next.pieces.find((p: any) => p.instanceId === 'kiljaedan-hidden')
+    const summoned = next.pieces.find((p: PieceInstance) => p.instanceId === 'kiljaedan-hidden')
     expect(summoned?.x).toBe(2)
     expect(summoned?.y).toBe(2)
     expect(summoned?.currentHp).toBe(17)
-    expect(next.players.find((p: any) => p.playerId === 'player-red').discardPile).toEqual(['summon-final'])
+    expect(next.players.find((p: BattleState['players'][number]) => p.playerId === 'player-red').discardPile).toEqual(['summon-final'])
   })
 
   it('resolves demon-summon-1 exactly once and deterministically after an allied piece target', () => {
     const ally = makePiece({ instanceId: 'ally-piece', ownerPlayerId: 'player-red', x: 1, y: 1, currentHp: 18, maxHp: 18, attack: 3, faction: 'red' })
     const state = makeState({ pieces: [ally], currentPlayerId: 'player-red', phase: 'action' }) as any
-    const red = state.players.find((p: any) => p.playerId === 'player-red')
+    const red = state.players.find((p: BattleState['players'][number]) => p.playerId === 'player-red')
     red.hand = [{ cardId: 'demon-summon-1', instanceId: 'card-1', actionPointCost: 1 }]
     red.discardPile = []
     red.actionPoints = 1
@@ -756,8 +757,8 @@ describe('card preflight and interrupted release', () => {
     const authority = runBattleAction(state, action as any, { rootSeed: 2173765951 })
     const peer = runBattleAction(peerState, action as any, { rootSeed: 2173765951 })
     const next = authority.state as any
-    const nextRed = next.players.find((p: any) => p.playerId === 'player-red')
-    const nextAlly = next.pieces.find((p: any) => p.instanceId === 'ally-piece')
+    const nextRed = next.players.find((p: BattleState['players'][number]) => p.playerId === 'player-red')
+    const nextAlly = next.pieces.find((p: PieceInstance) => p.instanceId === 'ally-piece')
 
     expect(authority.stateHash).toBe(peer.stateHash)
     expect(next.pendingTargetSelection).toBeUndefined()
@@ -773,7 +774,7 @@ describe('card preflight and interrupted release', () => {
   it('resolves the real demon-summon-5 card with an ally target followed by a grid target', () => {
     const anchor = makePiece({ instanceId: 'anchor', ownerPlayerId: 'player-red', x: 0, y: 0, currentHp: 20, maxHp: 20, attack: 3, faction: 'red' })
     const state = makeState({ pieces: [anchor], currentPlayerId: 'player-red', phase: 'action' }) as any
-    const red = state.players.find((p: any) => p.playerId === 'player-red')
+    const red = state.players.find((p: BattleState['players'][number]) => p.playerId === 'player-red')
     red.hand = [{ cardId: 'demon-summon-5', instanceId: 'card-5', actionPointCost: 3 }]
     red.discardPile = []
     red.actionPoints = 3
@@ -813,7 +814,7 @@ describe('card preflight and interrupted release', () => {
     }) as any) as any
 
     expect(next.extensions.kiljaedanPiece).toBeUndefined()
-    const summoned = next.pieces.find((p: any) => p.instanceId === 'kiljaedan-hidden')
+    const summoned = next.pieces.find((p: PieceInstance) => p.instanceId === 'kiljaedan-hidden')
     expect(summoned?.x).toBe(2)
     expect(summoned?.y).toBe(2)
     expect(summoned?.currentHp).toBe(17)
@@ -833,7 +834,7 @@ describe('card preflight and interrupted release', () => {
         sourcePiece: expect.objectContaining({ instanceId: 'kiljaedan-hidden' }),
       }),
     )
-    expect(next.players.find((p: any) => p.playerId === 'player-red').discardPile).toEqual(['demon-summon-5'])
+    expect(next.players.find((p: BattleState['players'][number]) => p.playerId === 'player-red').discardPile).toEqual(['demon-summon-5'])
   })
 })
 

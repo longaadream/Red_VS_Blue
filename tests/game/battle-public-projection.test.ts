@@ -42,15 +42,15 @@ describe('battle public pending projection', () => {
   })
 
   it('keeps Tracer Recall numeric choices private to their owner', () => {
-    const state = makeState() as any
-    state.extensions.recallData = [{
+    const state = makeState()
+    state.extensions!.recallData = [{
       pieceId: 'tracer-red', ownerPlayerId: 'player-red', projectionVisibility: 'owner', targetCount: 7, actionCount: 0,
       snapshot: { x: 1, y: 2, hp: 9 },
     }]
 
-    expect((toPublicBattleState(state, 'player-red').extensions as any).recallData).toHaveLength(1)
-    expect((toPublicBattleState(state, 'player-blue').extensions as any).recallData).toEqual([])
-    expect((toPublicBattleState(state).extensions as any).recallData).toEqual([])
+    expect((toPublicBattleState(state, 'player-red').extensions)!.recallData).toHaveLength(1)
+    expect((toPublicBattleState(state, 'player-blue').extensions)!.recallData).toEqual([])
+    expect((toPublicBattleState(state).extensions)!.recallData).toEqual([])
   })
 
   it('redacts invisible status data after a piece enters the graveyard', () => {
@@ -100,9 +100,9 @@ describe('battle public pending projection', () => {
     const ownerState = toPublicBattleState(state, 'player-red')
     const opponentState = toPublicBattleState(state, 'player-blue')
     const spectatorState = toPublicBattleState(state)
-    const owner = ownerState.pendingOptionSelection as any
-    const opponent = opponentState.pendingOptionSelection as any
-    const spectator = spectatorState.pendingOptionSelection as any
+    const owner = ownerState.pendingOptionSelection
+    const opponent = opponentState.pendingOptionSelection
+    const spectator = spectatorState.pendingOptionSelection
 
     for (const projection of [ownerState, opponentState, spectatorState]) {
       expect(JSON.parse(JSON.stringify(projection))).toEqual(projection)
@@ -112,9 +112,9 @@ describe('battle public pending projection', () => {
       ownerState,
     )).not.toThrow()
 
-    expect(owner.options).toEqual(['calm', 'rage'])
-    expect(opponent.options).toEqual([])
-    expect(spectator.options).toEqual([])
+    expect(owner!.options).toEqual(['calm', 'rage'])
+    expect(opponent!.options).toEqual([])
+    expect(spectator!.options).toEqual([])
     expect(owner).toMatchObject({
       selectionMode: 'multi',
       presentation: 'hand',
@@ -122,8 +122,8 @@ describe('battle public pending projection', () => {
       maxSelections: 4,
     })
     for (const projection of [opponent, spectator]) {
-      expect(projection.selectionMode).toBeUndefined()
-      expect(projection.presentation).toBeUndefined()
+      expect(projection!.selectionMode).toBeUndefined()
+      expect(projection!.presentation).toBeUndefined()
     }
     for (const projection of [owner, opponent, spectator]) {
       expect(projection).toMatchObject({
@@ -131,10 +131,10 @@ describe('battle public pending projection', () => {
         selectionId: 'pending-option-1',
         stateRevision: 8,
       })
-      expect(projection.continuationContext).toBeUndefined()
-      expect(projection.pendingAction).toBeUndefined()
-      expect(projection.transaction).toBeUndefined()
-      expect(projection.suspendedTurn).toBeUndefined()
+      expect(projection!.continuationContext).toBeUndefined()
+      expect(projection!.pendingAction).toBeUndefined()
+      expect(projection!.transaction).toBeUndefined()
+      expect(projection!.suspendedTurn).toBeUndefined()
     }
   })
 
@@ -177,9 +177,9 @@ describe('battle public pending projection', () => {
     const ownerState = toPublicBattleState(state, 'player-red')
     const opponentState = toPublicBattleState(state, 'player-blue')
     const spectatorState = toPublicBattleState(state)
-    const owner = ownerState.pendingTargetSelection as any
-    const opponent = opponentState.pendingTargetSelection as any
-    const spectator = spectatorState.pendingTargetSelection as any
+    const owner = ownerState.pendingTargetSelection
+    const opponent = opponentState.pendingTargetSelection
+    const spectator = spectatorState.pendingTargetSelection
 
     for (const projection of [ownerState, opponentState, spectatorState]) {
       expect(JSON.parse(JSON.stringify(projection))).toEqual(projection)
@@ -189,13 +189,13 @@ describe('battle public pending projection', () => {
       ownerState,
     )).not.toThrow()
 
-    expect(owner.candidates).toEqual([{ type: 'cell', x: 2, y: 3 }])
-    expect(owner.range).toBe(99)
+    expect(owner!.candidates).toEqual([{ type: 'cell', x: 2, y: 3 }])
+    expect(owner!.range).toBe(99)
     for (const projection of [opponent, spectator]) {
-      expect(projection.candidates).toEqual([])
-      expect(projection.range).toBeUndefined()
-      expect(projection.filter).toBeUndefined()
-      expect(projection.selectedTargets).toBeUndefined()
+      expect(projection!.candidates).toEqual([])
+      expect(projection!.range).toBeUndefined()
+      expect(projection!.filter).toBeUndefined()
+      expect(projection!.selectedTargets).toBeUndefined()
     }
     for (const projection of [owner, opponent, spectator]) {
       expect(projection).toMatchObject({
@@ -204,12 +204,12 @@ describe('battle public pending projection', () => {
         selectionId: 'pending-target-1',
         stateRevision: 9,
       })
-      expect(projection.effectCode).toBeUndefined()
-      expect(projection.continuationContext).toBeUndefined()
-      expect(projection.pendingAction).toBeUndefined()
-      expect(projection.transaction).toBeUndefined()
-      expect(projection.suspendedTurn).toBeUndefined()
-      expect(projection.candidateState).toBeUndefined()
+      expect(projection!.effectCode).toBeUndefined()
+      expect(projection!.continuationContext).toBeUndefined()
+      expect(projection!.pendingAction).toBeUndefined()
+      expect(projection!.transaction).toBeUndefined()
+      expect(projection!.suspendedTurn).toBeUndefined()
+      expect(projection!.candidateState).toBeUndefined()
     }
   })
 })

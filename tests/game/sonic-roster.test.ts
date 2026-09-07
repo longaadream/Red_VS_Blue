@@ -1,3 +1,4 @@
+import type { TriggerRule } from '@/lib/game/triggers'
 import { describe, expect, it } from 'vitest'
 import { readFileSync, readdirSync } from 'node:fs'
 import { resolve } from 'node:path'
@@ -8,8 +9,8 @@ import { prepareAction } from '@/lib/game/targeting'
 import { makePiece, makeState } from '../helpers/minimal-state'
 
 describe('Sonic roster mechanics', () => {
-  const attachRule = (piece: any, ruleId: string) => {
-    piece.rules = [...(piece.rules || []), loadRuleById(ruleId)]
+  const attachRule = <T extends { rules?: TriggerRule[] }>(piece: T, ruleId: string) => {
+    piece.rules = [...(piece.rules || []), loadRuleById(ruleId)!]
     return piece
   }
 
@@ -27,7 +28,7 @@ describe('Sonic roster mechanics', () => {
 
   it('only exposes skill keywords that have a glossary explanation', () => {
     const glossary = JSON.parse(readFileSync(resolve(process.cwd(), 'data/skill-keywords.json'), 'utf8'))
-    const knownKeywords = new Set(glossary.map((entry: any) => entry.name))
+    const knownKeywords = new Set(glossary.map((entry: { name: string }) => entry.name))
     const skillDirectory = resolve(process.cwd(), 'data/skills')
 
     for (const file of readdirSync(skillDirectory).filter(file => file.endsWith('.json') && file !== 'manifest.json')) {
@@ -66,14 +67,14 @@ describe('Sonic roster mechanics', () => {
     const definition = JSON.parse(readFileSync(resolve(process.cwd(), 'data/skills/shadow-chaos-spear.json'), 'utf8'))
     const shadow = makePiece({
       instanceId: 'shadow', templateId: 'shadow', ownerPlayerId: 'player-red', x: 0, y: 0, attack: 10, moveRange: 5,
-    }) as any
+    })
     const target = makePiece({
       instanceId: 'target', ownerPlayerId: 'player-blue', x: 4, y: 0, currentHp: 20, maxHp: 20, moveRange: 5,
-    }) as any
+    })
     const beyondRange = makePiece({
       instanceId: 'beyond', ownerPlayerId: 'player-blue', x: 5, y: 0,
-    }) as any
-    const state = makeState({ pieces: [shadow, target, beyondRange], width: 8, height: 4 }) as any
+    })
+    const state = makeState({ pieces: [shadow, target, beyondRange], width: 8, height: 4 })
     state.skillsById[definition.id] = definition
     shadow.skills = [{ skillId: definition.id, currentCooldown: 0, usesRemaining: -1 }]
 
@@ -87,7 +88,7 @@ describe('Sonic roster mechanics', () => {
 
     const result = executeSkillFunction(definition, {
       piece: shadow, target, targetPosition: null, targets: [{ info: target, pos: null }], skill: definition, battle: state,
-    } as any, state) as any
+    }, state)
 
     expect(definition.description).toBe('对4格内一名敌人造成50%攻击力的物理伤害，并偷取其2点移动范围至己方下回合开始。')
     expect(result.success).toBe(true)
@@ -107,16 +108,16 @@ describe('Sonic roster mechanics', () => {
         { type: 'momentum-core', stacks: 3, skillIds: [definition.id] },
         { type: 'preserve-momentum', stacks: 1 },
       ],
-    }) as any
+    })
     sonic.momentum = 3
     const enemy = makePiece({
       instanceId: 'enemy', ownerPlayerId: 'player-blue', x: 3, y: 0, currentHp: 12, maxHp: 12,
     })
-    const state = makeState({ pieces: [sonic, enemy], width: 6, height: 4 }) as any
+    const state = makeState({ pieces: [sonic, enemy], width: 6, height: 4 })
 
     const result = executeSkillFunction(definition, {
       piece: sonic, target: enemy, targetPosition: null, targets: [{ info: enemy, pos: null }], skill: definition, battle: state,
-    } as any, state) as any
+    }, state)
 
     expect(result).toMatchObject({ success: true, message: '追踪攻击造成5点伤害' })
     expect(sonic).toMatchObject({ x: 4, y: 0 })
@@ -125,7 +126,7 @@ describe('Sonic roster mechanics', () => {
 
   it('documents the complete momentum acquisition and consumption contract', () => {
     const glossary = JSON.parse(readFileSync(resolve(process.cwd(), 'data/skill-keywords.json'), 'utf8'))
-    const momentum = glossary.find((entry: any) => entry.name === '动能')
+    const momentum = glossary.find((entry: { name: string }) => entry.name === '动能')
     expect(momentum).toMatchObject({ id: 'momentum', category: 'resource', highlight: true })
     expect(momentum.shortDescription).toContain('按移动格数累积动能')
     for (const rule of ['只有拥有至少一个动能技能', '普通移动', '获得动能', '使其他角色获得动能', '传送不获得动能', '没有上限', '重置为0']) {
@@ -140,7 +141,7 @@ describe('Sonic roster mechanics', () => {
       ownerPlayerId: 'player-red',
       x: 1,
       y: 1,
-      skills: [{ skillId: 'shadow-ride-sweep', currentCooldown: 0 } as any] as any,
+      skills: [{ skillId: 'shadow-ride-sweep', currentCooldown: 0 }],
     })
     const state = makeState({ pieces: [shadow], width: 10, height: 10 })
     const definition = JSON.parse(readFileSync(resolve(process.cwd(), 'data/skills/shadow-ride-sweep.json'), 'utf8'))
@@ -169,7 +170,7 @@ describe('Sonic roster mechanics', () => {
     const executeAtMomentum = (momentum: number) => {
       const shadow = makePiece({
         instanceId: 'shadow', templateId: 'shadow', ownerPlayerId: 'player-red', x: 1, y: 1, attack: 5,
-      }) as any
+      })
       shadow.momentum = momentum
       const enemy = makePiece({
         instanceId: 'enemy', ownerPlayerId: 'player-blue', x: 2, y: 1, currentHp: 20, maxHp: 20,
@@ -182,8 +183,8 @@ describe('Sonic roster mechanics', () => {
         targets: [{ info: null, pos: { x: 4, y: 1 } }],
         skill: definition,
         battle: state,
-      } as any, state)
-      return { result: result as any, state }
+      }, state)
+      return { result: result, state }
     }
 
     const belowThreshold = executeAtMomentum(4)
@@ -193,7 +194,7 @@ describe('Sonic roster mechanics', () => {
     const atThreshold = executeAtMomentum(5)
     expect(atThreshold.result.success).toBe(true)
     expect(atThreshold.result.needsOptionSelection).toBeUndefined()
-    expect((atThreshold.state.pieces[0] as any).statusTags).toEqual(expect.arrayContaining([
+    expect((atThreshold.state.pieces[0]).statusTags).toEqual(expect.arrayContaining([
       expect.objectContaining({
         type: 'shadow-ride-sweep-side',
         left: { x: 4, y: 0 },
@@ -211,19 +212,19 @@ describe('Sonic roster mechanics', () => {
     const result = executeSkillFunction(definition, {
       piece: shadow, target: null, targetPosition: { x: 2, y: 1 }, targets: [{ info: null, pos: { x: 2, y: 1 } }],
       skill: definition, battle: state,
-    } as any, state) as any
+    }, state)
 
     expect(result.success).toBe(true)
-    expect(enemy.statusTags.find((tag: any) => tag.type === 'silenced')?.relatedRules).toContain('rule-silenced-block')
-    expect(enemy.statusTags.find((tag: any) => tag.type === 'chidori-immobile')?.relatedRules).toContain('rule-chidori-immobile')
-    expect(enemy.rules.map((rule: any) => rule.id)).toEqual(expect.arrayContaining(['rule-silenced-block', 'rule-chidori-immobile']))
+    expect(enemy.statusTags.find((tag) => tag.type === 'silenced')?.relatedRules).toContain('rule-silenced-block')
+    expect(enemy.statusTags.find((tag) => tag.type === 'chidori-immobile')?.relatedRules).toContain('rule-chidori-immobile')
+    expect(enemy.rules.map((rule) => rule.id)).toEqual(expect.arrayContaining(['rule-silenced-block', 'rule-chidori-immobile']))
   })
 
   it('only exposes empty floor and cover cells for Shadow chaos control', () => {
     const definition = JSON.parse(readFileSync(resolve(process.cwd(), 'data/skills/shadow-chaos-control.json'), 'utf8'))
     const shadow = makePiece({
       instanceId: 'shadow', templateId: 'shadow', ownerPlayerId: 'player-red', x: 1, y: 1,
-      skills: [{ skillId: definition.id, currentCooldown: 0 } as any] as any,
+      skills: [{ skillId: definition.id, currentCooldown: 0 }],
     })
     const occupied = makePiece({ instanceId: 'occupied', ownerPlayerId: 'player-blue', x: 2, y: 1 })
     const state = makeState({ pieces: [shadow, occupied], width: 7, height: 5 })
@@ -251,7 +252,7 @@ describe('Sonic roster mechanics', () => {
     const definition = JSON.parse(readFileSync(resolve(process.cwd(), 'data/skills/tails-twin-flight.json'), 'utf8'))
     const tails = makePiece({
       instanceId: 'tails', templateId: 'tails', ownerPlayerId: 'player-red', x: 1, y: 1,
-      skills: [{ skillId: definition.id, currentCooldown: 0 } as any] as any,
+      skills: [{ skillId: definition.id, currentCooldown: 0 }],
     })
     const ally = makePiece({ instanceId: 'ally', ownerPlayerId: 'player-red', x: 2, y: 1 })
     const state = makeState({ pieces: [tails, ally], width: 8, height: 8 })
@@ -294,7 +295,7 @@ describe('Sonic roster mechanics', () => {
 
     const result = executeSkillFunction(definition, {
       piece: tails, target: tails, targets: [{ info: tails, pos: null }], skill: definition, battle: state,
-    } as any, state) as any
+    } as unknown as import('@/lib/game/skills').SkillExecutionContext, state)
 
     expect(result).toMatchObject({ success: false, message: '双尾飞行必须选择另一名友军' })
   })
@@ -303,7 +304,7 @@ describe('Sonic roster mechanics', () => {
     const definition = JSON.parse(readFileSync(resolve(process.cwd(), 'data/skills/tails-twin-flight.json'), 'utf8'))
     const tails = makePiece({
       instanceId: 'tails', templateId: 'tails', ownerPlayerId: 'player-red', x: 1, y: 1,
-      skills: [{ skillId: definition.id, currentCooldown: 0 } as any] as any,
+      skills: [{ skillId: definition.id, currentCooldown: 0 }],
     })
     const ally = makePiece({ instanceId: 'ally', ownerPlayerId: 'player-red', x: 2, y: 1 })
     const state = makeState({ pieces: [tails, ally], width: 8, height: 8 })
@@ -318,7 +319,7 @@ describe('Sonic roster mechanics', () => {
       type: 'useBasicSkill', playerId: 'player-red', pieceId: 'tails', skillId: definition.id,
       targetPieceId: 'ally', extraTargets: [{ x: 4, y: 4 }, { x: 4, y: 5 }],
       selectionId: first.selectionId, stateRevision: first.stateRevision,
-    } as any)
+    })
 
     expect(resolved.extensions!.scheduledTransfers).toBeUndefined()
     expect(resolved.extensions!.tileEffects).toEqual(expect.arrayContaining([
@@ -326,7 +327,7 @@ describe('Sonic roster mechanics', () => {
       expect.objectContaining({ type: 'tails-flight-reservation', x: 4, y: 5 }),
     ]))
     for (const piece of [resolved.pieces.find(piece => piece.instanceId === 'tails'), resolved.pieces.find(piece => piece.instanceId === 'ally')]) {
-      expect(piece?.statusTags.map((tag: any) => tag.type)).toEqual(expect.arrayContaining(['immune', 'inoperable']))
+      expect(piece?.statusTags.map((tag) => tag.type)).toEqual(expect.arrayContaining(['immune', 'inoperable']))
       expect(piece?.statusTags).toEqual(expect.arrayContaining([
         expect.objectContaining({ type: 'immune', remainingDuration: 2 }),
         expect.objectContaining({ type: 'inoperable', remainingDuration: 2 }),
@@ -341,7 +342,7 @@ describe('Sonic roster mechanics', () => {
     const definition = JSON.parse(readFileSync(resolve(process.cwd(), 'data/skills/tails-twin-flight.json'), 'utf8'))
     const tails = makePiece({
       instanceId: 'tails', templateId: 'tails', ownerPlayerId: 'player-red', x: 1, y: 1,
-      skills: [{ skillId: definition.id, currentCooldown: 0 } as any] as any,
+      skills: [{ skillId: definition.id, currentCooldown: 0 }],
     })
     const ally = makePiece({ instanceId: 'ally', ownerPlayerId: 'player-red', x: 2, y: 1 })
     const state = makeState({ pieces: [tails, ally], width: 8, height: 8 })
@@ -355,7 +356,7 @@ describe('Sonic roster mechanics', () => {
       type: 'useBasicSkill', playerId: 'player-red', pieceId: 'tails', skillId: definition.id,
       targetPieceId: 'ally', extraTargets: [{ x: 4, y: 4 }, { x: 4, y: 5 }],
       selectionId: first.selectionId, stateRevision: first.stateRevision,
-    } as any)
+    })
     const castingTurnEnd = applyBattleAction({
       ...reserved, turn: { ...reserved.turn, currentPlayerId: 'player-red', phase: 'action' },
     }, { type: 'endTurn', playerId: 'player-red' })
@@ -372,7 +373,7 @@ describe('Sonic roster mechanics', () => {
     expect(expiryTurnEnd.pieces.find(piece => piece.instanceId === 'tails')).toMatchObject({ x: 4, y: 4 })
     expect(expiryTurnEnd.pieces.find(piece => piece.instanceId === 'ally')).toMatchObject({ x: 4, y: 5 })
     for (const moved of ['tails', 'ally']) {
-      expect(expiryTurnEnd.pieces.find(piece => piece.instanceId === moved)?.statusTags.some((tag: any) =>
+      expect(expiryTurnEnd.pieces.find(piece => piece.instanceId === moved)?.statusTags.some((tag) =>
         ['tails-flight-reservation', 'immune', 'inoperable'].includes(tag.type))).toBe(false)
     }
   })
@@ -381,7 +382,7 @@ describe('Sonic roster mechanics', () => {
     const definition = JSON.parse(readFileSync(resolve(process.cwd(), 'data/skills/tails-mechanical-support.json'), 'utf8'))
     const tails = makePiece({
       instanceId: 'tails', templateId: 'tails', ownerPlayerId: 'player-red',
-      skills: [{ skillId: definition.id, currentCooldown: 0 } as any] as any,
+      skills: [{ skillId: definition.id, currentCooldown: 0 }],
     })
     const ally = makePiece({
       instanceId: 'ally', ownerPlayerId: 'player-red', currentHp: 80, maxHp: 100,
@@ -402,21 +403,21 @@ describe('Sonic roster mechanics', () => {
     })
     const pending = selecting.pendingOptionSelection
     if (!pending) throw new Error('机械支援未请求效果选择')
-    expect(pending.options.map((option: any) => option.label)).toEqual(['沉默（1）', '护盾（2）', '不移除效果'])
+    expect(pending.options.map((option) => option.label)).toEqual(['沉默（1）', '护盾（2）', '不移除效果'])
     const resolved = applyBattleAction(selecting, {
       type: 'pendingOptionSelect', playerId: 'player-red', selectedOption: '1',
       selectionId: pending.selectionId, stateRevision: pending.stateRevision,
     })
     const result = resolved.pieces.find(piece => piece.instanceId === 'ally')!
     expect(result.currentHp).toBe(85)
-    expect(result.statusTags.map((tag: any) => tag.type)).toEqual(['silenced'])
+    expect(result.statusTags.map((tag) => tag.type)).toEqual(['silenced'])
   })
 
   it('lets Mechanical Support keep the target effects when its removal choice is cancelled', () => {
     const definition = JSON.parse(readFileSync(resolve(process.cwd(), 'data/skills/tails-mechanical-support.json'), 'utf8'))
     const tails = makePiece({
       instanceId: 'tails', templateId: 'tails', ownerPlayerId: 'player-red',
-      skills: [{ skillId: definition.id, currentCooldown: 0 } as any] as any,
+      skills: [{ skillId: definition.id, currentCooldown: 0 }],
     })
     const ally = makePiece({
       instanceId: 'ally', ownerPlayerId: 'player-red', currentHp: 80, maxHp: 100,
@@ -425,7 +426,7 @@ describe('Sonic roster mechanics', () => {
         { id: 'ally-shield', type: 'shield', name: '护盾' },
       ],
     })
-    const state = makeState({ pieces: [tails, ally] }) as any
+    const state = makeState({ pieces: [tails, ally] })
     state.skillsById[definition.id] = definition
     const first = prepareAction(state, {
       type: 'useBasicSkill', playerId: 'player-red', pieceId: 'tails', skillId: definition.id,
@@ -446,7 +447,7 @@ describe('Sonic roster mechanics', () => {
 
     expect(pending).toMatchObject({ canCancel: true, cancelValue: 'none' })
     expect(result.currentHp).toBe(85)
-    expect(result.statusTags.map((tag: any) => tag.type)).toEqual(['silenced', 'shield'])
+    expect(result.statusTags.map((tag) => tag.type)).toEqual(['silenced', 'shield'])
   })
 
   it('creates the selected permanent armor card through Tails’s charge skill', () => {
@@ -456,7 +457,7 @@ describe('Sonic roster mechanics', () => {
     }
     const tails = makePiece({
       instanceId: 'tails', templateId: 'tails', ownerPlayerId: 'player-red',
-      skills: [{ skillId: definition.id, currentCooldown: 0, usesRemaining: -1 } as any] as any,
+      skills: [{ skillId: definition.id, currentCooldown: 0, usesRemaining: -1 }],
     })
     const state = makeState({ pieces: [tails] })
     state.skillsById[definition.id] = definition
@@ -468,7 +469,7 @@ describe('Sonic roster mechanics', () => {
     const pending = selecting.pendingOptionSelection
     if (!pending) throw new Error('护甲组装未请求模块选择')
 
-    expect(pending.options.map((option: any) => option.value)).toEqual(['heal', 'attack', 'speed', 'defense'])
+    expect(pending.options.map((option) => option.value)).toEqual(['heal', 'attack', 'speed', 'defense'])
     expect(pending).toMatchObject({ selectionMode: 'multi', minSelections: 2, maxSelections: 2 })
     const resolved = applyBattleAction(selecting, {
       type: 'pendingOptionSelect', playerId: 'player-red', selectedOption: ['heal', 'attack'],
@@ -488,7 +489,7 @@ describe('Sonic roster mechanics', () => {
     const definition = JSON.parse(readFileSync(resolve(process.cwd(), 'data/skills/shadow-ride-sweep.json'), 'utf8'))
     const shadow = makePiece({
       instanceId: 'shadow', templateId: 'shadow', ownerPlayerId: 'player-red', x: 1, y: 5, attack: 9,
-    }) as any
+    })
     shadow.momentum = 5
     shadow.facing = 'down'
     const pathEnemy = makePiece({
@@ -525,7 +526,7 @@ describe('Sonic roster mechanics', () => {
       selectionId: pending.selectionId, stateRevision: pending.stateRevision,
     })
 
-    expect(result.actions?.some((action: any) => String(action.payload?.message || '').includes(`垂直射击${side === 'left' ? '左侧' : '右侧'}命中`))).toBe(true)
+    expect(result.actions?.some((action) => String(action.payload?.message || '').includes(`垂直射击${side === 'left' ? '左侧' : '右侧'}命中`))).toBe(true)
     expect(result.pieces.find(piece => piece.instanceId === 'side-enemy')?.currentHp).toBe(15)
     expect(result.pieces.find(piece => piece.instanceId === 'opposite-enemy')?.currentHp).toBe(20)
     expect(result.pieces.find(piece => piece.instanceId === 'beyond-enemy')?.currentHp).toBe(20)
@@ -536,7 +537,7 @@ describe('Sonic roster mechanics', () => {
     const definition = JSON.parse(readFileSync(resolve(process.cwd(), 'data/skills/sonic-spin-dash.json'), 'utf8'))
     const sonic = makePiece({
       instanceId: 'sonic', templateId: 'sonic', ownerPlayerId: 'player-red', x: 2, y: 2,
-      skills: [{ skillId: definition.id, currentCooldown: 0 } as any] as any,
+      skills: [{ skillId: definition.id, currentCooldown: 0 }],
     })
     const state = makeState({ pieces: [sonic], width: 10, height: 10 })
     state.skillsById[definition.id] = definition
@@ -553,7 +554,7 @@ describe('Sonic roster mechanics', () => {
     expect(prepared.candidates).not.toContainEqual({ type: 'cell', x: 3, y: 3 })
 
     sonic.statusTags = [{ type: 'momentum-core', stacks: 3, skillIds: [definition.id] }]
-    ;(sonic as any).momentum = 3
+    ;((sonic) as { momentum?: number }).momentum = 3
     const extended = prepareAction(state, {
       type: 'useBasicSkill', playerId: 'player-red', pieceId: 'sonic', skillId: definition.id,
     })
@@ -566,7 +567,7 @@ describe('Sonic roster mechanics', () => {
     const direct = executeSkillFunction(definition, {
       piece: sonic, target: null, targetPosition: { x: 9, y: 2 },
       targets: [{ info: null, pos: { x: 9, y: 2 } }], skill: definition, battle: state,
-    } as any, state) as any
+    }, state)
     expect(direct).toMatchObject({ success: true })
     expect(sonic).toMatchObject({ x: 9, y: 2 })
   })
@@ -575,12 +576,12 @@ describe('Sonic roster mechanics', () => {
     const definition = JSON.parse(readFileSync(resolve(process.cwd(), 'data/skills/sonic-spin-dash.json'), 'utf8'))
     const sonic = makePiece({
       instanceId: 'sonic', templateId: 'sonic', ownerPlayerId: 'player-red', x: 0, y: 0,
-      skills: [{ skillId: definition.id, currentCooldown: 0, usesRemaining: -1 } as any] as any,
-    }) as any
+      skills: [{ skillId: definition.id, currentCooldown: 0, usesRemaining: -1 }],
+    })
     sonic.momentum = 4
     sonic.statusTags = [{ type: 'momentum-core', stacks: 4, skillIds: [definition.id] }]
     attachRule(sonic, 'rule-momentum-consume')
-    const state = makeState({ pieces: [sonic], width: 9, height: 4 }) as any
+    const state = makeState({ pieces: [sonic], width: 9, height: 4 })
     state.skillsById[definition.id] = definition
     state.players[0].actionPoints = 2
 
@@ -592,11 +593,11 @@ describe('Sonic roster mechanics', () => {
     const resolved = applyBattleAction(state, {
       type: 'useBasicSkill', playerId: 'player-red', pieceId: sonic.instanceId, skillId: definition.id,
       targetX: 3, targetY: 0, selectionId: prepared.selectionId, stateRevision: prepared.stateRevision,
-    }) as any
-    const nextSonic = resolved.pieces.find((piece: any) => piece.instanceId === sonic.instanceId)
+    })
+    const nextSonic = resolved.pieces.find((piece) => piece.instanceId === sonic.instanceId)
 
     expect(nextSonic).toMatchObject({ x: 3, y: 0, momentum: 3 })
-    expect(nextSonic.statusTags).toEqual(expect.arrayContaining([
+    expect(nextSonic!.statusTags).toEqual(expect.arrayContaining([
       expect.objectContaining({ type: 'momentum-core', stacks: 3 }),
     ]))
   })
@@ -605,8 +606,8 @@ describe('Sonic roster mechanics', () => {
     const definition = JSON.parse(readFileSync(resolve(process.cwd(), 'data/skills/shadow-ride-sweep.json'), 'utf8'))
     const shadow = makePiece({
       instanceId: 'shadow', templateId: 'shadow', ownerPlayerId: 'player-red', x: 1, y: 5, attack: 5,
-      skills: [{ skillId: definition.id, currentCooldown: 0, usesRemaining: -1 } as any] as any,
-    }) as any
+      skills: [{ skillId: definition.id, currentCooldown: 0, usesRemaining: -1 }],
+    })
     shadow.momentum = 5
     shadow.statusTags = [{ type: 'momentum-core', stacks: 5, skillIds: [definition.id] }]
     attachRule(shadow, 'rule-momentum-consume')
@@ -644,12 +645,12 @@ describe('Sonic roster mechanics', () => {
 
     expect(resolved.pendingTargetSelection).toBeUndefined()
     expect(resolved.pieces.find(piece => piece.instanceId === 'side-enemy')?.currentHp).toBe(15)
-    expect((resolved.pieces.find(piece => piece.instanceId === 'shadow') as any)?.momentum).toBe(3)
+    expect(((resolved.pieces.find(piece => piece.instanceId === 'shadow')) as { momentum?: number } | undefined)?.momentum).toBe(3)
   })
 
   it('pierces pieces but stops the perpendicular ray at cover and walls', () => {
     const definition = JSON.parse(readFileSync(resolve(process.cwd(), 'data/skills/shadow-ride-sweep.json'), 'utf8'))
-    const shadow = makePiece({ instanceId: 'shadow', templateId: 'shadow', ownerPlayerId: 'player-red', x: 1, y: 5, attack: 5 }) as any
+    const shadow = makePiece({ instanceId: 'shadow', templateId: 'shadow', ownerPlayerId: 'player-red', x: 1, y: 5, attack: 5 })
     shadow.momentum = 5
     const first = makePiece({ instanceId: 'first', ownerPlayerId: 'player-blue', x: 2, y: 4, currentHp: 20, maxHp: 20 })
     const second = makePiece({ instanceId: 'second', ownerPlayerId: 'player-blue', x: 2, y: 3, currentHp: 20, maxHp: 20 })
@@ -687,12 +688,12 @@ describe('Sonic roster mechanics', () => {
     const beyond = makePiece({ instanceId: 'beyond', ownerPlayerId: 'player-blue', x: 4, y: 2, currentHp: 20, maxHp: 20 })
     const state = makeState({ pieces: [shadow, beyond], width: 7, height: 5 })
     const blocker = state.map.tiles.find(tile => tile.x === 3 && tile.y === 2)!
-    blocker.props = { ...blocker.props, type: terrainType as any, walkable: false }
+    blocker.props = { ...blocker.props, type: terrainType as typeof blocker.props.type, walkable: false }
 
     const result = executeSkillFunction(definition, {
       piece: shadow, target: null, targetPosition: { x: 5, y: 2 }, targets: [{ info: null, pos: { x: 5, y: 2 } }],
       skill: definition, battle: state,
-    } as any, state) as any
+    }, state)
 
     expect(result).toMatchObject({ success: false, message: '冲刺路径被墙体、陷阱或不可通行地形阻挡' })
     expect(shadow).toMatchObject({ x: 1, y: 2 })
@@ -723,7 +724,7 @@ describe('Sonic roster mechanics', () => {
     const result = executeSkillFunction(definition, {
       piece: shadow, target: null, targetPosition: { x: 4, y: 2 }, targets: [{ info: null, pos: { x: 4, y: 2 } }],
       skill: definition, battle: state,
-    } as any, state) as any
+    }, state)
     expect(result).toMatchObject({ success: false, message: '冲刺路径被墙体、陷阱或不可通行地形阻挡' })
     expect(shadow).toMatchObject({ x: 1, y: 2 })
   })
@@ -736,7 +737,7 @@ describe('Sonic roster mechanics', () => {
     const result = executeSkillFunction(definition, {
       piece: shadow, target: null, targetPosition: { x: 3, y: 3 }, targets: [{ info: null, pos: { x: 3, y: 3 } }],
       skill: definition, battle: state,
-    } as any, state) as any
+    }, state)
 
     expect(result).toMatchObject({ success: false, message: '请选择7格内上下左右方向' })
   })
@@ -746,18 +747,18 @@ describe('Sonic roster mechanics', () => {
     ['shadow', 'shadow-ride-sweep'],
     ['tails', 'tails-mechanical-support'],
   ])('grants momentum to %s after a normal move through the real skill repository', (templateId, skillId) => {
-    const piece = makePiece({ instanceId: templateId, templateId, x: 0, y: 0, skills: [{ skillId } as any] as any })
+    const piece = makePiece({ instanceId: templateId, templateId, x: 0, y: 0, skills: [{ skillId }] })
     piece.statusTags = [{ type: 'momentum-core', stacks: 0 }]
     attachRule(piece, 'rule-momentum-gain')
     const state = makeState({ pieces: [piece] })
 
     const next = applyBattleAction(state, { type: 'move', playerId: 'player-red', pieceId: templateId, toX: 2, toY: 0 })
-    expect((next.pieces[0] as any).momentum).toBe(2)
+    expect(((next.pieces[0]) as { momentum?: number }).momentum).toBe(2)
   })
 
   it.each(['sonic', 'shadow', 'tails'])('hydrates %s’s template-declared momentum rules before a normal move', (templateId) => {
     const template = JSON.parse(readFileSync(resolve(process.cwd(), `data/pieces/${templateId}.json`), 'utf8'))
-    const state = makeState({ width: 8, height: 8 }) as any
+    const state = makeState({ width: 8, height: 8 })
     state.pieces = buildInitialPiecesForPlayers(
       state.map,
       ['player-red', 'player-blue'],
@@ -768,22 +769,22 @@ describe('Sonic roster mechanics', () => {
       ],
       () => 0,
     )
-    const piece = state.pieces.find((item: any) => item.ownerPlayerId === 'player-red')
-    piece.x = 0
-    piece.y = 0
-    state.pieces.find((piece: any) => piece.ownerPlayerId === 'player-blue').x = 7
-    state.pieces.find((piece: any) => piece.ownerPlayerId === 'player-blue').y = 7
+    const piece = state.pieces.find((item) => item.ownerPlayerId === 'player-red')
+    piece!.x = 0
+    piece!.y = 0
+    state.pieces.find((piece) => piece.ownerPlayerId === 'player-blue')!.x = 7
+    state.pieces.find((piece) => piece.ownerPlayerId === 'player-blue')!.y = 7
 
     const next = applyBattleAction(state, {
-      type: 'move', playerId: 'player-red', pieceId: piece.instanceId, toX: 2, toY: 0,
-    }) as any
-    const movedPiece = next.pieces.find((item: any) => item.instanceId === piece.instanceId)
+      type: 'move', playerId: 'player-red', pieceId: piece!.instanceId, toX: 2, toY: 0,
+    })
+    const movedPiece = next.pieces.find((item) => item.instanceId === piece!.instanceId)
 
-    expect(movedPiece.momentum).toBe(2)
-    expect(movedPiece.statusTags).toEqual(expect.arrayContaining([
+    expect((movedPiece! as { momentum?: number }).momentum).toBe(2)
+    expect(movedPiece!.statusTags).toEqual(expect.arrayContaining([
       expect.objectContaining({ type: 'momentum-core', stacks: 2 }),
     ]))
-    expect(movedPiece.rules.map((rule: any) => rule.id)).toEqual(expect.arrayContaining([
+    expect(movedPiece!.rules.map((rule) => rule.id)).toEqual(expect.arrayContaining([
       'rule-momentum-gain', 'rule-momentum-consume',
     ]))
   })
@@ -794,14 +795,14 @@ describe('Sonic roster mechanics', () => {
     const sonic = makePiece({
       instanceId: 'sonic', templateId: 'sonic', ownerPlayerId: 'player-red',
       skills: [
-        { skillId: definition.id, currentCooldown: 0, usesRemaining: -1 } as any,
-        { skillId: spinDash.id, currentCooldown: 0, usesRemaining: -1 } as any,
-      ] as any,
-    }) as any
+        { skillId: definition.id, currentCooldown: 0, usesRemaining: -1 },
+        { skillId: spinDash.id, currentCooldown: 0, usesRemaining: -1 },
+      ],
+    })
     sonic.momentum = 4
     sonic.statusTags = [{ type: 'momentum-core', stacks: 4, skillIds: ['sonic-spin-dash', 'sonic-homing-attack'] }]
     attachRule(sonic, 'rule-momentum-consume')
-    const state = makeState({ pieces: [sonic] }) as any
+    const state = makeState({ pieces: [sonic] })
     state.skillsById[definition.id] = definition
     state.skillsById[spinDash.id] = spinDash
     state.players[0].actionPoints = 0
@@ -809,23 +810,23 @@ describe('Sonic roster mechanics', () => {
 
     const next = applyBattleAction(state, {
       type: 'useChargeSkill', playerId: 'player-red', pieceId: sonic.instanceId, skillId: definition.id,
-    }) as any
-    const nextSonic = next.pieces.find((piece: any) => piece.instanceId === sonic.instanceId)
+    })
+    const nextSonic = next.pieces.find((piece) => piece.instanceId === sonic.instanceId)
 
     expect(next.players[0]).toMatchObject({ actionPoints: 2, chargePoints: 0 })
-    expect(nextSonic.momentum).toBe(4)
-    expect(nextSonic.statusTags).toEqual(expect.arrayContaining([
+    expect((nextSonic! as { momentum?: number }).momentum).toBe(4)
+    expect(nextSonic!.statusTags).toEqual(expect.arrayContaining([
       expect.objectContaining({ type: 'preserve-momentum' }),
     ]))
 
     const dashed = executeSkillFunction(spinDash, {
-      piece: nextSonic, target: null, targetPosition: { x: 1, y: 0 },
+      piece: nextSonic!, target: null, targetPosition: { x: 1, y: 0 },
       targets: [{ info: null, pos: { x: 1, y: 0 } }], skill: spinDash, battle: next,
-    } as any, next) as any
-    const core = nextSonic.statusTags.find((tag: any) => tag.type === 'momentum-core')
+    }, next)
+    const core = nextSonic!.statusTags.find((tag) => tag.type === 'momentum-core')
 
     expect(dashed.success).toBe(true)
-    expect(nextSonic.momentum).toBe(5)
+    expect((nextSonic! as { momentum?: number }).momentum).toBe(5)
     expect(core?.stacks).toBe(5)
   })
 
@@ -833,7 +834,7 @@ describe('Sonic roster mechanics', () => {
     const piece = makePiece({ instanceId: 'ordinary', x: 0, y: 0, skills: [] })
     const state = makeState({ pieces: [piece] })
     const next = applyBattleAction(state, { type: 'move', playerId: 'player-red', pieceId: 'ordinary', toX: 2, toY: 0 })
-    expect((next.pieces[0] as any).momentum).toBeUndefined()
+    expect(((next.pieces[0]) as { momentum?: number }).momentum).toBeUndefined()
   })
 
   it('lets Sonic make exactly one free normal move each turn', () => {
@@ -860,8 +861,8 @@ describe('Sonic roster mechanics', () => {
     const definition = JSON.parse(readFileSync(resolve(process.cwd(), 'data/skills/tails-mechanical-support.json'), 'utf8'))
     const tails = makePiece({
       instanceId: 'tails', templateId: 'tails', ownerPlayerId: 'player-red', x: 0, y: 0,
-      skills: [{ skillId: definition.id, currentCooldown: 0, usesRemaining: -1 } as any] as any,
-    }) as any
+      skills: [{ skillId: definition.id, currentCooldown: 0, usesRemaining: -1 }],
+    })
     tails.momentum = 8
     const ally = makePiece({ instanceId: 'ally', ownerPlayerId: 'player-red', x: 1, y: 0, statusTags: [] })
     const state = makeState({ pieces: [tails, ally] })
@@ -898,24 +899,24 @@ describe('Sonic roster mechanics', () => {
     const piece = makePiece({ instanceId: 'p1', x: 0, y: 0 })
     const state = makeState({ pieces: [piece] })
     state.extensions = { tileEffects: [{ type: 'tails-flight-reservation', x: 1, y: 0 }] }
-    attachRule(state.players[0] as any, 'rule-tails-flight-reservation-block')
+    attachRule(state.players[0], 'rule-tails-flight-reservation-block')
 
     const next = applyBattleAction(state, { type: 'move', playerId: 'player-red', pieceId: 'p1', toX: 1, toY: 0 })
     expect(next.pieces[0]).toMatchObject({ x: 0, y: 0 })
   })
 
   it('makes a Double Tail Flight immune target take no damage', () => {
-    const attacker = makePiece({ instanceId: 'attacker', ownerPlayerId: 'player-red', x: 0, y: 0 }) as any
-    const target = makePiece({ instanceId: 'target', ownerPlayerId: 'player-blue', x: 1, y: 0, currentHp: 10, statusTags: [{ type: 'immune' }] }) as any
+    const attacker = makePiece({ instanceId: 'attacker', ownerPlayerId: 'player-red', x: 0, y: 0 })
+    const target = makePiece({ instanceId: 'target', ownerPlayerId: 'player-blue', x: 1, y: 0, currentHp: 10, statusTags: [{ type: 'immune' }] })
     const state = makeState({ pieces: [attacker, target] })
     attachRule(target, 'rule-tails-flight-immune')
 
-    expect(dealDamage(attacker, target, 5, 'physical', state).damage).toBe(0)
+    expect(dealDamage(attacker as unknown as import('@/lib/game/piece').PieceInstance, target as unknown as import('@/lib/game/piece').PieceInstance, 5, 'physical', state).damage).toBe(0)
     expect(target.currentHp).toBe(10)
   })
 
   it('applies every recovery module at the end of its owner turn', () => {
-    const piece = makePiece({ instanceId: 'armored', currentHp: 5, maxHp: 20, statusTags: [{ type: 'periodic-heal' }, { type: 'periodic-heal' }] }) as any
+    const piece = makePiece({ instanceId: 'armored', currentHp: 5, maxHp: 20, statusTags: [{ type: 'periodic-heal' }, { type: 'periodic-heal' }] })
     const state = makeState({ pieces: [piece] })
     attachRule(piece, 'rule-tails-armor-recovery')
     const next = applyBattleAction(state, { type: 'endTurn', playerId: 'player-red' })

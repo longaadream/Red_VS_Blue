@@ -1,3 +1,4 @@
+import type { ServerBattleState } from '@/lib/game/battle-storage'
 import { describe, expect, it, vi } from 'vitest'
 
 import { getServerGameProfileIdentityV1 } from '@/lib/content-pipeline/runtime/profile-game-identity'
@@ -137,7 +138,7 @@ describe('RED-138 opening terminal room settlement', () => {
           notifications.push(snapshot)
         },
       })
-      const state = (store.room.battleState as any).state
+      const state = (store.room.battleState as unknown as ServerBattleState & { state: import('@/lib/game/turn').BattleState }).state
 
       expect(started.started).toBe(true)
       expect(openingSummonQueueCount).toBe(2)
