@@ -51,7 +51,10 @@
     "rvb": "node scripts/rvb.mjs",
     "typecheck": "next typegen && tsc --noEmit",
     "dev:host-relay": "node multiplayer-relay/start.mjs",
-    "test:multiplayer": "vitest run tests/colyseus tests/game/team-rules.test.ts tests/game/team-effects.test.ts tests/game/match-teams.test.ts --maxWorkers=1"
+    "test:multiplayer": "vitest run tests/colyseus tests/game/team-rules.test.ts tests/game/team-effects.test.ts tests/game/match-teams.test.ts --maxWorkers=1",
+    "package:multiplayer": "node scripts/package-multiplayer-candidate.mjs",
+    "build:multiplayer": "node scripts/build-multiplayer-candidate.mjs",
+    "smoke:multiplayer:windows": "node tests/electron/windows-smoke.mjs network-client"
   },
   "dependencies": {
     "@colyseus/schema": "5.0.25",

@@ -2,6 +2,10 @@
   'use strict'
   var published = null
   var busy = false
+  var lastDiagnosis = ''
+  var lastFailure = ''
+  var candidate = { version: '0.1.0', relayUrl: '' }
+  fetch('config/multiplayer.json').then(function (response) { return response.json() }).then(function (value) { candidate = value; if (!byId('relayUrl').value && value.relayUrl) byId('relayUrl').value = value.relayUrl }).catch(function () {})
   var byId = function (id) { return document.getElementById(id) }
   byId('relayUrl').value = localStorage.getItem('rvb_relay_url') || ''
   var identity = RvBIdentity.getIdentity()
@@ -22,7 +26,7 @@
     if (busy) return
     busy = true; byId('error').textContent = ''
     document.querySelectorAll('button').forEach(function (button) { button.disabled = true })
-    try { await task() } catch (error) { byId('error').textContent = error.message || String(error) }
+    try { await task() } catch (error) { lastFailure = error.message || String(error); byId('error').textContent = lastFailure }
     finally { busy = false; document.querySelectorAll('button').forEach(function (button) { button.disabled = false }) }
   }
   function showPublication(value) {
@@ -49,6 +53,8 @@
     RvBUtils.saveServerConfig({ mode: local ? 'local' : 'remote', url: url })
     var params = RvBUtils.appendServerParams(new URLSearchParams())
     params.set('server', local ? 'local' : 'remote')
+    // Static Electron HTML pages are not Next.js routes.
+    // eslint-disable-next-line @next/next/no-location-assign-relative-destination
     location.href = 'lobby.html?' + params.toString()
   }
   byId('publish').onclick = function () { run(async function () {
@@ -76,6 +82,13 @@
     if (!ready.ok) throw new Error(ready.error)
     await enter((await window.electronAPI.getMode()).localUrl, true)
   }) }
+  byId('showLocalAddress').onclick = function () { run(async function () {
+    if (!window.electronAPI) throw new Error('需要 Windows 客户端')
+    var ready = await window.electronAPI.ensureLocalAuthority()
+    if (!ready.ok) throw new Error(ready.error)
+    var address = new URL((await window.electronAPI.getMode()).localUrl)
+    byId('localAddress').textContent = 'frp 本地 IP：127.0.0.1\n本地端口：' + address.port + '\n类型：TCP。朋友在“直接连接主机”填写 frp 提供的 http://公网IP:端口。重启游戏后请再次核对本地端口。'
+  }) }
   function publishedAddress(host) {
     var address = new URL(host.url)
     if (address.origin !== rootUrl() || !/^\/hosts\/[a-f0-9]+$/.test(address.pathname)) throw new Error('转发服务器返回了无效主机地址')
@@ -100,6 +113,29 @@
       row.append(label, button); container.append(row)
     })
   }) }
+  byId('diagnose').onclick = function () { run(async function () {
+    var report = { format: 'rvb-network-diagnostic-v1', at: new Date().toISOString(), version: candidate.version, candidate: candidate.candidateId || 'development', lastError: lastFailure, checks: [] }
+    if (window.electronAPI) {
+      var mode = await window.electronAPI.getMode()
+      report.localAuthority = { ready: mode.ready, recovery: mode.localAuthorityRecovery, profileIdentity: mode.localAuthorityProfileIdentity }
+    }
+    var addresses = [byId('relayUrl').value.trim(), byId('directUrl').value.trim()].filter(Boolean)
+    for (var address of addresses) {
+      var started = Date.now()
+      var safeAddress = '(无效地址，已省略)'
+      try {
+        var parsed = new URL(address)
+        if (!['http:', 'https:'].includes(parsed.protocol) || parsed.username || parsed.password || parsed.search || parsed.hash) throw new Error('地址不能包含账号、密码或查询参数')
+        safeAddress = parsed.origin + parsed.pathname.replace(/\/+$/, '')
+        var health = await json(safeAddress + '/healthz')
+        report.checks.push({ address: safeAddress, ok: health.ok === true, protocol: health.protocol, elapsedMs: Date.now() - started })
+      } catch (error) { report.checks.push({ address: safeAddress, ok: false, elapsedMs: Date.now() - started, error: error.message }) }
+    }
+    lastDiagnosis = JSON.stringify(report, null, 2)
+    byId('diagnosis').textContent = lastDiagnosis
+    byId('copyDiagnosis').hidden = false
+  }) }
+  byId('copyDiagnosis').onclick = function () { run(function () { return navigator.clipboard.writeText(lastDiagnosis) }) }
   if (window.electronAPI && window.electronAPI.relayControl) {
     window.electronAPI.relayControl({ action: 'status' }).then(function (result) { if (result.ok) showPublication(result.published) }).catch(function (error) { byId('error').textContent = error.message })
     setInterval(function () { if (!busy) window.electronAPI.relayControl({ action: 'status' }).then(function (result) { if (result.ok) showPublication(result.published); else showPublication(null) }).catch(function () { showPublication(null) }) }, 5000)

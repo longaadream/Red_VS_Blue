@@ -47,8 +47,8 @@ it('holds 100 real relayed sockets, enforces the cap and removes every connectio
       expect(statuses.every(status => status === 200)).toBe(true)
     }
     latencies.sort((a, b) => a - b)
-    mkdirSync('output/multiplayer', { recursive: true })
-    writeFileSync('output/multiplayer/relay-capacity.json', JSON.stringify({ at: new Date().toISOString(), platform: process.platform, node: process.version, hosts: 4, connections: 100, roundTrips: latencies.length, payloadBytes: 1024, lobbyRequests: 3000, p50Ms: latencies[Math.floor(latencies.length * .5)], p95Ms: latencies[Math.floor(latencies.length * .95)], maxMs: latencies.at(-1), eventLoopP99Ms: loop.percentile(99) / 1e6, processRssBytes: process.memoryUsage().rss, scope: 'loopback opaque relay; not 100 game simulations or China WAN' }, null, 2))
+    mkdirSync('dist/multiplayer-qa', { recursive: true })
+    writeFileSync('dist/multiplayer-qa/relay-capacity.json', JSON.stringify({ at: new Date().toISOString(), platform: process.platform, node: process.version, hosts: 4, connections: 100, roundTrips: latencies.length, payloadBytes: 1024, lobbyRequests: 3000, p50Ms: latencies[Math.floor(latencies.length * .5)], p95Ms: latencies[Math.floor(latencies.length * .95)], maxMs: latencies.at(-1), eventLoopP99Ms: loop.percentile(99) / 1e6, processRssBytes: process.memoryUsage().rss, scope: 'loopback opaque relay; not 100 game simulations or China WAN' }, null, 2))
     const closed = sockets.map(socket => new Promise<void>(resolve => socket.once('close', () => resolve())))
     tunnels.forEach(tunnel => tunnel.close())
     await Promise.all(closed)

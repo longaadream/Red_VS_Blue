@@ -1,3 +1,4 @@
+import { createHash, generateKeyPairSync, sign } from 'node:crypto'
 import { execFileSync, spawn, spawnSync } from 'node:child_process'
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, unlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -212,6 +213,34 @@ async function waitForActivationTransaction(activePath, targetProfileHash, timeo
     await delay(2)
   }
   throw new Error(`Activation transaction did not appear for ${targetProfileHash}: ${JSON.stringify(observed)}`)
+}
+
+async function verifyMultiplayerPage(port, target, localUrl) {
+  await evaluate(target, "window.location.href = 'rvb-client://app/multiplayer.html'; true", false)
+  const page = await waitForTargets(port, candidate => candidate.url.startsWith('rvb-client://app/multiplayer.html'), 5000)
+  const deadline = Date.now() + 8000
+  let ready = false
+  while (Date.now() < deadline) {
+    ready = await evaluate(page, "typeof document.getElementById('showLocalAddress')?.onclick === 'function'")
+    if (ready) break
+    await delay(100)
+  }
+  assert(ready, 'Multiplayer page did not initialize')
+  const runtime = await evaluate(page, `(async () => {
+    const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+    document.getElementById('showLocalAddress').click();
+    while (document.getElementById('showLocalAddress').disabled) await sleep(50);
+    const localAddress = document.getElementById('localAddress').textContent;
+    document.getElementById('directUrl').value = ${JSON.stringify(localUrl)};
+    document.getElementById('diagnose').click();
+    while (document.getElementById('diagnose').disabled) await sleep(50);
+    return {localAddress, diagnosis: JSON.parse(document.getElementById('diagnosis').textContent), error: document.getElementById('error').textContent};
+  })()`)
+  assert(runtime.localAddress.includes(new URL(localUrl).port), `frp target is not the running game port: ${JSON.stringify(runtime)}`)
+  assert(!runtime.error && runtime.diagnosis.checks[0]?.ok === true, `Packaged network diagnostic failed: ${JSON.stringify(runtime)}`)
+  await evaluate(page, "document.getElementById('joinDirect').click(); true", false)
+  const lobby = await waitForTargets(port, candidate => candidate.url.startsWith('rvb-client://app/lobby.html'), 10000)
+  return {target: lobby, runtime}
 }
 
 async function verifyBattleTerminalError(port, target, timeoutMs = 5000) {
@@ -487,7 +516,7 @@ async function launch(application, timeoutMs = 30000) {
   return { target, rendererBoundary }
 }
 
-async function smokeClient(expectedIdentity = null, sharedUserDataDir = null) {
+async function smokeClient(expectedIdentity = null, sharedUserDataDir = null, networkOnly = false) {
   const application = applications.client
   const sourcePackageRoot = path.dirname(application.executable)
   const isolatedPackageBase = mkdtempSync(path.join(tmpdir(), 'rvb-client-package-smoke-'))
@@ -613,6 +642,7 @@ async function smokeClient(expectedIdentity = null, sharedUserDataDir = null) {
         markerAfterRecovery === recoveryMarker,
         `Silent authority recovery reloaded the main menu: ${JSON.stringify({ recoveryMarker, markerAfterRecovery })}`,
       )
+      if (!networkOnly) {
       tutorialWithoutAuthority = await verifyTutorialWithoutAuthority(application.debugPort, recoveryTarget)
       await evaluate(tutorialWithoutAuthority.target, "window.location.href = 'rvb-client://app/index.html'; true", false)
       recoveryTarget = await waitForTargets(
@@ -621,6 +651,7 @@ async function smokeClient(expectedIdentity = null, sharedUserDataDir = null) {
         10_000,
       )
       await evaluate(recoveryTarget, `window.__rvbRecoverySmokeMarker = ${JSON.stringify(recoveryMarker)}; true`)
+      }
     } finally {
       if (existsSync(disabledAuthorityEntry)) renameSync(disabledAuthorityEntry, authorityEntry)
     }
@@ -754,9 +785,20 @@ async function smokeClient(expectedIdentity = null, sharedUserDataDir = null) {
     )
     const colyseusClient = new ColyseusClient(`http://127.0.0.1:${localGatewayPort}`)
     const duplicateCreateClient = new ColyseusClient(`http://127.0.0.1:${localGatewayPort}`)
+    const smokeIdentity = () => {
+      const keys = generateKeyPairSync('ed25519')
+      const publicKey = keys.publicKey.export({ format: 'der', type: 'spki' }).subarray(-32).toString('hex')
+      return { keys, publicKey, playerId: createHash('sha256').update(Buffer.from(publicKey, 'hex')).digest('hex').slice(0, 8) }
+    }
+    const smokeHost = smokeIdentity(), smokeGuest = smokeIdentity()
+    const admissionProof = async (identity, roomId) => {
+      const { nonce } = await getJson(localBaseUrl + '/admission/challenge')
+      const payload = { type: 'rvb-colyseus-admission-v1', nonce, playerId: identity.playerId, roomId }
+      return { payload, publicKey: identity.publicKey, signature: sign(null, Buffer.from(JSON.stringify(payload)), identity.keys.privateKey).toString('hex') }
+    }
     const creationOptions = {
       product: true,
-      playerId: 'red158-windows-smoke-host',
+      playerId: smokeHost.playerId,
       playerName: 'RED-158 Windows smoke host',
       name: 'RED-158 Windows smoke room',
       mapId: 'winding-pass',
@@ -765,8 +807,8 @@ async function smokeClient(expectedIdentity = null, sharedUserDataDir = null) {
       profileIdentity: catalogIdentity.data.profileIdentity,
     }
     const concurrentCreateResults = await Promise.allSettled([
-      colyseusClient.create('battle', creationOptions),
-      duplicateCreateClient.create('battle', creationOptions),
+      colyseusClient.create('battle', { ...creationOptions, auth: await admissionProof(smokeHost, 'create') }),
+      duplicateCreateClient.create('battle', { ...creationOptions, auth: await admissionProof(smokeHost, 'create') }),
     ])
     const fulfilledCreates = concurrentCreateResults.filter(result => result.status === 'fulfilled')
     const rejectedCreates = concurrentCreateResults.filter(result => result.status === 'rejected')
@@ -799,7 +841,8 @@ async function smokeClient(expectedIdentity = null, sharedUserDataDir = null) {
     const guestClient = new ColyseusClient(`http://127.0.0.1:${localGatewayPort}`)
     const guestRoom = await guestClient.joinById(smokeRoom.roomId, {
       product: true,
-      playerId: 'red158-windows-smoke-guest',
+      playerId: smokeGuest.playerId,
+      auth: await admissionProof(smokeGuest, smokeRoom.roomId),
       playerName: 'RED-158 Windows smoke guest',
       profileIdentity: catalogIdentity.data.profileIdentity,
     })
@@ -811,13 +854,14 @@ async function smokeClient(expectedIdentity = null, sharedUserDataDir = null) {
       joinedRoom.ok === true
         && joinedRoom.data?.room?.id === smokeRoom.roomId
         && joinedRoom.data.room.players?.filter(player => (
-          player.id === 'red158-windows-smoke-host' || player.id === 'red158-windows-smoke-guest'
+          player.id === smokeHost.playerId || player.id === smokeGuest.playerId
         )).length === 2,
       `Second Windows player could not join the single created room: ${JSON.stringify(joinedRoom)}`,
     )
     await guestRoom.leave()
     await smokeRoom.leave()
-    const pieceGallery = await verifyPieceGallery(application.debugPort, gameTarget)
+    const multiplayerPage = networkOnly ? await verifyMultiplayerPage(application.debugPort, gameTarget, localBaseUrl) : null
+    const pieceGallery = await verifyPieceGallery(application.debugPort, multiplayerPage?.target || gameTarget)
     const battle = await verifyBattleTerminalError(application.debugPort, pieceGallery.target)
     assert(battle.runtime.readyState === 'complete', `Battle page did not finish loading: ${JSON.stringify(battle.runtime)}`)
     assert(battle.runtime.messageColor === 'rgb(248, 113, 113)', `Battle page did not style its terminal error: ${JSON.stringify(battle.runtime)}`)
@@ -832,19 +876,20 @@ async function smokeClient(expectedIdentity = null, sharedUserDataDir = null) {
       `Client candidate left residual processes: ${JSON.stringify(processCountsAfterExit)}`,
     )
     console.log(JSON.stringify({
-      entry: 'client',
+      entry: networkOnly ? 'network-client' : 'client',
       isolatedPackageRoot,
       rendererBoundary,
       invalidTlsCertificate: tlsProbe,
       homepageWindowBoundary,
       packagedAssets,
+      multiplayerPage: multiplayerPage?.runtime,
       localMode: mode,
       boundedAuthorityRecovery: {
         exhausted: exhaustedRecovery.localAuthorityRecovery,
         manual: manualRecovery.recovery,
         rendererPreserved: markerAfterManualRecovery === recoveryMarker,
       },
-      tutorialWithoutAuthority: tutorialWithoutAuthority.runtime,
+      tutorialWithoutAuthority: networkOnly ? { skipped: 'separate tutorial acceptance' } : tutorialWithoutAuthority.runtime,
       profileIdentity: catalogIdentity.data.profileIdentity,
       resourcePackStatus,
       databaseProbe: {
@@ -1613,7 +1658,8 @@ const entries = selectedEntries.includes('profile')
 let expectedIdentity = null
 try {
   for (const entry of entries) {
-    if (entry === 'client') await smokeClient(expectedIdentity, sharedUserDataDir)
+    if (entry === 'network-client') await smokeClient(expectedIdentity, sharedUserDataDir, true)
+    else if (entry === 'client') await smokeClient(expectedIdentity, sharedUserDataDir)
     else if (entry === 'profile') {
       expectedIdentity = await smokeProfileActivation(candidate, sharedUserDataDir)
     } else if (entry === 'editor') await smokeEditor(candidate)

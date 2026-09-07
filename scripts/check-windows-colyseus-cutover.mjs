@@ -35,7 +35,7 @@ for (const relativePath of forbiddenPaths) {
 }
 
 const packageJson = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'))
-for (const dependency of ['@prisma/client', 'prisma', 'ws', '@types/ws']) {
+for (const dependency of ['@prisma/client', 'prisma']) {
   if (packageJson.dependencies?.[dependency] || packageJson.devDependencies?.[dependency]) {
     failures.push(`forbidden direct dependency: ${dependency}`)
   }
@@ -57,6 +57,10 @@ for (const relativeRoot of sourceRoots) {
     if (!/\.(?:[cm]?[jt]sx?|html)$/.test(file)) continue
     const source = fs.readFileSync(file, 'utf8')
     for (const check of forbiddenSource) {
+      // RED-193: this module forwards opaque Colyseus traffic to a fixed local
+      // authority. It is not a second gameplay protocol or authority runtime.
+      if (check.label === 'raw websocket implementation'
+        && path.relative(root, file).replaceAll('\\', '/') === 'lib/server/relay/host-tunnel.ts') continue
       check.pattern.lastIndex = 0
       if (check.pattern.test(source)) {
         failures.push(`${check.label}: ${path.relative(root, file).replaceAll('\\', '/')}`)

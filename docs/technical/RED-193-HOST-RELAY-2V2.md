@@ -2,7 +2,9 @@
 
 用户于 2026-09-07 批准：保留主机直连和公网转发；玩家主机是唯一 Colyseus/PostgreSQL 权威，云端不执行规则。保留 1v1，新增 2v2，顺序蓝1 → 红1 → 红2 → 蓝2。每人独立阵容、资源、手牌与控制权，团队共享胜负。Windows、游客昵称、大厅和房间码；目标中国地区、同时在线少于100人。
 
-合同：[RED-193](https://linear.app/redvsblue/issue/RED-193)。High 风险；独立实现工作树 `multiplayer-demo`。基线 `main@bb0a3cfcb5c64bcaf41068faf21bfe4ee0eecf02`，本会话成功刷新后读取；后续刷新失败必须如实记录。
+合同：[RED-193](https://linear.app/redvsblue/issue/RED-193)。High 风险；独立实现工作树 `multiplayer-demo`。初始基线 `main@bb0a3cfcb5c64bcaf41068faf21bfe4ee0eecf02`，2026-09-07 刷新并同步至 `main@e9b6918080010f30f5b2fe5f535548f80c90a257`，随后重新验证并构建候选。后续刷新失败必须如实记录。
+
+用户纠偏后，交付主线是可分发的完整联机候选、服务包和首次批量测试，2v2 仅是其中一个模式。操作和部署见 [首次试玩指南](RED-193-FIRST-PLAYTEST.md)。用户现有入口是第三方 frp 公网 IP＋端口，没有域名；保留 HTTP 主机直连穿透用于小批量测试，公共目录与出站 relay 隧道仍要求 HTTPS，不降低其证书校验。
 
 范围：四人房间与规则/页面、主机出站隧道、公开目录与邀请、Windows接入、异常清理、部署与负载验证。原 Android/mobile/relay-server 不迁移。无云服务器时先交付本地候选；不购买、不合并、不公开发布、不承诺无缝主机迁移。不做三人混战、自动匹配、商业账号或无关数值调整。
 

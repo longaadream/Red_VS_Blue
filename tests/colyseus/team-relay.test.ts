@@ -30,7 +30,7 @@ const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
 it('authenticates real relay SDK guests, protects private hands, takes over after grace and returns control on rejoin', async () => {
   const authorityPort = await port(), relayPort = await port()
   const localUrl = `http://127.0.0.1:${authorityPort}`, relayUrl = `http://127.0.0.1:${relayPort}`
-  const candidate = createColyseusBattleServer({ repository: new FakeAuthorityRepository(), requireIdentityProof: true, reconnectGraceMs: 100 })
+  const candidate = createColyseusBattleServer({ repository: new FakeAuthorityRepository(), requireIdentityProof: true, reconnectGraceMs: 1000 })
   await candidate.server.listen(authorityPort, '127.0.0.1')
   const relay = createRelay({ publicOrigin: relayUrl })
   await new Promise<void>(resolve => relay.server.listen(relayPort, '127.0.0.1', resolve))
@@ -61,6 +61,19 @@ it('authenticates real relay SDK guests, protects private hands, takes over afte
       }
       if (viewer !== 0) expect(current.state.deployment.offerPieceIds || []).toHaveLength(0)
     }
+    const reconnecting = rooms[1]
+    reconnecting.reconnection.minUptime = 0
+    reconnecting.reconnection.minDelay = 10
+    reconnecting.reconnection.maxDelay = 50
+    const stable = await snapshot(reconnecting), originalSession = reconnecting.sessionId
+    const recovered = new Promise<void>((resolve, reject) => {
+      const timeout = setTimeout(() => reject(new Error('relay native reconnect timed out')), 3000)
+      reconnecting.onReconnect.once(() => { clearTimeout(timeout); resolve() })
+    })
+    void reconnecting.leave(false)
+    await recovered
+    expect(reconnecting.sessionId).toBe(originalSession)
+    expect(await snapshot(reconnecting)).toMatchObject({ authorityVersion: stable.authorityVersion, stateHash: stable.stateHash })
     const before = await snapshot(rooms[1])
     await rooms[0].leave()
     let advanced = before

@@ -8,6 +8,8 @@ import { allowedGamePath, CHANNEL_TIMEOUT_MS, MAX_PAYLOAD, MAX_BUFFERED, readPac
 export function createRelay({ publicOrigin = 'http://127.0.0.1:8080', publishKey = '', maxHosts = 50, maxConnections = 120, trustedProxyAddresses = /** @type {string[]} */ ([]) } = {}) {
   const origin = new URL(publicOrigin)
   if (!['http:', 'https:'].includes(origin.protocol) || origin.pathname !== '/' || origin.username || origin.password) throw new Error('Invalid public origin')
+  const startedAt = Date.now()
+  const stats = { requests: 0, capacityRejected: 0, denied: 0, published: 0, disconnected: 0 }
   const hosts = new Map()
   const channels = new Map()
   const publishers = new WebSocketServer({ noServer: true, maxPayload: MAX_PAYLOAD, perMessageDeflate: false })
@@ -15,6 +17,7 @@ export function createRelay({ publicOrigin = 'http://127.0.0.1:8080', publishKey
   let draining = false
   const requestBudget = new Map()
   function admit(request) {
+    stats.requests++
     const peer = request.socket.remoteAddress || 'unknown'
     const forwarded = request.headers['x-real-ip']
     const ip = trustedProxyAddresses.includes(peer) && typeof forwarded === 'string' && isIP(forwarded) ? forwarded : peer
@@ -28,6 +31,8 @@ export function createRelay({ publicOrigin = 'http://127.0.0.1:8080', publishKey
     return ++record.count <= 6000
   }
   function json(response, status, value) {
+    if (status === 503) stats.capacityRejected++
+    if (status === 401 || status === 403) stats.denied++
     response.writeHead(status, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', 'Access-Control-Allow-Origin': '*' })
     response.end(JSON.stringify(value))
   }
@@ -58,7 +63,7 @@ export function createRelay({ publicOrigin = 'http://127.0.0.1:8080', publishKey
     if (request.method === 'OPTIONS') {
       response.writeHead(204, { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'GET,POST,OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type' }); return response.end()
     }
-    if (request.method === 'GET' && request.url === '/healthz') return json(response, 200, { ok: true, protocol: 'rvb-host-relay-v1', hosts: hosts.size, connections: channels.size })
+    if (request.method === 'GET' && request.url === '/healthz') return json(response, 200, { ok: true, protocol: 'rvb-host-relay-v1', hosts: hosts.size, connections: channels.size, uptimeSeconds: Math.floor((Date.now() - startedAt) / 1000), limits: { maxHosts, maxConnections, maxPerHost: 32 }, stats })
     if (request.method === 'GET' && request.url === '/hosts') return json(response, 200, { hosts: [...hosts.values()].filter(h => h.visible).map(h => ({ id: h.id, name: h.name, inviteCode: h.code, url: h.url })) })
     const invite = /^\/invites\/([A-Z0-9]{8})$/.exec(request.url || '')
     if (request.method === 'GET' && invite) {
@@ -87,7 +92,7 @@ export function createRelay({ publicOrigin = 'http://127.0.0.1:8080', publishKey
   server.headersTimeout = CHANNEL_TIMEOUT_MS
   server.maxHeadersCount = 32
   server.on('upgrade', (request, socket, head) => {
-    const reject = (code) => { socket.end(`HTTP/1.1 ${code} Rejected\r\nConnection: close\r\n\r\n`) }
+    const reject = (code) => { if (code === 503) stats.capacityRejected++; if (code === 401 || code === 403) stats.denied++; socket.end(`HTTP/1.1 ${code} Rejected\r\nConnection: close\r\n\r\n`) }
     if (draining || !admit(request)) return reject(503)
     if (request.url === '/publish') {
       const provided = Buffer.from(String(request.headers.authorization || ''))
@@ -129,6 +134,8 @@ export function createRelay({ publicOrigin = 'http://127.0.0.1:8080', publishKey
           do { code = randomBytes(4).toString('hex').toUpperCase() } while ([...hosts.values()].some(h => h.code === code))
           host = { id, code, name: packet.name.trim(), visible: packet.visible === true, socket: ws, channels: new Set(), url: `${origin.origin}/hosts/${id}` }
           hosts.set(id, host)
+          stats.published++
+          console.info(JSON.stringify({ event: 'relay.host.published', hostId: id, visible: host.visible, hosts: hosts.size }))
           clearTimeout(registration)
           sendPacket(ws, { type: 'registered', id, inviteCode: code, url: host.url })
           return
@@ -154,6 +161,8 @@ export function createRelay({ publicOrigin = 'http://127.0.0.1:8080', publishKey
       clearTimeout(registration); clearInterval(heartbeat)
       if (!host) return
       hosts.delete(host.id)
+      stats.disconnected++
+      console.info(JSON.stringify({ event: 'relay.host.disconnected', hostId: host.id, closedConnections: host.channels.size, hosts: hosts.size }))
       for (const id of [...host.channels]) removeChannel(id, false)
     })
   })

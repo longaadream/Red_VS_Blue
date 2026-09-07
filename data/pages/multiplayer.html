@@ -23,16 +23,20 @@
       <button id="publish" class="primary">发布主机</button><button id="stop">停止发布</button>
       <p id="publication" class="status" role="status">尚未发布</p><div id="share"></div>
       <button id="copy" hidden>复制邀请信息</button><button id="localLobby">进入本机大厅建房</button>
+      <p>已有 frp TCP 穿透可直接映射本机游戏端口，无需发布到上面的转发服务器。</p>
+      <button id="showLocalAddress">查看 frp 本地目标</button><p id="localAddress" class="status" role="status"></p>
     </section>
     <section><h2>加入朋友</h2><p>输入朋友提供的 8 位邀请码，或在下方选择公开主机。</p>
       <label for="invite">邀请码</label><input id="invite" maxlength="8" placeholder="例如 A12BCD34" autocomplete="off">
       <button id="joinInvite" class="primary">通过邀请码加入</button>
       <label for="directUrl">直接连接主机（局域网 / 已有公网地址）</label><input id="directUrl" type="url" placeholder="http://192.168.1.10:2567">
       <button id="joinDirect">直接连接</button>
+      <small>frp 只有 IP 和端口时，填写 http://公网IP:端口。此连接没有 TLS 加密，适用于熟人小批量测试。</small>
       <p>短时掉线保留席位；超过 120 秒由主机 AI 接管，重连后恢复控制。2v2 投降需要两名队友同意。</p>
     </section>
   </div>
   <section><h2>公开主机</h2><button id="refresh">刷新大厅</button><div id="hosts" aria-live="polite"><p>填写服务器地址后刷新。</p></div></section>
+<section><h2>连接检查与反馈</h2><p>遇到无法加入、掉线或版本不一致时，生成诊断信息并发给测试组织者。诊断不包含身份私钥、发布密钥或游戏存档。</p><button id="diagnose">检查连接</button><button id="copyDiagnosis" hidden>复制诊断信息</button><pre id="diagnosis" style="white-space:pre-wrap;overflow-wrap:anywhere" aria-live="polite"></pre></section>
 </main>
 <script src="js/pack-fetch.js"></script><script src="js/server-utils.js"></script>
 <script src="js/colyseus-sdk.js"></script><script src="js/colyseus-client.js"></script>
