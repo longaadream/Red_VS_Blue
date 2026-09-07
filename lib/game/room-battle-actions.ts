@@ -344,6 +344,7 @@ export function createPublicBattleSnapshot(
   const storage = getBattleStorage(room)
   if (!storage) throw new RoomBattleActionError('BATTLE_NOT_STARTED', 'Battle not started')
   const state = toTimerSafePublicBattleState(storage.state as BattleState, viewerPlayerId)
+  const spectator = !!viewerPlayerId && !state.players.some(player => player.playerId.toLowerCase() === viewerPlayerId.trim().toLowerCase())
   const serverNow = getRoomAuthorityNow(room.id, clock)
   const authorityVersion = roomBattleAuthorityVersion(room)
   const publicIndex = cachePublicStateHashIndex(
@@ -356,8 +357,8 @@ export function createPublicBattleSnapshot(
     protocolVersion: BATTLE_AUTHORITY_PROTOCOL_VERSION,
     authorityBuildId: BATTLE_AUTHORITY_BUILD_ID,
     state,
-    seed: storage.rootSeed,
-    rootSeed: storage.rootSeed,
+    seed: spectator ? 0 : storage.rootSeed,
+    rootSeed: spectator ? 0 : storage.rootSeed,
     profileIdentity: storage.profileIdentity,
     stateHash: publicIndex.rootHash,
     authorityVersion,

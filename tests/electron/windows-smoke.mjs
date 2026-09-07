@@ -253,7 +253,7 @@ async function verifyMultiplayerPage(port, target, localUrl, observedRoomId) {
   const spectatorPage = await waitForTargets(port, candidate => candidate.url.includes('battle.html?') && candidate.url.includes('mode=spectate'), 10000)
   let spectator
   for (let attempt = 0; attempt < 80; attempt++) {
-    spectator = await evaluate(spectatorPage, `({ready: typeof G !== 'undefined' && !!G, status: document.getElementById('spectatorStatus').textContent, surrenderHidden: document.getElementById('btnSurrender').hidden, hiddenHands: typeof G !== 'undefined' && !!G && G.players.every(player => player.hand.every(card => card.cardId === 'hidden'))})`)
+    spectator = await evaluate(spectatorPage, `({ready: typeof G !== 'undefined' && !!G, status: document.getElementById('spectatorStatus')?.textContent || '', surrenderHidden: document.getElementById('btnSurrender')?.hidden, hiddenHands: typeof G !== 'undefined' && !!G && G.players.every(player => player.hand.every(card => card.cardId === 'hidden'))})`)
     if (spectator.ready && spectator.status.includes('只读观战')) break
     await delay(100)
   }

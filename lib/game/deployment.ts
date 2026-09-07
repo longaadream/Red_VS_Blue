@@ -143,6 +143,11 @@ export function toPublicBattleState(
   }
   const debugBattle = projected.extensions?.debugBattle
   const mayReadTerminalTrace = !viewerId || projected.players.some(player => player.playerId.toLowerCase() === viewerId)
+  if (!mayReadTerminalTrace && projected.extensions?.battleProfile) projected.extensions.battleProfile.rootSeed = 0
+  if (!mayReadTerminalTrace) {
+    delete projected.customCards
+    projectSpectatorDisguises(projected)
+  }
   const terminalTrace = projected.terminalResult && mayReadTerminalTrace
     ? readSanitizedBattleActionTrace(projected)
     : []
@@ -212,6 +217,61 @@ function omitUndefined<T extends Record<string, unknown>>(value: T): T {
   return Object.fromEntries(
     Object.entries(value).filter(([, entry]) => entry !== undefined),
   ) as T
+}
+
+/** Observers receive a display identity for source-mirror pieces. Raw ownership
+ * references and executable attributes must not reveal a secret clone choice. */
+function projectSpectatorDisguises(state: BattleState): void {
+  const all = [...state.pieces, ...(state.graveyard ?? [])]
+  const disguised = all.filter(piece => piece.templateId === 'blue-naruto')
+  if (!disguised.length) return
+  const references = new Map(disguised.map(piece => [piece.instanceId, `spectator-mirror-${piece.ownerPlayerId}`]))
+  const display = (piece: BattleState['pieces'][number]): BattleState['pieces'][number] => {
+    if (!references.has(piece.instanceId)) return piece
+    const mirror = piece as typeof piece & {
+      masterPieceId?: string; displayCurrentHp?: number; displayMaxHp?: number;
+      displayAttack?: number; displayDefense?: number; displayMoveRange?: number;
+      displaySkills?: typeof piece.skills; displayStatusTags?: typeof piece.statusTags;
+    }
+    const master = all.find(candidate => candidate.instanceId === mirror.masterPieceId && candidate.currentHp > 0)
+    const source = master ?? piece
+    return {
+      instanceId: `spectator-mirror-${piece.ownerPlayerId}-${piece.x}-${piece.y}`,
+      templateId: source.templateId, name: source.name, ownerPlayerId: piece.ownerPlayerId,
+      faction: piece.faction, x: piece.x, y: piece.y, isCore: source.isCore,
+      currentHp: piece.currentHp <= 0 ? 0 : master?.currentHp ?? mirror.displayCurrentHp ?? piece.currentHp,
+      maxHp: master?.maxHp ?? mirror.displayMaxHp ?? piece.maxHp,
+      attack: master?.attack ?? mirror.displayAttack ?? piece.attack,
+      defense: master?.defense ?? mirror.displayDefense ?? piece.defense,
+      moveRange: master?.moveRange ?? mirror.displayMoveRange ?? piece.moveRange,
+      skills: master?.skills ?? mirror.displaySkills ?? piece.skills,
+      statusTags: (master?.statusTags ?? mirror.displayStatusTags ?? piece.statusTags).filter(tag => tag.visible !== false),
+      rules: [], buffs: [], debuffs: [], ruleTags: [],
+    } as BattleState['pieces'][number]
+  }
+  state.pieces = state.pieces.map(display).sort((a, b) => a.instanceId.localeCompare(b.instanceId))
+  state.graveyard = (state.graveyard ?? []).map(display).sort((a, b) => a.instanceId.localeCompare(b.instanceId))
+  state.turn.actions = { hasMoved: false, hasUsedBasicSkill: false, hasUsedChargeSkill: false }
+  if (state.deployment) { state.deployment.initialPositions = {}; delete state.deployment.finalPositions }
+  state.actions = (state.actions ?? []).map(action => {
+    const skill = state.skillsById?.[action.payload?.skillId]
+    const secret = skill?.concealTargetInBattleLog || action.payload?.skillId === 'naruto-shadow-clone'
+    return { type: action.type, playerId: action.playerId, turn: action.turn, payload: {
+      message: secret ? `${skill?.name ?? '影分身之术'}（秘密选择）` : action.payload?.message,
+    } }
+  })
+  // Group references stay meaningful without identifying which visible body
+  // owns an internal status, flag, pending interaction or effect source.
+  const replace = (value: unknown): unknown => {
+    if (typeof value === 'string') {
+      for (const [id, group] of references) value = (value as string).split(id).join(group)
+      return value
+    }
+    if (Array.isArray(value)) return value.map(replace)
+    if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([key, item]) => [replace(key) as string, replace(item)]))
+    return value
+  }
+  Object.assign(state, replace(state))
 }
 
 function cloneSerializable<T>(value: T): T {

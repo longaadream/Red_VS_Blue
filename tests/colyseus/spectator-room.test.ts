@@ -62,6 +62,8 @@ it.each(['1v1', '2v2'] as const)('%s admits eight read-only spectators through r
     const roster = getDemoPieceIds().map(id => getPieceById(id)!).filter(p => p.faction === 'good').slice(0, 8).map(p => ({ templateId: p.id, faction: p.faction }))
     for (let i = 0; i < players.length; i++) await rpc(players[i], 'rooms.action', { action: 'select-pieces', playerId: identities[i].playerId, alignment: 'light', pieces: roster, profileIdentity })
     let view = await snapshot(watchers[0])
+    expect([view.seed, view.rootSeed]).toEqual([0, 0])
+    expect(view.state.extensions?.battleProfile?.rootSeed).toBe(0)
     expect(view.state.players.every(p => p.hand.every(c => c.cardId === 'hidden'))).toBe(true)
     expect(view.state.deployment?.offerPieceIds || []).toHaveLength(0)
     await expect(rpc(watchers[0], 'rooms.action', { action: 'spectating', enabled: false, playerId: identities[0].playerId, profileIdentity })).rejects.toThrow()
