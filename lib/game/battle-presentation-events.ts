@@ -103,6 +103,12 @@ export interface BattlePresentationEvent {
   statusType?: string
   result?: Record<string, string | number | boolean>
   presentation?: BattlePresentationMotion
+  /** Immutable, public-entity-only context for a local historical board preview. */
+  history?: {
+    turn: number
+    pieces: Array<{ id: string; name: string; templateId?: string; faction: string; ownerPlayerId: string; x: number; y: number }>
+    cells: Array<{ x: number; y: number; type: string }>
+  }
   complement?: BattlePresentationComplement
   visibility?: BattlePresentationVisibility
   /** Server-only allow-list. It is removed before events leave the authority process. */
@@ -847,6 +853,30 @@ function markPrivate(draft: EventDraft, playerId: string | undefined): EventDraf
   }
 }
 
+function historyContext(draft: EventDraft, before: BattleState, after: BattleState): BattlePresentationEvent['history'] {
+  // Only entities already disclosed by THIS event are included. Private child
+  // context stays on that child and is removed by the existing viewer projection.
+  const ids = new Set([draft.sourcePieceId, ...(draft.targetPieceIds ?? [])].filter(Boolean))
+  const pieces = [...ids].flatMap(id => {
+    const piece = before.pieces.find(p => p.instanceId === id) ?? after.pieces.find(p => p.instanceId === id)
+    const x = finite(piece?.x), y = finite(piece?.y)
+    if (!piece || x === undefined || y === undefined) return []
+    return [{ id: piece.instanceId, name: piece.name, templateId: piece.templateId, faction: piece.faction,
+      ownerPlayerId: piece.ownerPlayerId, x, y }]
+  })
+  const anchors: BattlePresentationPoint[] = [...pieces]
+  if (draft.targetCell) anchors.push(draft.targetCell)
+  const result = draft.result ?? {}
+  for (const prefix of ['from', 'to']) {
+    const x = finite(result[prefix + 'X']), y = finite(result[prefix + 'Y'])
+    if (x !== undefined && y !== undefined) anchors.push({ x, y })
+  }
+  if (!anchors.length) return undefined
+  const cells = before.map.tiles.filter(tile => anchors.some(p => Math.abs(tile.x - p.x) <= 1 && Math.abs(tile.y - p.y) <= 1))
+    .map(tile => ({ x: tile.x, y: tile.y, type: String(tile.props?.type ?? 'floor') }))
+  return { turn: before.turn.turnNumber, pieces, cells }
+}
+
 export function projectBattlePresentationEvents(
   input: BattlePresentationProjectionInput,
 ): BattlePresentationEvent[] {
@@ -891,6 +921,7 @@ export function projectBattlePresentationEvents(
     actionId,
     sequence,
     ...draft,
+    history: historyContext(draft, input.beforeState, input.afterState),
   }))
 }
 

@@ -29,6 +29,13 @@
   }
 
   const statusDefinitions = Object.freeze({
+    'chaos-spear-theft': entry('curse', VISIBILITY.DETAIL, { iconId: 'chaos-spear-theft', assetPath: 'images/effect-icons/chaos-spear-theft.svg', label: '混沌之矛' }),
+    'free-normal-move-every-turn': entry('buff', VISIBILITY.DETAIL, { iconId: 'free-normal-move-every-turn', assetPath: 'images/effect-icons/free-normal-move-every-turn.svg', label: '音速 / 高速模块' }),
+    'immune': entry('shield', VISIBILITY.DETAIL, { iconId: 'immune', assetPath: 'images/effect-icons/immune.svg', label: '免疫' }),
+    'periodic-heal': entry('buff', VISIBILITY.DETAIL, { iconId: 'periodic-heal', assetPath: 'images/effect-icons/periodic-heal.svg', label: '恢复模块' }),
+    'preserve-momentum': entry('transformation', VISIBILITY.DETAIL, { iconId: 'preserve-momentum', assetPath: 'images/effect-icons/preserve-momentum.svg', label: '超级形态' }),
+    'tails-flight-reservation': entry('mark', VISIBILITY.DETAIL, { iconId: 'tails-flight-reservation', assetPath: 'images/effect-icons/tails-flight-reservation.svg', label: '双尾飞行预留' }),
+    'shadow-ride-sweep-side': entry('internal', VISIBILITY.HIDDEN),
     'amaterasu-burn': entry('damage-over-time', VISIBILITY.BOARD, { iconId: 'amaterasu', assetPath: 'images/tile-effects/amaterasu.svg', label: '天照', priority: 260 }),
     'anti-heal': entry('disable', VISIBILITY.BOARD, { iconId: 'anti-heal', assetPath: 'images/effect-icons/anti-heal.svg', label: '禁疗', priority: 440 }),
     'arthas-slow': entry('control', VISIBILITY.BOARD, { iconId: 'slow', assetPath: 'images/effect-icons/slow.svg', label: '减速', priority: 320 }),

@@ -57,6 +57,48 @@ function fixtureSnapshot() {
 }
 
 describe('battle presentation boundary', () => {
+  it('shows player-wide protection and rules, then reflects consumed protection without rule code', () => {
+    const viewModel = loadBrowserModule('js/battle-ui/battle-view-model.js', 'BattleViewModel')
+    const domUi = loadBrowserModule('js/battle-ui/battle-dom-ui.js', 'BattleDomUI')
+    const snapshot = fixtureSnapshot()
+    Object.assign(snapshot.players[0], {
+      statusTags: [{ id: 'elune-protection', type: 'elune-protection', name: '艾露恩的守护', description: '全队共用一次，免疫致命伤害并恢复5点生命' }],
+      rules: [{ id: 'rule-elune-protection-player', name: '艾露恩的守护', description: '消耗守护来保护队友', effect: 'private-rule-code' }],
+    })
+    const hud = { className: '', innerHTML: '' }
+    const ui = domUi.create({ document: { getElementById: (id: string) => id === 'playerResCards' ? hud : null } })
+    const model = viewModel.create({ snapshot, viewerId: 'player-red' })
+    expect(JSON.stringify(model.players)).not.toContain('private-rule-code')
+    ui.update(model)
+    expect(hud.innerHTML).toContain('player-elune.svg')
+    expect(hud.innerHTML).not.toContain('player-rule-tray')
+    expect(hud.innerHTML).toContain('全队共用一次')
+    expect(hud.innerHTML).not.toContain('守护已消耗')
+    Object.assign(snapshot.players[0], { statusTags: [], rules: [{ id: 'rule-soul-fracture-player', name: '裂魂' }, { id: 'rule-sasuke-amaterasu-stack', name: '天照叠层' }] })
+    ui.update(viewModel.create({ snapshot, viewerId: 'player-red' }))
+    expect(hud.innerHTML).not.toContain('player-elune.svg')
+    expect(hud.innerHTML).not.toContain('全队共用一次')
+    expect(hud.innerHTML).toContain('player-soul-fracture.svg')
+    expect(hud.innerHTML).not.toContain('天照叠层')
+  })
+
+  it('only displays the selected player blessing while its authoritative uses remain', () => {
+    const viewModel = loadBrowserModule('js/battle-ui/battle-view-model.js', 'BattleViewModel')
+    const domUi = loadBrowserModule('js/battle-ui/battle-dom-ui.js', 'BattleDomUI')
+    const snapshot = fixtureSnapshot()
+    const buff = { multiplier: 2, uses: 1 }
+    Object.assign(snapshot.players[0], { buffs: { 'elune-blessing-buff': buff, 'hidden-debug-buff': { uses: 1 } } })
+    const hud = { innerHTML: '' }
+    const ui = domUi.create({ document: { getElementById: (id: string) => id === 'playerResCards' ? hud : null } })
+    ui.update(viewModel.create({ snapshot, viewerId: 'player-red' }))
+    expect(hud.innerHTML).toContain('player-elune-blessing.svg')
+    expect(hud.innerHTML).toContain('下一张圣光手牌')
+    expect(hud.innerHTML).not.toContain('hidden-debug')
+    buff.uses = 0
+    ui.update(viewModel.create({ snapshot, viewerId: 'player-red' }))
+    expect(hud.innerHTML).not.toContain('player-elune-blessing.svg')
+  })
+
   it('projects training and relay snapshots through one source-agnostic view model', () => {
     const viewModel = loadBrowserModule('js/battle-ui/battle-view-model.js', 'BattleViewModel')
     const legal = {

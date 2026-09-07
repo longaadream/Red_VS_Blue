@@ -1,0 +1,68 @@
+/* Dusk palette over the accepted comic silhouettes. No global dimming of text/art. */
+:root{--comic-ink:#30231c;--comic-paper:#c3ab86;--comic-yellow:#b78b49;--comic-mint:#7f8b72;--battle-text:#30251e;--battle-text-muted:#655443;--battle-focus:#c39b58}
+html,body{background-color:#251d1a!important;background-image:radial-gradient(ellipse at 50% 42%,#69523b88,transparent 68%),repeating-linear-gradient(6deg,#98806308 0 1px,transparent 1px 9px),radial-gradient(ellipse at 50% 40%,#403329,#1c1818)!important;background-size:100% 100%,100% 100%,100% 100%!important}
+body::before{filter:sepia(1) saturate(.65) brightness(1.1);opacity:.22}
+body :is(.turn-summary,.player-state-chip,.piece-context-menu,.action-history-dock,.target-mode-card,.deployment-status,.training-popover,.training-setup-sheet,.pi-layout,.cd-layout,.option-sheet,.battle-log-panel),body #tileStatusPanel{background:radial-gradient(#51382214 .65px,transparent .8px) 0 0/4px 4px,var(--comic-paper)!important;box-shadow:4px 5px 0 #151110,inset 0 0 16px #71553833!important}
+body .turn-summary{background:#bda47b!important}.turn-summary::after{background:#745543ad!important;border-color:#c6ad7980!important}
+body .turn-summary .turn-badge{color:#344936!important}body .turn-summary .turn-badge.opp-turn{color:#783f33!important}
+body #playerResCards .player-state-chip{background:#785343!important;border-color:#2e211b!important;box-shadow:4px 5px 0 #151110!important}
+body #playerResCards .player-state-chip.blue{background:#465861!important}
+body #playerResCards .player-state-chip.active{box-shadow:4px 5px 0 #151110,0 0 0 2px #b89254!important}
+body #playerResCards :is(.player-display-name,.player-side-name,.player-state-meta,.player-state-order,.resource-orb){color:#eee0bf!important}
+body #playerResCards .player-state-resources{bottom:6px!important;gap:7px!important}
+body #playerResCards .resource-orb{font-family:'Segoe UI',sans-serif!important;font-size:13px!important;font-weight:700!important;gap:2px!important}
+body :is(.topbar button,.back-btn,.board-view-button,.training-tools-toggle,.training-setup-btn,.target-cancel-btn,.option-cancel,.option-confirm,.ts-toggle,.ts-close,.piece-context-info,.piece-context-toggle,.battle-vignette-speed-control,.battle-vignette-status){background:#b9a07b!important;color:#30251f!important;border-color:#30231c!important;box-shadow:2px 3px 0 #171210!important}
+body .btn-end{background:#b58a49!important;color:#281f1b!important;box-shadow:5px 6px 0 #171210,inset 0 0 0 2px #cfac7044!important}
+body .btn-end:hover:not(:disabled){background:#c7a164!important}
+body .piece-context-menu{background:#c2ac89!important}.piece-context-menu::after{background:#c2ac89!important}
+body .piece-context-name{color:#35271e!important}
+body .piece-context-skill{background:#a69b7c!important;border-color:#594b38!important;box-shadow:2px 2px 0 #362a20!important}
+body .piece-context-skill:nth-child(2){background:#8d9b9d!important}
+body .piece-context-skill.is-charge{background:#a095a4!important}
+body .piece-context-skill:disabled{background:#a29781!important;border-color:#766b55!important;opacity:.68!important}
+body #tileStatusPanel{background:#b5a17e!important}
+body .action-history-dock{background:#bba888!important}
+body :is(.action-history-item,.action-history-collapsed-button,.action-history-toggle,.action-history-close){background:#c3b193!important;border-color:#7c6c54!important;color:#33261e!important}
+body .action-history-item.is-selected{background:#c7ac78!important;outline-color:#8c713f!important}
+body :is(.card-item,.card-item.card-reactive){background:#c5b190!important;box-shadow:4px 5px 0 #151110!important}
+body .card-item.card-reactive{background:#afa0ad!important}
+body .card-item .card-art{border-color:#423225!important;filter:saturate(.78)}
+body .card-name-banner{background:#b49a68!important;color:#30251e!important;border-color:#5a4632!important}
+body .card-item:nth-child(even) .card-name-banner{background:#a3a181!important}
+body .card-item .card-desc{color:#382d23!important}.card-type-badge{color:#574733!important}
+body :is(.card-mana-gem,.card-mana-gem.free){background:#839ca6!important;color:#261f1a!important;box-shadow:2px 2px 0 #251c17!important;border-color:#3b3027!important}
+body .card-mana-gem.free{background:#b9a171!important}
+body :is(.card-item.card-choice-selected,.card-item.card-pending){outline-color:#caa365!important}
+body .piece-board-summary{background:#d0bc98!important;box-shadow:2px 2px 0 #171210!important}
+body .piece-board-health{color:#30231c!important}
+body :is(.piece-board-status-popover,.pi-stat,.pi-skill,.pi-status-row,.option-item,.option-card){background:#b8a789!important;border-color:#887453!important}
+body :is(.keyword-badge,.pi-history,.pi-close,.cd-close){background:#a8a080!important;border-color:#60553f!important}
+body #resEditorSheet>div,body #surrenderConfirmOverlay>div{background:#c3ab86!important;box-shadow:5px 6px 0 #171210!important}
+body #statusMsg{background:#b8a17d!important;color:#33291f!important;border-color:#554633!important;box-shadow:2px 2px 0 #171210!important}
+body .skin-preview-marker{background:#211916d9;color:#bca889}.skin-preview-marker a{color:#c8ac79!important}
+body button:focus-visible{outline-color:#cea465!important}
+/* SVGs replace painted glyphs at existing semantic hooks, never the buttons or labels. */
+body :is(.resource-glyph.action,.resource-glyph.charge){width:19px!important;height:20px!important;border:0!important;clip-path:none!important;border-radius:0!important;transform:none!important;box-shadow:none!important;background:url('assets/ink-icons/verb-action-points.svg') center/contain no-repeat!important}
+body .resource-glyph.charge{background-image:url('assets/ink-icons/verb-charge-points.svg')!important}
+body .resource-glyph::before,body .resource-glyph::after{display:none!important}
+body .piece-context-skill-icon{font-size:0!important;width:25px!important;height:25px!important;background:url('assets/ink-icons/verb-skill.svg') center/contain no-repeat!important;filter:none!important}
+body .piece-context-skill.is-charge .piece-context-skill-icon{background-image:url('assets/ink-icons/verb-charge-skill.svg')!important}
+body .pi-skill-icon{filter:none!important;background-image:url('assets/ink-icons/verb-skill.svg')!important}
+body :where(#btnSwitchPov,#btnResetCD,#btnFullMap,.back-btn,.training-tools-toggle)::before{content:'';display:inline-block;width:21px;height:22px;vertical-align:middle;margin-right:3px;background:center/contain no-repeat;pointer-events:none}
+body #btnSwitchPov::before{background-image:url('assets/ink-icons/ui-view.svg')}
+body #btnResetCD::before{background-image:url('assets/ink-icons/ui-cooldown.svg')}
+body #btnFullMap::before{background-image:url('assets/ink-icons/ui-map.svg')}
+body .back-btn::before{background-image:url('assets/ink-icons/ui-exit.svg')}
+body .training-tools-toggle::before{background-image:url('assets/ink-icons/ui-tools.svg')}
+body #trainingToolsToggle::before{display:none}
+body .training-tools-icon{font-size:0!important;width:22px!important;height:23px!important;background:url('assets/ink-icons/ui-tools.svg') center/contain no-repeat!important}
+body .board-view-button::before{content:'';display:inline-block;width:22px;height:22px;background:url('assets/ink-icons/ui-reset.svg') center/contain;vertical-align:middle;margin-right:3px}
+body .board-view-button{font-size:0!important}body .board-view-button>span{display:inline!important;font-size:12px!important}
+body .action-history-glyph{background:url('assets/ink-icons/ui-history.svg') center/contain no-repeat!important;width:29px!important;height:29px!important}
+body .action-history-glyph i{display:none!important}
+body :is(.action-history-predicate>img,.action-history-complement>img,.action-history-root-icon:not(.is-portrait)>img){width:23px!important;height:23px!important;filter:none!important;border:0!important;background:none!important}
+body .piece-board-status-icon{background:#b8a480!important;border-color:#6b5740!important}
+body .keyword-panel{background:#b29e7d!important;border-color:#887453!important}
+body .phase-bar .turn-summary,body #pieceContextMenu,body #actionHistoryDock,body #tileStatusPanel,body #pieceInfoModal .pi-layout,body #cardDetailModal .cd-layout{box-shadow:4px 5px 0 #171210,inset 0 0 16px #71553822!important}
+@media(min-width:1000px){body .phase-bar{right:392px!important}body .topbar{max-width:380px!important}body .topbar button{padding-inline:5px!important;font-size:12px!important}}
+@media(max-width:999px){body :is(#btnSwitchPov,#btnResetCD,#btnFullMap,.back-btn)::before{width:16px;height:16px;margin-right:1px}}

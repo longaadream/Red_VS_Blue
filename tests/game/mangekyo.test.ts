@@ -121,8 +121,8 @@ describe('RED-124 Mangekyo data contract', () => {
       expect.objectContaining({
         id: 'mangekyo',
         name: '万花筒',
-        shortDescription: '每次友方角色死亡时，该技能的充能消耗降低1，可降至0。',
-        longDescription: '每当一个友方角色发生死亡结算，己方所有带有【万花筒】关键词的技能当前充能消耗永久降低1，最低为0。召唤物死亡会计算；同一角色复活后再次死亡也会再次计算。充能消耗降至0后，技能仍属于充能技能，并继续遵守行动点、冷却、目标和每局使用次数限制。',
+        shortDescription: '每有一个友方角色死亡，己方万花筒技能的充能消耗永久降低1，最低为0。',
+        longDescription: '每有一个友方角色死亡，己方万花筒技能的充能消耗永久降低1，最低为0。',
       }),
     ])
 

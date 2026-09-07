@@ -2,20 +2,20 @@
   'use strict'
 
   const METRICS = Object.freeze({
-    cameraTiltDeg: 45,
+    cameraTiltDeg: 42,
     cameraFovDeg: 35,
     cameraHeight: 28,
-    boardBaseHeight: 0.72,
-    pieceWidth: 0.72,
-    pieceDepth: 0.56,
-    pieceHeight: 0.10,
+    boardBaseHeight: 0.30,
+    pieceWidth: 0.82,
+    pieceDepth: 0.72,
+    pieceHeight: 0.22,
     panActivationPx: 10,
     minTouchCellPixels: 44,
   })
 
   const FACTION_EMISSIVE_COLORS = Object.freeze({
-    red: 0xef4444,
-    blue: 0x3b82f6,
+    red: 0xb05b50,
+    blue: 0x648ca6,
   })
 
   function cameraPose(input) {

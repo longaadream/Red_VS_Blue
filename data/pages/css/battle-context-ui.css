@@ -641,6 +641,83 @@
 
 .battle-vignette-layer[hidden] { display: none; }
 
+/* Historical context is a separate read-only board, never an overlay on play. */
+
+.history-preview { pointer-events:auto; position:fixed; top:112px; left:50%; transform:translateX(-50%); width:max-content; max-width:min(440px,calc(100vw - 120px)); padding:9px 13px; color:#e7d5af; background:#342c25; border:3px solid #b59768; border-radius:9px 15px 10px 13px; box-shadow:3px 4px 0 #211a16; z-index:65; }
+.history-preview[hidden] { display:none; }
+.history-preview-heading { display:flex; gap:16px; align-items:center; justify-content:space-between; }
+.history-preview-heading button { color:#2f271f; background:#c7af82; border:2px solid #261f19; border-radius:6px 9px; padding:5px 9px; cursor:pointer; white-space:nowrap; }
+.history-preview p { font-size:11px; margin:5px 0 0; line-height:1.5; }
+.action-history-dock.is-preview-open { z-index:95; }
+#boardStage3d:has(.action-history-dock.is-preview-open) { will-change:auto !important; }
+.is-viewing-history #handCards { opacity:.3; pointer-events:none; }
+.is-viewing-history #pieceInfoModal, .is-viewing-history #tileStatusPanel,
+.is-viewing-history .battle-vignette-veil, .is-viewing-history .battle-vignette-status,
+.is-viewing-history .battle-comic-beat { visibility:hidden; }
+.action-history-sentence:hover { outline:1px dashed #bc9b6c; outline-offset:2px; }
+.action-history-player-avatar { display:inline-grid; place-items:center; width:22px; height:22px; border:2px solid #3b2b20; border-radius:6px; background:#80594c; color:#f0dfbe; font-size:12px; }
+.action-history-player-avatar[data-faction="blue"] { background:#42636e; }
+.phase-bar:has(.player-effect-icon) { overflow:visible !important; }
+body #playerResCards .player-state-chip { overflow:visible; }
+body #playerResCards .player-state-tags { display:flex; position:absolute; top:calc(100% + 3px); left:5px; gap:5px; overflow:visible; }
+.player-effect-icon { display:inline-flex; position:relative; width:29px; height:29px; padding:2px; background:#443a2d; border:2px solid #af9367; border-radius:8px 6px 9px 7px; pointer-events:auto; cursor:help; }
+.player-effect-icon>img { width:100%; height:100%; }
+.player-effect-tip { display:none; position:absolute; left:0; top:calc(100% + 5px); width:210px; padding:10px; border:2px solid #49382a; border-radius:7px 11px; background:#c6b18a; color:#302720; box-shadow:3px 4px #231c16; text-align:left; z-index:100; }
+.player-effect-tip b,.player-effect-tip span { display:block; font-size:12px; line-height:1.5; }
+.player-effect-tip b { margin-bottom:4px; font-size:14px; }
+.player-effect-icon:hover .player-effect-tip,.player-effect-icon:focus .player-effect-tip { display:block; }
+.player-state-chip.blue .player-effect-tip { left:auto; right:0; }
+@media(max-height:500px) { .history-preview { top:68px; padding:6px 10px; max-width:calc(100vw - 200px); } }
+
+/* RED-186: a single projected comic accent for each visible action result. */
+.battle-comic-beat {
+  --comic-fill: #e4bd72;
+  position: absolute;
+  width: 142px;
+  height: 86px;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  isolation: isolate;
+  transform: translate(-50%, -50%) rotate(-9deg);
+  filter: drop-shadow(3px 5px 0 #241b17);
+  animation: battle-comic-pop 240ms cubic-bezier(.16,1.4,.3,1) both;
+}
+.battle-comic-beat::before, .battle-comic-beat::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  background: #2a211b;
+  clip-path: polygon(0 34%,19% 28%,11% 0,39% 17%,58% 0,66% 22%,96% 10%,85% 42%,100% 61%,78% 70%,84% 100%,57% 85%,35% 100%,30% 80%,3% 89%,13% 59%);
+}
+.battle-comic-beat::after {
+  inset: 4px;
+  z-index: -1;
+  background: radial-gradient(#49372333 1px, transparent 1.5px) 0 0 / 5px 5px, var(--comic-fill);
+}
+.battle-comic-beat span {
+  font: 900 38px/1 BattleComic, 'Microsoft YaHei', sans-serif;
+  color: #fff0cc;
+  -webkit-text-stroke: 2px #2b211b;
+  paint-order: stroke fill;
+  text-shadow: 2px 3px 0 #2b211b;
+}
+.battle-comic-beat.is-heal, .battle-comic-beat.is-summon { --comic-fill: #718e75; }
+.battle-comic-beat.is-move { --comic-fill: #62878c; }
+.battle-comic-beat.is-death { --comic-fill: #827386; }
+@keyframes battle-comic-pop {
+  from { opacity: 0; transform: translate(-50%, -50%) rotate(-14deg) scale(.65); }
+  to { opacity: 1; transform: translate(-50%, -50%) rotate(-9deg) scale(1); }
+}
+@media (max-height: 500px), (max-width: 760px) {
+  .battle-comic-beat { width: 112px; height: 68px; }
+  .battle-comic-beat span { font-size: 29px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .battle-comic-beat { animation: none; transform: translate(-50%, -50%); }
+}
+
 .battle-vignette-veil {
   position: absolute;
   inset: 0;

@@ -64,6 +64,32 @@ function project(
 }
 
 describe('RED-165 authoritative battle presentation events', () => {
+  it('captures a forced target before the action and does not follow subsequent movement', () => {
+    const before = stateWithPieces([piece('source', 'red', 10), piece('target', 'blue', 10)])
+    const after = structuredClone(before)
+    after.pieces[1].x = 4
+    const events = project({ type: 'useBasicSkill', playerId: 'red', pieceId: 'source', skillId: 'pull', targetPieceId: 'target' }, before, after)
+    const forced = events.find(event => event.kind === 'forceMove')!
+    expect(forced.result).toMatchObject({ fromX: 1, fromY: 0, toX: 4, toY: 0 })
+    expect(forced.history?.pieces.find(p => p.id === 'target')).toMatchObject({ x: 1, y: 0 })
+    after.pieces[1].x = 9
+    before.pieces[1].x = 8
+    expect(forced.history?.pieces.find(p => p.id === 'target')?.x).toBe(1)
+  })
+
+  it('removes private historical target metadata along with its event', () => {
+    const secret = { eventId: 'r:1', rootEventId: 'r:0', parentEventId: 'r:0', actionId: 'r', sequence: 1,
+      kind: 'damage', iconId: 'action-damage', actorPlayerId: 'red', visibility: 'actorOnly', visibleToPlayerIds: ['red'], priority: 1, skippable: true,
+      history: { turn: 3, pieces: [{ id: 'secret', name: '隐藏目标', faction: 'red', ownerPlayerId: 'red', x: 8, y: 9 }], cells: [{ x: 8, y: 9, type: 'wall' }] } } as BattlePresentationEvent
+    expect(projectBattlePresentationEventsForViewer([secret], 'red')[0].history).toEqual(secret.history)
+    for (const viewer of ['blue', undefined]) {
+      const projected = projectBattlePresentationEventsForViewer([secret], viewer)
+      expect(projected[0].kind).toBe('concealed')
+      expect(JSON.stringify(projected)).not.toContain('history')
+      expect(JSON.stringify(projected)).not.toContain('secret')
+    }
+  })
+
   it('declares presentation travel for every projectile skill', () => {
     const skillDirectory = resolve(process.cwd(), 'data/skills')
     const projectileSkills = readdirSync(skillDirectory)

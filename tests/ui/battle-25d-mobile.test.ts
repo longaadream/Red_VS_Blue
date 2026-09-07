@@ -77,15 +77,15 @@ describe('RED-68 tactical geometry', () => {
     )
     const angleFromVertical = Math.atan2(horizontalOffset, pose.position.y - pose.target.y) * 180 / Math.PI
 
-    expect(angleFromVertical).toBeCloseTo(45, 5)
+    expect(angleFromVertical).toBeCloseTo(42, 5)
     expect(pose.target).toEqual({ x: 9.5, y: 0, z: 7.5 })
     expect(geometry.METRICS).toMatchObject({
-      cameraTiltDeg: 45,
+      cameraTiltDeg: 42,
       cameraFovDeg: 35,
-      boardBaseHeight: 0.72,
-      pieceWidth: 0.72,
-      pieceDepth: 0.56,
-      pieceHeight: 0.1,
+      boardBaseHeight: 0.30,
+      pieceWidth: 0.82,
+      pieceDepth: 0.72,
+      pieceHeight: 0.22,
       panActivationPx: 10,
       minTouchCellPixels: 44,
     })
@@ -113,7 +113,7 @@ describe('RED-68 tactical geometry', () => {
       intensity: 0.4,
     })
     expect(geometry.pieceFlashStyle('blue', 1)).toEqual({
-      color: 0x3b82f6,
+      color: 0x648ca6,
       intensity: 0.08,
     })
   })

@@ -32,10 +32,12 @@ type ThreeCamera = { updateMatrixWorld(force: boolean): void }
 type RendererApi = {
   init(options: unknown): void
   update(model: unknown): void
+  showHistoricalBoard(model: unknown): void
   animateAction(action: unknown, previousModel: unknown, nextModel: unknown): void
   resize(): void
+  spawnFloater(x: number, y: number, text: string, color: string, big: boolean, options: unknown): void
   resetView(): void
-  projectCell(x: number, y: number, elevation?: number): { clientX: number; clientY: number }
+  projectCell(x: number, y: number, elevation?: number): { clientX: number; clientY: number; left: number; top: number }
   setHistoryHighlight(cells: Array<{ x: number; y: number; role: 'source' | 'target' }>): void
   setTutorialCue(cue: { cells?: Array<{ x: number; y: number }>; path?: Array<{ x: number; y: number }> }): void
   clearTutorialCue(): void
@@ -245,6 +247,7 @@ function createHarness(width = 390, height = 844, coarsePointer = true, reducedM
 
   const document = {
     createElement(tagName: string) { return new FakeElement(tagName) },
+    createElementNS(_namespace: string, tagName: string) { return new FakeElement(tagName) },
     getElementById() { return null },
   }
   const windowObject: WindowHarness = {
@@ -375,6 +378,25 @@ function distance(a: { clientX: number; clientY: number }, b: { clientX: number;
 }
 
 describe('RED-68 BattleRenderer3D runtime', () => {
+
+  it.each([false, true])('places signed number bursts beside pieces and cleans up (reduced=%s)', (reduced) => {
+    const h = createHarness(1280, 720, false, reduced)
+    const layer = new FakeElement('div')
+    layer.rect = { left: 0, top: 0, width: 1280, height: 720 }
+    h.renderer.init({ container: h.container, floatLayer: layer })
+    h.renderer.update(runtimeModel())
+    h.frame(16)
+    const point = h.renderer.projectCell(2, 2, 0.65)
+    h.renderer.spawnFloater(2, 2, '−5', '#fff', false, { kind: 'damage' })
+    expect(layer.children[0].textContent).toBe('−5')
+    expect(parseFloat(String(layer.children[0].style.left))).toBeCloseTo(Math.max(48, Math.min(1232, point.left + 48)))
+    expect(parseFloat(String(layer.children[0].style.top))).toBeCloseTo(Math.max(60, Math.min(660, point.top - 44)))
+    h.renderer.spawnFloater(2, 2, '+8', '#fff', false, { kind: 'heal' })
+    expect(layer.children[1].textContent).toBe('+8')
+    h.renderer.dispose()
+    expect(layer.children).toHaveLength(0)
+  })
+
   it('renders static state on demand and batches terrain by material', () => {
     const harness = createHarness(1280, 720, false)
     const model = runtimeModel()
@@ -431,8 +453,10 @@ describe('RED-68 BattleRenderer3D runtime', () => {
 
     expect(trajectory.userData.sourceCell).toEqual({ x: 2, y: 2 })
     expect(trajectory.userData.endCell).toEqual({ x: 2, y: 5 })
-    expect(Math.min(...xs)).toBeCloseTo(1.965, 3)
-    expect(Math.max(...xs)).toBeCloseTo(2.035, 3)
+    // Comic arrowhead is wider than the shaft but ends at the same true endpoint.
+    expect(Math.min(...xs)).toBeCloseTo(1.79, 3)
+    expect(Math.max(...xs)).toBeCloseTo(2.21, 3)
+    expect(trajectory.children).toHaveLength(1)
     expect(Math.min(...zs)).toBeCloseTo(2, 5)
     expect(Math.max(...zs)).toBeCloseTo(5, 5)
     expect(new Set(ys.map(value => value.toFixed(3)))).toEqual(new Set(['0.148']))
@@ -480,8 +504,9 @@ describe('RED-68 BattleRenderer3D runtime', () => {
     const flashes = scene.children.filter(child => child.userData.presentationAreaFlash === true)
     expect(flashes).toHaveLength(3)
     flashes.forEach((flash) => {
-      expect(flash.material!.emissive.getHex()).toBe(0xf97316)
+      expect(flash.material!.emissive.getHex()).toBe(0xd09a52)
       expect(flash.material!.emissiveIntensity).toBeGreaterThan(0)
+      expect(flash.children).toHaveLength(1)
     })
     expect(flashes.map(flash => flash.userData.presentationAreaCell)).toEqual([
       { x: 2, y: 2 }, { x: 2, y: 3 }, { x: 2, y: 4 },
@@ -526,6 +551,34 @@ describe('RED-68 BattleRenderer3D runtime', () => {
     expect(harness.renderer.getMotionDiagnostics().highlightCounts.historyPaths).toBe(0)
     expect(harness.renderers[0].scene!.children).not.toContain(historyGroup)
     harness.renderer.dispose()
+  })
+
+  it('wakes an idle board for history and reduced-motion effects, then sleeps after clearing', () => {
+    const harness = createHarness(1280, 720, false)
+    harness.windowObject.matchMedia = () => ({ matches: true })
+    harness.renderer.init({ container: harness.container })
+    harness.renderer.update(runtimeModel())
+    harness.frame()
+    expect(harness.rafCallbacks.size).toBe(0)
+    for (const [show, clear] of [
+      [() => harness.renderer.setHistoryHighlight([{ x: 2, y: 2, role: 'source' }, { x: 3, y: 2, role: 'target' }]), () => harness.renderer.setHistoryHighlight([])],
+      [() => harness.renderer.showPresentationPath({ source: { x: 2, y: 2 }, end: { x: 3, y: 2 } }), () => harness.renderer.clearPresentationPath()],
+      [() => harness.renderer.showPresentationAreaFlash([{ x: 2, y: 2 }]), () => harness.renderer.clearPresentationAreaFlash()],
+    ]) {
+      const before = harness.renderers[0].renderCount
+      show()
+      expect(harness.rafCallbacks.size).toBe(1)
+      harness.frame()
+      expect(harness.renderers[0].renderCount).toBe(before + 1)
+      expect(harness.rafCallbacks.size).toBe(0)
+      clear()
+      expect(harness.rafCallbacks.size).toBe(1)
+      harness.frame()
+      expect(harness.renderers[0].renderCount).toBe(before + 2)
+      expect(harness.rafCallbacks.size).toBe(0)
+    }
+    harness.renderer.dispose()
+    expect(harness.rafCallbacks.size).toBe(0)
   })
 
   it('renders tutorial rings, beams, and routes as disposable Three.js world geometry', () => {
@@ -621,12 +674,12 @@ describe('RED-68 BattleRenderer3D runtime', () => {
     )
     expect(blueGroup).toBeTruthy()
     const blueBody = blueGroup!.children[1]
-    expect(blueBody.material!.emissive.getHex()).toBe(0x3b82f6)
+    expect(blueBody.material!.emissive.getHex()).toBe(0x648ca6)
     const nextModel = structuredClone(model)
     nextModel.pieces[8].health.current -= 1
     harness.renderer.animateAction({}, model, nextModel)
     for (let index = 0; index < 5; index += 1) harness.frame()
-    expect(blueBody.material!.emissive.getHex()).toBe(0x3b82f6)
+    expect(blueBody.material!.emissive.getHex()).toBe(0x648ca6)
     expect(blueBody.material!.emissiveIntensity).toBe(0.08)
     expect(JSON.stringify(model)).toBe(authorityBefore)
   })
@@ -902,6 +955,24 @@ describe('RED-68 BattleRenderer3D runtime', () => {
     expect(pendingRing).toBeTruthy()
     expect(pendingRing!.material!.opacity).toBeGreaterThanOrEqual(0.58)
     harness.renderer.dispose()
+  })
+
+  it('replaces the main board at historical positions and restores it without pending motion', () => {
+    const h = createHarness(1280, 720, false), old = runtimeModel(), live = structuredClone(old)
+    live.pieces[0].x += 3
+    h.renderer.init({ container: h.container })
+    h.renderer.update(live)
+    h.frame(16)
+    const cameraPoint = h.renderer.projectCell(1, 1)
+    h.renderer.showHistoricalBoard(old)
+    h.frame(32)
+    const piece = h.renderers[0].scene!.children.find(p => p.userData.pieceId === old.pieces[0].id)!
+    expect(piece.position.x).toBe(old.pieces[0].x)
+    expect(h.renderer.projectCell(1, 1)).toEqual(cameraPoint)
+    h.renderer.showHistoricalBoard(live)
+    h.frame(48)
+    expect(h.renderers[0].scene!.children.find(p => p.userData.pieceId === live.pieces[0].id)!.position.x).toBe(live.pieces[0].x)
+    h.renderer.dispose()
   })
 
   it('removes spatial motion in reduced-motion mode while preserving result feedback and cleanup', () => {

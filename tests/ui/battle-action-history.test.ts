@@ -15,11 +15,14 @@ type RootGroup = {
 type ActionHistoryUi = {
   mount: (options: Record<string, unknown>) => void
   update: (model: Record<string, unknown>) => void
+  resize: () => void
   getRoots: () => RootGroup[]
   getActiveRootId: () => string | null
 }
 
 type BrowserModule = {
+  aggregateEffects: (events: Array<Record<string, unknown>>) => Array<{ batchEvents: Array<Record<string, unknown>> }>
+  historicalContext: (events: Array<Record<string, unknown>>) => { pieces: Array<Record<string, unknown>>; moves: Array<Record<string, unknown>>; marks: Array<Record<string, unknown>> }
   mergeRoots: (previous: RootGroup[], events: Array<Record<string, unknown>>, limit: number) => RootGroup[]
   visibleRoots: (roots: RootGroup[], limit: number) => RootGroup[]
   groupEvents: (events: Array<Record<string, unknown>>) => RootGroup[]
@@ -77,6 +80,36 @@ function rootEvent(index: number, overrides: Record<string, unknown> = {}) {
 }
 
 describe('RED-166 icon action history', () => {
+  it('merges consecutive matching multi-target effects without crossing order, source or effect type', () => {
+    const { history } = loadActionHistory()
+    const effect = { kind: 'tileEffectAdded', actorPlayerId: 'red', complement: { kind: 'tileEffect', type: 'amaterasu' } }
+    const events = [0, 1, 2].map(x => ({ ...effect, eventId: 'tile-' + x, targetCell: { x, y: 2 } }))
+    const rows = history.aggregateEffects([...events, { ...effect, kind: 'tileEffectRemoved' }, { ...effect, actorPlayerId: 'blue' }, { ...effect, complement: { kind: 'tileEffect', type: 'blizzard' } }])
+    expect(rows).toHaveLength(4)
+    expect(rows[0].batchEvents).toEqual(events)
+    const damage = [2, 4].map((amount, i) => ({ kind: 'damage', sourcePieceId: 'caster', targetPieceIds: ['victim-' + i], result: { amount, damageType: 'physical' } }))
+    expect(history.aggregateEffects(damage)).toHaveLength(1)
+    expect(history.aggregateEffects(damage)[0].batchEvents).toEqual(damage)
+    expect(history.aggregateEffects([{ kind: 'concealed' }, { kind: 'concealed' }])).toHaveLength(2)
+    expect(history.aggregateEffects([
+      { kind: 'statusAdded', targetPlayerIds: ['red'], statusType: 'elune-protection' },
+      { kind: 'statusAdded', targetPlayerIds: ['blue'], statusType: 'elune-protection' },
+      { kind: 'statusAdded', targetPieceIds: ['target'], statusType: 'elune-protection' },
+    ])).toHaveLength(3)
+  })
+
+  it('uses immutable event positions and the forced target path, never a later board', () => {
+    const { history } = loadActionHistory()
+    const event = { kind: 'forceMove', sourcePieceId: 'caster', targetPieceIds: ['victim'],
+      targetCell: { x: 6, y: 4 }, result: { fromX: 2, fromY: 4, toX: 6, toY: 4 },
+      history: { turn: 3, pieces: [{ id: 'victim', name: '目标', x: 2, y: 4 }], cells: [] } }
+    const result = history.historicalContext([event])
+    expect(result.pieces).toEqual([{ id: 'victim', name: '目标', x: 2, y: 4 }])
+    expect(result.moves).toEqual([{ from: { x: 2, y: 4 }, to: { x: 6, y: 4 }, pieceId: 'victim' }])
+    expect(history.historicalContext([{ kind: 'damage', targetPieceIds: ['victim'] }]).pieces).toEqual([])
+    expect(history.historicalContext([{ ...event, kind: 'concealed' }]).pieces).toEqual([])
+  })
+
   it('groups children under their root and ignores duplicate snapshot events', () => {
     const { history } = loadActionHistory()
     const root = rootEvent(1)
@@ -304,13 +337,19 @@ describe('RED-166 icon action history', () => {
     }
     const before = JSON.stringify(model)
 
-    ui.mount({ element: dock, setHistoryHighlight })
+    ui.mount({ element: dock, setHistoryHighlight, setHistoricalBoard: (id: string | null) => {
+      if (id === null) {
+        expect(ui.getActiveRootId()).toBeNull()
+        ui.resize()
+      }
+      return null
+    } })
     ui.update(model)
     ui.update(model)
 
     expect(ui.getRoots()).toHaveLength(1)
     expect(list.innerHTML).toContain('images/effect-icons/fallback.svg')
-    expect(list.innerHTML).toContain('aria-label="未知动作，点击高亮来源与目标"')
+    expect(list.innerHTML).toContain('aria-label="未知动作，查看当时的目标与棋盘"')
     expect(list.innerHTML.match(/data-history-root-id=/g)).toHaveLength(1)
     expect(JSON.stringify(model)).toBe(before)
 
@@ -337,7 +376,7 @@ describe('RED-166 icon action history', () => {
     expect(list.innerHTML).toContain('寒冰坚忍')
     expect(list.innerHTML).toContain('平静护盾')
     expect(list.innerHTML).not.toContain('calm-shield')
-    expect(list.innerHTML).toContain('aria-label="寒冰坚忍，包含 1 个结果，点击高亮来源与目标"')
+    expect(list.innerHTML).toContain('aria-label="寒冰坚忍，包含 1 个结果，查看当时的目标与棋盘"')
     expect(list.innerHTML).not.toContain('使用<br>技能')
     expect(JSON.stringify(model)).toBe(before)
 
@@ -395,10 +434,7 @@ describe('RED-166 icon action history', () => {
     expect(clickEvent.preventDefault).toHaveBeenCalledOnce()
     expect(clickEvent.stopPropagation).toHaveBeenCalledOnce()
     expect(ui.getActiveRootId()).toBe('action-1:0')
-    expect(setHistoryHighlight).toHaveBeenLastCalledWith([
-      expect.objectContaining({ x: 0, y: 0, role: 'source' }),
-      expect.objectContaining({ x: 1, y: 0, role: 'target' }),
-    ])
+    expect(setHistoryHighlight.mock.calls.every(call => call[0].length === 0)).toBe(true)
 
     const expandEvent = {
       preventDefault: vi.fn(),
@@ -420,11 +456,15 @@ describe('RED-166 icon action history', () => {
     ui.update({ ...model, selection: { mode: 'target' } })
     expect(classNames.has('is-collapsed')).toBe(true)
     expect(classNames.has('is-user-expanded')).toBe(false)
+    expect(ui.getActiveRootId()).toBeNull()
+    expect(classNames.has('is-preview-open')).toBe(false)
     ui.update(model)
     expect(classNames.has('is-collapsed')).toBe(false)
     expect(classNames.has('is-user-expanded')).toBe(true)
 
     listeners.get('pointerout')?.({ relatedTarget: null } as never)
+    expect(ui.getActiveRootId()).toBeNull()
+    listeners.get('click')?.(clickEvent)
     expect(ui.getActiveRootId()).toBe('action-1:0')
     listeners.get('click')?.(clickEvent)
     expect(ui.getActiveRootId()).toBeNull()

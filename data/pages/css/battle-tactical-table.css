@@ -1,4 +1,9 @@
 /* RED-68: final presentation layer for the fixed 2.5D tactical table. */
+@font-face {
+  font-family: BattleComic;
+  src: url('../images/tabletop/ZCOOLKuaiLe-Regular.ttf') format('truetype');
+  font-display: swap;
+}
 :root {
   --battle-ink: #090b0d;
   --battle-surface: #111417;
@@ -636,17 +641,41 @@ canvas:focus-visible {
 
 .dmg-float {
   --floater-duration: 600ms;
+  font-family: BattleComic, 'Microsoft YaHei', sans-serif;
+  font-size: 29px !important;
+  line-height: 1.1;
+  padding: 4px 9px;
+  color: #f4d79b !important;
+  -webkit-text-stroke: 1px #281d18;
+  paint-order: stroke fill;
+  text-shadow: 2px 3px 0 #281d18 !important;
+  filter: drop-shadow(0 2px 0 #281d18);
   animation: rvbResultFloat var(--floater-duration) var(--ease-out) both !important;
 }
 
+.dmg-float::before {
+  content: '';
+  position: absolute;
+  inset: -5px -7px;
+  z-index: -1;
+  background: #914f40;
+  clip-path: polygon(0 35%,22% 29%,15% 0,44% 18%,63% 1%,68% 23%,100% 17%,87% 49%,100% 76%,73% 76%,72% 100%,46% 84%,19% 100%,21% 72%,0 77%,10% 55%);
+}
+
+.dmg-float.big { font-size: 36px !important; }
+
 .dmg-float.is-heal {
   --floater-duration: 550ms;
-  text-shadow: 0 1px 8px rgba(74, 222, 128, 0.42);
+  color: #dbe7b6 !important;
 }
+.dmg-float.is-heal::before { background: #47685a; }
 
 .dmg-float.is-death {
   --floater-duration: 650ms;
+  font-size: 25px !important;
+  color: #d9cfbc !important;
 }
+.dmg-float.is-death::before { background: #524b61; }
 
 @keyframes rvbStatusEnter {
   from { opacity: 0; transform: scale(0.92); }
@@ -659,9 +688,10 @@ canvas:focus-visible {
 }
 
 @keyframes rvbResultFloat {
-  0% { opacity: 0; transform: translate(-50%, 3px) scale(0.96); }
-  18% { opacity: 1; transform: translate(-50%, -4px) scale(1); }
-  100% { opacity: 0; transform: translate(-50%, -24px) scale(1); }
+  0% { opacity: 0; transform: translate(-50%, 3px) rotate(-12deg) scale(0.7); }
+  20% { opacity: 1; transform: translate(-50%, -6px) rotate(-7deg) scale(1.18); }
+  40% { opacity: 1; transform: translate(-50%, -10px) rotate(-7deg) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -32px) rotate(-4deg) scale(1); }
 }
 
 @media (prefers-reduced-motion: reduce) {

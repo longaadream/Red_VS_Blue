@@ -163,6 +163,14 @@
       },
       handCount: Array.isArray(player.hand) ? player.hand.length : numberOr(player.handCount, 0),
       statusSummary: normalizeStatuses(player),
+      buffSummary: ['elune-blessing-buff'].filter(function (id) {
+        return player.buffs && player.buffs[id] && numberOr(player.buffs[id].uses, 0) > 0
+      }).map(function (id) { return { id: id, uses: numberOr(player.buffs[id].uses, 0) } }),
+      ruleSummary: (player.rules || []).filter(function (rule) {
+        return rule && typeof rule === 'object' && rule.visible !== false && rule.name
+      }).map(function (rule) {
+        return { id: String(rule.id || rule.name), label: String(rule.name), description: String(rule.description || '') }
+      }),
     }
   }
 
@@ -249,7 +257,7 @@
     }
   }
 
-  function normalizePresentationEvents(value) {
+  function normalizePresentationEvents(value, templates) {
     if (!Array.isArray(value)) return []
     return value.flatMap(function (event) {
       if (!event || typeof event !== 'object' || !event.eventId || !event.rootEventId || !event.kind) return []
@@ -276,6 +284,19 @@
         statusType: event.statusType ? String(event.statusType) : null,
         result: event.result && typeof event.result === 'object' ? Object.assign({}, event.result) : null,
         presentation: normalizePresentation(event.presentation),
+        history: event.history && typeof event.history === 'object' ? {
+          turn: numberOr(event.history.turn, 0),
+          pieces: (event.history.pieces || []).filter(function (piece) {
+            return piece && finiteOrNull(piece.x) != null && finiteOrNull(piece.y) != null
+          }).map(function (piece) {
+            const template = (templates || {})[piece.templateId] || {}
+            return { id: String(piece.id), name: String(piece.name || '?'),
+              image: String(template.image || piece.templateId || ''), faction: piece.faction === 'blue' ? 'blue' : 'red',
+              ownerPlayerId: String(piece.ownerPlayerId || ''), x: Number(piece.x), y: Number(piece.y) }
+          }),
+          cells: (event.history.cells || []).filter(function (cell) { return cell && finiteOrNull(cell.x) != null && finiteOrNull(cell.y) != null })
+            .map(function (cell) { return { x: Number(cell.x), y: Number(cell.y), type: String(cell.type || 'floor') } }),
+        } : null,
         complement: event.complement && typeof event.complement === 'object' ? Object.assign({}, event.complement) : null,
         visibility: event.visibility ? String(event.visibility) : 'public',
         priority: numberOr(event.priority, 0),
@@ -323,7 +344,7 @@
       pieces: pieces,
       effects: ((snapshot.extensions && snapshot.extensions.tileEffects) || []).map(normalizeEffect),
       skillSummariesById: normalizeSkillSummaries(input.skillsById || snapshot.skillsById),
-      presentationEvents: normalizePresentationEvents(input.presentationEvents),
+      presentationEvents: normalizePresentationEvents(input.presentationEvents, input.pieceTemplates),
       players: players,
       viewer: viewer,
       turn: {

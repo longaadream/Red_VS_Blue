@@ -226,7 +226,7 @@
   }
 
   function finite(value) {
-    return Number.isFinite(Number(value)) ? Number(value) : null
+    return value != null && value !== '' && Number.isFinite(Number(value)) ? Number(value) : null
   }
 
   function pieceById(model, pieceId) {
@@ -280,6 +280,7 @@
     let clearAreaFlash = null
     let showPath = null
     let clearPath = null
+    let projectCell = null
     let model = null
     let currentPhase = null
     let currentGroup = null
@@ -365,6 +366,31 @@
         + '<span class="battle-vignette-action-name" title="' + escapeHtml(actionLabel) + '">'
         + escapeHtml(actionLabel) + '</span></span>'
         + '<span class="battle-vignette-skip-hint">点按战场略过</span></div>'
+        + renderComicBeat(resultVisible)
+    }
+
+    // One accent per root, derived only from a visible atomic result. Never
+    // infer damage/critical hits from a skill name or a hidden outcome.
+    function renderComicBeat(resultVisible) {
+      if (!resultVisible || currentPhase === 'settle' || !projectCell) return ''
+      const labels = { death: '退场!', summon: '登场!', move: '嗖!' }
+      const events = (currentGroup.children || []).concat([currentGroup.root])
+      const event = events.find(function (entry) {
+        return entry && labels[entry.kind] && entry.visibility !== 'actorOnly'
+          && (entry.targetCell || (entry.targetPieceIds || []).length)
+      })
+      if (!event) return ''
+      const cell = event.targetCell || pieceCell(model, event.targetPieceIds[0])
+      if (!cell) return ''
+      const point = projectCell(cell.x, cell.y, 0.65)
+      if (!point || !Number.isFinite(point.left) || !Number.isFinite(point.top)) return ''
+      const bounds = floatLayer && floatLayer.getBoundingClientRect && floatLayer.getBoundingClientRect()
+      if (!bounds || bounds.width < 220 || bounds.height < 200) return ''
+      // Keep the label beside the result, with room for HUD and hand cards.
+      const left = Math.max(90, Math.min(bounds.width - 90, point.left + 48))
+      const top = Math.max(100, Math.min(bounds.height - 100, point.top - 44))
+      return '<div class="battle-comic-beat is-' + event.kind + '" aria-hidden="true" style="left:'
+        + left + 'px;top:' + top + 'px"><span>' + labels[event.kind] + '</span></div>'
     }
 
     function consume(event) {
@@ -424,6 +450,7 @@
       clearAreaFlash = typeof mountInput.clearAreaFlash === 'function' ? mountInput.clearAreaFlash : null
       showPath = typeof mountInput.showPath === 'function' ? mountInput.showPath : null
       clearPath = typeof mountInput.clearPath === 'function' ? mountInput.clearPath : null
+      projectCell = typeof mountInput.projectCell === 'function' ? mountInput.projectCell : null
       if (!doc || !doc.createElement || !floatLayer || !floatLayer.appendChild) return
       layer = doc.createElement('div')
       layer.className = 'battle-vignette-layer'
@@ -475,6 +502,7 @@
       clearAreaFlash = null
       showPath = null
       clearPath = null
+      projectCell = null
       model = null
       currentPhase = null
       currentGroup = null

@@ -1,6 +1,13 @@
 ;(function (root) {
   'use strict'
 
+  // Opt-in player-facing effects. Background trigger rules stay out of the HUD.
+  const PLAYER_EFFECTS = Object.freeze([
+    { id: 'elune-protection', statusType: 'elune-protection', label: '艾露恩的守护', icon: 'images/effect-icons/player-elune.svg', description: '免疫友方棋子的一次致命伤害，并恢复5点生命。全队共用一次。' },
+    { id: 'elune-blessing', buffId: 'elune-blessing-buff', label: '月神赐福', icon: 'images/effect-icons/player-elune-blessing.svg', description: '下一张圣光手牌的效果提高100%，使用后消耗。' },
+    { id: 'soul-fracture', ruleId: 'rule-soul-fracture-player', label: '裂魂', icon: 'images/effect-icons/player-soul-fracture.svg', description: '本局中，每有一个棋子死亡，你获得1张灵魂残片。' },
+  ])
+
   const PHASE_LABELS = { start: '开始阶段', action: '行动阶段', end: '结束阶段' }
 
   function escapeHtml(value) {
@@ -102,14 +109,14 @@
       players.innerHTML = model.players.map(function (player) {
         const isLocal = !!(model.viewer && String(model.viewer.id).toLowerCase() === String(player.id).toLowerCase())
         const sideName = player.faction === 'blue' ? '蓝方 · 后手' : '红方 · 先手'
-        const tags = (player.statusSummary || []).map(function (status) {
-          const label = statusLabel(status)
-          const badge = statusBadge(status)
-          return '<span class="status-tag status-tag-icon" title="' + escapeHtml(label) + '" aria-label="' + escapeHtml(label) + '">'
-            + '<img src="' + escapeHtml(statusIcon(status)) + '" alt="" aria-hidden="true">'
-            + (badge ? '<b class="status-icon-badge" aria-hidden="true">' + escapeHtml(badge) + '</b>' : '') + '</span>'
-        }).join('')
         const currentLabel = player.isCurrent ? '，当前行动方' : ''
+        const tags = PLAYER_EFFECTS.filter(function (effect) {
+          return effect.statusType ? (player.statusSummary || []).some(function (status) { return status.type === effect.statusType })
+            : effect.buffId ? (player.buffSummary || []).some(function (buff) { return buff.id === effect.buffId && buff.uses > 0 })
+            : (player.ruleSummary || []).some(function (rule) { return rule.id === effect.ruleId })
+        }).map(function (effect) {
+          return '<span class="player-effect-icon" tabindex="0" aria-label="' + escapeHtml(effect.label + '：' + effect.description) + '"><img src="' + effect.icon + '" alt=""><span class="player-effect-tip" role="tooltip"><b>' + escapeHtml(effect.label) + '</b><span>' + escapeHtml(effect.description) + '</span></span></span>'
+        }).join('')
         const localLabel = isLocal ? '，你' : ''
         return '<div class="player-state-chip ' + player.faction + (player.isCurrent ? ' active' : '') + (isLocal ? ' is-local-player' : '')
           + '" role="group" aria-label="' + escapeHtml(player.name + '，' + sideName + localLabel + currentLabel) + '" title="' + escapeHtml(player.id) + '">'
@@ -122,7 +129,7 @@
           + '<span class="resource-orb charge" title="充能点"><span class="resource-glyph charge"></span>' + player.resources.charge + '</span>'
           + '</span>'
           + (player.isCurrent ? '<span class="current-player-marker" aria-hidden="true">◆</span>' : '')
-          + '<div class="player-state-tags">' + tags + '</div></div>'
+          + '<div class="player-state-tags">' + tags + '</div>' + '</div>'
       }).join('')
     }
 
@@ -136,5 +143,5 @@
     return { update: update, dispose: dispose }
   }
 
-  root.BattleDomUI = { create: create }
+  root.BattleDomUI = { playerEffectRegistry: PLAYER_EFFECTS, create: create }
 })(typeof window !== 'undefined' ? window : globalThis)

@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>选择棋子 - RED vs BLUE</title>
   <script src="js/pack-fetch.js"></script>
+  <script src="js/hand-card-face.js"></script>
+  <link rel="stylesheet" href="css/tabletop/related-hand-cards.css" />
   <script src="js/server-utils.js"></script>
   <script src="js/crypto-lib.js"></script>
   <script src="js/identity.js"></script>
@@ -284,8 +286,9 @@
       .btn-confirm { padding: 11px 14px; white-space: nowrap; }
     }
   </style>
+  <link rel="stylesheet" href="css/tabletop/tabletop.css" />
 </head>
-<body>
+<body data-art-page="piece-selection">
 
   <!-- Topbar -->
   <div class="topbar">
@@ -1091,18 +1094,14 @@
       // Load related cards
       const relatedContainer = document.getElementById('detailRelatedCards')
       if (p.relatedCards && p.relatedCards.length > 0) {
-        let relatedHtml = '<div class="detail-related-label">相关手牌</div>'
+        let relatedHtml = '<div class="detail-related-label">相关手牌</div><div class="related-hand-cards">'
         for (const cardId of p.relatedCards) {
           const card = await getCard(cardId)
           if (card) {
-            relatedHtml += `<div class="detail-related-card">
-              <div class="detail-related-name">${card.icon || '*'} ${card.name || cardId} <span style="color:#a855f7;font-size:11px">AP:${card.actionPointCost ?? 0}</span></div>
-              <div class="detail-related-type">${card.type === 'active' ? '主动' : '反应'}</div>
-              <div class="detail-related-desc">${card.description || ''}</div>
-            </div>`
+            relatedHtml += HandCardFace.preview(cardId, card)
           }
         }
-        relatedContainer.innerHTML = relatedHtml
+        relatedContainer.innerHTML = relatedHtml + '</div>'
       } else {
         relatedContainer.innerHTML = ''
       }

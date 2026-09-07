@@ -146,6 +146,8 @@ function createRuntime(overrides: Record<string, unknown> = {}): Runtime {
 }
 
 function installRenderHand(context: Context) {
+  new Script(readFileSync(resolve(process.cwd(), 'data/pages/js/hand-card-face.js'), 'utf8')).runInContext(context)
+  context.HandCardFace = context.window.HandCardFace
   new Script([
     readNamedFunction('progressiveDeploymentPending'),
     readNamedFunction('isPendingHandSelection'),

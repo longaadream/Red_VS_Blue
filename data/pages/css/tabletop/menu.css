@@ -1,0 +1,60 @@
+/* A table of paper tabs and a playbook, using the existing four-mode navigation. */
+body[data-art-page=index] .game-shell{max-width:1300px;height:100svh;min-height:0;padding-top:clamp(14px,2vh,24px);padding-bottom:16px;gap:16px}
+body[data-art-page=index] .brand{rotate:-3deg;gap:10px;filter:drop-shadow(3px 4px 0 #1d1713)}
+body[data-art-page=index] .brand :is(.brand-red,.brand-blue){font:clamp(32px,4.2vw,56px) var(--table-heading);-webkit-text-stroke:1px #35271e}
+body[data-art-page=index] .brand-red{color:#bf7560}body[data-art-page=index] .brand-blue{color:#89a4a4}
+body[data-art-page=index] .brand-vs{color:#d2b889;font:25px var(--table-heading);rotate:8deg}
+body[data-art-page=index] .user-pill{rotate:2deg;padding:10px 17px;border-radius:8px 14px 7px 12px!important}.user-elo{color:#66533b!important}
+body[data-art-page=index] .menu-workspace{gap:30px;grid-template-columns:minmax(245px,.8fr) minmax(0,1.7fr)}
+body[data-art-page=index] .mode-nav{background:transparent;border:0;padding:5px 0;gap:18px}
+body[data-art-page=index] .tutorial-shortcut{background:#8c714f;border:2px solid #3e3025;border-radius:11px 20px 7px 16px!important;box-shadow:3px 4px 0 #201914;rotate:-1deg;padding:12px}
+body[data-art-page=index] .tutorial-shortcut__mark{background:#bba479 url('../../images/tabletop/desk-emblem.svg') center/62px no-repeat;border:1px solid #56432d;border-radius:38% 30% 40% 32%;color:transparent}
+body[data-art-page=index] .tutorial-shortcut__kicker{color:#e6cca2}
+body[data-art-page=index] .tutorial-shortcut__title{color:#f3deba;font:22px var(--table-heading)}
+body[data-art-page=index] .tutorial-shortcut__description{color:#ecdbbd;font-size:11px}
+body[data-art-page=index] .tutorial-shortcut__arrow{color:#e1c799}
+body[data-art-page=index] .mode-tabs{gap:13px}
+body[data-art-page=index] .mode-tab{background:#bda782 var(--table-grain);background-size:6px 6px;border:2px solid #483525;border-radius:7px 18px 10px 14px!important;box-shadow:3px 4px 0 #201914;color:#3c2e22;padding:13px 17px;position:relative}
+body[data-art-page=index] .mode-tab:nth-child(2n){border-radius:15px 7px 17px 8px!important;rotate:-.6deg}
+body[data-art-page=index] .mode-tab.is-active{background-color:#415b60;color:#f1ddba;box-shadow:4px 5px 0 #1c2629,inset 5px 0 0 #c9a871;translate:5px 0}
+body[data-art-page=index] .mode-name{font:clamp(20px,2.1vw,29px) var(--table-heading)}
+body[data-art-page=index] .mode-hint{color:#665137;font-size:11px}
+body[data-art-page=index] .mode-tab.is-active .mode-hint{color:#d4c3a3}
+body[data-art-page=index] .mode-mark{background:#a48d69 center/30px no-repeat!important;color:transparent!important;border:1px solid #6e5539;border-radius:12px 7px 15px 8px;rotate:-5deg}
+body[data-art-page=index] .mode-tab[data-mode=online] .mode-mark{background-image:url('../../images/tabletop/ui-view.svg')!important}
+body[data-art-page=index] .mode-tab[data-mode=adventure] .mode-mark{background-image:url('../../images/tabletop/ui-map.svg')!important}
+body[data-art-page=index] .mode-tab[data-mode=training] .mode-mark{background-image:url('../../images/tabletop/ui-reset.svg')!important}
+body[data-art-page=index] .mode-tab[data-mode=codex] .mode-mark{background-image:url('../../images/tabletop/ui-history.svg')!important}
+body[data-art-page=index] .mode-stage{background:#b8a07a var(--table-grain);background-size:6px 6px;color:#352b20;border:3px solid #473325;border-radius:14px 30px 12px 23px;box-shadow:6px 7px 0 #211914,inset 0 0 35px #76583122;position:relative;overflow:visible;padding:clamp(22px,3vw,40px)}
+body[data-art-page=index] .mode-stage::before{content:'';position:absolute;top:-13px;left:42%;width:86px;height:26px;background:#877353b3;border-inline:2px dashed #c0a78066;rotate:4deg;pointer-events:none}
+body[data-art-page=index] .panel-header{position:relative;padding:15px 160px 24px 0;border-bottom:2px dashed #8e754f;margin-bottom:18px}
+body[data-art-page=index] .panel-header::after{content:'';position:absolute;right:0;top:-12px;width:160px;height:126px;background:url('../../images/tabletop/desk-emblem.svg') center/contain no-repeat;rotate:5deg;pointer-events:none}
+body[data-art-page=index] .panel-title{color:#3b2d22;font:clamp(32px,3.6vw,48px) var(--table-heading);letter-spacing:.02em}
+body[data-art-page=index] .panel-description{color:#655039;font-size:13px}
+body[data-art-page=index] .action-stack{gap:16px;align-content:center}
+body[data-art-page=index] .action-button{background:#cbbc98;border:1.5px solid #806848;border-bottom-width:3px;border-radius:14px 8px 18px 7px!important;box-shadow:2px 3px 0 #82684666;min-height:86px;position:relative}
+body[data-art-page=index] .action-button:nth-child(2){rotate:-.7deg}
+body[data-art-page=index] .action-button.action-feature{background:#a5ac91;border-color:#64735c}
+body[data-art-page=index] .action-title{color:#362c21;font:25px var(--table-heading)}
+body[data-art-page=index] .action-description{color:#655139}
+body[data-art-page=index] .action-code{background:#a5906c;color:#473923;font:17px var(--table-heading);border:2px solid #806848;border-radius:40% 32% 39% 34%;rotate:-6deg}
+body[data-art-page=index] .action-arrow{color:#443629;font:32px var(--table-heading)}
+body[data-art-page=index] .action-button:hover{background:#d5c5a0;border-color:#695338}
+body[data-art-page=index] .action-button.action-feature:hover{background:#b4ba9e}
+body[data-art-page=index] .utility-bar{background:transparent;border:0;gap:15px;overflow:visible;grid-template-columns:repeat(4,minmax(0,1fr))}
+body[data-art-page=index] .utility-button{background:#514333;color:#ddc59d;border:2px solid #2d231b;box-shadow:2px 3px 0 #211914;min-height:50px;border-radius:10px 6px 13px 7px!important}
+body[data-art-page=index] .utility-title{font:18px var(--table-heading)}
+body[data-art-page=index] .utility-meta{color:#bba681}
+body[data-art-page=index] .utility-button:hover{background:#65523b;color:#f2dbb1}
+body[data-art-page=index] .sheet :is(h2,h3){font-family:var(--table-heading);font-weight:400;color:#3b2d22;font-size:26px}
+body[data-art-page=index] .sheet :is(p,label,.field-label,.lan-empty,.lan-scanning,.lan-server-url){color:#655139!important}
+body[data-art-page=index] .sheet [style*="color:"]{color:#56432f!important}
+body[data-art-page=index] .sheet :is(div,section)[style*="background:"]{background:#a48f6b40!important;border-color:#8b7350!important}
+body[data-art-page=index] .sheet button[style*="background:"]{background:#486269!important;color:#efddbd!important;border:1px solid #37433e!important}
+body[data-art-page=index] .sheet button[style*="background:transparent"]{background:transparent!important;color:#51412f!important}
+@media(orientation:landscape) and (max-height:450px){body[data-art-page=index] .mode-nav,body[data-art-page=index] .mode-stage{min-height:0}body[data-art-page=index] .mode-nav{padding:0!important}body[data-art-page=index] .mode-mark{width:28px;height:28px}body[data-art-page=index] .action-button{height:52px!important;min-height:0!important;padding:4px 12px!important}body[data-art-page=index] .action-copy{gap:2px}body[data-art-page=index] .action-arrow{font-size:24px!important}}
+@media(orientation:landscape) and (max-height:600px){body[data-art-page=index] .action-stack{grid-template-columns:1fr!important}body[data-art-page=index] .action-code{display:grid!important}body[data-art-page=index] .action-arrow{display:block!important}}
+@media(min-height:940px){body[data-art-page=index] .game-shell{height:900px;margin-block:calc((100svh - 900px)/2)}}
+@media(max-width:760px) and (orientation:portrait){body[data-art-page=index] .game-shell{height:auto;min-height:100svh}body[data-art-page=index] .utility-bar{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:760px){body[data-art-page=index] .game-shell{padding:16px 12px;gap:15px}body[data-art-page=index] .menu-workspace{grid-template-columns:1fr;gap:18px}body[data-art-page=index] .mode-nav{gap:12px}body[data-art-page=index] .mode-tabs{gap:10px}body[data-art-page=index] .mode-tab{padding:10px;min-height:60px}body[data-art-page=index] .mode-name{font-size:20px}body[data-art-page=index] .mode-tab.is-active{translate:0 0}body[data-art-page=index] .mode-stage{padding:18px}body[data-art-page=index] .panel-header{padding-right:80px;padding-bottom:14px}body[data-art-page=index] .panel-header::after{width:80px;height:80px}body[data-art-page=index] .panel-title{font-size:32px}body[data-art-page=index] .panel-layout{min-height:310px}body[data-art-page=index] .action-title{font-size:21px}body[data-art-page=index] .action-button{min-height:75px}body[data-art-page=index] .utility-bar{gap:8px}body[data-art-page=index] .utility-title{font-size:16px}}
+@media(orientation:landscape) and (max-height:600px){body[data-art-page=index] .game-shell{padding:10px 16px;gap:10px}body[data-art-page=index] .brand :is(.brand-red,.brand-blue){font-size:28px}body[data-art-page=index] .menu-workspace{grid-template-columns:minmax(220px,.8fr) minmax(0,1.7fr);gap:18px}body[data-art-page=index] .mode-nav{gap:9px}body[data-art-page=index] .tutorial-shortcut{min-height:58px;padding:6px 10px}body[data-art-page=index] .tutorial-shortcut__title{font-size:18px}body[data-art-page=index] .tutorial-shortcut__description{display:none}body[data-art-page=index] .mode-tabs{gap:6px}body[data-art-page=index] .mode-tab{padding:6px 10px;min-height:42px}body[data-art-page=index] .mode-name{font-size:19px}body[data-art-page=index] .mode-hint{display:none}body[data-art-page=index] .mode-stage{padding:12px 18px}body[data-art-page=index] .panel-layout{min-height:0}body[data-art-page=index] .panel-header{padding:0 80px 8px 0;margin-bottom:9px}body[data-art-page=index] .panel-title{font-size:28px}body[data-art-page=index] .panel-header::after{width:80px;height:70px}body[data-art-page=index] .panel-description{font-size:11px;margin-top:5px}body[data-art-page=index] .action-stack{gap:7px}body[data-art-page=index] .action-button{min-height:54px;padding:7px 12px;grid-template-columns:40px minmax(0,1fr) auto}body[data-art-page=index] .action-code{width:37px;height:34px;font-size:14px}body[data-art-page=index] .action-title{font-size:20px}body[data-art-page=index] .action-description{font-size:10px}body[data-art-page=index] .utility-button{min-height:36px;padding:5px 10px}body[data-art-page=index] .utility-title{font-size:15px}body[data-art-page=index] .utility-meta{display:none}}

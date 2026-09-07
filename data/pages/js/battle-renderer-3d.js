@@ -13,8 +13,8 @@
   const PIECE_W = TACTICAL_METRICS.pieceWidth
   const PIECE_D = TACTICAL_METRICS.pieceDepth
   const PIECE_H = TACTICAL_METRICS.pieceHeight
-  const PIECE_PORTRAIT_W = 0.66
-  const PIECE_PORTRAIT_D = 0.50
+  const PIECE_PORTRAIT_W = 0.72
+  const PIECE_PORTRAIT_D = 0.62
   const RING_T = 0.035
   const SELECTED_RING_T = 0.018
   const PAN_ACTIVATION_PX = TACTICAL_METRICS.panActivationPx
@@ -48,27 +48,27 @@
   })
 
   const TILE_COLORS = {
-    floor:     0x252a30,
-    wall:      0x0c1015,
-    spawn:     0x173127,
-    cover:     0x4b3a26,
-    hole:      0x07131c,
-    lava:      0x6b2418,
-    spring:    0x17413d,
-    chargepad: 0x34244c,
-    trap:      0x4a3020,
+    floor:     0xb4a182,
+    wall:      0x555451,
+    spawn:     0x6f785d,
+    cover:     0x997548,
+    hole:      0x4d5961,
+    lava:      0x934f40,
+    spring:    0x5b7b72,
+    chargepad: 0x7b667e,
+    trap:      0x998364,
   }
   const TILE_EMISSIVE = {
     lava:      { color: 0xff4400, intensity: 0.35 },
     chargepad: { color: 0x8800ff, intensity: 0.25 },
     spring:    { color: 0x00ffcc, intensity: 0.15 },
   }
-  const FACTION_COLORS = { red: 0xef4444, blue: 0x3b82f6 }
+  const FACTION_COLORS = { red: 0xb05b50, blue: 0x648ca6 }
   const HL_COLORS = {
-    move:     { color: 0x22c55e, opacity: 0.50 },
-    skill:    { color: 0xf59e0b, opacity: 0.50 },
-    place:    { color: 0x8b5cf6, opacity: 0.50 },
-    selected: { color: 0x60a5fa, opacity: 0.70 },
+    move:     { color: 0x29494e, opacity: 0.86 },
+    skill:    { color: 0x653a31, opacity: 0.86 },
+    place:    { color: 0x51435e, opacity: 0.86 },
+    selected: { color: 0x273e4d, opacity: 0.94 },
   }
   const TILE_EFFECT_VISUALS = Object.freeze({
     'charge-crystal': Object.freeze({ color: 0xc084fc, colorCss: '#e9d5ff', bg: 'rgba(88,28,135,.82)', border: '#c084fc', icon: 'images/effect-icons/verb-charge-points.svg' }),
@@ -79,7 +79,7 @@
     'blizzard': Object.freeze({ color: 0x67e8f9, colorCss: '#cffafe', bg: 'rgba(14,116,144,.72)', border: '#67e8f9', icon: 'images/tile-effects/blizzard.svg' }),
     'shishio-burn': Object.freeze({ color: 0xfb4934, colorCss: '#fdba74', bg: 'rgba(124,45,18,.75)', border: '#fb4934', icon: 'images/tile-effects/shishio-burn.svg' }),
     'sticky-bomb': Object.freeze({ color: 0xfacc15, colorCss: '#fef08a', bg: 'rgba(113,63,18,.78)', border: '#facc15', icon: 'images/tile-effects/sticky-bomb.svg' }),
-    'tails-flight-reservation': Object.freeze({ color: 0x60a5fa, colorCss: '#bfdbfe', bg: 'rgba(30,58,138,.78)', border: '#60a5fa', icon: 'images/tile-effects/flying-raijin-anchor.svg' }),
+    'tails-flight-reservation': Object.freeze({ color: 0x60a5fa, colorCss: '#bfdbfe', bg: 'rgba(30,58,138,.78)', border: '#60a5fa', icon: 'images/tile-effects/tails-flight-reservation.svg' }),
     fallback: Object.freeze({ color: 0x94a3b8, colorCss: '#e5e7eb', bg: 'rgba(15,23,42,.76)', border: '#94a3b8', icon: 'images/tile-effects/fallback.svg' }),
   })
   const TILE_EFFECT_ICON_SLOTS = Object.freeze([
@@ -161,6 +161,13 @@
     const em  = TILE_EMISSIVE[type]
     const mat = new THREE.MeshLambertMaterial({ color: col })
     if (em) { mat.emissive = new THREE.Color(em.color); mat.emissiveIntensity = em.intensity }
+    if (type === 'floor' || type === 'cover' || type === 'wall') {
+      loadTexture('tabletop-battle/assets/comic-tile.svg', function(texture) {
+        texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+        texture.repeat.set(1,1); texture.offset.set(0,0);
+        mat.map=texture; mat.needsUpdate=true; _invalidate();
+      });
+    }
     _tileMats[type] = mat
     return mat
   }
@@ -177,6 +184,13 @@
     if (_hlMats[type]) return _hlMats[type]
     const cfg = HL_COLORS[type] || HL_COLORS.move
     const mat = new THREE.MeshBasicMaterial({ color: cfg.color, transparent: true, opacity: cfg.opacity, depthWrite: false })
+    const skinHighlightUrl = 'tabletop-battle/assets/highlight-' + (['move','skill','place','selected'].includes(type) ? type : 'move') + '.svg';
+    loadTexture(skinHighlightUrl, function(texture) {
+      mat.map = texture; mat.color.setHex(0xffffff); mat.needsUpdate = true; _invalidate();
+    }, function() {});
+    // Native highlights clone this material. Share the cached pending texture before cloning.
+    const pendingTexture = _texCache.get(skinHighlightUrl);
+    if (pendingTexture && pendingTexture.texture) { mat.map = pendingTexture.texture; mat.color.setHex(0xffffff); }
     _hlMats[type] = mat
     return mat
   }
@@ -301,19 +315,19 @@
     // Scene and table lighting use dark neutral metal; faction color is reserved
     // for the narrow base ring and the existing authoritative highlight layers.
     _scene = new THREE.Scene()
-    _scene.background = new THREE.Color(0x07090b)
+    _scene.background = null
 
-    const ambient = new THREE.AmbientLight(0xdbe4ee, 0.48)
+    const ambient = new THREE.AmbientLight(0xfff3e4, 0.72)
     _scene.add(ambient)
-    const dirLight = new THREE.DirectionalLight(0xfff1dc, 0.72)
+    const dirLight = new THREE.DirectionalLight(0xfff6e5, 0.35)
     dirLight.position.set(-7, 13, 10)
     _scene.add(dirLight)
-    const edgeLight = new THREE.DirectionalLight(0x7ba3c9, 0.24)
+    const edgeLight = new THREE.DirectionalLight(0xc8c7b5, 0.16)
     edgeLight.position.set(10, 5, -8)
     _scene.add(edgeLight)
 
     // Renderer
-    _renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false })
+    _renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true })
     _renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
     _container.insertBefore(_renderer.domElement, _container.firstChild)
     _renderer.domElement.tabIndex = 0
@@ -507,7 +521,7 @@
   function _buildTiles(map) {
     _clearPresentationAreaFlash()
     _clearPresentationPath()
-    _tileBatches.forEach(batch => _scene.remove(batch))
+    _tileBatches.forEach(batch => { _scene.remove(batch); if (batch.dispose) batch.dispose() })
     _tileBatches.clear()
     _tileObjects.clear()
     if (_boardFront) {
@@ -527,11 +541,11 @@
     _mapH = map.height
 
     const boardBaseGeometry = new THREE.BoxGeometry(_mapW + 1.25, BOARD_BASE_H, _mapH + 1.25)
-    const boardBaseMaterial = new THREE.MeshLambertMaterial({ color: 0x20272e })
+    const boardBaseMaterial = new THREE.MeshLambertMaterial({ color: 0x493729 })
     _boardBase = new THREE.Mesh(boardBaseGeometry, boardBaseMaterial)
     _boardBase.position.set((_mapW - 1) / 2, -BOARD_BASE_H / 2, (_mapH - 1) / 2)
     const boardFrontGeometry = new THREE.BoxGeometry(_mapW + 1.25, BOARD_BASE_H, 0.10)
-    const boardFrontMaterial = new THREE.MeshLambertMaterial({ color: 0x37414b })
+    const boardFrontMaterial = new THREE.MeshLambertMaterial({ color: 0x2d241d })
     _boardFront = new THREE.Mesh(boardFrontGeometry, boardFrontMaterial)
     _boardFront.position.set((_mapW - 1) / 2, -BOARD_BASE_H / 2, _mapH + 0.105)
     _scene.add(_boardFront)
@@ -783,7 +797,7 @@
 
     const factionColor = FACTION_COLORS[faction] || FACTION_COLORS.red
     const bodyMaterial = new THREE.MeshLambertMaterial({
-      color: 0x22272d,
+      color: factionColor,
       emissive: new THREE.Color(factionColor),
       emissiveIntensity: 0.08,
     })
@@ -1088,7 +1102,7 @@
       const scale = Math.max(0.36, Math.min(1, cellSpan / 38))
       obj.summaryEl.style.setProperty('--piece-summary-scale', scale.toFixed(3))
       obj.summaryEl.style.left = projected.left + 'px'
-      obj.summaryEl.style.top = (projected.top + Math.max(3, cellSpan * 0.28)) + 'px'
+      obj.summaryEl.style.top = (projected.top - Math.max(20, cellSpan * 0.48)) + 'px'
       obj.summaryEl.style.display = ''
     })
   }
@@ -1218,6 +1232,7 @@
     if (!_presentationAreaFlash) return
     _presentationAreaFlash.entries.forEach(function (entry) {
       if (_scene && entry.mesh) _scene.remove(entry.mesh)
+      entry.mesh.children.forEach(_disposePresentationObject)
       if (entry.flashMaterial && entry.flashMaterial.dispose) entry.flashMaterial.dispose()
     })
     _presentationAreaFlash = null
@@ -1245,10 +1260,10 @@
 
     const entries = normalized.map(function (cell) {
       const flashMaterial = new THREE.MeshLambertMaterial({
-        color: 0xf97316,
-        emissive: 0xf97316,
+        color: 0xd09a52,
+        emissive: 0xd09a52,
         transparent: true,
-        opacity: 0.76,
+        opacity: 0.56,
         depthWrite: false,
       })
       flashMaterial.emissiveIntensity = _reducedMotion ? 0.72 : 0
@@ -1258,6 +1273,18 @@
       mesh.renderOrder = 6
       mesh.userData.presentationAreaFlash = true
       mesh.userData.presentationAreaCell = { x: cell.x, y: cell.z }
+      // Ink border and sparse hatch live on the overlay, never on terrain.
+      const inkPoints = [-0.43,-0.43,0.004, 0.43,-0.43,0.004,
+        0.43,-0.43,0.004, 0.43,0.43,0.004,
+        0.43,0.43,0.004, -0.43,0.43,0.004,
+        -0.43,0.43,0.004, -0.43,-0.43,0.004,
+        -0.4,-0.18,0.004, -0.18,-0.4,0.004,
+        0.18,0.4,0.004, 0.4,0.18,0.004]
+      const inkGeometry = new THREE.BufferGeometry()
+      inkGeometry.setAttribute('position', new THREE.Float32BufferAttribute(inkPoints, 3))
+      const ink = new THREE.LineSegments(inkGeometry, new THREE.LineBasicMaterial({ color: 0x30251e, transparent: true, opacity: 0.85, depthWrite: false }))
+      ink.renderOrder = 7
+      mesh.add(ink)
       _scene.add(mesh)
       return {
         key: cell.key,
@@ -1270,6 +1297,7 @@
       cellCount: normalized.length,
       entries: entries,
     }
+    _invalidate()
     if (_reducedMotion) return
     _startAnimation('presentation:area:intensity', {
       duration: MOTION_SECONDS.result,
@@ -1305,6 +1333,7 @@
     if (_scene && _presentationPath.group) _scene.remove(_presentationPath.group)
     _disposePresentationObject(_presentationPath.group)
     _presentationPath = null
+    _invalidate()
   }
 
   function _normalizePresentationPoint(point) {
@@ -1313,36 +1342,38 @@
     return cell
   }
 
-  function _createPresentationPathRibbon(source, end) {
+  function _createComicArrow(source, end, elevation, color, depthTest) {
     const dx = end.x - source.x
     const dz = end.z - source.z
     const distance = Math.hypot(dx, dz)
     if (distance < 0.001) return null
-    const halfWidth = 0.035
-    const offsetX = -dz / distance * halfWidth
-    const offsetZ = dx / distance * halfWidth
-    // One constant board-plane elevation is intentional: endpoint terrain may
-    // be raised, but the trajectory direction must stay parallel to the grid.
-    // Raised tiles then occlude the line naturally instead of tilting it.
-    const sourceY = TILE_H + 0.028
-    const endY = sourceY
-    const geometry = new THREE.BufferGeometry()
-    geometry.setAttribute('position', new THREE.Float32BufferAttribute([
-      source.x + offsetX, sourceY, source.z + offsetZ,
-      source.x - offsetX, sourceY, source.z - offsetZ,
-      end.x - offsetX, endY, end.z - offsetZ,
-      end.x + offsetX, endY, end.z + offsetZ,
-    ], 3))
-    geometry.setIndex([0, 1, 2, 0, 2, 3])
-    const material = new THREE.MeshBasicMaterial({
-      color: 0x93c5fd,
-      transparent: true,
-      opacity: 0,
-      depthWrite: false,
-      side: THREE.DoubleSide,
-    })
-    const mesh = new THREE.Mesh(geometry, material)
-    mesh.renderOrder = 4
+    function shape(width, arrowWidth, y, tint, order) {
+      const neck = Math.max(0, distance - Math.min(0.36, distance * 0.4))
+      const outline = [[0,width],[neck,width],[neck,arrowWidth],[distance,0],
+        [neck,-arrowWidth],[neck,-width],[0,-width]]
+      const positions = []
+      outline.forEach(function (p) {
+        positions.push(source.x + dx / distance * p[0] - dz / distance * p[1], y,
+          source.z + dz / distance * p[0] + dx / distance * p[1])
+      })
+      const geometry = new THREE.BufferGeometry()
+      geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
+      geometry.setIndex([0,1,5,0,5,6,1,2,3,1,3,5,3,4,5])
+      const mesh = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ color: tint,
+        transparent: true, opacity: 0, depthTest: depthTest, depthWrite: false, side: THREE.DoubleSide }))
+      mesh.renderOrder = order
+      return mesh
+    }
+    const mesh = shape(0.065, 0.21, elevation, color, 22)
+    const ink = shape(0.105, 0.28, elevation - 0.002, 0x251e1a, 21)
+    mesh.add(ink)
+    return mesh
+  }
+
+  function _createPresentationPathRibbon(source, end) {
+    // All vertices stay parallel to the board; raised terrain occludes naturally.
+    const mesh = _createComicArrow(source, end, TILE_H + 0.028, 0xe3bc73, true)
+    if (!mesh) return null
     mesh.userData.presentationPathRole = 'trajectory'
     mesh.userData.sourceCell = { x: source.x, y: source.z }
     mesh.userData.endCell = { x: end.x, y: end.z }
@@ -1352,8 +1383,8 @@
   function _createPresentationAimMarker(selected) {
     if (!selected) return null
     const positions = []
-    const segmentCount = 16
-    const radius = 0.22
+    const segmentCount = 24
+    const radius = 0.32
     const elevation = _tileSurfaceHeightAt(selected.x, selected.z) + 0.032
     for (let index = 0; index < segmentCount; index += 2) {
       const startAngle = index / segmentCount * Math.PI * 2
@@ -1366,7 +1397,7 @@
     const geometry = new THREE.BufferGeometry()
     geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
     const material = new THREE.LineBasicMaterial({
-      color: 0xfacc15,
+      color: 0xf3d699,
       transparent: true,
       opacity: 0,
       depthWrite: false,
@@ -1399,7 +1430,9 @@
     if (trajectory) group.add(trajectory)
     if (aim) group.add(aim)
     _scene.add(group)
-    const materials = (trajectory ? [trajectory.material] : []).concat(aim ? [aim.material] : [])
+    _invalidate()
+    const materials = []
+    group.traverse(function (object) { if (object.material) materials.push(object.material) })
     _presentationPath = {
       signature: signature,
       group: group,
@@ -1407,7 +1440,7 @@
       end: end ? { x: end.x, y: end.z } : null,
       selected: selected ? { x: selected.x, y: selected.z } : null,
     }
-    const targetOpacities = (trajectory ? [0.82] : []).concat(aim ? [0.86] : [])
+    const targetOpacities = materials.map(function () { return 0.96 })
     if (_reducedMotion) {
       materials.forEach(function (material, index) { material.opacity = targetOpacities[index] })
       return
@@ -1447,6 +1480,7 @@
     _historyHighlightGroup = null
     _historyHighlightPointCount = 0
     _historyHighlightPathCount = 0
+    _invalidate()
   }
 
   function setHistoryHighlight(items) {
@@ -1461,7 +1495,8 @@
       const key = cell.key + ':' + role
       if (seen.has(key)) return
       seen.add(key)
-      cells.push({ x: cell.x, z: cell.z, role: role })
+      const origin = _normalizeHighlightItem({ x: item.fromX, y: item.fromY })
+      cells.push({ x: cell.x, z: cell.z, role: role, origin: origin })
     })
     if (!cells.length) return
 
@@ -1475,8 +1510,8 @@
     const source = cells.find(function (cell) { return cell.role === 'source' })
 
     cells.forEach(function (cell) {
-      const geometry = new THREE.RingGeometry(0.20, 0.29, 32)
-      const color = cell.role === 'source' ? 0x93c5fd : 0xfacc15
+      const geometry = new THREE.RingGeometry(0.43, 0.52, cell.role === 'source' ? 8 : 4)
+      const color = cell.role === 'source' ? 0x83b7ba : 0xe4b967
       const material = new THREE.MeshBasicMaterial({
         color: color,
         transparent: true,
@@ -1490,29 +1525,20 @@
       marker.position.set(cell.x, planeY, cell.z)
       marker.renderOrder = 21
       marker.userData.historyRole = cell.role
+      const ink = new THREE.Mesh(new THREE.RingGeometry(0.40, 0.56, cell.role === 'source' ? 8 : 4),
+        new THREE.MeshBasicMaterial({ color: 0x251e1a, transparent: true, opacity: 1, side: THREE.DoubleSide, depthTest: false, depthWrite: false }))
+      ink.renderOrder = 20
+      marker.add(ink)
       group.add(marker)
       _historyHighlightPointCount += 1
     })
 
     if (source) {
       cells.filter(function (cell) { return cell.role === 'target' }).forEach(function (target) {
-        if (target.x === source.x && target.z === source.z) return
-        const geometry = new THREE.BufferGeometry().setFromPoints([
-          new THREE.Vector3(source.x, planeY, source.z),
-          new THREE.Vector3(target.x, planeY, target.z),
-        ])
-        const material = new THREE.LineDashedMaterial({
-          color: 0xfde047,
-          transparent: true,
-          opacity: 0.92,
-          dashSize: 0.24,
-          gapSize: 0.14,
-          depthTest: false,
-          depthWrite: false,
-        })
-        const path = new THREE.Line(geometry, material)
-        path.computeLineDistances()
-        path.renderOrder = 20
+        const start = target.origin || source
+        if (target.x === start.x && target.z === start.z) return
+        const path = _createComicArrow(start, target, planeY, 0xe4b967, false)
+        path.traverse(function (object) { if (object.material) object.material.opacity = 0.96 })
         path.userData.historyRole = 'path'
         group.add(path)
         _historyHighlightPathCount += 1
@@ -2579,6 +2605,29 @@
     _invalidate()
   }
 
+  // Replace only the rendered board, preserving the user's camera and authority model.
+  function showHistoricalBoard(model) {
+    if (!_mounted || !model || !model.board) return
+    _cancelPieceDrag()
+    Array.from(_anims.keys()).forEach(_cancelAnimation)
+    _clearPresentationAreaFlash()
+    _clearPresentationPath()
+    _floaterTimers.forEach(function (timer) { clearTimeout(timer) })
+    _floaterTimers.clear()
+    _floaters.forEach(function (element) { element.remove() })
+    _floaters.clear()
+    _pieceObjects.forEach(function (obj) { _scene.remove(obj.group); _disposePieceObject(obj) })
+    _pieceObjects.clear()
+    const camera = { x: _cameraTarget.x, y: _cameraTarget.y, z: _cameraTarget.z, zoom: _camera.zoom }
+    _buildTiles(model.board)
+    _cameraTarget.set(camera.x, camera.y, camera.z)
+    _camera.zoom = camera.zoom
+    _positionCameraFromTarget()
+    _camera.updateProjectionMatrix()
+    _currentModel = model
+    update(model)
+  }
+
   // ── spawnFloater ─────────────────────────────────────────────────────────────
   function spawnFloater(x, z, text, color, big, options) {
     options = options || {}
@@ -2588,10 +2637,11 @@
     let left = x * 44 + 22  // fallback pixel estimate
     let top  = z * 44 + 4
 
-    const projected = projectCell(x, z, _tileSurfaceHeightAt(x, z) + PIECE_H + 0.2)
+    const projected = projectCell(x, z, 0.65)
     if (projected) {
-      left = projected.left
-      top = projected.top - 14
+      const bounds = layer.getBoundingClientRect()
+      left = Math.max(48, Math.min(bounds.width - 48, projected.left + 48))
+      top = Math.max(60, Math.min(bounds.height - 60, projected.top - 44))
     }
 
     const el = document.createElement('div')
@@ -2727,6 +2777,7 @@
   window.BattleRenderer3D = {
     init,
     update,
+    showHistoricalBoard,
     animateAction,
     spawnFloater,
     resize,
