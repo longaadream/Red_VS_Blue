@@ -140,8 +140,8 @@ describe('RED-178 JSON-first content editor', () => {
 
     expect(ui).toContain('const value = JSON.parse(text)')
     expect(ui).toContain("throw new Error('顶层必须是 JSON 对象。')")
-    expect(ui).toContain("saveButton.disabled = Boolean(result.error)")
-    expect(ui).toContain('if (parsed.error) return')
+    expect(ui).toContain("saveButton.disabled = Boolean(result.error || result.graphError)")
+    expect(ui).toContain('if (parsed.error || parsed.graphError) return')
     expect(ui).toContain('await api.writeDocument(subdir, item.filename, parsed.value, item.revision)')
     expect(ui).toContain('let draft = clone(data)')
     expect(ui).toContain('setPath(draft, input.dataset.fieldPath, value)')

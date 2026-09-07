@@ -1,0 +1,12 @@
+{
+  "ok": true,
+  "checks": [
+    "real canvas node creation/parameters/connections",
+    "cycle blocks save",
+    "code/JSON synchronization",
+    "unknown fields preserved",
+    "atomic save and reload",
+    "external revision conflict protected"
+  ],
+  "screenshot": "skill-graph-editor.png"
+}

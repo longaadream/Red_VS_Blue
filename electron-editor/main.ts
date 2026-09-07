@@ -3,6 +3,7 @@ import * as path from 'path'
 import * as fs from 'fs'
 import { assertTrustedIpcSender, isFileUrlWithinRoot } from './ipc-trust'
 import { CreativeWorkbench } from './workbench'
+import { assertSkillGraphArtifact } from './skill-graph'
 import { assertContentProjectRoot, createContentProject, openContentProject, readDocumentSnapshot, writeDocumentSnapshot } from './content-project'
 import {
   EditorContentOperationQueueV1,
@@ -101,6 +102,7 @@ let win: BrowserWindow | null = null
 
 function createWindow(): void {
   win = new BrowserWindow({
+    show: !process.argv.includes('--editor-smoke-hidden'),
     width: 1200,
     height: 780,
     minWidth: 900,
@@ -113,6 +115,8 @@ function createWindow(): void {
       nodeIntegration: false,
       sandbox: true,
       webSecurity: true,
+      backgroundThrottling: !process.argv.includes('--editor-smoke-hidden'),
+      offscreen: process.argv.includes('--editor-smoke-hidden'),
     },
   })
   const uiRoot = getEditorUiRoot()
@@ -270,6 +274,7 @@ handleTrusted('read-file', (_e, subdir: string, filename: string) => {
 // ─── IPC: 写入文件 ─────────────────────────────────────────────────────────────
 
 handleTrusted('write-file', (_e, subdir: string, filename: string, data: unknown) => {
+  assertSkillGraphArtifact(data)
   const file = safePath(subdir, filename, 'write')
   fs.writeFileSync(file, JSON.stringify(data, null, 2) + '\n', 'utf-8')
   return { ok: true }
@@ -278,6 +283,7 @@ handleTrusted('write-file', (_e, subdir: string, filename: string, data: unknown
 // ─── IPC: 创建文件并登记 manifest ──────────────────────────────────────────────
 
 handleTrusted('create-file', (_e, subdir: string, id: string, data: unknown) => {
+  assertSkillGraphArtifact(data)
   if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(id)) {
     throw new Error('ID 只能包含小写字母、数字和单个连字符')
   }

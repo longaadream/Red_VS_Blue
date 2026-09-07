@@ -3,5 +3,6 @@
 // Returning false prevents electron-builder from collecting every production
 // dependency from the root Next.js application into the editor ASAR.
 module.exports = async function handleEditorDependenciesExternally() {
+  await import('./build-skill-graph.mjs')
   return false
 }

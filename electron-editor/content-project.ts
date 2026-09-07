@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto'
 import * as fs from 'node:fs'
 import path from 'node:path'
+import { assertSkillGraphArtifact } from './skill-graph'
 
 const MARKER = 'rvb-content-project.json'
 const COLLECTIONS = ['pieces', 'skills', 'cards', 'rules']
@@ -69,6 +70,7 @@ export function readDocumentSnapshot(file: string) {
 
 /** Detect stale editors; arbitrary external writers do not participate in a filesystem lock. */
 export function writeDocumentSnapshot(file: string, value: unknown, expectedRevision: string) {
+  assertSkillGraphArtifact(value)
   if (typeof expectedRevision !== 'string' || digest(fs.readFileSync(file)) !== expectedRevision) {
     throw new Error('文件已被 AI 或其他程序修改，请刷新后重新编辑；磁盘文件未被覆盖。')
   }

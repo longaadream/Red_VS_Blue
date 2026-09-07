@@ -578,7 +578,7 @@ function validateStaticSvg(
     const attributes = match[3]
     let attributeCursor = 0
     const attributeNames = new Set<string>()
-    const attributePattern = /\s+([A-Za-z][A-Za-z0-9.-]*)\s*=\s*(["'])(.*?)\2/gs
+    const attributePattern = /\s+([A-Za-z][A-Za-z0-9.-]*)\s*=\s*(["'])([\s\S]*?)\2/g
     for (let attribute = attributePattern.exec(attributes); attribute; attribute = attributePattern.exec(attributes)) {
       if (attributes.slice(attributeCursor, attribute.index).trim()) invalid()
       attributeCursor = attributePattern.lastIndex

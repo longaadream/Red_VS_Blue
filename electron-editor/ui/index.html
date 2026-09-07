@@ -6,6 +6,9 @@
 <title>数据编辑器</title>
 <link rel="stylesheet" href="workbench.css"/>
 <script src="visual-fields.js"></script>
+<script src="skill-graph-core.js"></script>
+<script src="skill-graph-editor.js"></script>
+<link rel="stylesheet" href="skill-graph.css">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{--bg:#0d0f12;--rail:#101318;--surface:#15191f;--surface-2:#1b2028;--border:#2a3039;--border-soft:#20252d;--muted:#7f8997;--text:#eef1f5;--text-dim:#b3bac4;--accent:#f05252;--accent-h:#ff6b6b;--blue:#5b8def;--green:#35b97f;--red:#f06464;--yellow:#e8ad4d;--mono:'Cascadia Code','SFMono-Regular',Consolas,monospace}
@@ -443,12 +446,13 @@ function renderDocumentEditor({ subdir, item, data, dataMap, items, listControll
   let serialized = JSON.stringify(draft, null, 2)
   const executableFields = ['skillCode','code','previewCode','effectCode'].filter(field => Object.hasOwn(draft, field))
   if (config.codeField && executableFields.length === 0) executableFields.push(config.codeField)
-  const panes = ['fields', ...(executableFields.length ? ['code'] : []), 'json']
+  const panes = ['fields', ...(subdir === 'skills' ? ['graph'] : []), ...(executableFields.length ? ['code'] : []), 'json']
 
   detailEl.innerHTML = `<article class="editor-frame">
     <header class="editor-header"><div class="editor-title"><h2 data-document-title>${esc(draft.name || item.id)}</h2><div class="file-id">${esc(item.filename)}</div></div><span class="dirty-state" role="status" aria-live="polite">${isNew ? '待创建' : '已保存'}</span></header>
-    <nav class="editor-tabs" aria-label="编辑模式">${panes.map((mode,index) => `<button class="editor-mode ${index === 0 ? 'active' : ''}" data-editor-mode="${mode}">${({fields:'常用字段',code:'代码',json:'完整 JSON'})[mode]}</button>`).join('')}</nav>
+    <nav class="editor-tabs" aria-label="编辑模式">${panes.map((mode,index) => `<button class="editor-mode ${index === 0 ? 'active' : ''}" data-editor-mode="${mode}">${({fields:'常用字段',graph:'流程图',code:'代码',json:'完整 JSON'})[mode]}</button>`).join('')}</nav>
     <section class="editor-pane active" data-editor-pane="fields"><div class="editor-help">修改会同步到完整 JSON，未展示的字段不会被删除。标签声明与技能逻辑分别编辑。</div><div data-visual-fields></div><div class="form-section grid2">${config.fields.map(field => fieldMarkup(field, getPath(draft, field[0]))).join('')}</div></section>
+    ${subdir === 'skills' ? '<section class="editor-pane" data-editor-pane="graph"><div data-skill-graph></div></section>' : ''}
     ${executableFields.length ? `<section class="editor-pane" data-editor-pane="code"><div class="editor-help">复杂效果仍使用代码字段。编辑器只负责保存文本，不执行代码。</div>${executableFields.map(field => `<div class="field-group"><label>${esc(field)}</label><textarea class="code-editor" data-code-field="${esc(field)}" spellcheck="false">${esc(draft[field] || '')}</textarea></div>`).join('')}</section>` : ''}
     <section class="editor-pane" data-editor-pane="json"><div class="editor-help">可直接修改任意字段。只有合法的 JSON 对象才能保存；格式错误时原文件保持不变。</div><div class="json-error" data-json-error></div><textarea class="json-editor" data-json-source spellcheck="false">${esc(serialized)}</textarea></section>
     <footer class="editor-footer"><span class="dirty-state" data-footer-state>${isNew ? '待创建' : '已保存'}</span><div class="footer-actions"><button class="btn btn-ghost" data-open-external ${isNew ? 'disabled' : ''}>外部打开</button><button class="btn btn-ghost" data-reset-document>恢复</button><button class="btn btn-ghost" data-format-json>格式化 JSON</button><button class="btn btn-primary" data-save-json>${isNew ? '创建文件' : '保存 JSON'}</button></div></footer>
@@ -460,6 +464,7 @@ function renderDocumentEditor({ subdir, item, data, dataMap, items, listControll
   const footerState = detailEl.querySelector('[data-footer-state]')
   const saveButton = detailEl.querySelector('[data-save-json]')
   let visualEditor = null
+  const graphEditor = subdir === 'skills' ? window.ContentSkillGraph.mount(detailEl.querySelector('[data-skill-graph]'), { getDraft: () => draft, onChange: syncDraft }) : null
   if (['pieces','skills','cards'].includes(subdir)) {
     const container = detailEl.querySelector('[data-visual-fields]')
     container.textContent = '正在读取技能与标签目录…'
@@ -485,11 +490,14 @@ function renderDocumentEditor({ subdir, item, data, dataMap, items, listControll
   }
   function validateSource() {
     const result = parseJsonDocument(jsonEl.value)
-    errorEl.textContent = result.error || ''
+    if (!result.error && result.value.skillGraph !== undefined) {
+      try { window.SkillGraphCore.assertSkillGraphArtifact(result.value) } catch (error) { result.graphError = error.message }
+    }
+    errorEl.textContent = result.error || result.graphError || ''
     jsonEl.classList.toggle('invalid', Boolean(result.error))
-    saveButton.disabled = Boolean(result.error)
+    saveButton.disabled = Boolean(result.error || result.graphError)
     const unchanged = jsonEl.value === JSON.stringify(saved, null, 2)
-    setStatus(result.error ? 'JSON 有错误' : (pendingCreate ? '待创建' : (unchanged ? '已保存' : '未保存')), result.error ? 'invalid' : (pendingCreate || !unchanged ? 'dirty' : 'valid'))
+    setStatus(result.error ? 'JSON 有错误' : result.graphError ? '流程图需要修正或重新生成' : (pendingCreate ? '待创建' : (unchanged ? '已保存' : '未保存')), result.error || result.graphError ? 'invalid' : (pendingCreate || !unchanged ? 'dirty' : 'valid'))
     return result
   }
   function syncDraft(nextDraft) {
@@ -512,6 +520,7 @@ function renderDocumentEditor({ subdir, item, data, dataMap, items, listControll
       })
       detailEl.querySelectorAll('[data-code-field]').forEach(input => { input.value = draft[input.dataset.codeField] || '' })
       visualEditor?.refresh()
+      graphEditor?.refresh()
     }
     detailEl.querySelectorAll('.editor-mode').forEach(candidate => candidate.classList.toggle('active', candidate === button))
     detailEl.querySelectorAll('.editor-pane').forEach(pane => pane.classList.toggle('active', pane.dataset.editorPane === mode))
@@ -529,7 +538,7 @@ function renderDocumentEditor({ subdir, item, data, dataMap, items, listControll
   saveButton.onclick = async () => {
     if (detailEl.dataset.saving === 'true') return
     const parsed = validateSource()
-    if (parsed.error) return
+    if (parsed.error || parsed.graphError) return
     detailEl.dataset.saving = 'true'
     const controls = [...detailEl.querySelectorAll('input, textarea, select, button')].map(node => [node, node.disabled])
     controls.forEach(([node]) => { node.disabled = true })

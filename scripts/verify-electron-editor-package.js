@@ -10,6 +10,10 @@ const REQUIRED_ARCHIVE_FILES = [
   'electron-editor/dist/main.js',
   'electron-editor/dist/preload.js',
   'electron-editor/ui/index.html',
+  'electron-editor/ui/skill-graph-core.js',
+  'electron-editor/ui/skill-graph-editor.js',
+  'electron-editor/ui/skill-graph.css',
+  'electron-editor/dist/skill-graph.js',
   'package.json',
 ]
 
