@@ -36,6 +36,8 @@ let actualLocalPort = LOCAL_PORT_HINT  // 实际绑定成功的端口
 const GAME_PORT_HINT = 38621
 let actualGamePort = GAME_PORT_HINT
 const CLIENT_SCHEME = 'rvb-client'
+// Kept in sync with lib/game/rule-version.ts by the desktop contract test.
+const DESKTOP_BATTLE_RUNNER_REVISION = 'rvb-battle-runner/v2' as const
 const BATTLE_AUTHORITY_SHUTDOWN_REQUEST = 'rvb:battle-authority:shutdown'
 const BATTLE_AUTHORITY_SHUTDOWN_RESULT = 'rvb:battle-authority:shutdown-result'
 const SERVER_GRACEFUL_SHUTDOWN_TIMEOUT_MS = 6_500
@@ -53,7 +55,7 @@ let appExitPromise: Promise<void> | null = null
 type GameProfileIdentity = Readonly<{
   schemaVersion: 'rvb-game-profile-identity/v1'
   engineAbi: string
-  runnerRevision: 'rvb-battle-runner/v1'
+  runnerRevision: typeof DESKTOP_BATTLE_RUNNER_REVISION
   resolvedProfileHash: string
   authorityContentHash: string
 }>
@@ -557,7 +559,7 @@ function gameProfileIdentityFromReference(reference: DesktopProfileReference): G
   return {
     schemaVersion: 'rvb-game-profile-identity/v1',
     engineAbi: reference.compatibility.engineAbi,
-    runnerRevision: 'rvb-battle-runner/v1',
+    runnerRevision: DESKTOP_BATTLE_RUNNER_REVISION,
     resolvedProfileHash: reference.resolvedProfileHash,
     authorityContentHash: reference.authorityContentHash,
   }
@@ -581,7 +583,7 @@ function parseGameProfileIdentity(value: unknown): GameProfileIdentity {
   if (
     keys !== 'authorityContentHash,engineAbi,resolvedProfileHash,runnerRevision,schemaVersion'
     || identity.schemaVersion !== 'rvb-game-profile-identity/v1'
-    || identity.runnerRevision !== 'rvb-battle-runner/v1'
+    || identity.runnerRevision !== DESKTOP_BATTLE_RUNNER_REVISION
     || typeof identity.engineAbi !== 'string'
     || !/^[a-f0-9]{64}$/.test(identity.resolvedProfileHash ?? '')
     || !/^[a-f0-9]{64}$/.test(identity.authorityContentHash ?? '')
