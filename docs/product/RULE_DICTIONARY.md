@@ -2,6 +2,8 @@
 
 本文件记录 RED-192 中逐项确认的规则。角色描述只写效果和例外；通用含义放在词典中。
 
+技能的固定句式、对象称谓和角色改写示例见[技能描述语言标准](SKILL_DESCRIPTION_STANDARD.md)；结构化描述向流程图编程的接入见[作者方案](../technical/SKILL_GRAPH_AUTHORING_PLAN.md)。
+
 ## 回合与时间
 
 每名玩家的回合依次执行：

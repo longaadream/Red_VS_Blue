@@ -1,5 +1,7 @@
 # SkillCode 作者标准与现役 Helper 接口手册
 
+描述编写使用[技能描述语言标准](../product/SKILL_DESCRIPTION_STANDARD.md)。后续结构化定义、节点目录及与可视化编辑器的接入提案见[技能图编程方案](SKILL_GRAPH_AUTHORING_PLAN.md)；该提案尚未替代本手册中的现役执行接口。
+
 > RED-192 公共规则更新：状态通过 `addStatusEffectById` / `removeStatusEffectById` 进入统一合并与计时，玩家状态使用对应玩家入口。新状态须在 `STATUS_DEFINITIONS` 声明叠加策略；普通持续效果不另写回合倒计时。技能和pending回调可调用 `context.changePositions(changes, kind)` 做批量位移；普通移动、技能落点与禁锢共享约束。伤害来源可显式声明 `kind: 'player' | 'environment'`，不得任选友军充当卡牌来源。每步数值向下取整；详情见 [规则生命周期](RULE_LIFECYCLE.md) 和 [基础规则词典](../product/RULE_DICTIONARY.md)。
 
 > 状态：现役实现说明（RED-137）
