@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>公网联机 · Red VS Blue</title>
+  <style>
+    *{box-sizing:border-box}body{margin:0;background:#0b1220;color:#e2e8f0;font:15px/1.6 system-ui,sans-serif}main{max-width:1000px;margin:40px auto;padding:0 24px}a{color:#93c5fd}h1{font-size:30px;margin:18px 0 4px}h2{font-size:20px;margin:0 0 14px}p{color:#94a3b8}section{background:#111c2e;border:1px solid #2b3a50;border-radius:16px;padding:24px;margin:20px 0}.columns{display:grid;grid-template-columns:1fr 1fr;gap:22px}.columns section{margin:0}label{display:block;margin:14px 0 5px}input{width:100%;padding:12px;background:#091322;color:#e2e8f0;border:1px solid #40536d;border-radius:8px;font:inherit}input[type=checkbox]{width:auto}button{padding:11px 17px;border-radius:8px;border:1px solid #40536d;background:#21344e;color:#e2e8f0;font:inherit;cursor:pointer;margin:10px 6px 0 0}button.primary{background:#2563eb;border-color:#60a5fa}button:disabled{opacity:.5;cursor:wait}button:focus-visible,input:focus-visible{outline:3px solid #93c5fd;outline-offset:3px}.host{display:flex;align-items:center;justify-content:space-between;border-top:1px solid #2b3a50;padding:12px 0;gap:12px}.host span{overflow-wrap:anywhere}.status{white-space:pre-wrap;overflow-wrap:anywhere;color:#a7f3d0}#error{color:#fca5a5}small{color:#94a3b8}#share{font-family:monospace;font-size:21px;color:#93c5fd}@media(max-width:700px){.columns{grid-template-columns:1fr}main{margin:20px auto;padding:0 16px}section{padding:18px}}
+  </style>
+</head>
+<body><main>
+  <a href="index.html">← 返回主菜单</a>
+  <h1>公网联机</h1><p>朋友开房，你来加入。支持 1v1 和 2v2；2v2 按蓝1 → 红1 → 红2 → 蓝2 行动。</p>
+  <section>
+    <label for="relayUrl">转发服务器地址</label><input id="relayUrl" type="url" placeholder="https://relay.example.com" autocomplete="url">
+    <small>由组织试玩的人提供。主机和加入者使用同一个转发服务器。</small>
+    <div id="error" role="alert"></div>
+  </section>
+  <div class="columns">
+    <section><h2>我来当主机</h2><p>公网只转发连接，对局运行在你的电脑上。请保持游戏开启；主机退出会中断对局。</p>
+      <label for="hostName">主机名称</label><input id="hostName" maxlength="60" placeholder="我的游戏房间">
+      <label><input id="visible" type="checkbox" checked> 在公开大厅显示</label>
+      <label for="publishKey">发布密钥（服务器要求时填写）</label><input id="publishKey" type="password" autocomplete="off">
+      <button id="publish" class="primary">发布主机</button><button id="stop">停止发布</button>
+      <p id="publication" class="status" role="status">尚未发布</p><div id="share"></div>
+      <button id="copy" hidden>复制邀请信息</button><button id="localLobby">进入本机大厅建房</button>
+    </section>
+    <section><h2>加入朋友</h2><p>输入朋友提供的 8 位邀请码，或在下方选择公开主机。</p>
+      <label for="invite">邀请码</label><input id="invite" maxlength="8" placeholder="例如 A12BCD34" autocomplete="off">
+      <button id="joinInvite" class="primary">通过邀请码加入</button>
+      <label for="directUrl">直接连接主机（局域网 / 已有公网地址）</label><input id="directUrl" type="url" placeholder="http://192.168.1.10:2567">
+      <button id="joinDirect">直接连接</button>
+      <p>短时掉线保留席位；超过 120 秒由主机 AI 接管，重连后恢复控制。2v2 投降需要两名队友同意。</p>
+    </section>
+  </div>
+  <section><h2>公开主机</h2><button id="refresh">刷新大厅</button><div id="hosts" aria-live="polite"><p>填写服务器地址后刷新。</p></div></section>
+</main>
+<script src="js/pack-fetch.js"></script><script src="js/server-utils.js"></script>
+<script src="js/colyseus-sdk.js"></script><script src="js/colyseus-client.js"></script>
+<script src="js/crypto-lib.js"></script><script src="js/identity.js"></script>
+<script src="js/multiplayer.js"></script>
+</body></html>

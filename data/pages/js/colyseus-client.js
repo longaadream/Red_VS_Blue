@@ -111,12 +111,22 @@
     }
   }
 
-  function joinOptions(playerId) {
+  async function admissionProof(base, playerId, roomId) {
+    if (!window.RvBIdentity || typeof window.RvBIdentity.sign !== 'function') return undefined
+    var identity = window.RvBIdentity.getIdentity()
+    if (!identity || identity.id !== playerId) throw new Error('请先创建或恢复自己的玩家身份')
+    var challenge = await fetchJson(normalizedBaseUrl(base) + '/admission/challenge', 5000)
+    var payload = { type: 'rvb-colyseus-admission-v1', nonce: challenge.nonce, playerId: playerId, roomId: roomId }
+    return { payload: payload, publicKey: identity.publicKey, signature: await window.RvBIdentity.sign(payload) }
+  }
+
+  async function joinOptions(playerId, base, roomId) {
     var params = pageParams()
     var identity = currentIdentity()
     var profileIdentity = storedProfileIdentity()
     if (!profileIdentity) throw new Error('Game profile identity is required for Colyseus admission')
     return {
+      auth: await admissionProof(base || getServerUrl(), String(playerId || identity.id || '').trim().toLowerCase(), roomId || _roomId),
       product: true,
       playerId: String(playerId || identity.id || '').trim().toLowerCase(),
       playerName: params.get('playerName') || identity.displayName || '',
@@ -226,10 +236,10 @@
         } catch {
           clearReconnectToken()
           if (generation !== _generation || !_shouldReconnect) return false
-          room = await _client.joinById(_roomId, joinOptions(_playerId))
+          room = await _client.joinById(_roomId, await joinOptions(_playerId))
         }
       } else {
-        room = await _client.joinById(_roomId, joinOptions(_playerId))
+        room = await _client.joinById(_roomId, await joinOptions(_playerId))
       }
       if (!room) return false
       if (generation !== _generation || !_shouldReconnect) {
@@ -365,7 +375,7 @@
     if (!base) throw new Error('Server URL is required')
     if (method === 'system.health') return fetchJson(base + '/healthz', timeoutMs)
     if (method === 'catalog.identity') return fetchJson(base + '/catalog/identity', timeoutMs)
-    if (method === 'catalog.maps') return fetchJson(base + '/catalog/maps', timeoutMs)
+    if (method === 'catalog.maps') return fetchJson(base + '/catalog/maps' + (payload.mode === '2v2' ? '?mode=2v2' : ''), timeoutMs)
     if (method === 'catalog.pieces') return fetchJson(base + '/catalog/pieces', timeoutMs)
     if (method === 'catalog.skills') return fetchJson(base + '/catalog/skills', timeoutMs)
     if (method === 'catalog.card') return fetchJson(base + '/catalog/cards/' + encodeURIComponent(String(payload.cardId || '')), timeoutMs)
@@ -393,6 +403,7 @@
       var creationKey = hostId + ':' + Date.now() + '-' + (_reqSeq++)
       _createInFlight[createFlightKey] = (async function () {
         var room = await withTimeout(client.create('battle', {
+          auth: await admissionProof(base, hostId, 'create'),
           product: true,
           creationKey: creationKey,
           name: payload.name,
@@ -416,7 +427,7 @@
       }
     }
     if (method === 'rooms.action' && (payload.action === 'join' || payload.action === 'rejoin')) {
-      var admission = joinOptions(payload.playerId)
+      var admission = await joinOptions(payload.playerId, base, payload.roomId)
       admission.playerName = payload.playerName || admission.playerName
       admission.alignment = payload.alignment || admission.alignment
       admission.profileIdentity = payload.profileIdentity || admission.profileIdentity
@@ -430,6 +441,7 @@
     }
     if (method === 'rooms.delete') {
       var deleteRoom = await withTimeout(client.joinById(payload.roomId, {
+        auth: await admissionProof(base, payload.playerId, payload.roomId),
         product: true,
         playerId: payload.playerId,
         playerName: currentIdentity().displayName,

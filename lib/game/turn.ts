@@ -1,3 +1,4 @@
+import { areMatchAllies } from './match-teams'
 // 当序列化格式出现不兼容变化时递增此值（旧状态会被 applyBattleAction 拒绝）
 export const BATTLE_STATE_VERSION = 1
 function battleDebugLog(...args: unknown[]): void {
@@ -289,6 +290,8 @@ export type PlayerId = string
 
 export interface PlayerTurnMeta {
   playerId: PlayerId
+  teamId?: 'red' | 'blue'
+  surrenderVote?: boolean
   /** 玩家昵称 */
   name?: string
   /** 当前累计的充能点数（用于释放充能技能） */
@@ -963,7 +966,7 @@ function validateDeclaredSkillTarget(
     if (!target) {
       throw new BattleRuleError("Invalid skill target")
     }
-    const isAlly = isSamePlayer(target.ownerPlayerId, piece.ownerPlayerId)
+    const isAlly = areMatchAllies(state, target.ownerPlayerId, piece.ownerPlayerId)
     if (filter === "ally" && !isAlly) throw new BattleRuleError("Skill target must be an ally")
     if (filter === "enemy" && isAlly) throw new BattleRuleError("Skill target must be an enemy")
     if (typeof range === "number") {
@@ -3472,10 +3475,11 @@ function applyBattleActionInternal(
 
     case "surrender": {
       const next = cloneBattleStateForEffectExecution(state)
-      if (next.players.length !== 2) {
+      if (next.players.length !== 2 && next.players.length !== 4) {
         throw new BattleRuleError('Surrender requires exactly two battle players', 'INVALID_SURRENDER_PLAYER')
       }
-      getPlayerMeta(next, action.playerId)
+      const player = getPlayerMeta(next, action.playerId)
+      if (next.players.length === 4) player.surrenderVote = true
       return next
     }
 

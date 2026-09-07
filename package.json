@@ -49,7 +49,9 @@
     "benchmark:skillcode-runtime": "node scripts/benchmark-skillcode-runtime.mjs",
     "smoke:electron:windows": "node tests/electron/windows-smoke.mjs",
     "rvb": "node scripts/rvb.mjs",
-    "typecheck": "next typegen && tsc --noEmit"
+    "typecheck": "next typegen && tsc --noEmit",
+    "dev:host-relay": "node multiplayer-relay/start.mjs",
+    "test:multiplayer": "vitest run tests/colyseus tests/game/team-rules.test.ts tests/game/team-effects.test.ts tests/game/match-teams.test.ts --maxWorkers=1"
   },
   "dependencies": {
     "@colyseus/schema": "5.0.25",
@@ -111,7 +113,8 @@
     "sonner": "^1.7.1",
     "tailwind-merge": "^3.3.1",
     "vaul": "^1.1.2",
-    "zod": "^3.24.1"
+    "zod": "^3.24.1",
+    "ws": "8.21.0"
   },
   "devDependencies": {
     "@capacitor/android": "8.5.0",
@@ -138,7 +141,8 @@
     "tsx": "4.20.6",
     "tw-animate-css": "1.3.3",
     "typescript": "5.7.3",
-    "vitest": "^4.1.10"
+    "vitest": "^4.1.10",
+    "@types/ws": "8.18.1"
   },
   "overrides": {
     "@xmldom/xmldom": "0.8.13",

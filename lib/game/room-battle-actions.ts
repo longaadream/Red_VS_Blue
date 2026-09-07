@@ -188,6 +188,8 @@ export interface PreResumeDeliveryContext {
 }
 
 export interface DispatchRoomBattleActionOptions {
+  /** Revalidate ephemeral control ownership inside the serialized authority queue. */
+  validateExecution?: () => void
   allowSystem?: boolean
   expectedAuthorityVersion?: number
   /** Candidate persistence checkpoint cadence; legacy callers retain the existing default. */
@@ -516,6 +518,7 @@ export async function dispatchRoomBattleAction(
       if (!storage) throw new RoomBattleActionError('BATTLE_NOT_STARTED', 'Battle not started', { roomId: normalizedRoomId })
       roomRuleRuntime ??= restoreRoomRuleRuntime(normalizedRoomId)
       const state = storage.state as BattleState
+      options.validateExecution?.()
       if (!Number.isSafeInteger(room.version) || Number(room.version) < 0) {
         throw new RoomBattleActionError(
           'ROOM_VERSION_MISSING',

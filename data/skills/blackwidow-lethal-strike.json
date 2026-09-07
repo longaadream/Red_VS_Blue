@@ -2,9 +2,13 @@
   "id": "blackwidow-lethal-strike",
   "name": "致命打击",
   "description": "弹射物：向同一行或同一列射击，对路径上的第1个敌人造成物理伤害（无法穿过掩体和角色）。伤害=(1+距离×0.1)×攻击力，无上限。",
-  "keywords": ["弹射物"],
+  "keywords": [
+    "弹射物"
+  ],
   "targetText": "同一行或同一列的1个方向",
-  "effectTags": ["物理伤害"],
+  "effectTags": [
+    "物理伤害"
+  ],
   "icon": "🎆",
   "kind": "active",
   "type": "normal",
@@ -13,7 +17,17 @@
   "maxCharges": 0,
   "powerMultiplier": 1,
   "actionPointCost": 2,
-  "targeting": { "steps": [{ "type": "grid", "filter": "all", "range": 99, "sameRowOrColumn": true, "excludeSourceCell": true }] },
-  "code": "function executeSkill(context) { var caster = context.piece; var targetPos = selectTarget({ type: 'grid', range: 99, filter: 'all' }); if (!targetPos || targetPos.needsTargetSelection) return targetPos; var dx = targetPos.x - caster.x; var dy = targetPos.y - caster.y; if (dx !== 0 && dy !== 0) { return { success: false, message: '必须选择与自己在同一行或同一列的格子' }; } if (dx === 0 && dy === 0) { return { success: false, message: '不能选择自身所在格' }; } var direction = { x: dx === 0 ? 0 : (dx > 0 ? 1 : -1), y: dy === 0 ? 0 : (dy > 0 ? 1 : -1) }; var events = traceProjectile({ x: caster.x, y: caster.y }, direction, { excludePieceId: caster.instanceId }); for (var i = 0; i < events.length; i++) { var event = events[i]; if (event.type === 'piece') { var target = event.piece; if (target.ownerPlayerId === caster.ownerPlayerId) { return { success: true, message: caster.name + '释放致命射线，但被' + target.name + '阻挡' }; } var damageMultiplier = 1 + (event.distance * 0.1); var damage = Math.round(caster.attack * damageMultiplier); var result = dealDamage(caster, target, damage, 'physical', context.battle, context.skill.id); return { success: true, message: caster.name + '对' + target.name + '造成' + result.damage + '点伤害（距离' + event.distance + '格）' }; } if (event.type === 'terrain' && event.blocksProjectile) { return { success: true, message: caster.name + '释放致命射线，但被地形阻挡' }; } } return { success: true, message: caster.name + '释放致命射线，但路径上没有命中敌人' }; }",
+  "targeting": {
+    "steps": [
+      {
+        "type": "grid",
+        "filter": "all",
+        "range": 99,
+        "sameRowOrColumn": true,
+        "excludeSourceCell": true
+      }
+    ]
+  },
+  "code": "function executeSkill(context) { var caster = context.piece; var targetPos = selectTarget({ type: 'grid', range: 99, filter: 'all' }); if (!targetPos || targetPos.needsTargetSelection) return targetPos; var dx = targetPos.x - caster.x; var dy = targetPos.y - caster.y; if (dx !== 0 && dy !== 0) { return { success: false, message: '必须选择与自己在同一行或同一列的格子' }; } if (dx === 0 && dy === 0) { return { success: false, message: '不能选择自身所在格' }; } var direction = { x: dx === 0 ? 0 : (dx > 0 ? 1 : -1), y: dy === 0 ? 0 : (dy > 0 ? 1 : -1) }; var events = traceProjectile({ x: caster.x, y: caster.y }, direction, { excludePieceId: caster.instanceId }); for (var i = 0; i < events.length; i++) { var event = events[i]; if (event.type === 'piece') { var target = event.piece; if (arePlayersAllied(battle, target.ownerPlayerId, caster.ownerPlayerId)) { return { success: true, message: caster.name + '释放致命射线，但被' + target.name + '阻挡' }; } var damageMultiplier = 1 + (event.distance * 0.1); var damage = Math.round(caster.attack * damageMultiplier); var result = dealDamage(caster, target, damage, 'physical', context.battle, context.skill.id); return { success: true, message: caster.name + '对' + target.name + '造成' + result.damage + '点伤害（距离' + event.distance + '格）' }; } if (event.type === 'terrain' && event.blocksProjectile) { return { success: true, message: caster.name + '释放致命射线，但被地形阻挡' }; } } return { success: true, message: caster.name + '释放致命射线，但路径上没有命中敌人' }; }",
   "previewCode": "function calculatePreview(piece, skillDef) { return { description: '向同一行或同一列射击，对路径上的第1个敌人造成伤害。伤害=(1+距离×0.1)×攻击力，无上限。', expectedValues: { damage: Math.round(piece.attack * 1.1) } }; }"
 }

@@ -443,9 +443,9 @@
                 <span class="action-copy"><span class="action-title">连接主机</span><span class="action-description">扫描并加入好友的房间</span></span>
                 <span class="action-arrow" aria-hidden="true">›</span>
               </button>
-              <button class="action-button" type="button" onclick="showConnectSheet()">
+              <button class="action-button" type="button" onclick="loadPage('multiplayer.html')">
                 <span class="action-code" aria-hidden="true">在线</span>
-                <span class="action-copy"><span class="action-title">连接游戏服务器</span><span class="action-description" id="serverStatusDesc">进入在线大厅，与更多玩家对战</span></span>
+                <span class="action-copy"><span class="action-title">公网联机</span><span class="action-description" id="serverStatusDesc">发布玩家主机、邀请码加入与公开大厅</span></span>
                 <span class="action-arrow" aria-hidden="true">›</span>
               </button>
             </div>
@@ -1355,14 +1355,14 @@
       const promise = RvBColyseus.requestAt(serverUrl, 'battleReports.list', { playerId: identity.id }, 8000)
         .then(payload => (payload.reports || []).map(report => {
           const me = (report.players || []).find(player => player.id === identity.id)
-          const opponent = (report.players || []).find(player => player.id !== identity.id)
+          const opponents = (report.players || []).filter(player => player.id !== identity.id && (!me || player.seat !== me.seat))
           const winner = report.terminalResult && report.terminalResult.winnerPlayerId
           return {
             battleId: report.battleId,
             timestamp: Date.parse(report.committedAt),
-            result: winner ? (winner === identity.id ? 'win' : 'loss') : 'draw',
+            result: winner ? ((report.terminalResult.winnerPlayerIds || [winner]).includes(identity.id) ? 'win' : 'loss') : 'draw',
             myFaction: me && me.seat,
-            opponentName: (opponent && opponent.name) || '对手',
+            opponentName: opponents.map(player => player.name).join(' / ') || '对手',
             transitionHash: report.transitionHash,
           }
         }))

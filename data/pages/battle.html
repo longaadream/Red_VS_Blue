@@ -3247,6 +3247,9 @@
     // ── Surrender ──
     function confirmSurrender() {
       if (!G || G.terminalResult) { goBack(); return }
+      document.getElementById('surrenderExplanation').textContent = G.players.length === 4
+        ? '提交同意投降。只有两名队友都同意才会结束比赛；掉线 AI 不会代替队友投票。'
+        : '这将立即结束对战。'
       const overlay = document.getElementById('surrenderConfirmOverlay')
       if (overlay) { overlay.style.display = 'flex'; return }
       // Fallback if overlay not present
@@ -5039,6 +5042,7 @@
             ;(msg.room.players || []).forEach(function(p) {
               var pid = (p.id || '').toLowerCase()
               if (pid && p.name) playerNames[pid] = p.name
+              if (pid) teamConnectionStatus[pid] = p.connectionStatus || 'online'
               if (pid && (p.alignment === 'light' || p.alignment === 'dark')) playerAlignments[pid] = p.alignment
             })
             if (G) render()
@@ -5787,19 +5791,50 @@
       return result
     }
 
+    var teamConnectionStatus = {}
+    function sameBattleTeam(first, second) {
+      if (String(first).toLowerCase() === String(second).toLowerCase()) return true
+      const one = (G.players || []).find(p => p.playerId === first)
+      const two = (G.players || []).find(p => p.playerId === second)
+      return !!(one && one.teamId && two && one.teamId === two.teamId)
+    }
+
+    function renderTeamRoster() {
+      if (!G || G.players.length !== 4) return
+      let strip = document.getElementById('teamRoster')
+      if (!strip) {
+        strip = document.createElement('div'); strip.id = 'teamRoster'
+        strip.style.cssText = 'display:flex;flex-wrap:wrap;gap:8px;padding:8px 12px;background:#0f172a;color:#e2e8f0;font-size:12px;position:relative;z-index:5'
+        document.body.prepend(strip)
+      }
+      strip.replaceChildren()
+      G.players.forEach(function(player, index) {
+        const seat = document.createElement('div')
+        const mine = player.playerId.toLowerCase() === myPlayerId
+        const connection = teamConnectionStatus[player.playerId] || 'online'
+        seat.style.cssText = 'flex:1;min-width:150px;border:1px solid ' + (player.teamId === 'blue' ? '#3b82f6' : '#ef4444') + ';border-radius:6px;padding:6px 10px'
+        const name = playerNames[player.playerId] || player.name || player.playerId
+        seat.textContent = (index + 1) + '. ' + (player.teamId === 'blue' ? '蓝队' : '红队') + ' · ' + name + (mine ? '（你）' : '') +
+          (G.turn.currentPlayerId === player.playerId ? ' · 正在行动' : '') + ' · AP ' + player.actionPoints + ' · 充能 ' + player.chargePoints +
+          (player.surrenderVote ? ' · 已同意投降' : '') + (connection === 'ai' ? ' · AI 接管' : connection === 'reconnecting' ? ' · 等待重连' : '')
+        strip.append(seat)
+      })
+    }
+
     function renderPanels() {
       if (!G) return
+      renderTeamRoster()
       // Determine which player is me
       const myPieces = sortWithSummons(
-        G.pieces.filter(p => p.ownerPlayerId && p.ownerPlayerId.toLowerCase() === myPlayerId)
+        G.pieces.filter(p => p.ownerPlayerId && sameBattleTeam(p.ownerPlayerId, myPlayerId))
       )
       const oppPieces = sortWithSummons(
-        G.pieces.filter(p => !(p.ownerPlayerId && p.ownerPlayerId.toLowerCase() === myPlayerId))
+        G.pieces.filter(p => !(p.ownerPlayerId && sameBattleTeam(p.ownerPlayerId, myPlayerId)))
       )
 
       // Update labels; use player name if available.
       const myMeta = G.players && G.players.find(p => p.playerId && p.playerId.toLowerCase() === myPlayerId)
-      const oppMeta = G.players && G.players.find(p => !(p.playerId && p.playerId.toLowerCase() === myPlayerId))
+      const oppMeta = G.players && G.players.find(p => !sameBattleTeam(p.playerId, myPlayerId))
       const factionIcon = myFaction === 'red' ? '[R]' : '[B]'
       const oppIcon = myFaction === 'red' ? '[B]' : '[R]'
       const myName = myPlayerName || playerNames[myPlayerId] || '我方'
@@ -5809,7 +5844,7 @@
       document.getElementById('myLabel').textContent = factionIcon + ' ' + alignmentText(playerAlignments[myPlayerId]) + ' · ' + myName
       document.getElementById('oppLabel').textContent = oppIcon + ' ' + alignmentText(playerAlignments[oppPid]) + ' · ' + oppName
 
-      document.getElementById('myPieces').innerHTML = myPieces.map(p => renderPieceCard(p, true)).join('')
+      document.getElementById('myPieces').innerHTML = myPieces.map(p => renderPieceCard(p, p.ownerPlayerId.toLowerCase() === myPlayerId)).join('')
       document.getElementById('oppPieces').innerHTML = oppPieces.map(p => renderPieceCard(p, false)).join('')
 
       const opponentHandStack = document.getElementById('opponentHandStack')
@@ -7245,9 +7280,11 @@
       if (!TRAINING_MODE && !SPECTATE_MODE) {
       }
       const winner = terminalResult.winnerPlayerId
-      const iWon = winner && String(winner).toLowerCase() === String(myPlayerId).toLowerCase()
+      const iWon = Array.isArray(terminalResult.winnerPlayerIds)
+        ? terminalResult.winnerPlayerIds.some(id => String(id).toLowerCase() === String(myPlayerId).toLowerCase())
+        : winner && String(winner).toLowerCase() === String(myPlayerId).toLowerCase()
       const isDraw = !winner
-      const winnerLabel = winner
+      const winnerLabel = terminalResult.winnerTeamId ? (terminalResult.winnerTeamId === 'blue' ? '蓝队' : '红队') : winner
         ? (playerNames[String(winner).toLowerCase()] || winner)
         : ''
       document.getElementById('resultIcon').textContent = isDraw ? '=' : (iWon ? 'WIN' : 'LOSE')
@@ -7694,7 +7731,7 @@
     <div style="background:#1e293b;border:1px solid #334155;border-radius:16px;padding:28px 24px;max-width:300px;width:90%;text-align:center">
       <div style="font-size:16px;font-weight:700;margin-bottom:12px;color:#fca5a5">投降确认</div>
       <div style="font-size:16px;font-weight:700;margin-bottom:8px;color:#e2e8f0">确认投降？</div>
-      <div style="font-size:13px;color:#94a3b8;margin-bottom:20px">这将立即结束对战。</div>
+      <div id="surrenderExplanation" style="font-size:13px;color:#94a3b8;margin-bottom:20px">这将立即结束对战。</div>
       <div style="display:flex;gap:10px;justify-content:center">
         <button onclick="cancelSurrender()" style="flex:1;padding:10px;background:#334155;border:none;border-radius:8px;color:#e2e8f0;font-size:14px;cursor:pointer">取消</button>
         <button onclick="doSurrender()" style="flex:1;padding:10px;background:#dc2626;border:none;border-radius:8px;color:#fff;font-size:14px;font-weight:700;cursor:pointer">投降</button>

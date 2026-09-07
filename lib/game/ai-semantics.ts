@@ -1,3 +1,4 @@
+import { areMatchAllies } from './match-teams'
 import {
   AI_SEMANTICS_SCHEMA_VERSION,
   type AiCandidateActionFeatures,
@@ -41,8 +42,8 @@ export function observeAiState(state: BattleLike, playerId: string, hashes: { ru
   const live = (state.pieces || []).filter(piece => piece.currentHp > 0)
   return {
     schemaVersion: AI_SEMANTICS_SCHEMA_VERSION, observationScope: 'public-state', ...hashes,
-    allies: live.filter(piece => piece.ownerPlayerId === playerId).map(project).sort((a, b) => a.id.localeCompare(b.id)),
-    enemies: live.filter(piece => piece.ownerPlayerId !== playerId).map(project).sort((a, b) => a.id.localeCompare(b.id)),
+    allies: live.filter(piece => areMatchAllies({ players: state.players || [] }, piece.ownerPlayerId, playerId)).map(project).sort((a, b) => a.id.localeCompare(b.id)),
+    enemies: live.filter(piece => !areMatchAllies({ players: state.players || [] }, piece.ownerPlayerId, playerId)).map(project).sort((a, b) => a.id.localeCompare(b.id)),
   }
 }
 

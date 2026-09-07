@@ -13,6 +13,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   goOffline: () => ipcRenderer.invoke('go-offline'),
   openLocalGame: () => ipcRenderer.invoke('open-local-game'),
   ensureLocalAuthority: () => ipcRenderer.invoke('ensure-local-authority'),
+  relayControl: (options: { action: 'status' | 'publish' | 'stop'; relayUrl?: string; name?: string; visible?: boolean; publishKey?: string }) => ipcRenderer.invoke('relay-control', options),
   // 查询当前模式
   getMode: () => ipcRenderer.invoke('get-mode'),
   // 重启本地服务器

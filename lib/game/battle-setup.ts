@@ -355,12 +355,12 @@ export function buildInitialPiecesForPlayers(
   randomFloat: () => number = rng,
   options: InitialPieceBuildOptions = {},
 ): PieceInstance[] {
-  if (players.length !== 2) return []
+  if (players.length !== 2 && players.length !== 4) return []
 
   const deterministicDeployment = options.deterministicDeployment === true
   const progressiveDeployment = options.progressiveDeployment === true
   if (deterministicDeployment) {
-    if (!playerSelectedPieces || playerSelectedPieces.length !== 2 || playerSelectedPieces.some(player => player.pieces.length !== 8)) {
+    if (!playerSelectedPieces || playerSelectedPieces.length !== players.length || playerSelectedPieces.some(player => player.pieces.length !== 8)) {
       throw new Error('Demo deployment requires exactly two players with eight pieces each')
     }
     const comparePlayerIds = progressiveDeployment
@@ -405,8 +405,8 @@ export function buildInitialPiecesForPlayers(
     .sort((left, right) => left.y - right.y || left.x - right.x)
   const deploymentPositions: Array<{ x: number; y: number }> = []
   if (deterministicDeployment && !progressiveDeployment) {
-    if (availableTiles.length < 16) throw new Error('Demo deployment map does not contain sixteen ordinary floor tiles')
-    for (let index = 0; index < 16; index += 1) {
+    if (availableTiles.length < players.length * 8) throw new Error(players.length === 2 ? 'Demo deployment map requires sixteen ordinary floor tiles' : '2v2 deployment map requires thirty-two ordinary floor tiles')
+    for (let index = 0; index < players.length * 8; index += 1) {
       const swapIndex = index + Math.floor(randomFloat() * (availableTiles.length - index))
       const selected = availableTiles[swapIndex]
       availableTiles[swapIndex] = availableTiles[index]
@@ -575,8 +575,8 @@ export function buildInitialPiecesForPlayers(
   console.log('Red pieces created:', redPieceIndex)
   console.log('Blue pieces created:', bluePieceIndex)
 
-  if (deterministicDeployment && pieces.length !== 16) {
-    throw new Error(`Demo deployment created ${pieces.length} pieces instead of sixteen`)
+  if (deterministicDeployment && pieces.length !== players.length * 8) {
+    throw new Error(`Demo deployment created ${pieces.length} pieces instead of ${players.length * 8}`)
   }
   
   // 确保每个玩家至少有一个棋子
@@ -752,6 +752,7 @@ export async function createInitialBattleForPlayers(
   playerSelectedPieces?: PlayerSelectedPieces[],
   mapId?: string,
   options?: {
+    matchMode?: '1v1' | '2v2'
     firstPlayerId?: PlayerId
     rootSeed?: number
     deploymentEnabled?: boolean
@@ -762,7 +763,12 @@ export async function createInitialBattleForPlayers(
     ruleExecutionContext?: RuleExecutionContext
   },
 ): Promise<BattleState | null> {
-  if (playerIds.length !== 2) return null
+  const teamMatch = options?.matchMode === '2v2'
+  if (playerIds.length !== (teamMatch ? 4 : 2)) return null
+  if (new Set(playerIds.map(id => id.toLowerCase())).size !== playerIds.length) return null
+  if (teamMatch && playerIds.some((id, index) => playerSelectedPieces?.find(p => p.playerId === id)?.faction !== ['blue', 'red', 'red', 'blue'][index])) {
+    throw new Error('2v2 requires blue-red-red-blue player order')
+  }
 
   const deploymentMode: DeploymentMode | undefined = options?.deploymentEnabled
     ? options.deploymentMode ?? 'progressive-reserve-v1'
@@ -777,15 +783,14 @@ export async function createInitialBattleForPlayers(
     if (!Number.isSafeInteger(options.deploymentStartedAt) || (options.deploymentStartedAt ?? -1) < 0) {
       throw new Error('Demo deployment requires an explicit non-negative deployment start time')
     }
-    resolvedMapId = assertSelectableMapId(mapId)
+    resolvedMapId = assertSelectableMapId(mapId, options.matchMode)
     const comparePlayerIds = progressiveDeployment
       ? compareStableProgressivePlayerIds
       : compareStableText
-    orderedIds.sort(comparePlayerIds)
+    if (!teamMatch) orderedIds.sort(comparePlayerIds)
     orderedPSP?.sort((left, right) => comparePlayerIds(left.playerId, right.playerId))
   }
 
-  const [p1, p2] = orderedIds
   
   writeLog('[createInitialBattleForPlayers] mapId: ' + resolvedMapId)
   writeLog('[createInitialBattleForPlayers] DEFAULT_MAP_ID: ' + DEFAULT_MAP_ID)
@@ -884,12 +889,12 @@ export async function createInitialBattleForPlayers(
   const boardPieces = progressiveDeployment ? [] : pieces
 
   // 先后手：由 battle-setup 统一决定（不在调用方重复随机）
-  const firstPlayer = options?.firstPlayerId && orderedIds.includes(options.firstPlayerId)
+  const firstPlayer = teamMatch ? orderedIds[0] : options?.firstPlayerId && orderedIds.includes(options.firstPlayerId)
     ? options.firstPlayerId
     : ((runtime
         ? runtime.nextRandom(RANDOM_STREAM_NAMES.turnOrder)
         : rng()) < 0.5 ? orderedIds[0] : orderedIds[1])
-  const secondPlayer = firstPlayer === orderedIds[0] ? orderedIds[1] : orderedIds[0]
+  const secondPlayer = teamMatch ? orderedIds[3] : firstPlayer === orderedIds[0] ? orderedIds[1] : orderedIds[0]
 
   const skills = buildDefaultSkills()
   console.log('Skills for battle:', Object.keys(skills))
@@ -911,10 +916,12 @@ export async function createInitialBattleForPlayers(
     graveyard: [],
     pieceStatsByTemplateId: buildDefaultPieceStats(),
     skillsById: skills,
-    players: [
-      { playerId: p1, chargePoints: 0, actionPoints: firstPlayer === p1 ? 1 : 0, maxActionPoints: firstPlayer === p1 ? 1 : 0, hand: [], discardPile: [], rules: [] },
-      { playerId: p2, chargePoints: 0, actionPoints: firstPlayer === p2 ? 1 : 0, maxActionPoints: firstPlayer === p2 ? 1 : 0, hand: [], discardPile: [], rules: [] },
-    ],
+    players: orderedIds.map(playerId => ({
+      playerId,
+      ...(teamMatch ? { teamId: playerSelectedPieces!.find(p => p.playerId === playerId)!.faction as 'red' | 'blue' } : {}),
+      chargePoints: 0, actionPoints: firstPlayer === playerId ? 1 : 0,
+      maxActionPoints: firstPlayer === playerId ? 1 : 0, hand: [], discardPile: [], rules: [],
+    })),
     turn: {
       currentPlayerId: firstPlayer,
       turnNumber: 1,

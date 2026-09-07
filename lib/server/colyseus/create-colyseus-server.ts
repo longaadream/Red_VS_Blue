@@ -1,4 +1,5 @@
 import { defineRoom, defineServer, matchMaker } from 'colyseus'
+import { randomUUID } from 'node:crypto'
 import { WebSocketTransport } from '@colyseus/ws-transport'
 import { Pool } from 'pg'
 
@@ -17,6 +18,7 @@ import {
 import { PostgresAuthorityRepository } from '@/lib/server/postgres/postgres-authority-repository'
 
 import { createBattleRoomClass } from './battle-room'
+import { createAdmissionAuthority } from './admission'
 import { BATTLE_ROOM_TYPE } from './battle-room-protocol'
 import {
   type BattleRoomFixtureFactory,
@@ -33,6 +35,8 @@ export interface BattleServerRepository
 }
 
 export interface CreateColyseusBattleServerOptions {
+  requireIdentityProof?: boolean
+  reconnectGraceMs?: number
   databaseUrl?: string
   repository?: BattleServerRepository
   journal?: PostgresAuthorityJournal
@@ -137,7 +141,12 @@ export function createColyseusBattleServer(options: CreateColyseusBattleServerOp
   }
   const productCreationClaims = new Map<string, ProductCreationClaim>()
   const logger = options.logger ?? console
+  const admission = createAdmissionAuthority()
+  const restoreCapability = randomUUID()
   const BattleRoom = createBattleRoomClass({
+    restoreCapability,
+    reconnectGraceMs: options.reconnectGraceMs,
+    authenticate: (options.requireIdentityProof ?? !options.repository) ? admission.authenticate : undefined,
     repository,
     journal,
     fixtureFactory: options.fixtureFactory ?? createDevelopmentBattleRoom,
@@ -211,11 +220,15 @@ export function createColyseusBattleServer(options: CreateColyseusBattleServerOp
         protocol: 'rvb-colyseus',
         ...healthIdentity,
       }))
+      app.get('/admission/challenge', (_request, response) => {
+        try { response.status(200).json(admission.challenge()) }
+        catch { response.status(429).json({ error: 'ADMISSION_BUSY' }) }
+      })
       app.get('/catalog/identity', (_request, response) => response.status(200).json({
         profileIdentity: getServerGameProfileIdentityV1(),
       }))
-      app.get('/catalog/maps', (_request, response) => response.status(200).json({
-        maps: getSelectableMapCatalog(),
+      app.get('/catalog/maps', (request, response) => response.status(200).json({
+        maps: getSelectableMapCatalog(request.query?.mode === '2v2' ? '2v2' : '1v1'),
       }))
       app.get('/catalog/pieces', (_request, response) => response.status(200).json({ pieces: getAllPieces() }))
       app.get('/catalog/skills', (_request, response) => response.status(200).json({ skills: getAllSkills() }))
@@ -288,7 +301,7 @@ export function createColyseusBattleServer(options: CreateColyseusBattleServerOp
     const restoredRoomIds: string[] = []
     for (const battleId of roomIds) {
       try {
-        await matchMaker.createRoom(BATTLE_ROOM_TYPE, { product: true, restore: true, battleId })
+          await matchMaker.createRoom(BATTLE_ROOM_TYPE, { product: true, restore: true, battleId, restoreCapability })
         restoredRoomIds.push(battleId)
       } catch (error) {
         logger.error('[colyseus] durable room restore skipped', {

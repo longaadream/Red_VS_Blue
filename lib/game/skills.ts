@@ -1,3 +1,4 @@
+import { areMatchAllies } from './match-teams'
 import type { BattleState } from "./turn"
 import type { PieceInstance } from "./piece"
 import {
@@ -694,7 +695,7 @@ function createCardEffectFunctions(
         return manhattanDistance({ x: source.x ?? 0, y: source.y ?? 0 }, { x, y }) <= opts.range
       }
       if (opts.type === 'piece' && selectedTarget) {
-        const isAlly = selectedTarget.ownerPlayerId === playerId
+        const isAlly = areMatchAllies(battle, selectedTarget.ownerPlayerId, playerId)
         if (opts.filter === 'ally' && !isAlly)
           return needsTargetSelection()
         if (opts.filter === 'enemy' && isAlly)
@@ -2179,7 +2180,7 @@ export function getAllEnemiesInRange(context: SkillExecutionContext, range: numb
 
   for (const p of battle.pieces) {
     // 只考虑存活的敌人
-    if (p.currentHp > 0 && p.ownerPlayerId !== piece.ownerPlayerId) {
+    if (p.currentHp > 0 && !areMatchAllies(battle, p.ownerPlayerId, piece.ownerPlayerId)) {
       if (p.x == null || p.y == null) continue
       const distance = manhattanDistance(piece, p)
       if (distance <= range) {
@@ -2229,7 +2230,7 @@ export function getAllAlliesInRange(context: SkillExecutionContext, range: numbe
 
   for (const p of battle.pieces) {
     // 只考虑存活的盟友
-    if (p.currentHp > 0 && p.ownerPlayerId === piece.ownerPlayerId) {
+    if (p.currentHp > 0 && areMatchAllies(battle, p.ownerPlayerId, piece.ownerPlayerId)) {
       if (p.x == null || p.y == null) continue
       const distance = manhattanDistance(piece, p)
       if (distance <= range) {
@@ -2299,21 +2300,21 @@ function createTargetSelectors(battle: BattleState, sourcePiece: PieceInstance):
     // 获取所有敌人
     getAllEnemies: () => {
       return battle.pieces.filter(p => 
-        p.ownerPlayerId !== sourcePiece.ownerPlayerId && p.currentHp > 0
+        !areMatchAllies(battle, p.ownerPlayerId, sourcePiece.ownerPlayerId) && p.currentHp > 0
       );
     },
     
     // 获取所有盟友
     getAllAllies: () => {
       return battle.pieces.filter(p => 
-        p.ownerPlayerId === sourcePiece.ownerPlayerId && p.currentHp > 0
+        areMatchAllies(battle, p.ownerPlayerId, sourcePiece.ownerPlayerId) && p.currentHp > 0
       );
     },
     
     // 获取单个敌人（最近的）
     getNearestEnemy: () => {
       const enemies = battle.pieces.filter(p => 
-        p.ownerPlayerId !== sourcePiece.ownerPlayerId && p.currentHp > 0
+        !areMatchAllies(battle, p.ownerPlayerId, sourcePiece.ownerPlayerId) && p.currentHp > 0
       );
       if (enemies.length === 0) return null;
       
@@ -2327,7 +2328,7 @@ function createTargetSelectors(battle: BattleState, sourcePiece: PieceInstance):
     // 获取单个敌人（血量最低的）
     getLowestHpEnemy: () => {
       const enemies = battle.pieces.filter(p => 
-        p.ownerPlayerId !== sourcePiece.ownerPlayerId && p.currentHp > 0
+        !areMatchAllies(battle, p.ownerPlayerId, sourcePiece.ownerPlayerId) && p.currentHp > 0
       );
       if (enemies.length === 0) return null;
       
@@ -2339,7 +2340,7 @@ function createTargetSelectors(battle: BattleState, sourcePiece: PieceInstance):
     // 获取单个敌人（攻击力最高的）
     getHighestAttackEnemy: () => {
       const enemies = battle.pieces.filter(p => 
-        p.ownerPlayerId !== sourcePiece.ownerPlayerId && p.currentHp > 0
+        !areMatchAllies(battle, p.ownerPlayerId, sourcePiece.ownerPlayerId) && p.currentHp > 0
       );
       if (enemies.length === 0) return null;
       
@@ -2351,7 +2352,7 @@ function createTargetSelectors(battle: BattleState, sourcePiece: PieceInstance):
     // 获取单个敌人（防御力最低的）
     getLowestDefenseEnemy: () => {
       const enemies = battle.pieces.filter(p => 
-        p.ownerPlayerId !== sourcePiece.ownerPlayerId && p.currentHp > 0
+        !areMatchAllies(battle, p.ownerPlayerId, sourcePiece.ownerPlayerId) && p.currentHp > 0
       );
       if (enemies.length === 0) return null;
       
@@ -2363,7 +2364,7 @@ function createTargetSelectors(battle: BattleState, sourcePiece: PieceInstance):
     // 获取单个盟友（血量最低的）
     getLowestHpAlly: () => {
       const allies = battle.pieces.filter(p => 
-        p.ownerPlayerId === sourcePiece.ownerPlayerId && p.currentHp > 0
+        areMatchAllies(battle, p.ownerPlayerId, sourcePiece.ownerPlayerId) && p.currentHp > 0
       );
       if (allies.length === 0) return null;
       
@@ -2375,7 +2376,7 @@ function createTargetSelectors(battle: BattleState, sourcePiece: PieceInstance):
     // 获取单个盟友（攻击力最高的）
     getHighestAttackAlly: () => {
       const allies = battle.pieces.filter(p => 
-        p.ownerPlayerId === sourcePiece.ownerPlayerId && p.currentHp > 0
+        areMatchAllies(battle, p.ownerPlayerId, sourcePiece.ownerPlayerId) && p.currentHp > 0
       );
       if (allies.length === 0) return null;
       
@@ -2392,7 +2393,7 @@ function createTargetSelectors(battle: BattleState, sourcePiece: PieceInstance):
     // 获取指定范围内的敌人
     getEnemiesInRange: (range: number) => {
       return battle.pieces.filter(p => {
-        if (p.ownerPlayerId === sourcePiece.ownerPlayerId || p.currentHp <= 0) {
+        if (areMatchAllies(battle, p.ownerPlayerId, sourcePiece.ownerPlayerId) || p.currentHp <= 0) {
           return false;
         }
         const distance = manhattanDistance(p, sourcePiece);
@@ -2403,7 +2404,7 @@ function createTargetSelectors(battle: BattleState, sourcePiece: PieceInstance):
     // 获取指定范围内的盟友
     getAlliesInRange: (range: number) => {
       return battle.pieces.filter(p => {
-        if (p.ownerPlayerId !== sourcePiece.ownerPlayerId || p.currentHp <= 0) {
+        if (!areMatchAllies(battle, p.ownerPlayerId, sourcePiece.ownerPlayerId) || p.currentHp <= 0) {
           return false;
         }
         const distance = manhattanDistance(p, sourcePiece);
@@ -2497,7 +2498,7 @@ function createEffectFunctions(battle: BattleState, sourcePiece: PieceInstance, 
           && ctx.ruleRewrittenPrimaryTargetPieceId === activeTarget.instanceId;
         if (!primaryTargetWasRuleRewritten) {
           // 检查目标是否符合filter要求
-          const isAlly = activeTarget.ownerPlayerId === sourcePiece.ownerPlayerId;
+          const isAlly = areMatchAllies(battle, activeTarget.ownerPlayerId, sourcePiece.ownerPlayerId);
           const isEnemy = !isAlly;
 
           // 根据filter参数检查目标是否符合要求
@@ -5281,7 +5282,7 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
       const targetIndex = battle.pieces.findIndex(piece =>
         piece.instanceId === targetPieceId &&
         piece.currentHp > 0 &&
-        piece.ownerPlayerId !== sourcePiece.ownerPlayerId)
+        !areMatchAllies(battle, piece.ownerPlayerId, sourcePiece.ownerPlayerId))
       if (targetIndex === -1) return false
 
       const [removed] = battle.pieces.splice(targetIndex, 1)
@@ -5633,7 +5634,7 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
 
     // 记录技能执行前的状态
     const beforeState = {
-      enemies: battle.pieces.filter(p => p.ownerPlayerId !== sourcePiece.ownerPlayerId && p.currentHp > 0).map(p => ({ instanceId: p.instanceId, currentHp: p.currentHp })),
+      enemies: battle.pieces.filter(p => !areMatchAllies(battle, p.ownerPlayerId, sourcePiece.ownerPlayerId) && p.currentHp > 0).map(p => ({ instanceId: p.instanceId, currentHp: p.currentHp })),
       movementBlocked: battle.pieces.flatMap(piece => (
         Array.isArray(piece.statusTags) && piece.statusTags.some(tag => tag.blocksForcedMovement === true)
           ? [{ instanceId: piece.instanceId, x: piece.x, y: piece.y }]

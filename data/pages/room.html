@@ -183,7 +183,7 @@
   </div>
 
   <div class="bottom-bar">
-    <div class="status-line" id="statusLine">等待对手加入…</div>
+    <div class="status-line" id="statusLine">等待玩家加入…</div>
     <button class="btn-ready ready-up" id="readyBtn" onclick="toggleReady()" disabled>准备</button>
   </div>
 
@@ -319,7 +319,7 @@
           + '<div class="slot-label">' + slotLabel + '</div>'
           + '<div class="slot-empty-body">'
             + '<div class="slot-spinner">⟳</div>'
-            + '<div>' + (isMySlot ? '加载中…' : '等待对手加入…') + '</div>'
+            + '<div>' + (isMySlot ? '加载中…' : '等待玩家加入…') + '</div>'
           + '</div>'
         + '</div>'
       }
@@ -360,7 +360,7 @@
           return
         }
         // 双方都已选完棋子但还没开战，也跳 battle（兼容旧流程）
-        const allSelected = (room.players || []).length >= 2 &&
+        const allSelected = (room.players || []).length === (room.maxPlayers || 2) &&
           room.players.every(p => p.hasSelectedPieces === true || (p.selectedPieces && p.selectedPieces.length > 0))
         if (allSelected) {
           navigateBattle()
@@ -391,9 +391,13 @@
       const me = players.find(p => p.id && p.id.toLowerCase() === playerId) || null
       const opp = players.find(p => p.id && p.id.toLowerCase() !== playerId) || null
       const list = document.getElementById('playerList')
-      list.innerHTML =
-        renderSlot('自己', me, playerId, hostId, true) +
-        renderSlot('对手', opp, playerId, hostId, false)
+      list.innerHTML = cap === 4
+        ? ['蓝1 · 第1位', '红1 · 第2位', '红2 · 第3位', '蓝2 · 第4位 · 幸运币'].map((label, index) => {
+            const seated = players.find(p => p.teamSlot === index) || null
+            const isMe = !!seated && seated.id.toLowerCase() === playerId
+            return renderSlot(label + (isMe ? ' · 自己' : seated && me && seated.seat === me.seat ? ' · 队友' : ''), seated, playerId, hostId, isMe)
+          }).join('')
+        : renderSlot('自己', me, playerId, hostId, true) + renderSlot('对手', opp, playerId, hostId, false)
 
       // 解散按钮：仅主机在 waiting 状态可见
       const dissolveBtn = document.getElementById('dissolveBtn')
@@ -418,8 +422,8 @@
         btn.textContent = room.status === 'selecting' ? '进入选人' : '等待对手'
         btn.className = 'btn-ready cancel-ready'
         status.textContent = room.status === 'selecting'
-          ? '双方已入座，正在进入选人…'
-          : '等待对手加入…（' + players.length + '/' + cap + '）'
+          ? '所有玩家已入座，正在进入选人…'
+          : '等待玩家加入…（' + players.length + '/' + cap + '）'
         status.className = room.status === 'selecting' ? 'status-line ok' : 'status-line'
         return
       }
@@ -433,12 +437,12 @@
       }
 
       if (players.length < cap) {
-        status.textContent = '等待对手加入…（' + players.length + '/' + cap + '）'
+        status.textContent = '等待玩家加入…（' + players.length + '/' + cap + '）'
         status.className = 'status-line'
       } else {
         const readyCount = players.filter(p => p.ready === true).length
         if (readyCount === cap) {
-          status.textContent = '双方已准备，即将进入选人…'
+          status.textContent = '所有玩家已准备，即将进入选人…'
           status.className = 'status-line ok'
           // 双方都准备 → 跳选人页（仅本玩家自己已准备时才跳，否则让 polling 等待）
           if (me.ready && !_navigating) {

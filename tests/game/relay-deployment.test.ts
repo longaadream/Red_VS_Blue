@@ -429,7 +429,7 @@ describe('relay deployment initialization', () => {
     expect(page).not.toContain('postLocalRelayInitialization')
     expect(page).not.toContain('verifyRelayBattleActionAuth')
     expect(page).not.toContain('relayAuthorityState')
-    expect(wsClient).toContain("_client.joinById(_roomId, joinOptions(_playerId))")
+    expect(wsClient).toContain("_client.joinById(_roomId, await joinOptions(_playerId))")
     expect(wsClient).toContain("_room.send('battleCommand', message)")
     expect(wsClient).toContain("localStorage.getItem('rvb_game_profile_identity')")
     expect(wsClient).toContain('profileIdentity: profileIdentity')

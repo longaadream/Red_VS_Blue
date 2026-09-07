@@ -4,7 +4,10 @@
   "description": "对以自身为中心的3×3范围内所有敌人造成200%攻击力的物理伤害。",
   "keywords": [],
   "targetText": "以自身为中心的3×3范围内所有敌人",
-  "effectTags": ["area", "damage"],
+  "effectTags": [
+    "area",
+    "damage"
+  ],
   "icon": "🌭",
   "kind": "active",
   "type": "super",
@@ -12,11 +15,11 @@
   "cooldownTurns": 3,
   "maxCharges": 0,
   "chargeCost": 3,
-  "powerMultiplier": 2.0,
+  "powerMultiplier": 2,
   "actionPointCost": 3,
   "range": "area",
   "areaSize": 3,
   "requiresTarget": false,
-  "code": "function executeSkill(context) { var sourcePiece = context.piece; var damageValue = Math.round(sourcePiece.attack * context.skill.powerMultiplier); var enemiesInArea = battle.pieces.filter(function(piece) { return piece.currentHp > 0 && piece.ownerPlayerId !== sourcePiece.ownerPlayerId && Math.abs(piece.x - sourcePiece.x) <= 1 && Math.abs(piece.y - sourcePiece.y) <= 1; }); if (enemiesInArea.length === 0) { return { message: '自身周围3×3范围内没有敌人', success: false }; } var result = dealDamage(sourcePiece, enemiesInArea, damageValue, 'physical', battle, context.skill.id); var killedCount = result.results.filter(function(item) { return item.isKilled; }).length; var hitMessages = enemiesInArea.map(function(enemy, index) { return enemy.name + '受到' + (result.results[index] ? result.results[index].damage : 0) + '点伤害'; }); var message = sourcePiece.name + '释放死亡绽放，' + hitMessages.join('；'); if (killedCount > 0) { message += '，击杀了' + killedCount + '个敌人'; } return { message: message, success: true }; }",
+  "code": "function executeSkill(context) { var sourcePiece = context.piece; var damageValue = Math.round(sourcePiece.attack * context.skill.powerMultiplier); var enemiesInArea = battle.pieces.filter(function(piece) { return piece.currentHp > 0 && !arePlayersAllied(battle, piece.ownerPlayerId, sourcePiece.ownerPlayerId) && Math.abs(piece.x - sourcePiece.x) <= 1 && Math.abs(piece.y - sourcePiece.y) <= 1; }); if (enemiesInArea.length === 0) { return { message: '自身周围3×3范围内没有敌人', success: false }; } var result = dealDamage(sourcePiece, enemiesInArea, damageValue, 'physical', battle, context.skill.id); var killedCount = result.results.filter(function(item) { return item.isKilled; }).length; var hitMessages = enemiesInArea.map(function(enemy, index) { return enemy.name + '受到' + (result.results[index] ? result.results[index].damage : 0) + '点伤害'; }); var message = sourcePiece.name + '释放死亡绽放，' + hitMessages.join('；'); if (killedCount > 0) { message += '，击杀了' + killedCount + '个敌人'; } return { message: message, success: true }; }",
   "previewCode": "function calculatePreview(piece, skillDef) { const damageValue = Math.round(piece.attack * skillDef.powerMultiplier); return { description: '对以自身为中心的3×3范围内所有敌人造成' + damageValue + '点物理伤害。', expectedValues: { damage: damageValue } }; }"
 }

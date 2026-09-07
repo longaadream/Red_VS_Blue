@@ -124,6 +124,7 @@ describe('Tracer Recall option resolution', () => {
 
     const triggerContext = {
       piece: activeTracer,
+      rulePiece: activeTracer,
       sourcePiece: activeEnemy,
       target: null,
       playerId: activeEnemy.ownerPlayerId,
@@ -157,6 +158,7 @@ describe('Tracer Recall option resolution', () => {
 
     executeSkillFunction(trigger, {
       piece: tracer,
+      rulePiece: tracer,
       sourcePiece: actor,
       battle: state,
       target: null,

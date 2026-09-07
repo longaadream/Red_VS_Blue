@@ -75,6 +75,9 @@ const SURFACES = {
   },
 }
 
+// DynamicCodeRuntime closes over these pure team queries for every surface, including restored pending code.
+for (const surface of Object.values(SURFACES)) surface.bindings.push('arePlayersAllied', 'nextEnemyPlayer')
+
 const injected = Object.fromEntries(Object.entries(SURFACES).map(([surface, value]) => [surface, new Set(value.bindings)]))
 
 function surfaceFor(group, field) {

@@ -253,7 +253,7 @@
 
     <div class="actions-row">
       <button class="btn-refresh" onclick="loadRooms()" id="refreshBtn">🔄 刷新</button>
-      <button class="btn-create" onclick="openCreateSheet()">＋ 创建房间</button>
+      <button class="btn-create" id="openCreateRoom" onclick="openCreateSheet()">＋ 创建房间</button>
     </div>
 
     <div class="invite-row">
@@ -288,6 +288,8 @@
       <div class="sheet-title">创建房间</div>
       <div class="field-label">地图</div>
       <select id="mapSelect" disabled><option value="">正在加载地图…</option></select>
+      <label class="field-label" for="matchMode">对局模式</label>
+      <select id="matchMode" onchange="mapsLoaded=false;loadMaps()"><option value="1v1">1v1 · 双人对战</option><option value="2v2">2v2 · 蓝1 → 红1 → 红2 → 蓝2</option></select>
       <div class="field-label">可见性</div>
       <div class="toggle-row">
         <span>公开房间（所有人可见）</span>
@@ -588,7 +590,7 @@
           return `<div class="room-card">
             <div class="room-info">
               <div class="room-name">${escHtml(r.name || r.id)}</div>
-              <div class="room-meta">玩家 ${players}/2 · 地图：${escHtml(getMapDisplayName(r.mapId))}${inviteInfo}</div>
+              <div class="room-meta">玩家 ${players}/${r.maxPlayers || 2} · 地图：${escHtml(getMapDisplayName(r.mapId))}${inviteInfo}</div>
             </div>
             ${deleteBtn}
             <button class="btn-join" onclick="showFactionPicker('${escHtml(r.id)}')">加入</button>
@@ -603,7 +605,7 @@
           return `<div class="room-card">
             <div class="room-info">
               <div class="room-name">${escHtml(r.name || r.id)}</div>
-              <div class="room-meta">玩家 ${players}/2 · 地图：${escHtml(getMapDisplayName(r.mapId))} · 正在选人</div>
+              <div class="room-meta">玩家 ${players}/${r.maxPlayers || 2} · 地图：${escHtml(getMapDisplayName(r.mapId))} · 正在选人</div>
             </div>
             <button class="btn-spectate" disabled>选人中</button>
           </div>`
@@ -617,7 +619,7 @@
           return `<div class="room-card">
             <div class="room-info">
               <div class="room-name">${escHtml(r.name || r.id)}</div>
-              <div class="room-meta">玩家 ${players}/2 · 🔴 进行中</div>
+              <div class="room-meta">玩家 ${players}/${r.maxPlayers || 2} · 🔴 进行中</div>
             </div>
             <button class="btn-spectate" onclick="spectateRoom('${escHtml(r.id)}')">观战</button>
           </div>`
@@ -704,7 +706,14 @@
       } catch (e) { alert('删除房间失败：' + e.message) }
     }
 
+    const isPublishedGuest = /^\/hosts\//.test(new URL(RvBUtils.getServerUrl() || location.origin).pathname)
+    if (isPublishedGuest) {
+      const createEntry = document.getElementById('openCreateRoom')
+      createEntry.disabled = true
+      createEntry.textContent = '请由玩家主机创建房间'
+    }
     async function openCreateSheet() {
+      if (isPublishedGuest) return
       if (!RvBUtils.getServerUrl()) { alert('请先连接服务器'); return }
       document.getElementById('createSheet').style.display = 'flex'
       document.getElementById('createErr').style.display = 'none'
@@ -740,12 +749,13 @@
       if (mapsLoaded) return true
       if (mapsLoadPromise) return mapsLoadPromise
 
+      document.getElementById('matchMode').disabled = true
       sel.disabled = true
       createBtn.disabled = true
       sel.innerHTML = '<option value="">正在加载地图…</option>'
       mapsLoadPromise = (async () => {
         try {
-          const payload = await lobbyRequest('catalog.maps')
+          const payload = await lobbyRequest('catalog.maps', { mode: document.getElementById('matchMode').value })
           const maps = Array.isArray(payload.maps) ? payload.maps : []
           if (!maps.length) throw new Error('服务器未返回可选地图')
 
@@ -778,6 +788,7 @@
           return false
         } finally {
           mapsLoadPromise = null
+          document.getElementById('matchMode').disabled = false
         }
       })()
       return mapsLoadPromise
@@ -803,7 +814,8 @@
           if (!mapId) throw new Error('请选择地图')
           await reconcileLobbyServerMode()
           const profileIdentity = await getLocalGameProfileIdentity()
-          const room = await lobbyRequest('rooms.create', { name: playerName + ' 的 1v1 房间', hostId, hostName: playerName, publicKey, mapId, visibility, profileIdentity })
+          const mode = document.getElementById('matchMode').value
+          const room = await lobbyRequest('rooms.create', { name: playerName + ' 的 ' + mode + ' 房间', mode, hostId, hostName: playerName, publicKey, mapId, visibility, profileIdentity })
           if (room.id) { closeCreateSheet(); showFactionPicker(room.id, 'join') }
           else throw new Error('未返回房间 ID')
         } catch (e) {

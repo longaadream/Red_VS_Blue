@@ -158,7 +158,7 @@ describe('Colyseus reconnect and authority resync state machine', () => {
     const android = readFileSync(resolve('android-client/www/js/ws-client.js'), 'utf8')
 
     expect(desktop).toContain('new Colyseus.Client(base)')
-    expect(desktop).toContain('_client.joinById(_roomId, joinOptions(_playerId))')
+    expect(desktop).toContain('_client.joinById(_roomId, await joinOptions(_playerId))')
     expect(desktop).not.toContain('new WebSocket(')
     expect(desktop).not.toContain('BATTLE_AUTHORITY_PROTOCOL_VERSION')
     expect(android).toContain('BATTLE_AUTHORITY_PROTOCOL_VERSION')

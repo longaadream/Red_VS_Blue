@@ -1,4 +1,10 @@
-import { randomInt } from 'node:crypto'
+import { randomInt, randomUUID } from 'node:crypto'
+import { matchCapacity, nextTeamSlot, TEAM_TURN_ORDER } from '@/lib/game/match-teams'
+import { planBotActions, prepareLegalBotAction } from '@/lib/game/ai'
+import { getCurrentInputOwnerPlayerId } from '@/lib/game/turn-timer'
+import type { BattleAction, BattleState } from '@/lib/game/turn'
+import { restoreRoomRuleRuntime } from '@/lib/game/room-rule-runtime'
+import { roomAuthorityQueue } from '@/lib/game/room-authority-queue'
 
 import { Room, type Client } from 'colyseus'
 
@@ -57,6 +63,10 @@ import { BattleRoomState } from './battle-room-state'
 import { ProductBattleStore } from './product-battle-store'
 
 export interface BattleRoomCreateOptions {
+  restoreCapability?: string
+  playerId?: string
+  auth?: unknown
+  mode?: '1v1' | '2v2'
   battleId?: string
   creationKey?: string
   product?: boolean
@@ -67,6 +77,7 @@ export interface BattleRoomCreateOptions {
 }
 
 export interface BattleRoomJoinOptions {
+  auth?: unknown
   playerId: string
   playerName?: string
   accountId?: string
@@ -75,6 +86,9 @@ export interface BattleRoomJoinOptions {
 }
 
 export interface BattleRoomDependencies {
+  restoreCapability?: string
+  authenticate?: (playerId: string, roomId: string, proof: unknown) => string
+  reconnectGraceMs?: number
   repository: CandidateAuthorityRepository
   journal: PostgresAuthorityJournal
   fixtureFactory: BattleRoomFixtureFactory
@@ -99,10 +113,23 @@ export function createBattleRoomClass(dependencies: BattleRoomDependencies) {
     private readonly sessionByPlayer = new Map<string, string>()
     private readonly rpcCache = new Map<string, RpcCacheRecord>()
     private unsubscribeDurable?: () => void
+    private readonly offlineSince = new Map<string, number>()
+    private readonly botPlans = new Map<string, { turn: number; actions: BattleAction[] }>()
+    private botBusy = false
+    private disposed = false
+    private creationPlayerId?: string
+    private creationPublicKey?: string
 
     async onCreate(options: BattleRoomCreateOptions): Promise<void> {
+      if (options?.restore && dependencies.restoreCapability && options.restoreCapability !== dependencies.restoreCapability) throw new Error('Only the host process may restore rooms')
       this.productMode = options?.product === true
+      if (dependencies.authenticate && !this.productMode && !options?.restore) throw new Error('Product admission required')
+      if (this.productMode && !options?.restore) {
+        this.creationPlayerId = normalizeRequiredId(options.playerId, 'playerId')
+        if (dependencies.authenticate) this.creationPublicKey = dependencies.authenticate(normalizeRequiredId(options.playerId, 'playerId'), 'create', options.auth)
+      }
       this.state = new BattleRoomState()
+      this.clock.setInterval(() => { void this.advanceDisconnectedPlayer() }, 500)
       this.onMessage(BATTLE_COMMAND_MESSAGE, (client, message) => this.handleBattleCommand(client, message))
       this.onMessage(BATTLE_RESYNC_MESSAGE, client => this.sendBattleSnapshot(client))
       this.onMessage(PRODUCT_ROOM_RPC_MESSAGE, (client, message) => this.handleProductRpc(client, message))
@@ -148,13 +175,14 @@ export function createBattleRoomClass(dependencies: BattleRoomDependencies) {
           })
         }
         try {
-          const mapId = assertSelectableMapId(options.mapId ?? 'open-expanse')
+          const mapId = assertSelectableMapId(options.mapId ?? (options.mode === '2v2' ? 'twin-fronts' : 'open-expanse'), options.mode)
           const room: GameRoom = {
             id: this.roomId,
             name: normalizeRoomName(options.name, this.roomId),
             status: 'waiting',
             createdAt: Date.now(),
-            maxPlayers: 2,
+            maxPlayers: matchCapacity(options.mode),
+            mode: options.mode ?? '1v1',
             players: [],
             mapId,
             visibility: options.visibility === 'private' ? 'private' : 'public',
@@ -191,12 +219,26 @@ export function createBattleRoomClass(dependencies: BattleRoomDependencies) {
 
     async onJoin(client: Client, options: BattleRoomJoinOptions): Promise<void> {
       const playerId = normalizeRequiredId(options?.playerId, 'playerId')
+      let verifiedKey: string | undefined
+      if (this.productMode && dependencies.authenticate) {
+        verifiedKey = this.creationPlayerId === playerId && this.creationPublicKey
+          ? this.creationPublicKey : dependencies.authenticate(playerId, this.roomId, options.auth)
+        this.creationPlayerId = undefined
+        this.creationPublicKey = undefined
+        const room = await this.requireProductRoom()
+        const existing = room.players.find(p => p.id === playerId)
+        if (existing?.publicKey && existing.publicKey !== verifiedKey) throw new Error('Player identity key mismatch')
+      }
       const activeSessionId = this.sessionByPlayer.get(playerId)
       if (activeSessionId && activeSessionId !== client.sessionId) {
         throw Object.assign(new Error('Player is already connected'), { code: 'BATTLE_PLAYER_ALREADY_CONNECTED' })
       }
       if (this.productMode) {
-        await this.joinProductPlayer(client, playerId, options)
+        await roomAuthorityQueue.enqueue(this.roomId, { kind: 'system', playerId, actionId: 'admission' }, async () => {
+          const active = this.sessionByPlayer.get(playerId)
+          if (active && active !== client.sessionId) throw Object.assign(new Error('Player is already connected'), { code: 'BATTLE_PLAYER_ALREADY_CONNECTED' })
+          await this.joinProductPlayer(client, playerId, options, verifiedKey)
+        })
         return
       }
       const room = await this.requireGameRoom()
@@ -207,7 +249,13 @@ export function createBattleRoomClass(dependencies: BattleRoomDependencies) {
     }
 
     async onDrop(client: Client): Promise<void> {
-      await this.allowReconnection(client, 30)
+      const playerId = this.playerBySession.get(client.sessionId)
+      if (playerId) this.offlineSince.set(playerId, Date.now())
+      if (this.productMode) await this.broadcastProductRoom()
+      try { await this.allowReconnection(client, (dependencies.reconnectGraceMs ?? 120000) / 1000) } catch {
+        // Colyseus expires the reservation and invokes onLeave. The host then
+        // owns AI control; this is a normal connection lifecycle outcome.
+      }
     }
 
     async onReconnect(client: Client): Promise<void> {
@@ -215,6 +263,10 @@ export function createBattleRoomClass(dependencies: BattleRoomDependencies) {
       if (!playerId || this.sessionByPlayer.get(playerId) !== client.sessionId) {
         throw Object.assign(new Error('Reconnected session is not seated'), { code: 'BATTLE_SESSION_NOT_SEATED' })
       }
+      await roomAuthorityQueue.enqueue(this.roomId, { kind: 'disconnect', playerId }, () => {
+        this.offlineSince.delete(playerId)
+        this.botPlans.delete(playerId)
+      })
       client.send('subscribed', { type: 'subscribed', role: await this.roleFor(playerId) })
       if (this.productMode) await this.broadcastProductRoom()
       await this.sendBattleSnapshot(client)
@@ -226,10 +278,12 @@ export function createBattleRoomClass(dependencies: BattleRoomDependencies) {
       this.playerBySession.delete(client.sessionId)
       if (playerId && this.sessionByPlayer.get(playerId) === client.sessionId) {
         this.sessionByPlayer.delete(playerId)
+        if (!this.offlineSince.has(playerId)) this.offlineSince.set(playerId, Date.now())
       }
     }
 
     async onDispose(): Promise<void> {
+      this.disposed = true
       clearRoomBattleTimeout(this.roomId)
       this.unsubscribeDurable?.()
       if (this.authorityStore) await this.authorityStore.drainBattleAuthorityPersistence(this.roomId)
@@ -239,6 +293,7 @@ export function createBattleRoomClass(dependencies: BattleRoomDependencies) {
       client: Client,
       playerId: string,
       options: BattleRoomJoinOptions,
+      verifiedKey?: string,
     ): Promise<void> {
       const profileIdentity = assertGameProfileCompatibleV1(options.profileIdentity)
       const store = this.requireProductStore()
@@ -248,10 +303,13 @@ export function createBattleRoomClass(dependencies: BattleRoomDependencies) {
         if (room.status !== 'waiting' && room.status !== 'ready') {
           throw Object.assign(new Error('Player is not seated in this battle'), { code: 'BATTLE_PLAYER_FORBIDDEN' })
         }
-        if (room.players.length >= 2) throw Object.assign(new Error('Room is full'), { code: 'ROOM_FULL' })
-        const seat = nextSeat(room.players, playerId)
+        if (room.players.length >= matchCapacity(room.mode)) throw Object.assign(new Error('Room is full'), { code: 'ROOM_FULL' })
+        const teamSlot = room.mode === '2v2' ? nextTeamSlot(room.players) : undefined
+        const seat = teamSlot === undefined ? nextSeat(room.players, playerId) : TEAM_TURN_ORDER[teamSlot]
         player = {
           id: playerId,
+          ...(verifiedKey ? { publicKey: verifiedKey } : {}),
+          ...(teamSlot === undefined ? {} : { teamSlot }),
           accountId: normalizeOptionalId(options.accountId),
           name: normalizePlayerName(options.playerName, playerId),
           joinedAt: Date.now(),
@@ -269,6 +327,7 @@ export function createBattleRoomClass(dependencies: BattleRoomDependencies) {
         if (requestedAlignment) player.alignment = requestedAlignment
         player.profileIdentity = profileIdentity
         player.name = normalizePlayerName(options.playerName, playerId)
+        if (verifiedKey) player.publicKey = verifiedKey
         player.accountId = normalizeOptionalId(options.accountId) ?? player.accountId
       }
       await store.setRoom(this.roomId, room)
@@ -337,7 +396,7 @@ export function createBattleRoomClass(dependencies: BattleRoomDependencies) {
       data: Record<string, unknown>,
     ): Promise<unknown> {
       if (method === 'catalog.identity') return { profileIdentity: getServerGameProfileIdentityV1() }
-      if (method === 'catalog.maps') return { maps: getSelectableMapCatalog() }
+      if (method === 'catalog.maps') return { maps: getSelectableMapCatalog((await this.requireProductRoom()).mode) }
       if (method === 'catalog.pieces') return { pieces: getAllPieces() }
       if (method === 'catalog.skills') return { skills: getAllSkills() }
       if (method === 'catalog.card') {
@@ -394,7 +453,7 @@ export function createBattleRoomClass(dependencies: BattleRoomDependencies) {
       if (action === 'toggle-ready') {
         if (room.status === 'in-progress' || room.status === 'finished') throw new Error('Battle has already started')
         player.ready = !player.ready
-        const allReady = room.players.length === 2 && room.players.every(candidate => candidate.ready === true)
+        const allReady = room.players.length === matchCapacity(room.mode) && room.players.every(candidate => candidate.ready === true)
         room.status = allReady ? 'ready' : 'waiting'
         await store.setRoom(this.roomId, room)
         await this.broadcastProductRoom()
@@ -572,7 +631,12 @@ export function createBattleRoomClass(dependencies: BattleRoomDependencies) {
       if (!this.productMode) return
       const room = await this.requireProductRoom()
       await this.publishProductRoom(room)
-      this.broadcast(PRODUCT_ROOM_UPDATE_MESSAGE, { type: 'roomUpdate', room: publicProductRoom(room) })
+      this.broadcast(PRODUCT_ROOM_UPDATE_MESSAGE, { type: 'roomUpdate', room: {
+        ...publicProductRoom(room),
+        players: publicProductRoom(room).players.map(player => ({ ...player,
+          connectionStatus: this.aiOwns(player.id) ? 'ai' : this.offlineSince.has(player.id) ? 'reconnecting' : 'online',
+        })),
+      } })
     }
 
     private async publishProductRoom(room: GameRoom): Promise<void> {
@@ -629,6 +693,8 @@ export function createBattleRoomClass(dependencies: BattleRoomDependencies) {
     }
 
     private bindSession(client: Client, playerId: string): void {
+      this.offlineSince.delete(playerId)
+      this.botPlans.delete(playerId)
       this.playerBySession.set(client.sessionId, playerId)
       this.sessionByPlayer.set(playerId, client.sessionId)
     }
@@ -650,6 +716,58 @@ export function createBattleRoomClass(dependencies: BattleRoomDependencies) {
           if (this.productMode) await this.broadcastProductRoom()
         },
       })
+    }
+
+    private aiOwns(playerId: string): boolean {
+      const since = this.offlineSince.get(playerId)
+      return !this.disposed && since !== undefined && Date.now() - since >= (dependencies.reconnectGraceMs ?? 120000)
+    }
+
+    private async advanceDisconnectedPlayer(): Promise<void> {
+      if (this.disposed || this.botBusy || !this.productMode || !this.authorityStore) return
+      this.botBusy = true
+      try {
+        const room = await this.requireGameRoom()
+        const state = getBattleStorage(room)?.state as BattleState | undefined
+        if (!state || state.terminalResult) return
+        for (const player of room.players) {
+          if (!this.sessionByPlayer.has(player.id) && !this.offlineSince.has(player.id)) this.offlineSince.set(player.id, Date.now())
+        }
+        const playerId = getCurrentInputOwnerPlayerId(state)
+        if (!this.aiOwns(playerId)) return
+        const runtime = restoreRoomRuleRuntime(this.roomId)
+        const previousPlan = this.botPlans.get(playerId)
+        const mayUseCached = state.turn.phase === 'action' && !state.pendingOptionSelection && !state.pendingTargetSelection
+          && state.deployment?.status !== 'awaiting-reserve-deploy' && previousPlan?.turn === state.turn.turnNumber
+        const plan = mayUseCached ? { kind: 'action' as const, actions: previousPlan.actions }
+          : runtime.run(() => planBotActions(state, playerId))
+        if (!plan) return
+        let action: BattleAction | undefined
+        if (plan.kind === 'structural') action = plan.actions[0]
+        else {
+          let cached = this.botPlans.get(playerId)
+          if (!cached || cached.turn !== state.turn.turnNumber) {
+            cached = { turn: state.turn.turnNumber, actions: plan.actions }
+            this.botPlans.set(playerId, cached)
+          }
+          while (cached.actions.length && !action) action = runtime.run(() => prepareLegalBotAction(state, cached!.actions.shift()!, playerId))
+          action ??= { type: 'endTurn', playerId }
+        }
+        if (!action || action.type === 'surrender') return
+        const result = await dispatchRoomBattleAction(this.authorityStore, this.roomId, playerId,
+          { ...action, clientActionId: `host-ai:${playerId}:${randomUUID()}` } as BattleAction, {
+            allowSystem: true,
+            expectedAuthorityVersion: room.battleAuthorityVersion ?? 0,
+            validateExecution: () => {
+              if (!this.aiOwns(playerId)) throw Object.assign(new Error('Player resumed control'), { code: 'AI_CONTROL_REVOKED' })
+            },
+          })
+        await this.publishAuthorityResult(result)
+        await this.scheduleAuthorityTimeout()
+      } catch (error) {
+        const code = (error as { code?: string })?.code
+        if (code !== 'AI_CONTROL_REVOKED' && code !== 'AUTHORITY_VERSION_MISMATCH') console.error('[host-ai] command failed', { roomId: this.roomId, code, message: error instanceof Error ? error.message : String(error) })
+      } finally { this.botBusy = false }
     }
 
     private async publishAuthorityResult(result: DispatchRoomBattleActionResult): Promise<void> {
@@ -680,6 +798,7 @@ function publicProductRoom(room: GameRoom) {
     hostId: publicRoom.hostId,
     mapId: publicRoom.mapId,
     maxPlayers: publicRoom.maxPlayers ?? 2,
+    mode: publicRoom.mode ?? '1v1',
     authorityVersion: Number(publicRoom.battleAuthorityVersion ?? 0),
     durableAuthorityVersion: Number(publicRoom.battleAuthorityDurableVersion ?? 0),
     visibility: publicRoom.visibility ?? 'public',
@@ -689,6 +808,7 @@ function publicProductRoom(room: GameRoom) {
       accountId: player.accountId,
       name: player.name,
       seat: seatOf(player),
+      teamSlot: player.teamSlot,
       faction: seatOf(player),
       alignment: player.alignment,
       ready: player.ready === true,
