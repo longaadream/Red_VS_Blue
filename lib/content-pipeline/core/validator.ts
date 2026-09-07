@@ -129,7 +129,19 @@ interface PreflightedSourceV1 {
   readonly entries: readonly ContentSourceEntryV1[]
 }
 
-const forbiddenActiveExtensionPattern = /\.(?:html?|js|mjs|cjs|css|svg|wasm|node|dll|exe)$/i
+const forbiddenActiveExtensionPattern = /\.(?:html?|js|mjs|cjs|css|wasm|node|dll|exe)$/i
+const STATIC_SVG_ELEMENTS = new Set([
+  'svg', 'g', 'defs', 'symbol', 'use', 'title', 'desc', 'path', 'rect', 'circle',
+  'ellipse', 'line', 'polyline', 'polygon', 'clipPath', 'mask', 'linearGradient',
+  'radialGradient', 'stop',
+])
+const STATIC_SVG_ATTRIBUTES = new Set([
+  'xmlns', 'viewBox', 'width', 'height', 'x', 'y', 'x1', 'y1', 'x2', 'y2', 'cx',
+  'cy', 'r', 'rx', 'ry', 'd', 'points', 'fill', 'fill-rule', 'fill-opacity',
+  'stroke', 'stroke-width', 'stroke-linecap', 'stroke-linejoin', 'stroke-opacity',
+  'opacity', 'transform', 'id', 'href', 'clip-path', 'mask', 'offset', 'stop-color',
+  'stop-opacity', 'gradientUnits', 'gradientTransform', 'spreadMethod', 'preserveAspectRatio',
+])
 const jsonBudgetReasons = new Set([
   'depth',
   'nodes',
@@ -523,7 +535,70 @@ function hasBytesPrefix(bytes: Uint8Array, prefix: readonly number[]): boolean {
   return prefix.every((byte, index) => bytes[index] === byte)
 }
 
-function validateRasterMagic(
+function validateStaticSvg(
+  descriptor: PackFileDescriptorV1,
+  bytes: Uint8Array,
+  packId?: string,
+): void {
+  const invalid = (): never => reject('PACK_MEDIA_TYPE_INVALID', 'content', {
+    packId,
+    path: descriptor.path,
+  })
+  let source: string
+  try {
+    source = new TextDecoder('utf-8', { fatal: true }).decode(bytes)
+  } catch {
+    return invalid()
+  }
+  source = source.replace(/^\uFEFF?\s*<\?xml\s+version=["']1\.0["'](?:\s+encoding=["']UTF-8["'])?(?:\s+standalone=["'](?:yes|no)["'])?\s*\?>\s*/i, '')
+  if (/\u0000|<!DOCTYPE|<!ENTITY|<\?|<!--|<!\[CDATA\[/i.test(source)) invalid()
+  if (/\b(?:style|class)\s*=|\burl\s*\((?!\s*#[A-Za-z][\w.-]*\s*\))/i.test(source)) invalid()
+  if (/\b(?:javascript|data|file):/i.test(source)) invalid()
+  let cursor = 0
+  let rootSeen = false
+  const elementStack: string[] = []
+  const tagPattern = /<\s*(\/)?\s*([A-Za-z][A-Za-z0-9]*)\b([^<>]*?)(\/)?\s*>/g
+  for (let match = tagPattern.exec(source); match; match = tagPattern.exec(source)) {
+    const between = source.slice(cursor, match.index)
+    if (/[<>]/.test(between)) invalid()
+    if (elementStack.length === 0 && between.trim()) invalid()
+    cursor = tagPattern.lastIndex
+    const closing = Boolean(match[1])
+    const tag = match[2]
+    if (!STATIC_SVG_ELEMENTS.has(tag)) invalid()
+    if (!rootSeen) {
+      if (closing || tag !== 'svg') invalid()
+      rootSeen = true
+    } else if (!closing && elementStack.length === 0) invalid()
+    if (closing) {
+      if (match[3].trim() || match[4]) invalid()
+      if (elementStack.pop() !== tag) invalid()
+      continue
+    }
+    const attributes = match[3]
+    let attributeCursor = 0
+    const attributeNames = new Set<string>()
+    const attributePattern = /\s+([A-Za-z][A-Za-z0-9.-]*)\s*=\s*(["'])(.*?)\2/gs
+    for (let attribute = attributePattern.exec(attributes); attribute; attribute = attributePattern.exec(attributes)) {
+      if (attributes.slice(attributeCursor, attribute.index).trim()) invalid()
+      attributeCursor = attributePattern.lastIndex
+      const name = attribute[1]
+      const value = attribute[3]
+      if (attributeNames.has(name)) invalid()
+      attributeNames.add(name)
+      if (name.toLowerCase().startsWith('on') || !STATIC_SVG_ATTRIBUTES.has(name)) invalid()
+      if (name === 'xmlns' && value !== 'http://www.w3.org/2000/svg') invalid()
+      if (name === 'href' && !/^#[A-Za-z][\w.-]*$/.test(value)) invalid()
+      if (name !== 'xmlns' && /\bhttps?:|\/\//i.test(value)) invalid()
+      if (/[<>`]/.test(value) || /&(?!amp;|lt;|gt;|quot;|apos;)/.test(value)) invalid()
+    }
+    if (attributes.slice(attributeCursor).trim()) invalid()
+    if (!match[4]) elementStack.push(tag)
+  }
+  if (!rootSeen || elementStack.length > 0 || source.slice(cursor).trim()) invalid()
+}
+
+function validateImageMagic(
   descriptor: PackFileDescriptorV1,
   bytes: Uint8Array,
   packId?: string,
@@ -535,6 +610,9 @@ function validateRasterMagic(
     ])
   } else if (descriptor.mediaType === 'image/jpeg') {
     valid = bytes.byteLength >= 3 && hasBytesPrefix(bytes, [0xff, 0xd8, 0xff])
+  } else if (descriptor.mediaType === 'image/svg+xml') {
+    validateStaticSvg(descriptor, bytes, packId)
+    return
   } else if (descriptor.mediaType === 'image/webp') {
     if (
       bytes.byteLength >= 12
@@ -607,7 +685,7 @@ function validateFileContent(
   packId?: string,
 ): ValidatedFileFactV1 {
   if (descriptor.mediaType !== 'application/json') {
-    validateRasterMagic(descriptor, bytes, packId)
+    validateImageMagic(descriptor, bytes, packId)
     return { descriptor, bytes, hasExecutableContent: false }
   }
 

@@ -105,7 +105,7 @@ describe('Electron Profile store security boundary', () => {
       .toBe(path.join(root, 'profiles', candidate.resolvedProfileHash))
   })
 
-  test('exposes only v1 data JSON and safe raster files from a complete stable snapshot', () => {
+  test('exposes only v1 data JSON and validated image files from a complete stable snapshot', () => {
     const root = temporaryPackRoot()
     const stable = reference('installed', 'c')
     materializeProfile(root, stable)
@@ -114,6 +114,7 @@ describe('Electron Profile store security boundary', () => {
     expect(listActiveResourcePackFiles(root)).toEqual([
       '/data/cards/test.json',
       '/images/test.png',
+      '/images/vector.svg',
     ])
   })
 
