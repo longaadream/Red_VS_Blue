@@ -1,6 +1,15 @@
 import { contextBridge, ipcRenderer } from 'electron'
 
 contextBridge.exposeInMainWorld('editorAPI', {
+  visualCatalog: () => ipcRenderer.invoke('visual-catalog'),
+  workbenchList: () => ipcRenderer.invoke('workbench-list'),
+  workbenchCreate: (input: unknown) => ipcRenderer.invoke('workbench-create', input),
+  workbenchInspect: (id: string) => ipcRenderer.invoke('workbench-inspect', id),
+  workbenchCheck: (id: string) => ipcRenderer.invoke('workbench-check', id),
+  workbenchFeedback: (id: string, input: unknown) => ipcRenderer.invoke('workbench-feedback', id, input),
+  workbenchScenario: (id: string, input: unknown) => ipcRenderer.invoke('workbench-scenario', id, input),
+  workbenchKeep: (id: string, hash: string) => ipcRenderer.invoke('workbench-keep', id, hash),
+  workbenchHandoff: (id: string) => ipcRenderer.invoke('workbench-handoff', id),
   projectInfo: () => ipcRenderer.invoke('project-info'),
   revealProject: () => ipcRenderer.invoke('project-reveal'),
   selectProject: (mode: 'open' | 'official' | 'blank') => ipcRenderer.invoke('project-select', mode),

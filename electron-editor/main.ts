@@ -2,12 +2,14 @@ import { app, BrowserWindow, clipboard, dialog, ipcMain, shell, utilityProcess }
 import * as path from 'path'
 import * as fs from 'fs'
 import { assertTrustedIpcSender, isFileUrlWithinRoot } from './ipc-trust'
+import { CreativeWorkbench } from './workbench'
 import { assertContentProjectRoot, createContentProject, openContentProject, readDocumentSnapshot, writeDocumentSnapshot } from './content-project'
 import {
   EditorContentOperationQueueV1,
   normalizeEditorContentOperationRequestV1,
   resolveEditorDataDirectoryV1,
   resolveEditorDataFilePathV1,
+  resolveEditorWorkspacePathV1,
 } from './content-pipeline-ipc'
 import {
   importAssetV1,
@@ -121,6 +123,17 @@ function createWindow(): void {
 }
 
 app.whenReady().then(() => {
+  const checkIndex = process.argv.indexOf('--check-content-task')
+  if (checkIndex !== -1) {
+    try {
+      const root = process.argv[checkIndex + 1]
+      const id = process.argv[checkIndex + 2]
+      const result = new CreativeWorkbench(root, getProjectRoot(), editorLauncher()).check(id)
+      console.log(JSON.stringify({ taskId: id, contentHash: result.contentHash, check: result.check }))
+      app.exit(result.check && !result.check.issues.some(issue => issue.severity === 'error') ? 0 : 1)
+    } catch (error) { console.error(String(error)); app.exit(1) }
+    return
+  }
   const settings = path.join(app.getPath('userData'), 'content-project-selection.json')
   if (fs.existsSync(settings)) {
     try { selectedProject = openContentProject(JSON.parse(fs.readFileSync(settings, 'utf8')).root) }
@@ -146,6 +159,64 @@ function handleTrusted(channel: string, listener: Parameters<typeof ipcMain.hand
 // ─── IPC: 文件列表 ─────────────────────────────────────────────────────────────
 
 handleTrusted('project-info', () => ({ root: ensureAuthoringWorkspace() }))
+function editorLauncher() {
+  const portable = process.env.PORTABLE_EXECUTABLE_FILE
+  return app.isPackaged ? [portable && path.isAbsolute(portable) ? portable : process.execPath] : [process.execPath, path.join(__dirname, 'main.js')]
+}
+function workbench() { return new CreativeWorkbench(ensureAuthoringWorkspace(), getProjectRoot(), editorLauncher()) }
+handleTrusted('workbench-list', () => workbench().list())
+handleTrusted('workbench-create', (_event, input) => workbench().create(input))
+handleTrusted('workbench-inspect', (_event, id: string) => workbench().inspect(id))
+handleTrusted('workbench-check', (_event, id: string) => workbench().check(id))
+handleTrusted('workbench-feedback', (_event, id: string, input) => workbench().feedback(id, input))
+handleTrusted('workbench-scenario', (_event, id: string, input) => workbench().scenario(id, input))
+handleTrusted('workbench-keep', (_event, id: string, hash: string) => workbench().keep(id, hash))
+handleTrusted('workbench-handoff', (_event, id: string) => {
+  const result = workbench().handoff(id)
+  clipboard.writeText(result.text)
+  return { path: result.path }
+})
+handleTrusted('visual-catalog', () => {
+  const errors: string[] = []
+  const read = (file: string): unknown => {
+    if (fs.statSync(file).size > 2 * 1024 * 1024) throw new Error('目录文件过大')
+    return JSON.parse(fs.readFileSync(file, 'utf8'))
+  }
+  const documents: Record<string, Record<string, unknown>[]> = {}
+  for (const collection of ['skills', 'rules', 'pieces']) {
+    documents[collection] = []
+    const directory = resolveEditorDataDirectoryV1(getDataRoot(), collection)
+    for (const filename of fs.readdirSync(directory).filter(name => name.endsWith('.json') && name !== 'manifest.json')) {
+      try {
+        const value = read(safePath(collection, filename))
+        if (value && typeof value === 'object' && !Array.isArray(value)) documents[collection].push(value as Record<string, unknown>)
+      } catch (error) { errors.push(`${collection}/${filename}: ${String(error)}`) }
+    }
+  }
+  let keywords: unknown[] = []
+  try {
+    const own = resolveEditorWorkspacePathV1(getDataRoot(), 'skill-keywords.json', 'keywords', 'write')
+    const file = fs.existsSync(own) ? own : path.join(getProjectRoot(), 'data', 'skill-keywords.json')
+    const value = read(file)
+    if (!Array.isArray(value)) throw new Error('关键词目录必须是数组')
+    keywords = value
+  } catch (error) { errors.push(`skill-keywords.json: ${String(error)}`) }
+  const statusTags: unknown[] = []
+  for (const document of [...documents.skills, ...documents.pieces]) {
+    for (const value of [document.statusTag, document.initialStatusTags]) {
+      const items = Array.isArray(value) ? value : value && typeof value === 'object' ? [value] : []
+      for (const item of items) if (item && typeof item === 'object' && typeof item.id === 'string' && typeof item.type === 'string') statusTags.push(item)
+    }
+  }
+  return {
+    keywords,
+    skills: documents.skills.map(({ id, name, description, keywords, effectTags }) => ({ id, name, description, keywords, effectTags })),
+    rules: documents.rules.map(({ id, name }) => ({ id, name })),
+    effects: [...new Set(documents.skills.flatMap(skill => Array.isArray(skill.effectTags) ? skill.effectTags.filter(tag => typeof tag === 'string') : []))],
+    statusTags,
+    errors,
+  }
+})
 handleTrusted('project-reveal', () => shell.openPath(ensureAuthoringWorkspace()))
 handleTrusted('project-select', async (_e, mode: 'open' | 'official' | 'blank') => {
   if (!win || !['open', 'official', 'blank'].includes(mode)) throw new Error('无效的项目操作')
