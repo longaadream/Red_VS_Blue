@@ -1,1 +1,13 @@
-{"id":"sleep-prevent","name":"麻醉阻止","description":"阻止被麻醉目标的移动和使用技能","kind":"passive","type":"normal","cooldownTurns":0,"maxCharges":0,"powerMultiplier":1,"actionPointCost":0,"code":"function executeSkill(context) { console.log('=== sleep-prevent skill called ==='); console.log('context.piece:', context.piece ? context.piece.name : 'null'); if (!context.piece) { console.log('No piece in context'); return { message: '没有目标', success: false }; } console.log('context.piece.statusTags:', context.piece.statusTags); var isSleeping = false; if (context.piece.statusTags) { for (var i = 0; i < context.piece.statusTags.length; i++) { var tag = context.piece.statusTags[i]; console.log('Checking tag:', tag); if (typeof tag === 'object' && tag.type === 'sleep') { isSleeping = true; console.log('Found sleep tag!'); break; } } } console.log('isSleeping:', isSleeping); if (isSleeping) { var actionType = '执行该操作'; if (context.type === 'beforeMove') { actionType = '移动'; } else if (context.type === 'beforeSkillUse') { actionType = '使用技能'; } console.log('Blocking action:', actionType); return { message: context.piece.name + '处于麻醉状态，无法' + actionType, success: true, blocked: true, showUIEffect: true }; } console.log('Not sleeping, action allowed'); return { message: '目标未处于麻醉状态或行动未被阻止', success: false }; }","showInUI":false}
+{
+  "id": "sleep-prevent",
+  "name": "麻醉阻止",
+  "description": "睡眠期间，不能主动走格或使用技能。",
+  "kind": "passive",
+  "type": "normal",
+  "cooldownTurns": 0,
+  "maxCharges": 0,
+  "powerMultiplier": 1,
+  "actionPointCost": 0,
+  "code": "function executeSkill(context) { console.log('=== sleep-prevent skill called ==='); console.log('context.piece:', context.piece ? context.piece.name : 'null'); if (!context.piece) { console.log('No piece in context'); return { message: '没有目标', success: false }; } console.log('context.piece.statusTags:', context.piece.statusTags); var isSleeping = false; if (context.piece.statusTags) { for (var i = 0; i < context.piece.statusTags.length; i++) { var tag = context.piece.statusTags[i]; console.log('Checking tag:', tag); if (typeof tag === 'object' && tag.type === 'sleep') { isSleeping = true; console.log('Found sleep tag!'); break; } } } console.log('isSleeping:', isSleeping); if (isSleeping) { var actionType = '执行该操作'; if (context.type === 'beforeMove') { actionType = '移动'; } else if (context.type === 'beforeSkillUse') { actionType = '使用技能'; } console.log('Blocking action:', actionType); return { message: context.piece.name + '处于麻醉状态，无法' + actionType, success: true, blocked: true, showUIEffect: true }; } console.log('Not sleeping, action allowed'); return { message: '目标未处于麻醉状态或行动未被阻止', success: false }; }",
+  "showInUI": false
+}

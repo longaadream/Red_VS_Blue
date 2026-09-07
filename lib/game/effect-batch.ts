@@ -11,9 +11,22 @@ export type EffectBatchKind = (typeof EFFECT_BATCH_KINDS)[number]
 export type EffectChainState = 'idle' | 'processing'
 export type EffectDamageType = 'physical' | 'magical' | 'true' | 'toxin'
 
+/** Non-piece effects carry attribution without inventing a board piece. */
+export interface NonPieceDamageSource {
+  kind: 'player' | 'environment'
+  instanceId: string
+  ownerPlayerId: string
+  name: string
+  templateId?: never
+}
+export type DamageSource = PieceInstance | NonPieceDamageSource
+export function damageSourcePiece(source: DamageSource | undefined): PieceInstance | undefined {
+  return source && 'currentHp' in source ? source : undefined
+}
+
 export interface DamageRequest {
   readonly kind: 'damage'
-  readonly attacker: PieceInstance
+  readonly attacker: DamageSource
   readonly targets: readonly PieceInstance[]
   readonly baseDamage: number
   readonly damageType: EffectDamageType
@@ -124,7 +137,7 @@ export interface SummonRequest {
 
 export interface DeathCandidate {
   readonly piece: PieceInstance
-  readonly attacker?: PieceInstance
+  readonly attacker?: DamageSource
   readonly killerPlayerId?: string
   readonly skillId?: string
 }
@@ -137,7 +150,7 @@ export interface DeathRequest {
 export type EffectRequest = DamageRequest | HealRequest | SummonRequest | DeathRequest
 
 export interface DamageQueueRequest {
-  readonly attacker: PieceInstance
+  readonly attacker: DamageSource
   readonly target: PieceInstance | readonly PieceInstance[]
   readonly damage: number
   readonly damageType: EffectDamageType

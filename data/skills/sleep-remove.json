@@ -1,1 +1,13 @@
-{"id":"sleep-remove","name":"麻醉解除","description":"受到伤害时解除麻醉状态","kind":"passive","type":"normal","cooldownTurns":0,"maxCharges":0,"powerMultiplier":1,"actionPointCost":0,"code":"function executeSkill(context) { if (!context.piece) { return { message: '没有目标', success: false }; } let sleepStatusIndex = -1; if (context.piece.statusTags) { for (let i = 0; i < context.piece.statusTags.length; i++) { const tag = context.piece.statusTags[i]; if (typeof tag === 'object' && tag.type === 'sleep') { sleepStatusIndex = i; break; } } } if (sleepStatusIndex !== -1) { context.piece.statusTags.splice(sleepStatusIndex, 1); removeRuleById(context.piece.instanceId, 'rule-sleep-prevent-move'); removeRuleById(context.piece.instanceId, 'rule-sleep-prevent-skill'); removeRuleById(context.piece.instanceId, 'rule-sleep-remove-on-damage'); removeSkillById(context.piece.instanceId, 'sleep-prevent'); removeSkillById(context.piece.instanceId, 'sleep-remove'); return { message: context.piece.name + '受到伤害，麻醉状态解除', success: true }; } return { message: '目标未处于麻醉状态', success: false }; }","showInUI":false}
+{
+  "id": "sleep-remove",
+  "name": "麻醉解除",
+  "description": "受到伤害后，移除睡眠。",
+  "kind": "passive",
+  "type": "normal",
+  "cooldownTurns": 0,
+  "maxCharges": 0,
+  "powerMultiplier": 1,
+  "actionPointCost": 0,
+  "code": "function executeSkill(context) { if (!context.piece) { return { message: '没有目标', success: false }; } let sleepStatusIndex = -1; if (context.piece.statusTags) { for (let i = 0; i < context.piece.statusTags.length; i++) { const tag = context.piece.statusTags[i]; if (typeof tag === 'object' && tag.type === 'sleep') { sleepStatusIndex = i; break; } } } if (sleepStatusIndex !== -1) { context.piece.statusTags.splice(sleepStatusIndex, 1); removeRuleById(context.piece.instanceId, 'rule-sleep-prevent-move'); removeRuleById(context.piece.instanceId, 'rule-sleep-prevent-skill'); removeRuleById(context.piece.instanceId, 'rule-sleep-remove-on-damage'); removeSkillById(context.piece.instanceId, 'sleep-prevent'); removeSkillById(context.piece.instanceId, 'sleep-remove'); return { message: context.piece.name + '受到伤害，麻醉状态解除', success: true }; } return { message: '目标未处于麻醉状态', success: false }; }",
+  "showInUI": false
+}

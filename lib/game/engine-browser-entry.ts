@@ -99,4 +99,6 @@ export async function createInitialBattleForPlayers(
 export { DEFAULT_PIECES, getPieceById, getAllPieces, getPiecesByFaction } from './piece-repository'
 
 export { globalTriggerSystem } from './triggers'
+export { changePiecePositions } from './position-change'
+export { STATUS_DEFINITIONS, addPieceStatus, removePieceStatus, removePieceStatusSource } from './status-lifecycle'
 export { loadRuleById }

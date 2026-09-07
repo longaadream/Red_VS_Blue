@@ -61,6 +61,10 @@ function literalEventType(contextNode, initializers, seen = new Set()) {
       : null
     const initializer = unwrapExpression(property.initializer)
     if (name === 'type' && ts.isStringLiteralLike(initializer)) return initializer.text
+    if (name === 'type' && ts.isConditionalExpression(initializer)
+      && ts.isStringLiteralLike(initializer.whenTrue) && ts.isStringLiteralLike(initializer.whenFalse)) {
+      return [initializer.whenTrue.text, initializer.whenFalse.text]
+    }
   }
   return null
 }
@@ -79,7 +83,7 @@ for (const file of globSync('lib/game/**/*.ts')) {
       const contextNode = node.arguments[1]
       const event = literalEventType(contextNode, initializers)
       if (event) {
-        addEvidence(emitted, event, normalizedFile)
+        for (const name of Array.isArray(event) ? event : [event]) addEvidence(emitted, name, normalizedFile)
       } else {
         const { line } = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile))
         dynamicCalls.push({

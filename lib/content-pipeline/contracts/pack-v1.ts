@@ -76,6 +76,7 @@ export const PackFileMediaTypeV1Schema = z.enum([
   'application/json',
   'image/jpeg',
   'image/png',
+  'image/svg+xml',
   'image/webp',
 ])
 
@@ -92,6 +93,7 @@ function expectedMediaType(path: string): PackFileMediaTypeV1 | null {
   if (PackJsonPayloadPathV1Schema.safeParse(path).success) return 'application/json'
   if (/^images\/(?:[^/]+\/)*[^/]+\.(?:jpg|jpeg)$/.test(path)) return 'image/jpeg'
   if (/^images\/(?:[^/]+\/)*[^/]+\.png$/.test(path)) return 'image/png'
+  if (/^images\/(?:[^/]+\/)*[^/]+\.svg$/.test(path)) return 'image/svg+xml'
   if (/^images\/(?:[^/]+\/)*[^/]+\.webp$/.test(path)) return 'image/webp'
   return null
 }
@@ -100,7 +102,7 @@ export const PackPayloadPathV1Schema = PosixRelativePathV1Schema.superRefine((pa
   if (expectedMediaType(path) === null) {
     context.addIssue({
       code: z.ZodIssueCode.custom,
-      message: 'Payload path must be data/**/*.json or images/**/*.{jpg,jpeg,png,webp}',
+      message: 'Payload path must be data/**/*.json or images/**/*.{jpg,jpeg,png,svg,webp}',
     })
   }
 })

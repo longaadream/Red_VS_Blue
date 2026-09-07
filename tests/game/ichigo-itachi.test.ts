@@ -125,13 +125,13 @@ describe('RED-120 character data contract', () => {
     })
 
     const expected = {
-      'ichigo-zangetsu': ['选择相邻的一个敌人，造成100%攻击力的物理伤害。', 1, 1],
-      'ichigo-getsuga-tensho': ['向同一行或同一列的一个方向发射弹射物，对路径上的第一个敌人造成150%攻击力的魔法伤害。', 2, 1],
-      'ichigo-bankai-tensa-zangetsu': ['攻击力+1、移动值+2并获得1点临时行动点，失去【月牙天冲】，获得初始冷却为0的【黑色月牙天冲】。', 0, 0],
-      'ichigo-black-getsuga-tensho': ['向同一行或同一列的一个方向发射弹射物，对路径上的所有敌人造成200%攻击力的魔法伤害；命中后，可以传送至第一个被命中敌人相邻的一个空格。', 2, 1],
-      'itachi-tsukuyomi': ['选择6格内的一个敌人，使其下一个使用的技能额外增加1回合冷却。', 0, 1],
-      'itachi-amaterasu': ['选择5格内的一个敌人，将其所在格变为天照地格，并使其获得1层天照。', 2, 2],
-      'itachi-totsuka-blade': ['万花筒。选择3格内的一个敌人，造成200%攻击力的魔法伤害，并使其所有主动技能进入1回合冷却。', 2, 2],
+      'ichigo-zangetsu': ['对本棋子相邻的1个敌方棋子造成等同于本棋子攻击力的物理伤害。', 1, 1],
+      'ichigo-getsuga-tensho': ['向同一行或同一列的1个方向发射弹射物，对路径上的第1个敌方棋子造成等同于本棋子攻击力150%的法术伤害。', 2, 1],
+      'ichigo-bankai-tensa-zangetsu': ['攻击力+1、移动力+2并获得1临时行动点，失去【月牙天冲】，获得初始冷却为0的【黑色月牙天冲】。', 0, 0],
+      'ichigo-black-getsuga-tensho': ['向同一行或同一列的1个方向发射弹射物，对路径上的所有敌方棋子造成等同于本棋子攻击力200%的法术伤害；命中后，可以传送至第1个被命中敌方棋子相邻的1个空格。', 2, 1],
+      'itachi-tsukuyomi': ['选择6格内的1个敌方棋子，使其下1个使用的技能额外增加1回合冷却。', 0, 1],
+      'itachi-amaterasu': ['选择5格内的1个敌方棋子，将其所在格变为天照地格，并使其获得1层天照。', 2, 2],
+      'itachi-totsuka-blade': ['万花筒。选择3格内的1个敌方棋子，造成等同于本棋子攻击力200%的法术伤害，并使其所有主动技能进入1回合冷却。', 2, 2],
     } as const
     for (const [id, [description, ap, cooldown]] of Object.entries(expected)) {
       const skill = loadSkill(id)
@@ -332,7 +332,7 @@ describe('RED-120 Ichigo combat behavior', () => {
     expect(first.currentHp).toBe(25)
 
     executeDirect(loadSkill('ichigo-getsuga-tensho'), state, ichigo, null, { x: 4, y: 0 })
-    expect(first.currentHp).toBe(17)
+    expect(first.currentHp).toBe(18) // floor(5 * 1.5) = 7
     expect(second.currentHp).toBe(30)
   })
 
@@ -352,7 +352,7 @@ describe('RED-120 Ichigo combat behavior', () => {
     state = runBattleAction(state, selectedAction(state, {
       type: 'useBasicSkill', playerId: 'player-red', pieceId: 'ichigo', skillId: 'ichigo-getsuga-tensho',
     }, { x: 5, y: 1 }), { rootSeed: ROOT_SEED }).state
-    expect(state.pieces.find(piece => piece.instanceId === 'enemy')?.currentHp).toBe(42)
+    expect(state.pieces.find(piece => piece.instanceId === 'enemy')?.currentHp).toBe(43)
 
     state = runBattleAction(state, {
       type: 'useChargeSkill', playerId: 'player-red', pieceId: 'ichigo', skillId: 'ichigo-bankai-tensa-zangetsu',
@@ -367,7 +367,7 @@ describe('RED-120 Ichigo combat behavior', () => {
     state = runBattleAction(state, selectedAction(state, {
       type: 'useBasicSkill', playerId: 'player-red', pieceId: 'ichigo', skillId: 'ichigo-black-getsuga-tensho',
     }, { x: 5, y: 1 }), { rootSeed: ROOT_SEED }).state
-    expect(state.pieces.find(piece => piece.instanceId === 'enemy')?.currentHp).toBe(42)
+    expect(state.pieces.find(piece => piece.instanceId === 'enemy')?.currentHp).toBe(43)
     expect(state.players[0].actionPoints).toBe(2)
     expect(state.pieces.find(piece => piece.instanceId === 'ichigo')?.skills[0]).toMatchObject({
       skillId: 'ichigo-black-getsuga-tensho', currentCooldown: 0,
@@ -381,7 +381,7 @@ describe('RED-120 Ichigo combat behavior', () => {
     } as BattleAction, { rootSeed: ROOT_SEED }).state
     expect(state.pendingTargetSelection).toBeUndefined()
     expect(state.pieces.find(piece => piece.instanceId === 'ichigo')).toMatchObject({ x: 0, y: 1 })
-    expect(state.pieces.find(piece => piece.instanceId === 'enemy')?.currentHp).toBe(30)
+    expect(state.pieces.find(piece => piece.instanceId === 'enemy')?.currentHp).toBe(31)
     expect(state.players[0].actionPoints).toBe(0)
     expect(state.pieces.find(piece => piece.instanceId === 'ichigo')?.skills[0].currentCooldown).toBe(1)
     expect(state.extensions?.ichigoBlackGetsugaTeleportByCaster).toBeUndefined()

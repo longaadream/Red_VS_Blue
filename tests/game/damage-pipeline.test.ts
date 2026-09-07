@@ -473,9 +473,11 @@ describe('RED-33 deterministic damage pipeline', () => {
     ])
   })
 
-  it('keeps lethal interception out of death, graveyard, and kill-charge processing', () => {
+  it('completes covenant death before reviving with initial attributes', () => {
     const attacker = makePiece({ instanceId: 'lich-attacker', ownerPlayerId: 'player-red' }) as any
-    const defender = makePiece({ instanceId: 'lich-defender', ownerPlayerId: 'player-blue', currentHp: 5, maxHp: 40, attack: 10 }) as any
+    const defender = makePiece({ instanceId: 'lich-defender', ownerPlayerId: 'player-blue', x: 2, currentHp: 5, maxHp: 40, attack: 10 }) as any
+    defender.isCore = true
+    defender.initialDefinition = { stats: { maxHp: 40, attack: 5, defense: 0, moveRange: 3 }, skills: [], rules: [], statusTags: [] }
     defender.statusTags = [{ id: 'lich-covenant', type: 'lich-covenant', intensity: 1 }]
     defender.skills = [{ skillId: 'matrix-cooldown', currentCooldown: 3 }]
     defender.rules = [requiredRule('rule-arthas-lich-covenant')]
@@ -483,10 +485,13 @@ describe('RED-33 deterministic damage pipeline', () => {
 
     const result = dealDamage(attacker, defender, 99, 'true', state, 'lich-intercept')
 
-    expect(result).toMatchObject({ success: false, damage: 0, blocked: true, isKilled: false, targetHp: 40 })
-    expect(state.graveyard).toEqual([])
+    expect(result).toMatchObject({ success: true, damage: 5, resolvedDamage: 99, blocked: false, isKilled: true, targetHp: 0 })
+    expect(state.graveyard).toEqual([defender])
     expect(state.players.find((player: any) => player.playerId === 'player-red').chargePoints).toBe(0)
-    expect(defender.statusTags).toEqual([expect.objectContaining({ type: 'undead-body' })])
+    const revived = state.pieces.find((piece: any) => piece.instanceId !== attacker.instanceId)
+    expect(revived).toMatchObject({ isCore: true, currentHp: 40, attack: 7 })
+    expect(revived.statusTags).toEqual([expect.objectContaining({ type: 'undead-body' })])
+    expect(state.actions.some((entry: any) => entry.type === 'chargeCrystalDropped')).toBe(true)
   })
 
   it('rejects attempts to revive a finalized candidate inside onPieceDied', () => {

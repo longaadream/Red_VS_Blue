@@ -3,8 +3,10 @@
   "name": "回溯触发（回合结束）",
   "description": "对手回合结束时，强制触发回溯。",
   "keywords": [],
-  "targetText": "自身",
-  "effectTags": ["回溯"],
+  "targetText": "本棋子",
+  "effectTags": [
+    "回溯"
+  ],
   "kind": "passive",
   "type": "normal",
   "cooldownTurns": 0,

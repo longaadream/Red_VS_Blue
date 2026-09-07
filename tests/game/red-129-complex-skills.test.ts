@@ -425,7 +425,7 @@ describe('RED-129 authoritative complex skill behavior', () => {
     const result = runBattleAction(state, action, { rootSeed: ROOT_SEED }).state
 
     expect(result.pieces.find(piece => piece.instanceId === 'doomfist')).toMatchObject({ x: 2, y: 1 })
-    expect(result.pieces.find(piece => piece.instanceId === 'first')?.currentHp).toBe(12)
+    expect(result.pieces.find(piece => piece.instanceId === 'first')?.currentHp).toBe(13) // floor(3 * 2.5) = 7
     expect(result.pieces.find(piece => piece.instanceId === 'behind')?.currentHp).toBe(20)
   })
 

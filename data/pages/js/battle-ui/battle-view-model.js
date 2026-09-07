@@ -117,7 +117,8 @@
     const ownerPlayerId = String(piece.ownerPlayerId || '')
     const statuses = normalizeStatuses(
       piece,
-      piece.displayStatusTags !== undefined ? piece.displayStatusTags : piece.statusTags,
+      master && piece.displayStatusTags !== undefined ? master.statusTags :
+        piece.displayStatusTags !== undefined ? piece.displayStatusTags : piece.statusTags,
     )
     return {
       id: String(piece.instanceId || piece.id || ''),

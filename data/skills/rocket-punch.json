@@ -1,7 +1,7 @@
 {
   "id": "rocket-punch",
   "name": "火箭重拳",
-  "description": "向同一行或同一列冲刺最多5格，对路径上的敌人造成等同攻击力250%的物理伤害，并停在第一个敌人或障碍前。",
+  "description": "选择同一行或同一列的方向，冲刺最多5格，在遇到的首个棋子或障碍前停下。若该棋子为敌方棋子，对其造成等同于本棋子攻击力250%的物理伤害。",
   "keywords": [],
   "targetText": "同一行或同一列的1个地格",
   "effectTags": [
@@ -15,8 +15,8 @@
   "maxCharges": 0,
   "powerMultiplier": 2.5,
   "actionPointCost": 2,
-  "code": "function executeSkill(context) { var source = context.piece; var pos = selectTarget({ type: 'grid', range: 5, filter: 'all' }); if (!pos || pos.needsTargetSelection) return pos; var dx = pos.x - source.x; var dy = pos.y - source.y; if ((dx !== 0 && dy !== 0) || (dx === 0 && dy === 0)) return { success: false, message: '目标必须与末日铁拳在同一行或同一列' }; var direction = { x: dx === 0 ? 0 : (dx > 0 ? 1 : -1), y: dy === 0 ? 0 : (dy > 0 ? 1 : -1) }; var finalX = source.x; var finalY = source.y; var hit = null; for (var step = 1; step <= 5; step++) { var x = source.x + direction.x * step; var y = source.y + direction.y * step; var tile = battle.map.tiles.find(function(item) { return item.x === x && item.y === y; }); if (!tile || !tile.props || !tile.props.walkable) break; var occupant = battle.pieces.find(function(piece) { return piece.currentHp > 0 && piece.instanceId !== source.instanceId && piece.x === x && piece.y === y; }); if (occupant) { if (occupant.ownerPlayerId !== source.ownerPlayerId) hit = occupant; break; } finalX = x; finalY = y; } source.x = finalX; source.y = finalY; var message = source.name + '使用火箭重拳冲刺至(' + finalX + ',' + finalY + ')'; if (hit) { var damage = Math.round(source.attack * context.skill.powerMultiplier); var result = dealDamage(source, hit, damage, 'physical', battle, context.skill.id); message += '，对' + hit.name + '造成' + result.damage + '点物理伤害'; } return { success: true, message: message }; }",
-  "previewCode": "function calculatePreview(piece, skillDef) { var damage = Math.round(piece.attack * skillDef.powerMultiplier); return { description: '向直线方向冲刺最多5格，对首个路径敌人造成' + damage + '点物理伤害。', expectedValues: { damage: damage, range: 5 } }; }",
+  "code": "function executeSkill(context) { var source = context.piece; var pos = selectTarget({ type: 'grid', range: 5, filter: 'all' }); if (!pos || pos.needsTargetSelection) return pos; var dx = pos.x - source.x; var dy = pos.y - source.y; if ((dx !== 0 && dy !== 0) || (dx === 0 && dy === 0)) return { success: false, message: '目标必须与末日铁拳在同一行或同一列' }; var direction = { x: dx === 0 ? 0 : (dx > 0 ? 1 : -1), y: dy === 0 ? 0 : (dy > 0 ? 1 : -1) }; var finalX = source.x; var finalY = source.y; var hit = null; for (var step = 1; step <= 5; step++) { var x = source.x + direction.x * step; var y = source.y + direction.y * step; var tile = battle.map.tiles.find(function(item) { return item.x === x && item.y === y; }); if (!tile || !tile.props || !tile.props.walkable) break; var occupant = battle.pieces.find(function(piece) { return piece.currentHp > 0 && piece.instanceId !== source.instanceId && piece.x === x && piece.y === y; }); if (occupant) { if (occupant.ownerPlayerId !== source.ownerPlayerId) hit = occupant; break; } finalX = x; finalY = y; } source.x = finalX; source.y = finalY; var message = source.name + '使用火箭重拳冲刺至(' + finalX + ',' + finalY + ')'; if (hit) { var damage = Math.floor(source.attack * context.skill.powerMultiplier); var result = dealDamage(source, hit, damage, 'physical', battle, context.skill.id); message += '，对' + hit.name + '造成' + result.damage + '点物理伤害'; } return { success: true, message: message }; }",
+  "previewCode": "function calculatePreview(piece, skillDef) { var damage = Math.floor(piece.attack * skillDef.powerMultiplier); return { description: \"选择直线方向，冲刺最多5格，在首个棋子或障碍前停下。若该棋子为敌方棋子，对其造成\" + damage + '点物理伤害。', expectedValues: { damage: damage, range: 5 } }; }",
   "range": "single",
   "targeting": {
     "steps": [

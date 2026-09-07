@@ -1,0 +1,21 @@
+{
+  "passed": true,
+  "artifact": "C:\\Users\\lngsc\\Documents\\Red_VS_Blue\\skillcode-spike\\dist\\editor\\win-unpacked\\RED vs BLUE Editor.exe",
+  "visualSkillLevelSaved": true,
+  "visualKeywordsSavedAndReopened": true,
+  "statusTagObjectPreserved": true,
+  "unknownFieldsPreserved": true,
+  "jsonToVisualSync": true,
+  "taskCreation": "UI",
+  "actualDiff": true,
+  "checkCommandPassed": true,
+  "invalidJsonCommandRejected": true,
+  "staleEvidenceInvalidated": true,
+  "feedbackBoundToVersion": true,
+  "candidateImmutable": true,
+  "runtimeVerified": false,
+  "scenariosExecuted": false,
+  "visualRulesSavedAndReopened": true,
+  "ruleRemovalPreservesPlayerRules": true,
+  "relatedRuleNavigation": true
+}

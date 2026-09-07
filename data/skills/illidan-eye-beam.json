@@ -1,10 +1,13 @@
 {
   "id": "illidan-eye-beam",
   "name": "眼棱",
-  "description": "对4格内1个敌方棋子造成100%攻击力的魔法伤害，并治疗自身等量生命。",
+  "description": "对本棋子4格内1个敌方棋子造成等同于本棋子攻击力的法术伤害，并使本棋子恢复等量生命。",
   "keywords": [],
   "targetText": "4格内1个敌方棋子",
-  "effectTags": ["damage", "recovery"],
+  "effectTags": [
+    "damage",
+    "recovery"
+  ],
   "icon": "👁️",
   "kind": "active",
   "type": "normal",
@@ -13,6 +16,6 @@
   "powerMultiplier": 1,
   "actionPointCost": 1,
   "code": "function executeSkill(context) { var caster = context.piece; var target = selectTarget({ type: 'piece', range: 4, filter: 'enemy' }); if (!target || target.needsTargetSelection) return target; var dmgResult = dealDamage(caster, target, caster.attack, 'magical', battle, context.skill.id); var actualDamage = dmgResult.damage || 0; var healResult = healDamage(caster, caster, actualDamage, battle, context.skill.id); return { success: true, message: caster.name + '释放眼棱，对' + target.name + '造成' + actualDamage + '点伤害并恢复' + healResult.heal + '点生命值' }; }",
-  "previewCode": "function calculatePreview(piece, skillDef) { return { description: '对4格内1个敌方棋子造成' + piece.attack + '点魔法伤害，并治疗自身等量生命。', expectedValues: { damage: piece.attack, heal: piece.attack } }; }",
+  "previewCode": "function calculatePreview(piece, skillDef) { return { description: '对4格内1个敌方棋子造成' + piece.attack + \"点法术伤害，并治疗本棋子等量生命。\", expectedValues: { damage: piece.attack, heal: piece.attack } }; }",
   "range": "single"
 }

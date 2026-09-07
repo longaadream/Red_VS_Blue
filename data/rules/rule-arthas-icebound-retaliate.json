@@ -1,0 +1,9 @@
+{
+  "id": "rule-arthas-icebound-retaliate",
+  "name": "寒冰坚忍·反冻",
+  "description": "寒冰坚忍受到实际伤害后，冰冻造成伤害的敌方棋子1回合。",
+  "trigger": {
+    "type": "afterDamageTaken"
+  },
+  "skillCode": "var defender = context.rulePiece; if (!defender || !context.piece || context.piece.instanceId !== defender.instanceId || !(context.damage > 0) || !defender.statusTags.some(function(t) { return t.type === 'icebound-fortitude'; })) return { success: false, message: '' }; var attacker = context.targetPiece; if (!attacker || attacker.currentHp <= 0 || attacker.ownerPlayerId === defender.ownerPlayerId || !battle.pieces.some(function(p) { return p.instanceId === attacker.instanceId; })) return { success: false, message: '' }; addStatusEffectById(attacker.instanceId, { id: 'icebound-freeze-' + attacker.instanceId, name: '冰冻', type: 'freeze', currentDuration: 1, intensity: 1, relatedRules: ['rule-freeze-prevent-move', 'rule-freeze-prevent-skill'] }); addRuleById(attacker.instanceId, 'rule-freeze-prevent-move'); addRuleById(attacker.instanceId, 'rule-freeze-prevent-skill'); return { success: true, message: attacker.name + '被寒冰坚忍冰冻1回合' };"
+}

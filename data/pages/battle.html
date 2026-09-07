@@ -2916,7 +2916,10 @@
       return currentCost === baseCost ? String(currentCost) : currentCost + '/' + baseCost
     }
     function pieceDispTags(p) {
-      // Shadow clones keep a summon-time display snapshot only; real rules still read statusTags.
+      // Display mirrors the living source; actual rules always read the clone's own statusTags.
+      const master = p.displayStatusTags !== undefined && p.masterPieceId && G && G.pieces &&
+        G.pieces.find(candidate => candidate.instanceId === p.masterPieceId && candidate.currentHp > 0)
+      if (master) return (master.statusTags || []).filter(tag => tag.visible !== false)
       return p.displayStatusTags !== undefined ? p.displayStatusTags : (p.statusTags || [])
     }
     function pieceHasVisibleStatusTag(piece, statusId) {

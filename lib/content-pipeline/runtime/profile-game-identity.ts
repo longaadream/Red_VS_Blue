@@ -2,7 +2,8 @@ import type { ProfileReferenceV1 } from './profile-store'
 import { getRuntimeProfileReferenceV1 } from './profile-runtime'
 
 export const GAME_PROFILE_IDENTITY_SCHEMA_V1 = 'rvb-game-profile-identity/v1' as const
-export const BATTLE_RUNNER_REVISION_V1 = 'rvb-battle-runner/v1' as const
+import { BATTLE_RUNNER_REVISION_V1 } from '../../game/rule-version'
+export { BATTLE_RUNNER_REVISION_V1 }
 
 const SHA256_HEX = /^[a-f0-9]{64}$/
 const IDENTITY_KEYS = [

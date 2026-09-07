@@ -1,7 +1,7 @@
 {
   "id": "venom-corrosion",
   "name": "腐蚀",
-  "description": "毒液每次更改敌方位置时，使其定身1回合。",
+  "description": "本棋子改变敌方棋子的位置时，使其获得定身，持续1回合。",
   "keywords": [
     "定身"
   ],

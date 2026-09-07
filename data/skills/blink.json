@@ -1,10 +1,12 @@
 {
   "id": "blink",
   "name": "闪现",
-  "description": "传送到5x5范围内1个空地格。",
+  "description": "传送到5×5范围内1个空地格。",
   "keywords": [],
-  "targetText": "5x5范围内1个空地格",
-  "effectTags": ["位移"],
+  "targetText": "5×5范围内1个空地格",
+  "effectTags": [
+    "位移"
+  ],
   "icon": "✨",
   "kind": "active",
   "type": "normal",
@@ -14,7 +16,15 @@
   "actionPointCost": 1,
   "targeting": {
     "steps": [
-      { "kind": "target", "type": "grid", "filter": "all", "range": 2, "distanceMetric": "chebyshev", "requireWalkable": true, "requireUnoccupied": true }
+      {
+        "kind": "target",
+        "type": "grid",
+        "filter": "all",
+        "range": 2,
+        "distanceMetric": "chebyshev",
+        "requireWalkable": true,
+        "requireUnoccupied": true
+      }
     ]
   },
   "range": "single",

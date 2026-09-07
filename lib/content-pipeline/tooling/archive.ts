@@ -58,6 +58,7 @@ function mediaType(relativePath: string): PackFileMediaTypeV1 {
   const extension = path.extname(relativePath).toLowerCase()
   if (extension === '.json') return 'application/json'
   if (extension === '.png') return 'image/png'
+  if (extension === '.svg') return 'image/svg+xml'
   if (extension === '.webp') return 'image/webp'
   if (extension === '.jpg' || extension === '.jpeg') return 'image/jpeg'
   throw new ContentToolingRefusalErrorV1(

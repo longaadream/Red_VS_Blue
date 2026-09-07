@@ -1,7 +1,7 @@
 import fs from 'fs'
 import path from 'path'
 import type { TriggerRule } from './triggers'
-import { executeSkillFunction } from './skills'
+import { executeSkillFunction, createSkillCodeFlow } from './skills'
 import { dynamicCodeRuntime } from './dynamic-code-runtime'
 import { getRuleDate, getRuleMath } from './rule-runtime'
 import { manhattanDistance } from './spatial'
@@ -380,7 +380,7 @@ export function convertToTriggerRule(ruleDef: RuleDefinition): TriggerRule {
                 }
 
                 // 执行技能代码
-                const skillResult = executeSkillFunction(skillDef, skillContext, battle)
+                const skillResult = executeSkillFunction(skillDef, skillContext, battle, { context, surface: 'triggerSkill' })
                 if (skillResult.success) {
                   message = skillResult.message || resolveMessage(effect.message, context)
                   success = true
@@ -415,11 +415,11 @@ export function convertToTriggerRule(ruleDef: RuleDefinition): TriggerRule {
                     playerId: context.playerId
                   }
                   const skillCode = skillDef.code
-                  const executeRuleSkill = dynamicCodeRuntime.compileExpression<(context: unknown, math: Math, date: DateConstructor) => { success?: boolean; message?: string }>({
+                  const executeRuleSkill = dynamicCodeRuntime.compileExpression<(context: unknown, math: Math, date: DateConstructor, flow: unknown) => { success?: boolean; message?: string }>({
                     surface: 'ruleTriggerSkill', contentId: effect.skillId,
-                    code: `(function(context, Math, Date) { ${skillCode}; return executeSkill(context); })`, entry: 'executeSkill(context)',
+                    code: `(function(context, Math, Date, flow) { ${skillCode}; return executeSkill(context); })`, entry: 'executeSkill(context)',
                   })
-                  const skillResult = executeRuleSkill(playerSkillContext, getRuleMath(), getRuleDate())
+                  const skillResult = executeRuleSkill(playerSkillContext, getRuleMath(), getRuleDate(), createSkillCodeFlow(battle, context, 'triggerSkill'))
                   if (skillResult?.success) {
                     message = skillResult.message || resolveMessage(effect.message, context)
                     success = true

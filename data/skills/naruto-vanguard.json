@@ -1,9 +1,12 @@
 {
   "id": "naruto-vanguard",
   "name": "率先出阵",
-  "description": "当阵容中有鸣人时，鸣人首先上场。",
+  "description": "当阵容中有本棋子时，本棋子首先上场。",
+  "passiveTraits": [
+    "opening-vanguard"
+  ],
   "keywords": [],
-  "targetText": "自身",
+  "targetText": "本棋子",
   "effectTags": [
     "部署"
   ],

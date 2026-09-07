@@ -134,7 +134,8 @@
       "rule-turalyon-lightforged-march",
       "rule-ulquiorra-damage-dealt",
       "rule-ulquiorra-damage-taken",
-      "rule-ulquiorra-resurreccion"
+      "rule-ulquiorra-resurreccion",
+      "rule-arthas-lich-covenant"
     ]
   },
   "evaluatorRequired": {

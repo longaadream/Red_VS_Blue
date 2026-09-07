@@ -26,6 +26,10 @@ function writeLog(message: string) {
 
 // 重新导出类型，保持向后兼容
 import type { BoardMap } from "./map"
+import { expireOwnerStatuses } from './status-lifecycle'
+import { statusEventSink, expirePlayerStatuses, addStatusWithEvents, addPlayerStatusWithEvents, createSkillCodeFlow } from './skills'
+import { changePiecePositions, type PiecePositionChange } from './position-change'
+import type { PositionChangeKind } from './spatial'
 import {
   DEPLOYMENT_FIRST_MOVE_FREE_STATUS,
   type PieceInstance,
@@ -339,6 +343,8 @@ export interface PerTurnActionFlags {
 }
 
 export interface TurnState {
+  /** Persisted stage checkpoint: deployment/pending resumes cannot refresh twice. */
+  refreshedAtTurn?: number
   /** 当前处于回合中的玩家 */
   currentPlayerId: PlayerId
   /** 当前是第几个整回合（从 1 开始） */
@@ -1022,6 +1028,10 @@ function validateSkillActionBasics(
     }
   }
   validateDeclaredSkillTarget(state, piece, skillDef, action)
+  if (skillDef.usesPerBattle != null
+    && (piece.limitedSkillUses?.[skillId] ?? skillDef.usesPerBattle) <= 0) {
+    throw new BattleRuleError(`Skill ${skillId} has exhausted its per-battle uses`)
+  }
   return skillDef
 }
 
@@ -1038,6 +1048,13 @@ function applySkillPayment(
 
   if (chargeCost > 0) {
     playerMeta.chargePoints -= chargeCost
+  }
+
+  if (skillDef.type === 'ultimate' || skillDef.usesPerBattle != null) {
+    piece.limitedSkillUses ??= {}
+    const remaining = piece.limitedSkillUses[skillId] ?? skillDef.usesPerBattle
+      ?? piece.skills?.find(skill => skill.skillId === skillId)?.usesRemaining ?? 1
+    piece.limitedSkillUses[skillId] = Math.max(0, remaining - 1)
   }
 
   if (skillDef.cooldownTurns > 0 || skillDef.type === "ultimate") {
@@ -2330,6 +2347,18 @@ function applyBattleActionInternal(
         // consume its random stream after either side has lost its last core.
         if (finalizeBattleTerminal(next, action)) return next
 
+        // Refresh precedes deployment and begin effects; checkpoint survives pending.
+        if (next.turn.refreshedAtTurn !== next.turn.turnNumber) {
+          getActiveTriggerSystem().updateCooldowns()
+          for (const piece of next.pieces) {
+            if (!isSamePlayer(piece.ownerPlayerId, next.turn.currentPlayerId)) continue
+            for (const skill of piece.skills ?? []) {
+              if ((skill.currentCooldown ?? 0) > 0) skill.currentCooldown!--
+            }
+          }
+          next.turn.refreshedAtTurn = next.turn.turnNumber
+        }
+
         if (!continuation.skipProgressiveDeployment
           && startProgressiveDeploymentTurn(next)) {
           return next
@@ -2365,28 +2394,6 @@ function applyBattleActionInternal(
           pendingAction: { type: 'beginPhase', __pendingContinuationMode: 'beginPhaseAfterTrigger' },
         })) return next
         }
-
-        // 更新冷却
-        getActiveTriggerSystem().updateCooldowns();
-
-        // 行动点已经在回合切换时设置，这里不再重复增加
-        // 确保当前玩家有行动点属性
-        const currentPlayerMeta = next.players.find(p => p.playerId === next.turn.currentPlayerId)
-        if (currentPlayerMeta) {
-          battleDebugLog(`Player ${currentPlayerMeta.playerId} has ${currentPlayerMeta.actionPoints}/${currentPlayerMeta.maxActionPoints} action points for this turn`)
-        }
-
-        // 更新当前玩家棋子技能的冷却时间
-        next.pieces.forEach(piece => {
-          // 只减少当前玩家棋子的技能冷却
-          if (isSamePlayer(piece.ownerPlayerId, next.turn.currentPlayerId) && piece.skills) {
-            piece.skills.forEach(skill => {
-              if (skill.currentCooldown && skill.currentCooldown > 0) {
-                skill.currentCooldown--
-              }
-            })
-          }
-        })
 
         // 触发whenever规则（每一步行动后检测）
         const wheneverResult = getActiveTriggerSystem().checkTriggers(next, {
@@ -2425,7 +2432,7 @@ function applyBattleActionInternal(
 
           // 熔岩伤害：调用 dealDamage（true 伤害），完整联动触发器和护盾等效果
           if (tile.props.damagePerTurn && tile.props.damagePerTurn > 0) {
-            dealDamage(piece, piece, tile.props.damagePerTurn, "true", next, "lava-terrain")
+            dealDamage({ kind: 'environment', instanceId: 'lava-terrain', ownerPlayerId: 'neutral', name: '熔岩' }, piece, tile.props.damagePerTurn, "true", next, "lava-terrain")
           }
 
           // 治愈泉回复：调用 healDamage，完整联动触发器和反治疗等效果
@@ -2606,8 +2613,8 @@ function applyBattleActionInternal(
       }
 
       // 触发器可能修改了目标位置，使用修改后的值
-      const finalToX = moveContext.targetX;
-      const finalToY = moveContext.targetY;
+      let finalToX = moveContext.targetX;
+      let finalToY = moveContext.targetY;
 
       validateMove(next, piece, finalToX, finalToY)
 
@@ -2625,8 +2632,9 @@ function applyBattleActionInternal(
       const fromY = piece.y
 
       // 执行移动（使用触发器可能修改后的目标位置）
-      piece.x = finalToX
-      piece.y = finalToY
+      changePiecePositions(next, [{ pieceId: piece.instanceId, x: finalToX, y: finalToY }], 'walk')
+      finalToX = piece.x!
+      finalToY = piece.y!
       
       // 消耗行动点
       if (!deploymentFirstMoveFree) playerMeta.actionPoints -= 1
@@ -3403,57 +3411,9 @@ function applyBattleActionInternal(
       // Clear every storage location before handing authority to the next turn.
       clearDeploymentFirstMoveFree(next)
 
-      // 在回合结束阶段的最后时刻，处理当前玩家棋子的状态效果持续时间扣除和规则移除
-      next.pieces.forEach(piece => {
-        // 只处理当前玩家棋子的状态效果
-        if (isSamePlayer(piece.ownerPlayerId, action.playerId) && piece.statusTags) {
-          // 遍历所有状态标签
-          for (let i = piece.statusTags.length - 1; i >= 0; i--) {
-            const statusTag = piece.statusTags[i];
-            // 检查状态标签是否有持续时间属性（支持 currentDuration 和 remainingDuration）
-            const currentDuration = statusTag.remainingDuration ?? statusTag.currentDuration;
-            if (currentDuration !== undefined && currentDuration > 0) {
-              // 减少持续时间
-              const newDuration = currentDuration - 1;
-              if (statusTag.remainingDuration !== undefined) {
-                statusTag.remainingDuration = newDuration;
-              } else {
-                statusTag.currentDuration = newDuration;
-              }
-              // 如果持续时间为0，清除状态标签
-              if (newDuration === 0) {
-                
-                // 检查并清理相关规则
-                if (statusTag.relatedRules && statusTag.relatedRules.length > 0) {
-                  statusTag.relatedRules.forEach(ruleId => {
-                    // 检查是否有其他状态标签关联此规则
-                    let hasOtherRelatedStatus = false;
-                    
-                    piece.statusTags.forEach(otherStatusTag => {
-                      if (otherStatusTag !== statusTag && 
-                          otherStatusTag.relatedRules && 
-                          otherStatusTag.relatedRules.includes(ruleId)) {
-                        hasOtherRelatedStatus = true;
-                      }
-                    });
-                    
-                    // 如果没有其他状态标签关联此规则，移除规则
-                    if (!hasOtherRelatedStatus && piece.rules) {
-                      const ruleIndex = piece.rules.findIndex(rule => rule.id === ruleId);
-                      if (ruleIndex !== -1) {
-                        piece.rules.splice(ruleIndex, 1);
-                      }
-                    }
-                  });
-                }
-                
-                // 从状态标签数组中移除
-                piece.statusTags.splice(i, 1);
-              }
-            }
-          }
-        }
-      });
+      // All end triggers and their chains settle before expiry.
+      expireOwnerStatuses(next, action.playerId, statusEventSink(next))
+      expirePlayerStatuses(next, action.playerId)
 
       const endingPlayer = next.players.find(
         player => isSamePlayer(player.playerId, action.playerId),
@@ -3567,7 +3527,7 @@ function applyBattleActionInternal(
           throw new BattleRuleError('[STAGE6] effectCode did not compile to a function, got: ' + typeof fn)
         }
         try {
-          result = fn({
+          const pendingContext = {
             battle: next,
             playerId: action.playerId,
             targetPiece,
@@ -3575,7 +3535,16 @@ function applyBattleActionInternal(
             targetY: y,
             pending: resolvedPending,
             payload: pending.payload,
-          }) || { success: true }
+            addStatusEffectById: (pieceId: string, status: PieceStatusTag) => addStatusWithEvents(next, pieceId, status),
+            addPlayerStatusEffectById: (playerId: string, status: PieceStatusTag) => addPlayerStatusWithEvents(next, playerId, status),
+            changePositions: (changes: PiecePositionChange[], kind: PositionChangeKind) => changePiecePositions(next, changes, kind),
+          }
+          result = fn({ ...pendingContext, flow: createSkillCodeFlow(next, {
+            ...pendingContext, type: 'pendingEffect',
+            rulePiece: next.pieces.find(p => p.instanceId === pending.source?.pieceId),
+            sourcePiece: next.pieces.find(p => p.instanceId === pending.triggerContext?.sourcePiece?.instanceId),
+            triggerPlayerId: pending.triggerContext?.triggerPlayerId ?? pending.triggerContext?.playerId,
+          }, 'pending') }) || { success: true }
         } catch (execErr) {
           if (isEffectChainPendingSignal(execErr)) throw execErr
           throw new BattleRuleError('[STAGE6] effectCode execution error: ' + (execErr instanceof Error ? execErr.message : String(execErr)))

@@ -40,12 +40,28 @@ export interface SpatialPiece {
     type?: string
     grantedTurnNumber?: unknown
     currentUses?: unknown
+    blocksForcedMovement?: unknown
   }>
 }
 
 export interface SpatialBattleState {
+  extensions?: { tileEffects?: Array<{ type?: string; x?: number; y?: number; blocksLanding?: boolean }>; [key: string]: unknown }
   map: SpatialMap
   pieces: readonly SpatialPiece[]
+}
+
+export type PositionChangeKind = 'walk' | 'dash' | 'teleport' | 'push' | 'pull' | 'swap'
+
+/** Leaving play and entering play are lifecycle operations, not board movement. */
+export function getPositionChangeRejection(piece: SpatialPiece, kind: PositionChangeKind): string | null {
+  const tags = Array.isArray(piece.statusTags) ? piece.statusTags : []
+  if (tags.some(tag => tag.type === 'imprisoned' || tag.blocksForcedMovement === true)) {
+    return '棋子被禁锢，不能改变棋盘位置'
+  }
+  if (kind === 'walk' && tags.some(tag => tag.type === 'root')) {
+    return '棋子被定身，不能主动走格'
+  }
+  return null
 }
 
 /**
@@ -88,6 +104,7 @@ export interface NormalMoveActionState extends SpatialBattleState {
 }
 
 export type NormalMoveRejectionCode =
+  | 'movement-restricted'
   | 'piece-not-on-board'
   | 'target-outside-board'
   | 'not-orthogonal'
@@ -211,10 +228,18 @@ export function isLegalSkillLanding(
   position: GridPosition,
   options: SkillLandingOptions = {},
 ): boolean {
+  if ((options.movingPieceIds ?? []).some(id => {
+    const piece = state.pieces.find(candidate => candidate.instanceId === id)
+    return piece && getPositionChangeRejection(piece, 'teleport') !== null
+  })) return false
   const tile = state.map.tiles.find(candidate => candidate.x === position.x && candidate.y === position.y)
   if (!tile?.props?.walkable) return false
 
   const reserved = new Set((options.reservedCells ?? []).map(gridPositionKey))
+  for (const effect of state.extensions?.tileEffects ?? []) {
+    if ((effect.blocksLanding || effect.type === 'tails-flight-reservation')
+      && effect.x != null && effect.y != null) reserved.add(gridPositionKey({ x: effect.x, y: effect.y }))
+  }
   if (reserved.has(gridPositionKey(position))) return false
 
   const movingPieceIds = new Set(options.movingPieceIds ?? [])
@@ -341,6 +366,8 @@ export function getNormalMoveRejection(
   piece: SpatialPiece,
   target: GridPosition,
 ): NormalMoveRejection | null {
+  const restriction = getPositionChangeRejection(piece, 'walk')
+  if (restriction) return { code: 'movement-restricted', message: restriction }
   if (piece.x == null || piece.y == null) {
     return { code: 'piece-not-on-board', message: 'Piece is not on the board' }
   }

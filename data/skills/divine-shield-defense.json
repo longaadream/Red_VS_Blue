@@ -2,9 +2,13 @@
   "id": "divine-shield-defense",
   "name": "圣盾防御",
   "description": "拥有圣盾时，抵挡一次伤害并移除圣盾。",
-  "keywords": ["圣盾"],
-  "targetText": "自身",
-  "effectTags": ["圣盾"],
+  "keywords": [
+    "圣盾"
+  ],
+  "targetText": "本棋子",
+  "effectTags": [
+    "圣盾"
+  ],
   "kind": "passive",
   "type": "normal",
   "cooldownTurns": 0,

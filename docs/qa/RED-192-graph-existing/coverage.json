@@ -1,0 +1,2293 @@
+{
+  "skills": 144,
+  "rules": 110,
+  "nodes": 6986,
+  "opaque": 2,
+  "entries": [
+    {
+      "category": "skills",
+      "id": "aizen-black-coffin",
+      "name": "黑棺",
+      "nodes": 20,
+      "opaque": 0,
+      "functions": 2,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "aizen-kyoka-suiguetsu",
+      "name": "镜花水月",
+      "nodes": 20,
+      "opaque": 0,
+      "functions": 3,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "aizen-shunpo",
+      "name": "瞬步",
+      "nodes": 23,
+      "opaque": 0,
+      "functions": 2,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "anti-heal-block",
+      "name": "禁疗阻止",
+      "nodes": 22,
+      "opaque": 0,
+      "functions": 1,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "arthas-frostmourne",
+      "name": "霜之哀伤",
+      "nodes": 28,
+      "opaque": 0,
+      "functions": 3,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "arthas-howling-blast",
+      "name": "凛冬咆哮",
+      "nodes": 40,
+      "opaque": 0,
+      "functions": 5,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "arthas-icebound-fortitude",
+      "name": "寒冰坚忍",
+      "nodes": 22,
+      "opaque": 0,
+      "functions": 3,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "arthas-lich-covenant",
+      "name": "巫妖誓约",
+      "nodes": 24,
+      "opaque": 0,
+      "functions": 3,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "ashbringer",
+      "name": "灰烬使者",
+      "nodes": 19,
+      "opaque": 0,
+      "functions": 2,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "biotic-grenade",
+      "name": "生物手雷",
+      "nodes": 52,
+      "opaque": 0,
+      "functions": 4,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "blackwidow-deadly-gaze",
+      "name": "致命视线",
+      "nodes": 21,
+      "opaque": 0,
+      "functions": 2,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "blackwidow-lethal-strike",
+      "name": "致命打击",
+      "nodes": 38,
+      "opaque": 0,
+      "functions": 2,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "blackwidow-lethal-toxin",
+      "name": "致命毒素",
+      "nodes": 40,
+      "opaque": 0,
+      "functions": 4,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "blackwidow-toxin-damage",
+      "name": "毒素伤害",
+      "nodes": 12,
+      "opaque": 0,
+      "functions": 2,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "blessed-hammer",
+      "name": "祝福之锤",
+      "nodes": 19,
+      "opaque": 0,
+      "functions": 2,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "blink",
+      "name": "闪现",
+      "nodes": 28,
+      "opaque": 0,
+      "functions": 3,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "blizzard",
+      "name": "暴风雪",
+      "nodes": 34,
+      "opaque": 0,
+      "functions": 2,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "blizzard-damage",
+      "name": "暴风雪伤害",
+      "nodes": 75,
+      "opaque": 0,
+      "functions": 9,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "blood-echo",
+      "name": "血色回响",
+      "nodes": 6,
+      "opaque": 0,
+      "functions": 1,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "blood-echo-trigger",
+      "name": "血色回响·触发",
+      "nodes": 24,
+      "opaque": 0,
+      "functions": 3,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "death-blossom",
+      "name": "死亡绽放",
+      "nodes": 33,
+      "opaque": 0,
+      "functions": 5,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "divine-blessing",
+      "name": "赐福",
+      "nodes": 41,
+      "opaque": 0,
+      "functions": 8,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "divine-shield-defense",
+      "name": "圣盾防御",
+      "nodes": 25,
+      "opaque": 0,
+      "functions": 2,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "earthshatter",
+      "name": "毁天灭地",
+      "nodes": 38,
+      "opaque": 0,
+      "functions": 5,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "elune-blessing",
+      "name": "月神赐福",
+      "nodes": 26,
+      "opaque": 0,
+      "functions": 3,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "elune-guidance",
+      "name": "艾露恩的指引",
+      "nodes": 8,
+      "opaque": 0,
+      "functions": 1,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "elune-guidance-trigger",
+      "name": "艾露恩的指引触发",
+      "nodes": 47,
+      "opaque": 0,
+      "functions": 6,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "elune-protection",
+      "name": "艾露恩的守护",
+      "nodes": 8,
+      "opaque": 0,
+      "functions": 1,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "elune-protection-trigger",
+      "name": "艾露恩的守护触发",
+      "nodes": 29,
+      "opaque": 0,
+      "functions": 3,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "fel-blessing",
+      "name": "邪能赐福",
+      "nodes": 18,
+      "opaque": 0,
+      "functions": 2,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "fireball",
+      "name": "火球术",
+      "nodes": 19,
+      "opaque": 0,
+      "functions": 2,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "freeze-prevent",
+      "name": "冰冻阻止",
+      "nodes": 24,
+      "opaque": 0,
+      "functions": 2,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "frostbolt",
+      "name": "冰霜箭",
+      "nodes": 27,
+      "opaque": 0,
+      "functions": 2,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "grant-lucky-coin",
+      "name": "发放幸运币",
+      "nodes": 9,
+      "opaque": 1,
+      "functions": 2,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "grimmjow-destruction-instinct",
+      "name": "破坏本能",
+      "nodes": 6,
+      "opaque": 0,
+      "functions": 1,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "grimmjow-gran-rey-cero",
+      "name": "王虚的闪光",
+      "nodes": 32,
+      "opaque": 0,
+      "functions": 4,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "grimmjow-hunting-instinct",
+      "name": "狩猎本能",
+      "nodes": 6,
+      "opaque": 0,
+      "functions": 1,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "grimmjow-panther-claw",
+      "name": "豹王之爪",
+      "nodes": 34,
+      "opaque": 0,
+      "functions": 4,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "grimmjow-resurreccion",
+      "name": "归刃·豹王",
+      "nodes": 6,
+      "opaque": 0,
+      "functions": 1,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "hand-cannon",
+      "name": "手炮",
+      "nodes": 21,
+      "opaque": 0,
+      "functions": 2,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "hardy-block",
+      "name": "悍猛格挡",
+      "nodes": 20,
+      "opaque": 0,
+      "functions": 2,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "hardy-block-trigger",
+      "name": "悍猛格挡效果",
+      "nodes": 21,
+      "opaque": 0,
+      "functions": 2,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "hashirama-edo-regen",
+      "name": "秽土转生·自愈",
+      "nodes": 6,
+      "opaque": 0,
+      "functions": 1,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "hashirama-edo-sage-buddha",
+      "name": "仙术·顶上化佛",
+      "nodes": 56,
+      "opaque": 0,
+      "functions": 4,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "hashirama-edo-wood-dragon",
+      "name": "木遁·木龙之术",
+      "nodes": 30,
+      "opaque": 0,
+      "functions": 2,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "hashirama-edo-wood-spike",
+      "name": "木遁·扦插之术",
+      "nodes": 23,
+      "opaque": 0,
+      "functions": 2,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "hellfire-shotgun",
+      "name": "地狱火霰弹枪",
+      "nodes": 32,
+      "opaque": 0,
+      "functions": 2,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "hidan-blood-oath",
+      "name": "血誓仪式",
+      "nodes": 24,
+      "opaque": 0,
+      "functions": 3,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "hidan-sacrifice",
+      "name": "狂信者献祭",
+      "nodes": 30,
+      "opaque": 0,
+      "functions": 4,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "hidan-undying",
+      "name": "不死神体",
+      "nodes": 6,
+      "opaque": 0,
+      "functions": 1,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "holy-light-descend",
+      "name": "圣光降临",
+      "nodes": 44,
+      "opaque": 0,
+      "functions": 7,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "holy-shield-defense",
+      "name": "圣盾防御",
+      "nodes": 10,
+      "opaque": 0,
+      "functions": 1,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "ichigo-bankai-tensa-zangetsu",
+      "name": "卍解·天锁斩月",
+      "nodes": 31,
+      "opaque": 0,
+      "functions": 4,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "ichigo-black-getsuga-tensho",
+      "name": "黑色月牙天冲",
+      "nodes": 72,
+      "opaque": 0,
+      "functions": 7,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "ichigo-getsuga-tensho",
+      "name": "月牙天冲",
+      "nodes": 35,
+      "opaque": 0,
+      "functions": 2,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "ichigo-zangetsu",
+      "name": "斩月",
+      "nodes": 19,
+      "opaque": 0,
+      "functions": 2,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "illidan-blade-dash",
+      "name": "战刃挥刺",
+      "nodes": 65,
+      "opaque": 0,
+      "functions": 7,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "illidan-demon-strike",
+      "name": "恶魔冲击",
+      "nodes": 17,
+      "opaque": 0,
+      "functions": 2,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "illidan-eye-beam",
+      "name": "眼棱",
+      "nodes": 19,
+      "opaque": 0,
+      "functions": 2,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "illidan-metamorphosis",
+      "name": "恶魔变形",
+      "nodes": 18,
+      "opaque": 0,
+      "functions": 2,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "initial-draw",
+      "name": "初始抽牌",
+      "nodes": 16,
+      "opaque": 0,
+      "functions": 2,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "itachi-amaterasu",
+      "name": "天照之缚",
+      "nodes": 45,
+      "opaque": 0,
+      "functions": 5,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "itachi-totsuka-blade",
+      "name": "须佐能乎·十拳剑",
+      "nodes": 26,
+      "opaque": 0,
+      "functions": 3,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "itachi-tsukuyomi",
+      "name": "月读",
+      "nodes": 29,
+      "opaque": 0,
+      "functions": 4,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "kenshin-amakakeru",
+      "name": "天翔龙闪",
+      "nodes": 58,
+      "opaque": 0,
+      "functions": 6,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "kenshin-ryusosen",
+      "name": "龙巢闪",
+      "nodes": 34,
+      "opaque": 0,
+      "functions": 3,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "kenshin-ryutsuisen",
+      "name": "龙槌闪",
+      "nodes": 57,
+      "opaque": 0,
+      "functions": 5,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "kenshin-tenken-passive",
+      "name": "飞天御剑流·剑速",
+      "nodes": 3,
+      "opaque": 0,
+      "functions": 0,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "kiljaedan-demonic-pact",
+      "name": "恶魔仪式",
+      "nodes": 44,
+      "opaque": 1,
+      "functions": 3,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "kiljaedan-fel-fire",
+      "name": "恒星之火",
+      "nodes": 28,
+      "opaque": 0,
+      "functions": 3,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "kiljaedan-soul-drain",
+      "name": "灵魂汲取",
+      "nodes": 35,
+      "opaque": 0,
+      "functions": 5,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "light-extraction",
+      "name": "圣光汲取",
+      "nodes": 34,
+      "opaque": 0,
+      "functions": 4,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "light-of-the-light",
+      "name": "圣光闪耀",
+      "nodes": 19,
+      "opaque": 0,
+      "functions": 2,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "minato-flying-raijin-passive",
+      "name": "飞雷神",
+      "nodes": 6,
+      "opaque": 0,
+      "functions": 1,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "minato-kunai-formula",
+      "name": "苦无术式",
+      "nodes": 50,
+      "opaque": 0,
+      "functions": 6,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "minato-rasengan",
+      "name": "螺旋丸",
+      "nodes": 32,
+      "opaque": 0,
+      "functions": 3,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "minato-spiral-barrage",
+      "name": "螺旋连丸",
+      "nodes": 140,
+      "opaque": 0,
+      "functions": 19,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "muru-lament",
+      "name": "穆鲁的挽歌",
+      "nodes": 96,
+      "opaque": 0,
+      "functions": 15,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "nano-boost",
+      "name": "纳米激素",
+      "nodes": 24,
+      "opaque": 0,
+      "functions": 2,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "nano-boost-damage",
+      "name": "纳米激素增伤",
+      "nodes": 19,
+      "opaque": 0,
+      "functions": 3,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "naruto-rasengan",
+      "name": "螺旋手里剑",
+      "nodes": 27,
+      "opaque": 0,
+      "functions": 2,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "naruto-sage-mode",
+      "name": "仙人模式",
+      "nodes": 24,
+      "opaque": 0,
+      "functions": 3,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "naruto-shadow-clone",
+      "name": "影分身之术",
+      "nodes": 50,
+      "opaque": 0,
+      "functions": 5,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "naruto-vanguard",
+      "name": "率先出阵",
+      "nodes": 6,
+      "opaque": 0,
+      "functions": 1,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "obito-ally-teleport",
+      "name": "神威·转移",
+      "nodes": 29,
+      "opaque": 0,
+      "functions": 3,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "obito-grudge",
+      "name": "怨念积蓄",
+      "nodes": 6,
+      "opaque": 0,
+      "functions": 1,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "obito-kamui",
+      "name": "神威·吸收",
+      "nodes": 21,
+      "opaque": 0,
+      "functions": 3,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "obito-space-time",
+      "name": "神威",
+      "nodes": 19,
+      "opaque": 0,
+      "functions": 2,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "pulse-pistol",
+      "name": "脉冲手枪",
+      "nodes": 22,
+      "opaque": 0,
+      "functions": 2,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "pulse-pistol-move",
+      "name": "脉冲手枪（移动触发）",
+      "nodes": 22,
+      "opaque": 0,
+      "functions": 2,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "rafaam-curse-amplify",
+      "name": "诅咒增幅",
+      "nodes": 40,
+      "opaque": 0,
+      "functions": 4,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "rafaam-curse-ward",
+      "name": "诅咒结界",
+      "nodes": 6,
+      "opaque": 0,
+      "functions": 1,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "rafaam-temporal-distortion",
+      "name": "时空扭曲",
+      "nodes": 21,
+      "opaque": 0,
+      "functions": 2,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "reap",
+      "name": "收割",
+      "nodes": 6,
+      "opaque": 0,
+      "functions": 1,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "reap-heal",
+      "name": "收割治疗",
+      "nodes": 12,
+      "opaque": 0,
+      "functions": 1,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "recall",
+      "name": "回溯",
+      "nodes": 21,
+      "opaque": 0,
+      "functions": 2,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "recall-endturn-trigger",
+      "name": "回溯触发（回合结束）",
+      "nodes": 38,
+      "opaque": 0,
+      "functions": 3,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "recall-move-trigger",
+      "name": "回溯触发（移动）",
+      "nodes": 41,
+      "opaque": 0,
+      "functions": 3,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "recall-skill-trigger",
+      "name": "回溯触发（技能）",
+      "nodes": 41,
+      "opaque": 0,
+      "functions": 3,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "rocket-punch",
+      "name": "火箭重拳",
+      "nodes": 53,
+      "opaque": 0,
+      "functions": 4,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "sasuke-amaterasu",
+      "name": "天照之炎",
+      "nodes": 53,
+      "opaque": 0,
+      "functions": 5,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "sasuke-chidori",
+      "name": "千鸟",
+      "nodes": 60,
+      "opaque": 0,
+      "functions": 7,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "sasuke-indra-arrow",
+      "name": "因陀罗之矢",
+      "nodes": 60,
+      "opaque": 0,
+      "functions": 5,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "sasuke-kagutsuchi",
+      "name": "加具土命",
+      "nodes": 45,
+      "opaque": 0,
+      "functions": 7,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "sasuke-susanoo",
+      "name": "须佐能乎",
+      "nodes": 18,
+      "opaque": 0,
+      "functions": 2,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "shadow-bolt",
+      "name": "暗影箭",
+      "nodes": 58,
+      "opaque": 0,
+      "functions": 4,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "shadow-chaos-control",
+      "name": "混沌控制",
+      "nodes": 40,
+      "opaque": 0,
+      "functions": 6,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "shadow-chaos-spear",
+      "name": "混沌之矛",
+      "nodes": 21,
+      "opaque": 0,
+      "functions": 2,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "shadow-ride-sweep",
+      "name": "骑射横扫",
+      "nodes": 54,
+      "opaque": 0,
+      "functions": 7,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "shadow-step",
+      "name": "暗影步",
+      "nodes": 54,
+      "opaque": 0,
+      "functions": 7,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "shadow-step-teleport",
+      "name": "暗影步传送",
+      "nodes": 62,
+      "opaque": 0,
+      "functions": 9,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "shield-of-light",
+      "name": "圣光盾",
+      "nodes": 30,
+      "opaque": 0,
+      "functions": 3,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "shishio-combustion-passive",
+      "name": "自燃",
+      "nodes": 6,
+      "opaque": 0,
+      "functions": 1,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "shishio-flame-spirit",
+      "name": "我流·炎灵",
+      "nodes": 69,
+      "opaque": 0,
+      "functions": 6,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "shishio-infinite-blade",
+      "name": "无限刃",
+      "nodes": 31,
+      "opaque": 0,
+      "functions": 4,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "sleep-dart",
+      "name": "麻醉镖",
+      "nodes": 42,
+      "opaque": 0,
+      "functions": 2,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "sleep-prevent",
+      "name": "麻醉阻止",
+      "nodes": 33,
+      "opaque": 0,
+      "functions": 1,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "sleep-remove",
+      "name": "麻醉解除",
+      "nodes": 25,
+      "opaque": 0,
+      "functions": 1,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "sonic-free-move-passive",
+      "name": "音速",
+      "nodes": 2,
+      "opaque": 0,
+      "functions": 0,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "sonic-homing-attack",
+      "name": "追踪攻击",
+      "nodes": 29,
+      "opaque": 0,
+      "functions": 3,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "sonic-spin-dash",
+      "name": "旋转冲刺",
+      "nodes": 65,
+      "opaque": 0,
+      "functions": 9,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "sonic-super-form",
+      "name": "超级形态",
+      "nodes": 17,
+      "opaque": 0,
+      "functions": 3,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "soul-fracture",
+      "name": "裂魂",
+      "nodes": 6,
+      "opaque": 0,
+      "functions": 1,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "tails-armor-assembly",
+      "name": "护甲组装",
+      "nodes": 22,
+      "opaque": 0,
+      "functions": 2,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "tails-mechanical-support",
+      "name": "机械支援",
+      "nodes": 41,
+      "opaque": 0,
+      "functions": 4,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "tails-twin-flight",
+      "name": "双尾飞行",
+      "nodes": 59,
+      "opaque": 0,
+      "functions": 6,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "tirion-divine-glory",
+      "name": "圣骑士的荣耀",
+      "nodes": 3,
+      "opaque": 0,
+      "functions": 0,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "tirion-holy-recall",
+      "name": "圣光重召",
+      "nodes": 21,
+      "opaque": 0,
+      "functions": 3,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "turalyon-expedition-order",
+      "name": "征讨号令",
+      "nodes": 19,
+      "opaque": 0,
+      "functions": 2,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "turalyon-grand-crusade",
+      "name": "圣光大远征",
+      "nodes": 183,
+      "opaque": 0,
+      "functions": 32,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "turalyon-lightforged-march",
+      "name": "圣铸进军",
+      "nodes": 6,
+      "opaque": 0,
+      "functions": 1,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "ulquiorra-black-cero",
+      "name": "黑虚闪",
+      "nodes": 11,
+      "opaque": 0,
+      "functions": 1,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "ulquiorra-cero",
+      "name": "虚闪",
+      "nodes": 11,
+      "opaque": 0,
+      "functions": 1,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "ulquiorra-high-speed-regeneration",
+      "name": "超速再生",
+      "nodes": 6,
+      "opaque": 0,
+      "functions": 1,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "ulquiorra-resurreccion",
+      "name": "归刃·黑翼大魔",
+      "nodes": 6,
+      "opaque": 0,
+      "functions": 1,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "velen-fate-shelter",
+      "name": "命运庇护",
+      "nodes": 26,
+      "opaque": 0,
+      "functions": 3,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "velen-holy-prophecy",
+      "name": "圣光预言",
+      "nodes": 46,
+      "opaque": 0,
+      "functions": 7,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "velen-thousand-futures-ultimate",
+      "name": "万千未来",
+      "nodes": 77,
+      "opaque": 0,
+      "functions": 11,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "venom-claw-rend",
+      "name": "利爪撕裂",
+      "nodes": 18,
+      "opaque": 0,
+      "functions": 2,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "venom-corrosion",
+      "name": "腐蚀",
+      "nodes": 6,
+      "opaque": 0,
+      "functions": 1,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "venom-host-transfer",
+      "name": "宿主转移",
+      "nodes": 40,
+      "opaque": 0,
+      "functions": 3,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "venom-symbiote-drag",
+      "name": "共生拖行",
+      "nodes": 68,
+      "opaque": 0,
+      "functions": 5,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "watcher-form",
+      "name": "红蓝形态",
+      "nodes": 2,
+      "opaque": 0,
+      "functions": 0,
+      "diagnostics": []
+    },
+    {
+      "category": "skills",
+      "id": "watcher-ultimate",
+      "name": "潦草急救",
+      "nodes": 36,
+      "opaque": 0,
+      "functions": 3,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "ai-semantics",
+      "nodes": 1,
+      "opaque": 0,
+      "functions": 0,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "rule-aizen-black-coffin-end",
+      "name": "黑棺·终结",
+      "nodes": 31,
+      "opaque": 0,
+      "functions": 3,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "rule-aizen-black-coffin-move",
+      "name": "黑棺·禁锢",
+      "nodes": 3,
+      "opaque": 0,
+      "functions": 0,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "rule-aizen-kyoka-expire",
+      "name": "镜花水月·失效",
+      "nodes": 16,
+      "opaque": 0,
+      "functions": 2,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "rule-aizen-kyoka-rewrite",
+      "name": "镜花水月·目标改写",
+      "nodes": 48,
+      "opaque": 0,
+      "functions": 6,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "rule-anti-heal-block",
+      "name": "禁疗阻止治疗",
+      "nodes": 2,
+      "opaque": 0,
+      "functions": 0,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "rule-arthas-icebound",
+      "name": "寒冰坚忍触发",
+      "nodes": 11,
+      "opaque": 0,
+      "functions": 1,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "rule-arthas-icebound-retaliate",
+      "name": "寒冰坚忍·反冻",
+      "nodes": 18,
+      "opaque": 0,
+      "functions": 2,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "rule-arthas-lich-covenant",
+      "name": "巫妖誓约·复活",
+      "nodes": 12,
+      "opaque": 0,
+      "functions": 2,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "rule-arthas-slow-restore",
+      "name": "减速恢复",
+      "nodes": 26,
+      "opaque": 0,
+      "functions": 1,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "rule-blackwidow-toxin-player",
+      "name": "毒素陷阱",
+      "nodes": 47,
+      "opaque": 0,
+      "functions": 7,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "rule-blizzard-active",
+      "name": "暴风雪激活",
+      "nodes": 2,
+      "opaque": 0,
+      "functions": 0,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "rule-blood-echo",
+      "name": "血色回响触发",
+      "nodes": 2,
+      "opaque": 0,
+      "functions": 0,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "rule-blood-oath-tick",
+      "name": "血誓倒计时",
+      "nodes": 3,
+      "opaque": 0,
+      "functions": 0,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "rule-chidori-immobile",
+      "name": "千鸟贯穿",
+      "nodes": 15,
+      "opaque": 0,
+      "functions": 1,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "rule-damage-buff",
+      "name": "强化",
+      "nodes": 19,
+      "opaque": 0,
+      "functions": 1,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "rule-divine-shield",
+      "name": "圣盾",
+      "nodes": 16,
+      "opaque": 0,
+      "functions": 1,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "rule-elune-guidance",
+      "name": "艾露恩的指引规则",
+      "nodes": 41,
+      "opaque": 0,
+      "functions": 5,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "rule-elune-protection",
+      "name": "艾露恩的守护降临",
+      "nodes": 24,
+      "opaque": 0,
+      "functions": 2,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "rule-elune-protection-player",
+      "name": "艾露恩的守护",
+      "nodes": 30,
+      "opaque": 0,
+      "functions": 3,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "rule-freeze-prevent-move",
+      "name": "冰冻阻止移动",
+      "nodes": 2,
+      "opaque": 0,
+      "functions": 0,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "rule-freeze-prevent-skill",
+      "name": "冰冻阻止技能",
+      "nodes": 2,
+      "opaque": 0,
+      "functions": 0,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "rule-grimmjow-hunt-after-move",
+      "name": "狩猎本能·移动",
+      "nodes": 75,
+      "opaque": 0,
+      "functions": 11,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "rule-grimmjow-hunt-after-skill",
+      "name": "狩猎本能·技能",
+      "nodes": 75,
+      "opaque": 0,
+      "functions": 11,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "rule-grimmjow-resurreccion",
+      "name": "归刃·豹王",
+      "nodes": 12,
+      "opaque": 0,
+      "functions": 1,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "rule-hardy-block",
+      "name": "悍猛格挡触发",
+      "nodes": 2,
+      "opaque": 0,
+      "functions": 0,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "rule-hashirama-edo-regen",
+      "name": "秽土转生自愈",
+      "nodes": 15,
+      "opaque": 0,
+      "functions": 0,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "rule-hidan-blood-oath-reflect",
+      "name": "血誓反射",
+      "nodes": 23,
+      "opaque": 0,
+      "functions": 3,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "rule-hidan-dying-immune",
+      "name": "濒死免疫",
+      "nodes": 24,
+      "opaque": 0,
+      "functions": 3,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "rule-hidan-undying",
+      "name": "不死神体",
+      "nodes": 26,
+      "opaque": 0,
+      "functions": 2,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "rule-hidan-undying-tick",
+      "name": "濒死倒计时",
+      "nodes": 32,
+      "opaque": 0,
+      "functions": 5,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "rule-ichigo-black-getsuga-teleport",
+      "name": "黑色月牙天冲·传送",
+      "nodes": 114,
+      "opaque": 0,
+      "functions": 16,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "rule-illidan-demon-strike",
+      "name": "恶魔冲击计数",
+      "nodes": 29,
+      "opaque": 0,
+      "functions": 3,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "rule-initial-draw",
+      "name": "初始抽牌",
+      "nodes": 2,
+      "opaque": 0,
+      "functions": 0,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "rule-itachi-tsukuyomi",
+      "name": "月读·冷却延长",
+      "nodes": 21,
+      "opaque": 0,
+      "functions": 2,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "rule-kenshin-tenken",
+      "name": "飞天御剑流·蓄势",
+      "nodes": 16,
+      "opaque": 0,
+      "functions": 1,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "rule-kenshin-tenken-boost",
+      "name": "飞天御剑流·剑速",
+      "nodes": 20,
+      "opaque": 0,
+      "functions": 1,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "rule-kiljaedan-gamestart",
+      "name": "恶魔仪式启动（旧版兼容）",
+      "nodes": 2,
+      "opaque": 0,
+      "functions": 0,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "rule-lucky-coin-gamestart",
+      "name": "幸运币",
+      "nodes": 6,
+      "opaque": 0,
+      "functions": 0,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "rule-lucky-coin-start",
+      "name": "幸运币规则",
+      "nodes": 2,
+      "opaque": 0,
+      "functions": 0,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "rule-mangekyo-friendly-death",
+      "name": "万花筒·见证死亡",
+      "nodes": 32,
+      "opaque": 0,
+      "functions": 3,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "rule-minato-anchor-end-turn",
+      "name": "飞雷神锚点",
+      "nodes": 75,
+      "opaque": 0,
+      "functions": 12,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "rule-minato-flying-raijin-trigger",
+      "name": "飞雷神触发",
+      "nodes": 73,
+      "opaque": 0,
+      "functions": 9,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "rule-momentum-consume",
+      "name": "动能消耗",
+      "nodes": 81,
+      "opaque": 0,
+      "functions": 13,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "rule-momentum-gain",
+      "name": "动能积累",
+      "nodes": 23,
+      "opaque": 0,
+      "functions": 2,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "rule-nano-boost-damage",
+      "name": "纳米激素增伤",
+      "nodes": 2,
+      "opaque": 0,
+      "functions": 0,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "rule-naruto-clone-died",
+      "name": "影分身消散",
+      "nodes": 11,
+      "opaque": 0,
+      "functions": 0,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "rule-naruto-clone-endturn-charge",
+      "name": "影分身蓄力",
+      "nodes": 3,
+      "opaque": 0,
+      "functions": 0,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "rule-naruto-clone-immobile",
+      "name": "影分身定身",
+      "nodes": 15,
+      "opaque": 0,
+      "functions": 1,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "rule-naruto-clone-one-hit",
+      "name": "影分身脆弱",
+      "nodes": 11,
+      "opaque": 0,
+      "functions": 0,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "rule-naruto-sage-block-skill",
+      "name": "仙人专注",
+      "nodes": 15,
+      "opaque": 0,
+      "functions": 1,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "rule-naruto-sage-immobile",
+      "name": "仙人打坐",
+      "nodes": 15,
+      "opaque": 0,
+      "functions": 1,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "rule-naruto-sage-immunity",
+      "name": "仙人之盾",
+      "nodes": 17,
+      "opaque": 0,
+      "functions": 1,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "rule-naruto-sage-tick",
+      "name": "仙人模式倒计时",
+      "nodes": 39,
+      "opaque": 0,
+      "functions": 5,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "rule-obito-grudge",
+      "name": "怨念积蓄",
+      "nodes": 24,
+      "opaque": 0,
+      "functions": 1,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "rule-obito-grudge-reset",
+      "name": "怨念消散",
+      "nodes": 20,
+      "opaque": 0,
+      "functions": 1,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "rule-obito-kamui-block",
+      "name": "神威·反弹",
+      "nodes": 28,
+      "opaque": 0,
+      "functions": 3,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "rule-pulse-pistol",
+      "name": "脉冲手枪规则",
+      "nodes": 2,
+      "opaque": 0,
+      "functions": 0,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "rule-pulse-pistol-move",
+      "name": "脉冲手枪（移动触发）",
+      "nodes": 2,
+      "opaque": 0,
+      "functions": 0,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "rule-rafaam-curse-end-turn",
+      "name": "诅咒-回合结束伤害",
+      "nodes": 42,
+      "opaque": 0,
+      "functions": 6,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "rule-rafaam-curse-ward",
+      "name": "诅咒结界规则",
+      "nodes": 27,
+      "opaque": 0,
+      "functions": 2,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "rule-rafaam-temporal-distortion",
+      "name": "时空扭曲归还",
+      "nodes": 43,
+      "opaque": 0,
+      "functions": 6,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "rule-reap",
+      "name": "收割",
+      "nodes": 13,
+      "opaque": 0,
+      "functions": 0,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "rule-recall-endturn",
+      "name": "回溯（回合结束强制）",
+      "nodes": 2,
+      "opaque": 0,
+      "functions": 0,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "rule-recall-move",
+      "name": "回溯计数（移动）",
+      "nodes": 2,
+      "opaque": 0,
+      "functions": 0,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "rule-recall-skill",
+      "name": "回溯计数（技能）",
+      "nodes": 2,
+      "opaque": 0,
+      "functions": 0,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "rule-sasuke-amaterasu-damage",
+      "name": "天照灼烧结算",
+      "nodes": 31,
+      "opaque": 0,
+      "functions": 3,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "rule-sasuke-amaterasu-endturn",
+      "name": "天照回合结算",
+      "nodes": 53,
+      "opaque": 0,
+      "functions": 8,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "rule-sasuke-amaterasu-move",
+      "name": "天照经过灼烧",
+      "nodes": 56,
+      "opaque": 0,
+      "functions": 3,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "rule-sasuke-amaterasu-stack",
+      "name": "天照叠层",
+      "nodes": 28,
+      "opaque": 0,
+      "functions": 3,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "rule-shadow-chaos-spear-restore",
+      "name": "混沌之矛归还移速",
+      "nodes": 25,
+      "opaque": 0,
+      "functions": 3,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "rule-shadow-step",
+      "name": "暗影步传送",
+      "nodes": 2,
+      "opaque": 0,
+      "functions": 0,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "rule-shishio-burn-endturn",
+      "name": "燃地灼烧·回合结算",
+      "nodes": 32,
+      "opaque": 0,
+      "functions": 4,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "rule-shishio-burn-move",
+      "name": "燃地灼烧·踏入",
+      "nodes": 24,
+      "opaque": 0,
+      "functions": 2,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "rule-shishio-combustion",
+      "name": "自燃·灵力消耗",
+      "nodes": 31,
+      "opaque": 0,
+      "functions": 1,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "rule-shishio-cooldown-once",
+      "name": "自燃·压制",
+      "nodes": 33,
+      "opaque": 0,
+      "functions": 3,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "rule-shishio-execute-option",
+      "name": "自燃·灭杀",
+      "nodes": 23,
+      "opaque": 0,
+      "functions": 1,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "rule-shishio-infinite-blade-recast",
+      "name": "无限刃·二段",
+      "nodes": 43,
+      "opaque": 0,
+      "functions": 6,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "rule-shishio-kill-track",
+      "name": "击杀计数",
+      "nodes": 19,
+      "opaque": 0,
+      "functions": 1,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "rule-shishio-no-heal",
+      "name": "自燃·拒愈",
+      "nodes": 7,
+      "opaque": 0,
+      "functions": 0,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "rule-shishio-silence-burst",
+      "name": "自燃·灼魂",
+      "nodes": 21,
+      "opaque": 0,
+      "functions": 1,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "rule-silenced-block",
+      "name": "沉默拦截",
+      "nodes": 18,
+      "opaque": 0,
+      "functions": 2,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "rule-sleep-prevent-move",
+      "name": "麻醉阻止移动",
+      "nodes": 2,
+      "opaque": 0,
+      "functions": 0,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "rule-sleep-prevent-skill",
+      "name": "麻醉阻止技能",
+      "nodes": 2,
+      "opaque": 0,
+      "functions": 0,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "rule-sleep-remove-on-damage",
+      "name": "麻醉受伤解除",
+      "nodes": 2,
+      "opaque": 0,
+      "functions": 0,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "rule-sonic-free-move",
+      "name": "音速",
+      "nodes": 17,
+      "opaque": 0,
+      "functions": 1,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "rule-soul-fracture",
+      "name": "裂魂规则",
+      "nodes": 14,
+      "opaque": 0,
+      "functions": 0,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "rule-soul-fracture-player",
+      "name": "裂魂",
+      "nodes": 6,
+      "opaque": 0,
+      "functions": 0,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "rule-spiritual-pressure",
+      "name": "灵压",
+      "nodes": 2,
+      "opaque": 0,
+      "functions": 0,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "rule-tails-armor-recovery",
+      "name": "恢复模块",
+      "nodes": 15,
+      "opaque": 0,
+      "functions": 1,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "rule-tails-flight-immune",
+      "name": "双尾飞行免疫",
+      "nodes": 12,
+      "opaque": 0,
+      "functions": 1,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "rule-tails-flight-immune-target",
+      "name": "双尾飞行免疫（技能）",
+      "nodes": 12,
+      "opaque": 0,
+      "functions": 1,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "rule-tails-flight-inoperable",
+      "name": "双尾飞行不可操作",
+      "nodes": 12,
+      "opaque": 0,
+      "functions": 1,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "rule-tails-flight-inoperable-skill",
+      "name": "双尾飞行不可操作（技能）",
+      "nodes": 12,
+      "opaque": 0,
+      "functions": 1,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "rule-tails-flight-reservation-block",
+      "name": "双尾飞行落点预留",
+      "nodes": 10,
+      "opaque": 0,
+      "functions": 1,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "rule-tails-flight-resolve",
+      "name": "双尾飞行结算",
+      "nodes": 56,
+      "opaque": 0,
+      "functions": 10,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "rule-tirion-divine-glory",
+      "name": "圣骑士的荣耀",
+      "nodes": 7,
+      "opaque": 0,
+      "functions": 0,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "rule-tirion-divine-shield-start",
+      "name": "圣骑士的荣耀",
+      "nodes": 20,
+      "opaque": 0,
+      "functions": 2,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "rule-turalyon-lightforged-march",
+      "name": "圣铸进军触发",
+      "nodes": 96,
+      "opaque": 0,
+      "functions": 11,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "rule-ulquiorra-damage-dealt",
+      "name": "超速再生·造成伤害",
+      "nodes": 22,
+      "opaque": 0,
+      "functions": 2,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "rule-ulquiorra-damage-taken",
+      "name": "超速再生·受到伤害",
+      "nodes": 24,
+      "opaque": 0,
+      "functions": 2,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "rule-ulquiorra-resurreccion",
+      "name": "归刃·黑翼大魔",
+      "nodes": 22,
+      "opaque": 0,
+      "functions": 2,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "rule-velen-death-cleanup",
+      "name": "未完预言",
+      "nodes": 34,
+      "opaque": 0,
+      "functions": 5,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "rule-velen-delayed-effects",
+      "name": "远见者预言",
+      "nodes": 67,
+      "opaque": 0,
+      "functions": 6,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "rule-velen-fate-target",
+      "name": "命运庇护目标",
+      "nodes": 13,
+      "opaque": 0,
+      "functions": 1,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "rule-venom-corrosion-immobile",
+      "name": "腐蚀定身",
+      "nodes": 13,
+      "opaque": 0,
+      "functions": 1,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "rule-watcher-form",
+      "name": "红蓝形态",
+      "nodes": 16,
+      "opaque": 0,
+      "functions": 0,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "rule-watcher-rage-dealt",
+      "name": "暴怒·伤害加倍",
+      "nodes": 16,
+      "opaque": 0,
+      "functions": 1,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "rule-watcher-rage-taken",
+      "name": "暴怒·受创加倍",
+      "nodes": 16,
+      "opaque": 0,
+      "functions": 1,
+      "diagnostics": []
+    },
+    {
+      "category": "rules",
+      "id": "rule-watcher-shield",
+      "name": "平静护盾",
+      "nodes": 25,
+      "opaque": 0,
+      "functions": 1,
+      "diagnostics": []
+    }
+  ]
+}

@@ -1835,7 +1835,13 @@ describe('RED-138 progressive reserve deployment', () => {
 
   it('keeps reserve deployment atomic until the complete interactive summon queue settles', async () => {
     const seed = ROOT_SEED + 5
-    const initial = await createProgressiveBattle(seed)
+    let initial = await createProgressiveBattle(seed)
+    const pioneer = initial.pieces.find(piece => piece.ownerPlayerId === PLAYERS[0])!
+    pioneer.skills = [{ skillId: 'fireball', currentCooldown: 2 }]
+    delete initial.turn.refreshedAtTurn
+    initial.deployment!.status = 'turn-ready'
+    initial = runBattleAction(initial, { type: 'beginPhase' }, { rootSeed: seed }).state
+    expect(initial.pieces.find(piece => piece.instanceId === pioneer.instanceId)?.skills[0].currentCooldown).toBe(1)
     const offeredPieceId = initial.deployment!.offerPieceIds![0]
     const position = initial.deployment!.legalPositions![0]
     const beforeAp = initial.players.find(player => player.playerId === PLAYERS[0])!.actionPoints
@@ -1875,6 +1881,16 @@ describe('RED-138 progressive reserve deployment', () => {
           return { success: true, message: 'summon queue tail resolved' }
         },
       },
+      {
+        id: 'red-192-deployed-begin-order', name: 'begin order', description: '',
+        trigger: { type: 'beginTurn' },
+        effect: (battle: BattleState) => {
+          expect((battle.extensions as any).summonQueueTailCount).toBe(1)
+          expect(battle.pieces.some(piece => piece.instanceId === offeredPieceId)).toBe(true)
+          ;(battle.extensions as any).approvedBeginCount = ((battle.extensions as any).approvedBeginCount || 0) + 1
+          return { success: true }
+        },
+      },
     ] as any)
 
     try {
@@ -1901,6 +1917,8 @@ describe('RED-138 progressive reserve deployment', () => {
         tag.type === 'deployment-first-move-free'))).toBe(false)
       expect((pending.extensions as any).summonChoiceCount).toBeUndefined()
       expect((pending.extensions as any).summonQueueTailCount).toBeUndefined()
+      expect((pending.extensions as any).approvedBeginCount).toBeUndefined()
+      expect(pending.pieces.find(piece => piece.instanceId === pioneer.instanceId)?.skills[0].currentCooldown).toBe(1)
       expect(pending.players.find(player => player.playerId === PLAYERS[0])?.actionPoints).toBe(beforeAp)
       expect(pendingResult.trace?.deployment?.deployedPosition).toBeUndefined()
 
@@ -1922,6 +1940,8 @@ describe('RED-138 progressive reserve deployment', () => {
       }))
       expect((resolved.extensions as any).summonChoiceCount).toBe(1)
       expect((resolved.extensions as any).summonQueueTailCount).toBe(1)
+      expect((resolved.extensions as any).approvedBeginCount).toBe(1)
+      expect(resolved.pieces.find(piece => piece.instanceId === pioneer.instanceId)?.skills[0].currentCooldown).toBe(1)
       expect(resolved.deployment).toMatchObject({
         status: 'turn-ready',
         reserveCounts: { [PLAYERS[0]]: 6, [PLAYERS[1]]: 7 },
