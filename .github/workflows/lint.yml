@@ -23,6 +23,8 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      - run: npm ci --ignore-scripts
+      # Match the locked install documented in docs/qa/RED-186/README.md:
+      # Colyseus has an existing optional Zod peer conflict.
+      - run: npm ci --ignore-scripts --legacy-peer-deps
       - run: npm run lint
       - run: npm test -- tests/eslint-config.test.ts

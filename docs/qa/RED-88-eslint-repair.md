@@ -42,3 +42,5 @@ Medium：涉及核心模块类型和测试构造器，保持运行行为并进�
 完整日志保存在本工作区 `output/eslint-repair/`：`tests-full-before.json`、`tests-full-after.json`、`tests-review-fixes.json`、`lint-final.txt`、`typecheck-final.txt`、`build.txt`、`build-webpack.txt`。原工作区仍在 RED-184 分支，不会自动获得本独立分支上的修复。
 
 用户随后明确要求创建 PR 并合并；据此继续提交、推送及合并流程，任务合同仍仅本地记录，不创建 Linear 工单。最终 PR 检查与合并结果以 GitHub 记录为准。
+
+PR 阶段无冲突同步主线 `4095cf289103eb3f1895d95fa74434aea30adbc0`，同步后 lint、根项目类型检查和编码检查再次通过。首次 CI 在安装依赖时触发现有 Colyseus/Zod 可选 peer 冲突；lint 工作流改用 RED-161 与 RED-186 记录的 `npm ci --ignore-scripts --legacy-peer-deps` 安装方式，保留锁文件和检查要求，不升级依赖。
