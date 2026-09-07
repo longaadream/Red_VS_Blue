@@ -61,7 +61,7 @@ export function createRelay({ publicOrigin = 'http://127.0.0.1:8080', publishKey
   const server = createServer(async (request, response) => {
     if (draining || !admit(request)) return json(response, 503, { error: 'RELAY_CAPACITY' })
     if (request.method === 'OPTIONS') {
-      response.writeHead(204, { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'GET,POST,OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type' }); return response.end()
+      response.writeHead(204, { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'GET,POST,OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type,X-RvB-Auth' }); return response.end()
     }
     if (request.method === 'GET' && request.url === '/healthz') return json(response, 200, { ok: true, protocol: 'rvb-host-relay-v1', hosts: hosts.size, connections: channels.size, uptimeSeconds: Math.floor((Date.now() - startedAt) / 1000), limits: { maxHosts, maxConnections, maxPerHost: 32 }, stats })
     if (request.method === 'GET' && request.url === '/hosts') return json(response, 200, { hosts: [...hosts.values()].filter(h => h.visible).map(h => ({ id: h.id, name: h.name, inviteCode: h.code, url: h.url })) })
@@ -85,7 +85,9 @@ export function createRelay({ publicOrigin = 'http://127.0.0.1:8080', publishKey
         chunks.push(chunk)
       }
       if (!channels.has(channel.id)) return
-      sendPacket(host.socket, { type: 'http', id: channel.id, method: request.method, path, body: Buffer.concat(chunks).toString('base64') })
+      const reportAuth = typeof request.headers['x-rvb-auth'] === 'string' ? request.headers['x-rvb-auth'] : ''
+      if (reportAuth.length > 2048) { json(response, 413, { error: 'AUTH_TOO_LARGE' }); return removeChannel(channel.id) }
+      sendPacket(host.socket, { type: 'http', id: channel.id, method: request.method, path, reportAuth, body: Buffer.concat(chunks).toString('base64') })
     } catch { removeChannel(channel.id) }
   })
   server.requestTimeout = CHANNEL_TIMEOUT_MS

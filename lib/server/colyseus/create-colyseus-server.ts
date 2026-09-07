@@ -56,6 +56,7 @@ interface HealthResponse {
 }
 
 interface JsonRequest {
+  headers?: Record<string, string | string[] | undefined>
   params?: Record<string, string | undefined>
   query?: Record<string, unknown>
 }
@@ -143,7 +144,12 @@ export function createColyseusBattleServer(options: CreateColyseusBattleServerOp
   const logger = options.logger ?? console
   const admission = createAdmissionAuthority()
   const restoreCapability = randomUUID()
+  const roomInvites = new Map<string, string>()
   const BattleRoom = createBattleRoomClass({
+    updateInvite: (roomId, code) => {
+      for (const [existing, id] of roomInvites) if (id === roomId && existing !== code) roomInvites.delete(existing)
+      if (code) roomInvites.set(code, roomId)
+    },
     restoreCapability,
     reconnectGraceMs: options.reconnectGraceMs,
     authenticate: (options.requireIdentityProof ?? !options.repository) ? admission.authenticate : undefined,
@@ -189,7 +195,7 @@ export function createColyseusBattleServer(options: CreateColyseusBattleServerOp
       const app = rawApp as unknown as ExpressLikeApp
       app.use((_request, response, next) => {
         response.setHeader('Access-Control-Allow-Origin', '*')
-        response.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+        response.setHeader('Access-Control-Allow-Headers', 'Content-Type,X-RvB-Auth')
         response.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS')
         if (_request.method === 'OPTIONS') {
           response.sendStatus(204)
@@ -245,13 +251,36 @@ export function createColyseusBattleServer(options: CreateColyseusBattleServerOp
           ? { room }
           : { code: 'ROOM_NOT_FOUND', error: 'Room not found' })
       })
+      app.get('/room-invites/:code', async (request, response) => {
+        const code = String(request.params?.code ?? '').trim().toUpperCase()
+        const roomId = /^[A-F0-9]{12}$/.test(code) ? roomInvites.get(code) : undefined
+        const listings = roomId ? await matchMaker.query({ name: BATTLE_ROOM_TYPE }) : []
+        const room = collectProductRooms(listings, true).find(candidate => candidate.id === roomId)
+        response.status(room ? 200 : 404).json(room ? { room } : { code: 'ROOM_NOT_FOUND', error: '邀请码无效或房间已关闭' })
+      })
       app.get('/battle-reports/:battleId', async (request, response) => {
         const battleId = String(request.params?.battleId ?? '').trim().toLowerCase()
+        let playerId: string
+        let verifiedKey: string
+        try {
+          const proof = JSON.parse(String(request.headers?.['x-rvb-auth'] ?? ''))
+          playerId = String(proof?.payload?.playerId ?? '')
+          verifiedKey = admission.authenticate(playerId, 'report:' + battleId, proof)
+        } catch {
+          response.status(401).json({ code: 'PLAYER_AUTH_INVALID', error: '请使用参赛玩家身份读取战报' })
+          return
+        }
         if (!repository.readBattleReport) {
           response.status(501).json({ code: 'BATTLE_REPORT_UNAVAILABLE', error: 'Battle report store is unavailable' })
           return
         }
         try {
+          const restored = await repository.restoreRoom(battleId)
+          const participant = restored?.room.players.find(player => player.id === playerId)
+          if (!participant?.publicKey || participant.publicKey !== verifiedKey) {
+            response.status(403).json({ code: 'BATTLE_REPORT_FORBIDDEN', error: '完整战报仅向参赛玩家开放' })
+            return
+          }
           const report = await repository.readBattleReport(battleId)
           response.status(report ? 200 : 404).json(report
             ? { report }

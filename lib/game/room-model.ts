@@ -116,6 +116,7 @@ export interface Room {
   createdAt?: number
   visibility?: 'private' | 'public'
   inviteCode?: string
+  spectatingEnabled?: boolean
   version?: number
   battleAuthorityVersion?: number
   battleAuthorityTransitionHash?: string

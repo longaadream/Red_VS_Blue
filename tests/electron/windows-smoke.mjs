@@ -215,7 +215,7 @@ async function waitForActivationTransaction(activePath, targetProfileHash, timeo
   throw new Error(`Activation transaction did not appear for ${targetProfileHash}: ${JSON.stringify(observed)}`)
 }
 
-async function verifyMultiplayerPage(port, target, localUrl) {
+async function verifyMultiplayerPage(port, target, localUrl, observedRoomId) {
   await evaluate(target, "window.location.href = 'rvb-client://app/multiplayer.html'; true", false)
   const page = await waitForTargets(port, candidate => candidate.url.startsWith('rvb-client://app/multiplayer.html'), 5000)
   const deadline = Date.now() + 8000
@@ -240,7 +240,29 @@ async function verifyMultiplayerPage(port, target, localUrl) {
   assert(!runtime.error && runtime.diagnosis.checks[0]?.ok === true, `Packaged network diagnostic failed: ${JSON.stringify(runtime)}`)
   await evaluate(page, "document.getElementById('joinDirect').click(); true", false)
   const lobby = await waitForTargets(port, candidate => candidate.url.startsWith('rvb-client://app/lobby.html'), 10000)
-  return {target: lobby, runtime}
+  await evaluate(lobby, "localStorage.setItem('rvb_active_battle', 'spectator-smoke-preserve-existing-match'); true")
+  const spectateButton = `Array.from(document.querySelectorAll('.btn-spectate')).find(button => (button.getAttribute('onclick') || '').includes(${JSON.stringify(observedRoomId)}))`
+  let available = false
+  for (let attempt = 0; attempt < 60; attempt++) {
+    available = await evaluate(lobby, `!!(${spectateButton})`)
+    if (available) break
+    await delay(100)
+  }
+  assert(available, 'Active game has no lobby spectate button')
+  await evaluate(lobby, `${spectateButton}.click(); true`, false)
+  const spectatorPage = await waitForTargets(port, candidate => candidate.url.includes('battle.html?') && candidate.url.includes('mode=spectate'), 10000)
+  let spectator
+  for (let attempt = 0; attempt < 80; attempt++) {
+    spectator = await evaluate(spectatorPage, `({ready: typeof G !== 'undefined' && !!G, status: document.getElementById('spectatorStatus').textContent, surrenderHidden: document.getElementById('btnSurrender').hidden, hiddenHands: typeof G !== 'undefined' && !!G && G.players.every(player => player.hand.every(card => card.cardId === 'hidden'))})`)
+    if (spectator.ready && spectator.status.includes('只读观战')) break
+    await delay(100)
+  }
+  assert(spectator?.ready && spectator.hiddenHands && spectator.surrenderHidden, `Packaged spectator view failed: ${JSON.stringify(spectator)}`)
+  const perspective = await evaluate(spectatorPage, "({blue: document.getElementById('myLabel').textContent, red: document.getElementById('oppLabel').textContent, active: localStorage.getItem('rvb_active_battle')})")
+  assert(perspective.blue.includes('蓝方') && perspective.red.includes('红方') && perspective.active === 'spectator-smoke-preserve-existing-match', `Spectator perspective or player recovery record changed: ${JSON.stringify(perspective)}`)
+  spectator.perspective = perspective
+  runtime.spectator = spectator
+  return {target: spectatorPage, runtime}
 }
 
 async function verifyBattleTerminalError(port, target, timeoutMs = 5000) {
@@ -799,6 +821,7 @@ async function smokeClient(expectedIdentity = null, sharedUserDataDir = null, ne
     const creationOptions = {
       product: true,
       playerId: smokeHost.playerId,
+      alignment: 'light',
       playerName: 'RED-158 Windows smoke host',
       name: 'RED-158 Windows smoke room',
       mapId: 'winding-pass',
@@ -842,6 +865,7 @@ async function smokeClient(expectedIdentity = null, sharedUserDataDir = null, ne
     const guestRoom = await guestClient.joinById(smokeRoom.roomId, {
       product: true,
       playerId: smokeGuest.playerId,
+      alignment: 'light',
       auth: await admissionProof(smokeGuest, smokeRoom.roomId),
       playerName: 'RED-158 Windows smoke guest',
       profileIdentity: catalogIdentity.data.profileIdentity,
@@ -858,9 +882,28 @@ async function smokeClient(expectedIdentity = null, sharedUserDataDir = null, ne
         )).length === 2,
       `Second Windows player could not join the single created room: ${JSON.stringify(joinedRoom)}`,
     )
+    if (networkOnly) {
+      const catalog = await fetch(`${localBaseUrl}/catalog/pieces`).then(response => response.json())
+      const pieces = catalog.pieces.filter(piece => piece.faction === 'good').slice(0, 8).map(piece => ({ templateId: piece.id, faction: piece.faction }))
+      for (const [room, identity] of [[smokeRoom, smokeHost], [guestRoom, smokeGuest]]) await room.request('roomRpc', { method: 'rooms.action', data: { action: 'select-pieces', playerId: identity.playerId, alignment: 'light', pieces, profileIdentity: catalogIdentity.data.profileIdentity } })
+    }
+    const multiplayerPage = networkOnly ? await verifyMultiplayerPage(application.debugPort, gameTarget, localBaseUrl, smokeRoom.roomId) : null
+    if (multiplayerPage) {
+      const state = await new Promise(resolve => { const off = smokeRoom.onMessage('battleSnapshot', message => { off(); resolve(message) }); smokeRoom.send('battleResync', {}) })
+      const clientActionId = 'spectator-smoke-terminal'
+      smokeRoom.send('battleCommand', { protocolVersion: state.protocolVersion, authorityBuildId: state.authorityBuildId, roomId: smokeRoom.roomId, playerId: smokeHost.playerId, expectedAuthorityVersion: state.authorityVersion, clientActionId, command: { type: 'surrender', playerId: smokeHost.playerId, clientActionId } })
+      const deadline = Date.now() + 8000
+      let terminal
+      while (Date.now() < deadline) {
+        terminal = await evaluate(multiplayerPage.target, "({finished: !!G?.terminalResult, title: document.getElementById('resultTitle').textContent, trace: document.getElementById('matchTraceStatus').textContent, active: localStorage.getItem('rvb_active_battle'), privateHistory: !!G?.extensions?.debugBattle})")
+        if (terminal.finished) break
+        await delay(100)
+      }
+      assert(terminal?.finished && terminal.title === '对局结束' && !terminal.trace && !terminal.privateHistory && terminal.active === 'spectator-smoke-preserve-existing-match', `Spectator terminal view failed: ${JSON.stringify(terminal)}`)
+      multiplayerPage.runtime.spectator.terminal = terminal
+    }
     await guestRoom.leave()
     await smokeRoom.leave()
-    const multiplayerPage = networkOnly ? await verifyMultiplayerPage(application.debugPort, gameTarget, localBaseUrl) : null
     const pieceGallery = await verifyPieceGallery(application.debugPort, multiplayerPage?.target || gameTarget)
     const battle = await verifyBattleTerminalError(application.debugPort, pieceGallery.target)
     assert(battle.runtime.readyState === 'complete', `Battle page did not finish loading: ${JSON.stringify(battle.runtime)}`)

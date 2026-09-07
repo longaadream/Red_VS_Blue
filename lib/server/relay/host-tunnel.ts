@@ -92,7 +92,7 @@ export function openHostTunnel(options: HostTunnelOptions): Promise<{ published:
           requests.set(id, controller)
           try {
             const response = await fetch(`${local.origin}${packet.path}`, {
-              method: packet.method, headers: { 'Content-Type': 'application/json' },
+              method: packet.method, headers: { 'Content-Type': 'application/json', ...(typeof packet.reportAuth === 'string' && packet.reportAuth.length <= 2048 ? { 'X-RvB-Auth': packet.reportAuth } : {}) },
               body: packet.method === 'POST' ? Buffer.from(packet.body, 'base64') : undefined,
               signal: controller.signal, redirect: 'error',
             })

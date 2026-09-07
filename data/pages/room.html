@@ -172,6 +172,7 @@
         <span class="room-info-label">人数</span>
         <span class="room-info-value" id="playerCountLabel">0 / 2</span>
       </div>
+      <div class="room-info-row"><span id="spectatorCount">观众 0 / 8</span><label id="spectatingControl" hidden><input id="spectatingEnabled" type="checkbox" onchange="setSpectating(this.checked)">允许观战</label></div>
     </div>
   </div>
 
@@ -372,7 +373,15 @@
       }
     }
 
+    async function setSpectating(enabled) {
+      try { await renderRoom(await roomRequest('rooms.action', { action: 'spectating', enabled, playerId })) }
+      catch (error) { alert('观战设置失败：' + error.message); await refreshRoom() }
+    }
+
     async function renderRoom(room) {
+      document.getElementById('spectatorCount').textContent = '观众 ' + (room.spectatorCount || 0) + ' / 8'
+      document.getElementById('spectatingControl').hidden = room.hostId !== playerId
+      document.getElementById('spectatingEnabled').checked = room.spectatingEnabled !== false
       document.getElementById('roomIdBadge').textContent = '#' + (room.id || roomId).slice(0, 8)
       document.getElementById('roomNameLabel').textContent = room.name || roomId
       document.getElementById('roomMapLabel').textContent = await getMapName(room.mapId)

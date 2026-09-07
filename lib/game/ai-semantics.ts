@@ -31,7 +31,7 @@ interface SemanticPiece {
 
 type BattleLike = {
   pieces?: SemanticPiece[]
-  players?: Array<{ actionPoints?: number; chargePoints?: number }>
+  players?: Array<{ playerId?: string; teamId?: 'red' | 'blue'; actionPoints?: number; chargePoints?: number }>
   rules?: unknown[]
 }
 
@@ -73,10 +73,11 @@ function visibleStatuses(piece: SemanticPiece): AiStatusFeature[] {
 export function observeAiState(state: BattleLike, playerId: string, hashes: { rulesHash: string; contentHash: string }): AiObservation {
   const project = (piece: SemanticPiece) => ({ id: String(piece.instanceId), hp: Number(piece.currentHp || 0), maxHp: Number(piece.maxHp || 0), x: Number(piece.x || 0), y: Number(piece.y || 0), statuses: visibleStatuses(piece) })
   const live = (state.pieces || []).filter(piece => piece.currentHp > 0)
+  const identities = { players: (state.players || []).map(player => ({ playerId: player.playerId || '', teamId: player.teamId })) }
   return {
     schemaVersion: AI_SEMANTICS_SCHEMA_VERSION, observationScope: 'public-state', ...hashes,
-    allies: live.filter(piece => areMatchAllies({ players: state.players || [] }, piece.ownerPlayerId, playerId)).map(project).sort((a, b) => a.id.localeCompare(b.id)),
-    enemies: live.filter(piece => !areMatchAllies({ players: state.players || [] }, piece.ownerPlayerId, playerId)).map(project).sort((a, b) => a.id.localeCompare(b.id)),
+    allies: live.filter(piece => areMatchAllies(identities, piece.ownerPlayerId || '', playerId)).map(project).sort((a, b) => a.id.localeCompare(b.id)),
+    enemies: live.filter(piece => !areMatchAllies(identities, piece.ownerPlayerId || '', playerId)).map(project).sort((a, b) => a.id.localeCompare(b.id)),
   }
 }
 

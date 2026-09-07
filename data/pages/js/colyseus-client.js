@@ -51,7 +51,7 @@
   }
 
   function reconnectTokenKey() {
-    return RECONNECT_TOKEN_PREFIX + normalizedBaseUrl(getServerUrl()) + ':' + _roomId + ':' + _playerId
+    return RECONNECT_TOKEN_PREFIX + normalizedBaseUrl(getServerUrl()) + ':' + _roomId + ':' + _playerId + (pageParams().get('mode') === 'spectate' ? ':spectator' : '')
   }
 
   function readReconnectToken() {
@@ -128,6 +128,8 @@
     return {
       auth: await admissionProof(base || getServerUrl(), String(playerId || identity.id || '').trim().toLowerCase(), roomId || _roomId),
       product: true,
+      spectator: params.get('mode') === 'spectate',
+      inviteCode: window.sessionStorage?.getItem('rvb_room_invite:' + normalizedBaseUrl(base || getServerUrl()) + ':' + (roomId || _roomId)) || undefined,
       playerId: String(playerId || identity.id || '').trim().toLowerCase(),
       playerName: params.get('playerName') || identity.displayName || '',
       accountId: identity.accountId || undefined,
@@ -157,6 +159,13 @@
   }
 
   function registerRoomHandlers(room, generation) {
+    room.onMessage('spectatorClosed', function (message) {
+      if (generation !== _generation) return
+      _shouldReconnect = false
+      room.reconnection.enabled = false
+      clearReconnectToken()
+      emitRoomMessage('spectatorClosed', message)
+    })
     room.onMessage('roomUpdate', function (message) {
       if (generation === _generation) emitRoomMessage('roomUpdate', message)
     })
@@ -217,7 +226,7 @@
     try {
       var snapshot = await request('rooms.get', { roomId: _roomId }, 5000)
       if (generation !== _generation || room !== _room || !_subscribed) return
-      var role = snapshot && snapshot.hostId && String(snapshot.hostId).toLowerCase() === _playerId ? 'host' : 'guest'
+      var role = snapshot.viewerRole || (snapshot && snapshot.hostId && String(snapshot.hostId).toLowerCase() === _playerId ? 'host' : 'guest')
       emitRoomMessage('subscribed', { role: role })
       room.send('battleResync', {})
     } catch (error) {
@@ -373,6 +382,13 @@
     var payload = data || {}
     timeoutMs = timeoutMs || 5000
     if (!base) throw new Error('Server URL is required')
+    if (method === 'rooms.resolveInvite') {
+      var code = String(payload.inviteCode || '').trim().toUpperCase()
+      if (!/^[A-F0-9]{12}$/.test(code)) throw new Error('请输入完整的12位房间邀请码')
+      var found = await fetchJson(base + '/room-invites/' + code, timeoutMs)
+      window.sessionStorage.setItem('rvb_room_invite:' + base + ':' + found.room.id, code)
+      return found.room
+    }
     if (method === 'system.health') return fetchJson(base + '/healthz', timeoutMs)
     if (method === 'catalog.identity') return fetchJson(base + '/catalog/identity', timeoutMs)
     if (method === 'catalog.maps') return fetchJson(base + '/catalog/maps' + (payload.mode === '2v2' ? '?mode=2v2' : ''), timeoutMs)
@@ -380,7 +396,9 @@
     if (method === 'catalog.skills') return fetchJson(base + '/catalog/skills', timeoutMs)
     if (method === 'catalog.card') return fetchJson(base + '/catalog/cards/' + encodeURIComponent(String(payload.cardId || '')), timeoutMs)
     if (method === 'battleReports.get') {
-      var reportPayload = await fetchJson(base + '/battle-reports/' + encodeURIComponent(String(payload.battleId || payload.roomId || '')), timeoutMs)
+      var battleId = String(payload.battleId || payload.roomId || '').trim().toLowerCase()
+      var reportAuth = await admissionProof(base, currentIdentity().id, 'report:' + battleId)
+      var reportPayload = await fetchJson(base + '/battle-reports/' + encodeURIComponent(battleId), timeoutMs, { 'X-RvB-Auth': JSON.stringify(reportAuth) })
       return reportPayload && reportPayload.report ? reportPayload.report : reportPayload
     }
     if (method === 'battleReports.list') {
@@ -388,6 +406,13 @@
     }
 
     var client = createClient(base)
+    if (method === 'rooms.spectate') {
+      var spectatorAdmission = await joinOptions(payload.spectatorId, base, payload.roomId)
+      spectatorAdmission.spectator = true
+      var viewer = await withTimeout(client.joinById(payload.roomId, spectatorAdmission), timeoutMs, method)
+      try { return await roomRpc(viewer, 'rooms.get', {}, timeoutMs) }
+      finally { await viewer.leave() }
+    }
     if (method === 'rooms.list') {
       return fetchJson(base + '/rooms', timeoutMs)
     }
@@ -460,12 +485,12 @@
     return room.request('roomRpc', { method: method, data: data || {} }, { timeout: timeoutMs || 5000 })
   }
 
-  async function fetchJson(url, timeoutMs) {
+  async function fetchJson(url, timeoutMs, headers) {
     var controller = new AbortController()
     var timer = setTimeout(function () { controller.abort() }, timeoutMs || 5000)
     var diagnosticUrl = requestUrlForDiagnostics(url)
     try {
-      var response = await fetch(url, { signal: controller.signal, cache: 'no-store' })
+      var response = await fetch(url, { signal: controller.signal, cache: 'no-store', headers: headers })
       var body = await response.json().catch(function () { return {} })
       if (!response.ok) throw makeRpcError(body)
       return body

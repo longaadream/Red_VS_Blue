@@ -1654,6 +1654,9 @@
     <div class="room-name" id="roomNameLabel">对战</div>
     <div id="colyseusStatus" style="display:none;font-size:11px;padding:2px 7px;border-radius:5px;background:#1e3a2f;color:#4ade80;letter-spacing:.02em">● Colyseus</div>
     <button id="btnSurrender" class="btn-surrender" aria-label="投降" onclick="confirmSurrender()">投降</button>
+    <span id="spectatorStatus" style="font-size:12px"></span>
+    <button id="spectatingToggle" class="back-btn" hidden onclick="toggleSpectating()">关闭观战</button>
+    <button id="spectatorInvite" class="back-btn" hidden onclick="copySpectatorInvite()">复制房间邀请码</button>
     <button id="btnSwitchPov" aria-label="切换视角" style="display:none;background:#1e1b4b;border:1px solid #4f46e5;border-radius:8px;color:#a5b4fc;padding:5px 9px;font-size:12px;font-weight:700;cursor:pointer" onclick="switchPerspective()">切换视角 红方</button>
     <button id="btnResetCD" aria-label="重置冷却" style="display:none;background:#3b0764;border:1px solid #7c3aed;border-radius:8px;color:#d8b4fe;padding:5px 9px;font-size:12px;cursor:pointer" onclick="resetCooldowns()">冷却</button>
     <button class="btn-fullmap" id="btnFullMap" aria-label="切换全屏地图" onclick="toggleFullMap()" title="全屏地图">全图</button>
@@ -1844,6 +1847,17 @@
     const TUTORIAL_MODE = params.get('mode') === 'tutorial'
     const TRAINING_MODE = params.get('mode') === 'training' || TUTORIAL_MODE
     const SPECTATE_MODE = params.get('mode') === 'spectate'
+    let roomSpectatingEnabled = true
+    let roomSpectatorInvite = ''
+    if (SPECTATE_MODE) document.getElementById('btnSurrender').hidden = true
+    async function toggleSpectating() {
+      try { await RvBColyseus.request('rooms.action', { action: 'spectating', enabled: !roomSpectatingEnabled }) }
+      catch (error) { setStatusMsg('观战设置失败：' + error.message) }
+    }
+    async function copySpectatorInvite() {
+      try { await navigator.clipboard.writeText(roomSpectatorInvite); setStatusMsg('房间邀请码已复制') }
+      catch { setStatusMsg('房间邀请码：' + roomSpectatorInvite) }
+    }
     const RED43_QA_MODE = params.get('qa') === 'RED-43'
     const RED167_QA_MODE = params.get('qa') === 'RED-167'
     const DEBUG_BATTLE_LOG = params.get('debugBattleLog') === '1'
@@ -4298,7 +4312,7 @@
         showMsg('本地资源读取异常，继续连接战斗：' + (localLoad.errors[0] || 'unknown'), 'err')
       }
       try {
-        localStorage.setItem('rvb_active_battle', JSON.stringify({ roomId, playerId: myPlayerId, accountId: myAccountId, playerName: myPlayerName }))
+        if (!SPECTATE_MODE) localStorage.setItem('rvb_active_battle', JSON.stringify({ roomId, playerId: myPlayerId, accountId: myAccountId, playerName: myPlayerName }))
       } catch {}
       await initBattle()
     }
@@ -5002,7 +5016,10 @@
 
       RvBColyseus.on('message', function(msg) {
         if (msg.to && String(msg.to).toLowerCase() !== myPlayerId) return
-        if (msg.type === 'subscribed') {
+        if (msg.type === 'spectatorClosed') {
+          setStatusMsg(msg.reason || '观战已关闭，请返回大厅')
+          showMsg(msg.reason || '观战已关闭，请返回大厅', 'err')
+        } else if (msg.type === 'subscribed') {
           colyseusRole = msg.role || 'guest'
           addLog('[Colyseus] 角色：' + colyseusRole, 'info')
           if (pendingActionFeedback) {
@@ -5039,6 +5056,13 @@
         } else if (msg.type === 'roomUpdate') {
           if (msg.room) {
             isHost = msg.room.hostId && msg.room.hostId.toLowerCase() === myPlayerId
+            roomSpectatingEnabled = msg.room.spectatingEnabled !== false
+            roomSpectatorInvite = msg.room.inviteCode || ''
+            document.getElementById('spectatorStatus').textContent = (SPECTATE_MODE ? '只读观战 · ' : '') + '观众 ' + (msg.room.spectatorCount || 0) + '/8'
+            document.getElementById('spectatingToggle').hidden = !isHost || SPECTATE_MODE
+            document.getElementById('spectatingToggle').textContent = roomSpectatingEnabled ? '关闭观战' : '开放观战'
+            document.getElementById('spectatorInvite').hidden = !isHost || !roomSpectatorInvite || SPECTATE_MODE
+            if (SPECTATE_MODE && !G) showMsg('已进入观战，等待玩家完成阵容选择…', 'info')
             ;(msg.room.players || []).forEach(function(p) {
               var pid = (p.id || '').toLowerCase()
               if (pid && p.name) playerNames[pid] = p.name
@@ -5826,10 +5850,10 @@
       renderTeamRoster()
       // Determine which player is me
       const myPieces = sortWithSummons(
-        G.pieces.filter(p => p.ownerPlayerId && sameBattleTeam(p.ownerPlayerId, myPlayerId))
+        G.pieces.filter(p => SPECTATE_MODE ? p.faction === 'blue' : p.ownerPlayerId && sameBattleTeam(p.ownerPlayerId, myPlayerId))
       )
       const oppPieces = sortWithSummons(
-        G.pieces.filter(p => !(p.ownerPlayerId && sameBattleTeam(p.ownerPlayerId, myPlayerId)))
+        G.pieces.filter(p => SPECTATE_MODE ? p.faction !== 'blue' : !(p.ownerPlayerId && sameBattleTeam(p.ownerPlayerId, myPlayerId)))
       )
 
       // Update labels; use player name if available.
@@ -5843,6 +5867,10 @@
       const alignmentText = function(alignment) { return alignment === 'light' ? '光' : alignment === 'dark' ? '暗' : '阵营未知' }
       document.getElementById('myLabel').textContent = factionIcon + ' ' + alignmentText(playerAlignments[myPlayerId]) + ' · ' + myName
       document.getElementById('oppLabel').textContent = oppIcon + ' ' + alignmentText(playerAlignments[oppPid]) + ' · ' + oppName
+      if (SPECTATE_MODE) {
+        document.getElementById('myLabel').textContent = '[B] 蓝方'
+        document.getElementById('oppLabel').textContent = '[R] 红方'
+      }
 
       document.getElementById('myPieces').innerHTML = myPieces.map(p => renderPieceCard(p, p.ownerPlayerId.toLowerCase() === myPlayerId)).join('')
       document.getElementById('oppPieces').innerHTML = oppPieces.map(p => renderPieceCard(p, false)).join('')
@@ -7121,6 +7149,7 @@
     }
 
     async function doAction(action) {
+      if (SPECTATE_MODE) { setStatusMsg('观战为只读模式'); return }
       if (typeof TUTORIAL_MODE !== 'undefined' && TUTORIAL_MODE && tutorialRuntime) {
         const tutorialGuard = tutorialRuntime.beforeAction(action, G)
         if (!tutorialGuard.allowed) {
@@ -7218,7 +7247,7 @@
     }
 
     function storeCompletedMatchTrace() {
-      if (TRAINING_MODE || !G || !G.terminalResult) return null
+      if (TRAINING_MODE || SPECTATE_MODE || !G || !G.terminalResult) return null
       if (!window.RvBDeveloperTools) {
         const message = 'Trace 生成失败：比赛 Trace 导出器未加载'
         setCompletedMatchTraceStatus(message)
@@ -7254,6 +7283,7 @@
     }
 
     async function downloadCompletedMatchTrace() {
+      if (SPECTATE_MODE) return
       const record = completedMatchTraceRecord
         || (window.RvBDeveloperTools && await RvBDeveloperTools.readStoredTrace())
       if (!record || !window.RvBDeveloperTools) {
@@ -7272,7 +7302,7 @@
       if (TUTORIAL_MODE && params.has('lesson') && tutorialRuntime) { tutorialRuntime.showResult(); return }
       const terminalResult = G.terminalResult
       if (pollTimer) { clearInterval(pollTimer); pollTimer = null }
-      try { localStorage.removeItem('rvb_active_battle') } catch {}
+      try { if (!SPECTATE_MODE) localStorage.removeItem('rvb_active_battle') } catch {}
       if (!completedMatchTraceRecord) storeCompletedMatchTrace()
       if (completedMatchTraceRecord && typeof RvBColyseus !== 'undefined') RvBColyseus.disconnect()
       if (recordSaved) return
@@ -7287,8 +7317,8 @@
       const winnerLabel = terminalResult.winnerTeamId ? (terminalResult.winnerTeamId === 'blue' ? '蓝队' : '红队') : winner
         ? (playerNames[String(winner).toLowerCase()] || winner)
         : ''
-      document.getElementById('resultIcon').textContent = isDraw ? '=' : (iWon ? 'WIN' : 'LOSE')
-      document.getElementById('resultTitle').textContent = isDraw ? '平局' : (iWon ? '胜利' : '失败')
+      document.getElementById('resultIcon').textContent = isDraw ? '=' : (SPECTATE_MODE ? 'END' : iWon ? 'WIN' : 'LOSE')
+      document.getElementById('resultTitle').textContent = isDraw ? '平局' : (SPECTATE_MODE ? '对局结束' : iWon ? '胜利' : '失败')
       const terminalReasonLabels = {
         'core-eliminated': '核心棋子全灭',
         'mutual-core-elimination': '双方核心棋子同时全灭',

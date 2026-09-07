@@ -5,6 +5,16 @@ import { toPublicBattleState } from '@/lib/game/deployment'
 import { makePiece, makeState } from '../helpers/minimal-state'
 
 describe('battle public pending projection', () => {
+  it('never exposes terminal debug history to an admitted spectator identity', () => {
+    const state = makeState()
+    state.terminalResult = { status: 'finished' } as never
+    state.extensions!.debugBattle = { actionLog: [{ private: 'secret-recall' }], replay: { frames: [{ postState: { hand: 'secret-hand' } }] } } as never
+    const projection = toPublicBattleState(state, 'spectator-identity')
+    expect(projection.extensions?.debugBattle).toBeUndefined()
+    expect(JSON.stringify(projection)).not.toContain('secret-recall')
+    expect(JSON.stringify(projection)).not.toContain('secret-hand')
+    expect(state.extensions!.debugBattle).toBeDefined()
+  })
   it('keeps only the viewer hand visible and uses the same redaction for spectators', () => {
     const state = makeState()
     state.players[0].hand = [{

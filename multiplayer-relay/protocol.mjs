@@ -11,6 +11,7 @@ export function allowedGamePath(method, path) {
   if (method === 'WS') return /^\/[a-zA-Z0-9_-]+\/[a-zA-Z0-9_-]+$/.test(pathname)
   if (method === 'POST') return /^\/matchmake\/(joinById|reconnect)\/[a-zA-Z0-9_-]+$/.test(pathname)
   if (method !== 'GET') return false
+  if (/^\/room-invites\/[A-F0-9]{12}$/.test(pathname)) return true
   return /^\/(healthz|api\/ping|admission\/challenge|catalog\/(identity|maps|pieces|skills)|catalog\/cards\/[a-zA-Z0-9_-]+|rooms|rooms\/[a-zA-Z0-9_-]+|battle-reports|battle-reports\/[a-zA-Z0-9_-]+)$/.test(pathname)
 }
 

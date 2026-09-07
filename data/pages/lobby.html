@@ -257,8 +257,9 @@
     </div>
 
     <div class="invite-row">
-      <input class="invite-input" id="inviteInput" placeholder="输入邀请码加入…" maxlength="10" />
+      <input class="invite-input" id="inviteInput" placeholder="12位房间邀请码" maxlength="12" />
       <button class="btn-invite-join" onclick="joinByCode()">加入</button>
+      <button class="btn-invite-join" onclick="joinByCode(true)">观战</button>
     </div>
 
     <div class="status-bar" id="statusBar"></div>
@@ -621,7 +622,7 @@
               <div class="room-name">${escHtml(r.name || r.id)}</div>
               <div class="room-meta">玩家 ${players}/${r.maxPlayers || 2} · 🔴 进行中</div>
             </div>
-            <button class="btn-spectate" onclick="spectateRoom('${escHtml(r.id)}')">观战</button>
+            <button class="btn-spectate" ${r.spectatingEnabled === false || r.spectatorCount >= 8 ? 'disabled' : ''} onclick="spectateRoom('${escHtml(r.id)}')">${r.spectatingEnabled === false ? '观战关闭' : '观战 ' + (r.spectatorCount || 0) + '/8'}</button>
           </div>`
         }).join('')
       }
@@ -831,16 +832,15 @@
       return createRoomPromise
     }
 
-    async function joinByCode() {
+    async function joinByCode(spectating) {
       const raw = document.getElementById('inviteInput').value.trim()
       if (!raw) return
       const code = raw.toUpperCase()
       try {
-        const data = await lobbyRequest('rooms.list')
-        const rooms = data.rooms || []
-        const match = rooms.find(r => r.inviteCode && r.inviteCode.toUpperCase() === code && r.status === 'waiting')
-        if (match) { showFactionPicker(match.id) }
-        else { alert('邀请码无效或房间已关闭') }
+        const match = await lobbyRequest('rooms.resolveInvite', { inviteCode: code })
+        if (spectating) await spectateRoom(match.id)
+        else if (match.status === 'waiting' || match.status === 'ready') showFactionPicker(match.id)
+        else alert('对局已开始，可以选择观战')
       } catch (e) { alert('查找房间失败：' + e.message) }
     }
 

@@ -142,13 +142,15 @@ export function toPublicBattleState(
     }) as typeof target
   }
   const debugBattle = projected.extensions?.debugBattle
-  const terminalTrace = projected.terminalResult
+  const mayReadTerminalTrace = !viewerId || projected.players.some(player => player.playerId.toLowerCase() === viewerId)
+  const terminalTrace = projected.terminalResult && mayReadTerminalTrace
     ? readSanitizedBattleActionTrace(projected)
     : []
-  const terminalReplay = projected.terminalResult
+  const terminalReplay = projected.terminalResult && mayReadTerminalTrace
     ? readSanitizedBattleReplay(projected)
     : undefined
   if (debugBattle) {
+    if (!mayReadTerminalTrace) delete projected.extensions!.debugBattle
     debugBattle.appliedActionIds = []
     debugBattle.actionLog = terminalTrace
     if (terminalReplay) debugBattle.replay = terminalReplay
