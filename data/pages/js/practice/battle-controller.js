@@ -47,6 +47,8 @@ function acceptPracticeSnapshot(result) {
   }
   clearPendingActionFeedback('practice-applied')
   selectedPieceId = selectedPieceId && G.pieces.some(p => p.instanceId === selectedPieceId) ? selectedPieceId : null
+  // Reset the menu before render derives legal moves from the new state.
+  if (result.action?.playerId === result.humanPlayerId) restoreSelectedPieceMenu({ reopen: result.action.type === 'move' })
   render()
   if (G.terminalResult) showPracticeResult()
   else if (result.paused) pausePractice(new Error(result.paused))
@@ -119,7 +121,6 @@ async function practiceDoAction(rawAction) {
     applyAuthorityReceipt({ clientActionId: action.clientActionId, status: 'applied' }, null, null, { deferRender: true, deferPerformance: true })
     pendingSkill = null; pendingCardAction = null
     acceptPracticeSnapshot(result)
-    restoreSelectedPieceMenu({ reopen: action.type === 'move' })
   } catch (error) {
     clearPendingActionFeedback('practice-rejected')
     if (error.practicePaused) { pausePractice(error); return }
