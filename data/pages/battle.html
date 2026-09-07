@@ -33,6 +33,8 @@
   <script src="js/tutorial/tutorial-scenario.js"></script>
   <script src="js/tutorial/tutorial-controller.js"></script>
   <script src="js/tutorial/tutorial-runtime.js"></script>
+  <script src="js/tutorial/tutorial-lessons.js"></script>
+  <script src="js/tutorial/tutorial-lesson-runtime.js"></script>
   <style>
     :root {
       --bg: #0f172a; --bg2: #1e293b; --border: #334155;
@@ -1495,6 +1497,7 @@
 <link rel="stylesheet" href="tabletop-battle/dusk.css">
 <link rel="stylesheet" href="tabletop-battle/refinements.css">
 <link rel="stylesheet" href="tabletop-battle/character-dock.css">
+<link rel="stylesheet" href="tabletop-battle/comic-print.css">
 </head>
 <body>
 
@@ -2014,6 +2017,16 @@
       const Engine = await window.RvBGameEngine.ensure()
       const tutorialActive = typeof TUTORIAL_MODE !== 'undefined' && TUTORIAL_MODE
       if (method === 'POST') {
+        if (TUTORIAL_MODE && params.has('lesson')) {
+          const profileResponse = await withTimeout(fetch('./__tutorial-profile.json', { cache: 'no-store' }), 15000, '教程本地资源身份')
+          if (!profileResponse.ok) throw new Error('教程本地资源尚未就绪，请使用客户端或教程预览服务打开')
+          const profileIdentity = Engine.parseGameProfileIdentityV1(await profileResponse.json())
+          if (!profileIdentity) throw new Error('教程本地资源身份无效')
+          return window.RvBTutorialLessons.createBattle(Object.assign({}, Engine, {
+            getPieceById: function (id) { return PIECES_BY_ID[id] },
+            tutorialProfileIdentity: profileIdentity,
+          }), tutorialDefinition)
+        }
         const firstPlayerId = body && body.firstPlayerId === 'training-blue' ? 'training-blue' : 'training-red'
         const secondPlayerId = firstPlayerId === 'training-red' ? 'training-blue' : 'training-red'
         // Alignment filters the piece pool only; red/blue are engine seats.
@@ -2451,6 +2464,7 @@
       }
 
       const stamped = withClientActionId(prepareFreshSelectionAction(action))
+      if (!tutorialActionAllowed(stamped)) return false
       targetSubmissionPending = {
         clientActionId: stamped.clientActionId,
         type: stamped.type,
@@ -3669,8 +3683,16 @@
       currentPieceInfoDeploymentRevision = null
       renderPieceInfoRecord(piece, preserveKeyword)
     }
+    let tutorialDeploymentViewCache = null
+    function presentedDeployment() {
+      if (!(TUTORIAL_MODE && params.has('lesson')) || !G || !G.deployment) return G && G.deployment
+      if (!tutorialDeploymentViewCache || tutorialDeploymentViewCache.state !== G || tutorialDeploymentViewCache.playerId !== myPlayerId) {
+        tutorialDeploymentViewCache = { state: G, playerId: myPlayerId, deployment: window.GameEngine.toPublicBattleState(G, myPlayerId).deployment }
+      }
+      return tutorialDeploymentViewCache.deployment
+    }
     function resolveDeploymentOfferPiece(pieceId) {
-      const deployment = G && G.deployment
+      const deployment = presentedDeployment()
       if (
         !deployment
         || deployment.mode !== 'progressive-reserve-v1'
@@ -3744,7 +3766,7 @@
         || !progressiveDeploymentOwned(G)
         || G.terminalResult
         || deployment.revision !== currentPieceInfoDeploymentRevision
-        || !(deployment.offerPieces || []).some(function(piece) { return piece.instanceId === currentPieceInfoId })
+        || !(presentedDeployment().offerPieces || []).some(function(piece) { return piece.instanceId === currentPieceInfoId })
       ) closePieceInfo({ restoreFocus: false })
     }
     function handlePieceInfoModalKeydown(event) {
@@ -4217,6 +4239,11 @@
 
     // ── Init ──
     async function init() {
+      const requestedLesson = TUTORIAL_MODE && params.has('lesson') && window.RvBTutorialLessons.get(params.get('lesson'))
+      if (requestedLesson && requestedLesson.enabled === false) {
+        window.location.replace('tutorial.html')
+        return
+      }
       if (TRAINING_MODE) {
         document.getElementById('btnSurrender').style.display = 'none'
         document.getElementById('btnSwitchPov').style.display = TUTORIAL_MODE ? 'none' : ''
@@ -4230,6 +4257,12 @@
         if (!trainingLoad.ok) showMsg('本地资源读取异常：' + (trainingLoad.errors[0] || 'unknown'), 'err')
         refreshPlaceTemplates()
         if (TUTORIAL_MODE) {
+          if (params.has('lesson')) {
+            tutorialDefinition = window.RvBTutorialLessons.get(params.get('lesson'))
+            if (!tutorialDefinition) throw new Error('未知教学场景，请从课程页重新选择')
+            await initTraining(tutorialDefinition.mapId, {})
+            return
+          }
           if (!tutorialDefinition) {
             const tutorialErrors = []
             tutorialDefinition = await loadJsonRequired('./data/tutorial/first-session.json', tutorialErrors)
@@ -4373,6 +4406,22 @@
 
     function mountTutorialRuntime() {
       if (tutorialRuntime) tutorialRuntime.dispose()
+      if (params.has('lesson')) {
+        tutorialRuntime = window.RvBTutorialLessonRuntime.create(tutorialDefinition, {
+          getState: function () { return G },
+          getSelectedPieceId: function () { return selectedPieceId },
+          revealPieceSkills: function (pieceId) { selectedPieceId = pieceId; restoreSelectedPieceMenu({ reopen: true }); render() },
+          engine: function () { return window.RvBGameEngine.ensure() },
+          commit: async function (action) { await commitTutorialScriptAction(action); render() },
+          render: render,
+          setCue: function (cue) { if (window.BattleRenderer3D) window.BattleRenderer3D.setTutorialCue(cue) },
+          exit: function () { window.location.href = 'tutorial.html' },
+          restart: function () { window.location.reload() },
+          next: function () { window.location.href = 'battle.html?mode=tutorial&lesson=' + encodeURIComponent(window.RvBTutorialLessons.all[tutorialDefinition.number].id) },
+        })
+        window.__RVB_TUTORIAL__ = { scenarioId: tutorialDefinition.id, snapshot: tutorialRuntime.snapshot }
+        return
+      }
       tutorialRuntime = window.RvBTutorialRuntime.create(tutorialDefinition, {
         getState: function () { return G },
         setCue: function (cue) {
@@ -4404,7 +4453,7 @@
         latestBattlePresentationEvents = []
         G = await trainingApiFetch('POST', Object.assign({ mapId: mapId || undefined }, config))
         myPlayerId = TUTORIAL_MODE ? tutorialDefinition.player.playerId : G.turn.currentPlayerId
-        if (TUTORIAL_MODE) await runTutorialOpening()
+        if (TUTORIAL_MODE && !params.has('lesson')) await runTutorialOpening()
         // Auto-advance past start phase so training enters action phase immediately
         if (!TUTORIAL_MODE && G.turn && G.turn.phase === 'start') {
           try {
@@ -5354,7 +5403,7 @@
     // This keeps account identity separate from match player identity.
     function clientOwns(pid) {
       if (!pid) return false
-      if (TRAINING_MODE) return true
+      if (TRAINING_MODE && !(TUTORIAL_MODE && params.has('lesson'))) return true
       return String(pid).toLowerCase() === String(myPlayerId).toLowerCase()
     }
 
@@ -6267,11 +6316,11 @@
       const panel = document.getElementById('deploymentStatus')
       if (!panel || typeof RvBDeploymentStatus === 'undefined') return
       const selected = G && G.deployment && localDeploymentChoiceId
-        ? (G.deployment.offerPieces || []).find(function(piece) { return piece.instanceId === localDeploymentChoiceId })
+        ? (presentedDeployment().offerPieces || []).find(function(piece) { return piece.instanceId === localDeploymentChoiceId })
           || G.pieces.find(function(piece) { return piece.instanceId === localDeploymentChoiceId })
         : null
       const view = RvBDeploymentStatus.create({
-        deployment: G && G.deployment,
+        deployment: presentedDeployment(),
         playerId: myPlayerId,
         selectedPieceName: selected ? (selected.name || pieceName(selected)) : '',
         spectating: SPECTATE_MODE,
@@ -6458,7 +6507,11 @@
         return result
       }
       if (intent.type === 'inspect-piece') return showPieceInfo(intent.pieceId)
-      if (intent.type === 'select-piece') return selectPiece(intent.pieceId)
+      if (intent.type === 'select-piece') {
+        const result = selectPiece(intent.pieceId)
+        if (TUTORIAL_MODE && tutorialRuntime) tutorialRuntime.afterIntent(intent)
+        return result
+      }
       if (intent.type === 'clear-selection') return clearPieceSelection()
       if (intent.type === 'select-skill') return selectSkillCard(intent.skillId)
       if (intent.type === 'cancel-target') return cancelTargetSelection()
@@ -7181,6 +7234,7 @@
 
     function handleGameOver() {
       if (!G || !G.terminalResult) return
+      if (TUTORIAL_MODE && params.has('lesson') && tutorialRuntime) { tutorialRuntime.showResult(); return }
       const terminalResult = G.terminalResult
       if (pollTimer) { clearInterval(pollTimer); pollTimer = null }
       try { localStorage.removeItem('rvb_active_battle') } catch {}
@@ -7487,6 +7541,10 @@
         document,
         window,
         icons: BattleEffectIcons,
+        getCardDefinition: function(cardId) {
+          const definition = getCardDisplayDefinition(cardId)
+          return definition.name ? definition : loadCardDisplayMetadata(cardId)
+        },
         forcePlayback: RED167_QA_MODE,
       })
       battlePresentation = BattlePresentation.create({

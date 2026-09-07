@@ -380,6 +380,24 @@ describe('RED-166 icon action history', () => {
     expect(list.innerHTML).not.toContain('使用<br>技能')
     expect(JSON.stringify(model)).toBe(before)
 
+    const freeMove = {
+      ...rootEvent(7, { kind: 'move', iconId: 'action-move' }),
+      eventId: 'action-7:1', parentEventId: 'action-7:0', sequence: 1,
+      kind: 'statusRemoved', statusType: 'deployment-first-move-free',
+      sourcePieceId: 'source', targetPieceIds: ['source'],
+      complement: { kind: 'status', type: 'deployment-first-move-free' },
+    }
+    ui.update({ ...model, presentationEvents: [rootEvent(7, { kind: 'move', iconId: 'action-move' }), freeMove] })
+    const freeMoveRow = list.innerHTML.split('data-history-event-id="action-7:1"')[1].split('</button>')[0]
+    expect(freeMoveRow.match(/首次移动免费/g)).toHaveLength(1)
+    expect(freeMoveRow.match(/data-piece-id="source"/g)).toHaveLength(1)
+    expect(freeMoveRow).not.toContain('action-history-complement')
+
+    ui.update({ ...model, presentationEvents: [rootEvent(6, { kind: 'move', iconId: 'action-move' }),
+      { ...freeMove, eventId: 'action-6:1', rootEventId: 'action-6:0', parentEventId: 'action-6:0', targetPieceIds: ['target'] }] })
+    const targetRow = list.innerHTML.split('data-history-event-id="action-6:1"')[1].split('</button>')[0]
+    expect(targetRow).toContain('data-piece-id="target"')
+
     const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
     const unknownRoot = rootEvent(3, { kind: 'move', iconId: 'action-move' })
     ui.update({

@@ -17,6 +17,14 @@
 
 .tutorial-dialog[hidden] { display: none; }
 
+#tutorialLessonDialog { max-height: calc(100dvh - 180px); overflow-y: auto; }
+#tutorialLessonDialog .tutorial-dialog__actions { flex-wrap: wrap; }
+#tutorialLessonDialog .tutorial-dialog__objective { display: block; }
+#tutorialLessonDialog .tutorial-dialog__scene { margin-top: 0; }
+@media (max-height: 600px) {
+  #tutorialLessonDialog { bottom: 82px; width: min(380px, calc(100vw - 20px)); max-height: calc(100dvh - 140px); }
+}
+
 .tutorial-dialog__topline {
   display: flex;
   align-items: center;
@@ -128,3 +136,131 @@ body.tutorial-mode #btnSurrender { display: none !important; }
 @media (prefers-reduced-motion: reduce) {
   .tutorial-dialog *, .tutorial-dialog { scroll-behavior: auto !important; transition: none !important; }
 }
+
+/* Shared tabletop art: the lesson model and input gates remain unchanged. */
+@font-face {
+  font-family: TutorialComic;
+  src: url('../images/tabletop/ZCOOLKuaiLe-Regular.ttf') format('truetype');
+  font-display: swap;
+}
+.tutorial-dialog {
+  --guide-ink: #382b21;
+  --guide-paper: #c5b18d;
+  color: var(--guide-ink);
+  background: radial-gradient(#58402b16 .7px, transparent 1px) 0 0/5px 5px, var(--guide-paper);
+  border: 3px solid #39291e;
+  border-radius: 25px 10px 28px 12px;
+  box-shadow: 5px 7px 0 #211912, inset 0 0 25px #8c6e4226;
+  padding: 18px 20px;
+  backdrop-filter: none;
+  font-family: 'Microsoft YaHei', sans-serif;
+  scrollbar-width: thin;
+  scrollbar-color: #766147 transparent;
+}
+.tutorial-dialog::before {
+  content: '社长的小抄'; display: block; width: fit-content;
+  background: #465a59; color: #ead7b3; border: 2px solid #302c24;
+  border-radius: 5px 9px 4px 7px; padding: 5px 12px; margin: -6px 0 12px;
+  rotate: -2deg; font: 17px TutorialComic, sans-serif; box-shadow: 2px 2px #382b2140;
+}
+.tutorial-dialog__scene { color: #382b21; font: 24px/1.2 TutorialComic, sans-serif; }
+.tutorial-dialog__text { color: #4d3d2b; font-size: 14px; line-height: 1.7; margin: 12px 0; }
+.tutorial-dialog__session { color: #395653; }
+.tutorial-dialog__progress { color: #725d43; }
+.tutorial-dialog__speaker { background: #776d5040; color: #4e543c; }
+.tutorial-dialog__skip { color: #725d43; }
+.tutorial-dialog__skip:hover { color: #39291e; }
+.tutorial-dialog__objective {
+  background: #a8926940; border: 0; border-bottom: 2px dashed #7e684a;
+  border-radius: 8px 4px 12px 3px; color: #394e4c;
+  padding: 10px 12px; font-weight: 700; line-height: 1.6;
+}
+#tutorialLessonDialog .tutorial-dialog__objective::before { content: '→ '; font: 22px TutorialComic, sans-serif; }
+.tutorial-dialog__objective span { color: #705b41; }
+.tutorial-dialog__objective strong { color: #394e4c; }
+.tutorial-dialog__button {
+  background: #b6a07b; color: #423222; border: 2px solid #5a4631;
+  border-radius: 8px 5px 13px 6px; box-shadow: 2px 3px #493724;
+  font: 16px/1.25 TutorialComic, sans-serif; min-height: 38px; padding: 8px 13px;
+}
+.tutorial-dialog__button.is-primary { background: #455f60; color: #f0dfb9; border-color: #2b3a39; }
+.tutorial-dialog__button:hover { translate: 0 -1px; filter: brightness(1.07); }
+.tutorial-dialog__button:active { translate: 1px 2px; box-shadow: none; }
+.tutorial-dialog__button:focus-visible { outline: 3px solid #435a60; outline-offset: 4px; }
+.tutorial-dialog.is-busy { border-color: #80633c; }
+#tutorialLessonDialog details { border-top: 1px solid #8f795851; margin-top: 14px; padding-top: 9px; color: #675138; font-size: 12px; }
+#tutorialLessonDialog summary { cursor: pointer; width: fit-content; font: 15px TutorialComic, sans-serif; }
+#tutorialLessonDialog details ol { padding-left: 20px; line-height: 1.65; }
+#tutorialLessonDialog details li + li { margin-top: 8px; }
+@media (min-width: 1000px) {
+  #tutorialLessonDialog { left: 16px; bottom: 18px; width: 314px; max-height: min(280px, 42dvh); padding: 14px 16px; }
+  #tutorialLessonDialog .tutorial-dialog__scene { font-size: 21px; }
+  #tutorialLessonDialog .tutorial-dialog__text { font-size: 13px; line-height: 1.6; }
+  body.tutorial-mode #pieceInfoModal.character-dock { bottom: calc(min(280px, 42dvh) + 40px) !important; }
+  body.tutorial-mode .hand-scroll { margin-left: 350px; width: calc(100% - 350px); }
+}
+@media (max-width: 999px) {
+  #tutorialLessonDialog { left: auto; right: 12px; bottom: 175px; width: min(380px, calc(100vw - 32px)); max-height: 42dvh; }
+}
+@media (max-width: 600px) {
+  #tutorialLessonDialog { left: 10px; right: 10px; bottom: 160px; width: auto; max-height: 34dvh; padding: 12px 14px; }
+  .tutorial-dialog::before { font-size: 14px; margin-bottom: 8px; }
+  .tutorial-dialog__scene { font-size: 19px; }
+  .tutorial-dialog__text { font-size: 13px; line-height: 1.5; }
+}
+
+/* Six paper practice cards spread on the club table. */
+body[data-art-page=tutorial] { margin: 0; font-size: 14px; line-height: 1.6; }
+body[data-art-page=tutorial] * { box-sizing: border-box; }
+body[data-art-page=tutorial] main { max-width: 1120px; margin: auto; padding: 24px 30px 40px; }
+.lesson-nav { display: flex; align-items: center; justify-content: space-between; gap: 20px; color: #a08d70; font-size: 12px; }
+.lesson-nav .back-link { padding: 5px 13px; text-decoration: none; }
+.lesson-welcome { display: flex; align-items: center; justify-content: space-between; gap: 25px; padding: 20px 6px 24px; }
+.lesson-eyebrow { font: 19px TutorialComic, sans-serif; color: #c39f68; margin: 0 0 10px; }
+body[data-art-page=tutorial] h1 { color: #e5cfaa; margin: 0 0 12px; font-size: clamp(27px, 3.2vw, 42px); line-height: 1.2; text-shadow: 3px 4px #1a1410; }
+body[data-art-page=tutorial] .intro { color: #bfa987; max-width: 620px; margin: 0; }
+.lesson-stamp { flex-shrink: 0; border: 3px double #ad7057; color: #bd8365; border-radius: 12px 7px 14px 6px; padding: 10px 15px; rotate: 12deg; font: 25px/1.3 TutorialComic, sans-serif; text-align: center; }
+.lesson-table-heading { display: flex; justify-content: space-between; gap: 15px; border-top: 1px dashed #92765465; padding: 14px 2px 20px; color: #b9a17c; font-size: 12px; }
+.lesson-table-heading span:last-child { font: 16px TutorialComic, sans-serif; color: #c6a975; rotate: -3deg; }
+body[data-art-page=tutorial] .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 25px 22px; }
+body[data-art-page=tutorial] .lesson-card {
+  position: relative; display: flex; flex-direction: column; align-items: stretch; padding: 14px 18px 17px;
+  background: radial-gradient(#5b42221c .7px, transparent 1px) 0 0/5px 5px, #bba47d;
+  border: 3px solid #3a2b20; border-radius: 13px 7px 19px 8px;
+  color: #382b21; box-shadow: 4px 6px #1d1612, inset 0 0 24px #8b6b4030;
+  rotate: -.8deg; transition: translate .15s, box-shadow .15s;
+}
+body[data-art-page=tutorial] .lesson-card:nth-child(2n) { rotate: .7deg; border-radius: 6px 17px 8px 20px; }
+body[data-art-page=tutorial] .lesson-card:hover { translate: 0 -3px; box-shadow: 5px 9px #1d1612; }
+.lesson-card::before { content: ''; position: absolute; top: -10px; left: 42%; width: 52px; height: 18px; background: #ab8b6088; rotate: -5deg; border-inline: 1px dashed #59432e66; z-index: 1; }
+body[data-art-page=tutorial] .label { position: absolute; z-index: 2; top: 12px; left: 13px; font: 15px TutorialComic, sans-serif; color: #e4d1af; background: #4a5b57; padding: 3px 8px; border: 2px solid #3a3225; border-radius: 7px 4px 9px 5px; letter-spacing: 0; rotate: -5deg; }
+.lesson-art { height: 100px; position: relative; margin: 4px 0 6px; background: linear-gradient(90deg, #634e3922 1px, transparent 1px) 50% 50%/24px 24px, linear-gradient(#634e3922 1px, transparent 1px) 50% 50%/24px 24px; border-bottom: 2px dashed #7b624555; }
+.lesson-token { position: absolute; width: 61px; height: 61px; border: 4px solid #506d78; object-fit: cover; border-radius: 50%; box-shadow: 0 6px #30454b, 3px 10px 0 #4f3c2940; top: 26px; left: 27%; rotate: -9deg; }
+.lesson-token.token-1 { border-color: #985d4d; box-shadow: 0 6px #643d33, 3px 10px 0 #4f3c2940; left: 63%; top: 12px; rotate: 7deg; }
+.lesson-card--2 .token-1, .lesson-card--3 .token-1, .lesson-card--5 .token-1 { border-color: #506d78; box-shadow: 0 6px #30454b, 3px 10px 0 #4f3c2940; }
+.lesson-gesture { position: absolute; top: 36px; left: 50%; color: #544231; font: 33px TutorialComic, sans-serif; rotate: -12deg; }
+.lesson-shout { position: absolute; right: -4px; top: -6px; font: 17px TutorialComic, sans-serif; color: #713d2d; rotate: 9deg; background: #d2b988; border: 2px solid #63482e; padding: 4px 8px; border-radius: 48% 38% 46% 31%; }
+body[data-art-page=tutorial] .lesson-card h2 { color: #382b21; font-size: 24px; margin: 9px 0 7px; line-height: 1.25; }
+body[data-art-page=tutorial] .lesson-card p { color: #655036; font-size: 13px; margin: 0 0 12px; }
+body[data-art-page=tutorial] .meta { color: #786044; font-size: 11px; margin: auto 0 12px; }
+body[data-art-page=tutorial] .start { align-self: flex-end; padding: 7px 13px; color: #ebd9b6; background: #465e5c; border: 2px solid #313c33; border-radius: 8px 5px 12px 6px; font: 17px TutorialComic, sans-serif; text-decoration: none; box-shadow: 2px 3px #403221; }
+body[data-art-page=tutorial] .start::after { content: ' ↗'; }
+body[data-art-page=tutorial] .start:hover { background: #334947; }
+body[data-art-page=tutorial] .rules { display: flex; align-items: center; gap: 15px; margin: 28px 0 16px; padding: 16px 20px; border: 2px solid #5b4832; border-radius: 9px 16px 8px 12px; background: #75604722; color: #b9a581; font-size: 12px; }
+body[data-art-page=tutorial] .rules strong { font: 18px TutorialComic, sans-serif; color: #d6bc91; }
+.rule-mark { font: 35px TutorialComic, sans-serif; color: #c4a06b; border: 2px solid #927044; border-radius: 43% 38% 45% 36%; min-width: 39px; text-align: center; rotate: -8deg; }
+body[data-art-page=tutorial] footer { font-size: 11px; color: #9f8d73; margin-top: 16px; }
+body[data-art-page=tutorial] footer details { margin-top: 8px; }
+body[data-art-page=tutorial] footer summary { cursor: pointer; width: fit-content; }
+body[data-art-page=tutorial] footer a { color: #c4ad85; }
+@media (max-width: 800px) { body[data-art-page=tutorial] .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .lesson-stamp { font-size: 19px; } }
+@media (max-width: 520px) {
+  body[data-art-page=tutorial] main { padding: 20px 20px 32px; }
+  body[data-art-page=tutorial] .grid { grid-template-columns: minmax(0, 1fr); }
+  .lesson-nav span, .lesson-stamp, .lesson-table-heading span:last-child { display: none; }
+  .lesson-welcome { padding-top: 27px; } .lesson-art { height: 112px; }
+}
+@media (prefers-reduced-motion: reduce) { .lesson-card, .tutorial-dialog__button { transition: none !important; } }
+body[data-art-page=tutorial] .lesson-card.is-unavailable { filter: saturate(.35); }
+body[data-art-page=tutorial] .is-unavailable .start { background: #655b4c; color: #dbcaac; cursor: default; box-shadow: none; }
+body[data-art-page=tutorial] .is-unavailable .start::after { content: none; }

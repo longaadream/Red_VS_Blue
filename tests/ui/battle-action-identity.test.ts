@@ -19,6 +19,17 @@ function loadIdentity() {
 }
 
 describe('RED-167 action identity', () => {
+  it('shows authoritative rule response names but never announces a declined skill as released', () => {
+    const identity = loadIdentity()
+    const event = { kind: 'passive', sourcePieceId: 'minato', ruleId: 'rule-minato-flying-raijin-trigger', label: '飞雷神触发', result: { pending: true } }
+    const model = { pieces: [{ id: 'minato', name: '水门', portraitId: 'minato' }] }
+    expect(identity.resolve(event, model)).toMatchObject({ isSkill: true, skillName: '飞雷神触发', portraitSrc: 'images/minato.jpg' })
+    expect(identity.resolve({ ...event, kind: 'choiceResolved', result: { cancelled: true } }, model).isSkill).toBe(false)
+    expect(identity.resolve({ ...event, kind: 'choiceResolved', rootEventId: 'private-choice', result: undefined }, {
+      ...model, presentationEvents: [{ kind: 'concealed', rootEventId: 'private-choice' }],
+    }).isSkill).toBe(false)
+  })
+
   it('resolves a skill name and caster portrait from presentation-only metadata', () => {
     const identity = loadIdentity()
 
