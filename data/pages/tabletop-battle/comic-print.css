@@ -1,0 +1,24 @@
+/* Printed comic panels: flat fills and offset ink, with no soft bevels. */
+body :is(.turn-summary,.player-state-chip,.piece-context-menu,.action-history-dock,.target-mode-card,.deployment-status,.training-popover,.training-setup-sheet,.pi-layout,.cd-layout,.option-sheet,.battle-log-panel),
+body #tileStatusPanel {
+  box-shadow: 4px 5px 0 #201a17 !important;
+  border-color: #2b211c !important;
+  background-image: radial-gradient(#44312718 .8px,transparent 1px) !important;
+  background-size: 5px 5px !important;
+  backdrop-filter: none !important;
+}
+body :is(.card-item,.card-item.card-reactive) { box-shadow: 4px 5px 0 #201a17 !important; }
+body :is(.card-name-banner,.piece-context-skill,.btn-end) { box-shadow: 3px 4px 0 #201a17 !important; }
+body .turn-summary { border-radius: 5px 14px 5px 12px !important; }
+body .tutorial-dialog { box-shadow: 5px 6px 0 #201a17 !important; border: 3px solid #30251e; }
+body .tutorial-dialog__scene { letter-spacing: .055em; }
+body .piece-board-health {
+  border: 0 !important; border-radius: 0 !important;
+  background: none !important; color: #241e1a !important;
+  box-shadow: none !important; text-shadow: none !important;
+  transform: none;
+}
+body .dmg-float { -webkit-text-stroke: 1px #211a17; text-shadow: 3px 4px 0 #211a17 !important; }
+body .piece-board-health[data-level="critical"] { color: #8b2820 !important; }
+body .piece-context-skill:hover:not(:disabled) { outline: 2px solid #e2c58c; outline-offset: 2px; }
+body .battle-comic-beat { filter: drop-shadow(3px 4px 0 #211a17); }

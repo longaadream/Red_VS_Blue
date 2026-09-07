@@ -2,9 +2,18 @@
   'use strict'
 
   const NORMAL_DURATION_MS = 1100
+  const CARD_DURATION_MS = 1800
   const REDUCED_DURATION_MS = 120
   const SKIP_SETTLE_MS = 60
   const MAX_PLAYED_ROOTS = 256
+
+  function actionDuration(group) {
+    return group && group.root && group.root.kind === 'card' ? CARD_DURATION_MS : NORMAL_DURATION_MS
+  }
+
+  function phaseTime(phase, group) {
+    return phase === 'settle' ? actionDuration(group) - 320 : ({ path: 120, result: 420 }[phase] || 0)
+  }
 
   function eventOrder(left, right) {
     return Number(left && left.sequence || 0) - Number(right && right.sequence || 0)
@@ -40,6 +49,17 @@
         }
       })
       .sort(function (left, right) { return eventOrder(left.root, right.root) })
+      .flatMap(function (group) {
+        // Pending announcements have their own identity, but keep the causal
+        // root intact for board effects and the action history.
+        const reactions = group.children.filter(function (event) {
+          return event.kind === 'passive' && (event.skillId || event.ruleId) && event.sourcePieceId
+            && event.result && event.result.pending === true
+        }).map(function (event) {
+          return { rootEventId: event.eventId, root: event, children: [] }
+        })
+        return [group].concat(reactions)
+      })
   }
 
   function createQueue(options) {
@@ -99,12 +119,12 @@
       if (!active) return
       clearTimers()
       activeTimelineStartedAt = now()
-      const duration = reducedMotion ? REDUCED_DURATION_MS : NORMAL_DURATION_MS
+      const duration = reducedMotion ? REDUCED_DURATION_MS : actionDuration(active)
       if (!reducedMotion) {
         ;[
           { at: 120, phase: 'path' },
           { at: 420, phase: 'result' },
-          { at: 780, phase: 'settle' },
+          { at: phaseTime('settle', active), phase: 'settle' },
         ].forEach(function (entry) {
           if (entry.at <= activeProgressMs) return
           later(function () { if (active) onPhase(entry.phase, active) }, (entry.at - activeProgressMs) / speed)
@@ -120,6 +140,8 @@
         onIdle()
         return
       }
+      activeProgressMs = 0
+      activeTimelineStartedAt = now()
       if (reducedMotion) {
         onPhase('static', active)
         activeProgressMs = 0
@@ -155,7 +177,10 @@
       const incoming = groups.filter(function (group) { return remember(group.rootEventId) })
       const controlReturnedToViewer = !forcePlayback && lastIsViewerTurn === false && isViewerTurn
       lastIsViewerTurn = isViewerTurn
-      if (controlReturnedToViewer) {
+      const hasPendingBanner = [active].concat(pending, incoming).some(function (group) {
+        return group && group.root && group.root.result && group.root.result.pending === true
+      })
+      if (controlReturnedToViewer && !hasPendingBanner) {
         settleAll()
       }
       pending.push.apply(pending, incoming)
@@ -180,7 +205,7 @@
       if (normalized === speed) return
       if (active) {
         activeProgressMs += Math.max(0, now() - activeTimelineStartedAt) * speed
-        activeProgressMs = Math.min(reducedMotion ? REDUCED_DURATION_MS : NORMAL_DURATION_MS, activeProgressMs)
+        activeProgressMs = Math.min(reducedMotion ? REDUCED_DURATION_MS : actionDuration(active), activeProgressMs)
       }
       speed = normalized
       if (active) scheduleActiveTimeline()
@@ -211,6 +236,7 @@
           speed: speed,
           playedRootCount: playedRoots.size,
           timerCount: timers.length,
+          activeProgressMs: active ? Math.min(actionDuration(active), activeProgressMs + Math.max(0, now() - activeTimelineStartedAt) * speed) : 0,
         }
       },
     }
@@ -269,6 +295,8 @@
     const win = input.window || root
     const icons = input.icons || root.BattleEffectIcons
     const actionIdentity = input.actionIdentity || root.BattleActionIdentity
+    const cardFace = input.cardFace || root.HandCardFace
+    const getCardDefinition = input.getCardDefinition
     const reducedMotion = input.reducedMotion === true
       || !!(win && win.matchMedia && win.matchMedia('(prefers-reduced-motion: reduce)').matches)
     const now = typeof input.now === 'function' ? input.now : Date.now
@@ -286,6 +314,7 @@
     let currentGroup = null
     let suppressClickUntil = 0
     let speed = 1
+    let displayedCard = null
 
     const queue = createQueue({
       reducedMotion: reducedMotion,
@@ -301,6 +330,7 @@
       onIdle: function () {
         currentPhase = null
         currentGroup = null
+        displayedCard = null
         if (clearAreaFlash) clearAreaFlash()
         if (clearPath) clearPath()
         if (layer) layer.hidden = true
@@ -318,7 +348,9 @@
 
     function resolveIdentity(event) {
       return actionIdentity && typeof actionIdentity.resolve === 'function'
-        ? actionIdentity.resolve(event, model)
+        ? actionIdentity.resolve(event, Object.assign({}, model, {
+          presentationEvents: currentGroup ? [currentGroup.root].concat(currentGroup.children || []) : [],
+        }))
         : { isSkill: false, skillName: '', sourceName: '', portraitSrc: '', portraitFallback: '?', faction: '' }
     }
 
@@ -334,11 +366,39 @@
         + '</span>'
     }
 
+    function cardDisplay(event) {
+      if (event.kind !== 'card' || !event.cardId || !cardFace) return null
+      if (displayedCard && displayedCard.eventId === event.eventId) return displayedCard.definition
+      const snapshot = { eventId: event.eventId, definition: { name: '已打出的手牌', actionPointCost: '?', description: '卡牌资料暂不可用' } }
+      displayedCard = snapshot
+      const definition = typeof getCardDefinition === 'function' ? getCardDefinition(event.cardId) : null
+      function accept(value) {
+        if (value && value.name) snapshot.definition = value
+      }
+      if (definition && typeof definition.then === 'function') {
+        definition.then(function (value) {
+          accept(value)
+          if (displayedCard === snapshot && currentGroup && currentGroup.root.eventId === snapshot.eventId) render()
+        }).catch(function (error) {
+          console.error('[battle-action-vignette] card metadata unavailable', { eventId: event.eventId, cardId: event.cardId, error: error })
+        })
+      } else accept(definition)
+      return snapshot.definition
+    }
+
+    function renderCard(event, definition) {
+      return '<div class="battle-card-reveal"><span class="battle-card-reveal-kicker">打出手牌</span>'
+        + '<article class="card-item battle-played-card' + (definition.type === 'reactive' ? ' card-reactive' : '')
+        + '" aria-label="' + escapeHtml(definition.name) + '">'
+        + cardFace.render({ cardId: event.cardId }, definition) + '</article></div>'
+    }
+
     function render() {
       if (!layer || !currentGroup || !model) return
       const rootEvent = currentGroup.root
       const meta = resolveIcon(rootEvent)
       const identity = resolveIdentity(rootEvent)
+      const card = cardDisplay(rootEvent)
       const cells = eventCells(currentGroup, model)
       const cue = rootEvent.presentation && rootEvent.presentation.cue || 'directional'
       const actionLabel = identity.isSkill ? identity.skillName : (meta.label || '战场动作')
@@ -357,14 +417,21 @@
       }
       layer.hidden = false
       layer.className = 'battle-vignette-layer is-phase-' + currentPhase + ' is-cue-' + cue
+        + (card ? ' is-card-reveal' : identity.isSkill ? ' is-skill-banner' : ' is-action-banner')
       layer.dataset.phase = currentPhase
       layer.dataset.rootId = currentGroup.rootEventId
       layer.innerHTML = '<div class="battle-vignette-veil" aria-hidden="true"></div>'
-        + '<div class="battle-vignette-status" role="status" aria-live="polite">'
-        + '<span class="battle-vignette-label">'
-        + (identity.isSkill ? renderPortrait(identity) : '<img src="' + escapeHtml(meta.assetPath) + '" alt="">')
+        + '<div class="battle-vignette-status" data-action="' + escapeHtml(rootEvent.kind) + '" data-faction="' + escapeHtml(identity.faction) + '" role="status" aria-live="polite"'
+        + ' style="--banner-duration:' + (actionDuration(currentGroup) / speed) + 'ms;--banner-elapsed:-'
+        + (Math.max(phaseTime(currentPhase, currentGroup), queue.getDiagnostics().activeProgressMs) / speed) + 'ms">'
+        + (card ? renderCard(rootEvent, card) : '<span class="battle-vignette-label">'
+        + (identity.isSkill ? renderPortrait(identity) : '<span class="battle-vignette-action-icon" aria-hidden="true"><img src="' + escapeHtml(meta.assetPath) + '" alt=""></span>')
+        + '<span class="battle-vignette-copy">'
+        + (identity.isSkill ? '<span class="battle-vignette-kicker">'
+          + (rootEvent.result && rootEvent.result.pending ? '连锁触发' : rootEvent.kind === 'choiceResolved' ? '响应技能' : rootEvent.kind === 'chargeSkill' ? '充能释放' : '技能释放')
+          + ' · ' + escapeHtml(identity.sourceName) + '</span>' : '')
         + '<span class="battle-vignette-action-name" title="' + escapeHtml(actionLabel) + '">'
-        + escapeHtml(actionLabel) + '</span></span>'
+        + escapeHtml(actionLabel) + '</span></span></span>')
         + '<span class="battle-vignette-skip-hint">点按战场略过</span></div>'
         + renderComicBeat(resultVisible)
     }
@@ -506,6 +573,7 @@
       model = null
       currentPhase = null
       currentGroup = null
+      displayedCard = null
     }
 
     return {
@@ -527,6 +595,7 @@
     eventCells: eventCells,
     constants: Object.freeze({
       normalDurationMs: NORMAL_DURATION_MS,
+      cardDurationMs: CARD_DURATION_MS,
       reducedDurationMs: REDUCED_DURATION_MS,
       skipSettleMs: SKIP_SETTLE_MS,
     }),

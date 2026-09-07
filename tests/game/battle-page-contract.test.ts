@@ -406,7 +406,7 @@ describe('battle page route contract', () => {
 
     expect(lobby).toContain("window.location.href = 'battle.html?mode=' + mode")
     expect(lobby).toContain("function goToTraining() { return goToLocalPractice('training') }")
-    expect(lobby).toContain("function goToTutorial() { window.location.href = 'battle.html?mode=tutorial' }")
+    expect(lobby).toContain("function goToTutorial() { window.location.href = 'tutorial.html' }")
     expect(lobby).not.toContain("goToLocalPractice('tutorial')")
     expect(lobby).not.toMatch(/location\.href\s*=\s*['"]training\.html/)
   })

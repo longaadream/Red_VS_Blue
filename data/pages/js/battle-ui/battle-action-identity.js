@@ -4,7 +4,9 @@
   const reportedMissingSkills = new Set()
 
   function isSkillAction(event) {
-    return !!event && (event.kind === 'skill' || event.kind === 'chargeSkill')
+    return !!event && (event.kind === 'skill' || event.kind === 'chargeSkill'
+      || (!!(event.skillId || event.ruleId) && !!event.sourcePieceId && ((event.kind === 'choiceResolved' && !(event.result && event.result.cancelled))
+        || (event.kind === 'passive' && event.result && event.result.pending === true))))
   }
 
   function portraitUrl(portraitRef) {
@@ -49,7 +51,11 @@
   }
 
   function resolve(event, model) {
-    const skillAction = isSkillAction(event)
+    const concealedChoice = event && event.kind === 'choiceResolved'
+      && ((model && model.presentationEvents) || []).some(function (entry) {
+        return entry.kind === 'concealed' && entry.rootEventId === event.rootEventId
+      })
+    const skillAction = isSkillAction(event) && !concealedChoice
     const sourcePiece = pieceById(model, event && event.sourcePieceId)
     const skillId = String(event && event.skillId || '')
     const skill = model && model.skillSummariesById && model.skillSummariesById[skillId]

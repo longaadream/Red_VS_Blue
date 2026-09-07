@@ -149,6 +149,7 @@
   let _portraitDiscGeom = null
   let _contactShadowGeom = null
   let _contactShadowMat = null
+  let _toonRamp = null
   const _tileMats = {}
   const _factionMats = {}
   const _hlMats = {}
@@ -159,10 +160,10 @@
     if (_tileMats[type]) return _tileMats[type]
     const col = TILE_COLORS[type] || TILE_COLORS.floor
     const em  = TILE_EMISSIVE[type]
-    const mat = new THREE.MeshLambertMaterial({ color: col })
+    const mat = new THREE.MeshToonMaterial({ color: col, gradientMap: _toonRamp })
     if (em) { mat.emissive = new THREE.Color(em.color); mat.emissiveIntensity = em.intensity }
     if (type === 'floor' || type === 'cover' || type === 'wall') {
-      loadTexture('tabletop-battle/assets/comic-tile.svg', function(texture) {
+      loadTexture('tabletop-battle/assets/' + (type === 'floor' ? 'comic-tile.svg' : 'comic-terrain.svg'), function(texture) {
         texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
         texture.repeat.set(1,1); texture.offset.set(0,0);
         mat.map=texture; mat.needsUpdate=true; _invalidate();
@@ -175,7 +176,7 @@
   function getFactionMat(faction) {
     if (_factionMats[faction]) return _factionMats[faction]
     const col = FACTION_COLORS[faction] || FACTION_COLORS.red
-    const mat = new THREE.MeshLambertMaterial({ color: col, emissive: new THREE.Color(col), emissiveIntensity: 0.3 })
+    const mat = new THREE.MeshToonMaterial({ color: col, gradientMap: _toonRamp, emissive: new THREE.Color(col), emissiveIntensity: 0.3 })
     _factionMats[faction] = mat
     return mat
   }
@@ -301,6 +302,16 @@
     _textureLoadGeneration += 1
     _mounted = true
 
+    // Three discrete lighting bands, shared across instanced terrain and tokens.
+    // A tiny nearest-filtered ramp avoids a full-screen postprocessing pass.
+    _toonRamp = new THREE.DataTexture(new Uint8Array([
+      88, 88, 88, 255, 170, 170, 170, 255, 255, 255, 255, 255,
+    ]), 3, 1, THREE.RGBAFormat)
+    _toonRamp.minFilter = THREE.NearestFilter
+    _toonRamp.magFilter = THREE.NearestFilter
+    _toonRamp.generateMipmaps = false
+    _toonRamp.needsUpdate = true
+
     // Shared geometries. Piece geometry stays unit-sized so the oval metrics are
     // explicit and identical for portrait, faction ring, and touch projection.
     _tileGeom = new THREE.BoxGeometry(TILE_W, 1, TILE_W)
@@ -310,21 +321,18 @@
     _pieceRingGeom = new THREE.TorusGeometry(0.5, RING_T, 8, 32)
     _portraitDiscGeom = new THREE.CircleGeometry(0.5, 32)
     _contactShadowGeom = new THREE.CircleGeometry(0.5, 32)
-    _contactShadowMat = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.30, depthWrite: false })
+    _contactShadowMat = new THREE.MeshBasicMaterial({ color: 0x211b19, transparent: true, opacity: 0.55, depthWrite: false })
 
     // Scene and table lighting use dark neutral metal; faction color is reserved
     // for the narrow base ring and the existing authoritative highlight layers.
     _scene = new THREE.Scene()
     _scene.background = null
 
-    const ambient = new THREE.AmbientLight(0xfff3e4, 0.72)
+    const ambient = new THREE.AmbientLight(0xfff3e4, 0.50)
     _scene.add(ambient)
-    const dirLight = new THREE.DirectionalLight(0xfff6e5, 0.35)
+    const dirLight = new THREE.DirectionalLight(0xfff6e5, 0.82)
     dirLight.position.set(-7, 13, 10)
     _scene.add(dirLight)
-    const edgeLight = new THREE.DirectionalLight(0xc8c7b5, 0.16)
-    edgeLight.position.set(10, 5, -8)
-    _scene.add(edgeLight)
 
     // Renderer
     _renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true })
@@ -541,11 +549,11 @@
     _mapH = map.height
 
     const boardBaseGeometry = new THREE.BoxGeometry(_mapW + 1.25, BOARD_BASE_H, _mapH + 1.25)
-    const boardBaseMaterial = new THREE.MeshLambertMaterial({ color: 0x493729 })
+    const boardBaseMaterial = new THREE.MeshBasicMaterial({ color: 0x302720 })
     _boardBase = new THREE.Mesh(boardBaseGeometry, boardBaseMaterial)
     _boardBase.position.set((_mapW - 1) / 2, -BOARD_BASE_H / 2, (_mapH - 1) / 2)
     const boardFrontGeometry = new THREE.BoxGeometry(_mapW + 1.25, BOARD_BASE_H, 0.10)
-    const boardFrontMaterial = new THREE.MeshLambertMaterial({ color: 0x2d241d })
+    const boardFrontMaterial = new THREE.MeshBasicMaterial({ color: 0x201b19 })
     _boardFront = new THREE.Mesh(boardFrontGeometry, boardFrontMaterial)
     _boardFront.position.set((_mapW - 1) / 2, -BOARD_BASE_H / 2, _mapH + 0.105)
     _scene.add(_boardFront)
@@ -796,8 +804,9 @@
     group.add(contactShadow)
 
     const factionColor = FACTION_COLORS[faction] || FACTION_COLORS.red
-    const bodyMaterial = new THREE.MeshLambertMaterial({
+    const bodyMaterial = new THREE.MeshToonMaterial({
       color: factionColor,
+      gradientMap: _toonRamp,
       emissive: new THREE.Color(factionColor),
       emissiveIntensity: 0.08,
     })
@@ -805,6 +814,12 @@
     body.scale.set(PIECE_W, 1, PIECE_D)
     body.position.y = PIECE_H / 2 + 0.012
     group.add(body)
+
+    const inkMaterial = new THREE.MeshBasicMaterial({ color: 0x211c1a, side: THREE.BackSide })
+    const ink = new THREE.Mesh(_pieceBodyGeom, inkMaterial)
+    ink.scale.set(PIECE_W * 1.09, 1.08, PIECE_D * 1.09)
+    ink.position.y = body.position.y
+    ink.userData.motionRole = 'comic-outline'
 
     const portraitMat = new THREE.MeshBasicMaterial({ color: 0x3b4148 })
     const portraitMesh = new THREE.Mesh(_portraitDiscGeom, portraitMat)
@@ -846,6 +861,7 @@
     feedbackRing.position.y = PIECE_H + 0.03
     feedbackRing.renderOrder = 7
     group.add(feedbackRing)
+    group.add(ink)
 
     // Compact health and negative-status summary.
     const summaryEl = _createPieceSummaryEl(piece)
@@ -854,7 +870,7 @@
     _pieceObjects.set(piece.id, {
       id: piece.id,
       motionId: 'piece:' + piece.id,
-      group, body, ring, portraitMesh, contactShadow, factionMarkers, feedbackRing,
+      group, body, ink, ring, portraitMesh, contactShadow, factionMarkers, feedbackRing,
       markerMaterial,
       summaryEl,
       faction,
@@ -876,7 +892,7 @@
     _cancelAnimationsForPrefix(obj.motionId + ':')
     obj.statusExitTimers.forEach(function (timer) { clearTimeout(timer) })
     obj.statusExitTimers.clear()
-    ;[obj.body.material, obj.portraitMesh.material, obj.ring.material, obj.markerMaterial, obj.feedbackRing.material]
+    ;[obj.body.material, obj.ink.material, obj.portraitMesh.material, obj.ring.material, obj.markerMaterial, obj.feedbackRing.material]
       .forEach(function (material) { if (material && material.dispose) material.dispose() })
     if (obj.summaryEl && obj.summaryEl.parentNode) obj.summaryEl.remove()
   }
@@ -2084,7 +2100,7 @@
   }
 
   function _ownedPieceMaterials(obj) {
-    return [obj.body.material, obj.portraitMesh.material, obj.ring.material, obj.markerMaterial]
+    return [obj.body.material, obj.ink.material, obj.portraitMesh.material, obj.ring.material, obj.markerMaterial]
       .filter(function (material, index, materials) { return material && materials.indexOf(material) === index })
   }
 
@@ -2696,6 +2712,8 @@
       materials.forEach(function (material) { if (material.dispose) material.dispose() })
     }
     _texCache.forEach(function (entry) { if (entry && entry.texture && entry.texture.dispose) entry.texture.dispose() })
+    if (_toonRamp) _toonRamp.dispose()
+    _toonRamp = null
     if (_renderer) {
       _renderer.dispose()
       if (_renderer.forceContextLoss) _renderer.forceContextLoss()

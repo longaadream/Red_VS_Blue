@@ -21,6 +21,9 @@ export {
   projectBattlePresentationEventsForViewer,
 } from './battle-presentation-events'
 export { getEffectiveChargeCost } from './skills'
+export { planBotActions, prepareLegalBotAction } from './ai'
+export { getCurrentInputOwnerPlayerId } from './turn-timer'
+export { parseGameProfileIdentityV1 } from '../content-pipeline/runtime/profile-game-identity'
 export {
   AI_ENVIRONMENT_CAPABILITIES,
   aiEnvironmentV1,
@@ -76,6 +79,7 @@ export async function createInitialBattleForPlayers(
   options?: {
     firstPlayerId?: PlayerId
     rootSeed?: number
+    profileIdentity?: import('../content-pipeline/runtime/profile-game-identity').GameProfileIdentityV1
     deploymentEnabled?: boolean
     deploymentStartedAt?: number
   },

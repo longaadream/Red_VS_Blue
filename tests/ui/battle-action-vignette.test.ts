@@ -23,7 +23,7 @@ type VignetteModule = {
     getDiagnostics(): { activeRootId: string | null; pendingRootIds: string[]; speed: number; playedRootCount: number }
     dispose(): void
   }
-  constants: { normalDurationMs: number; reducedDurationMs: number; skipSettleMs: number }
+  constants: { normalDurationMs: number; cardDurationMs: number; reducedDurationMs: number; skipSettleMs: number }
 }
 
 class FakeElement {
@@ -71,6 +71,7 @@ function loadModule(): VignetteModule {
     clearTimeout,
   }
   const context = createContext({ window: windowObject, globalThis: windowObject, console, setTimeout, clearTimeout })
+  new Script(readFileSync(resolve(process.cwd(), 'data/pages/js/hand-card-face.js'), 'utf8')).runInContext(context)
   const identitySource = readFileSync(resolve(process.cwd(), 'data/pages/js/battle-ui/battle-action-identity.js'), 'utf8')
   const source = readFileSync(resolve(process.cwd(), 'data/pages/js/battle-ui/battle-action-vignette.js'), 'utf8')
   new Script(identitySource, { filename: 'battle-action-identity.js' }).runInContext(context)
@@ -113,6 +114,57 @@ describe('RED-167 action vignette queue', () => {
 
   it('does not invent a source at (0,0) for a card without a caster', () => {
     expect(loadModule().eventCells({ root: root(1, { kind: 'card' }), children: [] }, { pieces: [] }).source).toBeNull()
+  })
+
+  it('queues another caster pending banner after the original skill, once even across control changes', () => {
+    const vignetteModule = loadModule()
+    const phases: string[] = []
+    const queue = vignetteModule.createQueue({ onPhase: (phase: string, group: { rootEventId: string }) => {
+      if (phase === 'focus') phases.push(group.rootEventId)
+    } })
+    queue.update({ presentationEvents: [], turn: { isViewerTurn: false } })
+    const events = [root(1, { sourcePieceId: 'attacker', skillId: 'shot' }),
+      child(1, 1, { kind: 'passive', sourcePieceId: 'defender', skillId: 'counter', result: { pending: true } })]
+    queue.update({ presentationEvents: events, turn: { isViewerTurn: false } })
+    queue.update({ presentationEvents: events, turn: { isViewerTurn: true } })
+    expect(queue.getDiagnostics().activeRootId).toBe('action-1:0')
+    expect(queue.getDiagnostics().pendingRootIds).toEqual(['action-1:1'])
+    vi.advanceTimersByTime(vignetteModule.constants.normalDurationMs)
+    expect(phases).toEqual(['action-1:0', 'action-1:1'])
+    queue.update({ presentationEvents: events, turn: { isViewerTurn: true } })
+    vi.advanceTimersByTime(vignetteModule.constants.normalDurationMs)
+    expect(phases).toHaveLength(2)
+    expect(vi.getTimerCount()).toBe(0)
+  })
+
+  it('renders a pending response with its own portrait and skill name rather than the initiating caster', () => {
+    const vignetteModule = loadModule()
+    const floatLayer = new FakeElement()
+    const vignette = vignetteModule.create({ document: { createElement: () => new FakeElement() } })
+    vignette.mount({ boardContainer: new FakeElement(), floatLayer })
+    vignette.update({ presentationEvents: [], turn: { isViewerTurn: true } })
+    vignette.update({ presentationEvents: [root(2, { kind: 'choiceResolved', sourcePieceId: 'reactor', skillId: 'shield' })],
+      turn: { isViewerTurn: true }, pieces: [{ id: 'reactor', name: '乌瑟尔', portraitId: 'uther.jpg', faction: 'blue' }],
+      skillSummariesById: { shield: { name: '圣光盾' } } })
+    expect(floatLayer.children[0].className).toContain('is-skill-banner')
+    expect(floatLayer.children[0].innerHTML).toContain('响应技能 · 乌瑟尔')
+    expect(floatLayer.children[0].innerHTML).toContain('images/uther.jpg')
+    expect(floatLayer.children[0].innerHTML).toContain('圣光盾')
+    vignette.dispose()
+  })
+
+  it('keeps a concealed response neutral after a newer action replaces the current event model', () => {
+    const vignetteModule = loadModule()
+    const floatLayer = new FakeElement()
+    const vignette = vignetteModule.create({ document: { createElement: () => new FakeElement() } })
+    vignette.mount({ boardContainer: new FakeElement(), floatLayer })
+    const model = { turn: { isViewerTurn: false }, pieces: [{ id: 'reactor', name: '乌瑟尔' }], skillSummariesById: { shield: { name: '圣光盾' } } }
+    vignette.update({ ...model, presentationEvents: [] })
+    vignette.update({ ...model, presentationEvents: [root(2, { kind: 'choiceResolved', sourcePieceId: 'reactor', skillId: 'shield' }), child(2, 1, { kind: 'concealed' })] })
+    vignette.update({ ...model, presentationEvents: [root(3, { kind: 'move' })] })
+    vi.advanceTimersByTime(420)
+    expect(floatLayer.children[0].className).not.toContain('is-skill-banner')
+    vignette.dispose()
   })
 
   it.each([false, true])('anchors a visible result accent and clears it after playback (reduced=%s)', (reducedMotion) => {
@@ -187,7 +239,7 @@ describe('RED-167 action vignette queue', () => {
     expect(queue.getDiagnostics().pendingRootIds).toEqual([
       'action-2:0', 'action-3:0', 'action-4:0', 'action-5:0',
     ])
-    vi.advanceTimersByTime(vignetteModule.constants.normalDurationMs * 5)
+    vi.advanceTimersByTime(vignetteModule.constants.normalDurationMs * 4 + vignetteModule.constants.cardDurationMs)
     queue.update({ presentationEvents: [root(5), child(5, 1)], turn: { isViewerTurn: false } })
 
     expect(phases.filter(value => value.endsWith(':focus'))).toEqual([
@@ -277,6 +329,75 @@ describe('RED-167 action vignette queue', () => {
     expect(queue.getDiagnostics().activeRootId).toBe('action-1:0')
     vi.advanceTimersByTime(1)
     expect(queue.getDiagnostics().activeRootId).toBeNull()
+  })
+
+  it('holds each played card before the next card or pending skill and retimes the remaining hold', () => {
+    const vignetteModule = loadModule()
+    const queue = vignetteModule.createQueue({ now: () => Date.now() })
+    queue.update({ presentationEvents: [], turn: { isViewerTurn: true } })
+    queue.update({ presentationEvents: [root(1, { kind: 'card', cardId: 'coin' }),
+      root(2, { kind: 'card', cardId: 'heal' }), child(2, 1, { kind: 'passive', skillId: 'reaction', sourcePieceId: 'other', result: { pending: true } })], turn: { isViewerTurn: true } })
+    vi.advanceTimersByTime(1000)
+    expect(queue.getDiagnostics().activeRootId).toBe('action-1:0')
+    queue.setSpeed(2)
+    vi.advanceTimersByTime(399)
+    expect(queue.getDiagnostics().activeRootId).toBe('action-1:0')
+    vi.advanceTimersByTime(1)
+    expect(queue.getDiagnostics().activeRootId).toBe('action-2:0')
+    vi.advanceTimersByTime(vignetteModule.constants.cardDurationMs / 2)
+    expect(queue.getDiagnostics().activeRootId).toBe('action-2:1')
+    queue.dispose()
+    expect(vi.getTimerCount()).toBe(0)
+  })
+
+  it('renders the public played card with the shared face after it leaves the hand, but never looks up hidden cards', () => {
+    const vignetteModule = loadModule()
+    const floatLayer = new FakeElement()
+    const getCardDefinition = vi.fn(() => ({ name: '幸运币', description: '获得1点行动点。', actionPointCost: 0, image: 'coin.png' }))
+    const vignette = vignetteModule.create({ document: { createElement: () => new FakeElement() }, getCardDefinition })
+    vignette.mount({ boardContainer: new FakeElement(), floatLayer })
+    const model = { presentationEvents: [] as unknown[], pieces: [], turn: { isViewerTurn: true } }
+    vignette.update(model)
+    vignette.update({ ...model, presentationEvents: [root(1, { kind: 'card', cardId: 'coin' })] })
+    const layer = floatLayer.children[0]
+    expect(layer.className).toContain('is-card-reveal')
+    expect(layer.innerHTML).toContain('images/card-art/coin.png')
+    expect(layer.innerHTML).toContain('幸运币')
+    expect(layer.innerHTML).toContain('获得1点行动点。')
+    expect(layer.innerHTML).not.toContain('battle-vignette-action-name')
+    vi.advanceTimersByTime(vignetteModule.constants.cardDurationMs)
+    vignette.update({ ...model, presentationEvents: [root(2, { kind: 'concealed', cardId: 'secret' })] })
+    expect(getCardDefinition).toHaveBeenCalledTimes(1)
+    expect(layer.innerHTML).not.toContain('幸运币')
+    expect(layer.innerHTML).not.toContain('secret')
+    vignette.dispose()
+  })
+
+  it('accepts late card metadata only for the same active reveal and ignores it after skipping', async () => {
+    const vignetteModule = loadModule()
+    const floatLayer = new FakeElement()
+    let deliver!: (value: unknown) => void
+    const getCardDefinition = vi.fn(() => new Promise(resolve => { deliver = resolve }))
+    const vignette = vignetteModule.create({ document: { createElement: () => new FakeElement() }, getCardDefinition, now: () => Date.now() })
+    vignette.mount({ boardContainer: new FakeElement(), floatLayer })
+    const model = { presentationEvents: [] as unknown[], pieces: [], turn: { isViewerTurn: true } }
+    vignette.update(model)
+    vignette.update({ ...model, presentationEvents: [root(1, { kind: 'card', cardId: 'late' })] })
+    expect(floatLayer.children[0].innerHTML).toContain('资料暂不可用')
+    vi.advanceTimersByTime(900)
+    deliver({ name: '迟到卡牌', description: '真实描述', actionPointCost: 2 })
+    await Promise.resolve()
+    expect(floatLayer.children[0].innerHTML).toContain('真实描述')
+    expect(floatLayer.children[0].innerHTML).toContain('--banner-elapsed:-900ms')
+    vi.advanceTimersByTime(vignetteModule.constants.cardDurationMs)
+    vignette.update({ ...model, presentationEvents: [root(2, { kind: 'card', cardId: 'later' })] })
+    vignette.settleAll()
+    vignette.update({ ...model, presentationEvents: [root(3, { kind: 'move' })] })
+    deliver({ name: '过期卡牌', description: '不可覆盖移动' })
+    await Promise.resolve()
+    expect(floatLayer.children[0].innerHTML).not.toContain('过期卡牌')
+    expect(floatLayer.children[0].className).toContain('is-action-banner')
+    vignette.dispose()
   })
 
   it('fast-settles the active queue when control returns to the viewer and disposes all timers', () => {

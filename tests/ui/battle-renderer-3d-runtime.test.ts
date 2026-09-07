@@ -2,12 +2,13 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { Script, createContext } from 'node:vm'
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import { createRed68BattleFixture } from './fixtures/red-68-battle-fixture'
 
 const pagesDir = resolve(process.cwd(), 'data/pages')
 type ThreeMaterial = {
+  gradientMap?: { dispose(): void }
   color?: { getHex(): number }
   emissive: { getHex(): number }
   emissiveIntensity: number
@@ -691,6 +692,8 @@ describe('RED-68 BattleRenderer3D runtime', () => {
     harness.renderer.update(model)
     harness.frame()
     const firstRenderer = harness.renderers[0]
+    const toonRamp = firstRenderer.scene!.children.find((child) => child.isInstancedMesh)!.material!.gradientMap!
+    const disposeRamp = vi.spyOn(toonRamp, 'dispose')
     const firstCanvas = firstRenderer.domElement as FakeElement
     expect(firstCanvas.listenerCount()).toBeGreaterThan(0)
     harness.renderer.update(model)
@@ -700,12 +703,17 @@ describe('RED-68 BattleRenderer3D runtime', () => {
     expect(firstCanvas.listenerCount()).toBe(0)
     expect(firstRenderer.disposed).toBe(true)
     expect(firstRenderer.contextLost).toBe(true)
+    expect(disposeRamp).toHaveBeenCalledOnce()
     expect(harness.observers[0].disconnected).toBe(true)
     expect(harness.disposeCounts.geometry).toBeGreaterThan(0)
     expect(harness.disposeCounts.material).toBeGreaterThan(0)
     expect(harness.cancelledRafs.size).toBeGreaterThan(0)
 
     const secondRenderer = harness.renderers[1]
+    harness.renderer.update(model)
+    harness.frame()
+    const remountedRamp = secondRenderer.scene!.children.find((child) => child.isInstancedMesh)!.material!.gradientMap!
+    expect(remountedRamp).not.toBe(toonRamp)
     const secondCanvas = secondRenderer.domElement as FakeElement
     harness.renderer.dispose()
     expect(secondCanvas.listenerCount()).toBe(0)
@@ -792,6 +800,8 @@ describe('RED-68 BattleRenderer3D runtime', () => {
     expect(pieceGroups).toHaveLength(16)
     const removedGroup = pieceGroups[0]
     const markerMaterial = removedGroup.children[4].material!
+    const outlineMaterial = removedGroup.children.find((child) => child.userData.motionRole === 'comic-outline')!.material!
+    const outlineDispose = vi.spyOn(outlineMaterial, 'dispose')
     let markerDisposed = false
     const disposeMarker = markerMaterial.dispose.bind(markerMaterial)
     markerMaterial.dispose = () => {
@@ -807,7 +817,8 @@ describe('RED-68 BattleRenderer3D runtime', () => {
     expect(scene.children).not.toContain(removedGroup)
     expect(scene.children.filter((child) => child.type === 'Group')).toHaveLength(15)
     expect(markerDisposed).toBe(true)
-    expect(harness.disposeCounts.material - materialDisposalsBefore).toBe(5)
+    expect(outlineDispose).toHaveBeenCalledOnce()
+    expect(harness.disposeCounts.material - materialDisposalsBefore).toBe(6)
     harness.renderer.dispose()
   })
 

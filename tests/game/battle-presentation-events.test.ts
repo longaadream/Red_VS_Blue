@@ -64,6 +64,58 @@ function project(
 }
 
 describe('RED-165 authoritative battle presentation events', () => {
+  it('announces rule-backed Flying Raijin and marks declining its pending as cancelled', () => {
+    const before = stateWithPieces([piece('source', 'player-red', 10), piece('minato', 'player-red', 10)])
+    before.pieces[1].rules = [{ id: 'rule-minato-flying-raijin-trigger', name: '飞雷神触发' }] as typeof before.pieces[1]['rules']
+    const after = structuredClone(before)
+    after.pendingOptionSelection = { selectionId: 'raijin-1', playerId: 'player-red', title: '飞雷神', cancelValue: 'no',
+      options: [{ label: '是', value: 'yes' }, { label: '否', value: 'no' }],
+      source: { type: 'rule', id: 'rule-minato-flying-raijin-trigger', pieceId: 'minato' } }
+    const events = project({ type: 'useBasicSkill', playerId: 'player-red', pieceId: 'source', skillId: 'fireball' }, before, after)
+    expect(events.find(event => event.result?.pending)).toMatchObject({ sourcePieceId: 'minato', ruleId: 'rule-minato-flying-raijin-trigger', label: '飞雷神触发' })
+    const declined = structuredClone(after)
+    declined.pendingOptionSelection = undefined
+    for (const command of [{ type: 'pendingOptionSelect', playerId: 'player-red', selectedOption: 'no' }, { type: 'cancelPendingSelection', playerId: 'player-red' }]) {
+      expect(project(command as BattleAction, after, declined)[0]).toMatchObject({ ruleId: 'rule-minato-flying-raijin-trigger', result: { cancelled: true } })
+    }
+    expect(project({ type: 'pendingOptionSelect', playerId: 'player-red', selectedOption: 'yes' }, after, declined)[0]).toMatchObject({ ruleId: 'rule-minato-flying-raijin-trigger', label: '飞雷神触发' })
+  })
+
+  it('announces a newly triggered other-piece skill once and only to its chooser', () => {
+    const before = stateWithPieces([piece('source', 'player-red', 10), piece('target', 'player-blue', 10)])
+    const after = structuredClone(before)
+    after.pendingOptionSelection = {
+      selectionId: 'response-1', playerId: 'player-blue', title: '秘密选项',
+      options: [{ label: '秘密目标', value: 'hidden-choice' }],
+      source: { type: 'skill', id: 'response-skill', pieceId: 'target' },
+    }
+    const command = { type: 'useBasicSkill', playerId: 'player-red', pieceId: 'source', skillId: 'attack' } as BattleAction
+    const events = project(command, before, after)
+    const announcement = events.find(event => event.result?.pending)
+    expect(announcement).toMatchObject({ kind: 'passive', sourcePieceId: 'target', skillId: 'response-skill', actorPlayerId: 'player-blue' })
+    expect(JSON.stringify(announcement)).not.toContain('hidden-choice')
+    expect(projectBattlePresentationEventsForViewer(events, 'player-blue').some(event => event.result?.pending)).toBe(true)
+    for (const viewer of ['player-red', undefined]) {
+      expect(JSON.stringify(projectBattlePresentationEventsForViewer(events, viewer))).not.toContain('response-skill')
+    }
+    expect(project(command, after, structuredClone(after)).some(event => event.result?.pending)).toBe(false)
+    const cleared = structuredClone(after)
+    cleared.pendingOptionSelection = undefined
+    expect(project(command, after, cleared).some(event => event.result?.pending)).toBe(false)
+    after.pendingOptionSelection.source!.pieceId = 'source'
+    expect(project(command, before, after).some(event => event.result?.pending)).toBe(false)
+  })
+
+  it('deduplicates target and option announcements for the same pending selection', () => {
+    const before = stateWithPieces([piece('source', 'player-red', 10), piece('target', 'player-blue', 10)])
+    const after = structuredClone(before)
+    const shared = { selectionId: 'response-2', playerId: 'player-blue', source: { type: 'skill' as const, id: 'response-skill', pieceId: 'target' } }
+    after.pendingOptionSelection = { ...shared, title: '响应', options: [] }
+    after.pendingTargetSelection = { ...shared, targetType: 'cell', candidates: [] }
+    const events = project({ type: 'useBasicSkill', playerId: 'player-red', pieceId: 'source', skillId: 'attack' }, before, after)
+    expect(events.filter(event => event.result?.pending)).toHaveLength(1)
+  })
+
   it('captures a forced target before the action and does not follow subsequent movement', () => {
     const before = stateWithPieces([piece('source', 'red', 10), piece('target', 'blue', 10)])
     const after = structuredClone(before)
@@ -171,7 +223,7 @@ describe('RED-165 authoritative battle presentation events', () => {
   it('models player status effects with the player as subject instead of the acting piece', () => {
     const before = stateWithPieces([piece('source', 'player-red', 10)])
     const after = structuredClone(before)
-    ;(after.players[0] as any).statusTags = [{ id: 'player-rule', type: 'player-rule', name: '玩家规则', visible: true }]
+    after.players[0].statusTags = [{ id: 'player-rule', type: 'player-rule', name: '玩家规则', visible: true }]
 
     const events = project(
       { type: 'useBasicSkill', playerId: 'player-red', pieceId: 'source', skillId: 'skill-basic' },
