@@ -63,6 +63,12 @@
 
 本增量通过 15 项工作台测试、TypeScript、lint 和独立代码审查。真实 Electron smoke 已验证两组规则添加/写盘/重开、规则导航及删除棋子规则后玩家规则与技能扩展字段不变；界面证据为 `docs/qa/RED-191/visual-piece-rules.png`。
 
-## 回退方式
+## PR 基线复验
+
+创建 PR 前已无冲突合入 `origin/main@e9b6918080010f30f5b2fe5f535548f80c90a257`。直接相关的 4 个编辑器测试文件共 38 项通过，编辑器 TypeScript 与 content-pipeline lint 通过；重建后的真实 Electron 工作台 smoke 通过。
+
+扩大运行 `tests/content-pipeline` 与 `tests/electron` 时，479 项中 474 项通过、5 项失败：3 项 battle-page-runtime 测试缺少新教程全局 `TUTORIAL_MODE` / `tutorialActionAllowed`；2 项 embedded-postgres 测试涉及本地运行库缺失及 manifest 校验。对应测试及实现文件与上述 main 无差异；未声称全套测试通过，也未在编辑器 PR 中改动这些模块。
+
+## 回退操作
 
 回退候选代码/安装程序即可；保留内容项目、资源包、已安装 Profile、存档与密钥，不通过删除用户数据实现回退。不自行合并或正式发布。
