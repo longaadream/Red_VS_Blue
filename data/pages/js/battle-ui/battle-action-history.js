@@ -365,11 +365,16 @@
 
     function displayObject(event, compact) {
       const batch = event.batchEvents || [event]
+      const ownEffect = ['passive', 'statusAdded', 'statusRemoved'].includes(event.kind)
+      if (ownEffect && (event.targetPieceIds || []).length === 1 && event.targetPieceIds[0] === event.sourcePieceId
+        && batch.every(function (entry) { return (entry.targetPieceIds || []).length === 1 && entry.targetPieceIds[0] === event.sourcePieceId })) return ''
+      if (ownEffect && !(event.targetPieceIds || []).length && (event.targetPlayerIds || []).length === 1
+        && (event.kind !== 'passive' || event.targetPlayerIds[0] === event.actorPlayerId)) return ''
       if (batch.length > 1) {
         const targets = new Set(batch.flatMap(function (entry) {
           return (entry.targetPieceIds || []).concat(entry.targetCell ? [entry.targetCell.x + ',' + entry.targetCell.y] : [])
         }))
-        return '<span class="action-history-target-count">' + targets.size + (event.targetCell ? ' 个地格' : ' 个目标') + '</span>'
+        return targets.size ? '<span class="action-history-target-count">' + targets.size + (event.targetCell ? ' 个地格' : ' 个目标') + '</span>' : ''
       }
       if (event.kind === 'move') return ''
       if (event.targetPieceIds && event.targetPieceIds[0]) return displayPiece(event.targetPieceIds[0], compact)
@@ -398,19 +403,21 @@
       return displayPlayer(event.actorPlayerId || (rootEvent && rootEvent.actorPlayerId), compact)
     }
 
-    function displayComplement(event) {
+    function displayComplement(event, predicateLabel) {
       if (event.batchEvents && event.batchEvents.length > 1 && (event.kind === 'damage' || event.kind === 'heal')) {
         const total = event.batchEvents.reduce(function (sum, item) { return sum + Math.abs(finite(item.result && item.result.amount) || 0) }, 0)
         return '<span class="action-history-complement is-amount">共 ' + total + '</span>'
       }
       const complement = event.complement || {}
       if (complement.kind === 'concealed') return ''
-      if (complement.kind === 'option') return '<span class="action-history-complement">“' + escapeHtml(complement.label) + '”</span>'
+      if (complement.kind === 'option') return complement.label && String(complement.label).trim() !== predicateLabel
+        ? '<span class="action-history-complement">“' + escapeHtml(complement.label) + '”</span>' : ''
       if (complement.kind === 'status' || complement.kind === 'tileEffect') {
         const meta = resolveIcon({ statusType: complement.type, iconId: event.iconId })
         const explicitLabel = typeof complement.label === 'string' ? complement.label.trim() : ''
         const registeredLabel = typeof meta.label === 'string' ? meta.label.trim() : ''
         const displayName = explicitLabel || registeredLabel || (complement.kind === 'tileEffect' ? '未知地格效果' : '未知状态')
+        if ((explicitLabel || registeredLabel) && displayName === predicateLabel) return ''
         if (!explicitLabel && !registeredLabel) {
           const diagnosticKey = String(event.eventId || '') + ':' + String(complement.kind || '') + ':' + String(complement.type || '')
           if (!missingEffectDisplayMetadata.has(diagnosticKey)) {
@@ -442,7 +449,7 @@
         + displaySubject(event, rootEvent, !isRoot)
         + predicate
         + displayObject(event, !isRoot)
-        + displayComplement(event)
+        + displayComplement(event, isSkillRelease ? identity.skillName : (meta.label || KIND_LABELS[event.kind] || '动作'))
         + '</span>'
     }
 
