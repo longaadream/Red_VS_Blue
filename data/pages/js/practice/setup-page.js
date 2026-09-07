@@ -1,4 +1,3 @@
-/* eslint-disable @next/next/no-location-assign-relative-destination -- canonical standalone desktop HTML, not a Next route */
 (async function () {
   'use strict'
   const el = id => document.getElementById(id)

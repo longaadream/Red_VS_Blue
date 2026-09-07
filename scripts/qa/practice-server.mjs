@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url'
 import { build } from 'esbuild'
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 const outfile = path.join(root, 'output/pvp-practice/qa-resources.cjs')
-await build({ stdin: { contents: `export { readClientProtocolBattleData } from './electron-client/client-protocol-resource'; export { getServerGameProfileIdentityV1 } from './lib/content-pipeline/runtime/profile-game-identity';`, resolveDir: root, loader: 'ts' }, outfile, bundle: true, platform: 'node', format: 'cjs', packages: 'external', logLevel: 'silent' })
+await build({ stdin: { contents: `export { readClientProtocolBattleData } from './electron-client/client-protocol-resource'; export { getServerGameProfileIdentityV1 } from './lib/content-pipeline/runtime/profile-game-identity';`, resolveDir: root, loader: 'ts' }, outfile, bundle: true, platform: 'node', format: 'cjs', packages: 'external', logLevel: 'silent', banner: { js: '/* eslint-disable -- generated local QA resource adapter */' } })
 const api = createRequire(import.meta.url)(outfile)
 const files = api.readClientProtocolBattleData({ htmlRoot: path.join(root, 'data/pages'), appRoot: root, activePackRoot: null, isPackaged: false })
 const profile = api.getServerGameProfileIdentityV1()
