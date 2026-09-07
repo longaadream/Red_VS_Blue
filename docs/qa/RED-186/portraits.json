@@ -1,0 +1,220 @@
+[
+  {
+    "id": "ana",
+    "source": "exec-9da7f777-b051-4166-ada3-4c3d63cb5939.png",
+    "destination": "public/ana.jpg",
+    "correction": null
+  },
+  {
+    "id": "anduin",
+    "source": "exec-036e9393-3620-4efd-9743-88fd3af94db9.png",
+    "destination": "public/anduin.jpg",
+    "correction": null
+  },
+  {
+    "id": "arthas",
+    "source": "exec-f30d285f-1435-4dfa-bb02-6f38e81dd0b2.png",
+    "destination": "public/arthas.jpg",
+    "correction": null
+  },
+  {
+    "id": "ichigo",
+    "source": "exec-86be87dc-43f8-4ade-97b8-339eb3bb9fd6.png",
+    "destination": "public/ichigo.jpg",
+    "correction": null
+  },
+  {
+    "id": "kenshin",
+    "source": "exec-110e22c8-86e9-4b34-8312-f6a2fdc38ecb.png",
+    "destination": "public/kenshin.jpg",
+    "correction": null
+  },
+  {
+    "id": "minato",
+    "source": "exec-7157eacd-359f-4352-8298-fdf4922c9efb.png",
+    "destination": "public/minato.jpg",
+    "correction": null
+  },
+  {
+    "id": "naruto",
+    "source": "exec-7d88928a-3eab-48d2-a6b2-aa41f739ad6b.png",
+    "destination": "public/naruto.jpg",
+    "correction": null
+  },
+  {
+    "id": "tirion-fordring",
+    "source": "exec-0a73298d-f81e-4086-821c-8e0e95274ad4.png",
+    "destination": "public/tirion-fordring.jpg",
+    "correction": null
+  },
+  {
+    "id": "watcher",
+    "source": "exec-7681eb69-2dbc-481f-b4bb-17322edd3d45.png",
+    "destination": "public/watcher.jpg",
+    "correction": null
+  },
+  {
+    "id": "aizen",
+    "source": "exec-38f69542-39b1-4c23-87f7-3d5ec6743d9e.png",
+    "destination": "public/aizen.jpg",
+    "correction": "Use case: precise-object-edit. Edit this existing game portrait. Remove the dark cross-shaped mark beneath the visible eye; restore smooth unmarked facial skin with natural cel shading. Aizen has no facial tattoo or scar. Change only the specified incorrect additions. Keep the character identity, face, costume, composition, ink style, palette and warm taupe background otherwise unchanged. No new ornaments or writing."
+  },
+  {
+    "id": "grimmjow",
+    "source": "exec-13690545-969a-413f-b062-5d3fada76682.png",
+    "destination": "public/grimmjow.jpg",
+    "correction": null
+  },
+  {
+    "id": "ulquiorra",
+    "source": "exec-33e252ce-5840-4a7a-bc2a-40b2237ab48e.png",
+    "destination": "public/ulquiorra.jpg",
+    "correction": null
+  },
+  {
+    "id": "guldan",
+    "source": "exec-3b8f4f4d-58e4-4cdb-a74f-86564187f0de.png",
+    "destination": "public/guldan.jpg",
+    "correction": null
+  },
+  {
+    "id": "hashirama-edo",
+    "source": "exec-06f4d958-6218-4dfb-bc2c-1c80296a80c5.png",
+    "destination": "public/hashirama-edo.jpg",
+    "correction": null
+  },
+  {
+    "id": "jaina",
+    "source": "exec-d06e85df-3dc2-4ddf-98e9-bfdbde14d862.png",
+    "destination": "public/jaina.jpg",
+    "correction": null
+  },
+  {
+    "id": "kiljaedan",
+    "source": "exec-d61305e5-312e-49ca-9ec3-7b989fe81460.png",
+    "destination": "public/kiljaedan.jpg",
+    "correction": null
+  },
+  {
+    "id": "liadrin",
+    "source": "exec-b79f8320-9577-4022-a3df-26da2e861c3c.png",
+    "destination": "public/liadrin.jpg",
+    "correction": null
+  },
+  {
+    "id": "reaper",
+    "source": "exec-ced25ff9-b21f-4ad5-822e-45bf74e9a81e.png",
+    "destination": "public/reaper.jpg",
+    "correction": null
+  },
+  {
+    "id": "blackwidow",
+    "source": "exec-267ba6fd-287d-46a8-bc7f-9ca798f8286b.png",
+    "destination": "public/blackwidow.jpg",
+    "correction": null
+  },
+  {
+    "id": "doomsday-fist",
+    "source": "exec-2988eef5-20f9-4519-8269-18092571dc57.png",
+    "destination": "public/doomsday-fist.jpg",
+    "correction": null
+  },
+  {
+    "id": "hidan",
+    "source": "exec-8804c394-80dc-45e0-a0fe-6c2ff7db1c08.png",
+    "destination": "public/hidan.jpg",
+    "correction": "Use case: precise-object-edit. Edit this existing game portrait. Remove both horn-like spikes behind the head and shoulders; fill with plain taupe background. Hidan has no horns. Change only the specified incorrect additions. Keep the character identity, face, costume, composition, ink style, palette and warm taupe background otherwise unchanged. No new ornaments or writing."
+  },
+  {
+    "id": "illidan",
+    "source": "exec-69781edd-c683-42d6-a6b9-2e6dff209a74.png",
+    "destination": "public/illidan.jpg",
+    "correction": null
+  },
+  {
+    "id": "itachi",
+    "source": "exec-13f85ba2-2491-4c23-9b56-dd74e32d1a91.png",
+    "destination": "public/itachi.jpg",
+    "correction": "Use case: precise-object-edit. Edit this existing game portrait. Remove both small horns from the hair; reconstruct natural black hair. Itachi has no horns. Change only the specified incorrect additions. Keep the character identity, face, costume, composition, ink style, palette and warm taupe background otherwise unchanged. No new ornaments or writing."
+  },
+  {
+    "id": "obito",
+    "source": "exec-bb1c824a-71ad-4a37-8b78-a8a95b280642.png",
+    "destination": "public/obito.jpg",
+    "correction": "Use case: precise-object-edit. Edit this existing game portrait. Remove all horn-like blue spikes and projecting ribbon-like shapes around the head; preserve the smooth oval white patterned mask and simple purple high collar. Obito has no horns. Change only the specified incorrect additions. Keep the character identity, face, costume, composition, ink style, palette and warm taupe background otherwise unchanged. No new ornaments or writing."
+  },
+  {
+    "id": "rafaam",
+    "source": "exec-279d251d-0c16-4a02-a0e8-86c43592e37f.png",
+    "destination": "public/rafaam.jpg",
+    "correction": "Use case: precise-object-edit. Edit this existing game portrait. Remove both horns from the bandaged forehead; reconstruct uninterrupted cloth bandages. Rafaam has no horns. Keep the forehead jewel. Change only the specified incorrect additions. Keep the character identity, face, costume, composition, ink style, palette and warm taupe background otherwise unchanged. No new ornaments or writing."
+  },
+  {
+    "id": "sasuke",
+    "source": "exec-100de4d5-f52c-4042-92a8-bb9a9f9a7f25.png",
+    "destination": "public/sasuke.jpg",
+    "correction": "Use case: precise-object-edit. Edit this existing game portrait. Remove both horns protruding from the black hair; reconstruct natural black hair. Sasuke has no horns. Change only the specified incorrect additions. Keep the character identity, face, costume, composition, ink style, palette and warm taupe background otherwise unchanged. No new ornaments or writing."
+  },
+  {
+    "id": "shishio",
+    "source": "exec-2acdb991-1bce-4958-8c09-c691b25e4817.png",
+    "destination": "public/shishio.jpg",
+    "correction": null
+  },
+  {
+    "id": "shadow",
+    "source": "exec-efeae64a-97d9-4ccd-a190-67a3ae925c01.png",
+    "destination": "data/pages/images/shadow.png",
+    "correction": null,
+    "prompt": "Use case: style-transfer. Single square game avatar of Shadow the Hedgehog, black and red hedgehog with natural quills and white chest tuft. Image 1 is the only identity reference. Preserve ONLY physical features actually visible in that reference; do not add new facial marks, ornaments or anatomy. Image 2 is STYLE ONLY: match its American comic ink contours, chunky cel-shaded planes, muted colors, subtle paper grain, warm taupe plain backdrop. Do not import the style reference character or costume. Head and shoulders centered at eye level, entire head comfortably within square, clear at 64 pixels. No full body, hands, writing, logo or border. Ink illustration instead of photorealism or 3D render."
+  },
+  {
+    "id": "sonic",
+    "source": "exec-85cc266b-a5f7-4704-8422-6c66e5d83b19.png",
+    "destination": "data/pages/images/sonic.png",
+    "correction": null,
+    "prompt": "Use case: style-transfer. Single square game avatar of Sonic the Hedgehog, blue hedgehog with tan muzzle and green eyes. Image 1 is the only identity reference. Preserve ONLY physical features actually visible in that reference; do not add new facial marks, ornaments or anatomy. Image 2 is STYLE ONLY: match its American comic ink contours, chunky cel-shaded planes, muted colors, subtle paper grain, warm taupe plain backdrop. Do not import the style reference character or costume. Head and shoulders centered at eye level, entire head comfortably within square, clear at 64 pixels. No full body, hands, writing, logo or border. Ink illustration instead of photorealism or 3D render."
+  },
+  {
+    "id": "tails",
+    "source": "exec-6fb53ea5-cdae-4ea4-94af-e12ec37eebdc.png",
+    "destination": "data/pages/images/tails.png",
+    "correction": null,
+    "prompt": "Use case: style-transfer. Single square game avatar of Tails the fox, orange fur and white muzzle, bright blue eyes. Image 1 is the only identity reference. Preserve ONLY physical features actually visible in that reference; do not add new facial marks, ornaments or anatomy. Image 2 is STYLE ONLY: match its American comic ink contours, chunky cel-shaded planes, muted colors, subtle paper grain, warm taupe plain backdrop. Do not import the style reference character or costume. Head and shoulders centered at eye level, entire head comfortably within square, clear at 64 pixels. No full body, hands, writing, logo or border. Ink illustration instead of photorealism or 3D render."
+  },
+  {
+    "id": "tracer",
+    "source": "exec-5358a337-e736-4ab9-9c98-d4a5ff6e41fa.png",
+    "destination": "public/tracer.jpg",
+    "correction": null,
+    "prompt": "Use case: style-transfer. Single square game avatar of Tracer from Overwatch, short spiky brown hair and orange goggles. Image 1 is the only identity reference. Preserve ONLY physical features actually visible in that reference; do not add new facial marks, ornaments or anatomy. Image 2 is STYLE ONLY: match its American comic ink contours, chunky cel-shaded planes, muted colors, subtle paper grain, warm taupe plain backdrop. Do not import the style reference character or costume. Head and shoulders centered at eye level, entire head comfortably within square, clear at 64 pixels. No full body, hands, writing, logo or border. Ink illustration instead of photorealism or 3D render."
+  },
+  {
+    "id": "turalyon",
+    "source": "exec-8788033d-9764-490f-b2f2-bf25ab73e4ca.png",
+    "destination": "public/turalyon.jpg",
+    "correction": null,
+    "prompt": "Use case: style-transfer. Single square game avatar of Turalyon human paladin, blond hair, blue gold plate and red shoulder cloak. Image 1 is the only identity reference. Preserve ONLY physical features actually visible in that reference; do not add new facial marks, ornaments or anatomy. Image 2 is STYLE ONLY: match its American comic ink contours, chunky cel-shaded planes, muted colors, subtle paper grain, warm taupe plain backdrop. Do not import the style reference character or costume. Head and shoulders centered at eye level, entire head comfortably within square, clear at 64 pixels. No full body, hands, writing, logo or border. Ink illustration instead of photorealism or 3D render."
+  },
+  {
+    "id": "tyrande",
+    "source": "exec-d07674b8-29e9-471b-a112-c1cfe4d9539f.png",
+    "destination": "public/tyrande.jpg",
+    "correction": null,
+    "prompt": "Use case: style-transfer. Single square game avatar of Tyrande night elf woman, purple skin, blue hair and crescent forehead decoration. Image 1 is the only identity reference. Preserve ONLY physical features actually visible in that reference; do not add new facial marks, ornaments or anatomy. Image 2 is STYLE ONLY: match its American comic ink contours, chunky cel-shaded planes, muted colors, subtle paper grain, warm taupe plain backdrop. Do not import the style reference character or costume. Head and shoulders centered at eye level, entire head comfortably within square, clear at 64 pixels. No full body, hands, writing, logo or border. Ink illustration instead of photorealism or 3D render."
+  },
+  {
+    "id": "uther",
+    "source": "exec-f52a3f41-d530-4e76-aae3-87cee260b510.png",
+    "destination": "public/uther.jpg",
+    "correction": null,
+    "prompt": "Use case: style-transfer. Single square game avatar of Uther human paladin, mature face, grey brown beard, blue eyes. Image 1 is the only identity reference. Preserve ONLY physical features actually visible in that reference; do not add new facial marks, ornaments or anatomy. Image 2 is STYLE ONLY: match its American comic ink contours, chunky cel-shaded planes, muted colors, subtle paper grain, warm taupe plain backdrop. Do not import the style reference character or costume. Head and shoulders centered at eye level, entire head comfortably within square, clear at 64 pixels. No full body, hands, writing, logo or border. Ink illustration instead of photorealism or 3D render."
+  },
+  {
+    "id": "velen",
+    "source": "exec-ca24dfdd-858d-4afd-b85b-225214d707f8.png",
+    "destination": "public/velen.jpg",
+    "correction": null,
+    "prompt": "Use case: style-transfer. Single square game avatar of Velen draenei elder, purple skin, white beard and ornate purple gold robes. Image 1 is the only identity reference. Preserve ONLY physical features actually visible in that reference; do not add new facial marks, ornaments or anatomy. Image 2 is STYLE ONLY: match its American comic ink contours, chunky cel-shaded planes, muted colors, subtle paper grain, warm taupe plain backdrop. Do not import the style reference character or costume. Head and shoulders centered at eye level, entire head comfortably within square, clear at 64 pixels. No full body, hands, writing, logo or border. Ink illustration instead of photorealism or 3D render."
+  }
+]

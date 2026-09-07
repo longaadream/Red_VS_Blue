@@ -45,7 +45,7 @@ describe('RED-167 action identity', () => {
       { kind: 'chargeSkill', sourcePieceId: 'future-piece', skillId: 'future-skill' },
       { pieces: [{ id: 'future-piece', name: '新角色', faction: 'red' }] },
     )).toMatchObject({
-      skillName: 'future-skill',
+      skillName: '未知技能',
       portraitSrc: '',
       portraitFallback: '新',
     })

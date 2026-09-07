@@ -5,6 +5,7 @@ import { Script, createContext } from 'node:vm'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 type VignetteModule = {
+  eventCells(group: unknown, model: unknown): { source: unknown }
   groupEvents(events: unknown[]): Array<{ rootEventId: string; root: { eventId: string }; children: unknown[] }>
   createQueue(options?: Record<string, unknown>): {
     update(model: unknown): void
@@ -26,6 +27,7 @@ type VignetteModule = {
 }
 
 class FakeElement {
+  getBoundingClientRect() { return { width: 1280, height: 720 } }
   children: FakeElement[] = []
   listeners = new Map<string, Set<(event: Record<string, unknown>) => void>>()
   attributes: Record<string, string> = {}
@@ -107,6 +109,48 @@ describe('RED-167 action vignette queue', () => {
   afterEach(() => {
     vi.useRealTimers()
     vi.restoreAllMocks()
+  })
+
+  it('does not invent a source at (0,0) for a card without a caster', () => {
+    expect(loadModule().eventCells({ root: root(1, { kind: 'card' }), children: [] }, { pieces: [] }).source).toBeNull()
+  })
+
+  it.each([false, true])('anchors a visible result accent and clears it after playback (reduced=%s)', (reducedMotion) => {
+    const vignetteModule = loadModule()
+    const floatLayer = new FakeElement()
+    const projectCell = vi.fn(() => ({ left: 500, top: 400 }))
+    const vignette = vignetteModule.create({ document: { createElement: () => new FakeElement() }, reducedMotion })
+    vignette.mount({ boardContainer: new FakeElement(), floatLayer, projectCell })
+    vignette.update({ presentationEvents: [], pieces: [], turn: { isViewerTurn: false } })
+    const model = { presentationEvents: [root(1), child(1, 1, { targetPieceIds: ['victim'] })], pieces: [{ id: 'victim', x: 3, y: 4 }], turn: { isViewerTurn: false } }
+    const before = JSON.stringify(model)
+    vignette.update(model)
+    if (!reducedMotion) vi.advanceTimersByTime(420)
+    const layer = floatLayer.children[0]
+    expect(layer.innerHTML).not.toContain('battle-comic-beat is-damage')
+    expect(layer.innerHTML).not.toContain('砰!')
+    expect(layer.innerHTML).not.toContain('恢复!')
+    // Numeric feedback is owned by the renderer, without a duplicate vignette label.
+    expect(JSON.stringify(model)).toBe(before)
+    vi.advanceTimersByTime(1100)
+    expect(layer.hidden).toBe(true)
+    vignette.dispose()
+    expect(floatLayer.children).toHaveLength(0)
+    expect(vi.getTimerCount()).toBe(0)
+  })
+
+  it.each(['concealed', 'death'])('does not invent coordinates for %s with no visible target', (kind) => {
+    const vignetteModule = loadModule()
+    const floatLayer = new FakeElement()
+    const projectCell = vi.fn()
+    const vignette = vignetteModule.create({ document: { createElement: () => new FakeElement() } })
+    vignette.mount({ boardContainer: new FakeElement(), floatLayer, projectCell })
+    vignette.update({ presentationEvents: [], pieces: [], turn: { isViewerTurn: false } })
+    vignette.update({ presentationEvents: [root(1), child(1, 1, { kind, targetPieceIds: kind === 'death' ? ['removed-target'] : [] })], pieces: [], turn: { isViewerTurn: false } })
+    vi.advanceTimersByTime(420)
+    expect(floatLayer.children[0].innerHTML).not.toContain('battle-comic-beat')
+    expect(projectCell).not.toHaveBeenCalled()
+    vignette.dispose()
   })
 
   it('groups children under stable roots and rejects orphan child-only groups', () => {

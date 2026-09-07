@@ -1,8 +1,10 @@
 {
   "id": "sasuke-amaterasu",
   "name": "天照之炎",
-  "description": "将5格内1个格子周围的3×3区域永久标记为天照范围。棋子经过或停留在天照格上时会叠加天照，每层天照会在回合结束时使其失去2点生命。",
-  "keywords": [],
+  "description": "将5格内一个格子周围的3×3区域化为永久天照地格。",
+  "keywords": [
+    "天照"
+  ],
   "targetText": "5格内1个格子",
   "effectTags": [
     "field",

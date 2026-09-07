@@ -2,7 +2,9 @@
   "id": "sasuke-kagutsuchi",
   "name": "加具土命",
   "description": "为任意1个棋子附加2层天照效果，然后移除其周围4格内所有的天照地格效果，每消耗一个地格，多附加一层天照，共计最多附加4层。",
-  "keywords": [],
+  "keywords": [
+    "天照"
+  ],
   "targetText": "任意1个棋子",
   "effectTags": [
     "地形",

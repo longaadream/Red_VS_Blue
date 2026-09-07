@@ -2,7 +2,9 @@
   "id": "sasuke-indra-arrow",
   "name": "因陀罗之矢",
   "description": "选择同一行或同一列的方向，将该方向直到地图边缘的所有地格永久标记为天照范围。",
-  "keywords": [],
+  "keywords": [
+    "天照"
+  ],
   "targetText": "同一行或同一列的1个方向",
   "effectTags": [
     "地形"

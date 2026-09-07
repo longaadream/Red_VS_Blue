@@ -1,0 +1,12 @@
+{
+  "base": "afbbda5f1d4f7179ec2b2d3a81fceaee9fb157a8",
+  "htmlPagesPreserved": 9,
+  "sharedCardPages": [
+    "battle.html",
+    "pieces.html",
+    "piece-selection.html"
+  ],
+  "cssParsed": 5,
+  "localAssetReferences": 12,
+  "fontLicense": true
+}

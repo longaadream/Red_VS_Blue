@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>棋子图鉴 - RED vs BLUE</title>
   <script src="js/pack-fetch.js"></script>
+  <script src="js/hand-card-face.js"></script>
+  <link rel="stylesheet" href="css/tabletop/related-hand-cards.css" />
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
     body {
@@ -151,8 +153,9 @@
     .status-msg .big { font-size: 32px; margin-bottom: 12px; }
     .no-data-hint { font-size: 12px; color: #334155; margin-top: 8px; }
   </style>
+  <link rel="stylesheet" href="css/tabletop/tabletop.css" />
 </head>
-<body>
+<body data-art-page="pieces">
 
   <!-- Topbar -->
   <div class="topbar">
@@ -423,14 +426,10 @@
           for (const cardId of relatedCards) {
             const cardData = await loadCard(cardId)
             if (cardData) {
-              cardHtmls.push(`<div class="related-card-row">
-                <div class="related-card-name">${cardData.icon || '🎴'} ${cardData.name || cardId} <span style="color:#a855f7;font-size:11px">AP:${cardData.actionPointCost ?? 0}</span></div>
-                <div class="related-card-type">${cardData.type === 'active' ? '主动' : '反应'}</div>
-                <div class="related-card-desc">${cardData.description || ''}</div>
-              </div>`)
+              cardHtmls.push(HandCardFace.preview(cardId, cardData))
             }
           }
-          rcContent.innerHTML = cardHtmls.join('')
+          rcContent.innerHTML = '<div class="related-hand-cards">' + cardHtmls.join('') + '</div>'
         } else if (rcContent) {
           rcContent.innerHTML = '<div style="font-size:12px;color:#475569">无相关手牌</div>'
         }

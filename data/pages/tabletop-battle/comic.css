@@ -1,0 +1,58 @@
+/* Comic tabletop silhouette layer. Native layout, events and visibility remain authoritative. */
+@font-face{font-family:'ZCOOL KuaiLe';src:url('assets/fonts/ZCOOLKuaiLe-Regular.ttf') format('truetype');font-weight:400;font-style:normal;font-display:swap}
+:root{--comic-ink:#293e3a;--comic-paper:#fff9e9;--comic-yellow:#ffe08a;--comic-mint:#afd8bd;--comic-font:'ZCOOL KuaiLe','Microsoft YaHei',sans-serif}
+html,body{background-color:#8eaf9c!important;background-image:radial-gradient(#3e655331 1px,transparent 1px),radial-gradient(ellipse at 50% 44%,#bdd3bb 0%,#8bab97 80%)!important;background-size:8px 8px,100% 100%!important;color:var(--comic-ink)!important}
+body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;background:url('assets/comic-doodles.svg') center/100% 100% no-repeat;opacity:.7}
+body :is(.turn-summary,.player-state-chip,.player-state-chip.active,.player-state-chip.is-local-player,.piece-context-menu,.action-history-dock,.target-mode-card,.deployment-status,.training-popover,.training-setup-sheet,.pi-layout,.cd-layout,.option-sheet,.battle-log-panel),body #tileStatusPanel,body #playerResCards .player-state-chip{border-image:none!important;border:3px solid var(--comic-ink)!important;background:var(--comic-paper)!important;border-radius:18px 10px 23px 9px / 10px 23px 11px 20px!important;box-shadow:4px 5px 0 #293e3a!important;color:var(--comic-ink)!important}
+body :is(button,.turn-badge,.turn-clock,.card-name-banner,.card-name,.piece-context-name,.ts-title,.pi-name,.pi-skill-name,.pi-stat-val,.training-setup-title,.option-title,.action-history-title,.action-history-event-label,.resource-orb,.card-mana-gem,.piece-board-health){font-family:var(--comic-font)!important;font-weight:400!important;letter-spacing:.35px}
+body :is(.card-desc,.pi-skill-desc,.ts-effect-description,.keyword-long,.action-history-sentence){font-family:'Microsoft YaHei','Segoe UI',sans-serif!important;letter-spacing:0}
+body .turn-summary{rotate:-2deg;padding:8px 16px!important;background:#fff1af!important;border-radius:12px 7px 30px 8px!important;position:relative}
+body .turn-summary::after{content:'';position:absolute;top:-9px;left:36%;width:58px;height:16px;rotate:6deg;background:#e9907499;border-left:2px dotted #fff8;border-right:2px dotted #fff8;pointer-events:none}
+body .turn-summary .turn-badge{font-size:23px!important;color:#327c60!important}.turn-summary #roundLabel{font-family:var(--comic-font);font-size:14px}.turn-summary #phaseLabel{font-size:12px}
+body .turn-summary .turn-badge.opp-turn{color:#a54f40!important}
+body #playerResCards .player-state-chip{rotate:-1.4deg;border-radius:24px 9px 18px 10px!important;background:#ffe5cf!important;padding:5px 12px!important}
+body #playerResCards .player-state-chip.blue{rotate:1.3deg;background:#dcecf4!important;border-radius:8px 24px 10px 22px!important}
+body #playerResCards .player-state-chip.active{box-shadow:4px 5px 0 #293e3a,0 0 0 3px #ffe18b!important}
+body #playerResCards .player-display-name{font-family:var(--comic-font)!important;font-size:15px!important;line-height:19px!important}
+body #playerResCards .player-side-name{font-size:11px!important;color:#485b51!important}
+body #playerResCards .player-state-chip::before{display:none!important}
+body :is(.topbar button,.back-btn,.board-view-button,.training-tools-toggle,.training-setup-btn,.target-cancel-btn,.option-cancel,.option-confirm,.ts-toggle,.ts-close,.piece-context-info,.piece-context-toggle,.battle-vignette-speed-control,.battle-vignette-status){background:#fff9e9!important;border:2px solid var(--comic-ink)!important;border-image:none!important;border-radius:9px 16px 8px 13px!important;box-shadow:2px 3px 0 #293e3a!important;color:var(--comic-ink)!important}
+body .topbar button{font-size:14px!important;padding:5px 8px!important}.topbar button:nth-child(even){rotate:2deg}.topbar button:nth-child(odd){rotate:-1deg}
+body .btn-end{font-family:var(--comic-font)!important;background:#ffdb70!important;border:3px solid var(--comic-ink)!important;border-image:none!important;border-radius:45% 12% 39% 17% / 19% 41% 24% 45%!important;box-shadow:5px 6px 0 #293e3a!important;color:#293e3a!important;rotate:-4deg;font-size:28px!important;min-width:175px!important;min-height:71px!important;padding:9px 16px!important}
+body .btn-end:hover:not(:disabled){background:#ffe9a1!important;translate:0 -3px}.btn-end:active:not(:disabled){translate:2px 2px}
+body .piece-context-menu{padding:9px 12px!important;border-radius:24px 13px 32px 9px!important;background:#fffcee!important;overflow:visible!important}
+body .piece-context-menu::after{content:'';position:absolute;right:-13px;top:24px;width:20px;height:20px;background:#fffcee;border-top:3px solid var(--comic-ink);border-right:3px solid var(--comic-ink);transform:skewY(-28deg) rotate(40deg);pointer-events:none}
+body .piece-context-name{font-size:17px!important;line-height:1.35!important;color:#293e3a!important}.piece-context-header{padding-bottom:8px!important}
+body .piece-context-skill{background:#e1edcd!important;border:2px solid #455546!important;border-radius:13px 6px 14px 7px!important;box-shadow:2px 2px 0 #293e3a!important;padding:8px 10px!important;margin-top:3px!important}
+body .piece-context-skill:nth-child(2){background:#dbeef6!important;border-radius:6px 16px 7px 12px!important}
+body .piece-context-skill-name{font-size:17px!important}.piece-context-skill-cost{font-family:'Microsoft YaHei',sans-serif!important;font-size:11px!important}
+body .piece-context-skill:disabled{background:#e0dfd4!important;opacity:.65!important;box-shadow:none!important;border-style:dashed!important}
+body #tileStatusPanel{background:#fff2c1!important;border-radius:7px 20px 12px 28px!important;rotate:-1deg;padding:10px 13px!important}
+body .ts-title{font-size:20px!important}.ts-coords{font-size:12px!important}
+body .action-history-dock{border-radius:22px 8px 25px 12px!important;padding:9px!important;background:#f3f7e8!important}
+body :is(.action-history-item,.action-history-collapsed-button,.action-history-toggle,.action-history-close){background:#fffdf2!important;border:2px solid #566353!important;border-radius:12px 6px 11px 8px!important;color:#293e3a!important;box-shadow:none!important}
+body .action-history-item{border-width:0 0 2px!important;border-style:dashed!important;padding:8px!important;margin-bottom:5px!important}
+body .action-history-item.is-selected{background:#fff0ad!important;outline:2px solid #657b52!important}
+body :is(.card-item,.card-item.card-reactive){background:#fffbed!important;border:3px solid var(--comic-ink)!important;border-image:none!important;border-radius:13px 8px 16px 9px!important;box-shadow:4px 5px 0 #293e3a!important;color:var(--comic-ink)!important;overflow:visible!important}
+body .card-item.card-reactive{background:#f2e7f7!important;border-style:dashed!important}
+body .card-item .card-art{border:2px solid var(--comic-ink)!important;border-radius:9px 4px 12px 5px!important;margin:5px 5px 0!important;overflow:hidden!important}
+body .card-name-banner{font-size:17px!important;line-height:1.2!important;color:#293e3a!important;background:#ffebaa!important;border:2px solid #455246!important;border-radius:4px 10px 3px 7px!important;margin:0 3px!important;padding:3px 2px!important;rotate:-1deg}
+body .card-item:nth-child(even) .card-name-banner{rotate:1.5deg;background:#dceccb!important}
+body .card-item .card-desc{font-size:11px!important;line-height:1.55!important;color:#37483e!important}
+body .card-body{padding:6px 8px!important}.card-type-badge{font-family:var(--comic-font)!important;font-size:12px!important;color:#4f6557!important}
+body :is(.card-mana-gem,.card-mana-gem.free){width:31px!important;height:32px!important;background:#95cddd!important;border:2px solid var(--comic-ink)!important;border-radius:47% 40% 45% 38%!important;color:#253b38!important;font-size:22px!important;box-shadow:2px 2px 0 #293e3a!important;top:-7px!important;left:-8px!important}
+body .card-mana-gem.free{background:#efd491!important}
+body :is(.card-item.card-choice-selected,.card-item.card-pending){outline:4px solid #fff0a2!important}
+body .piece-board-summary{background:#fff4c9!important;border:2px solid var(--comic-ink)!important;border-radius:8px 4px 7px 5px!important;box-shadow:2px 2px 0 #293e3a!important;height:24px!important;min-width:39px!important;rotate:-3deg}
+body .piece-board-health{font-family:'Segoe UI','Microsoft YaHei',sans-serif!important;font-variant-numeric:tabular-nums;font-size:13px!important;font-weight:700!important;color:#293e3a!important}
+body :is(.piece-board-status-popover,.pi-stat,.pi-skill,.pi-status-row,.option-item,.option-card){background:#f4eed9!important;border:2px solid #6d7964!important;border-radius:10px 5px 12px 7px!important}
+body .pi-name{font-size:29px!important}body .pi-skill-name{font-size:21px!important}body .pi-stat-val{font-size:26px!important}
+body .pi-sheet{border:0!important}
+body :is(.keyword-badge,.pi-history,.pi-close,.cd-close){background:#dbe9c9!important;border:2px solid #455346!important;border-radius:10px 5px 11px 7px!important}
+body #resEditorSheet>div,body #surrenderConfirmOverlay>div{background:#fff9e9!important;border:3px solid #293e3a!important;border-image:none!important;border-radius:18px 9px 23px 11px!important;box-shadow:5px 6px 0 #293e3a!important}
+body #statusMsg{background:#fff6d9!important;color:#3c4c40!important;border:2px solid #455346!important;border-radius:11px 5px 12px 7px!important;box-shadow:2px 2px 0 #293e3a!important;font-size:12px!important}
+body .skin-preview-marker{background:#314d40d9;color:#f6edcb;border-radius:9px;font-size:10px}.skin-preview-marker a{color:#fff3af}
+body button:focus-visible{outline:3px dashed #d07241!important;outline-offset:4px!important}
+@media(min-width:1000px){:root{--battle-hand-height:192px}body .hand-scroll{height:192px!important;padding-bottom:12px!important;padding-inline:245px 215px!important}body .card-item{width:139px!important;min-width:139px!important;height:175px!important}body .card-item .card-art{height:48px!important}body .piece-context-menu{min-width:216px!important;max-width:244px!important}body .phase-bar{grid-template-columns:216px minmax(0,1fr)!important}body .turn-summary{min-width:206px!important}}
+@media(max-width:999px){body .turn-summary .turn-badge{font-size:17px!important}body .piece-context-skill-name{font-size:14px!important}body .btn-end{font-size:21px!important;min-width:125px!important;min-height:52px!important}}
+@media(prefers-reduced-motion:reduce){body .btn-end:hover:not(:disabled){translate:none}}

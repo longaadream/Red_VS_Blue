@@ -1,0 +1,55 @@
+/* Compact, aligned HUD. Icon-only controls keep native accessible names and tooltips. */
+body .topbar{display:flex!important;gap:8px!important;right:16px!important;top:16px!important;max-width:228px!important;align-items:center!important}
+body .topbar button{position:relative!important;width:42px!important;min-width:42px!important;height:42px!important;min-height:42px!important;padding:0!important;font-size:0!important;rotate:0deg!important;flex-shrink:0;line-height:0!important}
+body .topbar button::before{margin:0!important;width:27px!important;height:27px!important;position:absolute;inset:0;margin:auto!important}
+body #btnSurrender::before{content:'';background:url('assets/ink-icons/ui-surrender.svg') center/contain no-repeat}
+body #btnDebugBattleLog::before{content:'';background:url('assets/ink-icons/ui-history.svg') center/contain no-repeat}
+body .board-camera-controls{display:flex!important;align-items:center!important;gap:10px!important;top:96px!important;left:16px!important}
+body #btnResetBoardView{width:40px!important;min-width:40px!important;height:38px!important;padding:0!important;position:relative}
+body #btnResetBoardView>span{display:none!important}body #btnResetBoardView::before{margin:0!important;width:26px!important;height:26px!important}
+body .battle-vignette-speed-control{width:40px!important;min-width:40px!important;height:38px!important;box-sizing:border-box;position:fixed!important;top:96px!important;left:66px!important;padding:0!important;display:grid!important;place-items:center!important;font-size:15px!important}
+body #trainingToolsToggle{width:42px!important;min-width:42px!important;height:40px!important;display:grid!important;place-items:center!important;padding:0!important;gap:0!important}
+body #trainingToolsToggle>span:not(.training-tools-icon){display:none!important}body #trainingToolsToggle .training-tools-icon{width:26px!important;height:27px!important}
+body #actionHistoryDock:not(.is-user-expanded){box-sizing:border-box!important;right:16px!important;width:54px!important;padding:4px!important;border-width:2px!important;border-radius:12px 8px 14px 8px!important}
+body #actionHistoryDock:not(.is-user-expanded) .action-history-list{grid-template-columns:42px!important;gap:5px!important;justify-items:center!important}
+body #actionHistoryDock:not(.is-user-expanded) :is(.action-history-item,.action-history-collapsed-button){width:42px!important;min-width:42px!important;height:42px!important;min-height:42px!important;margin:0!important;padding:0!important;border:0!important;border-radius:9px 6px 11px 7px!important;box-sizing:border-box!important}
+body #actionHistoryDock .action-history-collapsed-button{display:grid!important;place-items:center!important}
+body #actionHistoryDock.is-user-expanded{right:16px!important;box-sizing:border-box!important}
+/* Real opponent count, same public DOM node; every rendered item is the same back. */
+body #opponentHandStack{position:fixed!important;top:0!important;left:50%!important;right:auto!important;translate:-50% 0!important;width:310px!important;height:104px!important;z-index:19!important;overflow:visible!important;pointer-events:none!important;filter:drop-shadow(0 4px 2px #120e0c88)}
+body #opponentHandStack i{display:block!important;position:absolute!important;left:calc(50% - 32px)!important;top:var(--fan-y)!important;width:64px!important;height:91px!important;background:url('assets/ink-card-back.svg') center/100% 100% no-repeat!important;border:0!important;border-radius:9px!important;transform:translateX(var(--fan-x)) rotate(var(--fan-angle))!important;transform-origin:50% 0!important;box-shadow:2px 3px 0 #1c171566!important}
+body #opponentHandStack .opponent-hand-count{position:absolute!important;top:77px!important;bottom:auto!important;left:50%!important;right:auto!important;transform:translateX(-50%)!important;background:#352a23!important;border:1px solid #a58754!important;color:#e3cc9f!important;border-radius:8px 5px 9px 5px!important;padding:1px 8px!important;min-width:25px!important;font-size:12px!important;line-height:18px!important}
+body #opponentHandStack.is-empty{opacity:.6}body #opponentHandStack.is-empty .opponent-hand-count::after{content:' 张'}
+@media(min-width:1100px){body #playerResCards{position:fixed!important;top:14px!important;left:250px!important;right:244px!important;display:flex!important;justify-content:space-between!important;gap:0!important;pointer-events:none!important}body #playerResCards .player-state-chip{width:153px!important;min-width:153px!important;pointer-events:auto!important}body #playerResCards .player-state-resources{right:9px!important}body #playerResCards .player-display-name{font-size:14px!important}}
+/* A 2-row tile slip: coordinate/controls, then terrain/effect count. Extra space only for effects. */
+body #tileStatusPanel{top:146px!important;left:16px!important;width:216px!important;padding:6px 8px!important;rotate:0deg!important;border-radius:10px 7px 18px 8px!important;max-height:280px!important}
+body #tileStatusPanel .ts-sheet{gap:0!important}body #tileStatusPanel .ts-header{min-height:25px!important;padding:0!important;gap:5px!important;border:0!important}
+body #tileStatusTitle{position:absolute!important;width:1px!important;height:1px!important;overflow:hidden!important;clip-path:inset(50%)!important;white-space:nowrap!important}
+body #tileStatusCoords{margin:0!important;font:14px var(--comic-font)!important;color:#49372a!important}
+body #tileStatusPanel .ts-actions{gap:4px!important}body #tileStatusPanel :is(.ts-toggle,.ts-close){width:26px!important;height:26px!important;flex:0 0 26px!important;padding:0!important;border-width:1.5px!important;box-shadow:none!important;font-size:0!important}
+body #tileStatusPanel :is(.ts-toggle,.ts-close)::before{content:'';width:18px;height:18px;background:url('assets/ink-icons/ui-close.svg') center/contain no-repeat}
+body #tileStatusPanel .ts-toggle::before{background-image:url('assets/ink-icons/ui-expand.svg')}
+body #tileStatusPanel.is-expanded .ts-toggle::before{rotate:180deg}body #tileStatusPanel [hidden]{display:none!important}
+body #tileStatusPanel .ts-body{display:flex!important;flex-wrap:wrap!important;align-items:center!important;gap:2px 6px!important;padding:2px 0 0!important}
+body #tileStatusPanel .ts-terrain{border:0!important;min-height:26px!important;padding:0!important;flex:1 1 auto;justify-content:flex-start!important}
+body #tileStatusPanel .ts-terrain-label{display:none!important}body #tileStatusTerrain{display:flex!important;align-items:center!important;gap:5px!important;font-size:12px!important;color:#392c23!important}
+body #tileStatusTerrain::before{content:'';width:25px;height:25px;background:var(--terrain-icon) center/contain no-repeat;flex-shrink:0}
+body #tileStatusEffectCount{padding:0!important;font-size:10px!important;color:#63513e!important;white-space:nowrap!important}
+body #tileStatusPanel .ts-details{flex-basis:100%;width:100%}body #tileStatusPanel .ts-effect-type{display:none!important}
+body #tileStatusPanel .ts-effect{min-height:34px!important;padding:3px 0!important}.ts-effect-name{color:#3a2d23!important;font-size:12px!important}
+.skin-tile-chips{display:flex;gap:4px;align-items:center;width:100%}.skin-tile-chips:empty{display:none}
+.skin-tile-chips button{display:grid;place-items:center;width:30px;height:30px;padding:2px;border:1px solid #69523c;border-radius:7px 4px 8px 5px;background:#ac9675;cursor:pointer}.skin-tile-chips img{width:25px;height:25px}.skin-tile-chips span{font-size:11px}
+body #tileStatusPanel.is-expanded .skin-tile-chips{display:none}
+/* Dark selection surfaces + contrasting ink boundaries, not similar beige/yellow washes. */
+body :is(.piece-context-skill:hover:not(:disabled),.option-btn[aria-pressed="true"],.option-item[aria-selected="true"],.keyword-badge.active){background:#394a50!important;color:#f3dfb8!important;border-color:#202d32!important;box-shadow:0 0 0 2px #bda36f!important}
+body .piece-context-skill:hover:not(:disabled) :is(.piece-context-skill-name,.piece-context-skill-cost){color:#f3dfb8!important}
+body :is(.card-item.card-choice-selected,.card-item.card-pending,.card-item.selected){outline:4px solid #1e303a!important;box-shadow:0 0 0 6px #c3aa7b,4px 7px 0 #161310!important}
+body :is(.card-item.card-choice-selected,.card-item.card-pending) .card-name-banner{background:#354a55!important;color:#f0d9ad!important;border-color:#1e303a!important}
+body #actionHistoryDock .action-history-item:is(:hover,:focus-visible,.is-selected){background:#35474d!important;color:#efdbb7!important;outline:2px solid #202e33!important}
+body #actionHistoryDock .action-history-item:is(:hover,:focus-visible,.is-selected) :is(span,strong,.action-history-entity,.action-history-complement){color:#efdbb7!important}
+body .training-piece-option:has(input:checked){background:#42554e!important;color:#f0dfbd!important;outline:2px solid #202e28!important}body .training-piece-option:has(input:checked) span{color:#f0dfbd!important}
+body .status-tag-icon,body .piece-board-status-icon{border-radius:6px 3px 7px 4px!important;border:1px solid #5c4938!important;background:#c6b18d!important}
+body .pi-close,body .cd-close,body .piece-context-info{font-size:0!important;display:grid!important;place-items:center!important}body :is(.pi-close,.cd-close,.piece-context-info)::before{content:'';width:22px;height:22px;background:url('assets/ink-icons/ui-close.svg') center/contain no-repeat}body .piece-context-info::before{background-image:url('assets/ink-icons/ui-info.svg')}
+@media(max-width:1099px){body #opponentHandStack{top:74px!important;width:240px!important;height:85px!important}body #opponentHandStack i{width:47px!important;height:67px!important;left:calc(50% - 24px)!important}body #opponentHandStack .opponent-hand-count{top:57px!important}}
+@media(min-width:1000px){body #handCards{height:240px!important;padding-top:44px!important;align-items:flex-end!important;box-sizing:border-box!important}body #statusMsg{bottom:248px!important;text-shadow:none!important}}
+body #turnAnnounce{background:#2c4148!important;color:#ecd4a6!important;border:3px solid #1c2a2e!important;border-radius:15px 8px 19px 9px!important;padding:10px 22px!important;box-shadow:4px 5px 0 #171310!important;text-shadow:none!important;font-family:var(--comic-font)!important;font-weight:400!important}

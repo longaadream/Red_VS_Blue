@@ -20,6 +20,23 @@ function readNamedFunction(html: string, name: string) {
 }
 
 describe('RED-69 battle motion contract', () => {
+
+  it('shows lethal numbers for confirmed graveyard deaths without inventing damage for removals', () => {
+    const calls: unknown[][] = []
+    const context = createContext({ stateFloaterEventKeys: new Set(), stateFloaterEventOrder: [], spawnFloater: (...args: unknown[]) => calls.push(args) })
+    new Script(readNamedFunction(readPage('battle.html'), 'spawnStateFloaters')).runInContext(context)
+    const victim = { instanceId: 'victim', x: 2, y: 3, currentHp: 5, visible: true }
+    context.before = { pieces: [victim], graveyard: [] }
+    context.after = { pieces: [], graveyard: [{ ...victim, currentHp: 0 }] }
+    new Script("spawnStateFloaters(before, after, 'death')").runInContext(context)
+    expect(calls[0].slice(0, 3)).toEqual([2, 3, '−5'])
+    new Script("spawnStateFloaters(before, after, 'death')").runInContext(context)
+    expect(calls).toHaveLength(1)
+    context.after = { pieces: [], graveyard: [] }
+    new Script("spawnStateFloaters(before, after, 'removed')").runInContext(context)
+    expect(calls).toHaveLength(1)
+  })
+
   it('shares the named motion tokens between CSS and Three.js without long interaction segments', () => {
     const css = readPage('css/battle-tactical-table.css')
     const renderer = readPage('js/battle-renderer-3d.js')

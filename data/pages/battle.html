@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>对战 - RED vs BLUE</title>
   <script src="js/pack-fetch.js"></script>
+  <script src="js/hand-card-face.js"></script>
+  <link rel="stylesheet" href="css/tabletop/related-hand-cards.css" />
   <script src="js/server-utils.js"></script>
   <script src="js/developer-tools/match-trace.js"></script>
   <script src="js/crypto-lib.js"></script>
@@ -1488,6 +1490,11 @@
   </style>
   <link rel="stylesheet" href="css/battle-tactical-table.css" />
   <link rel="stylesheet" href="css/tutorial.css" />
+<link rel="stylesheet" href="tabletop-battle/skin.css">
+<link rel="stylesheet" href="tabletop-battle/comic.css">
+<link rel="stylesheet" href="tabletop-battle/dusk.css">
+<link rel="stylesheet" href="tabletop-battle/refinements.css">
+<link rel="stylesheet" href="tabletop-battle/character-dock.css">
 </head>
 <body>
 
@@ -1696,7 +1703,7 @@
         </div>
         <div class="board-shell board-shell-3d">
           <div class="board-stage" id="boardStage3d" data-battle-layer="three-battlefield">
-            <div id="floatLayer" style="position:absolute;inset:0;pointer-events:none;overflow:visible;z-index:2"></div>
+            <div id="floatLayer" style="position:absolute;inset:0;pointer-events:none;overflow:visible;z-index:12"></div>
             <div id="pieceContextMenu" class="piece-context-menu" role="toolbar" aria-label="棋子可用技能" aria-hidden="true" data-piece-id="" data-side="right">
               <div class="piece-context-heading">
                 <span class="piece-context-identity">
@@ -2580,6 +2587,14 @@
       if (chain.length) trainingBattlePresentationChains.push(chain)
       trainingBattlePresentationChains = trainingBattlePresentationChains.slice(-20)
       refreshTrainingPresentationEvents(Engine)
+      if (battlePresentation && battlePresentation.captureHistory) {
+        // Training owns both sides, but stores independently projected histories.
+        ;(beforeState.players || []).forEach(function (player) {
+          const viewerId = player.playerId
+          const historicalModel = BattleViewModel.create({ snapshot: beforeState, viewerId: viewerId, pieceTemplates: PIECES_BY_ID })
+          battlePresentation.captureHistory(Engine.projectBattlePresentationEventsForViewer(chain, viewerId), historicalModel)
+        })
+      }
     }
     function red167QaPresentationSequence(snapshot, replayId) {
       if (!RED167_QA_MODE || !snapshot || !Array.isArray(snapshot.pieces) || !snapshot.map) return []
@@ -2917,7 +2932,6 @@
       return `<div class="keyword-panel-title">关键词</div>
         <div class="keyword-name">${escHtml(meta.name)}</div>
         <div class="keyword-short">${escHtml(meta.shortDescription || '该关键词暂无说明')}</div>
-        ${meta.longDescription ? `<div class="keyword-long">${escHtml(meta.longDescription)}</div>` : ''}
         ${extra.length ? `<div class="keyword-panel-list">${extra.map(name => `<span class="keyword-mini">${escHtml(name)}</span>`).join('')}</div>` : ''}`
     }
     function bindKeywordBadges(scope) {
@@ -3097,7 +3111,11 @@
       stateFloaterEventKeys.add(stableKey)
       stateFloaterEventOrder.push(stableKey)
       if (stateFloaterEventOrder.length > 256) stateFloaterEventKeys.delete(stateFloaterEventOrder.shift())
-      for (const np of newG.pieces) {
+      const confirmedDeaths = (newG.graveyard || []).filter(p =>
+        !newG.pieces.some(live => live.instanceId === p.instanceId)
+        && !(oldG.graveyard || []).some(dead => dead.instanceId === p.instanceId)
+        && oldG.pieces.some(old => old.instanceId === p.instanceId && old.visible !== false))
+      for (const np of newG.pieces.concat(confirmedDeaths)) {
         const op = oldG.pieces.find(p => p.instanceId === np.instanceId)
         if (!op) continue
         const newHp = np.currentHp ?? np.hp ?? 0
@@ -3106,7 +3124,7 @@
         if (diff < 0) {
           const dead = newHp <= 0
           const big = dead || -diff >= 50
-          spawnFloater(np.x, np.y, dead ? '阵亡' : String(-diff), dead ? '#c4b5fd' : '#f87171', big, { kind: dead ? 'death' : 'damage', durationMs: dead ? 650 : 600 })
+          spawnFloater(np.x, np.y, '−' + String(-diff), dead ? '#c4b5fd' : '#f87171', big, { kind: dead ? 'death' : 'damage', durationMs: dead ? 650 : 600 })
         } else if (diff > 0) {
           spawnFloater(np.x, np.y, '+' + diff, '#4ade80', false, { kind: 'heal', durationMs: 550 })
         }
@@ -3616,10 +3634,10 @@
       const relatedCardIds = tmplForCards.relatedCards || []
       let relatedCardsHtml = ''
       if (relatedCardIds.length > 0) {
-        relatedCardsHtml = `<div class="pi-section-label" style="margin-top:10px">相关卡牌</div><div class="pi-related-hand-cards">` +
+        relatedCardsHtml = `<div class="pi-section-label" style="margin-top:10px">相关卡牌</div><div class="pi-related-hand-cards related-hand-cards">` +
           relatedCardIds.map(cid => {
             const cd = cardsById[cid] || (G.customCards && G.customCards[cid]) || {}
-            return `<div class="card-item pi-related-card-face" aria-label="${escHtml((cd.name || cid) + '，行动点 ' + (cd.actionPointCost ?? 0))}">
+            return `<div class="card-item pi-related-card-face related-hand-card" aria-label="${escHtml((cd.name || cid) + '，行动点 ' + (cd.actionPointCost ?? 0))}">
               ${renderHandCardFace({ cardId: cid }, cd)}
             </div>`
           }).join('') + '</div>'
@@ -4426,6 +4444,9 @@
         const oldG = G
         G = await trainingApiFetch('PATCH', Object.assign({}, body, { battleState: G }))
         const interactionFeedback = reconcileBattleInteractionState(oldG, G)
+        // A successful placement completes this tool interaction. Otherwise the
+        // history dock remains forcibly collapsed by placement mode.
+        if (body.type === 'addPiece' && placingMode) togglePlaceMode()
         render()
         if (interactionFeedback) setStatusMsg(interactionFeedback)
         return true
@@ -6091,27 +6112,7 @@
     function renderHandCardFace(card, definition) {
       const def = definition || {}
       const cardId = card && card.cardId || def.id || ''
-      const presentation = card && card.presentation && typeof card.presentation === 'object' ? card.presentation : {}
-      const cost = card && card.actionPointCost != null ? card.actionPointCost : (def.actionPointCost ?? 0)
-      const gemCls = cost === 0 ? 'free' : ''
-      const icon = escHtml(String(def.name || cardId || '牌').slice(0, 1))
-      const artSrc = cardArtSource(cardId, def.image)
-      const artContent = artSrc
-        ? `<img src="${artSrc}" style="width:100%;height:100%;object-fit:cover;border-radius:8px 8px 0 0" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><span style="display:none;font-size:28px;width:100%;height:100%;align-items:center;justify-content:center">${icon}</span>`
-        : `<span style="font-size:28px">${icon}</span>`
-      const contentBadge = typeof presentation.badge === 'string' && presentation.badge
-        ? '<span class="card-content-badge">' + escHtml(presentation.badge) + '</span>'
-        : ''
-      const typeLabel = def.type === 'reactive' ? '触发' : def.type === 'passive' ? '持续' : '主动'
-      const cdTurns = def.cooldownTurns ?? def.cooldown ?? 0
-      const cdHtml = cdTurns > 0 ? `<span style="font-size:8px;color:#475569"> CD${cdTurns}</span>` : ''
-      return `<div class="card-mana-gem ${gemCls}">${cost}</div>
-        <div class="card-art">${artContent}${contentBadge}</div>
-        <div class="card-name-banner">${escHtml(def.name || cardId)}</div>
-        <div class="card-body">
-          <div class="card-desc">${escHtml(cardDisplayDescription(card || { cardId: cardId }, def) || '暂无描述')}</div>
-          <div class="card-type-badge">${typeLabel}${cdHtml}</div>
-        </div>`
+      return HandCardFace.render(card, def, { artSrc: cardArtSource(cardId, def.image) })
     }
 
     function onCardClick(cardInstanceId, cardId) {
@@ -7643,5 +7644,7 @@
     </div>
   </div>
 
+<script src="tabletop-battle/refinements.js"></script>
+<script src="tabletop-battle/character-dock.js"></script>
 </body>
 </html>
