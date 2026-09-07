@@ -1,0 +1,13 @@
+{
+  "depth": 3,
+  "beamWidth": 6,
+  "rootCandidates": 24,
+  "childCandidates": 10,
+  "nodesPerDecision": 128,
+  "deploymentNodesPerDecision": 384,
+  "nodesPerTurn": 896,
+  "maxActionsPerTurn": 8,
+  "turnTimeMs": 4500,
+  "decisionTimeMs": 900,
+  "deploymentTimeMs": 2250
+}
