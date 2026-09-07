@@ -1,7 +1,7 @@
 {
   "id": "blood-echo-trigger",
   "name": "血色回响·触发",
-  "description": "友方失去【圣盾】时获得1张【圣光充能】。",
+  "description": "友方棋子失去圣盾时，你获得1张【圣光充能】。",
   "targetText": "失去圣盾的友方",
   "effectTags": [
     "圣光",

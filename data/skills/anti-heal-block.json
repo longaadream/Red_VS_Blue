@@ -1,1 +1,13 @@
-{"id":"anti-heal-block","name":"禁疗阻止","description":"阻止被禁疗目标受到治疗","kind":"passive","type":"normal","cooldownTurns":0,"maxCharges":0,"powerMultiplier":1,"actionPointCost":0,"code":"function executeSkill(context) { if (!context.piece) { return { message: '没有目标', success: false }; } let isAntiHeal = false; if (context.piece.statusTags) { for (let i = 0; i < context.piece.statusTags.length; i++) { const tag = context.piece.statusTags[i]; if (typeof tag === 'object' && tag.type === 'anti-heal') { isAntiHeal = true; break; } if (typeof tag === 'string' && tag.includes('anti-heal')) { isAntiHeal = true; break; } } } if (isAntiHeal) { return { message: context.piece.name + '处于禁疗状态，无法受到治疗', success: false, blocked: true, showUIEffect: true }; } return { message: '目标未处于禁疗状态', success: true }; }","showInUI":false}
+{
+  "id": "anti-heal-block",
+  "name": "禁疗阻止",
+  "description": "阻止被禁疗目标受到治疗。",
+  "kind": "passive",
+  "type": "normal",
+  "cooldownTurns": 0,
+  "maxCharges": 0,
+  "powerMultiplier": 1,
+  "actionPointCost": 0,
+  "code": "function executeSkill(context) { if (!context.piece) { return { message: '没有目标', success: false }; } let isAntiHeal = false; if (context.piece.statusTags) { for (let i = 0; i < context.piece.statusTags.length; i++) { const tag = context.piece.statusTags[i]; if (typeof tag === 'object' && tag.type === 'anti-heal') { isAntiHeal = true; break; } if (typeof tag === 'string' && tag.includes('anti-heal')) { isAntiHeal = true; break; } } } if (isAntiHeal) { return { message: context.piece.name + '处于禁疗状态，无法受到治疗', success: false, blocked: true, showUIEffect: true }; } return { message: '目标未处于禁疗状态', success: true }; }",
+  "showInUI": false
+}

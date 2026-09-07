@@ -1,7 +1,7 @@
 {
   "id": "freeze-prevent",
   "name": "冰冻阻止",
-  "description": "阻止被冰冻目标的移动和使用技能",
+  "description": "冰冻期间，不能主动走格或使用技能。",
   "kind": "passive",
   "type": "normal",
   "cooldownTurns": 0,

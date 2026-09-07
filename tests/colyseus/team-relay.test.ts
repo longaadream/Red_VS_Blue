@@ -1,3 +1,4 @@
+import type { PublicBattleSnapshot } from '@/lib/game/room-battle-actions'
 import { createServer } from 'node:net'
 import type { AddressInfo } from 'node:net'
 import { Client, type Room } from '@colyseus/sdk'
@@ -18,13 +19,13 @@ async function port() {
   await new Promise<void>(resolve => server.close(() => resolve()))
   return value
 }
-function next(room: Room, type: string): Promise<any> {
+function next<T = unknown>(room: Room, type: string): Promise<T> {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => { unsubscribe(); reject(new Error(`Missing ${type}`)) }, 8000)
-    const unsubscribe = room.onMessage(type, data => { clearTimeout(timer); unsubscribe(); resolve(data) })
+    const unsubscribe = room.onMessage(type, data => { clearTimeout(timer); unsubscribe(); resolve(data as T) })
   })
 }
-async function snapshot(room: Room) { const value = next(room, 'battleSnapshot'); room.send('battleResync', {}); return value }
+async function snapshot(room: Room) { const value = next<PublicBattleSnapshot>(room, 'battleSnapshot'); room.send('battleResync', {}); return value }
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
 
 it('authenticates real relay SDK guests, protects private hands, takes over after grace and returns control on rejoin', async () => {
@@ -55,11 +56,11 @@ it('authenticates real relay SDK guests, protects private hands, takes over afte
       const current = await snapshot(rooms[viewer])
       expect(current.state.map).toMatchObject({ width: 24, height: 20 })
       for (let index = 0; index < 4; index++) {
-        const player = current.state.players.find((p: any) => p.playerId === identities[index].playerId)
-        if (index === viewer) expect(player.hand.filter((c: any) => c.cardId === 'lucky-coin')).toHaveLength(index === 3 ? 1 : 0)
-        else expect(player.hand.every((c: any) => c.cardId === 'hidden')).toBe(true)
+        const player = current.state.players.find((p) => p.playerId === identities[index].playerId)
+        if (index === viewer) expect(player!.hand.filter((c) => c.cardId === 'lucky-coin')).toHaveLength(index === 3 ? 1 : 0)
+        else expect(player!.hand.every((c) => c.cardId === 'hidden')).toBe(true)
       }
-      if (viewer !== 0) expect(current.state.deployment.offerPieceIds || []).toHaveLength(0)
+      if (viewer !== 0) expect(current.state.deployment?.offerPieceIds || []).toHaveLength(0)
     }
     const reconnecting = rooms[1]
     reconnecting.reconnection.minUptime = 0

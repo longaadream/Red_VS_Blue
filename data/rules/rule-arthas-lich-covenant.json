@@ -1,8 +1,10 @@
 {
   "id": "rule-arthas-lich-covenant",
   "priority": -100,
-  "name": "巫妖誓约拦截",
-  "description": "当拥有巫妖誓约buff的棋子即将受到致命伤害时，拦截死亡：HP恢复至满血，攻击力+50%，所有技能冷却清零，进入永久亡灵之躯状态",
-  "trigger": { "type": "beforeDamageApplied" },
-  "skillCode": "var piece = context.rulePiece; if (!context.piece || context.piece.instanceId !== piece.instanceId) return { success: false, message: '' }; var hasCovenantBuff = piece.statusTags && piece.statusTags.some(function(t) { return t.type === 'lich-covenant'; }); if (!hasCovenantBuff) return { success: false, message: '' }; var effectiveDmg = context.damage || 0; if (effectiveDmg < piece.currentHp) return { success: false, message: '' }; var covenantTag = piece.statusTags.find(function(t) { return t.type === 'lich-covenant'; }); if (covenantTag) { var ci = piece.statusTags.indexOf(covenantTag); piece.statusTags.splice(ci, 1); } removeRuleById(piece.instanceId, 'rule-arthas-lich-covenant'); piece.currentHp = piece.maxHp; var attackBoost = Math.round(piece.attack * 0.5); piece.attack = piece.attack + attackBoost; addStatusEffectById(piece.instanceId, { id: 'undead-body-' + piece.instanceId, name: '亡灵之躯', type: 'undead-body', currentDuration: -1, currentUses: -1, intensity: attackBoost, stacks: -1 }); if (piece.skills) { piece.skills.forEach(function(s) { s.currentCooldown = 0; }); } return { success: true, blocked: true, message: piece.name + '的巫妖誓约触发！从致命伤害中复活！HP恢复至满血（' + piece.maxHp + '），攻击力永久+' + attackBoost + '，进入亡灵之躯状态（永久），所有技能冷却重置！' };"
+  "name": "巫妖誓约·复活",
+  "description": "棋子死亡结算完成后满血复活，恢复初始能力并提高当前攻击力50%，重置技能冷却。",
+  "trigger": {
+    "type": "onPieceDied"
+  },
+  "skillCode": "var piece = context.rulePiece; if (!piece || !context.sourcePiece || context.sourcePiece.instanceId !== piece.instanceId || piece.currentHp !== 0 || !piece.statusTags.some(function(t) { return t.type === 'lich-covenant'; })) return { success: false, message: '' }; return { success: true, summonAfterDeath: { revive: true, attackBonusMultiplier: 0.5, skillId: 'arthas-lich-covenant', maxHp: piece.maxHp, currentHp: piece.maxHp, attack: piece.attack, defense: piece.defense, moveRange: piece.moveRange, skillIds: piece.skills.map(function(s) { return s.skillId; }), message: piece.name + '的巫妖誓约触发：完成死亡结算后满血复活，攻击力提高50%，技能冷却重置' }, message: '' };"
 }

@@ -1,0 +1,281 @@
+{
+  "phase": "Final broad suite then focused fixes; 10 known baseline/environment failures remain, no frozen hashes rewritten",
+  "runs": [
+    {
+      "run": "tests",
+      "total": 1442,
+      "passed": 1411,
+      "failed": 31,
+      "failedCases": [
+        {
+          "file": "tests/game/ai-environment.test.ts",
+          "name": "versioned headless AI environment enumerates deployment, pending option, and a real rule-produced pending target",
+          "error": "Error: STACK_TRACE_ERROR"
+        },
+        {
+          "file": "tests/game/ai-planner.test.ts",
+          "name": "representative real transition fixtures plans movement before casting and retreats a critically injured piece from danger",
+          "error": "Error: STACK_TRACE_ERROR"
+        },
+        {
+          "file": "tests/game/ai-semantics.test.ts",
+          "name": "AI semantic contract audits every current manifest and makes a changed admission manifest fail closed",
+          "error": "Error: Command failed: C:\\Program Files\\nodejs\\node.exe scripts/audit-ai-semantics.mjs"
+        },
+        {
+          "file": "tests/game/battle-state-hash.test.ts",
+          "name": "battle state chunked hash v1 keeps the frozen Unicode vector identical in Node, desktop and Android bundles",
+          "error": "Error: ENOENT: no such file or directory, open 'C:\\Users\\lngsc\\Documents\\Red_VS_Blue\\red192-graph\\android-client\\www\\js\\game-engine.js'"
+        },
+        {
+          "file": "tests/game/ichigo-itachi.test.ts",
+          "name": "RED-120 character data contract registers Ichigo and Itachi with the approved stats and skill text",
+          "error": "AssertionError: expected { id: 'ichigo-zangetsu', …(17) } to match object { id: 'ichigo-zangetsu', …(3) }"
+        },
+        {
+          "file": "tests/game/mangekyo.test.ts",
+          "name": "RED-124 Mangekyo data contract defines the keyword once and marks the three Uchiha ultimates with approved base costs",
+          "error": "AssertionError: expected { id: 'itachi-totsuka-blade', …(19) } to match object { chargeCost: 3, …(3) }"
+        },
+        {
+          "file": "tests/game/projectile-trace.test.ts",
+          "name": "death blossom approved area behavior damages only living enemies in the caster-centered 3×3 area and ignores projectile blockers",
+          "error": "AssertionError: expected '对以本棋子为中心的3×3范围内所有敌方棋子造成等同于本棋子攻击力200%的…' to be '对以自身为中心的3×3范围内所有敌人造成200%攻击力的物理伤害。' // Object.is equality"
+        },
+        {
+          "file": "tests/game/red-129-data-contract.test.ts",
+          "name": "RED-129 complete data contract pins the approved stats, renamed skills, targeting boundaries, and rewritten text",
+          "error": "AssertionError: expected '使本棋子10格内1个其他友方棋子防御力+3、移动力+1，造成的伤害+1。' to be '使10格内1个其他友军防御力+3、移速+1，且其造成的所有伤害+1。' // Object.is equality"
+        },
+        {
+          "file": "tests/game/red-130-balance.test.ts",
+          "name": "RED-130 data contract publishes the approved curse coefficient and Itachi AP cost",
+          "error": "AssertionError: expected '每回合限1次：本棋子在你的回合受到伤害时，免疫此次伤害，并将1张诅咒交给对…' to contain '向下取整'"
+        },
+        {
+          "file": "tests/game/red-163-dark-characters.test.ts",
+          "name": "RED-163 dark character contract registers Aizen, Ulquiorra and Grimmjow with their approved base stats",
+          "error": "AssertionError: expected '敌方棋子行动后，若其位于本棋子4格内，可将本棋子移动至2格内1个空地格。若…' to be '每当一名敌人行动后，若其在格力姆乔4格内，格力姆乔可移动至2格内1个空格；…' // Object.is equality"
+        },
+        {
+          "file": "tests/game/red-183-regressions.test.ts",
+          "name": "RED-183 character rules and selection UI regressions documents the self-cast AP refund on Shield of Light",
+          "error": "AssertionError: expected '使本棋子7格内1个友方棋子获得圣盾。若目标是本棋子，你恢复1行动点。' to contain '若对自己使用，回复1点AP'"
+        },
+        {
+          "file": "tests/game/red-183-regressions.test.ts",
+          "name": "RED-183 character rules and selection UI regressions keeps Tails Twin Flight immunity and inoperable buffs at two turns",
+          "error": "AssertionError: expected '选择本棋子4格内1个其他友方棋子。选择本棋子7格内1个合法地格作为本棋子的…' to contain '作为塔尔斯的落点'"
+        },
+        {
+          "file": "tests/game/red-183-regressions.test.ts",
+          "name": "RED-183 character rules and selection UI regressions uses Manhattan distance for Naruto candidates and execution",
+          "error": "AssertionError: expected '选择本棋子5格内1个空地格，并秘密选择一项：召唤1个影分身；或将本棋子传送…' to be '选择5格内1个空地格并秘密选择一项：召唤1个影分身，或传送到目标格并在原地…' // Object.is equality"
+        },
+        {
+          "file": "tests/game/red-183-regressions.test.ts",
+          "name": "RED-183 character rules and selection UI regressions uses the approved Grimmjow wording and hides the Recall number from its result message",
+          "error": "AssertionError: expected '敌方棋子行动后，若其位于本棋子4格内，可将本棋子移动至2格内1个空地格。若…' to be '每当一名敌人行动后，若其在格力姆乔4格内，格力姆乔可移动至2格内1个空格；…' // Object.is equality"
+        },
+        {
+          "file": "tests/game/room-runtime-isolation.test.ts",
+          "name": "RED-141 room rule runtime isolation matches real online dispatch receipts and states for two interleaved 100-transition rooms",
+          "error": "Error: EPERM: operation not permitted, rename 'C:\\Users\\lngsc\\Documents\\Red_VS_Blue\\red192-graph\\resource-pack\\active.json.tmp-12332-6682c6da-b401-418a-838a-81758a6b4af6' -> 'C:\\Users\\lngsc\\Documents\\Red_VS_Blue\\red192-graph\\resource-pack\\active.json'"
+        },
+        {
+          "file": "tests/game/skillcode-static-audit.test.ts",
+          "name": "RED-45 skillCode static compatibility audit classifies every executable field and every lexical free variable",
+          "error": "AssertionError: expected [ { …(4) }, { …(4) }, { …(4) }, …(16) ] to have a length of 21 but got 19"
+        },
+        {
+          "file": "tests/game/skillcode-static-audit.test.ts",
+          "name": "RED-45 data parse and production loader smoke parses every JSON definition and loads every skill, rule, and card",
+          "error": "AssertionError: expected [ 'aizen-black-coffin', …(143) ] to have a length of 134 but got 144"
+        },
+        {
+          "file": "tests/game/sonic-roster.test.ts",
+          "name": "Sonic roster mechanics uses the requested Sonic and Shadow skill descriptions and Super Form costs",
+          "error": "AssertionError: expected '获得动能。选择1个正方向五格内的空格并向其冲刺，可穿过无法行走地格，对路径…' to be '获得动能。选择一个正方向五格内的空格并向其冲刺，可穿过无法行走地格，对路径…' // Object.is equality"
+        },
+        {
+          "file": "tests/game/sonic-roster.test.ts",
+          "name": "Sonic roster mechanics lists Sonic's once-per-turn free normal movement passive",
+          "error": "AssertionError: expected '你的回合开始时，本棋子获得1次免费普通移动。' to contain '每个己方回合开始时'"
+        },
+        {
+          "file": "tests/game/sonic-roster.test.ts",
+          "name": "Sonic roster mechanics uses the requested Chaos Spear range, damage, and movement theft",
+          "error": "AssertionError: expected '对4格内一名敌方棋子造成等同于本棋子攻击力50%的物理伤害，并偷取其2点移…' to be '对4格内一名敌人造成50%攻击力的物理伤害，并偷取其2点移动范围至己方下回…' // Object.is equality"
+        },
+        {
+          "file": "tests/game/sonic-roster.test.ts",
+          "name": "Sonic roster mechanics documents the complete momentum acquisition and consumption contract",
+          "error": "AssertionError: expected '普通移动每格获得1动能；标有“获得动能”的技能也按移动格数积累。动能强化技…' to contain '按移动格数累积动能'"
+        },
+        {
+          "file": "tests/game/sonic-roster.test.ts",
+          "name": "Sonic roster mechanics resolves Double Tail Flight when its two-turn effects expire",
+          "error": "AssertionError: expected [ { …(20) }, { …(14) }, { …(14) } ] to deeply equal ArrayContaining{…}"
+        },
+        {
+          "file": "tests/game/sonic-roster.test.ts",
+          "name": "Sonic roster mechanics creates the selected permanent armor card through Tails’s charge skill",
+          "error": "AssertionError: expected '选择2个不同模块，创造1张护甲手牌，消耗2行动点可对本棋子或1个友方棋子使…' to contain '恢复模块：每回合结束回复3点生命'"
+        },
+        {
+          "file": "tests/game/targeting.test.ts",
+          "name": "Demo targeting admission fixture covers the current admitted piece, skill, and card manifests with a stable preparation hash",
+          "error": "AssertionError: expected 'fc1fe4dd99bf95e4a7b908c158dc2df66f712…' to be 'efb69827a23519d68ab13bf4887d1f6154eb1…' // Object.is equality"
+        },
+        {
+          "file": "tests/game/venom-skills.test.ts",
+          "name": "Venom data contract exposes the approved costs, cooldowns, ranges and descriptions",
+          "error": "AssertionError: expected { id: 'venom-host-transfer', …(19) } to match object { actionPointCost: 1, …(4) }"
+        },
+        {
+          "file": "tests/electron/battle-page-runtime.test.ts",
+          "name": "battle page runtime source marks every initial training roster piece as core",
+          "error": "ReferenceError: TUTORIAL_MODE is not defined"
+        },
+        {
+          "file": "tests/electron/battle-page-runtime.test.ts",
+          "name": "battle page runtime source submits a completed target step with a fresh authority action id",
+          "error": "evalmachine.<anonymous>:89"
+        },
+        {
+          "file": "tests/electron/battle-page-runtime.test.ts",
+          "name": "battle page runtime source routes Grand Crusade confirmation through presentation and submits selected pieces once",
+          "error": "ReferenceError: tutorialActionAllowed is not defined"
+        },
+        {
+          "file": "tests/electron/editor-content-pipeline.test.ts",
+          "name": "RED-178 JSON-first content editor rejects malformed JSON before write and preserves unknown fields during common-field edits",
+          "error": "AssertionError: expected '<!DOCTYPE html>\\r\\n<html lang=\"zh-CN\"…' to contain 'saveButton.disabled = Boolean(result.…'"
+        },
+        {
+          "file": "tests/electron/embedded-postgres.test.ts",
+          "name": "RED-161 embedded PostgreSQL LAN authority initializes once, enforces loopback/SCRAM, persists, and detects a database crash",
+          "error": "AssertionError: expected false to be true // Object.is equality"
+        },
+        {
+          "file": "tests/electron/embedded-postgres.test.ts",
+          "name": "RED-161 embedded PostgreSQL LAN authority fails closed when a plaintext initialization credential cannot be deleted",
+          "error": "Error: expected [Function] to throw error including 'Temporary PostgreSQL credential clean…' but got 'Embedded PostgreSQL runtime manifest …'"
+        }
+      ]
+    },
+    {
+      "run": "affected",
+      "total": 313,
+      "passed": 310,
+      "failed": 3,
+      "failedCases": [
+        {
+          "file": "tests/game/projectile-trace.test.ts",
+          "name": "death blossom approved area behavior damages only living enemies in the caster-centered 3×3 area and ignores projectile blockers",
+          "error": "AssertionError: expected '以本棋子为中心的3×3范围内所有敌方棋子' to be '以自身为中心的3×3范围内所有敌人' // Object.is equality"
+        },
+        {
+          "file": "tests/game/red-129-data-contract.test.ts",
+          "name": "RED-129 complete data contract pins the approved stats, renamed skills, targeting boundaries, and rewritten text",
+          "error": "AssertionError: expected '选择1个5格内的敌方棋子，偷取其攻击力，并在对方的下1个回合结束时归还。' to contain '对方的下一个回合结束时归还'"
+        },
+        {
+          "file": "tests/game/sonic-roster.test.ts",
+          "name": "Sonic roster mechanics documents the complete momentum acquisition and consumption contract",
+          "error": "AssertionError: expected '普通移动每格获得1动能；标有“获得动能”的技能也按移动格数积累。动能强化技…' to contain '按移动格数累积动能'"
+        }
+      ]
+    },
+    {
+      "run": "final-focused",
+      "total": 39,
+      "passed": 39,
+      "failed": 0,
+      "failedCases": []
+    },
+    {
+      "run": "slow-recheck",
+      "total": 47,
+      "passed": 47,
+      "failed": 0,
+      "failedCases": []
+    },
+    {
+      "run": "final-suite",
+      "total": 1442,
+      "passed": 1431,
+      "failed": 11,
+      "failedCases": [
+        {
+          "file": "battle-page-runtime.test.ts",
+          "name": "battle page runtime source marks every initial training roster piece as core",
+          "error": "ReferenceError: TUTORIAL_MODE is not defined"
+        },
+        {
+          "file": "battle-page-runtime.test.ts",
+          "name": "battle page runtime source submits a completed target step with a fresh authority action id",
+          "error": "evalmachine.<anonymous>:89"
+        },
+        {
+          "file": "battle-page-runtime.test.ts",
+          "name": "battle page runtime source routes Grand Crusade confirmation through presentation and submits selected pieces once",
+          "error": "ReferenceError: tutorialActionAllowed is not defined"
+        },
+        {
+          "file": "embedded-postgres.test.ts",
+          "name": "RED-161 embedded PostgreSQL LAN authority initializes once, enforces loopback/SCRAM, persists, and detects a database crash",
+          "error": "AssertionError: expected false to be true // Object.is equality"
+        },
+        {
+          "file": "embedded-postgres.test.ts",
+          "name": "RED-161 embedded PostgreSQL LAN authority fails closed when a plaintext initialization credential cannot be deleted",
+          "error": "Error: expected [Function] to throw error including 'Temporary PostgreSQL credential clean…' but got 'Embedded PostgreSQL runtime manifest …'"
+        },
+        {
+          "file": "ai-semantics.test.ts",
+          "name": "AI semantic contract audits every current manifest and makes a changed admission manifest fail closed",
+          "error": "Error: Command failed: C:\\Program Files\\nodejs\\node.exe scripts/audit-ai-semantics.mjs"
+        },
+        {
+          "file": "skillcode-static-audit.test.ts",
+          "name": "RED-45 skillCode static compatibility audit classifies every executable field and every lexical free variable",
+          "error": "AssertionError: expected [ { …(4) }, { …(4) }, { …(4) }, …(16) ] to have a length of 21 but got 19"
+        },
+        {
+          "file": "skillcode-static-audit.test.ts",
+          "name": "RED-45 data parse and production loader smoke parses every JSON definition and loads every skill, rule, and card",
+          "error": "AssertionError: expected [ 'aizen-black-coffin', …(143) ] to have a length of 134 but got 144"
+        },
+        {
+          "file": "sonic-roster.test.ts",
+          "name": "Sonic roster mechanics uses the requested Chaos Spear range, damage, and movement theft",
+          "error": "AssertionError: expected '对4格内1个敌方棋子造成等同于本棋子攻击力50%的物理伤害，并偷取其2点移…' to be '对4格内1个敌方棋子造成等同于本棋子攻击力50%的物理伤害，并偷取其2点移…' // Object.is equality"
+        },
+        {
+          "file": "sonic-roster.test.ts",
+          "name": "Sonic roster mechanics documents the complete momentum acquisition and consumption contract",
+          "error": "AssertionError: expected '普通移动每格获得1动能；标有“获得动能”的技能也按移动格数积累。动能强化技…' to contain '按移动格数累积动能'"
+        },
+        {
+          "file": "targeting.test.ts",
+          "name": "Demo targeting admission fixture covers the current admitted piece, skill, and card manifests with a stable preparation hash",
+          "error": "AssertionError: expected 'fc1fe4dd99bf95e4a7b908c158dc2df66f712…' to be 'efb69827a23519d68ab13bf4887d1f6154eb1…' // Object.is equality"
+        }
+      ]
+    },
+    {
+      "run": "sonic-final",
+      "total": 41,
+      "passed": 40,
+      "failed": 1,
+      "failedCases": [
+        {
+          "file": "sonic-roster.test.ts",
+          "name": "Sonic roster mechanics documents the complete momentum acquisition and consumption contract",
+          "error": "AssertionError: expected '普通移动每格获得1动能；标有“获得动能”的技能也按移动格数积累。动能强化技…' to contain '按移动格数累积动能'"
+        }
+      ]
+    }
+  ]
+}

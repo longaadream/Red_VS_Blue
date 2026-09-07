@@ -1,11 +1,11 @@
 {
   "id": "hidan-sacrifice",
   "name": "狂信者献祭",
-  "description": "对自身造成4点真实伤害。若血誓诅咒已生效，对被诅咒目标造成4点真实伤害，并额外造成飞段已损失HP的1/3（向下取整）点真实伤害。飞段损失的血越多，苦难越深，伤害越强。",
+  "description": "本棋子受到4点真实伤害。若血誓诅咒已生效，对被诅咒目标造成4点真实伤害，再造成等同于本棋子已损失生命值1/3的真实伤害。",
   "keywords": [
     "真实伤害"
   ],
-  "targetText": "自身",
+  "targetText": "本棋子",
   "effectTags": [
     "真实伤害"
   ],
@@ -17,5 +17,5 @@
   "powerMultiplier": 1,
   "actionPointCost": 2,
   "code": "function executeSkill(context) { var caster = context.piece; var maxHp = caster.maxHp || (caster.stats && caster.stats.maxHp) || 18; var lostHp = maxHp - caster.currentHp; var result = dealDamage(caster, caster, 4, 'true', context.battle, context.skill.id); var oathed = context.battle.pieces.find(function(p) { return !arePlayersAllied(battle, p.ownerPlayerId, caster.ownerPlayerId) && p.currentHp > 0 && p.statusTags && p.statusTags.some(function(t) { return t.type === 'blood-oath'; }); }); var bonusDamage = Math.floor(lostHp / 3); if (oathed && bonusDamage > 0) { dealDamage(caster, oathed, bonusDamage, 'true', context.battle, 'sacrifice-bonus'); return { success: true, message: caster.name + '发动狂信者献祭，对自身造成' + result.damage + '点真实伤害，对' + oathed.name + '造成' + (4 + bonusDamage) + '点真实伤害（含' + bonusDamage + '点苦难加深）' }; } return { success: true, message: caster.name + '发动狂信者献祭，对自身造成' + result.damage + '点真实伤害' }; }",
-  "previewCode": "function calculatePreview(piece, skillDef) { var maxHp = piece.maxHp || (piece.stats && piece.stats.maxHp) || 18; var lostHp = maxHp - piece.currentHp; var bonus = Math.floor(lostHp / 3); return { description: '对自身造成4点真实伤害。若血誓诅咒已生效，对被诅咒目标造成4点真实伤害，并额外造成飞段已损失HP的1/3（向下取整）点真实伤害。飞段损失的血越多，苦难越深，伤害越强。', expectedValues: { selfDamage: 4, reflectedDamage: 4, bonusDamage: bonus } }; }"
+  "previewCode": "function calculatePreview(piece, skillDef) { var maxHp = piece.maxHp || (piece.stats && piece.stats.maxHp) || 18; var lostHp = maxHp - piece.currentHp; var bonus = Math.floor(lostHp / 3); return { description: \"本棋子受到4点真实伤害。若血誓诅咒已生效，对被诅咒目标造成4点真实伤害，再造成等同于本棋子已损失生命值1/3的真实伤害。\", expectedValues: { selfDamage: 4, reflectedDamage: 4, bonusDamage: bonus } }; }"
 }

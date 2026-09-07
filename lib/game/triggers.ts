@@ -132,6 +132,7 @@ export type TriggerType =
   | "endTurn"               // 回合结束时
   | "afterMove"             // 移动后
   | "beforeMove"            // 即将移动前
+  | "beforePiecePositionChange" // Any explicit board relocation, including skill movement
   | "beforeSkillUse"        // 即将使用技能前
   | "afterHealDealt"        // 造成治疗后
   | "afterHealTaken"        // 受到治疗后
@@ -300,8 +301,14 @@ function writeBackMutableTriggerContext(
   target: TriggerContext,
   before: MutableTriggerContextSnapshot,
 ): void {
-  if (source.damage !== before.damage) target.damage = source.damage
-  if (source.heal !== before.heal) target.heal = source.heal
+  if (source.damage !== before.damage) {
+    target.damage = typeof source.damage === 'number' ? Math.floor(source.damage) : source.damage
+    // Numerical mitigation retains minimum damage; explicit blocked effects still win.
+    if (source.type === 'beforeDamageTaken' && Number(before.damage) > 0 && Number(source.damage) >= 0) {
+      target.damage = Math.max(1, Number(target.damage))
+    }
+  }
+  if (source.heal !== before.heal) target.heal = typeof source.heal === 'number' ? Math.floor(source.heal) : source.heal
   const position = source.targetPosition as { x?: unknown; y?: unknown } | null | undefined
   const positionX = position && typeof position === 'object' ? position.x : undefined
   const positionY = position && typeof position === 'object' ? position.y : undefined
@@ -379,6 +386,9 @@ export interface TriggerResult {
   targetReplacementPieceId?: string
   /** Creates a new non-core summon after the current piece fully completes DeathBatch. */
   summonAfterDeath?: {
+    /** Real revival restores initial attributes/abilities, retaining formal identity and use limits. */
+    revive?: boolean
+    attackBonusMultiplier?: number
     skillId: string
     maxHp: number
     currentHp: number

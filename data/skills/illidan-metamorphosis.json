@@ -3,8 +3,10 @@
   "name": "恶魔变形",
   "description": "攻击力+2，防御力-1，并获得2次【恶魔冲击】。",
   "keywords": [],
-  "targetText": "自身",
-  "effectTags": ["强化"],
+  "targetText": "本棋子",
+  "effectTags": [
+    "强化"
+  ],
   "icon": "🔪",
   "kind": "active",
   "type": "super",

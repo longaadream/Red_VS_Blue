@@ -18,6 +18,8 @@
   <script src="js/three.min.js"></script>
   <script src="js/battle-ui/battle-effect-icons.js"></script>
   <script src="js/battle-ui/battle-view-model.js"></script>
+  <script src="js/practice/client.js"></script>
+  <script src="js/practice/battle-controller.js"></script>
   <script src="js/battle-ui/battle-action-identity.js"></script>
   <script src="js/battle-ui/battle-action-history.js"></script>
   <script src="js/battle-ui/battle-action-vignette.js"></script>
@@ -1845,6 +1847,7 @@
     const myAccountId = (params.get('accountId') || params.get('account') || '').trim().toLowerCase()
     const myPlayerName = params.get('playerName') || '玩家'
     const TUTORIAL_MODE = params.get('mode') === 'tutorial'
+    const PRACTICE_MODE = params.get('mode') === 'practice'
     const TRAINING_MODE = params.get('mode') === 'training' || TUTORIAL_MODE
     const SPECTATE_MODE = params.get('mode') === 'spectate'
     let roomSpectatingEnabled = true
@@ -2927,7 +2930,10 @@
       return currentCost === baseCost ? String(currentCost) : currentCost + '/' + baseCost
     }
     function pieceDispTags(p) {
-      // Shadow clones keep a summon-time display snapshot only; real rules still read statusTags.
+      // Display mirrors the living source; actual rules always read the clone's own statusTags.
+      const master = p.displayStatusTags !== undefined && p.masterPieceId && G && G.pieces &&
+        G.pieces.find(candidate => candidate.instanceId === p.masterPieceId && candidate.currentHp > 0)
+      if (master) return (master.statusTags || []).filter(tag => tag.visible !== false)
       return p.displayStatusTags !== undefined ? p.displayStatusTags : (p.statusTags || [])
     }
     function pieceHasVisibleStatusTag(piece, statusId) {
@@ -4040,7 +4046,7 @@
       let request = null
       request = (async function() {
         try {
-          const raw = TRAINING_MODE
+          const raw = TRAINING_MODE || PRACTICE_MODE
             ? await fetchLocalJson('./data/cards/' + cardId + '.json', 3500)
             : await fetchServerJson('catalog.card', { cardId }, 3500)
           const display = sanitizeCardDisplayMetadata(cardId, raw)
@@ -4256,6 +4262,7 @@
 
     // ── Init ──
     async function init() {
+      if (PRACTICE_MODE) { await initPracticeBattle(); return }
       const requestedLesson = TUTORIAL_MODE && params.has('lesson') && window.RvBTutorialLessons.get(params.get('lesson'))
       if (requestedLesson && requestedLesson.enabled === false) {
         window.location.replace('tutorial.html')
@@ -4506,6 +4513,7 @@
 
     // ── Training: send admin patch ──
     async function sendPatch(body) {
+      if (PRACTICE_MODE) return false
       try {
         const oldG = G
         G = await trainingApiFetch('PATCH', Object.assign({}, body, { battleState: G }))
@@ -4521,6 +4529,7 @@
 
     // ── Training: switch perspective ──
     function switchPerspective() {
+      if (PRACTICE_MODE) return
       const next = myPlayerId === 'training-red' ? 'training-blue' : 'training-red'
       myPlayerId = next
       myFaction = getTrainingPlayerFaction(myPlayerId)
@@ -6989,6 +6998,7 @@
 
     async function doEndTurn() {
       await doAction({ type: 'endTurn', playerId: myPlayerId })
+      if (PRACTICE_MODE) return
       // If phase is now 'end', auto-advance to next player's turn
       if (G && G.turn && G.turn.phase === 'end') {
         await doBeginPhase()
@@ -7150,6 +7160,7 @@
 
     async function doAction(action) {
       if (SPECTATE_MODE) { setStatusMsg('观战为只读模式'); return }
+      if (PRACTICE_MODE) { await practiceDoAction(action); return }
       if (typeof TUTORIAL_MODE !== 'undefined' && TUTORIAL_MODE && tutorialRuntime) {
         const tutorialGuard = tutorialRuntime.beforeAction(action, G)
         if (!tutorialGuard.allowed) {
@@ -7247,7 +7258,7 @@
     }
 
     function storeCompletedMatchTrace() {
-      if (TRAINING_MODE || SPECTATE_MODE || !G || !G.terminalResult) return null
+      if (TRAINING_MODE || PRACTICE_MODE || SPECTATE_MODE || !G || !G.terminalResult) return null
       if (!window.RvBDeveloperTools) {
         const message = 'Trace 生成失败：比赛 Trace 导出器未加载'
         setCompletedMatchTraceStatus(message)
@@ -7299,6 +7310,7 @@
 
     function handleGameOver() {
       if (!G || !G.terminalResult) return
+      if (PRACTICE_MODE) { showPracticeResult(); return }
       if (TUTORIAL_MODE && params.has('lesson') && tutorialRuntime) { tutorialRuntime.showResult(); return }
       const terminalResult = G.terminalResult
       if (pollTimer) { clearInterval(pollTimer); pollTimer = null }
@@ -7411,6 +7423,7 @@
     }
     function clearLog() { const b = document.getElementById('logBody'); if (b) b.innerHTML = '' }
     function goBack() {
+      if (PRACTICE_MODE) { disposePracticeBattle(); window.location.href = 'practice.html'; return }
       if (TRAINING_MODE) { window.location.href = 'index.html'; return }
       // Carry current server mode/url back to the lobby.
       try {
@@ -7706,6 +7719,7 @@
       }
     })
     function disposeBattlePage() {
+      if (PRACTICE_MODE) disposePracticeBattle()
       battlePageDisposed = true
       cardDisplayMetadataRequests.clear()
       if (pollTimer) clearInterval(pollTimer)

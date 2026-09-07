@@ -186,7 +186,7 @@
   },
   "lib/game/skills.ts": {
     "@typescript-eslint/no-explicit-any": {
-      "count": 152
+      "count": 133
     },
     "@typescript-eslint/no-require-imports": {
       "count": 10

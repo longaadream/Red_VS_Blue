@@ -1,7 +1,7 @@
 {
   "id": "grimmjow-gran-rey-cero",
   "name": "王虚的闪光",
-  "description": "灵压。选择同一行或同一列6格内1名敌人，对路径上所有敌人造成200%攻击力的魔法伤害。",
+  "description": "灵压。选择同一行或同一列6格内1个敌方棋子，对路径上所有敌方棋子造成等同于本棋子攻击力200%的法术伤害。",
   "keywords": [
     "灵压"
   ],
@@ -11,7 +11,7 @@
     "name": "灵压",
     "rule": "rule-spiritual-pressure"
   },
-  "targetText": "同一行或同一列6格内1名敌人",
+  "targetText": "同一行或同一列6格内1个敌方棋子",
   "effectTags": [
     "魔法伤害",
     "路径"

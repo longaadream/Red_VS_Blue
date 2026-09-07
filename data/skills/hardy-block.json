@@ -1,10 +1,12 @@
 {
   "id": "hardy-block",
   "name": "悍猛格挡",
-  "description": "持续2回合：受到伤害时，将其中50%转化为攻击力，向下取整。",
+  "description": "持续2回合：本棋子受到伤害时，攻击力增加等同于此次伤害50%的数值。",
   "keywords": [],
-  "targetText": "自身",
-  "effectTags": ["强化"],
+  "targetText": "本棋子",
+  "effectTags": [
+    "强化"
+  ],
   "icon": "🛕",
   "kind": "active",
   "type": "buff",
@@ -13,6 +15,6 @@
   "powerMultiplier": 0.5,
   "actionPointCost": 2,
   "code": "function executeSkill(context) { console.log('[HardyBlock] Skill executing'); const sourcePiece = context.piece; console.log('[HardyBlock] sourcePiece:', sourcePiece.instanceId, sourcePiece.name); console.log('[HardyBlock] Calling addStatusEffectById'); addStatusEffectById(sourcePiece.instanceId, { id: 'hardy-block', type: 'hardy-block', currentDuration: 2, currentUses: -1, intensity: 50, stacks: 1, relatedRules: ['rule-hardy-block'] }); console.log('[HardyBlock] Calling addRuleById'); addRuleById(sourcePiece.instanceId, 'rule-hardy-block'); console.log('[HardyBlock] Skill execution complete'); return { message: sourcePiece.name + ' 激活了悍猛格挡，持续2回合，受到伤害时将50%伤害转化为攻击力', success: true }; }",
-  "previewCode": "function calculatePreview(piece, skillDef) { return { description: '持续2回合：受到伤害时，将其中50%转化为攻击力。', expectedValues: { duration: 2 } }; }",
+  "previewCode": "function calculatePreview(piece, skillDef) { return { description: \"持续2回合：本棋子受到伤害时，攻击力增加等同于此次伤害50%的数值。\", expectedValues: { duration: 2 } }; }",
   "range": "self"
 }

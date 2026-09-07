@@ -2042,7 +2042,7 @@ async function classifyAuthorityPlayerContext(): Promise<AuthorityPlayerContext>
   try { currentUrl = new URL(mainWin.webContents.getURL()) }
   catch { return 'idle' }
   if (!currentUrl.pathname.endsWith('/battle.html')) return 'idle'
-  if (currentUrl.searchParams.get('mode') === 'training') return 'local-match'
+  if (['training', 'practice'].includes(currentUrl.searchParams.get('mode') ?? '')) return 'local-match'
 
   try {
     const selection = await mainWin.webContents.executeJavaScript(`

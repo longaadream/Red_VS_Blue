@@ -9,6 +9,7 @@ import { finalizePendingTargetSession } from '@/lib/game/targeting'
 import { TriggerSystem, globalTriggerSystem } from '@/lib/game/triggers'
 import { applyBattleAction, summonPiece } from '@/lib/game/turn'
 import { makePiece, makeState } from '../helpers/minimal-state'
+import { expireOwnerStatuses } from '@/lib/game/status-lifecycle'
 
 function requiredRule(id: string) {
   const rule = loadRuleById(id, true)
@@ -48,24 +49,28 @@ describe('RED-45 complex combat mechanisms', () => {
     expect(defender.rules).toEqual([])
   })
 
-  it('intercepts lethal damage and revives through the real lich covenant rule', () => {
+  it('completes death before reviving through the real lich covenant rule', () => {
     const attacker = makePiece({ instanceId: 'lethal-attacker', ownerPlayerId: 'player-red' }) as any
-    const defender = makePiece({ instanceId: 'lich-defender', ownerPlayerId: 'player-blue', attack: 10 }) as any
+    const defender = makePiece({ instanceId: 'lich-defender', ownerPlayerId: 'player-blue', attack: 10, x: 2 }) as any
     defender.currentHp = 5
     defender.maxHp = 40
     defender.statusTags = [{ id: 'lich-covenant', type: 'lich-covenant', intensity: 1 }]
-    defender.skills = [{ skillId: 'matrix-cooldown', currentCooldown: 3 }]
+    defender.skills = [{ skillId: 'fireball', currentCooldown: 3 }]
+    defender.initialDefinition = { stats: { maxHp: 40, attack: 10, defense: 0, moveRange: 3 },
+      skills: [{ skillId: 'fireball', currentCooldown: 0 }], rules: [], statusTags: [] }
     defender.rules = [requiredRule('rule-arthas-lich-covenant')]
     const state = makeState({ pieces: [attacker, defender] }) as any
 
     const result = dealDamage(attacker, defender, 99, 'true', state, 'matrix-lethal')
 
-    expect(result).toMatchObject({ success: false, damage: 0 })
-    expect(defender.currentHp).toBe(40)
-    expect(defender.attack).toBe(15)
-    expect(defender.skills[0].currentCooldown).toBe(0)
-    expect(defender.statusTags).toEqual([expect.objectContaining({ type: 'undead-body' })])
-    expect(defender.rules).toEqual([])
+    expect(result).toMatchObject({ success: true, damage: 5 })
+    expect(state.graveyard).toContainEqual(expect.objectContaining({ instanceId: defender.instanceId, currentHp: 0 }))
+    const revived = state.pieces.find((piece: any) => piece.ownerPlayerId === 'player-blue')
+    expect(revived.currentHp).toBe(40)
+    expect(revived.attack).toBe(15)
+    expect(revived.skills[0].currentCooldown).toBe(0)
+    expect(revived.statusTags).toEqual([expect.objectContaining({ type: 'undead-body' })])
+    expect(revived.rules).toEqual([])
   })
 
   it('dispatches before/after summon around one inserted piece', () => {
@@ -123,17 +128,19 @@ describe('RED-45 complex combat mechanisms', () => {
       id: 'blood-oath-cursed',
       type: 'blood-oath',
       sourcePlayerId: 'player-red',
-      remainingTurns: 1,
       remainingDuration: 1,
-      currentDuration: 1,
+        currentDuration: 1,
+        relatedRules: ['rule-blood-oath-tick'],
     }]
     cursed.rules = [requiredRule('rule-blood-oath-tick')]
     const state = makeState({ pieces: [cursed], currentPlayerId: 'player-red' }) as any
     state.turn.currentPlayerId = 'player-red'
 
-    const result = new TriggerSystem().checkTriggers(state, { type: 'endTurn', playerId: 'player-red' } as any)
-
-    expect(result.success).toBe(true)
+    expireOwnerStatuses(state, 'player-red')
+    expect(cursed.statusTags).toHaveLength(1)
+    state.turn.currentPlayerId = 'player-blue'
+    state.turn.turnNumber += 1
+    expireOwnerStatuses(state, 'player-blue')
     expect(cursed.statusTags).toEqual([])
     expect(cursed.rules).toEqual([])
   })

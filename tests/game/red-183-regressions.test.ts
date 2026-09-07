@@ -15,17 +15,17 @@ describe('RED-183 character rules and selection UI regressions', () => {
   it('documents the self-cast AP refund on Shield of Light', () => {
     const shield = JSON.parse(readFileSync(resolve(process.cwd(), 'data/skills/shield-of-light.json'), 'utf8'))
 
-    expect(shield.description).toContain('若对自己使用，回复1点AP')
-    expect(shield.previewCode).toContain('若对自己使用，回复1点AP')
+    expect(shield.description).toContain('若目标是本棋子，你恢复1行动点')
+    expect(shield.previewCode).toContain('若目标是本棋子，你恢复1行动点')
   })
 
   it('keeps Tails Twin Flight immunity and inoperable buffs at two turns', () => {
     const skill = json('data/skills/tails-twin-flight.json')
     const resolveRule = json('data/rules/rule-tails-flight-resolve.json')
     expect(skill.description).toContain('持续2回合')
-    expect(skill.description).toContain('作为塔尔斯的落点')
-    expect(skill.description).toContain('相邻的地格作为友军的落点')
-    expect(skill.description).toContain('然后2回合后同步传送')
+    expect(skill.description).toContain('作为本棋子的落点')
+    expect(skill.description).toContain('相邻的合法地格作为友方棋子的落点')
+    expect(skill.description).toContain('接下来的第二个你的回合结束时')
     expect(skill.code).toContain('currentDuration:2,remainingDuration:2')
     expect(skill.code).toContain('turns:2')
     expect(skill.targeting.steps[2].distanceFromSelectedTarget).toEqual({ index: 1, range: 1, minRange: 1 })
@@ -34,7 +34,7 @@ describe('RED-183 character rules and selection UI regressions', () => {
 
   it('uses Manhattan distance for Naruto candidates and execution', () => {
     const skill = json('data/skills/naruto-shadow-clone.json')
-    expect(skill.description).toBe('选择5格内1个空地格并秘密选择一项：召唤1个影分身，或传送到目标格并在原地留下1个影分身。影分身受到1次伤害后消散，不能行动，被击杀时不会提供充能。')
+    expect(skill.description).toBe('选择本棋子5格内1个空地格，并秘密选择一项：召唤1个影分身；或将本棋子传送至目标格，并在原地留下1个影分身。影分身受到1次伤害后消散，不能行动，被击杀时不提供充能。')
     expect(skill.previewCode).toContain(skill.description)
     expect(skill.effectTags).toContain('秘密选择')
     const naruto = makePiece({ instanceId: 'naruto-red183', templateId: 'naruto', ownerPlayerId: 'player-red', x: 1, y: 1 })
@@ -58,10 +58,10 @@ describe('RED-183 character rules and selection UI regressions', () => {
 
   it('uses the approved Grimmjow wording and hides the Recall number from its result message', () => {
     expect(json('data/skills/grimmjow-hunting-instinct.json').description).toBe(
-      '每当一名敌人行动后，若其在格力姆乔4格内，格力姆乔可移动至2格内1个空格；若与其相邻，攻击该敌人2次，每次造成75%攻击力的物理伤害。',
+      '敌方棋子行动后，若其位于本棋子4格内，可将本棋子移动至2格内1个空地格。若随后与该敌方棋子相邻，则攻击其2次，每次造成等同于本棋子攻击力75%的物理伤害。',
     )
     const recall = json('data/skills/recall.json')
-    expect(recall.description).toContain('秘密选择一个数字')
+    expect(recall.description).toContain('秘密选择1个数字')
     expect(recall.effectTags).toContain('秘密选择')
     expect(recall.concealTargetInBattleLog).toBe(true)
     expect(recall.code).not.toContain("' enemy actions'")

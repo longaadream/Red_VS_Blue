@@ -14,6 +14,7 @@
   ],
   "extraResources": [
     { "from": "data",    "to": "app/data" },
+    { "from": "public/images", "to": "app/public/images" },
     { "from": "scripts", "to": "app/scripts" },
     { "from": "node_modules/jszip",             "to": "app/node_modules/jszip" },
     { "from": "node_modules/jszip/node_modules/readable-stream", "to": "app/node_modules/jszip/node_modules/readable-stream" },

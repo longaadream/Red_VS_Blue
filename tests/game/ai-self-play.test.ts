@@ -711,11 +711,11 @@ describe('offline self-play league and evaluation baseline', () => {
         'f857d7516d0bcdb05c1ea32e05157d28e9322c7245b950115f71dc172db6af0d',
         'f857d7516d0bcdb05c1ea32e05157d28e9322c7245b950115f71dc172db6af0d',
       ],
-      // RED-131 keeps the deterministic state sequence but binds its digest to
-      // the v3 chunk hierarchy instead of the legacy whole-state serialization.
+      // RED-192 preserves actions and terminal outcomes; state now includes the
+      // once-per-turn refresh checkpoint. Digest update confirmed by the user.
       stateTraceHashes: [
-        'acafe41533063615e59bb02024bdc3e523e4509ed035901c41347da7397a6e1b',
-        'acafe41533063615e59bb02024bdc3e523e4509ed035901c41347da7397a6e1b',
+        '3848a1135b864d7696333787905587722f0295c3ba7305420b2e1e7317f4de34',
+        '3848a1135b864d7696333787905587722f0295c3ba7305420b2e1e7317f4de34',
       ],
       terminal: [
         ['finished', 'core-eliminated'],

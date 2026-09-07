@@ -85,6 +85,13 @@ describe('RED-189 opening and whole-match effects', () => {
     expect(state.pieces.every(p => p.templateId === 'custom-vanguard')).toBe(true)
   })
 
+  it('shares the opening passive with an unrelated template without template flags', async () => {
+    const custom = { ...piece('guldan'), id: 'shared-passive-user', skills: [{ skillId: 'naruto-vanguard', level: 1 }] }
+    const state = await opening(192, [custom])
+    expect(state.pieces.every(p => p.templateId === custom.id)).toBe(true)
+    expect(load('skills', 'naruto-vanguard').description).toBe('当阵容中有本棋子时，本棋子首先上场。')
+  })
+
   it('selects only one priority character per owner, leaving the others in reserve', async () => {
     const roster = [piece('blue-naruto'), { ...piece('blue-naruto'), id: 'custom-vanguard', name: 'Custom vanguard' }]
     const selected = new Set<string>()

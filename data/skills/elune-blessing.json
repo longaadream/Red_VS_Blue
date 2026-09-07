@@ -3,8 +3,11 @@
   "name": "月神赐福",
   "description": "获得1张随机圣光手牌，且你打出的下一张圣光手牌效果提高100%。",
   "keywords": [],
-  "targetText": "自身",
-  "effectTags": ["手牌", "强化"],
+  "targetText": "本棋子",
+  "effectTags": [
+    "手牌",
+    "强化"
+  ],
   "icon": "🌙",
   "kind": "active",
   "type": "normal",

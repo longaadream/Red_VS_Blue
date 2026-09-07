@@ -1,10 +1,12 @@
 {
   "id": "hardy-block-trigger",
   "name": "悍猛格挡效果",
-  "description": "受到伤害时，将其中50%转化为攻击力。",
+  "description": "本棋子受到伤害时，攻击力增加等同于此次伤害50%的数值。",
   "keywords": [],
-  "targetText": "拥有悍猛格挡的自身",
-  "effectTags": ["强化"],
+  "targetText": "拥有悍猛格挡的本棋子",
+  "effectTags": [
+    "强化"
+  ],
   "kind": "passive",
   "type": "normal",
   "cooldownTurns": 0,

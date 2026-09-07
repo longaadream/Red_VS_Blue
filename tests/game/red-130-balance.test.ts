@@ -55,7 +55,8 @@ describe('RED-130 data contract', () => {
     expect(curseRule.description).toContain('50%')
     expect(curseRule.description).toContain('向下取整')
     expect(curseSkill.description).toContain('50%')
-    expect(curseSkill.description).toContain('向下取整')
+    // Rounding is a shared dictionary rule; the numerical behavior is tested below.
+    expect(curseSkill.description).toContain('此次伤害加本棋子攻击力的50%')
     expect(amaterasu).toMatchObject({ actionPointCost: 2 })
   })
 

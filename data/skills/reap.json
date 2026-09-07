@@ -1,10 +1,12 @@
 {
   "id": "reap",
   "name": "收割",
-  "description": "造成伤害后，治疗等同于该伤害50%的生命。",
+  "description": "本棋子造成实际伤害后，恢复等同于实际伤害50%的生命。",
   "keywords": [],
-  "targetText": "自身",
-  "effectTags": ["治疗"],
+  "targetText": "本棋子",
+  "effectTags": [
+    "治疗"
+  ],
   "icon": "🃏",
   "kind": "passive",
   "type": "normal",

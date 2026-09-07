@@ -1,0 +1,1158 @@
+{
+  "schema": "rvb-skill-language-review/v1",
+  "description": "完整技能清单，含辅助/遗留技能；文案迁移不修改code。已确认的独立机制修复另有提交差异与测试。",
+  "entries": [
+    {
+      "id": "aizen-black-coffin",
+      "name": "黑棺",
+      "before": "灵压。对5格内1名敌人造成150%攻击力的魔法伤害并使其定身1回合；目标下回合结束时再次造成等量伤害。",
+      "after": "灵压。对本棋子5格内1个敌方棋子造成等同于本棋子攻击力150%的法术伤害，并使其获得定身，持续1回合。目标的下一个回合结束时，再次对其造成等量伤害。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "aizen-kyoka-suiguetsu",
+      "name": "镜花水月",
+      "before": "秘密选择4格内1名友军。对方下回合以单体技能指定该角色时，可将目标转移给蓝染3格内另1名敌人。",
+      "after": "秘密选择本棋子4格内1个友方棋子。对方的下一个回合中，该棋子成为单体技能目标时，可将目标转移至本棋子3格内另1个敌方棋子。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "aizen-shunpo",
+      "name": "瞬步",
+      "before": "灵压。选择5格内1名敌人，传送至其2格内1个空格，并获得2点临时行动点。",
+      "after": "灵压。选择本棋子5格内1个敌方棋子，将本棋子传送至该目标2格内1个空地格，你获得2点临时行动点。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "anti-heal-block",
+      "name": "禁疗阻止",
+      "before": "阻止被禁疗目标受到治疗",
+      "after": "阻止被禁疗目标受到治疗。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "arthas-frostmourne",
+      "name": "霜之哀伤",
+      "before": "对1格内1个敌人造成等同攻击力200%的物理伤害。若击杀目标，获得2点充能。",
+      "after": "对本棋子1格内1个敌方棋子造成等同于本棋子攻击力200%的物理伤害。若击杀目标，你获得2充能。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "arthas-howling-blast",
+      "name": "凛冬咆哮",
+      "before": "对4×4范围内所有敌方棋子造成75%攻击力的法术伤害，并有25%概率冻结目标1回合。",
+      "after": "对4×4范围内所有敌方棋子造成等同于本棋子攻击力75%的法术伤害，并有25%概率冰冻目标1回合。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "arthas-icebound-fortitude",
+      "name": "寒冰坚忍",
+      "before": "持续2回合：受到的伤害减少50%；受到实际伤害后，冰冻造成伤害的敌方棋子1回合。",
+      "after": "持续2回合：本棋子受到的伤害减少50%；受到实际伤害后，使伤害来源的敌方棋子获得冰冻，持续1回合。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "arthas-lich-covenant",
+      "name": "巫妖誓约",
+      "before": "使3格内1个友军获得巫妖誓约。该友军死亡后满血复活，然后攻击力提高50%，并重置所有技能冷却。",
+      "after": "使本棋子3格内1个友方棋子获得巫妖誓约。该棋子死亡后满血复活，然后攻击力提高50%，并重置所有技能冷却。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "ashbringer",
+      "name": "灰烬使者",
+      "before": "对1格内1个敌人造成等同攻击力的真实伤害。",
+      "after": "对1格内1个敌方棋子造成等同于本棋子攻击力的真实伤害。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "biotic-grenade",
+      "name": "生物手雷",
+      "before": "对4格内选定的2×2区域生效：友军治疗4点，敌军受到1点物理伤害并禁疗1回合。以目标格为左上角结算2×2区域。",
+      "after": "选择本棋子4格内1个地格，以该格为左上角，对2×2区域内的友方棋子恢复4点生命，对敌方棋子造成1点物理伤害，并使其获得禁疗，持续1回合。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "blackwidow-deadly-gaze",
+      "name": "致命视线",
+      "before": "对6格外1个敌人造成等同攻击力200%的物理伤害。",
+      "after": "对6格外1个敌方棋子造成等同于本棋子攻击力200%的物理伤害。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "blackwidow-lethal-strike",
+      "name": "致命打击",
+      "before": "弹射物：向同一行或同一列射击，对路径上的第1个敌人造成物理伤害（无法穿过掩体和角色）。伤害=(1+距离×0.1)×攻击力，无上限。",
+      "after": "弹射物：向同一行或同一列射击，对路径上的第1个敌方棋子造成物理伤害（无法穿过掩体和棋子）。伤害=(1+距离×0.1)×攻击力，无上限。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "blackwidow-lethal-toxin",
+      "name": "致命毒素",
+      "before": "在当前地格放置1个毒素，并移动到5格内1个空地格。敌人经过毒素地格时会受到4点伤害。",
+      "after": "在本棋子所在的地格放置毒素，然后将本棋子传送至5格内1个空地格。敌方棋子触发毒素时，受到4点真实伤害。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "blackwidow-toxin-damage",
+      "name": "毒素伤害",
+      "before": "敌人踩到毒素时，受到4点真实伤害。",
+      "after": "敌方棋子踩到毒素时，受到4点真实伤害。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "blessed-hammer",
+      "name": "祝福之锤",
+      "before": "对2格内1个敌人造成等同攻击力的物理伤害。",
+      "after": "对2格内1个敌方棋子造成等同于本棋子攻击力的物理伤害。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "blink",
+      "name": "闪现",
+      "before": "传送到5x5范围内1个空地格。",
+      "after": "传送到5×5范围内1个空地格。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "blizzard-damage",
+      "name": "暴风雪伤害",
+      "before": "对暴风雪区域内的所有敌人造成等同攻击力150%的法术伤害和冰冻",
+      "after": "对暴风雪区域内所有敌方棋子造成施放时记录的法术伤害，并使其获得冰冻，持续1回合。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "blizzard",
+      "name": "暴风雪",
+      "before": "在全场1个地格周围召唤7x7暴风雪区域。敌方回合结束时，区域内敌人受到等同攻击力150%的法术伤害，并冰冻1回合。",
+      "after": "选择地图上1个地格，形成以该格为中心的7×7暴风雪区域。对方的下一个回合结束时，对区域内所有敌方棋子造成等同于本棋子施放时攻击力150%的法术伤害，并使其获得冰冻，持续1回合。随后暴风雪消散。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "blood-echo-trigger",
+      "name": "血色回响·触发",
+      "before": "友方失去【圣盾】时获得1张【圣光充能】。",
+      "after": "友方棋子失去圣盾时，你获得1张【圣光充能】。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "blood-echo",
+      "name": "血色回响",
+      "before": "任意友方失去【圣盾】后，获得1张【圣光充能】。",
+      "after": "每当友方棋子失去圣盾时，你获得1张【圣光充能】。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "death-blossom",
+      "name": "死亡绽放",
+      "before": "对以自身为中心的3×3范围内所有敌人造成200%攻击力的物理伤害。",
+      "after": "对以本棋子为中心的3×3范围内所有敌方棋子造成等同于本棋子攻击力200%的物理伤害。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "divine-blessing",
+      "name": "赐福",
+      "before": "所有友方棋子下一次造成伤害时，伤害增加2点。场上每有一个棋子带有圣盾，再额外+1。",
+      "after": "使所有友方棋子下一次造成的伤害+2。场上每有1个持有圣盾的棋子，该次伤害额外+1。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "divine-shield-defense",
+      "name": "圣盾防御",
+      "before": "拥有圣盾时，抵挡一次伤害并移除圣盾。",
+      "after": "拥有圣盾时，抵挡一次伤害并移除圣盾。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "earthshatter",
+      "name": "毁天灭地",
+      "before": "选择1个空地格落下，对以该格为中心的3x3区域内敌人造成攻击力200%的物理伤害。",
+      "after": "选择1个空地格落下，对以该格为中心的3×3区域内敌方棋子造成等同于本棋子攻击力200%的物理伤害。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "elune-blessing",
+      "name": "月神赐福",
+      "before": "获得1张随机圣光手牌，且你打出的下一张圣光手牌效果提高100%。",
+      "after": "获得1张随机圣光手牌，且你打出的下一张圣光手牌效果提高100%。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "elune-guidance-trigger",
+      "name": "艾露恩的指引触发",
+      "before": "使用圣光手牌时，获得1层月华；月华达到2层时，治疗生命值最低的友军5点生命。",
+      "after": "你使用圣光手牌时，获得1层月华。月华达到2层时，使生命值最低的友方棋子恢复5点生命。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "elune-guidance",
+      "name": "艾露恩的指引",
+      "before": "每当己方使用圣光手牌时，获得1层月华，最多2层。月华达到2层时，治疗生命值最低的友军5点生命。",
+      "after": "每当你使用圣光手牌时，获得1层月华，最多2层。月华达到2层时，使生命值最低的友方棋子恢复5点生命。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "elune-protection-trigger",
+      "name": "艾露恩的守护触发",
+      "before": "受到致命伤害时，免疫该伤害并治疗5点生命。",
+      "after": "友方棋子将受到致命伤害时，免疫此次伤害，并恢复5点生命。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "elune-protection",
+      "name": "艾露恩的守护",
+      "before": "泰兰德被召唤时，为己方提供1次未持有的艾露恩守护。当任意友军将受到致命伤害时，免疫该伤害并治疗5点生命。全队共享1次，与泰兰德是否存活无关；未消耗时再次召唤不会叠加。",
+      "after": "本棋子被召唤时，若你尚未持有艾露恩守护，则获得1次艾露恩守护。友方棋子将受到致命伤害时，消耗守护，免疫此次伤害，并恢复5点生命。守护由全队共享，不依赖本棋子存活。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "fel-blessing",
+      "name": "邪能赐福",
+      "before": "使全图任意1个友军攻击力+2，并使其受到2点真实伤害。",
+      "after": "使地图上1个友方棋子攻击力+2，然后使其受到2点真实伤害。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "fireball",
+      "name": "火球术",
+      "before": "对5格内1个敌人造成等同攻击力150%的法术伤害。",
+      "after": "对5格内1个敌方棋子造成等同于本棋子攻击力150%的法术伤害。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "freeze-prevent",
+      "name": "冰冻阻止",
+      "before": "阻止被冰冻目标的移动和使用技能",
+      "after": "冰冻期间，不能主动走格或使用技能。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "frostbolt",
+      "name": "冰霜箭",
+      "before": "对5格内1个敌人造成等同攻击力的法术伤害，并冰冻1回合。冰冻期间，目标不能移动或使用技能。",
+      "after": "对本棋子5格内1个敌方棋子造成等同于本棋子攻击力的法术伤害，并使其获得冰冻，持续1回合。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "grant-lucky-coin",
+      "name": "发放幸运币",
+      "before": "战斗开始时，该阵营玩家获得1张幸运币手牌。",
+      "after": "游戏开始时，你获得1张【幸运币】。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "grimmjow-destruction-instinct",
+      "name": "破坏本能",
+      "before": "每次攻击后，受到1点真实伤害。",
+      "after": "每次攻击后，本棋子受到1点真实伤害。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "grimmjow-gran-rey-cero",
+      "name": "王虚的闪光",
+      "before": "灵压。选择同一行或同一列6格内1名敌人，对路径上所有敌人造成200%攻击力的魔法伤害。",
+      "after": "灵压。选择同一行或同一列6格内1个敌方棋子，对路径上所有敌方棋子造成等同于本棋子攻击力200%的法术伤害。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "grimmjow-hunting-instinct",
+      "name": "狩猎本能",
+      "before": "每当一名敌人行动后，若其在格力姆乔4格内，格力姆乔可移动至2格内1个空格；若与其相邻，攻击该敌人2次，每次造成75%攻击力的物理伤害。",
+      "after": "敌方棋子行动后，若其位于本棋子4格内，可将本棋子移动至2格内1个空地格。若随后与该敌方棋子相邻，则攻击其2次，每次造成等同于本棋子攻击力75%的物理伤害。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "grimmjow-panther-claw",
+      "name": "豹王之爪",
+      "before": "灵压。对4格内1名敌人连续攻击5次，每次造成75%攻击力的物理伤害。",
+      "after": "灵压。对4格内1个敌方棋子连续攻击5次，每次造成等同于本棋子攻击力75%的物理伤害。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "grimmjow-resurreccion",
+      "name": "归刃·豹王",
+      "before": "首次死亡结算后，在原地重新召唤10点生命的归刃形态；其攻击力+1、移动值+1，并将【王虚的闪光】替换为【豹王之爪】。",
+      "after": "首次死亡结算后，在原地重新召唤10点生命的归刃形态；其攻击力+1、移动力+1，并将【王虚的闪光】替换为【豹王之爪】。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "hand-cannon",
+      "name": "手炮",
+      "before": "对2格内1个敌人造成1点物理伤害。",
+      "after": "对2格内1个敌方棋子造成1点物理伤害。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "hardy-block-trigger",
+      "name": "悍猛格挡效果",
+      "before": "受到伤害时，将其中50%转化为攻击力。",
+      "after": "本棋子受到伤害时，攻击力增加等同于此次伤害50%的数值。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "hardy-block",
+      "name": "悍猛格挡",
+      "before": "持续2回合：受到伤害时，将其中50%转化为攻击力，向下取整。",
+      "after": "持续2回合：本棋子受到伤害时，攻击力增加等同于此次伤害50%的数值。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "hashirama-edo-regen",
+      "name": "秽土转生·自愈",
+      "before": "生命值低于50%时，每回合结束治疗1点生命，直到回到50%为止。",
+      "after": "你的回合结束时，若本棋子的生命值低于最大生命值的50%，恢复2点生命。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "hashirama-edo-sage-buddha",
+      "name": "仙术·顶上化佛",
+      "before": "瞬移到自身5x5范围内1个地格，重置其他技能冷却，并获得1张【木遁·真数千手】和1张【仙术·大自然愈合】。",
+      "after": "将本棋子传送至以本棋子为中心的5×5范围内1个地格，重置其他技能冷却，你获得1张【木遁·真数千手】和1张【仙术·大自然愈合】。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "hashirama-edo-wood-dragon",
+      "name": "木遁·木龙之术",
+      "before": "对6格内1个敌人造成100%攻击力的物理伤害，永久夺取其50%攻击力和防御力，并夺取其已损生命上限的50%，然后治疗自身等量生命。",
+      "after": "对6格内1个敌方棋子造成等同于本棋子攻击力100%的物理伤害，永久夺取其50%攻击力和防御力，并夺取其已损生命上限的50%，然后治疗本棋子等量生命。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "hashirama-edo-wood-spike",
+      "name": "木遁·扦插之术",
+      "before": "对4格内1个敌人造成等同攻击力的伤害，并沉默1回合。",
+      "after": "对本棋子4格内1个敌方棋子造成等同于本棋子攻击力的物理伤害，并使其获得沉默，持续1回合。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "hellfire-shotgun",
+      "name": "地狱火霰弹枪",
+      "before": "弹射物。选择同一行或同一列的方向，对路径上的第1个目标造成等同攻击力加(4-距离)的物理伤害（无法穿过掩体和角色）。距离越近，伤害越高。",
+      "after": "弹射物。选择同一行或同一列的方向，对路径上的第1个目标造成等同于本棋子攻击力加(4-距离)的物理伤害（无法穿过掩体和棋子）。距离越近，伤害越高。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "hidan-blood-oath",
+      "name": "血誓仪式",
+      "before": "对4格内1个目标施加【血誓诅咒】3回合：飞段受到的任何伤害，都会同时作为真实伤害施加给目标。",
+      "after": "使本棋子4格内1个目标获得血誓诅咒，持续3回合。本棋子受到伤害时，对被诅咒目标造成等量真实伤害。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "hidan-sacrifice",
+      "name": "狂信者献祭",
+      "before": "对自身造成4点真实伤害。若血誓诅咒已生效，对被诅咒目标造成4点真实伤害，并额外造成飞段已损失HP的1/3（向下取整）点真实伤害。飞段损失的血越多，苦难越深，伤害越强。",
+      "after": "本棋子受到4点真实伤害。若血誓诅咒已生效，对被诅咒目标造成4点真实伤害，再造成等同于本棋子已损失生命值1/3的真实伤害。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "hidan-undying",
+      "name": "不死神体",
+      "before": "受到致命伤害时，生命值强制保留为1点并进入濒死状态。濒死状态下不会死亡；濒死持续2回合，结束后才会真正死亡。每局仅触发一次。",
+      "after": "受到致命伤害时，生命值强制保留为1点并进入濒死状态。濒死状态下不会死亡；濒死持续2回合，结束后才会真正死亡。每局仅触发一次。",
+      "changed": false,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "holy-light-descend",
+      "name": "圣光降临",
+      "before": "选择6格内1个地格。该格中的友军治疗9点，敌军受到9点法术伤害；距离1格的单位治疗或受到7点法术伤害；距离2、3格的单位治疗或受到4点法术伤害。",
+      "after": "选择本棋子6格内1个地格。对该格中的友方棋子恢复9点生命，对敌方棋子造成9点法术伤害；距离该格1格时，数值为7；距离该格2至3格时，数值为4。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "holy-shield-defense",
+      "name": "圣盾防御",
+      "before": "拥有圣盾时，抵挡一次伤害并移除圣盾。",
+      "after": "拥有圣盾时，抵挡一次伤害并移除圣盾。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "ichigo-bankai-tensa-zangetsu",
+      "name": "卍解·天锁斩月",
+      "before": "攻击力+1、移动值+2并获得1点临时行动点，失去【月牙天冲】，获得初始冷却为0的【黑色月牙天冲】。",
+      "after": "攻击力+1、移动力+2并获得1临时行动点，失去【月牙天冲】，获得初始冷却为0的【黑色月牙天冲】。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "ichigo-black-getsuga-tensho",
+      "name": "黑色月牙天冲",
+      "before": "向同一行或同一列的一个方向发射弹射物，对路径上的所有敌人造成200%攻击力的魔法伤害；命中后，可以传送至第一个被命中敌人相邻的一个空格。",
+      "after": "向同一行或同一列的1个方向发射弹射物，对路径上的所有敌方棋子造成等同于本棋子攻击力200%的法术伤害；命中后，可以传送至第1个被命中敌方棋子相邻的1个空格。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "ichigo-getsuga-tensho",
+      "name": "月牙天冲",
+      "before": "向同一行或同一列的一个方向发射弹射物，对路径上的第一个敌人造成150%攻击力的魔法伤害。",
+      "after": "向同一行或同一列的1个方向发射弹射物，对路径上的第1个敌方棋子造成等同于本棋子攻击力150%的法术伤害。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "ichigo-zangetsu",
+      "name": "斩月",
+      "before": "选择相邻的一个敌人，造成100%攻击力的物理伤害。",
+      "after": "对本棋子相邻的1个敌方棋子造成等同于本棋子攻击力的物理伤害。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "illidan-blade-dash",
+      "name": "战刃挥刺",
+      "before": "向同一行或同一列冲刺至6格内1个地格，对路径上的所有敌人造成等同攻击力的物理伤害，并穿过敌人落在目标格子。若前方被友方或地形阻挡，则无法冲刺。",
+      "after": "向同一行或同一列冲刺至6格内1个地格，对路径上的所有敌方棋子造成等同于本棋子攻击力的物理伤害，并穿过敌方棋子落在目标格子。若前方被友方或地形阻挡，则无法冲刺。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "illidan-demon-strike",
+      "name": "恶魔冲击",
+      "before": "对任意1个敌人造成等同攻击力的物理伤害。恶魔变形期间可使用2次。",
+      "after": "对任意1个敌方棋子造成等同于本棋子攻击力的物理伤害。恶魔变形期间可使用2次。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "illidan-eye-beam",
+      "name": "眼棱",
+      "before": "对4格内1个敌方棋子造成100%攻击力的魔法伤害，并治疗自身等量生命。",
+      "after": "对本棋子4格内1个敌方棋子造成等同于本棋子攻击力的法术伤害，并使本棋子恢复等量生命。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "illidan-metamorphosis",
+      "name": "恶魔变形",
+      "before": "攻击力+2，防御力-1，并获得2次【恶魔冲击】。",
+      "after": "攻击力+2，防御力-1，并获得2次【恶魔冲击】。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "initial-draw",
+      "name": "初始抽牌",
+      "before": "游戏开始时，每个玩家抽3张牌。",
+      "after": "游戏开始时，每个玩家抽3张牌。",
+      "changed": false,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "itachi-amaterasu",
+      "name": "天照之缚",
+      "before": "选择5格内的一个敌人，将其所在格变为天照地格，并使其获得1层天照。",
+      "after": "选择5格内的1个敌方棋子，将其所在格变为天照地格，并使其获得1层天照。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "itachi-totsuka-blade",
+      "name": "须佐能乎·十拳剑",
+      "before": "万花筒。选择3格内的一个敌人，造成200%攻击力的魔法伤害，并使其所有主动技能进入1回合冷却。",
+      "after": "万花筒。选择3格内的1个敌方棋子，造成等同于本棋子攻击力200%的法术伤害，并使其所有主动技能进入1回合冷却。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "itachi-tsukuyomi",
+      "name": "月读",
+      "before": "选择6格内的一个敌人，使其下一个使用的技能额外增加1回合冷却。",
+      "after": "选择6格内的1个敌方棋子，使其下1个使用的技能额外增加1回合冷却。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "kenshin-amakakeru",
+      "name": "天翔龙闪",
+      "before": "冲向全图任意1名敌人，并在其身旁造成200%攻击力的真实伤害。若击杀目标，立即恢复1点行动点。",
+      "after": "冲向全图任意1个敌方棋子，并在其身旁造成等同于本棋子攻击力200%的真实伤害。若击杀目标，立即恢复1点行动点。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "kenshin-ryusosen",
+      "name": "龙巢闪",
+      "before": "对相邻1名敌人连续攻击3次，每次造成攻击力75%的物理伤害。",
+      "after": "对相邻1个敌方棋子连续攻击3次，每次造成等同于本棋子攻击力75%的物理伤害。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "kenshin-ryutsuisen",
+      "name": "龙槌闪",
+      "before": "突进到5格内1个敌人的相邻地格，并对其造成等同攻击力的物理伤害。",
+      "after": "突进到5格内1个敌方棋子的相邻地格，并对其造成等同于本棋子攻击力的物理伤害。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "kenshin-tenken-passive",
+      "name": "飞天御剑流·剑速",
+      "before": "移动后，下一次攻击造成150%伤害。",
+      "after": "移动后，下一次攻击造成150%伤害。",
+      "changed": false,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "kiljaedan-demonic-pact",
+      "name": "恶魔仪式",
+      "before": "战斗初始化时，基尔加丹进入虚空，并留下【恶魔召唤(1)】。依次打出5张召唤牌后，基尔加丹会被召唤至指定格子。",
+      "after": "战斗初始化时，本棋子进入虚空，并留下【恶魔召唤(1)】。依次打出5张召唤牌后，本棋子会被召唤至指定格子。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "kiljaedan-fel-fire",
+      "name": "恒星之火",
+      "before": "对4格内1个敌人造成等同攻击力200%的法术伤害，并对其周围3x3范围内其他敌人造成等量法术伤害。",
+      "after": "对4格内1个敌方棋子造成等同于本棋子攻击力200%的法术伤害，并对其周围3×3范围内其他敌方棋子造成等量法术伤害。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "kiljaedan-soul-drain",
+      "name": "灵魂汲取",
+      "before": "对生命值最低的敌方棋子造成999点真实伤害，然后对所有存活的敌方棋子造成等同于该目标最大生命值30%的法术伤害。",
+      "after": "对生命值最低的敌方棋子造成999点真实伤害，然后对所有存活的敌方棋子造成等同于该目标最大生命值30%的法术伤害。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "light-extraction",
+      "name": "圣光汲取",
+      "before": "选择1个拥有【圣盾】的友方，移除其【圣盾】，获得1张【圣光惩戒】和1张【圣光治疗】。",
+      "after": "选择1个拥有【圣盾】的友方，移除其【圣盾】，获得1张【圣光惩戒】和1张【圣光治疗】。",
+      "changed": false,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "light-of-the-light",
+      "name": "圣光闪耀",
+      "before": "治疗7格内1个友军5点生命。",
+      "after": "使本棋子7格内1个友方棋子恢复5点生命。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "minato-flying-raijin-passive",
+      "name": "飞雷神",
+      "before": "仅在水门自己的回合结束时，标记7格内一处合法位置作为飞雷神锚点，最多存在3个，多于3个时清除最早的锚点。当带有飞雷神标记的单位成为指向型技能目标时，若该单位为友方且释放者为敌方，则以释放者为目标；若该单位为敌方，则以该单位为目标。波风水门可选择是否触发飞雷神；触发时随机传送到目标半径1格内并对其使用螺旋丸，随后移除成为原技能目标单位的飞雷神标记。",
+      "after": "仅在你的回合结束时，标记7格内一处合法位置作为飞雷神锚点，最多存在3个，多于3个时清除最早的锚点。当带有飞雷神标记的单位成为指向型技能目标时，若该单位为友方且释放者为敌方，则以释放者为目标；若该单位为敌方，则以该单位为目标。本棋子可选择是否触发飞雷神；触发时随机传送到目标半径1格内并对其使用螺旋丸，随后移除成为原技能目标单位的飞雷神标记。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "minato-kunai-formula",
+      "name": "苦无术式",
+      "before": "选择一名友方角色（包括自己）并传送至一个飞雷神锚点处，清除该锚点并给该角色附加1层飞雷神标记。",
+      "after": "选择1个友方棋子（包括本棋子）并传送至1个飞雷神锚点处，清除该锚点并给该棋子附加1层飞雷神标记。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "minato-rasengan",
+      "name": "螺旋丸",
+      "before": "对1格内1名敌人造成攻击力100%的物理伤害，水门攻击力+1，并给该敌方角色附加1层飞雷神标记。",
+      "after": "对1格内1个敌方棋子造成等同于本棋子攻击力100%的物理伤害，本棋子攻击力+1，并给该敌方棋子附加1层飞雷神标记。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "minato-spiral-barrage",
+      "name": "螺旋连丸",
+      "before": "传送到一个飞雷神锚点处并取消该锚点，再传送到该锚点3格内一名随机敌人身边，对其释放螺旋丸。若击杀敌方，可立即选择地图上一处可行走地格作为新的飞雷神锚点。",
+      "after": "传送到1个飞雷神锚点处并取消该锚点，再传送到该锚点3格内1个随机敌方棋子身边，对其释放螺旋丸。若击杀敌方，可立即选择地图上一处可行走地格作为新的飞雷神锚点。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "muru-lament",
+      "name": "穆鲁的挽歌",
+      "before": "选择并丢弃1至4张圣光手牌。每丢弃1张，对所有敌人造成2点真实伤害，并使所有友方恢复2点生命。若丢弃至少3张，所有友方获得【圣盾】，并重置【圣光汲取】的冷却。",
+      "after": "选择并丢弃1至4张圣光手牌。每丢弃1张，对所有敌方棋子造成2点真实伤害，并使所有友方恢复2点生命。若丢弃至少3张，所有友方获得【圣盾】，并重置【圣光汲取】的冷却。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "nano-boost-damage",
+      "name": "纳米激素增伤",
+      "before": "每份纳米激素使造成的伤害+1，可叠加。",
+      "after": "每份纳米激素使造成的伤害+1，可叠加。",
+      "changed": false,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "nano-boost",
+      "name": "纳米激素",
+      "before": "使10格内1个其他友军防御力+3、移速+1，且其造成的所有伤害+1。",
+      "after": "使本棋子10格内1个其他友方棋子防御力+3、移动力+1，造成的伤害+1。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "naruto-rasengan",
+      "name": "螺旋手里剑",
+      "before": "对2格内1个敌人造成200%攻击力的法术伤害，并沉默1回合。",
+      "after": "对本棋子2格内1个敌方棋子造成等同于本棋子攻击力200%的法术伤害，并使其获得沉默，持续1回合。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "naruto-sage-mode",
+      "name": "仙人模式",
+      "before": "进入打坐状态：不能主动走格或使用技能，准备进度为6。你的回合开始时，准备进度减少1，每个存活影分身额外减少1；归零时结束打坐，获得3行动点和1充能。",
+      "after": "进入打坐状态，准备进度为6。打坐期间，不能主动走格或使用技能。你的回合开始时，准备进度减少1，每个存活的友方影分身额外减少1。准备进度归零时，结束打坐，你获得3行动点和1充能。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "naruto-shadow-clone",
+      "name": "影分身之术",
+      "before": "选择5格内1个空地格并秘密选择一项：召唤1个影分身，或传送到目标格并在原地留下1个影分身。影分身受到1次伤害后消散，不能行动，被击杀时不会提供充能。",
+      "after": "选择本棋子5格内1个空地格，并秘密选择一项：召唤1个影分身；或将本棋子传送至目标格，并在原地留下1个影分身。影分身受到1次伤害后消散，不能行动，被击杀时不提供充能。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "naruto-vanguard",
+      "name": "率先出阵",
+      "before": "当阵容中有本棋子时，本棋子首先上场。",
+      "after": "当阵容中有本棋子时，本棋子首先上场。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "obito-ally-teleport",
+      "name": "神威·转移",
+      "before": "选择7格内1名其他友军，将其立即传送至你7格内1个空的可行走地格。",
+      "after": "选择本棋子7格内1个其他友方棋子，将其传送至本棋子7格内1个空的可行走地格。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "obito-grudge",
+      "name": "怨念积蓄",
+      "before": "任意友军受到伤害时，带土获得1层怨念，最多3层，每层攻击力+2；己方回合结束时清空。",
+      "after": "友方棋子受到伤害时，本棋子获得1层怨念，最多3层。每层怨念使攻击力+2。你的回合结束时，清空怨念。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "obito-kamui",
+      "name": "神威·吸收",
+      "before": "获得【神威护盾】：完全免疫下一次受到的伤害，并将该伤害作为真实伤害反弹给攻击者。",
+      "after": "获得【神威护盾】：完全免疫下一次受到的伤害，并将该伤害作为真实伤害反弹给攻击者。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "obito-space-time",
+      "name": "神威",
+      "before": "万花筒。选择地图上的一名敌方棋子，将其强制移出战场。该效果不造成伤害，也不视为死亡。每局限用一次。",
+      "after": "万花筒。选择地图上1个敌方棋子，将其强制移出战场。每局限用1次。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "pulse-pistol-move",
+      "name": "脉冲手枪（移动触发）",
+      "before": "当敌人移动或释放技能时，对以自身为区域的3*3范围内随机1名敌人造成等同于攻击力的物理伤害",
+      "after": "当敌方棋子移动或释放技能时，对以本棋子为区域的3×3范围内随机1个敌方棋子造成等同于本棋子攻击力的物理伤害。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "pulse-pistol",
+      "name": "脉冲手枪",
+      "before": "敌人移动或使用技能后，随机对以自身为中心5×5范围内1个敌人造成等同攻击力的物理伤害。",
+      "after": "敌方棋子移动或使用技能后，随机对以本棋子为中心5×5范围内1个敌方棋子造成等同于本棋子攻击力的物理伤害。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "rafaam-curse-amplify",
+      "name": "诅咒增幅",
+      "before": "复制对方手牌里所有的诅咒，并将复制品加入对方手牌。",
+      "after": "复制对方手牌里所有的诅咒，并将复制品加入对方手牌。",
+      "changed": false,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "rafaam-curse-ward",
+      "name": "诅咒结界",
+      "before": "每回合限一次，该棋子在己方回合受到伤害时，免疫该伤害，并将1张等同此次伤害值+拉法姆攻击力50%（向下取整）的诅咒交给对手。该诅咒可消耗1点行动点弃置，若未弃置，则己方回合结束时使1个随机友军受到记录的伤害。",
+      "after": "每回合限1次：本棋子在你的回合受到伤害时，免疫此次伤害，并将1张诅咒交给对手，记录的伤害为此次伤害加本棋子攻击力的50%。对手可消耗1行动点弃置诅咒；若仍持有，在对手的回合结束时，使其随机1个友方棋子受到记录的真实伤害。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "rafaam-temporal-distortion",
+      "name": "时空扭曲",
+      "before": "选择一名5格内的敌方角色，偷取其攻击力，并在对方下回合结束时归还。",
+      "after": "选择1个5格内的敌方棋子，偷取其攻击力，并在对方的下一个回合结束时归还。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "reap-heal",
+      "name": "收割治疗",
+      "before": "治疗等同于造成伤害50%的生命。",
+      "after": "使本棋子恢复等同于本次实际伤害50%的生命。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "reap",
+      "name": "收割",
+      "before": "造成伤害后，治疗等同于该伤害50%的生命。",
+      "after": "本棋子造成实际伤害后，恢复等同于实际伤害50%的生命。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "recall-endturn-trigger",
+      "name": "回溯触发（回合结束）",
+      "before": "对手回合结束时，强制触发回溯。",
+      "after": "对手回合结束时，强制触发回溯。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "recall-move-trigger",
+      "name": "回溯触发（移动）",
+      "before": "对手移动时计数；达到目标次数时，触发回溯。",
+      "after": "对手移动时计数；达到目标次数时，触发回溯。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "recall-skill-trigger",
+      "name": "回溯触发（技能）",
+      "before": "对手使用技能时计数；达到目标次数时，触发回溯。",
+      "after": "对手使用技能时计数；达到目标次数时，触发回溯。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "recall",
+      "name": "回溯",
+      "before": "秘密选择一个数字。对方下回合中，当敌人的操作达到该次数，或其回合结束时，将自身状态与位置重置为回溯前。",
+      "after": "秘密选择1个数字。对方的下一个回合中，当敌方棋子的操作达到该次数，或其回合结束时，将本棋子状态与位置重置为回溯前。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "rocket-punch",
+      "name": "火箭重拳",
+      "before": "向同一行或同一列冲刺最多5格，对路径上的敌人造成等同攻击力250%的物理伤害，并停在第一个敌人或障碍前。",
+      "after": "选择同一行或同一列的方向，冲刺最多5格，在遇到的首个棋子或障碍前停下。若该棋子为敌方棋子，对其造成等同于本棋子攻击力250%的物理伤害。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "sasuke-amaterasu",
+      "name": "天照之炎",
+      "before": "将5格内一个格子周围的3×3区域化为永久天照地格。",
+      "after": "将5格内1个格子周围的3×3区域化为永久天照地格。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "sasuke-chidori",
+      "name": "千鸟",
+      "before": "冲刺到同一行或同一列6格内1个空格，对路径上的所有敌人造成100%攻击力的物理伤害，并使其定身1回合。",
+      "after": "冲刺到同一行或同一列6格内1个空格，对路径上的所有敌方棋子造成等同于本棋子攻击力100%的物理伤害，并使其定身1回合。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "sasuke-indra-arrow",
+      "name": "因陀罗之矢",
+      "before": "选择同一行或同一列的方向，将该方向直到地图边缘的所有地格永久标记为天照范围。",
+      "after": "选择同一行或同一列的方向，将该方向直到地图边缘的所有地格永久标记为天照范围。",
+      "changed": false,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "sasuke-kagutsuchi",
+      "name": "加具土命",
+      "before": "为任意1个棋子附加2层天照效果，然后移除其周围4格内所有的天照地格效果，每消耗一个地格，多附加一层天照，共计最多附加4层。",
+      "after": "为任意1个棋子附加2层天照效果，然后移除其周围4格内所有的天照地格效果，每消耗1个地格，多附加一层天照，共计最多附加4层。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "sasuke-susanoo",
+      "name": "须佐能乎",
+      "before": "万花筒。激活完全体须佐能乎：防御力+1，失去【千鸟】，获得【加具土命】与【因陀罗之矢】。",
+      "after": "万花筒。激活完全体须佐能乎：防御力+1，失去【千鸟】，获得【加具土命】与【因陀罗之矢】。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "shadow-bolt",
+      "name": "暗影箭",
+      "before": "选择同一行或同一列的方向，消耗手牌中所有灵魂残片，对该方向所有敌人造成攻击力+灵魂残片数量的法术伤害。",
+      "after": "选择同一行或同一列的方向，消耗手牌中所有灵魂残片，对该方向所有敌方棋子造成攻击力+灵魂残片数量的法术伤害。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "shadow-chaos-control",
+      "name": "混沌控制",
+      "before": "传送至5格内未被占据的空地或掩体，使7格内敌人获得沉默与定身1回合。",
+      "after": "传送至5格内未被占据的空地或掩体，使7格内敌方棋子获得沉默与定身1回合。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "shadow-chaos-spear",
+      "name": "混沌之矛",
+      "before": "对4格内一名敌人造成50%攻击力的物理伤害，并偷取其2点移动范围至己方下回合开始。",
+      "after": "对4格内1个敌方棋子造成等同于本棋子攻击力50%的物理伤害，并偷取其2点移动力至你的下一个回合开始时。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "shadow-ride-sweep",
+      "name": "骑射横扫",
+      "before": "获得动能。选择一个正方向上7格内的一个空格并向其冲刺，对路径上敌人造成100%攻击力的物理伤害。动能5：弹射物。冲刺后选择一个垂直于冲刺方向的方向，对路径上每格往该方向4格范围内的所有敌人造成5点伤害，可穿透角色。动能7：路径伤害+2。",
+      "after": "获得动能。选择1个正方向上7格内的1个空格并向其冲刺，对路径上敌方棋子造成等同于本棋子攻击力100%的物理伤害。动能5：弹射物。冲刺后选择1个垂直于冲刺方向的方向，对路径上每格往该方向4格范围内的所有敌方棋子造成5点伤害，可穿透棋子。动能7：路径伤害+2。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "shadow-step-teleport",
+      "name": "暗影步传送",
+      "before": "回合开始时，传送到预设位置。",
+      "after": "你的回合开始时，将本棋子传送至预设地格。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "shadow-step",
+      "name": "暗影步",
+      "before": "标记7格内1个空地格，下回合开始时传送到该位置。",
+      "after": "标记本棋子7格内1个空地格。你的下一个回合开始时，将本棋子传送至该地格。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "shield-of-light",
+      "name": "圣光盾",
+      "before": "使7格内1个友军获得圣盾，抵挡一次伤害。若对自己使用，回复1点AP。",
+      "after": "使本棋子7格内1个友方棋子获得圣盾。若目标是本棋子，你恢复1行动点。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "shishio-combustion-passive",
+      "name": "自燃",
+      "before": "处于禁疗状态，所有治疗均无效。每累计造成5点直接伤害，对自身造成1点真实伤害。每回合第一次造成伤害前，使目标所有技能进入冷却。",
+      "after": "处于禁疗状态，所有治疗均无效。每累计造成5点直接伤害，对本棋子造成1点真实伤害。每回合第一次造成伤害前，使目标所有技能进入冷却。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "shishio-flame-spirit",
+      "name": "我流·炎灵",
+      "before": "永久点燃周围4格。角色踏入燃烧格或在回合结束时站在燃烧格上时，失去当前生命值50%。同时，对6格内随机1个敌人造成真实伤害。燃烧格可累积扩展，随机伤害倍率为100%/150%/200%攻击力，每击杀1名角色提升1级。",
+      "after": "永久点燃周围4格。棋子踏入燃烧格或在回合结束时站在燃烧格上时，受到等同于其当前生命值50%的真实伤害。同时，对6格内随机1个敌方棋子造成真实伤害。燃烧格可累积扩展，随机伤害倍率为100%/150%/200%攻击力，每击杀1个棋子提升1级。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "shishio-infinite-blade",
+      "name": "无限刃",
+      "before": "对2格内1个敌人造成真实伤害。结算后进入二段选择，可受到1点真实伤害并再次发动，无需额外行动点。伤害倍率为100%/150%/200%攻击力，每击杀1名角色提升1级。",
+      "after": "对本棋子2格内1个敌方棋子造成真实伤害。结算后，你可使本棋子受到1点真实伤害并再次发动，无需额外行动点。伤害倍率依次为本棋子攻击力的100%、150%、200%，每击杀1个棋子提高一级。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "sleep-dart",
+      "name": "麻醉镖",
+      "before": "弹射物：向同一行或同一列发射麻醉镖（无法穿过掩体和角色）。命中路径上的第1个敌人后，使其睡眠2回合。睡眠期间，目标不能移动或使用技能；受到伤害后会提前解除。",
+      "after": "弹射物。选择同一行或同一列的方向，发射麻醉镖。使路径上首个命中的敌方棋子获得睡眠，持续2回合。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "sleep-prevent",
+      "name": "麻醉阻止",
+      "before": "阻止被麻醉目标的移动和使用技能",
+      "after": "睡眠期间，不能主动走格或使用技能。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "sleep-remove",
+      "name": "麻醉解除",
+      "before": "受到伤害时解除麻醉状态",
+      "after": "受到伤害后，移除睡眠。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "sonic-free-move-passive",
+      "name": "音速",
+      "before": "每个己方回合开始时，获得一次免费普通移动。",
+      "after": "你的回合开始时，本棋子获得1次免费普通移动。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "sonic-homing-attack",
+      "name": "追踪攻击",
+      "before": "传送至4格内、身旁存在空的可通行格的敌人身旁，造成100%攻击力物理伤害；每3层动能伤害+1。",
+      "after": "传送至4格内、身旁存在空的可通行格的敌方棋子身旁，造成100%攻击力物理伤害；每3层动能伤害+1。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "sonic-spin-dash",
+      "name": "旋转冲刺",
+      "before": "获得动能。选择一个正方向五格内的空格并向其冲刺，可穿过无法行走地格，对路径敌人造成150%攻击力的物理伤害。动能3：冲刺最大距离+2。动能5：命中敌人沉默1回合。",
+      "after": "获得动能。选择1个正方向5格内的空格并向其冲刺，可穿过无法行走地格，对路径敌方棋子造成等同于本棋子攻击力150%的物理伤害。动能3：冲刺最大距离+2。动能5：命中敌方棋子沉默1回合。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "sonic-super-form",
+      "name": "超级形态",
+      "before": "获得两点临时行动点。本回合索尼克使用技能不消耗动能，回合结束后保留。",
+      "after": "你获得2临时行动点。本回合本棋子使用技能不消耗动能，回合结束后保留。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "soul-fracture",
+      "name": "裂魂",
+      "before": "游戏开始时，在本局游戏中每当一个棋子死亡，获得一张灵魂残片。",
+      "after": "游戏开始时，在本局游戏中每当一个棋子死亡，获得一张灵魂残片。",
+      "changed": false,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "tails-armor-assembly",
+      "name": "护甲组装",
+      "before": "一次选择两个不同模块，创造一张永久护甲手牌（AP2）；可对自己或一名友军使用。恢复模块：每回合结束回复3点生命；攻击模块：攻击+3；高速模块：每回合获得一次免费普通移动；硬化模块：防御+2。护甲可叠加且持续整场对局。",
+      "after": "选择2个不同模块，创造1张护甲手牌，消耗2行动点可对本棋子或1个友方棋子使用。恢复模块：持有者的回合结束时，恢复3点生命；攻击模块：攻击力+3；高速模块：持有者每回合获得1次免费普通移动；硬化模块：防御力+2。护甲可叠加，持续本局游戏。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "tails-mechanical-support",
+      "name": "机械支援",
+      "before": "选择7格内友军，回复5点生命；随后可选择移除其任意一个效果，也可不移除。动能4时治疗+2；动能8时目标下一次普通移动免费。",
+      "after": "使本棋子7格内1个友方棋子恢复5点生命，然后可选择移除其1个效果。动能4：治疗量+2。动能8：目标的下一次普通移动免费。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "tails-twin-flight",
+      "name": "双尾飞行",
+      "before": "选择4格内另一名友军。选择7格内的一个合法格子作为塔尔斯的落点，然后选择一个相邻的地格作为友军的落点。预留落点两回合，两者获得持续2回合的免疫与不可操作，然后2回合后同步传送。",
+      "after": "选择本棋子4格内1个其他友方棋子。选择本棋子7格内1个合法地格作为本棋子的落点，再选择本棋子7格内、与前一落点相邻的合法地格作为友方棋子的落点。预留这两个落点，两者获得免疫与不可操作，持续2回合。在接下来的第二个你的回合结束时，将两者分别传送至预留落点。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "tirion-divine-glory",
+      "name": "圣骑士的荣耀",
+      "before": "游戏开始时获得圣盾，抵挡一次伤害。失去圣盾时，获得+1攻击力。",
+      "after": "游戏开始时，本棋子获得圣盾。本棋子失去圣盾时，攻击力+1。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "tirion-holy-recall",
+      "name": "圣光重召",
+      "before": "获得圣盾。",
+      "after": "获得圣盾。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "turalyon-expedition-order",
+      "name": "征讨号令",
+      "before": "选择一种圣光手牌获得。",
+      "after": "选择一种圣光手牌获得。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "turalyon-grand-crusade",
+      "name": "圣光大远征",
+      "before": "选择1至3个友方核心棋子，再选择6格内的1个空集结点，将其移至集结点及其相邻可落脚空格，并使其获得【圣盾】。",
+      "after": "选择1至3个友方核心棋子，再选择6格内的1个空集结点，将其移至集结点及其相邻可落脚空格，并使其获得【圣盾】。",
+      "changed": false,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "turalyon-lightforged-march",
+      "name": "圣铸进军",
+      "before": "每个己方回合首次成功使用普通圣光手牌后，选择1个友方免费进行一次远征移动，范围为其移动值+2。可经过友方，不可经过敌方或不可行走格。",
+      "after": "每个你的回合首次成功使用普通圣光手牌后，选择1个友方免费进行一次远征移动，范围为其移动力+2。可经过友方，不可经过敌方或不可行走格。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "ulquiorra-black-cero",
+      "name": "黑虚闪",
+      "before": "灵压。对6格内1名敌人造成200%攻击力的魔法伤害。",
+      "after": "灵压。对6格内1个敌方棋子造成等同于本棋子攻击力200%的法术伤害。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "ulquiorra-cero",
+      "name": "虚闪",
+      "before": "对6格内1名敌人造成75%攻击力的魔法伤害。",
+      "after": "对6格内1个敌方棋子造成等同于本棋子攻击力75%的法术伤害。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "ulquiorra-high-speed-regeneration",
+      "name": "超速再生",
+      "before": "造成或受到伤害后，恢复2点生命。",
+      "after": "造成或受到伤害后，恢复2点生命。",
+      "changed": false,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "ulquiorra-resurreccion",
+      "name": "归刃·黑翼大魔",
+      "before": "造成或受到3次伤害后，于下回合开始时归刃：攻击力+1、移动值+1，并获得【黑虚闪】。",
+      "after": "本棋子累计造成或受到3次伤害后，在你的下一个回合开始时归刃：攻击力+1、移动力+1，并获得【黑虚闪】。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "velen-fate-shelter",
+      "name": "命运庇护",
+      "before": "选择1个友方。下个己方回合开始时，若维伦与目标均存活，使其恢复8点生命并获得【圣盾】。",
+      "after": "选择1个友方。你的下一个回合开始时，若本棋子与目标均存活，使其恢复8点生命并获得【圣盾】。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "velen-holy-prophecy",
+      "name": "圣光预言",
+      "before": "选择1张未被预言且未强化的普通圣光手牌。下个己方回合开始时，若它仍在手中，则永久强化。",
+      "after": "选择1张未被预言且未强化的普通圣光手牌。你的下一个回合开始时，若它仍在手中，则永久强化。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "velen-thousand-futures-ultimate",
+      "name": "万千未来",
+      "before": "选择手中1至3张未强化的普通圣光手牌，立即使它们永久强化。每局限用1次。",
+      "after": "选择手中1至3张未强化的普通圣光手牌，立即使它们永久强化。每局限用1次。",
+      "changed": false,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "venom-claw-rend",
+      "name": "利爪撕裂",
+      "before": "对1格内1名敌人造成等同攻击力200%的物理伤害。",
+      "after": "对1格内1个敌方棋子造成等同于本棋子攻击力200%的物理伤害。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "venom-corrosion",
+      "name": "腐蚀",
+      "before": "毒液每次更改敌方位置时，使其定身1回合。",
+      "after": "本棋子改变敌方棋子的位置时，使其获得定身，持续1回合。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "venom-host-transfer",
+      "name": "宿主转移",
+      "before": "选择7格内任意另一名角色，与其交换位置。",
+      "after": "选择本棋子7格内1个其他棋子，与其换位。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "venom-symbiote-drag",
+      "name": "共生拖行",
+      "before": "弹射物：选择同一行或同一列的方向，将路径上第一名敌人拉至毒液身前一格。（若身前格子无法放置则无效）",
+      "after": "弹射物：选择同一行或同一列的方向，将路径上第1个敌方棋子拉至本棋子身前一格。（若身前格子无法放置则无效）。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "watcher-form",
+      "name": "红蓝形态",
+      "before": "每回合开始时，选择将【平静】或【暴怒】加入手牌。【平静】提供护盾，【暴怒】提高伤害。",
+      "after": "你的回合开始时，选择获得1张【平静】或【暴怒】。【平静】提供护盾，【暴怒】提高伤害。",
+      "changed": true,
+      "executableCodeChanged": false
+    },
+    {
+      "id": "watcher-ultimate",
+      "name": "潦草急救",
+      "before": "用【平静】和【暴怒】填满自己的手牌。",
+      "after": "用【平静】和【暴怒】填满自己的手牌。",
+      "changed": true,
+      "executableCodeChanged": false
+    }
+  ]
+}

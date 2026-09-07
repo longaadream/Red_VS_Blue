@@ -160,6 +160,7 @@ export function createBattleRoomClass(dependencies: BattleRoomDependencies) {
           this.authorityStore,
         )
         this.maxClients = matchCapacity(room.mode) + 8
+        await this.productStore.setRoom(this.roomId, room)
         if (room.visibility === 'private' && !room.inviteCode) {
           room.inviteCode = randomBytes(6).toString('hex').toUpperCase()
           await this.productStore.setRoom(this.roomId, room)

@@ -475,7 +475,12 @@
               <p class="panel-description">离线练习棋子、技能和战斗操作，不影响正式对局。</p>
             </header>
             <div class="action-stack">
-              <button class="action-button action-feature" type="button" onclick="goToTraining()">
+              <button class="action-button action-feature" type="button" onclick="window.location.href='practice.html'">
+                <span class="action-code" aria-hidden="true">PVP</span>
+                <span class="action-copy"><span class="action-title">PVP 练习</span><span class="action-description">与实验 AI 切磋，指定或自动选择对手棋组</span></span>
+                <span class="action-arrow" aria-hidden="true">›</span>
+              </button>
+              <button class="action-button" type="button" onclick="goToTraining()">
                 <span class="action-code" aria-hidden="true">自由</span>
                 <span class="action-copy"><span class="action-title">自由训练</span><span class="action-description">自行选择双方阵容与地图，不带教学步骤</span></span>
                 <span class="action-arrow" aria-hidden="true">›</span>

@@ -91,7 +91,7 @@ describe('RED-163 dark character contract', () => {
     })
     expect(grimmjow.skills).not.toContainEqual(expect.objectContaining({ skillId: 'grimmjow-panther-claw' }))
     expect(json('data/skills/grimmjow-hunting-instinct.json').description).toBe(
-      '每当一名敌人行动后，若其在格力姆乔4格内，格力姆乔可移动至2格内1个空格；若与其相邻，攻击该敌人2次，每次造成75%攻击力的物理伤害。',
+      '敌方棋子行动后，若其位于本棋子4格内，可将本棋子移动至2格内1个空地格。若随后与该敌方棋子相邻，则攻击其2次，每次造成等同于本棋子攻击力75%的物理伤害。',
     )
     for (const image of ['aizen.jpg', 'ulquiorra.jpg', 'grimmjow.jpg']) expectJpeg(`public/${image}`)
   })
@@ -514,7 +514,7 @@ describe('RED-163 dark character contract', () => {
       .not.toContainEqual(expect.objectContaining({ type: 'aizen-kyoka-secret' }))
   })
 
-  it('settles Black Coffin twice and blocks the imprisoned piece movement', () => {
+  it('settles Black Coffin twice and roots ordinary walking', () => {
     const aizen = makePiece({
       instanceId: 'coffin-aizen', templateId: 'dark-aizen', ownerPlayerId: 'player-red', x: 0, y: 0,
       currentHp: 9, maxHp: 9, attack: 4,
@@ -535,14 +535,16 @@ describe('RED-163 dark character contract', () => {
     const cast = runBattleAction(state, action, { rootSeed: 168 }).state as any
     expect(cast.pieces.find((piece: any) => piece.instanceId === enemy.instanceId)).toMatchObject({ currentHp: 14, x: 2, y: 0 })
     expect(cast.pieces.find((piece: any) => piece.instanceId === enemy.instanceId).statusTags)
-      .toContainEqual(expect.objectContaining({ type: 'imprisoned', name: '禁锢', blocksForcedMovement: true }))
+      .toContainEqual(expect.objectContaining({ type: 'root', name: '定身' }))
     expect(cast.players[0]).toMatchObject({ actionPoints: 0, chargePoints: 0 })
 
     cast.turn.currentPlayerId = 'player-blue'
+    cast.turn.turnNumber += 1
     cast.players[1].actionPoints = 2
-    const blockedMove = runBattleAction(cast, {
+    expect(() => runBattleAction(cast, {
       type: 'move', playerId: 'player-blue', pieceId: enemy.instanceId, toX: 3, toY: 0,
-    }, { rootSeed: 168 }).state as any
+    }, { rootSeed: 168 })).toThrow('定身')
+    const blockedMove = cast
     expect(blockedMove.pieces.find((piece: any) => piece.instanceId === enemy.instanceId)).toMatchObject({ currentHp: 14, x: 2, y: 0 })
     expect(blockedMove.players[1].actionPoints).toBe(2)
 
@@ -554,7 +556,7 @@ describe('RED-163 dark character contract', () => {
       .not.toContainEqual(expect.objectContaining({ id: expect.stringMatching(/^aizen-black-coffin-/) }))
   })
 
-  it('rejects skill movement of a piece imprisoned by Black Coffin without changing state', () => {
+  it('rejects skill movement of an imprisoned piece without changing state', () => {
     const prisoner = makePiece({
       instanceId: 'coffin-prisoner', ownerPlayerId: 'player-red', x: 2, y: 1,
       statusTags: [{ id: 'coffin-lock', type: 'imprisoned', name: '禁锢', blocksForcedMovement: true }],

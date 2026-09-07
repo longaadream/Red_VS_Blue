@@ -1,9 +1,9 @@
 {
   "id": "rafaam-temporal-distortion",
   "name": "时空扭曲",
-  "description": "选择一名5格内的敌方角色，偷取其攻击力，并在对方下回合结束时归还。",
+  "description": "选择1个5格内的敌方棋子，偷取其攻击力，并在对方的下一个回合结束时归还。",
   "keywords": [],
-  "targetText": "5格内1名敌方角色",
+  "targetText": "5格内1个敌方棋子",
   "effectTags": [
     "攻击力",
     "延迟"
@@ -16,7 +16,7 @@
   "powerMultiplier": 1,
   "actionPointCost": 1,
   "code": "function executeSkill(context) { var caster = context.piece; var target = selectTarget({ type: 'piece', range: 5, filter: 'enemy' }); if (!target || target.needsTargetSelection) return target; var stolen = Math.max(0, target.attack || 0); target.attack -= stolen; caster.attack += stolen; addPlayerStatusEffectById(target.ownerPlayerId, { id: 'rafaam-temporal-distortion-' + caster.instanceId + '-' + target.instanceId + '-' + Date.now(), name: '时空扭曲', type: 'rafaam-temporal-distortion', currentDuration: -1, currentUses: -1, intensity: stolen, sourceId: caster.instanceId, targetId: target.instanceId }); addPlayerRuleById(target.ownerPlayerId, 'rule-rafaam-temporal-distortion'); return { success: true, message: caster.name + '从' + target.name + '偷取' + stolen + '点攻击力，将在对方下回合结束时归还' }; }",
-  "previewCode": "function calculatePreview() { return { description: '偷取5格内1名敌人的全部当前攻击力，并在其玩家下回合结束时归还。', expectedValues: {} }; }",
+  "previewCode": "function calculatePreview() { return { description: \"选择1个5格内的敌方棋子，偷取其攻击力，并在对方的下一个回合结束时归还。\", expectedValues: {} }; }",
   "range": "single",
   "requiresTarget": true,
   "targeting": {

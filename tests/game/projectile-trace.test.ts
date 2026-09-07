@@ -358,9 +358,9 @@ describe('death blossom approved area behavior', () => {
     expect(outside.currentHp).toBe(100)
     expect(defeated.currentHp).toBe(0)
     expect(skill.form).toBe('area')
-    expect(skill.description).toBe('对以自身为中心的3×3范围内所有敌人造成200%攻击力的物理伤害。')
-    expect((skill as any).targetText).toBe('以自身为中心的3×3范围内所有敌人')
-    expect(skill.previewCode).toContain('以自身为中心的3×3范围内所有敌人')
+    expect(skill.description).toBe('对以本棋子为中心的3×3范围内所有敌方棋子造成等同于本棋子攻击力200%的物理伤害。')
+    expect((skill as any).targetText).toBe('以本棋子为中心的3×3范围内所有敌方棋子')
+    expect(skill.previewCode).toContain('以本棋子为中心的3×3范围内所有敌方棋子')
   })
 })
 

@@ -10,8 +10,8 @@ function teamState() {
   state.players = ['blue1', 'red1', 'red2', 'blue2'].map((id, index) => ({
     ...makePlayer(id, index === 0 || index === 3 ? 'blue' : 'red'),
     teamId: index === 0 || index === 3 ? 'blue' as const : 'red' as const,
-  })) as any
-  state.pieces = state.players.map((p, i) => ({ ...makePiece({ instanceId: p.playerId, ownerPlayerId: p.playerId, x: i }), isCore: true })) as any
+  }))
+  state.pieces = state.players.map((p, i) => ({ ...makePiece({ instanceId: p.playerId, ownerPlayerId: p.playerId, x: i }), isCore: true })) as unknown as typeof state.pieces
   return state
 }
 describe('2v2 team rules', () => {
@@ -34,7 +34,7 @@ describe('2v2 team rules', () => {
   })
   it('rotates blue red red blue, rejects teammate piece control, and observes teammates as allies', () => {
     let state = teamState()
-    expect(() => applyBattleAction(state, { type: 'move', playerId: 'blue1', pieceId: 'blue2', toX: 4, toY: 0 } as any)).toThrow()
+    expect(() => applyBattleAction(state, { type: 'move', playerId: 'blue1', pieceId: 'blue2', toX: 4, toY: 0 })).toThrow()
     for (const next of ['red1', 'red2', 'blue2', 'blue1']) {
       state = applyBattleAction(state, { type: 'endTurn', playerId: state.turn.currentPlayerId })
       state = applyBattleAction(state, { type: 'beginPhase' })

@@ -24,10 +24,15 @@
 
 - `batchId`、`chainId`、可选 `parentBatchId`；
 - `sourceId`、`targetId`、`skillId`、`damageType`；
-- `rawDamage`、`modifiedDamage`、`defense`、`shieldAbsorbed`、`damage`；
+- `rawDamage`、`modifiedDamage`、`defense`、`shieldAbsorbed`、`resolvedDamage`、`damage`；
+- `damageSource`：棋子、玩家或环境来源的类型、来源ID与玩家归属；
 - `blocked`、`isKilled`、`targetHp`。
 
 同样的字段写入 `battle.actions` 的 `type: "damage"` 日志，最终伤害字段名为 `finalDamage`，并额外记录 `killed`。这些日志属于权威状态和固定 seed hash 证据。
+
+RED-192：`resolvedDamage` 是防御、减伤和护盾结算后的伤害，`damage` / `finalDamage` 是实际生命损失，上限为目标扣血前的生命值；吸血和伤害后触发使用后者。所有数值计算逐步向下取整，真实伤害仅绕过防御。`DamageSource` 的玩家和环境来源不伪造 `sourcePiece`，寒冰坚忍只反冻造成实际生命损失的敌方棋子。
+
+巫妖誓约通过 `summonAfterDeath.revive` 在正式死亡后复活。初始能力模板用于清除死前增益、恢复初始属性；之后再计算复活加攻，保留核心身份、独立每局限用和被动已触发记录。规则版本及统一状态/回合阶段见 [RULE_LIFECYCLE.md](RULE_LIFECYCLE.md)。
 
 ## 伤害连锁与错误
 

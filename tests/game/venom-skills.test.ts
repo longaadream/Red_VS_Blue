@@ -145,7 +145,7 @@ describe('Venom data contract', () => {
 
   it('exposes the approved costs, cooldowns, ranges and descriptions', () => {
     expect(corrosion()).toMatchObject({ kind: 'passive', actionPointCost: 0, cooldownTurns: 0 })
-    expect(hostTransfer()).toMatchObject({ actionPointCost: 1, cooldownTurns: 1, targetText: '7格内任意另一名存活角色', keywords: [], effectTags: [] })
+    expect(hostTransfer()).toMatchObject({ actionPointCost: 1, cooldownTurns: 1, targetText: '7格内任意另1个存活棋子', keywords: [], effectTags: [] })
     expect(symbioteDrag()).toMatchObject({ actionPointCost: 1, cooldownTurns: 1, form: 'projectile', keywords: ['弹射物'], effectTags: ['弹射物'] })
     expect(clawRend()).toMatchObject({ actionPointCost: 1, cooldownTurns: 1, powerMultiplier: 2, keywords: [], effectTags: [] })
   })

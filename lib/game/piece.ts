@@ -35,6 +35,13 @@ export interface PieceStatusTag {
   value?: number
   relatedRules?: string[]
   visible?: boolean
+  stacking?: 'none' | 'duration' | 'intensity' | 'independent'
+  lifetime?: 'owner-turn-end' | 'event'
+  appliedTurn?: number
+  expiresAfterTurn?: number | null
+  lastDurationTickTurn?: number
+  statusAliases?: string[]
+  statusOrigins?: PieceStatusTag[]
   [key: string]: unknown
 }
 
@@ -61,6 +68,15 @@ export interface PieceTemplate {
 }
 
 export interface PieceInstance {
+  /** Initial incarnation data; revival restores this before applying its own bonuses. */
+  initialDefinition?: {
+    stats: PieceStats
+    skills: PieceSkill[]
+    rules: string[]
+    statusTags: PieceStatusTag[]
+  }
+  limitedSkillUses?: Record<string, number>
+  spentPassives?: string[]
   instanceId: string
   /** Demo 初始阵容身份；召唤物不得继承。 */
   isCore?: boolean

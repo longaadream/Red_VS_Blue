@@ -530,7 +530,7 @@ describe('RED-139 old/new hash evidence', () => {
       actionMessagesHash: hashStable(messages),
     }
     expect(final).toMatchObject({
-      reaperHp: 7, victimOnBoard: false, victimInGraveyard: true, redCharge: 0,
+      reaperHp: engine === 'base' ? 7 : 6, victimOnBoard: false, victimInGraveyard: true, redCharge: 0,
     })
     if (engine === 'base') {
       expect(events.authority.map(event => event.stage)).toEqual([

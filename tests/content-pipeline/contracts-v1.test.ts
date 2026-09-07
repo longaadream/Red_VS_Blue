@@ -214,6 +214,7 @@ describe('rvb-pack/v1 manifest contract', () => {
     ['images/cards/core.jpg', true],
     ['images/cards/core.jpeg', true],
     ['images/cards/core.png', true],
+    ['images/cards/core.svg', true],
     ['images/cards/core.webp', true],
     ['images/cards/.png', false],
     ['images/cards/.jpeg', false],
@@ -221,7 +222,7 @@ describe('rvb-pack/v1 manifest contract', () => {
     ['index.html', false],
     ['scripts/runtime.js', false],
     ['styles/runtime.css', false],
-    ['images/vector.svg', false],
+    ['images/vector.svg', true],
   ])('enforces the approved payload extension boundary for %s', (path, accepted) => {
     expect(PackPayloadPathV1Schema.safeParse(path).success).toBe(accepted)
   })

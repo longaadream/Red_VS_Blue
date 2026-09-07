@@ -1,3 +1,4 @@
+import type { PublicBattleSnapshot } from '@/lib/game/room-battle-actions'
 import { createServer } from 'node:net'
 import type { AddressInfo } from 'node:net'
 import { Client, type Room } from '@colyseus/sdk'
@@ -8,14 +9,14 @@ import { getServerGameProfileIdentityV1 } from '@/lib/content-pipeline/runtime/p
 import { getDemoPieceIds, getPieceById } from '@/lib/game/piece-repository'
 import { BATTLE_AUTHORITY_BUILD_ID, BATTLE_AUTHORITY_PROTOCOL_VERSION } from '@/lib/game/battle-public-patch'
 
-function nextMessage(room: Room, type: string): Promise<any> {
+function nextMessage<T = unknown>(room: Room, type: string): Promise<T> {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => { unsubscribe(); reject(new Error(`Missing ${type}`)) }, 10000)
-    const unsubscribe = room.onMessage(type, data => { clearTimeout(timer); unsubscribe(); resolve(data) })
+    const unsubscribe = room.onMessage(type, data => { clearTimeout(timer); unsubscribe(); resolve(data as T) })
   })
 }
 async function snapshot(room: Room) {
-  const result = nextMessage(room, 'battleSnapshot')
+  const result = nextMessage<PublicBattleSnapshot>(room, 'battleSnapshot')
   room.send('battleResync', {})
   return result
 }
@@ -34,15 +35,15 @@ it('four real clients lock rosters and only unanimous team surrender settles for
       const options = { product: true, mode: '2v2', playerId: `team-p${i}`, playerName: `P${i}`, alignment: 'light', profileIdentity }
       rooms.push(i === 0 ? await client.create('battle', options) : await client.joinById(rooms[0].roomId, options))
     }
-    const room = await rooms[0].request('roomRpc', { method: 'rooms.get', data: {} }) as any
-    expect(room.players.map((p: any) => p.seat)).toEqual(['blue', 'red', 'red', 'blue'])
+    const room = await rooms[0].request('roomRpc', { method: 'rooms.get', data: {} }) as { id: string; maxPlayers: number; players: Array<{ seat: string }> }
+    expect(room.players.map((p) => p.seat)).toEqual(['blue', 'red', 'red', 'blue'])
     expect(room.maxPlayers).toBe(4)
     await expect(client.joinById(room.id, { playerId: 'fifth', profileIdentity })).rejects.toThrow()
     const pieces = getDemoPieceIds().map(id => getPieceById(id)!).filter(p => p.faction === 'good').slice(0, 8).map(p => ({ templateId: p.id, faction: p.faction }))
     for (let i = 0; i < 4; i++) await rooms[i].request('roomRpc', { method: 'rooms.action', data: { action: 'select-pieces', playerId: `team-p${i}`, alignment: 'light', pieces, profileIdentity } })
     const initial = await snapshot(rooms[0])
-    expect(initial.state.players.map((p: any) => p.playerId)).toEqual(['team-p0', 'team-p1', 'team-p2', 'team-p3'])
-    expect(initial.state.players.map((p: any) => p.teamId)).toEqual(['blue', 'red', 'red', 'blue'])
+    expect(initial.state.players.map((p) => p.playerId)).toEqual(['team-p0', 'team-p1', 'team-p2', 'team-p3'])
+    expect(initial.state.players.map((p) => p.teamId)).toEqual(['blue', 'red', 'red', 'blue'])
     expect(initial.state.turn.currentPlayerId).toBe('team-p0')
     async function surrender(index: number) {
       const current = await snapshot(rooms[index])

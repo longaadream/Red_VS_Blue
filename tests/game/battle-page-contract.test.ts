@@ -687,6 +687,8 @@ describe('battle page route contract', () => {
     let actionSequence = 0
     const context = createContext({
       withClientActionId: (action: Record<string, unknown>) => ({ ...action, clientActionId: `client-${++actionSequence}` }),
+      SPECTATE_MODE: false,
+      PRACTICE_MODE: false,
       TRAINING_MODE: false,
       trainingDoAction: () => {
         throw new Error('training path should not run')
@@ -764,6 +766,8 @@ new Script([
         isAuthoritySyncing: () => true,
         send: () => { sent = true },
       },
+      SPECTATE_MODE: false,
+      PRACTICE_MODE: false,
       withClientActionId: () => {
         stamped = true
         return { type: 'move', clientActionId: 'should-not-exist' }

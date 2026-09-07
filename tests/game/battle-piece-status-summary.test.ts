@@ -36,6 +36,26 @@ function fixtureSnapshot(statusTags: Array<Record<string, unknown>>) {
 }
 
 describe('battle piece health and negative-status summary', () => {
+  it('mirrors a living clone master status display dynamically without copying effects', () => {
+    const window: Record<string, unknown> = {}
+    loadBrowserModule('js/battle-ui/battle-effect-icons.js', 'BattleEffectIcons', window)
+    const viewModel = loadBrowserModule('js/battle-ui/battle-view-model.js', 'BattleViewModel', window)
+    const snapshot = fixtureSnapshot([{ id: 'meditation', name: '打坐', visible: true, currentDuration: 3 }, { id: 'private', visible: false }])
+    const clone = { ...snapshot.pieces[0], instanceId: 'clone', masterPieceId: 'piece-red', displayStatusTags: [],
+      statusTags: [{ id: 'shadow-clone', visible: false }], x: 10 }
+    snapshot.pieces.push(clone)
+    const actual = JSON.stringify(clone)
+    const summary = () => viewModel.create({ snapshot, viewerId: 'player-red', selectedPieceId: 'clone' }).selection.piece.statusSummary
+    expect(summary().map((s: { id: string }) => s.id)).toEqual(['meditation'])
+    snapshot.pieces[0].statusTags = [{ id: 'divine-shield', name: '圣盾', visible: true, currentUses: 1 }]
+    expect(summary().map((s: { id: string }) => s.id)).toEqual(['divine-shield'])
+    expect(JSON.stringify(clone)).toBe(actual)
+    snapshot.pieces[0].statusTags = []
+    expect(summary()).toEqual([])
+    snapshot.pieces[0].currentHp = 0
+    expect(summary()).toEqual([])
+    expect(clone.statusTags).toEqual([{ id: 'shadow-clone', visible: false }])
+  })
   it('shows the authoritative deployment first-move tag through the generic status UI', () => {
     const window: Record<string, unknown> = {}
     loadBrowserModule('js/battle-ui/battle-effect-icons.js', 'BattleEffectIcons', window)

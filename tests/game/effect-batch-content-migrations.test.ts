@@ -179,7 +179,7 @@ describe('RED-139 approved content migrations', () => {
       redCharge: 0,
       effectBatchKind: 'heal',
     }])
-    expect(reaper.currentHp).toBe(7)
+    expect(reaper.currentHp).toBe(6) // floor(5 actual HP lost * 0.5), excluding overkill
     expect(state.actions
       .filter((action: any) => action.type === 'triggerEffect')
       .map((action: any) => action.payload?.message))

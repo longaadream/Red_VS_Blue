@@ -54,7 +54,6 @@
     var params = RvBUtils.appendServerParams(new URLSearchParams())
     params.set('server', local ? 'local' : 'remote')
     // Static Electron HTML pages are not Next.js routes.
-    // eslint-disable-next-line @next/next/no-location-assign-relative-destination
     location.href = 'lobby.html?' + params.toString()
   }
   byId('publish').onclick = function () { run(async function () {
