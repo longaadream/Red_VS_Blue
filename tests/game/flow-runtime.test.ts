@@ -20,6 +20,9 @@ describe('trusted code-node runtime facade', () => {
   it('distinguishes holder/source/target across skill and rule entry points', () => {
     const battle = fixture(), context = { piece: battle.pieces[1], rulePiece: battle.pieces[0], sourcePiece: battle.pieces[1], targetPiece: battle.pieces[0], playerId: 'player-red', triggerPlayerId: 'player-blue' }
     const flow = createSkillCodeFlow(battle, context, 'triggerSkill')
+    expect('refs' in flow).toBe(true)
+    expect(Object.keys(flow)).toContain('effects')
+    expect(flow.refs).toBe(flow.refs)
     expect(flow.refs.holder()).toBe('self'); expect(flow.refs.source()).toBe('enemy')
     expect(flow.refs.player()).toBe('player-red'); expect(flow.refs.eventPlayer()).toBe('player-blue')
     expect(flow.query.pieces({ relation: 'enemy' })).toEqual(['enemy'])
@@ -73,7 +76,8 @@ describe('trusted code-node runtime facade', () => {
   })
   it('uses actual damage, authoritative movement and status helpers', () => {
     const battle = fixture(), flow = createSkillCodeFlow(battle, { piece: battle.pieces[0] }, 'skill')
-    flow.status.add('self', { id: 'rooted', type: 'rooted', name: '定身', duration: 1, visible: true })
+    flow.status.add('self', { id: 'root', type: 'root', name: '定身', currentDuration: 1, visible: true })
+    expect(() => flow.effects.move([{ pieceId: 'self', x: 1, y: 0 }], 'walk')).toThrow()
     flow.effects.move([{ pieceId: 'self', x: 1, y: 0 }], 'teleport')
     expect(battle.pieces[0].x).toBe(1)
     flow.effects.damage('self', 'enemy', 100, 'true')

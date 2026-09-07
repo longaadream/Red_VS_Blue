@@ -1130,6 +1130,17 @@ function ensureSkillDefinitionForAddition(
 
 /** Trusted code-node adapter. Serialized state contains data only, never these functions. */
 export function createSkillCodeFlow(battle: BattleState, context: Parameters<typeof createFlowRuntime>[1], surface: import('./flow-runtime').FlowSurface, overrides: Parameters<typeof createFlowRuntime>[3] = {}) {
+  // Existing skills need no facade allocation during each speculative AI action.
+  // Materialize once, on first actual access, without inspecting/reinterpreting source text.
+  let instance: ReturnType<typeof createFlowRuntime> | undefined
+  const resolve = () => instance ??= materialize()
+  return new Proxy({} as ReturnType<typeof createFlowRuntime>, {
+    get: (_target, property) => Reflect.get(resolve(), property),
+    has: (_target, property) => Reflect.has(resolve(), property),
+    ownKeys: () => Reflect.ownKeys(resolve()),
+    getOwnPropertyDescriptor: (_target, property) => Reflect.getOwnPropertyDescriptor(resolve(), property),
+  })
+  function materialize() {
   const rules = (id: string, scope: 'piece' | 'player') => scope === 'piece'
     ? battle.pieces.find(p => p.instanceId === id) : battle.players.find(p => p.playerId === id)
   const addRule = (id: string, ruleId: string, scope: 'piece' | 'player') => {
@@ -1169,6 +1180,7 @@ export function createSkillCodeFlow(battle: BattleState, context: Parameters<typ
     fireEvent: (name, payload) => getActiveTriggerSystem().fireEvent(battle, context, name, payload),
     ...overrides,
   })
+  }
 }
 
 export function clearSkillDefinitionCache(): void {
