@@ -127,6 +127,7 @@ describe('battle page runtime source', () => {
     }))
     const context = vm.createContext({
       window: { RvBGameEngine: { ensure: async () => ({ createInitialBattleForPlayers }) } },
+      TUTORIAL_MODE: false,
       skillsById: {},
       resolveTrainingInitialPieces: (alignment: string) => [{ id: `${alignment}-piece` }],
     })
@@ -344,6 +345,7 @@ describe('battle page runtime source', () => {
       closePieceContextMenu: () => undefined,
       currentTargetSourceName: () => '暗影步',
       _targetPromptText: () => '选择一个地格',
+      tutorialActionAllowed: () => true,
       recordTargetClear: () => undefined,
       setStatusMsg: () => undefined,
       withClientActionId: (action: Record<string, unknown>) => action.clientActionId
@@ -406,6 +408,7 @@ describe('battle page runtime source', () => {
       setStatusMsg,
       doAction,
       currentTargetSourceName: () => '圣光大远征',
+      tutorialActionAllowed: () => true,
       withClientActionId: (action: Record<string, unknown>) => ({ ...action, clientActionId: 'grand-crusade-1' }),
       addLog: vi.fn(),
       Date,

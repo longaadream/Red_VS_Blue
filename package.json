@@ -13,7 +13,7 @@
     "build:colyseus": "node scripts/build-colyseus-server.mjs",
     "prepare:embedded-postgres": "node scripts/prepare-embedded-postgres.mjs",
     "verify:embedded-postgres": "node scripts/verify-embedded-postgres-package.mjs",
-    "build": "node scripts/build-tailwind.mjs && next build && node -e \"const fs=require('fs'),path=require('path');function cp(s,d){fs.mkdirSync(d,{recursive:true});for(const e of fs.readdirSync(s,{withFileTypes:true})){const ss=path.join(s,e.name),dd=path.join(d,e.name);e.isDirectory()?cp(ss,dd):fs.copyFileSync(ss,dd)}}cp('.next/static','.next/standalone/.next/static');cp('public','.next/standalone/public');console.log('Static assets copied to standalone.')\"",
+    "build": "npm run build:practice-ai && node scripts/build-tailwind.mjs && next build && node -e \"const fs=require('fs'),path=require('path');function cp(s,d){fs.mkdirSync(d,{recursive:true});for(const e of fs.readdirSync(s,{withFileTypes:true})){const ss=path.join(s,e.name),dd=path.join(d,e.name);e.isDirectory()?cp(ss,dd):fs.copyFileSync(ss,dd)}}cp('.next/static','.next/standalone/.next/static');cp('public','.next/standalone/public');console.log('Static assets copied to standalone.')\"",
     "start": "next start",
     "lint": "eslint . --max-warnings 0",
     "lint:content-pipeline": "eslint lib/content-pipeline/tooling electron-editor/main.ts electron-editor/preload.ts electron-editor/content-pipeline-ipc.ts electron-editor/content-pipeline-worker.ts scripts/rvb.mjs scripts/build-resource-pack.js tests/content-pipeline/tooling.test.ts tests/electron/editor-content-pipeline.test.ts tests/electron/windows-smoke.mjs --max-warnings 0 --suppressions-location tests/content-pipeline/empty-eslint-suppressions.json",
@@ -22,8 +22,8 @@
     "build:electron:client": "npm run build && npm run build:colyseus && npm run prepare:embedded-postgres && node scripts/stage-client-resources.js && npx tsc -p electron-client/tsconfig.json && electron-builder --config electron-builder.client.json && node scripts/verify-electron-client-package.js && npm run verify:embedded-postgres && node scripts/cleanup-client-resources.js",
     "preflight:electron:client": "node scripts/check-worktree-environment.mjs electron-client",
     "preflight:electron:editor": "node scripts/check-worktree-environment.mjs electron-editor",
-    "dev:electron:client": "npm run preflight:electron:client && npm run build:colyseus && npm run prepare:embedded-postgres && npx tsc -p electron-client/tsconfig.json && npx electron electron-client/dist/main.js",
-    "build:game-engine": "node scripts/build-game-engine.js",
+    "dev:electron:client": "npm run build:practice-ai && npm run preflight:electron:client && npm run build:colyseus && npm run prepare:embedded-postgres && npx tsc -p electron-client/tsconfig.json && npx electron electron-client/dist/main.js",
+    "build:game-engine": "npm run build:practice-ai && node scripts/build-game-engine.js",
     "build:mobile-server": "node scripts/build-mobile-server.js",
     "build:crypto-lib": "node scripts/build-crypto-lib.js",
     "build:android": "npm run build:game-engine && npm run build:mobile-server && npm run build:crypto-lib && node scripts/sync-android-assets.js && npx cap sync android",
@@ -49,7 +49,8 @@
     "benchmark:skillcode-runtime": "node scripts/benchmark-skillcode-runtime.mjs",
     "smoke:electron:windows": "node tests/electron/windows-smoke.mjs",
     "rvb": "node scripts/rvb.mjs",
-    "typecheck": "next typegen && tsc --noEmit"
+    "typecheck": "next typegen && tsc --noEmit",
+    "build:practice-ai": "node scripts/build-practice-ai.mjs"
   },
   "dependencies": {
     "@colyseus/schema": "5.0.25",

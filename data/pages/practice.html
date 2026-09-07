@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PVP 练习 · RED vs BLUE</title>
+  <script src="js/pack-fetch.js"></script>
+  <script src="js/deck-presets.js"></script>
+  <script src="js/practice/client.js"></script>
+  <link rel="stylesheet" href="css/tabletop/tabletop.css">
+  <link rel="stylesheet" href="js/practice/style.css">
+</head>
+<body data-art-page="practice">
+  <header class="topbar"><a class="back-btn" href="index.html">返回</a><h1>PVP 练习</h1><span class="stamp">实验 AI</span></header>
+  <main class="practice-shell">
+    <section class="intro"><div><p class="eyebrow">摆好棋组，来一局。</p><h2>你的对手，已经就位。</h2><p>按正式对战规则与 AI 切磋。双方各 8 枚棋子，逐回合上场。</p></div><div class="duel-mark" aria-hidden="true"><span>你</span><i>VS</i><span>AI</span></div></section>
+    <div class="roster-columns">
+      <section class="panel roster-panel" aria-labelledby="humanTitle"><header><span class="side-number">01</span><h2 id="humanTitle">你的棋组</h2><b id="humanCount">0 / 8</b></header>
+        <div class="fields"><label>阵营<select id="humanAlignment"><option value="good">光方</option><option value="evil">暗方</option></select></label><label>已保存棋组<select id="humanPreset"><option value="">手动选棋</option></select></label></div>
+        <div class="roster-tools"><span>选择 8 枚不同棋子</span><button class="deck-btn" id="humanFill" type="button">帮我选一组</button></div>
+        <div class="piece-grid" id="humanPieces" aria-label="你的棋子选择"></div>
+      </section>
+      <section class="panel roster-panel ai-panel" aria-labelledby="aiTitle"><header><span class="side-number">02</span><h2 id="aiTitle">AI 的棋组</h2><b id="aiCount">0 / 8</b></header>
+        <div class="fields"><label>选组方式<select id="aiMode"><option value="auto">AI 自动选择</option><option value="manual">由我指定</option></select></label><label>阵营<select id="aiAlignment"><option value="evil">暗方</option><option value="good">光方</option></select></label></div>
+        <div class="roster-tools" id="aiAutoTools"><span>优先选用有效预设，也可自动组队</span><button class="deck-btn" id="aiReroll" type="button">换一组</button></div>
+        <label class="preset-field" id="aiPresetField" hidden>已保存棋组<select id="aiPreset"><option value="">手动选棋</option></select></label>
+        <div class="piece-grid" id="aiPieces" aria-label="AI 棋组预览"></div>
+      </section>
+    </div>
+    <section class="panel match-settings" aria-label="对局设置"><label>地图<select id="mapId"></select></label><label>先后手<select id="humanFirst"><option value="true">我先手</option><option value="false">AI 先手</option></select></label><p>AI 思考时仍可查看棋盘或退出。<br>练习不计入战绩。</p><button class="btn-primary" id="startPractice" type="button" disabled>开始练习 →</button></section>
+    <p id="setupStatus" class="status" role="status" aria-live="polite">正在准备棋子和地图…</p>
+  </main>
+  <script src="js/practice/setup-page.js"></script>
+</body>
+</html>
