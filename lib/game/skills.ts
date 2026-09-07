@@ -1,4 +1,5 @@
 import { addPieceStatus, removePieceStatus, expireHolderStatuses, type StatusHolder } from './status-lifecycle'
+import { createFlowRuntime, clearRemovedPieceFlowState } from './flow-runtime'
 import { changePiecePositions, type PiecePositionChange } from './position-change'
 import type { PositionChangeKind } from './spatial'
 import type { BattleState } from "./turn"
@@ -1127,6 +1128,49 @@ function ensureSkillDefinitionForAddition(
   return definition
 }
 
+/** Trusted code-node adapter. Serialized state contains data only, never these functions. */
+export function createSkillCodeFlow(battle: BattleState, context: Parameters<typeof createFlowRuntime>[1], surface: import('./flow-runtime').FlowSurface, overrides: Parameters<typeof createFlowRuntime>[3] = {}) {
+  const rules = (id: string, scope: 'piece' | 'player') => scope === 'piece'
+    ? battle.pieces.find(p => p.instanceId === id) : battle.players.find(p => p.playerId === id)
+  const addRule = (id: string, ruleId: string, scope: 'piece' | 'player') => {
+    const target = rules(id, scope), rule = loadRuleForBattle(battle, ruleId, { sourceId: id })
+    if (!target || !rule) return false
+    target.rules ??= []
+    if (target.rules.some(r => r.id === ruleId)) return false
+    target.rules.push(rule); return true
+  }
+  const removeRule = (id: string, ruleId: string, scope: 'piece' | 'player') => {
+    const target = rules(id, scope)
+    if (!target?.rules) return false
+    const count = target.rules.length; target.rules = target.rules.filter(r => r.id !== ruleId)
+    return count !== target.rules.length
+  }
+  return createFlowRuntime(battle, context, surface, {
+    dealDamage, healDamage,
+    addStatusEffectById: (id, status) => addStatusWithEvents(battle, id, status),
+    removeStatusEffectById: (id, status) => removeStatusWithEvents(battle, id, status),
+    addPlayerStatusEffectById: (id, status) => addPlayerStatusWithEvents(battle, id, status),
+    removePlayerStatusEffectById: (id, status) => removePlayerStatusWithEvents(battle, id, status),
+    validateRule: id => { if (!loadRuleForBattle(battle, id)) throw new Error('Unknown flow rule: ' + id) },
+    addRuleById: (id, ruleId) => addRule(id, ruleId, 'piece'),
+    addPlayerRuleById: (id, ruleId) => addRule(id, ruleId, 'player'),
+    removeRuleById: (id, ruleId) => removeRule(id, ruleId, 'piece'),
+    removePlayerRuleById: (id, ruleId) => removeRule(id, ruleId, 'player'),
+    addCardToHand: (cardId, playerId) => addCardToHandWithTriggers(battle, cardId, playerId, context.sourcePiece),
+    discardCard: instanceId => {
+      for (const player of battle.players) {
+        const index = player.hand.findIndex(card => card.instanceId === instanceId)
+        if (index < 0) continue
+        const [card] = player.hand.splice(index, 1); player.discardPile ??= []; player.discardPile.push(card.cardId); return true
+      }
+      return false
+    },
+    selectOption: config => context.selectedOption !== undefined ? context.selectedOption : { ...config, needsOptionSelection: true },
+    fireEvent: (name, payload) => getActiveTriggerSystem().fireEvent(battle, context, name, payload),
+    ...overrides,
+  })
+}
+
 export function clearSkillDefinitionCache(): void {
   const caches = getSkillExecutionCaches()
   caches.skillDefinitionCache.clear()
@@ -1418,14 +1462,21 @@ export function loadRuleById(
             };
 
             const codeEnvironment = `
-              (function(battle, context, dealDamage, healDamage, addCardToHand, checkToxin, addStatusEffectById, removeStatusEffectById, addPlayerRuleById, removePlayerRuleById, addRuleById, removeRuleById, addPlayerStatusEffectById, removePlayerStatusEffectById, addPlayerSkillById, removePlayerSkillById, addSkillById, removeSkillById, selectOption, fireEvent, Math, Date) {
+              (function(battle, context, dealDamage, healDamage, addCardToHand, checkToxin, addStatusEffectById, removeStatusEffectById, addPlayerRuleById, removePlayerRuleById, addRuleById, removeRuleById, addPlayerStatusEffectById, removePlayerStatusEffectById, addPlayerSkillById, removePlayerSkillById, addSkillById, removeSkillById, selectOption, fireEvent, Math, Date, flow) {
                 ${ruleData.skillCode}
               })
             `;
             const executeRuleCode = getSkillExecutionCaches().dynamicCodeRuntime.compileExpression<any>({
               surface: 'ruleSkillCode', contentId: ruleId, code: codeEnvironment, entry: 'rule skillCode body',
             });
-            const result = executeRuleCode(battle, context, globalDealDamage, globalHealDamage, addCardToHand, checkToxin, addStatusEffectById, removeStatusEffectById, addPlayerRuleById, removePlayerRuleById, addRuleById, removeRuleById, addPlayerStatusEffectById, removePlayerStatusEffectById, addPlayerSkillById, removePlayerSkillById, addSkillById, removeSkillById, selectOption, fireEvent, getRuleMath(), getRuleDate());
+            const flow = createSkillCodeFlow(battle, context, 'rule', {
+              dealDamage: globalDealDamage, healDamage: globalHealDamage, addCardToHand,
+              addStatusEffectById, removeStatusEffectById, addPlayerRuleById, removePlayerRuleById,
+              addRuleById, removeRuleById, addPlayerStatusEffectById, removePlayerStatusEffectById,
+              addSkillById, removeSkillById, selectOption, fireEvent,
+              validateRule: (id: string) => { if (!loadRuleForBattle(battle, id)) throw new Error('Unknown flow rule: ' + id) },
+            })
+            const result = executeRuleCode(battle, context, globalDealDamage, globalHealDamage, addCardToHand, checkToxin, addStatusEffectById, removeStatusEffectById, addPlayerRuleById, removePlayerRuleById, addRuleById, removeRuleById, addPlayerStatusEffectById, removePlayerStatusEffectById, addPlayerSkillById, removePlayerSkillById, addSkillById, removeSkillById, selectOption, fireEvent, getRuleMath(), getRuleDate(), flow);
             if (result && result.needsOptionSelection) return result;
             return result || { success: false, message: '' };
           } catch (error) {
@@ -1654,6 +1705,7 @@ export function loadRuleById(
                   const fullSkillCode = `
                     (function(environment) {
                       const context = environment.context;
+                      const flow = environment.flow;
                       const sourcePiece = environment.sourcePiece;
                       const battle = environment.battle;
                       const select = environment.select;
@@ -1695,7 +1747,13 @@ export function loadRuleById(
                   const executeTriggeredSkill = getSkillExecutionCaches().dynamicCodeRuntime.compileExpression<(environment: typeof skillEnvironment) => SkillExecutionResult>({
                     surface: 'ruleTriggerSkill', contentId: skillId, code: fullSkillCode, entry: 'executeSkill(context)',
                   });
-                  const result = executeTriggeredSkill(skillEnvironment);
+                  const flowEnvironment = { ...skillEnvironment, flow: createSkillCodeFlow(battle, context, 'triggerSkill', {
+                    ...skillEnvironment,
+                    // The old triggered-skill selector/teleport stubs are not advertised as real capabilities.
+                    selectTarget: undefined, teleport: undefined,
+                    validateRule: (id: string) => { if (!loadRuleForBattle(battle, id)) throw new Error('Unknown flow rule: ' + id) },
+                  } as unknown as Parameters<typeof createFlowRuntime>[3]) }
+                  const result = executeTriggeredSkill(flowEnvironment);
                   finishSealedContentExecution(battle, sealedContent)
                   writeLog(`[triggerSkill] Skill execution result for ${skillId}: ${JSON.stringify(result)}`);
                   battleDebugLog(`Skill execution result:`, result);
@@ -3461,6 +3519,7 @@ function resolveDeathBatch(
 
   const finalizable = frozen
   const killedIds = finalizable.map(candidate => candidate.targetId)
+  clearRemovedPieceFlowState(battle, killedIds)
   const removedIds = new Set(finalizable.map(candidate => candidate.targetId))
   battle.pieces.splice(
     0,
@@ -5138,7 +5197,7 @@ export function healDamage(
 }
 
 // 执行技能函数
-export function executeSkillFunction(skillDef: SkillDefinition, context: SkillExecutionContext, battle: BattleState): SkillExecutionResult {
+export function executeSkillFunction(skillDef: SkillDefinition, context: SkillExecutionContext, battle: BattleState, flowEntry?: { context: Parameters<typeof createFlowRuntime>[1]; surface: 'triggerSkill' }): SkillExecutionResult {
   const expectedSkillId = String((context as any)?.skill?.id ?? skillDef?.id ?? '')
   try {
     skillDef = assertSkillDefinition(expectedSkillId, skillDef, { requireExecutable: true })
@@ -5193,6 +5252,7 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
       if (targetIndex === -1) return false
 
       const [removed] = battle.pieces.splice(targetIndex, 1)
+      clearRemovedPieceFlowState(battle, [removed.instanceId])
       battle.extensions ??= {}
       const removedPieces = Array.isArray(battle.extensions.removedPieces)
         ? battle.extensions.removedPieces
@@ -5456,6 +5516,7 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
             (function(environment) {
               // 定义全局变量
               const context = environment.context;
+              const flow = environment.flow;
               const sourcePiece = environment.sourcePiece;
               const battle = environment.battle;
               const select = environment.select;
@@ -5504,7 +5565,13 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
           const executeSkill = getSkillExecutionCaches().dynamicCodeRuntime.compileExpression<(environment: typeof skillEnvironment) => SkillExecutionResult>({
             surface: 'skillCode', contentId: skillDef.id, code: fullSkillCode, entry: 'executeSkill(context)',
           });
-          let result = executeSkill(skillEnvironment);
+          const flowEnvironment = { ...skillEnvironment, flow: createSkillCodeFlow(battle, flowEntry?.context ?? skillEnvironment.context, flowEntry?.surface ?? 'skill', {
+            ...skillEnvironment,
+            ...(flowEntry ? { selectTarget: undefined } : {}),
+            ...(!flowEntry ? { forceRemoveEnemyPieceById } : {}),
+            validateRule: (id: string) => { if (!loadRuleForBattle(battle, id)) throw new Error('Unknown flow rule: ' + id) },
+          } as unknown as Parameters<typeof createFlowRuntime>[3]) }
+          const result = executeSkill(flowEnvironment);
           finishSealedContentExecution(battle, sealedContent)
 
           for (const snapshot of beforeState.movementBlocked) {

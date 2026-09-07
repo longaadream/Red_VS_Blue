@@ -1,6 +1,8 @@
 import { contextBridge, ipcRenderer } from 'electron'
 
 contextBridge.exposeInMainWorld('editorAPI', {
+  analyzeFlow: (category: string, document: unknown) => ipcRenderer.invoke('source-flow-analyze', category, document),
+  editFlowNode: (category: string, document: unknown, request: unknown) => ipcRenderer.invoke('source-flow-edit', category, document, request),
   visualCatalog: () => ipcRenderer.invoke('visual-catalog'),
   workbenchList: () => ipcRenderer.invoke('workbench-list'),
   workbenchCreate: (input: unknown) => ipcRenderer.invoke('workbench-create', input),

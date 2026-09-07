@@ -8,6 +8,8 @@
 <script src="visual-fields.js"></script>
 <script src="skill-graph-core.js"></script>
 <script src="skill-graph-editor.js"></script>
+<script src="source-flow.js"></script>
+<link rel="stylesheet" href="source-flow.css">
 <link rel="stylesheet" href="skill-graph.css">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -446,13 +448,13 @@ function renderDocumentEditor({ subdir, item, data, dataMap, items, listControll
   let serialized = JSON.stringify(draft, null, 2)
   const executableFields = ['skillCode','code','previewCode','effectCode'].filter(field => Object.hasOwn(draft, field))
   if (config.codeField && executableFields.length === 0) executableFields.push(config.codeField)
-  const panes = ['fields', ...(subdir === 'skills' ? ['graph'] : []), ...(executableFields.length ? ['code'] : []), 'json']
+  const panes = ['fields', ...(['skills','rules'].includes(subdir) ? ['graph'] : []), ...(executableFields.length ? ['code'] : []), 'json']
 
   detailEl.innerHTML = `<article class="editor-frame">
     <header class="editor-header"><div class="editor-title"><h2 data-document-title>${esc(draft.name || item.id)}</h2><div class="file-id">${esc(item.filename)}</div></div><span class="dirty-state" role="status" aria-live="polite">${isNew ? '待创建' : '已保存'}</span></header>
     <nav class="editor-tabs" aria-label="编辑模式">${panes.map((mode,index) => `<button class="editor-mode ${index === 0 ? 'active' : ''}" data-editor-mode="${mode}">${({fields:'常用字段',graph:'流程图',code:'代码',json:'完整 JSON'})[mode]}</button>`).join('')}</nav>
     <section class="editor-pane active" data-editor-pane="fields"><div class="editor-help">修改会同步到完整 JSON，未展示的字段不会被删除。标签声明与技能逻辑分别编辑。</div><div data-visual-fields></div><div class="form-section grid2">${config.fields.map(field => fieldMarkup(field, getPath(draft, field[0]))).join('')}</div></section>
-    ${subdir === 'skills' ? '<section class="editor-pane" data-editor-pane="graph"><div data-skill-graph></div></section>' : ''}
+    ${['skills','rules'].includes(subdir) ? '<section class="editor-pane" data-editor-pane="graph"><div data-source-flow></div>' + (subdir === 'skills' ? '<details data-typed-graph><summary>类型化节点编程</summary><div data-skill-graph></div></details>' : '') + '</section>' : ''}
     ${executableFields.length ? `<section class="editor-pane" data-editor-pane="code"><div class="editor-help">复杂效果仍使用代码字段。编辑器只负责保存文本，不执行代码。</div>${executableFields.map(field => `<div class="field-group"><label>${esc(field)}</label><textarea class="code-editor" data-code-field="${esc(field)}" spellcheck="false">${esc(draft[field] || '')}</textarea></div>`).join('')}</section>` : ''}
     <section class="editor-pane" data-editor-pane="json"><div class="editor-help">可直接修改任意字段。只有合法的 JSON 对象才能保存；格式错误时原文件保持不变。</div><div class="json-error" data-json-error></div><textarea class="json-editor" data-json-source spellcheck="false">${esc(serialized)}</textarea></section>
     <footer class="editor-footer"><span class="dirty-state" data-footer-state>${isNew ? '待创建' : '已保存'}</span><div class="footer-actions"><button class="btn btn-ghost" data-open-external ${isNew ? 'disabled' : ''}>外部打开</button><button class="btn btn-ghost" data-reset-document>恢复</button><button class="btn btn-ghost" data-format-json>格式化 JSON</button><button class="btn btn-primary" data-save-json>${isNew ? '创建文件' : '保存 JSON'}</button></div></footer>
@@ -465,6 +467,19 @@ function renderDocumentEditor({ subdir, item, data, dataMap, items, listControll
   const saveButton = detailEl.querySelector('[data-save-json]')
   let visualEditor = null
   const graphEditor = subdir === 'skills' ? window.ContentSkillGraph.mount(detailEl.querySelector('[data-skill-graph]'), { getDraft: () => draft, onChange: syncDraft }) : null
+  if (draft.skillGraph) detailEl.querySelector('[data-typed-graph]').open = true
+  const sourceFlow = ['skills','rules'].includes(subdir) ? window.ContentSourceFlow.mount(detailEl.querySelector('[data-source-flow]'), {
+    category: subdir, getDraft: () => draft, onChange: syncDraft, analyze: api.analyzeFlow, edit: api.editFlowNode,
+    navigate: (collection, id) => {
+      if (document.querySelector('[data-saving="true"]') || pendingCreate || jsonEl.value !== JSON.stringify(saved, null, 2)) { toast('请先保存或恢复当前修改。', 'error'); return }
+      if (document.querySelector(`#${collection}-detail .dirty-state.dirty, #${collection}-detail .dirty-state.invalid`)) { toast('目标页面有未保存的修改。', 'error'); return }
+      const search = document.getElementById(`${collection}-search`); search.value = ''; search.dispatchEvent(new Event('input'))
+      const match = [...document.querySelectorAll(`#${collection}-list .entity-item`)].find(node => node.querySelector('.id')?.textContent === id)
+      if (!match) { toast('找不到关联内容：' + id, 'error'); return }
+      document.querySelector(`[data-tab="${collection}"]`).click(); match.click()
+      document.querySelector(`#${collection}-detail [data-editor-mode="graph"]`).click()
+    },
+  }) : null
   if (['pieces','skills','cards'].includes(subdir)) {
     const container = detailEl.querySelector('[data-visual-fields]')
     container.textContent = '正在读取技能与标签目录…'
@@ -521,6 +536,7 @@ function renderDocumentEditor({ subdir, item, data, dataMap, items, listControll
       detailEl.querySelectorAll('[data-code-field]').forEach(input => { input.value = draft[input.dataset.codeField] || '' })
       visualEditor?.refresh()
       graphEditor?.refresh()
+      sourceFlow?.refresh()
     }
     detailEl.querySelectorAll('.editor-mode').forEach(candidate => candidate.classList.toggle('active', candidate === button))
     detailEl.querySelectorAll('.editor-pane').forEach(pane => pane.classList.toggle('active', pane.dataset.editorPane === mode))

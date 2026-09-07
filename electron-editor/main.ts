@@ -168,6 +168,19 @@ function editorLauncher() {
   return app.isPackaged ? [portable && path.isAbsolute(portable) ? portable : process.execPath] : [process.execPath, path.join(__dirname, 'main.js')]
 }
 function workbench() { return new CreativeWorkbench(ensureAuthoringWorkspace(), getProjectRoot(), editorLauncher()) }
+handleTrusted('source-flow-analyze', (_event, category, document) => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- The packaged parser is an explicit local CJS bundle.
+  const parser = require('./source-flow.cjs') as typeof import('./source-flow')
+  const directory = resolveEditorDataDirectoryV1(getDataRoot(), 'pieces')
+  const pieces = fs.readdirSync(directory).filter(file => file.endsWith('.json') && file !== 'manifest.json')
+    .map(file => JSON.parse(fs.readFileSync(resolveEditorDataFilePathV1(getDataRoot(), 'pieces', file, 'read'), 'utf8')))
+  return parser.analyzeContentFlow(category, document, pieces)
+})
+handleTrusted('source-flow-edit', (_event, category, document, request) => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- Same packaged local parser; never evaluates authored code.
+  const parser = require('./source-flow.cjs') as typeof import('./source-flow')
+  return parser.editFlowNode(category, document, request)
+})
 handleTrusted('workbench-list', () => workbench().list())
 handleTrusted('workbench-create', (_event, input) => workbench().create(input))
 handleTrusted('workbench-inspect', (_event, id: string) => workbench().inspect(id))

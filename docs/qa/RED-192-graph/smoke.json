@@ -1,6 +1,9 @@
 {
   "ok": true,
   "checks": [
+    "existing Naruto skill flow automatically populated",
+    "follow skill link into real rule flow",
+    "edit rule source node and save preserving other fields",
     "real canvas node creation/parameters/connections",
     "cycle blocks save",
     "code/JSON synchronization",

@@ -264,4 +264,29 @@ describe('RED-192 rule dictionary', () => {
     globalTriggerSystem.checkTriggers(state, { type: 'beginTurn', playerId: 'player-red' })
     expect(state.players[0].actionPoints).toBe(5)
   })
+  it.each([0, 2])('keeps the final meditation progress through both turn ends with %i clones and rewards after AP refresh', (cloneCount) => {
+    let state = fixture()
+    state.pieces[0].skills = [{ skillId: 'naruto-sage-mode', currentCooldown: 0, usesRemaining: -1 }]
+    state = runBattleAction(state, { type: 'useBasicSkill', playerId: 'player-red', pieceId: 'source', skillId: 'naruto-sage-mode' }, { rootSeed: 192 }).state
+    const tag = state.pieces[0].statusTags.find((t: any) => t.type === 'sage-mode')
+    expect(tag.currentDuration).toBe(-1)
+    tag.stacks = 1 + cloneCount
+    for (let index = 0; index < cloneCount; index++) state.pieces.push(makePiece({ instanceId: 'clone-' + index, x: index, y: 1, statusTags: [{ type: 'naruto-clone', visible: false }] }))
+    const cp = state.players[0].chargePoints, ap = state.players[0].actionPoints
+    const advance = (action: any) => { state = runBattleAction(state, action, { rootSeed: 192 }).state }
+    const progress = () => state.pieces.find((p: any) => p.instanceId === 'source').statusTags.find((t: any) => t.type === 'sage-mode')?.stacks
+    advance({ type: 'endTurn', playerId: 'player-red' })
+    expect(progress()).toBe(1 + cloneCount); expect(state.players[0].actionPoints).toBe(ap)
+    advance({ type: 'beginPhase' }) // Blue starts; red meditation must not advance.
+    expect(progress()).toBe(1 + cloneCount); expect(state.players[0].chargePoints).toBe(cp)
+    advance({ type: 'endTurn', playerId: 'player-blue' })
+    expect(progress()).toBe(1 + cloneCount); expect(state.players[0].chargePoints).toBe(cp)
+    advance({ type: 'beginPhase' }) // Red resources refresh, then beginTurn resolves meditation.
+    expect(progress()).toBeUndefined()
+    expect(state.players[0].actionPoints).toBe(state.players[0].maxActionPoints + 3)
+    expect(state.players[0].chargePoints).toBe(cp + 1)
+    advance({ type: 'beginPhase' }) // Already in action: must not grant twice.
+    expect(state.players[0].chargePoints).toBe(cp + 1)
+    expect(state.players[0].actionPoints).toBe(state.players[0].maxActionPoints + 3)
+  })
 })

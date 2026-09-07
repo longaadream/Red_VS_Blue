@@ -27,7 +27,7 @@ function writeLog(message: string) {
 // 重新导出类型，保持向后兼容
 import type { BoardMap } from "./map"
 import { expireOwnerStatuses } from './status-lifecycle'
-import { statusEventSink, expirePlayerStatuses, addStatusWithEvents, addPlayerStatusWithEvents } from './skills'
+import { statusEventSink, expirePlayerStatuses, addStatusWithEvents, addPlayerStatusWithEvents, createSkillCodeFlow } from './skills'
 import { changePiecePositions, type PiecePositionChange } from './position-change'
 import type { PositionChangeKind } from './spatial'
 import {
@@ -3527,7 +3527,7 @@ function applyBattleActionInternal(
           throw new BattleRuleError('[STAGE6] effectCode did not compile to a function, got: ' + typeof fn)
         }
         try {
-          result = fn({
+          const pendingContext = {
             battle: next,
             playerId: action.playerId,
             targetPiece,
@@ -3538,7 +3538,13 @@ function applyBattleActionInternal(
             addStatusEffectById: (pieceId: string, status: PieceStatusTag) => addStatusWithEvents(next, pieceId, status),
             addPlayerStatusEffectById: (playerId: string, status: PieceStatusTag) => addPlayerStatusWithEvents(next, playerId, status),
             changePositions: (changes: PiecePositionChange[], kind: PositionChangeKind) => changePiecePositions(next, changes, kind),
-          }) || { success: true }
+          }
+          result = fn({ ...pendingContext, flow: createSkillCodeFlow(next, {
+            ...pendingContext, type: 'pendingEffect',
+            rulePiece: next.pieces.find(p => p.instanceId === pending.source?.pieceId),
+            sourcePiece: next.pieces.find(p => p.instanceId === pending.triggerContext?.sourcePiece?.instanceId),
+            triggerPlayerId: pending.triggerContext?.triggerPlayerId ?? pending.triggerContext?.playerId,
+          }, 'pending') }) || { success: true }
         } catch (execErr) {
           if (isEffectChainPendingSignal(execErr)) throw execErr
           throw new BattleRuleError('[STAGE6] effectCode execution error: ' + (execErr instanceof Error ? execErr.message : String(execErr)))

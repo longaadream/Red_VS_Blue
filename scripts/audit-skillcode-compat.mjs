@@ -18,7 +18,7 @@ const SURFACES = {
     runtime: 'lib/game/skills.ts::loadRuleById',
     signature: 'statement body with battle/context plus injected helpers',
     bindings: [
-      'battle', 'context', 'dealDamage', 'healDamage', 'addCardToHand', 'checkToxin',
+      'battle', 'context', 'flow', 'dealDamage', 'healDamage', 'addCardToHand', 'checkToxin',
       'addStatusEffectById', 'removeStatusEffectById', 'addPlayerRuleById',
       'removePlayerRuleById', 'addRuleById', 'removeRuleById', 'addPlayerStatusEffectById',
       'removePlayerStatusEffectById', 'addPlayerSkillById', 'removePlayerSkillById',
@@ -41,7 +41,7 @@ const SURFACES = {
     runtime: 'lib/game/skills.ts::executeSkillFunction',
     signature: 'executeSkill(context) with skill environment bindings',
     bindings: [
-      'context', 'sourcePiece', 'battle', 'select', 'selectTarget', 'selectOption',
+      'context', 'flow', 'sourcePiece', 'battle', 'select', 'selectTarget', 'selectOption',
       'teleport', 'dealDamage', 'healDamage', 'traceProjectile', 'addStatusEffectById',
       'removeStatusEffectById', 'getAllEnemiesInRange', 'getAllAlliesInRange',
       'calculateDistance', 'isTargetInRange', 'addRuleById', 'removeRuleById',
