@@ -1,9 +1,9 @@
 {
   "id": "obito-ally-teleport",
   "name": "神威·转移",
-  "description": "选择7格内1名其他友军，将其立即传送至你7格内1个空的可行走地格。",
+  "description": "选择本棋子7格内1个其他友方棋子，将其传送至本棋子7格内1个空的可行走地格。",
   "keywords": [],
-  "targetText": "7格内1名其他友军，然后7格内1个空地格",
+  "targetText": "7格内1个其他友方棋子，然后7格内1个空地格",
   "effectTags": [
     "位移"
   ],
@@ -45,5 +45,5 @@
     ]
   },
   "code": "function executeSkill(context) { var caster = context.piece; var ally = selectTarget({ type: 'piece', range: 7, filter: 'ally' }); if (!ally || ally.needsTargetSelection) return ally; var pos = selectTarget({ type: 'grid', range: 7, filter: 'all' }); if (!pos || pos.needsTargetSelection) return pos; if (ally.instanceId === caster.instanceId || ally.ownerPlayerId !== caster.ownerPlayerId || Math.abs(ally.x-caster.x)+Math.abs(ally.y-caster.y)>7 || Math.abs(pos.x-caster.x)+Math.abs(pos.y-caster.y)>7) return { success: false, message: '神威转移目标不合法' }; if ((battle.extensions && battle.extensions.tileEffects || []).some(function(e) { return e.type === 'tails-flight-reservation' && e.x === pos.x && e.y === pos.y; })) return { success: false, message: '落点已被预留' }; var result = teleport(pos.x, pos.y, ally.instanceId); if (!result.success) return { success: false, message: '友军无法传送至该落点' }; return { success: true, message: caster.name + '将' + ally.name + '传送至(' + pos.x + ',' + pos.y + ')' }; }",
-  "previewCode": "function calculatePreview() { return { description: '选择7格内1名其他友军，将其立即传送至你7格内1个空的可行走地格。', expectedValues: { range: 7 } }; }"
+  "previewCode": "function calculatePreview() { return { description: \"选择本棋子7格内1个其他友方棋子，将其传送至本棋子7格内1个空的可行走地格。\", expectedValues: { range: 7 } }; }"
 }

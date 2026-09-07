@@ -141,7 +141,7 @@ describe('RED-124 Mangekyo data contract', () => {
     expect(loadJson<any>('skills', 'itachi-totsuka-blade.json')).toMatchObject({
       chargeCost: 3,
       chargeCostModifiers: modifier,
-      description: '万花筒。选择3格内的一个敌人，造成200%攻击力的魔法伤害，并使其所有主动技能进入1回合冷却。',
+      description: '万花筒。选择3格内的1个敌方棋子，造成等同于本棋子攻击力200%的法术伤害，并使其所有主动技能进入1回合冷却。',
       keywords: expect.arrayContaining([MANGEKYO_KEYWORD]),
     })
     expect(loadJson<any>('skills', 'obito-space-time.json')).toMatchObject({
@@ -150,7 +150,7 @@ describe('RED-124 Mangekyo data contract', () => {
       actionPointCost: 5,
       chargeCost: 3,
       chargeCostModifiers: modifier,
-      description: '万花筒。选择地图上的一名敌方棋子，将其强制移出战场。该效果不造成伤害，也不视为死亡。每局限用一次。',
+      description: '万花筒。选择地图上1个敌方棋子，将其强制移出战场。每局限用1次。',
       keywords: expect.arrayContaining([MANGEKYO_KEYWORD]),
       targeting: { steps: [{ type: 'piece', filter: 'enemy', range: 99 }] },
     })

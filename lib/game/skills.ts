@@ -1938,6 +1938,8 @@ export interface SkillDefinition {
   description: string
   /** 玩家可见的机制关键词。 */
   keywords?: string[]
+  /** Reusable setup passives; interpreted before deployment, without executing skill code. */
+  passiveTraits?: Array<'opening-vanguard'>
   /** Data-authored tags whose rules can add reusable targeting semantics. */
   statusTag?: {
     id: string

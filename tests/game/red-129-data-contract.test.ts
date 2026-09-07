@@ -110,19 +110,19 @@ describe('RED-129 complete data contract', () => {
     })
 
     expect(loadSkill('nano-boost').description).toBe(
-      '使10格内1个其他友军防御力+3、移速+1，且其造成的所有伤害+1。',
+      '使本棋子10格内1个其他友方棋子防御力+3、移动力+1，造成的伤害+1。',
     )
-    expect(loadSkill('holy-light-descend').description).toContain('治疗9点')
-    expect(loadSkill('holy-light-descend').description).toContain('距离2、3格')
+    expect(loadSkill('holy-light-descend').description).toContain('恢复9点生命')
+    expect(loadSkill('holy-light-descend').description).toContain('距离该格2至3格')
     expect(loadSkill('hellfire-shotgun').description).toContain('第1个目标')
-    expect(loadSkill('kiljaedan-fel-fire').description).toContain('3x3范围内其他敌人')
-    expect(loadSkill('minato-flying-raijin-passive').description).toContain('仅在水门自己的回合结束时')
+    expect(loadSkill('kiljaedan-fel-fire').description).toContain('3×3范围内其他敌方棋子')
+    expect(loadSkill('minato-flying-raijin-passive').description).toContain('仅在你的回合结束时')
     expect(loadSkill('minato-flying-raijin-passive').description).toContain('选择是否触发')
-    expect(loadSkill('rafaam-temporal-distortion').description).toContain('对方下回合结束时归还')
+    expect(loadSkill('rafaam-temporal-distortion').description).toContain('对方的下一个回合结束时归还')
     expect(loadSkill('rafaam-curse-amplify').description)
       .toBe('复制对方手牌里所有的诅咒，并将复制品加入对方手牌。')
     expect(loadSkill('sasuke-susanoo').description).toContain('防御力+1')
-    expect(loadSkill('venom-corrosion').description).toBe('毒液每次更改敌方位置时，使其定身1回合。')
+    expect(loadSkill('venom-corrosion').description).toBe('本棋子改变敌方棋子的位置时，使其获得定身，持续1回合。')
     expect(loadSkill('velen-fate-shelter').description).toContain('恢复8点生命并获得【圣盾】')
   })
 

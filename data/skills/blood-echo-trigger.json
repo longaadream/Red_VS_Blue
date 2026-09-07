@@ -1,19 +1,19 @@
 {
   "id": "blood-echo-trigger",
-  "name": "\u8840\u8272\u56de\u54cd\u00b7\u89e6\u53d1",
-  "description": "\u53cb\u65b9\u5931\u53bb\u3010\u5723\u76fe\u3011\u65f6\u83b7\u5f971\u5f20\u3010\u5723\u5149\u5145\u80fd\u3011\u3002",
-  "targetText": "\u5931\u53bb\u5723\u76fe\u7684\u53cb\u65b9",
+  "name": "血色回响·触发",
+  "description": "友方棋子失去圣盾时，你获得1张【圣光充能】。",
+  "targetText": "失去圣盾的友方",
   "effectTags": [
-    "\u5723\u5149",
-    "\u624b\u724c",
-    "\u89e6\u53d1"
+    "圣光",
+    "手牌",
+    "触发"
   ],
-  "icon": "\ud83e\ude78",
+  "icon": "🩸",
   "kind": "passive",
   "type": "normal",
   "cooldownTurns": 0,
   "maxCharges": 0,
   "powerMultiplier": 1,
   "actionPointCost": 0,
-  "code": "function executeSkill(context) {\n  if (context.statusId !== 'divine-shield') return { success: false, message: '' };\n  var sourcePiece = context.sourcePiece || context.piece;\n  if (!sourcePiece) return { success: false, message: '' };\n  var liadrin = battle.pieces.find(function(piece) { return piece.templateId === 'liadrin' && piece.ownerPlayerId === sourcePiece.ownerPlayerId && piece.currentHp > 0; });\n  if (!liadrin) return { success: false, message: '' };\n  var player = battle.players.find(function(item) { return item.playerId === sourcePiece.ownerPlayerId; });\n  if (!player) return { success: false, message: '' };\n  var added = addCardToHand('holy-charge', player.playerId);\n  return { success: added, message: added ? '\u8840\u8272\u56de\u54cd\u751f\u6210\u4e861\u5f20\u5723\u5149\u5145\u80fd' : '' };\n}"
+  "code": "function executeSkill(context) {\n  if (context.statusId !== 'divine-shield') return { success: false, message: '' };\n  var sourcePiece = context.sourcePiece || context.piece;\n  if (!sourcePiece) return { success: false, message: '' };\n  var liadrin = battle.pieces.find(function(piece) { return piece.templateId === 'liadrin' && piece.ownerPlayerId === sourcePiece.ownerPlayerId && piece.currentHp > 0; });\n  if (!liadrin) return { success: false, message: '' };\n  var player = battle.players.find(function(item) { return item.playerId === sourcePiece.ownerPlayerId; });\n  if (!player) return { success: false, message: '' };\n  var added = addCardToHand('holy-charge', player.playerId);\n  return { success: added, message: added ? '血色回响生成了1张圣光充能' : '' };\n}"
 }

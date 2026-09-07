@@ -1,10 +1,12 @@
 {
   "id": "hashirama-edo-regen",
   "name": "秽土转生·自愈",
-  "description": "生命值低于50%时，每回合结束治疗1点生命，直到回到50%为止。",
+  "description": "你的回合结束时，若本棋子的生命值低于最大生命值的50%，恢复2点生命。",
   "keywords": [],
   "targetText": "被动",
-  "effectTags": ["治疗"],
+  "effectTags": [
+    "治疗"
+  ],
   "icon": "❤️",
   "kind": "passive",
   "type": "passive",

@@ -1,10 +1,13 @@
 {
   "id": "obito-grudge",
   "name": "怨念积蓄",
-  "description": "任意友军受到伤害时，带土获得1层怨念，最多3层，每层攻击力+2；己方回合结束时清空。",
+  "description": "友方棋子受到伤害时，本棋子获得1层怨念，最多3层。每层怨念使攻击力+2。你的回合结束时，清空怨念。",
   "keywords": [],
   "targetText": "被动",
-  "effectTags": ["层数", "强化"],
+  "effectTags": [
+    "层数",
+    "强化"
+  ],
   "icon": "🕗",
   "kind": "passive",
   "type": "normal",

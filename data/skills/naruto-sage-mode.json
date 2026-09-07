@@ -1,11 +1,11 @@
 {
   "id": "naruto-sage-mode",
   "name": "仙人模式",
-  "description": "进入打坐状态：不能主动走格或使用技能，准备进度为6。你的回合开始时，准备进度减少1，每个存活影分身额外减少1；归零时结束打坐，获得3行动点和1充能。",
+  "description": "进入打坐状态，准备进度为6。打坐期间，不能主动走格或使用技能。你的回合开始时，准备进度减少1，每个存活的友方影分身额外减少1。准备进度归零时，结束打坐，你获得3行动点和1充能。",
   "keywords": [
     "充能"
   ],
-  "targetText": "自身",
+  "targetText": "本棋子",
   "effectTags": [
     "control",
     "resource"
@@ -18,5 +18,5 @@
   "powerMultiplier": 1,
   "actionPointCost": 1,
   "code": "function executeSkill(context) { var caster = context.piece; var battle = context.battle; var existingSageMode = caster.statusTags && caster.statusTags.find(function(t) { return t.type === 'sage-mode'; }); if (existingSageMode) return { success: false, message: caster.name + '已处于仙人模式中' }; addStatusEffectById(caster.instanceId, { id: 'sage-mode-' + caster.instanceId, name: '仙人模式', type: 'sage-mode', currentDuration: -1, currentUses: -1, intensity: 1, stacks: 6, relatedRules: ['rule-naruto-sage-immobile', 'rule-naruto-sage-block-skill', 'rule-naruto-sage-tick'] }); addRuleById(caster.instanceId, 'rule-naruto-sage-immobile'); addRuleById(caster.instanceId, 'rule-naruto-sage-block-skill'); addRuleById(caster.instanceId, 'rule-naruto-sage-tick'); return { success: true, message: caster.name + '进入仙人模式！你的回合开始时推进准备，完成后获得3行动点和1充能点' }; }",
-  "previewCode": "function calculatePreview() { return { description: \"进入打坐状态：不能主动走格或使用技能，准备进度为6。你的回合开始时，准备进度减少1，每个存活影分身额外减少1；归零时结束打坐，获得3行动点和1充能。\", expectedValues: {} }; }"
+  "previewCode": "function calculatePreview() { return { description: \"进入打坐状态，准备进度为6。打坐期间，不能主动走格或使用技能。你的回合开始时，准备进度减少1，每个存活的友方影分身额外减少1。准备进度归零时，结束打坐，你获得3行动点和1充能。\", expectedValues: {} }; }"
 }

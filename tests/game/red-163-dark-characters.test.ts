@@ -91,7 +91,7 @@ describe('RED-163 dark character contract', () => {
     })
     expect(grimmjow.skills).not.toContainEqual(expect.objectContaining({ skillId: 'grimmjow-panther-claw' }))
     expect(json('data/skills/grimmjow-hunting-instinct.json').description).toBe(
-      '每当一名敌人行动后，若其在格力姆乔4格内，格力姆乔可移动至2格内1个空格；若与其相邻，攻击该敌人2次，每次造成75%攻击力的物理伤害。',
+      '敌方棋子行动后，若其位于本棋子4格内，可将本棋子移动至2格内1个空地格。若随后与该敌方棋子相邻，则攻击其2次，每次造成等同于本棋子攻击力75%的物理伤害。',
     )
     for (const image of ['aizen.jpg', 'ulquiorra.jpg', 'grimmjow.jpg']) expectJpeg(`public/${image}`)
   })

@@ -1,10 +1,12 @@
 {
   "id": "light-of-the-light",
   "name": "圣光闪耀",
-  "description": "治疗7格内1个友军5点生命。",
+  "description": "使本棋子7格内1个友方棋子恢复5点生命。",
   "keywords": [],
-  "targetText": "7格内1个友军",
-  "effectTags": ["治疗"],
+  "targetText": "7格内1个友方棋子",
+  "effectTags": [
+    "治疗"
+  ],
   "icon": "✨",
   "kind": "active",
   "type": "normal",
@@ -13,6 +15,6 @@
   "powerMultiplier": 1,
   "actionPointCost": 1,
   "code": "function executeSkill(context) { const sourcePiece = context.piece; const targetAlly = selectTarget({ type: 'piece', range: 7, filter: 'ally' }); if (!targetAlly || targetAlly.needsTargetSelection) { return targetAlly; } const healValue = 5; const healResult = healDamage(sourcePiece, targetAlly, healValue, context.battle, context.skill.id); return { message: sourcePiece.name + '使' + targetAlly.name + '恢复' + healResult.heal + '点生命', success: true }; }",
-  "previewCode": "function calculatePreview(piece, skillDef) { const healValue = 5; return { description: '治疗7格内1个友军' + healValue + '点生命。', expectedValues: { heal: healValue } }; }",
+  "previewCode": "function calculatePreview(piece, skillDef) { const healValue = 5; return { description: \"治疗7格内1个友方棋子\" + healValue + '点生命。', expectedValues: { heal: healValue } }; }",
   "range": "single"
 }

@@ -1,9 +1,9 @@
 {
   "id": "kiljaedan-fel-fire",
   "name": "恒星之火",
-  "description": "对4格内1个敌人造成等同攻击力200%的法术伤害，并对其周围3x3范围内其他敌人造成等量法术伤害。",
+  "description": "对4格内1个敌方棋子造成等同于本棋子攻击力200%的法术伤害，并对其周围3×3范围内其他敌方棋子造成等量法术伤害。",
   "keywords": [],
-  "targetText": "4格内1个敌人",
+  "targetText": "4格内1个敌方棋子",
   "effectTags": [
     "法术伤害",
     "范围伤害"
@@ -16,5 +16,5 @@
   "range": "single",
   "powerMultiplier": 2,
   "code": "function executeSkill(context) { var caster = context.piece; var target = selectTarget({ type: 'piece', range: 4, filter: 'enemy' }); if (!target || target.needsTargetSelection) return target; var targetX = target.x; var targetY = target.y; var targetId = target.instanceId; var damage = Math.floor(caster.attack * context.skill.powerMultiplier); var result = dealDamage(caster, target, damage, 'magical', battle, context.skill.id); var others = battle.pieces.filter(function(piece) { return piece.instanceId !== targetId && piece.ownerPlayerId !== caster.ownerPlayerId && piece.currentHp > 0 && Math.abs(piece.x - targetX) <= 1 && Math.abs(piece.y - targetY) <= 1; }); if (others.length) dealDamage(caster, others, damage, 'magical', battle, context.skill.id); return { success: true, message: caster.name + '的恒星之火对' + target.name + '造成' + (result.damage || damage) + '点法术伤害，并波及周围' + others.length + '名敌人' }; }",
-  "previewCode": "function calculatePreview(piece, skillDef) { var damage = Math.floor(piece.attack * skillDef.powerMultiplier); return { description: '对4格内1个敌人及其周围3x3范围内其他敌人造成' + damage + '点法术伤害。', expectedValues: { damage: damage } }; }"
+  "previewCode": "function calculatePreview(piece, skillDef) { var damage = Math.floor(piece.attack * skillDef.powerMultiplier); return { description: \"对4格内1个敌方棋子及其周围3×3范围内其他敌方棋子造成\" + damage + '点法术伤害。', expectedValues: { damage: damage } }; }"
 }

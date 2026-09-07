@@ -41,9 +41,9 @@ describe('Sonic roster mechanics', () => {
 
   it('uses the requested Sonic and Shadow skill descriptions and Super Form costs', () => {
     const expected = {
-      'sonic-spin-dash': '获得动能。选择一个正方向五格内的空格并向其冲刺，可穿过无法行走地格，对路径敌人造成150%攻击力的物理伤害。动能3：冲刺最大距离+2。动能5：命中敌人沉默1回合。',
-      'shadow-ride-sweep': '获得动能。选择一个正方向上7格内的一个空格并向其冲刺，对路径上敌人造成100%攻击力的物理伤害。动能5：弹射物。冲刺后选择一个垂直于冲刺方向的方向，对路径上每格往该方向4格范围内的所有敌人造成5点伤害，可穿透角色。动能7：路径伤害+2。',
-      'sonic-super-form': '获得两点临时行动点。本回合索尼克使用技能不消耗动能，回合结束后保留。',
+      'sonic-spin-dash': '获得动能。选择1个正方向5格内的空格并向其冲刺，可穿过无法行走地格，对路径敌方棋子造成等同于本棋子攻击力150%的物理伤害。动能3：冲刺最大距离+2。动能5：命中敌方棋子沉默1回合。',
+      'shadow-ride-sweep': '获得动能。选择1个正方向上7格内的1个空格并向其冲刺，对路径上敌方棋子造成等同于本棋子攻击力100%的物理伤害。动能5：弹射物。冲刺后选择1个垂直于冲刺方向的方向，对路径上每格往该方向4格范围内的所有敌方棋子造成5点伤害，可穿透棋子。动能7：路径伤害+2。',
+      'sonic-super-form': '你获得2临时行动点。本回合本棋子使用技能不消耗动能，回合结束后保留。',
     }
     for (const [skillId, description] of Object.entries(expected)) {
       const definition = JSON.parse(readFileSync(resolve(process.cwd(), `data/skills/${skillId}.json`), 'utf8'))
@@ -59,7 +59,7 @@ describe('Sonic roster mechanics', () => {
 
     expect(sonic.skills).toContainEqual(expect.objectContaining({ skillId: passive.id }))
     expect(passive).toMatchObject({ kind: 'passive', relatedRules: ['rule-sonic-free-move'] })
-    expect(passive.description).toContain('每个己方回合开始时')
+    expect(passive.description).toContain('你的回合开始时')
   })
 
   it('uses the requested Chaos Spear range, damage, and movement theft', () => {
@@ -89,7 +89,7 @@ describe('Sonic roster mechanics', () => {
       piece: shadow, target, targetPosition: null, targets: [{ info: target, pos: null }], skill: definition, battle: state,
     } as any, state) as any
 
-    expect(definition.description).toBe('对4格内一名敌人造成50%攻击力的物理伤害，并偷取其2点移动范围至己方下回合开始。')
+    expect(definition.description).toBe('对4格内1个敌方棋子造成等同于本棋子攻击力50%的物理伤害，并偷取其2点移动力至你的下一个回合开始时。')
     expect(result.success).toBe(true)
     expect(target.currentHp).toBe(15)
     expect(target.moveRange).toBe(3)
@@ -361,13 +361,18 @@ describe('Sonic roster mechanics', () => {
     }, { type: 'endTurn', playerId: 'player-red' })
     expect(castingTurnEnd.pieces.find(piece => piece.instanceId === 'tails')).toMatchObject({ x: 1, y: 1 })
     expect(castingTurnEnd.pieces.find(piece => piece.instanceId === 'tails')?.statusTags).toEqual(expect.arrayContaining([
-      expect.objectContaining({ type: 'tails-flight-reservation', turns: 1 }),
-      expect.objectContaining({ type: 'immune', remainingDuration: 1 }),
-      expect.objectContaining({ type: 'inoperable', remainingDuration: 1 }),
+      expect.objectContaining({ type: 'tails-flight-reservation', currentDuration: 2 }),
+      expect.objectContaining({ type: 'immune', remainingDuration: 2 }),
+      expect.objectContaining({ type: 'inoperable', remainingDuration: 2 }),
     ]))
-    const expiryTurnEnd = applyBattleAction({
+    const firstOwnTurnEnd = applyBattleAction({
       ...castingTurnEnd,
       turn: { ...castingTurnEnd.turn, currentPlayerId: 'player-red', phase: 'action', turnNumber: castingTurnEnd.turn.turnNumber + 2 },
+    }, { type: 'endTurn', playerId: 'player-red' })
+    expect(firstOwnTurnEnd.pieces.find(piece => piece.instanceId === 'tails')).toMatchObject({ x: 1, y: 1 })
+    const expiryTurnEnd = applyBattleAction({
+      ...firstOwnTurnEnd,
+      turn: { ...firstOwnTurnEnd.turn, currentPlayerId: 'player-red', phase: 'action', turnNumber: firstOwnTurnEnd.turn.turnNumber + 2 },
     }, { type: 'endTurn', playerId: 'player-red' })
     expect(expiryTurnEnd.pieces.find(piece => piece.instanceId === 'tails')).toMatchObject({ x: 4, y: 4 })
     expect(expiryTurnEnd.pieces.find(piece => piece.instanceId === 'ally')).toMatchObject({ x: 4, y: 5 })
@@ -451,7 +456,7 @@ describe('Sonic roster mechanics', () => {
 
   it('creates the selected permanent armor card through Tails’s charge skill', () => {
     const definition = JSON.parse(readFileSync(resolve(process.cwd(), 'data/skills/tails-armor-assembly.json'), 'utf8'))
-    for (const moduleDetail of ['恢复模块：每回合结束回复3点生命', '攻击模块：攻击+3', '高速模块：每回合获得一次免费普通移动', '硬化模块：防御+2', '可对自己或一名友军使用', '护甲可叠加且持续整场对局']) {
+    for (const moduleDetail of ['恢复模块：持有者的回合结束时，恢复3点生命', '攻击模块：攻击力+3', '高速模块：持有者每回合获得1次免费普通移动', '硬化模块：防御力+2', '可对本棋子或1个友方棋子使用', '护甲可叠加，持续本局游戏']) {
       expect(definition.description).toContain(moduleDetail)
     }
     const tails = makePiece({

@@ -192,7 +192,10 @@ function initializeProgressiveOpeningVanguards(
 
     const streamPlayerId = normalizeProgressiveStreamPlayerId(playerId)
     const priority = eligible.filter(piece =>
-      templatesById.get(piece.templateId)?.progressiveDeployment?.openingVanguardPriority === true)
+      piece.skills.some(reference => {
+        const skill = state.skillsById[reference.skillId]
+        return skill?.kind === 'passive' && skill.passiveTraits?.includes('opening-vanguard')
+      }) || templatesById.get(piece.templateId)?.progressiveDeployment?.openingVanguardPriority === true)
     const openingPool = priority.length > 0 ? priority : eligible
     const piece = openingPool[runtime.nextInt(
       `${RANDOM_STREAM_NAMES.progressiveDeploymentOpeningPiece}/${streamPlayerId}`,

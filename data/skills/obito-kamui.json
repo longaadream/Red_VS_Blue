@@ -2,9 +2,15 @@
   "id": "obito-kamui",
   "name": "神威·吸收",
   "description": "获得【神威护盾】：完全免疫下一次受到的伤害，并将该伤害作为真实伤害反弹给攻击者。",
-  "keywords": ["护盾", "真实伤害"],
-  "targetText": "自身",
-  "effectTags": ["defense", "damage"],
+  "keywords": [
+    "护盾",
+    "真实伤害"
+  ],
+  "targetText": "本棋子",
+  "effectTags": [
+    "defense",
+    "damage"
+  ],
   "icon": "🌀",
   "kind": "active",
   "type": "normal",

@@ -3,8 +3,10 @@
   "name": "回溯触发（移动）",
   "description": "对手移动时计数；达到目标次数时，触发回溯。",
   "keywords": [],
-  "targetText": "自身",
-  "effectTags": ["回溯"],
+  "targetText": "本棋子",
+  "effectTags": [
+    "回溯"
+  ],
   "kind": "passive",
   "type": "normal",
   "cooldownTurns": 0,

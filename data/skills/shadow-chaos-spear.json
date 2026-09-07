@@ -1,7 +1,7 @@
 {
   "id": "shadow-chaos-spear",
   "name": "混沌之矛",
-  "description": "对4格内一名敌人造成50%攻击力的物理伤害，并偷取其2点移动范围至己方下回合开始。",
+  "description": "对4格内1个敌方棋子造成等同于本棋子攻击力50%的物理伤害，并偷取其2点移动力至你的下一个回合开始时。",
   "icon": "🔱",
   "kind": "active",
   "type": "normal",

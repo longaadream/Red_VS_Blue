@@ -32,8 +32,5 @@
   "rules": [
     "rule-naruto-clone-endturn-charge"
   ],
-  "isDefault": false,
-  "progressiveDeployment": {
-    "openingVanguardPriority": true
-  }
+  "isDefault": false
 }

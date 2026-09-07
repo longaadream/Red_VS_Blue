@@ -36,6 +36,6 @@
     ]
   },
   "code": "function executeSkill(context) { var caster = context.piece; var choice = selectOption({ title: '征讨号令：选择一种圣光手牌', options: [{ label: '圣光惩戒', value: 'holy-smite' }, { label: '圣光治疗', value: 'holy-heal' }, { label: '圣光冲锋', value: 'holy-charge' }] }); if (choice === undefined || choice === null || choice.needsOptionSelection) return choice; if (['holy-smite','holy-heal','holy-charge'].indexOf(choice) === -1) return { success: false, message: '无效的圣光手牌选择' }; addCardToHand(choice, caster.ownerPlayerId); return { success: true, message: caster.name + '发布征讨号令，获得1张圣光手牌' }; }",
-  "previewCode": "function calculatePreview() { return { description: '选择【圣光惩戒】【圣光治疗】或【圣光冲锋】中的一种获得。', expectedValues: { generatedCards: 1 } }; }",
+  "previewCode": "function calculatePreview() { return { description: \"选择一种圣光手牌获得。\", expectedValues: { generatedCards: 1 } }; }",
   "range": "self"
 }

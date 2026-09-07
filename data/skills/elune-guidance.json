@@ -1,10 +1,13 @@
 {
   "id": "elune-guidance",
   "name": "艾露恩的指引",
-  "description": "每当己方使用圣光手牌时，获得1层月华，最多2层。月华达到2层时，治疗生命值最低的友军5点生命。",
+  "description": "每当你使用圣光手牌时，获得1层月华，最多2层。月华达到2层时，使生命值最低的友方棋子恢复5点生命。",
   "keywords": [],
   "targetText": "被动",
-  "effectTags": ["层数", "治疗"],
+  "effectTags": [
+    "层数",
+    "治疗"
+  ],
   "icon": "✨",
   "kind": "passive",
   "type": "normal",

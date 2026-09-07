@@ -1,10 +1,14 @@
 {
   "id": "obito-space-time",
   "name": "神威",
-  "description": "万花筒。选择地图上的一名敌方棋子，将其强制移出战场。该效果不造成伤害，也不视为死亡。每局限用一次。",
-  "keywords": ["万花筒"],
-  "targetText": "地图上的一名敌方棋子",
-  "effectTags": ["remove"],
+  "description": "万花筒。选择地图上1个敌方棋子，将其强制移出战场。每局限用1次。",
+  "keywords": [
+    "万花筒"
+  ],
+  "targetText": "地图上的1个敌方棋子",
+  "effectTags": [
+    "remove"
+  ],
   "icon": "🌀",
   "kind": "active",
   "type": "ultimate",
@@ -19,11 +23,19 @@
       "minimum": 0
     }
   ],
-  "powerMultiplier": 1.0,
+  "powerMultiplier": 1,
   "actionPointCost": 5,
   "range": "single",
   "requiresTarget": true,
-  "targeting": { "steps": [{ "type": "piece", "filter": "enemy", "range": 99 }] },
+  "targeting": {
+    "steps": [
+      {
+        "type": "piece",
+        "filter": "enemy",
+        "range": 99
+      }
+    ]
+  },
   "code": "function executeSkill(context) { var caster = context.piece; var target = selectTarget({ type: 'piece', range: 99, filter: 'enemy' }); if (!target || target.needsTargetSelection) return target; var targetName = target.name || target.templateId; if (!context.forceRemoveEnemyPieceById(target.instanceId)) return { success: false, message: '目标无法被神威移除' }; return { success: true, message: caster.name + '发动神威，将' + targetName + '强制移出战场' }; }",
-  "previewCode": "function calculatePreview() { return { description: '选择地图上的一名敌方棋子，将其强制移出战场。该效果不造成伤害，也不触发死亡、击杀或复活。', expectedValues: {} }; }"
+  "previewCode": "function calculatePreview() { return { description: \"万花筒。选择地图上1个敌方棋子，将其强制移出战场。每局限用1次。\", expectedValues: {} }; }"
 }
