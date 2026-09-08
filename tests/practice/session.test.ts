@@ -7,6 +7,9 @@ import { AI_ID, HUMAN_ID, choosePracticeRoster, createPracticeState, validateRos
 import { PracticeSession, publicPracticeAction } from '@/lib/practice/session'
 import { observePractice } from '@/lib/practice/environment'
 import type { BattleAction } from '@/lib/game/turn'
+import { loadAllSkillsById } from '@/lib/game/skills'
+import { prepareAction } from '@/lib/game/targeting'
+import { makePiece, makeState } from '../helpers/minimal-state'
 
 async function fixture(humanFirst = true) {
   const setup = { human: choosePracticeRoster('good', 7), ai: choosePracticeRoster('evil', 8), humanFirst, mapId: 'large-hole-arena', seed: 2003 }
@@ -14,6 +17,22 @@ async function fixture(humanFirst = true) {
   return { setup, state }
 }
 describe('PVP practice authority and roster boundaries', () => {
+  it('delivers the same three committed Kenshin beats from the practice worker session', () => {
+    const state = makeState({ currentPlayerId: HUMAN_ID, pieces: [
+      makePiece({ instanceId: 'kenshin', ownerPlayerId: HUMAN_ID, attack: 4, x: 0, y: 0,
+        skills: [{ skillId: 'kenshin-ryusosen', currentCooldown: 0, usesRemaining: -1 }] }),
+      makePiece({ instanceId: 'enemy', ownerPlayerId: AI_ID, faction: 'blue', x: 1, y: 0, currentHp: 20 }),
+    ] })
+    state.players[0].playerId = HUMAN_ID; state.players[1].playerId = AI_ID
+    state.skillsById['kenshin-ryusosen'] = loadAllSkillsById()['kenshin-ryusosen']
+    const base: BattleAction = { type: 'useBasicSkill', playerId: HUMAN_ID, pieceId: 'kenshin', skillId: 'kenshin-ryusosen' }
+    const prepared = prepareAction(state, base)
+    if (prepared.kind !== 'needTarget') throw new Error('Expected target selection')
+    const result = new PracticeSession(state, 169).human({ ...base, targetPieceId: 'enemy',
+      selectionId: prepared.selectionId, stateRevision: prepared.stateRevision } as BattleAction, 0)
+    expect(result.events.filter(event => event.kind === 'damage').map(event => event.result?.value)).toEqual([17, 14, 11])
+    expect(result.state.actions).toEqual([])
+  })
   it('does not leak AI private choice values through the presentation command', () => {
     expect(publicPracticeAction({ type: 'pendingOptionSelect', playerId: AI_ID, selectedOption: 'secret-card' })).toEqual({ type: 'pendingOptionSelect', playerId: AI_ID })
     expect(publicPracticeAction({ type: 'useBasicSkill', playerId: AI_ID, pieceId: 'p1', skillId: 'recall', selectedOption: 3 })).not.toHaveProperty('selectedOption')

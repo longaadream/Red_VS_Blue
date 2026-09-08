@@ -2622,6 +2622,17 @@
   }
 
   // Replace only the rendered board, preserving the user's camera and authority model.
+  function settlePresentation(model) {
+    if (!_mounted) return
+    Array.from(_anims.keys()).forEach(_cancelAnimation)
+    _pieceObjects.forEach(function (obj) { _restorePieceVisual(obj); obj.group.scale.set(1, 1, 1) })
+    _floaterTimers.forEach(function (timer) { clearTimeout(timer) })
+    _floaterTimers.clear()
+    _floaters.forEach(function (element) { element.remove() })
+    _floaters.clear()
+    update(model)
+  }
+
   function showHistoricalBoard(model) {
     if (!_mounted || !model || !model.board) return
     _cancelPieceDrag()
@@ -2797,6 +2808,7 @@
     update,
     showHistoricalBoard,
     animateAction,
+    settlePresentation,
     spawnFloater,
     resize,
     resetView,

@@ -106,6 +106,33 @@ function child(index: number, childIndex: number, overrides: Record<string, unkn
 }
 
 describe('RED-167 action vignette queue', () => {
+  it('keeps authority arrival order when separate actions both number their root sequence zero', () => {
+    const groups = loadModule().groupEvents([root(9, { sequence: 0 }), root(1, { sequence: 0 })])
+    expect(groups.map(group => group.rootEventId)).toEqual(['action-9:0', 'action-1:0'])
+  })
+  it('does not replay a long retained chain when its beat count exceeds the deduplication root budget', () => {
+    const queue = loadModule().createQueue()
+    queue.update({ presentationEvents: [], turn: { isViewerTurn: false } })
+    const events = [root(1), ...Array.from({ length: 300 }, (_, i) => child(1, i + 1))]
+    queue.update({ presentationEvents: events, turn: { isViewerTurn: false } })
+    const pending = queue.getDiagnostics().pendingRootIds
+    queue.update({ presentationEvents: events, turn: { isViewerTurn: false } })
+    expect(queue.getDiagnostics().pendingRootIds).toEqual(pending)
+    queue.dispose()
+  })
+  it('separates movement and repeated hits while keeping only one explicit same-kind batch together', () => {
+    const groups = loadModule().groupEvents([
+      root(1),
+      child(1, 1, { kind: 'forceMove' }),
+      child(1, 2, { batchId: 'hit-1' }),
+      child(1, 3, { batchId: 'hit-1' }),
+      child(1, 4, { batchId: 'hit-2' }),
+      child(1, 5, { kind: 'heal', batchId: 'hit-2' }),
+    ])
+    expect(groups.map(group => [group.root.eventId, group.children.length])).toEqual([
+      ['action-1:0', 0], ['action-1:1', 0], ['action-1:2', 1], ['action-1:4', 0], ['action-1:5', 0],
+    ])
+  })
   beforeEach(() => vi.useFakeTimers())
   afterEach(() => {
     vi.useRealTimers()
@@ -184,7 +211,7 @@ describe('RED-167 action vignette queue', () => {
     expect(layer.innerHTML).not.toContain('恢复!')
     // Numeric feedback is owned by the renderer, without a duplicate vignette label.
     expect(JSON.stringify(model)).toBe(before)
-    vi.advanceTimersByTime(1100)
+    vi.advanceTimersByTime(2200)
     expect(layer.hidden).toBe(true)
     vignette.dispose()
     expect(floatLayer.children).toHaveLength(0)
@@ -216,8 +243,8 @@ describe('RED-167 action vignette queue', () => {
       root(2),
     ])
 
-    expect(groups.map(group => group.rootEventId)).toEqual(['action-1:0', 'action-2:0'])
-    expect(groups[1].children).toHaveLength(2)
+    expect(groups.map(group => group.rootEventId)).toEqual(['action-1:0', 'action-2:0', 'action-2:1', 'action-2:2'])
+    expect(groups.every(group => group.children.length === 0)).toBe(true)
   })
 
   it('plays five authoritative roots once in stable order without overlapping', () => {
@@ -237,13 +264,14 @@ describe('RED-167 action vignette queue', () => {
 
     expect(queue.getDiagnostics().activeRootId).toBe('action-1:0')
     expect(queue.getDiagnostics().pendingRootIds).toEqual([
-      'action-2:0', 'action-3:0', 'action-4:0', 'action-5:0',
+      'action-1:1', 'action-2:0', 'action-2:1', 'action-3:0', 'action-3:1', 'action-4:0', 'action-4:1', 'action-5:0', 'action-5:1',
     ])
-    vi.advanceTimersByTime(vignetteModule.constants.normalDurationMs * 4 + vignetteModule.constants.cardDurationMs)
+    vi.advanceTimersByTime(vignetteModule.constants.normalDurationMs * 9 + vignetteModule.constants.cardDurationMs)
     queue.update({ presentationEvents: [root(5), child(5, 1)], turn: { isViewerTurn: false } })
 
     expect(phases.filter(value => value.endsWith(':focus'))).toEqual([
-      'action-1:0:focus', 'action-2:0:focus', 'action-3:0:focus', 'action-4:0:focus', 'action-5:0:focus',
+      'action-1:0:focus', 'action-1:1:focus', 'action-2:0:focus', 'action-2:1:focus', 'action-3:0:focus', 'action-3:1:focus',
+      'action-4:0:focus', 'action-4:1:focus', 'action-5:0:focus', 'action-5:1:focus',
     ])
     expect(queue.getDiagnostics()).toMatchObject({
       activeRootId: null,
@@ -586,6 +614,8 @@ describe('RED-167 action vignette queue', () => {
     expect(event.stopImmediatePropagation).toHaveBeenCalledTimes(1)
     expect(layer.dataset.phase).toBe('settle')
     vi.advanceTimersByTime(vignetteModule.constants.skipSettleMs)
+    expect(layer.dataset.rootId).toBe('action-1:1')
+    vignette.settleAll()
     expect(layer.hidden).toBe(true)
 
     now += 20
