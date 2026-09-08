@@ -235,6 +235,12 @@ it('does not cancel a concurrently starting game; refuses missing authority on r
   await resumed.leave(); await peer.leave(); await app.close()
   app = await createOfficialServer(options); await app.start(port)
   expect(await app.ranked.settle(id)).toBe(false)
+  const restoredCatalog = await http('/rooms')
+  expect(restoredCatalog.body.rooms).not.toEqual(expect.arrayContaining([expect.objectContaining({ id })]))
+  const restoredDetail = await http('/rooms/' + id)
+  // Completed actors are not restored after restart; durable reports remain available.
+  expect(restoredDetail.status).toBe(404)
+  expect((await http('/battle-reports/' + id, undefined, first.token)).status).toBe(200)
   expect((await app.ranked.status(first.account.id)).rating.games).toBe(1)
   const historical = (await app.pool.query("SELECT first_id FROM official_matches WHERE season_id='test-1' AND status='settled' LIMIT 1")).rows[0]
   expect((await app.ranked.status(historical.first_id)).testParticipant).toBe(true)

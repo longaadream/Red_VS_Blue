@@ -120,6 +120,9 @@ try {
   await pages[0].evaluate('document.getElementById("btnSurrender").click()')
   await pages[0].evaluate(`document.querySelector('[onclick="doSurrender()"]').click()`)
   await until(async () => (await app.pool.query(`SELECT 1 FROM official_matches WHERE status='settled'`)).rowCount === 1, 'actual page action and Elo settlement')
+  const endedId = (await app.pool.query(`SELECT id FROM official_matches WHERE status='settled'`)).rows[0].id
+  await until(async () => !(await fetch(origin + '/rooms').then(r => r.json())).rooms.some(room => room.id === endedId), 'ended match removed from playable lobby')
+  if ((await fetch(origin + '/rooms/' + endedId).then(r => r.json())).room.status !== 'finished') throw Error('Terminal room detail was lost')
   for (const page of pages) { await page.call('Page.navigate', { url: origin + '/official.html' }); await until(() => page.evaluate('!!document.getElementById("profile") && !document.getElementById("profile").hidden && document.getElementById("record").textContent.includes("1 场")'), 'settled account UI') }
   await pages[0].evaluate("document.querySelector('[data-rank-tab=board]').click()")
   if (!await pages[0].evaluate('!document.getElementById("rank-board").hidden && !document.getElementById("join").hidden')) throw new Error('Matchmaking dock disappears when viewing leaderboard')
@@ -145,12 +148,16 @@ try {
       {id:'layout-full',name:'测试场景 · 等待中的1v1',mapId:'open-expanse',mode:'1v1',status:'waiting',visibility:'public',maxPlayers:2,players:[{id:me,alignment:'dark'},{id:'fixture-other'}]},
       {id:'layout-team',name:'测试场景 · 2v2招募队友',mapId:'team-crossroads',mode:'2v2',status:'waiting',visibility:'public',maxPlayers:4,players:[{id:'fixture-host'}]},
       {id:'layout-live',name:'测试场景 · 进行中的对局',mapId:'open-expanse',mode:'1v1',status:'in-progress',visibility:'public',maxPlayers:2,players:[{id:'fixture-a'},{id:'fixture-b'}],spectatingEnabled:true,spectatorCount:3},
-      {id:'layout-private',name:'Never expose private room',visibility:'private',status:'waiting',players:[]}
+      {id:'layout-private',name:'Never expose private room',visibility:'private',status:'waiting',players:[]},
+      {id:'layout-finished',name:'已结束的旧服务器房间',visibility:'public',status:'finished',players:[{id:me}]}
     ];
     renderRooms(fixtures);
     if(document.querySelectorAll('.room-row').length !== 3) throw Error('Public catalog visibility regression');
     const restore = document.querySelector('.room-row [data-room-id="layout-full"]');
     if(restore.disabled || restore.textContent !== '返回') throw Error('Existing member cannot return to a full waiting room');
+    fixtures[0].status='finished';renderRooms(fixtures);
+    if(document.querySelector('[data-room-id="layout-full"]') || document.getElementById('selectedRoomName').textContent.includes('等待中的1v1')) throw Error('Finished selected room remains actionable in the lobby');
+    fixtures[0].status='waiting';renderRooms(fixtures);
     document.getElementById('modeFilter').value='2v2'; filterLobbyRooms();
     if(document.querySelectorAll('.room-row').length !== 1 || !document.getElementById('selectedRoomName').textContent.includes('2v2')) throw Error('Mode selection/details failed');
     document.getElementById('modeFilter').value='all'; document.getElementById('stateFilter').value='watch'; filterLobbyRooms();

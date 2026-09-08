@@ -522,7 +522,7 @@
     function renderRooms(rooms) {
       const seen = new Set()
       catalogRooms = (Array.isArray(rooms) ? rooms : []).filter(r => {
-        if (!r || !r.id || seen.has(r.id) || (r.visibility && r.visibility !== 'public')) return false
+        if (!r || !r.id || seen.has(r.id) || r.status === 'finished' || (r.visibility && r.visibility !== 'public')) return false
         seen.add(r.id); return true
       })
       filterLobbyRooms()
@@ -552,7 +552,7 @@
         const title = document.createElement('strong'); title.className = 'room-name'; title.textContent = r.name || r.id
         const map = document.createElement('small'); map.className = 'room-meta'; map.textContent = getMapDisplayName(r.mapId)
         name.append(title,map); row.appendChild(name)
-        for (const value of [r.mode || (r.maxPlayers === 4 ? '2v2' : '1v1'), count + '/' + (r.maxPlayers || 2), waiting ? (count >= (r.maxPlayers || 2) ? '已满' : '等待中') : r.status === 'ready' ? '选人中' : '对局中']) { const cell = document.createElement('span'); cell.textContent = value; row.appendChild(cell) }
+        for (const value of [r.mode || (r.maxPlayers === 4 ? '2v2' : '1v1'), count + '/' + (r.maxPlayers || 2), waiting ? (count >= (r.maxPlayers || 2) ? '已满' : '等待中') : r.status === 'ready' ? '选人中' : r.status === 'in-progress' ? '对局中' : '状态未知']) { const cell = document.createElement('span'); cell.textContent = value; row.appendChild(cell) }
         const action = roomAction(r); row.appendChild(action)
         row.onclick = () => { selectedRoomId = r.id; filterLobbyRooms() }
         row.onkeydown = e => { if (e.target === row && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); selectedRoomId = r.id; filterLobbyRooms() } }

@@ -104,12 +104,14 @@ function createHarness(options: {
     checkRejoin,
     rejoinBattle,
     setLobbyRequest: (request) => { lobbyRequest = request },
+    renderCatalog: (rooms) => { const original = filterLobbyRooms; filterLobbyRooms = () => {}; try { renderRooms(rooms); return catalogRooms } finally { filterLobbyRooms = original } },
   }`
   vm.runInContext(script, context)
   const contract = context.__lobbyRejoinContract as {
     checkRejoin: () => Promise<void> | void
     rejoinBattle: () => void
     setLobbyRequest: (request: (method: string, data: unknown) => Promise<unknown>) => void
+    renderCatalog: (rooms: unknown[]) => { id: string }[]
   }
   contract.setLobbyRequest(async (method, data) => {
     expect(method).toBe('rooms.get')
@@ -122,6 +124,14 @@ function createHarness(options: {
 }
 
 describe('Electron lobby rejoin entry', () => {
+  it('removes ended rooms from older server catalogs without hiding active or waiting rooms', () => {
+    const harness = createHarness()
+    expect(harness.contract.renderCatalog([
+      { id: 'ended', status: 'finished', visibility: 'public', players: [{ id: 'alice' }] },
+      { id: 'active', status: 'in-progress' }, { id: 'waiting', status: 'waiting' },
+      { id: 'hidden', status: 'waiting', visibility: 'private' },
+    ]).map(room => room.id)).toEqual(['active', 'waiting'])
+  })
   it('stays hidden when there is no saved active battle', async () => {
     const harness = createHarness()
 

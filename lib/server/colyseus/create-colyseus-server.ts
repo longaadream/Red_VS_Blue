@@ -356,17 +356,20 @@ export function createColyseusBattleServer(options: CreateColyseusBattleServerOp
 
 function collectProductRooms(
   listings: ReadonlyArray<{ metadata?: unknown }>,
-  includePrivate: boolean,
+  includeUnlisted: boolean,
 ): Array<Record<string, unknown> & { id: string }> {
   const byId = new Map<string, Record<string, unknown> & { id: string }>()
   for (const listing of listings) {
     const metadata = listing.metadata as ProductRoomMetadata | undefined
-    if (metadata?.product !== true || (!includePrivate && metadata.visibility === 'private')) continue
+    if (metadata?.product !== true || (!includeUnlisted && metadata.visibility === 'private')) continue
     const room = metadata.room && typeof metadata.room === 'object'
       ? metadata.room as Record<string, unknown>
       : undefined
     const id = typeof room?.id === 'string' ? room.id.trim() : ''
     if (!id) continue
+    // Direct lookups retain terminal snapshots for participants already in the room.
+    // The public playable catalog must not advertise completed matches.
+    if (!includeUnlisted && room?.status === 'finished') continue
     const normalizedId = id.toLowerCase()
     if (byId.has(normalizedId)) {
       console.warn('[colyseus:rooms] duplicate room catalog entry ignored', { roomId: normalizedId })

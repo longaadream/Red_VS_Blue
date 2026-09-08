@@ -246,6 +246,22 @@ describe('RED-161 Colyseus product room', () => {
         authorityVersion: 1,
         receipt: { clientActionId, status: 'applied' },
       })
+      const terminalRoom = nextMessage(activeRoom, PRODUCT_ROOM_UPDATE_MESSAGE, message => message?.room?.status === 'finished')
+      activeRoom.send(BATTLE_COMMAND_MESSAGE, {
+        protocolVersion: BATTLE_AUTHORITY_PROTOCOL_VERSION,
+        authorityBuildId: BATTLE_AUTHORITY_BUILD_ID,
+        roomId: redRoom.roomId, playerId: activePlayerId, expectedAuthorityVersion: 1,
+        clientActionId: 'finished-catalog-regression',
+        command: { type: 'surrender', playerId: activePlayerId, clientActionId: 'finished-catalog-regression' },
+      })
+      await expect(terminalRoom).resolves.toMatchObject({ room: { status: 'finished' } })
+      const ended = await fetch(`http://127.0.0.1:${port}/rooms/${redRoom.roomId}`).then(r => r.json())
+      expect(ended.room.status).toBe('finished')
+      const catalog = await fetch(`http://127.0.0.1:${port}/rooms`).then(r => r.json())
+      expect(catalog.rooms).not.toEqual(expect.arrayContaining([expect.objectContaining({ id: redRoom.roomId })]))
+      expect(redRoom.connection.isOpen).toBe(true)
+      expect(blueRoom.connection.isOpen).toBe(true)
+      await expect(repository.restoreRoom(redRoom.roomId)).resolves.toMatchObject({ room: { status: 'finished' } })
     } finally {
       await redRoom.leave()
       await blueRoom.leave()
