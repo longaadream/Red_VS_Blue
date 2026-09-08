@@ -1,4 +1,5 @@
 import type { BattleState } from "./turn"
+import { checkpointBattlePresentation, withBattlePresentationSource } from './battle-presentation-recording'
 import type { PieceInstance, PieceStatusTag } from "./piece"
 import { executeCardFunction, loadCardForBattle, loadRuleForBattle } from './skills'
 import type { PendingReactiveCardRef } from './pending-interaction'
@@ -593,6 +594,7 @@ export class TriggerSystem {
 
   // 检查并触发规则
   checkTriggers(battle: BattleState, context: TriggerContext): TriggerResult {
+    checkpointBattlePresentation(battle)
     const ruleLimitSnapshots = this.rules.map(rule => ({
       rule,
       limits: rule.limits ? { ...rule.limits } : undefined,
@@ -929,7 +931,10 @@ export class TriggerSystem {
           ruleOwnerPlayerId = ruleCtx.ruleOwnerPlayerId
             || ruleCtx.playerId
             || context.playerId
-          result = item.rule.effect(battle, ruleCtx)
+          result = withBattlePresentationSource(battle, {
+            sourcePieceId: item.sourceId, actorPlayerId: ruleOwnerPlayerId,
+            ruleId: item.ruleId, label: item.rule.name,
+          }, () => item.rule.effect!(battle, ruleCtx))
           writeBackMutableTriggerContext(ruleCtx, context, mutableBeforeEffect)
           if (!result?.needsOptionSelection && !result?.needsTargetSelection) break
           if (!transactionRuntime || !interactionKey) break

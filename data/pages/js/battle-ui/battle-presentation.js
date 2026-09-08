@@ -28,6 +28,93 @@
     let boardContainer = null
     let pendingBefore = null
     let historicalSelection = ''
+    let playbackModel = null
+    let playbackRoot = null
+    const playbackBoards = new Map()
+    let updating = false
+    let updatePlaybackBase = null
+    const appliedBeats = new Set()
+
+    function playbackPhase(phase, group) {
+      if (historicalRoot || !currentModel) return
+      const rootId = group.root.rootEventId
+      const frames = playbackBoards.get(rootId)
+      if (frames && playbackRoot !== rootId) {
+        playbackRoot = rootId
+        playbackModel = Object.assign({}, currentModel, boardCopy(frames.before))
+        renderer.update(playbackModel)
+      }
+      const movement = group.root.kind === 'move' || group.root.kind === 'forceMove'
+      if (!(phase === 'static' || phase === 'settle' || phase === (movement ? 'path' : 'result'))) return
+      if (appliedBeats.has(group.rootEventId)) {
+        if (phase === 'settle' && renderer.settlePresentation && playbackModel) renderer.settlePresentation(playbackModel)
+        return
+      }
+      appliedBeats.add(group.rootEventId)
+      while (appliedBeats.size > 256) appliedBeats.delete(appliedBeats.values().next().value)
+      const before = playbackModel || currentModel
+      const after = Object.assign({}, before, { pieces: JSON.parse(JSON.stringify(before.pieces || [])), effects: JSON.parse(JSON.stringify(before.effects || [])) })
+      const events = [group.root].concat(group.children || [])
+      events.forEach(function (event) {
+        const result = event.result || {}
+        if ((event.kind === 'tileEffectAdded' || event.kind === 'tileEffectRemoved') && event.targetCell && result.effectId) {
+          after.effects = after.effects.filter(function (effect) { return effect.id !== result.effectId })
+          if (event.kind === 'tileEffectAdded') after.effects.push({ id: result.effectId, type: result.effectType,
+            icon: result.icon || '', x: event.targetCell.x, y: event.targetCell.y })
+        }
+        const ids = event.targetPieceIds || (event.kind === 'move' ? [event.sourcePieceId] : [])
+        ids.forEach(function (id) {
+          let piece = after.pieces.find(function (p) { return p.id === id })
+          const finalPiece = ((frames && frames.after || currentModel).pieces || []).find(function (p) { return p.id === id })
+          if (event.kind === 'spawn' && (event.pieceSnapshot || finalPiece)) {
+            const appeared = JSON.parse(JSON.stringify(event.pieceSnapshot || finalPiece))
+            if (piece) Object.assign(piece, appeared)
+            else { piece = appeared; after.pieces.push(piece) }
+          }
+          if (!piece) return
+          if ((event.kind === 'move' || event.kind === 'forceMove') && result.toX != null && result.toY != null) {
+            piece.x = result.toX; piece.y = result.toY
+          } else if (event.kind === 'damage' || event.kind === 'heal') {
+            const hp = piece.health ? piece.health.current : piece.hp || 0
+            const amount = Math.abs(Number(result.amount) || 0)
+            const value = result.value != null ? Number(result.value) : Math.max(0, hp + (event.kind === 'heal' ? amount : -amount))
+            piece.health = Object.assign({}, piece.health, { current: value }); piece.hp = value
+            if (amount && renderer.spawnFloater && phase !== 'settle') renderer.spawnFloater(piece.x, piece.y,
+              (event.kind === 'heal' ? '+' : '−') + amount, event.kind === 'heal' ? '#4ade80' : '#f87171', false, { kind: event.kind })
+          } else if (event.kind === 'death' || event.kind === 'eliminated') {
+            piece.visible = false; piece.alive = false
+          } else if (event.kind === 'statusAdded' || event.kind === 'statusRemoved') {
+            piece.statuses = (piece.statuses || []).filter(function (status) { return status.id !== event.statusId })
+            if (event.kind === 'statusAdded') {
+              const status = Object.assign({ id: event.statusId, type: event.statusType, name: event.label, remainingUses: result.uses }, result)
+              const normalized = root.BattleViewModel && root.BattleViewModel.normalizeStatuses
+                ? root.BattleViewModel.normalizeStatuses({ statusTags: [status] }) : [status]
+              piece.statuses = piece.statuses.concat(normalized)
+            }
+            piece.statusSummary = piece.statuses
+          }
+        })
+      })
+      playbackModel = after
+      if (phase === 'settle' && renderer.settlePresentation) renderer.settlePresentation(after)
+      else if (renderer.animateAction) renderer.animateAction({ motionEventKey: 'beat:' + group.rootEventId,
+        sourcePieceId: group.root.sourcePieceId, targetPieceId: (group.root.targetPieceIds || [])[0] }, before, after)
+      renderer.update(after)
+    }
+
+    function playbackIdle() {
+      if (updating) {
+        playbackRoot = null
+        playbackModel = updatePlaybackBase ? Object.assign({}, currentModel, boardCopy(updatePlaybackBase)) : null
+        return
+      }
+      playbackModel = null
+      playbackRoot = null
+      if (mounted && !historicalRoot && currentModel && !updating) {
+        if (renderer.settlePresentation) renderer.settlePresentation(currentModel)
+        else renderer.update(currentModel)
+      }
+    }
 
     function boardCopy(model) {
       return JSON.parse(JSON.stringify({ board: model.board, pieces: model.pieces, effects: model.effects, turn: model.turn }))
@@ -132,6 +219,9 @@
       }
       if (vignetteUi && vignetteUi.mount) {
         vignetteUi.mount({
+          onPlaybackPhase: playbackPhase,
+          onPlaybackIdle: playbackIdle,
+          getPlaybackModel: function () { return playbackModel || currentModel },
           boardContainer: mountInput.boardContainer,
           floatLayer: mountInput.floatLayer || null,
           projectCell: function (x, y, elevation) { return renderer.projectCell(x, y, elevation) },
@@ -158,23 +248,43 @@
       const nextViewer = model.viewer && model.viewer.id
       const viewerChanged = currentModel && previousViewer !== nextViewer
       if (viewerChanged) {
+        if (vignetteUi && vignetteUi.reset) vignetteUi.reset(model)
+        else if (vignetteUi && vignetteUi.settleAll) vignetteUi.settleAll()
+        playbackModel = null; playbackRoot = null; appliedBeats.clear(); playbackBoards.clear()
         seenRoots.clear(); pendingBefore = null
         if (historyUi && historyUi.clearHighlight) historyUi.clearHighlight()
       }
       if (!viewerChanged) captureHistory(model.presentationEvents, pendingBefore || currentModel)
+      const beforePlayback = viewerChanged ? null : pendingBefore || currentModel
+      const freshRoots = (model.presentationEvents || []).filter(function (event) {
+        return !event.parentEventId && !seenRoots.has(event.rootEventId)
+      })
+      if (beforePlayback && freshRoots.length === 1) freshRoots.forEach(function (event) {
+        playbackBoards.set(event.rootEventId, { before: boardCopy(beforePlayback), after: boardCopy(model) })
+      })
+      while (playbackBoards.size > 200) playbackBoards.delete(playbackBoards.keys().next().value)
       pendingBefore = null
       ;(model.presentationEvents || []).filter(function (e) { return !e.parentEventId }).forEach(function (e) { seenRoots.add(e.rootEventId) })
       while (seenRoots.size > 200) seenRoots.delete(seenRoots.values().next().value)
       currentModel = model
-      if (!historicalRoot) renderer.update(model)
       domUi.update(model)
-      if (!historicalRoot && vignetteUi && vignetteUi.update) vignetteUi.update(model)
+      if (!playbackModel && beforePlayback && vignetteUi && vignetteUi.sequencesBoard) {
+        playbackModel = Object.assign({}, model, boardCopy(beforePlayback))
+      }
+      updating = true
+      updatePlaybackBase = beforePlayback
+      try {
+        if (!historicalRoot && vignetteUi && vignetteUi.update) vignetteUi.update(model)
+      } finally { updating = false; updatePlaybackBase = null }
+      const playing = vignetteUi && vignetteUi.sequencesBoard && vignetteUi.getDiagnostics().activeRootId
+      if (!playing) playbackModel = null
+      if (!historicalRoot) renderer.update(playbackModel || model)
       if (historyUi && historyUi.update) historyUi.update(model)
     }
 
     function animateAction(action, previousModel, nextModel) {
       pendingBefore = previousModel && Object.assign(boardCopy(previousModel), { viewer: { id: previousModel.viewer && previousModel.viewer.id } })
-      if (mounted && !historicalRoot && renderer.animateAction) renderer.animateAction(action, previousModel, nextModel)
+      if (mounted && !historicalRoot && renderer.animateAction && (!(vignetteUi && vignetteUi.sequencesBoard) || action.type === 'ui-reject')) renderer.animateAction(action, previousModel, nextModel)
     }
 
     function spawnFloater(x, y, text, color, big, options) {
@@ -203,6 +313,7 @@
       currentModel = null
       historicalRoot = null; boardContainer = null; pendingBefore = null
       historyBoards.clear(); seenRoots.clear()
+      playbackModel = null; playbackRoot = null; appliedBeats.clear(); playbackBoards.clear()
     }
 
     return {
@@ -218,6 +329,7 @@
       dispose: dispose,
       getModel: function () { return currentModel },
       captureHistory: captureHistory,
+      sequencesBoard: !!(vignetteUi && vignetteUi.sequencesBoard),
     }
   }
 
