@@ -229,59 +229,26 @@
     }
   </style>
   <link rel="stylesheet" href="css/tabletop/tabletop.css" />
+<link rel="stylesheet" href="css/tabletop/online.css">
 </head>
 <body data-art-page="lobby">
 
-  <!-- Topbar -->
-  <div class="topbar">
-    <a class="back-btn" href="index.html">← 返回</a>
-    <div class="topbar-title">联机大厅</div>
-    <div class="user-pill">
-      <div class="user-dot" id="userDot" style="background:#475569"></div>
-      <span id="userName">未登录</span>
-    </div>
+  <div class="game-shell">
+    <header class="game-header"><a class="game-brand" href="index.html"><span>RED</span><small>vs</small><span>BLUE</span></a><span class="header-divider"></span><h1>联机大厅</h1><div class="header-end user-pill"><span class="user-dot" id="userDot"></span><span id="userName">本地玩家</span></div><a class="back-link" href="index.html">返回主菜单</a></header>
+    <nav class="game-nav" aria-label="联机导航"><a class="selected" href="lobby.html"><img src="images/tabletop/ui-map.svg" alt="">房间大厅</a><a href="official.html"><img src="images/tabletop/ui-confirm.svg" alt="">官方排位</a><a href="multiplayer.html"><img src="images/tabletop/ui-tools.svg" alt="">服务器</a><div class="nav-note">自由对战<br>1v1 / 2v2<br><small>P2P 与转发房间不计分</small></div></nav>
+    <main class="game-main">
+      <div class="view-heading"><div><p class="kicker">CUSTOM GAMES</p><h2>房间大厅</h2></div><div class="toolbar"><button class="button" onclick="document.getElementById('inviteDialog').showModal()">邀请码加入</button><button class="button primary" id="openCreateRoom" onclick="openCreateSheet()">创建房间</button></div></div>
+      <div class="browser-layout"><section class="room-browser">
+        <div class="browser-filters"><input id="roomSearch" type="search" aria-label="搜索房间" placeholder="搜索房间或地图" oninput="filterLobbyRooms()"><select id="modeFilter" aria-label="模式筛选" onchange="filterLobbyRooms()"><option value="all">全部模式</option><option value="1v1">1v1</option><option value="2v2">2v2</option></select><select id="stateFilter" aria-label="状态筛选" onchange="filterLobbyRooms()"><option value="all">全部状态</option><option value="waiting">可加入</option><option value="watch">可观战</option></select><button class="button" onclick="loadRooms()" id="refreshBtn">刷新</button></div>
+        <div class="room-columns"><span>房间 / 地图</span><span>模式</span><span>人数</span><span>状态</span><span></span></div>
+        <div id="roomList" class="room-scroll"><div class="browser-empty">正在连接并读取房间…</div></div>
+        <div class="browser-caption"><span id="roomCount">当前服务器</span><span id="statusBar" role="status"></span></div>
+      </section><aside class="room-preview"><div class="preview-label">房间详情</div><img class="preview-emblem" src="images/tabletop/desk-emblem.svg" alt=""><h3 id="selectedRoomName">选择一个房间</h3><p id="selectedRoomInfo">在列表中选择房间，查看模式、地图和席位。</p><div id="selectedRoomActions"></div><div class="preview-note">想和朋友单独开一局？<br>创建私密房间后分享邀请码。</div></aside></div>
+      <div id="rejoinBar" class="rejoin-strip" style="display:none"><span>你有一场进行中的对局</span><button class="button primary" id="rejoinBtn" onclick="rejoinBattle()">重新加入</button><button class="button" onclick="dismissRejoin()">忽略</button></div><div id="rejoinFeedback" role="status" style="display:none"></div>
+    </main>
+    <footer class="game-footer"><div class="connection-indicator"><span id="floatStatus">连接中</span><span class="server-address" id="serverUrlDisplay">未连接</span></div><a href="multiplayer.html">更换服务器 / 连接设置</a></footer>
   </div>
-
-  <!-- Server info -->
-  <div class="section">
-    <div class="server-badge">
-      <div class="server-badge-url">
-        服务器：<span id="serverUrlDisplay">未连接</span>
-      </div>
-      <button class="btn-disconnect" onclick="goBack()">断开</button>
-    </div>
-
-    <div class="actions-row">
-      <button class="btn-refresh" onclick="loadRooms()" id="refreshBtn">🔄 刷新</button>
-      <button class="btn-create" id="openCreateRoom" onclick="openCreateSheet()">＋ 创建房间</button>
-    </div>
-
-    <div class="invite-row">
-      <input class="invite-input" id="inviteInput" placeholder="12位房间邀请码" maxlength="12" />
-      <button class="btn-invite-join" onclick="joinByCode()">加入</button>
-      <button class="btn-invite-join" onclick="joinByCode(true)">观战</button>
-    </div>
-
-    <div class="status-bar" id="statusBar"></div>
-    <!-- 断线重连提示 -->
-    <div id="rejoinBar" style="display:none;background:#1e3a5f;border:1px solid #3b82f6;border-radius:10px;padding:10px 14px;margin-top:10px;align-items:center;gap:10px;flex-wrap:wrap">
-      <span style="flex:1;font-size:13px;color:#93c5fd">⚔️ 您有一场进行中的对局</span>
-      <button id="rejoinBtn" onclick="rejoinBattle()" style="background:#1d4ed8;border:none;border-radius:8px;color:#fff;padding:6px 14px;font-size:13px;font-weight:700;cursor:pointer">重新加入</button>
-      <button onclick="dismissRejoin()" style="background:none;border:1px solid #334155;border-radius:8px;color:#64748b;padding:6px 10px;font-size:12px;cursor:pointer">忽略</button>
-    </div>
-    <div id="rejoinFeedback" role="status" style="display:none;color:#f59e0b;font-size:12px;margin-top:8px"></div>
-  </div>
-
-  <!-- Room list -->
-  <div class="section" style="padding-top:0">
-    <div class="section-label">公开房间</div>
-    <div id="roomList">
-      <div class="empty-state">
-        <div class="spinner-sm"></div>
-        <div style="margin-top:8px">加载中…</div>
-      </div>
-    </div>
-  </div>
+  <dialog class="game-dialog" id="inviteDialog"><form method="dialog"><button class="dialog-close" aria-label="关闭">×</button></form><h2>通过房间邀请码加入</h2><p>输入房主提供的12位房间邀请码。</p><div class="invite-row"><input class="invite-input" id="inviteInput" placeholder="12位房间邀请码" maxlength="12"><button class="button primary" onclick="joinByCode()">加入</button><button class="button" onclick="joinByCode(true)">观战</button></div></dialog>
 
   <!-- Create room overlay -->
   <div id="createSheet" class="overlay" style="display:none" onclick="if(event.target===this)closeCreateSheet()">
@@ -300,12 +267,6 @@
       <button class="btn-primary" id="createRoomBtn" onclick="doCreateRoom()" disabled>创建并加入</button>
       <button class="btn-cancel" onclick="closeCreateSheet()">取消</button>
     </div>
-  </div>
-
-  <!-- Float bar -->
-  <div id="floatBar">
-    <span id="floatStatus" style="font-size:13px;color:#64748b">⚫ 离线模式</span>
-    <button onclick="goBack()" style="background:transparent;border:1px solid #334155;color:#94a3b8;border-radius:8px;padding:5px 12px;font-size:12px;cursor:pointer">← 返回主页</button>
   </div>
 
   <script>
@@ -550,89 +511,78 @@
         statusBar.textContent = '上次更新：' + new Date().toLocaleTimeString()
       } catch (e) {
         document.getElementById('roomList').innerHTML =
-          '<div class="empty-state"><div class="empty-icon">❌</div>加载失败：' + e.message + '</div>'
+          '<div class="browser-empty">暂时无法读取房间：' + escHtml(e.message) + '<br><a href="multiplayer.html">打开服务器连接设置</a></div>'
         statusBar.textContent = ''
       } finally {
         btn.disabled = false
       }
     }
 
+    let catalogRooms = [], selectedRoomId = null
     function renderRooms(rooms) {
-      const list = document.getElementById('roomList')
-      const { id: playerId } = RvBIdentity.getIdentity()
-      const uniqueRooms = []
-      const roomIds = new Set()
-      for (const room of Array.isArray(rooms) ? rooms : []) {
-        if (!room || !room.id || roomIds.has(room.id)) {
-          if (room && room.id) console.warn('[lobby:rooms] 忽略重复房间目录项', room.id)
-          continue
+      const seen = new Set()
+      catalogRooms = (Array.isArray(rooms) ? rooms : []).filter(r => {
+        if (!r || !r.id || seen.has(r.id) || (r.visibility && r.visibility !== 'public')) return false
+        seen.add(r.id); return true
+      })
+      filterLobbyRooms()
+    }
+    function filterLobbyRooms() {
+      const search = document.getElementById('roomSearch').value.toLocaleLowerCase().trim()
+      const mode = document.getElementById('modeFilter').value, state = document.getElementById('stateFilter').value
+      const filtered = catalogRooms.filter(r => {
+        const waiting = ['waiting','open'].includes(r.status) || !r.status
+        const count = r.players ? r.players.length : (r.playerCount || 0)
+        return (mode === 'all' || (r.mode || (r.maxPlayers === 4 ? '2v2' : '1v1')) === mode) &&
+          (state === 'all' || (state === 'waiting' ? waiting && (count < (r.maxPlayers || 2) || roomMembership(r)) : r.status === 'in-progress' && r.spectatingEnabled !== false && (r.spectatorCount || 0) < 8)) &&
+          (!search || (String(r.name || r.id) + ' ' + getMapDisplayName(r.mapId)).toLocaleLowerCase().includes(search))
+      })
+      const list = document.getElementById('roomList'); list.replaceChildren()
+      document.getElementById('roomCount').textContent = filtered.length + ' 个房间 / 共 ' + catalogRooms.length + ' 个'
+      if (!filtered.some(r => r.id === selectedRoomId)) selectedRoomId = filtered[0]?.id || null
+      if (!filtered.length) {
+        const empty = document.createElement('div'); empty.className = 'browser-empty'
+        empty.textContent = catalogRooms.length ? '没有符合筛选条件的房间。' : '这里还没有房间。创建一局，邀请朋友来玩吧。'; list.appendChild(empty)
+      }
+      filtered.forEach(r => {
+        const row = document.createElement('div'); row.className = 'room-card room-row' + (r.id === selectedRoomId ? ' is-selected' : '')
+        row.tabIndex = 0; row.setAttribute('role','button'); row.setAttribute('aria-pressed', String(r.id === selectedRoomId))
+        const count = r.players ? r.players.length : (r.playerCount || 0), waiting = ['waiting','open'].includes(r.status) || !r.status
+        const name = document.createElement('div'); name.className = 'room-info'
+        const title = document.createElement('strong'); title.className = 'room-name'; title.textContent = r.name || r.id
+        const map = document.createElement('small'); map.className = 'room-meta'; map.textContent = getMapDisplayName(r.mapId)
+        name.append(title,map); row.appendChild(name)
+        for (const value of [r.mode || (r.maxPlayers === 4 ? '2v2' : '1v1'), count + '/' + (r.maxPlayers || 2), waiting ? (count >= (r.maxPlayers || 2) ? '已满' : '等待中') : r.status === 'ready' ? '选人中' : '对局中']) { const cell = document.createElement('span'); cell.textContent = value; row.appendChild(cell) }
+        const action = roomAction(r); row.appendChild(action)
+        row.onclick = () => { selectedRoomId = r.id; filterLobbyRooms() }
+        row.onkeydown = e => { if (e.target === row && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); selectedRoomId = r.id; filterLobbyRooms() } }
+        list.appendChild(row)
+      })
+      const selected = filtered.find(r => r.id === selectedRoomId), actions = document.getElementById('selectedRoomActions'); actions.replaceChildren()
+      document.getElementById('selectedRoomName').textContent = selected ? selected.name || selected.id : '选择一个房间'
+      document.getElementById('selectedRoomInfo').textContent = selected ? getMapDisplayName(selected.mapId) + ' · ' + (selected.mode || (selected.maxPlayers === 4 ? '2v2' : '1v1')) + '\n观众 ' + (selected.spectatorCount || 0) + '/8' : '加入公开房间，或使用邀请码加入朋友的房间。'
+      if (selected) {
+        actions.appendChild(roomAction(selected))
+        const me = RvBIdentity.getIdentity().id
+        if (me && selected.hostId && selected.hostId.toLowerCase() === me.toLowerCase() && selected.status !== 'in-progress') {
+          const remove = document.createElement('button'); remove.className = 'button danger'; remove.textContent = '删除我的房间'; remove.onclick = e => deleteRoom(selected.id,e); actions.appendChild(remove)
         }
-        roomIds.add(room.id)
-        uniqueRooms.push(room)
       }
-
-      const waiting = uniqueRooms.filter(r =>
-        (r.status === 'waiting' || r.status === 'open' || !r.status) &&
-        (r.visibility === 'public' || r.visibility == null)
-      )
-      const selecting = uniqueRooms.filter(r => r.status === 'ready')
-      const inProgress = uniqueRooms.filter(r => r.status === 'in-progress')
-
-      let html = ''
-
-      if (waiting.length) {
-        html += '<div class="section-label">等待中的房间</div>'
-        html += waiting.map(r => {
-          const players = r.players ? r.players.length : (r.playerCount || 0)
-          const inviteInfo = r.inviteCode ? ` · 邀请码: <b style="color:#94a3b8">${r.inviteCode}</b>` : ''
-          const isHost = playerId && r.hostId && r.hostId.toLowerCase() === playerId.toLowerCase()
-          const deleteBtn = isHost && r.status !== 'in-progress'
-            ? `<button class="btn-delete" onclick="deleteRoom('${escHtml(r.id)}', event)">删除</button>` : ''
-          return `<div class="room-card">
-            <div class="room-info">
-              <div class="room-name">${escHtml(r.name || r.id)}</div>
-              <div class="room-meta">玩家 ${players}/${r.maxPlayers || 2} · 地图：${escHtml(getMapDisplayName(r.mapId))}${inviteInfo}</div>
-            </div>
-            ${deleteBtn}
-            <button class="btn-join" onclick="showFactionPicker('${escHtml(r.id)}')">加入</button>
-          </div>`
-        }).join('')
-      }
-
-      if (selecting.length) {
-        html += '<div class="section-label" style="margin-top:16px">选人中的房间</div>'
-        html += selecting.map(r => {
-          const players = r.players ? r.players.length : (r.playerCount || 0)
-          return `<div class="room-card">
-            <div class="room-info">
-              <div class="room-name">${escHtml(r.name || r.id)}</div>
-              <div class="room-meta">玩家 ${players}/${r.maxPlayers || 2} · 地图：${escHtml(getMapDisplayName(r.mapId))} · 正在选人</div>
-            </div>
-            <button class="btn-spectate" disabled>选人中</button>
-          </div>`
-        }).join('')
-      }
-
-      if (inProgress.length) {
-        html += '<div class="section-label" style="margin-top:16px">进行中的比赛</div>'
-        html += inProgress.map(r => {
-          const players = r.players ? r.players.length : (r.playerCount || 0)
-          return `<div class="room-card">
-            <div class="room-info">
-              <div class="room-name">${escHtml(r.name || r.id)}</div>
-              <div class="room-meta">玩家 ${players}/${r.maxPlayers || 2} · 🔴 进行中</div>
-            </div>
-            <button class="btn-spectate" ${r.spectatingEnabled === false || r.spectatorCount >= 8 ? 'disabled' : ''} onclick="spectateRoom('${escHtml(r.id)}')">${r.spectatingEnabled === false ? '观战关闭' : '观战 ' + (r.spectatorCount || 0) + '/8'}</button>
-          </div>`
-        }).join('')
-      }
-
-      if (!waiting.length && !selecting.length && !inProgress.length) {
-        list.innerHTML = '<div class="empty-state"><div class="empty-icon">🏠</div>暂无房间<br><span style="font-size:12px">点击"创建房间"开始，或输入邀请码加入私密房间</span></div>'
-        return
-      }
-
-      list.innerHTML = html
+    }
+    function roomAction(r) {
+      const button = document.createElement('button'), waiting = ['waiting','open'].includes(r.status) || !r.status
+      const count = r.players ? r.players.length : (r.playerCount || 0)
+      const member = roomMembership(r)
+      button.dataset.roomId = r.id
+      button.className = waiting ? 'btn-join button primary' : 'btn-spectate button'
+      button.textContent = member ? '返回' : waiting ? '加入' : r.status === 'ready' ? '选人中' : r.spectatingEnabled === false ? '观战关闭' : '观战'
+      button.disabled = !member && (waiting ? count >= (r.maxPlayers || 2) : r.status !== 'in-progress' || r.spectatingEnabled === false || (r.spectatorCount || 0) >= 8)
+      button.onclick = e => { e.stopPropagation(); if (member) joinRoom(r.id, member.alignment, 'rejoin'); else if (waiting) showFactionPicker(r.id); else spectateRoom(r.id) }
+      return button
+    }
+    function roomMembership(room) {
+      const id = RvBIdentity.getIdentity()?.id
+      return id && Array.isArray(room.players) ? room.players.find(player => player.id && player.id.toLowerCase() === id.toLowerCase()) : null
     }
 
     function escHtml(s) {
@@ -839,7 +789,7 @@
       try {
         const match = await lobbyRequest('rooms.resolveInvite', { inviteCode: code })
         if (spectating) await spectateRoom(match.id)
-        else if (match.status === 'waiting' || match.status === 'ready') showFactionPicker(match.id)
+        else if (match.status === 'waiting' || match.status === 'ready') { document.getElementById('inviteDialog').close(); showFactionPicker(match.id) }
         else alert('对局已开始，可以选择观战')
       } catch (e) { alert('查找房间失败：' + e.message) }
     }
@@ -949,6 +899,7 @@
     window.addEventListener('load', async () => {
       await reconcileLobbyServerMode()
       document.getElementById('serverUrlDisplay').textContent = RvBUtils.getServerUrl() || '未连接'
+      try { await RvBIdentity.ensureIdentity() } catch (error) { document.getElementById('roomList').textContent = '本地玩家身份初始化失败：' + error.message; return }
       refreshUserUI()
       updateFloatBar()
       await checkRejoin()

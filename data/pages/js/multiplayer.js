@@ -24,9 +24,9 @@
   }
   async function run(task) {
     if (busy) return
-    busy = true; byId('error').textContent = ''
+    busy = true; byId('error').textContent = ''; document.querySelectorAll('.modalError').forEach(function (el) { el.textContent = '' })
     document.querySelectorAll('button').forEach(function (button) { button.disabled = true })
-    try { await task() } catch (error) { lastFailure = error.message || String(error); byId('error').textContent = lastFailure }
+    try { await task() } catch (error) { lastFailure = error.message || String(error); byId('error').textContent = lastFailure; document.querySelectorAll('.modalError').forEach(function (el) { el.textContent = lastFailure }) }
     finally { busy = false; document.querySelectorAll('button').forEach(function (button) { button.disabled = false }) }
   }
   function showPublication(value) {

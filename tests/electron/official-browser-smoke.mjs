@@ -38,7 +38,7 @@ async function cdp(url) {
     return result.result.value
   } }
 }
-let app, browser, chrome
+let app, browser, chrome, setupProcess
 const pages = []
 const pg = new EmbeddedPostgresController({ runtimeRoot: path.join(root, '_client-postgres/pgsql'), stateRoot: path.join(state, 'pg'), findFreePort, portHint: 38941, protectSecret: x => Buffer.from(x), unprotectSecret: x => x.toString() })
 try {
@@ -58,16 +58,38 @@ try {
   let version
   await until(async () => { try { version = await fetch(`http://127.0.0.1:${debugPort}/json/version`).then(r => r.json()); return !!version.webSocketDebuggerUrl } catch { return false } }, 'browser startup')
   browser = await cdp(version.webSocketDebuggerUrl)
+  const built = path.join(root, 'dist/official-server/win-x64')
+  let setupUrl = ''
+  setupProcess = spawn(path.join(built, 'node.exe'), [path.join(built, 'server.mjs')], { cwd:built, env:{...process.env, RVB_OFFICIAL_STATE_ROOT:path.join(state,'setup'), RVB_OFFICIAL_NO_BROWSER:'1'}, windowsHide:true, stdio:['ignore','pipe','pipe'] })
+  setupProcess.stdout.on('data', data => { const match = data.toString().match(/http:\/\/127\.0\.0\.1:\d+\/#([a-f0-9]+)/); if(match) setupUrl = match[0] })
+  await until(() => !!setupUrl, 'first run SMTP setup')
+  const setupOrigin = new URL(setupUrl).origin
+  for (const asset of ['/css/tabletop/tabletop.css','/css/tabletop/online.css','/images/tabletop/table-wood.svg','/images/tabletop/ZCOOLKuaiLe-Regular.ttf']) if (!(await fetch(setupOrigin + asset)).ok) throw Error('Setup art unavailable: ' + asset)
+  if ((await fetch(setupOrigin + '/official-config.json')).status !== 403) throw Error('Setup exposes a non-allowlisted path')
+  if ((await fetch(setupOrigin + '/save', {method:'POST',headers:{Origin:setupOrigin,'X-Setup-Token':'invalid'}})).status !== 403) throw Error('Setup accepts an invalid token')
+  const setupTarget = await browser.call('Target.createTarget', {url:setupUrl})
+  const setupListing = await fetch('http://127.0.0.1:' + debugPort + '/json/list').then(r=>r.json())
+  const setupPage = await cdp(setupListing.find(item=>item.id === setupTarget.targetId).webSocketDebuggerUrl)
+  await setupPage.call('Emulation.setDeviceMetricsOverride', {width:1200,height:800,deviceScaleFactor:1,mobile:false})
+  await until(() => setupPage.evaluate('!!document.getElementById("provider")'), 'QQ setup UI')
+  await setupPage.evaluate('document.fonts.ready.then(() => true)')
+  const setupShot = await setupPage.call('Page.captureScreenshot', {format:'png'});fs.writeFileSync(path.join(output,'red196-mail-setup.png'),Buffer.from(setupShot.data,'base64'))
+  setupPage.close();await browser.call('Target.closeTarget',{targetId:setupTarget.targetId});setupProcess.kill()
   for (const user of users) {
     const context = await browser.call('Target.createBrowserContext')
     const target = await browser.call('Target.createTarget', { url: origin + '/official.html', browserContextId: context.browserContextId })
     const listing = await fetch(`http://127.0.0.1:${debugPort}/json/list`).then(r => r.json())
     const page = await cdp(listing.find(item => item.id === target.targetId).webSocketDebuggerUrl); pages.push(page)
     await page.call('Page.enable')
-    await page.call('Emulation.setDeviceMetricsOverride', { width:1200,height:1400,deviceScaleFactor:1,mobile:false })
+    await page.call('Emulation.setDeviceMetricsOverride', { width:1200,height:800,deviceScaleFactor:1,mobile:false })
     await until(() => page.evaluate('!!document.getElementById("authForm") && document.getElementById("message").textContent.includes("已连接")'), 'official login page')
+    await page.evaluate('document.getElementById("loginPrompt").click()')
+    if (user === users[0]) {
+      await page.evaluate('document.fonts.ready.then(() => true)')
+      const login = await page.call('Page.captureScreenshot', { format: 'png' }); fs.writeFileSync(path.join(output, 'red196-official-login.png'), Buffer.from(login.data, 'base64'))
+    }
     await page.evaluate(`document.getElementById('email').value=${JSON.stringify(user.email)};document.getElementById('password').value=${JSON.stringify(password)};document.querySelector('#authForm button').click()`)
-    await until(() => page.evaluate('document.getElementById("profile").hidden === false'), 'account login')
+    await until(() => page.evaluate('document.getElementById("profile").hidden === false && !document.getElementById("join").disabled'), 'account login')
     if (user === users[0]) await page.evaluate('document.getElementById("alignment").value="dark"')
     await page.evaluate('document.getElementById("join").click()')
   }
@@ -89,6 +111,7 @@ try {
   await until(() => pages[0].evaluate('!!document.getElementById("profile") && !document.getElementById("profile").hidden'), 'return to account')
   await pages[0].evaluate('document.getElementById("logout").click()')
   await until(() => pages[0].evaluate('!document.getElementById("auth").hidden'), 'logout')
+  await pages[0].evaluate('document.getElementById("loginPrompt").click()')
   await pages[0].evaluate(`document.getElementById('email').value=${JSON.stringify(users[0].email)};document.getElementById('password').value=${JSON.stringify(password)};document.querySelector('#authForm button').click()`)
   await until(() => pages[0].evaluate('!document.getElementById("profile").hidden && !document.getElementById("enter").hidden'), 'login during battle')
   await pages[0].evaluate('document.getElementById("enter").click()')
@@ -98,7 +121,55 @@ try {
   await pages[0].evaluate(`document.querySelector('[onclick="doSurrender()"]').click()`)
   await until(async () => (await app.pool.query(`SELECT 1 FROM official_matches WHERE status='settled'`)).rowCount === 1, 'actual page action and Elo settlement')
   for (const page of pages) { await page.call('Page.navigate', { url: origin + '/official.html' }); await until(() => page.evaluate('!!document.getElementById("profile") && !document.getElementById("profile").hidden && document.getElementById("record").textContent.includes("1 场")'), 'settled account UI') }
+  await pages[0].evaluate("document.querySelector('[data-rank-tab=board]').click()")
+  if (!await pages[0].evaluate('!document.getElementById("rank-board").hidden && !document.getElementById("join").hidden')) throw new Error('Matchmaking dock disappears when viewing leaderboard')
+  const board = await pages[0].call('Page.captureScreenshot', { format: 'png' }); fs.writeFileSync(path.join(output, 'red196-official-board.png'), Buffer.from(board.data, 'base64'))
+  await pages[0].evaluate("document.querySelector('[data-rank-tab=prepare]').click()")
   const result = await pages[0].call('Page.captureScreenshot', { format: 'png' }); fs.writeFileSync(path.join(output, 'red196-official-result.png'), Buffer.from(result.data, 'base64'))
+  await pages[0].call('Emulation.setDeviceMetricsOverride', { width:390,height:844,deviceScaleFactor:1,mobile:true })
+  if (!await pages[0].evaluate('document.documentElement.scrollWidth <= document.documentElement.clientWidth')) throw new Error('Official page overflows mobile viewport')
+  const mobile = await pages[0].call('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true }); fs.writeFileSync(path.join(output, 'red196-official-mobile.png'), Buffer.from(mobile.data, 'base64'))
+  await pages[0].call('Emulation.setDeviceMetricsOverride', { width:1200,height:800,deviceScaleFactor:1,mobile:false })
+  await pages[0].call('Page.navigate', { url: origin + '/multiplayer.html' })
+  await until(() => pages[0].evaluate('!!document.querySelector("body[data-art-page=multiplayer] .game-nav")'), 'casual entry theme')
+  await pages[0].evaluate('document.fonts.ready.then(() => true)')
+  const casual = await pages[0].call('Page.captureScreenshot', { format: 'png' }); fs.writeFileSync(path.join(output, 'red196-multiplayer-entry.png'), Buffer.from(casual.data, 'base64'))
+  await pages[0].call('Page.navigate', { url: origin + '/lobby.html' })
+  await until(() => pages[0].evaluate('!!document.getElementById("roomSearch")'), 'room browser layout')
+  await pages[0].evaluate('document.fonts.ready.then(() => true)')
+  await until(() => pages[0].evaluate('!!window.RvBIdentity?.getIdentity()'), 'new browser local identity')
+  // Deterministic UI fixtures exercise catalog navigation; they are not advertised live rooms.
+  await pages[0].evaluate(`(() => {
+    const me = RvBIdentity.getIdentity().id;
+    const fixtures = [
+      {id:'layout-full',name:'测试场景 · 等待中的1v1',mapId:'open-expanse',mode:'1v1',status:'waiting',visibility:'public',maxPlayers:2,players:[{id:me,alignment:'dark'},{id:'fixture-other'}]},
+      {id:'layout-team',name:'测试场景 · 2v2招募队友',mapId:'team-crossroads',mode:'2v2',status:'waiting',visibility:'public',maxPlayers:4,players:[{id:'fixture-host'}]},
+      {id:'layout-live',name:'测试场景 · 进行中的对局',mapId:'open-expanse',mode:'1v1',status:'in-progress',visibility:'public',maxPlayers:2,players:[{id:'fixture-a'},{id:'fixture-b'}],spectatingEnabled:true,spectatorCount:3},
+      {id:'layout-private',name:'Never expose private room',visibility:'private',status:'waiting',players:[]}
+    ];
+    renderRooms(fixtures);
+    if(document.querySelectorAll('.room-row').length !== 3) throw Error('Public catalog visibility regression');
+    const restore = document.querySelector('.room-row [data-room-id="layout-full"]');
+    if(restore.disabled || restore.textContent !== '返回') throw Error('Existing member cannot return to a full waiting room');
+    document.getElementById('modeFilter').value='2v2'; filterLobbyRooms();
+    if(document.querySelectorAll('.room-row').length !== 1 || !document.getElementById('selectedRoomName').textContent.includes('2v2')) throw Error('Mode selection/details failed');
+    document.getElementById('modeFilter').value='all'; document.getElementById('stateFilter').value='watch'; filterLobbyRooms();
+    if(document.querySelectorAll('.room-row').length !== 1 || !document.querySelector('.room-row .btn-spectate')) throw Error('Watch filter failed');
+    document.getElementById('stateFilter').value='all'; document.getElementById('roomSearch').value='不存在';filterLobbyRooms();
+    if(document.querySelectorAll('.room-row').length !== 0) throw Error('Search filter failed');
+    document.getElementById('roomSearch').value='';renderRooms(fixtures);
+  })()`)
+  await pages[0].evaluate(`(async () => {
+    const original = lobbyRequest;
+    lobbyRequest = async () => ({id:'layout-invite',status:'waiting'});
+    try {
+      document.getElementById('inviteDialog').showModal(); document.getElementById('inviteInput').value='ABCDEF123456';
+      await joinByCode(false);
+      if(document.getElementById('inviteDialog').open || document.getElementById('factionSheet').style.display !== 'flex') throw Error('Invite modal blocks faction selection');
+      closeFactionSheet();
+    } finally { lobbyRequest = original }
+  })()`)
+  const lobby = await pages[0].call('Page.captureScreenshot', { format: 'png' }); fs.writeFileSync(path.join(output, 'red196-room-browser.png'), Buffer.from(lobby.data, 'base64'))
   const ratings = await app.ranked.leaderboard()
   if (ratings.map(p => p.rating).sort().join(',') !== '1016,984') throw new Error('Unexpected Elo ratings')
   console.log(JSON.stringify({ ok: true, browser: path.basename(executable), flow: 'login -> queue -> room -> roster -> actual battle surrender -> Elo/history', ratings, realEmailDelivery: false }))
@@ -108,6 +179,7 @@ try {
   }
   throw error
 } finally {
+  setupProcess?.kill()
   try { await browser?.call('Browser.close') } catch {}
   pages.forEach(page => page.close()); browser?.close(); chrome?.kill()
   await app?.close(); await pg.stop()

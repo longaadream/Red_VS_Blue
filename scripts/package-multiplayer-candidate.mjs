@@ -27,12 +27,14 @@ const instructions = fs.readFileSync(path.join(root, id.startsWith('RED-196-') ?
 const windows = new AdmZip()
 windows.addLocalFolder(windowsRoot, 'Red-vs-Blue')
 windows.addFile('START-HERE.md', Buffer.from(instructions))
+windows.addLocalFile(path.join(root,'docs/technical/RED-193-FIRST-PLAYTEST.md'))
 windows.writeZip(windowsZip)
 console.log(`[candidate] ${windowsZip}`)
 const relay = new AdmZip()
 for (const file of ['package.json', 'package-lock.json', 'protocol.mjs', 'relay.mjs', 'start.mjs', 'Dockerfile']) relay.addLocalFile(path.join(root, 'multiplayer-relay', file), 'multiplayer-relay')
 for (const file of ['compose.yaml', 'Caddyfile', '.env.example']) relay.addLocalFile(path.join(root, 'deploy/multiplayer-relay', file), 'deploy/multiplayer-relay')
 relay.addFile('START-HERE.md', Buffer.from(instructions))
+relay.addLocalFile(path.join(root,'docs/technical/RED-193-FIRST-PLAYTEST.md'))
 relay.writeZip(relayZip)
 const artifacts = [windowsZip, relayZip].map(file => ({ file: path.basename(file), bytes: fs.statSync(file).size, sha256: createHash('sha256').update(fs.readFileSync(file)).digest('hex') }))
 const manifest = { format: 'rvb-multiplayer-candidate-v1', candidate: id, version: built.version, commit, builtAt: built.builtAt, packagedAt: new Date().toISOString(), publicEndpointConfigured: Boolean(config.relayUrl), status: 'candidate-requires-public-network-acceptance', artifacts }
@@ -40,3 +42,5 @@ fs.writeFileSync(path.join(output, 'release.json'), JSON.stringify(manifest, nul
 fs.writeFileSync(path.join(output, 'SHA256SUMS.txt'), artifacts.map(a => `${a.sha256}  ${a.file}`).join('\n') + '\n')
 fs.writeFileSync(path.join(output, 'START-HERE.md'), instructions)
 console.log(JSON.stringify(manifest, null, 2))
+
+fs.copyFileSync(path.join(root,'docs/technical/RED-193-FIRST-PLAYTEST.md'),path.join(output,'RED-193-FIRST-PLAYTEST.md'))

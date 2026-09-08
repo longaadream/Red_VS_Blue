@@ -228,9 +228,13 @@ async function verifyMultiplayerPage(port, target, localUrl, observedRoomId) {
   assert(ready, 'Multiplayer page did not initialize')
   const runtime = await evaluate(page, `(async () => {
     const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+    document.getElementById('hostDialog').showModal();
+    document.getElementById('showLocalAddress').closest('details').open = true;
     document.getElementById('showLocalAddress').click();
     while (document.getElementById('showLocalAddress').disabled) await sleep(50);
     const localAddress = document.getElementById('localAddress').textContent;
+    document.getElementById('hostDialog').close();
+    document.getElementById('diagnosticDialog').showModal();
     document.getElementById('directUrl').value = ${JSON.stringify(localUrl)};
     document.getElementById('diagnose').click();
     while (document.getElementById('diagnose').disabled) await sleep(50);
@@ -238,10 +242,10 @@ async function verifyMultiplayerPage(port, target, localUrl, observedRoomId) {
   })()`)
   assert(runtime.localAddress.includes(new URL(localUrl).port), `frp target is not the running game port: ${JSON.stringify(runtime)}`)
   assert(!runtime.error && runtime.diagnosis.checks[0]?.ok === true, `Packaged network diagnostic failed: ${JSON.stringify(runtime)}`)
-  await evaluate(page, "document.getElementById('joinDirect').click(); true", false)
+  await evaluate(page, "document.getElementById('diagnosticDialog').close(); document.getElementById('directDialog').showModal(); document.getElementById('joinDirect').click(); true", false)
   const lobby = await waitForTargets(port, candidate => candidate.url.startsWith('rvb-client://app/lobby.html'), 10000)
   await evaluate(lobby, "localStorage.setItem('rvb_active_battle', 'spectator-smoke-preserve-existing-match'); true")
-  const spectateButton = `Array.from(document.querySelectorAll('.btn-spectate')).find(button => (button.getAttribute('onclick') || '').includes(${JSON.stringify(observedRoomId)}))`
+  const spectateButton = `Array.from(document.querySelectorAll('.btn-spectate')).find(button => button.dataset.roomId === ${JSON.stringify(observedRoomId)})`
   let available = false
   for (let attempt = 0; attempt < 60; attempt++) {
     available = await evaluate(lobby, `!!(${spectateButton})`)

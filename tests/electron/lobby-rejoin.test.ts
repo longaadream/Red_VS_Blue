@@ -82,6 +82,7 @@ function createHarness(options: {
     },
   }
   const context = vm.createContext({
+    URL,
     URLSearchParams,
     alert: (message: string) => { alerts.push(message) },
     clearInterval: () => {},

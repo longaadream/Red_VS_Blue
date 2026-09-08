@@ -1,44 +1,14 @@
-<!doctype html>
-<html lang="zh-CN">
-<head>
-  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>公网联机 · Red VS Blue</title>
-  <style>
-    *{box-sizing:border-box}body{margin:0;background:#0b1220;color:#e2e8f0;font:15px/1.6 system-ui,sans-serif}main{max-width:1000px;margin:40px auto;padding:0 24px}a{color:#93c5fd}h1{font-size:30px;margin:18px 0 4px}h2{font-size:20px;margin:0 0 14px}p{color:#94a3b8}section{background:#111c2e;border:1px solid #2b3a50;border-radius:16px;padding:24px;margin:20px 0}.columns{display:grid;grid-template-columns:1fr 1fr;gap:22px}.columns section{margin:0}label{display:block;margin:14px 0 5px}input{width:100%;padding:12px;background:#091322;color:#e2e8f0;border:1px solid #40536d;border-radius:8px;font:inherit}input[type=checkbox]{width:auto}button{padding:11px 17px;border-radius:8px;border:1px solid #40536d;background:#21344e;color:#e2e8f0;font:inherit;cursor:pointer;margin:10px 6px 0 0}button.primary{background:#2563eb;border-color:#60a5fa}button:disabled{opacity:.5;cursor:wait}button:focus-visible,input:focus-visible{outline:3px solid #93c5fd;outline-offset:3px}.host{display:flex;align-items:center;justify-content:space-between;border-top:1px solid #2b3a50;padding:12px 0;gap:12px}.host span{overflow-wrap:anywhere}.status{white-space:pre-wrap;overflow-wrap:anywhere;color:#a7f3d0}#error{color:#fca5a5}small{color:#94a3b8}#share{font-family:monospace;font-size:21px;color:#93c5fd}@media(max-width:700px){.columns{grid-template-columns:1fr}main{margin:20px auto;padding:0 16px}section{padding:18px}}
-  </style>
-</head>
-<body><main>
-  <a href="index.html">← 返回主菜单</a>
-  <h1>公网联机</h1><p>朋友开房，你来加入。支持 1v1 和 2v2；2v2 按蓝1 → 红1 → 红2 → 蓝2 行动。</p>
-  <section><h2>官方 1v1 排位</h2><p>使用服务器账号，系统匹配真人对手，按 Elo 计分。朋友房与玩家主机房不计排位分。</p><a href="official.html">进入官方排位 →</a></section>
-  <section>
-    <label for="relayUrl">转发服务器地址</label><input id="relayUrl" type="url" placeholder="https://relay.example.com" autocomplete="url">
-    <small>由组织试玩的人提供。主机和加入者使用同一个转发服务器。</small>
-    <div id="error" role="alert"></div>
-  </section>
-  <div class="columns">
-    <section><h2>我来当主机</h2><p>公网只转发连接，对局运行在你的电脑上。请保持游戏开启；主机退出会中断对局。</p>
-      <label for="hostName">主机名称</label><input id="hostName" maxlength="60" placeholder="我的游戏房间">
-      <label><input id="visible" type="checkbox" checked> 在公开大厅显示</label>
-      <label for="publishKey">发布密钥（服务器要求时填写）</label><input id="publishKey" type="password" autocomplete="off">
-      <button id="publish" class="primary">发布主机</button><button id="stop">停止发布</button>
-      <p id="publication" class="status" role="status">尚未发布</p><div id="share"></div>
-      <button id="copy" hidden>复制邀请信息</button><button id="localLobby">进入本机大厅建房</button>
-      <p>已有 frp TCP 穿透可直接映射本机游戏端口，无需发布到上面的转发服务器。</p>
-      <button id="showLocalAddress">查看 frp 本地目标</button><p id="localAddress" class="status" role="status"></p>
-    </section>
-    <section><h2>加入朋友</h2><p>输入朋友提供的 8 位邀请码，或在下方选择公开主机。</p>
-      <label for="invite">邀请码</label><input id="invite" maxlength="8" placeholder="例如 A12BCD34" autocomplete="off">
-      <button id="joinInvite" class="primary">通过邀请码加入</button>
-      <label for="directUrl">直接连接主机（局域网 / 已有公网地址）</label><input id="directUrl" type="url" placeholder="http://192.168.1.10:2567">
-      <button id="joinDirect">直接连接</button>
-      <small>frp 只有 IP 和端口时，填写 http://公网IP:端口。此连接没有 TLS 加密，适用于熟人小批量测试。</small>
-      <p>短时掉线保留席位；超过 120 秒由主机 AI 接管，重连后恢复控制。2v2 投降需要两名队友同意。</p>
-    </section>
-  </div>
-  <section><h2>公开主机</h2><button id="refresh">刷新大厅</button><div id="hosts" aria-live="polite"><p>填写服务器地址后刷新。</p></div></section>
-<section><h2>连接检查与反馈</h2><p>遇到无法加入、掉线或版本不一致时，生成诊断信息并发给测试组织者。诊断不包含身份私钥、发布密钥或游戏存档。</p><button id="diagnose">检查连接</button><button id="copyDiagnosis" hidden>复制诊断信息</button><pre id="diagnosis" style="white-space:pre-wrap;overflow-wrap:anywhere" aria-live="polite"></pre></section>
-</main>
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>服务器 · RED vs BLUE</title><link rel="stylesheet" href="css/tabletop/tabletop.css"><link rel="stylesheet" href="css/tabletop/online.css"></head>
+<body data-art-page="multiplayer"><div class="game-shell"><header class="game-header"><a class="game-brand" href="index.html"><span>RED</span><small>vs</small><span>BLUE</span></a><span class="header-divider"></span><h1>联机大厅</h1><span class="header-end">P2P / 公网转发</span><a class="back-link" href="index.html">主菜单</a></header>
+<nav class="game-nav" aria-label="联机导航"><a href="lobby.html"><img src="images/tabletop/ui-map.svg" alt="">房间大厅</a><a href="official.html"><img src="images/tabletop/ui-confirm.svg" alt="">官方排位</a><a class="selected" href="multiplayer.html"><img src="images/tabletop/ui-tools.svg" alt="">服务器</a><div class="nav-note">与朋友联机<br>自建 / 加入<small>选好服务器，再浏览房间</small></div></nav>
+<main class="game-main"><div class="view-heading"><div><p class="kicker">SERVER BROWSER</p><h2>服务器浏览器</h2></div><div class="toolbar"><button class="button" onclick="document.getElementById('directDialog').showModal()">直接连接</button><button class="button primary" onclick="document.getElementById('hostDialog').showModal()">我来开服</button></div></div>
+<div class="browser-layout"><section class="room-browser server-list"><div class="server-settings-row"><label for="relayUrl">转发入口</label><input id="relayUrl" type="url" placeholder="组织者提供的服务器地址" autocomplete="url"><button class="button" id="refresh">连接 / 刷新</button></div><div class="room-columns" style="display:flex;justify-content:space-between"><span>公开玩家主机</span><span>进入后选择房间</span></div><div id="hosts" class="room-scroll" aria-live="polite"><div class="browser-empty">连接转发入口，浏览公开玩家主机。<br>也可以使用朋友的邀请码或直接连接。</div></div></section>
+<aside class="room-preview"><div class="preview-label">加入朋友</div><h3 style="margin-top:20px">有邀请码？</h3><p>输入朋友分享的8位主机邀请码。</p><label for="invite" class="preview-label">主机邀请码</label><input id="invite" maxlength="8" placeholder="A12BCD34" autocomplete="off"><button id="joinInvite" class="button primary">连接主机</button><div class="preview-note">房间的12位邀请码在<br><a href="lobby.html">房间大厅</a>中使用。<br><br>使用同一版本客户端与朋友联机。</div></aside></div>
+<div id="error" class="connection-error" role="alert"></div><div class="server-guide">P2P与转发房间由玩家主机运行。主机须保持在线。<button class="button" onclick="document.getElementById('diagnosticDialog').showModal()">连接诊断</button></div>
+</main><footer class="game-footer"><span>休闲对战 · 不计排位分</span><a href="lobby.html">返回当前服务器的房间大厅</a></footer></div>
+<dialog class="game-dialog" id="hostDialog"><form method="dialog"><button class="dialog-close" aria-label="关闭">×</button></form><h2>我来开服</h2><p>对局在你的电脑运行。选择公网转发发布主机，或直接进入本机大厅。</p><label for="hostName">主机名称</label><input id="hostName" maxlength="60" placeholder="我的游戏房间"><label><input id="visible" type="checkbox" checked> 在公开列表显示</label><details><summary>转发发布设置</summary><label for="publishKey">发布密钥（服务器要求时填写）</label><input id="publishKey" type="password" autocomplete="off"></details><button id="publish" class="button primary">发布到公网转发</button><button id="stop" class="button">停止发布</button><p id="publication" class="status" role="status">尚未发布</p><div id="share"></div><button id="copy" class="button" hidden>复制邀请信息</button><button id="localLobby" class="button">进入本机大厅建房</button><details><summary>使用 frp / 内网穿透</summary><p>已有TCP穿透时，可直接映射本机游戏端口。</p><button id="showLocalAddress" class="button">查看 frp 本地目标</button><p id="localAddress" class="status" role="status"></p></details><p class="modalError" role="alert"></p></dialog>
+<dialog class="game-dialog" id="directDialog"><form method="dialog"><button class="dialog-close" aria-label="关闭">×</button></form><h2>直接连接玩家主机</h2><label for="directUrl">主机地址</label><input id="directUrl" type="url" placeholder="http://192.168.1.10:2567"><p>局域网地址，或 frp 提供的 http://公网IP:端口。</p><button id="joinDirect" class="button primary">连接并浏览房间</button><p>公网明文连接适用于熟人测试；官方账号排位使用独立HTTPS入口。</p><p class="modalError" role="alert"></p></dialog>
+<dialog class="game-dialog" id="diagnosticDialog"><form method="dialog"><button class="dialog-close" aria-label="关闭">×</button></form><h2>连接诊断</h2><p>检查当前地址并生成可发给组织者的诊断信息，不包含私钥、发布密钥和游戏存档。</p><button id="diagnose" class="button">检查连接</button><button id="copyDiagnosis" class="button" hidden>复制诊断信息</button><pre id="diagnosis" aria-live="polite"></pre><p class="modalError" role="alert"></p></dialog>
 <script src="js/pack-fetch.js"></script><script src="js/server-utils.js"></script>
 <script src="js/colyseus-sdk.js"></script><script src="js/colyseus-client.js"></script>
 <script src="js/crypto-lib.js"></script><script src="js/identity.js"></script>

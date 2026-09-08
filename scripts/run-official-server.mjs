@@ -36,7 +36,8 @@ const open = url => {
   child.on('exit', code => { if (code) console.info('[official] 请手动打开终端中的本机地址') })
   child.on('error', () => console.info('[official] 请手动打开终端中的本机地址'))
 }
-const config = process.argv.includes('--configure') ? await configureWindows(file, open) : loadConfig(file) || await configureWindows(file, open)
+const pagesRoot = path.join(root, 'data', 'pages')
+const config = process.argv.includes('--configure') ? await configureWindows(file, open, pagesRoot) : loadConfig(file) || await configureWindows(file, open, pagesRoot)
 const mail = createSmtpMailer(config.smtp)
 const runtimeRoot = fs.existsSync(path.join(root, 'postgres', 'pgsql')) ? path.join(root, 'postgres', 'pgsql') : path.join(root, '_client-postgres', 'pgsql')
 const database = new EmbeddedPostgresController({ runtimeRoot, stateRoot: path.join(stateRoot, 'postgres'), findFreePort, portHint: 38731,

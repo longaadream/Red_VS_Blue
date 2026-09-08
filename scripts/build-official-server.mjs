@@ -21,6 +21,7 @@ fs.cpSync(path.join(root, 'public'), path.join(output, 'public'), { recursive: t
 fs.cpSync(path.join(root, '_client-postgres'), path.join(output, 'postgres'), { recursive: true })
 fs.copyFileSync(process.execPath, path.join(output, 'node.exe'))
 fs.copyFileSync(path.join(root, 'docs/technical/RED-196-OFFICIAL-SERVER.md'), path.join(output, 'START-HERE.md'))
+fs.copyFileSync(path.join(root, 'docs/technical/RED-193-FIRST-PLAYTEST.md'), path.join(output, 'RED-193-FIRST-PLAYTEST.md'))
 const command = argument => '@echo off\r\ncd /d "%~dp0"\r\nset "RVB_OFFICIAL_ROOT=%~dp0"\r\n"%~dp0node.exe" "%~dp0server.mjs" ' + argument + '\r\npause\r\n'
 fs.writeFileSync(path.join(output, 'Start-Official.cmd'), command(''))
 fs.writeFileSync(path.join(output, 'Configure-Mail.cmd'), command('--configure'))
