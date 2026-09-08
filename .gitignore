@@ -33,6 +33,9 @@ _server-stage/
 .vscode/
 .idea/
 .claude/settings.local.json
+.claude/worktrees/
+*.bak
+*.class
 
 # Database and runtime state
 *.db
@@ -41,6 +44,7 @@ _server-stage/
 *.sqlite-journal
 rooms.json
 logs/
+/output/homepage-preview/
 data/rooms/
 
 # Generated/imported resource packs
