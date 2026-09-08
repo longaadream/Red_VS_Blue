@@ -1,0 +1,115 @@
+{
+  "base": "0debcd34126803686719b9ce87a490fe4795d13d",
+  "trackedFiles": 1844,
+  "textFilesScanned": 1293,
+  "deletedBytes": 50676,
+  "files": [
+    {
+      "file": "scripts/stage-server-resources.js",
+      "bytes": 4007,
+      "sha256": "3ef1e571fb1a9b5f778771a98a6a3b1e1c9447fcdc85ecf65b1a042dbe5b97dc",
+      "references": [
+        {
+          "file": "docs/decisions/ADR-0003-electron-server-packaging.md",
+          "line": 153
+        },
+        {
+          "file": "eslint-suppressions.json",
+          "line": 327
+        }
+      ]
+    },
+    {
+      "file": "scripts/cleanup-server-resources.js",
+      "bytes": 339,
+      "sha256": "c5142a3b929195a46984870f83229642529cb097f6728c2ff8fa13287a4cfe98",
+      "references": [
+        {
+          "file": "docs/decisions/ADR-0003-electron-server-packaging.md",
+          "line": 153
+        },
+        {
+          "file": "eslint-suppressions.json",
+          "line": 317
+        }
+      ]
+    },
+    {
+      "file": "scripts/migrate-player-ids.js",
+      "bytes": 5065,
+      "sha256": "651551594145f447fa3330ccc30ab514de0c80f27bbbfa8109a82f185a9b164b",
+      "references": [
+        {
+          "file": "eslint-suppressions.json",
+          "line": 322
+        }
+      ]
+    },
+    {
+      "file": "scripts/unlock-build.ps1",
+      "bytes": 1364,
+      "sha256": "97a620b5b2600c60a5936814fd8e607616a9d697210dab4196d9318e742ccc8e",
+      "references": []
+    },
+    {
+      "file": "ui-map-demo.html",
+      "bytes": 10141,
+      "sha256": "8bae7e5056d8f0ccb2ebb35d0855630240ce03cd8f213d41a451eee3875f2c3b",
+      "references": []
+    },
+    {
+      "file": "resource-icon-demo.html",
+      "bytes": 7307,
+      "sha256": "de999cfc29c591060b4d38455e994b98dee744810daa35b938958765720c213d",
+      "references": []
+    },
+    {
+      "file": "docker-compose.yml",
+      "bytes": 348,
+      "sha256": "ea9c87a2f9da4bd633d9764db5c834dec09610cef79ef7b2866bc4a180f5372c",
+      "references": []
+    },
+    {
+      "file": "styles/globals.css",
+      "bytes": 4478,
+      "sha256": "9f9f5625b7009f197c34e66ea62ccd5d1b9da375fe5725db6a6052fae08330a5",
+      "references": []
+    },
+    {
+      "file": "public/placeholder-logo.png",
+      "bytes": 568,
+      "sha256": "d7c39d978af643ba9525de6fb8171e0f834882db4110c82ecad0df3f4f69551a",
+      "references": []
+    },
+    {
+      "file": "public/placeholder-logo.svg",
+      "bytes": 3208,
+      "sha256": "19a9e968f4656d52a4c249b4056117ad109370ba9da51cdc630ddded74cec73b",
+      "references": []
+    },
+    {
+      "file": "public/placeholder-user.jpg",
+      "bytes": 1635,
+      "sha256": "22be067d748175598a5e00123902f5c8332dd7f101de03dfb92ec08d85bb5e53",
+      "references": []
+    },
+    {
+      "file": "public/placeholder.jpg",
+      "bytes": 1064,
+      "sha256": "14be0c7aa11cca1e78f0966176b286a6d36d00ec64be027775dfeb33d8e2dfdf",
+      "references": []
+    },
+    {
+      "file": "public/placeholder.svg",
+      "bytes": 3253,
+      "sha256": "64badf7aabda0b9630b87020ffb6095cb858ccbcf66b355c2aa08b1063954d3b",
+      "references": []
+    },
+    {
+      "file": "fi/iki/elonen/NanoWSD$WebSocket.class",
+      "bytes": 7899,
+      "sha256": "d330f1dbc12f5318a7eb5f77dd68fc859bcc22b00111a2621ad380fd92a9ce8f",
+      "references": []
+    }
+  ]
+}
