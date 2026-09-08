@@ -1,5 +1,6 @@
 import { areMatchAllies } from './match-teams'
 import { addPieceStatus, removePieceStatus, expireHolderStatuses, type StatusHolder } from './status-lifecycle'
+import { checkpointBattlePresentation, recordBattlePresentationBlock, createBattlePresentationQueue } from './battle-presentation-recording'
 import { createFlowRuntime, clearRemovedPieceFlowState } from './flow-runtime'
 import { changePiecePositions, type PiecePositionChange } from './position-change'
 import type { PositionChangeKind } from './spatial'
@@ -3703,10 +3704,15 @@ function resolveDamageBatch(
     battle,
   ))
   for (const entry of prepared) {
+    recordBattlePresentationBlock({ sourcePieceId: request.attacker.instanceId,
+      actorPlayerId: request.attacker.ownerPlayerId, skillId: request.skillId },
+    entry.target.instanceId, entry.result.shieldAbsorbed, entry.result.blocked)
     if (entry.result.damage <= 0) continue
     entry.target.currentHp = Math.max(0, entry.hpBefore - entry.result.damage)
     entry.result.targetHp = entry.target.currentHp
   }
+  checkpointBattlePresentation(battle, { kind: 'damage', id: context.batchId,
+    sourcePieceId: request.attacker.instanceId, actorPlayerId: request.attacker.ownerPlayerId, skillId: request.skillId })
 
   for (const entry of prepared) {
     const shared = {
@@ -3975,6 +3981,8 @@ function resolveHealBatch(
     if (!entry.result.blocked) entry.target.currentHp = entry.nextHp
     entry.result.targetHp = entry.target.currentHp
   }
+  checkpointBattlePresentation(battle, { kind: 'heal', id: context.batchId,
+    sourcePieceId: request.healer.instanceId, actorPlayerId: request.healer.ownerPlayerId, skillId: request.skillId })
   for (const entry of prepared) {
     if (entry.result.blocked) {
       appendHealBlockedMessage(
@@ -5302,6 +5310,7 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
         forceRemoveEnemyPieceById,
         changePositions: (changes: PiecePositionChange[], kind: PositionChangeKind) => changePiecePositions(battle, changes, kind),
         summonQueue: sealedContent.summonQueue,
+        presentationQueue: createBattlePresentationQueue(battle),
       },
       // 源棋子（直接引用，可读写）
       sourcePiece,

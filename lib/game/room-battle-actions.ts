@@ -1,4 +1,5 @@
 import type { GameProfileIdentityV1 } from '../content-pipeline/runtime/profile-game-identity'
+import { recordBattlePresentation } from './battle-presentation-recording'
 import {
   createServerBattleStateV1,
   getBattleStorage,
@@ -665,15 +666,16 @@ export async function dispatchRoomBattleAction(
       let submittedActionResult: BattleActionResult
       try {
         const rulesStartedAt = monotonicNow()
-        submittedActionResult = runBattleAction(state, actionToApply, {
+        const executionContext = roomRuleRuntime.executionContext
+        submittedActionResult = recordBattlePresentation(state, () => runBattleAction(state, actionToApply, {
           rootSeed: storage.rootSeed,
           stateHashIndex: getAuthorityStateHashIndex(
             normalizedRoomId,
             authorityVersion,
             state,
           ),
-          ruleExecutionContext: roomRuleRuntime.executionContext,
-        })
+          ruleExecutionContext: executionContext,
+        }), result => result.state)
         pinBattleProfileIdentityV1(
           submittedActionResult.state,
           storage.profileIdentity,

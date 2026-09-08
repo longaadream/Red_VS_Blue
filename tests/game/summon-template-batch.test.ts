@@ -2,6 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { hashBattleState } from '@/lib/game/battle-trace'
+import { recordBattlePresentation, recordedBattlePresentation } from '@/lib/game/battle-presentation-recording'
 import {
   createEffectChain,
   EffectChainFatalError,
@@ -573,7 +574,7 @@ describe('RED-139 internal template SummonBatch handler', () => {
       },
     ) as any)
 
-    const result = runTemplateFacade(
+    const result = recordBattlePresentation(state, () => runTemplateFacade(
       state,
       {
         templateId: 'summon-alpha',
@@ -583,9 +584,10 @@ describe('RED-139 internal template SummonBatch handler', () => {
         y: 1,
       },
       { 'summon-alpha': { id: 'summon-alpha', name: 'Alpha', rules: [] } },
-    )
+    ), () => state)
 
     expect(result).toMatchObject({ success: false, blocked: true })
+    expect(recordedBattlePresentation(state)).toEqual([])
     expect(hashBattleState(state)).toBe(beforeHash)
     expect(state.pieces).toBe(pieces)
     expect(state.players).toBe(players)

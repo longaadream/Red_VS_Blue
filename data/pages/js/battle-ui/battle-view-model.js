@@ -175,9 +175,9 @@
     }
   }
 
-  function normalizeEffect(effect, index) {
+  function normalizeEffect(effect) {
     return {
-      id: String(effect.id || effect.instanceId || effect.effectId || ('effect-' + index)),
+      id: String(effect.id || effect.instanceId || effect.effectId || ((effect.tileType || effect.type || 'effect') + ':' + numberOr(effect.x, 0) + ',' + numberOr(effect.y, 0) + ':' + (effect.sourceId || ''))),
       type: String(effect.tileType || effect.type || 'effect'),
       icon: String(effect.icon || ''),
       x: numberOr(effect.x, 0),
@@ -264,6 +264,10 @@
       if (!event || typeof event !== 'object' || !event.eventId || !event.rootEventId || !event.kind) return []
       return [{
         eventId: String(event.eventId),
+        batchId: event.batchId ? String(event.batchId) : undefined,
+        pieceSnapshot: event.pieceSnapshot ? normalizePiece(Object.assign({}, event.pieceSnapshot, {
+          instanceId: event.pieceSnapshot.id, currentHp: event.pieceSnapshot.hp,
+        }), { pieceTemplates: templates || {} }) : undefined,
         rootEventId: String(event.rootEventId),
         parentEventId: event.parentEventId ? String(event.parentEventId) : null,
         actionId: String(event.actionId || ''),
@@ -380,5 +384,6 @@
     normalizeCells: normalizeCells,
     normalizeSkillSummaries: normalizeSkillSummaries,
     normalizePresentationEvents: normalizePresentationEvents,
+    normalizeStatuses: normalizeStatuses,
   }
 })(typeof window !== 'undefined' ? window : globalThis)

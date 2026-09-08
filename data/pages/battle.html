@@ -2084,9 +2084,9 @@
       if (method === 'PUT') {
         if (!body || !body.action || !body.battleState) throw new Error('Missing action or battleState')
         const cloned = Engine.safeCloneBattleState(body.battleState)
-        const next = tutorialActive && tutorialDefinition
+        const next = Engine.recordBattlePresentation(cloned, () => tutorialActive && tutorialDefinition
           ? Engine.runBattleAction(cloned, body.action, { rootSeed: tutorialDefinition.rootSeed }).state
-          : Engine.applyBattleAction(cloned, body.action)
+          : Engine.applyBattleAction(cloned, body.action), state => state)
         // runBattleAction deliberately strips the presentation-only skill cache
         // from its authoritative result; the browser needs it again for the
         // next target preview and for rendering skill details.
@@ -3139,6 +3139,7 @@
     }
 
     function spawnStateFloaters(oldG, newG, eventKey) {
+      if (typeof battlePresentation !== 'undefined' && battlePresentation && battlePresentation.sequencesBoard) return
       if (!oldG || !newG || !oldG.pieces || !newG.pieces) return
       const stableKey = eventKey || battleStateMotionKey(newG)
       if (stateFloaterEventKeys.has(stableKey)) return

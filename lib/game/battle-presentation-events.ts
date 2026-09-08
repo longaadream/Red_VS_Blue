@@ -1,5 +1,6 @@
 import type { BattleAction, BattleActionLog, BattleState } from './turn'
 import { traceProjectile } from './spatial'
+import { recordedBattlePresentation } from './battle-presentation-recording'
 
 export type BattlePresentationEventKind =
   | 'move'
@@ -88,6 +89,10 @@ export interface BattlePresentationEvent {
   parentEventId?: string
   actionId: string
   sequence: number
+  /** Only equal explicit batches of the same kind may animate together. */
+  batchId?: string
+  /** Public appearance at the instant of a spawn, even if it dies in this action. */
+  pieceSnapshot?: { id: string; templateId: string; name: string; ownerPlayerId: string; faction: string; x: number; y: number; hp: number; maxHp: number }
   kind: BattlePresentationEventKind
   iconId: string
   label?: string
@@ -562,6 +567,7 @@ function structuredActionDrafts(entries: BattleActionLog[]): EventDraft[] {
     drafts.push({
       kind: 'damage',
       iconId: 'action-damage',
+      ...(text(payload.batchId) ? { batchId: text(payload.batchId) } : {}),
       actorPlayerId: text(entry.playerId),
       ...(text(payload.sourceId) ? { sourcePieceId: text(payload.sourceId) } : {}),
       targetPieceIds: [targetId],
@@ -620,7 +626,7 @@ function statusValues(entity: Record<string, unknown>): Record<string, unknown>[
   ))
 }
 
-function snapshotStatuses(state: BattleState): Map<string, StatusSnapshot> {
+export function snapshotBattlePresentationStatuses(state: BattleState): Map<string, StatusSnapshot> {
   const snapshots = new Map<string, StatusSnapshot>()
   const capture = (entityKind: StatusSnapshot['entityKind'], entityId: string, entity: Record<string, unknown>) => {
     for (const status of statusValues(entity)) {
@@ -629,7 +635,8 @@ function snapshotStatuses(state: BattleState): Map<string, StatusSnapshot> {
       if (!statusType || HIDDEN_STATUS_TYPES.has(statusType)) continue
       const statusId = text(status.id) ?? statusType
       const key = [entityKind, entityId, statusId, statusType].join(':')
-      snapshots.set(key, { entityKind, entityId, statusId, statusType, status })
+      snapshots.set(key, { entityKind, entityId, statusId, statusType,
+        status: { name: text(status.name), ...statusResult(status) } })
     }
   }
   for (const piece of state.pieces) capture('piece', piece.instanceId, piece as unknown as Record<string, unknown>)
@@ -662,6 +669,7 @@ function statusDraft(snapshot: StatusSnapshot, added: boolean, command: Record<s
     ...target,
     statusId: snapshot.statusId,
     statusType: snapshot.statusType,
+    label: text(snapshot.status.name),
     ...(result ? { result } : {}),
     complement: { kind: 'status', id: snapshot.statusId, type: snapshot.statusType },
     priority: 50,
@@ -670,8 +678,8 @@ function statusDraft(snapshot: StatusSnapshot, added: boolean, command: Record<s
 }
 
 function statusDrafts(command: Record<string, unknown>, beforeState: BattleState, afterState: BattleState): EventDraft[] {
-  const before = snapshotStatuses(beforeState)
-  const after = snapshotStatuses(afterState)
+  const before = snapshotBattlePresentationStatuses(beforeState)
+  const after = snapshotBattlePresentationStatuses(afterState)
   const beforePieceIds = new Set(beforeState.pieces.map(piece => piece.instanceId))
   const afterPieceIds = new Set(afterState.pieces.map(piece => piece.instanceId))
   const existsAcrossTransition = (snapshot: StatusSnapshot) => snapshot.entityKind === 'player'
@@ -685,6 +693,14 @@ function statusDrafts(command: Record<string, unknown>, beforeState: BattleState
     .sort(([left], [right]) => left.localeCompare(right))
     .map(([, snapshot]) => statusDraft(snapshot, true, command))
   return [...removed, ...added]
+}
+
+export function diffBattlePresentationStatuses(before: Map<string, StatusSnapshot>, after: Map<string, StatusSnapshot>): EventDraft[] {
+  return [
+    ...[...before].filter(([key]) => !after.has(key)).map(([, status]) => statusDraft(status, false, {})),
+    ...[...after].filter(([key, status]) => !before.has(key) || JSON.stringify(before.get(key)?.status) !== JSON.stringify(status.status))
+      .map(([, status]) => statusDraft(status, true, {})),
+  ]
 }
 
 function resourceDrafts(command: Record<string, unknown>, beforeState: BattleState, afterState: BattleState): EventDraft[] {
@@ -819,30 +835,32 @@ function tileDrafts(command: Record<string, unknown>, beforeState: BattleState, 
   return drafts
 }
 
-type TileEffectSnapshot = { id: string; type: string; x: number; y: number }
+type TileEffectSnapshot = { id: string; type: string; x: number; y: number; icon: string }
 
-function tileEffects(state: BattleState): Map<string, TileEffectSnapshot> {
+export function snapshotBattlePresentationTileEffects(state: BattleState): Map<string, TileEffectSnapshot> {
   const effects = Array.isArray(state.extensions?.tileEffects) ? state.extensions.tileEffects : []
-  return new Map(effects.flatMap((effect: unknown, index: number) => {
+  return new Map(effects.flatMap((effect: unknown) => {
     if (!effect || typeof effect !== 'object') return []
     const record = effect as Record<string, unknown>
     const x = finite(record.x)
     const y = finite(record.y)
     const type = text(record.tileType) ?? text(record.type)
     if (x === undefined || y === undefined || !type) return []
-    const id = text(record.id) ?? text(record.instanceId) ?? `${type}:${x},${y}:${index}`
-    return [[id, { id, type, x, y }] as const]
+    const id = text(record.id) ?? text(record.instanceId) ?? text(record.effectId) ?? `${type}:${x},${y}:${text(record.sourceId) ?? ''}`
+    return [[id, { id, type, x, y, icon: text(record.icon) ?? '' }] as const]
   }))
 }
 
 function tileEffectDrafts(command: Record<string, unknown>, beforeState: BattleState, afterState: BattleState): EventDraft[] {
-  const before = tileEffects(beforeState)
-  const after = tileEffects(afterState)
+  return diffBattlePresentationTileEffects(snapshotBattlePresentationTileEffects(beforeState), snapshotBattlePresentationTileEffects(afterState), command)
+}
+
+export function diffBattlePresentationTileEffects(before: Map<string, TileEffectSnapshot>, after: Map<string, TileEffectSnapshot>, command: Record<string, unknown> = {}): EventDraft[] {
   const make = (effect: TileEffectSnapshot, added: boolean): EventDraft => ({
     kind: added ? 'tileEffectAdded' : 'tileEffectRemoved',
     iconId: added ? 'action-tile-effect-add' : 'action-tile-effect-remove',
     actorPlayerId: text(command.playerId), targetCell: { x: effect.x, y: effect.y },
-    result: { effectType: effect.type },
+    result: { effectId: effect.id, effectType: effect.type, icon: effect.icon },
     complement: { kind: 'tileEffect', id: effect.id, type: effect.type },
     priority: 50, skippable: true,
   })
@@ -915,15 +933,17 @@ export function projectBattlePresentationEvents(
   const actionId = text(input.actionId)
   if (!actionId) return []
   const command = commandRecord(input.command)
+  const recorded = recordedBattlePresentation(input.afterState)
+  const structured = structuredActionDrafts(appendedActions(input.beforeState, input.afterState))
   let children = [
-    ...structuredActionDrafts(appendedActions(input.beforeState, input.afterState)),
-    ...healDrafts(command, input.beforeState, input.afterState),
-    ...statusDrafts(command, input.beforeState, input.afterState),
-    ...pieceDrafts(command, input.beforeState, input.afterState),
+    ...(recorded ?? structured),
+    ...(recorded ? [] : healDrafts(command, input.beforeState, input.afterState)),
+    ...(recorded ? [] : statusDrafts(command, input.beforeState, input.afterState)),
+    ...pieceDrafts(command, input.beforeState, input.afterState).filter(event => !recorded || event.kind === 'statChanged'),
     ...resourceDrafts(command, input.beforeState, input.afterState),
     ...handDrafts(command, input.beforeState, input.afterState),
     ...tileDrafts(command, input.beforeState, input.afterState),
-    ...tileEffectDrafts(command, input.beforeState, input.afterState),
+    ...(recorded ? [] : tileEffectDrafts(command, input.beforeState, input.afterState)),
   ]
   const seenDeaths = new Set<string>()
   children = children.filter(draft => {
@@ -941,6 +961,18 @@ export function projectBattlePresentationEvents(
     skippable: true,
   } : undefined)
   if (!root) return []
+  if (recorded && root.kind === 'move') {
+    const index = children.findIndex(event => event.kind === 'forceMove' && event.targetPieceIds?.[0] === root.sourcePieceId)
+    if (index >= 0) {
+      root.result = children[index].result
+      root.targetCell = children[index].targetCell
+      children.splice(index, 1)
+    } else {
+      // Pending/blocked attempts did not commit a relocation.
+      delete root.result
+      delete root.presentation
+    }
+  }
   if (isPrivateResult(command, input.beforeState) || hasPrivateTrigger(input.beforeState, input.afterState)) {
     const viewerId = root.actorPlayerId
     children = children.map(draft => markPrivate(draft, viewerId))

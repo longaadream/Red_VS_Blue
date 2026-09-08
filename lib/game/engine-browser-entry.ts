@@ -16,6 +16,7 @@
 
 export { applyBattleAction, safeCloneBattleState, validateSkillActionByDryRun } from './turn'
 export { getBattleRootSeed, hashBattleState, hashStable, runBattleAction } from './battle-runner'
+export { recordBattlePresentation, createBattlePresentationQueue } from './battle-presentation-recording'
 export {
   projectBattlePresentationEvents,
   projectBattlePresentationEventsForViewer,

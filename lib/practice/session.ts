@@ -1,5 +1,6 @@
 import { planShortSearchAction, type ShortSearchContinuation } from '../game/ai-short-search'
 import { runBattleActionIsolated } from '../game/battle-runner'
+import { recordBattlePresentation } from '../game/battle-presentation-recording'
 import { toPublicBattleState } from '../game/deployment'
 import { getCurrentInputOwnerPlayerId } from '../game/turn-timer'
 import type { BattleAction, BattleState } from '../game/turn'
@@ -51,7 +52,8 @@ export class PracticeSession {
 
   private commit(action: BattleAction) {
     const before = this.state
-    const result = runBattleActionIsolated(before, action, { rootSeed: this.seed })
+    const result = recordBattlePresentation(before,
+      () => runBattleActionIsolated(before, action, { rootSeed: this.seed }), result => result.state)
     this.state = result.state
     this.revision++
     const events = projectBattlePresentationEventsForViewer(projectBattlePresentationEvents({

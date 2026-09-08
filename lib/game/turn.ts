@@ -27,6 +27,7 @@ function writeLog(message: string) {
 
 // 重新导出类型，保持向后兼容
 import type { BoardMap } from "./map"
+import { presentationRecordingRollback } from './battle-presentation-recording'
 import { expireOwnerStatuses } from './status-lifecycle'
 import { statusEventSink, expirePlayerStatuses, addStatusWithEvents, addPlayerStatusWithEvents, createSkillCodeFlow } from './skills'
 import { changePiecePositions, type PiecePositionChange } from './position-change'
@@ -4666,11 +4667,13 @@ export function resolveTemplateSummonBatch<TTemplate extends TemplateSummonSourc
 ): TemplateSummonBatchResult {
   const chainSnapshot = chain.snapshot()
   const battleCheckpoint = captureBattleMutationCheckpoint(battle)
+  const restorePresentation = presentationRecordingRollback()
   const triggerSystem = getActiveTriggerSystem()
   const triggerSnapshot = triggerSystem.snapshotTransactionState()
   const ruleRuntime = getActiveRuleRuntime()
   const ruleRuntimeSnapshot = ruleRuntime?.snapshot()
   const restoreTransaction = (): void => {
+    restorePresentation()
     restoreBattleMutationCheckpoint(battle, battleCheckpoint)
     triggerSystem.restoreTransactionState(triggerSnapshot)
     if (ruleRuntime && ruleRuntimeSnapshot) ruleRuntime.restore(ruleRuntimeSnapshot)

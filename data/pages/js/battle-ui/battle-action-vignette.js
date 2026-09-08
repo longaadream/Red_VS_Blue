@@ -22,6 +22,10 @@
 
   function groupEvents(events) {
     const byRoot = new Map()
+    const rootOrder = new Map()
+    ;(Array.isArray(events) ? events : []).forEach(function (event) {
+      if (event && event.rootEventId && !rootOrder.has(String(event.rootEventId))) rootOrder.set(String(event.rootEventId), rootOrder.size)
+    })
     ;(Array.isArray(events) ? events : []).slice().sort(eventOrder).forEach(function (event) {
       if (!event || !event.eventId || !event.rootEventId) return
       const rootId = String(event.rootEventId)
@@ -48,17 +52,21 @@
           children: group.children.sort(eventOrder),
         }
       })
-      .sort(function (left, right) { return eventOrder(left.root, right.root) })
+      .sort(function (left, right) {
+        return Number(left.root.sequence || 0) - Number(right.root.sequence || 0)
+          || rootOrder.get(left.rootEventId) - rootOrder.get(right.rootEventId)
+      })
       .flatMap(function (group) {
-        // Pending announcements have their own identity, but keep the causal
-        // root intact for board effects and the action history.
-        const reactions = group.children.filter(function (event) {
-          return event.kind === 'passive' && (event.skillId || event.ruleId) && event.sourcePieceId
-            && event.result && event.result.pending === true
-        }).map(function (event) {
-          return { rootEventId: event.eventId, root: event, children: [] }
+        const beats = []
+        ;[group.root].concat(group.children).forEach(function (event) {
+          const previous = beats[beats.length - 1]
+          const simultaneous = ['damage', 'heal', 'spawn', 'death', 'statusAdded', 'statusRemoved', 'tileEffectAdded', 'tileEffectRemoved'].includes(event.kind)
+            && event.batchId && previous && previous.root.kind === event.kind
+            && previous.root.batchId === event.batchId
+          if (simultaneous) previous.children.push(event)
+          else beats.push({ rootEventId: event.eventId, root: event, children: [], identityEvents: [group.root].concat(group.children) })
         })
-        return [group].concat(reactions)
+        return beats
       })
   }
 
@@ -169,12 +177,14 @@
       const groups = groupEvents(model.presentationEvents)
       const isViewerTurn = !!(model.turn && model.turn.isViewerTurn)
       if (!primed) {
-        groups.forEach(function (group) { remember(group.rootEventId) })
+        groups.forEach(function (group) { remember(group.root.rootEventId) })
         primed = true
         lastIsViewerTurn = isViewerTurn
         return
       }
-      const incoming = groups.filter(function (group) { return remember(group.rootEventId) })
+      const freshRoots = new Set()
+      groups.forEach(function (group) { if (remember(group.root.rootEventId)) freshRoots.add(group.root.rootEventId) })
+      const incoming = groups.filter(function (group) { return freshRoots.has(group.root.rootEventId) })
       const controlReturnedToViewer = !forcePlayback && lastIsViewerTurn === false && isViewerTurn
       lastIsViewerTurn = isViewerTurn
       const hasPendingBanner = [active].concat(pending, incoming).some(function (group) {
@@ -225,6 +235,10 @@
 
     return {
       update: update,
+      reset: function (model) {
+        settleAll(); playedRoots.clear(); playedOrder.length = 0; primed = false
+        update(model)
+      },
       skip: skip,
       setSpeed: setSpeed,
       settleAll: settleAll,
@@ -315,6 +329,9 @@
     let suppressClickUntil = 0
     let speed = 1
     let displayedCard = null
+    let playbackPhase = null
+    let playbackIdle = null
+    let getPlaybackModel = null
 
     const queue = createQueue({
       reducedMotion: reducedMotion,
@@ -325,6 +342,7 @@
       onPhase: function (phase, group) {
         currentPhase = phase
         currentGroup = group
+        if (playbackPhase) playbackPhase(phase, group)
         render()
       },
       onIdle: function () {
@@ -334,6 +352,7 @@
         if (clearAreaFlash) clearAreaFlash()
         if (clearPath) clearPath()
         if (layer) layer.hidden = true
+        if (playbackIdle) playbackIdle()
       },
     })
 
@@ -349,7 +368,7 @@
     function resolveIdentity(event) {
       return actionIdentity && typeof actionIdentity.resolve === 'function'
         ? actionIdentity.resolve(event, Object.assign({}, model, {
-          presentationEvents: currentGroup ? [currentGroup.root].concat(currentGroup.children || []) : [],
+          presentationEvents: currentGroup ? currentGroup.identityEvents || [currentGroup.root].concat(currentGroup.children || []) : [],
         }))
         : { isSkill: false, skillName: '', sourceName: '', portraitSrc: '', portraitFallback: '?', faction: '' }
     }
@@ -399,7 +418,7 @@
       const meta = resolveIcon(rootEvent)
       const identity = resolveIdentity(rootEvent)
       const card = cardDisplay(rootEvent)
-      const cells = eventCells(currentGroup, model)
+      const cells = eventCells(currentGroup, getPlaybackModel ? getPlaybackModel() : model)
       const cue = rootEvent.presentation && rootEvent.presentation.cue || 'directional'
       const actionLabel = identity.isSkill ? identity.skillName : (meta.label || '战场动作')
       const resultVisible = currentPhase === 'result' || currentPhase === 'settle' || currentPhase === 'static'
@@ -511,6 +530,9 @@
 
     function mount(mountOptions) {
       const mountInput = mountOptions || {}
+      playbackPhase = typeof mountInput.onPlaybackPhase === 'function' ? mountInput.onPlaybackPhase : null
+      playbackIdle = typeof mountInput.onPlaybackIdle === 'function' ? mountInput.onPlaybackIdle : null
+      getPlaybackModel = typeof mountInput.getPlaybackModel === 'function' ? mountInput.getPlaybackModel : null
       boardContainer = mountInput.boardContainer || null
       floatLayer = mountInput.floatLayer || null
       showAreaFlash = typeof mountInput.showAreaFlash === 'function' ? mountInput.showAreaFlash : null
@@ -574,17 +596,22 @@
       currentPhase = null
       currentGroup = null
       displayedCard = null
+      playbackPhase = null
+      playbackIdle = null
+      getPlaybackModel = null
     }
 
     return {
       mount: mount,
       update: update,
+      reset: function (nextModel) { model = nextModel; queue.reset(nextModel) },
       resize: resize,
       dispose: dispose,
       skip: queue.skip,
       settleAll: queue.settleAll,
       setSpeed: setSpeed,
       getDiagnostics: queue.getDiagnostics,
+      sequencesBoard: true,
     }
   }
 
