@@ -20,15 +20,19 @@ CREATE TABLE IF NOT EXISTS official_drops(match_id TEXT NOT NULL REFERENCES offi
 CREATE TABLE IF NOT EXISTS official_cooldowns(account_id TEXT PRIMARY KEY REFERENCES official_accounts(id),until_at TIMESTAMPTZ NOT NULL);
 CREATE TABLE IF NOT EXISTS official_audit(id BIGSERIAL PRIMARY KEY,action TEXT NOT NULL,detail JSONB NOT NULL,created_at TIMESTAMPTZ NOT NULL DEFAULT now());
 ALTER TABLE official_matches ADD COLUMN IF NOT EXISTS actor_closed BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE official_accounts ADD COLUMN IF NOT EXISTS ranked_disabled BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE official_settings ADD COLUMN IF NOT EXISTS max_matches INTEGER CHECK(max_matches BETWEEN 1 AND 50);
+ALTER TABLE official_settings ADD COLUMN IF NOT EXISTS announcement TEXT NOT NULL DEFAULT '';
 CREATE INDEX IF NOT EXISTS official_matches_status ON official_matches(status);
 `
 type Match = { id: string; season_id: string; first_id: string; second_id: string; status: string; result: unknown; created_at: Date }
 export type RankedRoomHooks = {
   capability: string
+  canRestore?(roomId: string): Promise<boolean>
   authorize(roomId: string, playerId: string, token: unknown, spectator?: boolean): Promise<Account>
   longDrop(roomId: string, playerId: string): Promise<void>
 }
-type Lifecycle = { create(id: string, first: string): Promise<void>; dispose(id: string, onlyIfUnstarted?: boolean): Promise<boolean> }
+type Lifecycle = { create(id: string, first: string): Promise<void>; dispose(id: string, onlyIfUnstarted?: boolean): Promise<boolean>; revokeAccount?(id: string): Promise<void>; freeze?(id: string): Promise<void> }
 export class Ranked {
   readonly capability = randomUUID()
   private lifecycle?: Lifecycle
@@ -36,11 +40,16 @@ export class Ranked {
   private busy = false
   private stopping = false
   private lastError = ''
-  constructor(readonly pool: Pool, readonly accounts: Accounts, readonly maxMatches = 10) {
+  constructor(readonly pool: Pool, readonly accounts: Accounts, private capacity = 10) {
+    const maxMatches = capacity
     if (!Number.isInteger(maxMatches) || maxMatches < 1 || maxMatches > 50) throw new Error('排位并发局数须为1–50')
   }
   private async lock(client: PoolClient) { await client.query('SELECT pg_advisory_xact_lock(196196)') }
-  async initialize() { await this.pool.query(RANKED_SCHEMA) }
+  get maxMatches() { return this.capacity }
+  async initialize() {
+    await this.pool.query(RANKED_SCHEMA)
+    this.capacity = (await this.pool.query('UPDATE official_settings SET max_matches=coalesce(max_matches,$1) RETURNING max_matches', [this.capacity])).rows[0].max_matches
+  }
   async start(lifecycle: Lifecycle) {
     this.lifecycle = lifecycle
     // Queues are leases, not promises to start a game after a server restart.
@@ -50,6 +59,7 @@ export class Ranked {
   }
   async stop() { this.stopping = true; if (this.timer) clearInterval(this.timer); while (this.busy) await new Promise(resolve => setTimeout(resolve, 20)) }
   health() { return { maxMatches: this.maxMatches, settlementHealthy: !this.lastError } }
+  async canRestore(roomId: string) { return !!(await this.pool.query("SELECT 1 FROM official_matches WHERE id=$1 AND status='assigned'", [roomId])).rowCount }
   async authorize(roomId: string, playerId: string, token: unknown, spectator = false) {
     const account = await this.accounts.authenticate(token)
     if (account.id !== playerId) throw new OfficialError('账号与对局身份不匹配', 403)
@@ -63,6 +73,8 @@ export class Ranked {
     if (this.stopping || this.lastError) throw new OfficialError('服务器正在维护，请稍后重试', 503)
     await transaction(this.pool, async client => {
       await this.lock(client)
+      const account = (await client.query('SELECT banned,ranked_disabled FROM official_accounts WHERE id=$1', [accountId])).rows[0]
+      if (!account || account.banned || account.ranked_disabled) throw new OfficialError('该账号的排位资格已被限制', 403)
       if ((await client.query('SELECT maintenance FROM official_settings')).rows[0].maintenance) throw new OfficialError('排位正在维护', 503)
       if ((await client.query('SELECT 1 FROM official_claims WHERE account_id=$1', [accountId])).rowCount) throw new OfficialError('请先完成当前比赛', 409)
       if ((await client.query('SELECT 1 FROM official_cooldowns WHERE account_id=$1 AND until_at>now()', [accountId])).rowCount) throw new OfficialError('频繁长时间掉线，匹配冷却尚未结束', 429)
@@ -115,11 +127,11 @@ export class Ranked {
     let createdId: string | undefined
     try { await transaction(this.pool, async client => {
       await this.lock(client)
-      await client.query(`DELETE FROM official_queue WHERE seen_at<now()-interval '20 seconds' OR account_id IN (SELECT id FROM official_accounts WHERE banned)`)
+      await client.query(`DELETE FROM official_queue WHERE seen_at<now()-interval '20 seconds' OR account_id IN (SELECT id FROM official_accounts WHERE banned OR ranked_disabled)`)
       const settings = (await client.query('SELECT * FROM official_settings')).rows[0]
       if (settings.maintenance || this.stopping) return
       const count = Number((await client.query(`SELECT count(*) FROM official_matches WHERE status='assigned'`)).rows[0].count)
-      if (count >= this.maxMatches) return
+      if (count >= settings.max_matches) return
       const queue = (await client.query(`SELECT q.account_id FROM official_queue q WHERE NOT EXISTS (SELECT 1 FROM official_claims c WHERE c.account_id=q.account_id) ORDER BY q.created_at,q.account_id LIMIT 2`)).rows
       if (queue.length < 2) return
       const id = `ranked-${randomUUID()}`, first = queue[0].account_id as string, second = queue[1].account_id as string
@@ -182,7 +194,10 @@ export class Ranked {
       return true
     })
   }
-  async administer(action: string, value: string) {
+  async administer(action: string, value: string, reason = '') {
+    if (action === 'void-match') return this.voidMatch(value, reason)
+    if (reason.length > 300) throw new OfficialError('操作原因不能超过300字')
+    if (['kick', 'rank-disable', 'rank-enable', 'cooldown-clear', 'queue-clear', 'capacity', 'announcement'].includes(action) && !reason.trim()) throw new OfficialError('请填写操作原因')
     await transaction(this.pool, async client => {
       await this.lock(client)
       if (this.stopping) throw new OfficialError('服务正在停止', 503)
@@ -190,11 +205,23 @@ export class Ranked {
         if (!['on', 'off'].includes(value)) throw new OfficialError('维护状态须为 on 或 off')
         await client.query('UPDATE official_settings SET maintenance=$1', [value === 'on'])
       }
-      else if (action === 'ban' || action === 'unban') {
-        const updated = await client.query('UPDATE official_accounts SET banned=$2 WHERE id=$1', [value, action === 'ban'])
+      else if (['ban', 'unban', 'kick', 'rank-disable', 'rank-enable', 'cooldown-clear'].includes(action)) {
+        const updated = await client.query('SELECT id FROM official_accounts WHERE id=$1 FOR UPDATE', [value])
         if (!updated.rowCount) throw new OfficialError('账号不存在')
-        await client.query('DELETE FROM official_sessions WHERE account_id=$1', [value])
-        await client.query('DELETE FROM official_queue WHERE account_id=$1', [value])
+        if (action === 'ban' || action === 'unban') await client.query('UPDATE official_accounts SET banned=$2 WHERE id=$1', [value, action === 'ban'])
+        if (action === 'rank-disable' || action === 'rank-enable') await client.query('UPDATE official_accounts SET ranked_disabled=$2 WHERE id=$1', [value, action === 'rank-disable'])
+        if (['ban', 'unban', 'kick'].includes(action)) await client.query('DELETE FROM official_sessions WHERE account_id=$1', [value])
+        if (['ban', 'unban', 'kick', 'rank-disable'].includes(action)) await client.query('DELETE FROM official_queue WHERE account_id=$1', [value])
+        if (action === 'cooldown-clear') await client.query('DELETE FROM official_cooldowns WHERE account_id=$1', [value])
+      } else if (action === 'queue-clear') {
+        await client.query('DELETE FROM official_queue')
+      } else if (action === 'capacity') {
+        const capacity = Number(value)
+        if (!/^\d+$/.test(value) || !Number.isInteger(capacity) || capacity < 1 || capacity > 50) throw new OfficialError('并发上限须为1–50局')
+        await client.query('UPDATE official_settings SET max_matches=$1', [capacity])
+      } else if (action === 'announcement') {
+        if (value.length > 1000) throw new OfficialError('公告不能超过1000字')
+        await client.query('UPDATE official_settings SET announcement=$1', [value.trim()])
       } else if (action === 'season') {
         if (!/^[a-z0-9-]{1,40}$/.test(value)) throw new OfficialError('赛季编号须为小写字母、数字和连字符')
         if ((await client.query(`SELECT 1 FROM official_matches WHERE status='assigned' LIMIT 1`)).rowCount) throw new OfficialError('尚有比赛未完成，不能切换赛季')
@@ -202,8 +229,40 @@ export class Ranked {
         await client.query('UPDATE official_settings SET season_id=$1', [value])
         await client.query('DELETE FROM official_queue')
       } else throw new OfficialError('未知管理操作')
-      await client.query('INSERT INTO official_audit(action,detail) VALUES($1,$2)', [action, { value }])
+      await client.query('INSERT INTO official_audit(action,detail) VALUES($1,$2)', [action, { value, reason: reason.trim() }])
     })
+    if (action === 'capacity') this.capacity = Number(value)
+    if (['ban', 'kick'].includes(action)) await this.lifecycle?.revokeAccount?.(value)
+  }
+  private async voidMatch(id: string, reason: string) {
+    if (!reason.trim() || reason.length > 300) throw new OfficialError('请填写1–300字的作废原因')
+    await transaction(this.pool, async client => {
+      await this.lock(client)
+      if (this.stopping) throw new OfficialError('服务正在停止', 503)
+      const match = (await client.query('SELECT status FROM official_matches WHERE id=$1', [id])).rows[0]
+      if (!match) throw new OfficialError('对局不存在', 404)
+      if (match.status === 'settled') throw new OfficialError('已结算对局不能作废', 409)
+    })
+    // Never hold a database lock while waiting for the room's authority queue.
+    if (!this.lifecycle?.freeze) throw new OfficialError('当前服务无法安全关闭对局', 503)
+    await this.lifecycle.freeze(id)
+    const ended = await transaction(this.pool, async client => {
+      await this.lock(client)
+      const match = (await client.query('SELECT status FROM official_matches WHERE id=$1 FOR UPDATE', [id])).rows[0]
+      if (match.status === 'settled' || (await client.query('SELECT 1 FROM battle_terminal_barrier WHERE battle_id=$1', [id])).rowCount) return true
+      if (match.status === 'void') return false
+      await client.query(`UPDATE official_matches SET status='void',result=$2,finished_at=now() WHERE id=$1`, [id, { reason: reason.trim(), administrator: true }])
+      await client.query('DELETE FROM official_claims WHERE match_id=$1', [id])
+      await client.query('INSERT INTO official_audit(action,detail) VALUES($1,$2)', ['void-match', { value: id, reason: reason.trim() }])
+      return false
+    })
+    if (ended) {
+      await this.settle(id); await this.lifecycle.dispose(id)
+      await this.pool.query('UPDATE official_matches SET actor_closed=TRUE WHERE id=$1', [id])
+      throw new OfficialError('对局已结束，保留正常结算，不能作废', 409)
+    }
+    await this.lifecycle.dispose(id)
+    await this.pool.query('UPDATE official_matches SET actor_closed=TRUE WHERE id=$1', [id])
   }
   async prepareShutdown() {
     await transaction(this.pool, async client => {

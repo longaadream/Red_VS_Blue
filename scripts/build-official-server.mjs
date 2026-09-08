@@ -4,9 +4,11 @@ import { build } from 'esbuild'
 import { execFileSync } from 'node:child_process'
 
 const root = path.resolve(import.meta.dirname, '..')
-const output = path.join(root, 'dist', 'official-server', 'win-x64')
+const variant = process.env.RVB_OFFICIAL_BUILD_VARIANT || 'win-x64'
+if (!/^[a-z0-9-]+$/.test(variant)) throw new Error('Invalid build variant')
+const output = path.join(root, 'dist', 'official-server', variant)
 if (fs.existsSync(output)) {
-  const resolved = fs.realpathSync.native(output), expected = path.join(fs.realpathSync.native(root), 'dist', 'official-server', 'win-x64')
+  const resolved = fs.realpathSync.native(output), expected = path.join(fs.realpathSync.native(root), 'dist', 'official-server', variant)
   if (resolved.toLowerCase() !== expected.toLowerCase()) throw new Error('Refusing to replace a build directory outside the expected workspace path')
   fs.rmSync(resolved, { recursive: true })
 }

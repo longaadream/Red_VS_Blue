@@ -10,6 +10,8 @@ import { findFreePort } from '../../electron-client/local-port'
 import { createOfficialServer } from '@/lib/server/official/server'
 import { digest } from '@/lib/server/official/accounts'
 import { eloChange } from '@/lib/server/official/ranked'
+import { roomAuthorityQueue } from '@/lib/game/room-authority-queue'
+import type { CandidateBattleStore } from '@/lib/server/colyseus/candidate-battle-store'
 import { getServerGameProfileIdentityV1 } from '@/lib/content-pipeline/runtime/profile-game-identity'
 import { getDemoPieceIds, getPieceById } from '@/lib/game/piece-repository'
 import type { PublicBattleSnapshot } from '@/lib/game/room-battle-actions'
@@ -28,7 +30,7 @@ beforeAll(async () => {
   })
   const connection = await pg.start()
   databaseUrl = connection.url
-  app = await createOfficialServer({ databaseUrl: connection.url, mail: async (to, purpose, code) => { mail.set(`${to}:${purpose}`, code) }, maxMatches: 2, reconnectGraceMs: 5000, adminToken: 'a'.repeat(43) })
+  app = await createOfficialServer({ databaseUrl: connection.url, mail: async (to: string, purpose: string, code: string) => { mail.set(`${to}:${purpose}`, code) }, maxMatches: 2, reconnectGraceMs: 5000, adminToken: 'a'.repeat(43) })
   const port = await findFreePort(38932); url = `http://127.0.0.1:${port}`
   await app.start(port)
 }, 90000)
@@ -220,7 +222,7 @@ it('does not cancel a concurrently starting game; refuses missing authority on r
   try { await preparing; expect(await closing).toBe(false) } finally { spy.mockRestore() }
   expect((await snapshot(a)).authorityVersion).toBeGreaterThanOrEqual(0)
   await a.leave(); await b.leave(); await app.close()
-  const port = Number(new URL(url).port), options = { databaseUrl, mail: async () => {}, reconnectGraceMs: 5000 }
+  const port = Number(new URL(url).port), options = { databaseUrl, mail: async (to: string, purpose: string, code: string) => { mail.set(`${to}:${purpose}`, code) }, reconnectGraceMs: 5000 }
   app = await createOfficialServer(options)
   const restore = app.repository.restoreRoom.bind(app.repository)
   const failed = vi.spyOn(app.repository, 'restoreRoom').mockImplementation(async battleId => { if (battleId === id) throw new Error('injected restore failure'); return restore(battleId) })
@@ -247,12 +249,63 @@ it('does not cancel a concurrently starting game; refuses missing authority on r
 }, 60000)
 
 
+it('administrator kick immediately disconnects the SDK session and permits a fresh login to reclaim its seat', async () => {
+  await app.pool.query('DELETE FROM official_rate_limits'); await app.ranked.administer('maintenance', 'off')
+  const first = await user(), second = await user(), id = await matched(first, second)
+  const a = await join(first, id)
+  await app.ranked.administer('kick', first.account.id, '测试踢人')
+  await vi.waitFor(() => expect(a.connection.isOpen).toBe(false))
+  expect((await http('/official/me', undefined, first.token)).status).toBe(401)
+  const login = await http('/official/auth/login', { email: first.account.email, password: 'A-test-password-123!' })
+  expect(login.status).toBe(200); first.token = login.body.token
+  const rejoined = await join(first, id); expect(rejoined.connection.isOpen).toBe(true)
+  await app.ranked.administer('void-match', id, '清理准备阶段测试')
+  await vi.waitFor(() => expect(rejoined.connection.isOpen).toBe(false))
+}, 25000)
+
+it('freezes live authority before voiding, rejects queued writes, preserves Elo and never restores the void actor', async () => {
+  await app.pool.query('DELETE FROM official_rate_limits'); await app.ranked.administer('maintenance', 'off')
+  const first = await user(), second = await user(), id = await matched(first, second)
+  const a = await join(first, id), b = await join(second, id)
+  const pieces = getDemoPieceIds().map(id => getPieceById(id)!).filter(p => p.faction === 'good').slice(0, 8).map(p => ({ templateId: p.id, faction: p.faction }))
+  for (const [room, user] of [[a, first], [b, second]] as const) await room.request('roomRpc', { method: 'rooms.action', data: { action: 'select-pieces', playerId: user.account.id, alignment: 'light', pieces, profileIdentity } })
+  const actor = matchMaker.getLocalRoomById(id) as unknown as { authorityStore: CandidateBattleStore; freezeOfficialMatch(): Promise<void> }
+  const store = actor.authorityStore, old = (await store.getRoom(id))!
+  let release!: () => void
+  const holding = roomAuthorityQueue.enqueue(id, { kind: 'system' }, () => new Promise<void>(resolve => { release = resolve }))
+  const frozen = actor.freezeOfficialMatch()
+  const blocked = ['player', 'timer', 'bot'].map(() => roomAuthorityQueue.enqueue(id, { kind: 'system' }, () => store.setRoom(id, old)).then(() => false, () => true))
+  release(); await holding; await frozen
+  expect(await Promise.all(blocked)).toEqual([true, true, true])
+  await app.ranked.administer('void-match', id, '卡住的测试对局')
+  await vi.waitFor(() => { expect(a.connection.isOpen).toBe(false); expect(b.connection.isOpen).toBe(false) })
+  expect((await app.ranked.status(first.account.id)).matchId).toBeNull()
+  expect((await app.ranked.status(first.account.id)).rating.games).toBe(0)
+  await expect(store.setRoomIfVersion(id, old, old.version ?? 0)).rejects.toThrow('管理员关闭')
+  expect(await app.ranked.settle(id)).toBe(false)
+  await app.close(); app = await createOfficialServer({ databaseUrl, mail: async (to: string, purpose: string, code: string) => { mail.set(`${to}:${purpose}`, code) } }); await app.start(Number(new URL(url).port))
+  expect(matchMaker.getLocalRoomById(id)).toBeUndefined()
+  expect((await http('/rooms/' + id)).status).toBe(404)
+  expect((await app.pool.query('SELECT status FROM official_matches WHERE id=$1', [id])).rows[0].status).toBe('void')
+  await expect(app.ranked.authorize(id, first.account.id, first.token)).rejects.toThrow('取消')
+}, 40000)
+
+it('preserves normal terminal settlement when an administrator attempts to void an ended match', async () => {
+  await app.pool.query('DELETE FROM official_rate_limits')
+  const first = await user(), second = await user(), id = await matched(first, second)
+  await finish(first, second, id)
+  await expect(app.ranked.administer('void-match', id, '晚到的异常报告')).rejects.toThrow(/已结算|已结束/)
+  await app.ranked.settle(id)
+  expect((await app.ranked.status(first.account.id)).rating.games).toBe(1)
+  expect((await app.pool.query('SELECT status FROM official_matches WHERE id=$1', [id])).rows[0].status).toBe('settled')
+}, 30000)
+
 it('releases the listener and pool even when the durability journal fails during shutdown', async () => {
   const failed = vi.spyOn(app.journal, 'close').mockRejectedValueOnce(new Error('injected durability failure'))
   try { await expect(app.close()).rejects.toThrow('落盘或关闭失败') } finally { failed.mockRestore() }
   await expect(fetch(url + '/official/info')).rejects.toThrow()
   expect(app.pool.totalCount).toBe(0)
-  app = await createOfficialServer({ databaseUrl, mail: async () => {} }); await app.start(Number(new URL(url).port))
+  app = await createOfficialServer({ databaseUrl, mail: async (to: string, purpose: string, code: string) => { mail.set(`${to}:${purpose}`, code) } }); await app.start(Number(new URL(url).port))
 }, 20000)
 
 })

@@ -338,6 +338,7 @@ export function createColyseusBattleServer(options: CreateColyseusBattleServerOp
     const roomIds = await repository.listRestorableRoomIds?.() ?? []
     const restoredRoomIds: string[] = []
     for (const battleId of roomIds) {
+      if (options.official?.canRestore && !await options.official.canRestore(battleId)) continue
       try {
           await matchMaker.createRoom(BATTLE_ROOM_TYPE, { product: true, restore: true, battleId, restoreCapability })
         restoredRoomIds.push(battleId)

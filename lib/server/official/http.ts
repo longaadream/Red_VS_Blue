@@ -19,7 +19,7 @@ export function mountOfficialApi(app: Express, accounts: Accounts, ranked: Ranke
     }
     if (post) app.post(path, route); else app.get(path, route)
   }
-  endpoint('/official/info', async () => ({ kind: 'rvb-official-v1', ...ranked.health(), rating: { initial: 1000, k: 32 }, mode: '1v1' }))
+  endpoint('/official/info', async () => ({ kind: 'rvb-official-v1', ...ranked.health(), announcement: (await ranked.pool.query('SELECT announcement FROM official_settings')).rows[0].announcement, rating: { initial: 1000, k: 32 }, mode: '1v1' }))
   for (const [path, purpose] of [['register', 'verify'], ['forgot', 'reset']] as const) {
     endpoint(`/official/auth/${path}`, async request => { await accounts.requestCode(purpose, request.body ?? {}); return { message: '如果该邮箱可以执行此操作，验证邮件已发送，请检查收件箱和垃圾邮件' } }, true)
   }

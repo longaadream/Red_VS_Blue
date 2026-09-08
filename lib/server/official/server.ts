@@ -44,6 +44,16 @@ export async function createOfficialServer(options: { databaseUrl: string; mail:
       const active = await pool.query(`SELECT m.id FROM official_matches m JOIN battle_room_authority a ON a.battle_id=m.id WHERE m.status='assigned' AND NOT EXISTS (SELECT 1 FROM battle_terminal_barrier b WHERE b.battle_id=m.id)`)
       if (active.rows.some(row => !restored.has(row.id))) throw new Error('存在未成功恢复的排位比赛，请保留数据库并检查恢复日志')
       await ranked.start({
+        freeze: async id => {
+          const actor = matchMaker.getLocalRoomById(id) as unknown as { freezeOfficialMatch(): Promise<void> } | undefined
+          await actor?.freezeOfficialMatch()
+        },
+        revokeAccount: async id => {
+          for (const listing of await matchMaker.query({ name: 'battle' })) {
+            const actor = matchMaker.getLocalRoomById(listing.roomId) as unknown as { revokeOfficialAccount?(id: string): void } | undefined
+            actor?.revokeOfficialAccount?.(id)
+          }
+        },
         create: async (id, first) => { await matchMaker.createRoom('battle', { product: true, mode: '1v1', battleId: id, playerId: first, officialCapability: ranked.capability, mapId: 'open-expanse', name: '官方 1v1 排位' }) },
         dispose: async (id, onlyIfUnstarted) => {
           const room = matchMaker.getLocalRoomById(id) as unknown as { closeOfficialMatch?: (onlyIfUnstarted?: boolean) => Promise<boolean> } | undefined

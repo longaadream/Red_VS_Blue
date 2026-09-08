@@ -6,8 +6,10 @@ import { randomBytes } from 'node:crypto'
 import { acquireOfficialProcessLock } from '../lib/server/official/process-lock.ts'
 import { EmbeddedPostgresController } from '../electron-client/embedded-postgres.ts'
 import { findFreePort } from '../electron-client/local-port.ts'
-import { configureWindows, loadConfig, protectWindowsSecret, unprotectWindowsSecret } from '../lib/server/official/windows-config.ts'
-import { createSmtpMailer } from '../lib/server/official/mail.ts'
+import { configureWindows, loadConfig, saveConfig, protectWindowsSecret, unprotectWindowsSecret } from '../lib/server/official/windows-config.ts'
+import { createLiveMailer } from '../lib/server/official/live-mail.ts'
+import { OfficialBackups } from '../lib/server/official/backup.ts'
+import { OfficialError } from '../lib/server/official/accounts.ts'
 import { startControlPanel } from '../lib/server/official/control-panel.ts'
 
 const root = process.env.RVB_OFFICIAL_ROOT || (fs.existsSync(path.join(import.meta.dirname, 'data')) ? import.meta.dirname : path.resolve(import.meta.dirname, '..'))
@@ -48,31 +50,91 @@ process.env.APP_ROOT_DIR = root
 process.env.USER_DATA_DIR = stateRoot
 process.env.RVB_PROFILE_ROOT = root
 const pagesRoot = path.join(root, 'data', 'pages')
-const config = process.argv.includes('--configure') ? await configureWindows(file, open, pagesRoot) : loadConfig(file) || await configureWindows(file, open, pagesRoot)
-const mail = createSmtpMailer(config.smtp)
+let config = process.argv.includes('--configure') ? await configureWindows(file, open, pagesRoot) : loadConfig(file) || await configureWindows(file, open, pagesRoot)
+const mail = createLiveMailer(config.smtp, smtp => { const next = { ...config, smtp }; saveConfig(file, next); config = next })
+const backups = new OfficialBackups(stateRoot)
 const runtimeRoot = fs.existsSync(path.join(root, 'postgres', 'pgsql')) ? path.join(root, 'postgres', 'pgsql') : path.join(root, '_client-postgres', 'pgsql')
 const database = new EmbeddedPostgresController({ runtimeRoot, stateRoot: path.join(stateRoot, 'postgres'), findFreePort, portHint: 38731,
   protectSecret: protectWindowsSecret, unprotectSecret: unprotectWindowsSecret,
   onUnexpectedExit: () => { console.error('[official] 数据库进程退出，正在停止服务'); void shutdown() },
 })
-let app, panel, stopping = false
+let app, panel, stopping = false, stopRequested = false, operationTask
 const adminToken = randomBytes(32).toString('base64url')
 fs.writeFileSync(adminFile, protectWindowsSecret(adminToken))
 async function shutdown() {
-  if (stopping) return
+  if (stopRequested) return
+  stopRequested = true
+  // HTTP disconnection does not cancel an accepted data operation.
+  try { await operationTask } catch { /* The operation reports its own failure. Cleanup still runs. */ }
   stopping = true
   for (const cleanup of [() => panel?.close(), () => app?.close(), () => database.stop(), () => mail.close(), () => fs.rmSync(panelFile, { force: true })]) {
     try { await cleanup() } catch { process.exitCode = 1; console.error('[official] 停服清理发生错误，请保留数据与日志') }
   }
 }
 process.on('SIGINT', () => { void shutdown() }); process.on('SIGTERM', () => { void shutdown() })
-try {
+async function startApp(listen = true) {
+  if (stopping) throw new OfficialError('服务正在停止', 503)
   const connection = await database.start()
   const { createOfficialServer } = await import('../lib/server/official/server.ts')
   app = await createOfficialServer({ databaseUrl: connection.url, mail: mail.send, maxMatches: config.maxMatches, pagesRoot: path.join(root, 'data', 'pages'), adminToken })
+  if (listen && !stopRequested) await app.start(config.port)
+}
+async function stopApp() {
+  const previous = app; app = undefined; const errors = []
+  try { await previous?.close() } catch (error) { errors.push(error) }
+  try { await database.stop() } catch (error) { errors.push(error) }
+  if (errors.length) throw new AggregateError(errors, '玩家服务或数据库未正常停止，未执行数据替换')
+}
+const operations = {
+  read: async () => ({ smtp: mail.settings(), backups: await backups.list() }),
+  execute: async (action, input) => {
+    if (stopRequested || operationTask) throw new OfficialError('服务器正在维护数据或停止', 503)
+    const task = executeOperation(action, input); operationTask = task
+    try { await task } finally { if (operationTask === task) operationTask = undefined }
+  },
+}
+async function executeOperation(action, input) {
+    const reason = String(input.reason || '').trim(), value = String(input.value || '')
+    if (action === 'smtp-save') {
+      try { await mail.replace(input.smtp) } catch { throw new OfficialError('SMTP验证或保存失败，原配置仍然有效', 503) }
+    } else if (action === 'backup-check') await backups.verify(value)
+    else {
+      if (!(await app.pool.query('SELECT maintenance FROM official_settings')).rows[0].maintenance) throw new OfficialError('请先开启维护，再进行备份或恢复', 409)
+      if (action === 'backup-restore') await backups.verify(value)
+      await app.ranked.prepareShutdown()
+      try {
+        await stopApp()
+        const safety = await backups.create()
+        if (action === 'backup-restore') {
+          console.info('[official-backup] 恢复前自动备份已保存', { backupId: safety })
+          await backups.stageRestore(value)
+        }
+        await startApp(false)
+        if (action === 'backup-restore') {
+          await app.pool.query('DELETE FROM official_sessions; DELETE FROM official_email_codes; UPDATE official_settings SET maintenance=TRUE')
+          await backups.commitRestore()
+        }
+      } catch {
+        // Preserve both copies. On any interrupted restore, the previous cluster wins.
+        try { await stopApp(); await backups.recoverInterruptedRestore(); await startApp() }
+        catch { void shutdown(); throw new OfficialError('数据维护失败，服务正在停止；请保留数据并重新运行 Start-Official.cmd', 503) }
+        throw new OfficialError('备份或恢复失败，已重新启动原数据；请检查磁盘空间与备份完整性', 503)
+      }
+      if (!stopRequested) {
+        try { await app.start(config.port) }
+        catch { void shutdown(); throw new OfficialError('备份数据已保存，但玩家入口重启失败；请重新运行 Start-Official.cmd', 503) }
+      }
+    }
+    await app.pool.query('INSERT INTO official_audit(action,detail) VALUES($1,$2)', [action, { value: action === 'smtp-save' ? 'SMTP配置（凭据不记录）' : value, reason }])
+}
+try {
+  if (fs.existsSync(path.join(stateRoot, 'restore-intent.json'))) {
+    try { await database.stop() } catch { console.info('[official-backup] 停止检查未成功，将独立验证旧进程已退出后恢复') }
+    await backups.recoverInterruptedRestore()
+  }
+  await startApp()
   {
-    await app.start(config.port)
-    panel = await startControlPanel({ ranked: app.ranked, mail, playerPort: config.port, pagesRoot,
+    panel = await startControlPanel({ get ranked() { return app.ranked }, mail, playerPort: config.port, pagesRoot, operations,
       assetsRoot: fs.existsSync(path.join(root, 'control-panel')) ? path.join(root, 'control-panel') : path.join(root, 'lib/server/official/panel'), shutdown })
     fs.writeFileSync(panelFile, protectWindowsSecret(panel.url))
     console.info(`[official] 排位入口：http://127.0.0.1:${config.port}/official.html`)

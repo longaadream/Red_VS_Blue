@@ -40,6 +40,9 @@
     if (polling || document.hidden) return
     polling = true
     try {
+      var announcement = await api('/official/info')
+      $('server-announcement').textContent = announcement.announcement || ''; $('server-announcement').hidden = !announcement.announcement
+      $('server-announcement').style.whiteSpace = 'pre-wrap'
       var saved = session()
       if (saved && saved.url === base()) {
         current = await api('/official/me')

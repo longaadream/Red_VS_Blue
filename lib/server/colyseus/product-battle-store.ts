@@ -17,6 +17,7 @@ import {
 export class ProductBattleStore {
   private setupClosed = false
   closeSetup(): void { if (!this.authorityStore) this.setupClosed = true }
+  closeAuthority(): void { this.setupClosed = true; this.authorityStore?.closeAuthority() }
   readonly terminalAuthorityPersistencePolicy = 'durable-barrier' as const
 
   constructor(

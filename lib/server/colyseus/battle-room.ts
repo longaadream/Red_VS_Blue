@@ -777,6 +777,14 @@ export function createBattleRoomClass(dependencies: BattleRoomDependencies) {
       }
     }
 
+    revokeOfficialAccount(accountId: string): void {
+      if (!dependencies.official) return
+      for (const client of [...this.clients]) {
+        const playerId = this.playerBySession.get(client.sessionId) ?? this.spectators.get(client.sessionId)?.id
+        if (playerId === accountId) this.revokeOfficialSession(client.sessionId, playerId)
+      }
+    }
+
     private async officialSessionValid(client: Client): Promise<boolean> {
       if (!dependencies.official) return true
       const playerId = this.playerBySession.get(client.sessionId) ?? this.spectators.get(client.sessionId)?.id
@@ -791,11 +799,24 @@ export function createBattleRoomClass(dependencies: BattleRoomDependencies) {
       }
     }
 
+    async freezeOfficialMatch(): Promise<void> {
+      if (!dependencies.official) throw new Error('Official room required')
+      await roomAuthorityQueue.enqueue(this.roomId, { kind: 'system', playerId: 'official', actionId: 'freeze' }, async () => {
+        this.disposed = true
+        clearRoomBattleTimeout(this.roomId)
+        this.clock.clear()
+        this.productStore?.closeAuthority()
+        this.authorityStore?.closeAuthority()
+        await this.authorityStore?.drainBattleAuthorityPersistence(this.roomId)
+      })
+    }
+
     async closeOfficialMatch(onlyIfUnstarted = false): Promise<boolean> {
       const closed = await roomAuthorityQueue.enqueue(this.roomId, { kind: 'system', playerId: 'official', actionId: 'close' }, async () => {
         if (onlyIfUnstarted && (this.authorityStore || this.productStore?.authority)) return false
         this.disposed = true
-        this.productStore?.closeSetup()
+        this.productStore?.closeAuthority()
+        this.authorityStore?.closeAuthority()
         for (const client of this.clients) client.send('officialMatchClosed', {})
         return true
       })

@@ -8,7 +8,8 @@ import type { Ranked } from './ranked'
 import type { createSmtpMailer } from './mail'
 
 type Mail = Pick<ReturnType<typeof createSmtpMailer>, 'status' | 'verify'>
-export async function startControlPanel(options: { ranked: Ranked; mail: Mail; assetsRoot: string; pagesRoot: string; playerPort: number; shutdown: () => Promise<void> }) {
+export type PanelOperations = { read(): Promise<unknown>; execute(action: string, input: Record<string, unknown>): Promise<void> }
+export async function startControlPanel(options: { ranked: Ranked; mail: Mail; assetsRoot: string; pagesRoot: string; playerPort: number; shutdown: () => Promise<void>; operations?: PanelOperations }) {
   const token = randomBytes(32).toString('base64url'), startedAt = Date.now()
   const assets = new Map<string, { body: Buffer; type: string }>()
   for (const [url, file, type] of [
@@ -39,9 +40,13 @@ export async function startControlPanel(options: { ranked: Ranked; mail: Mail; a
       if (provided.length !== expected.length || !timingSafeEqual(provided, expected)) throw new OfficialError('管理会话失效，请重新运行 Open-Control-Panel.cmd', 403)
       if (req.headers.origin && req.headers.origin !== origin) throw new OfficialError('请求来源不符', 403)
       if (closing) throw new OfficialError('服务器正在停止，请用 Start-Official.cmd 重新启动', 503)
+      if (req.method === 'GET' && url.pathname === '/api/config') {
+        if (!options.operations) throw new OfficialError('请使用新版Windows启动器打开完整管理功能', 503)
+        json(res, 200, await options.operations.read()); return
+      }
       if (req.method === 'GET' && url.pathname === '/api/snapshot') {
         const pool = options.ranked.pool
-        const settings = (await pool.query('SELECT season_id,maintenance FROM official_settings')).rows[0]
+        const settings = (await pool.query('SELECT season_id,maintenance,announcement,max_matches FROM official_settings')).rows[0]
         const counts = (await pool.query(`SELECT (SELECT count(*)::int FROM official_accounts) accounts,
           (SELECT count(*)::int FROM official_queue WHERE seen_at>now()-interval '20 seconds') queued,
           (SELECT count(*)::int FROM official_matches WHERE status='assigned') active,
@@ -52,7 +57,8 @@ export async function startControlPanel(options: { ranked: Ranked; mail: Mail; a
       }
       if (req.method === 'GET' && url.pathname === '/api/accounts') {
         const q = (url.searchParams.get('q') || '').trim().slice(0, 254), offset = Math.min(1000000, Math.max(0, Number(url.searchParams.get('offset')) || 0)) | 0
-        const rows = (await options.ranked.pool.query(`SELECT a.id,a.name,a.banned,a.created_at,
+        const rows = (await options.ranked.pool.query(`SELECT a.id,a.name,a.banned,a.ranked_disabled,a.created_at,
+          (SELECT until_at FROM official_cooldowns WHERE account_id=a.id AND until_at>now()) cooldown_until,
           left(split_part(a.email,'@',1),1)||'***@'||split_part(a.email,'@',2) email,
           coalesce(r.rating,1000) rating,coalesce(r.games,0) games
           FROM official_accounts a LEFT JOIN official_ratings r ON r.account_id=a.id AND r.season_id=(SELECT season_id FROM official_settings)
@@ -64,13 +70,13 @@ export async function startControlPanel(options: { ranked: Ranked; mail: Mail; a
         const filter = url.searchParams.get('status') || 'assigned'
         if (!['assigned', 'settled', 'void'].includes(filter)) throw new OfficialError('对局筛选无效')
         const rows = (await options.ranked.pool.query(`SELECT m.id,m.season_id,m.status,m.created_at,m.finished_at,a.name first_name,b.name second_name,
-          m.result->>'winnerId' winner_id,m.first_id,m.second_id FROM official_matches m
+          m.result->>'winnerId' winner_id,m.result->>'reason' reason,m.first_id,m.second_id FROM official_matches m
           JOIN official_accounts a ON a.id=m.first_id JOIN official_accounts b ON b.id=m.second_id
           WHERE m.status=$1 ORDER BY m.created_at DESC,m.id LIMIT 100`, [filter])).rows
         json(res, 200, { rows }); return
       }
       if (req.method === 'GET' && url.pathname === '/api/audit') {
-        json(res, 200, { rows: (await options.ranked.pool.query(`SELECT id,action,detail->>'value' value,created_at FROM official_audit ORDER BY id DESC LIMIT 100`)).rows }); return
+        json(res, 200, { rows: (await options.ranked.pool.query(`SELECT id,action,detail->>'value' value,detail->>'reason' reason,created_at FROM official_audit ORDER BY id DESC LIMIT 100`)).rows }); return
       }
       if (req.method === 'POST' && url.pathname === '/api/action') {
         if (req.headers.origin !== origin) throw new OfficialError('请求来源不符', 403)
@@ -78,11 +84,15 @@ export async function startControlPanel(options: { ranked: Ranked; mail: Mail; a
         if (mutating) throw new OfficialError('上一项操作尚未完成，请稍后重试', 409)
         mutating = true
         try {
-          const action = String(input.action || ''), value = String(input.value || '')
+          const action = String(input.action || ''), value = String(input.value || ''), reason = String(input.reason || '')
           if (action === 'mail-check') {
             if (Date.now() - lastMailCheck < 15000) throw new OfficialError('请间隔15秒再检查', 429)
             lastMailCheck = Date.now()
             try { await options.mail.verify() } catch { throw new OfficialError('SMTP连接或认证失败，请检查网络、邮箱SMTP服务和本机授权码', 503) }
+          } else if (['smtp-save', 'backup-create', 'backup-check', 'backup-restore'].includes(action)) {
+            if (!options.operations) throw new OfficialError('当前启动器不支持此操作', 503)
+            if (!reason.trim() || reason.length > 300) throw new OfficialError('请填写1–300字的操作原因')
+            await options.operations.execute(action, input)
           } else if (action === 'stop') {
             await options.ranked.prepareShutdown(); closing = true
             // Once prepared, a closed browser must not strand the service half-stopped.
@@ -90,7 +100,7 @@ export async function startControlPanel(options: { ranked: Ranked; mail: Mail; a
             const stop = () => { if (scheduled) return; scheduled = true; setImmediate(() => { void options.shutdown().catch(() => console.error('[official-panel] SHUTDOWN_FAILED')) }) }
             res.once('finish', stop); res.once('close', stop)
             if (res.destroyed) stop()
-          } else if (['maintenance', 'ban', 'unban', 'season'].includes(action)) await options.ranked.administer(action, value)
+          } else if (['maintenance', 'ban', 'unban', 'season', 'kick', 'rank-disable', 'rank-enable', 'cooldown-clear', 'queue-clear', 'capacity', 'announcement', 'void-match'].includes(action)) await options.ranked.administer(action, value, reason)
           else throw new OfficialError('未知管理操作')
           json(res, 200, { ok: true }); return
         } finally { mutating = false }
