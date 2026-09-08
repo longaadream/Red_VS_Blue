@@ -117,7 +117,7 @@ export class Ranked {
       await this.lock(client)
       await client.query(`DELETE FROM official_queue WHERE seen_at<now()-interval '20 seconds' OR account_id IN (SELECT id FROM official_accounts WHERE banned)`)
       const settings = (await client.query('SELECT * FROM official_settings')).rows[0]
-      if (settings.maintenance) return
+      if (settings.maintenance || this.stopping) return
       const count = Number((await client.query(`SELECT count(*) FROM official_matches WHERE status='assigned'`)).rows[0].count)
       if (count >= this.maxMatches) return
       const queue = (await client.query(`SELECT q.account_id FROM official_queue q WHERE NOT EXISTS (SELECT 1 FROM official_claims c WHERE c.account_id=q.account_id) ORDER BY q.created_at,q.account_id LIMIT 2`)).rows
@@ -185,12 +185,14 @@ export class Ranked {
   async administer(action: string, value: string) {
     await transaction(this.pool, async client => {
       await this.lock(client)
+      if (this.stopping) throw new OfficialError('服务正在停止', 503)
       if (action === 'maintenance') {
         if (!['on', 'off'].includes(value)) throw new OfficialError('维护状态须为 on 或 off')
         await client.query('UPDATE official_settings SET maintenance=$1', [value === 'on'])
       }
       else if (action === 'ban' || action === 'unban') {
-        await client.query('UPDATE official_accounts SET banned=$2 WHERE id=$1', [value, action === 'ban'])
+        const updated = await client.query('UPDATE official_accounts SET banned=$2 WHERE id=$1', [value, action === 'ban'])
+        if (!updated.rowCount) throw new OfficialError('账号不存在')
         await client.query('DELETE FROM official_sessions WHERE account_id=$1', [value])
         await client.query('DELETE FROM official_queue WHERE account_id=$1', [value])
       } else if (action === 'season') {
@@ -202,5 +204,14 @@ export class Ranked {
       } else throw new OfficialError('未知管理操作')
       await client.query('INSERT INTO official_audit(action,detail) VALUES($1,$2)', [action, { value }])
     })
+  }
+  async prepareShutdown() {
+    await transaction(this.pool, async client => {
+      await this.lock(client)
+      if ((await client.query(`SELECT 1 FROM official_matches WHERE status='assigned' LIMIT 1`)).rowCount) throw new OfficialError('尚有比赛未完成，请先开启维护并等待比赛结束')
+      await client.query('UPDATE official_settings SET maintenance=TRUE')
+      await client.query(`INSERT INTO official_audit(action,detail) VALUES('stop','{}')`)
+    })
+    this.stopping = true
   }
 }

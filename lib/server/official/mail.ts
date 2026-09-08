@@ -11,11 +11,17 @@ export function createSmtpMailer(settings: SmtpSettings) {
     tls: { minVersion: 'TLSv1.2', rejectUnauthorized: true },
     disableFileAccess: true, disableUrlAccess: true,
   })
+  const status = { host: settings.host, port: settings.port, sent: 0, failed: 0, checkedAt: null as string | null, connected: null as boolean | null, lastSentAt: null as string | null, lastFailedAt: null as string | null }
   const send: MailSender = async (to, purpose, code) => {
-    await transport.sendMail({ from: { name: 'RED vs BLUE', address: settings.from }, to,
+    try { await transport.sendMail({ from: { name: 'RED vs BLUE', address: settings.from }, to,
       subject: purpose === 'verify' ? 'RED vs BLUE：验证邮箱' : 'RED vs BLUE：重置密码',
       text: `你的${purpose === 'verify' ? '注册验证' : '密码重置'}代码：\n\n${code}\n\n请复制到游戏中的验证页面。15分钟内有效，只能使用一次。\n如果不是你本人操作，请忽略本邮件。`,
-    })
+    }); status.sent++; status.lastSentAt = new Date().toISOString() }
+    catch (error) { status.failed++; status.lastFailedAt = new Date().toISOString(); throw error }
   }
-  return { send, verify: () => transport.verify(), close: () => transport.close() }
+  return { send, status: () => ({ ...status }), verify: async () => {
+    try { await transport.verify(); status.connected = true; return true }
+    catch { status.connected = false; throw new Error('SMTP连接或认证失败，请检查网络、邮箱服务和本机授权码') }
+    finally { status.checkedAt = new Date().toISOString() }
+  }, close: () => transport.close() }
 }

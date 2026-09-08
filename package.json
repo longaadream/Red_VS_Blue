@@ -58,6 +58,7 @@
     "build:practice-ai": "node scripts/build-practice-ai.mjs",
     "dev:official": "npm run build:official && node dist/official-server/win-x64/server.mjs",
     "smoke:official:browser": "node scripts/run-official-browser-smoke.mjs",
+    "smoke:official:panel": "node scripts/run-official-panel-smoke.mjs",
     "build:official": "node scripts/build-official-server.mjs",
     "test:official": "vitest run tests/colyseus/official-ranked.test.ts --maxWorkers=1",
     "smoke:official:load": "node scripts/run-official-load-smoke.mjs",
