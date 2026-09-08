@@ -44,7 +44,7 @@ _server-stage/
 *.sqlite-journal
 rooms.json
 logs/
-/output/homepage-preview/
+/output/
 data/rooms/
 
 # Generated/imported resource packs

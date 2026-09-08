@@ -47,7 +47,7 @@ RED-158 Windows 人工验收补充：教程是本地固定脚本，不依赖 Col
 Profile-resolved bundle 读取战斗 JSON 并预热规则引擎缓存，不再通过自定义协议发出数百次小文件请求；浏览器和
 Android 仍使用原逐文件加载路径。
 
-截图：`docs/qa/RED-95-tutorial-first-session.png`。
+截图：[历史截图：RED-95-tutorial-first-session.png](https://github.com/longaadream/Red_VS_Blue/blob/a7849ce9eb3fc9e2fbc000afdd5f770b6f57e37a/docs/qa/RED-95-tutorial-first-session.png)。
 
 ## 人工复核建议
 

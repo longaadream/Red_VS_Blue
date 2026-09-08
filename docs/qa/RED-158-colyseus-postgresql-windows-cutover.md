@@ -164,8 +164,8 @@ Colyseus：
 
 浏览器证据：
 
-- [动作简介右边界](../../output/playwright/red-158-action-history-edge.png)
-- [战绩失败与重试状态](../../output/playwright/red-158-records-error-retry.png)
+- [动作简介右边界](https://github.com/longaadream/Red_VS_Blue/blob/a7849ce9eb3fc9e2fbc000afdd5f770b6f57e37a/output/playwright/red-158-action-history-edge.png)
+- [战绩失败与重试状态](https://github.com/longaadream/Red_VS_Blue/blob/a7849ce9eb3fc9e2fbc000afdd5f770b6f57e37a/output/playwright/red-158-records-error-retry.png)
 
 本轮修复后的自动验证：
 

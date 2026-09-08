@@ -127,6 +127,7 @@ npm.cmd run dev:electron:editor
 | [`lib/content-pipeline/`](lib/content-pipeline/) | 内容校验、Profile、资源与版本流程 |
 | [`electron-client/`](electron-client/) / [`electron-editor/`](electron-editor/) | 游戏客户端与内容编辑器 |
 | [`app/`](app/) / [`components/`](components/) | Next.js 页面、API 与 React 组件 |
+| [`config/`](config/) | 桌面打包、Colyseus 开发服务、数据库与应用图标配置 |
 | [`tests/`](tests/) / [`scripts/`](scripts/) | 自动验证、构建、开发和 QA 工具 |
 
 深入阅读：[架构](docs/technical/ARCHITECTURE.md) · [游戏逻辑与执行流程](docs/technical/GAME_LOGIC_SYSTEM.md) · [技能流程图](docs/technical/SKILL_GRAPH_V1.md) · [AI 自对弈](docs/technical/AI_SELF_PLAY.md)

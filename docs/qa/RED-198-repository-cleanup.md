@@ -1,15 +1,26 @@
-# RED-198 · 退役文件清理
+# RED-198 · 仓库与过时图片清理
 
-风险 Low；AI 角色：实现者。用户继续授权清理已过时、无用的仓库文件。本轮在 RED-197 已合并后独立进行。
+风险 Medium；AI 角色：实现者。清除已退役文件与过时视觉素材，减少 GitHub 根目录列表，并保持当前开发和打包入口可用。
 
 - `base_branch: main`
 - `base_sha: 0debcd34126803686719b9ce87a490fe4795d13d`
 - 分支：`codex/RED-198-repository-cleanup`
-- [Linear 合同](https://linear.app/redvsblue/issue/RED-198)
+- [Linear 合同](https://linear.app/redvsblue/issue/RED-198) · [PR #170](https://github.com/longaadream/Red_VS_Blue/pull/170)
 
-## 审计与删除依据
+## 清理结果
 
-检查 1,844 个受控文件，其中 1,293 个文本文件参与精确路径/文件名引用扫描；排除待删文件间的相互引用与本地敏感配置。另用 `rg` 搜索目录引用、默认入口、动态资源加载，并核对 package scripts、Next/桌面打包、Android Gradle 与同步脚本。删除 14 个文件，共 50,676 字节；同步删除 3 个文件的 ESLint suppression（15 行）。删除前 SHA-256、大小和历史引用位置见 [机器可读清单](RED-198-cleanup-audit.json)。
+- GitHub 根目录受控条目从 48 减到 35（本次扩展前为 43）；根目录列表减少约 27%。
+- 删除 120 张旧图片，共 15,976,354 字节：旧暗黑写实概念图与 RED-68 棋盘图 21 张、旧 Playwright 界面图 60 张、旧 QA 截图 38 张、不再使用的主页图鉴截图 1 张。
+- 另删除 14 个退役脚本、演示页、模板占位资源等，共 50,676 字节，删除 3 个文件的 lint suppression。整个 PR 实际删除 134 个文件；迁移不计入删除数。
+- 迁移 19 个文件：两份 Electron Builder 配置、Colyseus 配置和 Compose 文件归入 `config/`；5 个程序图标文件归入 `config/branding/`；两份根目录教程归入 `docs/technical/` 和 `docs/product/`；8 个输出记录/图标证据归入 `docs/qa/archive/`。
+- 更新 npm、开发服务、程序图标、验证脚本和相关测试的路径；Compose 从根目录使用 `--project-directory .`，保持原项目名和数据库卷身份。
+- README 增加配置目录入口，文档目录提供教程与归档导航；`output/` 作为临时输出同时纳入 Git 和 ESLint 忽略范围。
+
+图片逐项大小、SHA-256、迁移映射见 [图片清理清单](RED-198-visual-cleanup-manifest.json)。旧图片的文字验收记录保留，图片引用改成固定提交 `a7849ce9eb3fc9e2fbc000afdd5f770b6f57e37a` 的普通链接，不再嵌入旧界面。清理当前文件树不会改写 Git 历史。
+
+## 退役文件依据
+
+检查 1,844 个受控文件，其中 1,293 个文本文件参与引用扫描；另核对目录引用、动态资源加载、package scripts、Next/桌面打包和 Android 构建。14 个退役文件的删除前哈希与引用位置见 [机器可读清单](RED-198-cleanup-audit.json)。
 
 | 删除文件 | 依据及当前入口 |
 | --- | --- |
@@ -17,31 +28,28 @@
 | `scripts/migrate-player-ids.js` | 对旧 JSON 房间的 players/hostId/battle 标识做递归小写改写；无调用入口。当前 Windows 对局存储为 PostgreSQL，切换合同明确不导入旧对局数据。此次只删除脚本，没有执行迁移。 |
 | `scripts/unlock-build.ps1` | 未被脚本、配置或文档引用的旧手工打包辅助，会按宽泛进程名强制结束进程并清除 app.asar；现役打包流程不调用它。 |
 | `ui-map-demo.html`、`resource-icon-demo.html` | 根目录自包含的早期示意页，使用内嵌假数据/固定技能文字，没有规则引擎接线或入口引用；实际界面位于 `data/pages/`。不进入 Next 路由或桌面包的页面目录。 |
-| `docker-compose.yml` | 原 `game_postgres` / `gamedb` 配置，仓库无引用、当前连接流程不使用该数据库身份；保留现役 `docker-compose.colyseus.yml`，并在构建文档补充明确启动命令。没有停止容器或移除 volume。 |
+| `docker-compose.yml` | 原 `game_postgres` / `gamedb` 配置，仓库无引用、当前连接流程不使用该数据库身份；保留现役 `config/docker-compose.colyseus.yml`，并在构建文档补充明确启动命令。没有停止容器或移除 volume。 |
 | `styles/globals.css` | 未被导入的初始模板主题；`app/layout.tsx` 和 `scripts/build-tailwind.mjs` 均明确读取 `app/globals.css`。 |
 | `public/placeholder-logo.png`、`placeholder-logo.svg`、`placeholder-user.jpg`、`placeholder.jpg`、`placeholder.svg` | 5 张模板占位图，没有代码、HTML、CSS、JSON 或文档引用；不是角色/卡牌资源，未被内容 ID 或动态回退规则使用。 |
 | `fi/iki/elonen/NanoWSD$WebSocket.class` | 位于 Android source set 外的散落编译文件；无加载引用，Gradle 仅扫描 app/libs 中的 JAR。当前 `MobileHttpServer` 已使用项目自己的实现。已有 `*.class` 忽略规则避免再次纳入。 |
+## 保留范围
 
-## 保留项
+当前主页的实机技能图、角色/卡牌/棋盘运行美术、游戏数据和正式测试保留；近期 RED-191、RED-192 技能编辑器证据保留。原始教程内容按用途迁移，旧版技能作者教程增加现役标准入口。ADR 和文字验收保留，只有迁移路径与历史图片链接更新。Android、mobile-server、relay-server 仍有代码和构建入口，未宣布退役。敏感配置、存档、数据库及其他工作区未修改。
 
-- `tutorial.md` 与 `新手教程.md`：技能作者参考和现役教程设计，不能按文件名判断废弃。
-- `docs/decisions/`、`docs/qa/`、`output/playwright/`：决策历史与验收证据；ADR-0003 保留原文，其中旧命令属于历史记录。
-- Android、mobile-server、relay-server：Windows 切换没有宣布其他平台退役，仍有构建入口或对应代码。
-- 游戏棋盘、技能、角色数据、原生预览页面、第三方库和版权文件：仍有运行、调试或授权用途。
-- `.claude/worktrees/` 中已有受控的本地敏感配置：此次不读内容、不修改；此前新增忽略规则只防止新增，不等于已取消跟踪。
+图片扫描中的唯一非 Markdown 同名命中是 `tests/electron/windows-client-development-smoke.mjs` 的临时输出文件名；它在 smokeRoot 内生成图片，不读取被删除的 QA 图片。
 
-## 验证
+## 验证与限制
 
-- 最初本地 fetch 因连接重置/443 超时失败。先通过 GitHub 接口从实时 main 创建分支并验证文件树；网络恢复后成功 fetch、快进到上述 main，并通过 `npm run check:main-baseline`（ahead 0 / behind 0）。没有以过期缓存替代基线门禁。
-- 提交前再次运行本地基线门禁时，网络又报 `REMOTE_UNREACHABLE`；GitHub 接口随后核对上述 base 与实时 main 仍为 identical、ahead/behind 0。该次本地复检失败如实保留，远端 PR 基线门禁仍须通过。
-- 删除前引用审计：只命中旧脚本的 3 个 lint 条目和 ADR-0003 历史记录，无其他精确引用。
-- `npm run build`：通过，Next 页面构建与静态资源复制成功；按既有配置跳过类型检查，不能视为 typecheck。
-- `npm run lint`：通过；`npm run check:encoding`：995 份文本通过。
-- 客户端打包、工作区环境、编辑器打包和 ESLint 配置测试共 34 项：最终 33 项通过，1 项已有失败。第一次并行构建时 ESLint 配置用例超过默认 5 秒；构建结束后独立复跑，保持原阈值，5 项全部通过。
-- 已有失败：`tests/build/electron-editor-package.test.ts` 的 `accepts an archived app and byte-identical external resources`。测试样本只创建 main/preload/index，但验证器要求另有 7 个 skill-graph/source-flow 文件。临时还原本次全部删除项及 suppression 后，同一用例仍报相同的 7 个缺失文件；已恢复清理改动。未放宽验证器或改写测试样本，本次删除不涉及这些文件。
-- `git diff --check`、新增文档本地链接与清单核对通过。构建生成的同内容文件已还原，不混入提交。
-- 未启动 Electron 发布包、Android 构建或真实数据库；不把静态构建验证当作这些运行环境的验收。
+- 本轮开始已成功 fetch、对齐远端任务分支，`check:main-baseline` 通过（main 为上述完整 SHA，behind 0）。提交前复检结果记录在 PR。
+- `npm.cmd run build:colyseus` 与 `npm.cmd run build` 通过。Next 依既有设置跳过类型检查，不能视为 typecheck。
+- 使用安装的 Electron Builder 读取两份新路径配置并通过 schema 校验；源码入口、beforeBuild 和图标路径存在。Colyseus 开发入口连同迁移后的配置经 esbuild 解析打包通过，没有连接真实数据库。
+- `npm.cmd run lint` 通过；`npm.cmd run check:encoding` 通过（1,000 份文本）。临时审计脚本导致过一次 lint 失败，统一忽略已归档完毕的 `output/` 后复检通过，正式归档脚本仍参与 lint。
+- 六个相关测试文件共 60 项，最终 59 项通过、1 项已有失败。覆盖客户端/编辑器打包、Colyseus 路径、安全边界、工作区和 ESLint 配置。并发时 ESLint 用例超过默认 5 秒；单独复跑及配置调整后再跑均在原阈值内 5/5 通过。
+- 已有失败为 `tests/build/electron-editor-package.test.ts` 的 `accepts an archived app and byte-identical external resources`：样本缺少验证器要求的 7 个 skill-graph/source-flow 文件。首轮临时还原全部清理项和 suppression 后已复现同一失败；本轮迁移后缺失列表相同。没有放宽验证器或补改样本。
+- 核对 369 处本地 Markdown 链接，无新增断链；117 处固定提交图片链接的目标均存在；120 张删除图片逐张历史哈希匹配。19 项迁移旧路径消失、新路径存在，根目录计数一致。运行资源没有新增删除。
+- 独立 AI 审查完成：配置接线、运行资源边界及图片哈希无剩余阻断项；修正了图标证据断链、嵌套截图链接和归档脚本命令路径。
+- 未制作或启动完整 Electron 发行包、未跑 Android 构建或真实 PostgreSQL 实例。配置静态校验不能替代这些环境的验收。
 
 ## 回退与人工验收
 
-回退本任务提交即可恢复全部删除文件及 lint 条目，不涉及存档或数据库迁移。人工检查 PR 删除清单、README 图片及当前开发入口；编辑器打包测试样本的已有缺口另行处理。
+回退本任务提交可恢复删除文件与原路径，不涉及数据迁移。人工浏览 PR 分支根目录和 README，确认目录列表、实机技能图片与文档导航；使用既有 npm 入口验证需要的本地开发环境。PR 保持待审阅，不合并或发布。

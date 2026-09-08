@@ -9,7 +9,7 @@
 | [combat-path.png](combat-path.png) | 实際规则执行后的原生位移轨迹，隐藏周边 UI 导出 |
 | [combat-impact.png](combat-impact.png) | 实际伤害阶段，原生伤害字放大并定格 |
 | [combat-capture.json](combat-capture.json) | 本次技能的前后状态与规则引擎事件 |
-| [battle.png](battle.png)、[menu.png](menu.png)、[roster.png](roster.png) | 未加工的完整训练场景、菜单与图鉴原图；图鉴不进入首页 |
+| [battle.png](battle.png)、[menu.png](menu.png) | 未加工的完整训练场景与菜单原图 |
 | [posters.html](posters.html) | 可编辑 HTML 排版，直接引用上述技能帧 |
 
 游戏角色、棋盘及伤害字均来自实际页面，未交给 AI 重绘。最终采用粗线条、扁平色的简笔画处理：放大棋盘、裁切战斗局部、叠加少量漫画速度线。伤害字沿用游戏原生字体及爆炸形状，从 29px 放大到 52px 并暂停动画。条幅只介绍项目与技能，不遮挡战斗主体。最终图片未使用先前试制的 AI 背景。
@@ -45,5 +45,4 @@ node docs/qa/render-homepage-posters.cjs
 ```text
 battle.png  41B3FBED0ED60D4D33B0271FD8B739CBFDC2DCC0C8BE6DCE2E5A939DE0059130
 menu.png    AA95B24C1E5E06755CDB3A034824C6DAE44269601DCD5FED9FCCA6622F21D9C0
-roster.png  C34BE251A35B8D9E56C9331E32A6019BFA9D5B2FCFD755A2A366A3035F56003A
 ```

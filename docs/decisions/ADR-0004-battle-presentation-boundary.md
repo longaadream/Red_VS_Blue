@@ -80,7 +80,7 @@ presentation.dispose()
 - resize、DPR、平移、缩放与镜头复位后，`projectCell()` / `screenToCell()` 必须保持同一格子；镜头变化通过 presentation 生命周期转发，并只触发浮动菜单重新定位，不进入规则命令。
 - renderer 脚本语法、初始化/resize/投影/dispose 浏览器回放。
 - 1280×720 与 390×844 的格子投影/命中和选择/取消/目标模式冒烟。
-- 浏览器截图与 console 检查记录在 `output/playwright/red-48-browser-evidence.md`。
+- 浏览器截图与 console 检查记录在 `docs/qa/archive/playwright/red-48-browser-evidence.md`。
 - Medium Risk 独立 AI 架构审查。
 
 ## 回退方式
@@ -93,4 +93,4 @@ presentation.dispose()
 - `docs/technical/ARCHITECTURE.md`
 - `docs/technical/MODULE_INTERFACES.md`
 - `tests/game/battle-ui-boundary.test.ts`
-- `output/playwright/red-48-browser-evidence.md`
+- `docs/qa/archive/playwright/red-48-browser-evidence.md`

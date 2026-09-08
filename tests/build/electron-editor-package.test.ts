@@ -25,7 +25,7 @@ interface EditorBuilderConfig {
 
 function readEditorBuilderConfig(): EditorBuilderConfig {
   return JSON.parse(
-    fs.readFileSync(path.join(process.cwd(), 'electron-builder.editor.json'), 'utf8'),
+    fs.readFileSync(path.join(process.cwd(), 'config/electron-builder.editor.json'), 'utf8'),
   ) as EditorBuilderConfig
 }
 

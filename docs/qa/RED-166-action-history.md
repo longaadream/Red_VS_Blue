@@ -47,10 +47,10 @@ npm.cmd test -- tests/ui/battle-action-history.test.ts tests/ui/battle-25d-mobil
 
 截图：
 
-- `docs/qa/evidence/RED-166-action-history-1280x720.png`
-- `docs/qa/evidence/RED-166-action-history-844x390.png`
-- `docs/qa/evidence/RED-166-orientation-guard-390x844.png`
-- `docs/qa/evidence/RED-166-action-history-overlay-avoidance.png`
+- [历史截图：RED-166-action-history-1280x720.png](https://github.com/longaadream/Red_VS_Blue/blob/a7849ce9eb3fc9e2fbc000afdd5f770b6f57e37a/docs/qa/evidence/RED-166-action-history-1280x720.png)
+- [历史截图：RED-166-action-history-844x390.png](https://github.com/longaadream/Red_VS_Blue/blob/a7849ce9eb3fc9e2fbc000afdd5f770b6f57e37a/docs/qa/evidence/RED-166-action-history-844x390.png)
+- [历史截图：RED-166-orientation-guard-390x844.png](https://github.com/longaadream/Red_VS_Blue/blob/a7849ce9eb3fc9e2fbc000afdd5f770b6f57e37a/docs/qa/evidence/RED-166-orientation-guard-390x844.png)
+- [历史截图：RED-166-action-history-overlay-avoidance.png](https://github.com/longaadream/Red_VS_Blue/blob/a7849ce9eb3fc9e2fbc000afdd5f770b6f57e37a/docs/qa/evidence/RED-166-action-history-overlay-avoidance.png)
 
 本地训练页仍会报告基线已有的 `data/skills/evil-explosion.json` 缺失 warning；RED-166 未修改该资源路径。`?qa=RED-166` 只在本地验收模式、且没有真实权威展示事件时注入确定性 20 动作样本，普通训练和真实对局不受影响。
 

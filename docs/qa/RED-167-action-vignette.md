@@ -33,11 +33,11 @@
 
 ## 浏览器证据（Playwright CLI）
 
-- 1280×720 弹射物：`output/playwright/RED-167-projectile-text-skill.png` 只作为轨迹几何证据；其顶部状态条为改版前样式，不用于验收头像和技能名。renderer 在固定棋盘平面高度创建 1 条指向权威 `endPoint` 的 3D ribbon 与 1 个 `selectedCell` 世界空间中心虚线；轨迹两端不读取高低地形高度，因此严格平行于棋盘格轴，高地只产生自然遮挡而不会把线段抬歪。DOM 棋盘图层的轨迹、文字和图标数量均为 0。
-- 真实训练动作：`output/playwright/RED-167-skill-avatar-name.png`。训练模式调用共享 `projectBattlePresentationEvents()`，以提交动作及结算前后状态生成与联网链路同结构的 `presentationEvents`。手动释放“寒冰坚忍”后，顶部状态条显示阿尔萨斯头像与“寒冰坚忍 / 点按战场略过 / 1×”，且最近动作的 `aria-label`、标题、头像与展开技能名均来自同一展示身份解析；未解析中文日志，也未改变技能结算。
-- 844×390 头像与名称：`output/playwright/RED-167-skill-avatar-name-844x390.png`。将同一真实动作保留的状态条切到静态结果帧后缩放视口，头像、技能名和 44px 速度按钮均可见，名称未挤压按钮或溢出视口。
-- 1280×720 范围闪烁：`output/playwright/RED-167-area-flash.png`。演出层处于 `is-cue-area`，不创建任何 DOM 或额外 3D 覆盖面；renderer 临时克隆并点亮 3 块真实地砖的材质，几何、位置和缩放完全不变，收束时恢复原材质。因此方向、透视、厚度与遮挡直接继承棋盘本身，不存在额外边框角度；棋盘 DOM 的路径、文字和图标数量均为 0。
-- 844×390、`prefers-reduced-motion: reduce`：`output/playwright/RED-167-reduced-motion-mobile-landscape.png`。截图时演出阶段为可见的 `static`，速度按钮为 44×44px。
+- 1280×720 弹射物：[历史截图：RED-167-projectile-text-skill.png](https://github.com/longaadream/Red_VS_Blue/blob/a7849ce9eb3fc9e2fbc000afdd5f770b6f57e37a/output/playwright/RED-167-projectile-text-skill.png) 只作为轨迹几何证据；其顶部状态条为改版前样式，不用于验收头像和技能名。renderer 在固定棋盘平面高度创建 1 条指向权威 `endPoint` 的 3D ribbon 与 1 个 `selectedCell` 世界空间中心虚线；轨迹两端不读取高低地形高度，因此严格平行于棋盘格轴，高地只产生自然遮挡而不会把线段抬歪。DOM 棋盘图层的轨迹、文字和图标数量均为 0。
+- 真实训练动作：[历史截图：RED-167-skill-avatar-name.png](https://github.com/longaadream/Red_VS_Blue/blob/a7849ce9eb3fc9e2fbc000afdd5f770b6f57e37a/output/playwright/RED-167-skill-avatar-name.png)。训练模式调用共享 `projectBattlePresentationEvents()`，以提交动作及结算前后状态生成与联网链路同结构的 `presentationEvents`。手动释放“寒冰坚忍”后，顶部状态条显示阿尔萨斯头像与“寒冰坚忍 / 点按战场略过 / 1×”，且最近动作的 `aria-label`、标题、头像与展开技能名均来自同一展示身份解析；未解析中文日志，也未改变技能结算。
+- 844×390 头像与名称：[历史截图：RED-167-skill-avatar-name-844x390.png](https://github.com/longaadream/Red_VS_Blue/blob/a7849ce9eb3fc9e2fbc000afdd5f770b6f57e37a/output/playwright/RED-167-skill-avatar-name-844x390.png)。将同一真实动作保留的状态条切到静态结果帧后缩放视口，头像、技能名和 44px 速度按钮均可见，名称未挤压按钮或溢出视口。
+- 1280×720 范围闪烁：[历史截图：RED-167-area-flash.png](https://github.com/longaadream/Red_VS_Blue/blob/a7849ce9eb3fc9e2fbc000afdd5f770b6f57e37a/output/playwright/RED-167-area-flash.png)。演出层处于 `is-cue-area`，不创建任何 DOM 或额外 3D 覆盖面；renderer 临时克隆并点亮 3 块真实地砖的材质，几何、位置和缩放完全不变，收束时恢复原材质。因此方向、透视、厚度与遮挡直接继承棋盘本身，不存在额外边框角度；棋盘 DOM 的路径、文字和图标数量均为 0。
+- 844×390、`prefers-reduced-motion: reduce`：[历史截图：RED-167-reduced-motion-mobile-landscape.png](https://github.com/longaadream/Red_VS_Blue/blob/a7849ce9eb3fc9e2fbc000afdd5f770b6f57e37a/output/playwright/RED-167-reduced-motion-mobile-landscape.png)。截图时演出阶段为可见的 `static`，速度按钮为 44×44px。
 - 略过输入：真实页面派发可取消的 `pointerdown` 后 10.5ms 内同步进入 `settle`；`defaultPrevented=true`、派发返回 `false`、战场父节点收到的穿透事件数为 0。收尾计时目标为 60ms，低于 100ms 验收上限。
 - 资源复查：静态 QA 服务修复后，`images/effect-icons/verb-move.svg` 返回 `200 image/svg+xml`；展开动作历史后遍历页面图片，`complete && naturalWidth === 0` 的破图数量为 0。
 - 普通训练复查：不带 `qa` 参数打开 `battle.html?mode=training`，己方回合真实释放阿尔萨斯“寒冰坚忍”后，状态条出现阿尔萨斯头像与“寒冰坚忍 / 点按战场略过”，行动点 10 → 9、技能进入 3 回合冷却。该链路未使用 `forcePlayback`。

@@ -48,7 +48,7 @@ describe('RED-161 default player transport', () => {
     const main = await readFile(path.join(ROOT, 'electron-client', 'main.ts'), 'utf8')
     const colyseusBuild = await readFile(path.join(ROOT, 'scripts', 'build-colyseus-server.mjs'), 'utf8')
     const packageJson = JSON.parse(await readFile(path.join(ROOT, 'package.json'), 'utf8'))
-    const builder = JSON.parse(await readFile(path.join(ROOT, 'electron-builder.client.json'), 'utf8'))
+    const builder = JSON.parse(await readFile(path.join(ROOT, 'config/electron-builder.client.json'), 'utf8'))
     expect(main).toContain("findColyseusEntry(appRoot)")
     expect(main).toContain("RVB_POSTGRES_URL: databaseUrl")
     expect(main).toContain('await resolveAuthorityDatabaseUrl()')
