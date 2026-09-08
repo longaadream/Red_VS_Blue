@@ -23,7 +23,7 @@ const filename = `Red-vs-Blue-0.1.0-${id}`
 const windowsZip = path.join(output, `${filename}-Windows-x64.zip`)
 const relayZip = path.join(output, `${filename}-Relay.zip`)
 if (fs.existsSync(windowsZip) || fs.existsSync(relayZip)) throw new Error('Candidate archives already exist; use a new candidate ID')
-const instructions = fs.readFileSync(path.join(root, 'docs/technical/RED-193-FIRST-PLAYTEST.md'), 'utf8')
+const instructions = fs.readFileSync(path.join(root, id.startsWith('RED-196-') ? 'docs/technical/RED-196-OFFICIAL-SERVER.md' : 'docs/technical/RED-193-FIRST-PLAYTEST.md'), 'utf8')
 const windows = new AdmZip()
 windows.addLocalFolder(windowsRoot, 'Red-vs-Blue')
 windows.addFile('START-HERE.md', Buffer.from(instructions))

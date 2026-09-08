@@ -13,7 +13,7 @@ import {
   getServerGameProfileIdentityV1,
 } from '@/lib/content-pipeline/runtime/profile-game-identity'
 import { hashBattleState } from '@/lib/game/battle-runner'
-import { getBattleStorage } from '@/lib/game/battle-storage'
+import { getBattleStorage, withServerSkills } from '@/lib/game/battle-storage'
 import { assertSelectableMapId, getSelectableMapCatalog } from '@/lib/game/map-selection'
 import { isPlayerSeat, normalizeContentAlignment, type PlayerSeat } from '@/lib/game/match-identity'
 import { getAllPieces } from '@/lib/game/piece-repository'
@@ -61,8 +61,11 @@ import {
 } from './battle-room-protocol'
 import { BattleRoomState } from './battle-room-state'
 import { ProductBattleStore } from './product-battle-store'
+import type { RankedRoomHooks } from '../official/ranked'
+import { OfficialError } from '../official/accounts'
 
 export interface BattleRoomCreateOptions {
+  officialCapability?: string
   restoreCapability?: string
   playerId?: string
   auth?: unknown
@@ -77,6 +80,7 @@ export interface BattleRoomCreateOptions {
 }
 
 export interface BattleRoomJoinOptions {
+  officialToken?: string
   spectator?: boolean
   inviteCode?: string
   auth?: unknown
@@ -88,6 +92,7 @@ export interface BattleRoomJoinOptions {
 }
 
 export interface BattleRoomDependencies {
+  official?: RankedRoomHooks
   updateInvite?: (roomId: string, code?: string) => void
   restoreCapability?: string
   authenticate?: (playerId: string, roomId: string, proof: unknown) => string
@@ -124,12 +129,16 @@ export function createBattleRoomClass(dependencies: BattleRoomDependencies) {
     private disposed = false
     private creationPlayerId?: string
     private creationPublicKey?: string
+    private readonly officialTokens = new Map<string, string>()
+    private readonly playerReconnections = new Map<string, () => void>()
+    private readonly reportedDrops = new Set<string>()
 
     async onCreate(options: BattleRoomCreateOptions): Promise<void> {
+      if (dependencies.official && !options.restore && options.officialCapability !== dependencies.official.capability) throw new Error('官方排位只能通过系统匹配创建')
       if (options?.restore && dependencies.restoreCapability && options.restoreCapability !== dependencies.restoreCapability) throw new Error('Only the host process may restore rooms')
       this.productMode = options?.product === true
       if (dependencies.authenticate && !this.productMode && !options?.restore) throw new Error('Product admission required')
-      if (this.productMode && !options?.restore) {
+      if (this.productMode && !options?.restore && !dependencies.official) {
         this.creationPlayerId = normalizeRequiredId(options.playerId, 'playerId')
         if (dependencies.authenticate) this.creationPublicKey = dependencies.authenticate(normalizeRequiredId(options.playerId, 'playerId'), 'create', options.auth)
       }
@@ -191,6 +200,7 @@ export function createBattleRoomClass(dependencies: BattleRoomDependencies) {
         try {
           const mapId = assertSelectableMapId(options.mapId ?? (options.mode === '2v2' ? 'twin-fronts' : 'open-expanse'), options.mode)
           const room: GameRoom = {
+            officialRanked: !!dependencies.official,
             id: this.roomId,
             name: normalizeRoomName(options.name, this.roomId),
             status: 'waiting',
@@ -237,7 +247,13 @@ export function createBattleRoomClass(dependencies: BattleRoomDependencies) {
     async onJoin(client: Client, options: BattleRoomJoinOptions): Promise<void> {
       const playerId = normalizeRequiredId(options?.playerId, 'playerId')
       let verifiedKey: string | undefined
-      if (this.productMode && dependencies.authenticate) {
+      if (dependencies.official) {
+        const spectator = options.spectator === true
+        const account = await dependencies.official.authorize(this.roomId, playerId, options.officialToken, spectator)
+        options = { ...options, spectator, accountId: account.id, playerName: account.name }
+        this.officialTokens.set(client.sessionId, options.officialToken!)
+      }
+      if (this.productMode && dependencies.authenticate && !dependencies.official) {
         verifiedKey = this.creationPlayerId === playerId && this.creationPublicKey
           ? this.creationPublicKey : dependencies.authenticate(playerId, this.roomId, options.auth)
         this.creationPlayerId = undefined
@@ -247,11 +263,12 @@ export function createBattleRoomClass(dependencies: BattleRoomDependencies) {
         if (existing?.publicKey && existing.publicKey !== verifiedKey) throw new Error('Player identity key mismatch')
       }
       const activeSessionId = this.sessionByPlayer.get(playerId)
-      if (activeSessionId && activeSessionId !== client.sessionId) {
+      if (!dependencies.official && activeSessionId && activeSessionId !== client.sessionId) {
         throw Object.assign(new Error('Player is already connected'), { code: 'BATTLE_PLAYER_ALREADY_CONNECTED' })
       }
       if (this.productMode) {
         await roomAuthorityQueue.enqueue(this.roomId, { kind: 'system', playerId, actionId: 'admission' }, async () => {
+          if (dependencies.official) await this.releaseRevokedOfficialSeat(playerId)
           const active = this.sessionByPlayer.get(playerId)
           if (active && active !== client.sessionId) throw Object.assign(new Error('Player is already connected'), { code: 'BATTLE_PLAYER_ALREADY_CONNECTED' })
           if ([...this.spectators.values()].some(viewer => viewer.id === playerId)) throw new Error('该身份已经在观战')
@@ -271,6 +288,7 @@ export function createBattleRoomClass(dependencies: BattleRoomDependencies) {
     }
 
     async onDrop(client: Client): Promise<void> {
+      if (dependencies.official && !this.officialTokens.has(client.sessionId)) return
       if (this.spectators.has(client.sessionId)) {
         const reservation = this.allowReconnection(client, 120)
         const cancel = () => reservation.reject(new Error('Spectating disabled'))
@@ -282,13 +300,16 @@ export function createBattleRoomClass(dependencies: BattleRoomDependencies) {
       const playerId = this.playerBySession.get(client.sessionId)
       if (playerId) this.offlineSince.set(playerId, Date.now())
       if (this.productMode) await this.broadcastProductRoom()
-      try { await this.allowReconnection(client, (dependencies.reconnectGraceMs ?? 120000) / 1000) } catch {
+      const reservation = this.allowReconnection(client, (dependencies.reconnectGraceMs ?? 120000) / 1000)
+      this.playerReconnections.set(client.sessionId, () => reservation.reject(new Error('服务器登录已失效')))
+      try { await reservation } catch {
         // Colyseus expires the reservation and invokes onLeave. The host then
         // owns AI control; this is a normal connection lifecycle outcome.
-      }
+      } finally { this.playerReconnections.delete(client.sessionId) }
     }
 
     async onReconnect(client: Client): Promise<void> {
+      if (!await this.officialSessionValid(client)) throw new Error('服务器登录已失效')
       if (this.spectators.has(client.sessionId)) {
         if ((await this.requireProductRoom()).spectatingEnabled === false || !this.spectators.has(client.sessionId)) throw new Error('房主已关闭观战')
         this.spectators.get(client.sessionId)!.client = client
@@ -312,6 +333,7 @@ export function createBattleRoomClass(dependencies: BattleRoomDependencies) {
     }
 
     onLeave(client: Client): void {
+      this.officialTokens.delete(client.sessionId)
       if (this.spectators.delete(client.sessionId)) {
         if (!this.disposed) void this.broadcastProductRoom().catch(error => console.error('[spectator-leave]', this.roomId, error))
         return
@@ -367,7 +389,7 @@ export function createBattleRoomClass(dependencies: BattleRoomDependencies) {
         room.hostId ??= playerId
       } else {
         assertGameProfileCompatibleV1(player.profileIdentity)
-        const requestedAlignment = normalizeContentAlignment(options.alignment)
+        const requestedAlignment = dependencies.official && player.alignment ? player.alignment : normalizeContentAlignment(options.alignment)
         ensureRosterAlignmentMutable(player, requestedAlignment)
         if (requestedAlignment) player.alignment = requestedAlignment
         player.profileIdentity = profileIdentity
@@ -404,6 +426,7 @@ export function createBattleRoomClass(dependencies: BattleRoomDependencies) {
     }
 
     private async handleProductRpc(client: Client, message: unknown): Promise<unknown> {
+      if (!await this.officialSessionValid(client)) throw new Error('服务器登录已失效')
       if (!this.productMode) {
         throw Object.assign(new Error('Product room RPC is unavailable'), { code: 'PRODUCT_ROOM_REQUIRED' })
       }
@@ -477,6 +500,7 @@ export function createBattleRoomClass(dependencies: BattleRoomDependencies) {
         return snapshot
       }
       if (method === 'rooms.delete') {
+        if (dependencies.official) throw new Error('官方比赛不能由参赛者删除')
         const playerId = this.requireSessionPlayer(client)
         const room = await this.requireProductRoom()
         if (room.hostId?.toLowerCase() !== playerId) {
@@ -501,10 +525,12 @@ export function createBattleRoomClass(dependencies: BattleRoomDependencies) {
       }
       assertGameProfileCompatibleV1(data.profileIdentity)
       const action = String(data.action ?? '')
+      if (dependencies.official && ['leave', 'spectating'].includes(action)) throw new Error('官方排位不允许更改该房间设置，请通过断开连接离开')
       const store = this.requireProductStore()
       let room = await this.requireProductRoom()
       const player = room.players.find(candidate => candidate.id.toLowerCase() === playerId)
       if (!player) throw Object.assign(new Error('Player not in room'), { code: 'ROOM_PLAYER_NOT_FOUND' })
+      if (dependencies.official) { data.accountId = playerId; data.playerName = player.name }
 
       if (action === 'spectating') {
         if (room.hostId !== playerId) throw new Error('只有房主可设置观战')
@@ -582,6 +608,7 @@ export function createBattleRoomClass(dependencies: BattleRoomDependencies) {
     }
 
     private async startProductBattle(): Promise<void> {
+      if (this.disposed) throw new Error('比赛已取消')
       if (this.authorityStore) return
       const store = this.requireProductStore()
       const result = await startBattleFromLockedRosters(store, this.roomId, {
@@ -611,6 +638,7 @@ export function createBattleRoomClass(dependencies: BattleRoomDependencies) {
       }
       let submittedAction: unknown
       try {
+        if (!await this.officialSessionValid(client)) throw new Error('服务器登录已失效')
         const envelope = parseBattleAuthorityEnvelope(message, this.roomId)
         submittedAction = envelope.command
         if (envelope.playerId !== seatedPlayerId) {
@@ -629,6 +657,7 @@ export function createBattleRoomClass(dependencies: BattleRoomDependencies) {
         this.applySnapshotProjection(result.snapshot, result.transition?.transitionHash)
         if (result.transition) {
           for (const recipient of this.clients) {
+            if (!await this.officialSessionValid(recipient)) continue
             if (this.spectators.has(recipient.sessionId)) { await this.sendBattleSnapshot(recipient); continue }
             const recipientPlayerId = this.playerBySession.get(recipient.sessionId)
             if (!recipientPlayerId) continue
@@ -651,6 +680,7 @@ export function createBattleRoomClass(dependencies: BattleRoomDependencies) {
     }
 
     private async handleBattleReceiptRequest(client: Client, message: unknown): Promise<unknown> {
+      if (!await this.officialSessionValid(client)) throw new Error('服务器登录已失效')
       const playerId = this.requireSessionPlayer(client)
       if (!this.authorityStore) {
         throw Object.assign(new Error('Battle has not started'), { code: 'BATTLE_NOT_STARTED' })
@@ -676,12 +706,14 @@ export function createBattleRoomClass(dependencies: BattleRoomDependencies) {
       const room = await this.requireGameRoom()
       const playerId = this.playerBySession.get(client.sessionId) ?? this.spectators.get(client.sessionId)?.id
       if (!playerId) return
+      if (!await this.officialSessionValid(client)) return
       const snapshot = createPublicBattleSnapshot(room, playerId)
       client.send(BATTLE_SNAPSHOT_MESSAGE, { type: 'stateUpdate', ...snapshot })
     }
 
     private async broadcastBattleSnapshot(snapshot: PublicBattleSnapshot): Promise<void> {
       for (const client of this.clients) {
+        if (!await this.officialSessionValid(client)) continue
         const playerId = this.playerBySession.get(client.sessionId) ?? this.spectators.get(client.sessionId)?.id
         if (!this.authorityStore || (!playerId && !this.spectators.has(client.sessionId))) continue
         const room = await this.requireGameRoom()
@@ -719,11 +751,64 @@ export function createBattleRoomClass(dependencies: BattleRoomDependencies) {
       return playerId
     }
 
+    private async releaseRevokedOfficialSeat(playerId: string): Promise<void> {
+      const previous = this.sessionByPlayer.get(playerId)
+      if (!previous || !dependencies.official) return
+      try { await dependencies.official.authorize(this.roomId, playerId, this.officialTokens.get(previous)) }
+      catch (error) {
+        if (!(error instanceof OfficialError)) throw error
+        this.revokeOfficialSession(previous, playerId)
+      }
+    }
+
+    private revokeOfficialSession(sessionId: string, playerId: string): void {
+      this.officialTokens.delete(sessionId)
+      this.spectators.delete(sessionId)
+      this.playerBySession.delete(sessionId)
+      if (this.sessionByPlayer.get(playerId) === sessionId) {
+        this.sessionByPlayer.delete(playerId)
+        if (!this.offlineSince.has(playerId)) this.offlineSince.set(playerId, Date.now())
+      }
+      this.playerReconnections.get(sessionId)?.()
+      const client = this.clients.find(client => client.sessionId === sessionId)
+      if (client) {
+        client.send('officialSessionExpired', { error: '服务器登录已失效，请重新登录后返回比赛' })
+        client.leave(4000)
+      }
+    }
+
+    private async officialSessionValid(client: Client): Promise<boolean> {
+      if (!dependencies.official) return true
+      const playerId = this.playerBySession.get(client.sessionId) ?? this.spectators.get(client.sessionId)?.id
+      if (!playerId) return false
+      try {
+        await dependencies.official.authorize(this.roomId, playerId, this.officialTokens.get(client.sessionId), this.spectators.has(client.sessionId))
+        return true
+      } catch (error) {
+        if (!(error instanceof OfficialError)) return false
+        this.revokeOfficialSession(client.sessionId, playerId)
+        return false
+      }
+    }
+
+    async closeOfficialMatch(onlyIfUnstarted = false): Promise<boolean> {
+      const closed = await roomAuthorityQueue.enqueue(this.roomId, { kind: 'system', playerId: 'official', actionId: 'close' }, async () => {
+        if (onlyIfUnstarted && (this.authorityStore || this.productStore?.authority)) return false
+        this.disposed = true
+        this.productStore?.closeSetup()
+        for (const client of this.clients) client.send('officialMatchClosed', {})
+        return true
+      })
+      if (closed) await this.disconnect()
+      return closed
+    }
+
     private async broadcastProductRoom(): Promise<void> {
       if (!this.productMode) return
       const room = await this.requireProductRoom()
       await this.publishProductRoom(room)
       for (const client of this.clients) {
+        if (!await this.officialSessionValid(client)) continue
         if (!this.playerBySession.has(client.sessionId) && !this.spectators.has(client.sessionId)) continue
         client.send(PRODUCT_ROOM_UPDATE_MESSAGE, { type: 'roomUpdate', room: {
         ...this.roomForClient(room, client),
@@ -824,10 +909,14 @@ export function createBattleRoomClass(dependencies: BattleRoomDependencies) {
       this.botBusy = true
       try {
         const room = await this.requireGameRoom()
-        const state = getBattleStorage(room)?.state as BattleState | undefined
+        const state = withServerSkills(getBattleStorage(room)?.state) as BattleState | undefined
         if (!state || state.terminalResult) return
         for (const player of room.players) {
           if (!this.sessionByPlayer.has(player.id) && !this.offlineSince.has(player.id)) this.offlineSince.set(player.id, Date.now())
+          if (dependencies.official && this.aiOwns(player.id) && !this.reportedDrops.has(player.id)) {
+            await dependencies.official.longDrop(this.roomId, player.id)
+            this.reportedDrops.add(player.id)
+          }
         }
         const playerId = getCurrentInputOwnerPlayerId(state)
         if (!this.aiOwns(playerId)) return
@@ -870,6 +959,7 @@ export function createBattleRoomClass(dependencies: BattleRoomDependencies) {
       this.applySnapshotProjection(result.snapshot, result.transition?.transitionHash)
       if (result.transition) {
         for (const recipient of this.clients) {
+          if (!await this.officialSessionValid(recipient)) continue
           if (this.spectators.has(recipient.sessionId)) { await this.sendBattleSnapshot(recipient); continue }
           const recipientPlayerId = this.playerBySession.get(recipient.sessionId)
           if (!recipientPlayerId) continue
@@ -889,6 +979,7 @@ function publicProductRoom(room: GameRoom) {
   const terminal = authorityState?.terminalResult
   const publicRoom = createPublicRoomSnapshot(room)
   return {
+    officialRanked: room.officialRanked === true,
     profileIdentity: getServerGameProfileIdentityV1(),
     id: publicRoom.id,
     name: publicRoom.name,

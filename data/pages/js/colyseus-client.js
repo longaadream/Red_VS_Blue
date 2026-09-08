@@ -102,6 +102,8 @@
   }
 
   function currentIdentity() {
+    var official = officialSession()
+    if (official) return { id: official.account.id, displayName: official.account.name, accountId: official.account.id }
     try {
       return window.RvBIdentity && typeof window.RvBIdentity.getIdentity === 'function'
         ? (window.RvBIdentity.getIdentity() || {})
@@ -109,6 +111,13 @@
     } catch {
       return {}
     }
+  }
+
+  function officialSession(base) {
+    try {
+      var saved = JSON.parse(window.sessionStorage.getItem('rvb_official_session') || 'null')
+      return saved && saved.token && saved.account && saved.url === normalizedBaseUrl(base || getServerUrl()) ? saved : null
+    } catch { return null }
   }
 
   async function admissionProof(base, playerId, roomId) {
@@ -125,8 +134,10 @@
     var identity = currentIdentity()
     var profileIdentity = storedProfileIdentity()
     if (!profileIdentity) throw new Error('Game profile identity is required for Colyseus admission')
+    var official = officialSession(base)
     return {
-      auth: await admissionProof(base || getServerUrl(), String(playerId || identity.id || '').trim().toLowerCase(), roomId || _roomId),
+      officialToken: official ? official.token : undefined,
+      auth: official ? undefined : await admissionProof(base || getServerUrl(), String(playerId || identity.id || '').trim().toLowerCase(), roomId || _roomId),
       product: true,
       spectator: params.get('mode') === 'spectate',
       inviteCode: window.sessionStorage?.getItem('rvb_room_invite:' + normalizedBaseUrl(base || getServerUrl()) + ':' + (roomId || _roomId)) || undefined,
@@ -159,6 +170,17 @@
   }
 
   function registerRoomHandlers(room, generation) {
+    room.onMessage('officialSessionExpired', function () {
+      _shouldReconnect = false
+      clearReconnectToken()
+      window.sessionStorage.removeItem('rvb_official_session')
+      window.location.href = 'official.html'
+    })
+    room.onMessage('officialMatchClosed', function () {
+      _shouldReconnect = false
+      clearReconnectToken()
+      window.location.href = 'official.html'
+    })
     room.onMessage('spectatorClosed', function (message) {
       if (generation !== _generation) return
       _shouldReconnect = false
@@ -396,6 +418,8 @@
     if (method === 'catalog.skills') return fetchJson(base + '/catalog/skills', timeoutMs)
     if (method === 'catalog.card') return fetchJson(base + '/catalog/cards/' + encodeURIComponent(String(payload.cardId || '')), timeoutMs)
     if (method === 'battleReports.get') {
+      var official = officialSession(base)
+      if (official) return fetchJson(base + '/battle-reports/' + encodeURIComponent(String(payload.battleId || payload.roomId || '')), timeoutMs, { Authorization: 'Bearer ' + official.token })
       var battleId = String(payload.battleId || payload.roomId || '').trim().toLowerCase()
       var reportAuth = await admissionProof(base, currentIdentity().id, 'report:' + battleId)
       var reportPayload = await fetchJson(base + '/battle-reports/' + encodeURIComponent(battleId), timeoutMs, { 'X-RvB-Auth': JSON.stringify(reportAuth) })
@@ -653,6 +677,7 @@
   function isAuthoritySyncing() { return _authoritySyncing }
 
   window.RvBColyseus = {
+    isOfficialSession: function (playerId) { var session = officialSession(); return !!session && session.account.id === playerId },
     connect: connect,
     disconnect: disconnect,
     send: send,

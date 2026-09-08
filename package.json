@@ -55,7 +55,14 @@
     "package:multiplayer": "node scripts/package-multiplayer-candidate.mjs",
     "build:multiplayer": "node scripts/build-multiplayer-candidate.mjs",
     "smoke:multiplayer:windows": "node tests/electron/windows-smoke.mjs network-client",
-    "build:practice-ai": "node scripts/build-practice-ai.mjs"
+    "build:practice-ai": "node scripts/build-practice-ai.mjs",
+    "dev:official": "npm run build:official && node dist/official-server/win-x64/server.mjs",
+    "smoke:official:browser": "node scripts/run-official-browser-smoke.mjs",
+    "build:official": "node scripts/build-official-server.mjs",
+    "test:official": "vitest run tests/colyseus/official-ranked.test.ts --maxWorkers=1",
+    "smoke:official:load": "node scripts/run-official-load-smoke.mjs",
+    "smoke:official:windows": "npm run build:official && vitest run tests/colyseus/official-windows.test.ts --maxWorkers=1",
+    "package:official": "node scripts/package-official-candidate.mjs"
   },
   "dependencies": {
     "@colyseus/schema": "5.0.25",
@@ -107,6 +114,7 @@
     "lucide-react": "^0.564.0",
     "next": "16.3.0",
     "next-themes": "^0.4.6",
+    "nodemailer": "10.0.1",
     "pg": "8.23.0",
     "react": "19.2.4",
     "react-day-picker": "9.13.2",
@@ -117,8 +125,8 @@
     "sonner": "^1.7.1",
     "tailwind-merge": "^3.3.1",
     "vaul": "^1.1.2",
-    "zod": "^3.24.1",
-    "ws": "8.21.0"
+    "ws": "8.21.0",
+    "zod": "^3.24.1"
   },
   "devDependencies": {
     "@capacitor/android": "8.5.0",
@@ -128,9 +136,11 @@
     "@types/bcryptjs": "^2.4.6",
     "@types/express": "5.0.3",
     "@types/node": "^22",
+    "@types/nodemailer": "8.0.1",
     "@types/pg": "8.15.5",
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
+    "@types/ws": "8.18.1",
     "@vitest/coverage-v8": "^4.1.10",
     "electron": "43.4.0",
     "electron-builder": "26.15.3",
@@ -145,8 +155,7 @@
     "tsx": "4.20.6",
     "tw-animate-css": "1.3.3",
     "typescript": "5.7.3",
-    "vitest": "^4.1.10",
-    "@types/ws": "8.18.1"
+    "vitest": "^4.1.10"
   },
   "overrides": {
     "@xmldom/xmldom": "0.8.13",

@@ -4688,6 +4688,7 @@
       return error
     }
     async function createBattleActionAuth(action) {
+      if (window.RvBColyseus && RvBColyseus.isOfficialSession && RvBColyseus.isOfficialSession(myPlayerId)) return undefined
       if (!window.RvBIdentity) {
         throw battleAuthError('BATTLE_AUTH_REQUIRED', 'Battle action identity is unavailable')
       }

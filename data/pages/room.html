@@ -380,7 +380,7 @@
 
     async function renderRoom(room) {
       document.getElementById('spectatorCount').textContent = '观众 ' + (room.spectatorCount || 0) + ' / 8'
-      document.getElementById('spectatingControl').hidden = room.hostId !== playerId
+      document.getElementById('spectatingControl').hidden = room.officialRanked || room.hostId !== playerId
       document.getElementById('spectatingEnabled').checked = room.spectatingEnabled !== false
       document.getElementById('roomIdBadge').textContent = '#' + (room.id || roomId).slice(0, 8)
       document.getElementById('roomNameLabel').textContent = room.name || roomId
@@ -412,7 +412,7 @@
       const dissolveBtn = document.getElementById('dissolveBtn')
       if (dissolveBtn) {
         const amHost = me && me.id && me.id.toLowerCase() === hostId
-        dissolveBtn.style.display = (amHost && room.status === 'waiting') ? 'block' : 'none'
+        dissolveBtn.style.display = (!room.officialRanked && amHost && room.status === 'waiting') ? 'block' : 'none'
       }
 
       // 按钮 + 状态文字

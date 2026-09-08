@@ -2,6 +2,8 @@ import { defineRoom, defineServer, matchMaker } from 'colyseus'
 import { randomUUID } from 'node:crypto'
 import { WebSocketTransport } from '@colyseus/ws-transport'
 import { Pool } from 'pg'
+import type { Express } from 'express'
+import type { RankedRoomHooks } from '../official/ranked'
 
 import { getServerGameProfileIdentityV1 } from '@/lib/content-pipeline/runtime/profile-game-identity'
 import { getSelectableMapCatalog } from '@/lib/game/map-selection'
@@ -35,6 +37,8 @@ export interface BattleServerRepository
 }
 
 export interface CreateColyseusBattleServerOptions {
+  official?: RankedRoomHooks
+  configureExpress?: (app: Express) => void
   requireIdentityProof?: boolean
   reconnectGraceMs?: number
   databaseUrl?: string
@@ -146,6 +150,7 @@ export function createColyseusBattleServer(options: CreateColyseusBattleServerOp
   const restoreCapability = randomUUID()
   const roomInvites = new Map<string, string>()
   const BattleRoom = createBattleRoomClass({
+    official: options.official,
     updateInvite: (roomId, code) => {
       for (const [existing, id] of roomInvites) if (id === roomId && existing !== code) roomInvites.delete(existing)
       if (code) roomInvites.set(code, roomId)
@@ -173,6 +178,9 @@ export function createColyseusBattleServer(options: CreateColyseusBattleServerOp
   let ready = false
   let healthError: string | undefined
   const server = defineServer({
+    // The official launcher must finish its embedded PostgreSQL shutdown before
+    // exiting; Colyseus' automatic process.exit would race that owner.
+    gracefullyShutdown: options.official ? false : undefined,
     // Keep the transport as a static dependency so the packaged authority does
     // not rely on Colyseus' runtime dynamic import from node_modules.
     transport: new WebSocketTransport(),
@@ -195,7 +203,7 @@ export function createColyseusBattleServer(options: CreateColyseusBattleServerOp
       const app = rawApp as unknown as ExpressLikeApp
       app.use((_request, response, next) => {
         response.setHeader('Access-Control-Allow-Origin', '*')
-        response.setHeader('Access-Control-Allow-Headers', 'Content-Type,X-RvB-Auth')
+        response.setHeader('Access-Control-Allow-Headers', 'Content-Type,X-RvB-Auth,Authorization')
         response.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS')
         if (_request.method === 'OPTIONS') {
           response.sendStatus(204)
@@ -203,6 +211,7 @@ export function createColyseusBattleServer(options: CreateColyseusBattleServerOp
         }
         next()
       })
+      options.configureExpress?.(rawApp as unknown as Express)
       app.get('/healthz', async (_request: unknown, response: HealthResponse) => {
         try {
           await repository.healthCheck()
@@ -320,7 +329,7 @@ export function createColyseusBattleServer(options: CreateColyseusBattleServerOp
       })
     },
   })
-  server.onBeforeShutdown(() => journal.close())
+  if (!options.official) server.onBeforeShutdown(() => journal.close())
   if (ownsRepository) server.onShutdown(() => repository.close?.())
   let roomsRestored = false
   const restoreProductRooms = async (): Promise<string[]> => {

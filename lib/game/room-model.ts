@@ -100,6 +100,7 @@ export interface GameRecord {
 
 /** Transport-neutral rule state shared by Colyseus and deterministic tests. */
 export interface Room {
+  officialRanked?: boolean
   id: string
   mode?: '1v1' | '2v2'
   name: string
