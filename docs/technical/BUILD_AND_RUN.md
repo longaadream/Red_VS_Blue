@@ -5,9 +5,9 @@
 ## 环境
 
 - Windows 10/11 x64
-- Node.js 与 npm 版本遵循仓库 `package.json` / lockfile
+- Node.js 22 或更高版本（Colyseus 引擎要求）；RED-197 文档验证使用 24.13.1，依赖遵循 lockfile
 - Git
-- 完整依赖通过 `npm.cmd ci` 安装
+- 完整依赖通过 `npm.cmd ci --legacy-peer-deps` 安装；当前 Colyseus 的可选 Zod 4 peer 与项目 Zod 3 冲突，普通 `npm ci` 会遇到 `ERESOLVE`。该选项只用于安装既有依赖，依赖兼容问题仍需专项处理。
 
 不要手工复制另一个 worktree 的 `node_modules`、构建目录或数据库目录。任务分支每天首次继续、提交 PR
 和请求验收前都运行 `npm.cmd run check:main-baseline`。
@@ -15,7 +15,7 @@
 ## 安装与基础验证
 
 ```powershell
-npm.cmd ci
+npm.cmd ci --legacy-peer-deps
 npm.cmd run check:main-baseline
 npm.cmd run check:windows-cutover
 npm.cmd run typecheck
@@ -28,6 +28,11 @@ npm.cmd test
 ## Colyseus 开发服务
 
 为开发 authority 配置 PostgreSQL：
+
+仓库提供的本机开发数据库配置为 [`config/docker-compose.colyseus.yml`](../../config/docker-compose.colyseus.yml)。
+使用 Docker 时运行 `docker compose --project-directory . -f config/docker-compose.colyseus.yml up -d postgres`，端口为 `127.0.0.1:5433`，
+数据库名为 `rvb_colyseus`；按该配置设置下面的连接 URL。也可以连接自己准备的 PostgreSQL。
+从仓库根目录运行，并保留 `--project-directory .`，使配置迁移后继续使用原 Compose 项目名和数据库卷。
 
 ```powershell
 $env:RVB_POSTGRES_URL = 'postgresql://user:password@127.0.0.1:5432/rvb'
@@ -57,8 +62,11 @@ PostgreSQL 集成测试需要 `RVB_TEST_POSTGRES_URL` 指向可删除测试数�
 ## Windows Electron Client 开发
 
 ```powershell
+npm.cmd run build
 npm.cmd run dev:electron:client
 ```
+
+首次运行前的 `build` 会生成开发入口预检所需的 `.next/standalone/server.js`；网页或静态资源修改后需重新构建。
 
 开发入口会：
 

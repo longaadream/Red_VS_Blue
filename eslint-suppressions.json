@@ -314,21 +314,6 @@
       "count": 2
     }
   },
-  "scripts/cleanup-server-resources.js": {
-    "@typescript-eslint/no-require-imports": {
-      "count": 2
-    }
-  },
-  "scripts/migrate-player-ids.js": {
-    "@typescript-eslint/no-require-imports": {
-      "count": 2
-    }
-  },
-  "scripts/stage-server-resources.js": {
-    "@typescript-eslint/no-require-imports": {
-      "count": 2
-    }
-  },
   "scripts/sync-android-assets.js": {
     "@typescript-eslint/no-require-imports": {
       "count": 2
@@ -337,47 +322,6 @@
   "scripts/sync-pages.js": {
     "@typescript-eslint/no-require-imports": {
       "count": 3
-    }
-  },
-  "test-map-load.js": {
-    "@typescript-eslint/no-require-imports": {
-      "count": 2
-    }
-  },
-  "test-map-path.js": {
-    "@typescript-eslint/no-require-imports": {
-      "count": 2
-    }
-  },
-  "test-map-repository.js": {
-    "@typescript-eslint/no-require-imports": {
-      "count": 1
-    }
-  },
-  "test-nilasec-fix.js": {
-    "@typescript-eslint/no-require-imports": {
-      "count": 2
-    }
-  },
-  "test-status-json.js": {
-    "@typescript-eslint/no-require-imports": {
-      "count": 1
-    },
-    "@typescript-eslint/no-unused-vars": {
-      "count": 1
-    }
-  },
-  "test-status-system.js": {
-    "@typescript-eslint/no-require-imports": {
-      "count": 1
-    }
-  },
-  "test-storage.js": {
-    "@typescript-eslint/no-require-imports": {
-      "count": 2
-    },
-    "@typescript-eslint/no-unused-vars": {
-      "count": 1
     }
   },
   "tests/game/movement-contract.test.ts": {

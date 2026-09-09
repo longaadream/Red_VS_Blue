@@ -27,7 +27,7 @@
 先启动 PostgreSQL：
 
 ```powershell
-docker compose -f docker-compose.colyseus.yml up -d postgres
+docker compose --project-directory . -f config/docker-compose.colyseus.yml up -d postgres
 $env:RVB_BATTLE_AUTHORITY_V2 = '1'
 $env:RVB_POSTGRES_URL = 'postgresql://rvb:rvb@127.0.0.1:5433/rvb_colyseus'
 npm run dev:colyseus

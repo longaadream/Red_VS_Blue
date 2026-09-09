@@ -6,6 +6,15 @@
 
 ## 快速入口
 
+### 第一次来到项目
+
+- [项目首页](../README.md)：游戏介绍、界面展示与开发起步。
+- [Windows 构建与运行](./technical/BUILD_AND_RUN.md)：客户端、编辑器、对局服务和打包。
+- [当前架构](./technical/ARCHITECTURE.md)：表现层、规则层、联机与持久化的边界。
+- [基础规则词典](./product/RULE_DICTIONARY.md)：理解游戏规则与公共机制。
+- [内容创作流程](./technical/HUMAN_AI_CONTENT_WORKFLOW.md)：角色、技能与内容编辑器。
+- [媒体素材](./media/README.md)：真实截图、宣传海报与制作说明。
+
 ### 项目管理
 
 - [团队协作指南](./COLLABORATION_GUIDE.md)

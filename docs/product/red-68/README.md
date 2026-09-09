@@ -1,9 +1,11 @@
 # RED-68 browser and test evidence
 
+> 历史设计记录：这里的旧棋盘和美术方向已被后续版本替代，图片仅通过固定提交追溯。当前游戏展示见 [项目主页](../../../README.md)。
+
 ## Reference and fixed state
 
-- Art-direction source: [dark tactical table v3](../art-direction-dark-tactical-table-v3.png).
-- Same-viewport reference: [v3 at 1280 × 720](./reference-1280x720.png), compared with the [1280 × 720 dense result](./after-1280x720-dense-8cards.png).
+- Art-direction source: [dark tactical table v3](https://github.com/longaadream/Red_VS_Blue/blob/a7849ce9eb3fc9e2fbc000afdd5f770b6f57e37a/docs/product/art-direction-dark-tactical-table-v3.png).
+- Same-viewport reference: [v3 at 1280 × 720](https://github.com/longaadream/Red_VS_Blue/blob/a7849ce9eb3fc9e2fbc000afdd5f770b6f57e37a/docs/product/red-68/reference-1280x720.png), compared with the [1280 × 720 dense result](https://github.com/longaadream/Red_VS_Blue/blob/a7849ce9eb3fc9e2fbc000afdd5f770b6f57e37a/docs/product/red-68/after-1280x720-dense-8cards.png).
 - Fixed camera: a centered single-axis 45° rake with a 35° FOV perspective projection. At 1280 × 720 the near board row is 1.313× the far row, so the grid and outer edges form a visible, symmetric trapezoid while the complete board and 0.72-unit front slab remain in the reset view. There is no horizontal yaw; pan, wheel/pinch zoom up to 8×, reset, projection, and authoritative coordinates remain separate.
 - Product-review simplification: player information stays inline at the top without individual boxes; the CSS board frame is removed; RED-68 button skin overrides are removed so existing battle controls keep their original UI and the board retains the dominant viewport share.
 - Fixed map: 20 × 16 with seed `red-68-fixed-seed-2026-08-20`.
@@ -14,19 +16,19 @@
 
 | Viewport | Before | After |
 | --- | --- | --- |
-| 1280 × 720 | [before](./before-1280x720.png) | [after](./after-1280x720.png) |
-| 1440 × 900 | [before](./before-1440x900.png) | [after](./after-1440x900.png) |
-| 1024 × 768 | [before](./before-1024x768.png) | [after](./after-1024x768.png) |
-| 760 × 720 | [before](./before-760x720.png) | [after](./after-760x720.png) |
-| 360 × 800 | [before](./before-360x800.png) | [after](./after-360x800.png) |
-| 390 × 844 | [before](./before-390x844.png) | [after](./after-390x844.png) |
-| 844 × 390 | [before](./before-844x390.png) | [after](./after-844x390.png) |
+| 1280 × 720 | [before](https://github.com/longaadream/Red_VS_Blue/blob/a7849ce9eb3fc9e2fbc000afdd5f770b6f57e37a/docs/product/red-68/before-1280x720.png) | [after](https://github.com/longaadream/Red_VS_Blue/blob/a7849ce9eb3fc9e2fbc000afdd5f770b6f57e37a/docs/product/red-68/after-1280x720.png) |
+| 1440 × 900 | [before](https://github.com/longaadream/Red_VS_Blue/blob/a7849ce9eb3fc9e2fbc000afdd5f770b6f57e37a/docs/product/red-68/before-1440x900.png) | [after](https://github.com/longaadream/Red_VS_Blue/blob/a7849ce9eb3fc9e2fbc000afdd5f770b6f57e37a/docs/product/red-68/after-1440x900.png) |
+| 1024 × 768 | [before](https://github.com/longaadream/Red_VS_Blue/blob/a7849ce9eb3fc9e2fbc000afdd5f770b6f57e37a/docs/product/red-68/before-1024x768.png) | [after](https://github.com/longaadream/Red_VS_Blue/blob/a7849ce9eb3fc9e2fbc000afdd5f770b6f57e37a/docs/product/red-68/after-1024x768.png) |
+| 760 × 720 | [before](https://github.com/longaadream/Red_VS_Blue/blob/a7849ce9eb3fc9e2fbc000afdd5f770b6f57e37a/docs/product/red-68/before-760x720.png) | [after](https://github.com/longaadream/Red_VS_Blue/blob/a7849ce9eb3fc9e2fbc000afdd5f770b6f57e37a/docs/product/red-68/after-760x720.png) |
+| 360 × 800 | [before](https://github.com/longaadream/Red_VS_Blue/blob/a7849ce9eb3fc9e2fbc000afdd5f770b6f57e37a/docs/product/red-68/before-360x800.png) | [after](https://github.com/longaadream/Red_VS_Blue/blob/a7849ce9eb3fc9e2fbc000afdd5f770b6f57e37a/docs/product/red-68/after-360x800.png) |
+| 390 × 844 | [before](https://github.com/longaadream/Red_VS_Blue/blob/a7849ce9eb3fc9e2fbc000afdd5f770b6f57e37a/docs/product/red-68/before-390x844.png) | [after](https://github.com/longaadream/Red_VS_Blue/blob/a7849ce9eb3fc9e2fbc000afdd5f770b6f57e37a/docs/product/red-68/after-390x844.png) |
+| 844 × 390 | [before](https://github.com/longaadream/Red_VS_Blue/blob/a7849ce9eb3fc9e2fbc000afdd5f770b6f57e37a/docs/product/red-68/before-844x390.png) | [after](https://github.com/longaadream/Red_VS_Blue/blob/a7849ce9eb3fc9e2fbc000afdd5f770b6f57e37a/docs/product/red-68/after-844x390.png) |
 
 Additional acceptance evidence:
 
-- Target mode: [390 × 844](./after-390x844-target.png) and [844 × 390](./after-844x390-target.png).
-- Dense 16-piece table with 8 cards: [1280 × 720](./after-1280x720-dense-8cards.png) and [390 × 844, scrolled to the last card](./after-390x844-dense-8cards.png).
-- Dense 16-piece table with 5 cards: [360 × 800, scrolled to the last card](./after-360x800-dense-5cards.png).
+- Target mode: [390 × 844](https://github.com/longaadream/Red_VS_Blue/blob/a7849ce9eb3fc9e2fbc000afdd5f770b6f57e37a/docs/product/red-68/after-390x844-target.png) and [844 × 390](https://github.com/longaadream/Red_VS_Blue/blob/a7849ce9eb3fc9e2fbc000afdd5f770b6f57e37a/docs/product/red-68/after-844x390-target.png).
+- Dense 16-piece table with 8 cards: [1280 × 720](https://github.com/longaadream/Red_VS_Blue/blob/a7849ce9eb3fc9e2fbc000afdd5f770b6f57e37a/docs/product/red-68/after-1280x720-dense-8cards.png) and [390 × 844, scrolled to the last card](https://github.com/longaadream/Red_VS_Blue/blob/a7849ce9eb3fc9e2fbc000afdd5f770b6f57e37a/docs/product/red-68/after-390x844-dense-8cards.png).
+- Dense 16-piece table with 5 cards: [360 × 800, scrolled to the last card](https://github.com/longaadream/Red_VS_Blue/blob/a7849ce9eb3fc9e2fbc000afdd5f770b6f57e37a/docs/product/red-68/after-360x800-dense-5cards.png).
 
 ## Browser verification
 

@@ -1,0 +1,644 @@
+{
+  "before": [
+    {
+      "id": "training-red-1",
+      "name": "阿尔萨斯·梅涅希尔",
+      "x": 6,
+      "y": 6,
+      "hp": 9
+    },
+    {
+      "id": "training-red-2",
+      "name": "夏特",
+      "x": 9,
+      "y": 6,
+      "hp": 12
+    },
+    {
+      "id": "training-red-3",
+      "name": "宇智波佐助",
+      "x": 12,
+      "y": 6,
+      "hp": 11
+    },
+    {
+      "id": "training-blue-1",
+      "name": "安度因",
+      "x": 6,
+      "y": 10,
+      "hp": 12
+    },
+    {
+      "id": "training-blue-2",
+      "name": "索尼克",
+      "x": 9,
+      "y": 10,
+      "hp": 12
+    },
+    {
+      "id": "training-blue-3",
+      "name": "漩涡鸣人",
+      "x": 12,
+      "y": 10,
+      "hp": 12
+    }
+  ],
+  "after": [
+    {
+      "id": "training-red-1",
+      "name": "阿尔萨斯·梅涅希尔",
+      "x": 6,
+      "y": 6,
+      "hp": 9
+    },
+    {
+      "id": "training-red-2",
+      "name": "夏特",
+      "x": 9,
+      "y": 6,
+      "hp": 12
+    },
+    {
+      "id": "training-red-3",
+      "name": "宇智波佐助",
+      "x": 12,
+      "y": 11,
+      "hp": 11
+    },
+    {
+      "id": "training-blue-1",
+      "name": "安度因",
+      "x": 6,
+      "y": 10,
+      "hp": 12
+    },
+    {
+      "id": "training-blue-2",
+      "name": "索尼克",
+      "x": 9,
+      "y": 10,
+      "hp": 12
+    },
+    {
+      "id": "training-blue-3",
+      "name": "漩涡鸣人",
+      "x": 12,
+      "y": 10,
+      "hp": 8
+    }
+  ],
+  "events": [
+    {
+      "eventId": "training-red-mtt0poxa-1:0",
+      "rootEventId": "training-red-mtt0poxa-1:0",
+      "actionId": "training-red-mtt0poxa-1",
+      "sequence": 0,
+      "kind": "automatic",
+      "iconId": "action-automatic",
+      "actorPlayerId": "training-red",
+      "priority": 80,
+      "skippable": true
+    },
+    {
+      "eventId": "training-red-mtt0ps9g-2:0",
+      "rootEventId": "training-red-mtt0ps9g-2:0",
+      "actionId": "training-red-mtt0ps9g-2",
+      "sequence": 0,
+      "kind": "skill",
+      "iconId": "action-skill",
+      "actorPlayerId": "training-red",
+      "sourcePieceId": "training-red-3",
+      "skillId": "sasuke-chidori",
+      "label": "千鸟",
+      "targetCell": {
+        "x": 12,
+        "y": 11
+      },
+      "presentation": {
+        "cue": "area",
+        "selectedCell": {
+          "x": 12,
+          "y": 11
+        },
+        "areaCells": [
+          {
+            "x": 12,
+            "y": 11
+          },
+          {
+            "x": 12,
+            "y": 6
+          },
+          {
+            "x": 12,
+            "y": 10
+          }
+        ],
+        "endPoint": {
+          "x": 12,
+          "y": 11
+        },
+        "endReason": "resolved"
+      },
+      "priority": 100,
+      "skippable": true,
+      "history": {
+        "turn": 1,
+        "pieces": [
+          {
+            "id": "training-red-3",
+            "name": "宇智波佐助",
+            "templateId": "red-sasuke",
+            "faction": "red",
+            "ownerPlayerId": "training-red",
+            "x": 12,
+            "y": 6
+          }
+        ],
+        "cells": [
+          {
+            "x": 11,
+            "y": 5,
+            "type": "floor"
+          },
+          {
+            "x": 12,
+            "y": 5,
+            "type": "floor"
+          },
+          {
+            "x": 13,
+            "y": 5,
+            "type": "floor"
+          },
+          {
+            "x": 11,
+            "y": 6,
+            "type": "cover"
+          },
+          {
+            "x": 12,
+            "y": 6,
+            "type": "floor"
+          },
+          {
+            "x": 13,
+            "y": 6,
+            "type": "floor"
+          },
+          {
+            "x": 11,
+            "y": 7,
+            "type": "floor"
+          },
+          {
+            "x": 12,
+            "y": 7,
+            "type": "floor"
+          },
+          {
+            "x": 13,
+            "y": 7,
+            "type": "floor"
+          },
+          {
+            "x": 11,
+            "y": 10,
+            "type": "floor"
+          },
+          {
+            "x": 12,
+            "y": 10,
+            "type": "floor"
+          },
+          {
+            "x": 13,
+            "y": 10,
+            "type": "floor"
+          },
+          {
+            "x": 11,
+            "y": 11,
+            "type": "floor"
+          },
+          {
+            "x": 12,
+            "y": 11,
+            "type": "floor"
+          },
+          {
+            "x": 13,
+            "y": 11,
+            "type": "floor"
+          },
+          {
+            "x": 11,
+            "y": 12,
+            "type": "floor"
+          },
+          {
+            "x": 12,
+            "y": 12,
+            "type": "floor"
+          },
+          {
+            "x": 13,
+            "y": 12,
+            "type": "floor"
+          }
+        ]
+      }
+    },
+    {
+      "eventId": "training-red-mtt0ps9g-2:1",
+      "rootEventId": "training-red-mtt0ps9g-2:0",
+      "parentEventId": "training-red-mtt0ps9g-2:0",
+      "actionId": "training-red-mtt0ps9g-2",
+      "sequence": 1,
+      "kind": "forceMove",
+      "iconId": "action-force-move",
+      "targetPieceIds": [
+        "training-red-3"
+      ],
+      "targetCell": {
+        "x": 12,
+        "y": 11
+      },
+      "result": {
+        "fromX": 12,
+        "fromY": 6,
+        "toX": 12,
+        "toY": 11
+      },
+      "priority": 75,
+      "skippable": true,
+      "history": {
+        "turn": 1,
+        "pieces": [
+          {
+            "id": "training-red-3",
+            "name": "宇智波佐助",
+            "templateId": "red-sasuke",
+            "faction": "red",
+            "ownerPlayerId": "training-red",
+            "x": 12,
+            "y": 6
+          }
+        ],
+        "cells": [
+          {
+            "x": 11,
+            "y": 5,
+            "type": "floor"
+          },
+          {
+            "x": 12,
+            "y": 5,
+            "type": "floor"
+          },
+          {
+            "x": 13,
+            "y": 5,
+            "type": "floor"
+          },
+          {
+            "x": 11,
+            "y": 6,
+            "type": "cover"
+          },
+          {
+            "x": 12,
+            "y": 6,
+            "type": "floor"
+          },
+          {
+            "x": 13,
+            "y": 6,
+            "type": "floor"
+          },
+          {
+            "x": 11,
+            "y": 7,
+            "type": "floor"
+          },
+          {
+            "x": 12,
+            "y": 7,
+            "type": "floor"
+          },
+          {
+            "x": 13,
+            "y": 7,
+            "type": "floor"
+          },
+          {
+            "x": 11,
+            "y": 10,
+            "type": "floor"
+          },
+          {
+            "x": 12,
+            "y": 10,
+            "type": "floor"
+          },
+          {
+            "x": 13,
+            "y": 10,
+            "type": "floor"
+          },
+          {
+            "x": 11,
+            "y": 11,
+            "type": "floor"
+          },
+          {
+            "x": 12,
+            "y": 11,
+            "type": "floor"
+          },
+          {
+            "x": 13,
+            "y": 11,
+            "type": "floor"
+          },
+          {
+            "x": 11,
+            "y": 12,
+            "type": "floor"
+          },
+          {
+            "x": 12,
+            "y": 12,
+            "type": "floor"
+          },
+          {
+            "x": 13,
+            "y": 12,
+            "type": "floor"
+          }
+        ]
+      }
+    },
+    {
+      "eventId": "training-red-mtt0ps9g-2:2",
+      "rootEventId": "training-red-mtt0ps9g-2:0",
+      "parentEventId": "training-red-mtt0ps9g-2:0",
+      "actionId": "training-red-mtt0ps9g-2",
+      "sequence": 2,
+      "sourcePieceId": "training-red-3",
+      "actorPlayerId": "training-red",
+      "skillId": "sasuke-chidori",
+      "kind": "damage",
+      "iconId": "action-damage",
+      "targetPieceIds": [
+        "training-blue-3"
+      ],
+      "batchId": "damage-batch-1-0",
+      "result": {
+        "amount": 4,
+        "value": 8
+      },
+      "targetCell": {
+        "x": 12,
+        "y": 10
+      },
+      "complement": {
+        "kind": "amount",
+        "amount": 4,
+        "value": 8
+      },
+      "priority": 70,
+      "skippable": true,
+      "history": {
+        "turn": 1,
+        "pieces": [
+          {
+            "id": "training-red-3",
+            "name": "宇智波佐助",
+            "templateId": "red-sasuke",
+            "faction": "red",
+            "ownerPlayerId": "training-red",
+            "x": 12,
+            "y": 6
+          },
+          {
+            "id": "training-blue-3",
+            "name": "漩涡鸣人",
+            "templateId": "blue-naruto",
+            "faction": "blue",
+            "ownerPlayerId": "training-blue",
+            "x": 12,
+            "y": 10
+          }
+        ],
+        "cells": [
+          {
+            "x": 11,
+            "y": 5,
+            "type": "floor"
+          },
+          {
+            "x": 12,
+            "y": 5,
+            "type": "floor"
+          },
+          {
+            "x": 13,
+            "y": 5,
+            "type": "floor"
+          },
+          {
+            "x": 11,
+            "y": 6,
+            "type": "cover"
+          },
+          {
+            "x": 12,
+            "y": 6,
+            "type": "floor"
+          },
+          {
+            "x": 13,
+            "y": 6,
+            "type": "floor"
+          },
+          {
+            "x": 11,
+            "y": 7,
+            "type": "floor"
+          },
+          {
+            "x": 12,
+            "y": 7,
+            "type": "floor"
+          },
+          {
+            "x": 13,
+            "y": 7,
+            "type": "floor"
+          },
+          {
+            "x": 11,
+            "y": 9,
+            "type": "floor"
+          },
+          {
+            "x": 12,
+            "y": 9,
+            "type": "floor"
+          },
+          {
+            "x": 13,
+            "y": 9,
+            "type": "floor"
+          },
+          {
+            "x": 11,
+            "y": 10,
+            "type": "floor"
+          },
+          {
+            "x": 12,
+            "y": 10,
+            "type": "floor"
+          },
+          {
+            "x": 13,
+            "y": 10,
+            "type": "floor"
+          },
+          {
+            "x": 11,
+            "y": 11,
+            "type": "floor"
+          },
+          {
+            "x": 12,
+            "y": 11,
+            "type": "floor"
+          },
+          {
+            "x": 13,
+            "y": 11,
+            "type": "floor"
+          }
+        ]
+      }
+    },
+    {
+      "eventId": "training-red-mtt0ps9g-2:3",
+      "rootEventId": "training-red-mtt0ps9g-2:0",
+      "parentEventId": "training-red-mtt0ps9g-2:0",
+      "actionId": "training-red-mtt0ps9g-2",
+      "sequence": 3,
+      "kind": "statusAdded",
+      "iconId": "status-add",
+      "targetPieceIds": [
+        "training-blue-3"
+      ],
+      "statusId": "chidori-immobile-training-blue-3",
+      "statusType": "chidori-immobile",
+      "label": "被千鸟贯穿",
+      "result": {
+        "stacks": 1,
+        "duration": 1,
+        "uses": -1,
+        "intensity": 1
+      },
+      "complement": {
+        "kind": "status",
+        "id": "chidori-immobile-training-blue-3",
+        "type": "chidori-immobile"
+      },
+      "priority": 50,
+      "skippable": true,
+      "history": {
+        "turn": 1,
+        "pieces": [
+          {
+            "id": "training-blue-3",
+            "name": "漩涡鸣人",
+            "templateId": "blue-naruto",
+            "faction": "blue",
+            "ownerPlayerId": "training-blue",
+            "x": 12,
+            "y": 10
+          }
+        ],
+        "cells": [
+          {
+            "x": 11,
+            "y": 9,
+            "type": "floor"
+          },
+          {
+            "x": 12,
+            "y": 9,
+            "type": "floor"
+          },
+          {
+            "x": 13,
+            "y": 9,
+            "type": "floor"
+          },
+          {
+            "x": 11,
+            "y": 10,
+            "type": "floor"
+          },
+          {
+            "x": 12,
+            "y": 10,
+            "type": "floor"
+          },
+          {
+            "x": 13,
+            "y": 10,
+            "type": "floor"
+          },
+          {
+            "x": 11,
+            "y": 11,
+            "type": "floor"
+          },
+          {
+            "x": 12,
+            "y": 11,
+            "type": "floor"
+          },
+          {
+            "x": 13,
+            "y": 11,
+            "type": "floor"
+          }
+        ]
+      }
+    },
+    {
+      "eventId": "training-red-mtt0ps9g-2:4",
+      "rootEventId": "training-red-mtt0ps9g-2:0",
+      "parentEventId": "training-red-mtt0ps9g-2:0",
+      "actionId": "training-red-mtt0ps9g-2",
+      "sequence": 4,
+      "kind": "actionPoints",
+      "iconId": "action-action-points",
+      "actorPlayerId": "training-red",
+      "targetPlayerIds": [
+        "training-red"
+      ],
+      "result": {
+        "amount": -1,
+        "value": 9
+      },
+      "complement": {
+        "kind": "amount",
+        "amount": -1,
+        "value": 9
+      },
+      "priority": 55,
+      "skippable": true
+    }
+  ],
+  "status": "拖动棋子到高亮格，或点击高亮格移动",
+  "pending": null
+}

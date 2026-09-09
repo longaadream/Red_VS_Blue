@@ -81,17 +81,17 @@ Vitest 覆盖本地成功、真实 LAN fallback 逻辑、同 ID 多实例/在途
 
 完整首帧：
 
-![RED-105 LAN 卡牌回退完整首帧](./red-105-lan-card-fallback.png)
+[历史截图：RED-105 LAN 卡牌回退完整首帧](https://github.com/longaadream/Red_VS_Blue/blob/a7849ce9eb3fc9e2fbc000afdd5f770b6f57e37a/docs/qa/red-105-lan-card-fallback.png)
 
 手牌细节：
 
-![RED-105 幸运币手牌细节](./red-105-lan-card-fallback-detail.png)
+[历史截图：RED-105 幸运币手牌细节](https://github.com/longaadream/Red_VS_Blue/blob/a7849ce9eb3fc9e2fbc000afdd5f770b6f57e37a/docs/qa/red-105-lan-card-fallback-detail.png)
 
 该 Electron 证据使用最小权威状态 fixture 注入仅含稳定实例字段的后手手牌，并真实请求本机 LAN/Next 单卡接口；它不创建房间或执行出牌。完整双客户端建房/加入体验仍建议人工复核。
 
 ## 包与回退证据
 
-当前 `electron-builder.client.json` 已把 `data/cards/**` 和 `public/card-art/**` 复制到 `resources/app/www`；`verify-electron-client-package.js` 会逐文件和 SHA-256 校验离线数据与图片。完整 Vitest 包含该包验证器测试。本次没有重新生成完整 Windows 候选包；合同允许的替代证据由真实 Electron custom protocol 资源 200 与 live authority fallback 成功共同提供。
+当前 `config/electron-builder.client.json` 已把 `data/cards/**` 和 `public/card-art/**` 复制到 `resources/app/www`；`verify-electron-client-package.js` 会逐文件和 SHA-256 校验离线数据与图片。完整 Vitest 包含该包验证器测试。本次没有重新生成完整 Windows 候选包；合同允许的替代证据由真实 Electron custom protocol 资源 200 与 live authority fallback 成功共同提供。
 
 ## 建议人工复核
 

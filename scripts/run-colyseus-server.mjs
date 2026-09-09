@@ -1,4 +1,4 @@
-import server, { journal, restoreProductRooms } from '../colyseus.config.ts'
+import server, { journal, restoreProductRooms } from '../config/colyseus.config.ts'
 import { openHostTunnel } from '../lib/server/relay/host-tunnel.ts'
 
 const SHUTDOWN_REQUEST = 'rvb:battle-authority:shutdown'
