@@ -352,7 +352,12 @@ export function createColyseusBattleServer(options: CreateColyseusBattleServerOp
     }
     return restoredRoomIds
   }
-  return { server, repository, journal, restoreProductRooms }
+  const restoreProductRoom = async (battleId: string) => {
+    if (options.official?.canRestore && !await options.official.canRestore(battleId)) throw new Error('Room is no longer active')
+    if (matchMaker.getLocalRoomById(battleId)) return
+    await matchMaker.createRoom(BATTLE_ROOM_TYPE, { product: true, restore: true, battleId, restoreCapability })
+  }
+  return { server, repository, journal, restoreProductRooms, restoreProductRoom }
 }
 
 function collectProductRooms(

@@ -3,6 +3,9 @@ import type { Pool, PoolClient } from 'pg'
 import type { BattleAuthorityCheckpointRecord } from '@/lib/game/battle-transition'
 import type { BattleState } from '@/lib/game/turn'
 import { Accounts, OfficialError, transaction, type Account } from './accounts'
+import { PREGAME_SCHEMA, createPregame, advancePregame, applyPregameAction, publicPregame, pregameBattlePlayers, readPregame, validateRankedMapPool } from './pregame'
+import type { Player } from '@/lib/game/room-model'
+import { assertGameProfileCompatibleV1 } from '@/lib/content-pipeline/runtime/profile-game-identity'
 
 export function eloChange(first: number, second: number, score: number) {
   return Math.round(32 * (score - 1 / (1 + 10 ** ((second - first) / 400))))
@@ -32,7 +35,7 @@ export type RankedRoomHooks = {
   authorize(roomId: string, playerId: string, token: unknown, spectator?: boolean): Promise<Account>
   longDrop(roomId: string, playerId: string): Promise<void>
 }
-type Lifecycle = { create(id: string, first: string): Promise<void>; dispose(id: string, onlyIfUnstarted?: boolean): Promise<boolean>; revokeAccount?(id: string): Promise<void>; freeze?(id: string): Promise<void> }
+type Lifecycle = { create(id: string, first: string, setup?: { mapId: string; players: Player[] }): Promise<void>; dispose(id: string, onlyIfUnstarted?: boolean): Promise<boolean>; revokeAccount?(id: string): Promise<void>; freeze?(id: string): Promise<void> }
 export class Ranked {
   readonly capability = randomUUID()
   private lifecycle?: Lifecycle
@@ -40,6 +43,13 @@ export class Ranked {
   private busy = false
   private stopping = false
   private lastError = ''
+  private readonly lifecycleTasks = new Map<string, Promise<unknown>>()
+  private async serialize<T>(id: string, task: () => Promise<T>): Promise<T> {
+    const previous = this.lifecycleTasks.get(id) ?? Promise.resolve()
+    const next = previous.catch(() => {}).then(task)
+    this.lifecycleTasks.set(id, next)
+    try { return await next } finally { if (this.lifecycleTasks.get(id) === next) this.lifecycleTasks.delete(id) }
+  }
   constructor(readonly pool: Pool, readonly accounts: Accounts, private capacity = 10) {
     const maxMatches = capacity
     if (!Number.isInteger(maxMatches) || maxMatches < 1 || maxMatches > 50) throw new Error('排位并发局数须为1–50')
@@ -48,6 +58,7 @@ export class Ranked {
   get maxMatches() { return this.capacity }
   async initialize() {
     await this.pool.query(RANKED_SCHEMA)
+    await this.pool.query(PREGAME_SCHEMA)
     this.capacity = (await this.pool.query('UPDATE official_settings SET max_matches=coalesce(max_matches,$1) RETURNING max_matches', [this.capacity])).rows[0].max_matches
   }
   async start(lifecycle: Lifecycle) {
@@ -57,7 +68,7 @@ export class Ranked {
     await this.tick()
     this.timer = setInterval(() => { void this.tick() }, 1000)
   }
-  async stop() { this.stopping = true; if (this.timer) clearInterval(this.timer); while (this.busy) await new Promise(resolve => setTimeout(resolve, 20)) }
+  async stop() { this.stopping = true; if (this.timer) clearInterval(this.timer); while (this.busy) await new Promise(resolve => setTimeout(resolve, 20)); await Promise.allSettled(this.lifecycleTasks.values()) }
   health() { return { maxMatches: this.maxMatches, settlementHealthy: !this.lastError } }
   async canRestore(roomId: string) { return !!(await this.pool.query("SELECT 1 FROM official_matches WHERE id=$1 AND status='assigned'", [roomId])).rowCount }
   async authorize(roomId: string, playerId: string, token: unknown, spectator = false) {
@@ -69,8 +80,10 @@ export class Ranked {
     if (spectator ? seated : !seated) throw new OfficialError('没有该比赛的参赛资格', 403)
     return account
   }
-  async enqueue(accountId: string) {
+  async enqueue(accountId: string, identity: unknown) {
     if (this.stopping || this.lastError) throw new OfficialError('服务器正在维护，请稍后重试', 503)
+    let profileIdentity
+    try { profileIdentity = assertGameProfileCompatibleV1(identity) } catch { throw new OfficialError('游戏版本与服务器不兼容，请更新后再匹配', 409) }
     await transaction(this.pool, async client => {
       await this.lock(client)
       const account = (await client.query('SELECT banned,ranked_disabled FROM official_accounts WHERE id=$1', [accountId])).rows[0]
@@ -78,7 +91,7 @@ export class Ranked {
       if ((await client.query('SELECT maintenance FROM official_settings')).rows[0].maintenance) throw new OfficialError('排位正在维护', 503)
       if ((await client.query('SELECT 1 FROM official_claims WHERE account_id=$1', [accountId])).rowCount) throw new OfficialError('请先完成当前比赛', 409)
       if ((await client.query('SELECT 1 FROM official_cooldowns WHERE account_id=$1 AND until_at>now()', [accountId])).rowCount) throw new OfficialError('频繁长时间掉线，匹配冷却尚未结束', 429)
-      await client.query(`INSERT INTO official_queue(account_id) VALUES($1) ON CONFLICT(account_id) DO UPDATE SET seen_at=now()`, [accountId])
+      await client.query(`INSERT INTO official_queue(account_id,profile_identity) VALUES($1,$2) ON CONFLICT(account_id) DO UPDATE SET seen_at=now(),profile_identity=excluded.profile_identity`, [accountId, profileIdentity])
     })
   }
   async cancel(accountId: string) {
@@ -132,20 +145,24 @@ export class Ranked {
       if (settings.maintenance || this.stopping) return
       const count = Number((await client.query(`SELECT count(*) FROM official_matches WHERE status='assigned'`)).rows[0].count)
       if (count >= settings.max_matches) return
-      const queue = (await client.query(`SELECT q.account_id FROM official_queue q WHERE NOT EXISTS (SELECT 1 FROM official_claims c WHERE c.account_id=q.account_id) ORDER BY q.created_at,q.account_id LIMIT 2`)).rows
+      const queue = (await client.query(`SELECT q.account_id,q.profile_identity FROM official_queue q WHERE NOT EXISTS (SELECT 1 FROM official_claims c WHERE c.account_id=q.account_id) ORDER BY q.created_at,q.account_id LIMIT 2`)).rows
       if (queue.length < 2) return
+      for (const entry of queue) assertGameProfileCompatibleV1(entry.profile_identity)
       const id = `ranked-${randomUUID()}`, first = queue[0].account_id as string, second = queue[1].account_id as string
       await client.query('INSERT INTO official_matches(id,season_id,first_id,second_id) VALUES($1,$2,$3,$4)', [id, settings.season_id, first, second])
       await client.query('INSERT INTO official_claims(account_id,match_id) VALUES($1,$3),($2,$3)', [first, second, id])
       await client.query('DELETE FROM official_queue WHERE account_id=ANY($1)', [[first, second]])
       createdId = id
-      await this.lifecycle!.create(id, first)
+      const participants = (await client.query('SELECT id,name FROM official_accounts WHERE id=ANY($1)', [[first, second]])).rows
+      const state = createPregame(settings.ranked_maps, [first, second].map(account => participants.find(p => p.id === account)), Date.now())
+      await client.query('INSERT INTO official_pregames(match_id,state) VALUES($1,$2)', [id, state])
     }) } catch (error) { if (createdId) await this.lifecycle!.dispose(createdId); throw error }
   }
   private async reconcile() {
     const matches = (await this.pool.query(`SELECT m.*,b.checkpoint_json FROM official_matches m LEFT JOIN battle_terminal_barrier b ON b.battle_id=m.id WHERE m.status='assigned'`)).rows
     for (const match of matches) {
       if (match.checkpoint_json) await this.settle(match.id)
+      else if ((await this.pool.query('SELECT 1 FROM official_pregames WHERE match_id=$1', [match.id])).rowCount) await this.advancePreparation(match.id)
       else if (Date.now() - new Date(match.created_at).getTime() > 180000) {
         const started = (await this.pool.query('SELECT 1 FROM battle_room_authority WHERE battle_id=$1', [match.id])).rowCount
         if (!started) {
@@ -170,6 +187,41 @@ export class Ranked {
       await this.pool.query('UPDATE official_matches SET actor_closed=TRUE WHERE id=$1', [match.id])
     }
   }
+  async preparation(id: string, accountId: string, input?: Record<string, unknown>) {
+    if (this.stopping) throw new OfficialError('服务正在停止，请稍后返回比赛', 503)
+    return this.serialize(id, () => transaction(this.pool, async client => {
+      await this.lock(client)
+      const match = (await client.query('SELECT * FROM official_matches WHERE id=$1 FOR UPDATE', [id])).rows[0] as Match | undefined
+      if (!match || ![match.first_id, match.second_id].includes(accountId)) throw new OfficialError('没有该比赛的参赛资格', 403)
+      const state = await readPregame(client, id)
+      if (match.status !== 'assigned') return { phase: 'finished', status: match.status, result: match.result, matchId: id }
+      if (!state) return { legacy: true, phase: 'battle', matchId: id }
+      if (input) applyPregameAction(state, accountId, input, Date.now()); else advancePregame(state, Date.now())
+      await client.query('UPDATE official_pregames SET state=$2 WHERE match_id=$1', [id, state])
+      return { ...publicPregame(state, accountId, Date.now()), matchId: id }
+    }))
+  }
+  private async advancePreparation(id: string) {
+    await this.serialize(id, async () => {
+      const state = await transaction(this.pool, async client => {
+        await this.lock(client)
+        if (!(await client.query("SELECT 1 FROM official_matches WHERE id=$1 AND status='assigned' FOR UPDATE", [id])).rowCount) return
+        const state = await readPregame(client, id)
+        if (!state) return
+        advancePregame(state, Date.now())
+        await client.query('UPDATE official_pregames SET state=$2 WHERE match_id=$1', [id, state])
+        return state
+      })
+      if (!state || state.phase !== 'starting' || !this.lifecycle) return
+      await this.lifecycle.create(id, state.players[0].id, { mapId: state.mapId!, players: pregameBattlePlayers(state) })
+      await transaction(this.pool, async client => {
+        await this.lock(client)
+        if (!(await client.query('SELECT 1 FROM battle_room_authority WHERE battle_id=$1', [id])).rowCount) throw new Error('RANKED_START_NOT_DURABLE')
+        state.phase = 'battle'
+        await client.query('UPDATE official_pregames SET state=$2 WHERE match_id=$1', [id, state])
+      })
+    })
+  }
   async settle(id: string) {
     return transaction(this.pool, async client => {
       await this.lock(client)
@@ -183,21 +235,42 @@ export class Ranked {
       if (!terminal || state.players.length !== 2 || !state.players.every(p => [match.first_id, match.second_id].includes(p.playerId))) throw new Error('RANKED_TERMINAL_PARTICIPANTS_INVALID')
       const winner = terminal.winnerPlayerId
       if (winner && ![match.first_id, match.second_id].includes(winner)) throw new Error('RANKED_WINNER_INVALID')
+      await this.recordResult(client, match, winner, { authorityVersion: checkpoint.authorityVersion, transitionHash: checkpoint.transitionHash })
+      return true
+    })
+  }
+  private async recordResult(client: PoolClient, match: Match, winner: string | null | undefined, evidence: Record<string, unknown>) {
       for (const account of [match.first_id, match.second_id]) await client.query('INSERT INTO official_ratings(season_id,account_id) VALUES($1,$2) ON CONFLICT DO NOTHING', [match.season_id, account])
       const ratings = (await client.query('SELECT account_id,rating FROM official_ratings WHERE season_id=$1 AND account_id=ANY($2) ORDER BY account_id FOR UPDATE', [match.season_id, [match.first_id, match.second_id]])).rows
       const first = Number(ratings.find(r => r.account_id === match.first_id)!.rating), second = Number(ratings.find(r => r.account_id === match.second_id)!.rating)
       const delta = eloChange(first, second, !winner ? 0.5 : winner === match.first_id ? 1 : 0)
-      const result = { winnerId: winner, first: { id: match.first_id, before: first, after: first + delta, delta }, second: { id: match.second_id, before: second, after: second - delta, delta: -delta }, authorityVersion: checkpoint.authorityVersion, transitionHash: checkpoint.transitionHash }
+      const result = { winnerId: winner, first: { id: match.first_id, before: first, after: first + delta, delta }, second: { id: match.second_id, before: second, after: second - delta, delta: -delta }, ...evidence }
       for (const [account, change] of [[match.first_id, delta], [match.second_id, -delta]] as const) await client.query('UPDATE official_ratings SET rating=rating+$3,games=games+1,wins=wins+$4 WHERE season_id=$1 AND account_id=$2', [match.season_id, account, change, winner === account ? 1 : 0])
-      await client.query(`UPDATE official_matches SET status='settled',result=$2,finished_at=now() WHERE id=$1`, [id, result])
-      await client.query('DELETE FROM official_claims WHERE match_id=$1', [id])
-      return true
-    })
+      await client.query(`UPDATE official_matches SET status='settled',result=$2,finished_at=now() WHERE id=$1`, [match.id, result])
+      await client.query('DELETE FROM official_claims WHERE match_id=$1', [match.id])
   }
+  async withdraw(id: string, accountId: string) {
+    if (this.stopping) throw new OfficialError('服务正在停止', 503)
+    return this.serialize(id, () => transaction(this.pool, async client => {
+      await this.lock(client)
+      const match = (await client.query('SELECT * FROM official_matches WHERE id=$1 FOR UPDATE', [id])).rows[0] as Match | undefined
+      if (!match || ![match.first_id, match.second_id].includes(accountId)) throw new OfficialError('没有该比赛的参赛资格', 403)
+      if (match.status === 'settled') return { ok: true }
+      if (match.status !== 'assigned') throw new OfficialError('比赛已取消', 409)
+      const state = await readPregame(client, id)
+      if (!state || state.phase === 'battle' || (await client.query('SELECT 1 FROM battle_room_authority WHERE battle_id=$1', [id])).rowCount) throw new OfficialError('对局已经开始，请在战斗内认输', 409)
+      const winner = accountId === match.first_id ? match.second_id : match.first_id
+      await this.recordResult(client, match, winner, { reason: '赛前主动退出', forfeitedBy: accountId })
+      await client.query("INSERT INTO official_cooldowns VALUES($1,now()+interval '15 minutes') ON CONFLICT(account_id) DO UPDATE SET until_at=greatest(official_cooldowns.until_at,excluded.until_at)", [accountId])
+      await client.query('INSERT INTO official_audit(action,detail) VALUES($1,$2)', ['pregame-withdraw', { value: id, accountId }])
+      return { ok: true }
+    }))
+  }
+
   async administer(action: string, value: string, reason = '') {
-    if (action === 'void-match') return this.voidMatch(value, reason)
+    if (action === 'void-match') return this.serialize(value, () => this.voidMatch(value, reason))
     if (reason.length > 300) throw new OfficialError('操作原因不能超过300字')
-    if (['kick', 'rank-disable', 'rank-enable', 'cooldown-clear', 'queue-clear', 'capacity', 'announcement'].includes(action) && !reason.trim()) throw new OfficialError('请填写操作原因')
+    if (['kick', 'rank-disable', 'rank-enable', 'cooldown-clear', 'queue-clear', 'capacity', 'announcement', 'map-pool'].includes(action) && !reason.trim()) throw new OfficialError('请填写操作原因')
     await transaction(this.pool, async client => {
       await this.lock(client)
       if (this.stopping) throw new OfficialError('服务正在停止', 503)
@@ -219,6 +292,10 @@ export class Ranked {
         const capacity = Number(value)
         if (!/^\d+$/.test(value) || !Number.isInteger(capacity) || capacity < 1 || capacity > 50) throw new OfficialError('并发上限须为1–50局')
         await client.query('UPDATE official_settings SET max_matches=$1', [capacity])
+      } else if (action === 'map-pool') {
+        let pool: unknown
+        try { pool = JSON.parse(value) } catch { throw new OfficialError('地图池格式错误') }
+        await client.query('UPDATE official_settings SET ranked_maps=$1', [JSON.stringify(validateRankedMapPool(pool))])
       } else if (action === 'announcement') {
         if (value.length > 1000) throw new OfficialError('公告不能超过1000字')
         await client.query('UPDATE official_settings SET announcement=$1', [value.trim()])

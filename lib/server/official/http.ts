@@ -2,6 +2,7 @@ import express, { type Express, type Request, type Response } from 'express'
 import { Accounts, OfficialError } from './accounts'
 import { Ranked } from './ranked'
 import type { PostgresBattleReportReader } from '../postgres/authority-types'
+import { rankedMapCatalog, validateRankedMapPool } from './pregame'
 
 export function mountOfficialApi(app: Express, accounts: Accounts, ranked: Ranked, reports: PostgresBattleReportReader) {
   app.use('/official', express.json({ limit: '8kb', strict: true }))
@@ -32,9 +33,22 @@ export function mountOfficialApi(app: Express, accounts: Accounts, ranked: Ranke
     const account = await accounts.authenticate(token(request))
     return { account: { id: account.id, name: account.name, email: account.email }, ...await ranked.status(account.id) }
   })
-  endpoint('/official/queue/join', async request => { const account = await accounts.authenticate(token(request)); await ranked.enqueue(account.id); return { ok: true } }, true)
+  endpoint('/official/queue/join', async request => { const account = await accounts.authenticate(token(request)); await ranked.enqueue(account.id, request.body?.profileIdentity); return { ok: true } }, true)
   endpoint('/official/queue/cancel', async request => { const account = await accounts.authenticate(token(request)); await ranked.cancel(account.id); return { ok: true } }, true)
   endpoint('/official/leaderboard', async () => ({ players: await ranked.leaderboard() }))
+  endpoint('/official/maps', async () => ({ maps: rankedMapCatalog(validateRankedMapPool((await ranked.pool.query('SELECT ranked_maps FROM official_settings')).rows[0].ranked_maps)) }))
+  endpoint('/official/pregame/:matchId', async request => {
+    const account = await accounts.authenticate(token(request))
+    return ranked.preparation(String(request.params.matchId), account.id)
+  })
+  endpoint('/official/pregame/:matchId', async request => {
+    const account = await accounts.authenticate(token(request))
+    return ranked.preparation(String(request.params.matchId), account.id, request.body ?? {})
+  }, true)
+  endpoint('/official/pregame/:matchId/withdraw', async request => {
+    const account = await accounts.authenticate(token(request))
+    return ranked.withdraw(String(request.params.matchId), account.id)
+  }, true)
   endpoint('/battle-reports/:battleId', async request => {
     const account = await accounts.authenticate(token(request))
     const report = await reports.readBattleReport(String(request.params.battleId))

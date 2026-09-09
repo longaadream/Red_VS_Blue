@@ -90,19 +90,36 @@ try {
     }
     await page.evaluate(`document.getElementById('email').value=${JSON.stringify(user.email)};document.getElementById('password').value=${JSON.stringify(password)};document.querySelector('#authForm button').click()`)
     await until(() => page.evaluate('document.getElementById("profile").hidden === false && !document.getElementById("join").disabled'), 'account login')
-    if (user === users[0]) await page.evaluate('document.getElementById("alignment").value="dark"')
+    if (user === users[0]) await page.evaluate('localStorage.setItem("rvb_game_profile_identity",JSON.stringify({runnerRevision:"stale-cached-client"}))')
     await page.evaluate('document.getElementById("join").click()')
   }
   for (const page of pages) {
     await until(() => page.evaluate('document.getElementById("enter").hidden === false'), 'matchmaking')
     await page.evaluate('document.getElementById("enter").click()')
-    await until(() => page.evaluate('!!document.getElementById("readyBtn") && !document.getElementById("readyBtn").disabled'), 'room admission')
-    await page.evaluate('document.getElementById("readyBtn").click()')
+    await until(() => page.evaluate('document.querySelectorAll(".ranked-map-card").length === 4'), 'real ranked veto')
   }
+  await pages[0].evaluate('document.fonts.ready.then(() => true)')
+  const vetoShot = await pages[0].call('Page.captureScreenshot', {format:'png'}); fs.writeFileSync(path.join(output,'red196-ranked-veto.png'),Buffer.from(vetoShot.data,'base64'))
+  for (const [index, page] of pages.entries()) {
+    await page.evaluate(`document.querySelectorAll('.choose-map')[${index}].click();document.getElementById('confirmBan').click()`)
+  }
+  await until(() => pages[0].evaluate('!document.getElementById("mapStage").hidden'), 'server map draw')
+  const mapShot = await pages[0].call('Page.captureScreenshot', {format:'png'}); fs.writeFileSync(path.join(output,'red196-ranked-map.png'),Buffer.from(mapShot.data,'base64'))
   for (const page of pages) {
-    await until(() => page.evaluate('location.pathname.endsWith("piece-selection.html") && document.querySelectorAll(".piece-card").length >= 8'), 'roster page')
+    await until(() => page.evaluate('!document.getElementById("chooseRoster").hidden'), 'map revealed')
+    await page.evaluate('document.getElementById("chooseRoster").click()')
+    await until(() => page.evaluate('location.pathname.endsWith("piece-selection.html") && !!document.getElementById("rankedRosterClock") && !document.getElementById("alignmentLightBtn").disabled'), 'ranked roster page')
+    await page.evaluate(`document.getElementById('${page === pages[0] ? 'alignmentDarkBtn' : 'alignmentLightBtn'}').click()`)
+    await until(() => page.evaluate('!alignmentLoading && document.querySelectorAll(".piece-card").length >= 8'), 'faction pieces')
     await page.evaluate(`while(document.querySelectorAll('.piece-card.selected').length<8){const next=document.querySelector('.piece-card:not(.selected)');if(!next)break;next.click()}`)
     await until(() => page.evaluate('!document.getElementById("confirmBtn").disabled'), 'legal roster')
+    if (page === pages[0]) {
+      await page.evaluate('document.getElementById("rankedViewMap").click()')
+      await until(() => page.evaluate('location.pathname.endsWith("ranked-match.html") && !!document.getElementById("chooseRoster") && !document.getElementById("chooseRoster").hidden'), 'draft saved before map review')
+      await page.evaluate('document.getElementById("chooseRoster").click()')
+      await until(() => page.evaluate('location.pathname.endsWith("piece-selection.html") && document.querySelectorAll(".piece-card.selected").length === 8 && !document.getElementById("confirmBtn").disabled && document.getElementById("selectedCount").textContent.includes("8 / 8")'), 'restored full draft can lock without edits')
+    }
+    if (page === pages[0]) { const shot = await page.call('Page.captureScreenshot', {format:'png'}); fs.writeFileSync(path.join(output,'red196-ranked-roster.png'),Buffer.from(shot.data,'base64')) }
     await page.evaluate('document.getElementById("confirmBtn").click()')
   }
   for (const page of pages) await until(() => page.evaluate('location.pathname.endsWith("battle.html") && typeof G!=="undefined" && !!G && typeof colyseusConnected!=="undefined" && colyseusConnected'), 'live battle', 60000)
@@ -179,7 +196,7 @@ try {
   const lobby = await pages[0].call('Page.captureScreenshot', { format: 'png' }); fs.writeFileSync(path.join(output, 'red196-room-browser.png'), Buffer.from(lobby.data, 'base64'))
   const ratings = await app.ranked.leaderboard()
   if (ratings.map(p => p.rating).sort().join(',') !== '1016,984') throw new Error('Unexpected Elo ratings')
-  console.log(JSON.stringify({ ok: true, browser: path.basename(executable), flow: 'login -> queue -> room -> roster -> actual battle surrender -> Elo/history', ratings, realEmailDelivery: false }))
+  console.log(JSON.stringify({ ok: true, browser: path.basename(executable), flow: 'login -> queue -> secret veto -> map draw -> original roster -> progressive deployment -> actual battle surrender -> Elo/history', ratings, realEmailDelivery: false }))
 } catch (error) {
   for (const [index, page] of pages.entries()) {
     try { console.error('page-state', index, await page.evaluate('({url:location.href,text:document.body.innerText.slice(-6000)})')) } catch {}

@@ -17,7 +17,7 @@
     $('loginPrompt').hidden = signedIn; $('logout').hidden = !signedIn; $('guestSummary').hidden = signedIn
     $('accountButton').textContent = signedIn ? current.account.name : '登录账号'
     $('seatName').textContent = signedIn ? current.account.name : '你的席位'
-    $('seatHint').textContent = signedIn ? '选择阵营，准备对战' : '登录后准备匹配'
+    $('seatHint').textContent = signedIn ? '先禁图，再选择阵营与阵容' : '登录后准备匹配'
     if (!signedIn) { $('join').hidden = true; $('cancel').hidden = true; $('enter').hidden = true; $('queueStatus').textContent = '登录后即可参加排位' }
   }
   function selectRankTab(name) {
@@ -98,15 +98,17 @@
     if (action === 'login') { clearBattleReservations(); sessionStorage.setItem('rvb_official_session', JSON.stringify({ url: base(), token: result.token, account: result.account })); message('登录成功。'); $('accountDialog').close(); await refresh() }
     else { message(result.message); $('authAction').value = action === 'register' ? 'verify' : action === 'forgot' ? 'reset' : 'login'; $('authAction').onchange() }
   })
-  $('join').onclick = run(async function () { await api('/official/queue/join', {}); await refresh() })
+  $('join').onclick = run(async function () {
+    var identity = localStorage.getItem('rvb_game_profile_identity')
+    if (!identity || (/^https?:$/.test(location.protocol) && location.origin === base())) { var catalog = await api('/catalog/identity'); identity = JSON.stringify(catalog.profileIdentity); localStorage.setItem('rvb_game_profile_identity', identity) }
+    await api('/official/queue/join', { profileIdentity: JSON.parse(identity) }); await refresh()
+  })
   $('cancel').onclick = run(async function () { await api('/official/queue/cancel', {}); await refresh() })
   $('logout').onclick = run(async function () { await api('/official/queue/cancel', {}); await api('/official/auth/logout', {}); clearBattleReservations(); sessionStorage.removeItem('rvb_official_session'); current = null; $('profile').hidden = true; $('auth').hidden = false; message('已退出账号。'); accountState(false); await refresh() })
   $('enter').onclick = run(async function () {
     if (!activeMatch || !current) return
-    var profile = await api('/catalog/identity')
-    localStorage.setItem('rvb_game_profile_identity', JSON.stringify(profile.profileIdentity))
     window.RvBUtils.saveRemoteServerUrl(base()); window.RvBUtils.switchServerMode('remote')
-    window.location.href = 'room.html?roomId=' + encodeURIComponent(activeMatch) + '&playerId=' + encodeURIComponent(current.account.id) + '&playerName=' + encodeURIComponent(current.account.name) + '&alignment=' + encodeURIComponent($('alignment').value)
+    window.location.href = 'ranked-match.html?matchId=' + encodeURIComponent(activeMatch)
   })
   $('server').value = localStorage.getItem('rvb_official_url') || (/^https?:$/.test(location.protocol) ? location.origin : 'http://127.0.0.1:2568')
   $('authAction').onchange()

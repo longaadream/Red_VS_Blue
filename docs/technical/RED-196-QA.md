@@ -79,3 +79,17 @@ Windows，AMD Ryzen 9 9955HX、32逻辑CPU、约15GiB内存，Node24.13.1。客�
 - 最终typecheck、全量lint、编码1049文件通过。独立审查已关闭提前开放恢复库、HTTP中断与停服交错、首次停服失败遗留、陈旧PID阻塞回退等问题，最终无剩余阻断。
 
 候选构建以最终干净提交及release.json为准。RC3和升级前数据备份保留；不自动清理备份或手动改变历史积分。候选打包后的实际客户端/服务验证日志附候选目录，真实SMTP送达、公网HTTPS与跨地区批量试玩仍待人工环境验收；未合并或公开发布。
+
+
+## 2026-09-09 真实排位赛前流程（源码验证）
+
+基线origin/main 03339a5efffde6cba4aaa53a33908db526d593e9 已合并到当前开发分支（56e9977）。新增真实ranked-match页面及原piece-selection页面的排位适配，服务器保存秘密禁图、池快照、绝对期限及阵容草稿。未生成或发布新的分发包，原RC4仍保留。
+
+- 实际Chrome双账号：登录→匹配→秘密禁图→服务器抽图→原选人→查看地图并恢复8枚草稿→原渐进部署/战斗→认输→Elo/历史，完整通过；测试发送真实邮件0封。
+- 4项纯赛前规则测试与6项真实PG管理测试通过；官方PG/Colyseus14项回归通过。覆盖四张地图实际创建渐进部署、秘密投影、局内池快照、版本不符拒绝排队、绝对期限重启/随机补齐、退出只计分一次。
+- 增加交接中断场景：落盘version0后将赛前状态模拟为未确认starting，重启仍恢复原种子、地图、阵容且只存在一个权威房间。定向测试通过。
+- 普通product-room、battle-room、spectator-room及客户端Colyseus路径4文件26项回归通过。类型、全量lint及编码检查通过。
+- 独立审查发现并修复草稿恢复后确认按钮/计数未刷新、查看地图前漏保存、HTTP托管页旧profile缓存无法重新匹配；最终未报告剩余P1/P2。
+- 实际截图：dist/multiplayer-qa/red196-ranked-veto.png、red196-ranked-map.png、red196-ranked-roster.png、red196-official-battle.png。日志ranked-browser.log、ranked-tests-rerun.log、ranked-handoff-test.log、ranked-transport-tests.log、ranked-flow-types.txt、ranked-lint.log、ranked-encoding.log。
+
+验证范围为本机源码服务与隔离数据库；未触碰用户现有QQ邮箱凭据、真实账号或运行中的win-x64服务。四图结构适配通过，不代表竞技胜率平衡已获得真人数据验证。未宣称公网/真实SMTP/新版分发包验收完成。

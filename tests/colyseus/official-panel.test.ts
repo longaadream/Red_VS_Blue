@@ -1,3 +1,4 @@
+import { getServerGameProfileIdentityV1 } from '@/lib/content-pipeline/runtime/profile-game-identity'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import fs from 'node:fs'
 import os from 'node:os'
@@ -50,7 +51,7 @@ describe.skipIf(process.platform !== 'win32')('local operations with actual Post
     expect(JSON.parse((await request('/api/accounts?q=' + encodeURIComponent("' OR 1=1 --"))).text).rows).toHaveLength(0)
   })
   it('revokes a banned session and queue; rejects nonexistent targets and duplicate seasons without leaking SQL', async () => {
-    await app.ranked.enqueue('panel-a')
+    await app.ranked.enqueue('panel-a', getServerGameProfileIdentityV1())
     expect((await request('/api/action', { action: 'ban', value: 'panel-a' })).status).toBe(200)
     expect((await app.pool.query("SELECT 1 FROM official_sessions WHERE account_id='panel-a'")).rowCount).toBe(0)
     expect((await app.pool.query("SELECT 1 FROM official_queue WHERE account_id='panel-a'")).rowCount).toBe(0)
@@ -68,7 +69,7 @@ describe.skipIf(process.platform !== 'win32')('local operations with actual Post
     expect(app.ranked.health().maxMatches).toBe(3)
     await app.ranked.initialize(); expect(app.ranked.maxMatches).toBe(3)
     expect((await request('/api/action', { action: 'rank-disable', value: 'panel-a', reason: '待审核' })).status).toBe(200)
-    await expect(app.ranked.enqueue('panel-a')).rejects.toThrow('排位资格')
+    await expect(app.ranked.enqueue('panel-a', getServerGameProfileIdentityV1())).rejects.toThrow('排位资格')
     expect((await request('/api/action', { action: 'rank-enable', value: 'panel-a', reason: '审核通过' })).status).toBe(200)
     await app.pool.query("INSERT INTO official_cooldowns VALUES('panel-a',now()+interval '1 hour')")
     expect((await request('/api/action', { action: 'cooldown-clear', value: 'panel-a', reason: '网络测试' })).status).toBe(200)

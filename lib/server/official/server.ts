@@ -54,7 +54,12 @@ export async function createOfficialServer(options: { databaseUrl: string; mail:
             actor?.revokeOfficialAccount?.(id)
           }
         },
-        create: async (id, first) => { await matchMaker.createRoom('battle', { product: true, mode: '1v1', battleId: id, playerId: first, officialCapability: ranked.capability, mapId: 'open-expanse', name: '官方 1v1 排位' }) },
+        create: async (id, first, setup) => {
+          if (matchMaker.getLocalRoomById(id)) return
+          if ((await pool.query('SELECT 1 FROM battle_room_authority WHERE battle_id=$1', [id])).rowCount) { await authority.restoreProductRoom(id); return }
+          await matchMaker.createRoom('battle', { product: true, mode: '1v1', battleId: id, playerId: first, officialCapability: ranked.capability,
+            mapId: setup?.mapId ?? 'open-expanse', officialPlayers: setup?.players, name: '官方 1v1 排位' })
+        },
         dispose: async (id, onlyIfUnstarted) => {
           const room = matchMaker.getLocalRoomById(id) as unknown as { closeOfficialMatch?: (onlyIfUnstarted?: boolean) => Promise<boolean> } | undefined
           return await room?.closeOfficialMatch?.(onlyIfUnstarted) ?? true

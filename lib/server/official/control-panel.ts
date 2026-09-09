@@ -46,7 +46,7 @@ export async function startControlPanel(options: { ranked: Ranked; mail: Mail; a
       }
       if (req.method === 'GET' && url.pathname === '/api/snapshot') {
         const pool = options.ranked.pool
-        const settings = (await pool.query('SELECT season_id,maintenance,announcement,max_matches FROM official_settings')).rows[0]
+        const settings = (await pool.query('SELECT season_id,maintenance,announcement,max_matches,ranked_maps FROM official_settings')).rows[0]
         const counts = (await pool.query(`SELECT (SELECT count(*)::int FROM official_accounts) accounts,
           (SELECT count(*)::int FROM official_queue WHERE seen_at>now()-interval '20 seconds') queued,
           (SELECT count(*)::int FROM official_matches WHERE status='assigned') active,
@@ -100,7 +100,7 @@ export async function startControlPanel(options: { ranked: Ranked; mail: Mail; a
             const stop = () => { if (scheduled) return; scheduled = true; setImmediate(() => { void options.shutdown().catch(() => console.error('[official-panel] SHUTDOWN_FAILED')) }) }
             res.once('finish', stop); res.once('close', stop)
             if (res.destroyed) stop()
-          } else if (['maintenance', 'ban', 'unban', 'season', 'kick', 'rank-disable', 'rank-enable', 'cooldown-clear', 'queue-clear', 'capacity', 'announcement', 'void-match'].includes(action)) await options.ranked.administer(action, value, reason)
+          } else if (['maintenance', 'ban', 'unban', 'season', 'kick', 'rank-disable', 'rank-enable', 'cooldown-clear', 'queue-clear', 'capacity', 'announcement', 'map-pool', 'void-match'].includes(action)) await options.ranked.administer(action, value, reason)
           else throw new OfficialError('未知管理操作')
           json(res, 200, { ok: true }); return
         } finally { mutating = false }

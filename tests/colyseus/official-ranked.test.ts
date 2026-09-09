@@ -10,6 +10,7 @@ import { findFreePort } from '../../electron-client/local-port'
 import { createOfficialServer } from '@/lib/server/official/server'
 import { digest } from '@/lib/server/official/accounts'
 import { eloChange } from '@/lib/server/official/ranked'
+import { getBattleStorage } from '@/lib/game/battle-storage'
 import { roomAuthorityQueue } from '@/lib/game/room-authority-queue'
 import type { CandidateBattleStore } from '@/lib/server/colyseus/candidate-battle-store'
 import { getServerGameProfileIdentityV1 } from '@/lib/content-pipeline/runtime/profile-game-identity'
@@ -52,8 +53,13 @@ async function user(): Promise<User> {
   return result.body as User
 }
 async function matched(first: User, second: User) {
-  await app.ranked.enqueue(first.account.id); await app.ranked.enqueue(second.account.id)
-  for (let i = 0; i < 50; i++) { await app.ranked.tick(); const status = await app.ranked.status(first.account.id); if (status.matchId) return status.matchId as string; await new Promise(resolve => setTimeout(resolve, 100)) }
+  await app.ranked.enqueue(first.account.id, profileIdentity); await app.ranked.enqueue(second.account.id, profileIdentity)
+  for (let i = 0; i < 50; i++) { await app.ranked.tick(); const status = await app.ranked.status(first.account.id); if (status.matchId) {
+    // RC4 assigned-room compatibility fixture. New preparation is covered by the pregame integration cases.
+    await app.pool.query('DELETE FROM official_pregames WHERE match_id=$1', [status.matchId])
+    await matchMaker.createRoom('battle', { product: true, mode: '1v1', battleId: status.matchId, playerId: first.account.id, officialCapability: app.ranked.capability, mapId: 'open-expanse', name: 'Legacy assigned fixture' })
+    return status.matchId as string
+  }; await new Promise(resolve => setTimeout(resolve, 100)) }
   throw new Error('No ranked match assigned')
 }
 async function join(user: User, roomId: string) {
@@ -108,7 +114,7 @@ it('uses only server assignments; arbitrary-Elo players finish a real Colyseus b
   await app.pool.query(`INSERT INTO official_ratings(season_id,account_id,rating) VALUES('test-1',$1,2200)`, [second.account.id])
   await expect(new Client(url).create('battle', { product: true, playerId: first.account.id, officialToken: first.token })).rejects.toThrow()
   const id = await matched(first, second)
-  await expect(app.ranked.enqueue(first.account.id)).rejects.toThrow('当前比赛')
+  await expect(app.ranked.enqueue(first.account.id, profileIdentity)).rejects.toThrow('当前比赛')
   await expect(new Client(url).joinById(id, { playerId: first.account.id, officialToken: outsider.token, profileIdentity })).rejects.toThrow()
   await expect(new Client(url).joinById(id, { playerId: outsider.account.id, officialToken: outsider.token, profileIdentity })).rejects.toThrow()
   expect(await app.ranked.settle(id)).toBe(false)
@@ -130,10 +136,10 @@ it('uses only server assignments; arbitrary-Elo players finish a real Colyseus b
 it('cancels leases, enforces room capacity, deduplicates long drops and preserves historical ratings on season change', async () => {
   await app.pool.query('DELETE FROM official_rate_limits')
   const players = [await user(), await user(), await user(), await user(), await user(), await user()]
-  await app.ranked.enqueue(players[0].account.id); await app.ranked.cancel(players[0].account.id)
+  await app.ranked.enqueue(players[0].account.id, profileIdentity); await app.ranked.cancel(players[0].account.id)
   expect((await app.ranked.status(players[0].account.id)).queued).toBe(false)
   const a = await matched(players[0], players[1]), b = await matched(players[2], players[3])
-  await app.ranked.enqueue(players[4].account.id); await app.ranked.enqueue(players[5].account.id)
+  await app.ranked.enqueue(players[4].account.id, profileIdentity); await app.ranked.enqueue(players[5].account.id, profileIdentity)
   await app.ranked.tick()
   expect((await app.ranked.status(players[4].account.id)).matchId).toBeNull()
   await app.ranked.longDrop(a, players[0].account.id); await app.ranked.longDrop(a, players[0].account.id)
@@ -299,6 +305,86 @@ it('preserves normal terminal settlement when an administrator attempts to void 
   expect((await app.ranked.status(first.account.id)).rating.games).toBe(1)
   expect((await app.pool.query('SELECT status FROM official_matches WHERE id=$1', [id])).rows[0].status).toBe('settled')
 }, 30000)
+
+async function matchedPregame(first: User, second: User) {
+  await app.ranked.enqueue(first.account.id, profileIdentity); await app.ranked.enqueue(second.account.id, profileIdentity)
+  for (let i = 0; i < 50; i++) { await app.ranked.tick(); const status = await app.ranked.status(first.account.id); if (status.matchId) return status.matchId; await new Promise(resolve => setTimeout(resolve, 100)) }
+  throw new Error('Pregame not assigned')
+}
+it('runs sealed veto and original progressive deployment on all four ranked maps; pool changes affect only future matches', async () => {
+  await app.pool.query('DELETE FROM official_rate_limits')
+  const maps = ['large-hole-arena', 'open-expanse', 'winding-pass', 'narrow-corridors']
+  const first = await user(), second = await user(), outsider = await user()
+  const ids = getDemoPieceIds().filter(id => getPieceById(id)?.faction === 'good').slice(0,8)
+  expect((await http('/official/queue/join', {}, first.token)).status).toBe(409)
+  await expect(app.ranked.enqueue(first.account.id, {...profileIdentity,runnerRevision:'wrong'})).rejects.toThrow('版本')
+  for (const selected of maps) {
+    const banned = maps.filter(id => id !== selected).slice(0,2), pool = [selected,...banned]
+    await app.ranked.administer('map-pool',JSON.stringify(pool),'地图适配测试')
+    const id = await matchedPregame(first,second)
+    expect(matchMaker.getLocalRoomById(id)).toBeUndefined()
+    expect((await http('/official/pregame/'+id,undefined,outsider.token)).status).toBe(403)
+    await app.ranked.administer('map-pool',JSON.stringify(maps),'新比赛地图池')
+    const a = await http('/official/pregame/'+id,{action:'ban',mapId:banned[0]},first.token)
+    expect(a.status).toBe(200); expect(a.body.maps).toHaveLength(3)
+    const hidden = (await http('/official/pregame/'+id,undefined,second.token)).body
+    expect(hidden.players.find((p: {id:string})=>p.id===first.account.id).ban).toBeNull()
+    expect(hidden).not.toHaveProperty('seed')
+    const reveal = await http('/official/pregame/'+id,{action:'ban',mapId:banned[1]},second.token)
+    expect(reveal.body.mapId).toBe(selected)
+    for (const user of [first,second]) expect((await http('/official/pregame/'+id,{action:'lock',revision:0,alignment:'light',pieces:ids},user.token)).status).toBe(200)
+    for (let i=0;i<30;i++) { await app.ranked.tick(); if ((await app.ranked.preparation(id,first.account.id)).phase==='battle') break; await new Promise(resolve=>setTimeout(resolve,100)) }
+    expect((await app.ranked.preparation(id,first.account.id)).phase).toBe('battle')
+    const persisted = (await app.pool.query('SELECT 1 FROM battle_room_authority WHERE battle_id=$1',[id])).rowCount
+    expect(persisted).toBe(1)
+    const store = (matchMaker.getLocalRoomById(id) as unknown as { authorityStore: CandidateBattleStore }).authorityStore
+    const room = await store.getRoom(id)
+    expect(room?.mapId).toBe(selected)
+    const socket = await join(first,id), view = await snapshot(socket)
+    expect(view.state.deployment?.mode).toBe('progressive-reserve-v1')
+    expect(view.state.pieces.length).toBeLessThan(16)
+    await socket.leave()
+    await expect(app.ranked.withdraw(id,first.account.id)).rejects.toThrow('已经开始')
+    await app.ranked.administer('void-match',id,'完成地图适配测试')
+  }
+  await expect(app.ranked.administer('map-pool',JSON.stringify(maps.slice(0,2)),'非法地图池')).rejects.toThrow('至少3')
+}, 90000)
+it('restores sealed pregame deadlines and drafts, auto-fills after expiry, and rates explicit withdrawal once', async () => {
+  await app.pool.query('DELETE FROM official_rate_limits')
+  const first=await user(),second=await user(),id=await matchedPregame(first,second)
+  await app.ranked.preparation(id,first.account.id,{action:'ban',mapId:'open-expanse'})
+  await app.ranked.preparation(id,second.account.id,{action:'ban',mapId:'open-expanse'})
+  const pieces=getDemoPieceIds().filter(id=>getPieceById(id)?.faction==='good').slice(0,2)
+  const draft=await app.ranked.preparation(id,first.account.id,{action:'draft',revision:0,alignment:'light',pieces})
+  await app.close();app=await createOfficialServer({databaseUrl,mail:async()=>{}});await app.start(Number(new URL(url).port))
+  const restored=await app.ranked.preparation(id,first.account.id)
+  expect(restored).toMatchObject({phase:'roster',deadlineAt:('deadlineAt' in draft ? draft.deadlineAt : 0)})
+  expect('players' in restored && restored.players.find(p=>p.id===first.account.id)?.pieces).toEqual(pieces)
+  await app.pool.query("UPDATE official_pregames SET state=jsonb_set(state,'{deadlineAt}',to_jsonb($2::bigint)) WHERE match_id=$1",[id,Date.now()-1])
+  for(let i=0;i<30;i++){await app.ranked.tick();if((await app.ranked.preparation(id,first.account.id)).phase==='battle')break;await new Promise(resolve=>setTimeout(resolve,100))}
+  const started=await app.ranked.preparation(id,first.account.id)
+  expect(started.phase).toBe('battle');expect('players' in started && started.players.find(p=>p.id===first.account.id)?.pieces?.slice(0,2)).toEqual(pieces)
+  // Model a crash after durable version zero but before the pregame phase acknowledgement.
+  const before = await (matchMaker.getLocalRoomById(id) as unknown as {authorityStore:CandidateBattleStore}).authorityStore.getRoom(id)
+  await app.pool.query(`UPDATE official_pregames SET state=jsonb_set(state,'{phase}','"starting"') WHERE match_id=$1`,[id])
+  await app.close();app=await createOfficialServer({databaseUrl,mail:async()=>{}});await app.start(Number(new URL(url).port))
+  const after = await (matchMaker.getLocalRoomById(id) as unknown as {authorityStore:CandidateBattleStore}).authorityStore.getRoom(id)
+  expect(after?.mapId).toBe(before?.mapId)
+  expect(after?.players.map(p=>p.selectedPieces)).toEqual(before?.players.map(p=>p.selectedPieces))
+  expect(before).toBeTruthy(); expect(after).toBeTruthy()
+  expect(getBattleStorage(before!)?.rootSeed).toEqual(expect.any(Number))
+  expect(getBattleStorage(after!)?.rootSeed).toBe(getBattleStorage(before!)?.rootSeed)
+  expect((await app.ranked.preparation(id,first.account.id)).phase).toBe('battle')
+  expect((await app.pool.query('SELECT 1 FROM battle_room_authority WHERE battle_id=$1',[id])).rowCount).toBe(1)
+  await app.ranked.administer('void-match',id,'超时启动验收')
+  const exitId=await matchedPregame(first,second)
+  await Promise.all([app.ranked.withdraw(exitId,first.account.id),app.ranked.withdraw(exitId,first.account.id),app.ranked.tick()])
+  expect((await app.ranked.status(first.account.id)).rating).toMatchObject({games:1,rating:984})
+  expect((await app.ranked.status(second.account.id)).rating).toMatchObject({games:1,rating:1016})
+  expect((await app.pool.query('SELECT 1 FROM battle_terminal_barrier WHERE battle_id=$1',[exitId])).rowCount).toBe(0)
+  expect((await app.ranked.status(first.account.id)).cooldownUntil).toBeTruthy()
+  expect((await app.ranked.status(first.account.id)).matchId).toBeNull()
+},60000)
 
 it('releases the listener and pool even when the durability journal fails during shutdown', async () => {
   const failed = vi.spyOn(app.journal, 'close').mockRejectedValueOnce(new Error('injected durability failure'))

@@ -37,12 +37,14 @@ try {
   async function join(user, id, spectator = false) { const socket = await new Client(url).joinById(id, { playerId:user.id, officialToken:user.token, alignment:'light', profileIdentity, spectator }); socket.onMessage('*',()=>{}); sockets.push(socket); return socket }
   for (const count of [5, 10]) {
     const start = performance.now(), cpu = process.cpuUsage(), games = [], rtts = [], receipts = []
-    for (const user of users.slice(0,count*2)) await app.ranked.enqueue(user.id)
+    for (const user of users.slice(0,count*2)) await app.ranked.enqueue(user.id, profileIdentity)
     await until(async()=>{ await app.ranked.tick(); return Number((await app.pool.query("SELECT count(*) FROM official_matches WHERE status='assigned'")).rows[0].count) === count }, 'match allocation')
     for (let i=0; i<count; i++) {
       const first = users[i*2], second = users[i*2+1], id = (await app.ranked.status(first.id)).matchId
+      for (const user of [first,second]) await app.ranked.preparation(id,user.id,{action:'ban',mapId:'large-hole-arena'})
+      for (const user of [first,second]) await app.ranked.preparation(id,user.id,{action:'lock',revision:0,alignment:'light',pieces:pieces.map(p=>p.templateId)})
+      await until(async()=>{ await app.ranked.tick(); return (await app.ranked.preparation(id,first.id)).phase === 'battle' }, 'roster start')
       const a = await join(first,id), b = await join(second,id)
-      for (const [socket,user] of [[a,first],[b,second]]) await socket.request('roomRpc',{method:'rooms.action',data:{action:'select-pieces',playerId:user.id,alignment:'light',pieces,profileIdentity}})
       const viewers = []
       for(let j=0;j<8;j++) viewers.push(await join(users[20+i*8+j],id,true))
       games.push({id,first,second,a,b,viewers})

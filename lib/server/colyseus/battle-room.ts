@@ -65,6 +65,7 @@ import type { RankedRoomHooks } from '../official/ranked'
 import { OfficialError } from '../official/accounts'
 
 export interface BattleRoomCreateOptions {
+  officialPlayers?: Player[]
   officialCapability?: string
   restoreCapability?: string
   playerId?: string
@@ -219,6 +220,16 @@ export function createBattleRoomClass(dependencies: BattleRoomDependencies) {
           }
           this.productStore = new ProductBattleStore(room, dependencies.repository, dependencies.journal)
           this.maxClients = matchCapacity(room.mode) + 8
+          if (options.officialPlayers) {
+            if (!dependencies.official || options.officialCapability !== dependencies.official.capability || options.officialPlayers.length !== 2) throw new Error('Trusted ranked roster required')
+            room.players = options.officialPlayers
+            room.hostId = room.players[0].id
+            room.status = 'ready'
+            await this.productStore.setRoom(this.roomId, room)
+            await this.startProductBattle()
+            await this.setPrivate(room.visibility === 'private')
+            return
+          }
           this.applyWaitingProjection(room)
           await this.publishProductRoom(room)
           await this.setPrivate(room.visibility === 'private')
