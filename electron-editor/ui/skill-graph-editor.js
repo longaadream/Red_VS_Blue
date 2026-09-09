@@ -2,6 +2,7 @@
 (() => {
   const el = (tag, text, className) => { const node = document.createElement(tag); if (text !== undefined) node.textContent = text; if (className) node.className = className; return node }
   const clone = value => JSON.parse(JSON.stringify(value))
+  const presentationLabels = {public:'所有人',owner:'仅持有者玩家',allies:'自己及队友',enemies:'敌方玩家',spectators:'仅观战者','while-alive':'持有棋子离场',battle:'本场战斗结束',statuses:'状态图标',health:'当前／最大生命',identity:'名称与头像',stats:'攻防与移动力',skills:'技能与冷却',live:'实时读取',snapshot:'使用创建时快照',self:'显示自身数据',remove:'取消绑定',currentHp:'当前生命值',maxHp:'最大生命值',defense:'防御力',moveRange:'移动力',float:'浮动文字',flash:'短暂地格高亮',sound:'提示音',notice:'普通提示音',success:'完成提示音',warning:'警示提示音'}
   window.ContentSkillGraph = {
     mount(container, { getDraft, onChange }) {
       const core = window.SkillGraphCore
@@ -28,7 +29,7 @@
       function changeNode(id, change) { const next = clone(graph()); change(next.nodes.find(node => node.id === id)); update(next) }
       function refresh() {
         container.replaceChildren()
-        const help = el('p', '连接“主动使用 → 选择目标 → 效果 → 完成”。目标选择放在条件和效果之前。支持伤害、治疗、定身、圣盾、传送与条件分支；回合被动、召唤及自定义脚本暂保留代码编辑。', 'graph-help')
+        const help = el('p', '连接“主动使用 → 选择 → 条件或效果 → 完成”。可配置显示来源、数值进度、地格标记、文字／高亮／音效和可见对象。一个技能可有一组选项，支持多选。回合被动、召唤及复杂旧脚本仍使用代码编辑。', 'graph-help')
         container.append(help)
         const current = graph()
         if (!current) {
@@ -99,15 +100,18 @@
             if (definition.type === 'number') {
               control = el('input'); control.type = 'number'; control.step = '1'; control.value = node.params[definition.key]
               control.onchange = () => changeNode(node.id, item => { item.params[definition.key] = Number(control.value) })
+            } else if (definition.type === 'text') {
+              control = el('input'); control.type = 'text'; control.maxLength = 120; control.value = node.params[definition.key]
+              control.onchange = () => changeNode(node.id, item => { item.params[definition.key] = control.value })
             } else {
-              const referenceKind = { piece: 'select-piece', cell: 'select-cell', damage: 'damage' }[definition.type]
-              const options = definition.options ? definition.options.map(option => [option, ({enemy:'敌方',ally:'友方',all:'全部',yes:'允许',no:'不允许',physical:'物理',magical:'法术',true:'真实',fixed:'固定数值',attack:'本棋子攻击力百分比',actualDamage:'已造成的实际伤害百分比',root:'定身','divine-shield':'圣盾','hp-below':'生命值低于阈值','is-self':'目标是本棋子'})[option] || option])
+              const referenceKind = { piece: 'select-piece', cell: 'select-cell', damage: 'damage', option: 'select-options' }[definition.type]
+              const options = definition.options ? definition.options.map(option => [option, (node.kind==='display-indicator' && option==='attack' ? '攻击力' : presentationLabels[option]) || ({enemy:'敌方',ally:'友方',all:'全部',yes:'允许',no:'不允许',physical:'物理',magical:'法术',true:'真实',fixed:'固定数值',attack:'本棋子攻击力百分比',actualDamage:'已造成的实际伤害百分比',root:'定身','divine-shield':'圣盾','hp-below':'生命值低于阈值','is-self':'目标是本棋子'})[option] || option])
                 : [['', '请选择数据来源'], ...(definition.type === 'piece' ? [['self', '本棋子']] : []), ...current.nodes.filter(item => item.kind === referenceKind && item.id !== node.id).map(item => [item.id, core.NODE_CATALOG[item.kind].name + ' · ' + item.id])]
               control = select(options, node.params[definition.key], value => changeNode(node.id, item => { item.params[definition.key] = value }))
             }
             control.dataset.graphParam = definition.key; control.setAttribute('aria-label', definition.label); field(definition.label, control, panel)
           }
-          const ports = node.kind === 'end' ? [] : node.kind === 'condition' ? ['yes', 'no'] : ['next']
+          const ports = node.kind === 'end' ? [] : ['condition','condition-option'].includes(node.kind) ? ['yes', 'no'] : ['next']
           for (const port of ports) {
             const control = select([['', '尚未连接'], ...current.nodes.filter(item => item.id !== node.id && item.kind !== 'start').map(item => [item.id, core.NODE_CATALOG[item.kind]?.name + ' · ' + item.id])], node[port], value => changeNode(node.id, item => { if (value) item[port] = value; else delete item[port] }))
             control.dataset.graphPort = port; field(port === 'yes' ? '条件成立 →' : port === 'no' ? '条件不成立 →' : '下一步 →', control, panel)

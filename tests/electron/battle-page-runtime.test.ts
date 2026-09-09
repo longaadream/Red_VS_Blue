@@ -3,6 +3,8 @@ import path from 'node:path'
 import vm from 'node:vm'
 
 import { describe, expect, it, vi } from 'vitest'
+import { makeState } from '../helpers/minimal-state'
+import { getTargetingStateRevision, validatePendingTargetSubmissions } from '../../lib/game/targeting'
 
 const projectRoot = process.cwd()
 const battlePagePath = path.join(projectRoot, 'data', 'pages', 'battle.html')
@@ -73,6 +75,27 @@ function createClassList() {
 }
 
 describe('battle page runtime source', () => {
+  it('collects cell multi-selection through the real page functions and submits an authoritative legal command',()=>{
+    const state=makeState(), revision=getTargetingStateRevision(state)
+    const pending={targetType:'cell' as const,playerId:'player-red',selectionMode:'multi' as const,minSelections:2,maxSelections:2,selectionId:'cells-202',stateRevision:revision,candidates:[{type:'cell' as const,x:0,y:0},{type:'cell' as const,x:1,y:0},{type:'cell' as const,x:2,y:0}]}
+    state.pendingTargetSelection=pending as typeof state.pendingTargetSelection
+    const submit=vi.fn((action: Parameters<typeof validatePendingTargetSubmissions>[1])=>Boolean(action)), html=readBattlePage()
+    const context=vm.createContext({pendingSkill:{turnTargetActionType:'pendingTargetSelect',turnTargetPlayerId:'player-red',preparation:pending},pendingBoardTargetSelection:{selectionId:'cells-202',selectedPieceIds:[]},targetSubmissionPending:null,G:state,myPlayerId:'player-red',setStatusMsg:vi.fn(),renderBoard:vi.fn(),renderTargetOverlay:vi.fn(),submitTargetAction:submit,currentTargetSourceName:()=> '地格测试'})
+    for(const name of ['isPendingBoardMultiTarget','syncPendingBoardTargetSelection','pendingBoardMultiLimits','pendingBoardMultiSummary','togglePendingBoardCell','confirmPendingBoardTargetSelection']) new vm.Script(runtimeFunction(html,name)).runInContext(context)
+    expect(context.togglePendingBoardCell(0,0)).toBe(true)
+    expect(context.confirmPendingBoardTargetSelection()).toBe(false)
+    expect(context.togglePendingBoardCell(1,0)).toBe(true)
+    expect(context.togglePendingBoardCell(2,0)).toBe(false)
+    expect(context.togglePendingBoardCell(9,9)).toBe(false)
+    expect(context.pendingBoardMultiSummary()).toBe('(0,0)、(1,0)')
+    expect(context.confirmPendingBoardTargetSelection()).toBe(true)
+    expect(submit).toHaveBeenCalledOnce()
+    const command=submit.mock.calls[0][0]
+    expect(validatePendingTargetSubmissions(state,command)).toEqual([{type:'cell',x:0,y:0},{type:'cell',x:1,y:0}])
+    context.syncPendingBoardTargetSelection({...pending,candidates:pending.candidates.slice(1)})
+    expect(context.pendingBoardMultiSummary()).toBe('(1,0)')
+    expect(html).toMatch(/targetType === 'cell'\) \{ togglePendingBoardCell\(x,y\); return \}/)
+  })
   it('parses every inline script before the loading overlay can initialize', () => {
     const scripts = inlineScripts(readBattlePage())
 

@@ -17,6 +17,7 @@
   <script src="js/colyseus-client.js"></script>
   <script src="js/three.min.js"></script>
   <script src="js/battle-ui/battle-effect-icons.js"></script>
+  <script src="js/battle-ui/battle-skill-presentation.js"></script>
   <script src="js/battle-ui/battle-view-model.js"></script>
   <script src="js/practice/client.js"></script>
   <script src="js/practice/battle-controller.js"></script>
@@ -2829,13 +2830,19 @@
 
     // ── Piece helpers ──
     function pieceName(p) {
+      const display = typeof BattleSkillPresentation === 'undefined' ? {} : BattleSkillPresentation.display(G,p.instanceId)
+      if (display.name) return display.name
       const tmpl = PIECES_BY_ID[p.templateId]
       return p.name || (tmpl && tmpl.name) || p.templateId || p.instanceId || '?'
     }
     function pieceMaxHp(p) {
+      const display = typeof BattleSkillPresentation === 'undefined' ? {} : BattleSkillPresentation.display(G,p.instanceId)
+      if (display.maxHp !== undefined) return display.maxHp
       return (p.displayMaxHp !== undefined ? p.displayMaxHp : null) || p.maxHp || (p.stats && p.stats.maxHp) || 1
     }
     function pieceDispHp(p) {
+      const display = typeof BattleSkillPresentation === 'undefined' ? {} : BattleSkillPresentation.display(G,p.instanceId)
+      if (display.currentHp !== undefined) return display.currentHp
       if (p.masterPieceId && G && G.pieces) {
         const master = G.pieces.find(m => m.instanceId === p.masterPieceId && m.currentHp > 0)
         if (master) return master.currentHp
@@ -2843,21 +2850,25 @@
       return p.displayCurrentHp !== undefined ? p.displayCurrentHp : p.currentHp
     }
     function pieceDispStats(p) {
+      const display = typeof BattleSkillPresentation === 'undefined' ? {} : BattleSkillPresentation.display(G,p.instanceId)
+      const overlay = Object.fromEntries(['attack','defense','moveRange'].filter(key=>display[key]!==undefined).map(key=>[key,display[key]]))
       if (p.masterPieceId && G && G.pieces) {
         const master = G.pieces.find(m => m.instanceId === p.masterPieceId && m.currentHp > 0)
         if (master) {
           const mb = master.stats || master
-          return { attack: mb.attack, defense: mb.defense, moveRange: mb.moveRange }
+          return Object.assign({ attack: mb.attack, defense: mb.defense, moveRange: mb.moveRange },overlay)
         }
       }
       const base = p.stats || p
-      return {
+      return Object.assign({
         attack:    p.displayAttack    !== undefined ? p.displayAttack    : base.attack,
         defense:   p.displayDefense   !== undefined ? p.displayDefense   : base.defense,
         moveRange: p.displayMoveRange !== undefined ? p.displayMoveRange : base.moveRange,
-      }
+      },overlay)
     }
     function pieceDispSkills(p) {
+      const display = typeof BattleSkillPresentation === 'undefined' ? {} : BattleSkillPresentation.display(G,p.instanceId)
+      if (display.skills !== undefined) return display.skills
       if (p.masterPieceId && G && G.pieces) {
         const master = G.pieces.find(m => m.instanceId === p.masterPieceId && m.currentHp > 0)
         if (master) return master.skills || []
@@ -2930,6 +2941,8 @@
       return currentCost === baseCost ? String(currentCost) : currentCost + '/' + baseCost
     }
     function pieceDispTags(p) {
+      const display = typeof BattleSkillPresentation === 'undefined' ? {} : BattleSkillPresentation.display(G,p.instanceId)
+      if (display.statusTags !== undefined) return display.statusTags
       // Display mirrors the living source; actual rules always read the clone's own statusTags.
       const master = p.displayStatusTags !== undefined && p.masterPieceId && G && G.pieces &&
         G.pieces.find(candidate => candidate.instanceId === p.masterPieceId && candidate.currentHp > 0)
@@ -3576,7 +3589,7 @@
       const tmpl = PIECES_BY_ID[piece.templateId] || {}
       const stats = piece.stats || {}
       const mhp = pieceMaxHp(piece)
-      const name = piece.name || tmpl.name || piece.templateId
+      const name = pieceName(piece)
 
       document.getElementById('pieceInfoName').textContent = name
       renderPieceIdentity(piece)
@@ -4760,6 +4773,7 @@
     }
     function applyServerState(state, seed, serverNow, turnTimer, options, pendingTimer) {
       if (!state) return
+      if (battlePresentation) battlePresentation.completeSkillRecovery()
       const input = options || {}
       resolveAuthoritySeed(state, seed)
       const wasNull = !G
@@ -4977,6 +4991,7 @@
       })
 
       RvBColyseus.on('disconnect', function() {
+        if (battlePresentation) battlePresentation.beginSkillRecovery()
 
         colyseusConnected = false
         var el = document.getElementById('colyseusStatus')
@@ -4989,6 +5004,7 @@
       })
 
       RvBColyseus.on('authoritySyncStart', function(sync) {
+        if (battlePresentation) battlePresentation.beginSkillRecovery()
         if (sync && sync.clientActionId && pendingActionFeedback && sync.clientActionId === pendingActionFeedback.clientActionId) {
           addLog('[authority] 正在按原指令编号查询服务端回执', 'info')
           setStatusMsg('正在同步服务端状态，请勿重复操作')
@@ -5031,6 +5047,7 @@
           setStatusMsg(msg.reason || '观战已关闭，请返回大厅')
           showMsg(msg.reason || '观战已关闭，请返回大厅', 'err')
         } else if (msg.type === 'subscribed') {
+          if (battlePresentation) battlePresentation.beginSkillRecovery()
           colyseusRole = msg.role || 'guest'
           addLog('[Colyseus] 角色：' + colyseusRole, 'info')
           if (pendingActionFeedback) {
@@ -5111,6 +5128,10 @@
             if (msg.preparation && msg.preparation.kind === 'needOption') {
               optionAction.selectionId = msg.preparation.selectionId
               optionAction.stateRevision = msg.preparation.stateRevision
+              optionAction.selectionMode = msg.preparation.max > 1 ? 'multi' : 'single'
+              optionAction.minSelections = msg.preparation.min
+              optionAction.maxSelections = msg.preparation.max
+              optionAction.canCancel = msg.preparation.canCancel
             }
             showOptionPicker(msg.title || '请选择', msg.options || [], optionAction)
             renderActionBar()
@@ -5240,12 +5261,12 @@
     function isPendingBoardMultiTarget() {
       const preparation = pendingSkill && pendingSkill.preparation
       return !!(pendingSkill && pendingSkill.turnTargetActionType === 'pendingTargetSelect' &&
-        preparation && preparation.selectionMode === 'multi' && preparation.targetType === 'piece')
+        preparation && preparation.selectionMode === 'multi' && ['piece','cell'].includes(preparation.targetType))
     }
 
     function syncPendingBoardTargetSelection(authoritativePending) {
       const isMulti = !!(authoritativePending && authoritativePending.selectionMode === 'multi' &&
-        authoritativePending.targetType === 'piece')
+        ['piece','cell'].includes(authoritativePending.targetType))
       if (!isMulti) {
         pendingBoardTargetSelection = { selectionId: null, selectedPieceIds: [] }
         return
@@ -5259,6 +5280,8 @@
         .map(ref => ref.pieceId))
       pendingBoardTargetSelection.selectedPieceIds = pendingBoardTargetSelection.selectedPieceIds
         .filter(pieceId => legalIds.has(pieceId))
+      pendingBoardTargetSelection.selectedCells = (pendingBoardTargetSelection.selectedCells || [])
+        .filter(cell => (authoritativePending.candidates || []).some(ref => ref.type === 'cell' && ref.x === cell.x && ref.y === cell.y))
     }
 
     function pendingBoardMultiLimits() {
@@ -5270,6 +5293,10 @@
 
     function pendingBoardMultiSummary() {
       if (!isPendingBoardMultiTarget()) return ''
+      if (pendingSkill.preparation.targetType === 'cell') {
+        const cells = pendingBoardTargetSelection.selectedCells || []
+        return cells.length ? cells.map(cell => '(' + cell.x + ',' + cell.y + ')').join('、') : '尚未选择地格'
+      }
       const ids = pendingBoardTargetSelection.selectedPieceIds
       if (!ids.length) return '尚未选择棋子'
       return ids.map(pieceId => {
@@ -5303,24 +5330,39 @@
       return true
     }
 
+    function togglePendingBoardCell(x, y) {
+      if (!isPendingBoardMultiTarget() || pendingSkill.preparation.targetType !== 'cell' || targetSubmissionPending) return false
+      const candidates = pendingSkill.preparation.candidates || []
+      if (!candidates.some(ref => ref.type === 'cell' && ref.x === x && ref.y === y)) { setStatusMsg('该地格不在权威合法目标集合内'); return false }
+      const cells = (pendingBoardTargetSelection.selectedCells || []).slice(), index = cells.findIndex(cell => cell.x === x && cell.y === y)
+      if (index >= 0) cells.splice(index, 1)
+      else {
+        if (cells.length >= pendingBoardMultiLimits().max) { setStatusMsg('已达到最多选择数量'); return false }
+        cells.push({x,y})
+      }
+      pendingBoardTargetSelection.selectedCells = cells
+      setStatusMsg('已选择 ' + cells.length + ' / ' + pendingBoardMultiLimits().max)
+      renderBoard(); renderTargetOverlay(); return true
+    }
+
     function confirmPendingBoardTargetSelection() {
       if (!isPendingBoardMultiTarget() || targetSubmissionPending) return false
-      const ids = pendingBoardTargetSelection.selectedPieceIds.slice()
+      const isCell = pendingSkill.preparation.targetType === 'cell'
+      const ids = isCell ? (pendingBoardTargetSelection.selectedCells || []).slice() : pendingBoardTargetSelection.selectedPieceIds.slice()
       const limits = pendingBoardMultiLimits()
       if (ids.length < limits.min || ids.length > limits.max) {
-        setStatusMsg('请选择' + limits.min + '至' + limits.max + '个棋子')
+        setStatusMsg('请选择' + limits.min + '至' + limits.max + (isCell ? '个地格' : '个棋子'))
         return false
       }
       const preparation = pendingSkill.preparation
       const action = {
         type: pendingSkill.turnTargetActionType,
         playerId: pendingSkill.turnTargetPlayerId || myPlayerId,
-        targetPieceId: ids[0],
-        extraTargets: ids.slice(1).map(pieceId => ({ pieceId })),
+        ...(isCell ? {targetX:ids[0].x,targetY:ids[0].y,extraTargets:ids.slice(1)} : {targetPieceId:ids[0],extraTargets:ids.slice(1).map(pieceId => ({pieceId}))}),
         selectionId: preparation.selectionId,
         stateRevision: preparation.stateRevision,
       }
-      setStatusMsg('已提交棋子选择')
+      setStatusMsg('已提交目标选择')
       renderTargetOverlay()
       return submitTargetAction(action, currentTargetSourceName())
     }
@@ -5348,7 +5390,7 @@
       if (pendingSkill.hint) return pendingSkill.hint
       if (isPendingBoardMultiTarget()) {
         const limits = pendingBoardMultiLimits()
-        return '选择' + limits.min + '至' + limits.max + '个友方角色（再次点击可取消）'
+        return '选择' + limits.min + '至' + limits.max + (pendingSkill.preparation.targetType === 'cell' ? '个地格' : '个角色') + '（再次点击可取消）'
       }
       return targetStepPrefix(pendingSkill.pendingTargetIndex) +
         targetTypeText(pendingSkill.targetType, pendingSkill.filter)
@@ -5378,7 +5420,7 @@
           multiSummary.textContent = multiActive ? pendingBoardMultiSummary() : ''
         }
         if (confirmButton) {
-          const count = pendingBoardTargetSelection.selectedPieceIds.length
+          const count = pendingSkill && pendingSkill.preparation && pendingSkill.preparation.targetType === 'cell' ? (pendingBoardTargetSelection.selectedCells || []).length : pendingBoardTargetSelection.selectedPieceIds.length
           const limits = pendingBoardMultiLimits()
           confirmButton.style.display = multiActive ? '' : 'none'
           confirmButton.disabled = !multiActive || count < limits.min || count > limits.max || !!targetSubmissionPending
@@ -5585,6 +5627,7 @@
         : new Set()
       return BattleViewModel.create({
         snapshot: snapshot,
+        presentationScope: roomId,
         presentationEvents: isCurrentSnapshot ? latestBattlePresentationEvents : [],
         viewerId: myPlayerId,
         selectedPieceId: selectedPieceId,
@@ -5595,6 +5638,7 @@
           pendingPieceId: isCurrentSnapshot && pendingActionFeedback ? pendingActionFeedback.pieceId : null,
           pendingCommandId: isCurrentSnapshot && pendingActionFeedback ? pendingActionFeedback.clientActionId : null,
           selectedTargetPieceIds: isCurrentSnapshot ? pendingBoardTargetSelection.selectedPieceIds : [],
+          selectedTargetCells: isCurrentSnapshot ? pendingBoardTargetSelection.selectedCells || [] : [],
         },
         legal: {
           moveCells: isCurrentSnapshot ? validMoves : new Set(),
@@ -6729,6 +6773,7 @@
 
       if (pendingSkill && pendingSkill.turnTargetActionType) {
         if (isPendingBoardMultiTarget()) {
+          if (pendingSkill.preparation.targetType === 'cell') { togglePendingBoardCell(x,y); return }
           if (!piece) {
             setStatusMsg('请选择高亮的友方棋子')
             return
@@ -7123,6 +7168,10 @@
           if (e.preparation && e.preparation.kind === 'needOption') {
             optionRetry.selectionId = e.preparation.selectionId
             optionRetry.stateRevision = e.preparation.stateRevision
+            optionRetry.selectionMode = e.preparation.max > 1 ? 'multi' : 'single'
+            optionRetry.minSelections = e.preparation.min
+            optionRetry.maxSelections = e.preparation.max
+            optionRetry.canCancel = e.preparation.canCancel
           }
           showOptionPicker(e.title||'请选择', e.options||[], optionRetry)
         } else {

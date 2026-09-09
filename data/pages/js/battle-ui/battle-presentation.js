@@ -17,6 +17,7 @@
     const input = options || {}
     const renderer = input.renderer
     const domUi = input.domUi
+    const skillAudio = input.skillAudio || (root.BattleSkillPresentation && root.BattleSkillPresentation.createAudio())
     const historyUi = input.historyUi || null
     const vignetteUi = input.vignetteUi || null
     const onIntent = typeof input.onIntent === 'function' ? input.onIntent : function () {}
@@ -34,6 +35,8 @@
     let updating = false
     let updatePlaybackBase = null
     const appliedBeats = new Set()
+    const skillPlayback = root.BattleSkillPresentation ? root.BattleSkillPresentation.createPlayback() : null
+    let skillRecovering = false
 
     function playbackPhase(phase, group) {
       if (historicalRoot || !currentModel) return
@@ -280,6 +283,12 @@
       if (!playing) playbackModel = null
       if (!historicalRoot) renderer.update(playbackModel || model)
       if (historyUi && historyUi.update) historyUi.update(model)
+      if (skillPlayback && !skillRecovering) skillPlayback.consume(model).forEach(function (cue) {
+        if (historicalRoot) return
+        if (cue.kind === 'float' && renderer.spawnFloater) renderer.spawnFloater(cue.x,cue.y,cue.text,'#e9d5ff',false,{kind:'skill'})
+        if (cue.kind === 'flash' && renderer.showPresentationAreaFlash) renderer.showPresentationAreaFlash([{x:cue.x,y:cue.y}],{transient:true})
+        if (cue.kind === 'sound' && skillAudio) skillAudio.play(cue.sound || 'notice')
+      })
     }
 
     function animateAction(action, previousModel, nextModel) {
@@ -307,12 +316,15 @@
       const doc = boardContainer && boardContainer.ownerDocument
       if (doc) ['pointerdown', 'click', 'contextmenu', 'keydown'].forEach(function (type) { doc.removeEventListener(type, guardHistoryInput, true) })
       renderer.dispose()
+      if (skillAudio) skillAudio.dispose()
       domUi.dispose()
       if (vignetteUi && vignetteUi.dispose) vignetteUi.dispose()
       mounted = false
       currentModel = null
       historicalRoot = null; boardContainer = null; pendingBefore = null
       historyBoards.clear(); seenRoots.clear()
+      if (skillPlayback) skillPlayback.reset()
+      skillRecovering = false
       playbackModel = null; playbackRoot = null; appliedBeats.clear(); playbackBoards.clear()
     }
 
@@ -329,6 +341,8 @@
       dispose: dispose,
       getModel: function () { return currentModel },
       captureHistory: captureHistory,
+      beginSkillRecovery: function () { skillRecovering = true },
+      completeSkillRecovery: function () { if (skillRecovering && skillPlayback) skillPlayback.reset(); skillRecovering = false },
       sequencesBoard: !!(vignetteUi && vignetteUi.sequencesBoard),
     }
   }

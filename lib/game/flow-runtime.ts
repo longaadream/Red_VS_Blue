@@ -5,6 +5,7 @@ import { changePiecePositions } from './position-change'
 import { traceProjectile, manhattanDistance } from './spatial'
 import { getRuleMath } from './rule-runtime'
 import { areMatchAllies } from './match-teams'
+import { createSkillPresentation } from './skill-presentation'
 export type FlowSurface = 'skill' | 'rule' | 'triggerSkill' | 'pending'
 type Delegate = Record<string, (...args: any[]) => any>
 /** Called at formal removal; revival creates a new incarnation. */
@@ -71,10 +72,12 @@ export function createFlowRuntime(battle: BattleState, context: any, surface: Fl
     return value
   }
   const expired = (entry: any) => entry.lifetime === 'while-alive' && !battle.pieces.some(p => p.instanceId === entry.entityId && p.currentHp > 0)
+  let presentation: ReturnType<typeof createSkillPresentation> | undefined
   return {
     version: 'rvb-flow-runtime/v1',
     surface,
     capabilities: Object.keys(delegates).filter(name => typeof delegates[name] === 'function').sort(),
+    get presentation() { return presentation ??= createSkillPresentation(battle, holder()?.ownerPlayerId ?? context.playerId, effectId(), holder()?.instanceId) },
     refs: {
       holder: () => holder()?.instanceId ?? null,
       source: () => context.sourcePiece?.instanceId ?? (surface === 'skill' ? context.piece?.instanceId : null),
@@ -113,12 +116,24 @@ export function createFlowRuntime(battle: BattleState, context: any, surface: Fl
       option: (options: any) => call('selectOption', options),
       // Return this descriptor from a rule. The existing pending pipeline owns validation,
       // cancellation and continuation; no closures or runtime facade enter the saved state.
-      deferTarget: (options: { playerId: string; title?: string; targetType: 'piece' | 'cell'; candidates: any[]; effectCode: string; payload?: unknown; canCancel?: boolean }) => {
+      deferTarget: (options: { playerId: string; title?: string; targetType: 'piece' | 'cell'; candidates: any[]; effectCode: string; payload?: unknown; canCancel?: boolean; selectionMode?: 'single' | 'multi'; minSelections?: number; maxSelections?: number }) => {
         player(options.playerId)
         if (!['piece','cell'].includes(options.targetType) || typeof options.effectCode !== 'string' || !options.effectCode.trim() || !Array.isArray(options.candidates)) throw new Error('flow: 延迟选择参数无效')
+        const candidates = json(options.candidates).map((candidate: any) => candidate && typeof candidate === 'object' && candidate.type === undefined ? { ...candidate, type: options.targetType } : candidate), mode = options.selectionMode ?? 'single'
+        const min = options.minSelections ?? 1, max = options.maxSelections ?? 1
+        if (!['single','multi'].includes(mode) || !Number.isSafeInteger(min) || !Number.isSafeInteger(max) || min < 1 || max < min || max > 64 || mode === 'single' && max !== 1 || candidates.length < min || candidates.length > 512) throw new Error('flow: 选择数量无效')
+        const ids = candidates.map((candidate: any) => {
+          if (options.targetType === 'piece' && candidate?.type === 'piece' && typeof candidate.pieceId === 'string' && Object.keys(candidate).every(k => ['type','pieceId'].includes(k))) {
+            if (piece(candidate.pieceId).currentHp <= 0) throw new Error('flow: 选择目标已失效')
+            return candidate.pieceId
+          }
+          if (options.targetType === 'cell' && candidate?.type === 'cell' && Number.isInteger(candidate.x) && Number.isInteger(candidate.y) && Object.keys(candidate).every(k => ['type','x','y'].includes(k)) && battle.map.tiles.some(t=>t.x===candidate.x&&t.y===candidate.y)) return candidate.x + ',' + candidate.y
+          throw new Error('flow: 候选目标无效')
+        })
+        if (new Set(ids).size !== ids.length) throw new Error('flow: 候选目标重复')
         return { success: true, needsTargetSelection: true, playerId: options.playerId, title: options.title || '请选择目标',
-          targetType: options.targetType, targetCandidates: json(options.candidates), effectCode: options.effectCode,
-          payload: json(options.payload ?? null), canCancel: options.canCancel ?? true, minSelections: 1, maxSelections: 1 }
+          targetType: options.targetType, targetCandidates: candidates, effectCode: options.effectCode,
+          payload: json(options.payload ?? null), canCancel: options.canCancel ?? true, selectionMode: mode, minSelections: min, maxSelections: max }
       },
     },
     effects: {

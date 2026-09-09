@@ -11,6 +11,8 @@ import { prepareAction } from '../../lib/game/targeting'
 import { globalTriggerSystem } from '../../lib/game/triggers'
 import { removePieceStatusSource } from '../../lib/game/status-lifecycle'
 import { makePiece, makeState } from '../helpers/minimal-state'
+import { toPublicBattleState } from '../../lib/game/deployment'
+import { listLegalAIActions } from '../../lib/game/ai-environment'
 
 function chain(parts: Array<[NodeKind, Record<string, unknown>?]>): SkillGraph {
   const nodes = parts.map(([kind, params], index) => ({ ...newGraphNode(kind, 'n' + index), params: { ...newGraphNode(kind, 'unused').params, ...params } }))
@@ -47,6 +49,47 @@ beforeEach(() => globalTriggerSystem.clearRules())
 afterEach(() => { for (const folder of folders.splice(0)) rmSync(folder, { recursive: true, force: true }) })
 
 describe('typed skill graph authoring', () => {
+  it('validates multi-option choices and follows their branch in the real engine',()=>{
+    const graph=chain([['start'],['select-options',{options:'治疗|护盾|跳过',min:1,max:2}],['condition-option',{choice:'n1',value:1}],['heal',{value:4}],['end']])
+    delete graph.nodes[2].next;graph.nodes[2].yes='n3';graph.nodes[2].no='n4'
+    const state=stateFor(graph),before=hashBattleState(state),prepared=prepareAction(state,action)
+    expect(prepared).toMatchObject({kind:'needOption',min:1,max:2,canCancel:true})
+    if(prepared.kind!=='needOption') throw Error('expected options')
+    const input={...action,selectionId:prepared.selectionId,stateRevision:prepared.stateRevision,selectedOption:['option-0','option-1']}
+    expect(prepareAction(state,input)).toEqual({kind:'ready'})
+    expect(runBattleAction(state,input as any,{rootSeed:202}).state.pieces[0].currentHp).toBe(54)
+    expect(runBattleAction(state,{...input,selectedOption:['option-2']} as any,{rootSeed:202}).state.pieces[0].currentHp).toBe(50)
+    for(const selectedOption of [[],['option-0','option-0'],['option-0','option-1','option-2'],['missing'],'option-0']) expect(prepareAction(state,{...input,selectedOption})).toMatchObject({kind:'invalid'})
+    expect(prepareAction(state,{...input,stateRevision:-1})).toMatchObject({kind:'invalid'})
+    expect(hashBattleState(state)).toBe(before)
+    const aiChoices=listLegalAIActions(state,'player-red').filter(item => 'skillId' in item.action && item.action.skillId==='graph-fixture')
+    expect(aiChoices).toHaveLength(6)
+    for(const candidate of aiChoices) expect(prepareAction(state,candidate.action)).toEqual({kind:'ready'})
+    graph.nodes[1].params.max=1
+    const single=stateFor(graph),choice=prepareAction(single,action)
+    if(choice.kind!=='needOption') throw Error('expected single option')
+    expect(runBattleAction(single,{...action,selectionId:choice.selectionId,stateRevision:choice.stateRevision,selectedOption:'option-0'} as any,{rootSeed:202}).state.pieces[0].currentHp).toBe(54)
+  })
+  it('runs visual presentation nodes through a real action with deterministic state and viewer filtering', () => {
+    const graph=chain([['start'],['select-cell',{range:5}],['display-bind',{fields:'health'}],['display-indicator',{basis:'currentHp',label:'生命显示',max:100,audience:'owner'}],['display-marker',{cell:'n1',icon:'⚡',label:'锚点显示'}],['display-cue',{label:'显示已更新'}],['end']])
+    const state=stateFor(graph), prepared=prepareAction(state,action)
+    if(prepared.kind!=='needTarget') throw Error('expected cell choice')
+    const input={...action,targetX:3,targetY:1,selectionId:prepared.selectionId,stateRevision:prepared.stateRevision}
+    const first=runBattleAction(state,input as any,{rootSeed:202})
+    const second=runBattleAction(state,input as any,{rootSeed:202})
+    expect(first.stateHash).toBe(second.stateHash)
+    const own=toPublicBattleState(first.state,'player-red').extensions!.skillPresentation
+    expect(own.bindings).toHaveLength(1)
+    expect(own.indicators[0]).toMatchObject({label:'生命显示',value:50})
+    expect(own.markers[0]).toMatchObject({x:3,y:1,label:'锚点显示'})
+    expect(own.cues).toHaveLength(1)
+    expect(toPublicBattleState(first.state,'player-blue').extensions!.skillPresentation.indicators).toEqual([])
+    expect(first.state.pieces[0].currentHp).toBe(50)
+    expect(first.state.extensions!.tileEffects).toBeUndefined()
+    expect(()=>assertSkillGraphArtifact(skill(graph))).not.toThrow()
+    graph.nodes[2].params.audience='unknown'
+    expect(()=>compileSkillGraph(graph)).toThrow('参数')
+  })
   it('generates deterministic code, target steps and descriptions from one definition', () => {
     const graph = drainGraph(), compiled = compileSkillGraph(graph)
     expect(compileSkillGraph(JSON.parse(JSON.stringify(graph)))).toEqual(compiled)

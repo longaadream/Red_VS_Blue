@@ -1,7 +1,7 @@
 /** Shared, deterministic authoring compiler. It never executes authored code. */
 export const GRAPH_VERSION = 'rvb-skill-graph/v1'
 export const COMPILER_VERSION = 'rvb-skill-graph-compiler/v1'
-export type NodeKind = 'start' | 'select-piece' | 'select-cell' | 'damage' | 'heal' | 'status' | 'teleport' | 'condition' | 'end'
+export type NodeKind = 'start' | 'select-piece' | 'select-cell' | 'select-options' | 'condition-option' | 'damage' | 'heal' | 'status' | 'teleport' | 'condition' | 'end' | 'display-bind' | 'display-indicator' | 'display-marker' | 'display-cue' | 'display-remove'
 export interface GraphNode {
   id: string
   kind: NodeKind
@@ -13,8 +13,30 @@ export interface GraphNode {
   y?: number
 }
 export interface SkillGraph { version: typeof GRAPH_VERSION; entry: string; nodes: GraphNode[] }
-type Field = { key: string; label: string; type: 'number' | 'piece' | 'cell' | 'damage' | 'select'; options?: string[]; default: string | number }
+type Field = { key: string; label: string; type: 'number' | 'piece' | 'cell' | 'damage' | 'option' | 'select' | 'text'; options?: string[]; default: string | number }
+const audience: Field = {key:'audience',label:'哪些人可见',type:'select',options:['public','owner','allies','enemies','spectators'],default:'public'}
+const lifetime: Field = {key:'lifetime',label:'记录保留到',type:'select',options:['while-alive','battle'],default:'while-alive'}
+const target: Field = {key:'target',label:'显示在哪个棋子上',type:'piece',default:'self'}
+const slot = (value: string): Field => ({key:'slot',label:'效果标识（用于更新或移除）',type:'text',default:value})
 export const NODE_CATALOG: Record<NodeKind, { name: string; fields: Field[] }> = {
+  'select-options': {name:'选择模式或选项',fields:[{key:'title',label:'选择提示',type:'text',default:'选择模式'},
+    {key:'options',label:'选项名称（用 | 分隔，最多8项）',type:'text',default:'模式一|模式二'},
+    {key:'min',label:'至少选择几项',type:'number',default:1},{key:'max',label:'最多选择几项',type:'number',default:1}]},
+  'condition-option': {name:'判断选中的模式',fields:[{key:'choice',label:'使用哪个选择结果',type:'option',default:''},
+    {key:'value',label:'是否包含第几项（从1开始）',type:'number',default:1}]},
+  'display-bind': {name:'绑定显示来源',fields:[slot('binding'),target,{key:'sourcePiece',label:'显示数据来自',type:'piece',default:'self'},
+    {key:'fields',label:'同步显示字段',type:'select',options:['statuses','health','identity','stats','skills','all'],default:'statuses'},
+    {key:'mode',label:'更新方式',type:'select',options:['live','snapshot'],default:'live'},
+    {key:'fallback',label:'来源离场后',type:'select',options:['snapshot','self','remove'],default:'snapshot'},audience,lifetime]},
+  'display-indicator': {name:'显示数值与进度',fields:[slot('indicator'),target,{key:'label',label:'显示名称',type:'text',default:'技能进度'},
+    {key:'basis',label:'数值来源',type:'select',options:['fixed','currentHp','maxHp','attack','defense','moveRange'],default:'fixed'},
+    {key:'value',label:'固定值／来源失效后的值',type:'number',default:0},{key:'max',label:'进度上限（0为只显示数值）',type:'number',default:0},audience,lifetime]},
+  'display-marker': {name:'显示地格标记',fields:[slot('marker'),{key:'cell',label:'标记位置',type:'cell',default:''},
+    {key:'label',label:'标记说明',type:'text',default:'技能标记'},{key:'icon',label:'标记图标',type:'select',options:['◆','⚡','✦'],default:'◆'},audience,lifetime]},
+  'display-cue': {name:'播放表现提示',fields:[slot('cue'),target,{key:'kind',label:'提示类型',type:'select',options:['float','flash','sound'],default:'float'},
+    {key:'sound',label:'音效预设（仅音效提示使用）',type:'select',options:['notice','success','warning'],default:'notice'},
+    {key:'label',label:'提示文字',type:'text',default:'技能生效'},audience]},
+  'display-remove': {name:'移除显示效果',fields:[slot('binding')]},
   start: { name: '主动使用', fields: [] },
   'select-piece': { name: '选择棋子', fields: [
     { key: 'relation', label: '目标关系', type: 'select', options: ['enemy', 'ally', 'all'], default: 'enemy' },
@@ -55,6 +77,9 @@ const names: Record<string, string> = { enemy: '敌方棋子', ally: '友方棋�
 const own = (object: object, key: string) => Object.prototype.hasOwnProperty.call(object, key)
 const literal = (value: unknown) => JSON.stringify(value)
 const fail = (message: string): never => { throw new Error('技能流程图：' + message) }
+const isChoice = (node: GraphNode) => ['select-piece','select-cell','select-options'].includes(node.kind)
+const isCondition = (node: GraphNode) => node.kind === 'condition' || node.kind === 'condition-option'
+const optionList = (node: GraphNode) => String(node.params.options).split('|').map((label,index)=>({label:label.trim(),value:'option-'+index}))
 
 export function newGraphNode(kind: NodeKind, id: string, x = 60, y = 60): GraphNode {
   return { id, kind, params: Object.fromEntries(NODE_CATALOG[kind].fields.map(field => [field.key, field.default])), x, y }
@@ -69,6 +94,7 @@ function validate(input: unknown) {
   const graph = input as SkillGraph
   if (graph.version !== GRAPH_VERSION) fail('不支持的版本')
   if (!Array.isArray(graph.nodes) || graph.nodes.length < 2 || graph.nodes.length > 64) fail('节点数量必须为2至64')
+  if (graph.nodes.filter(node => node.kind === 'select-options').length > 1) fail('一个主动技能最多一个选项选择节点，可一次选择多个选项')
   const byId = new Map<string, GraphNode>()
   for (const node of graph.nodes) {
     if (!node || typeof node.id !== 'string' || !/^[a-z][a-z0-9_-]{0,31}$/.test(node.id) || byId.has(node.id)) fail('节点ID无效或重复')
@@ -80,11 +106,15 @@ function validate(input: unknown) {
       const value = node.params[field.key]
       if (field.type === 'number') {
         if (!Number.isSafeInteger(value) || Number(value) < (field.key === 'turns' ? -1 : 0) || Number(value) > 10000) fail(node.id + '：数值参数无效 ' + field.key)
-      } else if (typeof value !== 'string' || (field.options && !field.options.includes(value))) fail(node.id + '：参数无效 ' + field.key)
+      } else if (typeof value !== 'string' || (field.options && !field.options.includes(value)) || field.type === 'text' && (!value.length || value.length > 120 || /[\x00-\x1f]/.test(value))) fail(node.id + '：参数无效 ' + field.key)
     }
     if (node.kind === 'condition' && Number(node.params.value) > 100) fail(node.id + '：生命百分比必须不大于100')
     if (node.kind === 'status' && (node.params.turns === 0 || (node.params.turns === -1 && node.params.status !== 'divine-shield'))) fail(node.id + '：状态需要正整数时长，圣盾可持续到消耗')
     if ((node.kind === 'select-piece' || node.kind === 'select-cell') && Number(node.params.range) > 50) fail(node.id + '：射程不可超过50格')
+    if (node.kind === 'select-options') {
+      const options=optionList(node)
+      if (!options.length || options.length>8 || options.some(o=>!o.label) || new Set(options.map(o=>o.label)).size!==options.length || Number(node.params.min)<1 || Number(node.params.max)<Number(node.params.min) || Number(node.params.max)>options.length) fail(node.id+'：选项或选择数量无效')
+    }
     byId.set(node.id, node)
   }
   if (byId.get(graph.entry)?.kind !== 'start' || graph.nodes.filter(node => node.kind === 'start').length !== 1) fail('必须有唯一的主动使用入口')
@@ -93,7 +123,7 @@ function validate(input: unknown) {
       if (node.next || node.yes || node.no) fail(node.id + '：完成节点不能有后继')
       return []
     }
-    if (node.kind === 'condition') {
+    if (isCondition(node)) {
       if (node.next || !node.yes || !node.no) fail(node.id + '：请连接是、否两个出口')
       return [node.yes!, node.no!]
     }
@@ -127,16 +157,22 @@ function validate(input: unknown) {
       if (value === node.id || !common.has(value as string)) fail(node.id + '：引用的结果必须在所有前置路径中产生')
     }
     if (own(node.params, 'target')) ref(node.params.target, 'select-piece', true)
+    if (node.kind === 'display-bind') ref(node.params.sourcePiece, 'select-piece', true)
+    if (node.kind === 'display-marker') ref(node.params.cell, 'select-cell')
+    if (node.kind === 'condition-option') {
+      ref(node.params.choice,'select-options')
+      if (Number(node.params.value)<1 || Number(node.params.value)>optionList(byId.get(String(node.params.choice))!).length) fail(node.id+'：选项序号无效')
+    }
     if (node.kind === 'teleport') ref(node.params.cell, 'select-cell')
     if ((node.kind === 'damage' || node.kind === 'heal') && node.params.basis === 'actualDamage') ref(node.params.source, 'damage')
   }
   // All choices are an unconditional prefix, matching the current targeting ABI.
   const selections: GraphNode[] = []
   let cursor = byId.get(graph.entry)!.next
-  while (cursor && ['select-piece', 'select-cell'].includes(byId.get(cursor)!.kind)) {
+  while (cursor && isChoice(byId.get(cursor)!)) {
     const node = byId.get(cursor)!; selections.push(node); cursor = node.next
   }
-  if (selections.length !== graph.nodes.filter(node => ['select-piece', 'select-cell'].includes(node.kind)).length) fail('目标选择必须连续放在所有效果和条件之前')
+  if (selections.length !== graph.nodes.filter(isChoice).length) fail('目标选择必须连续放在所有效果和条件之前')
   return { graph, byId, ordered, selections }
 }
 
@@ -154,11 +190,13 @@ export function compileSkillGraph(input: unknown) {
     if (mandatoryTeleports.has(key)) return mandatoryTeleports.get(key)!
     const node = byId.get(id)!
     const result = node.kind === 'teleport' && node.params.target === target ? true : node.kind === 'end' ? false
-      : node.kind === 'condition' ? alwaysTeleports(node.yes!, target) && alwaysTeleports(node.no!, target) : alwaysTeleports(node.next!, target)
+      : isCondition(node) ? alwaysTeleports(node.yes!, target) && alwaysTeleports(node.no!, target) : alwaysTeleports(node.next!, target)
     mandatoryTeleports.set(key, result)
     return result
   }
-  const targetingSteps = selections.map(node => node.kind === 'select-piece' ? {
+  const targetingSteps = selections.map(node => node.kind === 'select-options' ? {
+    kind:'option',title:node.params.title,options:optionList(node),selectionMode:Number(node.params.max)>1?'multi':'single',minSelections:node.params.min,maxSelections:node.params.max,canCancel:true,
+  } : node.kind === 'select-piece' ? {
     kind: 'target', type: 'piece', range: node.params.range, distanceMetric: 'manhattan', filter: node.params.relation,
     excludeSourcePiece: node.params.includeSelf === 'no',
     ...(alwaysTeleports(node.next!, node.id) ? { forbiddenTargetStatuses: ['imprisoned', 'inoperable'] } : {}),
@@ -170,9 +208,33 @@ export function compileSkillGraph(input: unknown) {
     let body = '', text = ''
     switch (node.kind) {
       case 'start': text = '主动使用'; break
+      case 'select-options':
+        body = `${v} = selectOption(${literal(targetingSteps[selections.indexOf(node)])}); if (${v} === undefined || ${v} === null || ${v}.needsOptionSelection) return ${v};`
+        text = `${p.title}：${optionList(node).map(o=>o.label).join('、')}（选${p.min}至${p.max}项）`; break
+      case 'condition-option': {
+        const choice=variable(p.choice), value=literal('option-'+(Number(p.value)-1))
+        body = `_pc = (Array.isArray(${choice}) ? ${choice}.includes(${value}) : ${choice} === ${value}) ? ${literal(node.yes)} : ${literal(node.no)};`
+        text = `选中了第${p.value}项`; break
+      }
+      case 'display-bind': {
+        const selected = ({statuses:['statuses'],health:['health'],identity:['name','templateId'],stats:['attack','defense','moveRange'],skills:['skills'],all:['name','templateId','health','attack','defense','moveRange','skills','statuses']} as Record<string,string[]>)[String(p.fields)]
+        body = `flow.presentation.bind({id:${literal(p.slot)},targetId:${target}.instanceId,sourceId:${variable(p.sourcePiece)}.instanceId,fields:${literal(selected)},mode:${literal(p.mode)},onSourceMissing:${literal(p.fallback)},audience:${literal(p.audience)},lifetime:${literal(p.lifetime)}});`
+        text = `使${label(p.target)}的显示读取${label(p.sourcePiece)}的数据`; break
+      }
+      case 'display-indicator':
+        body = `flow.presentation.indicator({id:${literal(p.slot)},targetId:${target}.instanceId,label:${literal(p.label)},value:${p.value}${p.max ? ',max:'+p.max : ''}${p.basis === 'fixed' ? '' : ',source:{pieceId:'+target+'.instanceId,field:'+literal(p.basis)+'}'},audience:${literal(p.audience)},lifetime:${literal(p.lifetime)}});`
+        text = `在${label(p.target)}上显示“${p.label}”`; break
+      case 'display-marker':
+        body = `flow.presentation.mark({id:${literal(p.slot)},cells:[{x:${variable(p.cell)}.x,y:${variable(p.cell)}.y}],label:${literal(p.label)},icon:${literal(p.icon)},audience:${literal(p.audience)},lifetime:${literal(p.lifetime)}});`
+        text = `在${label(p.cell)}显示“${p.label}”标记`; break
+      case 'display-cue':
+        body = `flow.presentation.emit({id:${literal(p.slot)}+':'+context.battle.turn.turnNumber+':'+(context.battle.targetingRevision||0),kind:${literal(p.kind)},sound:${literal(p.sound)},targetId:${target}.instanceId,text:${literal(p.label)},audience:${literal(p.audience)},lifetime:'battle'});`
+        text = `在${label(p.target)}播放“${p.label}”提示`; break
+      case 'display-remove':
+        body = `flow.presentation.remove(${literal(p.slot)});`; text = `移除本技能的显示效果“${p.slot}”`; break
       case 'select-piece':
       case 'select-cell': {
-        const index = selections.indexOf(node), step = targetingSteps[index]
+        const step = {type:node.kind === 'select-piece' ? 'piece' : 'grid',range:p.range,filter:node.kind==='select-piece'?p.relation:'all'}
         body = `${v} = selectTarget(${literal({type: step.type, range: step.range, filter: step.filter})}); if (!${v} || ${v}.needsTargetSelection) return ${v};`
         text = node.kind === 'select-piece'
           ? `选择本棋子${p.range}格内1个${p.includeSelf === 'no' && p.relation !== 'enemy' ? '其他' : ''}${names[String(p.relation)]}（${label(node.id)}）`
@@ -200,7 +262,7 @@ export function compileSkillGraph(input: unknown) {
     }
     nodeDescriptions[node.id] = text
     const trace = `_trace.push({ nodeId: ${literal(node.id)}, kind: ${literal(node.kind)}${node.kind === 'damage' ? ', actualDamage: ' + v + '.damage' : ''} });`
-    cases.push(`case ${literal(node.id)}: ${body} ${node.kind === 'end' ? '' : trace} ${node.kind === 'condition' || node.kind === 'end' ? '' : '_pc = ' + literal(node.next) + ';'} break;`)
+    cases.push(`case ${literal(node.id)}: ${body} ${node.kind === 'end' ? '' : trace} ${isCondition(node) || node.kind === 'end' ? '' : '_pc = ' + literal(node.next) + ';'} break;`)
   }
   let descriptionBudget = 0
   function describe(id: string): string {
@@ -208,12 +270,13 @@ export function compileSkillGraph(input: unknown) {
     const node = byId.get(id)!
     if (node.kind === 'end') return ''
     if (node.kind === 'start') return describe(node.next!)
-    if (node.kind === 'condition') return `若${nodeDescriptions[id]}，则${describe(node.yes!) || '结束技能。'}否则，${describe(node.no!) || '结束技能。'}`
+    if (isCondition(node)) return `若${nodeDescriptions[id]}，则${describe(node.yes!) || '结束技能。'}否则，${describe(node.no!) || '结束技能。'}`
     return nodeDescriptions[id] + '。' + describe(node.next!)
   }
   const description = describe(graph.entry) || '使用后结束技能。'
   const declarations = ordered.map(node => variable(node.id)).join(', ')
-  const code = `function executeSkill(context) { var ${declarations}; var _trace = []; var _pc = ${literal(graph.entry)}; for (var _step = 0; _step < 64; _step++) { switch (_pc) { ${cases.join(' ')} default: throw new Error('无效的技能图节点'); } } throw new Error('技能图超过执行预算'); }`
+  const presentationGuard = ordered.some(n=>n.kind.startsWith('display-')) ? "if(typeof flow==='undefined'||!flow.presentation) throw new Error('客户端不支持技能表现接口，请更新客户端'); " : ''
+  const code = `function executeSkill(context) { ${presentationGuard}var ${declarations}; var _trace = []; var _pc = ${literal(graph.entry)}; for (var _step = 0; _step < 64; _step++) { switch (_pc) { ${cases.join(' ')} default: throw new Error('无效的技能图节点'); } } throw new Error('技能图超过执行预算'); }`
   const previewCode = `function calculatePreview() { return { description: ${literal(description)}, expectedValues: {} }; }`
   return { compilerVersion: COMPILER_VERSION, description, code, previewCode, targeting: { steps: targetingSteps }, requiresTarget: selections.length > 0, nodeDescriptions }
 }

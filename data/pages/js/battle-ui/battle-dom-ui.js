@@ -113,9 +113,26 @@
     function update(model) {
       if (!model) return
       updateHud(model)
+      let panel = byId('skillPresentationIndicators')
+      if (!panel && doc && doc.createElement && doc.body) {
+        panel = doc.createElement('aside'); panel.id = 'skillPresentationIndicators'
+        panel.setAttribute('aria-label','技能信息'); panel.setAttribute('aria-live','polite')
+        panel.style.cssText = 'position:fixed;left:16px;bottom:90px;max-width:260px;max-height:30vh;overflow:auto;z-index:30;background:#171b2be8;color:#f1f5f9;border-radius:8px;padding:8px;pointer-events:none'
+        doc.body.appendChild(panel)
+      }
+      if (panel) {
+        const entries = model.skillIndicators || []
+        panel.hidden = entries.length === 0 && !(model.skillMarkers || []).length
+        panel.innerHTML = entries.map(function (entry) {
+          const piece = (model.pieces || []).find(function (p) { return p.id === entry.targetId })
+          const label = (piece ? piece.name + ' · ' : '') + entry.label
+          return '<div>' + escapeHtml(label) + '：' + escapeHtml(entry.value)
+            + (entry.max != null ? '/' + escapeHtml(entry.max) + '<progress max="' + Number(entry.max) + '" value="' + Math.max(0,Math.min(Number(entry.max),Number(entry.value))) + '" aria-label="' + escapeHtml(label) + '"></progress>' : '') + '</div>'
+        }).join('') + (model.skillMarkers || []).map(function (marker) { return '<div>' + escapeHtml(marker.icon + ' ' + marker.label + ' (' + marker.x + ',' + marker.y + ')') + '</div>' }).join('')
+      }
     }
 
-    function dispose() { previousTurnPlayerId = null }
+    function dispose() { previousTurnPlayerId = null; const panel=byId('skillPresentationIndicators'); if(panel) panel.remove() }
 
     return { update: update, dispose: dispose }
   }

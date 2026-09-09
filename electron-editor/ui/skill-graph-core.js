@@ -4,9 +4,9 @@ var SkillGraphCore = (() => {
   var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
   var __getOwnPropNames = Object.getOwnPropertyNames;
   var __hasOwnProp = Object.prototype.hasOwnProperty;
-  var __export = (target, all) => {
+  var __export = (target2, all) => {
     for (var name in all)
-      __defProp(target, name, { get: all[name], enumerable: true });
+      __defProp(target2, name, { get: all[name], enumerable: true });
   };
   var __copyProps = (to, from, except, desc) => {
     if (from && typeof from === "object" || typeof from === "function") {
@@ -32,7 +32,58 @@ var SkillGraphCore = (() => {
   });
   var GRAPH_VERSION = "rvb-skill-graph/v1";
   var COMPILER_VERSION = "rvb-skill-graph-compiler/v1";
+  var audience = { key: "audience", label: "\u54EA\u4E9B\u4EBA\u53EF\u89C1", type: "select", options: ["public", "owner", "allies", "enemies", "spectators"], default: "public" };
+  var lifetime = { key: "lifetime", label: "\u8BB0\u5F55\u4FDD\u7559\u5230", type: "select", options: ["while-alive", "battle"], default: "while-alive" };
+  var target = { key: "target", label: "\u663E\u793A\u5728\u54EA\u4E2A\u68CB\u5B50\u4E0A", type: "piece", default: "self" };
+  var slot = (value) => ({ key: "slot", label: "\u6548\u679C\u6807\u8BC6\uFF08\u7528\u4E8E\u66F4\u65B0\u6216\u79FB\u9664\uFF09", type: "text", default: value });
   var NODE_CATALOG = {
+    "select-options": { name: "\u9009\u62E9\u6A21\u5F0F\u6216\u9009\u9879", fields: [
+      { key: "title", label: "\u9009\u62E9\u63D0\u793A", type: "text", default: "\u9009\u62E9\u6A21\u5F0F" },
+      { key: "options", label: "\u9009\u9879\u540D\u79F0\uFF08\u7528 | \u5206\u9694\uFF0C\u6700\u591A8\u9879\uFF09", type: "text", default: "\u6A21\u5F0F\u4E00|\u6A21\u5F0F\u4E8C" },
+      { key: "min", label: "\u81F3\u5C11\u9009\u62E9\u51E0\u9879", type: "number", default: 1 },
+      { key: "max", label: "\u6700\u591A\u9009\u62E9\u51E0\u9879", type: "number", default: 1 }
+    ] },
+    "condition-option": { name: "\u5224\u65AD\u9009\u4E2D\u7684\u6A21\u5F0F", fields: [
+      { key: "choice", label: "\u4F7F\u7528\u54EA\u4E2A\u9009\u62E9\u7ED3\u679C", type: "option", default: "" },
+      { key: "value", label: "\u662F\u5426\u5305\u542B\u7B2C\u51E0\u9879\uFF08\u4ECE1\u5F00\u59CB\uFF09", type: "number", default: 1 }
+    ] },
+    "display-bind": { name: "\u7ED1\u5B9A\u663E\u793A\u6765\u6E90", fields: [
+      slot("binding"),
+      target,
+      { key: "sourcePiece", label: "\u663E\u793A\u6570\u636E\u6765\u81EA", type: "piece", default: "self" },
+      { key: "fields", label: "\u540C\u6B65\u663E\u793A\u5B57\u6BB5", type: "select", options: ["statuses", "health", "identity", "stats", "skills", "all"], default: "statuses" },
+      { key: "mode", label: "\u66F4\u65B0\u65B9\u5F0F", type: "select", options: ["live", "snapshot"], default: "live" },
+      { key: "fallback", label: "\u6765\u6E90\u79BB\u573A\u540E", type: "select", options: ["snapshot", "self", "remove"], default: "snapshot" },
+      audience,
+      lifetime
+    ] },
+    "display-indicator": { name: "\u663E\u793A\u6570\u503C\u4E0E\u8FDB\u5EA6", fields: [
+      slot("indicator"),
+      target,
+      { key: "label", label: "\u663E\u793A\u540D\u79F0", type: "text", default: "\u6280\u80FD\u8FDB\u5EA6" },
+      { key: "basis", label: "\u6570\u503C\u6765\u6E90", type: "select", options: ["fixed", "currentHp", "maxHp", "attack", "defense", "moveRange"], default: "fixed" },
+      { key: "value", label: "\u56FA\u5B9A\u503C\uFF0F\u6765\u6E90\u5931\u6548\u540E\u7684\u503C", type: "number", default: 0 },
+      { key: "max", label: "\u8FDB\u5EA6\u4E0A\u9650\uFF080\u4E3A\u53EA\u663E\u793A\u6570\u503C\uFF09", type: "number", default: 0 },
+      audience,
+      lifetime
+    ] },
+    "display-marker": { name: "\u663E\u793A\u5730\u683C\u6807\u8BB0", fields: [
+      slot("marker"),
+      { key: "cell", label: "\u6807\u8BB0\u4F4D\u7F6E", type: "cell", default: "" },
+      { key: "label", label: "\u6807\u8BB0\u8BF4\u660E", type: "text", default: "\u6280\u80FD\u6807\u8BB0" },
+      { key: "icon", label: "\u6807\u8BB0\u56FE\u6807", type: "select", options: ["\u25C6", "\u26A1", "\u2726"], default: "\u25C6" },
+      audience,
+      lifetime
+    ] },
+    "display-cue": { name: "\u64AD\u653E\u8868\u73B0\u63D0\u793A", fields: [
+      slot("cue"),
+      target,
+      { key: "kind", label: "\u63D0\u793A\u7C7B\u578B", type: "select", options: ["float", "flash", "sound"], default: "float" },
+      { key: "sound", label: "\u97F3\u6548\u9884\u8BBE\uFF08\u4EC5\u97F3\u6548\u63D0\u793A\u4F7F\u7528\uFF09", type: "select", options: ["notice", "success", "warning"], default: "notice" },
+      { key: "label", label: "\u63D0\u793A\u6587\u5B57", type: "text", default: "\u6280\u80FD\u751F\u6548" },
+      audience
+    ] },
+    "display-remove": { name: "\u79FB\u9664\u663E\u793A\u6548\u679C", fields: [slot("binding")] },
     start: { name: "\u4E3B\u52A8\u4F7F\u7528", fields: [] },
     "select-piece": { name: "\u9009\u62E9\u68CB\u5B50", fields: [
       { key: "relation", label: "\u76EE\u6807\u5173\u7CFB", type: "select", options: ["enemy", "ally", "all"], default: "enemy" },
@@ -75,6 +126,9 @@ var SkillGraphCore = (() => {
   var fail = (message) => {
     throw new Error("\u6280\u80FD\u6D41\u7A0B\u56FE\uFF1A" + message);
   };
+  var isChoice = (node) => ["select-piece", "select-cell", "select-options"].includes(node.kind);
+  var isCondition = (node) => node.kind === "condition" || node.kind === "condition-option";
+  var optionList = (node) => String(node.params.options).split("|").map((label, index) => ({ label: label.trim(), value: "option-" + index }));
   function newGraphNode(kind, id, x = 60, y = 60) {
     return { id, kind, params: Object.fromEntries(NODE_CATALOG[kind].fields.map((field) => [field.key, field.default])), x, y };
   }
@@ -89,6 +143,7 @@ var SkillGraphCore = (() => {
     const graph = input;
     if (graph.version !== GRAPH_VERSION) fail("\u4E0D\u652F\u6301\u7684\u7248\u672C");
     if (!Array.isArray(graph.nodes) || graph.nodes.length < 2 || graph.nodes.length > 64) fail("\u8282\u70B9\u6570\u91CF\u5FC5\u987B\u4E3A2\u81F364");
+    if (graph.nodes.filter((node) => node.kind === "select-options").length > 1) fail("\u4E00\u4E2A\u4E3B\u52A8\u6280\u80FD\u6700\u591A\u4E00\u4E2A\u9009\u9879\u9009\u62E9\u8282\u70B9\uFF0C\u53EF\u4E00\u6B21\u9009\u62E9\u591A\u4E2A\u9009\u9879");
     const byId = /* @__PURE__ */ new Map();
     for (const node of graph.nodes) {
       if (!node || typeof node.id !== "string" || !/^[a-z][a-z0-9_-]{0,31}$/.test(node.id) || byId.has(node.id)) fail("\u8282\u70B9ID\u65E0\u6548\u6216\u91CD\u590D");
@@ -100,11 +155,15 @@ var SkillGraphCore = (() => {
         const value = node.params[field.key];
         if (field.type === "number") {
           if (!Number.isSafeInteger(value) || Number(value) < (field.key === "turns" ? -1 : 0) || Number(value) > 1e4) fail(node.id + "\uFF1A\u6570\u503C\u53C2\u6570\u65E0\u6548 " + field.key);
-        } else if (typeof value !== "string" || field.options && !field.options.includes(value)) fail(node.id + "\uFF1A\u53C2\u6570\u65E0\u6548 " + field.key);
+        } else if (typeof value !== "string" || field.options && !field.options.includes(value) || field.type === "text" && (!value.length || value.length > 120 || /[\x00-\x1f]/.test(value))) fail(node.id + "\uFF1A\u53C2\u6570\u65E0\u6548 " + field.key);
       }
       if (node.kind === "condition" && Number(node.params.value) > 100) fail(node.id + "\uFF1A\u751F\u547D\u767E\u5206\u6BD4\u5FC5\u987B\u4E0D\u5927\u4E8E100");
       if (node.kind === "status" && (node.params.turns === 0 || node.params.turns === -1 && node.params.status !== "divine-shield")) fail(node.id + "\uFF1A\u72B6\u6001\u9700\u8981\u6B63\u6574\u6570\u65F6\u957F\uFF0C\u5723\u76FE\u53EF\u6301\u7EED\u5230\u6D88\u8017");
       if ((node.kind === "select-piece" || node.kind === "select-cell") && Number(node.params.range) > 50) fail(node.id + "\uFF1A\u5C04\u7A0B\u4E0D\u53EF\u8D85\u8FC750\u683C");
+      if (node.kind === "select-options") {
+        const options = optionList(node);
+        if (!options.length || options.length > 8 || options.some((o) => !o.label) || new Set(options.map((o) => o.label)).size !== options.length || Number(node.params.min) < 1 || Number(node.params.max) < Number(node.params.min) || Number(node.params.max) > options.length) fail(node.id + "\uFF1A\u9009\u9879\u6216\u9009\u62E9\u6570\u91CF\u65E0\u6548");
+      }
       byId.set(node.id, node);
     }
     if (byId.get(graph.entry)?.kind !== "start" || graph.nodes.filter((node) => node.kind === "start").length !== 1) fail("\u5FC5\u987B\u6709\u552F\u4E00\u7684\u4E3B\u52A8\u4F7F\u7528\u5165\u53E3");
@@ -113,7 +172,7 @@ var SkillGraphCore = (() => {
         if (node.next || node.yes || node.no) fail(node.id + "\uFF1A\u5B8C\u6210\u8282\u70B9\u4E0D\u80FD\u6709\u540E\u7EE7");
         return [];
       }
-      if (node.kind === "condition") {
+      if (isCondition(node)) {
         if (node.next || !node.yes || !node.no) fail(node.id + "\uFF1A\u8BF7\u8FDE\u63A5\u662F\u3001\u5426\u4E24\u4E2A\u51FA\u53E3");
         return [node.yes, node.no];
       }
@@ -149,17 +208,23 @@ var SkillGraphCore = (() => {
       for (const parent of parents.slice(1)) for (const id of common) if (!dominators.get(parent).has(id)) common.delete(id);
       dominators.set(node.id, /* @__PURE__ */ new Set([...common, node.id]));
       if (own(node.params, "target")) ref(node.params.target, "select-piece", true);
+      if (node.kind === "display-bind") ref(node.params.sourcePiece, "select-piece", true);
+      if (node.kind === "display-marker") ref(node.params.cell, "select-cell");
+      if (node.kind === "condition-option") {
+        ref(node.params.choice, "select-options");
+        if (Number(node.params.value) < 1 || Number(node.params.value) > optionList(byId.get(String(node.params.choice))).length) fail(node.id + "\uFF1A\u9009\u9879\u5E8F\u53F7\u65E0\u6548");
+      }
       if (node.kind === "teleport") ref(node.params.cell, "select-cell");
       if ((node.kind === "damage" || node.kind === "heal") && node.params.basis === "actualDamage") ref(node.params.source, "damage");
     }
     const selections = [];
     let cursor = byId.get(graph.entry).next;
-    while (cursor && ["select-piece", "select-cell"].includes(byId.get(cursor).kind)) {
+    while (cursor && isChoice(byId.get(cursor))) {
       const node = byId.get(cursor);
       selections.push(node);
       cursor = node.next;
     }
-    if (selections.length !== graph.nodes.filter((node) => ["select-piece", "select-cell"].includes(node.kind)).length) fail("\u76EE\u6807\u9009\u62E9\u5FC5\u987B\u8FDE\u7EED\u653E\u5728\u6240\u6709\u6548\u679C\u548C\u6761\u4EF6\u4E4B\u524D");
+    if (selections.length !== graph.nodes.filter(isChoice).length) fail("\u76EE\u6807\u9009\u62E9\u5FC5\u987B\u8FDE\u7EED\u653E\u5728\u6240\u6709\u6548\u679C\u548C\u6761\u4EF6\u4E4B\u524D");
     return { graph, byId, ordered, selections };
   }
   function compileSkillGraph(input) {
@@ -169,15 +234,23 @@ var SkillGraphCore = (() => {
     const amount = (node) => node.params.basis === "fixed" ? String(node.params.value) : `Math.floor(${node.params.basis === "attack" ? "context.piece.attack" : variable(node.params.source) + ".damage"} * ${node.params.value} / 100)`;
     const amountText = (node) => node.params.basis === "fixed" ? node.params.value + "\u70B9" : `\u7B49\u540C\u4E8E${node.params.basis === "attack" ? "\u672C\u68CB\u5B50\u653B\u51FB\u529B" : ordered.filter((n) => n.kind === "damage").length === 1 ? "\u672C\u6B21\u5B9E\u9645\u4F24\u5BB3" : "\u7B2C" + (ordered.filter((n) => n.kind === "damage").findIndex((n) => n.id === node.params.source) + 1) + "\u6B21\u4F24\u5BB3\u7684\u5B9E\u9645\u6263\u8840\u91CF"}${node.params.value}%\u7684`;
     const mandatoryTeleports = /* @__PURE__ */ new Map();
-    function alwaysTeleports(id, target) {
-      const key = id + ":" + target;
+    function alwaysTeleports(id, target2) {
+      const key = id + ":" + target2;
       if (mandatoryTeleports.has(key)) return mandatoryTeleports.get(key);
       const node = byId.get(id);
-      const result = node.kind === "teleport" && node.params.target === target ? true : node.kind === "end" ? false : node.kind === "condition" ? alwaysTeleports(node.yes, target) && alwaysTeleports(node.no, target) : alwaysTeleports(node.next, target);
+      const result = node.kind === "teleport" && node.params.target === target2 ? true : node.kind === "end" ? false : isCondition(node) ? alwaysTeleports(node.yes, target2) && alwaysTeleports(node.no, target2) : alwaysTeleports(node.next, target2);
       mandatoryTeleports.set(key, result);
       return result;
     }
-    const targetingSteps = selections.map((node) => node.kind === "select-piece" ? {
+    const targetingSteps = selections.map((node) => node.kind === "select-options" ? {
+      kind: "option",
+      title: node.params.title,
+      options: optionList(node),
+      selectionMode: Number(node.params.max) > 1 ? "multi" : "single",
+      minSelections: node.params.min,
+      maxSelections: node.params.max,
+      canCancel: true
+    } : node.kind === "select-piece" ? {
       kind: "target",
       type: "piece",
       range: node.params.range,
@@ -189,39 +262,71 @@ var SkillGraphCore = (() => {
     const nodeDescriptions = {};
     const cases = [];
     for (const node of ordered) {
-      const p = node.params, v = variable(node.id), target = variable(p.target);
+      const p = node.params, v = variable(node.id), target2 = variable(p.target);
       let body = "", text = "";
       switch (node.kind) {
         case "start":
           text = "\u4E3B\u52A8\u4F7F\u7528";
           break;
+        case "select-options":
+          body = `${v} = selectOption(${literal(targetingSteps[selections.indexOf(node)])}); if (${v} === undefined || ${v} === null || ${v}.needsOptionSelection) return ${v};`;
+          text = `${p.title}\uFF1A${optionList(node).map((o) => o.label).join("\u3001")}\uFF08\u9009${p.min}\u81F3${p.max}\u9879\uFF09`;
+          break;
+        case "condition-option": {
+          const choice = variable(p.choice), value = literal("option-" + (Number(p.value) - 1));
+          body = `_pc = (Array.isArray(${choice}) ? ${choice}.includes(${value}) : ${choice} === ${value}) ? ${literal(node.yes)} : ${literal(node.no)};`;
+          text = `\u9009\u4E2D\u4E86\u7B2C${p.value}\u9879`;
+          break;
+        }
+        case "display-bind": {
+          const selected = { statuses: ["statuses"], health: ["health"], identity: ["name", "templateId"], stats: ["attack", "defense", "moveRange"], skills: ["skills"], all: ["name", "templateId", "health", "attack", "defense", "moveRange", "skills", "statuses"] }[String(p.fields)];
+          body = `flow.presentation.bind({id:${literal(p.slot)},targetId:${target2}.instanceId,sourceId:${variable(p.sourcePiece)}.instanceId,fields:${literal(selected)},mode:${literal(p.mode)},onSourceMissing:${literal(p.fallback)},audience:${literal(p.audience)},lifetime:${literal(p.lifetime)}});`;
+          text = `\u4F7F${label(p.target)}\u7684\u663E\u793A\u8BFB\u53D6${label(p.sourcePiece)}\u7684\u6570\u636E`;
+          break;
+        }
+        case "display-indicator":
+          body = `flow.presentation.indicator({id:${literal(p.slot)},targetId:${target2}.instanceId,label:${literal(p.label)},value:${p.value}${p.max ? ",max:" + p.max : ""}${p.basis === "fixed" ? "" : ",source:{pieceId:" + target2 + ".instanceId,field:" + literal(p.basis) + "}"},audience:${literal(p.audience)},lifetime:${literal(p.lifetime)}});`;
+          text = `\u5728${label(p.target)}\u4E0A\u663E\u793A\u201C${p.label}\u201D`;
+          break;
+        case "display-marker":
+          body = `flow.presentation.mark({id:${literal(p.slot)},cells:[{x:${variable(p.cell)}.x,y:${variable(p.cell)}.y}],label:${literal(p.label)},icon:${literal(p.icon)},audience:${literal(p.audience)},lifetime:${literal(p.lifetime)}});`;
+          text = `\u5728${label(p.cell)}\u663E\u793A\u201C${p.label}\u201D\u6807\u8BB0`;
+          break;
+        case "display-cue":
+          body = `flow.presentation.emit({id:${literal(p.slot)}+':'+context.battle.turn.turnNumber+':'+(context.battle.targetingRevision||0),kind:${literal(p.kind)},sound:${literal(p.sound)},targetId:${target2}.instanceId,text:${literal(p.label)},audience:${literal(p.audience)},lifetime:'battle'});`;
+          text = `\u5728${label(p.target)}\u64AD\u653E\u201C${p.label}\u201D\u63D0\u793A`;
+          break;
+        case "display-remove":
+          body = `flow.presentation.remove(${literal(p.slot)});`;
+          text = `\u79FB\u9664\u672C\u6280\u80FD\u7684\u663E\u793A\u6548\u679C\u201C${p.slot}\u201D`;
+          break;
         case "select-piece":
         case "select-cell": {
-          const index = selections.indexOf(node), step = targetingSteps[index];
+          const step = { type: node.kind === "select-piece" ? "piece" : "grid", range: p.range, filter: node.kind === "select-piece" ? p.relation : "all" };
           body = `${v} = selectTarget(${literal({ type: step.type, range: step.range, filter: step.filter })}); if (!${v} || ${v}.needsTargetSelection) return ${v};`;
           text = node.kind === "select-piece" ? `\u9009\u62E9\u672C\u68CB\u5B50${p.range}\u683C\u51851\u4E2A${p.includeSelf === "no" && p.relation !== "enemy" ? "\u5176\u4ED6" : ""}${names[String(p.relation)]}\uFF08${label(node.id)}\uFF09` : `\u9009\u62E9\u672C\u68CB\u5B50${p.range}\u683C\u51851\u4E2A\u7A7A\u7684\u53EF\u884C\u8D70\u5730\u683C\uFF08${label(node.id)}\uFF09`;
           break;
         }
         case "damage":
-          body = `if (${target}.currentHp > 0) { ${v} = dealDamage(context.piece, ${target}, ${amount(node)}, ${literal(p.damageType)}, context.battle, context.skill.id); } else { ${v} = { damage: 0 }; }`;
+          body = `if (${target2}.currentHp > 0) { ${v} = dealDamage(context.piece, ${target2}, ${amount(node)}, ${literal(p.damageType)}, context.battle, context.skill.id); } else { ${v} = { damage: 0 }; }`;
           text = `\u5BF9${label(p.target)}\u9020\u6210${amountText(node)}${names[String(p.damageType)]}`;
           break;
         case "heal":
-          body = `if (${target}.currentHp > 0) ${v} = healDamage(context.piece, ${target}, ${amount(node)}, context.battle, context.skill.id);`;
+          body = `if (${target2}.currentHp > 0) ${v} = healDamage(context.piece, ${target2}, ${amount(node)}, context.battle, context.skill.id);`;
           text = `\u4F7F${label(p.target)}\u6062\u590D${amountText(node)}\u751F\u547D`;
           break;
         case "status": {
           const rules = p.status === "divine-shield" ? ["rule-divine-shield"] : [];
-          body = `if (${target}.currentHp > 0) { addStatusEffectById(${target}.instanceId, { id: context.skill.id + ${literal(":" + node.id + ":")} + context.piece.instanceId, sourceId: context.piece.instanceId, type: ${literal(p.status)}, name: ${literal(names[String(p.status)])}, currentDuration: ${p.turns}, currentUses: -1, intensity: 1, stacks: 1, relatedRules: ${literal(rules)} }); ${rules.map((rule) => `addRuleById(${target}.instanceId, ${literal(rule)});`).join(" ")} }`;
+          body = `if (${target2}.currentHp > 0) { addStatusEffectById(${target2}.instanceId, { id: context.skill.id + ${literal(":" + node.id + ":")} + context.piece.instanceId, sourceId: context.piece.instanceId, type: ${literal(p.status)}, name: ${literal(names[String(p.status)])}, currentDuration: ${p.turns}, currentUses: -1, intensity: 1, stacks: 1, relatedRules: ${literal(rules)} }); ${rules.map((rule) => `addRuleById(${target2}.instanceId, ${literal(rule)});`).join(" ")} }`;
           text = `\u4F7F${label(p.target)}\u83B7\u5F97${names[String(p.status)]}${p.turns === -1 ? "" : "\uFF0C\u6301\u7EED" + p.turns + "\u56DE\u5408"}`;
           break;
         }
         case "teleport":
-          body = `if (${target}.currentHp > 0) { ${v} = teleport(${variable(p.cell)}.x, ${variable(p.cell)}.y, ${target}.instanceId); if (!${v}.success) return { success: false, message: '\u4F20\u9001\u843D\u70B9\u6216\u76EE\u6807\u5DF2\u5931\u6548' }; }`;
+          body = `if (${target2}.currentHp > 0) { ${v} = teleport(${variable(p.cell)}.x, ${variable(p.cell)}.y, ${target2}.instanceId); if (!${v}.success) return { success: false, message: '\u4F20\u9001\u843D\u70B9\u6216\u76EE\u6807\u5DF2\u5931\u6548' }; }`;
           text = `\u5C06${label(p.target)}\u4F20\u9001\u81F3${label(p.cell)}`;
           break;
         case "condition":
-          body = `_pc = ${p.test === "is-self" ? target + ".instanceId === context.piece.instanceId" : target + ".currentHp < " + target + ".maxHp * " + p.value + " / 100"} ? ${literal(node.yes)} : ${literal(node.no)};`;
+          body = `_pc = ${p.test === "is-self" ? target2 + ".instanceId === context.piece.instanceId" : target2 + ".currentHp < " + target2 + ".maxHp * " + p.value + " / 100"} ? ${literal(node.yes)} : ${literal(node.no)};`;
           text = p.test === "is-self" ? `${label(p.target)}\u662F\u672C\u68CB\u5B50` : `${label(p.target)}\u7684\u751F\u547D\u503C\u4F4E\u4E8E\u5176\u6700\u5927\u751F\u547D\u503C${p.value}%`;
           break;
         case "end":
@@ -231,7 +336,7 @@ var SkillGraphCore = (() => {
       }
       nodeDescriptions[node.id] = text;
       const trace = `_trace.push({ nodeId: ${literal(node.id)}, kind: ${literal(node.kind)}${node.kind === "damage" ? ", actualDamage: " + v + ".damage" : ""} });`;
-      cases.push(`case ${literal(node.id)}: ${body} ${node.kind === "end" ? "" : trace} ${node.kind === "condition" || node.kind === "end" ? "" : "_pc = " + literal(node.next) + ";"} break;`);
+      cases.push(`case ${literal(node.id)}: ${body} ${node.kind === "end" ? "" : trace} ${isCondition(node) || node.kind === "end" ? "" : "_pc = " + literal(node.next) + ";"} break;`);
     }
     let descriptionBudget = 0;
     function describe(id) {
@@ -239,12 +344,13 @@ var SkillGraphCore = (() => {
       const node = byId.get(id);
       if (node.kind === "end") return "";
       if (node.kind === "start") return describe(node.next);
-      if (node.kind === "condition") return `\u82E5${nodeDescriptions[id]}\uFF0C\u5219${describe(node.yes) || "\u7ED3\u675F\u6280\u80FD\u3002"}\u5426\u5219\uFF0C${describe(node.no) || "\u7ED3\u675F\u6280\u80FD\u3002"}`;
+      if (isCondition(node)) return `\u82E5${nodeDescriptions[id]}\uFF0C\u5219${describe(node.yes) || "\u7ED3\u675F\u6280\u80FD\u3002"}\u5426\u5219\uFF0C${describe(node.no) || "\u7ED3\u675F\u6280\u80FD\u3002"}`;
       return nodeDescriptions[id] + "\u3002" + describe(node.next);
     }
     const description = describe(graph.entry) || "\u4F7F\u7528\u540E\u7ED3\u675F\u6280\u80FD\u3002";
     const declarations = ordered.map((node) => variable(node.id)).join(", ");
-    const code = `function executeSkill(context) { var ${declarations}; var _trace = []; var _pc = ${literal(graph.entry)}; for (var _step = 0; _step < 64; _step++) { switch (_pc) { ${cases.join(" ")} default: throw new Error('\u65E0\u6548\u7684\u6280\u80FD\u56FE\u8282\u70B9'); } } throw new Error('\u6280\u80FD\u56FE\u8D85\u8FC7\u6267\u884C\u9884\u7B97'); }`;
+    const presentationGuard = ordered.some((n) => n.kind.startsWith("display-")) ? "if(typeof flow==='undefined'||!flow.presentation) throw new Error('\u5BA2\u6237\u7AEF\u4E0D\u652F\u6301\u6280\u80FD\u8868\u73B0\u63A5\u53E3\uFF0C\u8BF7\u66F4\u65B0\u5BA2\u6237\u7AEF'); " : "";
+    const code = `function executeSkill(context) { ${presentationGuard}var ${declarations}; var _trace = []; var _pc = ${literal(graph.entry)}; for (var _step = 0; _step < 64; _step++) { switch (_pc) { ${cases.join(" ")} default: throw new Error('\u65E0\u6548\u7684\u6280\u80FD\u56FE\u8282\u70B9'); } } throw new Error('\u6280\u80FD\u56FE\u8D85\u8FC7\u6267\u884C\u9884\u7B97'); }`;
     const previewCode = `function calculatePreview() { return { description: ${literal(description)}, expectedValues: {} }; }`;
     return { compilerVersion: COMPILER_VERSION, description, code, previewCode, targeting: { steps: targetingSteps }, requiresTarget: selections.length > 0, nodeDescriptions };
   }
