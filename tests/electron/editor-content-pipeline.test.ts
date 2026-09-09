@@ -87,7 +87,9 @@ describe('RED-118 packaged Editor content pipeline boundary', () => {
   it('uses content-author language for the default packaging flow', () => {
     const ui = source('electron-editor/ui/index.html')
 
-    expect(ui).toContain('通常只需要“生成资源包”')
+    expect(ui).toContain('打开版本与发布')
+    expect(ui).toContain('id="project-import"')
+    expect(ui).toContain('<details class="advanced-settings" id="technical-pipeline-tools">')
     expect(ui).toContain('完整资源包（推荐）')
     expect(ui).toContain('资源包名称')
     expect(ui).toContain('版本号')

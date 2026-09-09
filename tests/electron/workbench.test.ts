@@ -1,4 +1,4 @@
-import { mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync, symlinkSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync, symlinkSync, existsSync } from 'node:fs'
 import path from 'node:path'
 import { tmpdir } from 'node:os'
 import { afterEach, expect, it } from 'vitest'
@@ -135,4 +135,142 @@ it('rejects mismatched cached evidence and repairs it on a fresh check', () => {
   writeFileSync(report, JSON.stringify({ contentHash: state.contentHash, issues: 'invalid' }))
   expect(store.inspect(state.task.id).check).toBeNull()
   expect(store.check(state.task.id).check?.issues).toEqual([])
+})
+
+function selection(state: ReturnType<CreativeWorkbench['inspect']>, paths: string[]) {
+  return { paths, expectedHash: state.contentHash, expectedAcceptedHash: state.acceptedHash }
+}
+
+it('accepts an image independently, leaves skill drafts untouched, and reverts only the selected skill', () => {
+  const { root, skill, store } = fixture()
+  mkdirSync(path.join(root, 'images'))
+  const image = path.join(root, 'images/hero.png')
+  writeFileSync(image, 'old image')
+  const initial = store.create(input)
+  writeFileSync(image, 'new image'); writeFileSync(skill, '{"id":"drain","amount":9}')
+  const modified = store.inspect(initial.task.id)
+  const accepted = store.accept(initial.task.id, selection(modified, ['images/hero.png']))
+  expect(accepted.changes.map(change => change.path)).toEqual(['data/skills/drain.json'])
+  expect(accepted.versions[0].status).toBe('accepted')
+  expect(accepted.versions[0].published).toBe(false)
+  expect(readFileSync(skill, 'utf8')).toContain('9')
+  const reverted = store.revert(initial.task.id, selection(accepted, ['data/skills/drain.json']))
+  expect(reverted.changes).toEqual([])
+  expect(JSON.parse(readFileSync(skill, 'utf8')).amount).toBe(3)
+  expect(readFileSync(image, 'utf8')).toBe('new image')
+  expect(readdirSync(path.join(root, '.workbench/transactions'))).toHaveLength(1)
+})
+
+it('refuses accepting only a reference whose required new object was not selected', () => {
+  const { root, hero, store } = fixture()
+  const initial = store.create(input)
+  writeFileSync(hero, '{"id":"hero","skills":["new-skill"]}')
+  writeFileSync(path.join(root, 'data/skills/new-skill.json'), '{"id":"new-skill"}')
+  writeFileSync(path.join(root, 'data/skills/manifest.json'), '["drain","new-skill"]')
+  const current = store.inspect(initial.task.id)
+  expect(() => store.accept(initial.task.id, selection(current, ['data/pieces/hero.json']))).toThrow('一并选择依赖')
+  expect(store.inspect(initial.task.id).acceptedHash).toBe(initial.acceptedHash)
+  expect(store.accept(initial.task.id, selection(current, current.changes.map(change => change.path))).changes).toEqual([])
+})
+
+it('refuses stale accept/revert requests without touching newer external edits', () => {
+  const { store, skill } = fixture()
+  const initial = store.create(input)
+  writeFileSync(skill, '{"id":"drain","amount":7}')
+  const seen = store.inspect(initial.task.id)
+  writeFileSync(skill, '{"id":"drain","amount":10}')
+  for (const action of ['accept', 'revert'] as const) expect(() => store[action](initial.task.id, selection(seen, ['data/skills/drain.json']))).toThrow('内容或已接受版本已改变')
+  expect(JSON.parse(readFileSync(skill, 'utf8')).amount).toBe(10)
+})
+
+it('accepts one valid file while an unrelated draft remains invalid', () => {
+  const { store, skill, hero } = fixture()
+  const initial = store.create(input)
+  writeFileSync(skill, '{ invalid')
+  writeFileSync(hero, '{"id":"hero","skills":["drain"],"stats":{"maxHp":200}}')
+  const current = store.inspect(initial.task.id)
+  const result = store.accept(initial.task.id, selection(current, ['data/pieces/hero.json']))
+  expect(result.changes.map(change => change.path)).toEqual(['data/skills/drain.json'])
+  expect(readFileSync(skill, 'utf8')).toBe('{ invalid')
+})
+
+it('materializes accepted bytes instead of later draft edits and binds the requested identity', () => {
+  const { root, store, skill } = fixture()
+  const initial = store.create(input)
+  writeFileSync(skill, '{"id":"drain","amount":7}')
+  const current = store.inspect(initial.task.id)
+  const accepted = store.accept(initial.task.id, selection(current, ['data/skills/drain.json']))
+  writeFileSync(skill, '{"id":"drain","amount":20}')
+  const staged = store.materializeAccepted(initial.task.id, accepted.acceptedHash)
+  expect(JSON.parse(readFileSync(path.join(root, staged.source, 'data/skills/drain.json'), 'utf8')).amount).toBe(7)
+  expect(() => store.materializeAccepted(initial.task.id, initial.acceptedHash)).toThrow('已接受版本发生变化')
+})
+
+it('does not revert an accepted change when another task inspects the shared workspace', () => {
+  const { store, skill } = fixture()
+  const one = store.create(input)
+  const two = store.create({ ...input, title: '另一任务' })
+  writeFileSync(skill, '{"id":"drain","amount":7}')
+  const current = store.inspect(one.task.id)
+  store.accept(one.task.id, selection(current, ['data/skills/drain.json']))
+  expect(store.inspect(two.task.id).changes).toEqual([])
+  expect(() => store.accept(two.task.id, selection(current, ['data/skills/drain.json']))).toThrow('已接受版本已改变')
+})
+
+it('does not implicitly accept older drafts when a new task starts after external edits', () => {
+  const { store, root, skill } = fixture()
+  mkdirSync(path.join(root, 'images'))
+  writeFileSync(path.join(root, 'images/hero.png'), 'old')
+  const first = store.create(input)
+  writeFileSync(skill, '{"id":"drain","amount":100}')
+  const second = store.create({ ...input, title: '只换图片' })
+  writeFileSync(path.join(root, 'images/hero.png'), 'new')
+  const current = store.inspect(second.task.id)
+  expect(current.acceptedHash).toBe(first.acceptedHash)
+  const accepted = store.accept(second.task.id, selection(current, ['images/hero.png']))
+  const source = store.materializeAccepted(second.task.id, accepted.acceptedHash)
+  expect(JSON.parse(readFileSync(path.join(root, source.source, 'data/skills/drain.json'), 'utf8')).amount).toBe(3)
+  expect(accepted.changes.map(change => change.path)).toEqual(['data/skills/drain.json'])
+})
+
+it.each(['../main.ts', 'electron-client/main.ts', 'data/../main.ts', 'images/../../main.ts', 'data/x.js'])('rejects non-content selection %s', relative => {
+  const { store } = fixture()
+  const initial = store.create(input)
+  expect(() => store.accept(initial.task.id, selection(initial, [relative]))).toThrow()
+})
+
+it('keeps a new external file when restoring a deleted file would overwrite it', () => {
+  const { root, store, skill } = fixture()
+  const initial = store.create(input)
+  const moved = path.join(root, 'data/skills/moved.json')
+  writeFileSync(moved, '{"id":"moved"}')
+  // A stale request is refused before any delete/restore operation.
+  const current = store.inspect(initial.task.id)
+  writeFileSync(skill, '{"id":"drain","amount":99}')
+  expect(() => store.revert(initial.task.id, selection(current, ['data/skills/moved.json']))).toThrow('内容或已接受版本已改变')
+  expect(existsSync(moved)).toBe(true)
+})
+
+it('exports AI instructions prohibiting process and engine changes without binding to a provider', () => {
+  const { store, root } = fixture()
+  const state = store.create(input)
+  store.handoff(state.task.id)
+  const instructions = readFileSync(path.join(root, '.workbench/tasks', state.task.id, 'AI_TASK.md'), 'utf8')
+  expect(instructions).toContain('禁止修改游戏及编辑器主进程')
+  expect(instructions).toContain('本任务无需建立 Git 分支')
+  expect(instructions).toContain('不得自行接受或发布内容')
+})
+
+it('accepts a JSON change while an uppercase image extension remains in the baseline', () => {
+  const { root, store, skill } = fixture()
+  mkdirSync(path.join(root, 'images'))
+  writeFileSync(path.join(root, 'images/Hero.PNG'), 'image')
+  const initial = store.create(input)
+  writeFileSync(skill, '{"id":"drain","amount":4}')
+  const current = store.inspect(initial.task.id)
+  const accepted = store.accept(initial.task.id, selection(current, ['data/skills/drain.json']))
+  expect(store.materializeAccepted(initial.task.id, accepted.acceptedHash).snapshot['images/Hero.PNG']).toBeTruthy()
+  writeFileSync(path.join(root, 'images/Hero.PNG'), 'new image')
+  const imageChange = store.inspect(initial.task.id)
+  expect(store.accept(initial.task.id, selection(imageChange, ['images/Hero.PNG'])).changes).toEqual([])
 })

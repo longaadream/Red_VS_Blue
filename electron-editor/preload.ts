@@ -7,6 +7,19 @@ contextBridge.exposeInMainWorld('editorAPI', {
   workbenchList: () => ipcRenderer.invoke('workbench-list'),
   workbenchCreate: (input: unknown) => ipcRenderer.invoke('workbench-create', input),
   workbenchInspect: (id: string) => ipcRenderer.invoke('workbench-inspect', id),
+  workbenchAccept: (id: string, input: unknown) => ipcRenderer.invoke('workbench-accept', id, input),
+  workbenchRevert: (id: string, input: unknown) => ipcRenderer.invoke('workbench-revert', id, input),
+  workbenchImage: (id: string, relative: string, side: 'before' | 'after', hash: string, acceptedHash: string) => ipcRenderer.invoke('workbench-image', id, relative, side, hash, acceptedHash),
+  workbenchExport: (id: string, hash: string, notes: string) => ipcRenderer.invoke('workbench-export', id, hash, notes),
+  workbenchPublish: (id: string, hash: string, notes: string) => ipcRenderer.invoke('workbench-publish', id, hash, notes),
+  publicationSettings: () => ipcRenderer.invoke('publication-settings'),
+  publicationSaveSettings: (input: unknown) => ipcRenderer.invoke('publication-save-settings', input),
+  publicationChooseKey: () => ipcRenderer.invoke('publication-choose-key'),
+  onPublicationProgress: (callback: (value: { taskId: string; stage: string }) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, value: { taskId: string; stage: string }) => callback(value)
+    ipcRenderer.on('publication-progress', listener)
+    return () => ipcRenderer.removeListener('publication-progress', listener)
+  },
   workbenchCheck: (id: string) => ipcRenderer.invoke('workbench-check', id),
   workbenchFeedback: (id: string, input: unknown) => ipcRenderer.invoke('workbench-feedback', id, input),
   workbenchScenario: (id: string, input: unknown) => ipcRenderer.invoke('workbench-scenario', id, input),
@@ -14,6 +27,7 @@ contextBridge.exposeInMainWorld('editorAPI', {
   workbenchHandoff: (id: string) => ipcRenderer.invoke('workbench-handoff', id),
   projectInfo: () => ipcRenderer.invoke('project-info'),
   revealProject: () => ipcRenderer.invoke('project-reveal'),
+  importProject: () => ipcRenderer.invoke('project-import'),
   selectProject: (mode: 'open' | 'official' | 'blank') => ipcRenderer.invoke('project-select', mode),
   readDocument: (subdir: string, filename: string) => ipcRenderer.invoke('read-document', subdir, filename),
   writeDocument: (subdir: string, filename: string, data: unknown, revision: string) => ipcRenderer.invoke('write-document', subdir, filename, data, revision),

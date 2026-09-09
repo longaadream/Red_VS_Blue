@@ -7,6 +7,7 @@
   const format = value => value === null ? '—' : typeof value === 'object' ? JSON.stringify(value, null, 2) : String(value)
   const fieldLabel = field => ({ name:'名称', description:'描述', 'stats.maxHp':'最大生命', 'stats.attack':'攻击力', 'stats.defense':'防御力', 'stats.moveRange':'移动范围', skills:'关联技能', rules:'关联规则', keywords:'机制关键词', effectTags:'效果分类', code:'技能逻辑', previewCode:'预览逻辑' })[field] || field
   let tasks = [], state = null, section = 'changes', busy = false, status = '', feedbackDraft = ''
+  let selected = new Set(), polling = false, generation = 0, releaseDraft = ''
   const scenarioDraft = { setup:'', action:'', expected:'' }
   const hasDrafts = () => Boolean(feedbackDraft || Object.values(scenarioDraft).some(Boolean))
   const discardDrafts = () => !hasDrafts() || window.confirm('当前反馈或场景尚未保存。继续会丢弃这些草稿，是否继续？')
@@ -26,17 +27,19 @@
     return `<div class="wb-metrics">
       <div class="wb-metric"><strong>${state.changes.length}</strong><span>实际变更文件</span></div>
       <div class="wb-metric"><strong>${state.check ? state.check.issues.filter(issue => issue.severity === 'error').length : '—'}</strong><span>当前检查错误</span></div>
-      <div class="wb-metric"><strong>${state.versions.length}</strong><span>保留的候选快照</span></div>
+      <div class="wb-metric"><strong>${state.versions.filter(version => version.status === 'accepted').length}</strong><span>已接受的本地版本</span></div>
     </div>${issues()}
+    ${state.changes.length ? `<div class="wb-selection"><label><input type="checkbox" data-select-all ${selected.size === state.changes.length ? 'checked' : ''}/> 全选修改</label><span>已选择 ${selected.size} 项</span><button class="btn btn-primary" data-wb="accept" ${busy || !selected.size ? 'disabled' : ''}>接受选中修改</button><button class="btn btn-ghost" data-wb="revert" ${busy || !selected.size ? 'disabled' : ''}>撤销选中修改</button></div><p class="wb-copy">按内容文件分别处理；未选中的修改继续保留。接受时检查关联依赖，不会发布。</p>` : ''}
     ${state.changes.length ? state.changes.map(change => `<article class="wb-card">
-      <div class="wb-card-header"><div><h3>${escape(change.name)}</h3><div class="wb-path">${escape(change.path)}</div></div><span class="wb-tag">${({ added:'新增', modified:'修改', deleted:'删除' })[change.kind]}</span></div>
+      <div class="wb-card-header"><label class="wb-choice"><input type="checkbox" data-select-path="${escape(change.path)}" ${selected.has(change.path) ? 'checked' : ''}/><span><strong>${escape(change.name)}</strong><span class="wb-path">${escape(change.path)}</span></span></label><span class="wb-tag">${({ added:'新增', modified:'修改', deleted:'删除' })[change.kind]}</span></div>
+      ${change.path.startsWith('images/') ? `<div class="wb-image-pair" data-image-path="${escape(change.path)}"><figure><figcaption>修改前 · ${change.beforeBytes || 0} 字节</figcaption><div data-image-before>加载预览…</div></figure><figure><figcaption>现在 · ${change.afterBytes || 0} 字节</figcaption><div data-image-after>加载预览…</div></figure></div>` : ''}
       ${change.fields.length ? `<table class="wb-fields"><thead><tr><th>变化项</th><th>修改前</th><th>现在</th></tr></thead><tbody>${change.fields.map(field => `<tr><td title="${escape(field.field)}">${escape(fieldLabel(field.field))}</td><td class="wb-before"><pre class="wb-code">${escape(format(field.before))}</pre></td><td class="wb-after"><pre class="wb-code">${escape(format(field.after))}</pre></td></tr>`).join('')}</tbody></table>` : '<p class="wb-copy">文件字节发生变化。图片或无法解析的 JSON 请在对应资源工具查看。</p>'}
       ${change.fieldsTruncated ? '<div class="wb-note wb-warning">变化超过 200 项，此处仅显示前 200 项，请结合源码检查完整改动。</div>' : ''}
       ${change.affected.length ? `<details style="margin-top:12px"><summary class="wb-copy">${change.affected.length} 个内容文件提及该 ID，需要留意影响</summary><div class="wb-path">${change.affected.map(escape).join('<br/>')}</div></details>` : ''}
-    </article>`).join('') : '<div class="wb-card"><h3>先把需求交给 AI</h3><p class="wb-copy">任务已保留修改前的基准。AI 改完内容后，点击“接收 AI 改动”，这里会显示实际差异。</p></div>'}`
+    </article>`).join('') : '<div class="wb-card"><h3>没有待接受的修改</h3><p class="wb-copy">让你使用的 AI 修改内容文件夹，变化会自动出现在这里。已接受版本可以在“版本与发布”中查看。</p></div>'}`
   }
   function tests() {
-    return `<div class="wb-note wb-warning"><strong>实战试验场尚未接通</strong><br/>目前可以保存复现场景并交给 AI，但不会执行外部技能代码，也不会生成“实战通过”记录。结构检查不代表玩法验证。</div>
+    return `<div class="wb-card"><h3>训练营试玩</h3><p class="wb-copy">加载候选资源后，进入训练营自行配置场景。</p><div class="wb-actions"><button class="btn btn-primary" disabled aria-describedby="training-gap">打开训练营</button></div><p id="training-gap" class="wb-copy">当前客户端缺少编辑器候选交接接口，暂不能一键加载。本次不修改客户端主进程或引擎，因此不会用旧内容冒充候选。下方可以保存尚未执行的场景和反馈。</p></div>
       <div class="wb-card"><h3>把想验证的玩法留下来</h3><p class="wb-copy">场景条件、操作和预期会随反馈交给 AI，后续无需重新描述。</p>
       <form class="wb-form" id="wb-scenario-form" style="margin-top:16px">
         <label>场景条件<textarea name="setup" required maxlength="12000" placeholder="例如：战士 40/100 血量，敌人相邻且没有护盾">${escape(scenarioDraft.setup)}</textarea></label>
@@ -49,24 +52,41 @@
       ${state.feedback.map(item => `<div class="wb-card"><p class="wb-copy">${escape(item.message)}</p><div class="wb-version">人工反馈 · ${date(item.createdAt)} · ${escape(item.contentHash)}</div></div>`).join('')}`
   }
   function versions() {
-    return `<div class="wb-card"><h3>保留当前候选</h3><p class="wb-copy">保存完整内容快照和对应检查结果，之后的 AI 修改不会改变这份快照。当前尚未完成实战验证，保存不会发布，也不会更新玩家客户端。</p><div class="wb-actions"><button class="btn btn-primary" data-wb="keep" ${busy || !state.check || state.check.issues.some(issue => issue.severity === 'error') ? 'disabled' : ''}>保留候选快照</button></div></div>
-      ${state.versions.map((version, index) => `<div class="wb-card"><div class="wb-card-header"><h3>候选 ${state.versions.length - index}</h3><span class="wb-tag">未发布 · 未实战验证</span></div><p class="wb-copy">${date(version.createdAt)} · ${Object.keys(version.snapshot || {}).length} 个内容文件</p><div class="wb-version">${escape(version.contentHash)}</div></div>`).join('')}`
+    return `<div class="wb-card"><h3>发布测试更新</h3><p class="wb-copy">发布最近一次已接受的内容。工作区里尚未接受的改动不会被打包。</p><label class="wb-form">更新说明<textarea id="wb-release-notes" maxlength="4000" placeholder="填写这次希望玩家关注的变化">${escape(releaseDraft)}</textarea></label><div class="wb-actions"><button class="btn btn-primary" data-wb="publish" ${busy || !state.acceptedVersionId ? 'disabled' : ''}>发布测试更新</button><button class="btn btn-ghost" data-wb="export" ${busy || !state.acceptedVersionId ? 'disabled' : ''}>导出本地资源包</button><button class="btn btn-ghost" data-wb="settings" ${busy ? 'disabled' : ''}>发布设置</button></div><p class="wb-copy">本地导出不等于发布。正式分发仍需签名及兼容性校验；首次发布需配置仓库与凭据。</p></div>
+      ${state.versions.map((version, index) => `<div class="wb-card"><div class="wb-card-header"><h3>${version.status === 'accepted' ? '已接受版本' : '候选快照'} ${state.versions.length - index}</h3><span class="wb-tag">本地保存 · 不代表已发布</span></div><p class="wb-copy">${date(version.createdAt)} · ${Object.keys(version.snapshot || {}).length} 个内容文件</p><div class="wb-version">${escape(version.contentHash)}</div></div>`).join('')}`
   }
   function render() {
     root.innerHTML = `<div class="wb-shell"><aside class="wb-rail"><div class="wb-kicker">HUMAN + AI</div><h2>创作任务</h2><p class="wb-copy">从一个玩法想法开始，\n把修改和验证留在一起。</p><button class="btn btn-primary wb-new" data-wb="new" ${busy ? 'disabled' : ''}>＋ 新的创作任务</button>${tasks.map(task => `<button class="wb-task ${current() === task.id ? 'active' : ''}" data-task="${task.id}" ${busy ? 'disabled' : ''}><strong>${escape(task.title)}</strong><span>${date(task.createdAt)}</span></button>`).join('')}</aside>
     <main class="wb-main"><div class="wb-status" role="status" aria-live="polite">${escape(status)}</div>${state ? `
       <div class="wb-topline"><div><div class="wb-kicker">当前创作任务</div><h2>${escape(state.task.title)}</h2></div><span class="wb-tag">${checkLabel()}</span></div>
       <p class="wb-copy">${escape(state.task.brief)}</p><details style="margin-top:12px"><summary class="wb-copy">验收条件与任务交接位置</summary><p class="wb-copy" style="margin-top:10px">${escape(state.task.criteria)}</p><div class="wb-path">${escape(state.handoffPath)}</div></details>
-      <div class="wb-actions"><button class="btn btn-primary" data-wb="handoff" ${busy ? 'disabled' : ''}>复制任务入口，交给 AI</button><button class="btn btn-ghost" data-wb="refresh" ${busy ? 'disabled' : ''}>接收 AI 改动</button><button class="btn btn-ghost" data-wb="check" ${busy ? 'disabled' : ''}>检查内容</button></div>
-      <nav class="wb-sections" aria-label="任务流程">${[['changes','01 看懂变化'], ['tests','02 场景与反馈'], ['versions','03 保留版本']].map(([key, label]) => `<button class="wb-section ${section === key ? 'active' : ''}" data-section="${key}">${label}</button>`).join('')}</nav>
+      <div class="wb-actions"><button class="btn btn-primary" data-wb="handoff" ${busy ? 'disabled' : ''}>复制任务入口，交给 AI</button><button class="btn btn-ghost" data-wb="refresh" ${busy ? 'disabled' : ''}>立即刷新</button><button class="btn btn-ghost" data-wb="check" ${busy ? 'disabled' : ''}>检查内容</button><span class="wb-copy">自动检测外部修改</span></div>
+      <nav class="wb-sections" aria-label="任务流程">${[['changes','01 待接受修改'], ['tests','02 训练营与反馈'], ['versions','03 版本与发布']].map(([key, label]) => `<button class="wb-section ${section === key ? 'active' : ''}" data-section="${key}">${label}</button>`).join('')}</nav>
       ${section === 'changes' ? changes() : section === 'tests' ? tests() : versions()}
     ` : `<div class="wb-empty"><div class="wb-kicker">让一个想法，变成可以验证的内容</div><h2>这次想做什么？</h2><p>新增一个角色，调整一个技能，或者改进一段 PVE。建立任务后，让你现有的 AI 实现，在这里查看真实变化、整理验证场景和反馈。</p><div class="wb-flow"><div><strong>你定义玩法，AI 负责实现</strong><p class="wb-copy">需求和验收条件随任务保留，不必在聊天与文件之间反复搬运。</p></div><div><strong>以实际改动和证据判断结果</strong><p class="wb-copy">文件比较、引用检查与版本记录由程序生成，AI 的完成说明不代替验证。</p></div></div><button class="btn btn-primary" data-wb="new" ${busy ? 'disabled' : ''}>开始一个创作任务</button></div>`}</main></div>`
     root.querySelectorAll('input, textarea, select').forEach(input => { input.disabled = busy })
+    void loadImages(++generation)
+  }
+  async function loadImages(version) {
+    if (!state || !api.workbenchImage || busy) return
+    const id = current(), hash = state.contentHash, acceptedHash = state.acceptedHash
+    for (const pair of root.querySelectorAll('[data-image-path]')) {
+      for (const side of ['before', 'after']) {
+        try {
+          const data = await api.workbenchImage(id, pair.dataset.imagePath, side, hash, acceptedHash)
+          if (generation !== version) return
+          const container = pair.querySelector('[data-image-' + side + ']')
+          container.textContent = data ? '' : '无图片或超出内嵌预览范围'
+          if (data) { const image = new Image(); image.src = data; image.alt = side === 'before' ? '修改前图片' : '修改后图片'; container.append(image) }
+        } catch { if (generation === version) pair.querySelector('[data-image-' + side + ']').textContent = '内容已变化，请等待刷新' }
+      }
+    }
   }
   async function run(operation, success = '') {
     if (busy) return
+    generation++
     busy = true; status = '正在处理…'; render()
-    try { await operation(); status = success }
+    try { await operation(); if (success) status = success; else if (status === '正在处理…') status = '' }
     catch (error) { status = errorMessage(error) }
     finally { busy = false; render() }
   }
@@ -89,8 +109,17 @@
     dialog.showModal()
   }
   root.addEventListener('input', event => {
+    if (event.target.id === 'wb-release-notes') releaseDraft = event.target.value
     if (event.target.closest('#wb-feedback-form')) feedbackDraft = event.target.value
     if (event.target.closest('#wb-scenario-form')) scenarioDraft[event.target.name] = event.target.value
+  })
+  root.addEventListener('change', event => {
+    if (event.target.hasAttribute('data-select-path')) {
+      const file = event.target.dataset.selectPath
+      if (event.target.checked) selected.add(file); else selected.delete(file)
+      render()
+    }
+    if (event.target.hasAttribute('data-select-all')) { selected = new Set(event.target.checked ? state.changes.map(change => change.path) : []); render() }
   })
   root.addEventListener('submit', event => {
     event.preventDefault()
@@ -103,8 +132,19 @@
     const button = event.target.closest('button')
     if (!button || button.disabled || busy) return
     if (button.dataset.section) { section = button.dataset.section; render(); return }
-    if (button.dataset.task) { if (!discardDrafts()) return; void run(async () => { state = await api.workbenchInspect(button.dataset.task); feedbackDraft = ''; Object.keys(scenarioDraft).forEach(key => { scenarioDraft[key] = '' }) }); return }
+    if (button.dataset.task) { if (!discardDrafts()) return; void run(async () => { state = await api.workbenchInspect(button.dataset.task); selected.clear(); feedbackDraft = ''; Object.keys(scenarioDraft).forEach(key => { scenarioDraft[key] = '' }) }); return }
     switch (button.dataset.wb) {
+      case 'accept':
+      case 'revert': {
+        const action = button.dataset.wb
+        if (action === 'revert' && !window.confirm(`撤销选中的 ${selected.size} 个内容文件，恢复到已接受版本？未选中的改动保留。`)) return
+        const input = { paths: [...selected], expectedHash: state.contentHash, expectedAcceptedHash: state.acceptedHash }
+        void run(async () => { state = await api[action === 'accept' ? 'workbenchAccept' : 'workbenchRevert'](current(), input); selected.clear() }, action === 'accept' ? '已接受选中修改并保存本地版本；没有发布。' : '选中修改已撤销，原文件保留在恢复记录中。')
+        break
+      }
+      case 'export': void run(async () => { const result = await api.workbenchExport(current(), state.acceptedHash, releaseDraft); status = result.path }, ''); break
+      case 'publish': void run(() => window.openContentPublication(api, { id: current(), acceptedHash: state.acceptedHash, notes: releaseDraft.trim() || state.task.title, pendingCount: state.changes.length })); break
+      case 'settings': void run(() => window.openPublicationSettings(api)); break
       case 'new': createDialog(); break
       case 'refresh': void run(async () => { state = await api.workbenchInspect(current()) }, '已读取实际内容变化。'); break
       case 'check': void run(async () => { state = await api.workbenchCheck(current()) }, '结构与引用检查完成；实战验证独立记录。'); break
@@ -113,5 +153,24 @@
     }
   })
   render()
+  document.getElementById('open-resource-publication').onclick = () => {
+    document.querySelector('[data-tab="workbench"]').click()
+    if (!root.classList.contains('active')) return
+    section = 'versions'; render()
+  }
   void run(async () => { tasks = await api.workbenchList(); if (tasks.length) state = await api.workbenchInspect(tasks[0].id) })
+  async function poll() {
+    if (busy || polling || !state || document.hidden || !root.classList.contains('active') || document.querySelector('dialog[open]') || hasDrafts() || root.contains(document.activeElement) && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) return
+    polling = true
+    const id = current(), hash = state.contentHash, acceptedHash = state.acceptedHash, observedGeneration = generation
+    try {
+      const next = await api.workbenchInspect(id)
+      if (!busy && generation === observedGeneration && id === current() && (next.contentHash !== hash || next.acceptedHash !== acceptedHash)) {
+        state = next; selected.clear(); status = '发现外部修改，差异已更新。原有检查仅适用于对应内容版本。'; render()
+      }
+    } catch (error) { if (!busy && id === current()) { status = errorMessage(error); const label = root.querySelector('[role="status"]'); if (label) label.textContent = status } }
+    finally { polling = false }
+  }
+  setInterval(() => void poll(), 4000)
+  window.addEventListener('focus', () => void poll())
 })()

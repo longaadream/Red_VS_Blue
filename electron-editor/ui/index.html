@@ -80,7 +80,8 @@ dialog{width:min(430px,calc(100vw - 32px));margin:auto;background:var(--surface)
 <header id="header">
   <div class="workspace-meta"><h1 id="section-title">创作工作台</h1><span id="data-root-label">content-authoring/data</span></div>
   <div style="display:flex;gap:6px;flex-wrap:wrap">
-    <button class="btn btn-primary" data-project="official">复制官方内容</button>
+    <button class="btn btn-primary" id="project-import">导入资源包</button>
+    <button class="btn btn-ghost" data-project="official">复制官方内容</button>
     <button class="btn btn-ghost" data-project="blank">空白项目</button>
     <button class="btn btn-ghost" data-project="open">打开项目</button>
     <button class="btn btn-ghost" id="project-reveal">文件夹</button>
@@ -179,8 +180,15 @@ dialog{width:min(430px,calc(100vw - 32px));margin:auto;background:var(--surface)
   <div class="tab-panel" id="tab-build">
     <div class="build-panel">
       <div class="build-card">
+        <h3>资源版本与发布</h3>
+        <p class="pipeline-intro">先在工作台接受想保留的修改，再发布这个固定版本。日常不需要填写包 ID、签名参数或补丁操作。</p>
+        <div class="action-row"><button class="btn btn-primary" id="open-resource-publication">打开版本与发布</button></div>
+      </div>
+      <details class="advanced-settings" id="technical-pipeline-tools">
+        <summary>高级资源工具 · 手动构建、签名与诊断</summary>
+      <div class="build-card">
         <h3>导出与检查</h3>
-        <p class="pipeline-intro">通常只需要“生成资源包”：系统会把当前 JSON、PVE 内容与贴图整理到一个文件中。其余工具用于正式发布或排查问题。</p>
+        <p class="pipeline-intro">这些工具直接处理工作区，供开发诊断使用。构建或签名成功不表示已经上传发布；日常请使用上方的“版本与发布”。</p>
         <div class="operation-nav" role="tablist" aria-label="资源包操作">
           <button type="button" class="operation-tab active" data-pipeline-operation="build" role="tab" aria-selected="true" aria-controls="pipeline-form-build">生成资源包</button>
           <button type="button" class="operation-tab" data-pipeline-operation="sign" role="tab" aria-selected="false" aria-controls="pipeline-form-sign">添加签名</button>
@@ -303,6 +311,7 @@ dialog{width:min(430px,calc(100vw - 32px));margin:auto;background:var(--surface)
         </div>
         <div class="console" id="build-console" role="log" aria-live="polite" aria-relevant="additions"><span class="console-line" style="color:#3f3f46">选择一项操作，结果会显示在这里。</span></div>
       </div>
+      </details>
     </div>
   </div>
 
@@ -337,6 +346,14 @@ document.querySelectorAll('[data-project]').forEach(button => button.onclick = a
   } catch (error) { toast('打开项目失败：' + error.message, 'error') }
 })
 document.getElementById('project-refresh').onclick = () => { if (confirmDiscard()) window.location.reload() }
+document.getElementById('project-import').onclick = async function () {
+  if (!confirmDiscard()) return
+  this.disabled = true
+  this.textContent = '选择并校验原包…'
+  try { const result = await api.importProject(); if (!result.canceled) window.location.reload() }
+  catch (error) { window.alert('资源包导入失败：' + error.message) }
+  finally { this.disabled = false; this.textContent = '导入资源包' }
+}
 document.getElementById('project-reveal').onclick = async () => {
   try { const error = await api.revealProject(); if (error) toast(error, 'error') }
   catch (error) { toast(error.message, 'error') }
@@ -940,6 +957,7 @@ initializeAssets().catch(error => toast('图片资源加载失败：' + error.me
   }))
 })()
 </script>
+<script src="publication.js"></script>
 <script src="workbench.js"></script>
 </body>
 </html>
