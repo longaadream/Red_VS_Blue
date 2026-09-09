@@ -56,6 +56,7 @@ export function assignNextSeat(
 
 export interface Player {
   id: string
+  teamSlot?: number
   accountId?: string
   name: string
   joinedAt?: number
@@ -99,7 +100,9 @@ export interface GameRecord {
 
 /** Transport-neutral rule state shared by Colyseus and deterministic tests. */
 export interface Room {
+  officialRanked?: boolean
   id: string
+  mode?: '1v1' | '2v2'
   name: string
   status: RoomStatus
   players: Player[]
@@ -114,6 +117,7 @@ export interface Room {
   createdAt?: number
   visibility?: 'private' | 'public'
   inviteCode?: string
+  spectatingEnabled?: boolean
   version?: number
   battleAuthorityVersion?: number
   battleAuthorityTransitionHash?: string

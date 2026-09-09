@@ -154,7 +154,7 @@
     return {
       id: id,
       name: String(player.name || id),
-      faction: ownedPiece ? ownedPiece.faction : 'red',
+      faction: player.teamId || (ownedPiece ? ownedPiece.faction : 'red'),
       isCurrent: id.toLowerCase() === String(currentPlayerId || '').toLowerCase(),
       resources: {
         action: numberOr(player.actionPoints, 0),

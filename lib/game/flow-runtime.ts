@@ -4,6 +4,7 @@ import type { BattleState } from './turn'
 import { changePiecePositions } from './position-change'
 import { traceProjectile, manhattanDistance } from './spatial'
 import { getRuleMath } from './rule-runtime'
+import { areMatchAllies } from './match-teams'
 export type FlowSurface = 'skill' | 'rule' | 'triggerSkill' | 'pending'
 type Delegate = Record<string, (...args: any[]) => any>
 /** Called at formal removal; revival creates a new incarnation. */
@@ -90,7 +91,7 @@ export function createFlowRuntime(battle: BattleState, context: any, surface: Fl
         if (options.relation && !owner) throw new Error('flow: 敌我查询缺少所属玩家')
         return battle.pieces.filter(p => (options.includeDead || p.currentHp > 0)
           && (!options.ownerId || options.relation || p.ownerPlayerId === options.ownerId)
-          && (!options.relation || (options.relation === 'ally' ? p.ownerPlayerId === owner : p.ownerPlayerId !== owner))
+          && (!options.relation || (options.relation === 'ally' ? areMatchAllies(battle, p.ownerPlayerId, owner) : !areMatchAllies(battle, p.ownerPlayerId, owner)))
           && (options.range === undefined || (p.x != null && p.y != null && origin!.x != null && origin!.y != null && manhattanDistance(p as any, origin as any) <= options.range)))
           .map(p => p.instanceId)
       },

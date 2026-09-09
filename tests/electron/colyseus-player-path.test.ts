@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 
 import { describe, expect, it } from 'vitest'
+import { BATTLE_RUNNER_REVISION_V1 } from '@/lib/game/rule-version'
 
 const ROOT = process.cwd()
 const PLAYER_PAGES = ['index.html', 'lobby.html', 'room.html', 'piece-selection.html', 'battle.html']
@@ -171,7 +172,7 @@ describe('RED-161 default player transport', () => {
     expect(stopHandler).toContain('killProcessTree(profileProc)')
     expect(stopHandler).not.toContain('stopChildProcessGracefully(profileProc')
     expect(runner.indexOf('await journal.close()')).toBeLessThan(runner.indexOf('await server.gracefullyShutdown(false)'))
-    expect(runner.indexOf('await server.gracefullyShutdown(false)')).toBeLessThan(runner.indexOf('ok: true'))
+    expect(runner.indexOf('await server.gracefullyShutdown(false)')).toBeLessThan(runner.indexOf('ok: true', runner.indexOf('async function shutdown')))
   })
 
   it('publishes the recovered local Profile identity through trusted Electron IPC', async () => {
@@ -183,7 +184,9 @@ describe('RED-161 default player transport', () => {
     expect(main).toContain('localAuthorityProfileIdentity,')
     expect(main).toContain('await fetchAuthorityProfileIdentity(actualGamePort)')
     expect(main).toContain('refreshLocalProfileIdentity(targetProfileHash)')
-    expect(main).toContain("runnerRevision: 'rvb-battle-runner/v1'")
+    expect(main).toContain(`const DESKTOP_BATTLE_RUNNER_REVISION = '${BATTLE_RUNNER_REVISION_V1}' as const`)
+    expect(main).toContain('runnerRevision: DESKTOP_BATTLE_RUNNER_REVISION,')
+    expect(main).toContain('identity.runnerRevision !== DESKTOP_BATTLE_RUNNER_REVISION')
     for (const source of [index, lobby]) {
       const start = source.indexOf('async function getLocalGameProfileIdentity')
       const end = source.indexOf(

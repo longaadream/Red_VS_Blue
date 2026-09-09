@@ -197,7 +197,7 @@ const analyzeMap = (config: AsciiMapConfig) => {
 }
 
 describe('RED-119 selectable map catalog', () => {
-  it('retires large-battlefield and catalogs exactly four authoritative map files', () => {
+  it('retires large-battlefield and catalogs four duel maps plus the dedicated team map', () => {
     const manifest = JSON.parse(
       readFileSync(resolve(mapsDirectory, 'manifest.json'), 'utf8'),
     ) as string[]
@@ -209,6 +209,7 @@ describe('RED-119 selectable map catalog', () => {
     expect(manifest).toEqual([
       'large-trap-arena',
       ...newMaps.map(map => map.filename),
+      'twin-fronts',
     ])
     expect([...manifest].sort()).toEqual(mapFiles)
     expect(mapFiles).not.toContain('large-battlefield')
@@ -312,6 +313,7 @@ describe('RED-119 selectable map catalog', () => {
     expect(repositoryIds).toEqual(new Set([
       'large-hole-arena',
       ...newMaps.map(map => map.id),
+      'twin-fronts',
     ]))
     expect(apiIds).toEqual(repositoryIds)
   })
@@ -325,7 +327,7 @@ describe('RED-119 selectable map catalog', () => {
     expect(lobby).toMatch(/<button[^>]*id="createRoomBtn"[^>]*disabled/)
     expect(lobby).not.toContain('DEMO_MAP_ID')
     expect(lobby).not.toContain('DEMO_MAP_FILENAME')
-    expect(loadMapsBlock).toContain("lobbyRequest('catalog.maps')")
+    expect(loadMapsBlock).toContain("lobbyRequest('catalog.maps', { mode: document.getElementById('matchMode').value })")
     expect(loadMapsBlock).not.toContain('/api/maps')
     expect(loadMapsBlock).toContain('sel.disabled = false')
     expect(lobby).toContain("const DEFAULT_SELECTED_MAP_ID = 'large-hole-arena'")

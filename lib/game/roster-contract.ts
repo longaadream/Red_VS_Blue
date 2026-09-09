@@ -220,7 +220,8 @@ export interface DemoRosterReadiness {
 }
 
 export function getDemoRosterReadiness(room: Room): DemoRosterReadiness {
-  const players = room.players.slice(0, 2)
+  const capacity = room.mode === '2v2' ? 4 : 2
+  const players = room.players
   const lockedPlayerIds: string[] = []
   const invalidPlayerIds: string[] = []
 
@@ -235,7 +236,7 @@ export function getDemoRosterReadiness(room: Room): DemoRosterReadiness {
   }
 
   return {
-    ready: players.length === 2 && lockedPlayerIds.length === 2 && invalidPlayerIds.length === 0,
+    ready: players.length === capacity && lockedPlayerIds.length === capacity && invalidPlayerIds.length === 0,
     lockedPlayerIds,
     invalidPlayerIds,
   }
@@ -245,7 +246,7 @@ export function assertDemoRostersReady(room: Room): void {
   const readiness = getDemoRosterReadiness(room)
   if (!readiness.ready) {
     throw new RosterContractError('ROSTER_NOT_ALL_LOCKED', {
-      playerIds: room.players.slice(0, 2).map(player => player.id),
+      playerIds: room.players.map(player => player.id),
       lockedPlayerIds: readiness.lockedPlayerIds,
       invalidPlayerIds: readiness.invalidPlayerIds,
     })

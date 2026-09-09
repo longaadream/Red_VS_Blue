@@ -133,13 +133,13 @@ export const systemAuthoritativeRuleClock: AuthoritativeRuleClock = {
   },
 }
 
-export function getFullRoundNumber(turnNumber: number): number {
+export function getFullRoundNumber(turnNumber: number, playerCount = 2): number {
   const normalized = Number.isSafeInteger(turnNumber) ? Math.max(1, turnNumber) : 1
-  return Math.floor((normalized - 1) / 2) + 1
+  return Math.floor((normalized - 1) / Math.max(2, playerCount)) + 1
 }
 
-export function getNormalTurnDurationMs(turnNumber: number): number {
-  const fullRound = getFullRoundNumber(turnNumber)
+export function getNormalTurnDurationMs(turnNumber: number, playerCount = 2): number {
+  const fullRound = getFullRoundNumber(turnNumber, playerCount)
   if (fullRound <= 2) return 90_000
   if (fullRound <= 4) return 120_000
   if (fullRound <= 6) return 150_000
@@ -192,7 +192,7 @@ export function createRunningTurnTimer(
     turnOwnerPlayerId,
     inputOwnerPlayerId,
     turnNumber: effectiveTurn.turnNumber,
-    fullRound: getFullRoundNumber(effectiveTurn.turnNumber),
+    fullRound: getFullRoundNumber(effectiveTurn.turnNumber, state.players.length),
     durationMs,
     remainingMs: durationMs,
     startedAt: now,
@@ -591,7 +591,7 @@ function createInputWindow(
   const effectiveTurn = getEffectiveTurn(state)
   const isTurnOwner = normalizePlayerId(ownerPlayerId) === normalizePlayerId(effectiveTurn.currentPlayerId)
   const fast = isTurnOwner && (streaks[ownerPlayerId] ?? 0) > 0
-  const durationMs = fast ? TURN_FAST_DURATION_MS : getNormalTurnDurationMs(effectiveTurn.turnNumber)
+  const durationMs = fast ? TURN_FAST_DURATION_MS : getNormalTurnDurationMs(effectiveTurn.turnNumber, state.players.length)
   return {
     durationMs,
     remainingMs: durationMs,

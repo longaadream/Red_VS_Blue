@@ -13,6 +13,8 @@
   <script src="js/colyseus-sdk.js"></script>
   <script src="js/colyseus-client.js"></script>
   <script src="js/deck-presets.js"></script>
+  <script src="js/ranked-session.js"></script>
+  <link rel="stylesheet" href="css/tabletop/ranked-match.css" />
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
     body {
@@ -362,6 +364,7 @@
   <script>
     // Back navigation: return to the room while preserving server params.
     function goBackToLobby() {
+      if (params.get('ranked') === '1' && window.RvBRankedSelection) { void window.RvBRankedSelection.viewMap(); return }
       if (deckBuilderMode) { window.location.href = 'index.html'; return }
       if (pollTimer) { clearInterval(pollTimer); pollTimer = null }
       const sp = new URLSearchParams(location.search)
@@ -681,6 +684,7 @@
 
     // Fetch player's faction from room data, then load matching pieces
     async function init() {
+      if (params.get('ranked') === '1') { await window.RvBRankedSelection.init(); return }
       if (deckBuilderMode) {
         document.getElementById('pageTitle').textContent = '我的棋组 · 开战前构筑'
         document.getElementById('confirmBtn').textContent = '保存棋组'
@@ -722,13 +726,14 @@
       const alignmentLocked = playerAlignment === 'light' || playerAlignment === 'dark' || playerAlignment === 'good' || playerAlignment === 'evil'
       if (lightBtn) lightBtn.classList.toggle('active', playerAlignment === 'light' || playerAlignment === 'good')
       if (darkBtn) darkBtn.classList.toggle('active', playerAlignment === 'dark' || playerAlignment === 'evil')
-      if (lightBtn) lightBtn.disabled = !deckBuilderMode || alignmentLoading
-      if (darkBtn) darkBtn.disabled = !deckBuilderMode || alignmentLoading
+      if (lightBtn) lightBtn.disabled = (!deckBuilderMode && params.get('ranked') !== '1') || alignmentLoading
+      if (darkBtn) darkBtn.disabled = (!deckBuilderMode && params.get('ranked') !== '1') || alignmentLoading
       if (lockNotice) lockNotice.textContent = deckBuilderMode
         ? '先选择光方或暗方，构筑并保存 8 枚棋子；开战时直接选择一套棋组。'
         : alignmentLocked
         ? '阵营已在大厅锁定。可载入棋组，也可在本页自由构筑、调整并保存本阵营的 8 枚棋子。'
         : '正在读取大厅分配的阵营'
+      if (lockNotice && params.get('ranked') === '1') lockNotice.textContent = '根据本局地图选择阵营和8枚棋子。120秒结束后自动补齐并锁定，随后进入正常逐步部署。'
       if (!badge) return
       const orderLabel = playerFaction === 'red' ? '座位 red' : playerFaction === 'blue' ? '座位 blue' : null
       if (playerAlignment === 'dark' || playerAlignment === 'evil') {
@@ -794,9 +799,10 @@
     }
 
     async function switchDeckAlignment(alignment) {
-      if (!deckBuilderMode || alignmentLoading || !['light', 'dark'].includes(alignment) || alignment === playerAlignment) return
+      if ((!deckBuilderMode && params.get('ranked') !== '1') || alignmentLoading || !['light', 'dark'].includes(alignment) || alignment === playerAlignment) return
       alignmentLoading = true
       playerAlignment = alignment
+      PIECE_TEMPLATES = []
       newPreset()
       updateFactionBadge()
       try { await loadPieces() }
@@ -1152,9 +1158,11 @@
       const n = selectedIds.size
       document.getElementById('selectedCount').textContent = '已选 ' + n + ' / 8 个棋子'
       document.getElementById('confirmBtn').disabled = !playerAlignment || n !== 8
+      if (params.get('ranked') === '1' && window.RvBRankedSelection) window.RvBRankedSelection.changed()
     }
 
     async function confirmSelection() {
+      if (params.get('ranked') === '1') { await window.RvBRankedSelection.confirm(); return }
       if (deckBuilderMode) { savePreset(); return }
       const url = getServerUrl()
       if (!url) { alert('服务器未连接'); return }
@@ -1238,5 +1246,6 @@
     window.addEventListener('load', () => { init() })
     window.addEventListener('unload', () => { if (pollTimer) clearInterval(pollTimer) })
   </script>
+  <script src="js/ranked-selection.js"></script>
 </body>
 </html>

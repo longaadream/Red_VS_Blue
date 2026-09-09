@@ -9,6 +9,8 @@ export const SELECTABLE_MAP_IDS = [
 ] as const
 
 export type SelectableMapId = (typeof SELECTABLE_MAP_IDS)[number]
+export const TEAM_MAP_IDS = ['twin-fronts'] as const
+export type TeamMapId = (typeof TEAM_MAP_IDS)[number]
 
 export type MapSelectionErrorCode =
   | 'MAP_ID_REQUIRED'
@@ -48,11 +50,11 @@ export function isMapSelectionError(error: unknown): error is MapSelectionError 
   return error instanceof MapSelectionError
 }
 
-export function assertSelectableMapId(input: unknown): SelectableMapId {
+export function assertSelectableMapId(input: unknown, mode: '1v1' | '2v2' = '1v1'): SelectableMapId | TeamMapId {
   if (typeof input !== 'string' || input.length === 0) {
     throw new MapSelectionError('MAP_ID_REQUIRED', { receivedType: typeof input })
   }
-  if (!(SELECTABLE_MAP_IDS as readonly string[]).includes(input)) {
+  if (!((mode === '2v2' ? TEAM_MAP_IDS : SELECTABLE_MAP_IDS) as readonly string[]).includes(input)) {
     throw new MapSelectionError('MAP_NOT_SELECTABLE', { mapId: input })
   }
 
@@ -60,18 +62,18 @@ export function assertSelectableMapId(input: unknown): SelectableMapId {
   const ordinaryFloorCount = map?.tiles.filter(tile => (
     tile.props.walkable === true && tile.props.type === 'floor'
   )).length ?? 0
-  if (!map || ordinaryFloorCount < 16) {
+  if (!map || ordinaryFloorCount < (mode === '2v2' ? 32 : 16)) {
     throw new MapSelectionError('MAP_NOT_DEPLOYABLE', {
       mapId: input,
       ordinaryFloorCount,
     })
   }
-  return input as SelectableMapId
+  return input as SelectableMapId | TeamMapId
 }
 
-export function getSelectableMapCatalog(): BoardMap[] {
-  return SELECTABLE_MAP_IDS.map(mapId => {
-    assertSelectableMapId(mapId)
+export function getSelectableMapCatalog(mode: '1v1' | '2v2' = '1v1'): BoardMap[] {
+  return (mode === '2v2' ? TEAM_MAP_IDS : SELECTABLE_MAP_IDS).map(mapId => {
+    assertSelectableMapId(mapId, mode)
     return mapRepository.getMapById(mapId)!
   })
 }

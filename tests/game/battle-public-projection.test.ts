@@ -1,10 +1,56 @@
 import { describe, expect, it } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { runInNewContext } from 'node:vm'
 
 import { createBattlePublicPatch } from '@/lib/game/battle-public-patch'
 import { toPublicBattleState } from '@/lib/game/deployment'
 import { makePiece, makeState } from '../helpers/minimal-state'
 
 describe('battle public pending projection', () => {
+  it.each([true, false])('preserves public mirror life/death when masterAlive=%s', masterAlive => {
+    const master = makePiece({ instanceId: 'master', templateId: 'blue-naruto', currentHp: masterAlive ? 70 : 0 })
+    const clone = Object.assign(makePiece({ instanceId: 'naruto-clone-1', templateId: 'blue-naruto', x: 2, currentHp: masterAlive ? 0 : 99 }), {
+      masterPieceId: 'master', displayCurrentHp: 70, displayMaxHp: 100, displayAttack: 10,
+    })
+    const state = makeState({ pieces: [masterAlive ? master : clone] })
+    state.graveyard = [masterAlive ? clone : master] as unknown as typeof state.graveyard
+    const projection = toPublicBattleState(state, 'observer')
+    expect(projection.pieces[0].currentHp).toBe(70)
+    expect(projection.graveyard[0].currentHp).toBe(0)
+    const runtime = { BattleViewModel: undefined as unknown as { create(input: unknown): { pieces: Array<{ visible: boolean; alive: boolean }> } } }
+    runInNewContext(readFileSync('data/pages/js/battle-ui/battle-view-model.js', 'utf8'), runtime)
+    const view = runtime.BattleViewModel.create({ snapshot: projection })
+    expect(view.pieces[0]).toMatchObject({ visible: true, alive: true })
+  })
+  it('hides dynamic card definitions and makes secret clone placement variants indistinguishable', () => {
+    const state = makeState({ pieces: [makePiece({ instanceId: 'naruto-original', templateId: 'blue-naruto', x: 0 }), makePiece({ instanceId: 'naruto-clone-123', templateId: 'blue-naruto', x: 2 })] })
+    state.pieces[0].isCore = true
+    Object.assign(state.pieces[1], { masterPieceId: 'naruto-original' })
+    state.pieces[1].isCore = false
+    state.pieces[1].currentHp = 99
+    state.pieces[1].attack = 0
+    state.customCards = { 'armor-private-module': { name: 'secret-module' } }
+    state.extensions!.battleProfile = { rootSeed: 192 }
+    const alternate = structuredClone(state)
+    alternate.pieces[0].x = 2; alternate.pieces[1].x = 0
+    const first = toPublicBattleState(state, 'observer'), second = toPublicBattleState(alternate, 'observer')
+    expect(first).toEqual(second)
+    expect(first.customCards).toBeUndefined()
+    expect(first.extensions?.battleProfile.rootSeed).toBe(0)
+    expect(JSON.stringify(first)).not.toMatch(/naruto-original|naruto-clone-123|masterPieceId|secret-module/)
+    expect(toPublicBattleState(state, 'player-red').pieces[1]).toHaveProperty('masterPieceId', 'naruto-original')
+    expect(state.pieces[1].currentHp).toBe(99)
+  })
+  it('never exposes terminal debug history to an admitted spectator identity', () => {
+    const state = makeState()
+    state.terminalResult = { status: 'finished' } as never
+    state.extensions!.debugBattle = { actionLog: [{ private: 'secret-recall' }], replay: { frames: [{ postState: { hand: 'secret-hand' } }] } } as never
+    const projection = toPublicBattleState(state, 'spectator-identity')
+    expect(projection.extensions?.debugBattle).toBeUndefined()
+    expect(JSON.stringify(projection)).not.toContain('secret-recall')
+    expect(JSON.stringify(projection)).not.toContain('secret-hand')
+    expect(state.extensions!.debugBattle).toBeDefined()
+  })
   it('keeps only the viewer hand visible and uses the same redaction for spectators', () => {
     const state = makeState()
     state.players[0].hand = [{

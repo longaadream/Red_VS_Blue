@@ -189,6 +189,8 @@ export interface PreResumeDeliveryContext {
 }
 
 export interface DispatchRoomBattleActionOptions {
+  /** Revalidate ephemeral control ownership inside the serialized authority queue. */
+  validateExecution?: () => void
   allowSystem?: boolean
   expectedAuthorityVersion?: number
   /** Candidate persistence checkpoint cadence; legacy callers retain the existing default. */
@@ -343,6 +345,7 @@ export function createPublicBattleSnapshot(
   const storage = getBattleStorage(room)
   if (!storage) throw new RoomBattleActionError('BATTLE_NOT_STARTED', 'Battle not started')
   const state = toTimerSafePublicBattleState(storage.state as BattleState, viewerPlayerId)
+  const spectator = !!viewerPlayerId && !state.players.some(player => player.playerId.toLowerCase() === viewerPlayerId.trim().toLowerCase())
   const serverNow = getRoomAuthorityNow(room.id, clock)
   const authorityVersion = roomBattleAuthorityVersion(room)
   const publicIndex = cachePublicStateHashIndex(
@@ -355,8 +358,8 @@ export function createPublicBattleSnapshot(
     protocolVersion: BATTLE_AUTHORITY_PROTOCOL_VERSION,
     authorityBuildId: BATTLE_AUTHORITY_BUILD_ID,
     state,
-    seed: storage.rootSeed,
-    rootSeed: storage.rootSeed,
+    seed: spectator ? 0 : storage.rootSeed,
+    rootSeed: spectator ? 0 : storage.rootSeed,
     profileIdentity: storage.profileIdentity,
     stateHash: publicIndex.rootHash,
     authorityVersion,
@@ -517,6 +520,7 @@ export async function dispatchRoomBattleAction(
       if (!storage) throw new RoomBattleActionError('BATTLE_NOT_STARTED', 'Battle not started', { roomId: normalizedRoomId })
       roomRuleRuntime ??= restoreRoomRuleRuntime(normalizedRoomId)
       const state = storage.state as BattleState
+      options.validateExecution?.()
       if (!Number.isSafeInteger(room.version) || Number(room.version) < 0) {
         throw new RoomBattleActionError(
           'ROOM_VERSION_MISSING',

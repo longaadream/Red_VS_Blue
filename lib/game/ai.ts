@@ -1,3 +1,4 @@
+import { areMatchAllies } from './match-teams'
 import { listLegalAIActions } from './ai-environment'
 import { stableJson } from './battle-trace'
 import { getCurrentInputOwnerPlayerId } from './turn-timer'
@@ -72,7 +73,7 @@ function prepareBotSkillAction(state: BattleState, draft: any, enemies: any[]): 
 }
 
 export function prepareBotAction(state: BattleState, draft: any, botPlayerId: string): any | undefined {
-  const enemies = state.pieces.filter(piece => piece.ownerPlayerId !== botPlayerId && piece.currentHp > 0)
+  const enemies = state.pieces.filter(piece => !areMatchAllies(state, piece.ownerPlayerId, botPlayerId) && piece.currentHp > 0)
   return prepareBotSkillAction(state, draft, enemies)
 }
 
@@ -84,7 +85,7 @@ export function generateBotActions(state: BattleState, botPlayerId: string): any
   if (!botMeta) return [endTurnAction]
 
   const botPieces = state.pieces.filter(p => p.ownerPlayerId === botPlayerId && p.currentHp > 0)
-  const enemies = state.pieces.filter(p => p.ownerPlayerId !== botPlayerId && p.currentHp > 0)
+  const enemies = state.pieces.filter(p => !areMatchAllies(state, p.ownerPlayerId, botPlayerId) && p.currentHp > 0)
 
   if (enemies.length === 0 || botPieces.length === 0) return [endTurnAction]
 

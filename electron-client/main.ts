@@ -36,6 +36,8 @@ let actualLocalPort = LOCAL_PORT_HINT  // 实际绑定成功的端口
 const GAME_PORT_HINT = 38621
 let actualGamePort = GAME_PORT_HINT
 const CLIENT_SCHEME = 'rvb-client'
+// Kept in sync with lib/game/rule-version.ts by the desktop contract test.
+const DESKTOP_BATTLE_RUNNER_REVISION = 'rvb-battle-runner/v2' as const
 const BATTLE_AUTHORITY_SHUTDOWN_REQUEST = 'rvb:battle-authority:shutdown'
 const BATTLE_AUTHORITY_SHUTDOWN_RESULT = 'rvb:battle-authority:shutdown-result'
 const SERVER_GRACEFUL_SHUTDOWN_TIMEOUT_MS = 6_500
@@ -53,7 +55,7 @@ let appExitPromise: Promise<void> | null = null
 type GameProfileIdentity = Readonly<{
   schemaVersion: 'rvb-game-profile-identity/v1'
   engineAbi: string
-  runnerRevision: 'rvb-battle-runner/v1'
+  runnerRevision: typeof DESKTOP_BATTLE_RUNNER_REVISION
   resolvedProfileHash: string
   authorityContentHash: string
 }>
@@ -557,7 +559,7 @@ function gameProfileIdentityFromReference(reference: DesktopProfileReference): G
   return {
     schemaVersion: 'rvb-game-profile-identity/v1',
     engineAbi: reference.compatibility.engineAbi,
-    runnerRevision: 'rvb-battle-runner/v1',
+    runnerRevision: DESKTOP_BATTLE_RUNNER_REVISION,
     resolvedProfileHash: reference.resolvedProfileHash,
     authorityContentHash: reference.authorityContentHash,
   }
@@ -581,7 +583,7 @@ function parseGameProfileIdentity(value: unknown): GameProfileIdentity {
   if (
     keys !== 'authorityContentHash,engineAbi,resolvedProfileHash,runnerRevision,schemaVersion'
     || identity.schemaVersion !== 'rvb-game-profile-identity/v1'
-    || identity.runnerRevision !== 'rvb-battle-runner/v1'
+    || identity.runnerRevision !== DESKTOP_BATTLE_RUNNER_REVISION
     || typeof identity.engineAbi !== 'string'
     || !/^[a-f0-9]{64}$/.test(identity.resolvedProfileHash ?? '')
     || !/^[a-f0-9]{64}$/.test(identity.authorityContentHash ?? '')
@@ -2156,6 +2158,26 @@ handleTrusted('open-local-game', ['connect'], async () => {
   } finally {
     if (localGameOpenPromise === opening) localGameOpenPromise = null
   }
+})
+
+handleTrusted('relay-control', ['game'], async (_event, options: { action?: string; relayUrl?: string; name?: string; visible?: boolean; publishKey?: string }) => {
+  if (!options || !['status', 'publish', 'stop'].includes(options.action || '')) return { ok: false, error: '无效操作' }
+  if (!gameServerProcess?.connected || !localGameReady) return { ok: false, error: '请先启动本机服务' }
+  const proc = gameServerProcess
+  const requestId = `relay-${Date.now()}-${Math.random().toString(36).slice(2)}`
+  return new Promise(resolve => {
+    const finish = (result: unknown) => { clearTimeout(timer); proc.off('message', onMessage); proc.off('exit', onExit); resolve(result) }
+    const onMessage = (message: { type?: string; requestId?: string }) => {
+      if (message?.type === 'rvb:relay:result' && message.requestId === requestId) finish(message)
+    }
+    const onExit = () => finish({ ok: false, error: '玩家主机已停止' })
+    const timer = setTimeout(() => finish({ ok: false, error: '主机响应超时，请检查发布状态后重试' }), 12000)
+    proc.on('message', onMessage); proc.once('exit', onExit)
+    proc.send({ type: 'rvb:relay:control', requestId, action: options.action,
+      relayUrl: String(options.relayUrl || '').slice(0, 1024), name: String(options.name || '').slice(0, 60),
+      visible: options.visible === true, publishKey: String(options.publishKey || '').slice(0, 512),
+    }, error => { if (error) finish({ ok: false, error: '主机连接已关闭' }) })
+  })
 })
 
 handleTrusted('ensure-local-authority', ['game'], async () => {

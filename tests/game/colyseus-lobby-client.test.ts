@@ -66,7 +66,9 @@ function jsonResponse(body: unknown, status = 200) {
 
 function loadLobbyClient(fetchMock: ReturnType<typeof vi.fn>): RpcClient {
   const profileIdentity = getServerGameProfileIdentityV1()
+  const session = new Map<string, string>()
   const browserWindow: Record<string, unknown> = {
+    sessionStorage: { getItem: (key: string) => session.get(key) || null, setItem: (key: string, value: string) => session.set(key, value) },
     location: { search: '' },
     Colyseus: { Client: FakeColyseusClient },
     RvBIdentity: {
@@ -106,6 +108,14 @@ beforeEach(() => {
 })
 
 describe('RED-158 Colyseus lobby client', () => {
+  it('resolves a private invitation and uses spectator admission without a player seat', async () => {
+    const fetchMock = vi.fn(async () => jsonResponse({ room: { id: 'room-a' } }))
+    const client = loadLobbyClient(fetchMock)
+    await client.requestAt('http://127.0.0.1:38621', 'rooms.resolveInvite', { inviteCode: 'abcdef123456' })
+    await client.requestAt('http://127.0.0.1:38621', 'rooms.spectate', { roomId: 'room-a', spectatorId: 'player-blue' })
+    expect(FakeColyseusClient.joinCalls[0]).toMatchObject({ roomId: 'room-a', options: { spectator: true, inviteCode: 'ABCDEF123456', playerId: 'player-blue' } })
+    expect(fetchMock).toHaveBeenCalledWith('http://127.0.0.1:38621/room-invites/ABCDEF123456', expect.anything())
+  })
   it('loads one room detail without joining or falling through to an unsupported RPC', async () => {
     const fetchMock = vi.fn(async () => jsonResponse({
       room: { id: 'Room-A', status: 'in-progress', players: [{ id: 'player-blue' }] },

@@ -2,6 +2,7 @@ import {
   assertGameProfileCompatibleV1,
   getServerGameProfileIdentityV1,
 } from '../content-pipeline/runtime/profile-game-identity'
+import { orderedMatchPlayers } from './match-teams'
 import { createInitialBattleForPlayers } from './battle-setup'
 import { assertSelectableMapId } from './map-selection'
 import { hashPublicBattleState } from './battle-public-patch'
@@ -88,21 +89,18 @@ async function startBattleFromLockedRostersQueued(
       return { room: authorityReadyRoom, started: false }
     }
 
-    const mapId = assertSelectableMapId(room.mapId)
+    const mapId = assertSelectableMapId(room.mapId, room.mode)
     resetRoomBattleAuthorityClock(roomId)
     assertDemoRostersReady(room)
 
-    const roomPlayers = [...room.players.slice(0, 2)].sort((left, right) => {
-      if (getPlayerSeat(left) === 'red' && getPlayerSeat(right) === 'blue') return -1
-      if (getPlayerSeat(left) === 'blue' && getPlayerSeat(right) === 'red') return 1
-      return 0
-    })
+    const roomPlayers = orderedMatchPlayers(room)
     const redPlayers = roomPlayers.filter(player => getPlayerSeat(player) === 'red')
     const bluePlayers = roomPlayers.filter(player => getPlayerSeat(player) === 'blue')
-    if (redPlayers.length !== 1 || bluePlayers.length !== 1) {
+    const teamSize = room.mode === '2v2' ? 2 : 1
+    if (redPlayers.length !== teamSize || bluePlayers.length !== teamSize) {
       throw new Error('Cannot start battle without exactly one red and one blue seat')
     }
-    const firstPlayerId = redPlayers[0].id
+    const firstPlayerId = room.mode === '2v2' ? roomPlayers[0].id : redPlayers[0].id
 
     const playerIds = roomPlayers.map(player => player.id)
     const playerSelectedPieces = roomPlayers.map(player => ({
@@ -130,6 +128,7 @@ async function startBattleFromLockedRostersQueued(
       playerSelectedPieces,
       mapId,
       {
+        matchMode: room.mode ?? '1v1',
         firstPlayerId,
         rootSeed: seed,
         profileIdentity,

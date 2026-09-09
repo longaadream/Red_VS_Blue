@@ -1,3 +1,4 @@
+import { areMatchAllies } from './match-teams'
 import fs from 'fs'
 import path from 'path'
 import type { TriggerRule } from './triggers'
@@ -289,7 +290,7 @@ export function convertToTriggerRule(ruleDef: RuleDefinition): TriggerRule {
               const range = effect.range
               battle.pieces.forEach(piece => {
                 // 只选择敌方棋子，并且在范围内
-                if (piece.ownerPlayerId !== context.sourcePiece.ownerPlayerId && piece.currentHp > 0) {
+                if (!areMatchAllies(battle, piece.ownerPlayerId, context.sourcePiece.ownerPlayerId) && piece.currentHp > 0) {
                   if (piece.x == null || piece.y == null) return
                   const distance = manhattanDistance(piece, context.sourcePiece)
                   if (distance <= range) {
@@ -337,6 +338,9 @@ export function convertToTriggerRule(ruleDef: RuleDefinition): TriggerRule {
               if (skillDef) {
                 // 创建技能执行上下文
                 const skillContext = {
+                  rulePiece: context.rulePiece,
+                  sourcePiece: context.sourcePiece,
+                  statusId: context.statusId,
                   piece: {
                     instanceId: rulePiece.instanceId,
                     templateId: rulePiece.templateId,

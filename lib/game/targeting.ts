@@ -1,3 +1,4 @@
+import { areMatchAllies } from './match-teams'
 /* eslint-disable @typescript-eslint/no-explicit-any -- RED-59 validates legacy data-authored definitions and action envelopes at runtime. */
 import type { PieceInstance } from './piece'
 import { getSkillById } from './skill-repository'
@@ -729,7 +730,7 @@ function validateSourceSpecificCell(
       piece.currentHp > 0 &&
       piece.x === nextX &&
       piece.y === nextY &&
-      normalizePlayerId(piece.ownerPlayerId) === normalizePlayerId(sourcePiece.ownerPlayerId),
+      areMatchAllies(state, piece.ownerPlayerId, sourcePiece.ownerPlayerId),
     )
     if (!tile?.props?.walkable || blockingAlly) {
       return issue('TARGET_SOURCE_CONSTRAINT_FAILED', 'The first movement step is blocked')
@@ -752,7 +753,7 @@ function validateSourceSpecificCell(
   if (constraint.requireEnemyWithinRange !== undefined) {
     const hasEnemy = sourcePiece && state.pieces.some(piece =>
       piece.currentHp > 0 &&
-      normalizePlayerId(piece.ownerPlayerId) !== normalizePlayerId(sourcePiece.ownerPlayerId) &&
+      !areMatchAllies(state, piece.ownerPlayerId, sourcePiece.ownerPlayerId) &&
       piece.x != null && piece.y != null &&
       manhattanDistance(piece, ref) <= constraint.requireEnemyWithinRange!,
     )
@@ -854,7 +855,7 @@ export function validateTargetRef(
     if (target.currentHp <= 0 || target.x == null || target.y == null) {
       return issue('TARGET_NOT_ALIVE', `Piece ${ref.pieceId} is not a living board target`)
     }
-    const sameOwner = normalizePlayerId(target.ownerPlayerId) === normalizePlayerId(constraint.ownerPlayerId)
+    const sameOwner = areMatchAllies(state, target.ownerPlayerId, constraint.ownerPlayerId)
     if (constraint.filter === 'enemy' && sameOwner) return issue('TARGET_FILTER_MISMATCH', 'Target must be an enemy')
     if (constraint.filter === 'ally' && !sameOwner) return issue('TARGET_FILTER_MISMATCH', 'Target must be an ally')
     if (constraint.filter === 'self' && target.instanceId !== constraint.sourcePieceId) {

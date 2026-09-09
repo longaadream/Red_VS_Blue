@@ -9,7 +9,7 @@ import { join } from 'node:path'
 import { runBattleAction, hashBattleState } from '../../lib/game/battle-runner'
 import { globalTriggerSystem } from '../../lib/game/triggers'
 import { createFlowRuntime } from '../../lib/game/flow-runtime'
-import { makePiece, makeState } from '../helpers/minimal-state'
+import { makePiece, makePlayer, makeState } from '../helpers/minimal-state'
 import { applyBattleAction } from '../../lib/game/turn'
 
 beforeEach(() => globalTriggerSystem.clearRules())
@@ -17,6 +17,15 @@ function fixture() {
   return makeState({ pieces: [makePiece({ instanceId: 'self' }), makePiece({ instanceId: 'enemy', ownerPlayerId: 'player-blue', x: 3, currentHp: 20 })] })
 }
 describe('trusted code-node runtime facade', () => {
+  it('uses team relations in four seats while ownerId alone remains exact ownership', () => {
+    const ids = ['blue1', 'red1', 'red2', 'blue2']
+    const battle = makeState({ pieces: ids.map(id => makePiece({ instanceId: id, ownerPlayerId: id })) })
+    battle.players = ids.map(id => ({ ...makePlayer(id, id.startsWith('blue') ? 'blue' : 'red'), teamId: id.startsWith('blue') ? 'blue' as const : 'red' as const }))
+    const flow = createSkillCodeFlow(battle, { piece: battle.pieces[0] }, 'skill')
+    expect(flow.query.pieces({ relation: 'ally' })).toEqual(['blue1', 'blue2'])
+    expect(flow.query.pieces({ relation: 'enemy' })).toEqual(['red1', 'red2'])
+    expect(flow.query.pieces({ ownerId: 'blue1' })).toEqual(['blue1'])
+  })
   it('distinguishes holder/source/target across skill and rule entry points', () => {
     const battle = fixture(), context = { piece: battle.pieces[1], rulePiece: battle.pieces[0], sourcePiece: battle.pieces[1], targetPiece: battle.pieces[0], playerId: 'player-red', triggerPlayerId: 'player-blue' }
     const flow = createSkillCodeFlow(battle, context, 'triggerSkill')

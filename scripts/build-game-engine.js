@@ -48,7 +48,7 @@ async function main() {
   }
   const outputs = [
     path.join(root, 'data', 'pages', 'js', 'game-engine.js'),
-    path.join(root, 'android-client', 'www', 'js', 'game-engine.js'),
+    ...(process.argv.includes('--windows-only') ? [] : [path.join(root, 'android-client', 'www', 'js', 'game-engine.js')]),
   ]
   for (const outfile of outputs) {
     await esbuild.build({ ...options, outfile })

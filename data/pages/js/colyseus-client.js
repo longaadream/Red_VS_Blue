@@ -51,7 +51,7 @@
   }
 
   function reconnectTokenKey() {
-    return RECONNECT_TOKEN_PREFIX + normalizedBaseUrl(getServerUrl()) + ':' + _roomId + ':' + _playerId
+    return RECONNECT_TOKEN_PREFIX + normalizedBaseUrl(getServerUrl()) + ':' + _roomId + ':' + _playerId + (pageParams().get('mode') === 'spectate' ? ':spectator' : '')
   }
 
   function readReconnectToken() {
@@ -102,6 +102,8 @@
   }
 
   function currentIdentity() {
+    var official = officialSession()
+    if (official) return { id: official.account.id, displayName: official.account.name, accountId: official.account.id }
     try {
       return window.RvBIdentity && typeof window.RvBIdentity.getIdentity === 'function'
         ? (window.RvBIdentity.getIdentity() || {})
@@ -111,13 +113,34 @@
     }
   }
 
-  function joinOptions(playerId) {
+  function officialSession(base) {
+    try {
+      var saved = JSON.parse(window.sessionStorage.getItem('rvb_official_session') || 'null')
+      return saved && saved.token && saved.account && saved.url === normalizedBaseUrl(base || getServerUrl()) ? saved : null
+    } catch { return null }
+  }
+
+  async function admissionProof(base, playerId, roomId) {
+    if (!window.RvBIdentity || typeof window.RvBIdentity.sign !== 'function') return undefined
+    var identity = window.RvBIdentity.getIdentity()
+    if (!identity || identity.id !== playerId) throw new Error('请先创建或恢复自己的玩家身份')
+    var challenge = await fetchJson(normalizedBaseUrl(base) + '/admission/challenge', 5000)
+    var payload = { type: 'rvb-colyseus-admission-v1', nonce: challenge.nonce, playerId: playerId, roomId: roomId }
+    return { payload: payload, publicKey: identity.publicKey, signature: await window.RvBIdentity.sign(payload) }
+  }
+
+  async function joinOptions(playerId, base, roomId) {
     var params = pageParams()
     var identity = currentIdentity()
     var profileIdentity = storedProfileIdentity()
     if (!profileIdentity) throw new Error('Game profile identity is required for Colyseus admission')
+    var official = officialSession(base)
     return {
+      officialToken: official ? official.token : undefined,
+      auth: official ? undefined : await admissionProof(base || getServerUrl(), String(playerId || identity.id || '').trim().toLowerCase(), roomId || _roomId),
       product: true,
+      spectator: params.get('mode') === 'spectate',
+      inviteCode: window.sessionStorage?.getItem('rvb_room_invite:' + normalizedBaseUrl(base || getServerUrl()) + ':' + (roomId || _roomId)) || undefined,
       playerId: String(playerId || identity.id || '').trim().toLowerCase(),
       playerName: params.get('playerName') || identity.displayName || '',
       accountId: identity.accountId || undefined,
@@ -147,6 +170,24 @@
   }
 
   function registerRoomHandlers(room, generation) {
+    room.onMessage('officialSessionExpired', function () {
+      _shouldReconnect = false
+      clearReconnectToken()
+      window.sessionStorage.removeItem('rvb_official_session')
+      window.location.href = 'official.html'
+    })
+    room.onMessage('officialMatchClosed', function () {
+      _shouldReconnect = false
+      clearReconnectToken()
+      window.location.href = 'official.html'
+    })
+    room.onMessage('spectatorClosed', function (message) {
+      if (generation !== _generation) return
+      _shouldReconnect = false
+      room.reconnection.enabled = false
+      clearReconnectToken()
+      emitRoomMessage('spectatorClosed', message)
+    })
     room.onMessage('roomUpdate', function (message) {
       if (generation === _generation) emitRoomMessage('roomUpdate', message)
     })
@@ -207,7 +248,7 @@
     try {
       var snapshot = await request('rooms.get', { roomId: _roomId }, 5000)
       if (generation !== _generation || room !== _room || !_subscribed) return
-      var role = snapshot && snapshot.hostId && String(snapshot.hostId).toLowerCase() === _playerId ? 'host' : 'guest'
+      var role = snapshot.viewerRole || (snapshot && snapshot.hostId && String(snapshot.hostId).toLowerCase() === _playerId ? 'host' : 'guest')
       emitRoomMessage('subscribed', { role: role })
       room.send('battleResync', {})
     } catch (error) {
@@ -226,10 +267,10 @@
         } catch {
           clearReconnectToken()
           if (generation !== _generation || !_shouldReconnect) return false
-          room = await _client.joinById(_roomId, joinOptions(_playerId))
+          room = await _client.joinById(_roomId, await joinOptions(_playerId))
         }
       } else {
-        room = await _client.joinById(_roomId, joinOptions(_playerId))
+        room = await _client.joinById(_roomId, await joinOptions(_playerId))
       }
       if (!room) return false
       if (generation !== _generation || !_shouldReconnect) {
@@ -363,14 +404,25 @@
     var payload = data || {}
     timeoutMs = timeoutMs || 5000
     if (!base) throw new Error('Server URL is required')
+    if (method === 'rooms.resolveInvite') {
+      var code = String(payload.inviteCode || '').trim().toUpperCase()
+      if (!/^[A-F0-9]{12}$/.test(code)) throw new Error('请输入完整的12位房间邀请码')
+      var found = await fetchJson(base + '/room-invites/' + code, timeoutMs)
+      window.sessionStorage.setItem('rvb_room_invite:' + base + ':' + found.room.id, code)
+      return found.room
+    }
     if (method === 'system.health') return fetchJson(base + '/healthz', timeoutMs)
     if (method === 'catalog.identity') return fetchJson(base + '/catalog/identity', timeoutMs)
-    if (method === 'catalog.maps') return fetchJson(base + '/catalog/maps', timeoutMs)
+    if (method === 'catalog.maps') return fetchJson(base + '/catalog/maps' + (payload.mode === '2v2' ? '?mode=2v2' : ''), timeoutMs)
     if (method === 'catalog.pieces') return fetchJson(base + '/catalog/pieces', timeoutMs)
     if (method === 'catalog.skills') return fetchJson(base + '/catalog/skills', timeoutMs)
     if (method === 'catalog.card') return fetchJson(base + '/catalog/cards/' + encodeURIComponent(String(payload.cardId || '')), timeoutMs)
     if (method === 'battleReports.get') {
-      var reportPayload = await fetchJson(base + '/battle-reports/' + encodeURIComponent(String(payload.battleId || payload.roomId || '')), timeoutMs)
+      var official = officialSession(base)
+      if (official) return fetchJson(base + '/battle-reports/' + encodeURIComponent(String(payload.battleId || payload.roomId || '')), timeoutMs, { Authorization: 'Bearer ' + official.token })
+      var battleId = String(payload.battleId || payload.roomId || '').trim().toLowerCase()
+      var reportAuth = await admissionProof(base, currentIdentity().id, 'report:' + battleId)
+      var reportPayload = await fetchJson(base + '/battle-reports/' + encodeURIComponent(battleId), timeoutMs, { 'X-RvB-Auth': JSON.stringify(reportAuth) })
       return reportPayload && reportPayload.report ? reportPayload.report : reportPayload
     }
     if (method === 'battleReports.list') {
@@ -378,6 +430,13 @@
     }
 
     var client = createClient(base)
+    if (method === 'rooms.spectate') {
+      var spectatorAdmission = await joinOptions(payload.spectatorId, base, payload.roomId)
+      spectatorAdmission.spectator = true
+      var viewer = await withTimeout(client.joinById(payload.roomId, spectatorAdmission), timeoutMs, method)
+      try { return await roomRpc(viewer, 'rooms.get', {}, timeoutMs) }
+      finally { await viewer.leave() }
+    }
     if (method === 'rooms.list') {
       return fetchJson(base + '/rooms', timeoutMs)
     }
@@ -393,6 +452,7 @@
       var creationKey = hostId + ':' + Date.now() + '-' + (_reqSeq++)
       _createInFlight[createFlightKey] = (async function () {
         var room = await withTimeout(client.create('battle', {
+          auth: await admissionProof(base, hostId, 'create'),
           product: true,
           creationKey: creationKey,
           name: payload.name,
@@ -416,7 +476,7 @@
       }
     }
     if (method === 'rooms.action' && (payload.action === 'join' || payload.action === 'rejoin')) {
-      var admission = joinOptions(payload.playerId)
+      var admission = await joinOptions(payload.playerId, base, payload.roomId)
       admission.playerName = payload.playerName || admission.playerName
       admission.alignment = payload.alignment || admission.alignment
       admission.profileIdentity = payload.profileIdentity || admission.profileIdentity
@@ -430,6 +490,7 @@
     }
     if (method === 'rooms.delete') {
       var deleteRoom = await withTimeout(client.joinById(payload.roomId, {
+        auth: await admissionProof(base, payload.playerId, payload.roomId),
         product: true,
         playerId: payload.playerId,
         playerName: currentIdentity().displayName,
@@ -448,12 +509,12 @@
     return room.request('roomRpc', { method: method, data: data || {} }, { timeout: timeoutMs || 5000 })
   }
 
-  async function fetchJson(url, timeoutMs) {
+  async function fetchJson(url, timeoutMs, headers) {
     var controller = new AbortController()
     var timer = setTimeout(function () { controller.abort() }, timeoutMs || 5000)
     var diagnosticUrl = requestUrlForDiagnostics(url)
     try {
-      var response = await fetch(url, { signal: controller.signal, cache: 'no-store' })
+      var response = await fetch(url, { signal: controller.signal, cache: 'no-store', headers: headers })
       var body = await response.json().catch(function () { return {} })
       if (!response.ok) throw makeRpcError(body)
       return body
@@ -616,6 +677,7 @@
   function isAuthoritySyncing() { return _authoritySyncing }
 
   window.RvBColyseus = {
+    isOfficialSession: function (playerId) { var session = officialSession(); return !!session && session.account.id === playerId },
     connect: connect,
     disconnect: disconnect,
     send: send,

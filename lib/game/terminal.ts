@@ -1,4 +1,5 @@
 import type { BattleAction, BattleState } from './turn'
+import { isTeamMatch, type MatchTeam } from './match-teams'
 import { TURN_TIMEOUT_FORFEIT_STREAK } from './turn-timer'
 
 export const BATTLE_ROUND_LIMIT = 40
@@ -21,6 +22,9 @@ export interface TerminalSettlementPosition {
 
 export interface TerminalResult {
   status: 'finished'
+  winnerTeamId?: MatchTeam | null
+  winnerPlayerIds?: string[]
+  loserPlayerIds?: string[]
   winnerPlayerId: string | null
   loserPlayerId: string | null
   reason: TerminalReason
@@ -39,8 +43,15 @@ function completedRounds(state: BattleState): number {
     ? Math.max(1, state.turn.turnNumber)
     : 1
   return state.turn?.phase === 'end'
-    ? Math.floor(turnNumber / 2)
-    : Math.floor((turnNumber - 1) / 2)
+    ? Math.floor(turnNumber / Math.max(2, state.players.length))
+    : Math.floor((turnNumber - 1) / Math.max(2, state.players.length))
+}
+
+function teamResult(state: BattleState, winnerTeamId: MatchTeam | null, reason: TerminalReason, settledAt: TerminalSettlementPosition): TerminalResult {
+  const winnerPlayerIds = state.players.filter(p => p.teamId === winnerTeamId).map(p => p.playerId)
+  const loserPlayerIds = state.players.filter(p => winnerTeamId !== null && p.teamId !== winnerTeamId).map(p => p.playerId)
+  return { status: 'finished', winnerTeamId, winnerPlayerIds, loserPlayerIds,
+    winnerPlayerId: winnerPlayerIds[0] ?? null, loserPlayerId: loserPlayerIds[0] ?? null, reason, settledAt }
 }
 
 function settlementPosition(
@@ -67,6 +78,12 @@ function surrenderResult(
 ): TerminalResult | null {
   const loser = state.players.find(player =>
     normalizePlayerId(player.playerId) === normalizePlayerId(action.playerId))
+  if (isTeamMatch(state)) {
+    if (action.reason === 'timeout' || !loser?.teamId) return null
+    const teammates = state.players.filter(p => p.teamId === loser.teamId)
+    if (!teammates.every(p => p.surrenderVote === true)) return null
+    return teamResult(state, loser.teamId === 'red' ? 'blue' : 'red', 'surrender', settledAt)
+  }
   const winner = state.players.find(player =>
     normalizePlayerId(player.playerId) !== normalizePlayerId(action.playerId))
   if (!loser || !winner) return null
@@ -83,7 +100,7 @@ function coreEliminationResult(
   state: BattleState,
   settledAt: TerminalSettlementPosition,
 ): TerminalResult | null {
-  if (state.players.length !== 2) return null
+  if (state.players.length !== 2 && !isTeamMatch(state)) return null
 
   const progressiveDeployment = state.deployment?.mode === 'progressive-reserve-v1'
   // Progressive setup temporarily owns every core in the reserve while the two
@@ -121,6 +138,12 @@ function coreEliminationResult(
       .map(piece => normalizePlayerId(piece.ownerPlayerId)),
   )
   const defeated = players.filter(player => !livingCoreOwners.has(player.normalizedId))
+  if (isTeamMatch(state)) {
+    const aliveTeams = new Set(state.players.filter(p => livingCoreOwners.has(normalizePlayerId(p.playerId))).map(p => p.teamId))
+    if (aliveTeams.size === 2) return null
+    return teamResult(state, aliveTeams.size === 1 ? [...aliveTeams][0]! : null,
+      aliveTeams.size === 0 ? 'mutual-core-elimination' : 'core-eliminated', settledAt)
+  }
   if (defeated.length === 0) return null
   if (defeated.length === 2) {
     return {
@@ -149,6 +172,7 @@ function roundLimitResult(
   settledAt: TerminalSettlementPosition,
 ): TerminalResult | null {
   if (state.turn.phase !== 'end' || settledAt.completedRound < BATTLE_ROUND_LIMIT) return null
+  if (isTeamMatch(state)) return teamResult(state, null, 'round-limit', settledAt)
   return {
     status: 'finished',
     winnerPlayerId: null,

@@ -15,6 +15,9 @@ import {
  * can never become two live authority sources.
  */
 export class ProductBattleStore {
+  private setupClosed = false
+  closeSetup(): void { if (!this.authorityStore) this.setupClosed = true }
+  closeAuthority(): void { this.setupClosed = true; this.authorityStore?.closeAuthority() }
   readonly terminalAuthorityPersistencePolicy = 'durable-barrier' as const
 
   constructor(
@@ -29,18 +32,21 @@ export class ProductBattleStore {
   }
 
   async getRoom(roomId: string): Promise<Room | undefined> {
+    if (this.setupClosed) throw new Error('比赛准备阶段已关闭')
     if (!this.matches(roomId)) return undefined
     if (this.authorityStore) return this.authorityStore.getRoom(roomId)
     return cloneRoomJson(this.room)
   }
 
   async setRoom(roomId: string, room: Room): Promise<void> {
+    if (this.setupClosed) throw new Error('比赛准备阶段已关闭')
     this.assertMatches(roomId)
     if (this.authorityStore) return this.authorityStore.setRoom(roomId, room)
     this.room = cloneRoomJson(room)
   }
 
   async setRoomIfVersion(roomId: string, room: Room, expectedVersion: number): Promise<boolean> {
+    if (this.setupClosed) throw new Error('比赛准备阶段已关闭')
     if (!this.matches(roomId)) return false
     if (this.authorityStore) {
       return this.authorityStore.setRoomIfVersion(roomId, room, expectedVersion)
@@ -56,6 +62,7 @@ export class ProductBattleStore {
     stateHash: string
     publicHash: string
   }): Promise<void> {
+    if (this.setupClosed) throw new Error('比赛准备阶段已关闭')
     this.assertMatches(input.room.id)
     if (this.authorityStore) return
     const checkpoint = createInitialCheckpoint(input.room)

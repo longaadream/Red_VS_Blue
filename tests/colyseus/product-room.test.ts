@@ -23,6 +23,7 @@ import { PostgresAuthorityJournal } from '@/lib/server/postgres/postgres-authori
 import type { PostgresBattleReportSummaryV1, PostgresBattleReportV1 } from '@/lib/server/postgres/authority-types'
 
 import { FakeAuthorityRepository } from './fake-authority-repository'
+import { guestIdentity } from '../helpers/guest-identity'
 
 describe('RED-161 Colyseus product room', () => {
   it('isolates an incompatible durable room instead of crashing authority startup', async () => {
@@ -245,6 +246,22 @@ describe('RED-161 Colyseus product room', () => {
         authorityVersion: 1,
         receipt: { clientActionId, status: 'applied' },
       })
+      const terminalRoom = nextMessage(activeRoom, PRODUCT_ROOM_UPDATE_MESSAGE, message => message?.room?.status === 'finished')
+      activeRoom.send(BATTLE_COMMAND_MESSAGE, {
+        protocolVersion: BATTLE_AUTHORITY_PROTOCOL_VERSION,
+        authorityBuildId: BATTLE_AUTHORITY_BUILD_ID,
+        roomId: redRoom.roomId, playerId: activePlayerId, expectedAuthorityVersion: 1,
+        clientActionId: 'finished-catalog-regression',
+        command: { type: 'surrender', playerId: activePlayerId, clientActionId: 'finished-catalog-regression' },
+      })
+      await expect(terminalRoom).resolves.toMatchObject({ room: { status: 'finished' } })
+      const ended = await fetch(`http://127.0.0.1:${port}/rooms/${redRoom.roomId}`).then(r => r.json())
+      expect(ended.room.status).toBe('finished')
+      const catalog = await fetch(`http://127.0.0.1:${port}/rooms`).then(r => r.json())
+      expect(catalog.rooms).not.toEqual(expect.arrayContaining([expect.objectContaining({ id: redRoom.roomId })]))
+      expect(redRoom.connection.isOpen).toBe(true)
+      expect(blueRoom.connection.isOpen).toBe(true)
+      await expect(repository.restoreRoom(redRoom.roomId)).resolves.toMatchObject({ room: { status: 'finished' } })
     } finally {
       await redRoom.leave()
       await blueRoom.leave()
@@ -291,6 +308,7 @@ describe('RED-161 Colyseus product room', () => {
   }, 20_000)
 
   it('serves verified authority reports through Colyseus HTTP only', async () => {
+    const identity = guestIdentity(), outsider = guestIdentity()
     const report = {
       schemaVersion: 'rvb-postgres-battle-report/v1',
       verified: true,
@@ -304,20 +322,30 @@ describe('RED-161 Colyseus product room', () => {
         : [],
     })
     const journal = new PostgresAuthorityJournal(repository, { maxBatchSize: 8, maxDwellMs: 25 })
+    const saved = createDevelopmentBattleRoom(report.battleId)
+    saved.players[0].id = identity.playerId
+    saved.players[0].publicKey = identity.proof('unused', 'unused').publicKey
+    await repository.initializeRoom(saved, createInitialCheckpoint(saved))
     const candidate = createColyseusBattleServer({ repository, journal })
     const port = await availablePort()
     await candidate.server.listen(port, '127.0.0.1')
+    async function readReport(battleId: string, who = identity) {
+      const { nonce } = await fetch(`http://127.0.0.1:${port}/admission/challenge`).then(response => response.json())
+      return fetch(`http://127.0.0.1:${port}/battle-reports/${battleId}`, { headers: { 'X-RvB-Auth': JSON.stringify(who.proof(nonce, 'report:' + battleId)) } })
+    }
     try {
-      await expect(fetch(`http://127.0.0.1:${port}/battle-reports/${report.battleId}`).then(response => response.json()))
+      expect((await fetch(`http://127.0.0.1:${port}/battle-reports/${report.battleId}`)).status).toBe(401)
+      expect((await readReport(report.battleId, outsider)).status).toBe(403)
+      await expect(readReport(report.battleId).then(response => response.json()))
         .resolves.toEqual({ report })
       await expect(fetch(`http://127.0.0.1:${port}/battle-reports?playerId=player-red`).then(response => response.json()))
         .resolves.toEqual({ reports: [{ battleId: report.battleId, transitionHash: report.authority.transitionHash }] })
-      await expect(fetch(`http://127.0.0.1:${port}/battle-reports/missing`).then(async response => ({
+      await expect(readReport('missing').then(async response => ({
         status: response.status,
         body: await response.json(),
       }))).resolves.toEqual({
-        status: 404,
-        body: { code: 'BATTLE_REPORT_NOT_FOUND', error: 'Battle report not found' },
+        status: 403,
+        body: { code: 'BATTLE_REPORT_FORBIDDEN', error: '完整战报仅向参赛玩家开放' },
       })
     } finally {
       await candidate.server.gracefullyShutdown(false)

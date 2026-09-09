@@ -1,0 +1,30 @@
+services:
+  relay:
+    build: ../../multiplayer-relay
+    network_mode: host
+    restart: unless-stopped
+    environment:
+      HOST: 127.0.0.1
+      PORT: 8080
+      RVB_RELAY_PUBLIC_ORIGIN: https://${RVB_RELAY_DOMAIN:?Set RVB_RELAY_DOMAIN}
+      RVB_RELAY_PUBLISH_KEY: ${RVB_RELAY_PUBLISH_KEY:?Set a host publication key}
+      RVB_RELAY_TRUSTED_PROXIES: 127.0.0.1,::ffff:127.0.0.1
+    logging:
+      driver: json-file
+      options: { max-size: 10m, max-file: "3" }
+  caddy:
+    image: caddy:2
+    network_mode: host
+    restart: unless-stopped
+    environment:
+      RVB_RELAY_DOMAIN: ${RVB_RELAY_DOMAIN:?Set RVB_RELAY_DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    logging:
+      driver: json-file
+      options: { max-size: 10m, max-file: "3" }
+volumes:
+  caddy-data:
+  caddy-config:

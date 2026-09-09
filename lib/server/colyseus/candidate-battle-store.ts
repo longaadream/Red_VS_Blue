@@ -28,6 +28,9 @@ export interface CandidateAuthorityRepository {
 }
 
 export class CandidateBattleStore implements DeploymentRoomStore {
+  private closed = false
+  closeAuthority(): void { this.closed = true }
+  private assertOpen(): void { if (this.closed) throw Object.assign(new Error('比赛已被管理员关闭'), { code: 'AUTHORITY_CLOSED' }) }
   readonly terminalAuthorityPersistencePolicy = 'durable-barrier' as const
   private readonly receipts = new Map<string, BattleAuthorityReceipt>()
   private readonly transitions: BattleAuthorityTransitionRecord[]
@@ -77,15 +80,18 @@ export class CandidateBattleStore implements DeploymentRoomStore {
   }
 
   async getRoom(roomId: string): Promise<Room | undefined> {
+    this.assertOpen()
     return normalizeRoomId(roomId) === this.room.id ? structuredClone(this.room) : undefined
   }
 
   async setRoom(roomId: string, room: Room): Promise<void> {
+    this.assertOpen()
     if (normalizeRoomId(roomId) !== this.room.id) throw new Error('Candidate room mismatch')
     this.room = structuredClone(room)
   }
 
   async setRoomIfVersion(roomId: string, room: Room, expectedVersion: number): Promise<boolean> {
+    this.assertOpen()
     if (normalizeRoomId(roomId) !== this.room.id || Number(this.room.version ?? 0) !== expectedVersion) return false
     this.room = { ...structuredClone(room), version: expectedVersion + 1 }
     return true
@@ -101,6 +107,7 @@ export class CandidateBattleStore implements DeploymentRoomStore {
   }
 
   async persistBattleAuthorityReceipt(receipt: BattleAuthorityReceipt): Promise<void> {
+    this.assertOpen()
     if (receipt.roomId !== this.room.id) throw new Error('Candidate receipt room mismatch')
     this.receipts.set(receipt.clientActionId, structuredClone(receipt))
   }
@@ -116,6 +123,7 @@ export class CandidateBattleStore implements DeploymentRoomStore {
     baseCheckpoint?: BattleAuthorityCheckpointRecord
     checkpoint?: BattleAuthorityCheckpointRecord
   }): Promise<boolean> {
+    this.assertOpen()
     const roomId = normalizeRoomId(input.roomId)
     if (
       roomId !== this.room.id

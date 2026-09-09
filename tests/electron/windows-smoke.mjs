@@ -1,3 +1,4 @@
+import { createHash, generateKeyPairSync, sign } from 'node:crypto'
 import { execFileSync, spawn, spawnSync } from 'node:child_process'
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, unlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -212,6 +213,60 @@ async function waitForActivationTransaction(activePath, targetProfileHash, timeo
     await delay(2)
   }
   throw new Error(`Activation transaction did not appear for ${targetProfileHash}: ${JSON.stringify(observed)}`)
+}
+
+async function verifyMultiplayerPage(port, target, localUrl, observedRoomId) {
+  await evaluate(target, "window.location.href = 'rvb-client://app/multiplayer.html'; true", false)
+  const page = await waitForTargets(port, candidate => candidate.url.startsWith('rvb-client://app/multiplayer.html'), 5000)
+  const deadline = Date.now() + 8000
+  let ready = false
+  while (Date.now() < deadline) {
+    ready = await evaluate(page, "typeof document.getElementById('showLocalAddress')?.onclick === 'function'")
+    if (ready) break
+    await delay(100)
+  }
+  assert(ready, 'Multiplayer page did not initialize')
+  const runtime = await evaluate(page, `(async () => {
+    const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+    document.getElementById('hostDialog').showModal();
+    document.getElementById('showLocalAddress').closest('details').open = true;
+    document.getElementById('showLocalAddress').click();
+    while (document.getElementById('showLocalAddress').disabled) await sleep(50);
+    const localAddress = document.getElementById('localAddress').textContent;
+    document.getElementById('hostDialog').close();
+    document.getElementById('diagnosticDialog').showModal();
+    document.getElementById('directUrl').value = ${JSON.stringify(localUrl)};
+    document.getElementById('diagnose').click();
+    while (document.getElementById('diagnose').disabled) await sleep(50);
+    return {localAddress, diagnosis: JSON.parse(document.getElementById('diagnosis').textContent), error: document.getElementById('error').textContent};
+  })()`)
+  assert(runtime.localAddress.includes(new URL(localUrl).port), `frp target is not the running game port: ${JSON.stringify(runtime)}`)
+  assert(!runtime.error && runtime.diagnosis.checks[0]?.ok === true, `Packaged network diagnostic failed: ${JSON.stringify(runtime)}`)
+  await evaluate(page, "document.getElementById('diagnosticDialog').close(); document.getElementById('directDialog').showModal(); document.getElementById('joinDirect').click(); true", false)
+  const lobby = await waitForTargets(port, candidate => candidate.url.startsWith('rvb-client://app/lobby.html'), 10000)
+  await evaluate(lobby, "localStorage.setItem('rvb_active_battle', 'spectator-smoke-preserve-existing-match'); true")
+  const spectateButton = `Array.from(document.querySelectorAll('.btn-spectate')).find(button => button.dataset.roomId === ${JSON.stringify(observedRoomId)})`
+  let available = false
+  for (let attempt = 0; attempt < 60; attempt++) {
+    available = await evaluate(lobby, `!!(${spectateButton})`)
+    if (available) break
+    await delay(100)
+  }
+  assert(available, 'Active game has no lobby spectate button')
+  await evaluate(lobby, `${spectateButton}.click(); true`, false)
+  const spectatorPage = await waitForTargets(port, candidate => candidate.url.includes('battle.html?') && candidate.url.includes('mode=spectate'), 10000)
+  let spectator
+  for (let attempt = 0; attempt < 80; attempt++) {
+    spectator = await evaluate(spectatorPage, `({ready: typeof G !== 'undefined' && !!G, status: document.getElementById('spectatorStatus')?.textContent || '', surrenderHidden: document.getElementById('btnSurrender')?.hidden, hiddenHands: typeof G !== 'undefined' && !!G && G.players.every(player => player.hand.every(card => card.cardId === 'hidden'))})`)
+    if (spectator.ready && spectator.status.includes('只读观战')) break
+    await delay(100)
+  }
+  assert(spectator?.ready && spectator.hiddenHands && spectator.surrenderHidden, `Packaged spectator view failed: ${JSON.stringify(spectator)}`)
+  const perspective = await evaluate(spectatorPage, "({blue: document.getElementById('myLabel').textContent, red: document.getElementById('oppLabel').textContent, active: localStorage.getItem('rvb_active_battle')})")
+  assert(perspective.blue.includes('蓝方') && perspective.red.includes('红方') && perspective.active === 'spectator-smoke-preserve-existing-match', `Spectator perspective or player recovery record changed: ${JSON.stringify(perspective)}`)
+  spectator.perspective = perspective
+  runtime.spectator = spectator
+  return {target: spectatorPage, runtime}
 }
 
 async function verifyBattleTerminalError(port, target, timeoutMs = 5000) {
@@ -487,7 +542,7 @@ async function launch(application, timeoutMs = 30000) {
   return { target, rendererBoundary }
 }
 
-async function smokeClient(expectedIdentity = null, sharedUserDataDir = null) {
+async function smokeClient(expectedIdentity = null, sharedUserDataDir = null, networkOnly = false) {
   const application = applications.client
   const sourcePackageRoot = path.dirname(application.executable)
   const isolatedPackageBase = mkdtempSync(path.join(tmpdir(), 'rvb-client-package-smoke-'))
@@ -613,6 +668,7 @@ async function smokeClient(expectedIdentity = null, sharedUserDataDir = null) {
         markerAfterRecovery === recoveryMarker,
         `Silent authority recovery reloaded the main menu: ${JSON.stringify({ recoveryMarker, markerAfterRecovery })}`,
       )
+      if (!networkOnly) {
       tutorialWithoutAuthority = await verifyTutorialWithoutAuthority(application.debugPort, recoveryTarget)
       await evaluate(tutorialWithoutAuthority.target, "window.location.href = 'rvb-client://app/index.html'; true", false)
       recoveryTarget = await waitForTargets(
@@ -621,6 +677,7 @@ async function smokeClient(expectedIdentity = null, sharedUserDataDir = null) {
         10_000,
       )
       await evaluate(recoveryTarget, `window.__rvbRecoverySmokeMarker = ${JSON.stringify(recoveryMarker)}; true`)
+      }
     } finally {
       if (existsSync(disabledAuthorityEntry)) renameSync(disabledAuthorityEntry, authorityEntry)
     }
@@ -754,9 +811,21 @@ async function smokeClient(expectedIdentity = null, sharedUserDataDir = null) {
     )
     const colyseusClient = new ColyseusClient(`http://127.0.0.1:${localGatewayPort}`)
     const duplicateCreateClient = new ColyseusClient(`http://127.0.0.1:${localGatewayPort}`)
+    const smokeIdentity = () => {
+      const keys = generateKeyPairSync('ed25519')
+      const publicKey = keys.publicKey.export({ format: 'der', type: 'spki' }).subarray(-32).toString('hex')
+      return { keys, publicKey, playerId: createHash('sha256').update(Buffer.from(publicKey, 'hex')).digest('hex').slice(0, 8) }
+    }
+    const smokeHost = smokeIdentity(), smokeGuest = smokeIdentity()
+    const admissionProof = async (identity, roomId) => {
+      const { nonce } = await getJson(localBaseUrl + '/admission/challenge')
+      const payload = { type: 'rvb-colyseus-admission-v1', nonce, playerId: identity.playerId, roomId }
+      return { payload, publicKey: identity.publicKey, signature: sign(null, Buffer.from(JSON.stringify(payload)), identity.keys.privateKey).toString('hex') }
+    }
     const creationOptions = {
       product: true,
-      playerId: 'red158-windows-smoke-host',
+      playerId: smokeHost.playerId,
+      alignment: 'light',
       playerName: 'RED-158 Windows smoke host',
       name: 'RED-158 Windows smoke room',
       mapId: 'winding-pass',
@@ -765,8 +834,8 @@ async function smokeClient(expectedIdentity = null, sharedUserDataDir = null) {
       profileIdentity: catalogIdentity.data.profileIdentity,
     }
     const concurrentCreateResults = await Promise.allSettled([
-      colyseusClient.create('battle', creationOptions),
-      duplicateCreateClient.create('battle', creationOptions),
+      colyseusClient.create('battle', { ...creationOptions, auth: await admissionProof(smokeHost, 'create') }),
+      duplicateCreateClient.create('battle', { ...creationOptions, auth: await admissionProof(smokeHost, 'create') }),
     ])
     const fulfilledCreates = concurrentCreateResults.filter(result => result.status === 'fulfilled')
     const rejectedCreates = concurrentCreateResults.filter(result => result.status === 'rejected')
@@ -799,7 +868,9 @@ async function smokeClient(expectedIdentity = null, sharedUserDataDir = null) {
     const guestClient = new ColyseusClient(`http://127.0.0.1:${localGatewayPort}`)
     const guestRoom = await guestClient.joinById(smokeRoom.roomId, {
       product: true,
-      playerId: 'red158-windows-smoke-guest',
+      playerId: smokeGuest.playerId,
+      alignment: 'light',
+      auth: await admissionProof(smokeGuest, smokeRoom.roomId),
       playerName: 'RED-158 Windows smoke guest',
       profileIdentity: catalogIdentity.data.profileIdentity,
     })
@@ -811,13 +882,33 @@ async function smokeClient(expectedIdentity = null, sharedUserDataDir = null) {
       joinedRoom.ok === true
         && joinedRoom.data?.room?.id === smokeRoom.roomId
         && joinedRoom.data.room.players?.filter(player => (
-          player.id === 'red158-windows-smoke-host' || player.id === 'red158-windows-smoke-guest'
+          player.id === smokeHost.playerId || player.id === smokeGuest.playerId
         )).length === 2,
       `Second Windows player could not join the single created room: ${JSON.stringify(joinedRoom)}`,
     )
+    if (networkOnly) {
+      const catalog = await fetch(`${localBaseUrl}/catalog/pieces`).then(response => response.json())
+      const pieces = catalog.pieces.filter(piece => piece.faction === 'good').slice(0, 8).map(piece => ({ templateId: piece.id, faction: piece.faction }))
+      for (const [room, identity] of [[smokeRoom, smokeHost], [guestRoom, smokeGuest]]) await room.request('roomRpc', { method: 'rooms.action', data: { action: 'select-pieces', playerId: identity.playerId, alignment: 'light', pieces, profileIdentity: catalogIdentity.data.profileIdentity } })
+    }
+    const multiplayerPage = networkOnly ? await verifyMultiplayerPage(application.debugPort, gameTarget, localBaseUrl, smokeRoom.roomId) : null
+    if (multiplayerPage) {
+      const state = await new Promise(resolve => { const off = smokeRoom.onMessage('battleSnapshot', message => { off(); resolve(message) }); smokeRoom.send('battleResync', {}) })
+      const clientActionId = 'spectator-smoke-terminal'
+      smokeRoom.send('battleCommand', { protocolVersion: state.protocolVersion, authorityBuildId: state.authorityBuildId, roomId: smokeRoom.roomId, playerId: smokeHost.playerId, expectedAuthorityVersion: state.authorityVersion, clientActionId, command: { type: 'surrender', playerId: smokeHost.playerId, clientActionId } })
+      const deadline = Date.now() + 8000
+      let terminal
+      while (Date.now() < deadline) {
+        terminal = await evaluate(multiplayerPage.target, "({finished: !!G?.terminalResult, title: document.getElementById('resultTitle').textContent, trace: document.getElementById('matchTraceStatus').textContent, active: localStorage.getItem('rvb_active_battle'), privateHistory: !!G?.extensions?.debugBattle})")
+        if (terminal.finished) break
+        await delay(100)
+      }
+      assert(terminal?.finished && terminal.title === '对局结束' && !terminal.trace && !terminal.privateHistory && terminal.active === 'spectator-smoke-preserve-existing-match', `Spectator terminal view failed: ${JSON.stringify(terminal)}`)
+      multiplayerPage.runtime.spectator.terminal = terminal
+    }
     await guestRoom.leave()
     await smokeRoom.leave()
-    const pieceGallery = await verifyPieceGallery(application.debugPort, gameTarget)
+    const pieceGallery = await verifyPieceGallery(application.debugPort, multiplayerPage?.target || gameTarget)
     const battle = await verifyBattleTerminalError(application.debugPort, pieceGallery.target)
     assert(battle.runtime.readyState === 'complete', `Battle page did not finish loading: ${JSON.stringify(battle.runtime)}`)
     assert(battle.runtime.messageColor === 'rgb(248, 113, 113)', `Battle page did not style its terminal error: ${JSON.stringify(battle.runtime)}`)
@@ -832,19 +923,20 @@ async function smokeClient(expectedIdentity = null, sharedUserDataDir = null) {
       `Client candidate left residual processes: ${JSON.stringify(processCountsAfterExit)}`,
     )
     console.log(JSON.stringify({
-      entry: 'client',
+      entry: networkOnly ? 'network-client' : 'client',
       isolatedPackageRoot,
       rendererBoundary,
       invalidTlsCertificate: tlsProbe,
       homepageWindowBoundary,
       packagedAssets,
+      multiplayerPage: multiplayerPage?.runtime,
       localMode: mode,
       boundedAuthorityRecovery: {
         exhausted: exhaustedRecovery.localAuthorityRecovery,
         manual: manualRecovery.recovery,
         rendererPreserved: markerAfterManualRecovery === recoveryMarker,
       },
-      tutorialWithoutAuthority: tutorialWithoutAuthority.runtime,
+      tutorialWithoutAuthority: networkOnly ? { skipped: 'separate tutorial acceptance' } : tutorialWithoutAuthority.runtime,
       profileIdentity: catalogIdentity.data.profileIdentity,
       resourcePackStatus,
       databaseProbe: {
@@ -1714,7 +1806,8 @@ const entries = selectedEntries.includes('profile')
 let expectedIdentity = null
 try {
   for (const entry of entries) {
-    if (entry === 'client') await smokeClient(expectedIdentity, sharedUserDataDir)
+    if (entry === 'network-client') await smokeClient(expectedIdentity, sharedUserDataDir, true)
+    else if (entry === 'client') await smokeClient(expectedIdentity, sharedUserDataDir)
     else if (entry === 'profile') {
       expectedIdentity = await smokeProfileActivation(candidate, sharedUserDataDir)
     } else if (entry === 'editor') await smokeEditor(candidate)

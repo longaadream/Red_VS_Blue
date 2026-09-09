@@ -1,6 +1,9 @@
 import { defineRoom, defineServer, matchMaker } from 'colyseus'
+import { randomUUID } from 'node:crypto'
 import { WebSocketTransport } from '@colyseus/ws-transport'
 import { Pool } from 'pg'
+import type { Express } from 'express'
+import type { RankedRoomHooks } from '../official/ranked'
 
 import { getServerGameProfileIdentityV1 } from '@/lib/content-pipeline/runtime/profile-game-identity'
 import { getSelectableMapCatalog } from '@/lib/game/map-selection'
@@ -17,6 +20,7 @@ import {
 import { PostgresAuthorityRepository } from '@/lib/server/postgres/postgres-authority-repository'
 
 import { createBattleRoomClass } from './battle-room'
+import { createAdmissionAuthority } from './admission'
 import { BATTLE_ROOM_TYPE } from './battle-room-protocol'
 import {
   type BattleRoomFixtureFactory,
@@ -33,6 +37,10 @@ export interface BattleServerRepository
 }
 
 export interface CreateColyseusBattleServerOptions {
+  official?: RankedRoomHooks
+  configureExpress?: (app: Express) => void
+  requireIdentityProof?: boolean
+  reconnectGraceMs?: number
   databaseUrl?: string
   repository?: BattleServerRepository
   journal?: PostgresAuthorityJournal
@@ -52,6 +60,7 @@ interface HealthResponse {
 }
 
 interface JsonRequest {
+  headers?: Record<string, string | string[] | undefined>
   params?: Record<string, string | undefined>
   query?: Record<string, unknown>
 }
@@ -137,7 +146,18 @@ export function createColyseusBattleServer(options: CreateColyseusBattleServerOp
   }
   const productCreationClaims = new Map<string, ProductCreationClaim>()
   const logger = options.logger ?? console
+  const admission = createAdmissionAuthority()
+  const restoreCapability = randomUUID()
+  const roomInvites = new Map<string, string>()
   const BattleRoom = createBattleRoomClass({
+    official: options.official,
+    updateInvite: (roomId, code) => {
+      for (const [existing, id] of roomInvites) if (id === roomId && existing !== code) roomInvites.delete(existing)
+      if (code) roomInvites.set(code, roomId)
+    },
+    restoreCapability,
+    reconnectGraceMs: options.reconnectGraceMs,
+    authenticate: (options.requireIdentityProof ?? !options.repository) ? admission.authenticate : undefined,
     repository,
     journal,
     fixtureFactory: options.fixtureFactory ?? createDevelopmentBattleRoom,
@@ -158,6 +178,9 @@ export function createColyseusBattleServer(options: CreateColyseusBattleServerOp
   let ready = false
   let healthError: string | undefined
   const server = defineServer({
+    // The official launcher must finish its embedded PostgreSQL shutdown before
+    // exiting; Colyseus' automatic process.exit would race that owner.
+    gracefullyShutdown: options.official ? false : undefined,
     // Keep the transport as a static dependency so the packaged authority does
     // not rely on Colyseus' runtime dynamic import from node_modules.
     transport: new WebSocketTransport(),
@@ -180,7 +203,7 @@ export function createColyseusBattleServer(options: CreateColyseusBattleServerOp
       const app = rawApp as unknown as ExpressLikeApp
       app.use((_request, response, next) => {
         response.setHeader('Access-Control-Allow-Origin', '*')
-        response.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+        response.setHeader('Access-Control-Allow-Headers', 'Content-Type,X-RvB-Auth,Authorization')
         response.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS')
         if (_request.method === 'OPTIONS') {
           response.sendStatus(204)
@@ -188,6 +211,7 @@ export function createColyseusBattleServer(options: CreateColyseusBattleServerOp
         }
         next()
       })
+      options.configureExpress?.(rawApp as unknown as Express)
       app.get('/healthz', async (_request: unknown, response: HealthResponse) => {
         try {
           await repository.healthCheck()
@@ -211,11 +235,15 @@ export function createColyseusBattleServer(options: CreateColyseusBattleServerOp
         protocol: 'rvb-colyseus',
         ...healthIdentity,
       }))
+      app.get('/admission/challenge', (_request, response) => {
+        try { response.status(200).json(admission.challenge()) }
+        catch { response.status(429).json({ error: 'ADMISSION_BUSY' }) }
+      })
       app.get('/catalog/identity', (_request, response) => response.status(200).json({
         profileIdentity: getServerGameProfileIdentityV1(),
       }))
-      app.get('/catalog/maps', (_request, response) => response.status(200).json({
-        maps: getSelectableMapCatalog(),
+      app.get('/catalog/maps', (request, response) => response.status(200).json({
+        maps: getSelectableMapCatalog(request.query?.mode === '2v2' ? '2v2' : '1v1'),
       }))
       app.get('/catalog/pieces', (_request, response) => response.status(200).json({ pieces: getAllPieces() }))
       app.get('/catalog/skills', (_request, response) => response.status(200).json({ skills: getAllSkills() }))
@@ -232,13 +260,36 @@ export function createColyseusBattleServer(options: CreateColyseusBattleServerOp
           ? { room }
           : { code: 'ROOM_NOT_FOUND', error: 'Room not found' })
       })
+      app.get('/room-invites/:code', async (request, response) => {
+        const code = String(request.params?.code ?? '').trim().toUpperCase()
+        const roomId = /^[A-F0-9]{12}$/.test(code) ? roomInvites.get(code) : undefined
+        const listings = roomId ? await matchMaker.query({ name: BATTLE_ROOM_TYPE }) : []
+        const room = collectProductRooms(listings, true).find(candidate => candidate.id === roomId)
+        response.status(room ? 200 : 404).json(room ? { room } : { code: 'ROOM_NOT_FOUND', error: '邀请码无效或房间已关闭' })
+      })
       app.get('/battle-reports/:battleId', async (request, response) => {
         const battleId = String(request.params?.battleId ?? '').trim().toLowerCase()
+        let playerId: string
+        let verifiedKey: string
+        try {
+          const proof = JSON.parse(String(request.headers?.['x-rvb-auth'] ?? ''))
+          playerId = String(proof?.payload?.playerId ?? '')
+          verifiedKey = admission.authenticate(playerId, 'report:' + battleId, proof)
+        } catch {
+          response.status(401).json({ code: 'PLAYER_AUTH_INVALID', error: '请使用参赛玩家身份读取战报' })
+          return
+        }
         if (!repository.readBattleReport) {
           response.status(501).json({ code: 'BATTLE_REPORT_UNAVAILABLE', error: 'Battle report store is unavailable' })
           return
         }
         try {
+          const restored = await repository.restoreRoom(battleId)
+          const participant = restored?.room.players.find(player => player.id === playerId)
+          if (!participant?.publicKey || participant.publicKey !== verifiedKey) {
+            response.status(403).json({ code: 'BATTLE_REPORT_FORBIDDEN', error: '完整战报仅向参赛玩家开放' })
+            return
+          }
           const report = await repository.readBattleReport(battleId)
           response.status(report ? 200 : 404).json(report
             ? { report }
@@ -278,7 +329,7 @@ export function createColyseusBattleServer(options: CreateColyseusBattleServerOp
       })
     },
   })
-  server.onBeforeShutdown(() => journal.close())
+  if (!options.official) server.onBeforeShutdown(() => journal.close())
   if (ownsRepository) server.onShutdown(() => repository.close?.())
   let roomsRestored = false
   const restoreProductRooms = async (): Promise<string[]> => {
@@ -287,8 +338,9 @@ export function createColyseusBattleServer(options: CreateColyseusBattleServerOp
     const roomIds = await repository.listRestorableRoomIds?.() ?? []
     const restoredRoomIds: string[] = []
     for (const battleId of roomIds) {
+      if (options.official?.canRestore && !await options.official.canRestore(battleId)) continue
       try {
-        await matchMaker.createRoom(BATTLE_ROOM_TYPE, { product: true, restore: true, battleId })
+          await matchMaker.createRoom(BATTLE_ROOM_TYPE, { product: true, restore: true, battleId, restoreCapability })
         restoredRoomIds.push(battleId)
       } catch (error) {
         logger.error('[colyseus] durable room restore skipped', {
@@ -300,22 +352,30 @@ export function createColyseusBattleServer(options: CreateColyseusBattleServerOp
     }
     return restoredRoomIds
   }
-  return { server, repository, journal, restoreProductRooms }
+  const restoreProductRoom = async (battleId: string) => {
+    if (options.official?.canRestore && !await options.official.canRestore(battleId)) throw new Error('Room is no longer active')
+    if (matchMaker.getLocalRoomById(battleId)) return
+    await matchMaker.createRoom(BATTLE_ROOM_TYPE, { product: true, restore: true, battleId, restoreCapability })
+  }
+  return { server, repository, journal, restoreProductRooms, restoreProductRoom }
 }
 
 function collectProductRooms(
   listings: ReadonlyArray<{ metadata?: unknown }>,
-  includePrivate: boolean,
+  includeUnlisted: boolean,
 ): Array<Record<string, unknown> & { id: string }> {
   const byId = new Map<string, Record<string, unknown> & { id: string }>()
   for (const listing of listings) {
     const metadata = listing.metadata as ProductRoomMetadata | undefined
-    if (metadata?.product !== true || (!includePrivate && metadata.visibility === 'private')) continue
+    if (metadata?.product !== true || (!includeUnlisted && metadata.visibility === 'private')) continue
     const room = metadata.room && typeof metadata.room === 'object'
       ? metadata.room as Record<string, unknown>
       : undefined
     const id = typeof room?.id === 'string' ? room.id.trim() : ''
     if (!id) continue
+    // Direct lookups retain terminal snapshots for participants already in the room.
+    // The public playable catalog must not advertise completed matches.
+    if (!includeUnlisted && room?.status === 'finished') continue
     const normalizedId = id.toLowerCase()
     if (byId.has(normalizedId)) {
       console.warn('[colyseus:rooms] duplicate room catalog entry ignored', { roomId: normalizedId })

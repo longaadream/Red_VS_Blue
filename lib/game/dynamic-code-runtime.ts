@@ -5,6 +5,8 @@
  * only eval boundary so Node and the browser bundle share cache, invalidation,
  * diagnostics, and compilation accounting.
  */
+import { areMatchAllies, nextMatchOpponent } from './match-teams'
+
 export type DynamicCodeSurface =
   | 'skillCode'
   | 'cardCode'
@@ -72,7 +74,9 @@ export class DynamicCodeRuntime {
     let value: unknown
     try {
       // Keep eval local to this runtime. The caller supplies a parenthesized expression.
-      value = (0, eval)(request.code)
+      // Bind the same pure team predicate on every dynamic surface, including
+      // rule triggers and resumed effects. No global or serialized function.
+      value = (0, eval)(`(function(arePlayersAllied, nextEnemyPlayer) { return (${request.code}); })`)(areMatchAllies, nextMatchOpponent)
     } catch (cause) {
       throw new DynamicCodeRuntimeError('compile', request.surface, request.contentId, request.contentVersion ?? '0', `unable to compile ${request.entry}`, cause)
     }

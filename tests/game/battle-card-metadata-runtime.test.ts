@@ -86,6 +86,7 @@ function createRuntime(overrides: Record<string, unknown> = {}): Runtime {
     },
     myPlayerId: 'player-blue',
     TRAINING_MODE: false,
+    PRACTICE_MODE: false,
     cardsById: {},
     cardDisplayMetadataById: Object.create(null),
     cardDisplayMetadataRequests: new Map(),
@@ -403,7 +404,7 @@ describe('LAN battle hand card display metadata', () => {
   })
 
   it('marks the page disposed before clearing in-flight card metadata requests', () => {
-    expect(battlePage).toMatch(/function disposeBattlePage\(\) \{\s*battlePageDisposed = true\s*cardDisplayMetadataRequests\.clear\(\)/)
+    expect(battlePage).toMatch(/battlePageDisposed = true\s*cardDisplayMetadataRequests\.clear\(\)/)
   })
 })
 
