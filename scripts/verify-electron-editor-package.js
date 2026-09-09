@@ -201,7 +201,7 @@ if (require.main === module) {
     const packageRoot = path.join(outputRoot, 'win-unpacked')
     const packageMetadata = JSON.parse(fs.readFileSync(path.join(projectRoot, 'package.json'), 'utf8'))
     const builderConfig = JSON.parse(
-      fs.readFileSync(path.join(projectRoot, 'electron-builder.editor.json'), 'utf8'),
+      fs.readFileSync(path.join(projectRoot, 'config/electron-builder.editor.json'), 'utf8'),
     )
     const portablePath = path.join(
       outputRoot,

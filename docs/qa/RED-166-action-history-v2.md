@@ -44,11 +44,11 @@ OK; origin/main 09e3e6c29a2c922bdc591cdb40bc26f6f56954dd; ahead 1, behind 0
 
 ## 浏览器证据
 
-- [真实棋盘默认态 1280×720](./evidence/RED-166-action-history-v2/board-collapsed-1280x720.png)：正式 `battle.html`、Three.js canvas、原地图与 5 条窄栏同时渲染；对手手牌显示卡背和数字角标。
-- [真实棋盘展开态 1280×720](./evidence/RED-166-action-history-v2/board-expanded-1280x720.png)：展开后渲染 20 个根动作，滚动容器 `388 / 1151px`，滚动测试达到 `scrollTop=500`；面板与“结束回合”按钮保留 `10px` 间距。
-- [真实棋盘高亮态 1280×720](./evidence/RED-166-action-history-v2/board-highlight-1280x720.png)：技能名称来自实际技能定义（示例“圣光盾”）；点击产生 2 个棋子点和 1 条路径，没有虚假的 `(0,0)` 地格；AP 与 hash 保持不变，图标无破图。
-- [1280×720 展开状态](./evidence/RED-166-action-history-v2/desktop-expanded.png)：技能名称使用文字；影分身结果为“结果保密”；充能点变化显示 `+1`；左上展示 8 张对手手牌的逐张压缩卡背与数字角标 `8`。夹具不绘制或替换棋盘，实际战斗场景沿用现有地图样式。
-- [844×390 横屏展开状态](./evidence/RED-166-action-history-v2/landscape-expanded.png)：动作栏仍可展开，内容内部滚动且没有页面横向溢出。
+- [真实棋盘默认态 1280×720](https://github.com/longaadream/Red_VS_Blue/blob/a7849ce9eb3fc9e2fbc000afdd5f770b6f57e37a/docs/qa/evidence/RED-166-action-history-v2/board-collapsed-1280x720.png)：正式 `battle.html`、Three.js canvas、原地图与 5 条窄栏同时渲染；对手手牌显示卡背和数字角标。
+- [真实棋盘展开态 1280×720](https://github.com/longaadream/Red_VS_Blue/blob/a7849ce9eb3fc9e2fbc000afdd5f770b6f57e37a/docs/qa/evidence/RED-166-action-history-v2/board-expanded-1280x720.png)：展开后渲染 20 个根动作，滚动容器 `388 / 1151px`，滚动测试达到 `scrollTop=500`；面板与“结束回合”按钮保留 `10px` 间距。
+- [真实棋盘高亮态 1280×720](https://github.com/longaadream/Red_VS_Blue/blob/a7849ce9eb3fc9e2fbc000afdd5f770b6f57e37a/docs/qa/evidence/RED-166-action-history-v2/board-highlight-1280x720.png)：技能名称来自实际技能定义（示例“圣光盾”）；点击产生 2 个棋子点和 1 条路径，没有虚假的 `(0,0)` 地格；AP 与 hash 保持不变，图标无破图。
+- [1280×720 展开状态](https://github.com/longaadream/Red_VS_Blue/blob/a7849ce9eb3fc9e2fbc000afdd5f770b6f57e37a/docs/qa/evidence/RED-166-action-history-v2/desktop-expanded.png)：技能名称使用文字；影分身结果为“结果保密”；充能点变化显示 `+1`；左上展示 8 张对手手牌的逐张压缩卡背与数字角标 `8`。夹具不绘制或替换棋盘，实际战斗场景沿用现有地图样式。
+- [844×390 横屏展开状态](https://github.com/longaadream/Red_VS_Blue/blob/a7849ce9eb3fc9e2fbc000afdd5f770b6f57e37a/docs/qa/evidence/RED-166-action-history-v2/landscape-expanded.png)：动作栏仍可展开，内容内部滚动且没有页面横向溢出。
 
 ## 人工验收建议
 

@@ -1,0 +1,634 @@
+{
+  "base": "a7849ce9eb3fc9e2fbc000afdd5f770b6f57e37a",
+  "rootBefore": 43,
+  "rootAfter": 35,
+  "deletedImages": [
+    {
+      "path": "docs/media/roster.png",
+      "bytes": 623115,
+      "sha256": "c34be251a35b8d9e56c9331e32a6019bfa9d5b2fcfd755a2a366a3035f56003a"
+    },
+    {
+      "path": "docs/product/art-direction-dark-tactical-table-v3.png",
+      "bytes": 2594943,
+      "sha256": "9083ed4e0fb6e7c57c3fe8f21ecae7f836e787275144f3a847fd7f0a685baa5e"
+    },
+    {
+      "path": "docs/product/red-68/after-1024x768.png",
+      "bytes": 127147,
+      "sha256": "202cfd8bb24e9779608ae672cc6570f4982542cbdb32983d3ad5e40ed1039335"
+    },
+    {
+      "path": "docs/product/red-68/after-1280x720-dense-8cards.png",
+      "bytes": 200582,
+      "sha256": "9d4d9e5462c9772e3b9bf5d6742044dab872892c40b209fdf335287c6762ef34"
+    },
+    {
+      "path": "docs/product/red-68/after-1280x720.png",
+      "bytes": 84573,
+      "sha256": "0609a5a7e503dd1975bda8407e82ae935ff69fe34ab33c747cbf9446b2a5c221"
+    },
+    {
+      "path": "docs/product/red-68/after-1440x900.png",
+      "bytes": 144683,
+      "sha256": "e37ade17dae39e6542b4e9dd50863638e05cacb7bc640b76305a30c651b6414a"
+    },
+    {
+      "path": "docs/product/red-68/after-360x800-dense-5cards.png",
+      "bytes": 79346,
+      "sha256": "abec66d420d9d0ada37bce8511f15c4184cf1392ae2042d3f326834edcc72e4c"
+    },
+    {
+      "path": "docs/product/red-68/after-360x800.png",
+      "bytes": 27686,
+      "sha256": "b3c9c2d27a84580364d7f565928d0b9c8b05c2386385a499f91d966bd530b127"
+    },
+    {
+      "path": "docs/product/red-68/after-390x844-dense-8cards.png",
+      "bytes": 88346,
+      "sha256": "ddb8bbe1557f392f20589a63b3a14e3539bb2d048066e6ca5e010a6ab9965032"
+    },
+    {
+      "path": "docs/product/red-68/after-390x844-target.png",
+      "bytes": 27696,
+      "sha256": "8b4811778a6c57418a64f0dda960bca7502d522d10d1e0f9e336eaa225ead9fd"
+    },
+    {
+      "path": "docs/product/red-68/after-390x844.png",
+      "bytes": 31722,
+      "sha256": "ab3772da81d301ee8b117e7dc5fd9b9f3165e04ede4570ba549230d2bf1ba9d3"
+    },
+    {
+      "path": "docs/product/red-68/after-760x720.png",
+      "bytes": 93775,
+      "sha256": "442a828611323512b36386e8daf4c0f61b041bceb6de76d6e415fa32d13f3579"
+    },
+    {
+      "path": "docs/product/red-68/after-844x390-target.png",
+      "bytes": 21396,
+      "sha256": "b75572c04605503e7c7acb744511e1b1e52311d376deb50bfa0317914638f1be"
+    },
+    {
+      "path": "docs/product/red-68/after-844x390.png",
+      "bytes": 42743,
+      "sha256": "0fd8ee43b13b0b4f4be48ab486c8729e7788be877d026493a69c8c1440d272b8"
+    },
+    {
+      "path": "docs/product/red-68/before-1024x768.png",
+      "bytes": 137651,
+      "sha256": "14e65a77273cb5a34c616221cce4a0550455ea1279ecf8f090b76ff9214d1211"
+    },
+    {
+      "path": "docs/product/red-68/before-1280x720.png",
+      "bytes": 132954,
+      "sha256": "0ac8826e3cf828b200c0e246cded6968e1fb9eecf35de936bce295b0e1b1b55a"
+    },
+    {
+      "path": "docs/product/red-68/before-1440x900.png",
+      "bytes": 159694,
+      "sha256": "735e247dfb2cbdc9d8bf4b4e00acdc21e77f0845d25a9832a34785f1304ee4f7"
+    },
+    {
+      "path": "docs/product/red-68/before-360x800.png",
+      "bytes": 91482,
+      "sha256": "eba667a56f8af5bff46add9eb041c5d332a26d66e92785a47bcb93edaea1b967"
+    },
+    {
+      "path": "docs/product/red-68/before-390x844.png",
+      "bytes": 102626,
+      "sha256": "afbf5a05b3c6961ac29d592aadf8fc8978da037cbaa6b25eb1db340507839fb1"
+    },
+    {
+      "path": "docs/product/red-68/before-760x720.png",
+      "bytes": 103124,
+      "sha256": "be639ee260be7d06709ae28db655efa278db7a37170361094fc3f445a3d46e67"
+    },
+    {
+      "path": "docs/product/red-68/before-844x390.png",
+      "bytes": 68408,
+      "sha256": "fe8e200b8bef9203c95ca6893f57a2cdcc4695433df81f042a8d410759c48287"
+    },
+    {
+      "path": "docs/product/red-68/reference-1280x720.png",
+      "bytes": 1464215,
+      "sha256": "20e082e52395d658c9c4c6964a2915cc515cc31d3f961ace7a65f2f888c1c423"
+    },
+    {
+      "path": "docs/qa/RED-171/evidence/main-menu-1280x720.png",
+      "bytes": 111967,
+      "sha256": "f3bb2b2fd465b40a29a62979b900407cdcacf4694e78704a91b5e91fde92fd6b"
+    },
+    {
+      "path": "docs/qa/RED-171/evidence/main-menu-1440x900.png",
+      "bytes": 124171,
+      "sha256": "ee078ab018212087e6081867bae2eed41e692913e729b376a6f5e761a68c6f09"
+    },
+    {
+      "path": "docs/qa/RED-171/evidence/main-menu-390x844.png",
+      "bytes": 48750,
+      "sha256": "1e457b92d234d468985270d5853acd9df27c51de13a7b8d1f085f10b6222158c"
+    },
+    {
+      "path": "docs/qa/RED-171/evidence/main-menu-844x390.png",
+      "bytes": 51466,
+      "sha256": "231aff8bae93a5499cd1fd95c6ff0f2ec557fce215cfef5c429fca644a6c5c4e"
+    },
+    {
+      "path": "docs/qa/RED-178/editor-assets-1200x780.png",
+      "bytes": 45441,
+      "sha256": "d95f328425d2215de60052e48791b1928fc92c4452f4fc6cbeee14580289e7f6"
+    },
+    {
+      "path": "docs/qa/RED-178/editor-fields-1200x780.png",
+      "bytes": 48626,
+      "sha256": "42c4533a126a99acb789173c3393b751ea924154586a1962267a34a900504dd7"
+    },
+    {
+      "path": "docs/qa/RED-178/editor-json-error-900x600.png",
+      "bytes": 32671,
+      "sha256": "15eeac180debe1b840b91b755bd3a47a0023c96ace3b75de1306115740873cf6"
+    },
+    {
+      "path": "docs/qa/RED-178/editor-new-template-900x600.png",
+      "bytes": 39426,
+      "sha256": "7424ea3d74f916ce80c1c0cb098492f01b835da66ac23b5eee84da7c40f2ead8"
+    },
+    {
+      "path": "docs/qa/RED-178/editor-package-content-1200x780.png",
+      "bytes": 53101,
+      "sha256": "18a77a6a183b74f31185b9eff66f820d5417a1feba6ebf5db8f9cc60a6c80162"
+    },
+    {
+      "path": "docs/qa/RED-178/editor-packaging-plain-language-1200x780.png",
+      "bytes": 55760,
+      "sha256": "25cd51982a7b244e369fc316acdbb927f4d290b89410f42727188573eecd4329"
+    },
+    {
+      "path": "docs/qa/RED-178/editor-packaging-simple-1200x780.png",
+      "bytes": 44330,
+      "sha256": "4a48202e4dba55cced93942e824cb0ee8b632e865c86ca470552b776a3607727"
+    },
+    {
+      "path": "docs/qa/RED-178/editor-pve-900x600.png",
+      "bytes": 41389,
+      "sha256": "7e7237649d9ba507fae2439e51e821b3d2e7907afab2376dd08b6c2e7a5fe3cd"
+    },
+    {
+      "path": "docs/qa/RED-95-tutorial-first-session.png",
+      "bytes": 152867,
+      "sha256": "fb81ba609735b76119750ec81f85961f0a2995a148e48690e16c3c65c37826f2"
+    },
+    {
+      "path": "docs/qa/evidence/RED-119-battle-large-hole-arena-desktop.png",
+      "bytes": 135741,
+      "sha256": "6266ae21b9145ab12fba6bfa96bd8a7c58748d6d5baf98d5e9a5ed3aa4598828"
+    },
+    {
+      "path": "docs/qa/evidence/RED-119-battle-narrow-corridors-desktop.png",
+      "bytes": 130157,
+      "sha256": "737c01f2bc0df5bb1f9417da49f9cfd9d876d16f209b78d78af3207c6bd1dec6"
+    },
+    {
+      "path": "docs/qa/evidence/RED-119-battle-open-expanse-390x844.png",
+      "bytes": 54120,
+      "sha256": "4e6a30edf211964ab04ef525d5b56e648f8eb9ccfd0def3b9acd7f04f54001b0"
+    },
+    {
+      "path": "docs/qa/evidence/RED-119-battle-open-expanse-desktop.png",
+      "bytes": 176420,
+      "sha256": "e5bd9b72e67be80ab18825139b0388e875cef0dadcc85d3bf3065e4fead768d5"
+    },
+    {
+      "path": "docs/qa/evidence/RED-119-battle-winding-pass-desktop.png",
+      "bytes": 136958,
+      "sha256": "c830a36e3494077e1c5dc27c5a05d4f91b9b18f7e159a7cea694d0f250cb0ef6"
+    },
+    {
+      "path": "docs/qa/evidence/RED-119-lobby-select-390x844.png",
+      "bytes": 38559,
+      "sha256": "7af8728eba3c9a028858ab3f16ab05825b0350e84002f0059d2dcae9a1364596"
+    },
+    {
+      "path": "docs/qa/evidence/RED-119-lobby-select-desktop.png",
+      "bytes": 43203,
+      "sha256": "75ca52b221050addda32faba8d6fbfbd0de66b3740d3e7331151af9c0adf3d12"
+    },
+    {
+      "path": "docs/qa/evidence/RED-119-map-api-failure-disabled-390x844.png",
+      "bytes": 40602,
+      "sha256": "ee9e10a0430e8a9c419a1a66dcaf3fcb537a4916692fa3a4fcf890f54c44ffbc"
+    },
+    {
+      "path": "docs/qa/evidence/RED-119-map-catalog-390x844.png",
+      "bytes": 40031,
+      "sha256": "4abc5c0023436b080848bd4f628e0bb663c56cd4e3dd322800a9327822f06bb4"
+    },
+    {
+      "path": "docs/qa/evidence/RED-119-map-catalog-desktop.png",
+      "bytes": 41798,
+      "sha256": "102707e1ad1bdf3fde607176efa5d6a072143fcb2f30a6f7b93b223f017d09c3"
+    },
+    {
+      "path": "docs/qa/evidence/RED-166-action-history-1280x720.png",
+      "bytes": 47977,
+      "sha256": "e33d038ffa6c97585324b0db9f375272fd35a198a525e09a1b5e0c56147c9360"
+    },
+    {
+      "path": "docs/qa/evidence/RED-166-action-history-844x390.png",
+      "bytes": 25875,
+      "sha256": "4332e0e7084c7ddbdb54e772ad5cfbfc4711e3c8fd543de2a43b77c42f6b3b5c"
+    },
+    {
+      "path": "docs/qa/evidence/RED-166-action-history-overlay-avoidance.png",
+      "bytes": 48005,
+      "sha256": "b551e7adeb3381d702c4de14c1294484d2a8f3fc48eb5adc8d13f88dfb44d754"
+    },
+    {
+      "path": "docs/qa/evidence/RED-166-action-history-v2/board-collapsed-1280x720.png",
+      "bytes": 89342,
+      "sha256": "a19d6fcc07d6d5ae3ecb81050490d4f64c72bdd95d31b1dbd0b89c600efcb7ad"
+    },
+    {
+      "path": "docs/qa/evidence/RED-166-action-history-v2/board-expanded-1280x720.png",
+      "bytes": 121299,
+      "sha256": "84fe4c528e1a90969e884fd30365dd03d7e37d00e08da39feb0a2dd1ab15b845"
+    },
+    {
+      "path": "docs/qa/evidence/RED-166-action-history-v2/board-highlight-1280x720.png",
+      "bytes": 129955,
+      "sha256": "4cb634d379745a3c3bd77a81f2aea5134a74e447f2724e54ed6e38aaddcb8148"
+    },
+    {
+      "path": "docs/qa/evidence/RED-166-action-history-v2/desktop-expanded.png",
+      "bytes": 228488,
+      "sha256": "5e0503c327d06d9cf51b9ad21878ae228c3d1b81ef804eda689201be6c0e9c9c"
+    },
+    {
+      "path": "docs/qa/evidence/RED-166-action-history-v2/landscape-expanded.png",
+      "bytes": 101816,
+      "sha256": "1b1d101edad9e3b685a76c78e6fe1529c2f5a0bcb28d5b683b7d4475b5eb8be4"
+    },
+    {
+      "path": "docs/qa/evidence/RED-166-orientation-guard-390x844.png",
+      "bytes": 10777,
+      "sha256": "1405fec1c98e909970fef7351e31e831b86979913c7cc4c2e0bba6bbc0743652"
+    },
+    {
+      "path": "docs/qa/evidence/red-162/red-162-edge-dock-844x390.png",
+      "bytes": 24665,
+      "sha256": "bce352bc51d3d11fe9c6a8b0424c4108e8454116f0528bd2a6f2b3fd16e00542"
+    },
+    {
+      "path": "docs/qa/evidence/red-162/red-162-edge-dock-desktop.png",
+      "bytes": 49912,
+      "sha256": "6b88bcc92e0e61e39a346c81a8520026ad43dfc3bd382613fc35d0f463179eec"
+    },
+    {
+      "path": "docs/qa/evidence/red-43-dark-dark.png",
+      "bytes": 122278,
+      "sha256": "1de2940c783af56512fbaa50e2e1074616df1195414cc8f98671938676b37715"
+    },
+    {
+      "path": "docs/qa/evidence/red-43-light-light.png",
+      "bytes": 144329,
+      "sha256": "cfeb97a0f81c8c0a30194e2996ac5066e35176ce5d05590d75f35d35bd29ebbf"
+    },
+    {
+      "path": "docs/qa/red-105-lan-card-fallback-detail.png",
+      "bytes": 77083,
+      "sha256": "b0ee01392a5cc57722f36fffb53ff96646f05ea77823d80e0c75d67308028374"
+    },
+    {
+      "path": "docs/qa/red-105-lan-card-fallback.png",
+      "bytes": 50005,
+      "sha256": "dce53a5ce2a5b34d76ceda199d8866400712798d9c225bf14e452d05873a5d54"
+    },
+    {
+      "path": "output/playwright/RED-167-area-flash.png",
+      "bytes": 95687,
+      "sha256": "12efc47360db5326aa846b3c8dc4e16c77072f0f7970be371ba7e6ccdef58c9f"
+    },
+    {
+      "path": "output/playwright/RED-167-projectile-text-skill.png",
+      "bytes": 90254,
+      "sha256": "2ac091c2cc68a0c9ed39e15625a62199bfdad788370e743b38d9ed9803186638"
+    },
+    {
+      "path": "output/playwright/RED-167-reduced-motion-mobile-landscape.png",
+      "bytes": 46645,
+      "sha256": "c6148d5f387378ccde99a30d0653faaa1b99f8ba7ecaa8d79e18796de394fa84"
+    },
+    {
+      "path": "output/playwright/RED-167-skill-avatar-name-844x390.png",
+      "bytes": 73322,
+      "sha256": "df3f078901cba8159545552e12d0244ff25c0574599057af605e4e9dcc045ea3"
+    },
+    {
+      "path": "output/playwright/RED-167-skill-avatar-name.png",
+      "bytes": 116511,
+      "sha256": "97baeac7bb447b31eb9b5f289a21a752e25abdefd00b759776314adf0cdc8b64"
+    },
+    {
+      "path": "output/playwright/red-158-action-history-edge.png",
+      "bytes": 14897,
+      "sha256": "c8399db658a2ec5332024405a0784ddde9cc9bcdd624ad0de6192615deb1fc65"
+    },
+    {
+      "path": "output/playwright/red-158-records-error-retry.png",
+      "bytes": 79561,
+      "sha256": "ac6b1456ae247dc348fe8bd45915c1fef5a9252cfc73a36f37d1451b8fe56653"
+    },
+    {
+      "path": "output/playwright/red-48-desktop-1280x720.png",
+      "bytes": 67767,
+      "sha256": "943f4538f71e1dcc9a993e28fba62b9b6cc5ff3438eab1cdb8ab4c25d9b8f350"
+    },
+    {
+      "path": "output/playwright/red-48-mobile-390x844.png",
+      "bytes": 42501,
+      "sha256": "7c3945c6db9b8502165973c9cab65fc1cb8dfba7120da9347513e3b39169b6ad"
+    },
+    {
+      "path": "output/playwright/red-49-after-desktop-1280x720.png",
+      "bytes": 117992,
+      "sha256": "89d27e30262320cb7b11fcbef371e5664f3fadb57773945b7bafa99bca56191b"
+    },
+    {
+      "path": "output/playwright/red-49-after-mobile-844x390.png",
+      "bytes": 77967,
+      "sha256": "975ed5fc1056478559aa5a442767e78953b93f1768f17c175470264698cb1356"
+    },
+    {
+      "path": "output/playwright/red-49-before-desktop-1280x720.png",
+      "bytes": 75037,
+      "sha256": "1cc94919022f7128e2ad6bde9bed3229a351909d77693dd4e72e9aa1f059535f"
+    },
+    {
+      "path": "output/playwright/red-49-status-detail-desktop-1280x720.png",
+      "bytes": 85550,
+      "sha256": "c3c1261f11e43a589ad60745cda74cf3b746aae81e80feb2f68b239565104f87"
+    },
+    {
+      "path": "output/playwright/red-50-desktop-1280x720-detail.png",
+      "bytes": 109536,
+      "sha256": "d8312177305e4944e151539909810c8efffecafd7bbf96932a662053104cc245"
+    },
+    {
+      "path": "output/playwright/red-50-desktop-1280x720-status.png",
+      "bytes": 73349,
+      "sha256": "250f6b65bd93ba3ccd9249eded995981dd599654362b62deeda12494f6fbf23c"
+    },
+    {
+      "path": "output/playwright/red-50-desktop-1280x720-target.png",
+      "bytes": 77995,
+      "sha256": "67b26745b4dc7340bf9b88eee11f81a4db661b2a711e573092a7e91e0c412b56"
+    },
+    {
+      "path": "output/playwright/red-50-mobile-390x844-rotate.png",
+      "bytes": 102626,
+      "sha256": "afbf5a05b3c6961ac29d592aadf8fc8978da037cbaa6b25eb1db340507839fb1"
+    },
+    {
+      "path": "output/playwright/red-50-mobile-844x390-detail.png",
+      "bytes": 72138,
+      "sha256": "ee7081cad49ac3d22883c9a25cb1e450936d170dbd456eecaf3e1072c90e3032"
+    },
+    {
+      "path": "output/playwright/red-50-mobile-844x390-status.png",
+      "bytes": 59199,
+      "sha256": "cd68e8e4efb90a6c01a3782bb914557d29aea6635bc2a362ed0d1332b089f1f3"
+    },
+    {
+      "path": "output/playwright/red-50-mobile-844x390-target.png",
+      "bytes": 45684,
+      "sha256": "9505cf9e29d556108e95b85877c0811fd1063bc14f3fa846ec3af762833a8b6c"
+    },
+    {
+      "path": "output/playwright/red-50-mobile-932x430-detail.png",
+      "bytes": 82924,
+      "sha256": "5a20234999aa0f7a84a03f2bba9193a8fb616410f51dbb9b0fec27caeaa65188"
+    },
+    {
+      "path": "output/playwright/red-50-mobile-932x430-status.png",
+      "bytes": 62751,
+      "sha256": "987e843fcfcca231438ef1bfc8200586af888ea512bc77b913163db59be950be"
+    },
+    {
+      "path": "output/playwright/red-50-mobile-932x430-target.png",
+      "bytes": 47110,
+      "sha256": "e0fdaebd8b7fd9f17e9d15550bca2461b3710a2c582a3f0317a4f08586f1a6a0"
+    },
+    {
+      "path": "output/playwright/red-51-baseline-1280x720.png",
+      "bytes": 64977,
+      "sha256": "106cdb1e60d6b0fd01d1ddf304fa688935f2fedcdee569bca31b4d3d2fa0f0a8"
+    },
+    {
+      "path": "output/playwright/red-51-baseline-390x844.png",
+      "bytes": 55648,
+      "sha256": "f41af31a1c5089b5544989f79e1e3c75c43363b842ffddae74da517cf6b41f25"
+    },
+    {
+      "path": "output/playwright/red-51-context-five-card-760x720.png",
+      "bytes": 153167,
+      "sha256": "93c3188a988beacfa79628a7027911432333a026df8ce88c7e7a8ace52d43c2d"
+    },
+    {
+      "path": "output/playwright/red-51-context-menu-desktop-1280x720.png",
+      "bytes": 107241,
+      "sha256": "c4638c5dcf6536e31195c9eb91ca4b5cc41b8da8421f63130d7ae6dcaa874c39"
+    },
+    {
+      "path": "output/playwright/red-51-context-menu-mobile-390x844-final.png",
+      "bytes": 132297,
+      "sha256": "0e0b71ac4d32554ec3a733dc8e6704177fe8496af60d90aa58690de4828c118f"
+    },
+    {
+      "path": "output/playwright/red-51-context-tablet-1024x768.png",
+      "bytes": 191344,
+      "sha256": "42efb4fed64c040a4f0c1dc58716ac820079405c76ecdfb55df3e4b9cdb91ff4"
+    },
+    {
+      "path": "output/playwright/red-51-density-1024x768.png",
+      "bytes": 152480,
+      "sha256": "eac858905ba76fc8ef9412672e398eaff76ed2e4105900a82ccc1fbff3703ec0"
+    },
+    {
+      "path": "output/playwright/red-51-density-1280x720.png",
+      "bytes": 152803,
+      "sha256": "5da7798fa122bf0e432a782ee50f6ad0c446d110be438fe8a52d4ed54ab4bfe7"
+    },
+    {
+      "path": "output/playwright/red-51-density-390x844-guard.png",
+      "bytes": 102626,
+      "sha256": "afbf5a05b3c6961ac29d592aadf8fc8978da037cbaa6b25eb1db340507839fb1"
+    },
+    {
+      "path": "output/playwright/red-51-density-760x390.png",
+      "bytes": 100964,
+      "sha256": "4faf494e0dacd0fc36c292f3d7ad061b946a46473f934f3eb0f10003ae812c46"
+    },
+    {
+      "path": "output/playwright/red-51-density-844x390.png",
+      "bytes": 100403,
+      "sha256": "3e6842b2ea4bc71c719c60405b99d2a9b36b4f643eb39422e11d97c9c3bd756e"
+    },
+    {
+      "path": "output/playwright/red-51-density-baseline-844x390.png",
+      "bytes": 161650,
+      "sha256": "6c95f166876fb234ca245d52a57fa8854d706e59d0774165fb60751eab94fb52"
+    },
+    {
+      "path": "output/playwright/red-51-desktop-1280x720.png",
+      "bytes": 90176,
+      "sha256": "50835236d0221dfe018a3be37e732ba2630dd5667060b088227828911a5d84ce"
+    },
+    {
+      "path": "output/playwright/red-51-direct-cards-collapsed-training-390x844.png",
+      "bytes": 117218,
+      "sha256": "92ad550194c48611255c562e44c4c8d3f88fb462beb015a0260f48afb4efadf6"
+    },
+    {
+      "path": "output/playwright/red-51-direct-cards-training-760x720.png",
+      "bytes": 146278,
+      "sha256": "dbb95089357ead3483d6d13455acce5849eb7aa79f8bee71cd4e88c9971440d8"
+    },
+    {
+      "path": "output/playwright/red-51-direct-cards-training-844x390.png",
+      "bytes": 164119,
+      "sha256": "e6bd844d7b63a73fb96ae87d61784e1fe49c8a92c55e6d331d86721ebfc7f34e"
+    },
+    {
+      "path": "output/playwright/red-51-fanned-hand-desktop-1280x720.png",
+      "bytes": 195448,
+      "sha256": "e6bd21eebcd0ba8277b17d6decd04463cc9d8a365e006ace7b7daf8c1b980376"
+    },
+    {
+      "path": "output/playwright/red-51-five-card-760x720.png",
+      "bytes": 130332,
+      "sha256": "b9e767e364f47653bf625ad87147a7908d2076ee45b266faec0ac98396b8d251"
+    },
+    {
+      "path": "output/playwright/red-51-frameless-hand-training-390x844.png",
+      "bytes": 120985,
+      "sha256": "0d58ac95910f1f31eebdcff74327a61531bc1e75666c2fd5c690e44749519f72"
+    },
+    {
+      "path": "output/playwright/red-51-frameless-hand-training-760x720.png",
+      "bytes": 151468,
+      "sha256": "5c1872a675ddace69e78445dcae63c947b85615eae483f6b987d7555df962036"
+    },
+    {
+      "path": "output/playwright/red-51-menu-status-overlay-1000x390.png",
+      "bytes": 102501,
+      "sha256": "18a2aba6e2caf678156d2d202682ef37a10c99c7353130896556aaa77ef686b2"
+    },
+    {
+      "path": "output/playwright/red-51-mobile-390x844.png",
+      "bytes": 125306,
+      "sha256": "eb723f390d7b001414144722a19c00c37ab197bc0a9fb6718c58d39ab32c12f5"
+    },
+    {
+      "path": "output/playwright/red-51-move-route-clear-390x844.png",
+      "bytes": 118266,
+      "sha256": "f4e81e3c23df61bb4b17bb14fd18209d686dc6109fe643f463a70c7d37ceecbe"
+    },
+    {
+      "path": "output/playwright/red-51-move-route-clear-844x390.png",
+      "bytes": 166545,
+      "sha256": "960d7138c257c353f3d4b9f7c529b0ce986870ce79a1a3ef32fb90d2c7fd03e4"
+    },
+    {
+      "path": "output/playwright/red-51-overlay-hand-1024x768.png",
+      "bytes": 162280,
+      "sha256": "f7a030299a841f1ba3bf8f5b83341647fe2bb59a5895dab9d93917e538d2df28"
+    },
+    {
+      "path": "output/playwright/red-51-overlay-hand-1280x720.png",
+      "bytes": 173248,
+      "sha256": "bb74558d047fbbafeb5c53b9a6279ef0585e4aded7b0f1bc7b001b1dcbab5cad"
+    },
+    {
+      "path": "output/playwright/red-51-overlay-hand-390x844-guard.png",
+      "bytes": 102626,
+      "sha256": "afbf5a05b3c6961ac29d592aadf8fc8978da037cbaa6b25eb1db340507839fb1"
+    },
+    {
+      "path": "output/playwright/red-51-overlay-hand-760x390.png",
+      "bytes": 147651,
+      "sha256": "8b7efed18a94205896b6afe6917245dc139e8dbb6526507c014781071f6e6e78"
+    },
+    {
+      "path": "output/playwright/red-51-overlay-hand-844x390.png",
+      "bytes": 113875,
+      "sha256": "0481f6decda83ecdf5d1fc393ba4aad2f073bd1491d42a15ce1d433c15808b41"
+    },
+    {
+      "path": "output/playwright/red-51-piece-menu-844x390.png",
+      "bytes": 183089,
+      "sha256": "5d67411a9f8d92ce308b30aaf1f022731ad6cf8fd6b01da4674bb2b3e771c10c"
+    },
+    {
+      "path": "output/playwright/red-51-status-sheet-mobile-390x844.png",
+      "bytes": 100381,
+      "sha256": "23b25e86250c22e5d0beec8314ec07e4f904fca3bc283caa0434d747b6260fa1"
+    },
+    {
+      "path": "output/playwright/red-51-tablet-1024x768.png",
+      "bytes": 206045,
+      "sha256": "1d4657a78c4b4730806c753fb2da912bd5360788be7b7f11e29d36c48efe0ec5"
+    },
+    {
+      "path": "output/playwright/red-51-training-placed-portrait-1000x390.png",
+      "bytes": 56290,
+      "sha256": "58c10dc9594c3b00b6c814f6aa9b36c4909b7c6c37dbd127e55e3a77cee59c00"
+    },
+    {
+      "path": "output/playwright/red-51-training-popover-390x844.png",
+      "bytes": 125038,
+      "sha256": "223a31892940b3ae1b7f1654e9b5815e72ab985cdfeb4a2a98af8b0c067cd832"
+    },
+    {
+      "path": "output/playwright/red-51-training-popover-760x720.png",
+      "bytes": 158462,
+      "sha256": "7f6c03fd1d238149025d68676753215172999ad3db5140afa5d912d7f553e8af"
+    },
+    {
+      "path": "output/playwright/red-51-training-popover-844x390.png",
+      "bytes": 169299,
+      "sha256": "12ed7eaba0867a117996aea070723d89b089735c9674d6abab89621d6bb90657"
+    },
+    {
+      "path": "output/playwright/red-51-training-setup-mobile-390x844.png",
+      "bytes": 49558,
+      "sha256": "05d47509beebb75f54a45594b1acf4b8118dceb33ecc2ac4f4877d5ff81c3e75"
+    }
+  ],
+  "moves": {
+    "electron-builder.client.json": "config/electron-builder.client.json",
+    "electron-builder.editor.json": "config/electron-builder.editor.json",
+    "docker-compose.colyseus.yml": "config/docker-compose.colyseus.yml",
+    "colyseus.config.ts": "config/colyseus.config.ts",
+    "tutorial.md": "docs/technical/LEGACY_SKILL_TUTORIAL.md",
+    "新手教程.md": "docs/product/PVP_TUTORIAL_DESIGN.md",
+    "build/branding/README.md": "config/branding/README.md",
+    "build/branding/icon.icns": "config/branding/icon.icns",
+    "build/branding/icon.ico": "config/branding/icon.ico",
+    "build/branding/icon.png": "config/branding/icon.png",
+    "build/branding/icon.svg": "config/branding/icon.svg",
+    "output/app-icon/native-smoke.json": "docs/qa/archive/app-icon/native-smoke.json",
+    "output/app-icon/sizes.png": "docs/qa/archive/app-icon/sizes.png",
+    "output/playwright/red-48-browser-evidence.md": "docs/qa/archive/playwright/red-48-browser-evidence.md",
+    "output/playwright/red-49-acceptance-evidence.md": "docs/qa/archive/playwright/red-49-acceptance-evidence.md",
+    "output/playwright/red-50-browser-evidence.md": "docs/qa/archive/playwright/red-50-browser-evidence.md",
+    "output/playwright/red-51-browser-evidence.md": "docs/qa/archive/playwright/red-51-browser-evidence.md",
+    "output/playwright/red-51-revised-acceptance-evidence.md": "docs/qa/archive/playwright/red-51-revised-acceptance-evidence.md",
+    "output/playwright/red-51-static-qa.mjs": "docs/qa/archive/playwright/red-51-static-qa.mjs"
+  },
+  "nonMarkdownReferences": [
+    {
+      "source": "tests/electron/windows-client-development-smoke.mjs",
+      "target": "docs/qa/red-105-lan-card-fallback.png"
+    }
+  ]
+}

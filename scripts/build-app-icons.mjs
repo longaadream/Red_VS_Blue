@@ -4,7 +4,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import sharp from 'sharp'
 
-const root = fileURLToPath(new URL('../build/branding/', import.meta.url))
+const root = fileURLToPath(new URL('../config/branding/', import.meta.url))
 const source = path.join(root, 'icon.svg')
 const png = size => sharp(source).resize(size, size, { fit: 'contain', background: '#00000000' }).png().toBuffer()
 

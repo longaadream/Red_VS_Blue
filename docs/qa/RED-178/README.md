@@ -2,14 +2,14 @@
 
 ## Visual evidence
 
-- `editor-fields-1200x780.png`: existing piece, common-field editing at the default window size.
-- `editor-new-template-900x600.png`: new piece template opened directly in Complete JSON at the minimum window size.
-- `editor-json-error-900x600.png`: malformed JSON with visible line/column feedback and the create action disabled.
-- `editor-packaging-simple-1200x780.png`: the default Snapshot packaging form with advanced and Patch-only parameters collapsed.
-- `editor-packaging-plain-language-1200x780.png`: the revised default packaging flow using content-author wording, a recommended full package option, and collapsed professional settings.
-- `editor-assets-1200x780.png`: image library with a selected static SVG preview, import/replace controls, and copyable pack path.
-- `editor-pve-900x600.png`: arbitrary-depth PVE document open in the schema-neutral Complete JSON editor.
-- `editor-package-content-1200x780.png`: current-workspace staging summary with data/PVE/image counts and added/overwritten paths.
+- [历史截图：editor-fields-1200x780.png](https://github.com/longaadream/Red_VS_Blue/blob/a7849ce9eb3fc9e2fbc000afdd5f770b6f57e37a/docs/qa/RED-178/editor-fields-1200x780.png): existing piece, common-field editing at the default window size.
+- [历史截图：editor-new-template-900x600.png](https://github.com/longaadream/Red_VS_Blue/blob/a7849ce9eb3fc9e2fbc000afdd5f770b6f57e37a/docs/qa/RED-178/editor-new-template-900x600.png): new piece template opened directly in Complete JSON at the minimum window size.
+- [历史截图：editor-json-error-900x600.png](https://github.com/longaadream/Red_VS_Blue/blob/a7849ce9eb3fc9e2fbc000afdd5f770b6f57e37a/docs/qa/RED-178/editor-json-error-900x600.png): malformed JSON with visible line/column feedback and the create action disabled.
+- [历史截图：editor-packaging-simple-1200x780.png](https://github.com/longaadream/Red_VS_Blue/blob/a7849ce9eb3fc9e2fbc000afdd5f770b6f57e37a/docs/qa/RED-178/editor-packaging-simple-1200x780.png): the default Snapshot packaging form with advanced and Patch-only parameters collapsed.
+- [历史截图：editor-packaging-plain-language-1200x780.png](https://github.com/longaadream/Red_VS_Blue/blob/a7849ce9eb3fc9e2fbc000afdd5f770b6f57e37a/docs/qa/RED-178/editor-packaging-plain-language-1200x780.png): the revised default packaging flow using content-author wording, a recommended full package option, and collapsed professional settings.
+- [历史截图：editor-assets-1200x780.png](https://github.com/longaadream/Red_VS_Blue/blob/a7849ce9eb3fc9e2fbc000afdd5f770b6f57e37a/docs/qa/RED-178/editor-assets-1200x780.png): image library with a selected static SVG preview, import/replace controls, and copyable pack path.
+- [历史截图：editor-pve-900x600.png](https://github.com/longaadream/Red_VS_Blue/blob/a7849ce9eb3fc9e2fbc000afdd5f770b6f57e37a/docs/qa/RED-178/editor-pve-900x600.png): arbitrary-depth PVE document open in the schema-neutral Complete JSON editor.
+- [历史截图：editor-package-content-1200x780.png](https://github.com/longaadream/Red_VS_Blue/blob/a7849ce9eb3fc9e2fbc000afdd5f770b6f57e37a/docs/qa/RED-178/editor-package-content-1200x780.png): current-workspace staging summary with data/PVE/image counts and added/overwritten paths.
 
 The screenshots use `mock-editor-api.js`, which provides deterministic in-memory authoring data without writing to a real Electron user-data workspace.
 

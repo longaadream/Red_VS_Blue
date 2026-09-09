@@ -1,0 +1,67 @@
+{
+  "appId": "com.redvsblue.client",
+  "productName": "RED vs BLUE",
+  "directories": { "output": "dist/client-build" },
+  "extraMetadata": {
+    "main": "electron-client/dist/main.js"
+  },
+  "npmRebuild": false,
+  "files": [
+    "electron-client/dist/**",
+    "electron-client/admin/**",
+    "electron-client/connect/**",
+    "package.json",
+    "!node_modules/**"
+  ],
+  "extraResources": [
+    { "from": "config/branding", "to": "branding", "filter": ["icon.ico", "icon.png"] },
+    { "from": "_client-stage",       "to": "app/standalone" },
+    { "from": "_client-colyseus",    "to": "app/standalone/colyseus" },
+    { "from": "_client-postgres",    "to": "postgres" },
+    { "from": "_client-stage/node_modules", "to": "app/standalone/node_modules" },
+    { "from": "public",              "to": "app/public" },
+    { "from": "data",                "to": "app/data" },
+    { "from": "data/pages",          "to": "app/www" },
+    {
+      "from": "data",
+      "to": "app/www/data",
+      "filter": [
+        "cards/**",
+        "effects/**",
+        "maps/**",
+        "pieces/**",
+        "pve/**",
+        "rules/**",
+        "skills/**",
+        "status-effects/**",
+        "tiles/**",
+        "tutorial/**",
+        "skill-keywords.json"
+      ]
+    },
+    {
+      "from": "public",
+      "to": "app/www/images",
+      "filter": ["*.jpg", "card-art/**"]
+    },
+    { "from": "electron-client/admin","to": "app/electron-client/admin" },
+    { "from": "node_modules/adm-zip","to": "app/node_modules/adm-zip" },
+    { "from": "_client-node/node.exe", "to": "node.exe" }
+  ],
+  "asar": false,
+  "win": {
+    "icon": "config/branding/icon.ico",
+    "target": "dir"
+  },
+  "mac": {
+    "icon": "config/branding/icon.icns",
+    "target": "dmg"
+  },
+  "linux": {
+    "icon": "config/branding/icon.png",
+    "target": [
+      { "target": "AppImage", "arch": ["x64"] },
+      { "target": "tar.gz", "arch": ["x64"] }
+    ]
+  }
+}

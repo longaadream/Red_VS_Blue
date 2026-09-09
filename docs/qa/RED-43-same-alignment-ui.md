@@ -33,8 +33,8 @@
 
 暗/暗 Alice 视角的客户端日志记录 8 个高亮目标全部为 `ownerPlayerId=3fd318ad` 且 `relation=ally`。两局的 `window.__RVB_RED43__.snapshot()` 均返回 `consistent: true`。
 
-- [光/光敌方目标高亮截图](evidence/red-43-light-light.png)
-- [暗/暗友方目标高亮截图](evidence/red-43-dark-dark.png)
+- [光/光敌方目标高亮截图](https://github.com/longaadream/Red_VS_Blue/blob/a7849ce9eb3fc9e2fbc000afdd5f770b6f57e37a/docs/qa/evidence/red-43-light-light.png)
+- [暗/暗友方目标高亮截图](https://github.com/longaadream/Red_VS_Blue/blob/a7849ce9eb3fc9e2fbc000afdd5f770b6f57e37a/docs/qa/evidence/red-43-dark-dark.png)
 
 ## 人工验收结论
 

@@ -56,8 +56,8 @@ npm.cmd test -- tests/game/battle-context-layout.test.ts tests/game/battle-page-
 
 截图：
 
-- `docs/qa/evidence/red-162/red-162-edge-dock-desktop.png`
-- `docs/qa/evidence/red-162/red-162-edge-dock-844x390.png`
+- [历史截图：red-162-edge-dock-desktop.png](https://github.com/longaadream/Red_VS_Blue/blob/a7849ce9eb3fc9e2fbc000afdd5f770b6f57e37a/docs/qa/evidence/red-162/red-162-edge-dock-desktop.png)
+- [历史截图：red-162-edge-dock-844x390.png](https://github.com/longaadream/Red_VS_Blue/blob/a7849ce9eb3fc9e2fbc000afdd5f770b6f57e37a/docs/qa/evidence/red-162/red-162-edge-dock-844x390.png)
 
 控制台没有新增 error。训练资源加载仍有基线 warning：缺少 `data/skills/evil-explosion.json`，并报告既有本地数据加载失败；该资源问题不在 RED-162 范围内。
 

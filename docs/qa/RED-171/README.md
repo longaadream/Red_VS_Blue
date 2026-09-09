@@ -22,10 +22,10 @@
 
 ## 截图
 
-- [1280×720](./evidence/main-menu-1280x720.png)
-- [1440×900](./evidence/main-menu-1440x900.png)
-- [390×844](./evidence/main-menu-390x844.png)
-- [844×390](./evidence/main-menu-844x390.png)
+- [1280×720](https://github.com/longaadream/Red_VS_Blue/blob/a7849ce9eb3fc9e2fbc000afdd5f770b6f57e37a/docs/qa/RED-171/evidence/main-menu-1280x720.png)
+- [1440×900](https://github.com/longaadream/Red_VS_Blue/blob/a7849ce9eb3fc9e2fbc000afdd5f770b6f57e37a/docs/qa/RED-171/evidence/main-menu-1440x900.png)
+- [390×844](https://github.com/longaadream/Red_VS_Blue/blob/a7849ce9eb3fc9e2fbc000afdd5f770b6f57e37a/docs/qa/RED-171/evidence/main-menu-390x844.png)
+- [844×390](https://github.com/longaadream/Red_VS_Blue/blob/a7849ce9eb3fc9e2fbc000afdd5f770b6f57e37a/docs/qa/RED-171/evidence/main-menu-844x390.png)
 
 ## 自动检查
 

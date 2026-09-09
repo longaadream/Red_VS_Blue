@@ -1881,7 +1881,7 @@ let mainWin: BrowserWindow | null = null
 function getApplicationIconPath(): string {
   const root = app.isPackaged
     ? path.join(process.resourcesPath, 'branding')
-    : path.join(__dirname, '..', '..', 'build', 'branding')
+    : path.join(__dirname, '..', '..', 'config', 'branding')
   return path.join(root, process.platform === 'win32' ? 'icon.ico' : 'icon.png')
 }
 

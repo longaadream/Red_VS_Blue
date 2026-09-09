@@ -228,7 +228,7 @@ RED-179 补充：动作小剧场的 1× / 2× 速度仍由 `battle-action-vignet
 - 状态变化：全局 `G`、DOM、localStorage；联网模式只用服务端 `stateUpdate` 替换 `G`。
 - 错误：网络失败、引擎异常或状态不兼容；部分异常只显示提示或被忽略。
 - 日志：浏览器 console；生产 mobile 构建会削弱部分 console 输出。
-- 测试：`tests/game/movement-contract.test.ts` 会执行页面实际加载的 `data/pages/js/game-engine.js`，验证共享移动导出和固定状态目标候选；`tests/game/battle-ui-boundary.test.ts` 覆盖展示模型、规则适配器与生命周期合同。RED-48 使用 Playwright 在训练模式完成 1280×720、390×844 的投影命中、选择/取消、目标模式和重复挂载冒烟，证据见 `output/playwright/red-48-browser-evidence.md`。
+- 测试：`tests/game/movement-contract.test.ts` 会执行页面实际加载的 `data/pages/js/game-engine.js`，验证共享移动导出和固定状态目标候选；`tests/game/battle-ui-boundary.test.ts` 覆盖展示模型、规则适配器与生命周期合同。RED-48 使用 Playwright 在训练模式完成 1280×720、390×844 的投影命中、选择/取消、目标模式和重复挂载冒烟，证据见 `docs/qa/archive/playwright/red-48-browser-evidence.md`。
 - 已知问题：页面控制器仍跨越网络、训练规则预演与展示；移动规则适配器仍在克隆快照上验证共享移动候选，技能、卡牌和 pending 目标则只消费核心 `preparation` 的精确候选。终局不再在 UI 重算，旧 Relay host 权威消息被忽略。
 - 最小调试：捕获连接模式、roomId、seed、最后 action、服务端/客户端 state hash 和截图。
 

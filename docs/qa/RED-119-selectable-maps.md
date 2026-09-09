@@ -31,16 +31,16 @@
 
 截图：
 
-- [地图目录（桌面）](evidence/RED-119-map-catalog-desktop.png)
-- [地图目录（390x844）](evidence/RED-119-map-catalog-390x844.png)
-- [创建房间选图（桌面）](evidence/RED-119-lobby-select-desktop.png)
-- [创建房间选图（390x844）](evidence/RED-119-lobby-select-390x844.png)
-- [地图 API 失败时禁用创建（390x844）](evidence/RED-119-map-api-failure-disabled-390x844.png)
-- [开阔原野战斗页（桌面）](evidence/RED-119-battle-open-expanse-desktop.png)
-- [开阔原野战斗页（390x844）](evidence/RED-119-battle-open-expanse-390x844.png)
-- [大型洞穴战斗页（桌面）](evidence/RED-119-battle-large-hole-arena-desktop.png)
-- [回风曲径战斗页（桌面）](evidence/RED-119-battle-winding-pass-desktop.png)
-- [狭廊要道战斗页（桌面）](evidence/RED-119-battle-narrow-corridors-desktop.png)
+- [地图目录（桌面）](https://github.com/longaadream/Red_VS_Blue/blob/a7849ce9eb3fc9e2fbc000afdd5f770b6f57e37a/docs/qa/evidence/RED-119-map-catalog-desktop.png)
+- [地图目录（390x844）](https://github.com/longaadream/Red_VS_Blue/blob/a7849ce9eb3fc9e2fbc000afdd5f770b6f57e37a/docs/qa/evidence/RED-119-map-catalog-390x844.png)
+- [创建房间选图（桌面）](https://github.com/longaadream/Red_VS_Blue/blob/a7849ce9eb3fc9e2fbc000afdd5f770b6f57e37a/docs/qa/evidence/RED-119-lobby-select-desktop.png)
+- [创建房间选图（390x844）](https://github.com/longaadream/Red_VS_Blue/blob/a7849ce9eb3fc9e2fbc000afdd5f770b6f57e37a/docs/qa/evidence/RED-119-lobby-select-390x844.png)
+- [地图 API 失败时禁用创建（390x844）](https://github.com/longaadream/Red_VS_Blue/blob/a7849ce9eb3fc9e2fbc000afdd5f770b6f57e37a/docs/qa/evidence/RED-119-map-api-failure-disabled-390x844.png)
+- [开阔原野战斗页（桌面）](https://github.com/longaadream/Red_VS_Blue/blob/a7849ce9eb3fc9e2fbc000afdd5f770b6f57e37a/docs/qa/evidence/RED-119-battle-open-expanse-desktop.png)
+- [开阔原野战斗页（390x844）](https://github.com/longaadream/Red_VS_Blue/blob/a7849ce9eb3fc9e2fbc000afdd5f770b6f57e37a/docs/qa/evidence/RED-119-battle-open-expanse-390x844.png)
+- [大型洞穴战斗页（桌面）](https://github.com/longaadream/Red_VS_Blue/blob/a7849ce9eb3fc9e2fbc000afdd5f770b6f57e37a/docs/qa/evidence/RED-119-battle-large-hole-arena-desktop.png)
+- [回风曲径战斗页（桌面）](https://github.com/longaadream/Red_VS_Blue/blob/a7849ce9eb3fc9e2fbc000afdd5f770b6f57e37a/docs/qa/evidence/RED-119-battle-winding-pass-desktop.png)
+- [狭廊要道战斗页（桌面）](https://github.com/longaadream/Red_VS_Blue/blob/a7849ce9eb3fc9e2fbc000afdd5f770b6f57e37a/docs/qa/evidence/RED-119-battle-narrow-corridors-desktop.png)
 
 ## 人工验收记录（2026-08-27）
 

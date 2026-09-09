@@ -95,7 +95,7 @@ describe('Electron desktop security boundary after Colyseus cutover', () => {
 
   test('uses one Windows player shell and no legacy Electron Server product', () => {
     const packageJson = JSON.parse(read('package.json')) as { main?: string; scripts?: Record<string, string> }
-    const clientBuilder = JSON.parse(read('electron-builder.client.json')) as {
+    const clientBuilder = JSON.parse(read('config/electron-builder.client.json')) as {
       extraMetadata?: { main?: string }
       extraResources?: Array<{ from?: string; to?: string }>
     }

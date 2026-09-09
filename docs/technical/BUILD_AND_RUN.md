@@ -29,6 +29,11 @@ npm.cmd test
 
 为开发 authority 配置 PostgreSQL：
 
+仓库提供的本机开发数据库配置为 [`config/docker-compose.colyseus.yml`](../../config/docker-compose.colyseus.yml)。
+使用 Docker 时运行 `docker compose --project-directory . -f config/docker-compose.colyseus.yml up -d postgres`，端口为 `127.0.0.1:5433`，
+数据库名为 `rvb_colyseus`；按该配置设置下面的连接 URL。也可以连接自己准备的 PostgreSQL。
+从仓库根目录运行，并保留 `--project-directory .`，使配置迁移后继续使用原 Compose 项目名和数据库卷。
+
 ```powershell
 $env:RVB_POSTGRES_URL = 'postgresql://user:password@127.0.0.1:5432/rvb'
 npm.cmd run dev:colyseus

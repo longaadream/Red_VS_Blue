@@ -314,21 +314,6 @@
       "count": 2
     }
   },
-  "scripts/cleanup-server-resources.js": {
-    "@typescript-eslint/no-require-imports": {
-      "count": 2
-    }
-  },
-  "scripts/migrate-player-ids.js": {
-    "@typescript-eslint/no-require-imports": {
-      "count": 2
-    }
-  },
-  "scripts/stage-server-resources.js": {
-    "@typescript-eslint/no-require-imports": {
-      "count": 2
-    }
-  },
   "scripts/sync-android-assets.js": {
     "@typescript-eslint/no-require-imports": {
       "count": 2

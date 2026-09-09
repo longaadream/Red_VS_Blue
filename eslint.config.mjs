@@ -48,7 +48,7 @@ export default defineConfig([
   globalIgnores([
     '.next/**',
     'out/**',
-    'build/**',
+    'output/**',
     'dist/**',
     '**/dist/**',
     '_client-colyseus/**',

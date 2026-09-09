@@ -15,7 +15,6 @@ async function main() {
     page.on('pageerror', error => failures.push(error.message))
     for (const [name, route] of [
       ['menu', 'index.html'],
-      ['roster', 'pieces.html'],
       ['battle', 'battle.html?mode=training&sample=1'],
     ]) {
       await page.goto('http://127.0.0.1:4197/' + route, { waitUntil: 'networkidle' })

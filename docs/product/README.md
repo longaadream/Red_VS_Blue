@@ -9,6 +9,8 @@
 
 ## 当前文档
 
+- [PVP 新手教程设计](PVP_TUTORIAL_DESIGN.md)：六课渐进教学、操作提示与验收要求。
+
 - [`DEMO_SCOPE.md`](./DEMO_SCOPE.md)：Demo v0.1 的目标、范围和明确排除项。
 - [`CORE_LOOP.md`](./CORE_LOOP.md)：一局对战的阶段与可观察流程。
 - [`GAME_RULES.md`](./GAME_RULES.md)：规则任务的入口与合同章节映射。

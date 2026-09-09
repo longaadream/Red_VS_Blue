@@ -8,7 +8,7 @@
 
 ## 最终实现
 
-- build/branding/icon.svg：原创手写路径，圆润收笔、轻微倾斜、错落基线；无字体或外部资源依赖。
+- config/branding/icon.svg：原创手写路径，圆润收笔、轻微倾斜、错落基线；无字体或外部资源依赖。
 - Windows ICO 九档尺寸、macOS ICNS 七档尺寸、512px PNG 及重建脚本 scripts/build-app-icons.mjs。
 - 客户端游戏、服务器连接、管理窗口读取统一图标。Windows AppUserModelID 与打包 appId 一致。
 - 打包配置包含平台程序图标与 resources/branding 的运行时资源。
@@ -19,8 +19,8 @@
 - npx.cmd tsc -p electron-client/tsconfig.json --noEmit：通过。
 - npm.cmd test -- tests/electron/windows-client-runtime.test.ts tests/electron/client-package-verifier.test.ts：2 文件、17 项通过。
 - node --check scripts/build-app-icons.mjs：通过。
-- ICO 九档 PNG 帧的尺寸、透明通道、文件偏移逐帧校验通过；深浅背景的 16/24/32/48/64/128px 预览见 ../../output/app-icon/sizes.png。
-- 最终手写版 ICO 经 Electron nativeImage 解码为 256×256，成功创建带图标的隐藏 BrowserWindow。../../output/app-icon/native-smoke.json 包含图标 SHA-256 与结果。存在 GPU 子进程退出日志，未将该检查视为完整游戏渲染验收。
+- ICO 九档 PNG 帧的尺寸、透明通道、文件偏移逐帧校验通过；深浅背景的 16/24/32/48/64/128px 预览见 [图标尺寸预览](archive/app-icon/sizes.png)。
+- 最终手写版 ICO 经 Electron nativeImage 解码为 256×256，成功创建带图标的隐藏 BrowserWindow。[原生图标验收记录](archive/app-icon/native-smoke.json) 包含图标 SHA-256 与结果。存在 GPU 子进程退出日志，未将该检查视为完整游戏渲染验收。
 - git diff --check：通过。
 
 ## 限制、人工验证与回退
