@@ -1,8 +1,9 @@
-import { app, BrowserWindow, clipboard, dialog, ipcMain, shell, utilityProcess } from 'electron'
+import { app, BrowserWindow, clipboard, dialog, ipcMain, net, safeStorage, shell, utilityProcess } from 'electron'
 import * as path from 'path'
 import * as fs from 'fs'
 import { assertTrustedIpcSender, isFileUrlWithinRoot } from './ipc-trust'
 import { CreativeWorkbench } from './workbench'
+import { ResourceRelease } from './resource-release'
 import { assertSkillGraphArtifact } from './skill-graph'
 import { assertContentProjectRoot, createContentProject, openContentProject, readDocumentSnapshot, writeDocumentSnapshot } from './content-project'
 import {
@@ -184,6 +185,9 @@ handleTrusted('source-flow-edit', (_event, category, document, request) => {
 handleTrusted('workbench-list', () => workbench().list())
 handleTrusted('workbench-create', (_event, input) => workbench().create(input))
 handleTrusted('workbench-inspect', (_event, id: string) => workbench().inspect(id))
+handleTrusted('workbench-accept', (_event, id: string, input) => workbench().accept(id, input))
+handleTrusted('workbench-revert', (_event, id: string, input) => workbench().revert(id, input))
+handleTrusted('workbench-image', (_event, id: string, relative: string, side: 'before' | 'after', hash: string, acceptedHash: string) => workbench().previewImage(id, relative, side, hash, acceptedHash))
 handleTrusted('workbench-check', (_event, id: string) => workbench().check(id))
 handleTrusted('workbench-feedback', (_event, id: string, input) => workbench().feedback(id, input))
 handleTrusted('workbench-scenario', (_event, id: string, input) => workbench().scenario(id, input))
@@ -235,6 +239,25 @@ handleTrusted('visual-catalog', () => {
   }
 })
 handleTrusted('project-reveal', () => shell.openPath(ensureAuthoringWorkspace()))
+handleTrusted('project-import', () => contentOperationQueue.enqueue(async () => {
+  if (!win) throw new Error('编辑器窗口不可用')
+  const archive = await dialog.showOpenDialog(win, { title: '导入原资源包（完整包或补丁）', properties: ['openFile'], filters: [{ name: 'RVB 资源包', extensions: ['rvbpack'] }] })
+  if (archive.canceled || archive.filePaths.length !== 1) return { canceled: true }
+  const parent = await dialog.showOpenDialog(win, { title: '选择保存位置：将创建独立项目，保留原包', properties: ['openDirectory', 'createDirectory'] })
+  if (parent.canceled || parent.filePaths.length !== 1) return { canceled: true }
+  const request = { operation: 'import-project', archive: archive.filePaths[0], parent: parent.filePaths[0] }
+  let result = await runContentWorker(request) as { needsBase: boolean; root?: string }
+  if (result.needsBase) {
+    const base = await dialog.showOpenDialog(win, { title: '这是补丁，请选择它对应的完整原包', properties: ['openFile'], filters: [{ name: '完整 RVB 资源包', extensions: ['rvbpack'] }] })
+    if (base.canceled || base.filePaths.length !== 1) return { canceled: true }
+    result = await runContentWorker({ ...request, baseArchive: base.filePaths[0] }) as typeof result
+  }
+  if (result.needsBase || !result.root) throw new Error('导入没有生成完整项目')
+  const root = openContentProject(result.root)
+  fs.writeFileSync(path.join(app.getPath('userData'), 'content-project-selection.json'), JSON.stringify({ root }) + '\n')
+  selectedProject = root
+  return { ...result, canceled: false, root }
+}))
 handleTrusted('project-select', async (_e, mode: 'open' | 'official' | 'blank') => {
   if (!win || !['open', 'official', 'blank'].includes(mode)) throw new Error('无效的项目操作')
   const selection = await dialog.showOpenDialog(win, {
@@ -413,6 +436,70 @@ function runContentWorker(request: unknown): Promise<unknown> {
 }
 
 const contentOperationQueue = new EditorContentOperationQueueV1()
+
+function publicationSettings() {
+  const filename = path.join(app.getPath('userData'), 'resource-publication.json')
+  if (!fs.existsSync(filename)) return { repository: '', encryptedToken: '', keyFile: '' }
+  const settings = JSON.parse(fs.readFileSync(filename, 'utf8'))
+  if (!settings || typeof settings.repository !== 'string' || typeof settings.encryptedToken !== 'string' || typeof settings.keyFile !== 'string') throw new Error('发布设置损坏，请重新配置；内容项目未受影响')
+  return settings as { repository: string; encryptedToken: string; keyFile: string }
+}
+handleTrusted('publication-settings', () => {
+  const settings = publicationSettings()
+  return { repository: settings.repository, hasToken: !!settings.encryptedToken, keyFile: settings.keyFile, encryptionAvailable: safeStorage.isEncryptionAvailable(), automaticClientDiscovery: false, trainingHandoffAvailable: false }
+})
+handleTrusted('publication-choose-key', async () => {
+  if (!win) throw new Error('编辑器窗口不可用')
+  const result = await dialog.showOpenDialog(win, { title: '选择已有官方签名密钥（放在内容工作区之外）', properties: ['openFile'] })
+  if (result.canceled || result.filePaths.length !== 1) return null
+  const filename = fs.realpathSync(result.filePaths[0])
+  const relative = path.relative(fs.realpathSync(ensureAuthoringWorkspace()), filename)
+  if (!path.isAbsolute(relative) && relative !== '..' && !relative.startsWith('..' + path.sep)) throw new Error('请选择内容工作区之外的密钥文件')
+  if (fs.statSync(filename).size > 128 || !/^[a-f0-9]{64}$/.test(fs.readFileSync(filename, 'utf8').trim())) throw new Error('需要现有管线支持的 32 字节十六进制签名密钥')
+  // A selection is staged in memory; merely opening the picker never changes saved settings.
+  pendingPublicationKey = filename
+  return filename
+})
+let pendingPublicationKey: string | null = null
+handleTrusted('publication-save-settings', (_event, input: unknown) => {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) throw new Error('发布设置无效')
+  const value = input as Record<string, unknown>
+  if (typeof value.repository !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9-]*\/[A-Za-z0-9_.-]+$/.test(value.repository) || typeof value.token !== 'string' || value.token.length > 4096 || /[\r\n]/.test(value.token)) throw new Error('请填写正确仓库和上传凭据')
+  const previous = publicationSettings()
+  let encryptedToken = previous.encryptedToken
+  if (value.token) {
+    if (!safeStorage.isEncryptionAvailable()) throw new Error('系统凭据加密不可用，未保存上传凭据')
+    encryptedToken = safeStorage.encryptString(value.token).toString('base64')
+  }
+  const next = { repository: value.repository, encryptedToken, keyFile: value.useSelectedKey === true && pendingPublicationKey ? pendingPublicationKey : previous.keyFile }
+  const filename = path.join(app.getPath('userData'), 'resource-publication.json')
+  const temporary = filename + '.tmp'
+  fs.writeFileSync(temporary, JSON.stringify(next), { mode: 0o600 })
+  fs.renameSync(temporary, filename)
+  pendingPublicationKey = null
+  return { repository: next.repository, hasToken: !!next.encryptedToken, keyFile: next.keyFile }
+})
+function releaseService(workspace: string) {
+  return new ResourceRelease(workspace, getProjectRoot(), path.join(app.getPath('userData'), 'resource-releases'), runContentWorker)
+}
+handleTrusted('workbench-export', (_event, id: string, acceptedHash: string, notes: string) => {
+  const workspace = ensureAuthoringWorkspace()
+  return contentOperationQueue.enqueue(async () => {
+    const result = await releaseService(workspace).export(id, acceptedHash, notes)
+    shell.showItemInFolder(result.path)
+    return result
+  })
+})
+handleTrusted('workbench-publish', (_event, id: string, acceptedHash: string, notes: string) => {
+  const workspace = ensureAuthoringWorkspace()
+  const settings = publicationSettings()
+  if (!settings.repository || !settings.encryptedToken || !settings.keyFile) throw new Error('首次发布需要配置 GitHub 仓库、上传凭据和已有官方签名密钥')
+  if (!safeStorage.isEncryptionAvailable()) throw new Error('当前系统无法解密上传凭据')
+  const token = safeStorage.decryptString(Buffer.from(settings.encryptedToken, 'base64'))
+  return contentOperationQueue.enqueue(() => releaseService(workspace).publish(id, acceptedHash, notes, { ...settings, token }, (url, init) => net.fetch(url, init), stage => {
+    if (win && !win.isDestroyed()) win.webContents.send('publication-progress', { taskId: id, stage })
+  }))
+})
 
 handleTrusted('content-operation', (_event, rawRequest: unknown) => {
   const workspace = ensureAuthoringWorkspace()

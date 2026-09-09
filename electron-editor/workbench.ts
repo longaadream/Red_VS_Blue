@@ -7,6 +7,8 @@ type Manifest = Record<string, string>
 type Task = { schema: 'rvb-creative-task/v1'; id: string; title: string; brief: string; criteria: string; createdAt: string; baseline: Manifest; baselineHash: string }
 type Issue = { severity: 'error' | 'warning'; path: string; message: string }
 type Check = { contentHash: string; checkedAt: string; issues: Issue[]; runtimeVerified: false }
+type Selection = { expectedHash: string; expectedAcceptedHash: string; paths: string[] }
+type Accepted = { snapshot: Manifest; contentHash: string; createdAt: string; versionId: string }
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 const HASH = /^[0-9a-f]{64}$/
 const digest = (value: string | Buffer) => createHash('sha256').update(value).digest('hex')
@@ -107,6 +109,147 @@ export class CreativeWorkbench {
       return value
     }).sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))
   }
+  private accepted(task: Task): Accepted {
+    const filename = this.file('.workbench/accepted.json', 'write')
+    if (!fs.existsSync(filename)) {
+      // Legacy projects may have several task baselines. Newer baselines can contain unaccepted drafts.
+      const tasks = this.list()
+      const original = tasks.length ? this.task(tasks[tasks.length - 1].id) : task
+      return { snapshot: original.baseline, contentHash: original.baselineHash, createdAt: original.createdAt, versionId: '' }
+    }
+    const value = this.read('.workbench/accepted.json')
+    if (!record(value) || !record(value.snapshot) || manifestHash(value.snapshot as Manifest) !== value.contentHash || typeof value.versionId !== 'string' || (value.versionId !== '' && !UUID.test(value.versionId))) throw new Error('已接受版本记录损坏，请保留工作区并检查历史')
+    for (const [relative, hash] of Object.entries(value.snapshot)) {
+      this.contentPath(relative)
+      if (typeof hash !== 'string') throw new Error('版本快照格式错误')
+      this.object(hash)
+    }
+    return value as Accepted
+  }
+  private contentPath(relative: string) {
+    if (typeof relative !== 'string' || !(relative.startsWith('data/') && relative.endsWith('.json') || relative.startsWith('images/') && /\.(png|jpe?g|webp|svg)$/i.test(relative)) || relative.includes('\\') || relative.split('/').some(part => !part || part === '.' || part === '..')) throw new Error('只能操作内容目录中的 JSON 和图片')
+    return this.file(relative, 'write')
+  }
+  private withLock<T>(operation: () => T): T {
+    const lock = this.file('.workbench/change.lock', 'write')
+    let descriptor: number
+    try { descriptor = fs.openSync(lock, 'wx') } catch { throw new Error('另一个内容操作正在进行；若编辑器意外退出，请先检查 .workbench/transactions 中的恢复记录') }
+    try { fs.writeFileSync(descriptor, JSON.stringify({ pid: process.pid, createdAt: now() })); return operation() }
+    finally { fs.closeSync(descriptor); fs.unlinkSync(lock) }
+  }
+  private selection(id: string, input: Selection) {
+    if (!input || !HASH.test(input.expectedHash) || !HASH.test(input.expectedAcceptedHash) || !Array.isArray(input.paths) || !input.paths.length || input.paths.length > 4000 || new Set(input.paths).size !== input.paths.length) throw new Error('请选择需要处理的修改')
+    const task = this.task(id)
+    const accepted = this.accepted(task)
+    const current = this.capture()
+    if (manifestHash(current) !== input.expectedHash || accepted.contentHash !== input.expectedAcceptedHash) throw new Error('内容或已接受版本已改变，请刷新后重新选择；没有覆盖新的修改')
+    for (const relative of input.paths) {
+      this.contentPath(relative)
+      if (current[relative] === accepted.snapshot[relative]) throw new Error('所选内容已不再有差异：' + relative)
+    }
+    return { task, current, accepted }
+  }
+  accept(id: string, input: Selection) {
+    return this.withLock(() => {
+      const { current, accepted } = this.selection(id, input)
+      const snapshot = { ...accepted.snapshot }
+      for (const relative of input.paths) {
+        if (current[relative]) snapshot[relative] = current[relative]
+        else delete snapshot[relative]
+      }
+      const issues = this.validateManifest(snapshot)
+      const errors = issues.filter(issue => issue.severity === 'error')
+      if (errors.length) throw new Error('所选修改不能单独接受，请一并选择依赖或修复：\n' + errors.slice(0, 12).map(issue => `${issue.path}：${issue.message}`).join('\n'))
+      this.selection(id, input)
+      const versionId = randomUUID()
+      const version = { versionId, createdAt: now(), contentHash: manifestHash(snapshot), snapshot, status: 'accepted', published: false, check: { contentHash: manifestHash(snapshot), checkedAt: now(), issues, runtimeVerified: false }, selectedPaths: input.paths, previousAcceptedHash: accepted.contentHash }
+      this.writeNew(`${this.id(id)}/versions/${versionId}.json`, version)
+      // This single pointer is the acceptance commit. Working files are never rewritten.
+      this.replace('.workbench/accepted.json', version)
+      return this.inspect(id)
+    })
+  }
+  revert(id: string, input: Selection) {
+    return this.withLock(() => {
+      const { current, accepted } = this.selection(id, input)
+      const next = { ...current }
+      for (const relative of input.paths) {
+        if (accepted.snapshot[relative]) next[relative] = accepted.snapshot[relative]
+        else delete next[relative]
+      }
+      const errors = this.validateManifest(next).filter(issue => issue.severity === 'error')
+      if (errors.length) throw new Error('撤销后会留下无效内容，请调整选择：\n' + errors.slice(0, 12).map(issue => `${issue.path}：${issue.message}`).join('\n'))
+      this.selection(id, input)
+      const transaction = `.workbench/transactions/${randomUUID()}`
+      this.directory(transaction)
+      const moved: { relative: string; backup: string; installed?: string }[] = []
+      this.writeNew(`${transaction}/plan.json`, { status: 'prepared', createdAt: now(), before: current, after: next, paths: input.paths })
+      try {
+        // Quarantine old files before replacing them. Exclusive links never overwrite a new external write.
+        for (const [index, relative] of input.paths.entries()) {
+          const target = this.contentPath(relative)
+          const backup = `${transaction}/${index}.original`
+          if (current[relative]) {
+            if (!fs.existsSync(target) || digest(fs.readFileSync(target)) !== current[relative]) throw new Error('撤销期间内容改变：' + relative)
+            fs.renameSync(target, this.file(backup, 'write'))
+            moved.push({ relative, backup })
+            if (digest(fs.readFileSync(this.file(backup))) !== current[relative]) throw new Error('撤销期间内容改变：' + relative)
+          } else {
+            if (fs.existsSync(target)) throw new Error('撤销期间内容新增：' + relative)
+            moved.push({ relative, backup: '' })
+          }
+        }
+        for (const item of moved) if (next[item.relative]) {
+          const staged = `${transaction}/${input.paths.indexOf(item.relative)}.replacement`
+          fs.writeFileSync(this.file(staged, 'write'), this.object(next[item.relative]), { flag: 'wx' })
+          const target = this.contentPath(item.relative)
+          fs.mkdirSync(path.dirname(target), { recursive: true })
+          fs.linkSync(this.file(staged), target)
+          item.installed = next[item.relative]
+        }
+        if (manifestHash(this.scan()) !== manifestHash(next)) throw new Error('撤销期间外部程序继续修改了内容，请检查恢复记录')
+        this.writeNew(`${transaction}/result.json`, { status: 'complete', createdAt: now() })
+      } catch (error) {
+        // Restore only vacant paths. Never delete or replace a path an external writer may own.
+        for (const item of moved) if (item.backup && !fs.existsSync(this.contentPath(item.relative))) {
+          try { fs.linkSync(this.file(item.backup), this.contentPath(item.relative)) } catch { /* Preserve the original in the transaction directory. */ }
+        }
+        this.writeNew(`${transaction}/result.json`, { status: 'needs-review', message: String(error), createdAt: now() })
+        throw new Error(`撤销未全部完成，已保留原文件和恢复记录 ${transaction}。${String(error)}`)
+      }
+      return this.inspect(id)
+    })
+  }
+  previewImage(id: string, relative: string, side: 'before' | 'after', expectedHash: string, expectedAcceptedHash: string) {
+    if (side !== 'before' && side !== 'after') throw new Error('图片版本无效')
+    this.contentPath(relative)
+    // SVG is intentionally not embedded as active markup in the comparison view.
+    const extension = /\.(png|jpe?g|webp)$/i.exec(relative)?.[1]?.toLowerCase()
+    if (!relative.startsWith('images/') || !extension) return null
+    const { current, accepted } = this.selection(id, { paths: [relative], expectedHash, expectedAcceptedHash })
+    const hash = (side === 'before' ? accepted.snapshot : current)[relative]
+    if (!hash) return null
+    const bytes = this.object(hash)
+    if (bytes.length > 4 * 1024 * 1024) return null
+    return `data:image/${extension === 'jpg' ? 'jpeg' : extension};base64,${bytes.toString('base64')}`
+  }
+  materializeAccepted(id: string, expectedAcceptedHash: string) {
+    return this.withLock(() => {
+      const accepted = this.accepted(this.task(id))
+      if (!accepted.versionId || accepted.contentHash !== expectedAcceptedHash) throw new Error('请先接受需要发布的修改；已接受版本发生变化时需重新确认')
+      const issues = this.validateManifest(accepted.snapshot)
+      if (issues.some(issue => issue.severity === 'error')) throw new Error('已接受版本未通过结构与引用检查')
+      const relativeRoot = `sources/accepted-${randomUUID()}`
+      this.directory(relativeRoot)
+      for (const [relative, hash] of Object.entries(accepted.snapshot)) {
+        this.contentPath(relative)
+        const destination = this.file(`${relativeRoot}/${relative}`, 'write')
+        fs.mkdirSync(path.dirname(destination), { recursive: true })
+        fs.writeFileSync(destination, this.object(hash), { flag: 'wx' })
+      }
+      return { source: relativeRoot, contentHash: accepted.contentHash, versionId: accepted.versionId, title: this.task(id).title, files: Object.keys(accepted.snapshot).length, snapshot: accepted.snapshot }
+    })
+  }
   list() {
     return fs.readdirSync(this.file('.workbench/tasks')).filter(id => UUID.test(id)).map(id => {
       const { title, brief, createdAt } = this.task(id)
@@ -120,6 +263,7 @@ export class CreativeWorkbench {
     const baseline = this.capture()
     const id = randomUUID()
     const task: Task = { schema: 'rvb-creative-task/v1', id, title, brief, criteria, createdAt: now(), baseline, baselineHash: manifestHash(baseline) }
+    if (!fs.existsSync(this.file('.workbench/accepted.json', 'write'))) this.writeNew('.workbench/accepted.json', this.accepted(task))
     for (const directory of ['', '/checks', '/feedback', '/versions', '/scenarios']) this.directory(this.id(id) + directory)
     this.writeNew(this.id(id) + '/task.json', task)
     this.handoff(id)
@@ -127,6 +271,8 @@ export class CreativeWorkbench {
   }
   inspect(id: string) {
     const task = this.task(id)
+    const accepted = this.accepted(task)
+    const baseline = accepted.snapshot
     const current = this.capture()
     const contentHash = manifestHash(current)
     const contents = new Map<string, string>()
@@ -135,8 +281,8 @@ export class CreativeWorkbench {
       return contents.get(hash)!
     }
     const parsed = (hash?: string) => { if (!hash) return null; const value = readObject(hash); try { return JSON.parse(value) } catch { return null } }
-    const changes = [...new Set([...Object.keys(task.baseline), ...Object.keys(current)])].sort().filter(file => task.baseline[file] !== current[file]).map(file => {
-      const before = file.endsWith('.json') ? parsed(task.baseline[file]) : null
+    const changes = [...new Set([...Object.keys(baseline), ...Object.keys(current)])].sort().filter(file => baseline[file] !== current[file]).map(file => {
+      const before = file.endsWith('.json') ? parsed(baseline[file]) : null
       const after = file.endsWith('.json') ? parsed(current[file]) : null
       const fields: { field: string; before: unknown; after: unknown }[] = []
       const compare = (left: unknown, right: unknown, prefix = '') => {
@@ -148,15 +294,24 @@ export class CreativeWorkbench {
       compare(before, after)
       const idValue = record(after) ? after.id : record(before) ? before.id : undefined
       const affected = typeof idValue === 'string' ? Object.keys(current).filter(other => other !== file && other.endsWith('.json') && readObject(current[other]).includes(JSON.stringify(idValue))) : []
-      return { path: file, kind: !task.baseline[file] ? 'added' : !current[file] ? 'deleted' : 'modified', name: (record(after) && after.name) || (record(before) && before.name) || path.basename(file), fields, fieldsTruncated: fields.length >= 200, affected }
+      return { path: file, kind: !baseline[file] ? 'added' : !current[file] ? 'deleted' : 'modified', name: (record(after) && after.name) || (record(before) && before.name) || path.basename(file), fields, fieldsTruncated: fields.length >= 200, affected, beforeBytes: baseline[file] ? this.object(baseline[file]).length : 0, afterBytes: current[file] ? this.object(current[file]).length : 0 }
     })
     const checkPath = `${this.id(id)}/checks/${contentHash}.json`
     const check = this.checkRecord(checkPath, contentHash)
-    return { task, contentHash, changes, check, hasOlderChecks: fs.readdirSync(this.file(`${this.id(id)}/checks`)).length > 0, feedback: this.records(id, 'feedback'), scenarios: this.records(id, 'scenarios'), versions: this.records(id, 'versions'), handoffPath: this.file(`${this.id(id)}/AI_TASK.md`, 'write') }
+    return { task, contentHash, acceptedHash: accepted.contentHash, acceptedVersionId: accepted.versionId, changes, check, hasOlderChecks: fs.readdirSync(this.file(`${this.id(id)}/checks`)).length > 0, feedback: this.records(id, 'feedback'), scenarios: this.records(id, 'scenarios'), versions: this.records(id, 'versions'), handoffPath: this.file(`${this.id(id)}/AI_TASK.md`, 'write') }
   }
   check(id: string) {
     this.task(id)
     const manifest = this.capture()
+    const issues = this.validateManifest(manifest)
+    const contentHash = manifestHash(manifest)
+    const report: Check = { contentHash, checkedAt: now(), issues, runtimeVerified: false }
+    const file = `${this.id(id)}/checks/${contentHash}.json`
+    this.replace(file, report)
+    this.handoff(id)
+    return this.inspect(id)
+  }
+  private validateManifest(manifest: Manifest) {
     const issues: Issue[] = []
     const documents = new Map<string, unknown>()
     const add = (relative: string, message: string, severity: 'error' | 'warning' = 'error') => issues.push({ severity, path: relative, message })
@@ -193,12 +348,7 @@ export class CreativeWorkbench {
         }
       }
     }
-    const contentHash = manifestHash(manifest)
-    const report: Check = { contentHash, checkedAt: now(), issues, runtimeVerified: false }
-    const file = `${this.id(id)}/checks/${contentHash}.json`
-    this.replace(file, report)
-    this.handoff(id)
-    return this.inspect(id)
+    return issues
   }
   feedback(id: string, input: { message: string; expectedHash: string }) {
     const state = this.inspect(id)
@@ -228,7 +378,7 @@ export class CreativeWorkbench {
     const checkCommand = this.launcher.length ? [...this.launcher, '--check-content-task', this.root, id] : null
     const report = { schema: 'rvb-ai-handoff/v1', ...state, task: { ...state.task, baseline: undefined }, checkCommand }
     const body = `# ${state.task.title}\n\n工作内容目录：${this.root}\n任务编号：${id}\n\n## 人的需求\n${state.task.brief}\n\n## 验收条件\n${state.task.criteria}\n\n## 协作规则\n修改 data/ 与 images/ 中的内容，保留未知字段和 manifest 引用一致性。不要修改 .workbench 内的历史、报告、快照或发布记录。需要新增引擎接口时先报告能力缺口。不要使用 eval 或可信开关绕过技能限制。\n\n在编辑器点击“检查内容”生成最新结构/引用报告，点击“接收 AI 改动”更新差异。AI_CONTEXT.json 包含实际变化、校验和人的反馈。结构检查不代表技能执行通过；当前实战试验入口尚未接通。不要声称没有运行过的测试通过。\n\n当前内容版本：${state.contentHash}\n修改文件数：${state.changes.length}\n`
-    const instructions = body + (checkCommand ? `\n## AI 自检入口\n使用以下参数数组启动子进程（不要拼接或 eval shell 字符串），退出码 0 表示结构/引用检查无错误，1 表示检查失败。命令会更新本任务 AI_CONTEXT.json。\n\n\`\`\`json\n${JSON.stringify(checkCommand, null, 2)}\n\`\`\`\n` : '')
+    const instructions = body + '\n## 纯内容任务边界\n本任务无需建立 Git 分支、worktree、PR 或重建客户端。仅修改这个独立内容工作区的 data/ JSON 和 images/ 图片。禁止修改游戏及编辑器主进程、preload、IPC、引擎源代码、依赖、构建脚本、密钥和发布记录。不得自行接受或发布内容。需要新的引擎能力时，记录具体缺口并停止相关内容实现。编辑器会自动显示变化，由人选择接受或撤销，再单独决定发布。此说明不等于操作系统沙箱；外部 AI 工具应只获得内容目录的写权限。\n' + (checkCommand ? `\n## AI 自检入口\n使用以下参数数组启动子进程（不要拼接或 eval shell 字符串），退出码 0 表示结构/引用检查无错误，1 表示检查失败。命令会更新本任务 AI_CONTEXT.json。\n\n\`\`\`json\n${JSON.stringify(checkCommand, null, 2)}\n\`\`\`\n` : '')
     for (const [name, value] of [['AI_TASK.md', instructions], ['AI_CONTEXT.json', JSON.stringify(report, null, 2) + '\n']]) {
       const relative = `${this.id(id)}/${name}`
       const temporary = `${relative}.${randomUUID()}.tmp`

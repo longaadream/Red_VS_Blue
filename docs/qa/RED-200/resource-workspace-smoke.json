@@ -1,0 +1,15 @@
+{
+  "passed": true,
+  "importEntryVisible": true,
+  "automaticDiff": true,
+  "imageComparison": true,
+  "acceptImageOnly": true,
+  "revertSkillOnly": true,
+  "advancedToolsCollapsed": true,
+  "publicationSeparate": true,
+  "credentialsUntouched": true,
+  "actualRuntime": "C:\\Users\\lngsc\\Documents\\Red_VS_Blue\\red200\\dist\\editor\\win-unpacked\\RED vs BLUE Editor.exe",
+  "trainingHandoff": "blocked: client interface absent",
+  "githubPublication": "not executed",
+  "project": "C:\\Users\\lngsc\\AppData\\Local\\Temp\\rvb-resource-workspace-PwgWqn\\rvb-content-f5a65738"
+}
