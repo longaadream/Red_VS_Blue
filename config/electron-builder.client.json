@@ -20,7 +20,7 @@
     { "from": "_client-postgres",    "to": "postgres" },
     { "from": "_client-stage/node_modules", "to": "app/standalone/node_modules" },
     { "from": "public",              "to": "app/public" },
-    { "from": "data",                "to": "app/data" },
+    { "from": "data",                "to": "app/data", "filter": ["**/*", "!users.json"] },
     { "from": "data/pages",          "to": "app/www" },
     {
       "from": "data",

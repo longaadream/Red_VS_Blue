@@ -62,6 +62,8 @@ function bundledFiles(appRoot: string): BundledFileV1[] {
   for (const absolute of walkFiles(dataRoot)) {
     if (path.extname(absolute).toLowerCase() !== '.json') continue
     const relative = path.relative(dataRoot, absolute).split(path.sep).join('/')
+    // Local accounts are application data, never shared game content or identity.
+    if (relative === 'users.json') continue
     // ADR-0018 explicitly keeps the pre-v1 browser PVE prototype outside the
     // v1 content identity. Once those files carry rvb-pve-*/v1 schemas, the
     // core validator owns their closed-set validation and they join Base.

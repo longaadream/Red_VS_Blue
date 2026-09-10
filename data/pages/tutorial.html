@@ -6,6 +6,8 @@
   <script src="js/tutorial/tutorial-lessons.js"></script>
   <link rel="stylesheet" href="css/tabletop/tabletop.css">
   <link rel="stylesheet" href="css/tutorial.css">
+  <link rel="stylesheet" href="css/compact-library.css">
+  <script src="js/compact-library.js"></script>
 </head>
 <body data-art-page="tutorial"><main>
   <nav class="lesson-nav"><a class="back-link" href="index.html">← 返回大厅</a><span>红蓝桌游社 · 新人练习册</span></nav>
@@ -42,4 +44,5 @@
     start.textContent = available ? '进入第 ' + lesson.number + ' 局' : '暂未开放'
     card.append(label, art, title, copy, meta, start); document.getElementById('lessons').appendChild(card)
   })
+  RvBCompactLibrary.lessons()
 </script></body></html>

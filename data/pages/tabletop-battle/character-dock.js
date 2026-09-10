@@ -64,6 +64,16 @@
  };
  function syncSelected(force){
   if(busy||currentPieceInfoSource==='deployment')return;
+  // On phones, selection opens the native quick skills. Details require an
+  // explicit inspect action and must never cover target selection.
+  if(window.matchMedia('(orientation: landscape) and (max-height: 600px)').matches){
+   if(pendingSkill||pendingCardAction||targetSubmissionPending||pendingTargetSelectionForMe()||pendingOptionSelectionForMe()||currentPieceInfoId!==selectedPieceId){
+    if(currentPieceInfoId){
+     busy=true;try{nativeClose({restoreFocus:false});document.body.classList.remove('character-dock-open');}finally{busy=false;}
+    }
+   }
+   reopen.hidden=true;return;
+  }
   if(selectedPieceId!==lastSelected){dismissed=null;keywordOpen=false;keywordName='';lastSignature='';lastSelected=selectedPieceId;modal.querySelector('.pi-sheet').scrollTop=0;}
   if(!selectedPieceId){reopen.hidden=true;return;}
   if(dismissed===selectedPieceId){reopen.hidden=false;return;}
