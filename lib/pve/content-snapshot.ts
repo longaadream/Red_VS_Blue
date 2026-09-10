@@ -1,5 +1,6 @@
 import type { ResolvedSnapshotViewV1 } from '@/lib/content-pipeline/core/resolver'
 import { parseStrictJsonBytesV1 } from '@/lib/content-pipeline/core/json-safety'
+import { parseRoguelikeDocumentV1 } from './contracts/roguelike-content-v1'
 import {
   PveCampaignV1Schema,
   PveChapterV1Schema,
@@ -260,11 +261,17 @@ export function createPveContentSnapshotV1(
         { path: descriptor.path },
       )
     }
+    const value = parseJson(descriptor.path, bytes)
+    try {
+      if (parseRoguelikeDocumentV1(value)) continue
+    } catch {
+      fail('PVE_SNAPSHOT_SCHEMA_INVALID', 'Invalid exploration content', { path: descriptor.path })
+    }
     const file = deepFreeze({
       path: descriptor.path,
       document: parseDocument(
         descriptor.path,
-        parseJson(descriptor.path, bytes),
+        value,
       ),
     })
     parsedFiles.push(file)

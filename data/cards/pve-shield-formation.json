@@ -1,0 +1,24 @@
+{
+  "id": "pve-shield-formation",
+  "name": "盾阵",
+  "description": "使两个不同的友方各获得圣盾。",
+  "type": "active",
+  "actionPointCost": 2,
+  "availability": {
+    "modes": [
+      "pve"
+    ],
+    "status": "draft"
+  },
+  "design": {
+    "familyId": "shield",
+    "handbookId": "shield-formation",
+    "curve": "ready",
+    "role": "防护",
+    "duration": "直到消耗 / 战后清除",
+    "start": "2次挡伤",
+    "end": "2次挡伤",
+    "condition": "花2费和1张牌同时保护两人。",
+    "note": "直接价值稳定；也能为持盾数量类卡提供配套。"
+  }
+}

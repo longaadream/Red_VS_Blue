@@ -1,0 +1,24 @@
+{
+  "id": "pve-skirmish-aid",
+  "name": "战地急救",
+  "description": "使一个友方恢复4点生命，再让其进行一次最多1格的普通移动，不额外支付行动点。",
+  "type": "active",
+  "actionPointCost": 1,
+  "availability": {
+    "modes": [
+      "pve"
+    ],
+    "status": "draft"
+  },
+  "design": {
+    "familyId": "skirmish",
+    "handbookId": "skirmish-aid",
+    "curve": "ready",
+    "role": "治疗 / 移动",
+    "duration": "一次结算",
+    "start": "恢复4 / 移动1",
+    "end": "恢复4 / 移动1",
+    "condition": "稳定撤出危险格，不随交火次数提高。",
+    "note": ""
+  }
+}

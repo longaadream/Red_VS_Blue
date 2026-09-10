@@ -1,4 +1,5 @@
 import type { BattleState } from "./turn"
+import { adventureRuleSourceAllowed } from './adventure-boundary'
 import { checkpointBattlePresentation, withBattlePresentationSource } from './battle-presentation-recording'
 import type { PieceInstance, PieceStatusTag } from "./piece"
 import { executeCardFunction, loadCardForBattle, loadRuleForBattle } from './skills'
@@ -822,6 +823,7 @@ export class TriggerSystem {
         allRuleItems.push({ rule, ruleId: rule.id, buildCtx: ctx => ctx })
       } else {
         for (const op of owningPieces) {
+          if (!adventureRuleSourceAllowed(battle, op)) continue
           allRuleItems.push({
             rule, ruleId: rule.id, sourceId: op.instanceId,
             buildCtx: ctx => ({ ...ctx, triggerPlayerId: ctx.playerId, ruleOwnerPlayerId: op.ownerPlayerId, piece: ctx.sourcePiece, rulePiece: op })
@@ -834,6 +836,7 @@ export class TriggerSystem {
     writeLog('[checkTriggers] Checking piece rules, pieces count: ' + (battle.pieces?.length || 0));
     if (battle.pieces) {
       for (const piece of battle.pieces) {
+        if (!adventureRuleSourceAllowed(battle, piece)) continue
         if (!piece.rules || piece.rules.length === 0) continue
         writeLog('[checkTriggers] Piece ' + piece.name + ' has ' + piece.rules.length + ' rules: ' + JSON.stringify(piece.rules.map((r: any) => r.id)));
         const pieceMatchingRules = piece.rules.filter((rule: any) => {

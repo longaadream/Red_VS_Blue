@@ -1,10 +1,11 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { Script, createContext } from 'node:vm'
+import { Script, createContext as createVmContext } from 'node:vm'
 
 import { describe, expect, it } from 'vitest'
 
 const pagesDir = resolve(process.cwd(), 'data/pages')
+const createContext = (values: Record<string, unknown>) => createVmContext({ ADVENTURE_MODE: false, ...values })
 
 function readPage(name: string) {
   return readFileSync(resolve(pagesDir, name), 'utf8')
@@ -68,6 +69,35 @@ function parseInlineScript(script: { source: string; htmlLine: number }, index: 
 }
 
 describe('battle page route contract', () => {
+  it.each(['human', 'phase'])('re-enables adventure deployment after the %s receipt clears busy state', async (path) => {
+    const renderedBusy: boolean[] = []
+    let scheduled: (() => Promise<void>) | undefined
+    const context = createContext({
+      window: {}, G: { turn: { phase: 'start' } }, myPlayerId: 'human',
+      clearTimeout: () => {}, setTimeout: (callback: () => Promise<void>) => { scheduled = callback },
+      withClientActionId: (action: unknown) => action,
+      beginPendingActionFeedback: () => true, applyAuthorityReceipt: () => {},
+      progressiveDeploymentPending: () => false, pendingSkill: null, pendingCardAction: null,
+      adventureHasSupplyChoice: () => false,
+      captureBusy: (busy: boolean) => { renderedBusy.push(busy) },
+    })
+    new Script(readPage('js/adventure/battle-controller.js')).runInContext(context)
+    new Script(`
+      adventureClient = { request: async () => ({}) };
+      adventureSnapshot = { inputOwner: 'human', aiPlayerId: 'enemy', revision: 1 };
+      renderAdventureWorld = () => captureBusy(adventureBusy);
+      acceptAdventureSnapshot = () => { G.turn.phase = 'action'; renderAdventureWorld(); };
+    `).runInContext(context)
+    if (path === 'human') {
+      await new Script("adventureDoAction({ type: 'move' })").runInContext(context)
+    } else {
+      new Script('scheduleAdventureAI()').runInContext(context)
+      expect(scheduled).toBeDefined()
+      await scheduled!()
+    }
+    expect(renderedBusy).toEqual([true, false])
+  })
+
   it('serves canonical battle-page images before legacy public QA assets', () => {
     const route = readFileSync(resolve(process.cwd(), 'app/qa/client/[...path]/route.ts'), 'utf8')
     const staticQaServer = readFileSync(resolve(process.cwd(), 'scripts/run-colyseus-pages-qa.mjs'), 'utf8')
@@ -689,6 +719,7 @@ describe('battle page route contract', () => {
       withClientActionId: (action: Record<string, unknown>) => ({ ...action, clientActionId: `client-${++actionSequence}` }),
       SPECTATE_MODE: false,
       PRACTICE_MODE: false,
+      ADVENTURE_MODE: false,
       TRAINING_MODE: false,
       trainingDoAction: () => {
         throw new Error('training path should not run')
@@ -768,6 +799,7 @@ new Script([
       },
       SPECTATE_MODE: false,
       PRACTICE_MODE: false,
+      ADVENTURE_MODE: false,
       withClientActionId: () => {
         stamped = true
         return { type: 'move', clientActionId: 'should-not-exist' }
@@ -781,6 +813,20 @@ new Script([
     expect(stamped).toBe(false)
     expect(sent).toBe(false)
     expect(statusMessages.at(-1)).toBe('正在同步服务端状态，请等待完成后重新操作')
+  })
+
+  it.each([false, true])('routes adventure commands locally while preserving spectator read-only=%s', async (spectating) => {
+    const commands: unknown[] = [], messages: string[] = []
+    const context = createContext({
+      SPECTATE_MODE: spectating, PRACTICE_MODE: false, ADVENTURE_MODE: true,
+      adventureDoAction: async (action: unknown) => { commands.push(action) },
+      setStatusMsg: (message: string) => messages.push(message),
+      RvBColyseus: { send: () => { throw new Error('Adventure must not submit a room command') } },
+    })
+    new Script(readNamedAsyncFunction(readPage('battle.html'), 'doAction')).runInContext(context)
+    await new Script("doAction({ type: 'endTurn', playerId: 'adventure-human' })").runInContext(context)
+    expect(commands).toHaveLength(spectating ? 0 : 1)
+    expect(messages).toEqual(spectating ? ['观战为只读模式'] : [])
   })
 
   it('keeps target submission single-flight and clears transient targeting on every authoritative exit', () => {

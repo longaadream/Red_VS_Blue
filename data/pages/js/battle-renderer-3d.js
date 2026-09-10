@@ -114,6 +114,8 @@
   const _pieceObjects = new Map()      // instanceId → {group, body, ring, portraitMesh, labelDiv, targetX, targetZ}
   const _tileEffectObjects = new Map()
   const _hlObjects = { move: new Map(), skill: new Map(), place: new Map(), selected: null, selectedId: null }
+  let _boardDecorations = null
+  let _boardDecorationsHistorical = false
   let _historyHighlightGroup = null
   let _historyHighlightPointCount = 0
   let _historyHighlightPathCount = 0
@@ -2597,6 +2599,66 @@
     return closest
   }
 
+  // Board-space decals: presentation only, rendered by the same camera/frame as tiles.
+  function clearBoardDecorations() {
+    if (!_boardDecorations) return
+    if (_scene) _scene.remove(_boardDecorations)
+    const textures = new Set()
+    _boardDecorations.traverse(function (node) {
+      if (node.geometry) node.geometry.dispose()
+      if (node.material) {
+        if (node.material.map) textures.add(node.material.map)
+        node.material.dispose()
+      }
+    })
+    textures.forEach(function (texture) { texture.dispose() })
+    _boardDecorations = null
+  }
+
+  function setBoardDecorations(data) {
+    clearBoardDecorations()
+    if (!_mounted || !_scene || !data) { _invalidate(); return }
+    const group = new THREE.Group()
+    group.name = 'board-decorations'
+    group.visible = !_boardDecorationsHistorical
+    const textures = new Map()
+    for (const item of data.cells || []) {
+      let map = null
+      if (item.image) {
+        map = textures.get(item.image)
+        if (!map) {
+          map = new THREE.CanvasTexture(item.image)
+          textures.set(item.image, map)
+        }
+      }
+      const material = new THREE.MeshBasicMaterial({
+        color: item.color || 0xffffff, map, transparent: true,
+        opacity: item.opacity == null ? 1 : item.opacity, depthWrite: false,
+        polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1,
+      })
+      const mesh = new THREE.Mesh(new THREE.PlaneGeometry(item.size || .86, item.size || .86), material)
+      mesh.rotation.x = -Math.PI / 2
+      mesh.position.set(item.x, _tileSurfaceHeightAt(item.x, item.y) + (item.lift || .02), item.y)
+      mesh.userData.decorationId = item.id || ''
+      group.add(mesh)
+    }
+    for (const line of data.lines || []) {
+      for (let i = 1; i < line.points.length; i++) {
+        const a = line.points[i - 1], b = line.points[i]
+        const dx = b.x - a.x, dz = b.y - a.y, length = Math.hypot(dx, dz)
+        if (!length) continue
+        const mesh = new THREE.Mesh(new THREE.PlaneGeometry(line.width || .035, length),
+          new THREE.MeshBasicMaterial({ color: line.color, transparent: true, opacity: .85, depthWrite: false }))
+        mesh.rotation.set(-Math.PI / 2, 0, Math.atan2(dx, dz))
+        mesh.position.set((a.x + b.x) / 2, Math.max(_tileSurfaceHeightAt(Math.round(a.x), Math.round(a.y)), _tileSurfaceHeightAt(Math.round(b.x), Math.round(b.y))) + .028, (a.y + b.y) / 2)
+        group.add(mesh)
+      }
+    }
+    _boardDecorations = group
+    _scene.add(group)
+    _invalidate()
+  }
+
   // ── update — one-way presentation model input ─────────────────────────────────
   function update(model) {
     if (!model || !model.board || !_mounted) return
@@ -2604,6 +2666,7 @@
     // Build / update tiles on first call or map change
     const mapKey = model.board.id + ':' + model.board.width + 'x' + model.board.height
     if (!_currentModel || !_currentModel.board || _currentModel.board.id + ':' + _currentModel.board.width + 'x' + _currentModel.board.height !== mapKey) {
+      clearBoardDecorations()
       _buildTiles(model.board)
     }
 
@@ -2615,6 +2678,8 @@
       place: model.legal && model.legal.placementCells,
       selected: model.selection && model.selection.pieceId,
     })
+    _boardDecorationsHistorical = false
+    if (_boardDecorations) _boardDecorations.visible = true
     _currentModel = model
     _syncPendingFeedback(model.interaction || {})
     _summaryPositionsDirty = true
@@ -2653,6 +2718,8 @@
     _camera.updateProjectionMatrix()
     _currentModel = model
     update(model)
+    _boardDecorationsHistorical = true
+    if (_boardDecorations) _boardDecorations.visible = false
   }
 
   // ── spawnFloater ─────────────────────────────────────────────────────────────
@@ -2702,6 +2769,8 @@
     if (_renderer) _resetPointerState(_renderer.domElement)
     _removeAllListeners()
     _clearHistoryHighlight()
+    clearBoardDecorations()
+    _boardDecorationsHistorical = false
     clearTutorialCue()
     if (_hpLayer && _hpLayer.parentNode) _hpLayer.remove()
     if (_scene) {
@@ -2814,6 +2883,7 @@
     resetView,
     projectCell,
     setHistoryHighlight,
+    setBoardDecorations,
     setTutorialCue,
     clearTutorialCue,
     screenToCell,

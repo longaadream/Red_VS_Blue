@@ -7,7 +7,7 @@ import type { RankedRoomHooks } from '../official/ranked'
 
 import { getServerGameProfileIdentityV1 } from '@/lib/content-pipeline/runtime/profile-game-identity'
 import { getSelectableMapCatalog } from '@/lib/game/map-selection'
-import { getAllPieces } from '@/lib/game/piece-repository'
+import { getAvailablePieces } from '@/lib/game/piece-repository'
 import { loadCardById } from '@/lib/game/skills'
 import { getAllSkills } from '@/lib/game/skill-repository'
 import { installNativeBattleSha256 } from '@/lib/server/battle-hash'
@@ -245,7 +245,7 @@ export function createColyseusBattleServer(options: CreateColyseusBattleServerOp
       app.get('/catalog/maps', (request, response) => response.status(200).json({
         maps: getSelectableMapCatalog(request.query?.mode === '2v2' ? '2v2' : '1v1'),
       }))
-      app.get('/catalog/pieces', (_request, response) => response.status(200).json({ pieces: getAllPieces() }))
+      app.get('/catalog/pieces', (_request, response) => response.status(200).json({ pieces: getAvailablePieces('pvp') }))
       app.get('/catalog/skills', (_request, response) => response.status(200).json({ skills: getAllSkills() }))
       app.get('/rooms', async (_request, response) => {
         const listings = await matchMaker.query({ name: BATTLE_ROOM_TYPE })

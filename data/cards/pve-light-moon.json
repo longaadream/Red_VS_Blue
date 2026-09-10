@@ -1,0 +1,24 @@
+{
+  "id": "pve-light-moon",
+  "name": "月辉迸发",
+  "description": "使一个友方对3格内一个敌人造成2点伤害；本场【艾露恩的指引】每触发1次治疗，伤害+6。",
+  "type": "active",
+  "actionPointCost": 2,
+  "availability": {
+    "modes": [
+      "pve"
+    ],
+    "status": "draft"
+  },
+  "design": {
+    "familyId": "light",
+    "handbookId": "light-moon",
+    "curve": "growth",
+    "role": "伤害",
+    "duration": "一次结算",
+    "start": "2伤害",
+    "end": "26伤害",
+    "condition": "月华治疗触发4次。",
+    "note": "是偏向泰兰德的专属配合；没有她时起步很差。"
+  }
+}

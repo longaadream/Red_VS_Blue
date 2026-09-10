@@ -1,0 +1,24 @@
+{
+  "id": "pve-shield-oath",
+  "name": "誓约之剑",
+  "description": "一个友方对3格内一个敌人造成伤害，数值为自身攻击力×当前带圣盾的己方棋子数。",
+  "type": "active",
+  "actionPointCost": 1,
+  "availability": {
+    "modes": [
+      "pve"
+    ],
+    "status": "draft"
+  },
+  "design": {
+    "familyId": "shield",
+    "handbookId": "shield-oath",
+    "curve": "growth",
+    "role": "伤害",
+    "duration": "一次结算",
+    "start": "0～5伤害",
+    "end": "24伤害",
+    "condition": "攻击8，己方3人带盾；不移除这些盾。",
+    "note": "弗丁失盾加攻击与队伍补盾是两条投入。"
+  }
+}

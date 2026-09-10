@@ -1,0 +1,24 @@
+{
+  "id": "pve-skirmish-step",
+  "name": "侧翼机动",
+  "description": "让一个友方进行一次最多3格的普通移动，不额外支付移动行动点。",
+  "type": "active",
+  "actionPointCost": 1,
+  "availability": {
+    "modes": [
+      "pve"
+    ],
+    "status": "draft"
+  },
+  "design": {
+    "familyId": "skirmish",
+    "handbookId": "skirmish-step",
+    "curve": "ready",
+    "role": "移动",
+    "duration": "一次结算",
+    "start": "移动3格",
+    "end": "移动3格",
+    "condition": "固定距离，先把棋子摆到需要的位置。",
+    "note": ""
+  }
+}

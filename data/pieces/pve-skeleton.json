@@ -1,0 +1,26 @@
+{
+  "id": "pve-skeleton",
+  "name": "骷髅",
+  "faction": "evil",
+  "rarity": "common",
+  "image": "adventure/skeleton.svg",
+  "description": "《我的世界》 · 直线射手",
+  "stats": {
+    "maxHp": 4,
+    "attack": 2,
+    "defense": 0,
+    "moveRange": 2
+  },
+  "skills": [
+    {
+      "skillId": "pve-arrow"
+    }
+  ],
+  "rules": [],
+  "availability": {
+    "modes": [
+      "pve"
+    ],
+    "status": "ready"
+  }
+}

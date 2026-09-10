@@ -1,4 +1,5 @@
 import type { BattleState } from './turn'
+import { assertAdventurePosition } from './adventure-boundary'
 import { BattleRuleError } from './battle-types'
 import { globalTriggerSystem } from './triggers'
 import { getRuleExecutionTriggerSystem } from './rule-runtime'
@@ -13,6 +14,7 @@ export function changePiecePositions(battle: BattleState, changes: readonly Piec
   const prepared = changes.map(change => {
     const piece = battle.pieces.find(piece => piece.instanceId === change.pieceId && piece.currentHp > 0)
     if (!piece || piece.x == null || piece.y == null) throw new BattleRuleError('Position change requires a living board piece')
+    assertAdventurePosition(battle, piece, change.x, change.y)
     const reason = getPositionChangeRejection(piece, kind)
     if (reason) throw new BattleRuleError(reason)
     const context = { type: 'beforePiecePositionChange', sourcePiece: piece, playerId: piece.ownerPlayerId,
@@ -25,6 +27,7 @@ export function changePiecePositions(battle: BattleState, changes: readonly Piec
   })
   const cells = new Set<string>()
   for (const entry of prepared) {
+    assertAdventurePosition(battle, entry.piece, entry.x, entry.y)
     const key = `${entry.x},${entry.y}`
     const reason = getPositionChangeRejection(entry.piece, kind)
     if (reason) throw new BattleRuleError(reason)

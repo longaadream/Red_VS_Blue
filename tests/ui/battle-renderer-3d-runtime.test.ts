@@ -8,6 +8,7 @@ import { createRed68BattleFixture } from './fixtures/red-68-battle-fixture'
 
 const pagesDir = resolve(process.cwd(), 'data/pages')
 type ThreeMaterial = {
+  map?: { dispose(): void }
   gradientMap?: { dispose(): void }
   color?: { getHex(): number }
   emissive: { getHex(): number }
@@ -16,6 +17,8 @@ type ThreeMaterial = {
   dispose(): void
 }
 type ThreeNode = {
+  name?: string
+  rotation: {x:number;y:number;z:number}
   type: string
   isInstancedMesh?: boolean
   count?: number
@@ -39,6 +42,7 @@ type RendererApi = {
   spawnFloater(x: number, y: number, text: string, color: string, big: boolean, options: unknown): void
   resetView(): void
   projectCell(x: number, y: number, elevation?: number): { clientX: number; clientY: number; left: number; top: number }
+  setBoardDecorations(data: { cells?: Array<{x:number;y:number;image?:unknown}>; lines?: Array<{points:Array<{x:number;y:number}>;color:number}> } | null): void
   setHistoryHighlight(cells: Array<{ x: number; y: number; role: 'source' | 'target' }>): void
   setTutorialCue(cue: { cells?: Array<{ x: number; y: number }>; path?: Array<{ x: number; y: number }> }): void
   clearTutorialCue(): void
@@ -379,6 +383,48 @@ function distance(a: { clientX: number; clientY: number }, b: { clientX: number;
 }
 
 describe('RED-68 BattleRenderer3D runtime', () => {
+
+  it('keeps decals in the board plane across camera changes and disposes replaced GPU resources', () => {
+    const h = createHarness(1280, 720, false)
+    h.renderer.init({container:h.container}); h.renderer.update(runtimeModel()); h.frame(16)
+    const canvas = new FakeElement('canvas')
+    const data = {cells:[{x:2,y:3,image:canvas},{x:3,y:3,image:canvas}],lines:[{points:[{x:2,y:3},{x:3,y:3}],color:0x336677}]}
+    h.renderer.setBoardDecorations(data); h.frame(16)
+    const scene = h.renderers[0].scene!, group = scene.children.find(n => n.name === 'board-decorations')!
+    expect(group.children).toHaveLength(3)
+    expect(group.children[0].rotation.x).toBeCloseTo(-Math.PI/2)
+    expect(group.children[0].position).toMatchObject({x:2,z:3})
+    const before = h.renderer.projectCell(2,3), geometryCount = h.disposeCounts.geometry
+    const element = h.renderers[0].domElement
+    element.dispatch('wheel',{clientX:before.clientX,clientY:before.clientY,deltaY:-200})
+    h.frame(16)
+    expect(distance(before,h.renderer.projectCell(2,3))).toBeGreaterThan(0)
+    const beforePan = h.renderer.projectCell(2,3)
+    element.dispatch('pointerdown',{pointerId:77,pointerType:'mouse',button:0,clientX:900,clientY:500})
+    element.dispatch('pointermove',{pointerId:77,pointerType:'mouse',clientX:980,clientY:540})
+    element.dispatch('pointerup',{pointerId:77,pointerType:'mouse',clientX:980,clientY:540})
+    h.frame(16)
+    expect(distance(beforePan,h.renderer.projectCell(2,3))).toBeGreaterThan(0)
+    expect(scene.children.find(n => n.name === 'board-decorations')).toBe(group)
+    expect(h.disposeCounts.geometry).toBe(geometryCount)
+    expect(h.rafCallbacks.size).toBe(0)
+    const texture = group.children[0].material!.map!, disposeTexture = vi.spyOn(texture,'dispose')
+    h.renderer.showHistoricalBoard(runtimeModel())
+    expect(group.visible).toBe(false)
+    h.renderer.setBoardDecorations(data)
+    const replacement = scene.children.find(n => n.name === 'board-decorations')!
+    expect(replacement.visible).toBe(false)
+    expect(disposeTexture).toHaveBeenCalledTimes(1)
+    h.renderer.update(runtimeModel()); expect(replacement.visible).toBe(true)
+    const replacementTexture = vi.spyOn(replacement.children[0].material!.map!,'dispose')
+    h.renderer.setBoardDecorations(null)
+    expect(scene.children.some(n => n.name === 'board-decorations')).toBe(false)
+    expect(replacementTexture).toHaveBeenCalledTimes(1)
+    h.renderer.setBoardDecorations(data)
+    const finalGroup = scene.children.find(n => n.name === 'board-decorations')!
+    const finalTexture = vi.spyOn(finalGroup.children[0].material!.map!,'dispose')
+    h.renderer.dispose(); expect(finalTexture).toHaveBeenCalledTimes(1)
+  })
 
   it.each([false, true])('places signed number bursts beside pieces and cleans up (reduced=%s)', (reduced) => {
     const h = createHarness(1280, 720, false, reduced)

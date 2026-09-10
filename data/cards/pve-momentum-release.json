@@ -1,0 +1,24 @@
+{
+  "id": "pve-momentum-release",
+  "name": "动能释放",
+  "description": "清空一个友方的动能，使其对3格内一个敌人造成伤害：每完整2点动能，造成2点伤害。",
+  "type": "active",
+  "actionPointCost": 1,
+  "availability": {
+    "modes": [
+      "pve"
+    ],
+    "status": "draft"
+  },
+  "design": {
+    "familyId": "momentum",
+    "handbookId": "momentum-release",
+    "curve": "growth",
+    "role": "伤害",
+    "duration": "一次结算",
+    "start": "0伤害",
+    "end": "16伤害",
+    "condition": "储存16点动能后释放。",
+    "note": "它一直是成长取向，即使打出后立即消耗。"
+  }
+}

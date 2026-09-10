@@ -1,0 +1,26 @@
+{
+  "id": "pve-zombie",
+  "name": "僵尸",
+  "faction": "evil",
+  "rarity": "common",
+  "image": "adventure/zombie.svg",
+  "description": "《我的世界》 · 近战杂兵",
+  "stats": {
+    "maxHp": 5,
+    "attack": 2,
+    "defense": 0,
+    "moveRange": 2
+  },
+  "skills": [
+    {
+      "skillId": "pve-claw"
+    }
+  ],
+  "rules": [],
+  "availability": {
+    "modes": [
+      "pve"
+    ],
+    "status": "ready"
+  }
+}

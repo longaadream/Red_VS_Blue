@@ -16,7 +16,7 @@ import { hashBattleState } from '@/lib/game/battle-runner'
 import { getBattleStorage, withServerSkills } from '@/lib/game/battle-storage'
 import { assertSelectableMapId, getSelectableMapCatalog } from '@/lib/game/map-selection'
 import { isPlayerSeat, normalizeContentAlignment, type PlayerSeat } from '@/lib/game/match-identity'
-import { getAllPieces } from '@/lib/game/piece-repository'
+import { getAvailablePieces } from '@/lib/game/piece-repository'
 import {
   createPublicBattleSnapshot,
   createPublicBattleTransitionUpdate,
@@ -497,7 +497,7 @@ export function createBattleRoomClass(dependencies: BattleRoomDependencies) {
     ): Promise<unknown> {
       if (method === 'catalog.identity') return { profileIdentity: getServerGameProfileIdentityV1() }
       if (method === 'catalog.maps') return { maps: getSelectableMapCatalog((await this.requireProductRoom()).mode) }
-      if (method === 'catalog.pieces') return { pieces: getAllPieces() }
+      if (method === 'catalog.pieces') return { pieces: getAvailablePieces('pvp') }
       if (method === 'catalog.skills') return { skills: getAllSkills() }
       if (method === 'catalog.card') {
         const card = loadCardById(String(data.cardId ?? ''))

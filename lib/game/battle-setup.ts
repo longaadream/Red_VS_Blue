@@ -32,6 +32,7 @@ import {
   type RuleExecutionContext,
 } from './rule-runtime'
 import { finalizeBattleTerminal } from './terminal'
+import { assertContentAvailable, type ContentMode } from './content-availability'
 
 const getActiveTriggerSystem = () => getRuleExecutionTriggerSystem(globalTriggerSystem)
 
@@ -321,6 +322,8 @@ export const DEMO_DEPLOYMENT_MAP_ID = 'large-hole-arena'
 export interface InitialPieceBuildOptions {
   deterministicDeployment?: boolean
   progressiveDeployment?: boolean
+  /** Construct off-board recruits without adding an opposing fallback roster. */
+  skipMissingPlayerDefaults?: boolean
 }
 
 const FORCE_RULE_RELOAD = process.env.NODE_ENV !== 'production'
@@ -337,7 +340,7 @@ function cloneInitialStatusTags(pieceTemplate: PieceTemplate): PieceInstance['st
 }
 
 /** 将棋子模板中的 rules 加载到棋子实例上。 */
-function applyInitialRules(piece: PieceInstance, pieceTemplate: PieceTemplate): void {
+export function applyInitialRules(piece: PieceInstance, pieceTemplate: PieceTemplate): void {
   piece.initialDefinition = {
     stats: { ...pieceTemplate.stats },
     skills: piece.skills.map(skill => ({ ...skill })),
@@ -589,6 +592,7 @@ export function buildInitialPiecesForPlayers(
   }
   
   // 确保每个玩家至少有一个棋子
+  if (options.skipMissingPlayerDefaults) return pieces
   if (pieces.length === 0) {
     console.log('No pieces created, adding default pieces')
     
@@ -770,6 +774,17 @@ export async function createInitialBattleForPlayers(
     deploymentStartedAt?: number
     profileIdentity?: GameProfileIdentityV1
     ruleExecutionContext?: RuleExecutionContext
+    /** Authority host mode; never accepted from a player action. */
+    contentMode?: ContentMode
+    /** Local adventure host only; never populated from a room/player command. Applied before gameStart/trace. */
+    adventureWorld?: {
+      map: BoardMap
+      humanId: string
+      captainId?: string
+      coreIds?: string[]
+      skills?: BattleState['skillsById']
+      positions: Record<string, { x: number; y: number }>
+    }
   },
 ): Promise<BattleState | null> {
   const teamMatch = options?.matchMode === '2v2'
@@ -777,6 +792,13 @@ export async function createInitialBattleForPlayers(
   if (new Set(playerIds.map(id => id.toLowerCase())).size !== playerIds.length) return null
   if (teamMatch && playerIds.some((id, index) => playerSelectedPieces?.find(p => p.playerId === id)?.faction !== ['blue', 'red', 'red', 'blue'][index])) {
     throw new Error('2v2 requires blue-red-red-blue player order')
+  }
+  if (options?.adventureWorld && (options.deploymentEnabled || teamMatch)) throw new Error('Adventure cannot use PVP deployment or team match setup')
+  const contentMode = options?.adventureWorld ? 'pve' : options?.contentMode ?? 'pvp'
+  for (const template of [...selectedPieces, ...(playerSelectedPieces ?? []).flatMap(player => player.pieces)]) {
+    assertContentAvailable(template, contentMode)
+    // A caller cannot erase the source definition's availability flag.
+    if (DEFAULT_PIECES[template.id]) assertContentAvailable(DEFAULT_PIECES[template.id], contentMode)
   }
 
   const deploymentMode: DeploymentMode | undefined = options?.deploymentEnabled
@@ -805,7 +827,7 @@ export async function createInitialBattleForPlayers(
   writeLog('[createInitialBattleForPlayers] DEFAULT_MAP_ID: ' + DEFAULT_MAP_ID)
   
   // 尝试获取指定地图或默认地图
-  let map = getMap(resolvedMapId || DEFAULT_MAP_ID)
+  let map = options?.adventureWorld?.map ?? getMap(resolvedMapId || DEFAULT_MAP_ID)
   writeLog('[createInitialBattleForPlayers] map from getMap: ' + (map ? map.name : 'NOT FOUND'))
   
   // 如果地图没有加载成功，尝试异步加载
@@ -962,6 +984,36 @@ export async function createInitialBattleForPlayers(
     ...(Object.keys(playerAlignments).length > 0 ? { extensions: { playerAlignments } } : {}),
   }
 
+  if (contentMode === 'pve') state.extensions = { ...state.extensions, contentMode }
+
+  if (options?.adventureWorld) {
+    const world = options.adventureWorld
+    if (!orderedIds.includes(world.humanId)) throw new Error('Adventure owner is missing')
+    const occupied = new Set<string>()
+    for (const piece of state.pieces) {
+      const pos = world.positions[piece.instanceId]
+      const tile = pos && state.map.tiles.find(tile => tile.x === pos.x && tile.y === pos.y)
+      const key = pos && `${pos.x},${pos.y}`
+      if (!pos || !tile?.props.walkable || occupied.has(key)) throw new Error('Adventure initial position is invalid')
+      occupied.add(key); piece.x = pos.x; piece.y = pos.y; piece.isCore = world.coreIds ? world.coreIds.includes(piece.instanceId) : true
+    }
+    state.extensions = { ...state.extensions, adventureWorld: { version: 'same-map-v1', humanId: world.humanId, activeEnemyIds: [], skillDefinitions:world.skills } }
+    Object.assign(state.skillsById, world.skills ?? {})
+    if (world.captainId) {
+      const captain = state.pieces.find(p => p.instanceId === world.captainId && p.ownerPlayerId === world.humanId)
+      if (!captain) throw new Error('Adventure captain is missing')
+      const reserves = state.pieces.filter(p => p.ownerPlayerId === world.humanId && p !== captain)
+      state.pieces = state.pieces.filter(p => !reserves.includes(p))
+      reserves.forEach(p => { p.x = null; p.y = null })
+      state.extensions.adventureWorld.party = { captainId: captain.instanceId, reserves,
+        anchor: { x: captain.x, y: captain.y }, battleRound: 0, deploymentRevision: 0 }
+        for (const player of state.players) {
+          player.name = player.playerId === world.humanId ? '冒险队伍' : '据点守军'
+        player.maxActionPoints = player.playerId === world.humanId ? 3 : 0
+        player.actionPoints = player.maxActionPoints
+      }
+    }
+  }
   if (runtime) {
     pinBattleProfileIdentityV1(state, options?.profileIdentity ?? getServerGameProfileIdentityV1(), runtime.rootSeed)
   }

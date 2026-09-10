@@ -1,0 +1,24 @@
+{
+  "id": "pve-pressure-seal",
+  "name": "封锁",
+  "description": "使3格内一个敌人的移动力降低2点，最低降至0。",
+  "type": "active",
+  "actionPointCost": 1,
+  "availability": {
+    "modes": [
+      "pve"
+    ],
+    "status": "draft"
+  },
+  "design": {
+    "familyId": "pressure",
+    "handbookId": "pressure-seal",
+    "curve": "ready",
+    "role": "控制",
+    "duration": "至目标下回合结束",
+    "start": "移动−2",
+    "end": "移动−2",
+    "condition": "不带灵压限制，给队伍争取时间。",
+    "note": ""
+  }
+}

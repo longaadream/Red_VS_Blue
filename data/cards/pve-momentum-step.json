@@ -1,0 +1,24 @@
+{
+  "id": "pve-momentum-step",
+  "name": "疾行",
+  "description": "让一个友方进行一次最多3格的普通移动，不额外支付移动行动点。",
+  "type": "active",
+  "actionPointCost": 1,
+  "availability": {
+    "modes": [
+      "pve"
+    ],
+    "status": "draft"
+  },
+  "design": {
+    "familyId": "momentum",
+    "handbookId": "momentum-step",
+    "curve": "ready",
+    "role": "移动",
+    "duration": "一次结算",
+    "start": "移动3格",
+    "end": "移动3格",
+    "condition": "移动距离固定；有动能核心才获得对应动能。",
+    "note": ""
+  }
+}

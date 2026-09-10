@@ -1,0 +1,30 @@
+{
+  "id": "pve-arthas",
+  "name": "阿尔萨斯·梅涅希尔",
+  "faction": "evil",
+  "description": "《魔兽世界》 · 首领",
+  "rarity": "legendary",
+  "image": "adventure/arthas.jpg",
+  "stats": {
+    "maxHp": 16,
+    "attack": 3,
+    "defense": 1,
+    "moveRange": 3
+  },
+  "skills": [
+    {
+      "skillId": "pve-claw"
+    },
+    {
+      "skillId": "pve-raise-dead"
+    }
+  ],
+  "rules": [],
+  "isDefault": false,
+  "availability": {
+    "modes": [
+      "pve"
+    ],
+    "status": "ready"
+  }
+}

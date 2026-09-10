@@ -1,5 +1,5 @@
 import { createInitialBattleForPlayers } from '../game/battle-setup'
-import { getAllPieces, getPieceById } from '../game/piece-repository'
+import { getAvailablePieces, getPieceById, isDemoPieceAdmitted } from '../game/piece-repository'
 import { validateDemoRosterSelection } from '../game/roster-contract'
 import { getSelectableMapCatalog } from '../game/map-selection'
 import { mulberry32 } from '../game/rng'
@@ -31,7 +31,7 @@ export function choosePracticeRoster(alignment: PracticeRoster['alignment'], see
     try { validateRoster(roster); return roster.alignment === alignment } catch { return false }
   })
   if (valid.length) return { alignment, pieceIds: [...valid[Math.floor(random() * valid.length)].pieceIds] }
-  const ids = getAllPieces().filter(piece => piece.faction === alignment).map(piece => piece.id).sort()
+  const ids = getAvailablePieces('pvp').filter(piece => piece.faction === alignment && isDemoPieceAdmitted(piece.id)).map(piece => piece.id).sort()
   for (let i = ids.length - 1; i > 0; i--) {
     const j = Math.floor(random() * (i + 1)); [ids[i], ids[j]] = [ids[j], ids[i]]
   }
@@ -41,7 +41,7 @@ export function choosePracticeRoster(alignment: PracticeRoster['alignment'], see
 }
 
 export function practiceCatalog() {
-  return { pieces: getAllPieces(), maps: getSelectableMapCatalog() }
+  return { pieces: getAvailablePieces('pvp').filter(piece => isDemoPieceAdmitted(piece.id)), maps: getSelectableMapCatalog() }
 }
 
 export async function createPracticeState(setup: PracticeSetup, profileIdentity: GameProfileIdentityV1) {

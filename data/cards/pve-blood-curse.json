@@ -1,0 +1,42 @@
+{
+  "id": "pve-blood-curse",
+  "name": "血咒",
+  "description": "一个友方受到1点真实伤害，再对其3格内一个敌人造成1点伤害。实际付出生命后，本次冒险后续同名牌伤害+3。",
+  "type": "active",
+  "actionPointCost": 1,
+  "availability": {
+    "modes": [
+      "pve"
+    ],
+    "status": "ready"
+  },
+  "design": {
+    "familyId": "blood",
+    "handbookId": "blood-curse",
+    "curve": "growth",
+    "role": "伤害 / 自我强化",
+    "duration": "一次结算",
+    "start": "1伤害",
+    "end": "13伤害",
+    "condition": "此前成功使用4张血咒。",
+    "note": "用过的牌消耗；强化留给之后获得或生成的同名牌，不会自动回手。"
+  },
+  "targeting": {
+    "steps": [
+      {
+        "kind": "target",
+        "type": "piece",
+        "filter": "ally"
+      },
+      {
+        "kind": "target",
+        "type": "piece",
+        "filter": "enemy",
+        "range": 3,
+        "originSelectedTargetIndex": 0
+      }
+    ]
+  },
+  "icon": "♜",
+  "code": "function executeCard(context) {\n  var ally = selectTarget({ type: 'piece', filter: 'ally' });\n  if (ally.needsTargetSelection) return ally;\n  context.piece = ally;\n  var target = selectTarget({ type: 'piece', filter: 'enemy', range: 3 });\n  if (target.needsTargetSelection) return target;\n  var world = battle.extensions && battle.extensions.adventureWorld;\n  var run = battle.extensions && battle.extensions.adventureCards;\n  var ledger = run && run.players[playerId];\n  if (!world || !world.activeZone || !ledger) return { success: false, message: '请在冒险战斗中使用' };\n  var zone = world.activeZone;\n  function inside(p) { return p.currentHp > 0 && p.x != null && p.y != null && p.x >= zone.x && p.x < zone.x + zone.width && p.y >= zone.y && p.y < zone.y + zone.height; }\n  if (!inside(ally) || !inside(target) || Math.abs(ally.x - target.x) + Math.abs(ally.y - target.y) > 3) return { success: false, message: '请选择战区内的友方及其3格内敌人' };\n  var cardId = context.card.id;\n  var growth = ledger.growth[cardId] || 0;\n  var paid = dealDamage({ kind: 'player', instanceId: cardId, ownerPlayerId: playerId, name: context.card.name }, ally, 1, 'true', battle, cardId);\n  if (paid.damage > 0) ledger.growth[cardId] = growth + 3;\n  if (ally.currentHp <= 0) return { success: true, message: '友方阵亡，后续同名血咒仍获得成长' };\n  var result = dealDamage(ally, target, 1 + growth, 'physical', battle, cardId);\n  return { success: true, message: context.card.name + '造成' + result.damage + '点伤害' };\n}"
+}

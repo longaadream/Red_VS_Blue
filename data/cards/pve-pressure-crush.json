@@ -1,0 +1,24 @@
+{
+  "id": "pve-pressure-crush",
+  "name": "绝对压制",
+  "description": "灵压。一个友方对3格内一个敌人造成伤害，数值为自身攻击力×双方攻击力差。",
+  "type": "active",
+  "actionPointCost": 2,
+  "availability": {
+    "modes": [
+      "pve"
+    ],
+    "status": "draft"
+  },
+  "design": {
+    "familyId": "pressure",
+    "handbookId": "pressure-crush",
+    "curve": "growth",
+    "role": "伤害",
+    "duration": "一次结算",
+    "start": "4伤害",
+    "end": "54伤害",
+    "condition": "自身攻击从4到9，目标攻击均为3。",
+    "note": "同样是一张用后消耗的伤害牌；不是给所有灵压技能装乘区。"
+  }
+}

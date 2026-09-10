@@ -1,3 +1,5 @@
+import type { ModeScopedContent } from './content-availability'
+
 export type PieceId = string
 
 export const DEPLOYMENT_FIRST_MOVE_FREE_STATUS = 'deployment-first-move-free' as const
@@ -45,7 +47,7 @@ export interface PieceStatusTag {
   [key: string]: unknown
 }
 
-export interface PieceTemplate {
+export interface PieceTemplate extends ModeScopedContent {
   id: PieceId
   name: string
   faction: Faction

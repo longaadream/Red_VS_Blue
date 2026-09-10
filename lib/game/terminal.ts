@@ -1,5 +1,6 @@
 import type { BattleAction, BattleState } from './turn'
 import { isTeamMatch, type MatchTeam } from './match-teams'
+import { adventureBoundary } from './adventure-boundary'
 import { TURN_TIMEOUT_FORFEIT_STREAK } from './turn-timer'
 
 export const BATTLE_ROUND_LIMIT = 40
@@ -115,12 +116,13 @@ function coreEliminationResult(
     playerId: player.playerId,
     normalizedId: normalizePlayerId(player.playerId),
   }))
+  const adventureReserves = adventureBoundary(state)?.party?.reserves ?? []
   if (!progressiveDeployment) {
     const removedPieces = Array.isArray(state.extensions?.removedPieces)
       ? state.extensions.removedPieces
       : []
     const coreOwners = new Set(
-      [...state.pieces, ...state.graveyard, ...removedPieces]
+      [...state.pieces, ...state.graveyard, ...removedPieces, ...adventureReserves]
         .filter(piece => piece.isCore === true)
         .map(piece => normalizePlayerId(piece.ownerPlayerId)),
     )
@@ -137,6 +139,9 @@ function coreEliminationResult(
       ))
       .map(piece => normalizePlayerId(piece.ownerPlayerId)),
   )
+  for (const piece of adventureReserves) {
+    if (piece.isCore && piece.currentHp > 0) livingCoreOwners.add(normalizePlayerId(piece.ownerPlayerId))
+  }
   const defeated = players.filter(player => !livingCoreOwners.has(player.normalizedId))
   if (isTeamMatch(state)) {
     const aliveTeams = new Set(state.players.filter(p => livingCoreOwners.has(normalizePlayerId(p.playerId))).map(p => p.teamId))
@@ -171,6 +176,7 @@ function roundLimitResult(
   state: BattleState,
   settledAt: TerminalSettlementPosition,
 ): TerminalResult | null {
+  if (adventureBoundary(state)) return null
   if (state.turn.phase !== 'end' || settledAt.completedRound < BATTLE_ROUND_LIMIT) return null
   if (isTeamMatch(state)) return teamResult(state, null, 'round-limit', settledAt)
   return {

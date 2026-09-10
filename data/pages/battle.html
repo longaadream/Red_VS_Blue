@@ -20,6 +20,10 @@
   <script src="js/battle-ui/battle-view-model.js"></script>
   <script src="js/practice/client.js"></script>
   <script src="js/practice/battle-controller.js"></script>
+  <script src="js/adventure/client.js"></script>
+  <script src="js/adventure/battle-controller.js"></script>
+  <script src="js/adventure/world-ui.js"></script>
+  <link rel="stylesheet" href="css/adventure.css">
   <script src="js/battle-ui/battle-action-identity.js"></script>
   <script src="js/battle-ui/battle-action-history.js"></script>
   <script src="js/battle-ui/battle-action-vignette.js"></script>
@@ -1848,6 +1852,8 @@
     const myPlayerName = params.get('playerName') || '玩家'
     const TUTORIAL_MODE = params.get('mode') === 'tutorial'
     const PRACTICE_MODE = params.get('mode') === 'practice'
+    const ADVENTURE_MODE = params.get('mode') === 'adventure'
+    if (ADVENTURE_MODE) document.body.classList.add('adventure-mode')
     const TRAINING_MODE = params.get('mode') === 'training' || TUTORIAL_MODE
     const SPECTATE_MODE = params.get('mode') === 'spectate'
     let roomSpectatingEnabled = true
@@ -3632,7 +3638,8 @@
         const desc = skd.description || '暂无描述'
         const isPassive = skd.type === 'passive' || skd.kind === 'passive'
         const isDerived = sk.derived === true
-        const typeLabel = isDerived ? '可解锁' : skd.type === 'ultimate' ? '限定' : skillUsesCharge(skd) ? '充能' : skd.type === 'buff' ? '增益' : isPassive ? '被动' : '主动'
+        const programEnemy = ADVENTURE_MODE && piece.ownerPlayerId !== myPlayerId
+        const typeLabel = programEnemy ? '预告行动' : isDerived ? '可解锁' : skd.type === 'ultimate' ? '限定' : skillUsesCharge(skd) ? '充能' : skd.type === 'buff' ? '增益' : isPassive ? '被动' : '主动'
         const cooldownTurns = skd.cooldownTurns ?? 0
         const currentCooldown = sk.currentCooldown ?? 0
         const keywords = normalizeKeywordList(skd.keywords)
@@ -3643,7 +3650,7 @@
         }
         if (!isPassive) {
           const apCost = skd.actionPointCost ?? 0
-          metaParts.push(`行动 ${apCost}`)
+          if (!programEnemy) metaParts.push(`行动 ${apCost}`)
           if (skillUsesCharge(skd)) {
             metaParts.push(`充能 ${skillChargeCostLabel(piece, skd)}`)
           }
@@ -4047,7 +4054,7 @@
       let request = null
       request = (async function() {
         try {
-          const raw = TRAINING_MODE || PRACTICE_MODE
+          const raw = TRAINING_MODE || PRACTICE_MODE || ADVENTURE_MODE
             ? await fetchLocalJson('./data/cards/' + cardId + '.json', 3500)
             : await fetchServerJson('catalog.card', { cardId }, 3500)
           const display = sanitizeCardDisplayMetadata(cardId, raw)
@@ -4263,6 +4270,7 @@
 
     // ── Init ──
     async function init() {
+      if (ADVENTURE_MODE) { await initAdventureBattle(); return }
       if (PRACTICE_MODE) { await initPracticeBattle(); return }
       const requestedLesson = TUTORIAL_MODE && params.has('lesson') && window.RvBTutorialLessons.get(params.get('lesson'))
       if (requestedLesson && requestedLesson.enabled === false) {
@@ -4514,7 +4522,7 @@
 
     // ── Training: send admin patch ──
     async function sendPatch(body) {
-      if (PRACTICE_MODE) return false
+      if (PRACTICE_MODE || ADVENTURE_MODE) return false
       try {
         const oldG = G
         G = await trainingApiFetch('PATCH', Object.assign({}, body, { battleState: G }))
@@ -4530,7 +4538,7 @@
 
     // ── Training: switch perspective ──
     function switchPerspective() {
-      if (PRACTICE_MODE) return
+      if (PRACTICE_MODE || ADVENTURE_MODE) return
       const next = myPlayerId === 'training-red' ? 'training-blue' : 'training-red'
       myPlayerId = next
       myFaction = getTrainingPlayerFaction(myPlayerId)
@@ -5502,6 +5510,7 @@
     }
 
     function battleInteractionMode() {
+      if (ADVENTURE_MODE && adventureDeployPieceId) return 'place'
       if (progressiveDeploymentOwned(G) && localDeploymentChoiceId) return 'place'
       if (TRAINING_MODE && placingMode) return 'place'
       if (pendingSkill || (pendingCardAction && pendingCardAction.type) || targetSubmissionPending) return 'target'
@@ -5510,6 +5519,7 @@
     }
 
     function refreshBattleLegalActions() {
+      if (ADVENTURE_MODE && adventureDeployPieceId) { pendingMove = false; validMoves = new Set(); return }
       if (!G || !window.BattleLegalActions) {
         pendingMove = false
         validMoves = new Set()
@@ -5539,7 +5549,7 @@
         && typeof GameEngine !== 'undefined'
       )
       if (canSelectMove) {
-        validMoves = BattleLegalActions.queryMoveCells({
+        validMoves = ADVENTURE_MODE ? new Set(adventureSnapshot?.legalMoves?.[selectedPieceId] || []) : BattleLegalActions.queryMoveCells({
           snapshot: G,
           playerId: myPlayerId,
           pieceId: selectedPieceId,
@@ -5599,7 +5609,9 @@
         legal: {
           moveCells: isCurrentSnapshot ? validMoves : new Set(),
           targetCells: targetCells,
-          placementCells: progressivePlacementCells.size
+          placementCells: isCurrentSnapshot && ADVENTURE_MODE && adventureDeployPieceId
+            ? authorityCellSet(adventureSnapshot?.deployment?.cells)
+            : progressivePlacementCells.size
             ? progressivePlacementCells
             : (isCurrentSnapshot && TRAINING_MODE && placingMode
                 ? BattleLegalActions.queryTrainingPlacementCells(snapshot)
@@ -6617,10 +6629,12 @@
 
     function onCellClick(x, y) {
       if (!G) return
+      if (ADVENTURE_MODE && adventureDeployPieceId) { adventurePlaceAt(x, y); return }
       if (targetSubmissionPending) {
         setStatusMsg('目标指令已提交，正在等待权威确认')
         return
       }
+      if (ADVENTURE_MODE && adventureOpenCell(x, y)) return
       const isMyTurn = G.turn && G.turn.currentPlayerId && G.turn.currentPlayerId.toLowerCase() === myPlayerId
       const piece = G.pieces.find(p => p.x === x && p.y === y && p.currentHp > 0)
 
@@ -7000,7 +7014,7 @@
 
     async function doEndTurn() {
       await doAction({ type: 'endTurn', playerId: myPlayerId })
-      if (PRACTICE_MODE) return
+      if (PRACTICE_MODE || ADVENTURE_MODE) return
       // If phase is now 'end', auto-advance to next player's turn
       if (G && G.turn && G.turn.phase === 'end') {
         await doBeginPhase()
@@ -7163,6 +7177,7 @@
     async function doAction(action) {
       if (SPECTATE_MODE) { setStatusMsg('观战为只读模式'); return }
       if (PRACTICE_MODE) { await practiceDoAction(action); return }
+      if (ADVENTURE_MODE) { await adventureDoAction(action); return }
       if (typeof TUTORIAL_MODE !== 'undefined' && TUTORIAL_MODE && tutorialRuntime) {
         const tutorialGuard = tutorialRuntime.beforeAction(action, G)
         if (!tutorialGuard.allowed) {
@@ -7260,7 +7275,7 @@
     }
 
     function storeCompletedMatchTrace() {
-      if (TRAINING_MODE || PRACTICE_MODE || SPECTATE_MODE || !G || !G.terminalResult) return null
+      if (TRAINING_MODE || PRACTICE_MODE || ADVENTURE_MODE || SPECTATE_MODE || !G || !G.terminalResult) return null
       if (!window.RvBDeveloperTools) {
         const message = 'Trace 生成失败：比赛 Trace 导出器未加载'
         setCompletedMatchTraceStatus(message)
@@ -7313,6 +7328,7 @@
     function handleGameOver() {
       if (!G || !G.terminalResult) return
       if (PRACTICE_MODE) { showPracticeResult(); return }
+      if (ADVENTURE_MODE) { showAdventureResult(); return }
       if (TUTORIAL_MODE && params.has('lesson') && tutorialRuntime) { tutorialRuntime.showResult(); return }
       const terminalResult = G.terminalResult
       if (pollTimer) { clearInterval(pollTimer); pollTimer = null }
@@ -7426,6 +7442,7 @@
     function clearLog() { const b = document.getElementById('logBody'); if (b) b.innerHTML = '' }
     function goBack() {
       if (PRACTICE_MODE) { disposePracticeBattle(); window.location.href = 'practice.html'; return }
+      if (ADVENTURE_MODE) { disposeAdventureBattle(); window.location.href = 'adventure.html'; return }
       if (TRAINING_MODE) { window.location.href = 'index.html'; return }
       // Carry current server mode/url back to the lobby.
       try {
@@ -7721,6 +7738,7 @@
       }
     })
     function disposeBattlePage() {
+      if (ADVENTURE_MODE) disposeAdventureBattle()
       if (PRACTICE_MODE) disposePracticeBattle()
       battlePageDisposed = true
       cardDisplayMetadataRequests.clear()

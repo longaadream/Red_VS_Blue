@@ -96,6 +96,10 @@ export function resolveClientProtocolFile({
     if (repositoryFile) return repositoryFile
   }
 
+  if (!isPackaged && /^images\/.+\.(?:svg|jpe?g|png|webp)$/i.test(relativePath)) {
+    const contentImage = resolveExistingFile(path.join(appRoot, 'public'), segments)
+    if (contentImage) return contentImage
+  }
   const htmlFile = resolveExistingFile(htmlRoot, segments)
   if (htmlFile) return htmlFile
 
@@ -150,5 +154,9 @@ export function readClientProtocolBattleData(
   }
 
   for (const relativePath of singletons) readJson(relativePath)
+  // Optional for old packs/PVP. Exploration requires its own versioned entry.
+  for (const relativePath of ['data/pve/roguelike/adventure.json', 'data/pve/roguelike/builds.json', 'data/pve/roguelike/supplies.json']) {
+    if (resolveClientProtocolFile({ ...options, relativePath })) readJson(relativePath)
+  }
   return files
 }
