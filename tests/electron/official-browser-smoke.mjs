@@ -5,6 +5,7 @@ import { spawn } from 'node:child_process'
 import { EmbeddedPostgresController } from '../../electron-client/embedded-postgres.ts'
 import { findFreePort } from '../../electron-client/local-port.ts'
 import { createOfficialServer } from '../../lib/server/official/server.ts'
+import { checkMobileBattlePanels } from './mobile-battle-panels.mjs'
 
 const root = path.resolve(import.meta.dirname, '../..'), output = path.join(root, 'dist/multiplayer-qa')
 fs.mkdirSync(output, { recursive: true })
@@ -123,6 +124,51 @@ try {
     await page.evaluate('document.getElementById("confirmBtn").click()')
   }
   for (const page of pages) await until(() => page.evaluate('location.pathname.endsWith("battle.html") && typeof G!=="undefined" && !!G && typeof colyseusConnected!=="undefined" && colyseusConnected'), 'live battle', 60000)
+  // Actual Colyseus battle and production DOM at phone sizes (desktop Chromium,
+  // not an Android performance/installation claim).
+  for (const [width, height] of [[740, 360], [844, 390], [932, 430]]) {
+    await pages[0].call('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: true })
+    await pages[0].call('Emulation.setTouchEmulationEnabled', { enabled: true })
+    await pages[0].evaluate('new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))')
+    await pages[0].evaluate('resetBoardView()')
+    await until(() => pages[0].evaluate('document.getElementById("turnAnnounce").getAnimations().every(animation => animation.playState === "finished")'), 'turn announcement complete')
+    const geometry = await pages[0].evaluate(`(() => {
+      const rect = document.getElementById('boardStage3d').getBoundingClientRect();
+      const points = [0, G.map.width - 1].flatMap(x => [0, G.map.height - 1].map(y => BattleRenderer3D.projectCell(x, y, .6)));
+      const buttons = [...document.querySelectorAll('.board-camera-controls button')].map(button => { const r = button.getBoundingClientRect(); return {width:r.width,height:r.height} });
+      return { board: {left:rect.left,right:rect.right,top:rect.top,bottom:rect.bottom,width:rect.width,height:rect.height}, points, buttons };
+    })()`)
+    if (geometry.board.top < 58 || geometry.board.bottom > height - 88 || geometry.board.height < 180) throw Error('Battle overlaps phone HUD: ' + JSON.stringify(geometry))
+    for (const p of geometry.points) if (p.clientX < geometry.board.left || p.clientX > geometry.board.right || p.clientY < geometry.board.top || p.clientY > geometry.board.bottom) throw Error('Phone board is cropped: ' + JSON.stringify(geometry))
+    if (geometry.buttons.some(b => b.width < 44 || b.height < 44)) throw Error('Phone camera control is too small')
+    if (geometry.buttons.length !== 1) throw Error('Phone camera should only show full-board reset; zoom uses gestures')
+    const shot = await pages[0].call('Page.captureScreenshot', {format: 'png'})
+    fs.writeFileSync(path.join(output, `red199-battle-${width}x${height}.png`), Buffer.from(shot.data, 'base64'))
+  }
+  // Submit the current authority offer using real DOM selection and canvas touch.
+  const deployPage = await pages[0].evaluate('progressiveDeploymentOwned(G)') ? pages[0] : pages[1]
+  await deployPage.call('Emulation.setDeviceMetricsOverride', {width:844,height:390,deviceScaleFactor:1,mobile:true})
+  await deployPage.call('Emulation.setTouchEmulationEnabled', {enabled:true})
+  await deployPage.evaluate('new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))')
+  await until(() => deployPage.evaluate('!!document.querySelector(".deployment-choice") && !pendingActionFeedback'), 'deployment offer ready')
+  await deployPage.evaluate('document.querySelector(".deployment-choice").click()')
+  const deployCell = await deployPage.evaluate(`(() => {
+    const cell = G.deployment?.legalPositions?.[0];
+    return G.deployment?.status === 'awaiting-reserve-deploy' && cell ? BattleRenderer3D.projectCell(cell.x,cell.y) : null;
+  })()`)
+  if (deployCell) {
+    await deployPage.call('Input.dispatchTouchEvent', {type:'touchStart',touchPoints:[{x:deployCell.clientX,y:deployCell.clientY}]})
+    await deployPage.call('Input.dispatchTouchEvent', {type:'touchEnd',touchPoints:[]})
+  }
+  await until(() => deployPage.evaluate('!pendingActionFeedback && G.deployment?.status !== "awaiting-reserve-deploy"'), 'touch deployment acknowledged')
+  await deployPage.evaluate('resetBoardView()')
+  const deployedShot = await deployPage.call('Page.captureScreenshot',{format:'png'})
+  fs.writeFileSync(path.join(output,'red199-battle-deployed.png'),Buffer.from(deployedShot.data,'base64'))
+  await checkMobileBattlePanels(deployPage, output)
+  await deployPage.call('Emulation.setTouchEmulationEnabled', {enabled:false})
+  await deployPage.call('Emulation.setDeviceMetricsOverride', {width:1200,height:800,deviceScaleFactor:1,mobile:false})
+  await pages[0].call('Emulation.setTouchEmulationEnabled', { enabled: false })
+  await pages[0].call('Emulation.setDeviceMetricsOverride', {width:1200,height:800,deviceScaleFactor:1,mobile:false})
   // Dark roster remains authoritative after logout/relogin, even though the entry defaults to light.
   await pages[0].call('Page.navigate', { url: origin + '/official.html' })
   await until(() => pages[0].evaluate('!!document.getElementById("profile") && !document.getElementById("profile").hidden'), 'return to account')
@@ -130,7 +176,9 @@ try {
   await until(() => pages[0].evaluate('!document.getElementById("auth").hidden'), 'logout')
   await pages[0].evaluate('document.getElementById("loginPrompt").click()')
   await pages[0].evaluate(`document.getElementById('email').value=${JSON.stringify(users[0].email)};document.getElementById('password').value=${JSON.stringify(password)};document.querySelector('#authForm button').click()`)
-  await until(() => pages[0].evaluate('!document.getElementById("profile").hidden && !document.getElementById("enter").hidden'), 'login during battle')
+  // refresh() reveals the match before run()'s finally re-enables controls.
+  // Clicking during that interval is a disabled-button no-op.
+  await until(() => pages[0].evaluate('!document.getElementById("profile").hidden && !document.getElementById("enter").hidden && !document.getElementById("enter").disabled'), 'login during battle')
   await pages[0].evaluate('document.getElementById("enter").click()')
   await until(() => pages[0].evaluate('location.pathname.endsWith("battle.html") && typeof G!=="undefined" && !!G && typeof colyseusConnected!=="undefined" && colyseusConnected'), 'dark roster reentry', 60000)
   const screenshot = await pages[0].call('Page.captureScreenshot', { format: 'png' }); fs.writeFileSync(path.join(output, 'red196-official-battle.png'), Buffer.from(screenshot.data, 'base64'))

@@ -25,7 +25,7 @@ describe('RED-171 game-style main menu layout contract', () => {
   it('keeps every existing destination mapped to the approved hierarchy', () => {
     expect(page).toMatch(/id="mode-online"[\s\S]*?onclick="showHostSheet\(\)"[\s\S]*?我当主机/)
     expect(page).toMatch(/id="mode-online"[\s\S]*?onclick="showJoinSheet\(\)"[\s\S]*?连接主机/)
-    expect(page).toMatch(/id="mode-online"[\s\S]*?onclick="showConnectSheet\(\)"[\s\S]*?连接游戏服务器/)
+    expect(page).toMatch(/id="mode-online"[\s\S]*?onclick="loadPage\('lobby\.html'\)"[\s\S]*?联机大厅/)
     expect(page).toMatch(/id="mode-adventure"[\s\S]*?id="pveBtn"[\s\S]*?onclick="startPve\(\)"/)
     expect(page).toMatch(/id="mode-training"[\s\S]*?onclick="goToTraining\(\)"/)
     expect(page).toMatch(/id="mode-codex"[\s\S]*?loadPage\('pieces\.html'\)[\s\S]*?loadPage\('maps\.html'\)/)
@@ -48,7 +48,9 @@ describe('RED-171 game-style main menu layout contract', () => {
     expect(page).toContain('第一次来？')
     expect(page).toContain('id="tutorialEntryDescription"')
     expect(page.match(/onclick="goToTutorial\(\)"/g)).toHaveLength(1)
-    expect(page).toMatch(/function goToTutorial\(\)\s*\{\s*window\.location\.href = 'battle\.html\?mode=tutorial'\s*\}/)
+    expect(page).toMatch(/function goToTutorial\(\)\s*\{\s*window\.location\.href = 'tutorial\.html'\s*\}/)
+    const tutorial = readFileSync(resolve(process.cwd(), 'data/pages/tutorial.html'), 'utf8')
+    expect(tutorial).toContain('battle.html?mode=tutorial')
     expect(page).not.toContain("goToLocalPractice('tutorial')")
   })
 
@@ -83,7 +85,7 @@ describe('RED-171 game-style main menu layout contract', () => {
     expect(page).toMatch(/if \(_recordsLoadInFlight && _recordsLoadInFlight\.promise === promise\) _recordsLoadInFlight = null/)
     expect(page).toContain('async function retryRecordsSheet()')
     expect(page).toContain("RvBUtils.getServerModeForUrl(serverUrl) === 'local'")
-    expect(page).toContain('await window.electronAPI.ensureLocalAuthority()')
+    expect(page).toContain('await (window.RvBHost || window.electronAPI).ensureLocalAuthority()')
     expect(page).toContain("RvBUtils.saveServerConfig({ mode: 'local', url: mode.localUrl })")
     expect(page).toMatch(/function _recordsLoadErrorMarkup[\s\S]*?role="alert"[\s\S]*?retryRecordsSheet\(\)[\s\S]*?重试/)
     expect(page).toContain("_recordsLoadErrorMarkup('权威战绩读取失败')")

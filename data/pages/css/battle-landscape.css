@@ -1,0 +1,417 @@
+/* Keep the established paper/ink skin; reserve a real viewport for the board.
+ * Loaded after the desktop skin, whose fixed docks otherwise cover the map.
+ */
+.cd-header { display: contents; }
+#mobileHandToggle, #mobileSkillsToggle, #mobileCardPlay, #mobileDockToggle { display: none; }
+#tileStatusSummary { display: none; }
+
+@media (orientation: landscape) and (max-height: 600px) {
+  :root {
+    --battle-hud-offset: 60px;
+    --battle-hand-height: 90px;
+    --battle-mobile-rail: 60px;
+  }
+  body.mobile-dock-collapsed:not(:has(#deploymentStatus.progressive:not([hidden]))) { --battle-hand-height: 8px; }
+  body.mobile-dock-collapsed #pieceContextMenu.is-open { display: none !important; }
+
+  body .board-wrap {
+    position: fixed !important;
+    inset: calc(var(--battle-hud-offset) + env(safe-area-inset-top))
+      calc(var(--battle-mobile-rail) + env(safe-area-inset-right))
+      calc(var(--battle-hand-height) + env(safe-area-inset-bottom))
+      calc(var(--battle-mobile-rail) + env(safe-area-inset-left)) !important;
+    width: auto !important;
+    height: auto !important;
+    padding: 0 !important;
+  }
+  body .board-shell-3d,
+  body .board-shell-3d .board-stage { min-height: 0 !important; min-width: 0 !important; }
+  body .board-shell-3d .board-stage { will-change: auto !important; transform: none !important; }
+
+  body .phase-bar {
+    top: env(safe-area-inset-top) !important;
+    left: max(4px, env(safe-area-inset-left)) !important;
+    right: 240px !important;
+    max-width: calc(100% - 244px) !important;
+    height: 58px !important;
+    max-height: 58px !important;
+    padding: 2px !important;
+    flex-wrap: nowrap !important;
+    gap: 4px !important;
+  }
+  body .turn-summary {
+    min-width: 210px !important; width: 210px !important; padding: 2px 5px !important;
+    display: flex !important; flex-direction: row !important; align-items: center;
+    gap: 8px; box-sizing: border-box; rotate: 0deg !important;
+  }
+  body .turn-summary .turn-badge { font-size: 17px !important; white-space: nowrap; }
+  body .turn-summary-secondary {
+    display: flex !important; flex-direction: column; align-items: flex-start; gap: 1px; overflow: visible;
+    position: static !important; inset: auto !important; padding: 0 !important; margin: 0 !important;
+    background: transparent !important; border: 0 !important; box-shadow: none !important;
+  }
+  body .turn-summary-secondary #phaseLabel { display: none !important; }
+  body #turnClock { font-size: 18px !important; line-height: 22px; overflow: visible; }
+  body .turn-summary-secondary:not(.pending-timer-active) #turnClock::before { content: '剩余 '; font-size: 11px; }
+  body #turnClockFrozen { font-size: 10px !important; line-height: 14px; order: 2; overflow: visible; }
+  body #turnClock.burning { color: #9c2f23 !important; }
+
+  /* The training setup must fit the WebView's usable height. Only the two
+     rosters scroll; the title and start/back controls remain in view. */
+  body #trainingSetupOverlay {
+    inset: 0 !important; box-sizing: border-box !important;
+    padding: max(8px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left)) !important;
+    align-items: stretch !important; overflow: hidden !important;
+  }
+  body #trainingSetupOverlay .training-setup-sheet {
+    display: grid !important; grid-template-rows: auto minmax(0, 1fr) auto !important;
+    width: min(860px, 100%) !important; height: 100% !important; max-height: 100% !important;
+    min-height: 0 !important; box-sizing: border-box !important; padding: 8px !important;
+    gap: 6px !important; overflow: hidden !important;
+  }
+  body #trainingSetupOverlay .training-setup-title { font-size: 20px !important; line-height: 28px; }
+  body #trainingSetupOverlay .training-setup-title .training-setup-btn,
+  body #trainingSetupOverlay .training-setup-sub,
+  body #trainingSetupOverlay .training-setup-hint { display: none !important; }
+  body #trainingSetupOverlay .training-setup-grid {
+    display: grid !important; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
+    min-height: 0 !important; overflow: hidden !important; padding: 0 !important; gap: 8px !important;
+  }
+  body #trainingSetupOverlay .training-setup-col {
+    display: grid !important; grid-template-rows: auto auto minmax(0, 1fr) !important;
+    min-width: 0; min-height: 0 !important; padding: 6px !important; gap: 4px !important;
+  }
+  body #trainingSetupOverlay .training-setup-field { min-height: 0 !important; gap: 2px !important; }
+  body #trainingSetupOverlay .training-setup-field:has(select) { display: grid; grid-template-columns: 40px minmax(0, 1fr); align-items: center; }
+  body #trainingSetupOverlay .training-setup-field select { min-height: 44px; padding: 5px 8px !important; font-size: 14px !important; }
+  body #trainingSetupOverlay .training-piece-list {
+    min-height: 0 !important; max-height: none !important; flex: 1 1 0 !important;
+    overflow-y: auto !important; overscroll-behavior: contain; touch-action: pan-y;
+    align-content: start; grid-auto-rows: max-content; padding: 3px !important; gap: 4px !important;
+  }
+  body #trainingSetupOverlay .training-piece-option { min-height: 44px !important; box-sizing: border-box; padding: 6px !important; font-size: 14px !important; }
+  body #trainingSetupOverlay .training-piece-option input { width: 20px !important; height: 20px !important; }
+  body #trainingSetupOverlay .training-setup-actions { flex-direction: row !important; justify-content: flex-end; gap: 8px; padding: 0 !important; background: transparent !important; }
+  body #trainingSetupOverlay .training-setup-actions .training-setup-btn { width: auto !important; min-width: 96px; min-height: 44px !important; padding: 6px 16px !important; font-size: 16px !important; }
+  body #playerResCards {
+    position: static !important;
+    width: auto !important;
+    min-width: 0 !important;
+    overflow-x: auto !important;
+    flex-wrap: nowrap !important;
+    gap: 3px !important;
+  }
+  body .player-state-chip,
+  body .player-state-chip.red,
+  body .player-state-chip.blue {
+    min-width: 95px !important;
+    min-height: 40px !important;
+    padding: 2px 5px !important;
+  }
+  body .topbar {
+    top: env(safe-area-inset-top) !important;
+    right: max(4px, env(safe-area-inset-right)) !important;
+    max-width: 236px !important;
+    padding: 2px !important;
+    gap: 3px !important;
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+  }
+  body .topbar button { width: 44px !important; min-width: 44px !important; height: 44px !important; min-height: 44px !important; }
+
+  body .board-camera-controls {
+    position: fixed !important;
+    top: calc(var(--battle-hud-offset) + env(safe-area-inset-top)) !important;
+    left: max(6px, env(safe-area-inset-left)) !important;
+    flex-direction: column !important;
+    gap: 5px !important;
+  }
+  body .board-camera-controls .board-view-button,
+  body #btnResetBoardView {
+    display: grid !important;
+    place-items: center;
+    width: 44px !important;
+    min-width: 44px !important;
+    height: 44px !important;
+    min-height: 44px !important;
+    padding: 0 !important;
+    font: 22px var(--comic-font) !important;
+  }
+  body #btnResetBoardView { font-size: 0 !important; }
+  body #btnResetBoardView::before { display: none !important; }
+  body #btnResetBoardView > span { display: inline !important; font-size: 15px !important; }
+  body .battle-vignette-speed-control {
+    position: fixed !important;
+    top: auto !important;
+    bottom: calc(116px + env(safe-area-inset-bottom)) !important;
+    left: max(6px, env(safe-area-inset-left)) !important;
+    width: 44px !important;
+    height: 44px !important;
+  }
+
+  body #handCards {
+    height: var(--battle-hand-height) !important;
+    padding: 4px 128px 4px 58px !important;
+    bottom: env(safe-area-inset-bottom) !important;
+    box-sizing: border-box !important;
+    align-items: flex-end !important;
+    overflow-x: auto !important;
+  }
+  body .card-item { width: 76px !important; min-width: 76px !important; height: 80px !important; }
+  body .card-item:hover { transform: none !important; }
+  body .battle-turn-control {
+    position: fixed !important;
+    right: max(6px, env(safe-area-inset-right)) !important;
+    bottom: calc(12px + env(safe-area-inset-bottom)) !important;
+  }
+  body .btn-end { min-width: 112px !important; min-height: 54px !important; font-size: 17px !important; padding: 4px 8px !important; }
+  body .training-tools { position: fixed !important; left: max(6px, env(safe-area-inset-left)) !important; bottom: calc(10px + env(safe-area-inset-bottom)) !important; }
+  body #trainingToolsToggle { width: 44px !important; height: 44px !important; }
+  body #statusMsg {
+    top: auto !important;
+    bottom: calc(var(--battle-hand-height) + env(safe-area-inset-bottom)) !important;
+    height: auto !important;
+    max-height: 36px !important;
+    max-width: 65vw !important;
+    pointer-events: none !important;
+  }
+  body .deployment-status.progressive {
+    position: fixed !important;
+    left: calc(58px + env(safe-area-inset-left)) !important;
+    right: calc(132px + env(safe-area-inset-right)) !important;
+    bottom: calc(4px + env(safe-area-inset-bottom)) !important;
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    height: 82px !important;
+    box-sizing: border-box !important;
+    padding: 3px 6px !important;
+    grid-template-columns: auto minmax(0, 1fr) !important;
+    gap: 2px 6px !important;
+  }
+  body .deployment-status.progressive .deployment-status-state { grid-column: 2 !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  body .deployment-status.progressive .deployment-status-footer { display: none !important; }
+  body .deployment-candidate { display: grid !important; grid-template-columns: minmax(70px, 1fr) 44px; min-width: 132px !important; gap: 2px !important; }
+  body .deployment-choice { min-height: 44px !important; padding: 4px !important; }
+  body .deployment-choice-stats { display: none !important; }
+  body .deployment-choice-info { min-height: 44px !important; width: 44px !important; padding: 2px !important; font-size: 0 !important; }
+  body .deployment-choice-info::after { content: '详情'; font-size: 12px; }
+  body:has(#deploymentStatus.progressive:not([hidden])) #handCards { visibility: hidden !important; }
+
+  /* Preserve public card count without placing a decorative fan over far tiles. */
+  body #opponentHandStack {
+    top: auto !important;
+    bottom: calc(98px + env(safe-area-inset-bottom)) !important;
+    left: auto !important;
+    right: max(5px, env(safe-area-inset-right)) !important;
+    translate: none !important;
+    width: 48px !important;
+    height: 30px !important;
+  }
+  body #opponentHandStack i { display: none !important; }
+  body #opponentHandStack .opponent-hand-count { top: 0 !important; white-space: nowrap; }
+  body #opponentHandStack .opponent-hand-count::after { content: ' 张'; }
+  body #actionHistoryDock { top: 60px !important; bottom: auto !important; max-height: calc(100dvh - 200px) !important; right: 4px !important; overflow-y: auto !important; }
+
+  body #pieceInfoModal.character-dock {
+    inset: 60px auto 94px max(6px, env(safe-area-inset-left)) !important;
+    width: min(310px, 46vw) !important;
+    max-height: none !important;
+  }
+  body #pieceInfoModal.character-dock .pi-sheet { overflow-y: auto !important; }
+  body #pieceInfoModal.character-dock .pi-header { grid-template-columns: 48px minmax(0, 1fr) 44px !important; }
+  body #pieceInfoModal.character-dock .pi-close { width: 44px !important; min-width: 44px !important; height: 44px !important; }
+  body #pieceInfoModal.character-dock .pi-name { font-size: 19px !important; }
+  body #pieceInfoModal.character-dock .pi-skill { padding-bottom: 60px !important; }
+  body #pieceInfoModal.character-dock .character-cast { min-height: 44px !important; min-width: 76px !important; }
+  body #pieceInfoModal .keyword-badge,
+  body #cardDetailModal .keyword-badge { min-height: 44px !important; min-width: 44px !important; padding: 8px !important; box-sizing: border-box; }
+  body #pieceInfoModal.character-dock #pieceKeywordPanel {
+    top: 62px !important;
+    bottom: 94px !important;
+    left: min(326px, 48vw) !important;
+    width: min(270px, 42vw) !important;
+    max-height: none !important;
+    padding-top: 48px !important;
+  }
+  body .character-reopen { top: auto !important; bottom: 8px !important; left: 6px !important; min-width: 44px; min-height: 44px; padding: 3px; }
+
+  body #cardDetailModal {
+    padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)) !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
+  body #cardDetailModal .cd-layout {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) !important;
+    width: min(700px, 100%) !important;
+    max-width: 100% !important;
+    max-height: calc(100dvh - 24px) !important;
+    height: calc(100dvh - 24px) !important;
+    min-height: 0 !important;
+    padding: 8px !important;
+    gap: 10px !important;
+    overflow: hidden !important;
+    box-sizing: border-box !important;
+  }
+  body #cardDetailModal .cd-layout::before { display: none !important; }
+  body #cardDetailModal .cd-sheet,
+  body #cardDetailModal #cardKeywordPanel {
+    width: auto !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    max-height: 100% !important;
+    margin: 0 !important;
+    padding: 8px !important;
+    overflow-y: auto !important;
+    box-sizing: border-box !important;
+    overscroll-behavior: contain;
+  }
+  body #cardDetailModal .cd-header {
+    display: grid !important;
+    grid-template-columns: 32px minmax(0, 1fr) 44px;
+    align-items: center;
+    gap: 6px;
+    position: sticky;
+    top: -8px;
+    min-height: 50px;
+    z-index: 3;
+    background: var(--battle-surface);
+  }
+  body #cardDetailModal .cd-close { grid-column: 3; grid-row: 1; position: static !important; width: 44px !important; height: 44px !important; }
+  body #cardDetailModal .cd-icon { grid-column: 1; grid-row: 1; font-size: 26px !important; margin: 0 !important; }
+  body #cardDetailModal .cd-name { grid-column: 2; grid-row: 1; margin: 0 !important; font-size: 18px !important; overflow-wrap: anywhere; }
+  body #cardDetailModal .cd-desc { font-size: 14px !important; line-height: 1.65 !important; }
+  body #tileStatusPanel, body.character-dock-open #tileStatusPanel {
+    position: fixed !important; top: calc(62px + env(safe-area-inset-top)) !important;
+    left: calc(60px + env(safe-area-inset-left)) !important; right: auto !important;
+    width: min(280px, 42vw) !important; max-height: calc(100dvh - 164px) !important;
+    box-sizing: border-box; overflow: hidden !important; z-index: 41 !important;
+    padding: 0 !important; border: 2px solid #35261e !important;
+    background: #c3ac85 var(--paper-image) center / 100% 100% !important;
+    border-radius: 10px 5px 12px 6px !important;
+  }
+  body #tileStatusPanel .ts-header { padding: 0 3px !important; gap: 2px !important; min-height: 44px !important; flex-shrink: 0; }
+  body #tileStatusPanel .ts-heading, body #tileStatusPanel .ts-toggle { display: none !important; }
+  body #tileStatusSummary {
+    display: flex; align-items: center; gap: 6px; flex: 1; min-width: 0; min-height: 44px;
+    padding: 4px 6px; border: 0; background: transparent; color: #30251e;
+    font: 16px var(--comic-font); text-align: left; cursor: pointer;
+  }
+  body #tileStatusSummaryTerrain { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  body #tileStatusSummaryEffects { display: flex; align-items: center; gap: 2px; font-size: 12px; }
+  body #tileStatusSummaryEffects img { width: 20px; height: 20px; object-fit: contain; }
+  body #tileStatusPanel .ts-summary-chevron { margin-left: auto; }
+  body #tileStatusSummary[aria-expanded="true"] .ts-summary-chevron { rotate: 180deg; }
+  body #tileStatusPanel .ts-close { width: 44px !important; height: 44px !important; flex-basis: 44px !important; }
+  body #tileStatusPanel:not(.is-expanded) .ts-body { display: none !important; }
+  body #tileStatusPanel.is-expanded .ts-body { display: block !important; overflow-y: auto; padding: 4px 12px 12px !important; }
+  body #tileStatusPanel .skin-tile-chips { display: none !important; }
+  body #tileStatusPanel .ts-terrain-label, body #tileStatusPanel .ts-section-label { font-size: 12px; }
+  body #tileStatusPanel .ts-terrain-value, body #tileStatusPanel .ts-effect-name, body #tileStatusPanel .ts-empty { font-size: 14px; }
+  body #tileStatusPanel .ts-effect-type { display: none; }
+  body.character-dock-open #tileStatusPanel { display: none !important; }
+  body .pi-close, body .cd-close, body .character-keyword-close { min-width: 44px !important; min-height: 44px !important; }
+  body #targetOverlay .target-mode-card { margin-left: 0 !important; max-width: calc(100vw - 16px) !important; }
+  body.target-mode-active .board-camera-controls { top: 66px !important; }
+
+  /* A compact action dock leaves the board visible. Large reading surfaces
+     appear only after an explicit tap, never as part of selecting a piece. */
+  body #mobileHandToggle, body #mobileSkillsToggle, body #mobileCardPlay, body #mobileDockToggle {
+    display: block; min-height: 44px; padding: 6px 12px;
+    border: 2px solid #35261e; border-radius: 12px 6px 14px 7px;
+    color: #30251e; background: #c3ac85 var(--paper-image) center / 100% 100%; box-shadow: 2px 3px 0 #35261e;
+    font: 16px var(--comic-font); cursor: pointer;
+  }
+  body #mobileHandToggle[hidden], body #mobileSkillsToggle[hidden], body #mobileCardPlay[hidden], body #mobileDockToggle[hidden] { display: none; }
+  body #mobileDockToggle { position: fixed; bottom: calc(64px + env(safe-area-inset-bottom)); left: max(6px, env(safe-area-inset-left)); z-index: 55; width: 44px; padding: 2px; font-size: 13px; }
+  body.mobile-dock-collapsed #mobileDockToggle { bottom: calc(12px + env(safe-area-inset-bottom)); left: calc(60px + env(safe-area-inset-left)); width: 128px; font-size: 16px; }
+  body #mobileHandToggle { position: fixed; bottom: calc(12px + env(safe-area-inset-bottom)); left: calc(60px + env(safe-area-inset-left)); z-index: 55; width: 92px; }
+  body #mobileSkillsToggle { position: fixed; bottom: calc(12px + env(safe-area-inset-bottom)); left: calc(164px + env(safe-area-inset-left)); z-index: 55; }
+  body #handCards { visibility: hidden !important; pointer-events: none !important; }
+  body.mobile-hand-expanded #handCards {
+    visibility: visible !important; pointer-events: auto !important;
+    height: 162px !important; padding: 8px 140px 8px 60px !important;
+    bottom: calc(68px + env(safe-area-inset-bottom)) !important;
+    background: linear-gradient(transparent, #30251ee6 24%) !important;
+    z-index: 54 !important;
+  }
+  body.mobile-hand-expanded #handCards .card-item { width: 110px !important; min-width: 110px !important; height: 144px !important; }
+  body.mobile-hand-required #handCards { visibility: visible !important; }
+  body.mobile-hand-required #handMultiSelectControls {
+    bottom: calc(8px + env(safe-area-inset-bottom)) !important;
+    left: calc(160px + env(safe-area-inset-left)) !important;
+    right: calc(132px + env(safe-area-inset-right)) !important;
+    transform: none !important; border-radius: 10px 5px !important;
+    background: #c3ac85 !important; color: #30251e !important; justify-content: center;
+  }
+  body #handMultiSelectControls button { min-height: 44px; min-width: 70px; }
+  body #pieceContextMenu.is-open {
+    display: flex !important; flex-direction: row !important; position: fixed !important;
+    left: calc(164px + env(safe-area-inset-left)) !important;
+    right: calc(132px + env(safe-area-inset-right)) !important;
+    top: auto !important; bottom: calc(6px + env(safe-area-inset-bottom)) !important;
+    width: auto !important; max-width: none !important; max-height: none !important; height: 76px !important;
+    padding: 5px !important; gap: 6px !important; transform: none !important;
+    opacity: 1 !important; visibility: visible !important; pointer-events: auto !important;
+    background: transparent !important; border: 0 !important; border-image: none !important;
+    box-shadow: none !important; backdrop-filter: none !important;
+    border-radius: 0 !important; box-sizing: border-box; z-index: 50 !important;
+  }
+  body.mobile-hand-expanded #pieceContextMenu.is-open { display: none !important; }
+  body #pieceContextMenu::before, body #pieceContextMenu::after { display: none !important; }
+  body #pieceContextMenu .piece-context-heading { display: flex; flex-direction: column; justify-content: center; gap: 1px; width: 90px; flex-shrink: 0; padding: 0; border: 0; }
+  body #pieceContextMenu .piece-context-identity { display: none; }
+  body #pieceContextMenu .piece-context-actions { display: flex; gap: 2px; }
+  body #pieceContextMenu .piece-context-info, body #pieceContextMenu .piece-context-collapse { width: 44px; min-width: 44px; height: 44px; padding: 0; font-size: 16px; }
+  body #pieceContextMenu .piece-context-info { font-size: 0; }
+  body #pieceContextMenu .piece-context-info::after { content: '详情'; font-size: 14px; }
+  body #pieceContextSkills { display: flex !important; flex-direction: row !important; flex: 1; gap: 4px; min-width: 0; overflow-x: auto; overflow-y: hidden; }
+  body #pieceContextSkills .piece-context-skill {
+    display: flex; flex-direction: column; justify-content: center; align-items: center;
+    flex: 0 0 108px; min-width: 78px !important; width: auto !important; min-height: 60px !important; height: 60px !important; box-sizing: border-box; padding: 3px; gap: 2px;
+    color: #30251e; background: #c3ac85 var(--paper-image) center / 100% 100% !important;
+    border: 2px solid #35261e !important; border-radius: 12px 6px 14px 7px !important;
+    box-shadow: 2px 3px 0 #211915 !important;
+    font-family: var(--comic-font);
+  }
+  body #pieceContextSkills .piece-context-skill-icon { display: none; }
+  body #pieceContextSkills .piece-context-skill-name { font-size: 15px; line-height: 1.2; white-space: normal; }
+  body #pieceContextSkills .piece-context-skill-cost { font-size: 11px; color: #493c2c; }
+  body #pieceContextSkills .piece-context-skill:nth-child(even) { border-radius: 6px 13px 7px 11px !important; }
+  body #pieceContextSkills .piece-context-skill.is-charge { border-color: #66516d !important; }
+  body #pieceContextSkills .piece-context-skill:disabled { opacity: .65; filter: saturate(.45); }
+  body .character-reopen { display: none !important; }
+  body #cardDetailModal .cd-layout { height: auto !important; position: relative; padding-bottom: 62px !important; }
+  body #cardDetailModal .cd-sheet, body #cardDetailModal #cardKeywordPanel { max-height: calc(100dvh - 108px) !important; }
+  body #cardDetailModal .cd-desc { color: #30251e !important; background: #e2d1ad !important; }
+  body #mobileCardPlay { position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%); min-width: 160px; }
+  body #mobileCardPlay:disabled { background: #a39880; color: #4d4235; cursor: default; }
+
+  /* Phone action announcements stay above the action, rather than covering
+     the centre of a board that has already been fitted to a small viewport. */
+  body :is(.is-action-banner, .is-skill-banner) .battle-vignette-status {
+    position: fixed !important; top: calc(62px + env(safe-area-inset-top)) !important;
+    left: 50% !important; right: auto !important; bottom: auto !important;
+    width: max-content !important; min-width: 130px !important; max-width: min(320px, 55vw) !important;
+    height: 40px !important; min-height: 40px !important; padding: 3px 12px !important;
+    box-sizing: border-box !important; transform: translateX(-50%) !important;
+    rotate: 0deg !important; animation: none !important; pointer-events: none !important;
+    border-radius: 8px 4px 9px 5px !important;
+  }
+  body :is(.is-action-banner, .is-skill-banner) .battle-vignette-label { gap: 8px !important; height: 100%; justify-content: center; }
+  body :is(.is-action-banner, .is-skill-banner) .battle-vignette-action-icon,
+  body :is(.is-action-banner, .is-skill-banner) .battle-vignette-avatar { width: 28px !important; min-width: 28px !important; flex-basis: 28px !important; height: 28px !important; border-width: 1px !important; }
+  body .is-action-banner .battle-vignette-action-icon img { width: 22px !important; height: 22px !important; }
+  body :is(.is-action-banner, .is-skill-banner) .battle-vignette-copy { gap: 0 !important; min-width: 0; }
+  body :is(.is-action-banner, .is-skill-banner) .battle-vignette-action-name { font-size: 17px !important; line-height: 1.25 !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  body :is(.is-action-banner, .is-skill-banner) .battle-vignette-skip-hint,
+  body :is(.is-action-banner, .is-skill-banner) .battle-vignette-kicker { display: none !important; }
+  body :is(.is-action-banner, .is-skill-banner) .battle-vignette-veil { background: transparent !important; }
+}
+
+@media (orientation: landscape) and (max-height: 600px) {
+  body #statusMsg { top: calc(62px + env(safe-area-inset-top)) !important; bottom: auto !important; left: auto !important; right: calc(132px + env(safe-area-inset-right)) !important; max-width: min(320px, calc(100vw - 470px)) !important; transform: none !important; }
+  body #handCards .card-name-banner { font-size: 12px !important; line-height: 1.2 !important; white-space: normal !important; text-overflow: clip !important; overflow-wrap: anywhere; min-height: 30px; }
+  body #handCards .card-item { -webkit-touch-callout: none; user-select: none; touch-action: pan-x; }
+}

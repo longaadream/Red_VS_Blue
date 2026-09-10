@@ -279,9 +279,9 @@
 
     async function detectLocalServerUrl() {
       if (window.RvBBridge) return 'http://localhost:7878'
-      if (window.electronAPI && window.electronAPI.getMode) {
+      if ((window.RvBHost || window.electronAPI) && (window.RvBHost || window.electronAPI).getMode) {
         try {
-          const mode = await window.electronAPI.getMode()
+          const mode = await (window.RvBHost || window.electronAPI).getMode()
           if (mode && mode.localUrl) return mode.localUrl
         } catch {}
       }
@@ -297,9 +297,9 @@
         const status = parseBridgeJson(window.RvBBridge.getMobileServerStatus())
         if (status && status.running) return 'http://localhost:7878'
       }
-      if (window.electronAPI && window.electronAPI.getMode) {
+      if ((window.RvBHost || window.electronAPI) && (window.RvBHost || window.electronAPI).getMode) {
         try {
-          const mode = await window.electronAPI.getMode()
+          const mode = await (window.RvBHost || window.electronAPI).getMode()
           if (mode && mode.ready && mode.localUrl) return mode.localUrl
         } catch {}
       }
@@ -423,10 +423,10 @@
     async function getLocalGameProfileIdentity() {
       let profileIdentity
       if (
-        window.electronAPI
-        && typeof window.electronAPI.getMode === 'function'
+        (window.RvBHost || window.electronAPI)
+        && typeof (window.RvBHost || window.electronAPI).getMode === 'function'
       ) {
-        const mode = await window.electronAPI.getMode()
+        const mode = await (window.RvBHost || window.electronAPI).getMode()
         const normalizeUrl = value => String(value || '').trim().replace(/\/+$/, '')
         const currentServerUrl = window.RvBUtils && RvBUtils.getServerUrl
           ? RvBUtils.getServerUrl()
@@ -434,11 +434,16 @@
         const isLocalAuthority = normalizeUrl(currentServerUrl) === normalizeUrl(mode && mode.localUrl)
         profileIdentity = mode && (isLocalAuthority ? mode.localAuthorityProfileIdentity : mode.profileIdentity)
       } else {
-        profileIdentity = readStoredGameProfileIdentity()
+        const nativeApp = window.Capacitor && window.Capacitor.isNativePlatform()
+        if (nativeApp) {
+          const response = await fetch('__tutorial-profile.json', { cache: 'no-store' })
+          if (!response.ok) throw new Error('本地资源不可用，请恢复内置资源或安装兼容资源包')
+          profileIdentity = await response.json()
+        } else profileIdentity = readStoredGameProfileIdentity()
         const localRuntimeUrl = /^https?:$/.test(window.location.protocol)
           ? window.location.origin
           : ''
-        if (!profileIdentity) {
+        if (!nativeApp && !profileIdentity) {
           const catalogIdentity = localRuntimeUrl
             ? await RvBColyseus.requestCatalogIdentityAt(localRuntimeUrl, 'local-profile-runtime')
             : await lobbyRequest('catalog.identity')

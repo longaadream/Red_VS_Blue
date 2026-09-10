@@ -90,11 +90,12 @@ class FakeColyseusClient {
   }
 }
 
-function loadClient(sessionEntries = new Map<string, string>()) {
+function loadClient(sessionEntries = new Map<string, string>(), nativeIdentity?: Record<string, unknown>) {
   FakeRoom.instances = []
   FakeColyseusClient.endpoints = []
   const profileIdentity = getServerGameProfileIdentityV1()
   const browserWindow: Record<string, unknown> = {
+    ...(nativeIdentity ? { Capacitor: { isNativePlatform: () => true } } : {}),
     location: { search: '' },
     Colyseus: { Client: FakeColyseusClient },
     RvBIdentity: {
@@ -112,14 +113,16 @@ function loadClient(sessionEntries = new Map<string, string>()) {
   const context = createContext({
     window: browserWindow,
     localStorage: {
+      setItem: () => {},
       getItem: (key: string) => key === 'rvb_game_profile_identity'
         ? JSON.stringify(profileIdentity)
         : null,
     },
+    sessionStorage: browserWindow.sessionStorage,
     URLSearchParams,
     URL,
     AbortController,
-    fetch,
+    fetch: nativeIdentity ? async (url: string) => ({ ok: true, json: async () => url === '__tutorial-profile.json' ? nativeIdentity : { profileIdentity } }) : fetch,
     queueMicrotask,
     setTimeout,
     clearTimeout,
@@ -153,6 +156,28 @@ afterEach(() => {
 })
 
 describe('Colyseus reconnect and authority resync state machine', () => {
+  it('blocks native token resumption when the installed authority content changed', async () => {
+    const original = getServerGameProfileIdentityV1()
+    const key = 'rvb_colyseus_reconnect:http://127.0.0.1:38521:room-a:player-red'
+    const sessions = new Map([[key, 'old-token'], [key + ':profile', JSON.stringify(original)]])
+    const client = loadClient(sessions, { ...original, authorityContentHash: 'f'.repeat(64) })
+    client.connect('room-a', TEST_PLAYER_ID, 'lan')
+    await vi.waitFor(() => expect(client.isConnected()).toBe(false))
+    for (let i=0;i<30;i++) await Promise.resolve()
+    expect(FakeColyseusClient.reconnectTokens).toEqual([])
+    expect(FakeColyseusClient.joinCalls).toBe(0)
+    client.disconnect()
+  })
+
+  it('allows native resumption after a compatible raster-only update', async () => {
+    const original = getServerGameProfileIdentityV1()
+    const key = 'rvb_colyseus_reconnect:http://127.0.0.1:38521:room-a:player-red'
+    const client = loadClient(new Map([[key, 'old-token'], [key + ':profile', JSON.stringify(original)]]), { ...original, resolvedProfileHash: 'e'.repeat(64) })
+    client.connect('room-a', TEST_PLAYER_ID, 'lan')
+    await vi.waitFor(() => expect(client.isConnected()).toBe(true))
+    expect(FakeColyseusClient.reconnectTokens).toEqual(['old-token'])
+    client.disconnect()
+  })
   it('uses the Colyseus SDK for desktop while keeping Android on its explicit legacy protocol', () => {
     const desktop = readFileSync(resolve('data/pages/js/colyseus-client.js'), 'utf8')
     const android = readFileSync(resolve('android-client/www/js/ws-client.js'), 'utf8')

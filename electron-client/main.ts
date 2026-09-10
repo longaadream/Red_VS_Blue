@@ -303,7 +303,7 @@ function getConnectRoot(): string {
 function isGameClientUrl(rawUrl: string): boolean {
   try {
     const url = new URL(rawUrl)
-    return url.protocol === `${CLIENT_SCHEME}:` && url.hostname === 'app'
+    return url.protocol === `${CLIENT_SCHEME}:` && url.hostname === 'app' && !url.port && !url.username && !url.password
   } catch {
     return false
   }
@@ -1806,7 +1806,11 @@ async function serveClientProtocolRequest(
       isPackaged: app.isPackaged,
     })
     if (!target) return new Response('Not found', { status: 404 })
-    return electronNet.fetch(pathToFileURL(target).toString())
+    const response = await electronNet.fetch(pathToFileURL(target).toString())
+    if (!target.toLowerCase().endsWith('.html')) return response
+    const headers = new Headers(response.headers)
+    headers.set('Content-Security-Policy', "script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; worker-src 'self' blob:; connect-src 'self' http: https: ws: wss:; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'")
+    return new Response(response.body, { status: response.status, headers })
   } catch {
     return new Response('Not found', { status: 404 })
   }
@@ -1902,6 +1906,9 @@ function createGameWindow(): BrowserWindow {
       nodeIntegration: false,
       sandbox: true,
       webSecurity: true,
+      // The navigation-locked local game needs HTTP/WS for LAN peers. CSP
+      // restricts scripts/styles to packaged resources; TLS checking stays on.
+      allowRunningInsecureContent: true,
     },
   })
 
@@ -2238,23 +2245,12 @@ handleTrusted('restart-server', ['admin'], async () => {
 
 // 获取本机局域网 IPv4 地址列表（供 LAN 扫描定位子网）
 handleTrusted('get-lan-ips', ['game'], () => {
-  const ips: string[] = []
-  for (const ifaces of Object.values(os.networkInterfaces())) {
-    for (const iface of ifaces ?? []) {
-      if (iface.family === 'IPv4' && !iface.internal) ips.push(iface.address)
-    }
-  }
-  return ips
+  return getLanIpList()
 })
 
 // 获取主机信息（端口 + LAN IP 列表），供"我当主机"功能使用
 handleTrusted('get-host-info', ['game'], () => {
-  const ips: string[] = []
-  for (const ifaces of Object.values(os.networkInterfaces())) {
-    for (const iface of ifaces ?? []) {
-      if (iface.family === 'IPv4' && !iface.internal) ips.push(iface.address)
-    }
-  }
+  const ips = getLanIpList(true)
   return {
     port: actualGamePort,
     ips,
@@ -2272,14 +2268,17 @@ handleTrusted('get-host-info', ['game'], () => {
 
 const DISCOVERY_PORT = 7877
 
-function getLanIpList(): string[] {
+function getLanIpList(includeVirtual = false): string[] {
   const ips: string[] = []
-  for (const ifaces of Object.values(os.networkInterfaces())) {
+  const virtual: string[] = []
+  for (const [name, ifaces] of Object.entries(os.networkInterfaces())) {
     for (const iface of ifaces ?? []) {
-      if (iface.family === 'IPv4' && !iface.internal) ips.push(iface.address)
+      if (iface.family !== 'IPv4' || iface.internal || iface.address.startsWith('169.254.')) continue
+      const target = /vEthernet|WSL|VMware|VirtualBox|Docker|VPN/i.test(name) ? virtual : ips
+      target.push(iface.address)
     }
   }
-  return ips
+  return [...new Set(includeVirtual || !ips.length ? [...ips, ...virtual] : ips)]
 }
 
 let broadcastSocket: dgram.Socket | null = null

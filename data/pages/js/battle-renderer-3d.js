@@ -18,8 +18,9 @@
   const RING_T = 0.035
   const SELECTED_RING_T = 0.018
   const PAN_ACTIVATION_PX = TACTICAL_METRICS.panActivationPx
-  const MIN_TOUCH_CELL_PIXELS = TACTICAL_METRICS.minTouchCellPixels
   const MAX_CAMERA_ZOOM = 8
+  let _overviewZoom = 1
+  let _cameraInOverview = true
   const MOTION_TOKENS = Object.freeze({
     press: 100,
     fast: 140,
@@ -335,7 +336,14 @@
     _scene.add(dirLight)
 
     // Renderer
-    _renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true })
+    try {
+      _renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true })
+    } catch (error) {
+      // Some emulator/Android GPU drivers cannot allocate a multisampled context.
+      // Retry the same 3D scene with a fresh non-multisampled canvas.
+      console.warn('[battle-renderer] retrying WebGL without antialiasing', String(error))
+      _renderer = new THREE.WebGLRenderer({ antialias: false, alpha: true, powerPreference: 'low-power' })
+    }
     _renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
     _container.insertBefore(_renderer.domElement, _container.firstChild)
     _renderer.domElement.tabIndex = 0
@@ -370,8 +378,12 @@
     _initControls()
 
     // Resize observer
-    _resizeObserver = new ResizeObserver(function () { resize() })
-    _resizeObserver.observe(_container)
+    if (typeof ResizeObserver === 'function') {
+      _resizeObserver = new ResizeObserver(function () { resize() })
+      _resizeObserver.observe(_container)
+    } else {
+      _listen(window, 'resize', resize)
+    }
 
     // Render once, then sleep until state, viewport, texture, or motion changes.
     _clock.prev = 0
@@ -387,10 +399,7 @@
     _renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2))
     _renderer.setSize(w, h, false)
     _updateCameraProjection(w, h)
-    if (_mapW && _camera) {
-      _camera.zoom = Math.max(_camera.zoom, _minimumUsableZoom(w, h))
-      _camera.updateProjectionMatrix()
-    }
+    if (_mapW && _camera && _cameraInOverview) _resetCamera()
     _notifyViewportChange()
   }
 
@@ -405,40 +414,7 @@
     return result
   }
 
-  function _projectToCss(point, w, h) {
-    const projected = point.clone().project(_camera)
-    return {
-      x: (projected.x + 1) * 0.5 * w,
-      y: (1 - projected.y) * 0.5 * h,
-    }
-  }
-
-  function _minimumUsableZoom(w, h) {
-    if (!_mapW) return 1
-    const touchViewport = w <= 760 || (w > h && h <= 500)
-    const coarsePointer = window.matchMedia && window.matchMedia('(pointer: coarse)').matches
-    if (!touchViewport && !coarsePointer) return 1
-    const minimumAxisAtZoomOne = _withCameraZoomOne(function () {
-      let minimum = Infinity
-      ;[0, (_mapW - 1) / 2, _mapW - 2].forEach(function (x) {
-        const origin = _projectToCss(new THREE.Vector3(x, TILE_H, 0), w, h)
-        const across = _projectToCss(new THREE.Vector3(x + 1, TILE_H, 0), w, h)
-        const depth = _projectToCss(new THREE.Vector3(x, TILE_H, 1), w, h)
-        minimum = Math.min(
-          minimum,
-          Math.hypot(across.x - origin.x, across.y - origin.y),
-          Math.hypot(depth.x - origin.x, depth.y - origin.y),
-        )
-      })
-      return minimum
-    })
-    // Keep one CSS pixel of headroom for fractional viewport sizes and the
-    // perspective edge samples that fall between our representative columns.
-    const requiredZoom = (MIN_TOUCH_CELL_PIXELS + 1) / Math.max(1, minimumAxisAtZoomOne)
-    return Math.max(1, Math.min(MAX_CAMERA_ZOOM, requiredZoom))
-  }
-
-  function _preferredInitialZoom(w, h) {
+  function _preferredInitialZoom() {
     if (!_mapW) return 1
     const halfWidth = (_mapW + 1.25) / 2
     const centerX = (_mapW - 1) / 2
@@ -458,8 +434,10 @@
       })
       return Math.min(0.90 / Math.max(0.001, maxX), 0.90 / Math.max(0.001, maxY))
     })
-    const widthCoverageZoom = fitZoom
-    return Math.max(_minimumUsableZoom(w, h), Math.min(4, widthCoverageZoom))
+    // Overview must fit the complete board, including elevated edge tiles.
+    // Touch target size is handled by zoom controls, never by cropping the map.
+    _overviewZoom = Math.max(0.01, Math.min(4, fitZoom))
+    return _overviewZoom
   }
 
   function _positionCameraFromTarget() {
@@ -589,6 +567,7 @@
     _positionCameraFromTarget()
     _updateCameraProjection(_container.clientWidth || 320, _container.clientHeight || 320)
     _camera.zoom = _preferredInitialZoom(_container.clientWidth || 320, _container.clientHeight || 320)
+    _cameraInOverview = true
 
     // The interaction plane remains a flat board-sized plane. It owns no rules;
     // rounding and bounds checks stay in screenToCell().
@@ -2231,6 +2210,7 @@
   let _panStart = null
   let _panMoved = false
   let _pinchDist = 0
+  let _pinchCenter = null
   let _pieceDrag = null
   const _pointers = new Map()
 
@@ -2275,6 +2255,11 @@
       deltaX = fallback.x
       deltaZ = fallback.z
     }
+    _moveCameraTarget(deltaX, deltaZ)
+  }
+
+  function _moveCameraTarget(deltaX, deltaZ) {
+    _cameraInOverview = false
     const clamped = TacticalGeometry.clampTarget({
       x: _cameraTarget.x + deltaX,
       z: _cameraTarget.z + deltaZ,
@@ -2378,7 +2363,10 @@
       } else if (_pointers.size === 2) {
         _cancelPieceDrag()
         _pinchDist = _getPinchDist()
+        _pinchCenter = _getPinchCenter()
+        _panMoved = true
         _panStart = null
+        if (typeof canvas.setPointerCapture === 'function') canvas.setPointerCapture(e.pointerId)
         _releasePressedFeedback()
       }
       e.preventDefault()
@@ -2391,10 +2379,15 @@
       if (_pointers.size === 2) {
         _cancelPieceDrag()
         const d = _getPinchDist()
+        const center = _getPinchCenter()
+        const anchor = _pinchCenter && _groundPointFromClient(_pinchCenter.x, _pinchCenter.y)
         if (_pinchDist > 0 && d > 0) {
           _applyZoom(_camera.zoom * (d / _pinchDist))
         }
         _pinchDist = d
+        const destination = _groundPointFromClient(center.x, center.y)
+        if (anchor && destination) _moveCameraTarget(anchor.x - destination.x, anchor.z - destination.z)
+        _pinchCenter = center
         _panMoved = true
         e.preventDefault()
         return
@@ -2430,7 +2423,7 @@
       if (_pieceDrag && _pieceDrag.pointerId === e.pointerId) _cancelPieceDrag()
       if (canvas.hasPointerCapture && canvas.hasPointerCapture(e.pointerId)) canvas.releasePointerCapture(e.pointerId)
       _pointers.delete(e.pointerId)
-      if (_pointers.size < 2) _pinchDist = 0
+      if (_pointers.size < 2) { _pinchDist = 0; _pinchCenter = null }
       if (_pointers.size === 1) {
         const remaining = Array.from(_pointers.values())[0]
         _panStart = { x: remaining.x, y: remaining.y, originX: remaining.x, originY: remaining.y }
@@ -2486,6 +2479,12 @@
     _panStart = null
     _panMoved = false
     _pinchDist = 0
+    _pinchCenter = null
+  }
+
+  function _getPinchCenter() {
+    const pts = Array.from(_pointers.values())
+    return { x: (pts[0].x + pts[1].x) / 2, y: (pts[0].y + pts[1].y) / 2 }
   }
 
   function _getPinchDist() {
@@ -2496,9 +2495,9 @@
   }
 
   function _applyZoom(z) {
-    const w = _container.clientWidth || 320
-    const h = _container.clientHeight || 320
-    _camera.zoom = Math.max(_minimumUsableZoom(w, h), Math.min(MAX_CAMERA_ZOOM, z))
+    if (!_camera || !_mapW) return
+    _cameraInOverview = false
+    _camera.zoom = Math.max(_overviewZoom * 0.5, Math.min(MAX_CAMERA_ZOOM, z))
     _camera.updateProjectionMatrix()
     _notifyViewportChange()
   }
@@ -2512,11 +2511,15 @@
     _positionCameraFromTarget()
     _updateCameraProjection(w, h)
     _camera.zoom = _preferredInitialZoom(w, h)
+    _cameraInOverview = true
     _camera.updateProjectionMatrix()
     _notifyViewportChange()
   }
 
   function resetView() { _resetCamera() }
+  function zoomBy(factor) {
+    if (_camera && Number.isFinite(factor) && factor > 0) _applyZoom(_camera.zoom * factor)
+  }
 
   // ── Raycasting ────────────────────────────────────────────────────────────────
   const _raycaster = new THREE.Raycaster()
@@ -2645,10 +2648,11 @@
     _floaters.clear()
     _pieceObjects.forEach(function (obj) { _scene.remove(obj.group); _disposePieceObject(obj) })
     _pieceObjects.clear()
-    const camera = { x: _cameraTarget.x, y: _cameraTarget.y, z: _cameraTarget.z, zoom: _camera.zoom }
+    const camera = { x: _cameraTarget.x, y: _cameraTarget.y, z: _cameraTarget.z, zoom: _camera.zoom, overview: _cameraInOverview }
     _buildTiles(model.board)
     _cameraTarget.set(camera.x, camera.y, camera.z)
     _camera.zoom = camera.zoom
+    _cameraInOverview = camera.overview
     _positionCameraFromTarget()
     _camera.updateProjectionMatrix()
     _currentModel = model
@@ -2797,6 +2801,9 @@
     _panStart = null
     _panMoved = false
     _pinchDist = 0
+    _pinchCenter = null
+    _cameraInOverview = true
+    _overviewZoom = 1
     _container = null
     _motionQuery = null
     _reducedMotion = false
@@ -2812,6 +2819,7 @@
     spawnFloater,
     resize,
     resetView,
+    zoomBy,
     projectCell,
     setHistoryHighlight,
     setTutorialCue,
