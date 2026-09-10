@@ -126,6 +126,7 @@
   const _playedEventOrder = []
   const _pendingAppearanceCues = new Map()
   let _presentationAreaFlash = null
+  let _skillFlashTimer = null
   let _presentationPath = null
   const _texCache = new Map()
   let _textureLoadGeneration = 0
@@ -1223,6 +1224,7 @@
   }
 
   function _clearPresentationAreaFlash() {
+    if (_skillFlashTimer) { clearTimeout(_skillFlashTimer); _skillFlashTimer = null }
     _cancelAnimation('presentation:area:intensity')
     if (!_presentationAreaFlash) return
     _presentationAreaFlash.entries.forEach(function (entry) {
@@ -1234,7 +1236,9 @@
     _invalidate()
   }
 
-  function showPresentationAreaFlash(cells) {
+  function showPresentationAreaFlash(cells, options) {
+    // Brief skill hints must not replace an active cinematic area overlay.
+    if (options && options.transient && _presentationAreaFlash) return
     if (!_mounted || !_scene || !_hlPlaneGeom) return
     const normalized = []
     const seen = new Set()
@@ -1292,6 +1296,7 @@
       cellCount: normalized.length,
       entries: entries,
     }
+    if (options && options.transient) _skillFlashTimer = setTimeout(_clearPresentationAreaFlash, 650)
     _invalidate()
     if (_reducedMotion) return
     _startAnimation('presentation:area:intensity', {
@@ -1906,6 +1911,11 @@
   }
 
   function _syncPendingFeedback(interaction) {
+    const selectedCells = new Set((interaction.selectedTargetCells || []).map(function (cell) { return cell.x + ',' + cell.y }))
+    _hlObjects.skill.forEach(function (entry, key) {
+      if (selectedCells.has(key)) entry.mesh.material.color.setHex(0x60a5fa)
+      else entry.mesh.material.color.copy(getHlMat('skill').color)
+    })
     const pendingId = interaction && interaction.pendingPieceId
     const selectedTargetIds = new Set(interaction && Array.isArray(interaction.selectedTargetPieceIds)
       ? interaction.selectedTargetPieceIds
@@ -2751,6 +2761,7 @@
     _playedEventKeys.clear()
     _playedEventOrder.length = 0
     _pendingAppearanceCues.clear()
+    if (_skillFlashTimer) { clearTimeout(_skillFlashTimer); _skillFlashTimer = null }
     _presentationAreaFlash = null
     _presentationPath = null
     _pressedPiece = null

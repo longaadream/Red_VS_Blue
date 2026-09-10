@@ -658,6 +658,9 @@ export function createBattleReplayCheckpoint(state: BattleState): BattleState {
   // Display checkpoints are not executable saves; incarnation templates remain
   // in authority state and its hash, without repeating them in every trace frame.
   const displayState = checkpoint as BattleState
+  // Author declarations contain audience-restricted sources and snapshots.
+  // A replay checkpoint is shared after the match, not an executable save.
+  if (displayState.extensions) delete displayState.extensions.skillPresentation
   for (const piece of [...(displayState.pieces ?? []), ...(displayState.graveyard ?? []),
     ...Object.values(displayState.deployment?.reserves ?? {}).flat()]) {
     delete piece.initialDefinition
