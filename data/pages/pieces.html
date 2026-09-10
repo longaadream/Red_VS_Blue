@@ -154,6 +154,8 @@
     .no-data-hint { font-size: 12px; color: #334155; margin-top: 8px; }
   </style>
   <link rel="stylesheet" href="css/tabletop/tabletop.css" />
+  <link rel="stylesheet" href="css/compact-library.css" />
+  <script src="js/compact-library.js"></script>
 </head>
 <body data-art-page="pieces">
 
@@ -404,7 +406,9 @@
     async function toggleCard(pieceId, skillsRaw, transformedRaw, relatedCards) {
       const card = document.getElementById('card-' + pieceId)
       if (!card) return
+      if (RvBCompactLibrary.active() && card.classList.contains('expanded')) return
       card.classList.toggle('expanded')
+      if (card.classList.contains('expanded')) RvBCompactLibrary.detail(card)
       if (card.classList.contains('expanded')) {
         const skills = typeof skillsRaw === 'string' ? JSON.parse(skillsRaw.replace(/&quot;/g, '"')) : skillsRaw
         for (const s of skills) {

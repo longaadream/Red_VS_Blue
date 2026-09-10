@@ -38,6 +38,7 @@ type RendererApi = {
   resize(): void
   spawnFloater(x: number, y: number, text: string, color: string, big: boolean, options: unknown): void
   resetView(): void
+  zoomBy(factor: number): void
   projectCell(x: number, y: number, elevation?: number): { clientX: number; clientY: number; left: number; top: number }
   setHistoryHighlight(cells: Array<{ x: number; y: number; role: 'source' | 'target' }>): void
   setTutorialCue(cue: { cells?: Array<{ x: number; y: number }>; path?: Array<{ x: number; y: number }> }): void
@@ -235,7 +236,7 @@ class FakeElement {
   releasePointerCapture(pointerId: number) { this.capturedPointers.delete(pointerId) }
 }
 
-function createHarness(width = 390, height = 844, coarsePointer = true, reducedMotion = false) {
+function createHarness(width = 390, height = 844, coarsePointer = true, reducedMotion = false, webglFailures = 0, resizeObserver = true) {
   const container = new FakeElement('div')
   container.rect = { left: 0, top: 0, width, height }
   const renderers: FakeRendererRecord[] = []
@@ -286,12 +287,12 @@ function createHarness(width = 390, height = 844, coarsePointer = true, reducedM
       cancelledRafs.add(id)
       rafCallbacks.delete(id)
     },
-    ResizeObserver: class {
+    ResizeObserver: resizeObserver ? class {
       disconnected = false
       constructor(callback: () => void) { void callback; observers.push(this) }
       observe() {}
       disconnect() { this.disconnected = true }
-    },
+    } : undefined,
   }
   sandbox.globalThis = sandbox
   sandbox.self = sandbox
@@ -310,6 +311,7 @@ function createHarness(width = 390, height = 844, coarsePointer = true, reducedM
     return materialDispose.call(this)
   }
 
+  const rendererOptions: unknown[] = []
   THREE.WebGLRenderer = class {
     readonly domElement = new FakeElement('canvas')
     pixelRatio = 1
@@ -318,7 +320,7 @@ function createHarness(width = 390, height = 844, coarsePointer = true, reducedM
     scene: ThreeScene | null = null
     camera: ThreeCamera | null = null
     renderCount = 0
-    constructor() { renderers.push(this) }
+    constructor(options: unknown) { rendererOptions.push(options); if(webglFailures-- > 0)throw Error('WebGL context unavailable'); renderers.push(this) }
     setPixelRatio(value: number) { this.pixelRatio = value }
     setSize(nextWidth: number, nextHeight: number) {
       this.domElement.width = nextWidth
@@ -349,7 +351,7 @@ function createHarness(width = 390, height = 844, coarsePointer = true, reducedM
     next[1](now)
   }
 
-  return { container, windowObject, renderers, observers, rafCallbacks, cancelledRafs, disposeCounts, frame, renderer: windowObject.BattleRenderer3D! }
+  return { container, windowObject, renderers, rendererOptions, observers, rafCallbacks, cancelledRafs, disposeCounts, frame, renderer: windowObject.BattleRenderer3D! }
 }
 
 function runtimeModel(): RuntimeModelFixture {
@@ -379,6 +381,25 @@ function distance(a: { clientX: number; clientY: number }, b: { clientX: number;
 }
 
 describe('RED-68 BattleRenderer3D runtime', () => {
+  it('retries without antialiasing while retaining the 3D scene on older WebViews', () => {
+    const h = createHarness(914, 411, true, false, 1, false)
+    h.renderer.init({ container: h.container })
+    h.renderer.update(runtimeModel())
+    h.frame()
+    expect(h.rendererOptions).toEqual([{ antialias: true, alpha: true }, { antialias: false, alpha: true, powerPreference: 'low-power' }])
+    expect(h.renderers).toHaveLength(1)
+    expect(h.renderers[0].scene).not.toBeNull()
+    expect(h.renderers[0].renderCount).toBeGreaterThan(0)
+    h.renderer.dispose()
+    expect(h.renderers[0].disposed).toBe(true)
+  })
+
+  it('reports complete WebGL failure instead of silently mounting a different board', () => {
+    const h = createHarness(914, 411, true, false, 2)
+    expect(() => h.renderer.init({ container: h.container })).toThrow('WebGL context unavailable')
+    expect(h.renderers).toHaveLength(0)
+    h.renderer.dispose()
+  })
 
   it.each([false, true])('places signed number bursts beside pieces and cleans up (reduced=%s)', (reduced) => {
     const h = createHarness(1280, 720, false, reduced)
@@ -629,16 +650,8 @@ describe('RED-68 BattleRenderer3D runtime', () => {
     }
 
     const center = harness.renderer.projectCell(10, 8)
-    let minimumCellAxis = Infinity
-    for (let y = 0; y < 15; y += 1) {
-      for (let x = 0; x < 19; x += 1) {
-        const origin = harness.renderer.projectCell(x, y, 0.12)
-        const horizontal = harness.renderer.projectCell(x + 1, y, 0.12)
-        const vertical = harness.renderer.projectCell(x, y + 1, 0.12)
-        minimumCellAxis = Math.min(minimumCellAxis, distance(origin, horizontal), distance(origin, vertical))
-      }
-    }
-    expect(minimumCellAxis).toBeGreaterThanOrEqual(44)
+    expect(center.clientX).toBeGreaterThan(0)
+    expect(center.clientX).toBeLessThan(390)
 
     const canvas = harness.renderers[0].domElement as FakeElement
     canvas.dispatch('pointerdown', { pointerId: 1, pointerType: 'touch', button: 0, clientX: center.clientX, clientY: center.clientY })
@@ -722,25 +735,74 @@ describe('RED-68 BattleRenderer3D runtime', () => {
     expect(harness.rafCallbacks.size).toBe(0)
   })
 
-  it('keeps every projected cell axis at least 44px in mobile landscape', () => {
-    const harness = createHarness(844, 390, true)
+  it.each([[740, 260, 20, 16], [844, 280, 24, 20], [932, 320, 20, 16]])(
+    'fits the entire %s×%s viewport board (%s×%s) and refits on resize', (width, height, columns, rows) => {
+    const harness = createHarness(width, height, true)
     const model = runtimeModel()
+    model.board.width = columns
+    model.board.height = rows
     harness.renderer.init({ container: harness.container })
     harness.renderer.update(model)
     harness.frame()
-
-    let minimumCellAxis = Infinity
-    for (let y = 0; y < 15; y += 1) {
-      for (let x = 0; x < 19; x += 1) {
-        const origin = harness.renderer.projectCell(x, y, 0.12)
-        const horizontal = harness.renderer.projectCell(x + 1, y, 0.12)
-        const vertical = harness.renderer.projectCell(x, y + 1, 0.12)
-        minimumCellAxis = Math.min(minimumCellAxis, distance(origin, horizontal), distance(origin, vertical))
+    function expectWholeBoard(w: number, h: number) {
+      for (const x of [-0.5, columns - 0.5]) {
+        for (const y of [-0.5, rows - 0.5]) {
+          const point = harness.renderer.projectCell(x, y, 0.6)
+          expect(point.clientX).toBeGreaterThan(0)
+          expect(point.clientX).toBeLessThan(w)
+          expect(point.clientY).toBeGreaterThan(0)
+          expect(point.clientY).toBeLessThan(h)
+        }
       }
     }
-
-    expect(minimumCellAxis).toBeGreaterThanOrEqual(44)
+    expectWholeBoard(width, height)
+    harness.container.rect.width = height
+    harness.container.rect.height = width
+    harness.renderer.resize()
+    expectWholeBoard(height, width)
+    harness.renderer.resetView()
+    expectWholeBoard(height, width)
     harness.renderer.dispose()
+  })
+
+  it('pans with two fingers and never submits a move when fingers are lifted', () => {
+    const h = createHarness(844, 280, true)
+    const intents: Array<{ type: string }> = []
+    h.renderer.init({ container: h.container, onIntent: (intent: { type: string }) => intents.push(intent) })
+    h.renderer.update(runtimeModel())
+    h.frame()
+    const canvas = h.renderers[0].domElement
+    const before = h.renderer.projectCell(10, 8)
+    for (const [pointerId, clientX] of [[1, 300], [2, 450]]) {
+      canvas.dispatch('pointerdown', { pointerId, pointerType: 'touch', clientX, clientY: 140 })
+    }
+    for (const [pointerId, clientX] of [[1, 340], [2, 490]]) {
+      canvas.dispatch('pointermove', { pointerId, pointerType: 'touch', clientX, clientY: 140 })
+    }
+    const after = h.renderer.projectCell(10, 8)
+    expect(after.clientX - before.clientX).toBeGreaterThan(30)
+    for (const [pointerId, clientX] of [[1, 340], [2, 490]]) {
+      canvas.dispatch('pointerup', { pointerId, pointerType: 'touch', clientX, clientY: 140 })
+    }
+    expect(intents.filter(intent => intent.type !== 'viewport-change')).toEqual([])
+    h.renderer.resetView()
+    expect(distance(before, h.renderer.projectCell(10, 8))).toBeLessThan(0.5)
+    h.renderer.dispose()
+  })
+
+  it('preserves manual zoom through historical board replacement and resize', () => {
+    const h = createHarness(844, 390, true)
+    const model = runtimeModel()
+    h.renderer.init({ container: h.container })
+    h.renderer.update(model)
+    h.frame()
+    h.renderer.zoomBy(1.8)
+    const before = h.renderer.projectCell(4, 5)
+    h.renderer.showHistoricalBoard(structuredClone(model))
+    expect(distance(before, h.renderer.projectCell(4, 5))).toBeLessThan(0.01)
+    h.renderer.resize()
+    expect(distance(before, h.renderer.projectCell(4, 5))).toBeLessThan(0.01)
+    h.renderer.dispose()
   })
 
   it('uses centered one-axis perspective so near cells are wider while the full board stays visible', () => {

@@ -7,8 +7,8 @@ android {
         applicationId "com.redvsblue.client"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        versionCode Integer.parseInt(System.getenv('RVB_ANDROID_VERSION_CODE') ?: '18')
+        versionName System.getenv('RVB_ANDROID_VERSION_NAME') ?: "0.1.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -17,17 +17,38 @@ android {
         }
     }
     buildTypes {
+        uiAcceptance {
+            initWith debug
+            applicationIdSuffix ".uiqa"
+            versionNameSuffix "-RED199-candidate"
+            matchingFallbacks = ['debug']
+        }
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
     }
+    sourceSets {
+        uiAcceptance.assets.srcDir "$buildDir/generated/ui-acceptance-assets"
+        uiAcceptance.res.srcDir "$buildDir/generated/android-distribution-res"
+        uiAcceptance.assets.srcDir "$buildDir/generated/android-host-assets"
+        uiAcceptance.jniLibs.srcDir "$buildDir/generated/android-host-jni"
+    }
+    packagingOptions { jniLibs { useLegacyPackaging true; keepDebugSymbols += ['**/librvb_node.so'] } }
 }
 
 repositories {
     flatDir{
         dirs '../capacitor-cordova-android-plugins/src/main/libs', 'libs'
     }
+}
+
+def stageUiAcceptance = tasks.register('stageUiAcceptance', Exec) {
+    workingDir rootProject.projectDir.parentFile
+    commandLine 'node', 'scripts/stage-android-ui-acceptance.mjs'
+}
+tasks.configureEach { task ->
+    if (task.name == 'preUiAcceptanceBuild') task.dependsOn(stageUiAcceptance)
 }
 
 dependencies {

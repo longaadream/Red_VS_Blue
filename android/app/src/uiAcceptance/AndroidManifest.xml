@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" xmlns:tools="http://schemas.android.com/tools">
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <application android:label="红蓝对决·安卓测试版" android:allowBackup="false" android:networkSecurityConfig="@xml/android_distribution_network" tools:replace="android:label,android:allowBackup,android:networkSecurityConfig">
+        <provider android:name="androidx.core.content.FileProvider" android:authorities="${applicationId}.fileprovider" tools:node="replace" android:exported="false" android:grantUriPermissions="true">
+            <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/update_paths" />
+        </provider>
+        <activity android:name=".MainActivity" tools:node="remove" />
+        <service android:name=".AndroidHostService" android:exported="false" android:foregroundServiceType="specialUse">
+            <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="User-started local multiplayer game authority, serving connected peers during short background or screen-off intervals" />
+        </service>
+        <activity android:name=".UiAcceptanceActivity" android:exported="true" android:launchMode="singleTask" android:hardwareAccelerated="true"
+            android:theme="@style/AppTheme.NoActionBarLaunch" android:screenOrientation="sensorLandscape"
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|navigation|density">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

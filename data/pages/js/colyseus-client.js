@@ -60,12 +60,33 @@
 
   function rememberReconnectToken(room) {
     try {
-      if (room && room.reconnectionToken) window.sessionStorage.setItem(reconnectTokenKey(), room.reconnectionToken)
+      if (room && room.reconnectionToken) {
+        window.sessionStorage.setItem(reconnectTokenKey(), room.reconnectionToken)
+        if (window.Capacitor && window.Capacitor.isNativePlatform()) window.sessionStorage.setItem(reconnectTokenKey() + ':profile', JSON.stringify(storedProfileIdentity()))
+      }
     } catch {}
   }
 
   function clearReconnectToken() {
-    try { window.sessionStorage.removeItem(reconnectTokenKey()) } catch {}
+    try { window.sessionStorage.removeItem(reconnectTokenKey()); window.sessionStorage.removeItem(reconnectTokenKey() + ':profile') } catch {}
+  }
+
+  async function nativeProfileIdentity(base, reconnecting) {
+    if (!window.Capacitor || !window.Capacitor.isNativePlatform()) return storedProfileIdentity()
+    var response = await fetch('__tutorial-profile.json', { cache: 'no-store' })
+    if (!response.ok) throw new Error('本地资源不可用，请返回资源管理恢复内置资源')
+    var local = await response.json()
+    var expected = null
+    if (reconnecting) {
+      try { expected = JSON.parse(sessionStorage.getItem(reconnectTokenKey() + ':profile') || 'null') } catch {}
+    }
+    if (!expected) expected = (await requestCatalogIdentityAt(base || getServerUrl(), 'android-installed-profile')).profileIdentity
+    for (var key of ['schemaVersion', 'engineAbi', 'runnerRevision', 'authorityContentHash']) {
+      if (!local || !expected || typeof local[key] !== 'string' || !local[key] || local[key] !== expected[key]) throw new Error('本机资源与对局不兼容，请恢复匹配的资源版本后重试')
+    }
+    if (!/^[a-f0-9]{64}$/.test(local.resolvedProfileHash)) throw new Error('本地资源身份无效')
+    localStorage.setItem('rvb_game_profile_identity', JSON.stringify(local))
+    return local
   }
 
   function delay(ms) {
@@ -132,7 +153,7 @@
   async function joinOptions(playerId, base, roomId) {
     var params = pageParams()
     var identity = currentIdentity()
-    var profileIdentity = storedProfileIdentity()
+    var profileIdentity = await nativeProfileIdentity(base, false)
     if (!profileIdentity) throw new Error('Game profile identity is required for Colyseus admission')
     var official = officialSession(base)
     return {
@@ -260,6 +281,8 @@
     try {
       _client = createClient()
       var token = readReconnectToken()
+      // Token resumption skips normal admission; validate before attempting it.
+      if (token) await nativeProfileIdentity(getServerUrl(), true)
       var room
       if (token && typeof _client.reconnect === 'function') {
         try {

@@ -42,8 +42,13 @@
     var health = await json(url + '/healthz')
     if (!health.ok || health.protocol !== 'rvb-colyseus') throw new Error('玩家主机尚未就绪')
     var remote = await RvBColyseus.requestCatalogIdentityAt(url, 'remote-server')
-    var mode = window.electronAPI ? await window.electronAPI.getMode() : null
+    var mode = (window.RvBHost || window.electronAPI) ? await (window.RvBHost || window.electronAPI).getMode() : null
     var installed = mode ? (local ? mode.localAuthorityProfileIdentity : mode.profileIdentity) : remote.profileIdentity
+    if (window.Capacitor && window.Capacitor.isNativePlatform()) {
+      var localProfile = await fetch('__tutorial-profile.json', { cache: 'no-store' })
+      if (!localProfile.ok) throw new Error('本地资源不可用，请恢复内置资源或安装兼容资源包')
+      installed = await localProfile.json()
+    }
     if (!installed || !remote.profileIdentity) throw new Error('资源版本不可用，请检查资源包')
     for (var key of ['schemaVersion', 'engineAbi', 'runnerRevision', 'resolvedProfileHash', 'authorityContentHash']) {
       if (installed[key] !== remote.profileIdentity[key]) throw new Error('主机和本机资源版本不同，请安装相同版本后重试')
@@ -57,18 +62,18 @@
     location.href = 'lobby.html?' + params.toString()
   }
   byId('publish').onclick = function () { run(async function () {
-    if (!window.electronAPI || !window.electronAPI.relayControl) throw new Error('发布主机需要本次 Windows 客户端')
-    var ready = await window.electronAPI.ensureLocalAuthority()
+    if (!(window.RvBHost || window.electronAPI) || !(window.RvBHost || window.electronAPI).relayControl) throw new Error('发布主机需要支持开房的安卓或 Windows 客户端')
+    var ready = await (window.RvBHost || window.electronAPI).ensureLocalAuthority()
     if (!ready.ok) throw new Error(ready.error)
-    var result = await window.electronAPI.relayControl({ action: 'publish', relayUrl: rootUrl(), name: byId('hostName').value.trim(), visible: byId('visible').checked, publishKey: byId('publishKey').value })
+    var result = await (window.RvBHost || window.electronAPI).relayControl({ action: 'publish', relayUrl: rootUrl(), name: byId('hostName').value.trim(), visible: byId('visible').checked, publishKey: byId('publishKey').value })
     if (!result.ok) throw new Error(result.error)
     byId('publishKey').value = ''
     showPublication(result.published)
   }) }
   byId('stop').onclick = function () { run(async function () {
-    if (!window.electronAPI) throw new Error('需要 Windows 客户端')
+    if (!(window.RvBHost || window.electronAPI)) throw new Error('需要支持开房的安卓或 Windows 客户端')
     if (published && !confirm('停止发布会断开通过公网转发加入的玩家。继续吗？')) return
-    var result = await window.electronAPI.relayControl({ action: 'stop' })
+    var result = await (window.RvBHost || window.electronAPI).relayControl({ action: 'stop' })
     if (!result.ok) throw new Error(result.error)
     showPublication(null)
   }) }
@@ -76,16 +81,16 @@
     if (published) await navigator.clipboard.writeText('Red VS Blue\n转发服务器：' + rootUrl() + '\n邀请码：' + published.inviteCode + '\n主机地址：' + published.url)
   }) }
   byId('localLobby').onclick = function () { run(async function () {
-    if (!window.electronAPI) throw new Error('需要 Windows 客户端')
-    var ready = await window.electronAPI.ensureLocalAuthority()
+    if (!(window.RvBHost || window.electronAPI)) throw new Error('需要支持开房的安卓或 Windows 客户端')
+    var ready = await (window.RvBHost || window.electronAPI).ensureLocalAuthority()
     if (!ready.ok) throw new Error(ready.error)
-    await enter((await window.electronAPI.getMode()).localUrl, true)
+    await enter((await (window.RvBHost || window.electronAPI).getMode()).localUrl, true)
   }) }
   byId('showLocalAddress').onclick = function () { run(async function () {
-    if (!window.electronAPI) throw new Error('需要 Windows 客户端')
-    var ready = await window.electronAPI.ensureLocalAuthority()
+    if (!(window.RvBHost || window.electronAPI)) throw new Error('需要支持开房的安卓或 Windows 客户端')
+    var ready = await (window.RvBHost || window.electronAPI).ensureLocalAuthority()
     if (!ready.ok) throw new Error(ready.error)
-    var address = new URL((await window.electronAPI.getMode()).localUrl)
+    var address = new URL((await (window.RvBHost || window.electronAPI).getMode()).localUrl)
     byId('localAddress').textContent = 'frp 本地 IP：127.0.0.1\n本地端口：' + address.port + '\n类型：TCP。朋友在“直接连接主机”填写 frp 提供的 http://公网IP:端口。重启游戏后请再次核对本地端口。'
   }) }
   function publishedAddress(host) {
@@ -114,8 +119,8 @@
   }) }
   byId('diagnose').onclick = function () { run(async function () {
     var report = { format: 'rvb-network-diagnostic-v1', at: new Date().toISOString(), version: candidate.version, candidate: candidate.candidateId || 'development', lastError: lastFailure, checks: [] }
-    if (window.electronAPI) {
-      var mode = await window.electronAPI.getMode()
+    if ((window.RvBHost || window.electronAPI)) {
+      var mode = await (window.RvBHost || window.electronAPI).getMode()
       report.localAuthority = { ready: mode.ready, recovery: mode.localAuthorityRecovery, profileIdentity: mode.localAuthorityProfileIdentity }
     }
     var addresses = [byId('relayUrl').value.trim(), byId('directUrl').value.trim()].filter(Boolean)
@@ -135,8 +140,8 @@
     byId('copyDiagnosis').hidden = false
   }) }
   byId('copyDiagnosis').onclick = function () { run(function () { return navigator.clipboard.writeText(lastDiagnosis) }) }
-  if (window.electronAPI && window.electronAPI.relayControl) {
-    window.electronAPI.relayControl({ action: 'status' }).then(function (result) { if (result.ok) showPublication(result.published) }).catch(function (error) { byId('error').textContent = error.message })
-    setInterval(function () { if (!busy) window.electronAPI.relayControl({ action: 'status' }).then(function (result) { if (result.ok) showPublication(result.published); else showPublication(null) }).catch(function () { showPublication(null) }) }, 5000)
+  if ((window.RvBHost || window.electronAPI) && (window.RvBHost || window.electronAPI).relayControl) {
+    (window.RvBHost || window.electronAPI).relayControl({ action: 'status' }).then(function (result) { if (result.ok) showPublication(result.published) }).catch(function (error) { byId('error').textContent = error.message })
+    setInterval(function () { if (!busy) (window.RvBHost || window.electronAPI).relayControl({ action: 'status' }).then(function (result) { if (result.ok) showPublication(result.published); else showPublication(null) }).catch(function () { showPublication(null) }) }, 5000)
   }
 })()

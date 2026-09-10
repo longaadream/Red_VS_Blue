@@ -2,13 +2,16 @@
   'use strict'
   var $ = function (id) { return document.getElementById(id) }
   var current = null, activeMatch = null, busy = false, polling = false
+  var nativeApp = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform())
   function session() { try { return JSON.parse(sessionStorage.getItem('rvb_official_session') || 'null') } catch { return null } }
   function clearBattleReservations() {
     var prefix = 'rvb_colyseus_reconnect:' + base() + ':'
     Object.keys(sessionStorage).forEach(function (key) { if (key.startsWith(prefix)) sessionStorage.removeItem(key) })
   }
   function base() {
+    if (!$('server').value.trim()) throw new Error('请先在服务器设置中填写组织者提供的官方服务器地址')
     var url = new URL($('server').value.trim())
+    if (nativeApp && url.origin === location.origin) throw new Error('这是手机内置页面地址，请填写实际的官方服务器地址')
     if (url.username || url.password || url.search || url.hash || (url.protocol !== 'https:' && !(url.protocol === 'http:' && ['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname)))) throw new Error('账号登录必须使用 HTTPS；只有本机 localhost/127.0.0.1 可使用 HTTP')
     return url.href.replace(/\/+$/, '')
   }
@@ -31,13 +34,14 @@
     var origin = base(), saved = session(), headers = { 'Content-Type': 'application/json' }
     if (saved && saved.url === origin) headers.Authorization = 'Bearer ' + saved.token
     var response = await fetch(origin + path, { method: body === undefined ? 'GET' : 'POST', headers: headers, body: body === undefined ? undefined : JSON.stringify(body), signal: AbortSignal.timeout(20000), cache: 'no-store' })
+    if (!(response.headers.get('content-type') || '').toLowerCase().includes('application/json')) throw new Error('此地址未返回排位服务数据，请检查服务器地址和端口')
     var result = await response.json()
     if (!response.ok) { if (response.status === 401 && path === '/official/me') { sessionStorage.removeItem('rvb_official_session'); $('profile').hidden = true; $('auth').hidden = false; current = null; activeMatch = null; accountState(false) }; throw new Error(result.error || '请求失败') }
     return result
   }
   function cell(row, text) { var td = document.createElement('td'); td.textContent = text; row.appendChild(td) }
   async function refresh() {
-    if (polling || document.hidden) return
+    if (polling || document.hidden || !$('server').value.trim()) return
     polling = true
     try {
       var announcement = await api('/official/info')
@@ -100,7 +104,13 @@
   })
   $('join').onclick = run(async function () {
     var identity = localStorage.getItem('rvb_game_profile_identity')
-    if (!identity || (/^https?:$/.test(location.protocol) && location.origin === base())) { var catalog = await api('/catalog/identity'); identity = JSON.stringify(catalog.profileIdentity); localStorage.setItem('rvb_game_profile_identity', identity) }
+    if (nativeApp) {
+      var localProfile = await fetch('__tutorial-profile.json', { cache: 'no-store' })
+      if (!localProfile.ok) throw new Error('本地资源不可用，请恢复内置资源或安装兼容资源包')
+      identity = JSON.stringify(await localProfile.json())
+    }
+    if (!nativeApp && (!identity || (/^https?:$/.test(location.protocol) && location.origin === base()))) { var catalog = await api('/catalog/identity'); identity = JSON.stringify(catalog.profileIdentity); localStorage.setItem('rvb_game_profile_identity', identity) }
+    if (nativeApp) localStorage.setItem('rvb_game_profile_identity', identity)
     await api('/official/queue/join', { profileIdentity: JSON.parse(identity) }); await refresh()
   })
   $('cancel').onclick = run(async function () { await api('/official/queue/cancel', {}); await refresh() })
@@ -110,8 +120,11 @@
     window.RvBUtils.saveRemoteServerUrl(base()); window.RvBUtils.switchServerMode('remote')
     window.location.href = 'ranked-match.html?matchId=' + encodeURIComponent(activeMatch)
   })
-  $('server').value = localStorage.getItem('rvb_official_url') || (/^https?:$/.test(location.protocol) ? location.origin : 'http://127.0.0.1:2568')
+  var savedServer = localStorage.getItem('rvb_official_url') || ''
+  if (nativeApp && savedServer.replace(/\/+$/, '') === location.origin) savedServer = ''
+  $('server').value = savedServer || (nativeApp ? '' : /^https?:$/.test(location.protocol) ? location.origin : 'http://127.0.0.1:2568')
   $('authAction').onchange()
-  void connect().catch(function (error) { message(error.message) })
+  if ($('server').value) void connect().catch(function (error) { message(error.message) })
+  else message('请先设置官方服务器地址，再登录并匹配')
   setInterval(refresh, 4000)
 })()

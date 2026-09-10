@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <title>对战 - RED vs BLUE</title>
   <script src="js/pack-fetch.js"></script>
   <script src="js/hand-card-face.js"></script>
@@ -1501,6 +1501,7 @@
 <link rel="stylesheet" href="tabletop-battle/refinements.css">
 <link rel="stylesheet" href="tabletop-battle/character-dock.css">
 <link rel="stylesheet" href="tabletop-battle/comic-print.css">
+<link rel="stylesheet" href="css/battle-landscape.css">
 </head>
 <body>
 
@@ -1523,6 +1524,7 @@
   <div id="loadingOverlay">
     <div class="spinner"></div>
     <div style="font-size:14px;color:#64748b" id="loadingMsg">连接战场…</div>
+    <div id="battleBootActions" hidden><button onclick="location.reload()" style="min-height:44px;padding:8px 18px">重试</button> <button onclick="goBack()" style="min-height:44px;padding:8px 18px">返回</button></div>
   </div>
 
   <div id="statusMsg" role="status" aria-live="polite">选择棋子开始行动</div>
@@ -1544,9 +1546,11 @@
   <div id="cardDetailModal" role="dialog" aria-modal="true" aria-label="卡牌详情" onclick="if(event.target===this)closeCardDetail()">
     <div class="cd-layout">
       <div class="cd-sheet">
-      <button class="cd-close" onclick="closeCardDetail()">✕</button>
+      <div class="cd-header">
+      <button class="cd-close" type="button" aria-label="关闭卡牌详情" onclick="closeCardDetail()">✕</button>
       <div class="cd-icon" id="cdIcon">牌</div>
       <div class="cd-name" id="cdName"></div>
+      </div>
       <div id="cdCost"></div>
       <div class="cd-type" id="cdType"></div>
         <div class="cd-desc" id="cdDesc"></div>
@@ -1708,7 +1712,7 @@
 
       <div class="board-wrap" id="boardWrap">
         <div class="board-camera-controls" aria-label="棋盘视图控制">
-          <button class="board-view-button" id="btnResetBoardView" type="button" onclick="resetBoardView()" title="复位棋盘镜头" aria-label="复位棋盘镜头">⌖ <span>复位</span></button>
+          <button class="board-view-button" id="btnResetBoardView" type="button" onclick="resetBoardView()" title="显示完整棋盘" aria-label="显示完整棋盘">⌖ <span>全图</span></button>
         </div>
         <div class="board-shell board-shell-3d">
           <div class="board-stage" id="boardStage3d" data-battle-layer="three-battlefield">
@@ -1730,6 +1734,9 @@
             <aside id="tileStatusPanel" role="dialog" aria-modal="false" aria-hidden="true" aria-labelledby="tileStatusTitle">
               <div class="ts-sheet">
                 <div class="ts-header">
+                  <button id="tileStatusSummary" type="button" aria-controls="tileStatusDetails" aria-expanded="false" onclick="toggleTileStatusExpanded()">
+                    <span id="tileStatusSummaryTerrain">地格</span><span id="tileStatusSummaryEffects"></span><span class="ts-summary-chevron" aria-hidden="true">⌄</span>
+                  </button>
                   <div class="ts-heading">
                     <div class="ts-title" id="tileStatusTitle">地格状态</div>
                     <div class="ts-coords" id="tileStatusCoords"></div>
@@ -3205,9 +3212,26 @@
       if (pressTimer) clearTimeout(pressTimer)
       pressTimer = setTimeout(() => { pressTimer = null; showPieceInfo(instanceId) }, 600)
     }
+    let cardPressOrigin = null, cardPressPreview = null
+    function consumeCardPressClick(instanceId) {
+      const consumed = cardPressPreview && cardPressPreview.id === instanceId
+      cardPressPreview = null
+      return !!consumed
+    }
+    function moveCardPressTimer(e) {
+      const touch = e.touches && e.touches[0]
+      if (!cardPressOrigin || !touch || Math.hypot(touch.clientX - cardPressOrigin.x, touch.clientY - cardPressOrigin.y) > 10) clearPressTimer()
+    }
     function startCardPressTimer(e, cardInstanceId, cardId) {
       if (pressTimer) clearTimeout(pressTimer)
-      pressTimer = setTimeout(() => { pressTimer = null; showCardDetail(cardInstanceId, cardId) }, 600)
+      const touch = e.touches && e.touches[0]
+      cardPressOrigin = touch ? { x: touch.clientX, y: touch.clientY } : null
+      cardPressPreview = null
+      pressTimer = setTimeout(() => {
+        pressTimer = null
+        cardPressPreview = { id: cardInstanceId }
+        showCardDetail(cardInstanceId, cardId)
+      }, 500)
     }
     function clearPressTimer() {
       if (pressTimer) { clearTimeout(pressTimer); pressTimer = null }
@@ -3874,6 +3898,18 @@
       const content = document.getElementById('tileStatusContent')
       if (!panel || !coords || !terrain || !count || !content) return
 
+      const summary = document.getElementById('tileStatusSummary')
+      const terrainLabel = TILE_TYPE_LABELS[terrainType] || '未知地形'
+      document.getElementById('tileStatusSummaryTerrain').textContent = terrainLabel
+      document.getElementById('tileStatusSummaryEffects').innerHTML = effects.slice(0, 3).map(function(effect) {
+        const meta = tileEffectMeta(effect)
+        return '<img src="' + escHtml(meta.icon) + '" alt="' + escHtml(meta.label) + '">'
+      }).join('') + (effects.length > 3 ? '<span>+' + (effects.length - 3) + '</span>' : '')
+      summary.setAttribute('aria-label', terrainLabel + '，坐标 ' + x + ',' + y + '，' + effects.length + ' 项效果，展开或收起详情')
+      const tileKey = x + ',' + y
+      if (matchMedia('(orientation: landscape) and (max-height: 600px)').matches && panel.dataset.tileKey !== tileKey) setTileStatusExpanded(false)
+      panel.dataset.tileKey = tileKey
+
       coords.textContent = '坐标 (' + x + ', ' + y + ')'
       terrain.textContent = (TILE_TYPE_LABELS[terrainType] || '未知地形') + ' · ' + terrainType
       count.textContent = '持续地格效果 · ' + effects.length
@@ -3898,6 +3934,8 @@
       const button = document.getElementById('tileStatusExpand')
       const details = document.getElementById('tileStatusDetails')
       const next = !!expanded
+      const summary = document.getElementById('tileStatusSummary')
+      if (summary) summary.setAttribute('aria-expanded', String(next))
       if (panel) panel.classList.toggle('is-expanded', next)
       if (button) {
         button.setAttribute('aria-expanded', String(next))
@@ -6265,10 +6303,10 @@
           : cardName + (cardPresentation.badge ? '，' + cardPresentation.badge : '') + '，行动点 ' + cost
         const arc = window.BattleContextLayout.handArc(index, hand.length)
         return `<button type="button" class="${cls}" style="--hand-arc-angle:${arc.angle}deg;--hand-arc-lift:${arc.lift}px;--hand-arc-z:${arc.zIndex}"
-          aria-label="${escHtml(cardAriaLabel)}" aria-pressed="${isHandSelection ? isHandChoiceSelected : isPending}" aria-disabled="${!canInteract}"${progressiveBlocked ? ' disabled' : ''}
-          onclick="onCardClick('${cid}','${cdid}')"
+          data-instance-id="${cid}" aria-label="${escHtml(cardAriaLabel)}" aria-pressed="${isHandSelection ? isHandChoiceSelected : isPending}" aria-disabled="${!canInteract}"${progressiveBlocked ? ' disabled' : ''}
+          onclick="if(!consumeCardPressClick('${cid}'))onCardClick('${cid}','${cdid}')"
           ontouchstart="startCardPressTimer(event,'${cid}','${cdid}')"
-          ontouchend="clearPressTimer()" ontouchmove="clearPressTimer()"
+          ontouchend="clearPressTimer()" ontouchcancel="clearPressTimer()" ontouchmove="moveCardPressTimer(event)"
           oncontextmenu="event.preventDefault();showCardDetail('${cid}','${cdid}')">
           ${renderHandCardFace(card, def)}
         </button>`
@@ -6282,7 +6320,7 @@
       return HandCardFace.render(card, def, { artSrc: cardArtSource(cardId, def.image) })
     }
 
-    function onCardClick(cardInstanceId, cardId) {
+    function onCardClick(cardInstanceId, cardId, confirmed = false) {
       if (!G) return
       if (isPendingHandSelection(G.pendingOptionSelection)) {
         togglePendingHandOption(cardInstanceId)
@@ -6325,7 +6363,7 @@
       renderPieceContextMenu(G && selectedPieceId ? G.pieces.find(p => p.instanceId === selectedPieceId) : null)
 
       // Second click on same card: confirm and play
-      if (pendingCardAction && pendingCardAction.cardInstanceId === cardInstanceId) {
+      if (confirmed || (pendingCardAction && pendingCardAction.cardInstanceId === cardInstanceId)) {
         pendingCardAction = null
         renderHand()
         doAction({ type: 'playCard', playerId: myPlayerId, cardInstanceId })
@@ -7524,7 +7562,7 @@
       } else {
         resetMapView()
       }
-      setStatusMsg('棋盘镜头已复位')
+      setStatusMsg('已显示全图 · 双指缩放和拖动可调整视野')
     }
 
     function clampMapScale(v) {
@@ -7648,20 +7686,15 @@
     }
 
 
+    function showBattleBootError(error) {
+      console.error('[battle-bootstrap]', { mode: TRAINING_MODE ? 'training' : 'multiplayer', userAgent: navigator.userAgent, error: String(error && error.stack || error) })
+      showMsg('三维战场启动失败：' + (error && error.message || String(error)), 'err')
+      document.getElementById('battleBootActions').hidden = false
+    }
     window.addEventListener('load', () => {
-      const hasThreeRenderer = !!(window.THREE && window.BattleRenderer3D)
-      const renderer = hasThreeRenderer ? window.BattleRenderer3D : {
-        init() {}, update() {}, resize() {}, resetView() {}, projectCell() { return null },
-        setHistoryHighlight(cells) {
-          document.querySelectorAll('.cell.history-source, .cell.history-target').forEach(function (cell) {
-            cell.classList.remove('history-source', 'history-target')
-          })
-          ;(cells || []).forEach(function (entry) {
-            const cell = document.querySelector('.cell[data-x="' + entry.x + '"][data-y="' + entry.y + '"]')
-            if (cell) cell.classList.add(entry.role === 'source' ? 'history-source' : 'history-target')
-          })
-        }, screenToCell() { return null }, dispose() {}, animateAction() {}, spawnFloater() {},
-      }
+      try {
+      if (!window.THREE || !window.BattleRenderer3D) throw new Error('三维渲染组件未加载，请重试或检查应用更新')
+      const renderer = window.BattleRenderer3D
       battleDomUi = BattleDomUI.create({ document, onTurnAnnounce: showTurnAnnounce })
       battleActionHistory = BattleActionHistory.create({
         document,
@@ -7690,9 +7723,8 @@
         floatLayer: document.getElementById('floatLayer'),
         historyDock: document.getElementById('actionHistoryDock'),
       })
-      _use3d = hasThreeRenderer
-      if (!_use3d) initMapControls()
-      init()
+      _use3d = true
+      init().catch(showBattleBootError)
       if (RED167_QA_MODE) {
         window.__RVB_RED167_REPLAY__ = playRed167QaSequence
         const waitForRed167Board = () => {
@@ -7708,6 +7740,7 @@
       }, true)
 
       document.addEventListener('pointerdown', function (event) {
+        if (matchMedia('(orientation: landscape) and (max-height: 600px)').matches) return
         const menu = document.getElementById('pieceContextMenu')
         if (!menu || !menu.classList.contains('is-open')) return
         if (event.target && typeof event.target.closest === 'function' && event.target.closest('#pieceContextMenu')) return
@@ -7715,6 +7748,7 @@
       }, true)
 
       document.addEventListener('wheel', function (event) {
+        if (matchMedia('(orientation: landscape) and (max-height: 600px)').matches) return
         if (!event.target || typeof event.target.closest !== 'function' || !event.target.closest('#boardStage3d')) return
         dismissPieceContextMenu()
       }, { capture: true, passive: true })
@@ -7728,7 +7762,7 @@
         if (!target || typeof target.closest !== 'function') return true
         // A battlefield pointerup can synchronously advance a card to its next
         // target step before the matching click bubbles to document.
-        return !target.closest('.card-item, #boardWrap, #targetOverlay')
+        return !target.closest('.card-item, #boardWrap, #targetOverlay, #mobileDockToggle')
       }
 
       // Click outside the hand and battlefield to cancel card targeting.
@@ -7768,6 +7802,7 @@
           }, { passive: false })
         }
       }
+      } catch (error) { showBattleBootError(error) }
     })
     function disposeBattlePage() {
       if (PRACTICE_MODE) disposePracticeBattle()
@@ -7836,5 +7871,6 @@
 
 <script src="tabletop-battle/refinements.js"></script>
 <script src="tabletop-battle/character-dock.js"></script>
+<script src="js/battle-ui/mobile-battle-controls.js"></script>
 </body>
 </html>

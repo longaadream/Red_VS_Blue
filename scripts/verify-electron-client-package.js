@@ -26,6 +26,7 @@ const REQUIRED_DIRECTORIES = [
 ]
 
 const FORBIDDEN_FILES = [
+  'resources/app/data/users.json',
   'resources/app/www/data/users.json',
   'resources/app/init-db.js',
   'resources/app/prisma/schema.prisma',

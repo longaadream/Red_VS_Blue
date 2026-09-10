@@ -1,0 +1,214 @@
+{
+  "schemaVersion": 1,
+  "source": "https://packages.termux.dev/apt/termux-main/",
+  "architectures": {
+    "aarch64": {
+      "packages": [
+        {
+          "Package": "nodejs-lts",
+          "Version": "24.18.0-1",
+          "Architecture": "aarch64",
+          "Filename": "pool/main/n/nodejs-lts/nodejs-lts_24.18.0-1_aarch64.deb",
+          "SHA256": "490f4d08c45b25a7ea7db6ee466ebb3ee61f07083260b85332704ed018f59a87"
+        },
+        {
+          "Package": "libc++",
+          "Version": "29",
+          "Architecture": "aarch64",
+          "Filename": "pool/main/libc/libc++/libc++_29_aarch64.deb",
+          "SHA256": "bb9f12113c137aa0e8513bb51cc49fe77a5ce3ca39ab9e92c57d228ecdf00222"
+        },
+        {
+          "Package": "openssl",
+          "Version": "1:3.6.3",
+          "Architecture": "aarch64",
+          "Filename": "pool/main/o/openssl/openssl_1:3.6.3_aarch64.deb",
+          "SHA256": "86760e9ce736f463236f2c15b1eb3a3fdcfc5778d0fd7077a917448dcc90f3aa"
+        },
+        {
+          "Package": "c-ares",
+          "Version": "1.34.8",
+          "Architecture": "aarch64",
+          "Filename": "pool/main/c/c-ares/c-ares_1.34.8_aarch64.deb",
+          "SHA256": "7681fc23e822d7988ba8b2adf3468f93ae68f724dda365cff1385096a9fa87e6"
+        },
+        {
+          "Package": "libicu",
+          "Version": "78.3",
+          "Architecture": "aarch64",
+          "Filename": "pool/main/libi/libicu/libicu_78.3_aarch64.deb",
+          "SHA256": "f536403f65a08fe0df6e7304184e902d54def77d5c3bd5edfd9109d57601d276"
+        },
+        {
+          "Package": "libsqlite",
+          "Version": "3.53.4",
+          "Architecture": "aarch64",
+          "Filename": "pool/main/libs/libsqlite/libsqlite_3.53.4_aarch64.deb",
+          "SHA256": "0e909ce0d50fe123305446cd22e0c5edf535d40344b9b065fbdcdee52f53198d"
+        },
+        {
+          "Package": "zlib",
+          "Version": "1.3.2",
+          "Architecture": "aarch64",
+          "Filename": "pool/main/z/zlib/zlib_1.3.2_aarch64.deb",
+          "SHA256": "75e7d0af17fcc3b40004309fdc00a1ddb9ae08346dce5e269902c34ac3966ac9"
+        },
+        {
+          "Package": "ca-certificates",
+          "Version": "1:2026.08.13",
+          "Architecture": "all",
+          "Filename": "pool/main/c/ca-certificates/ca-certificates_1:2026.08.13_all.deb",
+          "SHA256": "8e894fb885da738b4ca9a7932703e414d730fa32e78aba33046a747822547d5a"
+        }
+      ],
+      "files": {
+        "bin/node": "1ee21eebda8ba05919050fe0d2b84b773a5cb2d2d1a42a27bddfb5eaa1ee182e",
+        "lib/libc++_shared.so": "e09c2f45cf4cf8ae574f94b6c2650d99ead0d332d5396f6613f062a2d2d73540",
+        "lib/libcares.so": "68733ce8d4bb1bdc87d8ec550c58c70f3dcdb0f8c48d86b83235f536cb736e83",
+        "lib/libcrypto.so": "4122f5c95088f11a43c14e49e257cc1ce700960e855840cf9b9f39a8acbcd7e8",
+        "lib/libcrypto.so.3": "4122f5c95088f11a43c14e49e257cc1ce700960e855840cf9b9f39a8acbcd7e8",
+        "lib/libicudata.so": "71a7479056941b610589f82698cdfb220c169dce9bc7c78ef6a6e74d07b1e8fd",
+        "lib/libicudata.so.78": "71a7479056941b610589f82698cdfb220c169dce9bc7c78ef6a6e74d07b1e8fd",
+        "lib/libicudata.so.78.3": "71a7479056941b610589f82698cdfb220c169dce9bc7c78ef6a6e74d07b1e8fd",
+        "lib/libicui18n.so": "3140b2b28d16a6486a65663f1c47a94a4bb0d9def51612f8e941414bd50c7a0e",
+        "lib/libicui18n.so.78": "3140b2b28d16a6486a65663f1c47a94a4bb0d9def51612f8e941414bd50c7a0e",
+        "lib/libicui18n.so.78.3": "3140b2b28d16a6486a65663f1c47a94a4bb0d9def51612f8e941414bd50c7a0e",
+        "lib/libicuio.so": "7d7aa87a56f1919450f9539257b78dc71959083482a30ce9e56d5ff9d024202e",
+        "lib/libicuio.so.78": "7d7aa87a56f1919450f9539257b78dc71959083482a30ce9e56d5ff9d024202e",
+        "lib/libicuio.so.78.3": "7d7aa87a56f1919450f9539257b78dc71959083482a30ce9e56d5ff9d024202e",
+        "lib/libicutest.so": "b7038a3a1696e8e2fde4fc3fc924d0fa8a753aa939cfeb83cb51ffb0ce7ded58",
+        "lib/libicutest.so.78": "b7038a3a1696e8e2fde4fc3fc924d0fa8a753aa939cfeb83cb51ffb0ce7ded58",
+        "lib/libicutest.so.78.3": "b7038a3a1696e8e2fde4fc3fc924d0fa8a753aa939cfeb83cb51ffb0ce7ded58",
+        "lib/libicutu.so": "132e6d528338976c0305351360daf3ef53f71a85eb4380ade175750b9680ee55",
+        "lib/libicutu.so.78": "132e6d528338976c0305351360daf3ef53f71a85eb4380ade175750b9680ee55",
+        "lib/libicutu.so.78.3": "132e6d528338976c0305351360daf3ef53f71a85eb4380ade175750b9680ee55",
+        "lib/libicuuc.so": "91bcef1faba58b755d4870aaea95814d1753961fd72365c4701cfd4461e3584c",
+        "lib/libicuuc.so.78": "91bcef1faba58b755d4870aaea95814d1753961fd72365c4701cfd4461e3584c",
+        "lib/libicuuc.so.78.3": "91bcef1faba58b755d4870aaea95814d1753961fd72365c4701cfd4461e3584c",
+        "lib/libsqlite3.53.4.so": "5973b314d794aab0dbc9424d5748f80e4873561f7584707461f55d03877bcd05",
+        "lib/libsqlite3.so": "2305d0c8f90757fef4be25314f69a7ad412a970a1ca4fba7ba85bbbf4a37708a",
+        "lib/libsqlite3.so.0": "2305d0c8f90757fef4be25314f69a7ad412a970a1ca4fba7ba85bbbf4a37708a",
+        "lib/libsqlite3.so.3.53.4": "2305d0c8f90757fef4be25314f69a7ad412a970a1ca4fba7ba85bbbf4a37708a",
+        "lib/libssl.so": "9bf626fadf689237cf641bf1108057f0cc87c587c17fbdeaa16bd4a12807d7ce",
+        "lib/libssl.so.3": "9bf626fadf689237cf641bf1108057f0cc87c587c17fbdeaa16bd4a12807d7ce",
+        "lib/libz.so": "c47748ed4b6ca6a2ecd664bab04795f3493956ab1f5cddc4ba0efa737ef3b711",
+        "lib/libz.so.1": "c47748ed4b6ca6a2ecd664bab04795f3493956ab1f5cddc4ba0efa737ef3b711",
+        "lib/libz.so.1.3.2": "c47748ed4b6ca6a2ecd664bab04795f3493956ab1f5cddc4ba0efa737ef3b711",
+        "etc/tls/cert.pem": "f66dff1bdf8f96060b8177976f8b7d9254bc89bc4db933d769f7384d28480bc9",
+        "lib/engines-3/capi.so": "2ed38d039d3376c9a5e51f039c27d18045e2c3de2daa2081bbe2e75e84af31ba",
+        "lib/engines-3/loader_attic.so": "e7ae871cb848de5294d632ef2ae36df9abd99738a85bc32c0017a0d5e3026f5e",
+        "lib/ossl-modules/legacy.so": "eea0e11387028da621f72b106cab4584efb3f166c146fd2bb5e0e3c2bbcb5ef4",
+        "share/doc/c-ares/copyright": "460f5e768fda3752ca2169a95df062578a10fb126bfd65f3b9b1a1bed2f84807",
+        "share/doc/libicu/LICENSE": "d5558cd419c8d46bdc958064cb97f963d1ea793866414c025906ec15033512ed",
+        "share/doc/node/gdbinit": "8bb3e50d93a62af4452f7340401fdd573bd8a06862fe32510a039eceaf65d033",
+        "share/doc/node/lldb_commands.py": "58152cbeca5cfa5dec282837f9a41ca5c08030951f6b343a10d8f7cba112fe14",
+        "share/doc/nodejs-lts/copyright": "148eacf7863ef4329224a29398623077200a27194aa075569faf4a0a85566ca5",
+        "share/doc/zlib/copyright": "e32ff4e00d9d94930537635291da39e7e612703334bf6fde8c7f1686fe8a45a2"
+      }
+    },
+    "x86_64": {
+      "packages": [
+        {
+          "Package": "nodejs-lts",
+          "Version": "24.18.0-1",
+          "Architecture": "x86_64",
+          "Filename": "pool/main/n/nodejs-lts/nodejs-lts_24.18.0-1_x86_64.deb",
+          "SHA256": "2a41c61c609993a7d897fed130adf4d6debb0b30713ab85bb47c2fc8373458ba"
+        },
+        {
+          "Package": "libc++",
+          "Version": "29",
+          "Architecture": "x86_64",
+          "Filename": "pool/main/libc/libc++/libc++_29_x86_64.deb",
+          "SHA256": "a4325afa2ecde73742499766e2a46202003e5cb3dcd2b7773ae25f386f3fecfa"
+        },
+        {
+          "Package": "openssl",
+          "Version": "1:3.6.3",
+          "Architecture": "x86_64",
+          "Filename": "pool/main/o/openssl/openssl_1:3.6.3_x86_64.deb",
+          "SHA256": "b58fedf8d3accda418b69b636bb1f8b789a5a75a375bda4a1c4fccb2c6e30380"
+        },
+        {
+          "Package": "c-ares",
+          "Version": "1.34.8",
+          "Architecture": "x86_64",
+          "Filename": "pool/main/c/c-ares/c-ares_1.34.8_x86_64.deb",
+          "SHA256": "c5d6194d69a04089040ca50dad96ed7df8773bd3c3d7c4be7d1dd5661ceae6b4"
+        },
+        {
+          "Package": "libicu",
+          "Version": "78.3",
+          "Architecture": "x86_64",
+          "Filename": "pool/main/libi/libicu/libicu_78.3_x86_64.deb",
+          "SHA256": "19fa8c4d828719f465d523983b1e0d833e4130bb22790104638965d97e27fe60"
+        },
+        {
+          "Package": "libsqlite",
+          "Version": "3.53.4",
+          "Architecture": "x86_64",
+          "Filename": "pool/main/libs/libsqlite/libsqlite_3.53.4_x86_64.deb",
+          "SHA256": "c2801581e7c656aec11153e5ef42179b9f8db8b9739fb6706899b93fa2655e6e"
+        },
+        {
+          "Package": "zlib",
+          "Version": "1.3.2",
+          "Architecture": "x86_64",
+          "Filename": "pool/main/z/zlib/zlib_1.3.2_x86_64.deb",
+          "SHA256": "c61b089dd30981452f5953b2bad4c4e7857062b2abd971f87fb0aec441bc02f4"
+        },
+        {
+          "Package": "ca-certificates",
+          "Version": "1:2026.08.13",
+          "Architecture": "all",
+          "Filename": "pool/main/c/ca-certificates/ca-certificates_1:2026.08.13_all.deb",
+          "SHA256": "8e894fb885da738b4ca9a7932703e414d730fa32e78aba33046a747822547d5a"
+        }
+      ],
+      "files": {
+        "bin/node": "2e2ceb025c1cd2e9c198ba0d3be1eca58741ee010f8dabf4d16cc35fd2d1ce0c",
+        "lib/libc++_shared.so": "683a1c7cd2f6829fd40bf805739166c5fce35235bf60d2c4e4a95e9f65a342ef",
+        "lib/libcares.so": "dc1c4b57a52ed456cf6f0ff12d0331798ac2b0f53368a4223d65435ed618ee66",
+        "lib/libcrypto.so": "9db17a2d992dcca8fc4b11f314e9b5e74b260d8aaf51078aadf5058687cc8535",
+        "lib/libcrypto.so.3": "9db17a2d992dcca8fc4b11f314e9b5e74b260d8aaf51078aadf5058687cc8535",
+        "lib/libicudata.so": "82df3f943d7c3192c5b7d409977705a4b8ec531e3d3efff588eb96c3e14ed65d",
+        "lib/libicudata.so.78": "82df3f943d7c3192c5b7d409977705a4b8ec531e3d3efff588eb96c3e14ed65d",
+        "lib/libicudata.so.78.3": "82df3f943d7c3192c5b7d409977705a4b8ec531e3d3efff588eb96c3e14ed65d",
+        "lib/libicui18n.so": "f33bdea3dec11a7a80632cc5a1602a308a0b66a80fa6d4d196222f5dd998e21d",
+        "lib/libicui18n.so.78": "f33bdea3dec11a7a80632cc5a1602a308a0b66a80fa6d4d196222f5dd998e21d",
+        "lib/libicui18n.so.78.3": "f33bdea3dec11a7a80632cc5a1602a308a0b66a80fa6d4d196222f5dd998e21d",
+        "lib/libicuio.so": "95ea1fe7d68943e0d1c0b2e25449b1f214e7fdd7ee861929bad2d44eebec559b",
+        "lib/libicuio.so.78": "95ea1fe7d68943e0d1c0b2e25449b1f214e7fdd7ee861929bad2d44eebec559b",
+        "lib/libicuio.so.78.3": "95ea1fe7d68943e0d1c0b2e25449b1f214e7fdd7ee861929bad2d44eebec559b",
+        "lib/libicutest.so": "e4a1bd71f7aa28d118a0e702cab9a5042f86dbddb61d730242cbe2a709e99110",
+        "lib/libicutest.so.78": "e4a1bd71f7aa28d118a0e702cab9a5042f86dbddb61d730242cbe2a709e99110",
+        "lib/libicutest.so.78.3": "e4a1bd71f7aa28d118a0e702cab9a5042f86dbddb61d730242cbe2a709e99110",
+        "lib/libicutu.so": "2ce162a5b0b75e078d1e0905d0da42e6ddf4cb88670fbdd21cfa5f64951ae946",
+        "lib/libicutu.so.78": "2ce162a5b0b75e078d1e0905d0da42e6ddf4cb88670fbdd21cfa5f64951ae946",
+        "lib/libicutu.so.78.3": "2ce162a5b0b75e078d1e0905d0da42e6ddf4cb88670fbdd21cfa5f64951ae946",
+        "lib/libicuuc.so": "2f8ee9cfbf7e1ce625cd088c34a5e8dc9f6a6a62ed247cd4c9653f391b563a16",
+        "lib/libicuuc.so.78": "2f8ee9cfbf7e1ce625cd088c34a5e8dc9f6a6a62ed247cd4c9653f391b563a16",
+        "lib/libicuuc.so.78.3": "2f8ee9cfbf7e1ce625cd088c34a5e8dc9f6a6a62ed247cd4c9653f391b563a16",
+        "lib/libsqlite3.53.4.so": "7fe6420f7fe73ec118fc858c1f11a0c12dc0ff04918d34d84603e8218a05f4dd",
+        "lib/libsqlite3.so": "78612b7ab730b9a25472678a0ee025eabbe73788400856f96fd4bf961d170f77",
+        "lib/libsqlite3.so.0": "78612b7ab730b9a25472678a0ee025eabbe73788400856f96fd4bf961d170f77",
+        "lib/libsqlite3.so.3.53.4": "78612b7ab730b9a25472678a0ee025eabbe73788400856f96fd4bf961d170f77",
+        "lib/libssl.so": "d5f47e91117a755a953fd733572ebeb1b0a7b0f85212dda44ebcc6877495d7f3",
+        "lib/libssl.so.3": "d5f47e91117a755a953fd733572ebeb1b0a7b0f85212dda44ebcc6877495d7f3",
+        "lib/libz.so": "6a69170246472fe49a63d5ae1e878da3b622ecbee09b6a0aba16861e1c678c76",
+        "lib/libz.so.1": "6a69170246472fe49a63d5ae1e878da3b622ecbee09b6a0aba16861e1c678c76",
+        "lib/libz.so.1.3.2": "6a69170246472fe49a63d5ae1e878da3b622ecbee09b6a0aba16861e1c678c76",
+        "etc/tls/cert.pem": "f66dff1bdf8f96060b8177976f8b7d9254bc89bc4db933d769f7384d28480bc9",
+        "lib/engines-3/capi.so": "85ecf9c1699f6125535f743412526198ed421dc57b9c05c40ba55a941d19db84",
+        "lib/engines-3/loader_attic.so": "ff9178b0818d20f97144ecd6693847dc4ed72c8a9db539dfffe7bb31608f4b07",
+        "lib/ossl-modules/legacy.so": "488b22d4c5d8229157164582dae3d9dd68c079f539681467561f58cc97f3155d",
+        "share/doc/c-ares/copyright": "460f5e768fda3752ca2169a95df062578a10fb126bfd65f3b9b1a1bed2f84807",
+        "share/doc/libicu/LICENSE": "d5558cd419c8d46bdc958064cb97f963d1ea793866414c025906ec15033512ed",
+        "share/doc/node/gdbinit": "8bb3e50d93a62af4452f7340401fdd573bd8a06862fe32510a039eceaf65d033",
+        "share/doc/node/lldb_commands.py": "58152cbeca5cfa5dec282837f9a41ca5c08030951f6b343a10d8f7cba112fe14",
+        "share/doc/nodejs-lts/copyright": "148eacf7863ef4329224a29398623077200a27194aa075569faf4a0a85566ca5",
+        "share/doc/zlib/copyright": "e32ff4e00d9d94930537635291da39e7e612703334bf6fde8c7f1686fe8a45a2"
+      }
+    }
+  }
+}
