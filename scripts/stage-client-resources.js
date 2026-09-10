@@ -7,6 +7,7 @@
  */
 const fs = require('fs')
 const path = require('path')
+const { copyTracedDependencies } = require('./trace-client-dependencies.cjs')
 
 const srcRoot = path.join(__dirname, '..', '.next', 'standalone')
 const dstRoot = path.join(__dirname, '..', '_client-stage')
@@ -48,6 +49,14 @@ if (!fs.existsSync(path.join(standaloneDir, 'package.json'))) {
   process.exit(1)
 }
 
+async function main() {
+// Check exact staging locations and refuse directory links before any cleanup.
+for (const target of [dstRoot, nodeDstRoot]) {
+  if (path.dirname(path.resolve(target)) !== path.resolve(__dirname, '..') ||
+      (fs.existsSync(target) && fs.lstatSync(target).isSymbolicLink())) {
+    throw new Error('Unsafe staging cleanup target: ' + target)
+  }
+}
 if (fs.existsSync(dstRoot)) {
   console.log('[stage-client] Removing previous _client-stage...')
   fs.rmSync(dstRoot, { recursive: true, force: true })
@@ -110,12 +119,9 @@ if (fs.existsSync(nextSrc)) {
   copyDir(nextSrc, nextDst)
 }
 
-console.log('[stage-client] Copying node_modules (standalone trimmed set)...')
-const nmSrc = path.join(standaloneDir, 'node_modules')
+console.log('[stage-client] Collecting traced runtime dependencies...')
 const nmDst = path.join(dstRoot, 'node_modules')
-if (fs.existsSync(nmSrc)) {
-  copyDir(nmSrc, nmDst, [/\.tmp/])
-}
+await copyTracedDependencies(path.resolve(__dirname, '..'), standaloneDir, nmDst)
 
 
 console.log('[stage-client] Copying public/static assets...')
@@ -136,3 +142,5 @@ const nodeName = process.platform === 'win32' ? 'node.exe' : 'node'
 copyFile(process.execPath, path.join(nodeDstRoot, nodeName))
 
 console.log('[stage-client] Done.')
+}
+main().catch(error => { console.error('[stage-client]', error); process.exitCode = 1 })

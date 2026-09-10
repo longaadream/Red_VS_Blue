@@ -59,7 +59,7 @@ async function evaluate(expression) {
   return result.result.value
 }
 async function until(expression) {for(let i=0;i<100;i++){if(await evaluate(expression))return;await delay(100)}throw new Error('UI condition timed out: '+expression)}
-const evidence=path.join(root,presentationMode?'docs/qa/RED-202':'docs/qa/RED-192-graph');fs.mkdirSync(evidence,{recursive:true})
+const evidence=process.env.RVB_GRAPH_EVIDENCE_DIR || path.join(root,presentationMode?'docs/qa/RED-202':'docs/qa/RED-192-graph');fs.mkdirSync(evidence,{recursive:true})
 try {
   await connect();await until("Boolean(document.querySelector('#skills-list .entity-item'))")
   await evaluate("document.querySelector('[data-tab=skills]').click();[...document.querySelectorAll('#skills-list .entity-item')].find(e=>e.textContent.includes('仙人模式')).click();document.querySelector('#skills-detail [data-editor-mode=graph]').click()")
@@ -129,7 +129,8 @@ try {
   assert.equal(await evaluate("document.querySelector('#skills-detail [data-save-json]').disabled"),true)
   await configure('node-3',{}, {next:'end'})
   await evaluate("document.querySelector('#skills-detail [data-editor-mode=code]').click()")
-  assert.equal(await evaluate("document.querySelector('[data-code-field=code]').value.includes('healDamage')"),true)
+  assert.equal(await evaluate("JSON.parse(document.querySelector('#skills-detail [data-json-source]').value).code.includes('healDamage')"),true)
+  assert.equal(await evaluate("document.querySelector('#skills-detail [data-ide-field=code] .cm-content').getAttribute('contenteditable')"),'false')
   await evaluate("document.querySelector('#skills-detail [data-editor-mode=json]').click()")
   assert.equal(await evaluate("JSON.parse(document.querySelector('#skills-detail [data-json-source]').value).extension.preserved"),true)
   await evaluate("document.querySelector('#skills-detail [data-save-json]').click()")

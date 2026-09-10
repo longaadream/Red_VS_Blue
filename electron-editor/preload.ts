@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron'
 
 contextBridge.exposeInMainWorld('editorAPI', {
+  importCode: (mode: 'files' | 'folder') => ipcRenderer.invoke('code-import', mode),
   analyzeFlow: (category: string, document: unknown) => ipcRenderer.invoke('source-flow-analyze', category, document),
   editFlowNode: (category: string, document: unknown, request: unknown) => ipcRenderer.invoke('source-flow-edit', category, document, request),
   visualCatalog: () => ipcRenderer.invoke('visual-catalog'),
@@ -11,10 +12,12 @@ contextBridge.exposeInMainWorld('editorAPI', {
   workbenchRevert: (id: string, input: unknown) => ipcRenderer.invoke('workbench-revert', id, input),
   workbenchImage: (id: string, relative: string, side: 'before' | 'after', hash: string, acceptedHash: string) => ipcRenderer.invoke('workbench-image', id, relative, side, hash, acceptedHash),
   workbenchExport: (id: string, hash: string, notes: string) => ipcRenderer.invoke('workbench-export', id, hash, notes),
+  workbenchTraining: (id: string, hash: string) => ipcRenderer.invoke('workbench-training', id, hash),
   workbenchPublish: (id: string, hash: string, notes: string) => ipcRenderer.invoke('workbench-publish', id, hash, notes),
   publicationSettings: () => ipcRenderer.invoke('publication-settings'),
   publicationSaveSettings: (input: unknown) => ipcRenderer.invoke('publication-save-settings', input),
   publicationChooseKey: () => ipcRenderer.invoke('publication-choose-key'),
+  publicationCreateKey: () => ipcRenderer.invoke('publication-create-key'),
   onPublicationProgress: (callback: (value: { taskId: string; stage: string }) => void) => {
     const listener = (_event: Electron.IpcRendererEvent, value: { taskId: string; stage: string }) => callback(value)
     ipcRenderer.on('publication-progress', listener)

@@ -1,0 +1,6 @@
+const path = require('node:path')
+const { createUpdateFeed } = require('../tests/electron/binary-update-feed.cjs')
+const root = path.resolve(__dirname, '../../pr-tools/RED-202-IDE/binary-update-lean')
+const feed = createUpdateFeed(root)
+feed.server.on('error', error => { console.error(error); process.exitCode = 1 })
+feed.server.listen(18990, '127.0.0.1', () => console.log('RVB binary QA feed: http://127.0.0.1:18990/'))

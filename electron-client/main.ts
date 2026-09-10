@@ -12,6 +12,11 @@ import { resolveDevelopmentProfile } from './development-profile'
 import { findFreePort } from './local-port'
 import { readClientProtocolBattleData, resolveClientProtocolFile } from './client-protocol-resource'
 import { EmbeddedPostgresController } from './embedded-postgres'
+import { OfficialResourceUpdates } from './official-resource-updates'
+import { ClientBinaryUpdates } from './client-binary-updates'
+import { installedResourceVersion, resolvedResourceVersion } from './resource-update-identity'
+import { officialUpdateFetch, prepareOfficialUpdateNetwork } from './official-update-fetch'
+import { assertOfficialUpdateIpcAllowed } from './official-update-ipc'
 import {
   LocalAuthorityRecoveryBudget,
   LOCAL_GAME_OPEN_CANCELLED,
@@ -51,6 +56,11 @@ const PROFILE_ARCHIVE_MAX_BYTES = 32 * 1024 * 1024
 const PROFILE_ADMIN_KEY = randomBytes(32).toString('hex')
 let allowAppExit = false
 let appExitPromise: Promise<void> | null = null
+let officialUpdateApplying = false
+let automaticUpdates = true
+let resourceUpdates: OfficialResourceUpdates | null = null
+let binaryUpdates: ClientBinaryUpdates | null = null
+const updateAdmissionToken = randomBytes(24).toString('hex')
 
 type GameProfileIdentity = Readonly<{
   schemaVersion: 'rvb-game-profile-identity/v1'
@@ -327,6 +337,7 @@ function handleTrusted(
 ): void {
   ipcMain.handle(channel, (event, ...args) => {
     assertTrustedIpcSender(event, channel, trustedTargets(roles))
+    assertOfficialUpdateIpcAllowed(channel, officialUpdateApplying)
     return listener(event, ...args)
   })
 }
@@ -473,6 +484,10 @@ function forceKillServer(): void {
 }
 
 function requestApplicationExit(): void {
+  if (officialUpdateApplying && !allowAppExit) {
+    void enqueueProfileMutation(async () => { requestApplicationExit() })
+    return
+  }
   if (allowAppExit) {
     app.exit(0)
     return
@@ -814,6 +829,7 @@ async function startLocalGameAuthorityOnce(
       NODE_ENV: 'production',
       RVB_COLYSEUS_PORT: String(actualGamePort),
       RVB_COLYSEUS_HOST: '0.0.0.0',
+      RVB_UPDATE_ADMISSION_TOKEN: officialUpdateApplying ? updateAdmissionToken : '',
       RVB_POSTGRES_URL: databaseUrl,
       RVB_TURN_TIMER_ENABLED: '1',
       APP_ROOT_DIR: appRoot,
@@ -1913,6 +1929,7 @@ function createGameWindow(): BrowserWindow {
   })
 
   restrictWindowNavigation(win, isGameClientUrl)
+  win.webContents.on('will-navigate', event => { if (officialUpdateApplying) event.preventDefault() })
   win.setMenuBarVisibility(false)
 
   win.webContents.on('before-input-event', (_event, input) => {
@@ -1952,6 +1969,139 @@ function openAdminWindow(): void {
   win.loadURL(`file:///${adminPath.replace(/\\/g, '/')}?v=${Date.now()}`)
   adminWin = win
   win.on('closed', () => { adminWin = null })
+}
+
+function officialUpdateStatus() {
+  return { automatic: automaticUpdates, clientVersion: app.getVersion(), resource: resourceUpdates?.status ?? { phase: 'idle', message: '正在准备本机服务' }, client: binaryUpdates?.status ?? { phase: 'idle', message: '正在准备更新服务' } }
+}
+
+function notifyOfficialUpdates() {
+  if (mainWin && !mainWin.isDestroyed()) mainWin.webContents.send('official-update-status', officialUpdateStatus())
+}
+
+async function canApplyOfficialUpdate(): Promise<boolean> {
+  if (!localServerReady || !mainWin || mainWin.isDestroyed() || appExitPromise) return false
+  const win = mainWin
+  const stillAtMenu = () => {
+    if (mainWin !== win || win.isDestroyed() || win.webContents.isLoadingMainFrame()) return false
+    const url = new URL(win.webContents.getURL() || 'about:blank')
+    return url.protocol === `${CLIENT_SCHEME}:` && url.hostname === 'app' && url.pathname === '/index.html'
+  }
+  if (!stillAtMenu()) return false
+  const report = await profileApiRequest('/api/content-profile')
+  const rooms = await updateAuthorityAdmission('status')
+  return stillAtMenu() && report.server?.healthy === true && report.server?.activationId === null && report.server?.lease?.active === false && rooms.idle === true
+}
+
+function updateAuthorityAdmission(action: 'status' | 'acquire' | 'release'): Promise<{ idle?: boolean; acquired?: boolean }> {
+  const proc = gameServerProcess
+  if (!proc) return Promise.resolve({ idle: true, acquired: true })
+  if (!proc.connected) return Promise.reject(new Error('无法确认本机房间是否空闲'))
+  const requestId = randomBytes(16).toString('hex')
+  return new Promise((resolve, reject) => {
+    const cleanup = () => { clearTimeout(timer); proc.removeListener('message', onMessage); proc.removeListener('exit', onExit) }
+    const onExit = () => { cleanup(); reject(new Error('房间服务正在切换，请稍后重试')) }
+    const onMessage = (value: JsonObject) => { if (value?.type === 'rvb:update:result' && value.requestId === requestId) { cleanup(); resolve(value) } }
+    const timer = setTimeout(() => { cleanup(); reject(new Error('无法确认房间占用；已推迟更新')) }, 5000)
+    proc.on('message', onMessage); proc.once('exit', onExit)
+    proc.send({ type: 'rvb:update:control', action, token: updateAdmissionToken, requestId }, error => { if (error) { cleanup(); reject(error) } })
+  })
+}
+
+function setupOfficialUpdates(): void {
+  const settingsFile = path.join(getUserData(), 'official-updates.json')
+  try { automaticUpdates = JSON.parse(fs.readFileSync(settingsFile, 'utf8')).automatic !== false } catch { /* First launch uses automatic checks. */ }
+  const saveSettings = () => {
+    fs.mkdirSync(getUserData(), { recursive: true })
+    fs.writeFileSync(settingsFile + '.tmp', JSON.stringify({ schema: 'rvb-official-updates/v1', automatic: automaticUpdates }))
+    fs.renameSync(settingsFile + '.tmp', settingsFile)
+  }
+  let publishers: string[] = []
+  try { publishers = JSON.parse(fs.readFileSync(path.join(getAppRoot(), 'config/content-script-publishers.json'), 'utf8')).keyIds } catch { /* Empty pin list fails closed. */ }
+  resourceUpdates = new OfficialResourceUpdates(officialUpdateFetch, app.getVersion(), publishers, {
+    stable: async () => {
+      const state = readDesktopProfileState(getPackRoot())
+      if (!state) throw new Error('本机资源服务尚未就绪，请稍后重试')
+      return { ...state.stable, version: installedResourceVersion(getPackRoot(), state.stable), candidateHash: state.candidate?.resolvedProfileHash }
+    },
+    canApply: canApplyOfficialUpdate,
+    apply: (archive, index, expectedStableHash) => enqueueProfileMutation(async () => {
+      // Serialize with manual imports, lock renderer navigation and starting rooms,
+      // then fence actual Colyseus room creation as well as Next/PVE leases.
+      officialUpdateApplying = true
+      try {
+        const state = readDesktopProfileState(getPackRoot())
+        if (state?.stable.resolvedProfileHash !== expectedStableHash || state.candidate && state.candidate.resolvedProfileHash !== expectedStableHash) throw new Error('资源状态已改变，请先处理资源管理中的候选')
+        if (!await canApplyOfficialUpdate()) throw new Error('请返回主菜单并退出房间后更新')
+        if (!(await updateAuthorityAdmission('acquire')).acquired) throw new Error('本机还有房间，请关闭房间后更新')
+        const installed = await installProfileArchive(archive)
+        const reference = installed.reference as DesktopProfileReference
+        if (!reference || resolvedResourceVersion(installed.profile) !== index.version || reference.compatibility.engineAbi !== index.identity.engineAbi || reference.compatibility.contentAbi !== index.identity.contentAbi) throw new Error('已签名资源与发布清单不匹配，未启用候选')
+        if (!await canApplyOfficialUpdate()) throw new Error('房间已开始使用资源，请退出房间后在资源管理中应用候选')
+        await activateProfileHash(reference.resolvedProfileHash)
+        if (readDesktopProfileState(getPackRoot())?.stable.resolvedProfileHash !== reference.resolvedProfileHash) throw new Error('资源更新未完成，已保留原版本')
+        return reference.resolvedProfileHash
+      } finally {
+        await updateAuthorityAdmission('release').catch(error => console.error('[updates] admission release failed:', error))
+        officialUpdateApplying = false
+      }
+    }),
+    applied: receipt => {
+      // Active profile is the authoritative receipt; this file is diagnostic only.
+      try { fs.writeFileSync(path.join(getUserData(), 'official-resource-receipt.json'), JSON.stringify({ ...receipt, appliedAt: new Date().toISOString() })) } catch (error) { console.warn('[updates] receipt write failed:', error) }
+    },
+    changed: notifyOfficialUpdates,
+  })
+  try {
+    // Development/portable builds must never run an installer against themselves.
+    const executable = app.getPath('exe')
+    const uninstaller = path.join(path.dirname(executable), `Uninstall ${path.basename(executable, '.exe')}.exe`)
+    const supported = app.isPackaged && process.platform === 'win32' && fs.existsSync(path.join(process.resourcesPath, 'app-update.yml')) && fs.existsSync(uninstaller)
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const updater = supported ? new (require('./update-runtime.cjs').NsisUpdater)() : null
+    binaryUpdates = new ClientBinaryUpdates(updater, notifyOfficialUpdates, prepareOfficialUpdateNetwork)
+  } catch (error) {
+    console.error('[updates] binary updater initialization failed:', error)
+    binaryUpdates = new ClientBinaryUpdates(null, notifyOfficialUpdates)
+  }
+  const check = async () => {
+    if (officialUpdateApplying || appExitPromise) return officialUpdateStatus()
+    await Promise.all([resourceUpdates!.check(), binaryUpdates!.check()])
+    return officialUpdateStatus()
+  }
+  handleTrusted('official-update-status', ['game'], () => officialUpdateStatus())
+  handleTrusted('official-update-check', ['game'], check)
+  handleTrusted('official-update-automatic', ['game'], (_event, enabled) => {
+    if (typeof enabled !== 'boolean') throw new Error('自动更新设置无效')
+    automaticUpdates = enabled; saveSettings(); notifyOfficialUpdates(); return officialUpdateStatus()
+  })
+  handleTrusted('official-update-install', ['game'], () => enqueueProfileMutation(async () => {
+    if (!binaryUpdates?.isReady() || officialUpdateApplying || !await canApplyOfficialUpdate()) throw new Error('请在更新下载完成后，退出房间并返回主菜单')
+    const answer = await dialog.showMessageBox(mainWin!, { type: 'question', title: '安装客户端更新', message: '现在关闭游戏并安装已下载的客户端更新？', buttons: ['稍后', '重启并安装'], defaultId: 0, cancelId: 0 })
+    if (answer.response !== 1) return { cancelled: true }
+    officialUpdateApplying = true
+    try {
+      if (!await canApplyOfficialUpdate()) throw new Error('游戏状态已改变，请退出房间再试')
+      if (!(await updateAuthorityAdmission('acquire')).acquired) throw new Error('本机还有房间，请关闭房间后更新')
+      await killServer(true)
+      // quitAndInstall starts the installer synchronously, then quits Electron.
+      // Durable authority shutdown must complete before allowing that quit.
+      allowAppExit = true
+      binaryUpdates.install()
+      if (binaryUpdates.status.phase === 'error') throw new Error('安装程序未能启动，请稍后重试')
+      return { ok: true }
+    } catch (error) {
+      allowAppExit = false
+      try { await startStableLocalServerAndRecover() }
+      finally { await updateAuthorityAdmission('release').catch(failure => console.error('[updates] admission release failed:', failure)); officialUpdateApplying = false }
+      throw error
+    }
+  }))
+  setTimeout(() => { if (automaticUpdates) void check() }, 15000).unref()
+  setInterval(() => { if (automaticUpdates) void check() }, 15 * 60 * 1000).unref()
+  // A downloaded candidate is retried locally on return to the menu; no polling
+  // GitHub every few seconds. A disabled automatic preference pauses this too.
+  setInterval(() => { if (automaticUpdates && resourceUpdates?.status.phase === 'waiting' && !officialUpdateApplying) void resourceUpdates.applyPending() }, 15000).unref()
 }
 
 function loadLocalGame(): void {
@@ -2443,6 +2593,7 @@ app.whenReady().then(async () => {
     console.error('[client] automatic local service startup failed:', error)
   }
   loadLocalGame()
+  setupOfficialUpdates()
 })
 
 app.on('window-all-closed', () => {

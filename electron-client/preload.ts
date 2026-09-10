@@ -1,6 +1,15 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
 
 contextBridge.exposeInMainWorld('electronAPI', {
+  getOfficialUpdateStatus: () => ipcRenderer.invoke('official-update-status'),
+  checkOfficialUpdates: () => ipcRenderer.invoke('official-update-check'),
+  setAutomaticUpdates: (enabled: boolean) => ipcRenderer.invoke('official-update-automatic', enabled),
+  installClientUpdate: () => ipcRenderer.invoke('official-update-install'),
+  onOfficialUpdateStatus: (callback: (status: unknown) => void) => {
+    const listener = (_event: unknown, status: unknown) => callback(status)
+    ipcRenderer.on('official-update-status', listener)
+    return () => ipcRenderer.removeListener('official-update-status', listener)
+  },
   // 读取已保存的远程服务器地址
   getRemoteUrl: () => ipcRenderer.invoke('get-remote-url'),
   // 保存远程服务器地址（连接成功后调用，不跳转页面）

@@ -2,6 +2,7 @@ import { defineRoom, defineServer, matchMaker } from 'colyseus'
 import { randomUUID } from 'node:crypto'
 import { WebSocketTransport } from '@colyseus/ws-transport'
 import { Pool } from 'pg'
+import { UpdateAdmission } from './update-admission'
 import type { Express } from 'express'
 import type { RankedRoomHooks } from '../official/ranked'
 
@@ -175,6 +176,19 @@ export function createColyseusBattleServer(options: CreateColyseusBattleServerOp
       if (productCreationClaims.get(creationKey)?.roomId === roomId) productCreationClaims.delete(creationKey)
     },
   })
+  const updateAdmission = new UpdateAdmission(process.env.RVB_UPDATE_ADMISSION_TOKEN || null)
+  class UpdateAwareBattleRoom extends BattleRoom {
+    private releaseUpdateRoom?: () => void
+    async onCreate(options: Parameters<InstanceType<typeof BattleRoom>['onCreate']>[0]) {
+      this.releaseUpdateRoom = updateAdmission.enterRoom()
+      try { await super.onCreate(options) }
+      catch (error) { this.releaseUpdateRoom(); throw error }
+    }
+    async onDispose() {
+      await super.onDispose()
+      this.releaseUpdateRoom?.()
+    }
+  }
   let ready = false
   let healthError: string | undefined
   const server = defineServer({
@@ -185,7 +199,7 @@ export function createColyseusBattleServer(options: CreateColyseusBattleServerOp
     // not rely on Colyseus' runtime dynamic import from node_modules.
     transport: new WebSocketTransport(),
     rooms: {
-      [BATTLE_ROOM_TYPE]: defineRoom(BattleRoom),
+      [BATTLE_ROOM_TYPE]: defineRoom(UpdateAwareBattleRoom),
     },
     greet: false,
     beforeListen: async () => {
@@ -357,7 +371,7 @@ export function createColyseusBattleServer(options: CreateColyseusBattleServerOp
     if (matchMaker.getLocalRoomById(battleId)) return
     await matchMaker.createRoom(BATTLE_ROOM_TYPE, { product: true, restore: true, battleId, restoreCapability })
   }
-  return { server, repository, journal, restoreProductRooms, restoreProductRoom }
+  return { server, repository, journal, restoreProductRooms, restoreProductRoom, updateAdmission }
 }
 
 function collectProductRooms(

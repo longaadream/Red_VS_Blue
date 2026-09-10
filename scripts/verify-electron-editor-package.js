@@ -9,7 +9,14 @@ const path = require('path')
 const REQUIRED_ARCHIVE_FILES = [
   'electron-editor/dist/main.js',
   'electron-editor/dist/preload.js',
+  'electron-editor/dist/training-preview.js',
+  'electron-editor/dist/training-resources.js',
+  'electron-editor/dist/content-pipeline-worker.cjs',
   'electron-editor/ui/index.html',
+  'electron-editor/dist/code-import.js',
+  'electron-editor/ui/code-ide.js',
+  'electron-editor/ui/code-ide.css',
+  'electron-editor/ui/code-ide-LICENSES.txt',
   'electron-editor/ui/skill-graph-core.js',
   'electron-editor/ui/skill-graph-editor.js',
   'electron-editor/ui/skill-graph.css',
@@ -131,6 +138,13 @@ function findEditorPackageIssues(packageRoot, projectRoot, portablePath, install
     path.join(packageRoot, 'resources', 'app', 'data'),
     path.join('resources', 'app', 'data'),
     'editor data asset',
+  )
+  compareSourceTree(
+    issues,
+    path.join(projectRoot, 'public'),
+    path.join(packageRoot, 'resources', 'app', 'public'),
+    path.join('resources', 'app', 'public'),
+    'editor training artwork',
   )
   compareSourceTree(
     issues,

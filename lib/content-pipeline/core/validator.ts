@@ -77,15 +77,23 @@ export type ContentValidationPolicyV1 =
   | {
     readonly kind: 'bundled-base' | 'external'
     readonly expectedCompatibility: PackCompatibilityV1
+    /** Host-owned allowlist. A signature or manifest cannot grant this permission itself. */
+    readonly trustedScriptPublisherKeyIds?: readonly string[]
   }
   | {
-    readonly kind: 'local-dev'
+    readonly kind: 'local-dev' | 'authoring'
     readonly expectedCompatibility: PackCompatibilityV1
     readonly allowUnsigned: true
   }
 
 export interface PackValidationContextV1 {
   readonly parent?: ReadonlyContentTreeV1
+}
+
+function allowsScriptContent(policy: ContentValidationPolicyV1, verifiedKeyId: string | null): boolean {
+  if (policy.kind === 'bundled-base' || policy.kind === 'authoring') return true
+  return policy.kind === 'external' && verifiedKeyId !== null
+    && policy.trustedScriptPublisherKeyIds?.includes(verifiedKeyId) === true
 }
 
 export interface ValidatedPackV1 extends ReadonlyContentTreeV1 {
@@ -297,10 +305,11 @@ function assertRuntimePolicyV1(
     kind !== 'bundled-base'
     && kind !== 'external'
     && kind !== 'local-dev'
+    && kind !== 'authoring'
   ) {
     reject('PACK_SCHEMA_INVALID', 'source')
   }
-  if (kind === 'local-dev') {
+  if (kind === 'local-dev' || kind === 'authoring') {
     const allowUnsigned = readPropertyV1(
       policy,
       'allowUnsigned',
@@ -314,14 +323,24 @@ function assertRuntimePolicyV1(
     readPropertyV1(policy, 'expectedCompatibility', 'source'),
     'source',
   )
-  if (kind === 'local-dev') {
+  if (kind === 'local-dev' || kind === 'authoring') {
     return Object.freeze({
       kind,
       allowUnsigned: true,
       expectedCompatibility,
     })
   }
-  return Object.freeze({ kind, expectedCompatibility })
+  const rawKeys = readPropertyV1(policy, 'trustedScriptPublisherKeyIds', 'source')
+  const keys: string[] = []
+  if (rawKeys !== undefined) {
+    if (!Array.isArray(rawKeys) || rawKeys.length > 64) reject('PACK_SCHEMA_INVALID', 'source')
+    for (let index = 0; index < rawKeys.length; index++) {
+      const key = readPropertyV1(rawKeys, String(index), 'source')
+      if (typeof key !== 'string' || !/^[a-f0-9]{64}$/.test(key)) reject('PACK_SCHEMA_INVALID', 'source')
+      keys.push(key)
+    }
+  }
+  return Object.freeze({ kind, expectedCompatibility, trustedScriptPublisherKeyIds: Object.freeze(keys) })
 }
 
 function preflightSource(source: ContentPackSourceV1): PreflightedSourceV1 {
@@ -472,7 +491,7 @@ function validateSignature(
   policy: ContentValidationPolicyV1,
 ): PackSignatureEnvelopeV1 | null {
   if (signatureBytes === null) {
-    if (policy.kind !== 'local-dev') {
+    if (policy.kind !== 'local-dev' && policy.kind !== 'authoring') {
       reject('PACK_SIGNATURE_REQUIRED', 'signature', { packId: manifest.packageId })
     }
     if (manifest.publisher.keyId !== null) {
@@ -955,7 +974,7 @@ function derivePatchCapabilities(
         })
       }
       if (
-        policy.kind !== 'bundled-base'
+        !allowsScriptContent(policy, manifest.publisher.keyId)
         && exactParent.hasExecutableContent
       ) {
         reject('PACK_FORBIDDEN_EXECUTABLE_CONTENT', 'patch', {
@@ -1223,7 +1242,7 @@ export function validatePackSourceV1(
   const facts = validateInventory(
     manifest,
     preflighted.entries,
-    validatedPolicy.kind === 'bundled-base',
+    allowsScriptContent(validatedPolicy, signatureEnvelope?.keyId ?? null),
   )
 
   let capabilities: readonly PackCapabilityV1[]
@@ -1256,7 +1275,7 @@ export function validatePackSourceV1(
     signatureEnvelope: signatureEnvelope === null
       ? null
       : freezePlainObject(signatureEnvelope),
-    networkEligible: validatedPolicy.kind !== 'local-dev',
+    networkEligible: validatedPolicy.kind !== 'local-dev' && validatedPolicy.kind !== 'authoring',
     capabilities,
   })
 }

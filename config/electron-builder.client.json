@@ -6,6 +6,8 @@
     "main": "electron-client/dist/main.js"
   },
   "npmRebuild": false,
+  "publish": { "provider": "github", "owner": "longaadream", "repo": "Red_VS_Blue", "releaseType": "release" },
+  "nsis": { "oneClick": false, "perMachine": false, "allowToChangeInstallationDirectory": true, "createDesktopShortcut": true, "createStartMenuShortcut": true, "runAfterFinish": false },
   "files": [
     "electron-client/dist/**",
     "electron-client/admin/**",
@@ -14,6 +16,7 @@
     "!node_modules/**"
   ],
   "extraResources": [
+    { "from": "config/content-script-publishers.json", "to": "app/config/content-script-publishers.json" },
     { "from": "config/branding", "to": "branding", "filter": ["icon.ico", "icon.png"] },
     { "from": "_client-stage",       "to": "app/standalone" },
     { "from": "_client-colyseus",    "to": "app/standalone/colyseus" },
@@ -51,7 +54,7 @@
   "asar": false,
   "win": {
     "icon": "config/branding/icon.ico",
-    "target": "dir"
+    "target": ["dir", "nsis"]
   },
   "mac": {
     "icon": "config/branding/icon.icns",

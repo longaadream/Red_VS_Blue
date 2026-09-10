@@ -3,7 +3,7 @@ import type { PackCapabilityV1 } from '../contracts'
 export const CONTENT_OPERATION_SCHEMA_VERSION_V1 = 'rvb-content-operation/v1' as const
 export const CONTENT_REPORT_SCHEMA_VERSION_V1 = 'rvb-content-report/v1' as const
 
-export type ContentToolingChannelV1 = 'local-dev' | 'qa' | 'stable' | 'community'
+export type ContentToolingChannelV1 = 'local-dev' | 'authoring' | 'qa' | 'stable' | 'community'
 export type ContentToolingCallerV1 = 'cli' | 'editor'
 
 export interface ContentToolingCommandV1 {
@@ -35,6 +35,8 @@ export interface BuildContentOperationV1 extends ContentOperationCommonV1 {
   readonly description?: string
   readonly publisherId: string
   readonly parentProfileHash?: string
+  readonly base?: ContentBaseReferenceV1
+  readonly patches?: readonly string[]
   readonly operations?: readonly unknown[]
   readonly capabilities?: readonly PackCapabilityV1[]
 }
@@ -82,6 +84,8 @@ export interface ContentToolingIdentityV1 {
   readonly publisherKeyId: string | null
   readonly signature: 'signed' | 'unsigned-dev-only' | null
   readonly capabilities: readonly PackCapabilityV1[]
+  /** Union of verified input-package capabilities, including removed scripts. */
+  readonly sourceCapabilities?: readonly PackCapabilityV1[]
   readonly resolvedProfileHash: string | null
   readonly authorityContentHash: string | null
   readonly engineAbi: string | null

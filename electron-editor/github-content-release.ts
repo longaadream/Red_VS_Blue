@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto'
 export type ReleaseAsset = { name: string; bytes: Uint8Array }
 type AssetRecord = { name: string; size: number; digest?: string; state: string; browser_download_url: string }
 type ReleaseRecord = { id: number; tag_name: string; draft: boolean; body: string; html_url: string; assets: AssetRecord[] }
-type Fetcher = (url: string, init: RequestInit) => Promise<Response>
+type Fetcher = (url: string, init: RequestInit & { cache: 'no-store' }) => Promise<Response>
 const digest = (bytes: Uint8Array) => 'sha256:' + createHash('sha256').update(bytes).digest('hex')
 
 /** Only Github's fixed API/upload origins receive credentials. No remote redirect is followed. */
@@ -17,8 +17,9 @@ export class GithubContentRelease {
     let response: Response
     try {
       response = await this.fetcher(origin + `/repos/${this.repository}` + path, {
-        method, redirect: 'error', signal: AbortSignal.timeout(120000),
-        headers: { Accept: 'application/vnd.github+json', Authorization: `Bearer ${this.token}`, 'X-GitHub-Api-Version': '2022-11-28', 'Content-Type': upload ? 'application/octet-stream' : 'application/json' },
+        // Electron shares Chromium's HTTP cache: a pre-publish GET may still say draft=true.
+        method, cache: 'no-store', redirect: 'error', signal: AbortSignal.timeout(120000),
+        headers: { Accept: 'application/vnd.github+json', Authorization: `Bearer ${this.token}`, 'Cache-Control': 'no-cache', 'X-GitHub-Api-Version': '2022-11-28', 'Content-Type': upload ? 'application/octet-stream' : 'application/json' },
         body: upload ? new Uint8Array(upload) : body === undefined ? undefined : JSON.stringify(body),
       })
     } catch { throw new Error('GitHub 网络请求未确认完成。保留本地版本，再次发布时会先核对远端草稿；不会覆盖已有文件。') }

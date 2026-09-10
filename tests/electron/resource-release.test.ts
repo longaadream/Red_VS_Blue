@@ -10,6 +10,7 @@ import { readProfileArchiveV1 } from '../../lib/content-pipeline/runtime/profile
 import { resolveProfileV1 } from '../../lib/content-pipeline/core/resolver'
 import { contentPolicyForChannelV1 } from '../../lib/content-pipeline/tooling/archive'
 import type { ContentPipelineOperationV1 } from '../../lib/content-pipeline/tooling/contracts'
+import { publicationKeyId } from '../../electron-editor/publication-identity'
 
 const roots: string[] = []
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }) })
@@ -42,7 +43,7 @@ it('builds and validates a real rvbpack from accepted bytes, leaving later draft
   expect(JSON.parse(readFileSync(data, 'utf8')).value).toBe(99)
 })
 
-it('fails closed for unsupported executable content and does not make a Github request', async () => {
+it('exports authored JSON scripts as text without executing or uploading them', async () => {
   const { workspace, root, data } = fixture()
   const store = new CreativeWorkbench(workspace, root)
   const task = store.list()[0].id
@@ -50,7 +51,13 @@ it('fails closed for unsupported executable content and does not make a Github r
   const current = store.inspect(task)
   const accepted = store.accept(task, { paths: ['data/maps/fixture.json'], expectedHash: current.contentHash, expectedAcceptedHash: current.acceptedHash })
   const service = new ResourceRelease(workspace, root, path.join(root, 'private'), request => runContentPipelineOperationV1(request as ContentPipelineOperationV1))
-  await expect(service.export(task, accepted.acceptedHash, '')).rejects.toThrow('PACK_FORBIDDEN_EXECUTABLE_CONTENT')
+  const result = await service.export(task, accepted.acceptedHash, '')
+  expect(result.published).toBe(false)
+  const source = readProfileArchiveV1(readFileSync(result.path))
+  const view = resolveProfileV1({ base: { source, policy: contentPolicyForChannelV1('authoring') } })
+  expect(view.networkEligible).toBe(false)
+  expect(JSON.parse(Buffer.from(view.readFile('data/maps/fixture.json')!).toString('utf8')).code).toBe('return 1')
+  expect(() => resolveProfileV1({ base: { source, policy: contentPolicyForChannelV1('local-dev') } })).toThrow('PACK_FORBIDDEN_EXECUTABLE_CONTENT')
 })
 
 it('signs real snapshots and generates an automatically resolved patch on the next publication', async () => {
@@ -110,4 +117,21 @@ it('signs real snapshots and generates an automatically resolved patch on the ne
   const resolved = resolveProfileV1({ base: { source: readProfileArchiveV1(uploaded.get('1/content.rvbpack')!), policy }, patches: [2, 3].map(id => ({ source: readProfileArchiveV1(uploaded.get(`${id}/content-patch.rvbpack`)!), policy })) })
   expect(resolved.profile.resolvedProfileHash).toBe(thirdIndex.patch.resolvedProfileHash)
   expect(JSON.parse(Buffer.from(resolved.readFile('data/maps/fixture.json')!).toString('utf8')).value).toBe(4)
+  // A data-only base can gain and then lose its last script through patches.
+  // Even when both base and final snapshot have no script, the intermediate
+  // source chain must still be trusted before any upload (including retries).
+  mkdirSync(path.join(root, 'config'))
+  const config = path.join(root, 'config/content-script-publishers.json')
+  writeFileSync(config, JSON.stringify({ schema: 'rvb-script-publishers/v1', keyIds: [publicationKeyId(keyFile)] }))
+  writeFileSync(data, '{"name":"fixture","value":4,"code":"return 4"}')
+  const withScript = store.inspect(task)
+  const scriptAccepted = store.accept(task, { paths: ['data/maps/fixture.json'], expectedHash: withScript.contentHash, expectedAcceptedHash: withScript.acceptedHash })
+  await service.publish(task, scriptAccepted.acceptedHash, '第四版代码', settings, fetcher, () => {})
+  writeFileSync(data, '{"name":"fixture","value":5}')
+  const removed = store.inspect(task)
+  const removedAccepted = store.accept(task, { paths: ['data/maps/fixture.json'], expectedHash: removed.contentHash, expectedAcceptedHash: removed.acceptedHash })
+  writeFileSync(config, JSON.stringify({ schema: 'rvb-script-publishers/v1', keyIds: [] }))
+  await expect(service.publish(task, removedAccepted.acceptedHash, '第五版删掉代码', settings, fetcher, () => {})).rejects.toThrow('尚未被当前客户端版本信任')
+  await expect(service.publish(task, removedAccepted.acceptedHash, '缓存重试', settings, fetcher, () => {})).rejects.toThrow('尚未被当前客户端版本信任')
+  expect(releases).toHaveLength(4)
 })

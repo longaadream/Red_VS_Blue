@@ -25,7 +25,7 @@ interface ParsedOptionsV1 {
 }
 
 const CHANNELS = new Set<ContentToolingChannelV1>([
-  'local-dev', 'qa', 'stable', 'community',
+  'local-dev', 'authoring', 'qa', 'stable', 'community',
 ])
 
 function parseOptions(

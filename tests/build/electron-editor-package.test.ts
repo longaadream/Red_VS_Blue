@@ -47,6 +47,14 @@ async function createPackageFixture(options: { archivedNodeModules?: boolean } =
   fs.writeFileSync(path.join(archiveSourceRoot, 'electron-editor', 'dist', 'main.js'), 'main')
   fs.writeFileSync(path.join(archiveSourceRoot, 'electron-editor', 'dist', 'preload.js'), 'preload')
   fs.writeFileSync(path.join(archiveSourceRoot, 'electron-editor', 'ui', 'index.html'), 'editor')
+  for (const relative of [
+    'dist/training-preview.js', 'dist/training-resources.js', 'dist/content-pipeline-worker.cjs',
+    'dist/code-import.js', 'ui/code-ide.js', 'ui/code-ide.css', 'ui/code-ide-LICENSES.txt',
+    'ui/skill-graph-core.js', 'ui/skill-graph-editor.js', 'ui/skill-graph.css', 'dist/skill-graph.js',
+    'dist/source-flow.cjs', 'ui/source-flow.js', 'ui/source-flow.css',
+  ]) {
+    fs.writeFileSync(path.join(archiveSourceRoot, 'electron-editor', relative), 'fixture')
+  }
   fs.writeFileSync(
     path.join(archiveSourceRoot, 'package.json'),
     JSON.stringify({ main: 'electron-editor/dist/main.js' }),
@@ -115,6 +123,7 @@ describe('Electron editor packaging', () => {
       perMachine: false,
     })
     expect(extraResources.get('data')).toBe('app/data')
+    expect(extraResources.get('public')).toBe('app/public')
     expect(extraResources.get('scripts')).toBe('app/scripts')
     for (const packageName of EDITOR_RUNTIME_PACKAGES) {
       expect(extraResources.get(`node_modules/${packageName}`)).toBe(

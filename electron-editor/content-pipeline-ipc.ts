@@ -6,7 +6,7 @@ import {
 } from 'node:fs'
 
 type PlainRecord = Record<string, unknown>
-type EditorChannelV1 = 'local-dev' | 'qa' | 'stable' | 'community'
+type EditorChannelV1 = 'local-dev' | 'authoring' | 'qa' | 'stable' | 'community'
 type EditorCapabilityV1 =
   | 'game-data'
   | 'pve-content'
@@ -66,7 +66,7 @@ export type NormalizedEditorContentOperationV1 = NormalizedCommonV1 & (
   }>
 )
 
-const CHANNELS = new Set(['local-dev', 'qa', 'stable', 'community'])
+const CHANNELS = new Set(['local-dev', 'authoring', 'qa', 'stable', 'community'])
 const COMMON_KEYS = new Set([
   'operation',
   'taskId',

@@ -14,6 +14,7 @@ import {
 } from '../core/resolver'
 import type { ContentPackSourceV1 } from '../core/source'
 import type { ContentValidationPolicyV1 } from '../core/validator'
+import { readTrustedScriptPublishersV1 } from './script-publishers'
 import {
   createBundledBasePackInputV1,
   getBundledBaseProfileV1,
@@ -175,7 +176,7 @@ export function readProfileArchiveV1(archive: Uint8Array): ContentPackSourceV1 {
   }
 }
 
-function policyFor(allowLocalDevUnsigned: boolean): ContentValidationPolicyV1 {
+function policyFor(allowLocalDevUnsigned: boolean, appRoot: string): ContentValidationPolicyV1 & { kind: 'local-dev' | 'external' } {
   const expectedCompatibility = {
     engineAbi: PROFILE_ENGINE_ABI_V1,
     contentAbi: PROFILE_CONTENT_ABI_V1,
@@ -183,10 +184,10 @@ function policyFor(allowLocalDevUnsigned: boolean): ContentValidationPolicyV1 {
   if (allowLocalDevUnsigned) {
     return { kind: 'local-dev', expectedCompatibility, allowUnsigned: true }
   }
-  return { kind: 'external', expectedCompatibility }
+  return { kind: 'external', expectedCompatibility, trustedScriptPublisherKeyIds: readTrustedScriptPublishersV1(appRoot) }
 }
 
-function packageRoot(store: ProfileStoreV1, packageHash: string): string {
+function packageRoot(store: Pick<ProfileStoreV1, 'rootDir'>, packageHash: string): string {
   return path.join(store.rootDir, 'packages', packageHash)
 }
 
@@ -305,7 +306,7 @@ function walkPayload(root: string, directory = root): Array<{ path: string; byte
   return entries
 }
 
-function loadPackage(store: ProfileStoreV1, coordinate: ProfileResolutionPackageV1): ResolvePackInputV1 {
+function loadPackage(store: Pick<ProfileStoreV1, 'rootDir'>, coordinate: ProfileResolutionPackageV1, appRoot: string): ResolvePackInputV1 {
   if (coordinate.policy === 'bundled-base') {
     throw new ProfileStoreErrorV1('PROFILE_STATE_INVALID', 'bundled Base is reconstructed separately')
   }
@@ -341,6 +342,7 @@ function loadPackage(store: ProfileStoreV1, coordinate: ProfileResolutionPackage
       }
       : {
         kind: 'external',
+        trustedScriptPublisherKeyIds: readTrustedScriptPublishersV1(appRoot),
         expectedCompatibility: {
           engineAbi: PROFILE_ENGINE_ABI_V1,
           contentAbi: PROFILE_CONTENT_ABI_V1,
@@ -349,7 +351,7 @@ function loadPackage(store: ProfileStoreV1, coordinate: ProfileResolutionPackage
   }
 }
 
-function readParentResolution(store: ProfileStoreV1, parentHash: string): ProfileResolutionRecordV1 {
+function readParentResolution(store: Pick<ProfileStoreV1, 'rootDir'>, parentHash: string): ProfileResolutionRecordV1 {
   try {
     const value = JSON.parse(readFileSync(path.join(
       store.rootDir,
@@ -369,17 +371,28 @@ function readParentResolution(store: ProfileStoreV1, parentHash: string): Profil
 }
 
 function inputsFromResolution(
-  store: ProfileStoreV1,
+  store: Pick<ProfileStoreV1, 'rootDir'>,
   appRoot: string,
   resolution: ProfileResolutionRecordV1,
 ): { base: ResolvePackInputV1; patches: ResolvePackInputV1[] } {
   const base = resolution.base.policy === 'bundled-base'
     ? createBundledBasePackInputV1(appRoot)
-    : loadPackage(store, resolution.base)
+    : loadPackage(store, resolution.base, appRoot)
   return {
     base,
-    patches: resolution.patches.map(coordinate => loadPackage(store, coordinate)),
+    patches: resolution.patches.map(coordinate => loadPackage(store, coordinate, appRoot)),
   }
+}
+
+/** Rebuild the signed source chain using today's host-owned publisher list. */
+export function openInstalledProfileProvenanceV1(rootDir: string, appRoot: string, profileHash: string): ResolvedSnapshotViewV1 {
+  const store = { rootDir }
+  const resolution = readParentResolution(store, profileHash)
+  const view = resolveProfileV1(inputsFromResolution(store, appRoot, resolution))
+  if (view.profile.resolvedProfileHash !== profileHash) {
+    throw new ProfileStoreErrorV1('PROFILE_HASH_MISMATCH', 'signed profile provenance')
+  }
+  return view
 }
 
 export function installProfileArchiveV1(
@@ -398,7 +411,7 @@ export function installProfileArchiveV1(
       error instanceof Error ? error.message : String(error),
     )
   }
-  const policy = policyFor(options.allowLocalDevUnsigned === true)
+  const policy = policyFor(options.allowLocalDevUnsigned === true && source.signatureBytes === null, options.appRoot)
   const packageHash = computePackageHashV1(manifest)
   const coordinate: ProfileResolutionPackageV1 = {
     packageHash,

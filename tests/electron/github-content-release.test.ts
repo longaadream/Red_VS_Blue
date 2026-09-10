@@ -4,7 +4,7 @@ import { GithubContentRelease } from '../../electron-editor/github-content-relea
 
 const contentHash = 'a'.repeat(64)
 const asset = { name: 'content.rvbpack', bytes: new Uint8Array([1, 2, 3]) }
-function fixture() {
+function fixture(cacheReads = false) {
   const calls: { url: string; method: string }[] = []
   let release: Record<string, unknown> | null = null
   let assets: Record<string, unknown>[] = []
@@ -29,8 +29,24 @@ function fixture() {
     if (init.method === 'PATCH') release = { ...release, ...JSON.parse(String(init.body)) }
     return respond({ ...release, assets })
   }
-  return { calls, client: new GithubContentRelease(fetcher, 'owner/game', 'test-secret'), loseUploadResponse: () => { failAfterUpload = true }, alterAsset: () => { assets = assets.map(value => ({ ...value, digest: 'sha256:' + '0'.repeat(64) })) } }
+  const cache = new Map<string, Response>()
+  const cachedFetcher = async (url: string, init: RequestInit) => {
+    const fresh = init.cache === 'no-store' && new Headers(init.headers).get('Cache-Control') === 'no-cache'
+    if (!cacheReads || init.method !== 'GET' || fresh) return fetcher(url, init)
+    if (cache.has(url)) return cache.get(url)!.clone()
+    const result = await fetcher(url, init); cache.set(url, result.clone()); return result
+  }
+  return { calls, client: new GithubContentRelease(cachedFetcher, 'owner/game', 'test-secret'), loseUploadResponse: () => { failAfterUpload = true }, alterAsset: () => { assets = assets.map(value => ({ ...value, digest: 'sha256:' + '0'.repeat(64) })) } }
 }
+
+it('bypasses cached draft GET responses after publishing and while reconciling a retry', async () => {
+  const { client, calls } = fixture(true)
+  const input = { contentHash, notes: '缓存回归', assets: [asset] }
+  await expect(client.publish(input)).resolves.toMatchObject({ contentHash })
+  await expect(client.publish(input)).resolves.toMatchObject({ contentHash })
+  expect(calls.filter(call => call.method === 'POST')).toHaveLength(2)
+  expect(calls.filter(call => call.method === 'PATCH')).toHaveLength(1)
+})
 
 it('uploads to a draft, verifies bytes, and only then publishes; repeating does not upload or publish again', async () => {
   const { client, calls } = fixture()

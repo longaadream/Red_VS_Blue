@@ -1,4 +1,4 @@
 import { createColyseusBattleServer } from '../lib/server/colyseus/create-colyseus-server'
 
-export const { server, repository, journal, restoreProductRooms } = createColyseusBattleServer()
+export const { server, repository, journal, restoreProductRooms, updateAdmission } = createColyseusBattleServer()
 export default server

@@ -4,6 +4,7 @@ import {
   mkdirSync,
   readdirSync,
   readFileSync,
+  renameSync,
   rmSync,
   writeFileSync,
 } from 'node:fs'
@@ -13,7 +14,7 @@ import path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import type { PackCapabilityV1, PackFileMediaTypeV1 } from '@/lib/content-pipeline/contracts'
-import { sha256HexV1 } from '@/lib/content-pipeline/core/hash'
+import { sha256HexV1, computeResolvedProfileIdentitiesV1 } from '@/lib/content-pipeline/core/hash'
 import { resolveProfileV1, type ResolvedSnapshotViewV1 } from '@/lib/content-pipeline/core/resolver'
 import type { ContentPackSourceV1 } from '@/lib/content-pipeline/core/source'
 import {
@@ -354,6 +355,25 @@ describe('RED-115 Profile store and activation state', () => {
 
     expect(() => store.verifyReference(installed)).toThrow(/PROFILE_HASH_MISMATCH/)
     expect(() => store.verifyReference({ ...installed, capabilities: [] })).toThrow(/PROFILE_HASH_MISMATCH/)
+  })
+
+  it('rejects undeclared scripts even with self-consistent disk metadata and pointer hashes', () => {
+    const root = temporaryRoot()
+    const base = resolvedSnapshot({ packageId: 'rvb.base', marker: 27, jsonValue: 27 })
+    const store = createStore(root, base)
+    const installed = store.installCandidate(resolvedSnapshot({ packageId: 'rvb.tamper-script', marker: 28, jsonValue: 28 }))
+    const profileRoot = store.profileRoot(installed)!
+    const metadataPath = path.join(profileRoot, '.rvb/profile.json')
+    const metadata = JSON.parse(readFileSync(metadataPath, 'utf8'))
+    const bytes = encoder.encode('{"skillCode":"return 1"}')
+    writeFileSync(path.join(profileRoot, 'data/rules/profile.json'), bytes)
+    const descriptor = metadata.files.find((file: { descriptor: { path: string } }) => file.descriptor.path === 'data/rules/profile.json').descriptor
+    descriptor.size = bytes.length; descriptor.sha256 = sha256HexV1(bytes)
+    const derived = computeResolvedProfileIdentitiesV1({ schemaVersion: metadata.schemaVersion, compatibility: metadata.compatibility, capabilities: metadata.capabilities, base: metadata.base, patches: metadata.patches, files: metadata.files })
+    metadata.resolvedProfileHash = derived.resolvedProfileHash; metadata.authorityContentHash = derived.authorityContentHash
+    writeFileSync(metadataPath, JSON.stringify(metadata))
+    renameSync(profileRoot, path.join(root, 'profiles', derived.resolvedProfileHash))
+    expect(() => store.verifyReference({ ...installed, resolvedProfileHash: derived.resolvedProfileHash, authorityContentHash: derived.authorityContentHash })).toThrow('undeclared executable content')
   })
 
   it('recovers a corrupted installed stable pointer to Bundled Base before server startup', () => {

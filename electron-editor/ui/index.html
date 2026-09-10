@@ -9,6 +9,8 @@
 <script src="skill-graph-core.js"></script>
 <script src="skill-graph-editor.js"></script>
 <script src="source-flow.js"></script>
+<script src="code-ide.js"></script>
+<link rel="stylesheet" href="code-ide.css">
 <link rel="stylesheet" href="source-flow.css">
 <link rel="stylesheet" href="skill-graph.css">
 <style>
@@ -430,9 +432,9 @@ const EDITOR_TYPES = {
 
 const NEW_DOCUMENT_TEMPLATES = {
   pieces: (id, name) => ({ id, name, faction:'neutral', description:'', rarity:'common', image:'', stats:{maxHp:1,attack:0,defense:0,moveRange:1}, skills:[], rules:[], relatedCards:[], initialStatusTags:[], transformedSkills:[], progressiveDeployment:null, isDefault:false }),
-  skills: (id, name) => ({ id, name, description:'', keywords:[], targetText:'', effectTags:[], icon:'', kind:'active', type:'normal', form:null, cooldownTurns:0, maxCharges:0, chargeCost:0, powerMultiplier:1, actionPointCost:1, range:'single', areaSize:0, targetType:'piece', filter:'enemy', requiresTarget:true, targeting:null, showInUI:true, concealTargetInBattleLog:false, rollbackPendingTargetOnCancel:false, statusTag:null, summonCapability:null, chargeCostModifiers:[], code:'function executeSkill(context) {\n  return { success: true, message: "" };\n}', previewCode:'function calculatePreview(piece, skillDef) {\n  return { description: skillDef.description };\n}' }),
-  cards: (id, name) => ({ id, name, description:'', keywords:[], targetText:'', effectTags:[], type:'active', cardType:'neutral', actionPointCost:1, icon:'', image:'', isSample:false, trigger:null, targeting:null, summonCapability:null, code:'function executeCard(context) {\n  return { success: true, message: "" };\n}' }),
-  rules: (id, name) => ({ id, name, description:'', priority:0, trigger:{type:'gameStart'}, effect:null, targetValidation:null, limits:null, skillCode:'function executeRule(context) {\n  return { success: true, message: "" };\n}' }),
+  skills: (id, name) => ({ id, name, description:'', keywords:[], targetText:'', effectTags:[], icon:'', kind:'active', type:'normal', form:null, cooldownTurns:0, maxCharges:0, chargeCost:0, powerMultiplier:1, actionPointCost:1, range:'single', areaSize:0, targetType:'piece', filter:'enemy', requiresTarget:true, targeting:null, showInUI:true, concealTargetInBattleLog:false, rollbackPendingTargetOnCancel:false, statusTag:null, summonCapability:null, chargeCostModifiers:[], code:'function executeSkill(context) {\n  return { success: true };\n}' }),
+  cards: (id, name) => ({ id, name, description:'', keywords:[], targetText:'', effectTags:[], type:'active', cardType:'neutral', actionPointCost:1, icon:'', image:'', isSample:false, trigger:null, targeting:null, summonCapability:null, code:'function executeCard(context) {\n  return { success: true };\n}' }),
+  rules: (id, name) => ({ id, name, description:'', priority:0, trigger:{type:'gameStart'}, effect:null, targetValidation:null, limits:null, skillCode:'return { success: true };' }),
 }
 const COLLECTIONS = {}
 
@@ -459,6 +461,7 @@ function fieldMarkup(field, value) {
 function renderDocumentEditor({ subdir, item, data, dataMap, items, listController, isNew = false }) {
   const config = EDITOR_TYPES[subdir]
   const detailEl = document.getElementById(`${subdir}-detail`)
+  detailEl.codeIDE?.destroy()
   let saved = clone(data)
   let draft = clone(data)
   let pendingCreate = isNew
@@ -472,7 +475,7 @@ function renderDocumentEditor({ subdir, item, data, dataMap, items, listControll
     <nav class="editor-tabs" aria-label="编辑模式">${panes.map((mode,index) => `<button class="editor-mode ${index === 0 ? 'active' : ''}" data-editor-mode="${mode}">${({fields:'常用字段',graph:'流程图',code:'代码',json:'完整 JSON'})[mode]}</button>`).join('')}</nav>
     <section class="editor-pane active" data-editor-pane="fields"><div class="editor-help">修改会同步到完整 JSON，未展示的字段不会被删除。标签声明与技能逻辑分别编辑。</div><div data-visual-fields></div><div class="form-section grid2">${config.fields.map(field => fieldMarkup(field, getPath(draft, field[0]))).join('')}</div></section>
     ${['skills','rules'].includes(subdir) ? '<section class="editor-pane" data-editor-pane="graph"><div data-source-flow></div>' + (subdir === 'skills' ? '<details data-typed-graph><summary>类型化节点编程</summary><div data-skill-graph></div></details>' : '') + '</section>' : ''}
-    ${executableFields.length ? `<section class="editor-pane" data-editor-pane="code"><div class="editor-help">复杂效果仍使用代码字段。编辑器只负责保存文本，不执行代码。</div>${executableFields.map(field => `<div class="field-group"><label>${esc(field)}</label><textarea class="code-editor" data-code-field="${esc(field)}" spellcheck="false">${esc(draft[field] || '')}</textarea></div>`).join('')}</section>` : ''}
+    ${executableFields.length ? '<section class="editor-pane" data-editor-pane="code"><div class="editor-help">直接粘贴 AI 写好的 JavaScript。保存时自动写回 JSON，无需手写转义字符或维护额外 JS 文件。代码不会在编辑器中执行。</div><div data-code-ide></div></section>' : ''}
     <section class="editor-pane" data-editor-pane="json"><div class="editor-help">可直接修改任意字段。只有合法的 JSON 对象才能保存；格式错误时原文件保持不变。</div><div class="json-error" data-json-error></div><textarea class="json-editor" data-json-source spellcheck="false">${esc(serialized)}</textarea></section>
     <footer class="editor-footer"><span class="dirty-state" data-footer-state>${isNew ? '待创建' : '已保存'}</span><div class="footer-actions"><button class="btn btn-ghost" data-open-external ${isNew ? 'disabled' : ''}>外部打开</button><button class="btn btn-ghost" data-reset-document>恢复</button><button class="btn btn-ghost" data-format-json>格式化 JSON</button><button class="btn btn-primary" data-save-json>${isNew ? '创建文件' : '保存 JSON'}</button></div></footer>
   </article>`
@@ -482,6 +485,12 @@ function renderDocumentEditor({ subdir, item, data, dataMap, items, listControll
   const headerState = detailEl.querySelector('.editor-header .dirty-state')
   const footerState = detailEl.querySelector('[data-footer-state]')
   const saveButton = detailEl.querySelector('[data-save-json]')
+  const codeIDE = executableFields.length ? window.ContentCodeIDE.mount(detailEl.querySelector('[data-code-ide]'), {
+    category: subdir, primaryField: config.codeField, filename: item.filename,
+    getDraft: () => draft, onChange: syncDraft, importCode: api.importCode,
+    save: () => saveButton.click(),
+  }) : null
+  detailEl.codeIDE = codeIDE
   let visualEditor = null
   const graphEditor = subdir === 'skills' ? window.ContentSkillGraph.mount(detailEl.querySelector('[data-skill-graph]'), { getDraft: () => draft, onChange: syncDraft }) : null
   if (draft.skillGraph) detailEl.querySelector('[data-typed-graph]').open = true
@@ -550,7 +559,7 @@ function renderDocumentEditor({ subdir, item, data, dataMap, items, listControll
         const value = getPath(draft, input.dataset.fieldPath)
         input.value = input.dataset.valueType === 'boolean' ? String(Boolean(value)) : (value ?? '')
       })
-      detailEl.querySelectorAll('[data-code-field]').forEach(input => { input.value = draft[input.dataset.codeField] || '' })
+      codeIDE?.refresh()
       visualEditor?.refresh()
       graphEditor?.refresh()
       sourceFlow?.refresh()
@@ -563,7 +572,6 @@ function renderDocumentEditor({ subdir, item, data, dataMap, items, listControll
     setPath(draft, input.dataset.fieldPath, value)
     syncDraft(draft)
   })
-  detailEl.querySelectorAll('[data-code-field]').forEach(input => input.oninput = () => { draft[input.dataset.codeField] = input.value; syncDraft(draft) })
   jsonEl.addEventListener('input', validateSource)
   detailEl.querySelector('[data-format-json]').onclick = () => { const parsed = validateSource(); if (!parsed.error) syncDraft(parsed.value) }
   detailEl.querySelector('[data-reset-document]').onclick = () => renderDocumentEditor({ subdir, item, data:saved, dataMap, items, listController, isNew:pendingCreate })
@@ -575,9 +583,16 @@ function renderDocumentEditor({ subdir, item, data, dataMap, items, listControll
     detailEl.dataset.saving = 'true'
     const controls = [...detailEl.querySelectorAll('input, textarea, select, button')].map(node => [node, node.disabled])
     controls.forEach(([node]) => { node.disabled = true })
+    codeIDE?.setLocked(true)
     saveButton.disabled = true
     saveButton.textContent = '保存中…'
     try {
+      for (const field of ['code', 'skillCode', 'effectCode', 'previewCode']) {
+        if (Object.hasOwn(parsed.value, field) && parsed.value[field] !== saved[field]) {
+          const checked = await window.ContentCodeIDE.inspectCode(parsed.value[field], field)
+          if (checked.error) throw new Error(`${field} 第 ${checked.line} 行，第 ${checked.column} 列：${checked.error}`)
+        }
+      }
       if (pendingCreate) {
         await api.createFile(subdir, item.id, parsed.value)
         const snapshot = await api.readDocument(subdir, item.filename)
@@ -590,7 +605,7 @@ function renderDocumentEditor({ subdir, item, data, dataMap, items, listControll
       if (pendingCreate) { items.push(item); pendingCreate = false; detailEl.querySelector('[data-open-external]').disabled = false }
       listController.select(item.id); setStatus('已保存', 'valid'); toast(`${item.name} 已保存`)
     } catch (error) { toast('保存失败：' + error.message, 'error'); setStatus('保存失败', 'invalid') }
-    finally { delete detailEl.dataset.saving; controls.forEach(([node, disabled]) => { node.disabled = disabled }); saveButton.disabled = false; saveButton.textContent = pendingCreate ? '创建文件' : '保存 JSON'; if (!pendingCreate) detailEl.querySelector('[data-open-external]').disabled = false }
+    finally { delete detailEl.dataset.saving; controls.forEach(([node, disabled]) => { node.disabled = disabled }); codeIDE?.setLocked(false); saveButton.disabled = false; saveButton.textContent = pendingCreate ? '创建文件' : '保存 JSON'; if (!pendingCreate) detailEl.querySelector('[data-open-external]').disabled = false }
   }
   validateSource()
   if (isNew) detailEl.querySelector('[data-editor-mode="json"]').click()
@@ -832,7 +847,7 @@ initializeAssets().catch(error => toast('图片资源加载失败：' + error.me
   function common(operation) {
     const channelId = `${operation}-channel`
     const confirmId = `${operation}-confirm-stable`
-    const channel = operation === 'build' ? 'local-dev' : field(channelId)
+    const channel = operation === 'build' ? 'authoring' : field(channelId)
     return {
       operation,
       taskId: field('pipeline-task-id'),

@@ -1,0 +1,25 @@
+{
+  "runtimeBundle": "loaded real NsisUpdater",
+  "renderer": "real themed menu, sandboxed preload, settings/check/restart-request pass",
+  "layout": {
+    "buttonWidth": 36,
+    "buttonHeight": 36,
+    "x": 262,
+    "y": 138.1875,
+    "width": 460,
+    "height": 418.609375,
+    "viewportWidth": 984,
+    "viewportHeight": 695,
+    "checkY": 495.703125,
+    "closeY": 495.703125
+  },
+  "actualInstallation": false,
+  "publicResource": {
+    "phase": "waiting",
+    "message": "资源已下载，返回主菜单并退出房间后应用",
+    "checkedAt": "2026-09-10T13:31:05.643Z",
+    "version": "0.0.1789039264048"
+  },
+  "gameProxy": "DIRECT",
+  "updateProxy": "PROXY 127.0.0.1:7890"
+}

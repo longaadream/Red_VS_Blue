@@ -1,0 +1,15 @@
+.ide-toolbar { display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin-bottom:10px }
+.ide-toolbar select { flex:1; min-width:180px; background:#20252f; color:#e5e7eb; border:1px solid #424954; border-radius:6px; padding:8px }
+.ide-entry { color:#abb7c9; margin:8px 0 12px; font-size:12px; line-height:1.6 }
+.ide-host { border:1px solid #38404d; border-radius:8px; overflow:hidden }
+.ide-surface[hidden], .ide-imports[hidden] { display:none }
+.ide-status { padding:9px 11px; background:#18212b; color:#a8c9dc; font-size:11px; overflow-wrap:anywhere }
+.ide-shortcuts { color:#8291a7; font-size:11px; line-height:1.8; margin-top:8px }
+.ide-message { color:#e9c575; font-size:12px; line-height:1.7; margin:6px 0 }
+.ide-imports { padding:14px; background:#1a222c; border:1px solid #435467; border-radius:8px; margin-top:12px }
+.ide-imports select { display:block; width:100%; margin:10px 0; background:#101721; color:#eee; padding:8px }
+.ide-import-target { color:#b6d6ea; font-size:12px; overflow-wrap:anywhere }
+.ide-import-preview { max-height:220px; overflow:auto; white-space:pre; font:12px/1.6 Consolas,monospace; padding:10px; background:#0d131c }
+.ide-imports button { margin:6px 8px 0 0 }
+.ide-host .cm-content { min-height:100% }
+.ide-host .cm-tooltip { z-index:100 }

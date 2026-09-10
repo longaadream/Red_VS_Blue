@@ -17,6 +17,10 @@ function createFixture() {
   const publicSourceRoot = path.join(root, 'public')
   const requiredFiles = [
     'resources/app/electron-client/dist/main.js',
+    'resources/app/electron-client/dist/update-runtime.cjs',
+    'resources/app/electron-client/dist/official-resource-updates.js',
+    'resources/app/electron-client/dist/update-runtime-LICENSES.txt',
+    'resources/app-update.yml',
     'resources/app/standalone/server.js',
     'resources/app/standalone/node_modules/next/package.json',
     'resources/app/standalone/colyseus/colyseus-server.mjs',

@@ -39,7 +39,7 @@
     </article>`).join('') : '<div class="wb-card"><h3>没有待接受的修改</h3><p class="wb-copy">让你使用的 AI 修改内容文件夹，变化会自动出现在这里。已接受版本可以在“版本与发布”中查看。</p></div>'}`
   }
   function tests() {
-    return `<div class="wb-card"><h3>训练营试玩</h3><p class="wb-copy">加载候选资源后，进入训练营自行配置场景。</p><div class="wb-actions"><button class="btn btn-primary" disabled aria-describedby="training-gap">打开训练营</button></div><p id="training-gap" class="wb-copy">当前客户端缺少编辑器候选交接接口，暂不能一键加载。本次不修改客户端主进程或引擎，因此不会用旧内容冒充候选。下方可以保存尚未执行的场景和反馈。</p></div>
+    return `<div class="wb-card"><h3>训练营试玩</h3><p class="wb-copy">打开已接受版本，在独立训练营窗口中自行配置场景。</p><div class="wb-actions"><button class="btn btn-primary" data-wb="training" ${busy ? 'disabled' : ''}>打开训练营</button></div><p class="wb-copy">试玩版本：${escape(state.acceptedHash.slice(0, 12))}。未接受的修改不会进入试玩；改完后接受修改，再重新打开即可。关闭窗口结束本次试玩，不影响玩家客户端。</p></div>
       <div class="wb-card"><h3>把想验证的玩法留下来</h3><p class="wb-copy">场景条件、操作和预期会随反馈交给 AI，后续无需重新描述。</p>
       <form class="wb-form" id="wb-scenario-form" style="margin-top:16px">
         <label>场景条件<textarea name="setup" required maxlength="12000" placeholder="例如：战士 40/100 血量，敌人相邻且没有护盾">${escape(scenarioDraft.setup)}</textarea></label>
@@ -143,6 +143,7 @@
         break
       }
       case 'export': void run(async () => { const result = await api.workbenchExport(current(), state.acceptedHash, releaseDraft); status = result.path }, ''); break
+      case 'training': void run(async () => { status = '正在准备已接受资源并打开训练营…'; const result = await api.workbenchTraining(current(), state.acceptedHash); status = `已打开训练营 · 版本 ${result.contentHash.slice(0, 12)}。请在试玩窗口配置场景，完成后在这里记录反馈。` }, ''); break
       case 'publish': void run(() => window.openContentPublication(api, { id: current(), acceptedHash: state.acceptedHash, notes: releaseDraft.trim() || state.task.title, pendingCount: state.changes.length })); break
       case 'settings': void run(() => window.openPublicationSettings(api)); break
       case 'new': createDialog(); break

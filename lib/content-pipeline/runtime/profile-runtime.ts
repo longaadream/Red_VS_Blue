@@ -5,6 +5,7 @@ import path from 'node:path'
 import { getAppRoot, getUserDataDir } from '@/lib/app-paths'
 
 import { getBundledBaseProfileV1 } from './bundled-base'
+import { openInstalledProfileProvenanceV1 } from './profile-archive'
 import type { ResolvedSnapshotViewV1 } from '../core/resolver'
 import {
   classifyProfileReloadV1,
@@ -78,6 +79,7 @@ export function getProfileRuntimeContextV1(): ProfileRuntimeContextV1 {
     store: new ProfileStoreV1({
       rootDir: path.join(writable, 'resource-pack'),
       bundledBase: getBundledBaseProfileV1(root),
+      openScriptProvenance: hash => openInstalledProfileProvenanceV1(path.join(writable, 'resource-pack'), root, hash),
     }),
   }
   globalThis.__rvbProfileRuntimeContextV1 = context

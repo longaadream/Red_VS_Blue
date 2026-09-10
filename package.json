@@ -19,10 +19,10 @@
     "lint:content-pipeline": "eslint lib/content-pipeline/tooling electron-editor/main.ts electron-editor/preload.ts electron-editor/content-pipeline-ipc.ts electron-editor/content-pipeline-worker.ts scripts/rvb.mjs scripts/build-resource-pack.js tests/content-pipeline/tooling.test.ts tests/electron/editor-content-pipeline.test.ts tests/electron/windows-smoke.mjs --max-warnings 0 --suppressions-location tests/content-pipeline/empty-eslint-suppressions.json",
     "lint:prune": "eslint . --max-warnings 0 --prune-suppressions",
     "build:electron": "npm run build:electron:client",
-    "build:electron:client": "npm run build && npm run build:colyseus && npm run prepare:embedded-postgres && node scripts/stage-client-resources.js && npx tsc -p electron-client/tsconfig.json && electron-builder --config config/electron-builder.client.json && node scripts/verify-electron-client-package.js && npm run verify:embedded-postgres && node scripts/cleanup-client-resources.js",
+    "build:electron:client": "npm run build && npm run build:colyseus && npm run prepare:embedded-postgres && node scripts/stage-client-resources.js && npm run build:client-updater && npx tsc -p electron-client/tsconfig.json && electron-builder --publish never --config config/electron-builder.client.json && node scripts/verify-electron-client-package.js && npm run verify:embedded-postgres && node scripts/cleanup-client-resources.js",
     "preflight:electron:client": "node scripts/check-worktree-environment.mjs electron-client",
     "preflight:electron:editor": "node scripts/check-worktree-environment.mjs electron-editor",
-    "dev:electron:client": "npm run build:practice-ai && npm run preflight:electron:client && npm run build:colyseus && npm run prepare:embedded-postgres && npx tsc -p electron-client/tsconfig.json && npx electron electron-client/dist/main.js",
+    "dev:electron:client": "npm run build:practice-ai && npm run preflight:electron:client && npm run build:colyseus && npm run prepare:embedded-postgres && npm run build:client-updater && npx tsc -p electron-client/tsconfig.json && npx electron electron-client/dist/main.js",
     "build:game-engine": "npm run build:practice-ai && node scripts/build-game-engine.js",
     "build:mobile-server": "node scripts/build-mobile-server.js",
     "build:crypto-lib": "node scripts/build-crypto-lib.js",
@@ -63,7 +63,8 @@
     "test:official": "vitest run tests/colyseus/official-ranked.test.ts --maxWorkers=1",
     "smoke:official:load": "node scripts/run-official-load-smoke.mjs",
     "smoke:official:windows": "npm run build:official && vitest run tests/colyseus/official-windows.test.ts --maxWorkers=1",
-    "package:official": "node scripts/package-official-candidate.mjs"
+    "package:official": "node scripts/package-official-candidate.mjs",
+    "build:client-updater": "npm ci --prefix electron-client/update-runtime --ignore-scripts --no-audit --no-fund && node scripts/build-client-updater.mjs"
   },
   "dependencies": {
     "@colyseus/schema": "5.0.25",
