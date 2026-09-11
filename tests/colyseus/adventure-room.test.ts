@@ -1,7 +1,7 @@
 import { getProfileLeaseReportV1 } from '@/lib/content-pipeline/runtime/profile-runtime'
 import { createServer } from 'node:net'
 import { Client } from '@colyseus/sdk'
-import { describe,expect,it } from 'vitest'
+import { describe,expect,it,vi } from 'vitest'
 import { createColyseusBattleServer } from '@/lib/server/colyseus/create-colyseus-server'
 import { getServerGameProfileIdentityV1 } from '@/lib/content-pipeline/runtime/profile-game-identity'
 import type { AdventureRepository,AdventureReceipt,AdventureStoredRun } from '@/lib/server/colyseus/adventure-store'
@@ -64,6 +64,11 @@ describe('real adventure SDK transport',()=>{
       expect(view.snapshot?.world.canSave).toBe(true)
       await expect(g('save')).rejects.toThrow('房主')
       await h('save');expect((await store.get(view.runId))?.saved).not.toBeNull()
+      await h('save');expect((await store.get(view.runId))?.saved?.revision).toBe(view.snapshot?.revision)
+      const reads=vi.spyOn(store,'get')
+      await h('snapshot');await g('snapshot')
+      expect(reads).not.toHaveBeenCalled()
+      reads.mockRestore()
       expect((await g('snapshot')).snapshot?.revision).toBe(view.snapshot?.revision)
       const restoredRoom=await sdk.create('adventure',{playerId:'host',profileIdentity})
       const restore=bind(restoredRoom)

@@ -19,11 +19,12 @@ window.renderAdventureRoomStatus = function (value) {
     const saved = document.createElement('p'); saved.textContent = value.savedAt ? '上次保存：' + new Date(value.savedAt).toLocaleString() : '尚未保存'
     const save = adventureButton('保存冒险', async () => {
       save.disabled = true
-      try { await adventureClient.network.request('save'); saved.textContent = '已保存' }
-      catch (error) { saved.textContent = error.message; save.disabled = false }
+      try { await adventureClient.network.request('save'); saved.textContent = '已新增独立存档' }
+      catch (error) { saved.textContent = error.message }
+      finally { save.disabled = !adventureSnapshot?.world.canSave }
     })
     save.disabled = value.hostId !== value.playerId || !adventureSnapshot?.world.canSave
-    const hint = document.createElement('p'); hint.textContent = '所有战区和奖励结算后由房主保存。房主服务关闭后，从最近存档继续。'
+    const hint = document.createElement('p'); hint.textContent = '结算后由房主保存，每次保留独立记录。返回冒险准备，可选择旧进度继续。'
     body.append(order, saved, save, hint)
     if(value.hostId===value.playerId)for(const incoming of value.waiting || []) {
       const row=document.createElement('p');row.textContent=incoming.name+' 希望加入'

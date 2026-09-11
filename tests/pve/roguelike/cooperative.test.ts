@@ -104,3 +104,22 @@ describe('cooperative adventure authority',()=>{
     expect(session.canSave()).toBe(false)
   }, 15000)
 })
+
+it('keeps movement presentation in every viewer snapshot without saving transient events', async () => {
+  const {session}=await setup(2)
+  let snap=session.snapshot()
+  const owner=snap.inputOwner
+  if(snap.state.turn.phase==='start')snap=session.human({type:'beginPhase'},snap.revision,owner)
+  snap=session.snapshot(owner)
+  const pieceId=snap.world.captainId, [toX,toY]=snap.legalMoves[pieceId][0].split(',').map(Number)
+  session.human({type:'move',pieceId,toX,toY,playerId:owner},snap.revision,owner)
+  for(const id of snap.world.order){
+    const view=session.snapshot(id)
+    expect(view.action).toMatchObject({type:'move',pieceId,toX,toY})
+    expect(view.events.length).toBeGreaterThan(0)
+    view.events.length=0
+    expect(session.snapshot(id).events.length).toBeGreaterThan(0)
+  }
+  const restored=CooperativeAdventureSession.restoreAggregate(session.exportAggregate())
+  expect(restored.snapshot().events).toEqual([])
+})

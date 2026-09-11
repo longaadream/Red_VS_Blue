@@ -85,7 +85,7 @@ async function listAdventureSaves() {
     const saves = await adventureLobby.request('saves'); list.replaceChildren()
     if (!saves.length) { list.textContent = '还没有这台服务器上的旅途存档。'; return }
     for (const save of saves) {
-      const button = lobbyNode('button', '第 ' + save.actNumber + ' 幕 · ' + new Date(save.savedAt).toLocaleString())
+      const button = lobbyNode('button', (save.kind === 'manual' ? '手动存档' : '自动存档') + ' · 第 ' + save.actNumber + ' 幕 · ' + new Date(save.savedAt).toLocaleString() + ' · 进度 ' + save.revision)
       button.onclick = () => { lobbyElement('saveDialog').close(); void startAdventure(save.runId) }; list.append(button)
     }
   } catch (error) { list.textContent = error.message }

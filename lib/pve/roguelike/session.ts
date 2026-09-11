@@ -69,6 +69,7 @@ export class AdventureSession {
     adventureBoundary(this.state)!.campaignHasNext = !!content.nextActs?.length
     this.initial = safeCloneBattleState(this.state)
   }
+  get currentRevision() { return this.revision }
   snapshot() {
     if(this.insightRevision!==this.revision){this.insightCache.clear();this.threatCache=undefined;this.insightRevision=this.revision}
     if(!this.insightCache.has(this.playerId))this.insightCache.set(this.playerId,{counters:adventureCardCounters(this.state,this.playerId),forecast:this.threatCache??(this.threatCache=forecastAdventureThreats(this.state))})
@@ -210,13 +211,13 @@ export class AdventureSession {
     this.state = state; this.progress = progress; this.revision++
     this.progress.log = this.progress.log.slice(0, 20)
     this.receipts.push({ revision: this.revision, command: copy(command), before, after: hashBattleState(state), world: copy(progress) })
-    return { ...this.snapshot(), action, events }
+    return { ...this.snapshot(), action, events: projectBattlePresentationEventsForViewer(events as Parameters<typeof projectBattlePresentationEventsForViewer>[0], this.playerId) }
   }
   protected apply(action: BattleAction, stage = safeCloneBattleState(this.state), progress = copy(this.progress)) {
     const before = stage
     const result = recordBattlePresentation(before, () => runBattleActionIsolated(before, action, { rootSeed: this.content.party.seed }), r => r.state)
-    const events = projectBattlePresentationEventsForViewer(projectBattlePresentationEvents({
-      actionId: `adventure-${this.revision + 1}`, command: action, beforeState: before, afterState: result.state }), this.playerId)
+    const events = projectBattlePresentationEvents({
+      actionId: `adventure-${this.revision + 1}`, command: action, beforeState: before, afterState: result.state })
     return this.commit(result.state, progress, action, action, events)
   }
   human(action: BattleAction, revision: number) {

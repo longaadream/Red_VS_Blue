@@ -99,19 +99,37 @@ export function createAdventureRoomClass(dependencies:{store?:AdventureRepositor
     onDispose(){this.disposed=true;releaseAdventureLease(this.roomId)}
     private seatFor(identity:string){
       if(!this.session)return this.seats.has(identity)?identity:undefined
-      const coop=this.session.exportAggregate().state.extensions!.adventureWorld.coop
+      const coop=this.aggregate().state.extensions!.adventureWorld.coop
       return coop.humanIds.find((id:string)=>(coop.controllers?.[id]??id)===identity) as string|undefined
     }
     private view(id:string){
       const seat=this.seatFor(id)
-      const controllers=this.session?.exportAggregate().state.extensions!.adventureWorld.coop.controllers??{}
+      const controllers=(this.session?this.aggregate():undefined)?.state.extensions!.adventureWorld.coop.controllers??{}
       return {roomId:this.roomId,runId:this.runId,hostId:this.hostId,playerId:id,
         seats:[...this.seats.values()].map(s=>({...s,ready:this.ready.has(s.playerId),connected:!this.offline.has(controllers[s.playerId]??s.playerId)})),waiting:[...this.waiting.values()],
-        snapshot:seat?this.session?.snapshot(seat):undefined}
+        snapshot:seat&&this.session?this.snapshotFor(seat):undefined}
+    }
+    private cacheSession?: CooperativeAdventureSession
+    private cacheRevision=-1
+    private cachedAggregate?: ReturnType<CooperativeAdventureSession['exportAggregate']>
+    private views=new Map<string,ReturnType<CooperativeAdventureSession['snapshot']>>()
+    private savedMetadataRun=''
+    private savedMetadata:{savedAt:string|null;savedRevision?:number}={savedAt:null}
+    private aggregate(){
+      if(this.cacheSession!==this.session||this.cacheRevision!==this.session!.currentRevision){
+        this.cacheSession=this.session;this.cacheRevision=this.session!.currentRevision
+        this.cachedAggregate=this.session!.exportAggregate();this.views.clear()
+      }
+      return this.cachedAggregate!
+    }
+    private snapshotFor(id?:string){
+      const aggregate=this.aggregate(),viewer=id??aggregate.playerId
+      if(!this.views.has(viewer))this.views.set(viewer,this.session!.snapshot(viewer))
+      return this.views.get(viewer)!
     }
     private async publish(){
       if(this.disposed)return
-      const coop=this.session?.exportAggregate().state.extensions!.adventureWorld.coop
+      const coop=(this.session?this.aggregate():undefined)?.state.extensions!.adventureWorld.coop
       const connected=(id:string)=>!this.offline.has(id)&&[...this.playerByClient.values()].includes(id)
       const online=[...this.seats.keys()].filter(id=>connected(coop?.controllers?.[id]??id)).length
       const hostOnline=connected(this.hostId)
@@ -122,8 +140,11 @@ export function createAdventureRoomClass(dependencies:{store?:AdventureRepositor
         takeoverAvailable:Boolean(coop?.absent.length),
         teams:[...this.seats.values()].map(s=>({name:s.name,familyId:s.familyId,ready:this.ready.has(s.playerId)})),
       } })
-      const saved=this.runId?await dependencies.store!.get(this.runId):undefined
-      for(const client of this.clients){const id=this.playerByClient.get(client.sessionId);if(id)client.send('adventure.state',{...this.view(id),savedAt:saved?.savedAt,savedRevision:saved?.saved?.revision})}
+      if(this.runId&&this.savedMetadataRun!==this.runId){
+        const saved=await dependencies.store!.get(this.runId)
+        this.savedMetadata={savedAt:saved?.savedAt??null,savedRevision:saved?.saved?.revision};this.savedMetadataRun=this.runId
+      }
+      for(const client of this.clients){const id=this.playerByClient.get(client.sessionId);if(id)client.send('adventure.state',{...this.view(id),...this.savedMetadata})}
     }
     private async request(client:Client,message:Request){
       assertGameProfileCompatibleV1(message?.profileIdentity)
@@ -177,7 +198,8 @@ export function createAdventureRoomClass(dependencies:{store?:AdventureRepositor
       if(message.type==='save'){
         if(actor!==this.hostId)throw new Error('仅房主可以保存')
         createAdventureCheckpoint(this.session)
-        await dependencies.store!.save(this.runId,actor,this.session.snapshot(seat!).revision)
+        await dependencies.store!.save(this.runId,actor,this.snapshotFor(seat!).revision)
+        this.savedMetadata={savedAt:new Date().toISOString(),savedRevision:this.session.currentRevision}
         await this.publish();return this.view(actor)
       }
       if(message.type==='receipt')return await dependencies.store!.receipt(this.runId,actor,String(payload.actionId))??this.failures.get(`${actor}:${payload.actionId}`)??{status:'unknown'}
@@ -201,18 +223,20 @@ export function createAdventureRoomClass(dependencies:{store?:AdventureRepositor
         if(message.type==='takeover'){this.waiting.delete(String(payload.playerId));await this.publish()}
         return this.view(actor)
       }catch(error){
-        const receipt:AdventureReceipt={actor,actionId:message.actionId,fingerprint,revision:this.session.snapshot().revision,status:'rejected',error:error instanceof Error?error.message:String(error)}
+        const receipt:AdventureReceipt={actor,actionId:message.actionId,fingerprint,revision:this.snapshotFor().revision,status:'rejected',error:error instanceof Error?error.message:String(error)}
         if(this.failures.size>256)this.failures.delete(this.failures.keys().next().value!)
         this.failures.set(`${actor}:${message.actionId}`,receipt);throw error
       }
     }
     private async accept(candidate:CooperativeAdventureSession,receipt:AdventureReceipt){
-      const before=this.session!.snapshot().revision
+      const before=this.snapshotFor().revision
       const save=candidate.canSave()&&candidate.exportAggregate().checkpointPending
       if(save)candidate.markCheckpointSaved()
       const checkpoint=createAdventureCheckpoint(candidate,false)
       await dependencies.store!.commit(this.runId,before,checkpoint,receipt,save)
-      this.session=candidate;await this.publish()
+      this.session=candidate
+      if(save)this.savedMetadata={savedAt:new Date().toISOString(),savedRevision:checkpoint.revision}
+      await this.publish()
     }
     private async tick(){
       if(this.disposed)return
@@ -227,12 +251,12 @@ export function createAdventureRoomClass(dependencies:{store?:AdventureRepositor
       }
       if(!this.session)return
       if(![...this.playerByClient.values()].some(id=>!this.offline.has(id)&&this.seatFor(id)))return
-      const snapshot=this.session.snapshot(),state=snapshot.state
+      const snapshot=this.snapshotFor(),state=snapshot.state
       if(state.terminalResult)return
       const owner=snapshot.inputOwner
-      const coop=this.session.exportAggregate().state.extensions!.adventureWorld.coop
+      const coop=this.aggregate().state.extensions!.adventureWorld.coop
       const offline=(id:string)=>{const controller=coop.controllers?.[id]??id;return this.offline.has(controller)&&Date.now()-this.offline.get(controller)!>30000}
-      const waiting=(coop.humanIds as string[]).find(id=>offline(id)&&hasAdventureCardChoice(this.session!.exportAggregate().state,id))
+      const waiting=(coop.humanIds as string[]).find(id=>offline(id)&&hasAdventureCardChoice(this.aggregate().state,id))
       if(waiting&&!state.pendingOptionSelection&&!state.pendingTargetSelection){
         const candidate=restoreAdventureCheckpoint(createAdventureCheckpoint(this.session,false),getServerGameProfileIdentityV1(),false)
         candidate.skipDisconnected(waiting)

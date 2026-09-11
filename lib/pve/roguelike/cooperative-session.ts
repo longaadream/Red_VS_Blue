@@ -1,3 +1,4 @@
+import { projectBattlePresentationEventsForViewer, type BattlePresentationEvent } from '../../game/battle-presentation-events'
 import { AdventureSession, type WorldProgress } from './session'
 import { adventureContent, adventureSupplies, ENEMY, createAdventureMap } from './content'
 import { enemyTemplates, enemySkills, strengthenEliteGuards, completedAdventureRounds, upgradeWaitingEnemies } from './enemies'
@@ -73,6 +74,7 @@ export class CooperativeAdventureSession extends AdventureSession {
     for (const id of coop.humanIds) this.personal[id] = emptyProgress()
     this.select(coop.humanIds[0])
   }
+  private transition: { action?: BattleAction; events: BattlePresentationEvent[] } = { events: [] }
   protected select(id: string) {
     if (!this.personal[id]) throw new Error('玩家不属于本次冒险')
     selectAdventureActor(this.state,id)
@@ -92,7 +94,7 @@ export class CooperativeAdventureSession extends AdventureSession {
       if (publicWorld.coop) for (const id of coop.humanIds) if (id !== viewerId) publicWorld.coop.parties[id].reserves = []
       const publicCards=adventureCards(result.state)
       if(publicCards){publicCards.players={[viewerId]:publicCards.players[viewerId]};publicCards.rewards=publicCards.rewards?.[viewerId]?{[viewerId]:publicCards.rewards[viewerId]}:{}}
-      return { ...result, world: { ...result.world, worldRound:completedAdventureRounds(this.state)+1,
+      return { ...result, action: this.transition.action, events: projectBattlePresentationEventsForViewer(this.transition.events, viewerId), world: { ...result.world, worldRound:completedAdventureRounds(this.state)+1,
         plans:Object.values(coop.encounters).flatMap(e=>e.plans).concat(this.patrolPlans),
         stage:`第 ${this.actIndex+1} 幕 · 合作冒险`,
         encounters:copy(Object.values(coop.encounters)), order:[...coop.order],
@@ -305,7 +307,8 @@ export class CooperativeAdventureSession extends AdventureSession {
     if(action && state.turn.currentPlayerId===ENEMY && 'pieceId' in action)this.patrolPlans=this.patrolPlans.filter(p=>p.sourceId!==action.pieceId)
     this.state=state;this.personal=personal;this.cleared=[...new Set(cleared)];this.revision++
     this.select(this.playerId)
-    return {...this.snapshot(),action,events}
+    this.transition = { action: action && ['move','useBasicSkill','useChargeSkill','playCard','beginPhase','endTurn'].includes(action.type) ? action : action ? { type: action.type } as BattleAction : undefined, events: events as BattlePresentationEvent[] }
+    return this.snapshot()
   }
   override step(revision: number) {
     this.check(revision)

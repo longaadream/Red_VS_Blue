@@ -26,3 +26,20 @@
 
 ## 桌面客户端启动修复
 真实客户端首次启动健康检查错误地将 PVE 专属怪加入 createDebugDuel 的 PVP 自动阵容，导致 PROFILE_STARTUP_RECOVERY_HEALTH_MISMATCH。自动补位现按 availability 过滤，显式指定仍保留权威拒绝。debug-battle 13项测试、定向 ESLint 与客户端构建通过，独立审查无阻断项。使用独立 output/pve-client-acceptance 用户目录进行桌面验收。
+
+## 客户端反馈：广播、动画与独立存档
+
+用户批准每次手动保存保留独立记录，并从列表选择旧进度。范围限定 adventure 会话、Colyseus 存储/广播和对应页面；不改伤害、奖励或平衡。风险 High（新增存储表），checkpoint v1 不变。基线仍为 53c2c9ca3eef73d2158645b93138e242c225c604，2026-09-12 fetch 与 main-baseline 通过。
+
+- 广播不再每次读回整份 PostgreSQL 存档；aggregate 和各玩家 snapshot 按 session 实例及 revision 缓存。每条命令仍等待持久提交后确认。尚未测得真实客户端帧率或操作延迟，不能据此宣称卡顿全部消除。
+- 合作会话保存本次动作与表现事件，每个接收玩家分别过滤私有事件。事件不写入存档；页面忽略同 revision 的广播/RPC 重复结果，避免动画重复播放。
+- 手动保存以单条 SQL 原子更新最近进度并追加 rvb_adventure_saves，重复点击生成不同 ID。自动保存继续保留每个 run 的最新进度；列表隐藏已被同版本手动记录包含的自动副本。旧 run ID 继续可读，加载历史后创建新的 run。列表只查询标量，不返回全部存档 JSON。
+- 保存成功后按钮恢复可用，列表标明手动/自动、幕数、时间和进度版本。
+
+验收：真实 Colyseus SDK 与合作会话 11 项通过；真实内置 PostgreSQL 测试通过（连续保存、越权/过期拒绝、推进后旧快照不变、数据库重启后恢复）。最初沙箱内 PostgreSQL 无法启动，使用隔离临时实例在正常权限下验证通过，不接触用户当前数据库。独立 AI 审查未发现阻断问题。
+
+最终复验：17 文件 146 项探索与 Colyseus 回归通过；全项目 tsc、定向 ESLint、浏览器引擎/Colyseus/Next 客户端构建和 Electron preflight 通过。日志位于 output/pve-roguelike/feedback-regression.log、save-history-postgres.log、save-history-types.log、save-history-lint.log 及 feedback-*-build.log。
+
+人工步骤：结算后连续保存两次；推进后再保存；返回冒险准备的“继续存档”，选择最早记录，确认地图/资源回到对应进度。双客户端观察移动与攻击动画，并比较操作等待。当前正在运行的旧客户端不会自动加载新服务器代码，需用户保存并退出后再重启验收。
+
+回退：撤销本轮代码提交即可恢复旧逻辑，保留新增表和历史记录，不删除或修改用户数据。旧版只能显示最近进度，重新升级后历史再次可见。新增表为启动时幂等创建，无 checkpoint 格式迁移。

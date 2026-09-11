@@ -24,6 +24,7 @@ function pauseAdventure(error) {
   render()
 }
 function acceptAdventureSnapshot(result) {
+  if (adventureSnapshot && result.revision <= adventureSnapshot.revision) return
   const old = G
   if (result.content) {
     const files = {}
