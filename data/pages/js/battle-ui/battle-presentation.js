@@ -204,6 +204,8 @@
       const mountInput = mountOptions || {}
       boardContainer = mountInput.boardContainer
       const doc = boardContainer && boardContainer.ownerDocument
+      mounted = true
+      try {
       if (doc) ['pointerdown', 'click', 'contextmenu', 'keydown'].forEach(function (type) { doc.addEventListener(type, guardHistoryInput, true) })
       renderer.init({
         container: mountInput.boardContainer,
@@ -239,7 +241,10 @@
           },
         })
       }
-      mounted = true
+      } catch (error) {
+        try { dispose() } catch (cleanupError) { console.error('[battle-presentation] mount cleanup failed', cleanupError) }
+        throw error
+      }
     }
 
     function update(model) {
@@ -298,6 +303,7 @@
       if (historyUi && historyUi.resize) historyUi.resize()
     }
     function resetView() { if (mounted && renderer.resetView) renderer.resetView() }
+    function zoomBy(factor) { if (mounted && renderer.zoomBy) renderer.zoomBy(factor) }
     function projectCell(x, y, elevation) { return renderer.projectCell(x, y, elevation) }
     function screenToCell(clientX, clientY) { return renderer.screenToCell(clientX, clientY) }
 
@@ -324,6 +330,7 @@
       dispatch: dispatch,
       resize: resize,
       resetView: resetView,
+      zoomBy: zoomBy,
       projectCell: projectCell,
       screenToCell: screenToCell,
       dispose: dispose,

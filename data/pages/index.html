@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <title>RED vs BLUE</title>
   <script src="js/pack-fetch.js"></script>
   <script src="js/server-utils.js"></script>
@@ -359,6 +359,7 @@
     .btn-ghost:active { opacity: .7; }
 
     /* ── LAN scan sheet ── */
+    #lanOverlay .sheet { max-height: calc(100dvh - 24px); overflow-y: auto; }
     .lan-progress-bar { height: 3px; background: #1e293b; border-radius: 2px; margin-bottom: 14px; overflow: hidden; }
     .lan-progress-fill { height: 100%; background: #3b82f6; border-radius: 2px; transition: width .3s; width: 0; }
     .lan-server-list { max-height: 220px; overflow-y: auto; margin-bottom: 12px; }
@@ -581,6 +582,11 @@
         <button onclick="closeLanSheet()" style="background:transparent;border:none;color:#64748b;font-size:22px;line-height:1;cursor:pointer;padding:0 4px">×</button>
       </div>
       <p id="lanSubtitle">正在扫描局域网内的游戏服务器…</p>
+      <form onsubmit="event.preventDefault(); connectLanServer(document.getElementById('lanManualUrl').value)" style="display:flex;gap:8px;margin:10px 0">
+        <input id="lanManualUrl" type="text" inputmode="url" aria-label="房主地址" placeholder="房主显示的 IP:端口" style="min-width:0;flex:1;min-height:44px;padding:8px" />
+        <button class="btn-primary" type="submit" style="min-height:44px;padding:8px 14px">直连</button>
+      </form>
+      <div id="lanConnectError" role="alert" style="display:none;margin-bottom:8px"></div>
       <div class="lan-progress-bar"><div class="lan-progress-fill" id="lanProgressFill"></div></div>
       <div class="lan-scanning" id="lanScanningRow"><span class="spin">⟳</span><span id="lanScanningText">快速扫描中（约10秒）…</span></div>
       <div class="lan-server-list" id="lanServerList">
@@ -696,25 +702,26 @@
       document.getElementById('hostStopBtn').style.display = 'none'
 
       // Electron: query local server info
-      if (window.electronAPI && window.electronAPI.getHostInfo) {
+      if ((window.RvBHost || window.electronAPI) && (window.RvBHost || window.electronAPI).getHostInfo) {
         try {
-          let info = await window.electronAPI.getHostInfo()
+          let info = await (window.RvBHost || window.electronAPI).getHostInfo()
           let retryResult = null
-          if (!info?.running && forceRetry === true && typeof window.electronAPI.ensureLocalAuthority === 'function') {
-            retryResult = await window.electronAPI.ensureLocalAuthority()
-            info = await window.electronAPI.getHostInfo()
+          if (!info?.running && (forceRetry === true || !!window.RvBHost) && typeof (window.RvBHost || window.electronAPI).ensureLocalAuthority === 'function') {
+            retryResult = await (window.RvBHost || window.electronAPI).ensureLocalAuthority()
+            info = await (window.RvBHost || window.electronAPI).getHostInfo()
           }
           if (info && info.running) {
             const port = info.port || 3000
             _hostServerUrl = 'http://localhost:' + port
             const ips = (info.ips || []).map(ip => `http://${ip}:${port}`)
             // 启动 UDP 广播，让同局域网的安卓/Windows 设备可以自动发现
-            if (window.electronAPI.startHostBroadcast) window.electronAPI.startHostBroadcast()
+            if ((window.RvBHost || window.electronAPI).startHostBroadcast) (window.RvBHost || window.electronAPI).startHostBroadcast()
             document.getElementById('hostStatus').innerHTML = '<span style="color:#22c55e">✓ 服务器已运行</span>'
             document.getElementById('hostIpBox').style.display = 'block'
             document.getElementById('hostIpList').innerHTML = ips.map(ip => `<div style="cursor:pointer" onclick="navigator.clipboard&&navigator.clipboard.writeText('${ip}')">${ip}</div>`).join('')
-            document.getElementById('hostPortHint').textContent = '好友点「连接主机」→ 自动搜索，或手动输入上方地址'
+            document.getElementById('hostPortHint').textContent = window.RvBHost ? '好友在同一局域网手动输入上方地址；公网玩家可使用转发模式' : '好友点「连接主机」→ 自动搜索，或手动输入上方地址'
             document.getElementById('hostEnterBtn').style.display = 'block'
+            if(window.RvBHost)document.getElementById('hostStopBtn').style.display = 'block'
           } else {
             const recovery = info && info.recovery
             if (recovery && recovery.status === 'recovering') {
@@ -768,8 +775,9 @@
             document.getElementById('hostIpBox').style.display = 'block'
             document.getElementById('hostIpList').innerHTML =
               `<div style="cursor:pointer" onclick="navigator.clipboard&&navigator.clipboard.writeText('http://${ip}:7878')">http://${ip}:7878</div>`
-            document.getElementById('hostPortHint').textContent = '好友点「连接主机」→ 自动搜索，或手动输入上方地址'
+            document.getElementById('hostPortHint').textContent = window.RvBHost ? '好友在同一局域网手动输入上方地址；公网玩家可使用转发模式' : '好友点「连接主机」→ 自动搜索，或手动输入上方地址'
             document.getElementById('hostEnterBtn').style.display = 'block'
+            if(window.RvBHost)document.getElementById('hostStopBtn').style.display = 'block'
             document.getElementById('hostStopBtn').style.display = 'block'
           } else {
             document.getElementById('hostStatus').innerHTML = ''
@@ -801,7 +809,7 @@
 
       // Web browser fallback
       document.getElementById('hostStatus').innerHTML = '<span style="color:#94a3b8">当前环境不支持主机模式</span>'
-      document.getElementById('hostErrBox').textContent = '请使用 Android 客户端或 Electron 桌面版作为主机'
+      document.getElementById('hostErrBox').textContent = window.Capacitor && window.Capacitor.isNativePlatform() ? '手机开房功能仍在迁移，请先连接服务器或进入训练营' : '请使用 Android 客户端或 Electron 桌面版作为主机'
       document.getElementById('hostErrBox').style.display = 'block'
     }
 
@@ -809,7 +817,8 @@
       document.getElementById('hostOverlay').classList.remove('show')
     }
 
-    function stopMobileServer() {
+    async function stopMobileServer() {
+      if(window.RvBHost){if(!confirm("停止手机主机会断开当前对局，继续吗？"))return;await window.RvBHost.stopLocalAuthority()}
       if (window.RvBBridge && typeof window.RvBBridge.stopMobileServer === 'function') {
         window.RvBBridge.stopMobileServer()  // 内部会自动调用 stopHostBroadcast
       }
@@ -850,15 +859,16 @@
             ip: info.ip, port: info.port, name: (info.name || '局域网主机') + ' 📡' })
         }
         window.RvBBridge.discoverHosts(3000)
-      } else if (window.electronAPI && typeof window.electronAPI.startDiscoverHosts === 'function') {
+      } else if ((window.RvBHost || window.electronAPI) && typeof (window.RvBHost || window.electronAPI).startDiscoverHosts === 'function') {
         // Electron 路径：Node dgram 后台监听，结果通过 IPC 事件推送
-        if (window.electronAPI.offUdpDiscovery) window.electronAPI.offUdpDiscovery()
-        window.electronAPI.onUdpHostFound(function(info) {
+        const discovery = window.RvBHost || window.electronAPI
+        if (discovery.offUdpDiscovery) discovery.offUdpDiscovery()
+        discovery.onUdpHostFound(function(info) {
           if (!info || !info.ip || !info.port) return
           addLanServer({ url: 'http://' + info.ip + ':' + info.port,
             ip: info.ip, port: info.port, name: (info.name || '局域网主机') + ' 📡' })
         })
-        window.electronAPI.startDiscoverHosts(3000)
+        discovery.startDiscoverHosts(3000).catch(error => console.warn('[LAN] UDP unavailable; HTTP search continues', error))
       }
 
       startQuickScan()
@@ -867,20 +877,22 @@
     function closeLanSheet() {
       try { if (_lanScanner) _lanScanner.cancel() } catch {}
       _lanScanner = null
+      const discovery = window.RvBHost || window.electronAPI
+      if (discovery?.offUdpDiscovery) discovery.offUdpDiscovery()
       document.getElementById('lanOverlay').classList.remove('show')
     }
 
     function startQuickScan() {
       try { if (_lanScanner) _lanScanner.cancel() } catch {}
-      document.getElementById('lanScanningText').textContent = '快速扫描中（约10秒）…'
+      document.getElementById('lanScanningText').textContent = '正在搜索电脑与手机主机…'
       document.getElementById('lanFullBtn').style.display = 'block'
       document.getElementById('lanRescanBtn').style.display = 'none'
       document.getElementById('lanScanningRow').style.display = 'flex'
       document.getElementById('lanProgressFill').style.width = '0%'
       _lanScanner = RvBLanDiscover.startLanScan({
-        quick: true,
+        full: false,
         onFound: addLanServer,
-        onProgress: p => { document.getElementById('lanProgressFill').style.width = (p * 100) + '%' },
+        onProgress: (done, total) => { document.getElementById('lanProgressFill').style.width = Math.min(100, done / total * 100) + '%' },
         onDone: () => {
           document.getElementById('lanScanningRow').style.display = 'none'
           document.getElementById('lanRescanBtn').style.display = 'block'
@@ -898,9 +910,9 @@
       document.getElementById('lanScanningRow').style.display = 'flex'
       document.getElementById('lanProgressFill').style.width = '0%'
       _lanScanner = RvBLanDiscover.startLanScan({
-        quick: false,
+        full: true,
         onFound: addLanServer,
-        onProgress: p => { document.getElementById('lanProgressFill').style.width = (p * 100) + '%' },
+        onProgress: (done, total) => { document.getElementById('lanProgressFill').style.width = Math.min(100, done / total * 100) + '%' },
         onDone: () => {
           document.getElementById('lanScanningRow').style.display = 'none'
           document.getElementById('lanRescanBtn').style.display = 'block'
@@ -910,6 +922,7 @@
     }
 
     function addLanServer(info) {
+      if (!document.getElementById('lanOverlay').classList.contains('show')) return
       const existing = _lanFound.find(s => s.url === info.url)
       if (existing) {
         existing.name = info.name || existing.name
@@ -927,9 +940,23 @@
     }
 
     async function connectLanServer(url) {
-      RvBUtils.saveServerConfig({ mode: 'lan', url: url })
-      closeLanSheet()
-      await checkProfileAndGo(url, 'lan')
+      const errorBox = document.getElementById('lanConnectError')
+      errorBox.style.display = 'block'
+      errorBox.textContent = '正在连接…'
+      try {
+        url = String(url || '').trim().replace(/\/+$/, '')
+        if (!url) throw new Error('请输入房主显示的完整 IP:端口')
+        if (!/^[a-z]+:\/\//i.test(url)) url = 'http://' + url
+        const parsed = new URL(url)
+        if (!['http:', 'https:'].includes(parsed.protocol) || parsed.username || parsed.password || parsed.search || parsed.hash) throw new Error('地址格式不正确')
+        const health = await RvBColyseus.requestAt(url, 'system.health', {}, 8000)
+        if (!health?.ok || health.protocol !== 'rvb-colyseus') throw new Error('该地址不是可用的游戏主机')
+        RvBUtils.saveServerConfig({ mode: 'lan', url: url })
+        if (await checkProfileAndGo(url, 'lan')) closeLanSheet()
+        else errorBox.textContent = '未进入大厅，请检查刚才的资源版本提示。'
+      } catch (error) {
+        errorBox.textContent = '无法连接 ' + url + '：' + error.message + '。请确认房主显示“服务器已运行”，并使用当前 Wi-Fi／热点地址。'
+      }
     }
 
     // ── Page loading ──────────────────────────────────────────────────────────
@@ -969,8 +996,9 @@
 
     // ── Training ──────────────────────────────────────────────────────────────
     async function goToLocalPractice(mode) {
-      if (window.electronAPI && typeof window.electronAPI.ensureLocalAuthority === 'function') {
-        const result = await window.electronAPI.ensureLocalAuthority()
+      if (window.RvBHost) { window.location.href = "battle.html?mode=" + encodeURIComponent(mode); return }
+      if ((window.RvBHost || window.electronAPI) && typeof (window.RvBHost || window.electronAPI).ensureLocalAuthority === 'function') {
+        const result = await (window.RvBHost || window.electronAPI).ensureLocalAuthority()
         if (!result?.ok) {
           alert('本机服务尚未就绪：' + (result?.error || '请稍后重试'))
           return
@@ -999,8 +1027,8 @@
 
     // ── PVE single-player ─────────────────────────────────────────────────────
     async function startPve() {
-      if (window.electronAPI && typeof window.electronAPI.ensureLocalAuthority === 'function') {
-        const result = await window.electronAPI.ensureLocalAuthority()
+      if ((window.RvBHost || window.electronAPI) && typeof (window.RvBHost || window.electronAPI).ensureLocalAuthority === 'function') {
+        const result = await (window.RvBHost || window.electronAPI).ensureLocalAuthority()
         if (!result?.ok) {
           alert('本机服务尚未就绪：' + (result?.error || '请稍后重试'))
           return
@@ -1038,9 +1066,9 @@
       // Android embedded server
       if (window.RvBBridge) return 'http://localhost:7878'
       // Electron local server
-      if (window.electronAPI && window.electronAPI.getMode) {
+      if ((window.RvBHost || window.electronAPI) && (window.RvBHost || window.electronAPI).getMode) {
         try {
-          const mode = await window.electronAPI.getMode()
+          const mode = await (window.RvBHost || window.electronAPI).getMode()
           if (mode && mode.ready && mode.localUrl) return mode.localUrl
         } catch {}
       }
@@ -1428,17 +1456,17 @@
       const localAuthorityTarget = window.RvBUtils
         && typeof RvBUtils.getServerModeForUrl === 'function'
         && RvBUtils.getServerModeForUrl(serverUrl) === 'local'
-      if (localAuthorityTarget && window.electronAPI && typeof window.electronAPI.ensureLocalAuthority === 'function') {
+      if (localAuthorityTarget && (window.RvBHost || window.electronAPI) && typeof (window.RvBHost || window.electronAPI).ensureLocalAuthority === 'function') {
         list.innerHTML = '<div style="color:#64748b;text-align:center;padding:20px">正在恢复本机 PostgreSQL 战斗服务…</div>'
         try {
-          const result = await window.electronAPI.ensureLocalAuthority()
+          const result = await (window.RvBHost || window.electronAPI).ensureLocalAuthority()
           if (!result || result.ok !== true) {
             console.warn('[battle-reports] local authority recovery unavailable', result)
             list.innerHTML = _recordsLoadErrorMarkup('本机战斗服务仍未就绪')
             return
           }
-          if (typeof window.electronAPI.getMode === 'function') {
-            const mode = await window.electronAPI.getMode()
+          if (typeof (window.RvBHost || window.electronAPI).getMode === 'function') {
+            const mode = await (window.RvBHost || window.electronAPI).getMode()
             if (mode && mode.ready && mode.localUrl && typeof RvBUtils.saveServerConfig === 'function') {
               RvBUtils.saveServerConfig({ mode: 'local', url: mode.localUrl })
             }
@@ -1514,10 +1542,10 @@
     async function getLocalGameProfileIdentity(serverUrl) {
       let identity
       if (
-        window.electronAPI
-        && typeof window.electronAPI.getMode === 'function'
+        (window.RvBHost || window.electronAPI)
+        && typeof (window.RvBHost || window.electronAPI).getMode === 'function'
       ) {
-        const mode = await window.electronAPI.getMode()
+        const mode = await (window.RvBHost || window.electronAPI).getMode()
         const normalizeUrl = value => String(value || '').trim().replace(/\/+$/, '')
         const isLocalAuthority = normalizeUrl(serverUrl) === normalizeUrl(mode && mode.localUrl)
         identity = mode && (isLocalAuthority ? mode.localAuthorityProfileIdentity : mode.profileIdentity)
@@ -1548,19 +1576,25 @@
 
 
     async function checkProfileAndGo(serverUrl, mode) {
+      let installed
       try {
-        await getLocalGameProfileIdentity(serverUrl)
+        installed = await getLocalGameProfileIdentity(serverUrl)
       } catch (error) {
         alert('无法进入大厅：' + ((error && error.message) || error))
         return false
       }
       try {
         const data = await RvBColyseus.requestCatalogIdentityAt(serverUrl, 'remote-server')
+        if (!/^[a-f0-9]{64}$/.test(data?.profileIdentity?.resolvedProfileHash || '')) throw new Error('主机返回的资源身份无效')
+        for (const key of ['schemaVersion', 'engineAbi', 'runnerRevision', 'authorityContentHash']) {
+          if (!data?.profileIdentity || installed[key] !== data.profileIdentity[key]) throw new Error('主机与本机资源版本不同，请两端使用配套版本')
+        }
         if (data && data.profileIdentity) {
           try { localStorage.setItem('rvb_server_profile_identity', JSON.stringify(data.profileIdentity)) } catch {}
         }
       } catch (error) {
-        console.warn('[profile] remote catalog identity preflight failed', error)
+        alert('无法进入大厅：' + ((error && error.message) || error))
+        return false
       }
       goLobby(mode, serverUrl)
       return true
@@ -1599,7 +1633,7 @@
           if (regs.length) console.log('[RVB] Unregistered ' + regs.length + ' service worker(s) on file://')
         }).catch(() => {})
       }
-    } else if ('serviceWorker' in navigator) {
+    } else if ('serviceWorker' in navigator && !(window.Capacitor && window.Capacitor.isNativePlatform())) {
       let swRefreshing = false
       navigator.serviceWorker.addEventListener('controllerchange', () => {
         if (swRefreshing) return
@@ -1628,6 +1662,12 @@
       }
       refreshUserUI()
       updatePackBadge()
+      if (window.Capacitor && window.Capacitor.isNativePlatform() && !window.RvBBridge) {
+        const packButton = document.getElementById('packDesc').closest('button')
+        packButton.onclick = () => loadPage('android-maintenance.html')
+        packButton.querySelector('.utility-title').textContent = '更新与资源'
+        document.getElementById('packDesc').textContent = '检查更新 · 导入资源包'
+      }
       updateTutorialEntry()
       // Show connected server in server section if saved
       const saved = getSavedUrl()

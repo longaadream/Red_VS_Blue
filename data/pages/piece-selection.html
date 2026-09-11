@@ -289,6 +289,7 @@
     }
   </style>
   <link rel="stylesheet" href="css/tabletop/tabletop.css" />
+  <link rel="stylesheet" href="css/compact-library.css" />
 </head>
 <body data-art-page="piece-selection">
 
@@ -983,25 +984,36 @@
     // Long-press
     let lpTimer = null
     let lpMoved = false
+    let lpBound = false
+    let lpLongPressed = false
 
     function setupLongPress() {
-      document.getElementById('pieceGrid').addEventListener('touchstart', function(e) {
+      if (lpBound) return
+      lpBound = true
+      const grid = document.getElementById('pieceGrid')
+      const cancel = () => { if (lpTimer) clearTimeout(lpTimer); lpTimer = null }
+      grid.addEventListener('touchstart', function(e) {
+        cancel()
+        lpLongPressed = false
         const card = e.target.closest('[data-pid]')
         if (!card) return
         lpMoved = false
         lpTimer = setTimeout(() => {
-          if (!lpMoved) showPieceDetail(card.dataset.pid)
+          lpTimer = null
+          if (!lpMoved) { lpLongPressed = true; showPieceDetail(card.dataset.pid) }
         }, 600)
       }, { passive: true })
 
-      document.getElementById('pieceGrid').addEventListener('touchmove', function() {
+      grid.addEventListener('touchmove', function() {
         lpMoved = true
-        if (lpTimer) { clearTimeout(lpTimer); lpTimer = null }
+        cancel()
       }, { passive: true })
 
-      document.getElementById('pieceGrid').addEventListener('touchend', function() {
-        if (lpTimer) { clearTimeout(lpTimer); lpTimer = null }
-      }, { passive: true })
+      grid.addEventListener('touchend', cancel, { passive: true })
+      grid.addEventListener('touchcancel', cancel, { passive: true })
+      grid.addEventListener('click', function(e) {
+        if (lpLongPressed) { e.preventDefault(); e.stopImmediatePropagation(); lpLongPressed = false }
+      }, true)
     }
 
     // Piece detail popup

@@ -70,7 +70,7 @@ describe('historical main board', () => {
     const end = source.indexOf('// ── Training: switch perspective', start)
     for (const failed of [false, true]) {
       const old = { pieces: [{ id: 'old' }] }, next = { pieces: [{ id: 'old' }, { id: 'added' }] }
-      const context = { togglePlaceMode: () => {}, sendPatch: async (body: unknown) => { void body; return false }, G: old, placingMode: true, trainingApiFetch: async () => { if (failed) throw Error('rejected'); return next },
+      const context = { PRACTICE_MODE: false, togglePlaceMode: () => {}, sendPatch: async (body: unknown) => { void body; return false }, G: old, placingMode: true, trainingApiFetch: async () => { if (failed) throw Error('rejected'); return next },
         reconcileBattleInteractionState: () => '', setStatusMsg: () => {}, addLog: () => {}, render: vi.fn() }
       context.togglePlaceMode = () => { context.placingMode = !context.placingMode }
       const vm = createContext(context)

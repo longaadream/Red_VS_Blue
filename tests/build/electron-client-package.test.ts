@@ -62,6 +62,14 @@ afterEach(() => {
 })
 
 describe('Electron client package verification', () => {
+  it('rejects a development account database in native packaged data', () => {
+    const { dataSourceRoot, packageRoot, pageSourceRoot, publicSourceRoot } = createFixture()
+    fs.writeFileSync(path.join(packageRoot, 'resources', 'app', 'data', 'users.json'), '{}')
+    expect(
+      findClientPackageIssues(packageRoot, pageSourceRoot, dataSourceRoot, publicSourceRoot),
+    ).toContain('forbidden packaged file: resources/app/data/users.json')
+  })
+
   it('reports a missing packaged game entry page', () => {
     const { dataSourceRoot, packageRoot, pageSourceRoot, publicSourceRoot } = createFixture()
 

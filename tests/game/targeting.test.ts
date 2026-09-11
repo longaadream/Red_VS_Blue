@@ -626,6 +626,7 @@ describe('targeting consumers and performance contract', () => {
 
     expect(shouldCancel({ step: 1 }, targetWithin('#boardWrap'))).toBe(false)
     expect(shouldCancel({ step: 1 }, targetWithin('.card-item'))).toBe(false)
+    expect(shouldCancel({ step: 1 }, targetWithin('#mobileDockToggle'))).toBe(false)
     expect(shouldCancel({ step: 1 }, targetWithin(null))).toBe(true)
     expect(shouldCancel(null, targetWithin(null))).toBe(false)
     expect(html).toContain('if (!shouldCancelPendingCardTarget(pendingCardAction, e.target)) return')
