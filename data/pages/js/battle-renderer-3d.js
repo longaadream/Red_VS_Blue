@@ -2511,7 +2511,7 @@
   function _applyZoom(z) {
     if (!_camera || !_mapW) return
     _cameraInOverview = false
-    _camera.zoom = Math.max(_overviewZoom * 0.5, Math.min(MAX_CAMERA_ZOOM, z))
+    _camera.zoom = Math.max(_overviewZoom * 0.5, Math.min(Math.max(MAX_CAMERA_ZOOM, Math.max(_mapW, _mapH) / 2), z))
     _camera.updateProjectionMatrix()
     _notifyViewportChange()
   }
@@ -2535,11 +2535,19 @@
     if (_camera && Number.isFinite(factor) && factor > 0) _applyZoom(_camera.zoom * factor)
   }
 
-  function focusCell(x, y) {
+  function focusCell(x, y, cellPixels) {
     if (!_mounted || !_camera || !_cameraTarget || !Number.isFinite(x) || !Number.isFinite(y)
       || x < 0 || y < 0 || x >= _mapW || y >= _mapH) return false
     _cameraTarget.set(x, _tileSurfaceHeightAt(x, y), y)
     _positionCameraFromTarget()
+    _cameraInOverview = false
+    if (Number.isFinite(cellPixels) && cellPixels > 0) {
+      _camera.updateMatrixWorld(true)
+      const origin = projectCell(x, y)
+      const neighbors = [projectCell(x + (x < _mapW - 1 ? 1 : -1), y), projectCell(x, y + (y < _mapH - 1 ? 1 : -1))]
+      const spacing = Math.min(...neighbors.map(point => Math.hypot(point.clientX - origin.clientX, point.clientY - origin.clientY)))
+      if (spacing > 0) _applyZoom(_camera.zoom * cellPixels / spacing)
+    }
     _notifyViewportChange()
     return true
   }

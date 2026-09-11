@@ -50,3 +50,41 @@
 .adventure-lethal-warning,.adventure-piece-warning{display:block;border:2px solid #99452f;border-radius:6px;padding:6px 9px;background:#efd5ad;color:#842f22;font-size:12px;line-height:1.4}.adventure-mode .card-content-badge{max-width:100%;font-weight:bold;background:#664432;color:#fff0ce}
 
 .adventure-mode #handCards .card-content-badge{font-size:11px;padding:3px 7px;letter-spacing:0}.adventure-mode #handCards .card-desc{white-space:pre-line;line-height:1.35}.adventure-mode #cdDesc{white-space:pre-line}
+
+#adventurePartyToggle,#adventureMenuToggle,#adventureMobileAp,.adventure-reserve-details{display:none}
+#adventureDialog button{min-height:44px;min-width:44px;touch-action:manipulation}
+#adventureDialogContent button{margin:4px}
+@media(pointer:coarse){.adventure-reserve-details{display:block;min-height:44px;width:60px;border:1px solid #796044;border-radius:5px;background:#ddc8a1;color:#493729;font:inherit}}
+@media(orientation:landscape) and (max-height:600px){
+  #adventureWallet{top:calc(62px + env(safe-area-inset-top));left:calc(64px + env(safe-area-inset-left));transform:none;max-width:calc(100vw - 136px);padding:2px 4px;gap:2px;justify-content:flex-start}
+  #adventureWallet:not(.is-expanded)> :not(#adventureCoins):not(#adventureMobileAp):not(#adventurePartyToggle):not(#adventureMenuToggle){display:none}
+  #adventureWallet.is-expanded> :not([hidden]){display:block}
+  #adventureWallet button{min-width:44px;min-height:44px;padding:4px 8px}
+  #adventurePartyToggle,#adventureMenuToggle{display:block}
+  #adventureWallet.is-expanded{max-width:min(420px,calc(100vw - 136px))}
+  #adventurePartyDock{display:none;left:calc(64px + env(safe-area-inset-left));top:calc(114px + env(safe-area-inset-top));bottom:auto;max-width:calc(100vw - 136px);max-height:calc(100svh - 128px - var(--battle-hand-height,90px));overflow:auto;padding:6px 10px}
+  .adventure-party-open #adventurePartyDock{display:block}
+  #adventurePartyDock .adventure-party{flex-wrap:nowrap;overflow-x:auto;gap:12px;margin:6px 0}
+  #adventurePartyDock .adventure-party>*{flex:none}
+  #adventurePartyDock .adventure-portrait{width:60px;min-height:68px}
+  .adventure-reserve-details{display:block;min-height:44px;width:60px;border:1px solid #796044;border-radius:5px;background:#ddc8a1;color:#493729;font:inherit}
+  #adventurePartyDock>small{display:none}
+  #adventureEncounter{top:calc(64px + env(safe-area-inset-top));right:calc(64px + env(safe-area-inset-right));max-width:38vw;min-height:44px;font-size:11px;padding:4px 8px}
+  #adventureSiteActions{left:calc(64px + env(safe-area-inset-left));bottom:calc(var(--battle-hand-height,90px) + 5px + env(safe-area-inset-bottom));max-width:calc(100vw - 136px);flex-wrap:nowrap;overflow-x:auto}
+  #adventureSiteActions button{min-height:44px;white-space:nowrap;padding:6px 10px}
+  .adventure-mode #adventureStatus{top:auto!important;bottom:calc(var(--battle-hand-height,90px) + 2px + env(safe-area-inset-bottom));padding:2px 8px!important;max-width:60vw!important}
+  .adventure-mode:has(#adventureSiteActions:not([hidden])) #adventureStatus{display:none}
+  #adventureDialog{max-height:calc(100svh - 16px);padding:12px 16px}
+  #adventureDialog header{position:sticky;top:-12px;background:#c6b28b;z-index:1;padding-bottom:5px}
+  .adventure-mode #pieceInfoModal{z-index:400!important}
+  .adventure-mode:has(#pieceInfoModal[style*="display: flex"]) :is(#adventureWallet,#adventurePartyDock,#adventureSiteActions,#adventureEncounter){visibility:hidden}
+  .adventure-mode .player-state-chip{display:none!important}
+  .adventure-mode .turn-summary{width:150px!important;min-width:150px!important}
+  #adventureMobileAp{display:block;font-weight:bold;white-space:nowrap;padding:0 4px}
+  #adventureWallet{top:max(4px,env(safe-area-inset-top));bottom:auto;left:164px;max-width:calc(100vw - 320px);z-index:130}
+  #adventureWallet.is-expanded{top:calc(62px + env(safe-area-inset-top));bottom:auto;left:64px;max-width:calc(100vw - 128px)}
+  #adventurePartyDock{top:auto;bottom:calc(var(--battle-hand-height,90px) + 4px);max-height:calc(100svh - 160px);z-index:140}
+  .adventure-party-open #adventureSiteActions{display:none}
+  #adventurePartyDock .adventure-party{max-height:140px}
+  .adventure-mode #boardStage3d{overflow:hidden}
+}

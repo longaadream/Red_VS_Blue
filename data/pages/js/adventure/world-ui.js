@@ -4,6 +4,7 @@ let adventureCampTargetId = null
 let adventureDialogKind = null
 let adventureDecorationKey = null
 let adventureFocusedAct = null
+let adventureFocusedRegion = null
 let adventureSupplyPromptRevision = -1
 const adventureStampCache = new Map()
 const adventureIconPaths = {
@@ -48,10 +49,19 @@ function ensureAdventureUI() {
   if (document.getElementById('adventureWallet')) return
   const wallet = document.createElement('nav'); wallet.id = 'adventureWallet'; wallet.setAttribute('aria-label', '冒险资源与菜单')
   const coins = document.createElement('output'); coins.id = 'adventureCoins'; coins.setAttribute('aria-live', 'polite')
+  const mobileAp = document.createElement('output'); mobileAp.id = 'adventureMobileAp'; mobileAp.setAttribute('aria-label', '行动点')
   const supplies = adventureButton('构筑', () => openAdventureDialog('supplies')); supplies.id = 'adventureSuppliesButton'
   const act = adventureButton('', () => openAdventureDialog('sites')); act.id = 'adventureAct'
   const reward = adventureButton('战利品', () => openAdventureDialog('rewards')); reward.id = 'adventureRewardButton'; reward.hidden = true
-  wallet.append(act, coins, reward, adventureButton('地点', () => openAdventureDialog('sites')), supplies, adventureButton('手记', () => openAdventureDialog('notes')))
+  wallet.append(act, coins, mobileAp, reward, adventureButton('地点', () => openAdventureDialog('sites')), supplies, adventureButton('手记', () => openAdventureDialog('notes')))
+  const partyToggle = adventureButton('队伍', () => {
+    const open = document.body.classList.toggle('adventure-party-open')
+    partyToggle.setAttribute('aria-expanded', String(open))
+  }); partyToggle.id = 'adventurePartyToggle'; partyToggle.setAttribute('aria-expanded', 'false'); partyToggle.setAttribute('aria-controls', 'adventurePartyDock')
+  const menuToggle = adventureButton('冒险', () => {
+    const open = wallet.classList.toggle('is-expanded'); menuToggle.setAttribute('aria-expanded', String(open))
+  }); menuToggle.id = 'adventureMenuToggle'; menuToggle.setAttribute('aria-expanded', 'false')
+  wallet.append(partyToggle, menuToggle)
   const dock = document.createElement('aside'); dock.id = 'adventurePartyDock'; dock.setAttribute('aria-label', '冒险队伍')
   const encounter = adventureButton('', () => openAdventureDialog('site', adventureSnapshot.world.active)); encounter.id = 'adventureEncounter'
   const dialog = document.createElement('dialog'); dialog.id = 'adventureDialog'; dialog.setAttribute('aria-labelledby', 'adventureDialogTitle')
@@ -67,6 +77,8 @@ function ensureAdventureUI() {
 }
 function openAdventureDialog(kind, siteId) {
   ensureAdventureUI()
+  document.getElementById('adventureWallet').classList.remove('is-expanded')
+  document.getElementById('adventureMenuToggle').setAttribute('aria-expanded', 'false')
   adventureDialogKind = kind; adventureSiteId = siteId || null
   renderAdventureDialog(); syncAdventureBoard()
   const dialog = document.getElementById('adventureDialog')
@@ -107,10 +119,13 @@ function renderAdventureReward(content) {
 function focusAdventureAct(force = false) {
   const world = adventureSnapshot?.world, key = world && [world.seed, world.actNumber || 1, G.map.id, adventureSnapshot.revision].join(':')
   if (!world || !force && key === adventureFocusedAct) return
-  const zone = force && world.zones?.find(zone => zone.id === world.active)
-  if (zone && window.BattleRenderer3D?.focusCell?.(zone.x + (zone.width - 1) / 2, zone.y + (zone.height - 1) / 2)) { adventureFocusedAct = key; return }
+  const zone = world.zones?.find(zone => zone.id === world.active)
+  const region = [world.seed, world.actNumber || 1, world.active || 'explore'].join(':')
+  if (zone && !force && region === adventureFocusedRegion) { adventureFocusedAct = key; return }
+  const cellPixels = window.matchMedia('(orientation: landscape) and (max-height: 600px)').matches && (force || region !== adventureFocusedRegion) ? 44 : undefined
+  if (zone && window.BattleRenderer3D?.focusCell?.(zone.x + (zone.width - 1) / 2, zone.y + (zone.height - 1) / 2, cellPixels)) { adventureFocusedAct = key; adventureFocusedRegion = region; return }
   const captain = G.pieces.find(p => p.instanceId === world.captainId && p.currentHp > 0)
-  if (captain && captain.x !== null && captain.y !== null && window.BattleRenderer3D?.focusCell?.(captain.x, captain.y)) adventureFocusedAct = key
+  if (captain && captain.x !== null && captain.y !== null && window.BattleRenderer3D?.focusCell?.(captain.x, captain.y, cellPixels)) { adventureFocusedAct = key; adventureFocusedRegion = region }
 }
 window.focusAdventureContext = () => { if (!adventureSnapshot?.world) return false; focusAdventureAct(true); return true }
 function selectAdventurePartyPiece(piece) {
@@ -125,6 +140,7 @@ function renderAdventureWorld() {
   document.getElementById('adventureAct').textContent = world.name || '第 ' + (world.actNumber || 1) + ' 幕 · 旧城边境'
   document.getElementById('adventureRewardButton').hidden = !world.lastReward
   document.getElementById('adventureCoins').textContent = '◉ 金币 ' + world.coins
+  document.getElementById('adventureMobileAp').textContent = '⚡ ' + (G.players.find(p => p.playerId === myPlayerId)?.actionPoints ?? 0)
   const dock = document.getElementById('adventurePartyDock'); dock.replaceChildren()
   const title = document.createElement('strong'); title.textContent = '冒险队伍'; dock.append(title)
   const row = document.createElement('div'); row.className = 'adventure-party'
@@ -138,12 +154,17 @@ function renderAdventureWorld() {
       if (unavailable) return
       if (!world.active) { adventureCampTargetId = piece.instanceId; openAdventureDialog('reserve'); return }
       adventureDeployPieceId = adventureDeployPieceId === piece.instanceId ? null : piece.instanceId
+      document.body.classList.remove('adventure-party-open')
+      document.getElementById('adventurePartyToggle').setAttribute('aria-expanded', 'false')
       pendingSkill = null; pendingCardAction = null; selectedPieceId = null
       render(); renderAdventureWorld(); setStatusMsg(adventureDeployPieceId ? '点击高亮格 · 免费部署' : '已取消部署')
     }, world.active ? (adventureDeployPieceId === piece.instanceId ? '×' : '+') : '备')
     card.classList.toggle('is-picked', adventureDeployPieceId === piece.instanceId)
     card.setAttribute('aria-disabled', String(unavailable))
-    row.append(card)
+    const entry = document.createElement('div'); entry.className = 'adventure-reserve-entry'
+    const details = adventureButton('详情', () => showPieceInfo(piece.instanceId), 'adventure-reserve-details')
+    details.setAttribute('aria-label', '查看 ' + piece.name + ' 详情')
+    entry.append(card, details); row.append(entry)
   }
   dock.append(row)
   const hint = document.createElement('small'); hint.textContent = world.active ? (reserve.used ? '本轮已部署' : '每轮免费部署 1 枚') : '探索 · 每回合 3 行动点'; dock.append(hint)

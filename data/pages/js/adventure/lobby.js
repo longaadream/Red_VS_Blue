@@ -1,4 +1,5 @@
 let adventureLobby, adventureLobbyView, adventureFamilies = [], selectedFamily = 'skirmish', lobbyBusy = false
+let adventureNavigating = false
 const lobbyElement = id => document.getElementById(id)
 const lobbyStatus = message => { lobbyElement('lobbyStatus').textContent = message }
 function lobbyNode(tag, text, className) {
@@ -54,7 +55,15 @@ function renderAdventureLobby(value) {
   lobbyElement('start').hidden = !host
   lobbyElement('start').disabled = value.seats.some(s => !s.connected || s.playerId !== value.hostId && !s.ready)
   lobbyElement('partyDifficulty').textContent = value.seats.length + ' 人同行 · 敌方随参战人数增加援兵与首领生命。'
-  if (value.snapshot) location.href = 'battle.html?mode=adventure&roomId=' + encodeURIComponent(value.roomId) + '&server=' + encodeURIComponent(adventureLobby.server)
+  if (value.snapshot && !adventureNavigating) {
+    adventureNavigating = true
+    const destination = 'battle.html?mode=adventure&roomId=' + encodeURIComponent(value.roomId) + '&server=' + encodeURIComponent(adventureLobby.server)
+    // Release the lobby socket before the WebView opens a new battle connection.
+    // The active run retains the authenticated seat after a consented leave.
+    void adventureLobby.dispose().then(() => { location.href = destination }).catch(error => {
+      adventureNavigating = false; lobbyStatus(error.message)
+    })
+  }
 }
 async function connectAdventureLobby(join) {
   if (lobbyBusy) return false

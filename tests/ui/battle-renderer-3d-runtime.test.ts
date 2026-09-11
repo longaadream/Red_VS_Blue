@@ -41,7 +41,7 @@ type RendererApi = {
   resize(): void
   spawnFloater(x: number, y: number, text: string, color: string, big: boolean, options: unknown): void
   resetView(): void
-  focusCell(x: number, y: number): boolean
+  focusCell(x: number, y: number, cellPixels?: number): boolean
   zoomBy(factor: number): void
   projectCell(x: number, y: number, elevation?: number): { clientX: number; clientY: number; left: number; top: number }
   setBoardDecorations(data: { cells?: Array<{x:number;y:number;image?:unknown}>; lines?: Array<{points:Array<{x:number;y:number}>;color:number}> } | null): void
@@ -463,6 +463,20 @@ describe('RED-68 BattleRenderer3D runtime', () => {
     h.renderer.update(model);h.frame(16)
     expect(distance(focused,h.renderer.projectCell(5,55))).toBeLessThan(.01)
     expect(h.disposeCounts.geometry).toBe(disposals)
+    h.renderer.dispose()
+  })
+
+  it('makes a large adventure locally touchable and retains captain focus on resize', () => {
+    const h=createHarness(520,210,true),model=runtimeModel()
+    model.board.width=64;model.board.height=64
+    h.renderer.init({container:h.container});h.renderer.update(model);h.frame(16)
+    h.renderer.focusCell(5,55,44);h.frame(16)
+    const center=h.renderer.projectCell(5,55)
+    expect(distance(center,h.renderer.projectCell(6,55))).toBeGreaterThanOrEqual(43)
+    expect(distance(center,h.renderer.projectCell(5,54))).toBeGreaterThanOrEqual(40)
+    h.container.rect.width=680;h.container.rect.height=261;h.renderer.resize();h.frame(16)
+    expect(h.renderer.projectCell(5,55).clientX).toBeCloseTo(340)
+    expect(h.renderer.projectCell(5,55).clientY).toBeCloseTo(130.5)
     h.renderer.dispose()
   })
 
