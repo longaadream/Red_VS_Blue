@@ -22,3 +22,7 @@
 
 ## 主线同步复验
 保留 PVE focusCell 与移动端 zoomBy，重新构建冲突的引擎产物。同步 main 53c2c9c 后，19 文件185项测试通过（探索、资源、Colyseus、棋盘与移动端）。GitHub CLI 检查器返回 blocked：未登录；使用连接器确认 PR 元数据，不宣称远端 CI 已通过。
+
+
+## 桌面客户端启动修复
+真实客户端首次启动健康检查错误地将 PVE 专属怪加入 createDebugDuel 的 PVP 自动阵容，导致 PROFILE_STARTUP_RECOVERY_HEALTH_MISMATCH。自动补位现按 availability 过滤，显式指定仍保留权威拒绝。debug-battle 13项测试、定向 ESLint 与客户端构建通过，独立审查无阻断项。使用独立 output/pve-client-acceptance 用户目录进行桌面验收。
