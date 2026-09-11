@@ -146,5 +146,10 @@
   "pve-arrow",
   "pve-claw",
   "pve-raise-dead",
-  "pve-shot"
+  "pve-shot",
+  "pve-sweep",
+  "pve-hook",
+  "pve-tracking-slash",
+  "pve-overwatch",
+  "pve-blaster"
 ]

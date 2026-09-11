@@ -6,8 +6,8 @@
   "rarity": "legendary",
   "image": "adventure/arthas.jpg",
   "stats": {
-    "maxHp": 16,
-    "attack": 3,
+    "maxHp": 30,
+    "attack": 5,
     "defense": 1,
     "moveRange": 3
   },

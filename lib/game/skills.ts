@@ -1,5 +1,6 @@
 import { assertContentAvailable, battleContentMode, ContentUnavailableError, type ModeScopedContent } from './content-availability'
 import { adventureCards, recordAdventurePassiveHit, type AdventureHandCard } from './adventure-card-state'
+import { adventureBoundary } from './adventure-boundary'
 import { getSkillById } from './skill-repository'
 import { areMatchAllies } from './match-teams'
 import { addPieceStatus, removePieceStatus, expireHolderStatuses, type StatusHolder } from './status-lifecycle'
@@ -521,6 +522,7 @@ export interface SelectionContractDefinition {
 }
 
 export interface CardDefinition extends ModeScopedContent {
+  adventurePower?: { baseDamage: number; usesGrowth: boolean }
   id: string
   name: string
   description: string
@@ -559,6 +561,10 @@ export function assertCardDefinition(
   }
   if (card.availability !== undefined && (card.availability as any)?.status === 'draft') {
     throw new ContentUnavailableError(cardId, 'pve')
+  }
+  if (card.adventurePower !== undefined) {
+    const power=card.adventurePower as Record<string,unknown>
+    if(!power||typeof power!=='object'||Array.isArray(power)||typeof power.baseDamage!=='number'||!Number.isFinite(power.baseDamage)||power.baseDamage<0||typeof power.usesGrowth!=='boolean')throw new Error('Invalid adventure card power: '+cardId)
   }
   if (!isNonEmptyString(card.code)) {
     throw new Error(`Card definition ${cardId} has no executable code`)
@@ -960,7 +966,7 @@ export function executeCardFunction(
     // 卡牌执行上下文：优先使用 triggerContext 作为基础（保持引用），然后添加卡牌相关字段
     // 这样 reactive 卡牌可以修改原始事件的参数（如 damage、heal 等）
     const context = triggerContext || {}
-    context.card = { id: cardDef.id, name: cardDef.name, type: cardDef.type }
+    context.card = { id: cardDef.id, name: cardDef.name, type: cardDef.type, ...(cardDef.adventurePower ? { adventurePower: { ...cardDef.adventurePower } } : {}) }
     context.playerId = playerId
     context.battle = battle
     context.piece = context.piece || null
@@ -3105,7 +3111,9 @@ function prepareDamageTarget(
     context.batchId,
     target.instanceId,
   )
-  let blocked = sourceBlocked || Boolean(beforeTaken.blocked)
+  const cooperativeProtection = adventureBoundary(battle)?.coop
+  let blocked = sourceBlocked || Boolean(beforeTaken.blocked) || !!(cooperativeProtection
+    && (cooperativeProtection.protectedUntil[target.ownerPlayerId] ?? -1) >= cooperativeProtection.round)
   const defense = request.damageType === 'physical' || request.damageType === 'magical'
     ? Number(target.defense) || 0
     : 0
@@ -4290,8 +4298,12 @@ function validateStoredPieceSummon(
   const normalizedOwnerPlayerId = String(source.ownerPlayerId || '').trim().toLowerCase()
   if (!normalizedOwnerPlayerId) fatal('Stored summon source owner is invalid')
   const ownerScoped = capability.ownerScopedStorageExtensionKey !== undefined
+  const encounter = adventureBoundary(battle)
+  const encounterEnemy = !!encounter?.activeZone && source.ownerPlayerId !== encounter.humanId
+    && encounter.activeEnemyIds.includes(source.instanceId)
   const activePiece = battle.pieces.find(piece => (
     piece.currentHp > 0
+    && (!encounterEnemy || encounter!.activeEnemyIds.includes(piece.instanceId))
     && (!ownerScoped
       || String(piece.ownerPlayerId || '').trim().toLowerCase() === normalizedOwnerPlayerId)
     && (

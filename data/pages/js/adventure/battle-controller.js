@@ -32,6 +32,10 @@ function acceptAdventureSnapshot(result) {
     RvBGameEngine.primeJsonFiles(files)
   }
   adventureSnapshot = result
+  if (result.world?.name) {
+    document.title = result.world.name + ' · PVE - RED vs BLUE'
+    const roomLabel = document.getElementById('roomNameLabel'); if (roomLabel) roomLabel.textContent = 'PVE · ' + result.world.name
+  }
   if (result.action?.type === 'deployReservePiece' || !result.deployment?.cells?.length) adventureDeployPieceId = null
   if (result.diagnostics) {
     const turn = result.diagnostics.turn
@@ -92,6 +96,17 @@ async function initAdventureBattle() {
     await RvBGameEngine.ensure()
     playerNames['adventure-human'] = '你'; playerNames['adventure-enemy'] = '据点守卫'
     acceptAdventureSnapshot(await adventureClient.request('start', setup))
+    if (adventureClient.network) {
+      adventureClient.network.subscribe(value => {
+        if (value.snapshot && value.snapshot.revision > (adventureSnapshot?.revision ?? -1)) acceptAdventureSnapshot(value.snapshot)
+        renderAdventureRoomStatus(value)
+      })
+      adventureClient.network.onConnection((connected, message) => {
+        adventureBusy = !connected
+        adventureStatus(message || '连接已恢复', !connected)
+        render()
+      })
+    }
     document.getElementById('loadingOverlay').style.display = 'none'
     scheduleAdventureAI()
   } catch (error) {
@@ -104,6 +119,7 @@ async function initAdventureBattle() {
 }
 function scheduleAdventureAI() {
   clearTimeout(adventureTimer)
+  if (adventureClient?.network) return
   if (adventureStopped || adventureBusy || !adventureSnapshot || G?.terminalResult) return
   if (adventureHasSupplyChoice() && !G.pendingOptionSelection && !G.pendingTargetSelection) return
   const ai = adventureSnapshot.inputOwner === adventureSnapshot.aiPlayerId
@@ -150,12 +166,14 @@ async function adventureDoAction(rawAction) {
 }
 function showAdventureResult() {
   if (!G?.terminalResult || recordSaved) return
-  recordSaved = true; adventureStopped = true; clearTimeout(adventureTimer)
   const winner = G.terminalResult.winnerPlayerId
-  const won = winner === myPlayerId
+  const won = winner === myPlayerId || G.terminalResult.winnerPlayerIds?.includes(myPlayerId)
+  // Terminal combat has stopped already; keep reward authority usable until the final choice settles.
+  if (won && adventureHasSupplyChoice()) return
+  recordSaved = true; adventureStopped = true; clearTimeout(adventureTimer)
   document.getElementById('resultIcon').textContent = !winner ? '=' : won ? 'WIN' : 'LOSE'
   document.getElementById('resultTitle').textContent = !winner ? '平局' : won ? '胜利' : '失败'
-  document.getElementById('resultSub').textContent = '首幕切片结束 · 收获仅属于本次冒险'
+  document.getElementById('resultSub').textContent = (won ? '冒险完成' : '冒险止步于第 ' + (adventureSnapshot.world.actNumber || 1) + ' 幕') + ' · 金币 ' + adventureSnapshot.world.coins + (won && adventureSnapshot.world.lastReward ? ' · 最后一战奖励 +' + adventureSnapshot.world.lastReward.coins + ' 已入账' : '')
   document.getElementById('recordStatus').textContent = ''
   const back = document.getElementById('resultOverlay').querySelector('button[onclick="goBack()"]')
   if (back) back.textContent = '再来一局'

@@ -12,13 +12,31 @@ export interface AdventureEnemyPlan {
   kind: 'move' | 'attack' | 'summon'
   origin: {x:number;y:number}
   cells: {x:number;y:number}[]
+  trackingTargetId?: string
   action: BattleAction
 }
 export interface AdventureBoundary {
   version: 'same-map-v1'
   humanId: string
+  completedRoundOffset?: number
+  enemyLevels?: Record<string, { level: number; baseMaxHp: number }>
+  coop?: {
+    humanIds: string[]
+    enemyId: string
+    round: number
+    order: string[]
+    parties: Record<string, NonNullable<AdventureBoundary['party']>>
+    encounters: Record<string, AdventureZone & { name: string; enemyIds: string[]; coreIds: string[]; reward: number; participants: string[]; round: number; plans: AdventureEnemyPlan[]; plannedRound?:number; kind?: 'roaming'; scaledPlayers: number }>
+    playerZones: Record<string, string>
+    protectedUntil: Record<string, number>
+    absent: string[]
+    controllers?:Record<string,string>
+  }
   activeZone?: AdventureZone
   activeEnemyIds: string[]
+  campaignHasNext?: boolean
+  roamingEnemyIds?: string[]
+  roamingEncounter?: AdventureZone & { name: string; enemyIds: string[]; coreIds: string[]; reward: number; kind: 'roaming' }
   plans?: AdventureEnemyPlan[]
   plansTurn?: number
   skillDefinitions?: Record<string, SkillDefinition>
@@ -44,6 +62,14 @@ export function adventureDeploymentCells(state: BattleState): { x: number; y: nu
 /** Called by the native turn transition, including AI simulations. */
 export function refreshAdventureActionPoints(state: BattleState): boolean {
   const world = adventureBoundary(state), party = world?.party
+  if (world?.coop) {
+    selectAdventureActor(state, state.turn.currentPlayerId)
+    const player = state.players.find(p => p.playerId === state.turn.currentPlayerId)!
+    const zone = world.coop.encounters[world.coop.playerZones[player.playerId]]
+    player.maxActionPoints = world.coop.humanIds.includes(player.playerId) ? zone ? Math.min(10, zone.round) : 3 : 0
+    player.actionPoints = player.maxActionPoints
+    return true
+  }
   if (!party || !world) return false
   if (world.activeZone && state.turn.currentPlayerId === world.humanId) party.battleRound++
   const player = state.players.find(p => p.playerId === state.turn.currentPlayerId)!
@@ -51,14 +77,33 @@ export function refreshAdventureActionPoints(state: BattleState): boolean {
   player.actionPoints = player.maxActionPoints
   return true
 }
+export function isAdventureHuman(state: BattleState, playerId: string): boolean {
+  const world = adventureBoundary(state)
+  return !!world && (world.coop ? world.coop.humanIds.includes(playerId) : world.humanId === playerId)
+}
+/** Legacy fields are a transient view used by native skill/deployment code. */
+export function selectAdventureActor(state: BattleState, playerId: string, encounterId?: string): void {
+  const world = adventureBoundary(state), coop = world?.coop
+  if (!world || !coop) return
+  if (world.party && coop.humanIds.includes(world.humanId)) coop.parties[world.humanId] = world.party
+  const human = coop.humanIds.includes(playerId) ? playerId : coop.encounters[encounterId ?? '']?.participants[0] ?? world.humanId
+  world.humanId = human; world.party = coop.parties[human]
+  const zone = coop.encounters[encounterId ?? coop.playerZones[human]]
+  world.activeZone = zone
+  world.activeEnemyIds = zone ? zone.enemyIds : (world.roamingEnemyIds ?? []).filter(id => !Object.values(coop.encounters).some(e => e.enemyIds.includes(id)))
+  world.plans = zone?.plans ?? []
+  world.roamingEncounter = zone?.kind === 'roaming' ? { ...zone, kind: 'roaming' } : undefined
+  if (world.party) world.party.battleRound = zone?.round ?? 0
+}
 /** Only the exact published enemy move is exempt from the player AP economy. */
 export function isAdventureProgramMove(state: BattleState, action: BattleAction): boolean {
   const w=adventureBoundary(state),plan=w?.plans?.[0]
-  if(!w?.activeZone||!plan||plan.kind!=='move'||action.type!=='move'||plan.action.type!=='move')return false
+  if(!w||!plan||plan.kind!=='move'||action.type!=='move'||plan.action.type!=='move')return false
   const p=state.pieces.find(p=>p.instanceId===action.pieceId&&p.currentHp>0)
   return !!p && p.ownerPlayerId!==w.humanId && p.ownerPlayerId===action.playerId && w.activeEnemyIds.includes(p.instanceId)
     && plan.sourceId===p.instanceId && plan.round===(w.party?.battleRound??1) && p.x===plan.origin.x && p.y===plan.origin.y
-    && plan.action.toX===action.toX && plan.action.toY===action.toY && insideZone(w.activeZone,action.toX,action.toY)
+    && plan.action.toX===action.toX && plan.action.toY===action.toY
+    && (w.activeZone ? insideZone(w.activeZone,action.toX,action.toY) : !!w.roamingEnemyIds?.includes(p.instanceId))
 }
 export function updateAdventureCaptainAnchor(state: BattleState): void {
   const party = adventureBoundary(state)?.party
@@ -77,6 +122,12 @@ export function insideZone(zone: AdventureZone, x: number | null, y: number | nu
 export function adventureRuleSourceAllowed(state: BattleState, piece: PieceInstance): boolean {
   const world = adventureBoundary(state)
   if (!world) return true
+  if (world.coop) {
+    if(world.coop.absent.includes(piece.ownerPlayerId))return false
+    if (!isAdventureHuman(state, piece.ownerPlayerId)) return Object.values(world.coop.encounters).some(e => e.enemyIds.includes(piece.instanceId)) || !!world.roamingEnemyIds?.includes(piece.instanceId)
+    const zone = world.coop.encounters[world.coop.playerZones[piece.ownerPlayerId]]
+    return !zone || insideZone(zone, piece.x, piece.y)
+  }
   if (piece.ownerPlayerId !== world.humanId) return world.activeEnemyIds.includes(piece.instanceId)
   return !world.activeZone || insideZone(world.activeZone, piece.x, piece.y)
 }
@@ -98,6 +149,21 @@ export function supportDistances(state: BattleState, zone: AdventureZone): Map<s
 export function assertAdventurePosition(state: BattleState, piece: PieceInstance, x: number, y: number): void {
   const world = adventureBoundary(state)
   if (!world || piece.x === null || piece.y === null) return
+  if (world.coop) {
+    const zone = isAdventureHuman(state, piece.ownerPlayerId)
+      ? world.coop.encounters[world.coop.playerZones[piece.ownerPlayerId]]
+      : Object.values(world.coop.encounters).find(e => e.enemyIds.includes(piece.instanceId))
+    if (!zone) {
+      if (!isAdventureHuman(state, piece.ownerPlayerId) && !world.roamingEnemyIds?.includes(piece.instanceId) && (x !== piece.x || y !== piece.y)) throw new BattleRuleError('尚未激活的据点不能移动')
+      return
+    }
+    if (insideZone(zone, piece.x, piece.y) && !insideZone(zone,x,y)) throw new BattleRuleError('战区已封锁，战斗结算前无法离开')
+    if (!insideZone(zone,piece.x,piece.y) && (x !== piece.x || y !== piece.y)) {
+      const distances = supportDistances(state,zone)
+      if ((distances.get(`${x},${y}`) ?? Infinity) >= (distances.get(`${piece.x},${piece.y}`) ?? Infinity)) throw new BattleRuleError('区域外棋子只能支援')
+    }
+    return
+  }
   if (piece.ownerPlayerId !== world.humanId && !world.activeEnemyIds.includes(piece.instanceId)) {
     if (x !== piece.x || y !== piece.y) throw new BattleRuleError('尚未激活的据点不能移动')
     return
@@ -117,6 +183,7 @@ export function assertAdventurePosition(state: BattleState, piece: PieceInstance
 export function assertAdventureTransition(before: BattleState, after: BattleState, action?: BattleAction): void {
   const world = adventureBoundary(before)
   if (!world) return
+  if (world.coop) { assertCooperativeTransition(before, after, action); return }
   const allAfter = [...after.pieces, ...after.graveyard, ...(after.extensions?.removedPieces ?? [])] as PieceInstance[]
   for (const piece of before.pieces) {
     const next = allAfter.find(item => item.instanceId === piece.instanceId)
@@ -136,4 +203,25 @@ export function assertAdventureTransition(before: BattleState, after: BattleStat
       throw new BattleRuleError('不能在封锁战区外召唤棋子')
     }
   }
+}
+function assertCooperativeTransition(before: BattleState, after: BattleState, action?: BattleAction): void {
+  const world = adventureBoundary(before)!, coop = world.coop!
+  const actor = action && 'playerId' in action ? action.playerId : before.turn.currentPlayerId
+  const source = action && 'pieceId' in action ? before.pieces.find(p => p.instanceId === action.pieceId) : undefined
+  const zoneFor = (piece: PieceInstance) => coop.encounters[coop.playerZones[piece.ownerPlayerId]] ?? Object.values(coop.encounters).find(e => e.enemyIds.includes(piece.instanceId))
+  const zone = source ? zoneFor(source) : coop.encounters[coop.playerZones[actor ?? '']]
+  const remains = [...after.pieces,...after.graveyard,...(after.extensions?.removedPieces ?? [])]
+  for (const piece of before.pieces) {
+    const next = remains.find(p => p.instanceId === piece.instanceId)
+    if (next?.x != null && next.y != null) assertAdventurePosition(before,piece,next.x,next.y)
+    if(action?.type==='beginPhase'||action?.type==='endTurn')continue
+    const pieceZone = zoneFor(piece)
+    const untouched = zone ? !insideZone(zone,piece.x,piece.y) : !!pieceZone || !isAdventureHuman(before,piece.ownerPlayerId) && !world.roamingEnemyIds?.includes(piece.instanceId)
+    if (untouched && (!next || next.currentHp !== piece.currentHp || next.shield !== piece.shield)) throw new BattleRuleError('禁止跨战区伤害或治疗')
+    if (untouched && next) {
+      const effects = (p: PieceInstance) => [p.maxHp,p.attack,p.defense,p.moveRange,p.statusTags,p.buffs,p.debuffs,p.ruleTags,p.skills]
+      if (JSON.stringify(effects(piece)) !== JSON.stringify(effects(next))) throw new BattleRuleError('禁止跨战区施加效果')
+    }
+  }
+  if (zone) for (const piece of after.pieces) if (!before.pieces.some(p => p.instanceId === piece.instanceId) && !insideZone(zone,piece.x,piece.y)) throw new BattleRuleError('不能在战区外召唤棋子')
 }

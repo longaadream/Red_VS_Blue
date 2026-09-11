@@ -60,5 +60,6 @@
     "pve-light-spark",
     "pve-skirmish-calibrate"
   ],
-  "rewardCopies": 2
+  "rewardCopies": 2,
+  "rewardRelicLimit": 1
 }

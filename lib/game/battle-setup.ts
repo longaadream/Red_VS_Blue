@@ -320,6 +320,7 @@ interface PlayerSelectedPieces {
 export const DEMO_DEPLOYMENT_MAP_ID = 'large-hole-arena'
 
 export interface InitialPieceBuildOptions {
+  cooperativeAdventure?: boolean
   deterministicDeployment?: boolean
   progressiveDeployment?: boolean
   /** Construct off-board recruits without adding an opposing fallback roster. */
@@ -367,7 +368,7 @@ export function buildInitialPiecesForPlayers(
   randomFloat: () => number = rng,
   options: InitialPieceBuildOptions = {},
 ): PieceInstance[] {
-  if (players.length !== 2 && players.length !== 4) return []
+  if (options.cooperativeAdventure ? players.length < 2 || players.length > 5 : players.length !== 2 && players.length !== 4) return []
 
   const deterministicDeployment = options.deterministicDeployment === true
   const progressiveDeployment = options.progressiveDeployment === true
@@ -780,6 +781,7 @@ export async function createInitialBattleForPlayers(
     adventureWorld?: {
       map: BoardMap
       humanId: string
+      humanIds?: string[]
       captainId?: string
       coreIds?: string[]
       skills?: BattleState['skillsById']
@@ -788,7 +790,9 @@ export async function createInitialBattleForPlayers(
   },
 ): Promise<BattleState | null> {
   const teamMatch = options?.matchMode === '2v2'
-  if (playerIds.length !== (teamMatch ? 4 : 2)) return null
+  if (options?.adventureWorld?.humanIds) {
+    if (options.adventureWorld.humanIds.length < 1 || options.adventureWorld.humanIds.length > 4 || playerIds.length !== options.adventureWorld.humanIds.length + 1) return null
+  } else if (playerIds.length !== (teamMatch ? 4 : 2)) return null
   if (new Set(playerIds.map(id => id.toLowerCase())).size !== playerIds.length) return null
   if (teamMatch && playerIds.some((id, index) => playerSelectedPieces?.find(p => p.playerId === id)?.faction !== ['blue', 'red', 'red', 'blue'][index])) {
     throw new Error('2v2 requires blue-red-red-blue player order')
@@ -908,6 +912,7 @@ export async function createInitialBattleForPlayers(
     {
       deterministicDeployment: options?.deploymentEnabled === true,
       progressiveDeployment,
+      cooperativeAdventure: !!options?.adventureWorld?.humanIds,
     },
   )
   const progressiveReserves = progressiveDeployment
@@ -998,8 +1003,24 @@ export async function createInitialBattleForPlayers(
       occupied.add(key); piece.x = pos.x; piece.y = pos.y; piece.isCore = world.coreIds ? world.coreIds.includes(piece.instanceId) : true
     }
     state.extensions = { ...state.extensions, adventureWorld: { version: 'same-map-v1', humanId: world.humanId, activeEnemyIds: [], skillDefinitions:world.skills } }
+    if (world.humanIds) {
+      const parties: Record<string, NonNullable<import('./adventure-boundary').AdventureBoundary['party']>> = {}
+      for (const id of world.humanIds) {
+        const captain = state.pieces.find(p => p.ownerPlayerId === id)!
+        const reserves = state.pieces.filter(p => p.ownerPlayerId === id && p !== captain)
+        reserves.forEach(p => { p.x = null; p.y = null })
+        state.pieces = state.pieces.filter(p => !reserves.includes(p))
+        parties[id] = { captainId: captain.instanceId, reserves, anchor: { x: captain.x!, y: captain.y! }, battleRound: 0, deploymentRevision: 0 }
+      }
+      state.extensions.adventureWorld.coop = { humanIds: world.humanIds, enemyId: orderedIds.find(id => !world.humanIds!.includes(id))!, round: 1, order: [...world.humanIds], parties, encounters: {}, playerZones: {}, protectedUntil: {}, absent: [] }
+      state.extensions.adventureWorld.party = parties[world.humanId]
+      for (const player of state.players) {
+        player.teamId = world.humanIds.includes(player.playerId) ? 'red' : 'blue'
+        player.maxActionPoints = player.teamId === 'red' ? 3 : 0; player.actionPoints = player.maxActionPoints
+      }
+    }
     Object.assign(state.skillsById, world.skills ?? {})
-    if (world.captainId) {
+    if (world.captainId && !world.humanIds) {
       const captain = state.pieces.find(p => p.instanceId === world.captainId && p.ownerPlayerId === world.humanId)
       if (!captain) throw new Error('Adventure captain is missing')
       const reserves = state.pieces.filter(p => p.ownerPlayerId === world.humanId && p !== captain)

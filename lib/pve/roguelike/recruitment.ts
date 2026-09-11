@@ -1,7 +1,7 @@
 import { applyInitialRules, buildInitialPiecesForPlayers } from '../../game/battle-setup'
 import { getPieceById } from '../../game/piece-repository'
 import { getSkillById } from '../../game/skill-repository'
-import { assertContentAvailable } from '../../game/content-availability'
+import { assertContentAvailable, isContentAvailable } from '../../game/content-availability'
 import { deriveStreamSeed, mulberry32 } from '../../game/rule-runtime'
 import type { BattleState } from '../../game/turn'
 import type { RoguelikeAdventureV1 } from '../contracts/roguelike-content-v1'
@@ -11,7 +11,10 @@ export function recruitmentOffers(content: RoguelikeAdventureV1): Record<string,
   if (!config) return {}
   return Object.fromEntries(content.sites.filter(site => site.kind === 'recruit').map(site => {
     const random = mulberry32(deriveStreamSeed(content.party.seed, `adventure-recruitment:${site.id}`))
-    const pool = [...config.pieceIds]
+    const pool = config.pieceIds.filter(id => {
+      const piece = getPieceById(id)
+      return piece && isContentAvailable(piece, 'pve')
+    })
     for (let i = pool.length - 1; i > 0; i--) {
       const swap = Math.floor(random() * (i + 1)); [pool[i], pool[swap]] = [pool[swap], pool[i]]
     }

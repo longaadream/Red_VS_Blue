@@ -101,6 +101,15 @@ function coreEliminationResult(
   state: BattleState,
   settledAt: TerminalSettlementPosition,
 ): TerminalResult | null {
+  const cooperative = adventureBoundary(state)?.coop
+  if (cooperative) {
+    const living = [...state.pieces, ...Object.values(cooperative.parties).flatMap(p => p.reserves)]
+      .filter(p => p.isCore && p.currentHp > 0)
+    const humansAlive = cooperative.humanIds.some(id => !cooperative.absent.includes(id) && living.some(p => p.ownerPlayerId === id))
+    const enemiesAlive = living.some(p => p.ownerPlayerId === cooperative.enemyId)
+    if (humansAlive && (enemiesAlive || adventureBoundary(state)?.campaignHasNext)) return null
+    return teamResult(state, humansAlive ? 'red' : enemiesAlive ? 'blue' : null, 'core-eliminated', settledAt)
+  }
   if (state.players.length !== 2 && !isTeamMatch(state)) return null
 
   const progressiveDeployment = state.deployment?.mode === 'progressive-reserve-v1'
@@ -161,6 +170,8 @@ function coreEliminationResult(
   }
 
   const loser = defeated[0]
+  const world = adventureBoundary(state)
+  if (world?.campaignHasNext && loser.playerId !== world.humanId) return null
   const winner = players.find(player => player.normalizedId !== loser.normalizedId)
   if (!winner) return null
   return {
@@ -215,7 +226,9 @@ export function finalizeBattleTerminal(
           reason: 'timeout',
         }, settledAt)
       : null
-  const result = action.type === 'surrender'
+  const result = adventureBoundary(state)?.coop
+    ? (state.pendingOptionSelection || state.pendingTargetSelection ? null : coreEliminationResult(state, settledAt))
+    : action.type === 'surrender'
     ? surrenderResult(state, action, settledAt)
     : timeoutForfeit ?? (state.pendingOptionSelection || state.pendingTargetSelection
       ? null

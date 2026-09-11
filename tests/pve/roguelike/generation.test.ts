@@ -54,6 +54,6 @@ describe('landmark map generation', () => {
       expect(candidates).toHaveLength(3); expect(new Set(candidates).size).toBe(3)
     }
     expect(RoguelikeAdventureV1Schema.safeParse({ ...world, recruitment: undefined }).success).toBe(false)
-    expect(RoguelikeAdventureV1Schema.safeParse({ ...world, recruitment: { ...world.recruitment, candidates: 6 } }).success).toBe(false)
+    expect(RoguelikeAdventureV1Schema.safeParse({ ...world, recruitment: { ...world.recruitment, candidates: 7 } }).success).toBe(false)
   })
 })

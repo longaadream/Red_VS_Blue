@@ -8,6 +8,17 @@ window.RvBAdventureClient = {
     const [bundle, profile] = await Promise.all([json('./__battle-data.json'), json('./__tutorial-profile.json')])
     if (bundle.schemaVersion !== 'rvb-client-battle-data/v1' || !bundle.files) throw new Error('冒险资源格式无效')
     bundle.files['data/rules/rule-lucky-coin-gamestart.json'] = await json(new URL('./data/rules/rule-lucky-coin-gamestart.json', location.href))
+    const params = new URLSearchParams(location.search)
+    if (params.get('roomId')) {
+      const network = await RvBAdventureNetwork.connect({ roomId: params.get('roomId'), server: params.get('server') })
+      return { files: bundle.files, network, dispose: () => network.dispose(),
+        async request(type, payload) {
+          const result = await network.request(type === 'start' ? 'snapshot' : type, payload)
+          if (!result.snapshot) throw new Error('等待房主开始冒险')
+          return result.snapshot
+        },
+      }
+    }
     const worker = new Worker('js/adventure/bootstrap.js')
     const pending = new Map()
     let sequence = 0, disposed = false

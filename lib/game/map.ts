@@ -32,6 +32,7 @@ export interface Tile {
 }
 
 export interface BoardMap {
+  availability?: import('./content-availability').ContentAvailability
   id: string
   name: string
   width: number
@@ -48,6 +49,7 @@ export interface LegendEntry extends TileProperties {
 }
 
 export interface AsciiMapConfig {
+  availability?: import('./content-availability').ContentAvailability
   id: string
   name: string
   /** 每一行的字符串，长度应当一致 */
@@ -114,6 +116,6 @@ export function createMapFromAscii(config: AsciiMapConfig): BoardMap {
     })
   })
 
-  return { id, name, width, height, tiles }
+  return { id, name, width, height, tiles, ...(config.availability ? {availability:config.availability} : {}) }
 }
 

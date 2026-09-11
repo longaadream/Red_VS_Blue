@@ -1,6 +1,5 @@
+import { AdventureSession, createAdventureState, adventureContent, HUMAN, ENEMY } from './fixtures/legacy-adventure'
 import { describe, expect, it } from 'vitest'
-import { AdventureSession, createAdventureState } from '@/lib/pve/roguelike/session'
-import { adventureContent, HUMAN, ENEMY } from '@/lib/pve/roguelike/content'
 import { generateAdventureContent } from '@/lib/pve/roguelike/generation'
 import { adventureBoundary } from '@/lib/game/adventure-boundary'
 import { runBattleActionIsolated } from '@/lib/game/battle-runner'
@@ -8,6 +7,10 @@ import { getServerGameProfileIdentityV1 } from '@/lib/content-pipeline/runtime/p
 import { loadAllSkillsById } from '@/lib/game/skills'
 import { prepareAction } from '@/lib/game/targeting'
 import type { BattleAction } from '@/lib/game/turn'
+import { recruitmentOffers, buildAdventureRecruit } from '@/lib/pve/roguelike/recruitment'
+import { getPieceById } from '@/lib/game/piece-repository'
+import { isContentAvailable } from '@/lib/game/content-availability'
+import { adventureContent as liveContent } from '@/lib/pve/roguelike/content'
 
 const captainId = `${HUMAN}-1`
 async function fixture(cost = 15) {
@@ -21,6 +24,33 @@ async function fixture(cost = 15) {
   return { content, state, session: new AdventureSession(state, content) }
 }
 describe('map recruitment authority', () => {
+  it('draws three distinct recruits from the expanded pool with reproducible seed variation', async () => {
+    expect(liveContent.recruitment!.pieceIds.length).toBeGreaterThanOrEqual(30)
+    const seen=new Set<string>(), combinations=new Set<string>()
+    for(let seed=0;seed<32;seed++){
+      const content=structuredClone(liveContent);content.party.seed=seed
+      const offers=recruitmentOffers(content)
+      expect(offers).toEqual(recruitmentOffers(content))
+      for(const list of Object.values(offers)){
+        expect(list).toHaveLength(3);expect(new Set(list).size).toBe(3)
+        list.forEach(id=>seen.add(id));combinations.add([...list].sort().join(','))
+      }
+    }
+    expect(seen.size).toBeGreaterThan(25);expect(combinations.size).toBeGreaterThan(20)
+    const {state}=await fixture()
+    for(const id of liveContent.recruitment!.pieceIds)expect(()=>buildAdventureRecruit(state,id,`test-${id}`,HUMAN,ENEMY)).not.toThrow()
+  })
+  it('keeps Rafaam in PVP and rejects PVE initial rosters and recruitment', async () => {
+    const piece=getPieceById('red-rafaam')!
+    expect(isContentAvailable(piece,'pvp')).toBe(true)
+    expect(isContentAvailable(piece,'pve')).toBe(false)
+    const {state,content}=await fixture()
+    content.recruitment!.pieceIds=['red-rafaam','ana']
+    expect(Object.values(recruitmentOffers(content)).flat()).not.toContain('red-rafaam')
+    expect(()=>buildAdventureRecruit(state,'red-rafaam','blocked',HUMAN,ENEMY)).toThrow('未开放')
+    content.party.pieceIds=['red-rafaam']
+    await expect(createAdventureState(getServerGameProfileIdentityV1(),content)).rejects.toThrow('未开放')
+  })
   it('uses actual search coins, joins reserve with rules, and rejects duplicates, stale and invalid choices atomically', async () => {
     const { session } = await fixture()
     const before = session.snapshot()

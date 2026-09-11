@@ -53,8 +53,8 @@ describe('shared PVE resources and mode boundaries',()=>{
       expect(isContentAvailable({availability},'pvp')).toBe(false)
     }
   })
-  it('shares the five enemies and sixty designed cards, activating only the four supply-slice cards',()=>{
-    expect(read('data/pieces/manifest.json').filter((id:string)=>id.startsWith('pve-'))).toHaveLength(5)
+  it('shares the eight enemies and sixty designed cards, activating only the four supply-slice cards',()=>{
+    expect(read('data/pieces/manifest.json').filter((id:string)=>id.startsWith('pve-'))).toHaveLength(8)
     const cards=read('data/cards/manifest.json').filter((id:string)=>id.startsWith('pve-'))
     expect(cards).toHaveLength(60)
     const ready = ['pve-blood-curse','pve-light-spark','pve-skirmish-calibrate','pve-skirmish-cover']
@@ -82,6 +82,11 @@ describe('shared PVE resources and mode boundaries',()=>{
     expect(()=>RoguelikeAdventureV1Schema.parse({...read(worldPath),legacyNodes:[]})).toThrow()
     expect(()=>RoguelikeBuildsV1Schema.parse({...read('data/pve/roguelike/builds.json'),extra:true})).toThrow()
     expect(()=>validateRoguelikeReferences(files)).not.toThrow()
+    expect(()=>validateRoguelikeReferences(files.filter(file=>file.path!=='data/maps/adventure-act-1-v1.json'))).toThrow('maps/adventure-act-1-v1')
+    const invalidMap=clone(files)
+    const altered=invalidMap.find(file=>file.path==='data/maps/adventure-act-1-v1.json')!.jsonValue
+    altered.legend.find((entry:{char:string})=>entry.char==='#').walkable=true
+    expect(()=>validateRoguelikeReferences(invalidMap)).toThrow('terrain semantics')
     expect(()=>validateRoguelikeReferences(files.filter(file=>file.path!=='data/cards/pve-blood-flame.json'))).toThrow('pve-blood-flame')
     expect(()=>validateRoguelikeReferences(files.filter(file=>file.path!=='images/adventure/zombie.svg'))).toThrow('zombie.svg')
   })
@@ -118,8 +123,9 @@ describe('shared PVE resources and mode boundaries',()=>{
     }
   })
   it('a data-only map Patch changes the resolved identity and actual map initialization',()=>{
-    const world=read(worldPath);world.map.layout[2]='#C'+world.map.layout[2].slice(2)
-    const updated=resolveProfileV1({base,patches:[patch(worldPath,world)]})
+    const mapPath=`data/maps/${read(worldPath).map.id}.json`, map=read(mapPath)
+    map.layout[2]='#C'+map.layout[2].slice(2)
+    const updated=resolveProfileV1({base,patches:[patch(mapPath,map)]})
     const content=loadAdventureContent(relative=>JSON.parse(new TextDecoder().decode(updated.readFile('data/'+relative)!)))
     expect(updated.profile.authorityContentHash).not.toBe(profile.profile.authorityContentHash)
     expect(createAdventureMap(content).tiles.find(tile=>tile.x===1&&tile.y===2)?.props.type).toBe('cover')
@@ -167,3 +173,10 @@ describe('shared PVE resources and mode boundaries',()=>{
       expect(()=>validateRoguelikeReferences(files.filter(file=>file.path!==path))).toThrow(path.split('/').pop()!.replace('.json',''))
     })
 })
+
+ it('rejects malformed PVE power before resource-pack activation', () => {
+   for (const adventurePower of [null, {baseDamage:-1,usesGrowth:true}, {baseDamage:2,usesGrowth:'yes'}]) {
+     const card = {...read('data/cards/pve-skirmish-calibrate.json'), adventurePower}
+     expect(() => resolveProfileV1({base, patches:[patch('data/cards/pve-skirmish-calibrate.json',card)]})).toThrow()
+   }
+ })

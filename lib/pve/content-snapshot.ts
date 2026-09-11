@@ -1,6 +1,6 @@
 import type { ResolvedSnapshotViewV1 } from '@/lib/content-pipeline/core/resolver'
 import { parseStrictJsonBytesV1 } from '@/lib/content-pipeline/core/json-safety'
-import { parseRoguelikeDocumentV1 } from './contracts/roguelike-content-v1'
+import { parseRoguelikeDocumentV1, RoguelikeAdventureSourceV1Schema } from './contracts/roguelike-content-v1'
 import {
   PveCampaignV1Schema,
   PveChapterV1Schema,
@@ -263,7 +263,7 @@ export function createPveContentSnapshotV1(
     }
     const value = parseJson(descriptor.path, bytes)
     try {
-      if (parseRoguelikeDocumentV1(value)) continue
+      if (RoguelikeAdventureSourceV1Schema.safeParse(value).success || parseRoguelikeDocumentV1(value)) continue
     } catch {
       fail('PVE_SNAPSHOT_SCHEMA_INVALID', 'Invalid exploration content', { path: descriptor.path })
     }

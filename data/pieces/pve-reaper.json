@@ -6,8 +6,8 @@
   "rarity": "epic",
   "image": "adventure/reaper.jpg",
   "stats": {
-    "maxHp": 13,
-    "attack": 4,
+    "maxHp": 20,
+    "attack": 5,
     "defense": 1,
     "moveRange": 4
   },

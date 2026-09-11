@@ -1,7 +1,6 @@
+import { createAdventureState, AdventureSession, adventureSupplies, HUMAN, ENEMY, zones } from './fixtures/legacy-adventure'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
-import { createAdventureState, AdventureSession } from '@/lib/pve/roguelike/session'
-import { adventureSupplies, HUMAN, ENEMY, zones } from '@/lib/pve/roguelike/content'
 import { grantAdventureCards, supplyEncounter, cleanupAdventureCards, offerAdventureRewards, chooseAdventureSupply } from '@/lib/pve/roguelike/supplies'
 import { adventureCards } from '@/lib/game/adventure-card-state'
 import { adventureBoundary } from '@/lib/game/adventure-boundary'
@@ -43,6 +42,21 @@ function play(state: BattleState, cardId: string) {
     selectionId: prepared.selectionId, stateRevision: prepared.stateRevision }).state
 }
 describe('adventure supply and same-card growth', () => {
+  it('excludes starting relics from the one earned relic cap and ordinary fights give none',async()=>{
+    const {state}=await fixture(),ledger=adventureCards(state)!.players[HUMAN]
+    const limited={...config,rewardRelicLimit:1},starting=ledger.relicIds.length
+    offerAdventureRewards(state,HUMAN,'ordinary',limited,false)
+    expect(adventureCards(state)!.reward!.relicIds).toEqual([])
+    offerAdventureRewards(state,HUMAN,'elite',limited,true)
+    const id=adventureCards(state)!.reward!.relicIds[0]
+    expect(id).toBeTruthy()
+    chooseAdventureSupply(state,HUMAN,'relic',id,limited)
+    expect(ledger.relicIds).toHaveLength(starting+1)
+    const saved=JSON.parse(JSON.stringify(state))
+    offerAdventureRewards(saved,HUMAN,'next-act-elite',limited,true)
+    expect(adventureCards(saved)!.reward!.relicIds).toEqual([])
+    expect(adventureCards(saved)!.players[HUMAN].earnedRelics).toBe(1)
+  })
   it('publishes first-round enemy plans after supply hydrates and strips reserve rules', async () => {
     const state = runBattleActionIsolated(await createAdventureState(getServerGameProfileIdentityV1()), {type:'beginPhase'}).state
     const world = adventureBoundary(state)!, captain = state.pieces.find(p => p.ownerPlayerId === HUMAN)!

@@ -1,47 +1,64 @@
 {
   "schemaVersion": "rvb-pve-roguelike-adventure/v1",
   "id": "adventure-old-town",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "name": "第一幕 · 旧城边境",
-  "generation": { "algorithm": "landmark-routes-v1", "placementShift": 3, "sceneryDensity": 0.18, "mirror": true },
-  "recruitment": { "pieceIds": ["ana", "reaper", "liadrin", "anduin"], "candidates": 3, "cost": 15, "dismissCost": 10 },
+  "cooperation": {
+    "reinforcementPieceIds": [
+      "pve-zombie",
+      "pve-skeleton"
+    ],
+    "bossHealthPerExtraPlayer": 0.25,
+    "lateJoinCoinCap": 20
+  },
+  "generation": {
+    "algorithm": "terrain-regions-v1",
+    "placementShift": 2,
+    "sceneryDensity": 0.18,
+    "mirror": true
+  },
+  "recruitment": {
+    "pieceIds": [
+      "ana",
+      "anduin",
+      "arthas",
+      "blue-ichigo",
+      "blue-kenshin",
+      "blue-minato",
+      "blue-naruto",
+      "blue-tirion-fordring",
+      "blue-watcher",
+      "dark-aizen",
+      "dark-grimmjow",
+      "dark-ulquiorra",
+      "hashirama-edo",
+      "jaina",
+      "liadrin",
+      "reaper",
+      "red-blackwidow",
+      "red-doomsday-fist",
+      "red-hidan",
+      "red-illidan",
+      "red-itachi",
+      "red-obito",
+      "red-sasuke",
+      "red-shishio",
+      "red-venom",
+      "tracer",
+      "turalyon",
+      "tyrande",
+      "shadow",
+      "sonic",
+      "tails",
+      "uther",
+      "velen"
+    ],
+    "candidates": 3,
+    "cost": 15,
+    "dismissCost": 10
+  },
   "map": {
-    "id": "adventure-old-town-v1",
-    "name": "第一幕 · 旧城边境",
-    "layout": [
-      "################################",
-      "#..............................#",
-      "#..............................#",
-      "#..............................#",
-      "#.....................#........#",
-      "#.....................#........#",
-      "#.....................#...C....#",
-      "#.....................#........#",
-      "#..............................#",
-      "#..............................#",
-      "#..............................#",
-      "#.............C.......#C.......#",
-      "#.....................#........#",
-      "#.....................#........#",
-      "#...............C..............#",
-      "#..............................#",
-      "#OOOOOOOOOOO......OOOOOOOOOOOOO#",
-      "#..............................#",
-      "#..............................#",
-      "#.......C......................#",
-      "#...........##..###............#",
-      "#..............................#",
-      "#..............................#",
-      "#..............................#",
-      "#..C.........C.................#",
-      "#................C.............#",
-      "#..............................#",
-      "#..............................#",
-      "#.....C........................#",
-      "#..............................#",
-      "#..............................#",
-      "################################"
-    ]
+    "id": "adventure-act-1-v1"
   },
   "party": {
     "humanId": "adventure-human",
@@ -49,120 +66,332 @@
     "seed": 1810909,
     "pieceIds": [
       "tracer",
-      "uther"
+      "ana"
     ]
   },
   "zones": [
     {
       "id": "gate",
       "name": "断墙哨站",
-      "x": 10,
-      "y": 18,
-      "width": 10,
-      "height": 10,
+      "x": 4,
+      "y": 42,
+      "width": 16,
+      "height": 16,
       "enemyIds": [
         "adventure-enemy-1",
+        "adventure-enemy-2",
         "adventure-enemy-3",
         "adventure-enemy-4"
       ],
       "coreIds": [
         "adventure-enemy-1"
       ],
-      "reward": 25
+      "reward": 25,
+      "optional": true,
+      "elite": false
     },
     {
       "id": "keep",
-      "name": "旧城核心",
-      "x": 19,
-      "y": 3,
-      "width": 11,
-      "height": 11,
+      "name": "旧桥岗楼",
+      "x": 44,
+      "y": 42,
+      "width": 16,
+      "height": 16,
       "enemyIds": [
-        "adventure-enemy-2",
         "adventure-enemy-5",
-        "adventure-enemy-6"
+        "adventure-enemy-6",
+        "adventure-enemy-7",
+        "adventure-enemy-8"
       ],
       "coreIds": [
-        "adventure-enemy-2"
+        "adventure-enemy-5"
       ],
-      "reward": 40
+      "reward": 30,
+      "optional": true,
+      "elite": false
+    },
+    {
+      "id": "graveyard",
+      "name": "墓园小径",
+      "x": 24,
+      "y": 23,
+      "width": 16,
+      "height": 16,
+      "enemyIds": [
+        "adventure-enemy-9",
+        "adventure-enemy-10",
+        "adventure-enemy-11",
+        "adventure-enemy-12",
+        "adventure-enemy-13"
+      ],
+      "coreIds": [
+        "adventure-enemy-9"
+      ],
+      "reward": 35,
+      "optional": true,
+      "elite": true
+    },
+    {
+      "id": "hunters",
+      "name": "猎手庭院",
+      "x": 4,
+      "y": 4,
+      "width": 16,
+      "height": 16,
+      "enemyIds": [
+        "adventure-enemy-14",
+        "adventure-enemy-15",
+        "adventure-enemy-16",
+        "adventure-enemy-17",
+        "adventure-enemy-18"
+      ],
+      "coreIds": [
+        "adventure-enemy-14"
+      ],
+      "reward": 40,
+      "optional": true,
+      "elite": true
+    },
+    {
+      "id": "lord",
+      "name": "旧城领主",
+      "x": 44,
+      "y": 4,
+      "width": 16,
+      "height": 16,
+      "enemyIds": [
+        "adventure-enemy-19",
+        "adventure-enemy-20",
+        "adventure-enemy-21",
+        "adventure-enemy-22",
+        "adventure-enemy-23",
+        "adventure-enemy-24"
+      ],
+      "coreIds": [
+        "adventure-enemy-19"
+      ],
+      "reward": 50,
+      "optional": false,
+      "elite": false
     }
   ],
   "sites": [
-    { "id": "recruit-camp", "name": "营地同行者", "x": 3, "y": 27, "kind": "recruit", "detail": "从三名同行者中招募一人。加入预备队，战斗中免费部署。" },
-    { "id": "recruit-bridge", "name": "桥边旅人", "x": 13, "y": 14, "kind": "recruit", "detail": "从三名同行者中招募一人。离开再回来，人选不变。" },
-    {
-      "id": "camp",
-      "name": "旅人营地",
-      "x": 5,
-      "y": 26,
-      "kind": "camp",
-      "detail": "休整治疗全队，或强化一名队员；消耗当前回合。"
-    },
-    {
-      "id": "supply",
-      "name": "遗落的行囊",
-      "x": 7,
-      "y": 23,
-      "kind": "loot",
-      "detail": "搜索获得 15 枚金币。每局只能领取一次。"
-    },
-    {
-      "id": "cart",
-      "name": "旧桥补给",
-      "x": 15,
-      "y": 13,
-      "kind": "loot",
-      "detail": "搜索获得 15 枚金币。清除哨站后沿小径继续北上。"
-    },
     {
       "id": "gate",
-      "name": "断墙哨站",
-      "x": 10,
-      "y": 24,
+      "name": "断墙哨站 · 可选",
+      "x": 4,
+      "y": 54,
       "kind": "encounter",
-      "detail": "踏入虚线范围将正式开战。消灭守卫核心后解除封锁。"
+      "detail": "可选战斗：获取金币和卡牌，也可绕过。"
     },
     {
       "id": "keep",
-      "name": "旧城核心",
-      "x": 19,
-      "y": 11,
+      "name": "旧桥岗楼 · 可选",
+      "x": 44,
+      "y": 54,
       "kind": "encounter",
-      "detail": "先清除断墙哨站。消灭此处核心，完成首幕切片。"
+      "detail": "可选战斗：获取金币和卡牌，也可绕过。"
+    },
+    {
+      "id": "graveyard",
+      "name": "墓园小径 · 精英",
+      "x": 24,
+      "y": 35,
+      "kind": "encounter",
+      "detail": "可选精英战：更多金币与遗物奖励机会。"
+    },
+    {
+      "id": "hunters",
+      "name": "猎手庭院 · 精英",
+      "x": 4,
+      "y": 16,
+      "kind": "encounter",
+      "detail": "可选精英战：更多金币与遗物奖励机会。"
+    },
+    {
+      "id": "lord",
+      "name": "旧城领主 · 首领",
+      "x": 44,
+      "y": 16,
+      "kind": "encounter",
+      "detail": "击败此处首领即可进入下一幕。"
+    },
+    {
+      "id": "camp",
+      "name": "旅人营地",
+      "x": 7,
+      "y": 61,
+      "kind": "camp",
+      "detail": "全队治疗，或强化一名队员。"
+    },
+    {
+      "id": "supply",
+      "name": "遗落行囊",
+      "x": 5,
+      "y": 59,
+      "kind": "loot",
+      "detail": "搜索获得15金币。"
+    },
+    {
+      "id": "cart",
+      "name": "路边补给",
+      "x": 22,
+      "y": 41,
+      "kind": "loot",
+      "detail": "搜索获得15金币。"
+    },
+    {
+      "id": "north-cache",
+      "name": "北境行囊",
+      "x": 40,
+      "y": 21,
+      "kind": "loot",
+      "detail": "搜索获得15金币。"
+    },
+    {
+      "id": "recruit-camp",
+      "name": "营地同行者",
+      "x": 11,
+      "y": 60,
+      "kind": "recruit",
+      "detail": "招募一名队员，加入预备队。"
+    },
+    {
+      "id": "recruit-bridge",
+      "name": "岔路旅人",
+      "x": 32,
+      "y": 42,
+      "kind": "recruit",
+      "detail": "招募一名队员，加入预备队。"
+    },
+    {
+      "id": "recruit-north",
+      "name": "北境旅人",
+      "x": 22,
+      "y": 20,
+      "kind": "recruit",
+      "detail": "招募一名队员，加入预备队。"
+    },
+    {
+      "id": "exit",
+      "name": "幕间通道",
+      "x": 59,
+      "y": 2,
+      "kind": "exit",
+      "detail": "清除本幕五处据点后进入下一幕。"
     }
   ],
   "startingPositions": {
     "adventure-human-1": {
-      "x": 5,
-      "y": 25
+      "x": 7,
+      "y": 60
     },
     "adventure-human-2": {
-      "x": 5,
-      "y": 27
+      "x": 8,
+      "y": 60
     },
     "adventure-enemy-1": {
-      "x": 16,
-      "y": 23
+      "x": 13,
+      "y": 50
     },
     "adventure-enemy-2": {
-      "x": 25,
-      "y": 8
+      "x": 10,
+      "y": 53
     },
     "adventure-enemy-3": {
-      "x": 14,
-      "y": 25
+      "x": 15,
+      "y": 53
     },
     "adventure-enemy-4": {
-      "x": 18,
-      "y": 22
+      "x": 11,
+      "y": 48
     },
     "adventure-enemy-5": {
-      "x": 23,
-      "y": 10
+      "x": 53,
+      "y": 50
     },
     "adventure-enemy-6": {
-      "x": 27,
+      "x": 50,
+      "y": 53
+    },
+    "adventure-enemy-7": {
+      "x": 55,
+      "y": 53
+    },
+    "adventure-enemy-8": {
+      "x": 51,
+      "y": 48
+    },
+    "adventure-enemy-9": {
+      "x": 33,
+      "y": 31
+    },
+    "adventure-enemy-10": {
+      "x": 30,
+      "y": 34
+    },
+    "adventure-enemy-11": {
+      "x": 35,
+      "y": 34
+    },
+    "adventure-enemy-12": {
+      "x": 31,
+      "y": 29
+    },
+    "adventure-enemy-13": {
+      "x": 36,
+      "y": 28
+    },
+    "adventure-enemy-14": {
+      "x": 13,
+      "y": 12
+    },
+    "adventure-enemy-15": {
+      "x": 10,
+      "y": 15
+    },
+    "adventure-enemy-16": {
+      "x": 15,
+      "y": 15
+    },
+    "adventure-enemy-17": {
+      "x": 11,
+      "y": 10
+    },
+    "adventure-enemy-18": {
+      "x": 16,
+      "y": 9
+    },
+    "adventure-enemy-19": {
+      "x": 53,
+      "y": 12
+    },
+    "adventure-enemy-20": {
+      "x": 50,
+      "y": 15
+    },
+    "adventure-enemy-21": {
+      "x": 55,
+      "y": 15
+    },
+    "adventure-enemy-22": {
+      "x": 51,
+      "y": 10
+    },
+    "adventure-enemy-23": {
+      "x": 56,
+      "y": 9
+    },
+    "adventure-enemy-24": {
+      "x": 49,
+      "y": 12
+    },
+    "adventure-enemy-25": {
+      "x": 32,
+      "y": 58
+    },
+    "adventure-enemy-26": {
+      "x": 32,
       "y": 10
     }
   },
@@ -172,65 +401,285 @@
       "templateId": "pve-reaper",
       "zone": "gate",
       "tier": "elite",
-      "role": "近身压制",
+      "role": "直线压制",
       "ip": "守望先锋",
       "core": true,
-      "x": 16,
-      "y": 23
+      "x": 13,
+      "y": 50
     },
     {
       "id": "adventure-enemy-2",
-      "templateId": "pve-arthas",
-      "zone": "keep",
-      "tier": "boss",
-      "role": "近战 · 召唤",
-      "ip": "魔兽世界",
-      "core": true,
-      "x": 25,
-      "y": 8
+      "templateId": "pve-zombie",
+      "zone": "gate",
+      "tier": "minion",
+      "role": "近战堵路",
+      "ip": "我的世界",
+      "core": false,
+      "x": 10,
+      "y": 53
     },
     {
       "id": "adventure-enemy-3",
-      "templateId": "pve-zombie",
-      "zone": "gate",
-      "tier": "minion",
-      "role": "近战",
-      "ip": "我的世界",
-      "core": false,
-      "x": 14,
-      "y": 25
-    },
-    {
-      "id": "adventure-enemy-4",
       "templateId": "pve-skeleton",
       "zone": "gate",
       "tier": "minion",
-      "role": "直线射击",
+      "role": "交叉射击",
       "ip": "我的世界",
       "core": false,
-      "x": 18,
-      "y": 22
+      "x": 15,
+      "y": 53
+    },
+    {
+      "id": "adventure-enemy-4",
+      "templateId": "pve-zombie",
+      "zone": "gate",
+      "tier": "minion",
+      "role": "近战堵路",
+      "ip": "我的世界",
+      "core": false,
+      "x": 11,
+      "y": 48
     },
     {
       "id": "adventure-enemy-5",
-      "templateId": "pve-zombie",
+      "templateId": "pve-reaper",
       "zone": "keep",
-      "tier": "minion",
-      "role": "近战",
-      "ip": "我的世界",
-      "core": false,
-      "x": 23,
-      "y": 10
+      "tier": "elite",
+      "role": "直线压制",
+      "ip": "守望先锋",
+      "core": true,
+      "x": 53,
+      "y": 50
     },
     {
       "id": "adventure-enemy-6",
       "templateId": "pve-skeleton",
       "zone": "keep",
       "tier": "minion",
-      "role": "直线射击",
+      "role": "交叉射击",
       "ip": "我的世界",
       "core": false,
-      "x": 27,
+      "x": 50,
+      "y": 53
+    },
+    {
+      "id": "adventure-enemy-7",
+      "templateId": "pve-skeleton",
+      "zone": "keep",
+      "tier": "minion",
+      "role": "交叉射击",
+      "ip": "我的世界",
+      "core": false,
+      "x": 55,
+      "y": 53
+    },
+    {
+      "id": "adventure-enemy-8",
+      "templateId": "pve-zombie",
+      "zone": "keep",
+      "tier": "minion",
+      "role": "近战堵路",
+      "ip": "我的世界",
+      "core": false,
+      "x": 51,
+      "y": 48
+    },
+    {
+      "id": "adventure-enemy-9",
+      "templateId": "pve-reaper",
+      "zone": "graveyard",
+      "tier": "elite",
+      "role": "直线压制",
+      "ip": "守望先锋",
+      "core": true,
+      "x": 33,
+      "y": 31
+    },
+    {
+      "id": "adventure-enemy-10",
+      "templateId": "pve-abomination",
+      "zone": "graveyard",
+      "tier": "elite",
+      "role": "范围压迫",
+      "ip": "魔兽世界",
+      "core": false,
+      "x": 30,
+      "y": 34
+    },
+    {
+      "id": "adventure-enemy-11",
+      "templateId": "pve-wither-skeleton",
+      "zone": "graveyard",
+      "tier": "elite",
+      "role": "近身追猎",
+      "ip": "我的世界",
+      "core": false,
+      "x": 35,
+      "y": 34
+    },
+    {
+      "id": "adventure-enemy-12",
+      "templateId": "pve-stormtrooper",
+      "zone": "graveyard",
+      "tier": "elite",
+      "role": "远程封路",
+      "ip": "星球大战",
+      "core": false,
+      "x": 31,
+      "y": 29
+    },
+    {
+      "id": "adventure-enemy-13",
+      "templateId": "pve-abomination",
+      "zone": "graveyard",
+      "tier": "elite",
+      "role": "范围压迫",
+      "ip": "魔兽世界",
+      "core": false,
+      "x": 36,
+      "y": 28
+    },
+    {
+      "id": "adventure-enemy-14",
+      "templateId": "pve-reaper",
+      "zone": "hunters",
+      "tier": "elite",
+      "role": "直线压制",
+      "ip": "守望先锋",
+      "core": true,
+      "x": 13,
+      "y": 12
+    },
+    {
+      "id": "adventure-enemy-15",
+      "templateId": "pve-abomination",
+      "zone": "hunters",
+      "tier": "elite",
+      "role": "范围压迫",
+      "ip": "魔兽世界",
+      "core": false,
+      "x": 10,
+      "y": 15
+    },
+    {
+      "id": "adventure-enemy-16",
+      "templateId": "pve-wither-skeleton",
+      "zone": "hunters",
+      "tier": "elite",
+      "role": "近身追猎",
+      "ip": "我的世界",
+      "core": false,
+      "x": 15,
+      "y": 15
+    },
+    {
+      "id": "adventure-enemy-17",
+      "templateId": "pve-stormtrooper",
+      "zone": "hunters",
+      "tier": "elite",
+      "role": "远程封路",
+      "ip": "星球大战",
+      "core": false,
+      "x": 11,
+      "y": 10
+    },
+    {
+      "id": "adventure-enemy-18",
+      "templateId": "pve-abomination",
+      "zone": "hunters",
+      "tier": "elite",
+      "role": "范围压迫",
+      "ip": "魔兽世界",
+      "core": false,
+      "x": 16,
+      "y": 9
+    },
+    {
+      "id": "adventure-enemy-19",
+      "templateId": "pve-arthas",
+      "zone": "lord",
+      "tier": "boss",
+      "role": "近战 · 召唤",
+      "ip": "魔兽世界",
+      "core": true,
+      "x": 53,
+      "y": 12
+    },
+    {
+      "id": "adventure-enemy-20",
+      "templateId": "pve-zombie",
+      "zone": "lord",
+      "tier": "minion",
+      "role": "近战堵路",
+      "ip": "我的世界",
+      "core": false,
+      "x": 50,
+      "y": 15
+    },
+    {
+      "id": "adventure-enemy-21",
+      "templateId": "pve-skeleton",
+      "zone": "lord",
+      "tier": "minion",
+      "role": "交叉射击",
+      "ip": "我的世界",
+      "core": false,
+      "x": 55,
+      "y": 15
+    },
+    {
+      "id": "adventure-enemy-22",
+      "templateId": "pve-ghoul",
+      "zone": "lord",
+      "tier": "minion",
+      "role": "近战追击",
+      "ip": "魔兽世界",
+      "core": false,
+      "x": 51,
+      "y": 10
+    },
+    {
+      "id": "adventure-enemy-23",
+      "templateId": "pve-skeleton",
+      "zone": "lord",
+      "tier": "minion",
+      "role": "交叉射击",
+      "ip": "我的世界",
+      "core": false,
+      "x": 56,
+      "y": 9
+    },
+    {
+      "id": "adventure-enemy-24",
+      "templateId": "pve-zombie",
+      "zone": "lord",
+      "tier": "minion",
+      "role": "近战堵路",
+      "ip": "我的世界",
+      "core": false,
+      "x": 49,
+      "y": 12
+    },
+    {
+      "id": "adventure-enemy-25",
+      "templateId": "pve-zombie",
+      "zone": "roaming",
+      "tier": "minion",
+      "role": "巡游追击",
+      "ip": "我的世界",
+      "core": false,
+      "x": 32,
+      "y": 58
+    },
+    {
+      "id": "adventure-enemy-26",
+      "templateId": "pve-ghoul",
+      "zone": "roaming",
+      "tier": "minion",
+      "role": "巡游追击",
+      "ip": "魔兽世界",
+      "core": false,
+      "x": 32,
       "y": 10
     }
   ],
@@ -240,13 +689,21 @@
       "pve-skeleton",
       "pve-ghoul",
       "pve-reaper",
-      "pve-arthas"
+      "pve-arthas",
+      "pve-abomination",
+      "pve-wither-skeleton",
+      "pve-stormtrooper"
     ],
     "skillIds": [
       "pve-claw",
       "pve-shot",
       "pve-arrow",
-      "pve-raise-dead"
+      "pve-raise-dead",
+      "pve-sweep",
+      "pve-hook",
+      "pve-tracking-slash",
+      "pve-overwatch",
+      "pve-blaster"
     ],
     "buildsPath": "data/pve/roguelike/builds.json",
     "images": [
@@ -254,8 +711,1527 @@
       "images/adventure/skeleton.svg",
       "images/adventure/ghoul.svg",
       "images/adventure/reaper.jpg",
-      "images/adventure/arthas.jpg"
+      "images/adventure/arthas.jpg",
+      "images/adventure/abomination-portrait.png",
+      "images/adventure/wither-skeleton.svg",
+      "images/adventure/stormtrooper.svg"
     ],
     "suppliesPath": "data/pve/roguelike/supplies.json"
+  },
+  "roaming": {
+    "enemyIds": [
+      "adventure-enemy-25",
+      "adventure-enemy-26"
+    ],
+    "aggroRange": 5,
+    "reward": 8
+  },
+  "nextActs": [
+    {
+      "id": "adventure-ashlands",
+      "name": "第二幕 · 灰烬荒原",
+      "map": {
+        "id": "adventure-act-2-v1"
+      },
+      "zones": [
+        {
+          "id": "act2-outpost",
+          "name": "灰烬前哨",
+          "x": 4,
+          "y": 42,
+          "width": 16,
+          "height": 16,
+          "enemyIds": [
+            "adventure-enemy-1",
+            "adventure-enemy-2",
+            "adventure-enemy-3",
+            "adventure-enemy-4",
+            "adventure-enemy-5"
+          ],
+          "coreIds": [
+            "adventure-enemy-1"
+          ],
+          "reward": 35,
+          "optional": true,
+          "elite": false
+        },
+        {
+          "id": "act2-towers",
+          "name": "双塔火线",
+          "x": 44,
+          "y": 42,
+          "width": 16,
+          "height": 16,
+          "enemyIds": [
+            "adventure-enemy-6",
+            "adventure-enemy-7",
+            "adventure-enemy-8",
+            "adventure-enemy-9",
+            "adventure-enemy-10"
+          ],
+          "coreIds": [
+            "adventure-enemy-6"
+          ],
+          "reward": 40,
+          "optional": true,
+          "elite": false
+        },
+        {
+          "id": "act2-ambush",
+          "name": "荒原伏兵",
+          "x": 24,
+          "y": 23,
+          "width": 16,
+          "height": 16,
+          "enemyIds": [
+            "adventure-enemy-11",
+            "adventure-enemy-12",
+            "adventure-enemy-13",
+            "adventure-enemy-14",
+            "adventure-enemy-15",
+            "adventure-enemy-16"
+          ],
+          "coreIds": [
+            "adventure-enemy-11"
+          ],
+          "reward": 45,
+          "optional": true,
+          "elite": true
+        },
+        {
+          "id": "act2-guard",
+          "name": "焦土祭坛",
+          "x": 4,
+          "y": 4,
+          "width": 16,
+          "height": 16,
+          "enemyIds": [
+            "adventure-enemy-17",
+            "adventure-enemy-18",
+            "adventure-enemy-19",
+            "adventure-enemy-20",
+            "adventure-enemy-21",
+            "adventure-enemy-22"
+          ],
+          "coreIds": [
+            "adventure-enemy-17"
+          ],
+          "reward": 50,
+          "optional": true,
+          "elite": true
+        },
+        {
+          "id": "act2-boss",
+          "name": "余烬王庭",
+          "x": 44,
+          "y": 4,
+          "width": 16,
+          "height": 16,
+          "enemyIds": [
+            "adventure-enemy-23",
+            "adventure-enemy-24",
+            "adventure-enemy-25",
+            "adventure-enemy-26",
+            "adventure-enemy-27",
+            "adventure-enemy-28",
+            "adventure-enemy-29"
+          ],
+          "coreIds": [
+            "adventure-enemy-23"
+          ],
+          "reward": 60,
+          "optional": false,
+          "elite": false
+        }
+      ],
+      "sites": [
+        {
+          "id": "act2-outpost",
+          "name": "灰烬前哨 · 可选",
+          "x": 4,
+          "y": 54,
+          "kind": "encounter",
+          "detail": "可选战斗：获取金币和卡牌，也可绕过。"
+        },
+        {
+          "id": "act2-towers",
+          "name": "双塔火线 · 可选",
+          "x": 44,
+          "y": 54,
+          "kind": "encounter",
+          "detail": "可选战斗：获取金币和卡牌，也可绕过。"
+        },
+        {
+          "id": "act2-ambush",
+          "name": "荒原伏兵 · 精英",
+          "x": 24,
+          "y": 35,
+          "kind": "encounter",
+          "detail": "可选精英战：更多金币与遗物奖励机会。"
+        },
+        {
+          "id": "act2-guard",
+          "name": "焦土祭坛 · 精英",
+          "x": 4,
+          "y": 16,
+          "kind": "encounter",
+          "detail": "可选精英战：更多金币与遗物奖励机会。"
+        },
+        {
+          "id": "act2-boss",
+          "name": "余烬王庭 · 首领",
+          "x": 44,
+          "y": 16,
+          "kind": "encounter",
+          "detail": "击败此处首领即可进入下一幕。"
+        },
+        {
+          "id": "camp",
+          "name": "旅人营地",
+          "x": 7,
+          "y": 61,
+          "kind": "camp",
+          "detail": "全队治疗，或强化一名队员。"
+        },
+        {
+          "id": "supply",
+          "name": "遗落行囊",
+          "x": 5,
+          "y": 59,
+          "kind": "loot",
+          "detail": "搜索获得15金币。"
+        },
+        {
+          "id": "cart",
+          "name": "路边补给",
+          "x": 22,
+          "y": 41,
+          "kind": "loot",
+          "detail": "搜索获得15金币。"
+        },
+        {
+          "id": "north-cache",
+          "name": "北境行囊",
+          "x": 40,
+          "y": 21,
+          "kind": "loot",
+          "detail": "搜索获得15金币。"
+        },
+        {
+          "id": "recruit-camp",
+          "name": "营地同行者",
+          "x": 11,
+          "y": 60,
+          "kind": "recruit",
+          "detail": "招募一名队员，加入预备队。"
+        },
+        {
+          "id": "recruit-bridge",
+          "name": "岔路旅人",
+          "x": 32,
+          "y": 42,
+          "kind": "recruit",
+          "detail": "招募一名队员，加入预备队。"
+        },
+        {
+          "id": "recruit-north",
+          "name": "北境旅人",
+          "x": 22,
+          "y": 20,
+          "kind": "recruit",
+          "detail": "招募一名队员，加入预备队。"
+        },
+        {
+          "id": "exit",
+          "name": "幕间通道",
+          "x": 59,
+          "y": 2,
+          "kind": "exit",
+          "detail": "清除本幕五处据点后进入下一幕。"
+        }
+      ],
+      "startingPositions": {
+        "adventure-human-1": {
+          "x": 7,
+          "y": 60
+        },
+        "adventure-human-2": {
+          "x": 8,
+          "y": 60
+        },
+        "adventure-enemy-1": {
+          "x": 13,
+          "y": 50
+        },
+        "adventure-enemy-2": {
+          "x": 10,
+          "y": 53
+        },
+        "adventure-enemy-3": {
+          "x": 15,
+          "y": 53
+        },
+        "adventure-enemy-4": {
+          "x": 11,
+          "y": 48
+        },
+        "adventure-enemy-5": {
+          "x": 16,
+          "y": 47
+        },
+        "adventure-enemy-6": {
+          "x": 53,
+          "y": 50
+        },
+        "adventure-enemy-7": {
+          "x": 50,
+          "y": 53
+        },
+        "adventure-enemy-8": {
+          "x": 55,
+          "y": 53
+        },
+        "adventure-enemy-9": {
+          "x": 51,
+          "y": 48
+        },
+        "adventure-enemy-10": {
+          "x": 56,
+          "y": 47
+        },
+        "adventure-enemy-11": {
+          "x": 33,
+          "y": 31
+        },
+        "adventure-enemy-12": {
+          "x": 30,
+          "y": 34
+        },
+        "adventure-enemy-13": {
+          "x": 35,
+          "y": 34
+        },
+        "adventure-enemy-14": {
+          "x": 31,
+          "y": 29
+        },
+        "adventure-enemy-15": {
+          "x": 36,
+          "y": 28
+        },
+        "adventure-enemy-16": {
+          "x": 29,
+          "y": 31
+        },
+        "adventure-enemy-17": {
+          "x": 13,
+          "y": 12
+        },
+        "adventure-enemy-18": {
+          "x": 10,
+          "y": 15
+        },
+        "adventure-enemy-19": {
+          "x": 15,
+          "y": 15
+        },
+        "adventure-enemy-20": {
+          "x": 11,
+          "y": 10
+        },
+        "adventure-enemy-21": {
+          "x": 16,
+          "y": 9
+        },
+        "adventure-enemy-22": {
+          "x": 9,
+          "y": 12
+        },
+        "adventure-enemy-23": {
+          "x": 53,
+          "y": 12
+        },
+        "adventure-enemy-24": {
+          "x": 50,
+          "y": 15
+        },
+        "adventure-enemy-25": {
+          "x": 55,
+          "y": 15
+        },
+        "adventure-enemy-26": {
+          "x": 51,
+          "y": 10
+        },
+        "adventure-enemy-27": {
+          "x": 56,
+          "y": 9
+        },
+        "adventure-enemy-28": {
+          "x": 49,
+          "y": 12
+        },
+        "adventure-enemy-29": {
+          "x": 54,
+          "y": 7
+        },
+        "adventure-enemy-30": {
+          "x": 32,
+          "y": 58
+        },
+        "adventure-enemy-31": {
+          "x": 32,
+          "y": 10
+        }
+      },
+      "enemyLineup": [
+        {
+          "id": "adventure-enemy-1",
+          "templateId": "pve-reaper",
+          "zone": "act2-outpost",
+          "tier": "elite",
+          "role": "直线压制",
+          "ip": "守望先锋",
+          "core": true,
+          "x": 13,
+          "y": 50
+        },
+        {
+          "id": "adventure-enemy-2",
+          "templateId": "pve-zombie",
+          "zone": "act2-outpost",
+          "tier": "minion",
+          "role": "近战堵路",
+          "ip": "我的世界",
+          "core": false,
+          "x": 10,
+          "y": 53
+        },
+        {
+          "id": "adventure-enemy-3",
+          "templateId": "pve-skeleton",
+          "zone": "act2-outpost",
+          "tier": "minion",
+          "role": "交叉射击",
+          "ip": "我的世界",
+          "core": false,
+          "x": 15,
+          "y": 53
+        },
+        {
+          "id": "adventure-enemy-4",
+          "templateId": "pve-zombie",
+          "zone": "act2-outpost",
+          "tier": "minion",
+          "role": "近战堵路",
+          "ip": "我的世界",
+          "core": false,
+          "x": 11,
+          "y": 48
+        },
+        {
+          "id": "adventure-enemy-5",
+          "templateId": "pve-skeleton",
+          "zone": "act2-outpost",
+          "tier": "minion",
+          "role": "交叉射击",
+          "ip": "我的世界",
+          "core": false,
+          "x": 16,
+          "y": 47
+        },
+        {
+          "id": "adventure-enemy-6",
+          "templateId": "pve-reaper",
+          "zone": "act2-towers",
+          "tier": "elite",
+          "role": "直线压制",
+          "ip": "守望先锋",
+          "core": true,
+          "x": 53,
+          "y": 50
+        },
+        {
+          "id": "adventure-enemy-7",
+          "templateId": "pve-skeleton",
+          "zone": "act2-towers",
+          "tier": "minion",
+          "role": "交叉射击",
+          "ip": "我的世界",
+          "core": false,
+          "x": 50,
+          "y": 53
+        },
+        {
+          "id": "adventure-enemy-8",
+          "templateId": "pve-skeleton",
+          "zone": "act2-towers",
+          "tier": "minion",
+          "role": "交叉射击",
+          "ip": "我的世界",
+          "core": false,
+          "x": 55,
+          "y": 53
+        },
+        {
+          "id": "adventure-enemy-9",
+          "templateId": "pve-zombie",
+          "zone": "act2-towers",
+          "tier": "minion",
+          "role": "近战堵路",
+          "ip": "我的世界",
+          "core": false,
+          "x": 51,
+          "y": 48
+        },
+        {
+          "id": "adventure-enemy-10",
+          "templateId": "pve-skeleton",
+          "zone": "act2-towers",
+          "tier": "minion",
+          "role": "交叉射击",
+          "ip": "我的世界",
+          "core": false,
+          "x": 56,
+          "y": 47
+        },
+        {
+          "id": "adventure-enemy-11",
+          "templateId": "pve-reaper",
+          "zone": "act2-ambush",
+          "tier": "elite",
+          "role": "直线压制",
+          "ip": "守望先锋",
+          "core": true,
+          "x": 33,
+          "y": 31
+        },
+        {
+          "id": "adventure-enemy-12",
+          "templateId": "pve-abomination",
+          "zone": "act2-ambush",
+          "tier": "elite",
+          "role": "范围压迫",
+          "ip": "魔兽世界",
+          "core": false,
+          "x": 30,
+          "y": 34
+        },
+        {
+          "id": "adventure-enemy-13",
+          "templateId": "pve-wither-skeleton",
+          "zone": "act2-ambush",
+          "tier": "elite",
+          "role": "近身追猎",
+          "ip": "我的世界",
+          "core": false,
+          "x": 35,
+          "y": 34
+        },
+        {
+          "id": "adventure-enemy-14",
+          "templateId": "pve-stormtrooper",
+          "zone": "act2-ambush",
+          "tier": "elite",
+          "role": "远程封路",
+          "ip": "星球大战",
+          "core": false,
+          "x": 31,
+          "y": 29
+        },
+        {
+          "id": "adventure-enemy-15",
+          "templateId": "pve-abomination",
+          "zone": "act2-ambush",
+          "tier": "elite",
+          "role": "范围压迫",
+          "ip": "魔兽世界",
+          "core": false,
+          "x": 36,
+          "y": 28
+        },
+        {
+          "id": "adventure-enemy-16",
+          "templateId": "pve-wither-skeleton",
+          "zone": "act2-ambush",
+          "tier": "elite",
+          "role": "近身追猎",
+          "ip": "我的世界",
+          "core": false,
+          "x": 29,
+          "y": 31
+        },
+        {
+          "id": "adventure-enemy-17",
+          "templateId": "pve-reaper",
+          "zone": "act2-guard",
+          "tier": "elite",
+          "role": "直线压制",
+          "ip": "守望先锋",
+          "core": true,
+          "x": 13,
+          "y": 12
+        },
+        {
+          "id": "adventure-enemy-18",
+          "templateId": "pve-abomination",
+          "zone": "act2-guard",
+          "tier": "elite",
+          "role": "范围压迫",
+          "ip": "魔兽世界",
+          "core": false,
+          "x": 10,
+          "y": 15
+        },
+        {
+          "id": "adventure-enemy-19",
+          "templateId": "pve-wither-skeleton",
+          "zone": "act2-guard",
+          "tier": "elite",
+          "role": "近身追猎",
+          "ip": "我的世界",
+          "core": false,
+          "x": 15,
+          "y": 15
+        },
+        {
+          "id": "adventure-enemy-20",
+          "templateId": "pve-stormtrooper",
+          "zone": "act2-guard",
+          "tier": "elite",
+          "role": "远程封路",
+          "ip": "星球大战",
+          "core": false,
+          "x": 11,
+          "y": 10
+        },
+        {
+          "id": "adventure-enemy-21",
+          "templateId": "pve-abomination",
+          "zone": "act2-guard",
+          "tier": "elite",
+          "role": "范围压迫",
+          "ip": "魔兽世界",
+          "core": false,
+          "x": 16,
+          "y": 9
+        },
+        {
+          "id": "adventure-enemy-22",
+          "templateId": "pve-wither-skeleton",
+          "zone": "act2-guard",
+          "tier": "elite",
+          "role": "近身追猎",
+          "ip": "我的世界",
+          "core": false,
+          "x": 9,
+          "y": 12
+        },
+        {
+          "id": "adventure-enemy-23",
+          "templateId": "pve-arthas",
+          "zone": "act2-boss",
+          "tier": "boss",
+          "role": "近战 · 召唤",
+          "ip": "魔兽世界",
+          "core": true,
+          "x": 53,
+          "y": 12
+        },
+        {
+          "id": "adventure-enemy-24",
+          "templateId": "pve-zombie",
+          "zone": "act2-boss",
+          "tier": "minion",
+          "role": "近战堵路",
+          "ip": "我的世界",
+          "core": false,
+          "x": 50,
+          "y": 15
+        },
+        {
+          "id": "adventure-enemy-25",
+          "templateId": "pve-skeleton",
+          "zone": "act2-boss",
+          "tier": "minion",
+          "role": "交叉射击",
+          "ip": "我的世界",
+          "core": false,
+          "x": 55,
+          "y": 15
+        },
+        {
+          "id": "adventure-enemy-26",
+          "templateId": "pve-ghoul",
+          "zone": "act2-boss",
+          "tier": "minion",
+          "role": "近战追击",
+          "ip": "魔兽世界",
+          "core": false,
+          "x": 51,
+          "y": 10
+        },
+        {
+          "id": "adventure-enemy-27",
+          "templateId": "pve-skeleton",
+          "zone": "act2-boss",
+          "tier": "minion",
+          "role": "交叉射击",
+          "ip": "我的世界",
+          "core": false,
+          "x": 56,
+          "y": 9
+        },
+        {
+          "id": "adventure-enemy-28",
+          "templateId": "pve-zombie",
+          "zone": "act2-boss",
+          "tier": "minion",
+          "role": "近战堵路",
+          "ip": "我的世界",
+          "core": false,
+          "x": 49,
+          "y": 12
+        },
+        {
+          "id": "adventure-enemy-29",
+          "templateId": "pve-skeleton",
+          "zone": "act2-boss",
+          "tier": "minion",
+          "role": "交叉射击",
+          "ip": "我的世界",
+          "core": false,
+          "x": 54,
+          "y": 7
+        },
+        {
+          "id": "adventure-enemy-30",
+          "templateId": "pve-zombie",
+          "zone": "roaming",
+          "tier": "minion",
+          "role": "巡游追击",
+          "ip": "我的世界",
+          "core": false,
+          "x": 32,
+          "y": 58
+        },
+        {
+          "id": "adventure-enemy-31",
+          "templateId": "pve-ghoul",
+          "zone": "roaming",
+          "tier": "minion",
+          "role": "巡游追击",
+          "ip": "魔兽世界",
+          "core": false,
+          "x": 32,
+          "y": 10
+        }
+      ],
+      "roaming": {
+        "enemyIds": [
+          "adventure-enemy-30",
+          "adventure-enemy-31"
+        ],
+        "aggroRange": 5,
+        "reward": 8
+      },
+      "terrainProfile": "ruins"
+    },
+    {
+      "id": "adventure-frozen-throne",
+      "name": "第三幕 · 冰封王座",
+      "map": {
+        "id": "adventure-act-3-v1"
+      },
+      "zones": [
+        {
+          "id": "act3-outpost",
+          "name": "霜原关隘",
+          "x": 4,
+          "y": 42,
+          "width": 16,
+          "height": 16,
+          "enemyIds": [
+            "adventure-enemy-1",
+            "adventure-enemy-2",
+            "adventure-enemy-3",
+            "adventure-enemy-4",
+            "adventure-enemy-5",
+            "adventure-enemy-6"
+          ],
+          "coreIds": [
+            "adventure-enemy-1"
+          ],
+          "reward": 45,
+          "optional": true,
+          "elite": false
+        },
+        {
+          "id": "act3-towers",
+          "name": "冰窟守军",
+          "x": 44,
+          "y": 42,
+          "width": 16,
+          "height": 16,
+          "enemyIds": [
+            "adventure-enemy-7",
+            "adventure-enemy-8",
+            "adventure-enemy-9",
+            "adventure-enemy-10",
+            "adventure-enemy-11",
+            "adventure-enemy-12"
+          ],
+          "coreIds": [
+            "adventure-enemy-7"
+          ],
+          "reward": 50,
+          "optional": true,
+          "elite": false
+        },
+        {
+          "id": "act3-ambush",
+          "name": "寒鸦回廊",
+          "x": 24,
+          "y": 23,
+          "width": 16,
+          "height": 16,
+          "enemyIds": [
+            "adventure-enemy-13",
+            "adventure-enemy-14",
+            "adventure-enemy-15",
+            "adventure-enemy-16",
+            "adventure-enemy-17",
+            "adventure-enemy-18",
+            "adventure-enemy-19"
+          ],
+          "coreIds": [
+            "adventure-enemy-13"
+          ],
+          "reward": 55,
+          "optional": true,
+          "elite": true
+        },
+        {
+          "id": "act3-guard",
+          "name": "王座近卫",
+          "x": 4,
+          "y": 4,
+          "width": 16,
+          "height": 16,
+          "enemyIds": [
+            "adventure-enemy-20",
+            "adventure-enemy-21",
+            "adventure-enemy-22",
+            "adventure-enemy-23",
+            "adventure-enemy-24",
+            "adventure-enemy-25",
+            "adventure-enemy-26"
+          ],
+          "coreIds": [
+            "adventure-enemy-20"
+          ],
+          "reward": 60,
+          "optional": true,
+          "elite": true
+        },
+        {
+          "id": "act3-boss",
+          "name": "冰封王座",
+          "x": 44,
+          "y": 4,
+          "width": 16,
+          "height": 16,
+          "enemyIds": [
+            "adventure-enemy-27",
+            "adventure-enemy-28",
+            "adventure-enemy-29",
+            "adventure-enemy-30",
+            "adventure-enemy-31",
+            "adventure-enemy-32",
+            "adventure-enemy-33",
+            "adventure-enemy-34"
+          ],
+          "coreIds": [
+            "adventure-enemy-27"
+          ],
+          "reward": 70,
+          "optional": false,
+          "elite": false
+        }
+      ],
+      "sites": [
+        {
+          "id": "act3-outpost",
+          "name": "霜原关隘 · 可选",
+          "x": 4,
+          "y": 54,
+          "kind": "encounter",
+          "detail": "可选战斗：获取金币和卡牌，也可绕过。"
+        },
+        {
+          "id": "act3-towers",
+          "name": "冰窟守军 · 可选",
+          "x": 44,
+          "y": 54,
+          "kind": "encounter",
+          "detail": "可选战斗：获取金币和卡牌，也可绕过。"
+        },
+        {
+          "id": "act3-ambush",
+          "name": "寒鸦回廊 · 精英",
+          "x": 24,
+          "y": 35,
+          "kind": "encounter",
+          "detail": "可选精英战：更多金币与遗物奖励机会。"
+        },
+        {
+          "id": "act3-guard",
+          "name": "王座近卫 · 精英",
+          "x": 4,
+          "y": 16,
+          "kind": "encounter",
+          "detail": "可选精英战：更多金币与遗物奖励机会。"
+        },
+        {
+          "id": "act3-boss",
+          "name": "冰封王座 · 首领",
+          "x": 44,
+          "y": 16,
+          "kind": "encounter",
+          "detail": "击败此处首领，完成本次冒险。"
+        },
+        {
+          "id": "camp",
+          "name": "旅人营地",
+          "x": 7,
+          "y": 61,
+          "kind": "camp",
+          "detail": "全队治疗，或强化一名队员。"
+        },
+        {
+          "id": "supply",
+          "name": "遗落行囊",
+          "x": 5,
+          "y": 59,
+          "kind": "loot",
+          "detail": "搜索获得15金币。"
+        },
+        {
+          "id": "cart",
+          "name": "路边补给",
+          "x": 22,
+          "y": 41,
+          "kind": "loot",
+          "detail": "搜索获得15金币。"
+        },
+        {
+          "id": "north-cache",
+          "name": "北境行囊",
+          "x": 40,
+          "y": 21,
+          "kind": "loot",
+          "detail": "搜索获得15金币。"
+        },
+        {
+          "id": "recruit-camp",
+          "name": "营地同行者",
+          "x": 11,
+          "y": 60,
+          "kind": "recruit",
+          "detail": "招募一名队员，加入预备队。"
+        },
+        {
+          "id": "recruit-bridge",
+          "name": "岔路旅人",
+          "x": 32,
+          "y": 42,
+          "kind": "recruit",
+          "detail": "招募一名队员，加入预备队。"
+        },
+        {
+          "id": "recruit-north",
+          "name": "北境旅人",
+          "x": 22,
+          "y": 20,
+          "kind": "recruit",
+          "detail": "招募一名队员，加入预备队。"
+        },
+        {
+          "id": "exit",
+          "name": "归途",
+          "x": 59,
+          "y": 2,
+          "kind": "exit",
+          "detail": "清除五处据点后，完成本次远征。"
+        }
+      ],
+      "startingPositions": {
+        "adventure-human-1": {
+          "x": 7,
+          "y": 60
+        },
+        "adventure-human-2": {
+          "x": 8,
+          "y": 60
+        },
+        "adventure-enemy-1": {
+          "x": 13,
+          "y": 50
+        },
+        "adventure-enemy-2": {
+          "x": 10,
+          "y": 53
+        },
+        "adventure-enemy-3": {
+          "x": 15,
+          "y": 53
+        },
+        "adventure-enemy-4": {
+          "x": 11,
+          "y": 48
+        },
+        "adventure-enemy-5": {
+          "x": 16,
+          "y": 47
+        },
+        "adventure-enemy-6": {
+          "x": 9,
+          "y": 50
+        },
+        "adventure-enemy-7": {
+          "x": 53,
+          "y": 50
+        },
+        "adventure-enemy-8": {
+          "x": 50,
+          "y": 53
+        },
+        "adventure-enemy-9": {
+          "x": 55,
+          "y": 53
+        },
+        "adventure-enemy-10": {
+          "x": 51,
+          "y": 48
+        },
+        "adventure-enemy-11": {
+          "x": 56,
+          "y": 47
+        },
+        "adventure-enemy-12": {
+          "x": 49,
+          "y": 50
+        },
+        "adventure-enemy-13": {
+          "x": 33,
+          "y": 31
+        },
+        "adventure-enemy-14": {
+          "x": 30,
+          "y": 34
+        },
+        "adventure-enemy-15": {
+          "x": 35,
+          "y": 34
+        },
+        "adventure-enemy-16": {
+          "x": 31,
+          "y": 29
+        },
+        "adventure-enemy-17": {
+          "x": 36,
+          "y": 28
+        },
+        "adventure-enemy-18": {
+          "x": 29,
+          "y": 31
+        },
+        "adventure-enemy-19": {
+          "x": 34,
+          "y": 26
+        },
+        "adventure-enemy-20": {
+          "x": 13,
+          "y": 12
+        },
+        "adventure-enemy-21": {
+          "x": 10,
+          "y": 15
+        },
+        "adventure-enemy-22": {
+          "x": 15,
+          "y": 15
+        },
+        "adventure-enemy-23": {
+          "x": 11,
+          "y": 10
+        },
+        "adventure-enemy-24": {
+          "x": 16,
+          "y": 9
+        },
+        "adventure-enemy-25": {
+          "x": 9,
+          "y": 12
+        },
+        "adventure-enemy-26": {
+          "x": 14,
+          "y": 7
+        },
+        "adventure-enemy-27": {
+          "x": 53,
+          "y": 12
+        },
+        "adventure-enemy-28": {
+          "x": 50,
+          "y": 15
+        },
+        "adventure-enemy-29": {
+          "x": 55,
+          "y": 15
+        },
+        "adventure-enemy-30": {
+          "x": 51,
+          "y": 10
+        },
+        "adventure-enemy-31": {
+          "x": 56,
+          "y": 9
+        },
+        "adventure-enemy-32": {
+          "x": 49,
+          "y": 12
+        },
+        "adventure-enemy-33": {
+          "x": 54,
+          "y": 7
+        },
+        "adventure-enemy-34": {
+          "x": 47,
+          "y": 8
+        },
+        "adventure-enemy-35": {
+          "x": 32,
+          "y": 58
+        },
+        "adventure-enemy-36": {
+          "x": 32,
+          "y": 10
+        }
+      },
+      "enemyLineup": [
+        {
+          "id": "adventure-enemy-1",
+          "templateId": "pve-reaper",
+          "zone": "act3-outpost",
+          "tier": "elite",
+          "role": "直线压制",
+          "ip": "守望先锋",
+          "core": true,
+          "x": 13,
+          "y": 50
+        },
+        {
+          "id": "adventure-enemy-2",
+          "templateId": "pve-zombie",
+          "zone": "act3-outpost",
+          "tier": "minion",
+          "role": "近战堵路",
+          "ip": "我的世界",
+          "core": false,
+          "x": 10,
+          "y": 53
+        },
+        {
+          "id": "adventure-enemy-3",
+          "templateId": "pve-skeleton",
+          "zone": "act3-outpost",
+          "tier": "minion",
+          "role": "交叉射击",
+          "ip": "我的世界",
+          "core": false,
+          "x": 15,
+          "y": 53
+        },
+        {
+          "id": "adventure-enemy-4",
+          "templateId": "pve-zombie",
+          "zone": "act3-outpost",
+          "tier": "minion",
+          "role": "近战堵路",
+          "ip": "我的世界",
+          "core": false,
+          "x": 11,
+          "y": 48
+        },
+        {
+          "id": "adventure-enemy-5",
+          "templateId": "pve-skeleton",
+          "zone": "act3-outpost",
+          "tier": "minion",
+          "role": "交叉射击",
+          "ip": "我的世界",
+          "core": false,
+          "x": 16,
+          "y": 47
+        },
+        {
+          "id": "adventure-enemy-6",
+          "templateId": "pve-ghoul",
+          "zone": "act3-outpost",
+          "tier": "minion",
+          "role": "近战追击",
+          "ip": "魔兽世界",
+          "core": false,
+          "x": 9,
+          "y": 50
+        },
+        {
+          "id": "adventure-enemy-7",
+          "templateId": "pve-reaper",
+          "zone": "act3-towers",
+          "tier": "elite",
+          "role": "直线压制",
+          "ip": "守望先锋",
+          "core": true,
+          "x": 53,
+          "y": 50
+        },
+        {
+          "id": "adventure-enemy-8",
+          "templateId": "pve-skeleton",
+          "zone": "act3-towers",
+          "tier": "minion",
+          "role": "交叉射击",
+          "ip": "我的世界",
+          "core": false,
+          "x": 50,
+          "y": 53
+        },
+        {
+          "id": "adventure-enemy-9",
+          "templateId": "pve-skeleton",
+          "zone": "act3-towers",
+          "tier": "minion",
+          "role": "交叉射击",
+          "ip": "我的世界",
+          "core": false,
+          "x": 55,
+          "y": 53
+        },
+        {
+          "id": "adventure-enemy-10",
+          "templateId": "pve-zombie",
+          "zone": "act3-towers",
+          "tier": "minion",
+          "role": "近战堵路",
+          "ip": "我的世界",
+          "core": false,
+          "x": 51,
+          "y": 48
+        },
+        {
+          "id": "adventure-enemy-11",
+          "templateId": "pve-skeleton",
+          "zone": "act3-towers",
+          "tier": "minion",
+          "role": "交叉射击",
+          "ip": "我的世界",
+          "core": false,
+          "x": 56,
+          "y": 47
+        },
+        {
+          "id": "adventure-enemy-12",
+          "templateId": "pve-ghoul",
+          "zone": "act3-towers",
+          "tier": "minion",
+          "role": "近战追击",
+          "ip": "魔兽世界",
+          "core": false,
+          "x": 49,
+          "y": 50
+        },
+        {
+          "id": "adventure-enemy-13",
+          "templateId": "pve-reaper",
+          "zone": "act3-ambush",
+          "tier": "elite",
+          "role": "直线压制",
+          "ip": "守望先锋",
+          "core": true,
+          "x": 33,
+          "y": 31
+        },
+        {
+          "id": "adventure-enemy-14",
+          "templateId": "pve-abomination",
+          "zone": "act3-ambush",
+          "tier": "elite",
+          "role": "范围压迫",
+          "ip": "魔兽世界",
+          "core": false,
+          "x": 30,
+          "y": 34
+        },
+        {
+          "id": "adventure-enemy-15",
+          "templateId": "pve-wither-skeleton",
+          "zone": "act3-ambush",
+          "tier": "elite",
+          "role": "近身追猎",
+          "ip": "我的世界",
+          "core": false,
+          "x": 35,
+          "y": 34
+        },
+        {
+          "id": "adventure-enemy-16",
+          "templateId": "pve-stormtrooper",
+          "zone": "act3-ambush",
+          "tier": "elite",
+          "role": "远程封路",
+          "ip": "星球大战",
+          "core": false,
+          "x": 31,
+          "y": 29
+        },
+        {
+          "id": "adventure-enemy-17",
+          "templateId": "pve-abomination",
+          "zone": "act3-ambush",
+          "tier": "elite",
+          "role": "范围压迫",
+          "ip": "魔兽世界",
+          "core": false,
+          "x": 36,
+          "y": 28
+        },
+        {
+          "id": "adventure-enemy-18",
+          "templateId": "pve-wither-skeleton",
+          "zone": "act3-ambush",
+          "tier": "elite",
+          "role": "近身追猎",
+          "ip": "我的世界",
+          "core": false,
+          "x": 29,
+          "y": 31
+        },
+        {
+          "id": "adventure-enemy-19",
+          "templateId": "pve-stormtrooper",
+          "zone": "act3-ambush",
+          "tier": "elite",
+          "role": "远程封路",
+          "ip": "星球大战",
+          "core": false,
+          "x": 34,
+          "y": 26
+        },
+        {
+          "id": "adventure-enemy-20",
+          "templateId": "pve-reaper",
+          "zone": "act3-guard",
+          "tier": "elite",
+          "role": "直线压制",
+          "ip": "守望先锋",
+          "core": true,
+          "x": 13,
+          "y": 12
+        },
+        {
+          "id": "adventure-enemy-21",
+          "templateId": "pve-abomination",
+          "zone": "act3-guard",
+          "tier": "elite",
+          "role": "范围压迫",
+          "ip": "魔兽世界",
+          "core": false,
+          "x": 10,
+          "y": 15
+        },
+        {
+          "id": "adventure-enemy-22",
+          "templateId": "pve-wither-skeleton",
+          "zone": "act3-guard",
+          "tier": "elite",
+          "role": "近身追猎",
+          "ip": "我的世界",
+          "core": false,
+          "x": 15,
+          "y": 15
+        },
+        {
+          "id": "adventure-enemy-23",
+          "templateId": "pve-stormtrooper",
+          "zone": "act3-guard",
+          "tier": "elite",
+          "role": "远程封路",
+          "ip": "星球大战",
+          "core": false,
+          "x": 11,
+          "y": 10
+        },
+        {
+          "id": "adventure-enemy-24",
+          "templateId": "pve-abomination",
+          "zone": "act3-guard",
+          "tier": "elite",
+          "role": "范围压迫",
+          "ip": "魔兽世界",
+          "core": false,
+          "x": 16,
+          "y": 9
+        },
+        {
+          "id": "adventure-enemy-25",
+          "templateId": "pve-wither-skeleton",
+          "zone": "act3-guard",
+          "tier": "elite",
+          "role": "近身追猎",
+          "ip": "我的世界",
+          "core": false,
+          "x": 9,
+          "y": 12
+        },
+        {
+          "id": "adventure-enemy-26",
+          "templateId": "pve-stormtrooper",
+          "zone": "act3-guard",
+          "tier": "elite",
+          "role": "远程封路",
+          "ip": "星球大战",
+          "core": false,
+          "x": 14,
+          "y": 7
+        },
+        {
+          "id": "adventure-enemy-27",
+          "templateId": "pve-arthas",
+          "zone": "act3-boss",
+          "tier": "boss",
+          "role": "近战 · 召唤",
+          "ip": "魔兽世界",
+          "core": true,
+          "x": 53,
+          "y": 12
+        },
+        {
+          "id": "adventure-enemy-28",
+          "templateId": "pve-zombie",
+          "zone": "act3-boss",
+          "tier": "minion",
+          "role": "近战堵路",
+          "ip": "我的世界",
+          "core": false,
+          "x": 50,
+          "y": 15
+        },
+        {
+          "id": "adventure-enemy-29",
+          "templateId": "pve-skeleton",
+          "zone": "act3-boss",
+          "tier": "minion",
+          "role": "交叉射击",
+          "ip": "我的世界",
+          "core": false,
+          "x": 55,
+          "y": 15
+        },
+        {
+          "id": "adventure-enemy-30",
+          "templateId": "pve-ghoul",
+          "zone": "act3-boss",
+          "tier": "minion",
+          "role": "近战追击",
+          "ip": "魔兽世界",
+          "core": false,
+          "x": 51,
+          "y": 10
+        },
+        {
+          "id": "adventure-enemy-31",
+          "templateId": "pve-skeleton",
+          "zone": "act3-boss",
+          "tier": "minion",
+          "role": "交叉射击",
+          "ip": "我的世界",
+          "core": false,
+          "x": 56,
+          "y": 9
+        },
+        {
+          "id": "adventure-enemy-32",
+          "templateId": "pve-zombie",
+          "zone": "act3-boss",
+          "tier": "minion",
+          "role": "近战堵路",
+          "ip": "我的世界",
+          "core": false,
+          "x": 49,
+          "y": 12
+        },
+        {
+          "id": "adventure-enemy-33",
+          "templateId": "pve-skeleton",
+          "zone": "act3-boss",
+          "tier": "minion",
+          "role": "交叉射击",
+          "ip": "我的世界",
+          "core": false,
+          "x": 54,
+          "y": 7
+        },
+        {
+          "id": "adventure-enemy-34",
+          "templateId": "pve-ghoul",
+          "zone": "act3-boss",
+          "tier": "minion",
+          "role": "近战追击",
+          "ip": "魔兽世界",
+          "core": false,
+          "x": 47,
+          "y": 8
+        },
+        {
+          "id": "adventure-enemy-35",
+          "templateId": "pve-zombie",
+          "zone": "roaming",
+          "tier": "minion",
+          "role": "巡游追击",
+          "ip": "我的世界",
+          "core": false,
+          "x": 32,
+          "y": 58
+        },
+        {
+          "id": "adventure-enemy-36",
+          "templateId": "pve-ghoul",
+          "zone": "roaming",
+          "tier": "minion",
+          "role": "巡游追击",
+          "ip": "魔兽世界",
+          "core": false,
+          "x": 32,
+          "y": 10
+        }
+      ],
+      "roaming": {
+        "enemyIds": [
+          "adventure-enemy-35",
+          "adventure-enemy-36"
+        ],
+        "aggroRange": 5,
+        "reward": 8
+      },
+      "terrainProfile": "fortress"
+    }
+  ],
+  "terrainProfile": "streets",
+  "enemyGrowth": {
+    "everyRounds": 10,
+    "healthPerLevel": 0.2,
+    "attackPerLevel": 1
   }
 }

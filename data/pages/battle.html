@@ -21,8 +21,10 @@
   <script src="js/practice/client.js"></script>
   <script src="js/practice/battle-controller.js"></script>
   <script src="js/adventure/client.js"></script>
+  <script src="js/adventure/network.js"></script>
   <script src="js/adventure/battle-controller.js"></script>
   <script src="js/adventure/world-ui.js"></script>
+  <script src="js/adventure/room-ui.js"></script>
   <link rel="stylesheet" href="css/adventure.css">
   <script src="js/battle-ui/battle-action-identity.js"></script>
   <script src="js/battle-ui/battle-action-history.js"></script>
@@ -2821,6 +2823,7 @@
       if (!caster || !skillId) return
       selectPiece(caster.instanceId)
       await selectSkillCard(skillId)
+      if (ADVENTURE_MODE && typeof refreshAdventureSiteActions === 'function') refreshAdventureSiteActions()
       updateRed43QaEvidence()
       console.info('[RED-43 QA client]', JSON.stringify(red43QaSnapshot()))
     }
@@ -3239,7 +3242,8 @@
       document.getElementById('cdType').textContent = typeLabel
       document.getElementById('cdCost').innerHTML =
         `<div style="text-align:center;margin-bottom:8px"><span class="cd-cost ${cost===0?'free':''}">${cost===0?'费用: 免费':'费用: '+cost+' AP'}</span></div>`
-      document.getElementById('cdDesc').textContent = cardDisplayDescription(cardInstance, def)
+      const fullDescription = cardDisplayDescription(cardInstance, def)
+      document.getElementById('cdDesc').textContent = ADVENTURE_MODE && window.adventureCardDetail ? window.adventureCardDetail(cardId, fullDescription) : fullDescription
 
       const isPassiveCard = def.type === 'passive'
       const meta = []
@@ -3620,6 +3624,8 @@
         <div class="pi-stat"><div class="pi-stat-val" style="color:#fbbf24">${pstats.moveRange ?? '-'}</div><div class="pi-stat-lbl">移动</div></div>
       </div>`
 
+      const adventureWarning = ADVENTURE_MODE ? window.adventurePieceWarning?.(piece) : ''
+
       // Skills (display* aware)
       const skills = pieceInfoDisplaySkills(piece)
       currentPieceKeywords = normalizeKeywordList(skills.flatMap(sk => {
@@ -3630,7 +3636,8 @@
       if (!preserveKeyword || !currentPieceKeywords.includes(activePieceKeyword)) {
         activePieceKeyword = currentPieceKeywords[0] || ''
       }
-      const skillsHtml = skills.length ? skills.map(sk => {
+      const enemyIntent = ADVENTURE_MODE ? window.adventureEnemyIntent?.(piece) : ''
+      const skillsHtml = (enemyIntent ? '<div class="adventure-next-intent">' + '等级 ' + window.adventureEnemyLevel(piece) + ' · ' + escHtml(enemyIntent) + '</div>' : '') + (skills.length ? skills.map(sk => {
         const sid = skillIdOf(sk)
         const skd = skillDefOf(sid)
         const icon = skd.icon || '*'
@@ -3638,8 +3645,9 @@
         const desc = skd.description || '暂无描述'
         const isPassive = skd.type === 'passive' || skd.kind === 'passive'
         const isDerived = sk.derived === true
-        const programEnemy = ADVENTURE_MODE && piece.ownerPlayerId !== myPlayerId
-        const typeLabel = programEnemy ? '预告行动' : isDerived ? '可解锁' : skd.type === 'ultimate' ? '限定' : skillUsesCharge(skd) ? '充能' : skd.type === 'buff' ? '增益' : isPassive ? '被动' : '主动'
+        const intentLabel = ADVENTURE_MODE ? window.adventureSkillIntent?.(piece, sid, isPassive) : null
+        const programEnemy = intentLabel != null
+        const typeLabel = programEnemy ? intentLabel : isDerived ? '可解锁' : skd.type === 'ultimate' ? '限定' : skillUsesCharge(skd) ? '充能' : skd.type === 'buff' ? '增益' : isPassive ? '被动' : '主动'
         const cooldownTurns = skd.cooldownTurns ?? 0
         const currentCooldown = sk.currentCooldown ?? 0
         const keywords = normalizeKeywordList(skd.keywords)
@@ -3661,7 +3669,7 @@
             metaParts.push('冷却 无')
           }
         }
-        return `<div class="pi-skill">
+        return `<div class="pi-skill${intentLabel === '即将使用' ? ' adventure-skill-next' : ''}">
           <div class="pi-skill-header">
             <span class="pi-skill-icon">${icon}</span>
             <span class="pi-skill-name">${escHtml(skName)}</span>
@@ -3672,7 +3680,7 @@
           ${metaParts.length ? `<div class="pi-skill-meta">${metaParts.join(' · ')}</div>` : ''}
         </div>`
       }).join('')
-      : '<div style="color:#475569;font-size:12px;padding:8px 0">该棋子没有技能</div>'
+      : '<div style="color:#475569;font-size:12px;padding:8px 0">该棋子没有技能</div>')
 
       // Related cards from piece template
       const tmplForCards = PIECES_BY_ID[piece.templateId] || {}
@@ -3689,7 +3697,7 @@
       }
 
       document.getElementById('pieceInfoContent').innerHTML =
-        statsHtml + tagsHtml +
+        statsHtml + (adventureWarning ? '<div class="adventure-piece-warning">' + escHtml(adventureWarning) + '</div>' : '') + tagsHtml +
         `<div class="pi-section-label">技能</div>` + skillsHtml + relatedCardsHtml
 
       document.getElementById('pieceKeywordPanel').innerHTML = renderKeywordPanel(
@@ -3707,6 +3715,7 @@
       if (!G) return
       closePieceContextMenu()
       const piece = G.pieces.find(p => p.instanceId === instanceId)
+        || (ADVENTURE_MODE && adventureSnapshot?.deployment?.pieces?.find(p => p.instanceId === instanceId))
       if (!piece) return
       if (!preserveKeyword) pieceInfoReturnFocus = document.activeElement
       currentPieceInfoId = instanceId
@@ -6247,7 +6256,8 @@
     function renderHandCardFace(card, definition) {
       const def = definition || {}
       const cardId = card && card.cardId || def.id || ''
-      return HandCardFace.render(card, def, { artSrc: cardArtSource(cardId, def.image) })
+      const shown = ADVENTURE_MODE && window.adventureCardPresentation ? window.adventureCardPresentation(card, def) : card
+      return HandCardFace.render(shown, def, { artSrc: cardArtSource(cardId, def.image) })
     }
 
     function onCardClick(cardInstanceId, cardId) {
@@ -6838,7 +6848,7 @@
           playerId: myPlayerId,
           selectionId: pendingSelection && pendingSelection.selectionId,
           stateRevision: pendingSelection && pendingSelection.stateRevision,
-        })
+        }).then(() => window.focusAdventureContext?.())
       }
       clearTargetInteraction('selection-cleared')
       selectedPieceId = null
@@ -6850,6 +6860,7 @@
       if (pieceSelect) pieceSelect.value = ''
       renderPieceContextMenu(null)
       render()
+      window.focusAdventureContext?.()
     }
 
     function selectPiece(instanceId) {
@@ -7487,6 +7498,7 @@
     }
 
     function resetBoardView() {
+      if (window.focusAdventureContext?.()) return
       if (_use3d && battlePresentation && battlePresentation.resetView) {
         battlePresentation.resetView()
       } else {

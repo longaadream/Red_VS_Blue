@@ -13,6 +13,7 @@ export interface AdventureHandCard {
   contentState?: { adventure?: { lifetime: 'run' | 'encounter'; sourceId: string } }
 }
 export interface AdventureCardPlayer {
+  earnedRelics?: number
   relicIds: string[]
   growth: Record<string, number>
   passiveHits: Record<string, number>
@@ -25,6 +26,7 @@ export interface AdventureCardState {
   suppliedEncounters: string[]
   players: Record<string, AdventureCardPlayer>
   reward?: { encounterId: string; relicIds: string[]; cardIds: string[] }
+  rewards?: Record<string, NonNullable<AdventureCardState['reward']>>
 }
 export function adventureCards(state: BattleState): AdventureCardState | undefined {
   if (state.extensions?.adventureWorld?.version !== 'same-map-v1') return undefined
@@ -32,7 +34,11 @@ export function adventureCards(state: BattleState): AdventureCardState | undefin
   return value?.version === 'supply-v1' ? value : undefined
 }
 export function initializeAdventureCards(state: BattleState, playerId: string, relicIds: string[]): AdventureCardState {
-  if (adventureCards(state)) return adventureCards(state)!
+  if (adventureCards(state)) {
+    const value = adventureCards(state)!
+    value.players[playerId] ??= { relicIds: [...new Set(relicIds)], growth: {}, passiveHits: {}, overflow: [] }
+    return value
+  }
   const value: AdventureCardState = { version: 'supply-v1', serial: 0, supplyRuntime: { tick: 0, cursors: {} }, suppliedEncounters: [], players: {
     [playerId]: { relicIds: [...new Set(relicIds)], growth: {}, passiveHits: {}, overflow: [] },
   } }
@@ -46,5 +52,5 @@ export function recordAdventurePassiveHit(state: BattleState, playerId: string, 
 }
 export function hasAdventureCardChoice(state: BattleState, playerId: string): boolean {
   const value = adventureCards(state)
-  return !!(value?.players[playerId]?.overflow.length || value?.reward)
+  return !!(value?.players[playerId]?.overflow.length || (value?.rewards ? value.rewards[playerId] : value?.reward))
 }

@@ -1,0 +1,29 @@
+{
+  "id": "pve-abomination",
+  "name": "憎恶",
+  "description": "《魔兽世界》 · 范围压迫",
+  "faction": "evil",
+  "rarity": "rare",
+  "image": "adventure/abomination-portrait.png",
+  "stats": {
+    "maxHp": 24,
+    "attack": 5,
+    "defense": 1,
+    "moveRange": 2
+  },
+  "skills": [
+    {
+      "skillId": "pve-sweep"
+    },
+    {
+      "skillId": "pve-hook"
+    }
+  ],
+  "rules": [],
+  "availability": {
+    "modes": [
+      "pve"
+    ],
+    "status": "ready"
+  }
+}

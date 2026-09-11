@@ -39,5 +39,8 @@
   "pve-ghoul",
   "pve-reaper",
   "pve-skeleton",
-  "pve-zombie"
+  "pve-zombie",
+  "pve-abomination",
+  "pve-wither-skeleton",
+  "pve-stormtrooper"
 ]

@@ -1,0 +1,261 @@
+{
+  "schemaVersion": "rvb-pve-roguelike-adventure/v1",
+  "id": "adventure-old-town",
+  "version": "0.1.0",
+  "name": "第一幕 · 旧城边境",
+  "generation": { "algorithm": "landmark-routes-v1", "placementShift": 3, "sceneryDensity": 0.18, "mirror": true },
+  "recruitment": { "pieceIds": ["ana", "reaper", "liadrin", "anduin"], "candidates": 3, "cost": 15, "dismissCost": 10 },
+  "map": {
+    "id": "adventure-old-town-v1",
+    "name": "第一幕 · 旧城边境",
+    "layout": [
+      "################################",
+      "#..............................#",
+      "#..............................#",
+      "#..............................#",
+      "#.....................#........#",
+      "#.....................#........#",
+      "#.....................#...C....#",
+      "#.....................#........#",
+      "#..............................#",
+      "#..............................#",
+      "#..............................#",
+      "#.............C.......#C.......#",
+      "#.....................#........#",
+      "#.....................#........#",
+      "#...............C..............#",
+      "#..............................#",
+      "#OOOOOOOOOOO......OOOOOOOOOOOOO#",
+      "#..............................#",
+      "#..............................#",
+      "#.......C......................#",
+      "#...........##..###............#",
+      "#..............................#",
+      "#..............................#",
+      "#..............................#",
+      "#..C.........C.................#",
+      "#................C.............#",
+      "#..............................#",
+      "#..............................#",
+      "#.....C........................#",
+      "#..............................#",
+      "#..............................#",
+      "################################"
+    ]
+  },
+  "party": {
+    "humanId": "adventure-human",
+    "enemyId": "adventure-enemy",
+    "seed": 1810909,
+    "pieceIds": [
+      "tracer",
+      "uther"
+    ]
+  },
+  "zones": [
+    {
+      "id": "gate",
+      "name": "断墙哨站",
+      "x": 10,
+      "y": 18,
+      "width": 10,
+      "height": 10,
+      "enemyIds": [
+        "adventure-enemy-1",
+        "adventure-enemy-3",
+        "adventure-enemy-4"
+      ],
+      "coreIds": [
+        "adventure-enemy-1"
+      ],
+      "reward": 25
+    },
+    {
+      "id": "keep",
+      "name": "旧城核心",
+      "x": 19,
+      "y": 3,
+      "width": 11,
+      "height": 11,
+      "enemyIds": [
+        "adventure-enemy-2",
+        "adventure-enemy-5",
+        "adventure-enemy-6"
+      ],
+      "coreIds": [
+        "adventure-enemy-2"
+      ],
+      "reward": 40
+    }
+  ],
+  "sites": [
+    { "id": "recruit-camp", "name": "营地同行者", "x": 3, "y": 27, "kind": "recruit", "detail": "从三名同行者中招募一人。加入预备队，战斗中免费部署。" },
+    { "id": "recruit-bridge", "name": "桥边旅人", "x": 13, "y": 14, "kind": "recruit", "detail": "从三名同行者中招募一人。离开再回来，人选不变。" },
+    {
+      "id": "camp",
+      "name": "旅人营地",
+      "x": 5,
+      "y": 26,
+      "kind": "camp",
+      "detail": "休整治疗全队，或强化一名队员；消耗当前回合。"
+    },
+    {
+      "id": "supply",
+      "name": "遗落的行囊",
+      "x": 7,
+      "y": 23,
+      "kind": "loot",
+      "detail": "搜索获得 15 枚金币。每局只能领取一次。"
+    },
+    {
+      "id": "cart",
+      "name": "旧桥补给",
+      "x": 15,
+      "y": 13,
+      "kind": "loot",
+      "detail": "搜索获得 15 枚金币。清除哨站后沿小径继续北上。"
+    },
+    {
+      "id": "gate",
+      "name": "断墙哨站",
+      "x": 10,
+      "y": 24,
+      "kind": "encounter",
+      "detail": "踏入虚线范围将正式开战。消灭守卫核心后解除封锁。"
+    },
+    {
+      "id": "keep",
+      "name": "旧城核心",
+      "x": 19,
+      "y": 11,
+      "kind": "encounter",
+      "detail": "先清除断墙哨站。消灭此处核心，完成首幕切片。"
+    }
+  ],
+  "startingPositions": {
+    "adventure-human-1": {
+      "x": 5,
+      "y": 25
+    },
+    "adventure-human-2": {
+      "x": 5,
+      "y": 27
+    },
+    "adventure-enemy-1": {
+      "x": 16,
+      "y": 23
+    },
+    "adventure-enemy-2": {
+      "x": 25,
+      "y": 8
+    },
+    "adventure-enemy-3": {
+      "x": 14,
+      "y": 25
+    },
+    "adventure-enemy-4": {
+      "x": 18,
+      "y": 22
+    },
+    "adventure-enemy-5": {
+      "x": 23,
+      "y": 10
+    },
+    "adventure-enemy-6": {
+      "x": 27,
+      "y": 10
+    }
+  },
+  "enemyLineup": [
+    {
+      "id": "adventure-enemy-1",
+      "templateId": "pve-reaper",
+      "zone": "gate",
+      "tier": "elite",
+      "role": "近身压制",
+      "ip": "守望先锋",
+      "core": true,
+      "x": 16,
+      "y": 23
+    },
+    {
+      "id": "adventure-enemy-2",
+      "templateId": "pve-arthas",
+      "zone": "keep",
+      "tier": "boss",
+      "role": "近战 · 召唤",
+      "ip": "魔兽世界",
+      "core": true,
+      "x": 25,
+      "y": 8
+    },
+    {
+      "id": "adventure-enemy-3",
+      "templateId": "pve-zombie",
+      "zone": "gate",
+      "tier": "minion",
+      "role": "近战",
+      "ip": "我的世界",
+      "core": false,
+      "x": 14,
+      "y": 25
+    },
+    {
+      "id": "adventure-enemy-4",
+      "templateId": "pve-skeleton",
+      "zone": "gate",
+      "tier": "minion",
+      "role": "直线射击",
+      "ip": "我的世界",
+      "core": false,
+      "x": 18,
+      "y": 22
+    },
+    {
+      "id": "adventure-enemy-5",
+      "templateId": "pve-zombie",
+      "zone": "keep",
+      "tier": "minion",
+      "role": "近战",
+      "ip": "我的世界",
+      "core": false,
+      "x": 23,
+      "y": 10
+    },
+    {
+      "id": "adventure-enemy-6",
+      "templateId": "pve-skeleton",
+      "zone": "keep",
+      "tier": "minion",
+      "role": "直线射击",
+      "ip": "我的世界",
+      "core": false,
+      "x": 27,
+      "y": 10
+    }
+  ],
+  "resources": {
+    "pieceIds": [
+      "pve-zombie",
+      "pve-skeleton",
+      "pve-ghoul",
+      "pve-reaper",
+      "pve-arthas"
+    ],
+    "skillIds": [
+      "pve-claw",
+      "pve-shot",
+      "pve-arrow",
+      "pve-raise-dead"
+    ],
+    "buildsPath": "data/pve/roguelike/builds.json",
+    "images": [
+      "images/adventure/zombie.svg",
+      "images/adventure/skeleton.svg",
+      "images/adventure/ghoul.svg",
+      "images/adventure/reaper.jpg",
+      "images/adventure/arthas.jpg"
+    ],
+    "suppliesPath": "data/pve/roguelike/supplies.json"
+  }
+}

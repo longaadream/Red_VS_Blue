@@ -15,10 +15,12 @@ scope.onmessage = async event => {
     let result: unknown
     if (type === 'start' && !session) {
       const content = generateAdventureContent(adventureContent, payload.seed ?? createRootSeed())
-      session = new AdventureSession(await createAdventureState(profile, content), content); result = session.snapshot()
+      session = new AdventureSession(await createAdventureState(profile, content), content, profile); result = session.snapshot()
     }
     else if (session && type === 'human') result = session.human(payload.action, payload.revision)
-    else if (session && type === 'interact') result = session.interact(payload.siteId, payload.operation, payload.pieceId, payload.revision, payload.targetPieceId)
+    else if (session && type === 'interact') result = payload.operation === 'advance'
+      ? await session.advanceAct(payload.siteId, payload.pieceId, payload.revision)
+      : session.interact(payload.siteId, payload.operation, payload.pieceId, payload.revision, payload.targetPieceId)
     else if (session && type === 'step') result = session.step(payload.revision)
     else if (session && type === 'supply') result = session.supply(payload.operation, payload.choice, payload.revision)
     else throw new Error('冒险未开始或指令无效')

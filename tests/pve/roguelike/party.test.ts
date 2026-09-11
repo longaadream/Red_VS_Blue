@@ -1,6 +1,5 @@
+import { AdventureSession, createAdventureState, HUMAN, ENEMY, zones } from './fixtures/legacy-adventure'
 import { describe, it, expect } from 'vitest'
-import { AdventureSession, createAdventureState } from '@/lib/pve/roguelike/session'
-import { HUMAN, ENEMY, zones } from '@/lib/pve/roguelike/content'
 import { adventureBoundary, adventureDeploymentCells } from '@/lib/game/adventure-boundary'
 import { getServerGameProfileIdentityV1 } from '@/lib/content-pipeline/runtime/profile-game-identity'
 import { runBattleActionIsolated } from '@/lib/game/battle-runner'
@@ -97,7 +96,7 @@ describe('captain exploration and encounter deployment', () => {
     expect(won.state.pieces.filter(p => p.ownerPlayerId === HUMAN).map(p => p.instanceId)).toEqual([captainId])
     expect(won.deployment.pieces[0]).toMatchObject({ instanceId: reserveId, currentHp: 7, x: null, y: null })
     expect(won.state.players[0].actionPoints).toBe(3)
-    session.supply('skip-relic','',session.snapshot().revision)
+    expect(session.snapshot().world.cardProgress?.reward?.relicIds).toEqual([])
     session.supply('skip-cards','',session.snapshot().revision)
     command(session, { type: 'move', playerId: HUMAN, pieceId: captainId, toX: 14, toY: 18 })
     command(session, { type: 'move', playerId: HUMAN, pieceId: captainId, toX: 14, toY: 13 })
@@ -133,7 +132,7 @@ describe('captain exploration and encounter deployment', () => {
     const session = new AdventureSession(state)
     const deployed = command(session, { type: 'deployReservePiece', expectedDeploymentRevision: 0, playerId: HUMAN, pieceId: reserveId, toX: 15, toY: 23 })
     command(session, hammer(deployed.state))
-    session.supply('skip-relic', '', session.snapshot().revision)
+    expect(session.snapshot().world.cardProgress?.reward?.relicIds).toEqual([])
     session.supply('skip-cards', '', session.snapshot().revision)
     for (const [toX,toY] of [[9,23],[5,23],[5,25]]) command(session, { type: 'move', playerId: HUMAN, pieceId: captainId, toX, toY })
     const attack = session.snapshot().deployment.pieces[0].attack

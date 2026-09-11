@@ -3,6 +3,7 @@ let adventureDeployPieceId = null
 let adventureCampTargetId = null
 let adventureDialogKind = null
 let adventureDecorationKey = null
+let adventureFocusedAct = null
 let adventureSupplyPromptRevision = -1
 const adventureStampCache = new Map()
 const adventureIconPaths = {
@@ -11,6 +12,7 @@ const adventureIconPaths = {
   cart: '<path d="M3 7h16l-2 10H6L3 4H1m6 3V3h7v4m-4 1v7m5-7-1 7"/><circle cx="7" cy="21" r="1.5"/><circle cx="17" cy="21" r="1.5"/>',
   gate: '<path d="M6 22V3m0 1 13 2-3 4 3 4-13-2M2 22h9"/>',
   keep: '<path d="M3 21V5h4v4h3V3h4v6h3V5h4v16H3Zm6 0v-6q3-4 6 0v6M2 22h20"/>',
+  exit: '<path d="M4 22V3h13v19M4 3l9 4v15M9 13h1m7-3 5 3-5 3m-4-3h9"/>',
   recruit: '<circle cx="9" cy="7" r="4"/><path d="M2 22v-4a7 7 0 0 1 14 0v4M19 8v8m-4-4h8"/>',
 }
 function adventureSiteIcon(site) {
@@ -26,9 +28,10 @@ function adventurePortrait(piece, onClick, badge) {
   const name = document.createElement('span'); name.textContent = piece.name
   const health = document.createElement('meter'); health.min = 0; health.max = piece.maxHp; health.value = piece.currentHp
   const stamp = document.createElement('b'); stamp.textContent = badge || ''; stamp.className = 'adventure-stamp'
-  button.title = piece.name + ' · ' + piece.currentHp + '/' + piece.maxHp
+  button.title = piece.name + ' · ' + piece.currentHp + '/' + piece.maxHp + ' · ' + (window.adventurePieceWarning?.(piece) || '')
   button.setAttribute('aria-label', (badge === '+' ? '部署 ' : '查看 ') + piece.name + '，生命 ' + piece.currentHp + '/' + piece.maxHp)
   button.append(img,stamp,name,health); button.onclick = onClick
+  button.oncontextmenu = event => { event.preventDefault(); event.stopPropagation(); showPieceInfo(piece.instanceId) }
   return button
 }
 function adventureButton(label, action, className) {
@@ -46,7 +49,9 @@ function ensureAdventureUI() {
   const wallet = document.createElement('nav'); wallet.id = 'adventureWallet'; wallet.setAttribute('aria-label', '冒险资源与菜单')
   const coins = document.createElement('output'); coins.id = 'adventureCoins'; coins.setAttribute('aria-live', 'polite')
   const supplies = adventureButton('构筑', () => openAdventureDialog('supplies')); supplies.id = 'adventureSuppliesButton'
-  wallet.append(coins, adventureButton('地点', () => openAdventureDialog('sites')), supplies, adventureButton('手记', () => openAdventureDialog('notes')))
+  const act = adventureButton('', () => openAdventureDialog('sites')); act.id = 'adventureAct'
+  const reward = adventureButton('战利品', () => openAdventureDialog('rewards')); reward.id = 'adventureRewardButton'; reward.hidden = true
+  wallet.append(act, coins, reward, adventureButton('地点', () => openAdventureDialog('sites')), supplies, adventureButton('手记', () => openAdventureDialog('notes')))
   const dock = document.createElement('aside'); dock.id = 'adventurePartyDock'; dock.setAttribute('aria-label', '冒险队伍')
   const encounter = adventureButton('', () => openAdventureDialog('site', adventureSnapshot.world.active)); encounter.id = 'adventureEncounter'
   const dialog = document.createElement('dialog'); dialog.id = 'adventureDialog'; dialog.setAttribute('aria-labelledby', 'adventureDialogTitle')
@@ -57,7 +62,8 @@ function ensureAdventureUI() {
   dialog.append(header, content)
   dialog.addEventListener('click', event => { if (event.target === dialog) { const r = dialog.getBoundingClientRect(); if(event.clientX < r.left || event.clientX > r.right || event.clientY < r.top || event.clientY > r.bottom) dialog.close() } })
   dialog.addEventListener('close', () => { adventureDialogKind = null; adventureSiteId = null; syncAdventureBoard() })
-  document.body.append(wallet, dock, encounter, dialog)
+  const interaction = document.createElement('nav'); interaction.id = 'adventureSiteActions'; interaction.setAttribute('aria-label', '附近地点操作')
+  document.body.append(wallet, dock, encounter, dialog, interaction)
 }
 function openAdventureDialog(kind, siteId) {
   ensureAdventureUI()
@@ -71,36 +77,72 @@ function adventureOpenCell(x, y) {
   if (pendingSkill || pendingCardAction || pendingActionFeedback || targetSubmissionPending || adventureBusy) return false
   if (G.pendingTargetSelection || G.pendingOptionSelection) return false
   const occupant = G.pieces.find(p => p.currentHp > 0 && p.x === x && p.y === y)
-  if (occupant && occupant.ownerPlayerId !== myPlayerId) return false
+  // A piece click must retain the native selection/movement menu, even on a site.
+  if (occupant) return false
   // Legal moves and deployment keep their native click/drag behavior.
   if (!occupant && pendingMove && validMoves.has(x + ',' + y)) return false
   const site = adventureSnapshot?.world.sites.find(s => s.x === x && s.y === y)
   if (!site) return false
-  if (occupant) selectPiece(occupant.instanceId)
   openAdventureDialog('site', site.id); return true
+}
+// Refreshed by battle.html after native selection changes.
+function refreshAdventureSiteActions() {
+  const container = document.getElementById('adventureSiteActions'), world = adventureSnapshot?.world
+  if (!container || !world) return
+  container.replaceChildren()
+  const actor = adventureActor()
+  const blocked = world.active || adventureBusy || adventureStopped || pendingSkill || pendingCardAction || pendingActionFeedback || targetSubmissionPending || adventureDeployPieceId || G.pendingTargetSelection || G.pendingOptionSelection
+  if (blocked || !actor || actor.x === null || actor.y === null) { container.hidden = true; return }
+  const sites = world.sites.filter(site => site.kind !== 'encounter' && Math.abs(site.x - actor.x) + Math.abs(site.y - actor.y) <= 1)
+  container.hidden = !sites.length
+  for (const site of sites) container.append(adventureButton('交互 · ' + site.name, () => openAdventureDialog('site', site.id)))
+}
+function renderAdventureReward(content) {
+  const reward = adventureSnapshot.world.lastReward
+  if (!reward) { const empty = document.createElement('p'); empty.textContent = '击败敌人后在此查看战利品。'; content.append(empty); return }
+  const heading = document.createElement('h3'); heading.textContent = (reward.kind === 'roaming' ? '游敌击败 · ' : '据点攻克 · ') + reward.name
+  const coins = document.createElement('p'); coins.className = 'adventure-reward-coins'; coins.textContent = '＋' + reward.coins + ' 金币 · 已入账'
+  content.append(heading, coins)
+}
+function focusAdventureAct(force = false) {
+  const world = adventureSnapshot?.world, key = world && [world.seed, world.actNumber || 1, G.map.id, adventureSnapshot.revision].join(':')
+  if (!world || !force && key === adventureFocusedAct) return
+  const zone = force && world.zones?.find(zone => zone.id === world.active)
+  if (zone && window.BattleRenderer3D?.focusCell?.(zone.x + (zone.width - 1) / 2, zone.y + (zone.height - 1) / 2)) { adventureFocusedAct = key; return }
+  const captain = G.pieces.find(p => p.instanceId === world.captainId && p.currentHp > 0)
+  if (captain && captain.x !== null && captain.y !== null && window.BattleRenderer3D?.focusCell?.(captain.x, captain.y)) adventureFocusedAct = key
+}
+window.focusAdventureContext = () => { if (!adventureSnapshot?.world) return false; focusAdventureAct(true); return true }
+function selectAdventurePartyPiece(piece) {
+  selectPiece(piece.instanceId)
+  if (piece.x !== null && piece.y !== null) window.BattleRenderer3D?.focusCell?.(piece.x, piece.y)
 }
 function renderAdventureWorld() {
   const world = adventureSnapshot?.world
   if (!world) return
   ensureAdventureUI()
   document.querySelector('#boardStage3d canvas')?.setAttribute('aria-label','冒险棋盘，' + G.map.width + '×' + G.map.height + ' 格，可拖动平移、滚轮或双指缩放')
+  document.getElementById('adventureAct').textContent = world.name || '第 ' + (world.actNumber || 1) + ' 幕 · 旧城边境'
+  document.getElementById('adventureRewardButton').hidden = !world.lastReward
   document.getElementById('adventureCoins').textContent = '◉ 金币 ' + world.coins
   const dock = document.getElementById('adventurePartyDock'); dock.replaceChildren()
   const title = document.createElement('strong'); title.textContent = '冒险队伍'; dock.append(title)
   const row = document.createElement('div'); row.className = 'adventure-party'
   for (const piece of G.pieces.filter(p => p.ownerPlayerId === myPlayerId && p.currentHp > 0)) {
-    row.append(adventurePortrait(piece, () => { selectedPieceId = piece.instanceId; render() }, piece.instanceId === world.captainId ? '♛' : ''))
+    row.append(adventurePortrait(piece, () => selectAdventurePartyPiece(piece), piece.instanceId === world.captainId ? '♛' : ''))
   }
   const reserve = adventureSnapshot.deployment
   for (const piece of reserve.pieces) {
+    const unavailable = !!world.active && (!reserve.cells.length || adventureBusy || adventureStopped)
     const card = adventurePortrait(piece, () => {
+      if (unavailable) return
       if (!world.active) { adventureCampTargetId = piece.instanceId; openAdventureDialog('reserve'); return }
       adventureDeployPieceId = adventureDeployPieceId === piece.instanceId ? null : piece.instanceId
       pendingSkill = null; pendingCardAction = null; selectedPieceId = null
       render(); renderAdventureWorld(); setStatusMsg(adventureDeployPieceId ? '点击高亮格 · 免费部署' : '已取消部署')
     }, world.active ? (adventureDeployPieceId === piece.instanceId ? '×' : '+') : '备')
     card.classList.toggle('is-picked', adventureDeployPieceId === piece.instanceId)
-    card.disabled = !!world.active && (!reserve.cells.length || adventureBusy || adventureStopped)
+    card.setAttribute('aria-disabled', String(unavailable))
     row.append(card)
   }
   dock.append(row)
@@ -112,20 +154,46 @@ function renderAdventureWorld() {
   if (adventureHasSupplyChoice() && !G.pendingOptionSelection && !G.pendingTargetSelection && adventureSupplyPromptRevision !== adventureSnapshot.revision) {
     adventureSupplyPromptRevision = adventureSnapshot.revision; openAdventureDialog('supplies')
   }
-  refreshAdventureControls(); syncAdventureBoard()
+  if (world.forecast && !world.forecast.complete) { const note = document.createElement('small'); note.textContent = '死亡预测暂不可用'; note.title = world.forecast.note; dock.append(note) }
+  refreshAdventureControls(); refreshAdventureSiteActions(); syncAdventureBoard(); focusAdventureAct()
+}
+function adventureEnemyPlans(piece) {
+  const snapshot = adventureSnapshot, world = snapshot?.world
+  if (!world || piece.ownerPlayerId !== (snapshot.aiPlayerId || G.extensions?.adventureWorld?.coop?.enemyId || 'adventure-enemy')) return null
+  return (world.plans || []).filter(plan => plan.sourceId === piece.instanceId)
+}
+function adventurePlanLabel(plan) {
+  if (plan.kind === 'move') return '移动'
+  const sid = plan.action?.skillId
+  const name = sid && typeof skillDefOf === 'function' ? skillDefOf(sid)?.name : null
+  return (name || sid || (plan.kind === 'summon' ? '召唤' : '攻击')) + (plan.trackingTargetId ? '（锁定）' : '')
+}
+window.adventureEnemyLevel = piece => adventureEnemyPlans(piece) === null ? null : 1 + (G.extensions?.adventureWorld?.enemyLevels?.[piece.instanceId]?.level || 0)
+window.adventureEnemyIntent = piece => {
+  const plans = adventureEnemyPlans(piece)
+  if (!plans) return ''
+  return plans.length ? '下次行动：' + plans.map(adventurePlanLabel).join(' → ') : '暂无行动预告'
+}
+window.adventureSkillIntent = (piece, skillId, passive) => {
+  const plans = adventureEnemyPlans(piece)
+  if (!plans) return null
+  if (passive) return '条件触发'
+  if (plans.some(plan => plan.action?.skillId === skillId)) return '即将使用'
+  return plans.length ? '本轮不使用' : '未列入预告'
 }
 function renderAdventureEnemies(section, site) {
   const world = adventureSnapshot.world, enemies = document.createElement('div'); enemies.className = 'adventure-enemies'
   const members = [...world.enemies.filter(p => p.zone === site.id)]
-  if (world.active === site.id) for (const p of G.pieces.filter(p => p.ownerPlayerId !== myPlayerId && p.currentHp > 0 && !world.enemies.some(m => m.id === p.instanceId))) members.push({id:p.instanceId,tier:'minion',ip:'魔兽世界',role:'召唤物'})
+  const zone = world.zones?.find(zone => zone.id === site.id)
+  if (world.active === site.id && zone) for (const p of G.pieces.filter(p => adventureEnemyPlans(p) !== null && p.currentHp > 0 && p.x !== null && p.y !== null && p.x >= zone.x && p.y >= zone.y && p.x < zone.x + zone.width && p.y < zone.y + zone.height && !world.enemies.some(m => m.id === p.instanceId))) members.push({id:p.instanceId,tier:'minion',ip:'魔兽世界',role:'召唤物'})
   for (const member of members) {
     const piece = G.pieces.find(p => p.instanceId === member.id && p.currentHp > 0)
     if (!piece) continue
     const card = adventurePortrait(piece, () => { document.getElementById('adventureDialog').close(); selectedPieceId = piece.instanceId; render() }, member.tier === 'boss' ? '♛' : member.tier === 'elite' ? '◆' : '')
     card.title = piece.name + ' · ' + member.ip + ' · ' + member.role + (member.core ? ' · 核心' : '')
     card.classList.add('tier-' + member.tier)
-    const index = world.plans.findIndex(p => p.sourceId === piece.instanceId), plan = world.plans[index]
-    if (plan) { const intent = document.createElement('small'); intent.className = 'adventure-intent-chip'; intent.textContent = (index + 1) + ' ' + ({move:'移动',attack:'攻击',summon:'召唤'}[plan.kind]); card.append(intent) }
+    const plans = adventureEnemyPlans(piece)
+    if (plans?.length) { const intent = document.createElement('small'); intent.className = 'adventure-intent-chip'; intent.textContent = '等级 ' + window.adventureEnemyLevel(piece) + ' · 下次：' + plans.map(adventurePlanLabel).join(' → '); card.append(intent) }
     enemies.append(card)
   }
   section.append(enemies)
@@ -135,16 +203,19 @@ function renderAdventureDialog() {
   const focused = document.activeElement, focusKey = focused?.dataset.operation
   content.replaceChildren()
   if (adventureDialogKind === 'supplies') {
-    title.textContent = '随身遗物与补给'; renderAdventureSupplies(content)
+    title.textContent = '随身遗物与补给'; if (world.lastReward) renderAdventureReward(content); renderAdventureSupplies(content)
+  } else if (adventureDialogKind === 'rewards') {
+    title.textContent = '战利品'; renderAdventureReward(content)
+    if (adventureHasSupplyChoice()) content.append(adventureButton('选择卡牌与遗物', () => openAdventureDialog('supplies'), 'adventure-supply-choice'))
   } else if (adventureDialogKind === 'sites') {
-    title.textContent = '旧城边境'
+    title.textContent = '第 ' + (world.actNumber || 1) + ' / ' + (world.actCount || 3) + ' 幕 · ' + (world.name || '旧城边境')
     const progress = document.createElement('p'); progress.textContent = '据点 ' + world.cleared.length + ' / ' + world.zones.length; content.append(progress)
     const list = document.createElement('div'); list.className = 'adventure-site-list'
     for (const site of world.sites) {
       const button = adventureButton('', () => openAdventureDialog('site', site.id))
       button.innerHTML = adventureIcon(adventureSiteIcon(site))
       const label = document.createElement('span'); label.textContent = site.name
-      const status = document.createElement('small'); status.textContent = world.claimed.includes(site.id) || world.cleared.includes(site.id) ? '已完成' : site.kind === 'camp' ? '休整 / 强化' : site.kind === 'encounter' ? '遭遇战' : site.kind === 'recruit' ? '招募同行者' : '物资'
+      const status = document.createElement('small'); status.textContent = world.claimed.includes(site.id) || world.cleared.includes(site.id) ? '已完成' : site.kind === 'exit' ? (world.actReady ? '可前往下一幕' : '先攻克本幕据点') : site.kind === 'camp' ? '休整 / 强化' : site.kind === 'encounter' ? '遭遇战' : site.kind === 'recruit' ? '招募同行者' : '物资'
       button.append(label, status); list.append(button)
     }
     content.append(list)
@@ -163,6 +234,11 @@ function renderAdventureDialog() {
     title.textContent = site.name
     const description = document.createElement('p'); description.textContent = site.detail; content.append(description)
     if (site.kind === 'encounter') renderAdventureEnemies(content, site)
+    else if (site.kind === 'exit') {
+      const operations = document.createElement('div'); operations.className = 'adventure-operations'
+      const advance = adventureButton('前往下一幕', () => adventureInteract(site.id, 'advance')); advance.dataset.operation = 'advance'; operations.append(advance)
+      const hint = document.createElement('p'); hint.id = 'adventureInteractionHint'; content.append(operations, hint)
+    }
     else if (world.claimed.includes(site.id)) { const p = document.createElement('p'); p.textContent = site.kind === 'recruit' ? '✓ 同行者已加入队伍' : '✓ 已领取'; content.append(p) }
     else if (site.kind === 'recruit') renderAdventureRecruitment(content, site)
     else {
@@ -201,10 +277,10 @@ function refreshAdventureControls() {
       : button.dataset.operation === 'recruit' ? world.coins < world.recruitment.cost
       : button.dataset.operation === 'dismiss' ? world.coins < world.recruitment.dismissPrice || adventureCampTargetId === world.captainId
       : button.dataset.operation === 'search' && G.players.find(p => p.playerId === myPlayerId).actionPoints < 1
-    button.disabled = blocked || world.claimed.includes(site?.id) || unaffordable
+    button.disabled = blocked || world.claimed.includes(site?.id) || unaffordable || (button.dataset.operation === 'advance' && !world.actReady)
   })
   const hint = document.getElementById('adventureInteractionHint')
-  if (hint) hint.textContent = world.active ? '战斗中无法使用设施' : !near ? '队长或选中队员靠近后可使用' : ' '
+  if (hint) hint.textContent = world.active ? '战斗中无法使用设施' : site?.kind === 'exit' && !world.actReady ? '击败本幕首领后开放' : !near ? '队长或选中队员靠近后可使用' : ' '
 }
 function adventureStamp(kind, label, done) {
   const key = kind + ':' + label + ':' + done
@@ -225,7 +301,7 @@ function adventureStamp(kind, label, done) {
 function syncAdventureBoard() {
   const world = adventureSnapshot?.world
   if (!world || !window.BattleRenderer3D?.setBoardDecorations) return
-  const key = JSON.stringify([world.sites,world.claimed,world.cleared,world.active,adventureSiteId,world.plans])
+  const key = JSON.stringify([world.sites,world.claimed,world.cleared,world.active,world.zones,world.encounters,adventureSiteId,world.plans])
   if (key === adventureDecorationKey) return
   adventureDecorationKey = key
   const cells = [], lines = []
@@ -235,7 +311,7 @@ function syncAdventureBoard() {
     if (plan.kind === 'move') lines.push({points:[plan.origin,...plan.cells],color:0x3e7180,width:.04})
   }
   for (const zone of world.zones) {
-    if (world.cleared.includes(zone.id) || (world.active ? world.active !== zone.id : adventureSiteId !== zone.id)) continue
+    if (world.cleared.includes(zone.id)) continue
     const x=zone.x-.48,y=zone.y-.48,right=zone.x+zone.width-.52,bottom=zone.y+zone.height-.52
     const points=[]
     for(let px=x;px<right;px+=1)points.push({x:px,y})
@@ -246,15 +322,17 @@ function syncAdventureBoard() {
     points.push({x,y:bottom})
     for(let py=bottom;py>y;py-=1)points.push({x,y:py})
     points.push({x,y})
-    lines.push({points,color:world.active===zone.id?0xa14b38:0x967442,width:.045})
+    const sealed = world.active === zone.id || world.encounters?.some(e=>e.id===zone.id)
+    lines.push({points,color:0x38251c,width:sealed ? .32 : .20,lift:.035})
+    lines.push({points,color:sealed ? 0xe16b39 : 0xc49a5d,width:sealed ? .22 : .12,lift:.048,wallHeight:sealed ? .42 : 0,posts:sealed})
   }
   BattleRenderer3D.setBoardDecorations({cells,lines})
 }
 // eslint-disable-next-line @typescript-eslint/no-unused-vars -- Called by adventure/battle-controller.js.
 function disposeAdventureWorld() {
   BattleRenderer3D.setBoardDecorations(null)
-  adventureStampCache.clear(); adventureDecorationKey = null
-  for (const id of ['adventureDialog','adventureWallet','adventurePartyDock','adventureEncounter']) document.getElementById(id)?.remove()
+  adventureStampCache.clear(); adventureDecorationKey = null; adventureFocusedAct = null
+  for (const id of ['adventureDialog','adventureWallet','adventurePartyDock','adventureEncounter','adventureSiteActions']) document.getElementById(id)?.remove()
 }
 // eslint-disable-next-line @typescript-eslint/no-unused-vars -- Called by battle.html's deployment click handler.
 function adventurePlaceAt(x, y) {
@@ -266,6 +344,7 @@ async function adventureInteract(siteId, operation, choice = adventureCampTarget
   if (adventureBusy || adventureStopped) return
   adventureBusy = true; clearTimeout(adventureTimer)
   try {
+    if (operation === 'advance') document.getElementById('adventureDialog').close()
     acceptAdventureSnapshot(await adventureClient.request('interact', { siteId, operation, pieceId: adventureActor()?.instanceId, targetPieceId: choice, revision: adventureSnapshot.revision }))
   } catch (error) { showMsg(error.message, 'err') }
   finally { adventureBusy = false; renderAdventureWorld(); scheduleAdventureAI() }
@@ -301,6 +380,7 @@ async function adventureChooseSupply(operation, choice) {
   } catch (error) { showMsg(error.message, 'err') }
   finally { adventureBusy = false; renderAdventureWorld(); scheduleAdventureAI() }
 }
+function worldCardPower(id) { const value = adventureSnapshot?.world?.counters?.cards?.[id]; return value ? '当前牌面伤害 ' + value.damage + ' · ' : '' }
 function renderAdventureSupplies(content) {
   const run = adventureSnapshot.world.cardProgress, config = adventureSnapshot.world.supplies
   if (!run || !config) { const p = document.createElement('p'); p.textContent = '此冒险未配置供牌遗物。'; content.append(p); return }
@@ -311,7 +391,7 @@ function renderAdventureSupplies(content) {
     const small = document.createElement('small'); small.textContent = detail; button.append(small)
     button.disabled = adventureBusy; content.append(button)
   }
-  const cardText = id => (cardsById[id]?.description || id) + (ledger.growth[id] ? ' · 后续同名牌伤害 +' + ledger.growth[id] : '')
+  const cardText = id => (worldCardPower(id) + (cardsById[id]?.description || id)) + (ledger.growth[id] ? ' · 后续同名牌伤害 +' + ledger.growth[id] : '')
   if (ledger.overflow.length) {
     text('手牌已满（10张）。选择弃置一张，也可以放弃新牌。还有 ' + ledger.overflow.length + ' 张待处理。')
     const incoming = ledger.overflow[0]
@@ -329,6 +409,10 @@ function renderAdventureSupplies(content) {
     for (const id of reward.cardIds) choiceButton(cardsById[id]?.name || id, cardText(id), 'cards', id)
     choiceButton('跳过卡牌', '不领取本次卡牌', 'skip-cards', '')
   }
+  text('当前计数（随行动更新）')
+  for (const [id, value] of Object.entries(adventureSnapshot.world.counters?.cards || {})) text((cardsById[id]?.name || id) + '：威力 ' + value.damage + ' = 基础 ' + value.baseDamage + ' + 成长 ' + value.growth)
+  for (const [id, count] of Object.entries(adventureSnapshot.world.counters?.passiveHits || {})) text((G.pieces.find(p => p.instanceId === id)?.name || id) + '：本场受你方被动命中 ' + count + ' 次')
+  text('牌面威力未扣除目标防御、护盾，也未包含施放者增减伤。')
   text('已持有遗物 · ' + ledger.relicIds.length)
   for (const id of ledger.relicIds) {
     const relic = config.relics.find(r => r.id === id), tile = document.createElement('article'); tile.className = 'adventure-relic'
@@ -337,4 +421,33 @@ function renderAdventureSupplies(content) {
   }
   for (const [id, growth] of Object.entries(ledger.growth)) text((cardsById[id]?.name || id) + ' · 后续同名牌伤害 +' + growth)
   if (!Object.keys(ledger.growth).length) text('成长会记录在本次冒险中，新获得的同名牌继续继承。')
+}
+
+window.adventureCardPresentation = (card, definition) => {
+  const value = adventureSnapshot?.world?.counters?.cards?.[card.cardId || definition.id]
+  if (!value) return card
+  const brief = {
+    'pve-skirmish-calibrate': '友方对3格内敌人造成伤害。\n目标本场受过己方被动伤害：后续同名牌伤害+3。',
+    'pve-skirmish-cover': '友方对3格内敌人造成伤害。',
+    'pve-light-spark': '友方对3格内敌人造成伤害。\n本局同名牌伤害+2。',
+    'pve-blood-curse': '友方自伤1，再对3格内敌人造成伤害。\n付出生命：本局同名牌伤害+3。'
+  }
+  return {...card,presentation:{...card.presentation,badge:'威力 ' + value.damage,description:brief[card.cardId || definition.id] || definition.description || ''}}
+}
+window.adventureCardDetail = (cardId, description) => {
+  const value = adventureSnapshot?.world?.counters?.cards?.[cardId]
+  return value ? '威力 ' + value.damage + '（基础 ' + value.baseDamage + '＋成长 ' + value.growth + '）\n\n' + description : description
+}
+window.adventurePieceWarning = piece => {
+  const world = adventureSnapshot?.world
+  if (!world) return ''
+  if (adventureEnemyPlans(piece) !== null) return '本场受你方被动命中：' + (world.counters?.passiveHits?.[piece.instanceId] || 0) + ' 次'
+  const forecast = world.forecast, result = forecast?.pieces?.[piece.instanceId]
+  if (!result) return ''
+  return (result.dies ? '⚠ 保持当前站位，按预告预计阵亡' : '按当前预告预计受伤') + ' · 生命 ' + result.hp + ' → ' + result.remainingHp
+}
+
+window.adventureBoardWarning = id => {
+  const world = adventureSnapshot?.world
+  return world?.forecast?.complete && world.forecast.pieces?.[id]?.dies ? '⚠ 预计阵亡' : ''
 }

@@ -6,8 +6,8 @@
   "image": "adventure/ghoul.svg",
   "description": "《魔兽世界》 · 召唤物",
   "stats": {
-    "maxHp": 4,
-    "attack": 2,
+    "maxHp": 6,
+    "attack": 3,
     "defense": 0,
     "moveRange": 3
   },

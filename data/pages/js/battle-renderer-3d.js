@@ -990,6 +990,18 @@
 
   function _updatePieceSummary(obj, piece) {
     if (!obj.summaryEl) return
+    const warningText = !_boardDecorationsHistorical && window.adventureBoardWarning?.(piece.id) || ''
+    let warning = obj.summaryEl.querySelector('.piece-board-lethal')
+    if (warningText && !warning) {
+      warning = document.createElement('span')
+      warning.className = 'piece-board-lethal'
+      obj.summaryEl.appendChild(warning)
+    }
+    if (warning) {
+      warning.textContent = warningText
+      warning.hidden = !warningText
+      warning.title = '按当前站位与已公布行动预测；详见棋子详情'
+    }
     const currentHp = piece.health ? piece.health.current : 0
     const maxHp = piece.health ? piece.health.max : 1
     const health = obj.summaryEl.querySelector('.piece-board-health')
@@ -2461,7 +2473,7 @@
       e.preventDefault()
     }, { passive: false })
 
-    _listen(canvas, 'dblclick', () => _resetCamera())
+    _listen(canvas, 'dblclick', () => { if (!window.focusAdventureContext?.()) _resetCamera() })
 
     _listen(canvas, 'contextmenu', e => {
       e.preventDefault()
@@ -2519,6 +2531,15 @@
   }
 
   function resetView() { _resetCamera() }
+
+  function focusCell(x, y) {
+    if (!_mounted || !_camera || !_cameraTarget || !Number.isFinite(x) || !Number.isFinite(y)
+      || x < 0 || y < 0 || x >= _mapW || y >= _mapH) return false
+    _cameraTarget.set(x, _tileSurfaceHeightAt(x, y), y)
+    _positionCameraFromTarget()
+    _notifyViewportChange()
+    return true
+  }
 
   // ── Raycasting ────────────────────────────────────────────────────────────────
   const _raycaster = new THREE.Raycaster()
@@ -2650,8 +2671,21 @@
         const mesh = new THREE.Mesh(new THREE.PlaneGeometry(line.width || .035, length),
           new THREE.MeshBasicMaterial({ color: line.color, transparent: true, opacity: .85, depthWrite: false }))
         mesh.rotation.set(-Math.PI / 2, 0, Math.atan2(dx, dz))
-        mesh.position.set((a.x + b.x) / 2, Math.max(_tileSurfaceHeightAt(Math.round(a.x), Math.round(a.y)), _tileSurfaceHeightAt(Math.round(b.x), Math.round(b.y))) + .028, (a.y + b.y) / 2)
+        const surface = Math.max(_tileSurfaceHeightAt(Math.round(a.x), Math.round(a.y)), _tileSurfaceHeightAt(Math.round(b.x), Math.round(b.y)))
+        mesh.position.set((a.x + b.x) / 2, surface + (line.lift || .028), (a.y + b.y) / 2)
         group.add(mesh)
+        if (line.wallHeight) {
+          const wall = new THREE.Mesh(new THREE.BoxGeometry(.055, line.wallHeight, length),
+            new THREE.MeshBasicMaterial({color:line.color,transparent:true,opacity:.28,depthWrite:false}))
+          wall.rotation.y = Math.atan2(dx,dz)
+          wall.position.set((a.x+b.x)/2,surface+line.wallHeight/2,(a.y+b.y)/2)
+          wall.userData.decorationKind = 'sealed-wall'; group.add(wall)
+          if (line.posts && i % 3 === 1) {
+            const post = new THREE.Mesh(new THREE.BoxGeometry(.15,line.wallHeight+.22,.15),new THREE.MeshBasicMaterial({color:0x603724}))
+            post.position.set(a.x,surface+(line.wallHeight+.22)/2,a.y)
+            post.userData.decorationKind = 'boundary-post'; group.add(post)
+          }
+        }
       }
     }
     _boardDecorations = group
@@ -2670,6 +2704,7 @@
       _buildTiles(model.board)
     }
 
+    _boardDecorationsHistorical = false
     _updatePieces(model.pieces || [])
     _updateTileEffects(model.effects || [])
     setHighlights({
@@ -2719,6 +2754,10 @@
     _currentModel = model
     update(model)
     _boardDecorationsHistorical = true
+    _pieceObjects.forEach(function (obj) {
+      const warning = obj.summaryEl?.querySelector('.piece-board-lethal')
+      if (warning) warning.hidden = true
+    })
     if (_boardDecorations) _boardDecorations.visible = false
   }
 
@@ -2881,6 +2920,7 @@
     spawnFloater,
     resize,
     resetView,
+    focusCell,
     projectCell,
     setHistoryHighlight,
     setBoardDecorations,

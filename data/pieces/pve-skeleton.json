@@ -6,8 +6,8 @@
   "image": "adventure/skeleton.svg",
   "description": "《我的世界》 · 直线射手",
   "stats": {
-    "maxHp": 4,
-    "attack": 2,
+    "maxHp": 7,
+    "attack": 3,
     "defense": 0,
     "moveRange": 2
   },

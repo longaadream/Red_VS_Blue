@@ -58,9 +58,10 @@ export function supplyEncounter(state: BattleState, playerId: string, encounterI
   }
 }
 
-export function cleanupAdventureCards(state: BattleState): void {
+export function cleanupAdventureCards(state: BattleState, ownerId?: string): void {
   const run = adventureCards(state)
   for (const player of state.players) {
+    if (ownerId && player.playerId !== ownerId) continue
     player.hand = (player.hand ?? []).filter(card => (card.contentState?.adventure as { lifetime?: unknown } | undefined)?.lifetime === 'run')
     player.discardPile = []
     if (run?.players[player.playerId]) {
@@ -70,9 +71,13 @@ export function cleanupAdventureCards(state: BattleState): void {
   }
 }
 
-export function offerAdventureRewards(state: BattleState, playerId: string, encounterId: string, config: RoguelikeSuppliesV1): void {
+export function offerAdventureRewards(state: BattleState, playerId: string, encounterId: string, config: RoguelikeSuppliesV1, allowRelic=true): void {
   const run = adventureCards(state)!
-  run.reward = { encounterId, relicIds: config.rewardRelicIds.filter(id => !run.players[playerId].relicIds.includes(id)), cardIds: [...config.rewardCardIds] }
+  const ledger=run.players[playerId]
+  const eligible=allowRelic&&(config.rewardRelicLimit===undefined||(ledger.earnedRelics??0)<config.rewardRelicLimit)
+  const reward = { encounterId, relicIds: eligible?config.rewardRelicIds.filter(id => !ledger.relicIds.includes(id)):[], cardIds: [...config.rewardCardIds] }
+  if (run.rewards) run.rewards[playerId] = reward
+  else run.reward = reward
 }
 
 export function chooseAdventureSupply(state: BattleState, playerId: string, operation: string, choice: string, config: RoguelikeSuppliesV1): void {
@@ -91,9 +96,11 @@ export function chooseAdventureSupply(state: BattleState, playerId: string, oper
     }
     return
   }
-  const reward = run.reward
+  const reward = run.rewards ? run.rewards[playerId] : run.reward
   if (!reward) throw new Error('当前没有待领取的奖励')
   if (operation === 'relic' && reward.relicIds.includes(choice)) {
+    if(config.rewardRelicLimit!==undefined&&(ledger.earnedRelics??0)>=config.rewardRelicLimit)throw new Error('本次冒险的遗物奖励已领取')
+    ledger.earnedRelics=(ledger.earnedRelics??0)+1
     ledger.relicIds.push(choice); reward.relicIds = []
   } else if (operation === 'cards' && reward.cardIds.includes(choice)) {
     grantAdventureCards(state, playerId, choice, config.rewardCopies, 'run', reward.encounterId)
@@ -101,5 +108,8 @@ export function chooseAdventureSupply(state: BattleState, playerId: string, oper
   } else if (operation === 'skip-relic' && reward.relicIds.length) reward.relicIds = []
   else if (operation === 'skip-cards' && reward.cardIds.length) reward.cardIds = []
   else throw new Error('奖励选项无效或已经领取')
-  if (!reward.relicIds.length && !reward.cardIds.length) delete run.reward
+  if (!reward.relicIds.length && !reward.cardIds.length) {
+    if (run.rewards) delete run.rewards[playerId]
+    else delete run.reward
+  }
 }

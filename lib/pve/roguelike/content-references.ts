@@ -1,4 +1,4 @@
-import { parseRoguelikeDocumentV1 } from '../contracts/roguelike-content-v1'
+import { parseRoguelikeDocumentV1, resolveRoguelikeMaps, RoguelikeAdventureSourceV1Schema } from '../contracts/roguelike-content-v1'
 import { isContentAvailable, type ContentAvailability } from '../../game/content-availability'
 
 interface ReferencedContent {
@@ -60,7 +60,9 @@ export function validateRoguelikeReferences(files: readonly {path:string;jsonVal
   }
   const documents=new Set<string>()
   for(const file of files) {
-    const document=parseRoguelikeDocumentV1(file.jsonValue)
+    const source=RoguelikeAdventureSourceV1Schema.safeParse(file.jsonValue)
+    if(source.success)for(const act of [source.data,...source.data.nextActs??[]])resource('maps',act.map.id)
+    const document=parseRoguelikeDocumentV1(resolveRoguelikeMaps(file.jsonValue,path=>entries.get(path)))
     if(!document)continue
     const key=document.schemaVersion+':'+document.id
     if(documents.has(key))fail(file.path+': duplicate document id')
@@ -89,7 +91,7 @@ export function validateRoguelikeReferences(files: readonly {path:string;jsonVal
       }
       for (const relic of document.relics) {
         const familyExists = files.some(file => {
-          const builds = parseRoguelikeDocumentV1(file.jsonValue)
+          const builds = parseRoguelikeDocumentV1(resolveRoguelikeMaps(file.jsonValue,path=>entries.get(path)))
           return builds?.schemaVersion === 'rvb-pve-roguelike-builds/v1' && builds.families.some(family => family.id === relic.familyId)
         })
         if (!familyExists) fail(`relics/${relic.id}: missing family`)

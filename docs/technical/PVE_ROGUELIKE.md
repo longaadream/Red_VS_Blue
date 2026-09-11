@@ -1,5 +1,18 @@
 # Same-map adventure single-player implementation
 
+## 2026-09-10: three-act expansion and roaming encounters
+
+User requests both movement and site interaction on occupied special cells, unmistakable combat boundaries, larger arenas/maps, stronger IP enemies, visible rewards, at least five first-act encounters, both following acts and pursuing roaming enemies with kill rewards. This explicitly authorizes implementation of the extended single-player framework and configurable encounter numbers/economy defaults. Risk High: campaign transitions, rewards and encounter authority. Existing restrictions on new Linear transmissions remain; latest user scope supersedes the older one-act implementation limit. This amendment remains local.
+
+base_branch: main; base_sha: 53c2c9ca3eef73d2158645b93138e242c225c604 (fresh fetch succeeded). Working checkpoint ea84269a122f5219df25da1c60d62ce702e0306d is ahead 1 / behind 2; check:main-baseline reports BEHIND_MAIN. Do not rewrite the uploaded Draft branch or claim release readiness.
+
+Allowed paths: lib/pve/roguelike/**, lib/pve/contracts/roguelike-content-v1.ts, lib/game/adventure-boundary.ts, terminal.ts and skills.ts (mode-gated enemy encounter summon uniqueness; player/PvP uniqueness unchanged); data/pve/roguelike/adventure.json, data/pieces/pve-*.json, necessary PVE skills; native adventure page JS/CSS, adventure-only battle input and battle-renderer-3d decorations; corresponding tests, generated runtime engines and product/technical/QA documents. No dependency updates, changes to core RNG algorithms, PvP rules, old save migration, multiplayer implementation, merge or release.
+
+Implementation: three 64x64 authored landmark layouts, five encounters per act, larger 16x16 arenas, seeded generation retaining reachability. Native moves remain authoritative. Clicking an occupied facility selects the pawn; a distinct nearby action opens its site dialog. Pursuers move with public plans during exploration and trigger a bounded encounter when close, then use existing enemy programs; defeated roaming enemies award coins once. Cleared final encounter unlocks an on-map exit to the next act. Preserve run coins, recruited pieces, wounds, upgrades, relics, growth and retained cards; replace only the map/act encounter state. Defeat never advances the act.
+
+Acceptance: occupied-cell selection + repeated movement + optional site action; visible ground-aligned boundaries; three valid/reproducible maps and five encounters each; transition requires cleared encounters/exit proximity/resolved choices and preserves run state; predictable roam movement and combat with no enemy AP, no off-map/blocked moves, no duplicate kill reward; fixed and final encounter reward display; PVE suites, adjacent native tests, lint/types/build/encoding and browser verification, independent review. Rollback these additive optional campaign/roaming fields, modules and UI changes to ea84269; do not touch old PVE/PvP data or saves.
+
+
 ## 2026-09-10: Draft PR checkpoint
 
 The user explicitly requested committing and uploading the current PVE progress as a Draft PR. This authorizes a normal push and Draft creation on the existing RED-181 feature branch; no ready-for-review transition, merge, release or new Linear transmission. Include the current same-map framework, shared content/availability gates, resource-pack integration, supply/growth slice, random map/recruitment extension, native browser assets, tests and documentation. Local output logs and temporary previews remain ignored.
@@ -177,3 +190,76 @@ Required acceptance: independent encounter AP and cap, zero-AP free deployment,
 illegal/stale commands leave state unchanged, captain-death deployment, true final
 core victory, injury/upgrade retention, reserve camp services, normal loss, native
 PVP/practice/team/page regressions, typecheck, lint and real browser interaction.
+
+### 冒险准备与合作存档（实现中）
+
+`adventure.html` 使用既有木桌、纸页与动漫角色画像，提供六套初始队伍、返回主页、单人出发、创建/加入四人房间和存档列表。初始队伍来自资源包 `builds.json`；服务器按流派 ID 解析棋组，不接受客户端任意角色列表。换队取消准备，房主等其他玩家准备后开始。未开局离开释放席位；房主离开准备房时移交给剩余玩家。
+
+合作冒险由 Colyseus `adventure` 房间持有完整状态，通过 PostgreSQL 保存带版本的检查点。检查点使用规范 JSON 哈希，兼容 JSONB 键顺序变化。保存仅允许所有战区及奖励结算后的稳定边界；资源身份必须匹配。多人增加敌方援兵和首领生命，系数为可调整的资源包配置，尚未进行平衡验收。
+
+验证：112 项冒险及真实 SDK 测试通过；涵盖准备门槛、改队清准备、房主保存、重开房读档、规范化哈希和独立战区。引擎构建、相关 ESLint、编码检查通过。全仓类型检查仍受既有 `electron-editor/content-pipeline-worker.ts:8` TS2345 阻碍。浏览器已检查准备页与角色画像；数据库与完整联机浏览器验收仍待完成，不应把该状态标记为可发布。
+
+### 公共资源与房间发现
+
+探索三幕的源地图现在存放在 `data/maps/adventure-act-{1,2,3}-v1.json`，加入公共地图 manifest，并标记 `availability: { modes: ["pve"], status: "ready" }`。冒险源配置只保留地图 ID；读取资源包时解析引用，运行态与存档保留生成后布局。旧内嵌地图格式继续兼容。首版共享地图须使用标准 . # C O 图例，其他地形语义会明确拒绝，不会静默忽略。
+
+PVE 怪物、技能、卡牌继续存放在公共 pieces/skills/cards 目录，使用同一可用模式元数据；拉法姆标为仅 PVP，招募候选与实际初始化均检查模式。地图登记、缺失引用、模式及布局校验纳入资源包闭合验证。
+
+PVE 大厅复用同一个 Colyseus 服务与 `/rooms` 发现入口，通过 `?mode=pve` 读取冒险房间 metadata。默认 PVP 查询保持原行为。摘要仅含房间状态、人数和队伍资料；全员离线房间隐藏，缺席席位可申请接管。房间规则类仍按模式分离，避免把探索回合和 PVP 对局状态混用。
+
+### 地形生成 terrain-regions-v1
+
+按用户确认实现开阔地、街巷、废墟和峡道四类算法地形，采用带随机偏移的区域中心划分区域，再生成院墙出入口、断墙掩体及弯曲峡道。三幕通过 terrainProfile 分别偏向 streets、ruins、fortress。地形使用独立的派生种子流；已有 landmark-routes-v1 资源继续走原路径。
+
+战区也生成地形，不再复制空白基础战场。地标和敌方阵容布置后开路，保证事件、出生点、巡逻怪和区内敌人可达；无法从营地到达的探索地格，以及无法从战区入口到达的内部地格，转为掩体，避免多人出生/回归选中封闭院落。存档保留已生成布局，不重生成旧局。
+
+验证：14 文件、114 项冒险测试通过，覆盖三幕多种子可达性、密度、确定性、资源包与旧模式回归；相关 ESLint 和冒险引擎构建通过。类型检查仍只有既有 editor TS2345。已刷新本地预览资源并打开 seed=42 的实际原生棋盘确认地形表现。
+
+### 招募池扩充
+
+原配置仅有4名角色，每次抽3名，在固定种子下同一地点候选必然重复。现将正式招募池扩至33名，每个地点仍按种子与地点ID无放回抽3名。排除仅PVP角色、PVE敌人，以及当前不支持中途招募的玩家级开局规则/渐进部署角色。既有存档候选保留，新开局读取扩充配置。
+
+26项招募与资源包测试通过，包括32个种子的候选差异、单组不重复、相同种子复现及33名候选全部可构造。此验证不代表所有技能组合已完成实战平衡验收。独立只读审查未发现本轮配置或引用阻断。已刷新本地预览资源缓存。
+
+### 行动结算后跟随队长
+
+PVE 镜头聚焦缓存加入权威 revision，每次行动/结算提交后定位到己方队长当前位置；同一 revision 的重复 UI 渲染不抢占手动拖动视角。队长不在场时不强制定位。仅修改冒险 UI，不修改 PVP 相机行为。14 项 world-ui 测试通过，相关 ESLint 通过；独立审查确认同地图表现队列不会覆盖聚焦。
+
+
+### 2026-09-11 可选战斗与敌人压力调整
+
+每幕保留五处遭遇：两处普通可选据点、两处可选精英、一处必需首领。可选据点不要求顺序，可跳过；击败本幕首领后即可前往下一幕。普通战斗提供卡牌与金币；精英提供遗物候选，每位玩家整个三幕流程最多领取一件奖励遗物，初始配套遗物不计入。领取计数随玩家成长账本保存并跨幕保留。
+
+增加《魔兽世界》憎恶（相邻范围横扫）、《我的世界》凋灵骷髅（近身追击）、《星球大战》帝国冲锋队员（远程射线）。资源仍存入共享棋子、技能、图像目录并标注仅 PVE 可用。精英初始生命乘 1.5、攻击加 2；多人首领生命在包含精英强化的初始化基线上计算，不重复累乘。
+
+敌人可以提前宣布移动后攻击的完整序列。玩家占据预告路径或落点时，敌人停在阻挡前最后一个空格；后续攻击从实际停点按原预告方向执行。第一格就被挡住则原地出招。追魂斩明确锁定目标，可追踪位置；普通攻击不更换方向。攻击范围与移动路线均提前展示。取消选择及重置视角优先聚焦正在进行的战区，探索时聚焦队长；权威取消回执后再次落实该焦点。
+
+
+#### 同日追加：敌人机制
+
+- 憎恶：奇数轮可使用4格弹射物肉钩，命中后将目标拉向身前，途中受占位与地形阻挡则停下；相邻目标使用横扫。
+- 凋灵骷髅：偶数战斗轮锁定4格内目标发动追魂斩，结算时无视距离与阻挡；目标离场则失效，正常伤害结算仍生效。
+- 帝国冲锋队员：爆能射击与回合外警戒射击。玩家移动后若停在四方向5格内且射线无阻挡，触发警戒伤害，每个玩家回合最多一次。
+- 直接进入冒险的默认队伍同步为猎空＋安娜。
+- 憎恶使用新绘制的纸面手绘插图；冲锋队员插图因图像服务两次拒绝暂未生成，保留现有图标。
+
+
+### 敌人下一次技能提示
+
+敌人详情顶部与据点敌人列表读取权威 world.plans，按该棋子的预告顺序显示技能名，例如“下次行动：移动 → 横扫”。技能列表突出“即将使用”的技能，其他主动技能标“本轮不使用”，被动标“条件触发”；无预告时不预测技能。锁定攻击追加锁定标记。联机友方棋子保持原技能显示。16项world-ui测试与HTML内联脚本语法检查通过。此次未修改敌方决策与战斗结算。远端fetch因GitHub连接失败未刷新，未提交或推送。
+
+
+### 世界回合敌人成长
+
+每完成10个世界回合，场上存活且未进入战区的敌人提升一级：生命上限增加基础生命的20%（向上取整），攻击+1。等级1为初始等级，10回合结束后升至等级2。精英初始强化计入生命基线，不复利；增加生命额度但保留已有伤势，死亡棋子不复活。当前所有战区的敌人冻结，不改变已发布预告对应的强度。联机按共同世界轮次计算，与人数无关；跨幕保留完成轮数，存档保存各怪物已应用等级，防止重复升级。资源包根配置enemyGrowth支持调整间隔与增量。详情显示等级。
+
+
+### 卡牌计数与阵亡预估
+
+当前可用的四张PVE伤害牌在牌面只显示实时威力和简短效果，右键/长按详情显示同名成长加值与完整说明，构筑面板集中展示基础值、成长与当前值；敌人详情显示本场受你方被动命中的次数。adventurePower声明由执行与投影共同读取，牌面威力不包含目标防御/护盾和施放者增减伤。未启用的设计卡没有伪造可执行预览。
+
+权威快照以独立副本执行已公布的敌方计划，计入原生防御、阻挡、钩拉与追踪等效果，输出预计剩余生命和阵亡标记。只推演当前公开行动，不替玩家作出后续选择，不预演回合结束效果或尚未触发的警戒射击。需要额外选择/无法完成时明确提示预测不可用，不给出必死断言。结果按revision缓存；同一状态的联机查看者共用预测，各自卡牌计数分开，返回时复制避免污染缓存。
+
+
+### 手牌与棋子提示可读性
+PVP/PVE 共用加大的手牌，取消描述行数截断；过长规则可在牌内滚动，右键详情仍保留。冒险部署头像支持右键查看完整棋子详情，不能部署时仍可查看。预计阵亡显示在棋盘棋子的血量标记旁，随棋子移动；移除部署区重复警告，历史画面不显示当前预测。

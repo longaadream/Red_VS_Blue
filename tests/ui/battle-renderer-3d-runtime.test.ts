@@ -41,6 +41,7 @@ type RendererApi = {
   resize(): void
   spawnFloater(x: number, y: number, text: string, color: string, big: boolean, options: unknown): void
   resetView(): void
+  focusCell(x: number, y: number): boolean
   projectCell(x: number, y: number, elevation?: number): { clientX: number; clientY: number; left: number; top: number }
   setBoardDecorations(data: { cells?: Array<{x:number;y:number;image?:unknown}>; lines?: Array<{points:Array<{x:number;y:number}>;color:number}> } | null): void
   setHistoryHighlight(cells: Array<{ x: number; y: number; role: 'source' | 'target' }>): void
@@ -424,6 +425,43 @@ describe('RED-68 BattleRenderer3D runtime', () => {
     const finalGroup = scene.children.find(n => n.name === 'board-decorations')!
     const finalTexture = vi.spyOn(finalGroup.children[0].material!.map!,'dispose')
     h.renderer.dispose(); expect(finalTexture).toHaveBeenCalledTimes(1)
+  })
+
+  it('focuses an adventure cell without rebuilding the board or changing zoom', () => {
+    const h = createHarness(1280, 720, false)
+    const model=runtimeModel();model.board.width=64;model.board.height=64
+    h.renderer.init({container:h.container});h.renderer.update(model);h.frame(16)
+    const before = h.renderer.projectCell(5,55), disposals=h.disposeCounts.geometry
+    expect(h.renderer.focusCell(5,55)).toBe(true);h.frame(16)
+    const focused=h.renderer.projectCell(5,55)
+    expect(focused.clientX).toBeCloseTo(640)
+    expect(focused.clientY).toBeCloseTo(360)
+    expect(distance(before,focused)).toBeGreaterThan(10)
+    expect(h.renderer.focusCell(-1,55)).toBe(false)
+    expect(h.renderer.focusCell(Number.NaN,55)).toBe(false)
+    h.renderer.update(model);h.frame(16)
+    expect(distance(focused,h.renderer.projectCell(5,55))).toBeLessThan(.01)
+    expect(h.disposeCounts.geometry).toBe(disposals)
+    h.renderer.dispose()
+  })
+
+  it('renders sealed borders as floor bands, translucent walls and posts in board space', () => {
+    const h = createHarness(1280, 720, false)
+    h.renderer.init({container:h.container}); h.renderer.update(runtimeModel())
+    const data = { lines: [{points:[{x:2,y:3},{x:3,y:3}],color:0xe16b39,width:.22,wallHeight:.42,posts:true}] }
+    h.renderer.setBoardDecorations(data); h.frame(16)
+    const group = h.renderers[0].scene!.children.find(n => n.name === 'board-decorations')!
+    expect(group.children).toHaveLength(3)
+    expect(group.children[0].rotation.x).toBeCloseTo(-Math.PI/2)
+    const wall = group.children.find(n => n.userData.decorationKind === 'sealed-wall')!
+    const post = group.children.find(n => n.userData.decorationKind === 'boundary-post')!
+    expect(wall.position).toMatchObject({x:2.5,z:3})
+    expect(wall.material!.opacity).toBeLessThan(.5)
+    expect(post.position).toMatchObject({x:2,z:3})
+    const disposals = h.disposeCounts.geometry
+    h.renderer.setBoardDecorations(null)
+    expect(h.disposeCounts.geometry - disposals).toBe(3)
+    h.renderer.dispose()
   })
 
   it.each([false, true])('places signed number bursts beside pieces and cleans up (reduced=%s)', (reduced) => {

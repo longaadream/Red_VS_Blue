@@ -1,6 +1,5 @@
+import { createAdventureState, AdventureSession, HUMAN, ENEMY, zones, createAdventureMap, startingPositions } from './fixtures/legacy-adventure'
 import { describe, it, expect } from 'vitest'
-import { createAdventureState, AdventureSession } from '@/lib/pve/roguelike/session'
-import { HUMAN, ENEMY, zones, createAdventureMap, startingPositions } from '@/lib/pve/roguelike/content'
 import { getServerGameProfileIdentityV1 } from '@/lib/content-pipeline/runtime/profile-game-identity'
 import { runBattleActionIsolated, hashBattleState } from '@/lib/game/battle-runner'
 import { finalizeBattleTerminal } from '@/lib/game/terminal'
@@ -140,7 +139,7 @@ describe('same-map adventure single-player slice', () => {
     state.pieces[2].x=10;state.pieces[2].y=23
     const world=adventureBoundary(state)!;world.activeZone=zones[0];world.activeEnemyIds=zones[0].enemyIds
     const result=runBattleActionIsolated(state,{type:'move',playerId:ENEMY,pieceId:`${ENEMY}-1`,toX:10,toY:22}).state
-    expect(result.pieces.find(p=>p.instanceId===`${ENEMY}-1`)?.currentHp).toBe(13)
+    expect(result.pieces.find(p=>p.instanceId===`${ENEMY}-1`)?.currentHp).toBe(state.pieces.find(p=>p.instanceId===`${ENEMY}-1`)!.currentHp)
   })
   it('removes real Recall data when the encounter is cleared', async () => {
     let state=await fixture();state.players[0].actionPoints=6;state.players[0].chargePoints=10

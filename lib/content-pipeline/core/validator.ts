@@ -107,7 +107,7 @@ export interface ValidatedContentTreeV1 extends ReadonlyContentTreeV1 {
   readonly capabilities: readonly PackCapabilityV1[]
 }
 
-import { parseRoguelikeDocumentV1 } from '@/lib/pve/contracts/roguelike-content-v1'
+import { parseRoguelikeDocumentV1, RoguelikeAdventureSourceV1Schema } from '@/lib/pve/contracts/roguelike-content-v1'
 import { validateRoguelikeReferences } from '@/lib/pve/roguelike/content-references'
 import { isValidContentAvailability } from '@/lib/game/content-availability'
 
@@ -649,7 +649,7 @@ function parsePveDocument(
   packId?: string,
 ): ParsedPveDocumentV1 | undefined {
   try {
-    if (parseRoguelikeDocumentV1(value)) return undefined
+    if (RoguelikeAdventureSourceV1Schema.safeParse(value).success || parseRoguelikeDocumentV1(value)) return undefined
   } catch {
     reject('PACK_SCHEMA_INVALID', 'content', { packId, path })
   }
@@ -705,10 +705,16 @@ function validateFileContent(
     return rejectJsonFailure(error, 'content', { packId, path: descriptor.path })
   }
   const hasExecutableContent = hasExecutableContentV1(jsonValue)
-  if (/^data\/(pieces|cards|skills)\//.test(descriptor.path)
+  if (/^data\/(pieces|cards|skills|maps|rules)\//.test(descriptor.path)
     && jsonValue && typeof jsonValue === 'object' && !Array.isArray(jsonValue)
     && jsonValue.availability !== undefined && !isValidContentAvailability(jsonValue.availability)) {
     reject('PACK_SCHEMA_INVALID', 'content', { packId, path: descriptor.path })
+  }
+  if (descriptor.path.startsWith('data/cards/') && jsonValue && typeof jsonValue === 'object' && !Array.isArray(jsonValue) && jsonValue.adventurePower !== undefined) {
+    const power = jsonValue.adventurePower
+    if (!power || typeof power !== 'object' || Array.isArray(power)
+      || typeof power.baseDamage !== 'number' || !Number.isFinite(power.baseDamage) || power.baseDamage < 0
+      || typeof power.usesGrowth !== 'boolean') reject('PACK_SCHEMA_INVALID', 'content', { packId, path: descriptor.path })
   }
   if (hasExecutableContent && !allowExecutableContent) {
     reject('PACK_FORBIDDEN_EXECUTABLE_CONTENT', 'content', {

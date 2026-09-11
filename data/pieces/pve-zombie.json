@@ -6,8 +6,8 @@
   "image": "adventure/zombie.svg",
   "description": "《我的世界》 · 近战杂兵",
   "stats": {
-    "maxHp": 5,
-    "attack": 2,
+    "maxHp": 9,
+    "attack": 3,
     "defense": 0,
     "moveRange": 2
   },

@@ -1,3 +1,4 @@
+import { generateTerrain } from './terrain'
 import { deriveStreamSeed, mulberry32 } from '../../game/rule-runtime'
 import { insideZone } from '../../game/adventure-boundary'
 import { RoguelikeAdventureV1Schema, type RoguelikeAdventureV1 } from '../contracts/roguelike-content-v1'
@@ -75,8 +76,18 @@ function placeLandmarks(source: RoguelikeAdventureV1, seed: number, random: () =
     if (!cell) return
     Object.assign(site, cell); used.add(key(cell))
   }
+  const roaming = result.enemyLineup.filter(enemy => result.roaming?.enemyIds.includes(enemy.id))
+  for (const enemy of roaming) {
+    used.delete(key(enemy))
+    const cell = pick(nearby(enemy, p => outside(p) && !used.has(key(p))
+      && [...result.sites, ...safeCamp].every(site => Math.abs(site.x - p.x) + Math.abs(site.y - p.y) >= 6)))
+    if (!cell) return
+    Object.assign(enemy, cell)
+    result.startingPositions[enemy.id] = { ...cell }; used.add(key(cell))
+  }
 
-  const grid: string[][] = Array.from({ length: height }, (_, y) => Array.from({ length: width }, (_, x) => interior({ x, y }) ? '.' : '#'))
+  const grid: string[][] = settings.algorithm === 'terrain-regions-v1' ? generateTerrain(width,height,seed,source.terrainProfile??'streets') : Array.from({ length: height }, (_, y) => Array.from({ length: width }, (_, x) => interior({ x, y }) ? '.' : '#'))
+  if(settings.algorithm === 'landmark-routes-v1') {
   // Encounter rooms retain authored cover/walls relative to their own formations.
   for (const [i, zone] of result.zones.entries()) for (let dy = 0; dy < zone.height; dy++) for (let dx = 0; dx < zone.width; dx++) {
     grid[zone.y + dy][zone.x + dx] = source.map.layout[source.zones[i].y + dy][source.zones[i].x + dx]
@@ -89,6 +100,7 @@ function placeLandmarks(source: RoguelikeAdventureV1, seed: number, random: () =
       const cell = { x: x + (horizontal ? n : 0), y: y + (horizontal ? 0 : n) }
       if (outside(cell)) grid[cell.y][cell.x] = terrain
     }
+  }
   }
   const directions = [[1, 0], [-1, 0], [0, 1], [0, -1]]
   if (random() < .5) directions.reverse()
@@ -114,9 +126,24 @@ function placeLandmarks(source: RoguelikeAdventureV1, seed: number, random: () =
       if (!connect(site, enemy, p => insideZone(zone, p.x, p.y))) return
   }
   for (const id of partyIds) if (!connect(camp, result.startingPositions[id], outside)) return
+  for (const enemy of roaming) if (!connect(camp, enemy, outside)) return
   // Keep each facility usable from an adjacent floor as well as from its own cell.
   for (const site of result.sites.filter(s => s.kind !== 'encounter')) for (const [dx, dy] of directions) {
     const cell = { x: site.x + dx, y: site.y + dy }; if (outside(cell)) grid[cell.y][cell.x] = '.'
+  }
+  if(settings.algorithm === 'terrain-regions-v1') {
+    // Isolated courtyard pockets must not become legal multiplayer arrival cells.
+    const closePockets=(origin:Cell,permitted:(p:Cell)=>boolean)=>{
+      const queue=[origin],seen=new Set([key(origin)])
+      for(let i=0;i<queue.length;i++)for(const [dx,dy] of directions){
+        const next={x:queue[i].x+dx,y:queue[i].y+dy}
+        if(permitted(next)&&grid[next.y][next.x]==='.'&&!seen.has(key(next))){seen.add(key(next));queue.push(next)}
+      }
+      for(let y=1;y<height-1;y++)for(let x=1;x<width-1;x++)
+        if(permitted({x,y})&&grid[y][x]==='.'&&!seen.has(key({x,y})))grid[y][x]='C'
+    }
+    closePockets(camp,outside)
+    for(const zone of result.zones)closePockets(result.sites.find(site=>site.id===zone.id)!,p=>insideZone(zone,p.x,p.y))
   }
   if (settings.mirror && random() < .5) {
     grid.forEach(row => row.reverse())

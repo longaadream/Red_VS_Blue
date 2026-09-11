@@ -257,6 +257,7 @@ export function safeCloneBattleState(state: BattleState): BattleState {
   const graveFns   = collectRuleFns((state as any).graveyard || [])
   const playerFns  = collectRuleFns(state.players)
   const adventureFns = collectRuleFns(adventureBoundary(state)?.party?.reserves ?? [])
+  const cooperativeFns = Object.fromEntries(Object.entries(adventureBoundary(state)?.coop?.parties ?? {}).map(([id,party]) => [id,collectRuleFns(party.reserves)]))
   const reserveFns = Object.fromEntries(
     Object.entries(state.deployment?.reserves ?? {}).map(([playerId, pieces]) => [
       playerId,
@@ -278,6 +279,12 @@ export function safeCloneBattleState(state: BattleState): BattleState {
   restoreRuleFns((cloned as any).graveyard || [], graveFns)
   restoreRuleFns(cloned.players, playerFns)
   restoreRuleFns(adventureBoundary(cloned)?.party?.reserves ?? [], adventureFns)
+  const cooperative = adventureBoundary(cloned)?.coop
+  if (cooperative) {
+    for (const [id,fns] of Object.entries(cooperativeFns)) restoreRuleFns(cooperative.parties[id]?.reserves ?? [], fns)
+    const world = adventureBoundary(cloned)!
+    if (world.party) cooperative.parties[world.humanId] = world.party
+  }
   for (const [playerId, fnMap] of Object.entries(reserveFns)) {
     restoreRuleFns(cloned.deployment?.reserves?.[playerId] ?? [], fnMap)
   }
