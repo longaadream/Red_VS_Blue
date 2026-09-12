@@ -1,4 +1,6 @@
+import { assertContentAvailable, battleContentMode, type ModeScopedContent } from './content-availability'
 import { areMatchAllies } from './match-teams'
+import { adventureBoundary, adventureDeploymentCells, refreshAdventureActionPoints, isAdventureProgramMove } from './adventure-boundary'
 // 当序列化格式出现不兼容变化时递增此值（旧状态会被 applyBattleAction 拒绝）
 export const BATTLE_STATE_VERSION = 1
 function battleDebugLog(...args: unknown[]): void {
@@ -121,8 +123,8 @@ import {
 const FORCE_RULE_RELOAD = process.env.RVB_FORCE_RULE_RELOAD === '1'
 
 // ─── 辅助函数：恢复棋子规则的 effect 函数（用于 API 传输后重新加载）────────────────
-function restorePieceRules(state: BattleState): void {
-  const reservePieces = Object.values(state.deployment?.reserves ?? {}).flat()
+export function restorePieceRules(state: BattleState): void {
+  const reservePieces = [...Object.values(state.deployment?.reserves ?? {}).flat(), ...(adventureBoundary(state)?.party?.reserves ?? [])]
   ;[...state.pieces, ...reservePieces].forEach(piece => {
     // 确保 rules 数组存在
     if (!piece.rules) {
@@ -188,7 +190,7 @@ function restorePieceRules(state: BattleState): void {
 }
 
 // ─── 辅助函数：恢复玩家规则的 effect 函数（用于 API 传输后重新加载）────────────────
-function restorePlayerRules(state: BattleState): void {
+export function restorePlayerRules(state: BattleState): void {
   state.players.forEach(player => {
     // 确保 rules 数组存在
     if (!player.rules) {
@@ -254,6 +256,8 @@ export function safeCloneBattleState(state: BattleState): BattleState {
   const pieceFns   = collectRuleFns(state.pieces)
   const graveFns   = collectRuleFns((state as any).graveyard || [])
   const playerFns  = collectRuleFns(state.players)
+  const adventureFns = collectRuleFns(adventureBoundary(state)?.party?.reserves ?? [])
+  const cooperativeFns = Object.fromEntries(Object.entries(adventureBoundary(state)?.coop?.parties ?? {}).map(([id,party]) => [id,collectRuleFns(party.reserves)]))
   const reserveFns = Object.fromEntries(
     Object.entries(state.deployment?.reserves ?? {}).map(([playerId, pieces]) => [
       playerId,
@@ -274,6 +278,13 @@ export function safeCloneBattleState(state: BattleState): BattleState {
   restoreRuleFns(cloned.pieces, pieceFns)
   restoreRuleFns((cloned as any).graveyard || [], graveFns)
   restoreRuleFns(cloned.players, playerFns)
+  restoreRuleFns(adventureBoundary(cloned)?.party?.reserves ?? [], adventureFns)
+  const cooperative = adventureBoundary(cloned)?.coop
+  if (cooperative) {
+    for (const [id,fns] of Object.entries(cooperativeFns)) restoreRuleFns(cooperative.parties[id]?.reserves ?? [], fns)
+    const world = adventureBoundary(cloned)!
+    if (world.party) cooperative.parties[world.humanId] = world.party
+  }
   for (const [playerId, fnMap] of Object.entries(reserveFns)) {
     restoreRuleFns(cloned.deployment?.reserves?.[playerId] ?? [], fnMap)
   }
@@ -825,13 +836,14 @@ function commitReservePieceSummon(
   playerId: string,
   pieceId: string,
   position: DeploymentPosition,
-  positionPolicy: 'safe' | 'fallback',
+  positionPolicy: 'safe' | 'fallback' | 'adventure',
 ): PieceInstance {
   const deployment = state.deployment
-  if (!deployment || deployment.mode !== PROGRESSIVE_DEPLOYMENT_MODE) {
+  const party = positionPolicy === 'adventure' ? adventureBoundary(state)?.party : undefined
+  if (!party && (!deployment || deployment.mode !== PROGRESSIVE_DEPLOYMENT_MODE)) {
     throw new BattleRuleError('Progressive deployment is unavailable')
   }
-  const reserveEntry = progressiveReserveEntry(deployment, playerId)
+  const reserveEntry = party ? { playerId, pieces: party.reserves } : progressiveReserveEntry(deployment!, playerId)
   const reserveIndex = reserveEntry?.pieces.findIndex(piece => piece.instanceId === pieceId) ?? -1
   const piece = reserveIndex >= 0 ? reserveEntry!.pieces[reserveIndex] : undefined
   if (!piece || piece.isCore !== true || piece.currentHp <= 0) {
@@ -856,7 +868,7 @@ function commitReservePieceSummon(
   }
 
   const finalPosition = beforeContext.targetPosition
-  const legalFinalPositions = positionPolicy === 'safe'
+  const legalFinalPositions = positionPolicy === 'adventure' ? adventureDeploymentCells(state) : positionPolicy === 'safe'
     ? getSafeDeploymentPositions(state)
     : getEmptyWalkableDeploymentPositions(state)
   if (!finalPosition || !legalFinalPositions.some(candidate =>
@@ -874,7 +886,8 @@ function commitReservePieceSummon(
   piece.y = finalPosition.y
   const deployedPosition = { x: finalPosition.x, y: finalPosition.y }
   state.pieces.push(piece)
-  updateProgressiveReserveCounts(deployment)
+  if (party) { party.deployedTurn = state.turn.turnNumber; party.deploymentRevision++ }
+  else updateProgressiveReserveCounts(deployment!)
 
   const afterResult = getActiveTriggerSystem().checkTriggers(state, {
     type: 'afterPieceSummoned',
@@ -2155,6 +2168,16 @@ function applyBattleActionInternal(
     }
 
     case 'deployReservePiece': {
+      const world = adventureBoundary(state)
+      if (world?.party) {
+        if (action.expectedDeploymentRevision !== world.party.deploymentRevision) throw new BattleRuleError('部署指令已过期')
+        if (action.playerId !== world.humanId || !adventureDeploymentCells(state).some(cell => cell.x === action.toX && cell.y === action.toY)) {
+          throw new BattleRuleError('本回合无法部署，或落点不在队长周围的合法战区格')
+        }
+        const next = safeCloneBattleState(state)
+        commitReservePieceSummon(next, action.playerId, action.pieceId, { x: action.toX!, y: action.toY! }, 'adventure')
+        return next
+      }
       assertExpectedProgressiveDeploymentRevision(state, action.expectedDeploymentRevision)
       const next = safeCloneBattleState(state)
       const deployment = next.deployment
@@ -2487,7 +2510,7 @@ function applyBattleActionInternal(
         
         // 确保新回合的玩家有初始行动点和最大行动点
         const nextPlayerMeta = next.players[nextIndex]
-        if (nextPlayerMeta) {
+        if (nextPlayerMeta && !refreshAdventureActionPoints(next)) {
           // 实现类似炉石传说的法力水晶机制
           // 每回合开始时，最大行动点+1（最多10点），当前行动点充满
           if (nextPlayerMeta.maxActionPoints === undefined) {
@@ -2554,7 +2577,8 @@ function applyBattleActionInternal(
         statusTag => isCurrentTurnDeploymentFirstMoveFree(statusTag, state.turn.turnNumber),
       )
       const playerMetaCheck = getPlayerMeta(state, action.playerId)
-      if (!hasDeploymentFirstMoveFree && playerMetaCheck.actionPoints < 1) {
+      const programMove = isAdventureProgramMove(state, action)
+      if (!hasDeploymentFirstMoveFree && !programMove && playerMetaCheck.actionPoints < 1) {
         throw new BattleRuleError("Not enough action points to move")
       }
 
@@ -2607,7 +2631,7 @@ function applyBattleActionInternal(
       if (beforeMoveResult.blocked) {
         // A blocked deployment-free move is an authority rejection, so the
         // runner discards this clone together with trigger effects and RNG reads.
-        if (hasDeploymentFirstMoveFree) {
+        if (hasDeploymentFirstMoveFree || programMove) {
           throw new BattleRuleError(
             beforeMoveResult.messages.join('；') || 'Deployment first move was blocked',
             'DEPLOYMENT_FIRST_MOVE_BLOCKED',
@@ -2620,6 +2644,8 @@ function applyBattleActionInternal(
       let finalToX = moveContext.targetX;
       let finalToY = moveContext.targetY;
 
+      if (programMove && !isAdventureProgramMove(next, {...action,toX:finalToX,toY:finalToY})) throw new BattleRuleError('预告移动已改变')
+
       validateMove(next, piece, finalToX, finalToY)
 
       const deploymentFirstMoveFree = consumeDeploymentFirstMoveFree(
@@ -2627,7 +2653,7 @@ function applyBattleActionInternal(
         next.turn.turnNumber,
       )
       const playerMeta = getPlayerMeta(next, action.playerId)
-      if (!deploymentFirstMoveFree && playerMeta.actionPoints < 1) {
+      if (!deploymentFirstMoveFree && !programMove && playerMeta.actionPoints < 1) {
         throw new BattleRuleError("Not enough action points to move")
       }
 
@@ -2637,11 +2663,12 @@ function applyBattleActionInternal(
 
       // 执行移动（使用触发器可能修改后的目标位置）
       changePiecePositions(next, [{ pieceId: piece.instanceId, x: finalToX, y: finalToY }], 'walk')
+      if (programMove && (piece.x !== action.toX || piece.y !== action.toY)) throw new BattleRuleError('预告移动落点已改变')
       finalToX = piece.x!
       finalToY = piece.y!
       
       // 消耗行动点
-      if (!deploymentFirstMoveFree) playerMeta.actionPoints -= 1
+      if (!deploymentFirstMoveFree && !programMove) playerMeta.actionPoints -= 1
       
       // 初始化actions数组（如果不存在）
       if (!next.actions) {
@@ -4264,7 +4291,7 @@ export function applyBattleAction(
 
 export type TemplateSummonStatus = Readonly<Record<string, unknown>>
 
-export interface TemplateSummonSource {
+export interface TemplateSummonSource extends ModeScopedContent {
   id: string
   name?: string
   rules?: readonly unknown[]
@@ -4543,6 +4570,7 @@ function prepareTemplatePiece<TTemplate extends TemplateSummonSource>(
   fatal: (message: string, cause?: unknown) => never,
 ): PreparedTemplateSummon<TTemplate> {
   const { spec, template } = entry
+  assertContentAvailable(template, battleContentMode(battle))
   let piece: PieceInstance
   try {
     piece = dependencies.createPieceInstance(

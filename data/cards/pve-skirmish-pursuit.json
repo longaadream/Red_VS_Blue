@@ -1,0 +1,24 @@
+{
+  "id": "pve-skirmish-pursuit",
+  "name": "追击",
+  "description": "让一个友方普通移动最多2格，再对其3格内一个敌人造成2点伤害；该友方本回合每普通移动1格，伤害+1。",
+  "type": "active",
+  "actionPointCost": 1,
+  "availability": {
+    "modes": [
+      "pve"
+    ],
+    "status": "draft"
+  },
+  "design": {
+    "familyId": "skirmish",
+    "handbookId": "skirmish-pursuit",
+    "curve": "growth",
+    "role": "移动 / 伤害",
+    "duration": "一次结算",
+    "start": "2～4伤害",
+    "end": "12伤害",
+    "condition": "含当前移动，本回合累计实际普通移动10格。",
+    "note": "移动不额外支付行动点；瞬移不计数。"
+  }
+}

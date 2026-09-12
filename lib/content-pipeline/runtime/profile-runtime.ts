@@ -1,3 +1,4 @@
+import { adventureLeaseRoomIds } from './adventure-leases'
 import { existsSync, readFileSync } from 'node:fs'
 import { randomUUID } from 'node:crypto'
 import path from 'node:path'
@@ -240,7 +241,7 @@ function hasMenuResources(
 export async function getProfileLeaseReportV1(): Promise<ProfileLeaseReportV1> {
   const { getPveActiveBattleLeaseReportV1 } = await import('@/lib/pve/profile-lifecycle')
   const pve = getPveActiveBattleLeaseReportV1()
-  const roomIds: string[] = []
+  const roomIds: string[] = adventureLeaseRoomIds()
   return {
     active: roomIds.length > 0 || pve.active,
     roomIds,

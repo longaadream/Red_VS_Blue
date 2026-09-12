@@ -1,0 +1,24 @@
+{
+  "id": "pve-pressure-hado",
+  "name": "破道",
+  "description": "灵压。使一个友方对3格内一个敌人造成8点伤害。",
+  "type": "active",
+  "actionPointCost": 1,
+  "availability": {
+    "modes": [
+      "pve"
+    ],
+    "status": "draft"
+  },
+  "design": {
+    "familyId": "pressure",
+    "handbookId": "pressure-hado",
+    "curve": "ready",
+    "role": "伤害",
+    "duration": "一次结算",
+    "start": "8伤害",
+    "end": "8伤害",
+    "condition": "只要攻击差为正就打8；攻差增大不加伤。",
+    "note": ""
+  }
+}

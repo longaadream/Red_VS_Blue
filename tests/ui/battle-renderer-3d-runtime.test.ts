@@ -8,6 +8,7 @@ import { createRed68BattleFixture } from './fixtures/red-68-battle-fixture'
 
 const pagesDir = resolve(process.cwd(), 'data/pages')
 type ThreeMaterial = {
+  map?: { dispose(): void }
   gradientMap?: { dispose(): void }
   color?: { getHex(): number }
   emissive: { getHex(): number }
@@ -16,6 +17,8 @@ type ThreeMaterial = {
   dispose(): void
 }
 type ThreeNode = {
+  name?: string
+  rotation: {x:number;y:number;z:number}
   type: string
   isInstancedMesh?: boolean
   count?: number
@@ -38,8 +41,10 @@ type RendererApi = {
   resize(): void
   spawnFloater(x: number, y: number, text: string, color: string, big: boolean, options: unknown): void
   resetView(): void
+  focusCell(x: number, y: number, cellPixels?: number): boolean
   zoomBy(factor: number): void
   projectCell(x: number, y: number, elevation?: number): { clientX: number; clientY: number; left: number; top: number }
+  setBoardDecorations(data: { cells?: Array<{x:number;y:number;image?:unknown}>; lines?: Array<{points:Array<{x:number;y:number}>;color:number}> } | null): void
   setHistoryHighlight(cells: Array<{ x: number; y: number; role: 'source' | 'target' }>): void
   setTutorialCue(cue: { cells?: Array<{ x: number; y: number }>; path?: Array<{ x: number; y: number }> }): void
   clearTutorialCue(): void
@@ -398,6 +403,99 @@ describe('RED-68 BattleRenderer3D runtime', () => {
     const h = createHarness(914, 411, true, false, 2)
     expect(() => h.renderer.init({ container: h.container })).toThrow('WebGL context unavailable')
     expect(h.renderers).toHaveLength(0)
+    h.renderer.dispose()
+  })
+
+  it('keeps decals in the board plane across camera changes and disposes replaced GPU resources', () => {
+    const h = createHarness(1280, 720, false)
+    h.renderer.init({container:h.container}); h.renderer.update(runtimeModel()); h.frame(16)
+    const canvas = new FakeElement('canvas')
+    const data = {cells:[{x:2,y:3,image:canvas},{x:3,y:3,image:canvas}],lines:[{points:[{x:2,y:3},{x:3,y:3}],color:0x336677}]}
+    h.renderer.setBoardDecorations(data); h.frame(16)
+    const scene = h.renderers[0].scene!, group = scene.children.find(n => n.name === 'board-decorations')!
+    expect(group.children).toHaveLength(3)
+    expect(group.children[0].rotation.x).toBeCloseTo(-Math.PI/2)
+    expect(group.children[0].position).toMatchObject({x:2,z:3})
+    const before = h.renderer.projectCell(2,3), geometryCount = h.disposeCounts.geometry
+    const element = h.renderers[0].domElement
+    element.dispatch('wheel',{clientX:before.clientX,clientY:before.clientY,deltaY:-200})
+    h.frame(16)
+    expect(distance(before,h.renderer.projectCell(2,3))).toBeGreaterThan(0)
+    const beforePan = h.renderer.projectCell(2,3)
+    element.dispatch('pointerdown',{pointerId:77,pointerType:'mouse',button:0,clientX:900,clientY:500})
+    element.dispatch('pointermove',{pointerId:77,pointerType:'mouse',clientX:980,clientY:540})
+    element.dispatch('pointerup',{pointerId:77,pointerType:'mouse',clientX:980,clientY:540})
+    h.frame(16)
+    expect(distance(beforePan,h.renderer.projectCell(2,3))).toBeGreaterThan(0)
+    expect(scene.children.find(n => n.name === 'board-decorations')).toBe(group)
+    expect(h.disposeCounts.geometry).toBe(geometryCount)
+    expect(h.rafCallbacks.size).toBe(0)
+    const texture = group.children[0].material!.map!, disposeTexture = vi.spyOn(texture,'dispose')
+    h.renderer.showHistoricalBoard(runtimeModel())
+    expect(group.visible).toBe(false)
+    h.renderer.setBoardDecorations(data)
+    const replacement = scene.children.find(n => n.name === 'board-decorations')!
+    expect(replacement.visible).toBe(false)
+    expect(disposeTexture).toHaveBeenCalledTimes(1)
+    h.renderer.update(runtimeModel()); expect(replacement.visible).toBe(true)
+    const replacementTexture = vi.spyOn(replacement.children[0].material!.map!,'dispose')
+    h.renderer.setBoardDecorations(null)
+    expect(scene.children.some(n => n.name === 'board-decorations')).toBe(false)
+    expect(replacementTexture).toHaveBeenCalledTimes(1)
+    h.renderer.setBoardDecorations(data)
+    const finalGroup = scene.children.find(n => n.name === 'board-decorations')!
+    const finalTexture = vi.spyOn(finalGroup.children[0].material!.map!,'dispose')
+    h.renderer.dispose(); expect(finalTexture).toHaveBeenCalledTimes(1)
+  })
+
+  it('focuses an adventure cell without rebuilding the board or changing zoom', () => {
+    const h = createHarness(1280, 720, false)
+    const model=runtimeModel();model.board.width=64;model.board.height=64
+    h.renderer.init({container:h.container});h.renderer.update(model);h.frame(16)
+    const before = h.renderer.projectCell(5,55), disposals=h.disposeCounts.geometry
+    expect(h.renderer.focusCell(5,55)).toBe(true);h.frame(16)
+    const focused=h.renderer.projectCell(5,55)
+    expect(focused.clientX).toBeCloseTo(640)
+    expect(focused.clientY).toBeCloseTo(360)
+    expect(distance(before,focused)).toBeGreaterThan(10)
+    expect(h.renderer.focusCell(-1,55)).toBe(false)
+    expect(h.renderer.focusCell(Number.NaN,55)).toBe(false)
+    h.renderer.update(model);h.frame(16)
+    expect(distance(focused,h.renderer.projectCell(5,55))).toBeLessThan(.01)
+    expect(h.disposeCounts.geometry).toBe(disposals)
+    h.renderer.dispose()
+  })
+
+  it('makes a large adventure locally touchable and retains captain focus on resize', () => {
+    const h=createHarness(520,210,true),model=runtimeModel()
+    model.board.width=64;model.board.height=64
+    h.renderer.init({container:h.container});h.renderer.update(model);h.frame(16)
+    h.renderer.focusCell(5,55,44);h.frame(16)
+    const center=h.renderer.projectCell(5,55)
+    expect(distance(center,h.renderer.projectCell(6,55))).toBeGreaterThanOrEqual(43)
+    expect(distance(center,h.renderer.projectCell(5,54))).toBeGreaterThanOrEqual(40)
+    h.container.rect.width=680;h.container.rect.height=261;h.renderer.resize();h.frame(16)
+    expect(h.renderer.projectCell(5,55).clientX).toBeCloseTo(340)
+    expect(h.renderer.projectCell(5,55).clientY).toBeCloseTo(130.5)
+    h.renderer.dispose()
+  })
+
+  it('renders sealed borders as floor bands, translucent walls and posts in board space', () => {
+    const h = createHarness(1280, 720, false)
+    h.renderer.init({container:h.container}); h.renderer.update(runtimeModel())
+    const data = { lines: [{points:[{x:2,y:3},{x:3,y:3}],color:0xe16b39,width:.22,wallHeight:.42,posts:true}] }
+    h.renderer.setBoardDecorations(data); h.frame(16)
+    const group = h.renderers[0].scene!.children.find(n => n.name === 'board-decorations')!
+    expect(group.children).toHaveLength(3)
+    expect(group.children[0].rotation.x).toBeCloseTo(-Math.PI/2)
+    const wall = group.children.find(n => n.userData.decorationKind === 'sealed-wall')!
+    const post = group.children.find(n => n.userData.decorationKind === 'boundary-post')!
+    expect(wall.position).toMatchObject({x:2.5,z:3})
+    expect(wall.material!.opacity).toBeLessThan(.5)
+    expect(post.position).toMatchObject({x:2,z:3})
+    const disposals = h.disposeCounts.geometry
+    h.renderer.setBoardDecorations(null)
+    expect(h.disposeCounts.geometry - disposals).toBe(3)
     h.renderer.dispose()
   })
 

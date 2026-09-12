@@ -1,0 +1,90 @@
+.adventure-mode #adventureWallet,.adventure-mode #adventurePartyDock,.adventure-mode #adventureEncounter,#adventureDialog{color:#3c2d22;background:#c6b28b url('../tabletop-battle/assets/parchment.png') center/cover;border:2px solid #493729;box-shadow:3px 4px #21191488;font-family:inherit}
+#adventureWallet{position:fixed;top:17px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:5px;padding:7px 10px;border-radius:6px 12px 7px 10px;z-index:130}
+#adventureCoins{font-size:17px;font-weight:bold;white-space:nowrap;min-width:95px;padding-right:9px;border-right:1px dashed #8b7556}
+#adventureWallet button,#adventureEncounter{font:inherit;cursor:pointer;color:inherit}
+.adventure-recruits{grid-template-columns:1fr!important;gap:15px}
+.adventure-recruits article{display:grid;grid-template-columns:64px 1fr;gap:5px 15px;align-items:center;border-bottom:1px dashed #927854;padding-bottom:15px}
+.adventure-recruits img{width:60px;height:60px;object-fit:cover;border-radius:50%;border:2px solid #765c3d;grid-row:span 3}
+.adventure-recruits h3{margin:0;font-size:21px}.adventure-recruits small{margin:0;font-size:13px}
+#adventureDialogContent .adventure-recruits p{margin:0;font-size:12px;line-height:1.5}
+.adventure-recruits button{grid-column:2;font-size:15px;padding:8px}
+#adventureWallet button{border:0;background:transparent;padding:7px 10px;border-radius:4px}
+#adventureWallet button:hover{background:#79624222}
+#adventurePartyDock{position:fixed;left:18px;bottom:20px;max-width:min(380px,calc(100vw - 220px));padding:10px 15px;border-radius:8px 16px 6px 11px;z-index:110}
+#adventurePartyDock>strong{font-size:13px}#adventurePartyDock>small{display:block;font-size:11px;color:#695638}
+.adventure-party,.adventure-enemies{display:flex;gap:14px;flex-wrap:wrap;margin:9px 0}
+.adventure-portrait{position:relative;display:flex;flex-direction:column;align-items:center;width:60px;padding:0;border:0;background:none;color:#3b2d24;font:inherit;cursor:pointer}
+.adventure-portrait img{display:block;width:52px;height:52px;object-fit:cover;border:3px solid #64583e;border-radius:50%;box-shadow:1px 3px #493c2a66;background:#b8a780}
+.adventure-portrait span{max-width:75px;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:4px}.adventure-portrait meter{height:6px;width:50px;accent-color:#5b7953}
+.adventure-portrait:disabled{opacity:.55;cursor:default}.adventure-portrait:hover img,.adventure-portrait.is-picked img{border-color:#467d75}
+.adventure-stamp{position:absolute;right:-1px;top:-4px;border-radius:50%;background:#d9c596;color:#53402b;font-size:17px;padding:0 4px;line-height:24px}.adventure-stamp:empty{display:none}
+.tier-elite img{border-color:#985847}.tier-boss img{border-color:#946828}.tier-boss .adventure-stamp{background:#96703d;color:#f5dfaa}
+#adventureEncounter{position:fixed;top:110px;right:78px;padding:9px 16px;border-radius:5px 11px 6px 8px;z-index:100;font-size:13px}
+#adventureEncounter[hidden]{display:none}
+#adventureDialog{position:fixed;left:50%;top:50%;margin:0;transform:translate(-50%,-50%);box-sizing:border-box;width:min(480px,calc(100vw - 32px));max-height:calc(100svh - 120px);padding:23px 27px;border-radius:9px 19px 7px 15px;overflow:auto}
+#adventureDialog::backdrop{background:#20170f66}
+#adventureDialog header{display:flex;align-items:center;justify-content:space-between;gap:20px;border-bottom:2px dashed #9b835f;padding-bottom:12px}
+#adventureDialog h2{font:28px 'ZCOOL KuaiLe','ZCOOLKuaiLe',sans-serif;margin:0}
+#adventureDialog header button{background:transparent;color:inherit;border:1px solid #796044;border-radius:4px;font:24px inherit;cursor:pointer;padding:0 7px}
+#adventureDialogContent p{font-size:14px;line-height:1.75;margin:16px 0}
+#adventureDialogContent select{width:100%;background:#dfcca6;color:#49382a;border:1px solid #8a7351;border-radius:4px;padding:10px;font:inherit}
+.adventure-operations{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:18px 0}
+.adventure-operations button{font:inherit;font-size:18px;color:#f0dfbb;background:#4c6868;border:2px solid #364544;border-radius:6px 10px 4px 7px;padding:12px 8px;cursor:pointer}
+.adventure-operations small{display:block;font-size:12px;margin-top:6px}.adventure-operations button:disabled{background:#a4967c;color:#5b503d;cursor:default}
+.adventure-site-list{display:grid;gap:9px}.adventure-site-list button{display:flex;align-items:center;gap:14px;border:1px solid #9c835e;border-radius:5px 9px 4px 6px;padding:10px;background:#ddc8a166;color:inherit;text-align:left;font:inherit;cursor:pointer}.adventure-site-list button:hover{background:#ead6b1}
+.adventure-site-list svg{width:32px;height:32px;flex:none}.adventure-site-list small{margin-left:auto;color:#796044;font-size:12px}
+.adventure-enemies{gap:28px;margin:24px 0}.adventure-intent-chip{font-size:12px;color:#8c4935;background:#ddc49a;border-radius:4px;padding:2px 6px;margin-top:5px;white-space:nowrap}
+.adventure-mode #adventureStatus{top:76px!important;font-size:11px!important}
+.adventure-mode .player-state-chip:not(.is-local-player) .player-state-resources,.adventure-mode .player-state-chip:not(.is-local-player) .player-side-name{display:none}
+.adventure-mode .player-state-chip:not(.is-local-player) .player-state-copy:after{content:'按预告行动';font-size:11px;opacity:.8}
+.adventure-mode #opponentHandStack{display:none!important}
+.adventure-supply-choice{display:block;width:100%;margin:10px 0;padding:12px 14px;border:2px solid #88704c;border-radius:5px 12px 7px 4px;background:#e1cfa9;color:#49382b;font:inherit;font-size:18px;text-align:left;cursor:pointer}
+.adventure-supply-choice small{display:block;margin-top:7px;font-size:13px;line-height:1.6}.adventure-supply-choice:hover{background:#efdfbc}.adventure-supply-choice:disabled{opacity:.6;cursor:wait}
+.adventure-relic{margin:12px 0;padding:10px 14px;border:2px dashed #9b835f;border-radius:10px 4px 12px 5px}.adventure-relic h3{margin:0;font-size:21px}#adventureDialogContent .adventure-relic p{margin:8px 0;font-size:13px}
+@media(max-width:900px){#adventureWallet{top:95px;left:12px;transform:none;padding:4px 8px}#adventureCoins{font-size:14px;min-width:75px}#adventureWallet button{padding:5px 7px}#adventurePartyDock{left:10px;bottom:12px;padding:8px;max-width:calc(100vw - 155px)}#adventurePartyDock .adventure-portrait img{width:40px;height:40px}#adventurePartyDock .adventure-portrait{width:46px}#adventurePartyDock .adventure-party{gap:9px}#adventureEncounter{top:140px;right:12px}.adventure-mode #adventureStatus{top:63px!important;max-width:65vw!important}}
+
+#adventureSiteActions{position:fixed;left:18px;bottom:175px;display:flex;gap:8px;flex-wrap:wrap;max-width:380px;z-index:115}#adventureSiteActions[hidden],#adventureRewardButton[hidden]{display:none}#adventureSiteActions button{font:inherit;font-size:14px;padding:10px 16px;color:#493729;background:#dfcca6;border:2px solid #493729;border-radius:5px 12px 4px 8px;box-shadow:2px 3px #21191466;cursor:pointer}#adventureSiteActions button:hover{background:#f2deba}#adventureAct{max-width:190px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}#adventureDialogContent .adventure-reward-coins{font-size:22px;color:#795322;font-weight:bold}#adventureEncounter{border:3px solid #993f28;background-color:#e7bb8d;font-weight:bold}#adventureWallet{max-width:calc(100vw - 260px);flex-wrap:wrap;justify-content:center}@media(max-width:900px){#adventureSiteActions{left:10px;bottom:160px;max-width:220px}#adventureWallet{max-width:calc(100vw - 35px)}#adventureAct{max-width:135px}}
+
+.adventure-next-intent{margin:8px 0;padding:9px 12px;border:2px solid #805039;border-radius:8px;background:#ddc49a;color:#4c3024;font-weight:bold}.adventure-mode .pi-skill.adventure-skill-next{outline:2px solid #9b5036;background:#e7cfaa}.adventure-mode .adventure-skill-next .pi-skill-badge{background:#805039;color:#fff0ce}.adventure-intent-chip{white-space:normal;max-width:180px;line-height:1.4}
+
+.adventure-lethal-warning,.adventure-piece-warning{display:block;border:2px solid #99452f;border-radius:6px;padding:6px 9px;background:#efd5ad;color:#842f22;font-size:12px;line-height:1.4}.adventure-mode .card-content-badge{max-width:100%;font-weight:bold;background:#664432;color:#fff0ce}
+
+.adventure-mode #handCards .card-content-badge{font-size:11px;padding:3px 7px;letter-spacing:0}.adventure-mode #handCards .card-desc{white-space:pre-line;line-height:1.35}.adventure-mode #cdDesc{white-space:pre-line}
+
+#adventurePartyToggle,#adventureMenuToggle,#adventureMobileAp,.adventure-reserve-details{display:none}
+#adventureDialog button{min-height:44px;min-width:44px;touch-action:manipulation}
+#adventureDialogContent button{margin:4px}
+@media(pointer:coarse){.adventure-reserve-details{display:block;min-height:44px;width:60px;border:1px solid #796044;border-radius:5px;background:#ddc8a1;color:#493729;font:inherit}}
+@media(orientation:landscape) and (max-height:600px){
+  #adventureWallet{top:calc(62px + env(safe-area-inset-top));left:calc(64px + env(safe-area-inset-left));transform:none;max-width:calc(100vw - 136px);padding:2px 4px;gap:2px;justify-content:flex-start}
+  #adventureWallet:not(.is-expanded)> :not(#adventureCoins):not(#adventureMobileAp):not(#adventurePartyToggle):not(#adventureMenuToggle){display:none}
+  #adventureWallet.is-expanded> :not([hidden]){display:block}
+  #adventureWallet button{min-width:44px;min-height:44px;padding:4px 8px}
+  #adventurePartyToggle,#adventureMenuToggle{display:block}
+  #adventureWallet.is-expanded{max-width:min(420px,calc(100vw - 136px))}
+  #adventurePartyDock{display:none;left:calc(64px + env(safe-area-inset-left));top:calc(114px + env(safe-area-inset-top));bottom:auto;max-width:calc(100vw - 136px);max-height:calc(100svh - 128px - var(--battle-hand-height,90px));overflow:auto;padding:6px 10px}
+  .adventure-party-open #adventurePartyDock{display:block}
+  #adventurePartyDock .adventure-party{flex-wrap:nowrap;overflow-x:auto;gap:12px;margin:6px 0}
+  #adventurePartyDock .adventure-party>*{flex:none}
+  #adventurePartyDock .adventure-portrait{width:60px;min-height:68px}
+  .adventure-reserve-details{display:block;min-height:44px;width:60px;border:1px solid #796044;border-radius:5px;background:#ddc8a1;color:#493729;font:inherit}
+  #adventurePartyDock>small{display:none}
+  #adventureEncounter{top:calc(64px + env(safe-area-inset-top));right:calc(64px + env(safe-area-inset-right));max-width:38vw;min-height:44px;font-size:11px;padding:4px 8px}
+  #adventureSiteActions{left:calc(64px + env(safe-area-inset-left));bottom:calc(var(--battle-hand-height,90px) + 5px + env(safe-area-inset-bottom));max-width:calc(100vw - 136px);flex-wrap:nowrap;overflow-x:auto}
+  #adventureSiteActions button{min-height:44px;white-space:nowrap;padding:6px 10px}
+  .adventure-mode #adventureStatus{top:auto!important;bottom:calc(var(--battle-hand-height,90px) + 2px + env(safe-area-inset-bottom));padding:2px 8px!important;max-width:60vw!important}
+  .adventure-mode:has(#adventureSiteActions:not([hidden])) #adventureStatus{display:none}
+  #adventureDialog{max-height:calc(100svh - 16px);padding:12px 16px}
+  #adventureDialog header{position:sticky;top:-12px;background:#c6b28b;z-index:1;padding-bottom:5px}
+  .adventure-mode #pieceInfoModal{z-index:400!important}
+  .adventure-mode:has(#pieceInfoModal[style*="display: flex"]) :is(#adventureWallet,#adventurePartyDock,#adventureSiteActions,#adventureEncounter){visibility:hidden}
+  .adventure-mode .player-state-chip{display:none!important}
+  .adventure-mode .turn-summary{width:150px!important;min-width:150px!important}
+  #adventureMobileAp{display:block;font-weight:bold;white-space:nowrap;padding:0 4px}
+  #adventureWallet{top:max(4px,env(safe-area-inset-top));bottom:auto;left:164px;max-width:calc(100vw - 320px);z-index:130}
+  #adventureWallet.is-expanded{top:calc(62px + env(safe-area-inset-top));bottom:auto;left:64px;max-width:calc(100vw - 128px)}
+  #adventurePartyDock{top:auto;bottom:calc(var(--battle-hand-height,90px) + 4px);max-height:calc(100svh - 160px);z-index:140}
+  .adventure-party-open #adventureSiteActions{display:none}
+  #adventurePartyDock .adventure-party{max-height:140px}
+  .adventure-mode #boardStage3d{overflow:hidden}
+}

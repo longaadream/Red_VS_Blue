@@ -110,6 +110,9 @@ describe('RED-117 strict Prototype fixtures', () => {
       'data/pve/events/prototype-campfire.json',
       'data/pve/manifest.json',
       'data/pve/rewards/prototype-card-choice.json',
+      'data/pve/roguelike/adventure.json',
+      'data/pve/roguelike/builds.json',
+      'data/pve/roguelike/supplies.json',
     ])
 
     const keys = new Set<string>()

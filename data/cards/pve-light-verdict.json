@@ -1,0 +1,24 @@
+{
+  "id": "pve-light-verdict",
+  "name": "圣光裁决",
+  "description": "使一个友方对3格内一个敌人造成8点伤害。",
+  "type": "active",
+  "actionPointCost": 1,
+  "availability": {
+    "modes": [
+      "pve"
+    ],
+    "status": "draft"
+  },
+  "design": {
+    "familyId": "light",
+    "handbookId": "light-verdict",
+    "curve": "ready",
+    "role": "伤害",
+    "duration": "一次结算",
+    "start": "8伤害",
+    "end": "8伤害",
+    "condition": "不要求先用别的圣光卡。",
+    "note": "本版费用改为1；新圣光卡，不视为普通圣光卡。"
+  }
+}

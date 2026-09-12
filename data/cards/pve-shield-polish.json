@@ -1,0 +1,24 @@
+{
+  "id": "pve-shield-polish",
+  "name": "圣盾研磨",
+  "description": "你的【碎盾余响】每次失盾对应的伤害+1。",
+  "type": "active",
+  "actionPointCost": 2,
+  "availability": {
+    "modes": [
+      "pve"
+    ],
+    "status": "draft"
+  },
+  "design": {
+    "familyId": "shield",
+    "handbookId": "shield-polish",
+    "curve": "growth",
+    "role": "投入养成",
+    "duration": "本次冒险",
+    "start": "当前0伤害",
+    "end": "余响20→32",
+    "condition": "投入两张研磨，按本场失盾6次试算。",
+    "note": ""
+  }
+}

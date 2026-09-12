@@ -1,0 +1,25 @@
+{
+  "id": "pve-tracking-slash",
+  "name": "追魂斩",
+  "description": "每逢偶数战斗轮，锁定4格内1个敌方目标。敌方行动时对其造成等同攻击力的伤害，无视距离与阻挡。",
+  "kind": "active",
+  "type": "normal",
+  "range": "self",
+  "cooldownTurns": 0,
+  "maxCharges": 0,
+  "powerMultiplier": 1,
+  "actionPointCost": 0,
+  "icon": "⚔",
+  "targeting": {
+    "steps": []
+  },
+  "keywords": [],
+  "previewCode": "function calculatePreview(piece,skillDef) { return {description:skillDef.description,expectedValues:{damage:piece.attack}}; }",
+  "code": "function executeSkill(context){var source=context.piece,world=battle.extensions.adventureWorld,plan=world.plans[0];if(!plan||plan.sourceId!==source.instanceId||plan.kind!=='attack'||source.x!==plan.origin.x||source.y!==plan.origin.y)return {success:false,message:'预告计划已失效'};var target=battle.pieces.find(function(p){return p.instanceId===plan.trackingTargetId&&p.currentHp>0&&p.x!==null&&p.y!==null;});var z=world.activeZone;if(!target||arePlayersAllied(battle,target.ownerPlayerId,source.ownerPlayerId)||!z||target.x<z.x||target.y<z.y||target.x>=z.x+z.width||target.y>=z.y+z.height)return {success:true,message:'追魂斩的锁定目标已离场'};dealDamage(source,target,source.attack,'physical',battle,context.skill.id);return {success:true,message:'追魂斩命中锁定目标'};}",
+  "availability": {
+    "modes": [
+      "pve"
+    ],
+    "status": "ready"
+  }
+}

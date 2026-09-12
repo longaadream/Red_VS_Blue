@@ -1,0 +1,24 @@
+{
+  "id": "pve-shield-cover",
+  "name": "重披圣盾",
+  "description": "使一个友方获得圣盾。",
+  "type": "active",
+  "actionPointCost": 1,
+  "availability": {
+    "modes": [
+      "pve"
+    ],
+    "status": "draft"
+  },
+  "design": {
+    "familyId": "shield",
+    "handbookId": "shield-cover",
+    "curve": "ready",
+    "role": "防护",
+    "duration": "直到消耗 / 战后清除",
+    "start": "1次挡伤",
+    "end": "1次挡伤",
+    "condition": "直接生效；不因历史失盾次数多给一层。",
+    "note": "稳定工具牌；挡住高伤害也很有价值，不等于后期没用。"
+  }
+}

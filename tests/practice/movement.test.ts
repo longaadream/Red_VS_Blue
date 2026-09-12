@@ -18,14 +18,16 @@ function fixture(block: 'none' | 'pending' | 'no-moves' | 'other-turn' = 'none')
   const initial = { pieces: [{ instanceId: 'runner', ownerPlayerId: 'practice-human', currentHp: 12, x: 1, y: 1 }],
     players: [{ playerId: 'practice-human', faction: 'red' }], turn: { currentPlayerId: 'practice-human', phase: 'action' } }
   const submitted: Array<Record<string, unknown>> = []
+  const rejections: string[] = []
   const queryMoveCells = ({ snapshot }: { snapshot: typeof initial }) => new Set(block === 'no-moves' ? [] : [`${snapshot.pieces[0].x + 1},1`])
   const context = vm.createContext({ window: { BattleLegalActions: { queryMoveCells } }, BattleLegalActions: { queryMoveCells }, GameEngine: {},
     console: { info() {} }, document: { getElementById: () => null }, G: initial, skillsById: {}, myPlayerId: 'practice-human', myFaction: 'red',
     selectedPieceId: 'runner', pendingMove: true, validMoves: new Set(['2,1']), dismissedPieceContextId: null,
     pendingSkill: null, pendingCardAction: null, pendingActionFeedback: null, targetSubmissionPending: null,
-    SPECTATE_MODE: false, TRAINING_MODE: false, _use3d: false, latestBattlePresentationEvents: [],
+    SPECTATE_MODE: false, TRAINING_MODE: false, ADVENTURE_MODE: false, _use3d: false, latestBattlePresentationEvents: [],
     withClientActionId: (action: unknown) => action, clearTimeout() {}, beginPendingActionFeedback: () => true,
     applyAuthorityReceipt() {}, spawnStateFloaters() {}, reconcileBattleInteractionState() {}, clearPendingActionFeedback() {},
+    rejectPendingActionFeedback: (_reason: string, message: string) => rejections.push(message),
     renderPieceContextMenu() {}, setMoveButtonClass() {}, closePieceContextMenu() {}, setStatusMsg() {},
     request: async (_type: string, payload: { action: Record<string, unknown>; revision: number }) => {
       submitted.push(payload.action)
@@ -46,24 +48,26 @@ function fixture(block: 'none' | 'pending' | 'no-moves' | 'other-turn' = 'none')
     practiceClient = { request };
     schedulePracticeAI = () => {};
   `).runInContext(context)
-  return { context, submitted }
+  return { context, submitted, rejections }
 }
 
 describe('practice selected-piece movement after an authority receipt', () => {
   it('accepts two consecutive cell clicks without selecting the piece again', async () => {
-    const { context, submitted } = fixture()
+    const { context, submitted, rejections } = fixture()
     expect(context.moveSelectedPieceToCell('runner', 2, 1)).toBe(true)
     await context.window.lastAction
     expect(context.selectedPieceId).toBe('runner')
     expect(context.moveSelectedPieceToCell('runner', 3, 1)).toBe(true)
     await context.window.lastAction
     expect(submitted.map(action => action.toX)).toEqual([2, 3])
+    expect(rejections).toEqual([])
   })
   it.each(['pending', 'no-moves', 'other-turn'] as const)('keeps movement blocked for %s', async block => {
-    const { context, submitted } = fixture(block)
+    const { context, submitted, rejections } = fixture(block)
     expect(context.moveSelectedPieceToCell('runner', 2, 1)).toBe(true)
     await context.window.lastAction
     expect(context.moveSelectedPieceToCell('runner', 3, 1)).toBe(false)
     expect(submitted).toHaveLength(1)
+    expect(rejections).toEqual([])
   })
 })

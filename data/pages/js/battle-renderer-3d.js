@@ -115,6 +115,8 @@
   const _pieceObjects = new Map()      // instanceId → {group, body, ring, portraitMesh, labelDiv, targetX, targetZ}
   const _tileEffectObjects = new Map()
   const _hlObjects = { move: new Map(), skill: new Map(), place: new Map(), selected: null, selectedId: null }
+  let _boardDecorations = null
+  let _boardDecorationsHistorical = false
   let _historyHighlightGroup = null
   let _historyHighlightPointCount = 0
   let _historyHighlightPathCount = 0
@@ -967,6 +969,18 @@
 
   function _updatePieceSummary(obj, piece) {
     if (!obj.summaryEl) return
+    const warningText = !_boardDecorationsHistorical && window.adventureBoardWarning?.(piece.id) || ''
+    let warning = obj.summaryEl.querySelector('.piece-board-lethal')
+    if (warningText && !warning) {
+      warning = document.createElement('span')
+      warning.className = 'piece-board-lethal'
+      obj.summaryEl.appendChild(warning)
+    }
+    if (warning) {
+      warning.textContent = warningText
+      warning.hidden = !warningText
+      warning.title = '按当前站位与已公布行动预测；详见棋子详情'
+    }
     const currentHp = piece.health ? piece.health.current : 0
     const maxHp = piece.health ? piece.health.max : 1
     const health = obj.summaryEl.querySelector('.piece-board-health')
@@ -2452,7 +2466,7 @@
       e.preventDefault()
     }, { passive: false })
 
-    _listen(canvas, 'dblclick', () => _resetCamera())
+    _listen(canvas, 'dblclick', () => { if (!window.focusAdventureContext?.()) _resetCamera() })
 
     _listen(canvas, 'contextmenu', e => {
       e.preventDefault()
@@ -2497,7 +2511,7 @@
   function _applyZoom(z) {
     if (!_camera || !_mapW) return
     _cameraInOverview = false
-    _camera.zoom = Math.max(_overviewZoom * 0.5, Math.min(MAX_CAMERA_ZOOM, z))
+    _camera.zoom = Math.max(_overviewZoom * 0.5, Math.min(Math.max(MAX_CAMERA_ZOOM, Math.max(_mapW, _mapH) / 2), z))
     _camera.updateProjectionMatrix()
     _notifyViewportChange()
   }
@@ -2519,6 +2533,23 @@
   function resetView() { _resetCamera() }
   function zoomBy(factor) {
     if (_camera && Number.isFinite(factor) && factor > 0) _applyZoom(_camera.zoom * factor)
+  }
+
+  function focusCell(x, y, cellPixels) {
+    if (!_mounted || !_camera || !_cameraTarget || !Number.isFinite(x) || !Number.isFinite(y)
+      || x < 0 || y < 0 || x >= _mapW || y >= _mapH) return false
+    _cameraTarget.set(x, _tileSurfaceHeightAt(x, y), y)
+    _positionCameraFromTarget()
+    _cameraInOverview = false
+    if (Number.isFinite(cellPixels) && cellPixels > 0) {
+      _camera.updateMatrixWorld(true)
+      const origin = projectCell(x, y)
+      const neighbors = [projectCell(x + (x < _mapW - 1 ? 1 : -1), y), projectCell(x, y + (y < _mapH - 1 ? 1 : -1))]
+      const spacing = Math.min(...neighbors.map(point => Math.hypot(point.clientX - origin.clientX, point.clientY - origin.clientY)))
+      if (spacing > 0) _applyZoom(_camera.zoom * cellPixels / spacing)
+    }
+    _notifyViewportChange()
+    return true
   }
 
   // ── Raycasting ────────────────────────────────────────────────────────────────
@@ -2600,6 +2631,79 @@
     return closest
   }
 
+  // Board-space decals: presentation only, rendered by the same camera/frame as tiles.
+  function clearBoardDecorations() {
+    if (!_boardDecorations) return
+    if (_scene) _scene.remove(_boardDecorations)
+    const textures = new Set()
+    _boardDecorations.traverse(function (node) {
+      if (node.geometry) node.geometry.dispose()
+      if (node.material) {
+        if (node.material.map) textures.add(node.material.map)
+        node.material.dispose()
+      }
+    })
+    textures.forEach(function (texture) { texture.dispose() })
+    _boardDecorations = null
+  }
+
+  function setBoardDecorations(data) {
+    clearBoardDecorations()
+    if (!_mounted || !_scene || !data) { _invalidate(); return }
+    const group = new THREE.Group()
+    group.name = 'board-decorations'
+    group.visible = !_boardDecorationsHistorical
+    const textures = new Map()
+    for (const item of data.cells || []) {
+      let map = null
+      if (item.image) {
+        map = textures.get(item.image)
+        if (!map) {
+          map = new THREE.CanvasTexture(item.image)
+          textures.set(item.image, map)
+        }
+      }
+      const material = new THREE.MeshBasicMaterial({
+        color: item.color || 0xffffff, map, transparent: true,
+        opacity: item.opacity == null ? 1 : item.opacity, depthWrite: false,
+        polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1,
+      })
+      const mesh = new THREE.Mesh(new THREE.PlaneGeometry(item.size || .86, item.size || .86), material)
+      mesh.rotation.x = -Math.PI / 2
+      mesh.position.set(item.x, _tileSurfaceHeightAt(item.x, item.y) + (item.lift || .02), item.y)
+      mesh.userData.decorationId = item.id || ''
+      group.add(mesh)
+    }
+    for (const line of data.lines || []) {
+      for (let i = 1; i < line.points.length; i++) {
+        const a = line.points[i - 1], b = line.points[i]
+        const dx = b.x - a.x, dz = b.y - a.y, length = Math.hypot(dx, dz)
+        if (!length) continue
+        const mesh = new THREE.Mesh(new THREE.PlaneGeometry(line.width || .035, length),
+          new THREE.MeshBasicMaterial({ color: line.color, transparent: true, opacity: .85, depthWrite: false }))
+        mesh.rotation.set(-Math.PI / 2, 0, Math.atan2(dx, dz))
+        const surface = Math.max(_tileSurfaceHeightAt(Math.round(a.x), Math.round(a.y)), _tileSurfaceHeightAt(Math.round(b.x), Math.round(b.y)))
+        mesh.position.set((a.x + b.x) / 2, surface + (line.lift || .028), (a.y + b.y) / 2)
+        group.add(mesh)
+        if (line.wallHeight) {
+          const wall = new THREE.Mesh(new THREE.BoxGeometry(.055, line.wallHeight, length),
+            new THREE.MeshBasicMaterial({color:line.color,transparent:true,opacity:.28,depthWrite:false}))
+          wall.rotation.y = Math.atan2(dx,dz)
+          wall.position.set((a.x+b.x)/2,surface+line.wallHeight/2,(a.y+b.y)/2)
+          wall.userData.decorationKind = 'sealed-wall'; group.add(wall)
+          if (line.posts && i % 3 === 1) {
+            const post = new THREE.Mesh(new THREE.BoxGeometry(.15,line.wallHeight+.22,.15),new THREE.MeshBasicMaterial({color:0x603724}))
+            post.position.set(a.x,surface+(line.wallHeight+.22)/2,a.y)
+            post.userData.decorationKind = 'boundary-post'; group.add(post)
+          }
+        }
+      }
+    }
+    _boardDecorations = group
+    _scene.add(group)
+    _invalidate()
+  }
+
   // ── update — one-way presentation model input ─────────────────────────────────
   function update(model) {
     if (!model || !model.board || !_mounted) return
@@ -2607,9 +2711,11 @@
     // Build / update tiles on first call or map change
     const mapKey = model.board.id + ':' + model.board.width + 'x' + model.board.height
     if (!_currentModel || !_currentModel.board || _currentModel.board.id + ':' + _currentModel.board.width + 'x' + _currentModel.board.height !== mapKey) {
+      clearBoardDecorations()
       _buildTiles(model.board)
     }
 
+    _boardDecorationsHistorical = false
     _updatePieces(model.pieces || [])
     _updateTileEffects(model.effects || [])
     setHighlights({
@@ -2618,6 +2724,8 @@
       place: model.legal && model.legal.placementCells,
       selected: model.selection && model.selection.pieceId,
     })
+    _boardDecorationsHistorical = false
+    if (_boardDecorations) _boardDecorations.visible = true
     _currentModel = model
     _syncPendingFeedback(model.interaction || {})
     _summaryPositionsDirty = true
@@ -2657,6 +2765,12 @@
     _camera.updateProjectionMatrix()
     _currentModel = model
     update(model)
+    _boardDecorationsHistorical = true
+    _pieceObjects.forEach(function (obj) {
+      const warning = obj.summaryEl?.querySelector('.piece-board-lethal')
+      if (warning) warning.hidden = true
+    })
+    if (_boardDecorations) _boardDecorations.visible = false
   }
 
   // ── spawnFloater ─────────────────────────────────────────────────────────────
@@ -2706,6 +2820,8 @@
     if (_renderer) _resetPointerState(_renderer.domElement)
     _removeAllListeners()
     _clearHistoryHighlight()
+    clearBoardDecorations()
+    _boardDecorationsHistorical = false
     clearTutorialCue()
     if (_hpLayer && _hpLayer.parentNode) _hpLayer.remove()
     if (_scene) {
@@ -2819,9 +2935,11 @@
     spawnFloater,
     resize,
     resetView,
+    focusCell,
     zoomBy,
     projectCell,
     setHistoryHighlight,
+    setBoardDecorations,
     setTutorialCue,
     clearTutorialCue,
     screenToCell,

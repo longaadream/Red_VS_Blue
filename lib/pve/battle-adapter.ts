@@ -105,6 +105,7 @@ export async function createPveBattleV1(
     ],
     input.mapId,
     {
+      contentMode: 'pve',
       firstPlayerId: PVE_PLAYER_ID_V1,
       rootSeed: battleSeed,
       deploymentEnabled: true,

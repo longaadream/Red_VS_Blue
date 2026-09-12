@@ -210,6 +210,7 @@ describe('RED-119 selectable map catalog', () => {
       'large-trap-arena',
       ...newMaps.map(map => map.filename),
       'twin-fronts',
+      'adventure-act-1-v1', 'adventure-act-2-v1', 'adventure-act-3-v1',
     ])
     expect([...manifest].sort()).toEqual(mapFiles)
     expect(mapFiles).not.toContain('large-battlefield')
@@ -315,7 +316,8 @@ describe('RED-119 selectable map catalog', () => {
       ...newMaps.map(map => map.id),
       'twin-fronts',
     ]))
-    expect(apiIds).toEqual(repositoryIds)
+    expect(apiIds).toEqual(new Set([...repositoryIds,'adventure-act-1-v1','adventure-act-2-v1','adventure-act-3-v1']))
+    expect(getAllMaps('pve').filter(map=>map.availability?.modes.length===1).map(map=>map.id).sort()).toEqual(['adventure-act-1-v1','adventure-act-2-v1','adventure-act-3-v1'])
   })
 
   it('loads the authoritative map API and keeps room creation disabled until the catalog succeeds', () => {

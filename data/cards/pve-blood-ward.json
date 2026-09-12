@@ -1,0 +1,24 @@
+{
+  "id": "pve-blood-ward",
+  "name": "邪能护体",
+  "description": "使一个友方获得6点护盾。",
+  "type": "active",
+  "actionPointCost": 1,
+  "availability": {
+    "modes": [
+      "pve"
+    ],
+    "status": "draft"
+  },
+  "design": {
+    "familyId": "blood",
+    "handbookId": "blood-ward",
+    "curve": "ready",
+    "role": "防护",
+    "duration": "本场",
+    "start": "护盾6",
+    "end": "护盾6",
+    "condition": "稳定承担6点伤害，消耗完即结束。",
+    "note": "这是数值护盾，不是圣盾。"
+  }
+}

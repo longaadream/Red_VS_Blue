@@ -1,0 +1,24 @@
+{
+  "id": "pve-shield-thorns",
+  "name": "荆棘誓言",
+  "description": "一个友方下次用圣盾挡住敌方伤害时，对伤害来源造成等于所挡伤害50%的伤害。",
+  "type": "active",
+  "actionPointCost": 1,
+  "availability": {
+    "modes": [
+      "pve"
+    ],
+    "status": "draft"
+  },
+  "design": {
+    "familyId": "shield",
+    "handbookId": "shield-thorns",
+    "curve": "growth",
+    "role": "反伤",
+    "duration": "至你的下回合开始",
+    "start": "反伤1",
+    "end": "反伤15",
+    "condition": "挡住的伤害从2提高到30。",
+    "note": "按没有该圣盾时本应结算的伤害取值；环境与无敌方来源的伤害不反射。"
+  }
+}

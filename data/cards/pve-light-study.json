@@ -1,0 +1,24 @@
+{
+  "id": "pve-light-study",
+  "name": "圣光研习",
+  "description": "选择【圣光治疗】或【圣光惩戒】，其治疗量或伤害+2。",
+  "type": "active",
+  "actionPointCost": 2,
+  "availability": {
+    "modes": [
+      "pve"
+    ],
+    "status": "draft"
+  },
+  "design": {
+    "familyId": "light",
+    "handbookId": "light-study",
+    "curve": "growth",
+    "role": "投入养成",
+    "duration": "本次冒险",
+    "start": "当前0效果",
+    "end": "后续每张+6",
+    "condition": "同一方向投入3张研习。",
+    "note": "只强化选定卡名；强化可重复，临时卡仍会战后清除。"
+  }
+}

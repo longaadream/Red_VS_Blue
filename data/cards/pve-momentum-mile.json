@@ -1,0 +1,24 @@
+{
+  "id": "pve-momentum-mile",
+  "name": "里程碑",
+  "description": "让一个友方普通移动最多1格，再对其3格内一个敌人造成2点伤害。若完成移动，本次冒险后续同名牌移动距离+1、伤害+2。",
+  "type": "active",
+  "actionPointCost": 1,
+  "availability": {
+    "modes": [
+      "pve"
+    ],
+    "status": "draft"
+  },
+  "design": {
+    "familyId": "momentum",
+    "handbookId": "momentum-mile",
+    "curve": "growth",
+    "role": "移动 / 自我强化",
+    "duration": "一次结算",
+    "start": "1格 / 2伤害",
+    "end": "5格 / 10伤害",
+    "condition": "此前成功使用4张里程碑。",
+    "note": "移动不额外花行动点；牌消耗，成长留给后续副本。"
+  }
+}

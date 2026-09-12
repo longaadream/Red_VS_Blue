@@ -107,6 +107,10 @@ export interface ValidatedContentTreeV1 extends ReadonlyContentTreeV1 {
   readonly capabilities: readonly PackCapabilityV1[]
 }
 
+import { parseRoguelikeDocumentV1, RoguelikeAdventureSourceV1Schema } from '@/lib/pve/contracts/roguelike-content-v1'
+import { validateRoguelikeReferences } from '@/lib/pve/roguelike/content-references'
+import { isValidContentAvailability } from '@/lib/game/content-availability'
+
 type ParsedPveDocumentV1 =
   | { readonly kind: 'content-manifest'; readonly value: PveContentManifestV1 }
   | { readonly kind: 'campaign'; readonly value: PveCampaignV1 }
@@ -644,6 +648,11 @@ function parsePveDocument(
   value: JsonValueV1,
   packId?: string,
 ): ParsedPveDocumentV1 | undefined {
+  try {
+    if (RoguelikeAdventureSourceV1Schema.safeParse(value).success || parseRoguelikeDocumentV1(value)) return undefined
+  } catch {
+    reject('PACK_SCHEMA_INVALID', 'content', { packId, path })
+  }
   const schemaVersion = (
     value !== null
     && typeof value === 'object'
@@ -696,6 +705,17 @@ function validateFileContent(
     return rejectJsonFailure(error, 'content', { packId, path: descriptor.path })
   }
   const hasExecutableContent = hasExecutableContentV1(jsonValue)
+  if (/^data\/(pieces|cards|skills|maps|rules)\//.test(descriptor.path)
+    && jsonValue && typeof jsonValue === 'object' && !Array.isArray(jsonValue)
+    && jsonValue.availability !== undefined && !isValidContentAvailability(jsonValue.availability)) {
+    reject('PACK_SCHEMA_INVALID', 'content', { packId, path: descriptor.path })
+  }
+  if (descriptor.path.startsWith('data/cards/') && jsonValue && typeof jsonValue === 'object' && !Array.isArray(jsonValue) && jsonValue.adventurePower !== undefined) {
+    const power = jsonValue.adventurePower
+    if (!power || typeof power !== 'object' || Array.isArray(power)
+      || typeof power.baseDamage !== 'number' || !Number.isFinite(power.baseDamage) || power.baseDamage < 0
+      || typeof power.usesGrowth !== 'boolean') reject('PACK_SCHEMA_INVALID', 'content', { packId, path: descriptor.path })
+  }
   if (hasExecutableContent && !allowExecutableContent) {
     reject('PACK_FORBIDDEN_EXECUTABLE_CONTENT', 'content', {
       packId,
@@ -1026,6 +1046,11 @@ function validatePveClosure(
   facts: readonly ValidatedFileFactV1[],
   packId?: string,
 ): void {
+  try {
+    validateRoguelikeReferences(facts.map(fact => ({path:fact.descriptor.path,jsonValue:fact.jsonValue})))
+  } catch (error) {
+    reject('PACK_REFERENCE_INVALID', 'reference', { packId, path: error instanceof Error ? error.message : undefined })
+  }
   const factsByPath = new Map(facts.map(fact => [fact.descriptor.path, fact]))
   const registrationsByKey = new Map<string, {
     kind: PveContentKindV1

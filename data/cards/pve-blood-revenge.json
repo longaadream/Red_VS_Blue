@@ -1,0 +1,24 @@
+{
+  "id": "pve-blood-revenge",
+  "name": "痛楚反击",
+  "description": "本场战斗，一个友方受到伤害后，其下次主动伤害技能或伤害卡的伤害翻倍。",
+  "type": "active",
+  "actionPointCost": 2,
+  "availability": {
+    "modes": [
+      "pve"
+    ],
+    "status": "draft"
+  },
+  "design": {
+    "familyId": "blood",
+    "handbookId": "blood-revenge",
+    "curve": "growth",
+    "role": "放大",
+    "duration": "本场",
+    "start": "额外3伤害",
+    "end": "额外20伤害",
+    "condition": "下一击原伤害从3提高到20。",
+    "note": "只是一张可选卡。连续受伤刷新效果，不叠成4倍、8倍；受伤动作结束后才准备后续反击。"
+  }
+}

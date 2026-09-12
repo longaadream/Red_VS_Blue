@@ -87,6 +87,7 @@ function createRuntime(overrides: Record<string, unknown> = {}): Runtime {
     myPlayerId: 'player-blue',
     TRAINING_MODE: false,
     PRACTICE_MODE: false,
+    ADVENTURE_MODE: false,
     cardsById: {},
     cardDisplayMetadataById: Object.create(null),
     cardDisplayMetadataRequests: new Map(),
@@ -190,7 +191,8 @@ describe('LAN battle hand card display metadata', () => {
     expect(runtime.submittedActions).toEqual([])
   })
 
-  it('recovers missing training metadata from the local card file', async () => {
+  it.each(['TRAINING_MODE', 'PRACTICE_MODE', 'ADVENTURE_MODE'])(
+    'recovers missing %s metadata from the local card file', async mode => {
     const fetchLocalJson = vi.fn(async () => ({
       id: 'lucky-coin',
       name: '幸运币',
@@ -200,7 +202,7 @@ describe('LAN battle hand card display metadata', () => {
       image: 'the-coin.jpg',
       code: 'throw new Error("display metadata must not execute")',
     }))
-    const runtime = createRuntime({ TRAINING_MODE: true, fetchLocalJson })
+    const runtime = createRuntime({ [mode]: true, fetchLocalJson })
     installRenderHand(runtime.context)
 
     new Script('renderHand()').runInContext(runtime.context)
@@ -213,6 +215,7 @@ describe('LAN battle hand card display metadata', () => {
     expect(runtime.container.innerHTML).toContain('获得1点行动点。')
     expect(runtime.container.innerHTML).toContain('images/card-art/the-coin.jpg')
     expect(runtime.context.cardDisplayMetadataById['lucky-coin']).not.toHaveProperty('code')
+    expect(runtime.errors).toEqual([])
   })
 
   it('recovers a minimal LAN hand through one deduplicated display-only request', async () => {
@@ -265,6 +268,7 @@ describe('LAN battle hand card display metadata', () => {
     expect(runtime.context.pendingCardAction).toBeNull()
     expect(runtime.submittedActions).toEqual([])
     expect(runtime.context.cardDisplayMetadataById['lucky-coin']).not.toHaveProperty('code')
+    expect(runtime.errors).toEqual([])
   })
 
   it.each([

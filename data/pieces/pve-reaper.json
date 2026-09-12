@@ -1,0 +1,27 @@
+{
+  "id": "pve-reaper",
+  "name": "死神",
+  "faction": "evil",
+  "description": "《守望先锋》 · PVE 精英：预告直线射击",
+  "rarity": "epic",
+  "image": "adventure/reaper.jpg",
+  "stats": {
+    "maxHp": 20,
+    "attack": 5,
+    "defense": 1,
+    "moveRange": 4
+  },
+  "skills": [
+    {
+      "skillId": "pve-shot"
+    }
+  ],
+  "rules": [],
+  "isDefault": false,
+  "availability": {
+    "modes": [
+      "pve"
+    ],
+    "status": "ready"
+  }
+}

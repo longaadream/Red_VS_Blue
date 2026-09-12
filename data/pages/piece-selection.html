@@ -643,6 +643,12 @@
     }
 
     function validatePieceTemplates(pieces) {
+      pieces = pieces.filter(piece => !piece?.availability || (
+        piece.availability.status === 'ready' && Array.isArray(piece.availability.modes)
+        && piece.availability.modes.length > 0 && new Set(piece.availability.modes).size === piece.availability.modes.length
+        && piece.availability.modes.every(mode => mode === 'pvp' || mode === 'pve')
+        && piece.availability.modes.includes('pvp')
+      ))
       const seen = new Set()
       for (const piece of pieces) {
         if (!piece || typeof piece !== 'object' || typeof piece.id !== 'string' || !piece.id) {

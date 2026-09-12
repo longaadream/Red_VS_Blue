@@ -1,0 +1,27 @@
+{
+  "id": "pve-hook",
+  "name": "肉钩",
+  "description": "弹射物。沿预告方向，对4格内第1个敌方目标造成等同攻击力的伤害，并将其拉至身前。",
+  "kind": "active",
+  "type": "normal",
+  "range": "self",
+  "cooldownTurns": 0,
+  "maxCharges": 0,
+  "powerMultiplier": 1,
+  "actionPointCost": 0,
+  "icon": "⚔",
+  "targeting": {
+    "steps": []
+  },
+  "keywords": [
+    "弹射物"
+  ],
+  "previewCode": "function calculatePreview(piece,skillDef) { return {description:skillDef.description,expectedValues:{damage:piece.attack}}; }",
+  "code": "function executeSkill(context){var source=context.piece,world=battle.extensions.adventureWorld,plan=world.plans[0];if(!plan||plan.sourceId!==source.instanceId||plan.kind!=='attack'||source.x!==plan.origin.x||source.y!==plan.origin.y)return {success:false,message:'预告计划已失效'};for(var i=0;i<plan.cells.length;i++){var c=plan.cells[i],tile=battle.map.tiles.find(function(t){return t.x===c.x&&t.y===c.y;});if(!tile||tile.props.bulletPassable===false)break;var target=battle.pieces.find(function(p){return p.currentHp>0&&p.x===c.x&&p.y===c.y;});if(!target)continue;if(arePlayersAllied(battle,target.ownerPlayerId,source.ownerPlayerId))break;dealDamage(source,target,source.attack,'physical',battle,context.skill.id);if(target.currentHp>0){var dx=Math.sign(source.x-target.x),dy=Math.sign(source.y-target.y);while(Math.abs(target.x-source.x)+Math.abs(target.y-source.y)>1){var x=target.x+dx,y=target.y+dy,t=battle.map.tiles.find(function(t){return t.x===x&&t.y===y;});if(!t||!t.props.walkable||battle.pieces.some(function(p){return p.currentHp>0&&p.x===x&&p.y===y;}))break;target.x=x;target.y=y;}}return {success:true,message:'肉钩命中并拖拽目标'};}return {success:true,message:'肉钩落空'};}",
+  "availability": {
+    "modes": [
+      "pve"
+    ],
+    "status": "ready"
+  }
+}

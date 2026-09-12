@@ -1,0 +1,24 @@
+{
+  "id": "pve-shield-burst",
+  "name": "碎盾冲击",
+  "description": "移除一个友方的圣盾，使其对3格内一个敌人造成8点伤害。",
+  "type": "active",
+  "actionPointCost": 1,
+  "availability": {
+    "modes": [
+      "pve"
+    ],
+    "status": "draft"
+  },
+  "design": {
+    "familyId": "shield",
+    "handbookId": "shield-burst",
+    "curve": "ready",
+    "role": "伤害",
+    "duration": "一次结算",
+    "start": "8伤害",
+    "end": "8伤害",
+    "condition": "只需一面盾；本版将固定伤害草案提高到8。",
+    "note": ""
+  }
+}

@@ -1,3 +1,7 @@
+import { assertContentAvailable, battleContentMode, ContentUnavailableError, type ModeScopedContent } from './content-availability'
+import { adventureCards, recordAdventurePassiveHit, type AdventureHandCard } from './adventure-card-state'
+import { adventureBoundary } from './adventure-boundary'
+import { getSkillById } from './skill-repository'
 import { areMatchAllies } from './match-teams'
 import { addPieceStatus, removePieceStatus, expireHolderStatuses, type StatusHolder } from './status-lifecycle'
 import { checkpointBattlePresentation, recordBattlePresentationBlock, createBattlePresentationQueue } from './battle-presentation-recording'
@@ -339,8 +343,9 @@ export function clearRuleCache(): void {
  * @param sourcePiece 来源棋子（可选）
  * @returns 是否成功添加
  */
-function addCardToHandWithTriggers(battle: BattleState, cardId: string, targetPlayerId: string, sourcePiece?: PieceInstance): boolean {
-  const player = battle.players?.find((p: any) => p.playerId === targetPlayerId)
+export function addCardToHandWithTriggers(battle: BattleState, cardId: string, targetPlayerId: string, sourcePiece?: PieceInstance,
+  supplied?: Pick<AdventureHandCard, 'instanceId' | 'contentState' | 'additionPrepared'>): boolean {
+  const player = battle.players?.find(p => p.playerId === targetPlayerId)
   if (!player) return false
   const resolvedCard = loadCardForBattle(battle, cardId, {
     metadata: {
@@ -348,10 +353,11 @@ function addCardToHandWithTriggers(battle: BattleState, cardId: string, targetPl
       skillId: cardId,
     },
   })
+  if (!resolvedCard) return false
   if (!player.hand) player.hand = []
   
   // 触发手牌加入手里前规则
-  const beforeCardAddedResult = checkSynchronousTriggers(battle, {
+  const beforeCardAddedResult = supplied?.additionPrepared ? { blocked: false, messages: [] } : checkSynchronousTriggers(battle, {
     type: "beforeCardAdded",
     playerId: targetPlayerId,
     cardId: cardId,
@@ -372,7 +378,8 @@ function addCardToHandWithTriggers(battle: BattleState, cardId: string, targetPl
     return false;
   }
   
-  if (player.hand.length >= 10) {
+  const adventurePlayer = adventureCards(battle)?.players[targetPlayerId]
+  if (player.hand.length >= 10 && !adventurePlayer) {
     if (!battle.actions) battle.actions = []
     battle.actions.push({
       type: "cardOverflow",
@@ -386,19 +393,26 @@ function addCardToHandWithTriggers(battle: BattleState, cardId: string, targetPl
   }
   
   const runtime = getActiveRuleRuntime()
-  const instanceId = runtime
+  const instanceId = supplied?.instanceId ?? (runtime
     ? runtime.nextInstanceId('card', `ci-${cardId}`)
-    : `ci-${cardId}-${Math.floor(rng() * 1e9)}`
-  player.hand.push({
+    : `ci-${cardId}-${Math.floor(rng() * 1e9)}`)
+  const instance = {
     cardId, instanceId, ownerPlayerId: targetPlayerId,
     actionPointCost: resolvedCard?.actionPointCost ?? 0,
+    ...(adventurePlayer ? { contentState: supplied?.contentState ?? { adventure: { lifetime: 'encounter' as const, sourceId: sourcePiece?.instanceId ?? 'effect' } } } : {}),
     ...(resolvedCard ? {
       name: resolvedCard.name,
       description: resolvedCard.description,
       icon: resolvedCard.icon,
       type: resolvedCard.type,
     } : {})
-  })
+  }
+  if (player.hand.length >= 10 && adventurePlayer) {
+    // A deferred acceptance must not consume beforeCardAdded rules twice.
+    adventurePlayer.overflow.push({ ...instance, additionPrepared: true })
+    return true
+  }
+  player.hand.push(instance)
   
   // 触发手牌加入手里后规则
   const afterCardAddedResult = checkSynchronousTriggers(battle, {
@@ -475,6 +489,8 @@ export type SelectionStepDefinition =
       kind: 'target'
       type: 'piece' | 'grid' | 'cell'
       filter?: 'enemy' | 'ally' | 'all' | 'self'
+      /** Measure this target step from a previously selected piece. */
+      originSelectedTargetIndex?: number
       range?: number
       rangeByStatus?: StatusRangeOverrideDefinition
       minRange?: number
@@ -505,7 +521,8 @@ export interface SelectionContractDefinition {
   steps: SelectionStepDefinition[]
 }
 
-export interface CardDefinition {
+export interface CardDefinition extends ModeScopedContent {
+  adventurePower?: { baseDamage: number; usesGrowth: boolean }
   id: string
   name: string
   description: string
@@ -541,6 +558,13 @@ export function assertCardDefinition(
   }
   if (card.type !== 'active' && card.type !== 'reactive') {
     throw new Error(`Card definition ${cardId} has an unsupported type`)
+  }
+  if (card.availability !== undefined && (card.availability as any)?.status === 'draft') {
+    throw new ContentUnavailableError(cardId, 'pve')
+  }
+  if (card.adventurePower !== undefined) {
+    const power=card.adventurePower as Record<string,unknown>
+    if(!power||typeof power!=='object'||Array.isArray(power)||typeof power.baseDamage!=='number'||!Number.isFinite(power.baseDamage)||power.baseDamage<0||typeof power.usesGrowth!=='boolean')throw new Error('Invalid adventure card power: '+cardId)
   }
   if (!isNonEmptyString(card.code)) {
     throw new Error(`Card definition ${cardId} has no executable code`)
@@ -613,16 +637,16 @@ export function loadCardForBattle(
     metadata?: EffectDispatchMetadata
   } = {},
 ): CardDefinition | null {
-  const chain = getActiveEffectChain(battle)
-  const strict = Boolean(chain && !chain.detached)
   let staticCard: CardDefinition | null = null
   let definitionError: unknown
   try {
-    staticCard = loadCardById(cardId, options.forceReload, strict)
+    staticCard = loadCardById(cardId, options.forceReload, true)
+    if (staticCard) assertContentAvailable(staticCard, battleContentMode(battle))
   } catch (error) {
     definitionError = error
   }
 
+  if (definitionError instanceof ContentUnavailableError) throw definitionError
   const candidates = [
     staticCard,
     (battle as any).customCards?.[cardId] as unknown,
@@ -630,6 +654,7 @@ export function loadCardForBattle(
   for (const candidate of candidates) {
     if (!candidate) continue
     try {
+      assertContentAvailable(candidate as CardDefinition, battleContentMode(battle))
       return assertCardDefinition(cardId, candidate, {
         requireReactiveTrigger: options.requireReactiveTrigger,
       })
@@ -920,6 +945,7 @@ export function executeCardFunction(
 ): SkillExecutionResult {
   const expectedCardId = String(cardInstance?.cardId ?? cardDef?.id ?? '')
   try {
+    assertContentAvailable(cardDef, battleContentMode(battle))
     cardDef = assertCardDefinition(expectedCardId, cardDef)
   } catch (error) {
     rethrowAttachedEffectContentError(
@@ -940,7 +966,7 @@ export function executeCardFunction(
     // 卡牌执行上下文：优先使用 triggerContext 作为基础（保持引用），然后添加卡牌相关字段
     // 这样 reactive 卡牌可以修改原始事件的参数（如 damage、heal 等）
     const context = triggerContext || {}
-    context.card = { id: cardDef.id, name: cardDef.name, type: cardDef.type }
+    context.card = { id: cardDef.id, name: cardDef.name, type: cardDef.type, ...(cardDef.adventurePower ? { adventurePower: { ...cardDef.adventurePower } } : {}) }
     context.playerId = playerId
     context.battle = battle
     context.piece = context.piece || null
@@ -1089,6 +1115,7 @@ export function loadSkillForBattle(
       ? loadSkillById(skillId, strict)
       : assertSkillDefinition(skillId, candidate)
     if (definition) {
+      assertContentAvailable(definition, battleContentMode(battle))
       return assertSkillDefinition(skillId, definition, {
         requireExecutable: options.requireExecutable,
       })
@@ -2004,7 +2031,7 @@ export type SkillForm = "melee" | "ranged" | "magic" | "projectile" | "area" | "
  * 技能的静态定义（模板）
  * 包含技能的元数据和函数代码
  */
-export interface SkillDefinition {
+export interface SkillDefinition extends ModeScopedContent {
   id: SkillId
   name: string
   description: string
@@ -3084,7 +3111,9 @@ function prepareDamageTarget(
     context.batchId,
     target.instanceId,
   )
-  let blocked = sourceBlocked || Boolean(beforeTaken.blocked)
+  const cooperativeProtection = adventureBoundary(battle)?.coop
+  let blocked = sourceBlocked || Boolean(beforeTaken.blocked) || !!(cooperativeProtection
+    && (cooperativeProtection.protectedUntil[target.ownerPlayerId] ?? -1) >= cooperativeProtection.round)
   const defense = request.damageType === 'physical' || request.damageType === 'magical'
     ? Number(target.defense) || 0
     : 0
@@ -3743,6 +3772,11 @@ function resolveDamageBatch(
       continue
     }
     if (entry.result.damage <= 0) continue
+    if (adventureCards(battle) && request.skillId && (battle.skillsById?.[request.skillId] ?? getSkillById(request.skillId))?.kind === 'passive') {
+      if (!areMatchAllies(battle, request.attacker.ownerPlayerId, entry.target.ownerPlayerId)) {
+        recordAdventurePassiveHit(battle, request.attacker.ownerPlayerId, entry.target.instanceId)
+      }
+    }
     const dealtResult = checkSynchronousTriggers(battle, { ...shared, type: 'afterDamageDealt' })
     const takenResult = checkSynchronousTriggers(battle, {
       ...shared,
@@ -4264,8 +4298,12 @@ function validateStoredPieceSummon(
   const normalizedOwnerPlayerId = String(source.ownerPlayerId || '').trim().toLowerCase()
   if (!normalizedOwnerPlayerId) fatal('Stored summon source owner is invalid')
   const ownerScoped = capability.ownerScopedStorageExtensionKey !== undefined
+  const encounter = adventureBoundary(battle)
+  const encounterEnemy = !!encounter?.activeZone && source.ownerPlayerId !== encounter.humanId
+    && encounter.activeEnemyIds.includes(source.instanceId)
   const activePiece = battle.pieces.find(piece => (
     piece.currentHp > 0
+    && (!encounterEnemy || encounter!.activeEnemyIds.includes(piece.instanceId))
     && (!ownerScoped
       || String(piece.ownerPlayerId || '').trim().toLowerCase() === normalizedOwnerPlayerId)
     && (
@@ -5221,6 +5259,7 @@ export function healDamage(
 export function executeSkillFunction(skillDef: SkillDefinition, context: SkillExecutionContext, battle: BattleState, flowEntry?: { context: Parameters<typeof createFlowRuntime>[1]; surface: 'triggerSkill' }): SkillExecutionResult {
   const expectedSkillId = String(context?.skill?.id ?? skillDef?.id ?? '')
   try {
+    assertContentAvailable(skillDef, battleContentMode(battle))
     skillDef = assertSkillDefinition(expectedSkillId, skillDef, { requireExecutable: true })
   } catch (error) {
     rethrowAttachedEffectContentError(

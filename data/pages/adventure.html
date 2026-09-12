@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>冒险准备 - RED vs BLUE</title><link rel="stylesheet" href="css/tabletop/tabletop.css"><link rel="stylesheet" href="css/adventure-lobby.css"></head>
+<body data-art-page="adventure"><main class="adventure-desk">
+<header class="desk-header"><a class="home-link" href="index.html">← 返回主页</a><span>RED vs BLUE · PVE</span></header>
+<div class="desk-title"><div><span class="eyebrow">收拾行囊，结伴出发</span><h1>冒险准备</h1></div><span class="chapter-stamp">三幕旅途<br><b>1—4 人同行</b></span></div>
+<div class="preparation-layout"><section class="party-sheet" aria-labelledby="partyTitle"><div class="section-title"><h2 id="partyTitle">选择初始队伍</h2><span>队长带路 · 战时部署队员</span></div>
+<div id="families" class="family-tabs" role="group" aria-label="队伍流派"></div><div id="teamPreview" class="team-preview" aria-live="polite"></div><p class="party-note">这是旅途的起点。途中可以招募其他棋子，搭配不同体系的卡牌。</p></section>
+<aside class="departure-sheet"><span class="eyebrow">出发登记</span><h2>这次和谁同行？</h2><button id="solo" class="primary">独自出发 <span>→</span></button><button id="create">创建组队房间 <span>＋</span></button><button id="openJoin">加入队友房间 <span>↗</span></button><button id="resume">继续存档 <span>↶</span></button>
+<p id="lobbyStatus" role="status">先选一支队伍，再决定独行或结伴。</p><details class="connection-settings"><summary>连接设置</summary><label>冒险服务器<input id="server" autocomplete="url" placeholder="使用默认服务器"></label></details></aside></div>
+<section class="room-browser" aria-labelledby="roomsTitle"><div class="section-title"><div><span class="eyebrow">寻找同行者</span><h2 id="roomsTitle">PVE 房间列表</h2></div><button id="refreshRooms">刷新房间</button></div><p id="roomsStatus" role="status">查看当前服务器上可以加入的冒险。</p><div id="roomCatalog" class="room-catalog"></div></section><section id="roomInfo" class="room-sheet" hidden><div class="section-title"><div><span class="eyebrow">组队大厅</span><h2 id="roomLabel"></h2></div><button id="copyRoom">复制房间号</button></div><div id="seats" class="room-seats"></div><div class="room-footer"><p id="partyDifficulty">人数越多，敌方阵容越强。</p><button id="leave">离开房间</button><button id="ready">准备</button><button id="start" class="primary">踏上冒险 →</button></div></section>
+<footer class="desk-footer"><span>探索 3 点行动</span><span>战斗从 1 点起步</span><span>节点结算后保存</span></footer></main>
+<dialog id="joinDialog"><form id="joinForm"><h2>加入队友房间</h2><p>让房主将房间号发给你。</p><label>房间号<input id="roomCode" required autocomplete="off" maxlength="64"></label><div class="dialog-actions"><button type="button" data-close>取消</button><button id="join" class="primary">加入房间</button></div></form></dialog>
+<dialog id="saveDialog"><h2>继续旅途</h2><div id="saves"></div><div class="dialog-actions"><button data-close>关闭</button></div></dialog>
+<script src="js/server-utils.js"></script><script src="js/crypto-lib.js"></script><script src="js/identity.js"></script><script src="js/colyseus-sdk.js"></script><script src="js/adventure/network.js"></script><script src="js/adventure/lobby.js"></script></body></html>

@@ -1,0 +1,24 @@
+{
+  "id": "pve-shield-afterglow",
+  "name": "碎盾余响",
+  "description": "移除一个友方的圣盾，使其对3格内一个敌人造成2点伤害；本场此前每有1个己方圣盾消失，伤害+3。",
+  "type": "active",
+  "actionPointCost": 1,
+  "availability": {
+    "modes": [
+      "pve"
+    ],
+    "status": "draft"
+  },
+  "design": {
+    "familyId": "shield",
+    "handbookId": "shield-afterglow",
+    "curve": "growth",
+    "role": "伤害",
+    "duration": "一次结算",
+    "start": "2伤害",
+    "end": "20伤害",
+    "condition": "此前失盾6次。",
+    "note": "次数来自战斗本身，不需要先打出圣盾回响。"
+  }
+}

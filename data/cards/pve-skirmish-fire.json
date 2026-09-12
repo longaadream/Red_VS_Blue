@@ -1,0 +1,24 @@
+{
+  "id": "pve-skirmish-fire",
+  "name": "交叉火力",
+  "description": "一个友方对3格内一个敌人造成2点伤害；本场己方每通过被动对该目标造成1次伤害，本牌伤害+3。",
+  "type": "active",
+  "actionPointCost": 1,
+  "availability": {
+    "modes": [
+      "pve"
+    ],
+    "status": "draft"
+  },
+  "design": {
+    "familyId": "skirmish",
+    "handbookId": "skirmish-fire",
+    "curve": "growth",
+    "role": "伤害",
+    "duration": "一次结算",
+    "start": "2伤害",
+    "end": "17伤害",
+    "condition": "此前对同一目标被动命中5次。",
+    "note": "不需要先打火力网；换新目标时不能沿用旧目标次数。"
+  }
+}

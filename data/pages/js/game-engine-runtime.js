@@ -160,6 +160,9 @@
       Object.keys(files).forEach(function (path) {
         var normalized = cleanPath(path)
         if (!/^data\/[a-z0-9-]+\/[a-z0-9_-]+\.json$/.test(normalized)
+          && normalized !== 'data/pve/roguelike/adventure.json'
+          && normalized !== 'data/pve/roguelike/builds.json'
+          && normalized !== 'data/pve/roguelike/supplies.json'
           && normalized !== 'data/skill-keywords.json') {
           throw new Error('GameEngine 资源路径无效: ' + path)
         }

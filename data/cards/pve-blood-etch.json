@@ -1,0 +1,24 @@
+{
+  "id": "pve-blood-etch",
+  "name": "血焰淬炼",
+  "description": "你的【血焰】伤害倍率+1。",
+  "type": "active",
+  "actionPointCost": 2,
+  "availability": {
+    "modes": [
+      "pve"
+    ],
+    "status": "draft"
+  },
+  "design": {
+    "familyId": "blood",
+    "handbookId": "blood-etch",
+    "curve": "growth",
+    "role": "投入养成",
+    "duration": "本次冒险",
+    "start": "当前0伤害",
+    "end": "血焰6→10",
+    "condition": "投入两张淬炼，之后每张血焰按损失2生命试算。",
+    "note": "原有数值成长保留；这只是成长牌的一种形式。"
+  }
+}

@@ -124,13 +124,14 @@ describe('Sonic roster mechanics', () => {
     expect(enemy.currentHp).toBe(7)
   })
 
-  it('documents the complete momentum acquisition and consumption contract', () => {
+  it('summarizes momentum gain, consumption and the teleport exception in the glossary', () => {
     const glossary = JSON.parse(readFileSync(resolve(process.cwd(), 'data/skill-keywords.json'), 'utf8'))
     const momentum = glossary.find((entry: { name: string }) => entry.name === '动能')
     expect(momentum).toMatchObject({ id: 'momentum', category: 'resource', highlight: true })
-    expect(momentum.shortDescription).toContain('按移动格数累积动能')
-    for (const rule of ['只有拥有至少一个动能技能', '普通移动', '获得动能', '使其他角色获得动能', '传送不获得动能', '没有上限', '重置为0']) {
-      expect(momentum.longDescription).toContain(rule)
+    for (const description of [momentum.shortDescription, momentum.longDescription]) {
+      for (const rule of ['普通移动每格获得1动能', '标有“获得动能”的技能也按移动格数积累', '使用动能技能后通常消耗全部动能', '传送不积累']) {
+        expect(description).toContain(rule)
+      }
     }
   })
 

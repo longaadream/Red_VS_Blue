@@ -1,5 +1,6 @@
 import type { BoardMap } from './map'
 import * as mapRepository from './map-repository'
+import { isContentAvailable } from './content-availability'
 
 export const SELECTABLE_MAP_IDS = [
   'large-hole-arena',
@@ -62,7 +63,7 @@ export function assertSelectableMapId(input: unknown, mode: '1v1' | '2v2' = '1v1
   const ordinaryFloorCount = map?.tiles.filter(tile => (
     tile.props.walkable === true && tile.props.type === 'floor'
   )).length ?? 0
-  if (!map || ordinaryFloorCount < (mode === '2v2' ? 32 : 16)) {
+  if (!map || !isContentAvailable(map,'pvp') || ordinaryFloorCount < (mode === '2v2' ? 32 : 16)) {
     throw new MapSelectionError('MAP_NOT_DEPLOYABLE', {
       mapId: input,
       ordinaryFloorCount,

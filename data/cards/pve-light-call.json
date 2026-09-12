@@ -1,0 +1,24 @@
+{
+  "id": "pve-light-call",
+  "name": "引光",
+  "description": "选择生成1张普通【圣光治疗】或【圣光惩戒】。",
+  "type": "active",
+  "actionPointCost": 1,
+  "availability": {
+    "modes": [
+      "pve"
+    ],
+    "status": "draft"
+  },
+  "design": {
+    "familyId": "light",
+    "handbookId": "light-call",
+    "curve": "ready",
+    "role": "供牌",
+    "duration": "一次结算",
+    "start": "1张",
+    "end": "1张",
+    "condition": "始终补1张指定工具牌。",
+    "note": "沿用普通卡原有效果；生成卡战后清除。"
+  }
+}
