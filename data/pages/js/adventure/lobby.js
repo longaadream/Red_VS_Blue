@@ -77,6 +77,7 @@ async function connectAdventureLobby(join) {
       familyId: selectedFamily, roomId: join ? lobbyElement('roomCode').value.trim() : undefined })
     adventureLobby.subscribe(renderAdventureLobby)
     adventureLobby.onConnection((connected, message) => { if (!connected) lobbyStatus(message) })
+    void refreshAdventureRooms()
     lobbyStatus('房间已建立。将房间号发给队友，准备好后即可出发。')
     return true
   } catch (error) { lobbyStatus(error.message); return false }
@@ -126,7 +127,12 @@ async function refreshAdventureRooms() {
   const status = lobbyElement('roomsStatus'), list = lobbyElement('roomCatalog'), refresh = lobbyElement('refreshRooms')
   refresh.disabled = true; status.textContent = '正在寻找冒险房间…'
   try {
-    const server = String(lobbyElement('server').value.trim() || window.RvBUtils?.getServerUrl?.() || 'http://127.0.0.1:2567').replace(/\/+$/, '').replace(/^ws/, 'http')
+    const explicit = lobbyElement('server').value.trim(), host = window.RvBHost || window.electronAPI
+    const mode = !explicit && host?.getMode ? await host.getMode() : undefined
+    if (!explicit && !adventureLobby && mode?.running === false) {
+      list.replaceChildren(); status.textContent = '本机服务尚未启动。创建房间即可启动，或填写队友的服务器地址。'; return
+    }
+    const server = String(explicit || adventureLobby?.server || mode?.localUrl || window.RvBUtils?.getServerUrl?.() || 'http://127.0.0.1:2567').replace(/\/+$/, '').replace(/^ws/, 'http')
     const response = await fetch(server + '/rooms?mode=pve', { cache: 'no-store', signal: AbortSignal.timeout(8000) })
     if (!response.ok) throw new Error('房间列表读取失败（' + response.status + '）')
     const { rooms } = await response.json(); list.replaceChildren()

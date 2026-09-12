@@ -104,3 +104,5 @@ v18 LAN 传输仅对可信打包游戏页启用 mixed content；HTML CSP 限制�
 原生导航只允许已知本地页面。证书校验保持开启，不通过关闭 webSecurity 支持 LAN。
 Windows 和 Android 沿用各自默认监听端口，协议相同，客户端按房主完整 origin 连接。
 回退为上一候选安装包会恢复旧 LAN 限制；本轮没有更改数据库或存档格式。
+
+2026-09-12 补充：用户要求 Android 与 Windows PVE 功能同步，已批准在 RED-181 中补充手机 PVE 宿主。本文件早期“不包含 PVE”仅指 RED-199 当时的范围，后续以 [PVE 存档联机方案](../technical/PVE_SAVE_COOP_PLAN.md) 的安卓同步章节为准。

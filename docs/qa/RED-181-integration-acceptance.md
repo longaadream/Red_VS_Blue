@@ -63,3 +63,17 @@ Android 16 / WebView 134.0.6998.135 / x86_64 只读模拟器实际安装启动�
 最终镜头支持按相邻格屏幕距离聚焦，手机初入探索/战区目标 44px；focusCell 退出 overview 模式，resize 不再回到全图。进入战区或主动回中时聚焦战区，后续行动保持玩家平移；普通探索移动只跟随队长，不重置用户缩放。大地图提高允许缩放上限，常规 PVP 镜头流程不变。资源/AP/队伍入口放到缩短回合条后的顶部空位，底部保留技能和手牌；详情打开时隐藏 PVE 浮层。
 
 新回归先复现格子过小，再修复；最终 53 项镜头/移动端测试通过，包含战斗连续 revision 不强制居中。tsc 与定向 ESLint 通过。最终实际 APK 在 914×411 CSS 视口测得相邻格最短距离 42.46px，真实触屏选中并移动队长、14名后备的滚动布局、详情打开关闭、菜单和两次独立保存全部通过。日志 android-playable-final.log，ADB 原生截图 android-ui/tactical-native.png；该截图包含实际 3D 棋盘。仍不将模拟器结果代替 ARM64 真机和完整四人长局验收。
+
+## 2026-09-12 安卓本机 PVE 宿主
+
+本轮撤销“安卓必须连接 Windows 才能进行 PVE”的候选限制。安卓注入 SQLite AdventureRepository，复用同一 AdventureRoom、资源身份验证、四人准备、权威命令与 checkpoint v1。冒险入口通过 RvBHost 启动原生服务并使用返回的本机地址；本机未运行时，房间列表显示启动指引。
+
+验证：Android SQLite 与 Colyseus 三文件四项测试通过，覆盖真实 SQLite worker 重启后历史、连续独立保存、错误房主/版本、重复回执事务回滚、PVP 存储隔离。全项目 tsc 通过。真实 APK（Android 16 / WebView 134）从独自出发启动手机本机服务，触屏移动、详情及两次保存通过；通过 ADB 将手机 2567 端口映射到电脑，三个桌面 SDK 以真实签名身份加入，与 APK 共四席准备并开始，版本一致，非房主保存拒绝。停止原生服务后由“继续存档”自动启动，读取先前历史成功。
+
+脚本：tests/electron/adventure-mobile.mjs（RVB_ADVENTURE_QA_LOCAL=1）、tests/electron/adventure-android-host.mjs。日志：output/pve-roguelike/android-local-host-ui.log、android-native-coop-restart.log、android-host-tests.log。这些是模拟器本机权威和真实 SDK 证据，不代替 ARM64 真机、物理局域网、全四人长局或所有厂商后台策略验收。独立审查未发现阻断项。
+
+使用：安卓直接选择队伍后独自出发，或创建组队房间；不需电脑服务器。局域网队友填手机地址 http://手机IP:2567 并输入房间号。公网沿用现有主机发布/relay。存档保存在房主设备，多次保存保留历史；停止服务或强杀后从“继续存档”恢复。不会自动把电脑存档搬到手机。
+
+最终 APK 再验：四席场景下将应用退到后台 15 秒，电脑 SDK 仍能读取同版本快照；返回应用后连续保存，停止并重启原生服务，再读旧档成功。该短时窗口不代表所有手机的长期后台保活。最终包 SHA256：CA2AFDA88484CCAB7952315A5820DE0E9FE9670E563EAACE6B1634DF0E5B801B。
+
+提交前基线检查遇到 GitHub Git 传输连接重置，check:main-baseline 返回 REMOTE_UNREACHABLE，未绕过或标为通过。GitHub 连接器核对 PR #175 base SHA 仍为 53c2c9ca3eef73d2158645b93138e242c225c604；远端 CI/正式合并门禁保持待验证。

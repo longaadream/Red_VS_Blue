@@ -1,11 +1,14 @@
 /* Colyseus owns connection recovery; the page only submits actor-bound commands. */
 window.RvBAdventureNetwork = {
   async connect(options = {}) {
-    if (window.electronAPI?.ensureLocalAuthority && !options.roomId && !options.server) {
-      const result = await window.electronAPI.ensureLocalAuthority()
+    const host = window.RvBHost || window.electronAPI
+    let localServer
+    if (host?.ensureLocalAuthority && !options.roomId && !options.server) {
+      const result = await host.ensureLocalAuthority()
       if (result?.ok === false) throw new Error(result.error || '本机服务启动失败')
+      localServer = result?.localUrl || (await host.getMode?.())?.localUrl
     }
-    const server = String(options.server || RvBUtils?.getServerUrl?.() || 'http://127.0.0.1:2567').replace(/\/+$/, '')
+    const server = String(options.server || localServer || window.RvBUtils?.getServerUrl?.() || 'http://127.0.0.1:2567').replace(/\/+$/, '')
     const identity = await RvBIdentity.ensureIdentity()
     const profileResponse = await fetch('./__tutorial-profile.json', { cache: 'no-store' })
     if (!profileResponse.ok) throw new Error('无法读取本机资源身份')

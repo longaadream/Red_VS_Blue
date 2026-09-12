@@ -1,12 +1,14 @@
 import { DatabaseSync } from 'node:sqlite'
 import { parentPort, workerData } from 'node:worker_threads'
 import { createHash } from 'node:crypto'
+import { SqliteAdventureStorage } from './sqlite-adventure-storage'
 import type { Room } from '../lib/game/room-model'
 import type { BattleAuthorityCheckpointRecord } from '../lib/game/battle-transition'
 import type { PostgresAuthorityTransitionJob } from '../lib/server/postgres/authority-types'
 
 // Runs in a dedicated worker; SQLite fsync never blocks the Colyseus room clock.
 const db = new DatabaseSync(workerData.databasePath)
+const adventure = new SqliteAdventureStorage(db)
 const sessionRooms = new Set<string>()
 const digest = (text: string) => createHash('sha256').update(text).digest('hex')
 function transaction<T>(run: () => T): T {
@@ -92,6 +94,13 @@ parentPort!.on('message', ({ id, method, args }) => {
     else if (method === 'initializeRoom') initialize(args[0], args[1], args[2])
     else if (method === 'commitTransitionBatch') value = commit(args[0], args[1])
     else if (method === 'restoreRoom') value = restore(args[0])
+    else if (method === 'adventure.initialize') adventure.initialize()
+    else if (method === 'adventure.create') adventure.create(args[0], args[1], args[2])
+    else if (method === 'adventure.get') value = adventure.get(args[0])
+    else if (method === 'adventure.list') value = adventure.list(args[0])
+    else if (method === 'adventure.commit') adventure.commit(args[0], args[1], args[2], args[3], args[4])
+    else if (method === 'adventure.receipt') value = adventure.receipt(args[0], args[1], args[2])
+    else if (method === 'adventure.save') adventure.save(args[0], args[1], args[2])
     else if (method === 'close') { db.exec('PRAGMA wal_checkpoint(TRUNCATE)'); db.close() }
     else throw new Error('Unknown Android storage method')
     parentPort!.postMessage({ id, value })

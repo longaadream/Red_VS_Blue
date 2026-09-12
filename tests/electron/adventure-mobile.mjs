@@ -1,4 +1,4 @@
-// Runs against the installed APK's ADB-forwarded WebView and a disposable Windows host.
+// Installed APK WebView: use RVB_ADVENTURE_QA_LOCAL=1 for its native Android host.
 import fs from 'node:fs'
 import path from 'node:path'
 import { execFileSync } from 'node:child_process'
@@ -27,8 +27,8 @@ try{
   }
   const server=process.env.RVB_ADVENTURE_QA_SERVER
   await call('Emulation.clearDeviceMetricsOverride')
-  assert(server,'Set RVB_ADVENTURE_QA_SERVER to the disposable host reachable from Android')
-  await evaluate(`document.getElementById('server').value=${JSON.stringify(server)}`)
+  assert(server || process.env.RVB_ADVENTURE_QA_LOCAL==='1','Select the disposable remote or Android local host')
+  await evaluate(`document.getElementById('server').value=${JSON.stringify(server || '')}`)
   await touch('#solo')
   await until('location.pathname.endsWith("battle.html") && typeof adventureSnapshot!=="undefined" && !!adventureSnapshot && !adventureBusy')
   const tactical=await evaluate(`(()=>{const p=G.pieces.find(p=>p.instanceId===adventureSnapshot.world.captainId),a=BattleRenderer3D.projectCell(p.x,p.y),b=BattleRenderer3D.projectCell(p.x+1,p.y),c=BattleRenderer3D.projectCell(p.x,p.y-1);return {id:p.instanceId,x:a.clientX,y:a.clientY,spacing:Math.min(Math.hypot(b.clientX-a.clientX,b.clientY-a.clientY),Math.hypot(c.clientX-a.clientX,c.clientY-a.clientY))}})()`)

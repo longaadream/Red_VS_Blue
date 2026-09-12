@@ -1,4 +1,5 @@
 import { Worker } from 'node:worker_threads'
+import type { AdventureRepository } from '../lib/server/colyseus/adventure-store'
 import type { BattleServerRepository } from '../lib/server/colyseus/create-colyseus-server'
 import type { Room } from '../lib/game/room-model'
 import type { BattleAuthorityCheckpointRecord } from '../lib/game/battle-transition'
@@ -35,6 +36,17 @@ export class AndroidSqliteAuthorityRepository implements BattleServerRepository 
     })
   }
   initializeSchema() { return this.call<void>('initializeSchema') }
+  adventureRepository(): AdventureRepository {
+    return {
+      initialize: () => this.call('adventure.initialize'),
+      create: (...args) => this.call('adventure.create', ...args),
+      get: (...args) => this.call('adventure.get', ...args),
+      list: (...args) => this.call('adventure.list', ...args),
+      commit: (...args) => this.call('adventure.commit', ...args),
+      receipt: (...args) => this.call('adventure.receipt', ...args),
+      save: (...args) => this.call('adventure.save', ...args),
+    }
+  }
   healthCheck() { return this.call<void>('healthCheck') }
   initializeRoom(room: Room, checkpoint: BattleAuthorityCheckpointRecord, epoch = 1) { return this.call<void>('initializeRoom', room, checkpoint, epoch) }
   commitTransitionBatch(id: string, jobs: readonly PostgresAuthorityTransitionJob[]) { return this.call<number>('commitTransitionBatch', id, jobs) }
