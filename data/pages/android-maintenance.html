@@ -8,7 +8,15 @@
 header,footer{padding:8px 18px;border-bottom:2px solid #87704d;display:flex;gap:12px;align-items:center}header h1{font-size:23px;margin:0;flex:1}header span{font:12px sans-serif}main{overflow:auto;padding:14px 18px;display:grid;grid-template-columns:1fr 1fr;gap:16px;align-content:start}section{background:#bda982;color:#35291c;border:3px solid #58412a;border-radius:14px;box-shadow:3px 5px #171914;padding:14px}h2{font-size:20px;margin:0 0 8px}p{font:14px/1.5 Rvb,sans-serif;margin:8px 0}button,input{font:inherit;min-height:44px;border:2px solid #614930;border-radius:10px;padding:7px 12px}button{background:#d4bd8e;color:#35291c;cursor:pointer;box-shadow:1px 3px #463324}button:disabled{opacity:.45;cursor:default}.primary{background:#425d63;color:#eee0b6}input{width:100%;background:#e0cba2;margin:8px 0}.actions{display:flex;gap:10px;flex-wrap:wrap}footer{border-top:2px solid #87704d;border-bottom:0;min-height:52px}#message{margin:0;flex:1;overflow-wrap:anywhere}#notes{white-space:pre-wrap;max-height:110px;overflow:auto}#profileInfo{overflow-wrap:anywhere}@media(max-width:600px) and (orientation:portrait){main{grid-template-columns:1fr}}@media(max-height:500px){header h1{font-size:20px}main{padding:8px 14px}section{padding:10px}h2{font-size:18px}}
 </style></head><body>
 <header><h1>更新与资源</h1><span id="version"></span><button id="back">返回主菜单</button></header>
-<main><section><h2>游戏更新</h2><p>更新游戏功能和界面；安装时由安卓系统确认。</p><p id="updateInfo">正在读取版本…</p><p id="notes"></p><div class="actions"><button id="check" class="primary">检查更新</button><button id="download" disabled>下载更新</button><button id="install" disabled>安装更新</button></div></section>
-<section><h2>资源包</h2><p id="profileInfo">正在读取资源版本…</p><div class="actions"><button id="choose" class="primary">导入本地 ZIP</button><button id="activate" disabled>启用候选版本</button></div><input id="packUrl" type="url" placeholder="资源包 HTTPS 下载地址" aria-label="资源包下载地址"><div class="actions"><button id="fetchPack">下载资源包</button><button id="previous">恢复上一版</button><button id="base">恢复内置资源</button><button id="clean">清理未使用版本</button></div><p>导入后先校验，再由你选择启用。恢复内置资源不会清除账号和设置。</p></section></main>
-<footer><p id="message" role="status" aria-live="polite">准备就绪</p><button id="cancel">取消下载</button></footer><script src="js/android-maintenance.js"></script>
+<main><section id="updates"><h2>游戏更新</h2><p>更新游戏功能和界面；安装时由安卓系统确认。</p><p id="updateInfo">正在读取版本…</p><p id="notes"></p><div class="actions"><button id="check" class="primary">检查更新</button><button id="download" disabled>下载更新</button><button id="install" disabled>安装更新</button></div></section>
+<section id="resources"><h2>资源包</h2><p id="profileInfo">正在读取资源版本…</p><div class="actions"><button id="choose" class="primary">导入本地 ZIP</button><button id="activate" disabled>启用候选版本</button></div><input id="packUrl" type="url" placeholder="资源包 HTTPS 下载地址" aria-label="资源包下载地址"><div class="actions"><button id="fetchPack">下载资源包</button><button id="previous">恢复上一版</button><button id="base">恢复内置资源</button><button id="clean">清理未使用版本</button></div><p>导入后先校验，再由你选择启用。恢复内置资源不会清除账号和设置。</p></section></main>
+<footer><p id="message" role="status" aria-live="polite">准备就绪</p><button id="cancel">取消下载</button></footer>
+<script>
+  // Keep the native maintenance URL unchanged; its authorization is exact.
+  const requestedSection = sessionStorage.getItem('rvb_maintenance_section');
+  sessionStorage.removeItem('rvb_maintenance_section');
+  if (requestedSection === 'updates' || requestedSection === 'resources') {
+    document.getElementById(requestedSection).scrollIntoView({ block: 'start' });
+  }
+</script><script src="js/android-maintenance.js"></script>
 </body></html>

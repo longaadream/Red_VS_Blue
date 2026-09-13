@@ -1,7 +1,8 @@
 (function () {
   'use strict';
   const api = window.electronAPI;
-  if (!api?.getOfficialUpdateStatus) return;
+  const android = !api?.getOfficialUpdateStatus && window.Capacitor?.isNativePlatform?.() === true;
+  if (!api?.getOfficialUpdateStatus && !android) return;
   const host = document.querySelector('.header');
   if (!host) return;
   const style = document.createElement('style');
@@ -43,9 +44,17 @@
   button.type = 'button';
   button.title = '官方更新';
   button.setAttribute('aria-label', '官方更新');
-  button.setAttribute('aria-haspopup', 'dialog');
+  if (!android) button.setAttribute('aria-haspopup', 'dialog');
   button.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m-4-4 4 4 4-4M5 16v4h14v-4"/></svg>';
   actions.appendChild(button);
+  if (android) {
+    button.onclick = () => {
+      sessionStorage.setItem('rvb_maintenance_section', 'updates');
+      if (typeof window.loadPage === 'function') window.loadPage('android-maintenance.html');
+      else window.location.href = 'android-maintenance.html';
+    };
+    return;
+  }
   const panel = document.createElement('dialog');
   panel.className = 'official-update-panel';
   panel.setAttribute('aria-labelledby', 'official-update-title');
