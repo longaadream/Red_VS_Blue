@@ -3,6 +3,7 @@ import { appendAndroidPack,resolveAndroidProfile,type AndroidPackInput } from '@
 import { computePackageHashV1,sha256HexV1 } from '@/lib/content-pipeline/core/hash'
 import { deriveEd25519PublicKeyV1,derivePublisherKeyIdV1,signPackageHashV1 } from '@/lib/content-pipeline/core/signature'
 import type { PackManifestV1 } from '@/lib/content-pipeline/contracts'
+import { assertOfficialResourceIdentity,isNewerOfficialResource } from '@/android-client/official-resource-identity'
 
 const key=new Uint8Array(32).fill(42) // public test fixture only, never a release key
 const keyId=derivePublisherKeyIdV1(deriveEd25519PublicKeyV1(key))
@@ -15,6 +16,18 @@ function pack(kind:'snapshot'|'patch',parent?:string):AndroidPackInput{
   return{id:kind,source:{manifestBytes:encode(manifest),signatureBytes:encode(signPackageHashV1(computePackageHashV1(manifest),key)),entries:[{path:file.path,bytes}]}}
 }
 describe('Android content uses the shared v1 resolver',()=>{
+  it('binds official release metadata to the actual verified archive identity',()=>{
+    const base=pack('snapshot'),external=pack('snapshot')
+    const record=appendAndroidPack(base,[],external,[keyId])
+    const identity={publisherKeyId:keyId,version:'1.0.0',engineAbi:'rvb-engine/v1',contentAbi:'rvb-content/v1'}
+    expect(()=>assertOfficialResourceIdentity(record.profile,keyId,[keyId],identity)).not.toThrow()
+    for(const mismatch of [{version:'2.0.0'},{publisherKeyId:'0'.repeat(64)},{engineAbi:'rvb-engine/v2'},{contentAbi:'rvb-content/v2'}])expect(()=>assertOfficialResourceIdentity(record.profile,keyId,[keyId],{...identity,...mismatch})).toThrow('发布清单不匹配')
+    expect(()=>assertOfficialResourceIdentity(record.profile,keyId,[],identity)).toThrow()
+    expect(isNewerOfficialResource('1.0.0',record.profile)).toBe(false)
+    expect(isNewerOfficialResource('0.9.9',record.profile)).toBe(false)
+    expect(isNewerOfficialResource('1.0.1',record.profile)).toBe(true)
+    expect(()=>isNewerOfficialResource('2.0.9007199254740992',record.profile)).toThrow()
+  })
   it('imports signed snapshots and preserves authority identity for a raster patch',()=>{
     const base=pack('snapshot'), initial=resolveAndroidProfile(base,[],[])
     const incoming=pack('patch',initial.profile.resolvedProfileHash)

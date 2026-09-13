@@ -6,10 +6,11 @@ import { ClientBinaryUpdates, type BinaryUpdater } from '../../electron-client/c
 import { UpdateAdmission } from '../../lib/server/colyseus/update-admission'
 import { resolvedResourceVersion } from '../../electron-client/resource-update-identity'
 import { assertOfficialUpdateIpcAllowed } from '../../electron-client/official-update-ipc'
+import { COS_UPDATE_ROOT, binaryFeed, parseUpdateSource, readUpdateSettings, resourceMirrorUrl, type UpdateSource } from '../../electron-client/update-source'
 
 const sha = (b: Uint8Array) => createHash('sha256').update(b).digest('hex')
 const H = 'a'.repeat(64), P = 'b'.repeat(64), K = 'c'.repeat(64)
-function fixture(options: { patch?: boolean; canApply?: boolean; version?: string } = {}) {
+function fixture(options: { patch?: boolean; canApply?: boolean; version?: string; source?: UpdateSource } = {}) {
   const full = Buffer.from('signed full archive'), patch = Buffer.from('signed patch archive')
   const index: ResourceIndex = { schema: 'rvb-content-release/v1', channel: 'test', version: options.version || '0.0.123', contentHash: H, archive: 'content.rvbpack', archiveSha256: sha(full), identity: { publisherKeyId: K, engineAbi: 'engine/v1', contentAbi: 'content/v1' }, ...(options.patch ? { patch: { archive: 'content-patch.rvbpack', sha256: sha(patch), parentProfileHash: P, resolvedProfileHash: H } } : {}) }
   const state: StableResource = { kind: 'bundled-base', resolvedProfileHash: P, version: '0.1.0', compatibility: { engineAbi: 'engine/v1', contentAbi: 'content/v1' } }
@@ -21,6 +22,7 @@ function fixture(options: { patch?: boolean; canApply?: boolean; version?: strin
   const release = () => ({ tag_name: 'content-test-' + H, draft: false, published_at: '2026-09-10', assets: Object.entries(files()).map(([name, data]) => ({ name, size: data.length, digest: 'sha256:' + sha(data), state: 'uploaded', browser_download_url: urlOverride || 'https://github.com/longaadream/Red_VS_Blue/releases/download/content-test-' + H + '/' + name })) })
   const fetcher = vi.fn(async (url: string) => {
     reads.push(url)
+    if (url === COS_UPDATE_ROOT + '/resource/latest.json') return new Response(JSON.stringify([{ ...release(), rvb_version: index.version }]))
     if (url.includes('/releases?')) return new Response(JSON.stringify([{ tag_name: 'v99.0.0', draft: false, published_at: '2026-09-11', assets: [{ name: 'latest.yml' }] }, release()]))
     const name = url.split('/').pop()! as keyof ReturnType<typeof files>
     return new Response(corrupt === name ? Buffer.from('corrupt') : files()[name])
@@ -32,7 +34,7 @@ function fixture(options: { patch?: boolean; canApply?: boolean; version?: strin
     return H
   })
   const applied = vi.fn()
-  const updater = new OfficialResourceUpdates(fetcher, '0.1.0', [K], { stable: async () => ({ ...state }), canApply: async () => allowed, apply, applied })
+  const updater = new OfficialResourceUpdates(fetcher, '0.1.0', [K], { stable: async () => ({ ...state }), canApply: async () => allowed, apply, applied }, options.source)
   return { updater, state, index, reads, fetcher, apply, applied, full, patch, allow: () => { allowed = true }, corrupt: (name: string) => { corrupt = name }, badUrl: (url: string) => { urlOverride = url } }
 }
 
@@ -168,5 +170,65 @@ it('prepares binary-update networking before discovery and allows retry after se
   await client.check()
   expect(prepare).toHaveBeenCalledTimes(2)
   expect(updater.checkForUpdates).toHaveBeenCalledOnce()
+  expect(client.isReady()).toBe(true)
+})
+
+it('migrates existing preferences to GitHub and never accepts an arbitrary source URL', () => {
+  expect(readUpdateSettings({ automatic: false })).toEqual({ automatic: false, source: 'github' })
+  expect(readUpdateSettings({ automatic: true, source: 'cos' }).source).toBe('cos')
+  expect(readUpdateSettings({ source: 'https://evil.test' }).source).toBe('github')
+  expect(() => parseUpdateSource('https://evil.test')).toThrow()
+  expect(() => resourceMirrorUrl('../evil', 'content.rvbpack')).toThrow()
+  expect(binaryFeed('cos')).toMatchObject({ provider: 'generic', useMultipleRangeRequest: false })
+})
+it('downloads COS resources without GitHub requests and still checks asset hashes', async () => {
+  const f = fixture({ source: 'cos' })
+  await f.updater.check()
+  expect(f.apply).toHaveBeenCalledOnce()
+  expect(f.reads.every(url => url.startsWith(COS_UPDATE_ROOT + '/resource/'))).toBe(true)
+  const broken = fixture({ source: 'cos' }); broken.corrupt('content.rvbpack')
+  expect((await broken.updater.check()).phase).toBe('error')
+  expect(broken.apply).not.toHaveBeenCalled()
+})
+it('rejects COS metadata that attempts to change the official asset identity or redirect off-source', async () => {
+  const f = fixture({ source: 'cos' }); f.badUrl('https://evil.test/content.rvbpack')
+  expect((await f.updater.check()).phase).toBe('error')
+  expect(f.apply).not.toHaveBeenCalled()
+  const g = fixture({ source: 'cos' })
+  g.fetcher.mockResolvedValueOnce(new Response(null, { status: 302, headers: { location: 'https://evil.test/feed' } }))
+  expect((await g.updater.check()).phase).toBe('error')
+  expect(g.reads).toHaveLength(0)
+})
+it('reports missing COS metadata as an error rather than claiming latest', async () => {
+  const f = fixture({ source: 'cos' })
+  f.fetcher.mockResolvedValueOnce(new Response('not found', { status: 404 }))
+  expect((await f.updater.check()).phase).toBe('error')
+  const g = fixture({ source: 'cos' })
+  g.fetcher.mockResolvedValueOnce(new Response('[]'))
+  expect((await g.updater.check()).phase).toBe('error')
+})
+it('blocks source changes during resource work and discards pending bytes when switching idle', async () => {
+  const f = fixture({ canApply: false })
+  const work = f.updater.check()
+  expect(() => f.updater.setSource('cos')).toThrow()
+  await work
+  f.updater.setSource('cos'); f.allow(); await f.updater.check()
+  expect(f.reads).toContain(COS_UPDATE_ROOT + '/resource/0.0.123/content.rvbpack')
+  expect(f.apply).toHaveBeenCalledOnce()
+  expect(f.updater.isBusy()).toBe(false)
+})
+it('switches binary providers only while idle and preserves a downloaded installer', async () => {
+  const { updater } = binaryFixture()
+  const setFeedURL = vi.fn()
+  const client = new ClientBinaryUpdates(Object.assign(updater, { setFeedURL }), vi.fn())
+  client.setSource('cos')
+  expect(setFeedURL).toHaveBeenLastCalledWith(binaryFeed('cos'))
+  client.setSource('github')
+  expect(setFeedURL).toHaveBeenLastCalledWith(binaryFeed('github'))
+  const work = client.check()
+  expect(() => client.setSource('cos')).toThrow()
+  await work
+  expect(client.isBusy()).toBe(false)
+  expect(() => client.setSource('cos')).toThrow()
   expect(client.isReady()).toBe(true)
 })

@@ -23,6 +23,8 @@
     .official-update-section p { min-height:24px; }
     .official-update-panel label { display:flex; align-items:center; gap:8px; }
     .official-update-panel input { accent-color:#577059; }
+    .official-update-panel select { min-height:36px; padding:6px; background:#f8edda; color:#382c23; border:1px solid #877150; border-radius:6px; font:inherit; }
+    .official-update-panel select:focus-visible { outline:2px solid #386d85; outline-offset:3px; }
     .official-update-panel .official-update-note { margin-top:8px; font-size:12px; color:#70604b; }
     .official-update-panel [data-error] { color:#9b342d; margin-top:8px; }
     .official-update-footer { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:8px; margin-top:18px; }
@@ -60,12 +62,21 @@
   panel.setAttribute('aria-labelledby', 'official-update-title');
   panel.innerHTML = '<h2 id="official-update-title">官方更新</h2><p data-current></p><section class="official-update-section"><h3>资源包 · 测试频道</h3><p data-resource role="status"></p></section><section class="official-update-section"><h3>客户端 · 稳定频道</h3><p data-client role="status"></p></section><label><input type="checkbox" data-automatic> 自动检查并下载更新</label><p class="official-update-note">资源在主菜单应用；客户端需要你确认重启安装。对局中继续使用当前版本。</p><p data-error role="alert"></p><div class="official-update-footer"><button type="button" data-check>立即检查</button><button type="button" data-install hidden>重启并安装</button><button type="button" data-close>关闭</button></div>';
   document.body.appendChild(panel);
+  const sourceLabel = document.createElement('label');
+  sourceLabel.innerHTML = '下载源 <select data-source aria-label="更新下载源"><option value="github">GitHub 官方源</option><option value="cos">COS 香港源</option></select>';
+  panel.insertBefore(sourceLabel, panel.querySelector('.official-update-section'));
+  const sourceNote = document.createElement('p');
+  sourceNote.className = 'official-update-note';
+  sourceNote.textContent = '客户端和资源包共用所选源。更新中或客户端已下载时暂不能切换；下载失败可切换后重试。';
+  sourceLabel.after(sourceNote);
   const find = selector => panel.querySelector(selector);
   function render(status) {
     find('[data-current]').textContent = '当前客户端 ' + status.clientVersion;
     find('[data-resource]').textContent = status.resource.message + (status.resource.version ? ' · ' + status.resource.version : '');
     find('[data-client]').textContent = status.client.message + (status.client.version ? ' · ' + status.client.version : '') + (status.client.percent !== undefined ? ' · ' + status.client.percent + '%' : '');
     find('[data-automatic]').checked = status.automatic;
+    find('[data-source]').value = status.source || 'github';
+    find('[data-source]').disabled = Boolean(status.sourceLocked);
     find('[data-install]').hidden = status.client.phase !== 'downloaded';
     const label = status.client.phase === 'downloaded' ? '更新已就绪' : status.resource.phase === 'applying' ? '正在更新资源…' : '官方更新';
     button.title = label;
@@ -85,6 +96,10 @@
   });
   find('[data-install]').onclick = () => action(() => api.installClientUpdate());
   find('[data-automatic]').onchange = event => action(() => api.setAutomaticUpdates(event.target.checked));
+  find('[data-source]').onchange = event => action(async () => {
+    try { await api.setOfficialUpdateSource(event.target.value); }
+    finally { render(await api.getOfficialUpdateStatus()); }
+  });
   const unsubscribe = api.onOfficialUpdateStatus(render);
   window.addEventListener('pagehide', unsubscribe, { once: true });
   void action(() => Promise.resolve());

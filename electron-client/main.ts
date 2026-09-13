@@ -19,6 +19,7 @@ import { ClientBinaryUpdates } from './client-binary-updates'
 import { installedResourceVersion, resolvedResourceVersion } from './resource-update-identity'
 import { officialUpdateFetch, prepareOfficialUpdateNetwork } from './official-update-fetch'
 import { assertOfficialUpdateIpcAllowed } from './official-update-ipc'
+import { parseUpdateSource, readUpdateSettings, type UpdateSource } from './update-source'
 import {
   LocalAuthorityRecoveryBudget,
   LOCAL_GAME_OPEN_CANCELLED,
@@ -60,6 +61,7 @@ let allowAppExit = false
 let appExitPromise: Promise<void> | null = null
 let officialUpdateApplying = false
 let automaticUpdates = true
+let officialUpdateSource: UpdateSource = 'github'
 let resourceUpdates: OfficialResourceUpdates | null = null
 let binaryUpdates: ClientBinaryUpdates | null = null
 const updateAdmissionToken = randomBytes(24).toString('hex')
@@ -2050,7 +2052,7 @@ function openAdminWindow(): void {
 }
 
 function officialUpdateStatus() {
-  return { automatic: automaticUpdates, clientVersion: app.getVersion(), resource: resourceUpdates?.status ?? { phase: 'idle', message: '正在准备本机服务' }, client: binaryUpdates?.status ?? { phase: 'idle', message: '正在准备更新服务' } }
+  return { automatic: automaticUpdates, source: officialUpdateSource, sourceLocked: Boolean(officialUpdateApplying || resourceUpdates?.isBusy() || binaryUpdates?.isBusy() || binaryUpdates?.isReady()), clientVersion: app.getVersion(), resource: resourceUpdates?.status ?? { phase: 'idle', message: '正在准备本机服务' }, client: binaryUpdates?.status ?? { phase: 'idle', message: '正在准备更新服务' } }
 }
 
 function notifyOfficialUpdates() {
@@ -2089,10 +2091,10 @@ function updateAuthorityAdmission(action: 'status' | 'acquire' | 'release'): Pro
 
 function setupOfficialUpdates(): void {
   const settingsFile = path.join(getUserData(), 'official-updates.json')
-  try { automaticUpdates = JSON.parse(fs.readFileSync(settingsFile, 'utf8')).automatic !== false } catch { /* First launch uses automatic checks. */ }
+  try { const settings = readUpdateSettings(JSON.parse(fs.readFileSync(settingsFile, 'utf8'))); automaticUpdates = settings.automatic; officialUpdateSource = settings.source } catch { /* First launch uses automatic checks and GitHub. */ }
   const saveSettings = () => {
     fs.mkdirSync(getUserData(), { recursive: true })
-    fs.writeFileSync(settingsFile + '.tmp', JSON.stringify({ schema: 'rvb-official-updates/v1', automatic: automaticUpdates }))
+    fs.writeFileSync(settingsFile + '.tmp', JSON.stringify({ schema: 'rvb-official-updates/v1', automatic: automaticUpdates, source: officialUpdateSource }))
     fs.renameSync(settingsFile + '.tmp', settingsFile)
   }
   let publishers: string[] = []
@@ -2130,7 +2132,7 @@ function setupOfficialUpdates(): void {
       try { fs.writeFileSync(path.join(getUserData(), 'official-resource-receipt.json'), JSON.stringify({ ...receipt, appliedAt: new Date().toISOString() })) } catch (error) { console.warn('[updates] receipt write failed:', error) }
     },
     changed: notifyOfficialUpdates,
-  })
+  }, officialUpdateSource)
   try {
     // Development/portable builds must never run an installer against themselves.
     const executable = app.getPath('exe')
@@ -2139,6 +2141,7 @@ function setupOfficialUpdates(): void {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const updater = supported ? new (require('./update-runtime.cjs').NsisUpdater)() : null
     binaryUpdates = new ClientBinaryUpdates(updater, notifyOfficialUpdates, prepareOfficialUpdateNetwork)
+    binaryUpdates.setSource(officialUpdateSource)
   } catch (error) {
     console.error('[updates] binary updater initialization failed:', error)
     binaryUpdates = new ClientBinaryUpdates(null, notifyOfficialUpdates)
@@ -2150,6 +2153,16 @@ function setupOfficialUpdates(): void {
   }
   handleTrusted('official-update-status', ['game'], () => officialUpdateStatus())
   handleTrusted('official-update-check', ['game'], check)
+  handleTrusted('official-update-source', ['game'], (_event, value) => {
+    const source = parseUpdateSource(value)
+    if (officialUpdateStatus().sourceLocked || appExitPromise) throw new Error('更新正在进行或客户端已下载，请完成当前更新后再切换源')
+    const previous = officialUpdateSource
+    officialUpdateSource = source
+    try { saveSettings(); binaryUpdates!.setSource(source); resourceUpdates!.setSource(source) }
+    catch (error) { officialUpdateSource = previous; saveSettings(); throw error }
+    notifyOfficialUpdates()
+    return officialUpdateStatus()
+  })
   handleTrusted('official-update-automatic', ['game'], (_event, enabled) => {
     if (typeof enabled !== 'boolean') throw new Error('自动更新设置无效')
     automaticUpdates = enabled; saveSettings(); notifyOfficialUpdates(); return officialUpdateStatus()

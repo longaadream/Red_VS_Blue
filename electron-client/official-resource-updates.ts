@@ -1,10 +1,11 @@
 import { createHash } from 'node:crypto'
+import { COS_UPDATE_ROOT, resourceMirrorUrl, type UpdateSource } from './update-source'
 
 export const OFFICIAL_REPOSITORY = 'longaadream/Red_VS_Blue'
 const HASH = /^[a-f0-9]{64}$/
 const MAX_PACK = 32 * 1024 * 1024
 type Asset = { name: string; size: number; digest: string; state: string; browser_download_url: string }
-type Release = { tag_name: string; draft: boolean; assets: Asset[]; published_at: string }
+type Release = { tag_name: string; draft: boolean; assets: Asset[]; published_at: string; rvb_version?: string }
 type Identity = { engineAbi: string; contentAbi: string; publisherKeyId: string }
 export type ResourceIndex = { schema: string; channel: string; version: string; contentHash: string; archive: string; archiveSha256: string; identity: Identity; minimumClientVersion?: string; patch?: { archive: string; sha256: string; parentProfileHash: string; resolvedProfileHash: string } }
 export type ResourceUpdateStatus = { phase: 'idle' | 'checking' | 'downloading' | 'waiting' | 'applying' | 'current' | 'error'; message: string; version?: string; checkedAt?: string }
@@ -40,7 +41,14 @@ export class OfficialResourceUpdates {
   status: ResourceUpdateStatus = { phase: 'idle', message: '启动后检查官方测试资源更新' }
   private running?: Promise<ResourceUpdateStatus>
   private pending?: { release: Release; index: ResourceIndex; bytes: Buffer; parent: string; patch: boolean }
-  constructor(private fetcher: Fetcher, private clientVersion: string, private publishers: readonly string[], private hooks: ResourceUpdateHooks) {}
+  constructor(private fetcher: Fetcher, private clientVersion: string, private publishers: readonly string[], private hooks: ResourceUpdateHooks, private source: UpdateSource = 'github') {}
+  isBusy() { return Boolean(this.running) || ['checking', 'downloading', 'applying'].includes(this.status.phase) }
+  setSource(source: UpdateSource) {
+    if (this.running) throw new Error('正在更新资源，请稍后切换源')
+    this.source = source
+    this.pending = undefined
+    this.set('idle', '更新源已切换，请检查更新')
+  }
   private set(phase: ResourceUpdateStatus['phase'], message: string, version?: string) {
     this.status = { phase, message, checkedAt: new Date().toISOString(), ...(version ? { version } : {}) }
     this.hooks.changed?.(this.status)
@@ -73,16 +81,22 @@ export class OfficialResourceUpdates {
     const asset = matching[0]
     if (matching.length !== 1 || asset.state !== 'uploaded' || !Number.isSafeInteger(asset.size) || asset.size <= 0 || asset.size > max || !/^sha256:[a-f0-9]{64}$/.test(asset.digest) || !isAssetUrl(asset.browser_download_url, release.tag_name, name)) throw new Error('官方资源文件缺失或身份无效')
     if (hash && asset.digest !== `sha256:${hash}`) throw new Error('清单与官方文件摘要不一致')
-    const bytes = await this.read(asset.browser_download_url, max, true)
+    const url = this.source === 'cos' ? resourceMirrorUrl(release.rvb_version || '', name) : asset.browser_download_url
+    const bytes = await this.read(url, max, this.source === 'github')
     if (bytes.length !== asset.size || `sha256:${sha(bytes)}` !== asset.digest) throw new Error('更新文件完整性校验失败，已保留旧版本')
     return bytes
   }
   async discover(): Promise<{ release: Release; index: ResourceIndex } | null> {
     const releases: Release[] = []
     for (let page = 1; page <= 3; page++) {
-      const values = JSON.parse((await this.read(`https://api.github.com/repos/${OFFICIAL_REPOSITORY}/releases?per_page=100&page=${page}`, 2 * 1024 * 1024)).toString()) as Release[]
+      const url = this.source === 'cos' ? `${COS_UPDATE_ROOT}/resource/latest.json` : `https://api.github.com/repos/${OFFICIAL_REPOSITORY}/releases?per_page=100&page=${page}`
+      const values = JSON.parse((await this.read(url, 2 * 1024 * 1024)).toString()) as Release[]
       if (!Array.isArray(values)) throw new Error('官方版本列表格式无效')
       releases.push(...values.filter(r => r.draft === false && /^content-test-[a-f0-9]{64}$/.test(r.tag_name) && Array.isArray(r.assets)))
+      if (this.source === 'cos') {
+        if (!releases.length || releases.length > 100) throw new Error('COS 资源版本清单为空或无效')
+        break
+      }
       if (values.length < 100) break
       if (page === 3) throw new Error('官方版本列表过长，未能确认最新资源')
     }
@@ -95,6 +109,7 @@ export class OfficialResourceUpdates {
       const index = JSON.parse((await this.asset(release, 'content-update.json', undefined, 64 * 1024)).toString()) as ResourceIndex
       if (index.schema !== 'rvb-content-release/v1' || index.channel !== 'test' || !HASH.test(index.contentHash) || release.tag_name !== `content-test-${index.contentHash}` || index.archive !== 'content.rvbpack' || !HASH.test(index.archiveSha256) || !this.publishers.includes(index.identity?.publisherKeyId)) throw new Error('官方资源清单或签名发行者不受信任')
       compareVersions(index.version, index.version)
+      if (this.source === 'cos' && index.version !== release.rvb_version) throw new Error('COS 资源目录与清单版本不一致')
       if (index.minimumClientVersion) compareVersions(index.minimumClientVersion, index.minimumClientVersion)
       if (index.patch && (index.patch.archive !== 'content-patch.rvbpack' || !HASH.test(index.patch.sha256) || !HASH.test(index.patch.parentProfileHash) || !HASH.test(index.patch.resolvedProfileHash))) throw new Error('资源补丁清单无效')
       if (!latest || compareVersions(index.version, latest.index.version) > 0) latest = { release, index }
@@ -105,7 +120,7 @@ export class OfficialResourceUpdates {
   }
   check(): Promise<ResourceUpdateStatus> {
     if (this.running) return this.running
-    this.running = this.run().catch(error => { this.set('error', error instanceof Error ? error.message : String(error)); return this.status }).finally(() => { this.running = undefined })
+    this.running = this.run().catch(error => { this.set('error', error instanceof Error ? error.message : String(error)); return this.status }).finally(() => { this.running = undefined; this.hooks.changed?.(this.status) })
     return this.running
   }
   applyPending(): Promise<ResourceUpdateStatus> {

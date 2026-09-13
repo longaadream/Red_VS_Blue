@@ -4,6 +4,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getOfficialUpdateStatus: () => ipcRenderer.invoke('official-update-status'),
   checkOfficialUpdates: () => ipcRenderer.invoke('official-update-check'),
   setAutomaticUpdates: (enabled: boolean) => ipcRenderer.invoke('official-update-automatic', enabled),
+  setOfficialUpdateSource: (source: string) => ipcRenderer.invoke('official-update-source', source),
   installClientUpdate: () => ipcRenderer.invoke('official-update-install'),
   onOfficialUpdateStatus: (callback: (status: unknown) => void) => {
     const listener = (_event: unknown, status: unknown) => callback(status)
