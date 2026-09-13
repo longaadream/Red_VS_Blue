@@ -64,7 +64,11 @@
     "smoke:official:load": "node scripts/run-official-load-smoke.mjs",
     "smoke:official:windows": "npm run build:official && vitest run tests/colyseus/official-windows.test.ts --maxWorkers=1",
     "package:official": "node scripts/package-official-candidate.mjs",
-    "build:client-updater": "npm ci --prefix electron-client/update-runtime --ignore-scripts --no-audit --no-fund && node scripts/build-client-updater.mjs"
+    "build:client-updater": "npm ci --prefix electron-client/update-runtime --ignore-scripts --no-audit --no-fund && node scripts/build-client-updater.mjs",
+    "release:clients:build": "node scripts/synchronized-release.mjs build",
+    "release:clients:verify": "node scripts/synchronized-release.mjs verify",
+    "release:clients:upload": "node scripts/synchronized-release.mjs upload",
+    "test:client-updates": "node --test tests/build/apk-delta.test.mjs tests/build/synchronized-release.test.mjs tests/build/android-release-artifacts.test.mjs"
   },
   "dependencies": {
     "@colyseus/schema": "5.0.25",
