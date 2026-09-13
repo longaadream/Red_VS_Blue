@@ -2526,10 +2526,12 @@ handleTrusted('start-host-broadcast', ['game'], () => {
     const myIps = getLanIpList(true)
     const port = actualGamePort
     for (const ip of myIps) {
+      const iface = interfaces.find(iface => iface.address === ip)
+      if (!iface) continue // VPN adapters can change between interface snapshots.
       const identity = getHostDiscovery(hostDiscoveryFile())
       const payload = JSON.stringify({ magic: 'RVB_DISCOVER', ...identity, name: identity.serverName, ip, port })
       const buf = Buffer.from(payload)
-      const subnet = ipv4Broadcast(ip, interfaces.find(iface => iface.address === ip)!.netmask)
+      const subnet = ipv4Broadcast(ip, iface.netmask)
       for (const target of [subnet, '255.255.255.255']) {
         try {
           const sock = dgram.createSocket('udp4')
