@@ -73,6 +73,7 @@ public class AndroidHostService extends Service {
             ProcessBuilder builder=new ProcessBuilder(new File(getApplicationInfo().nativeLibraryDir,"librvb_node.so").getAbsolutePath(),new File(installed,"host-code/server.mjs").getAbsolutePath());
             builder.directory(installed);builder.redirectErrorStream(true);
             Map<String,String> env=builder.environment();env.put("LD_LIBRARY_PATH",libraries);env.put("APP_ROOT_DIR",new File(installed,"host-base").getAbsolutePath());
+            HostDiscoveryInfo.read(this);env.put("RVB_HOST_DISCOVERY_FILE",HostDiscoveryInfo.file(this).getAbsolutePath());
             env.put("USER_DATA_DIR",session.getAbsolutePath());env.put("RVB_ANDROID_HOST_CONFIG",new File(host,"config.json").getAbsolutePath());
             env.put("NODE_EXTRA_CA_CERTS",new File(installed,"host-runtime/"+abi+"/cert.pem").getAbsolutePath());
             env.put("NODE_ENV","production");env.put("TMPDIR",getCacheDir().getAbsolutePath());

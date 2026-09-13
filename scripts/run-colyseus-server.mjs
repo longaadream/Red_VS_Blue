@@ -1,4 +1,4 @@
-import server, { journal, restoreProductRooms } from '../config/colyseus.config.ts'
+import server, { journal, restoreProductRooms, updateAdmission } from '../config/colyseus.config.ts'
 import { openHostTunnel } from '../lib/server/relay/host-tunnel.ts'
 
 const SHUTDOWN_REQUEST = 'rvb:battle-authority:shutdown'
@@ -66,6 +66,11 @@ async function shutdown(requestId) {
 }
 
 process.on('message', message => {
+  if (message?.type === 'rvb:update:control' && typeof message.token === 'string' && typeof message.requestId === 'string') {
+    if (message.action === 'release') updateAdmission.release(message.token)
+    const acquired = message.action === 'acquire' ? !shuttingDown && updateAdmission.acquire(message.token) : undefined
+    process.send?.({ type: 'rvb:update:result', requestId: message.requestId, ...updateAdmission.status(), acquired })
+  }
   if (message?.type === SHUTDOWN_REQUEST) void shutdown(message.requestId)
   if (message?.type === 'rvb:relay:control') void handleRelayControl(message)
 })

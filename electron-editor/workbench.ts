@@ -328,8 +328,14 @@ export class CreativeWorkbench {
       for (const [relative, value] of documents) {
         if (!relative.startsWith(`data/${collection}/`) || relative === manifestPath) continue
         const id = path.posix.basename(relative, '.json')
+        // AI observation metadata is not a rule definition; it has its own document shape.
+        if (relative === 'data/rules/ai-semantics.json') {
+          if (!record(value) || value.schemaVersion !== 1 || value.observationScope !== 'public-state' || !record(value.profiles)) add(relative, 'AI 语义元数据格式不正确')
+          continue
+        }
         if (!record(value) || value.id !== id) { add(relative, '内容 ID 必须与文件名一致'); continue }
-        if (!ids.includes(id)) add(relative, '内容未登记到 manifest，游戏可能无法发现它')
+        // battle-setup explicitly loads this system rule by ID outside the discovery manifest.
+        if (!ids.includes(id) && relative !== 'data/rules/rule-lucky-coin-gamestart.json') add(relative, '内容未登记到 manifest，游戏可能无法发现它')
         for (const field of ['skills', 'rules', 'playerRules', 'relatedCards']) {
           if (value[field] === undefined) continue
           if (!Array.isArray(value[field])) { add(relative, `${field} 必须是引用数组`); continue }
@@ -377,7 +383,7 @@ export class CreativeWorkbench {
     const state = this.inspect(id)
     const checkCommand = this.launcher.length ? [...this.launcher, '--check-content-task', this.root, id] : null
     const report = { schema: 'rvb-ai-handoff/v1', ...state, task: { ...state.task, baseline: undefined }, checkCommand }
-    const body = `# ${state.task.title}\n\n工作内容目录：${this.root}\n任务编号：${id}\n\n## 人的需求\n${state.task.brief}\n\n## 验收条件\n${state.task.criteria}\n\n## 协作规则\n修改 data/ 与 images/ 中的内容，保留未知字段和 manifest 引用一致性。不要修改 .workbench 内的历史、报告、快照或发布记录。需要新增引擎接口时先报告能力缺口。不要使用 eval 或可信开关绕过技能限制。\n\n在编辑器点击“检查内容”生成最新结构/引用报告，点击“接收 AI 改动”更新差异。AI_CONTEXT.json 包含实际变化、校验和人的反馈。结构检查不代表技能执行通过；当前实战试验入口尚未接通。不要声称没有运行过的测试通过。\n\n当前内容版本：${state.contentHash}\n修改文件数：${state.changes.length}\n`
+    const body = `# ${state.task.title}\n\n工作内容目录：${this.root}\n任务编号：${id}\n\n## 人的需求\n${state.task.brief}\n\n## 验收条件\n${state.task.criteria}\n\n## 协作规则\n修改 data/ 与 images/ 中的内容，保留未知字段和 manifest 引用一致性。不要修改 .workbench 内的历史、报告、快照或发布记录。需要新增引擎接口时先报告能力缺口。不要使用 eval 或可信开关绕过技能限制。\n\n在编辑器点击“检查内容”生成最新结构/引用报告，点击“接收 AI 改动”更新差异。AI_CONTEXT.json 包含实际变化、校验和人的反馈。结构检查不代表技能执行通过；用户可在编辑器中打开已接受版本的训练营配置场景试玩，实战结果需单独记录。不要声称没有运行过的测试通过。\n\n当前内容版本：${state.contentHash}\n修改文件数：${state.changes.length}\n`
     const instructions = body + '\n## 纯内容任务边界\n本任务无需建立 Git 分支、worktree、PR 或重建客户端。仅修改这个独立内容工作区的 data/ JSON 和 images/ 图片。禁止修改游戏及编辑器主进程、preload、IPC、引擎源代码、依赖、构建脚本、密钥和发布记录。不得自行接受或发布内容。需要新的引擎能力时，记录具体缺口并停止相关内容实现。编辑器会自动显示变化，由人选择接受或撤销，再单独决定发布。此说明不等于操作系统沙箱；外部 AI 工具应只获得内容目录的写权限。\n' + (checkCommand ? `\n## AI 自检入口\n使用以下参数数组启动子进程（不要拼接或 eval shell 字符串），退出码 0 表示结构/引用检查无错误，1 表示检查失败。命令会更新本任务 AI_CONTEXT.json。\n\n\`\`\`json\n${JSON.stringify(checkCommand, null, 2)}\n\`\`\`\n` : '')
     for (const [name, value] of [['AI_TASK.md', instructions], ['AI_CONTEXT.json', JSON.stringify(report, null, 2) + '\n']]) {
       const relative = `${this.id(id)}/${name}`

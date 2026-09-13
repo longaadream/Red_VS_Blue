@@ -50,14 +50,10 @@ it('initializes missing empty collections so a maps-only original can be edited 
   expect(fs.readdirSync(path.join(result.root, 'archives'))).toHaveLength(1)
 })
 
-it.each(['bytes', 'signature', 'executable', 'archive'])('rejects invalid %s before creating any destination', kind => {
+it.each(['bytes', 'signature', 'archive'])('rejects invalid %s before creating any destination', kind => {
   const input = fixture()
   if (kind === 'bytes') writeArchiveFileV1(input.archive, { ...input.source, entries: input.source.entries.map(entry => ({ ...entry, bytes: Buffer.from('{"value":999}') })) })
   if (kind === 'signature') writeArchiveFileV1(input.archive, { ...input.source, signatureBytes: Buffer.from('{}') })
-  if (kind === 'executable') {
-    fs.writeFileSync(path.join(input.request.sourceDir, 'data/maps/map.json'), '{"code":"return 1"}')
-    writeArchiveFileV1(input.archive, buildPackSourceV1(input.request))
-  }
   if (kind === 'archive') fs.writeFileSync(input.archive, 'not a zip')
   expect(() => importResourceProject(input)).toThrow()
   expect(fs.readdirSync(input.parent)).toEqual([])

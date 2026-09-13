@@ -97,17 +97,20 @@
   }
 
   function normalizePiece(piece, context) {
+    const display = context.displayFor ? context.displayFor(piece.instanceId) : {}
     const rawPieces = context.rawPieces || []
     const template = (context.pieceTemplates || {})[piece.templateId] || {}
     const master = piece.masterPieceId && rawPieces.find(function (candidate) {
       return candidate.instanceId === piece.masterPieceId && candidate.currentHp > 0
     })
     const currentHealth = Math.max(0, firstNumber([
+      display.currentHp,
       master && master.currentHp,
       piece.displayCurrentHp,
       piece.currentHp,
     ], 0))
     const maxHealth = Math.max(1, firstNumber([
+      display.maxHp,
       master && (master.maxHp || (master.stats && master.stats.maxHp)),
       piece.displayMaxHp,
       piece.maxHp,
@@ -117,14 +120,14 @@
     const ownerPlayerId = String(piece.ownerPlayerId || '')
     const statuses = normalizeStatuses(
       piece,
-      master && piece.displayStatusTags !== undefined ? master.statusTags :
+      display.statusTags !== undefined ? display.statusTags : master && piece.displayStatusTags !== undefined ? master.statusTags :
         piece.displayStatusTags !== undefined ? piece.displayStatusTags : piece.statusTags,
     )
     return {
       id: String(piece.instanceId || piece.id || ''),
-      templateId: String(piece.templateId || ''),
-      portraitId: String(template.image || piece.templateId || ''),
-      name: String(piece.name || template.name || piece.templateId || piece.instanceId || '?'),
+      templateId: String(display.templateId || piece.templateId || ''),
+      portraitId: String(display.templateId ? ((context.pieceTemplates || {})[display.templateId] || {}).image || display.templateId : template.image || piece.templateId || ''),
+      name: String(display.name || piece.name || template.name || piece.templateId || piece.instanceId || '?'),
       ownerPlayerId: ownerPlayerId,
       faction: piece.faction === 'blue' ? 'blue' : 'red',
       x: piece.x == null ? null : numberOr(piece.x, 0),
@@ -134,6 +137,8 @@
       alive: piece.currentHp > 0,
       statuses: statuses,
       statusSummary: statuses,
+      displayStats: {attack: display.attack, defense: display.defense, moveRange: display.moveRange},
+      displaySkills: display.skills,
     }
   }
 
@@ -180,6 +185,7 @@
       id: String(effect.id || effect.instanceId || effect.effectId || ((effect.tileType || effect.type || 'effect') + ':' + numberOr(effect.x, 0) + ',' + numberOr(effect.y, 0) + ':' + (effect.sourceId || ''))),
       type: String(effect.tileType || effect.type || 'effect'),
       icon: String(effect.icon || ''),
+      label: String(effect.label || ''),
       x: numberOr(effect.x, 0),
       y: numberOr(effect.y, 0),
     }
@@ -318,9 +324,12 @@
     const turn = snapshot.turn || {}
     const viewerId = String(input.viewerId || '')
     const rawPieces = snapshot.pieces || []
+    const presentationApi = root.BattleSkillPresentation
+    const presentation = presentationApi ? presentationApi.read(snapshot) : {}
     const pieceContext = {
       rawPieces: rawPieces,
       pieceTemplates: input.pieceTemplates || {},
+      displayFor: presentationApi ? function (id) { return presentationApi.display(snapshot,id) } : null,
     }
     const pieces = rawPieces.map(function (piece) { return normalizePiece(piece, pieceContext) })
     const turnTimer = (snapshot.extensions && snapshot.extensions.turnTimer) || {}
@@ -347,7 +356,11 @@
         tiles: (map.tiles || []).map(normalizeTile),
       },
       pieces: pieces,
-      effects: ((snapshot.extensions && snapshot.extensions.tileEffects) || []).map(normalizeEffect),
+      effects: ((snapshot.extensions && snapshot.extensions.tileEffects) || []).concat((presentation.markers || []).map(function (marker) { return Object.assign({type:({'⚡':'flying-raijin-anchor','✦':'blizzard'})[marker.icon] || 'skill-marker'},marker) })).map(normalizeEffect),
+      skillMarkers: presentation.markers || [],
+      skillIndicators: presentation.indicators || [],
+      skillCues: presentation.cues || [],
+      skillPresentationScope: String(input.presentationScope || 'local') + ':' + viewerId,
       skillSummariesById: normalizeSkillSummaries(input.skillsById || snapshot.skillsById),
       presentationEvents: normalizePresentationEvents(input.presentationEvents, input.pieceTemplates),
       players: players,
@@ -365,6 +378,7 @@
         mode: String(input.interactionMode || 'inspect'),
       },
       interaction: {
+        selectedTargetCells: normalizeCells(interaction.selectedTargetCells),
         pendingPieceId: interaction.pendingPieceId || null,
         pendingCommandId: interaction.pendingCommandId || null,
         selectedTargetPieceIds: Array.isArray(interaction.selectedTargetPieceIds)

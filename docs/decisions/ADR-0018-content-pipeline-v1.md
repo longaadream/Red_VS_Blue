@@ -1,6 +1,7 @@
 # ADR-0018：Content Pipeline v1 的开放包、Resolved Profile 与声明式 PVE 合同
 
 - 状态：Accepted（项目负责人于 2026-08-27 明确接受）
+- 局部更新（2026-09-10）：外部脚本包禁令由 [ADR-0033](ADR-0033-trusted-script-resource-publication.md) 对受信发行者发布及编辑器原包作限定替代，其余合同继续有效。
 - 接受记录：项目负责人于 2026-08-27 在 RED-113 人工验收中明确回复“接受”
 - 日期：2026-08-27
 - 任务：RED-111、RED-113

@@ -1,0 +1,13 @@
+{
+  "ok": true,
+  "nodeCount": 11,
+  "checks": [
+    "real editor node creation and wiring",
+    "option branch and multi-choice contract",
+    "display binding/indicator/marker/cue/remove nodes",
+    "Chinese audience settings",
+    "atomic save and reopen",
+    "compiled artifact validation"
+  ],
+  "screenshot": "skill-presentation-editor.png"
+}

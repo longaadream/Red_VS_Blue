@@ -4,6 +4,7 @@ import { createHash, randomUUID } from 'node:crypto'
 import { CreativeWorkbench } from './workbench'
 import { normalizeEditorContentOperationRequestV1, resolveEditorWorkspacePathV1 } from './content-pipeline-ipc'
 import { GithubContentRelease } from './github-content-release'
+import { trustedPublicationKeys } from './publication-identity'
 
 type Result = { ok: boolean; report?: { identity?: Record<string, unknown>; refusal?: { code: string; message?: string; path?: string } }; reportPath?: string }
 type Runner = (request: unknown) => Promise<unknown>
@@ -19,13 +20,13 @@ export class ResourceRelease {
     const result = await this.run(request) as Result
     if (!result?.ok) {
       const refusal = result?.report?.refusal
-      throw new Error(`资源包未通过检查：${refusal?.code || 'UNKNOWN'}${refusal?.path ? ' · ' + refusal.path : ''}。${refusal?.message || ''} 旧式可执行技能或不兼容内容需要先完成引擎支持，不能通过签名绕过。`)
+      throw new Error(`资源包未通过检查：${refusal?.code || 'UNKNOWN'}${refusal?.path ? ' · ' + refusal.path : ''}。${refusal?.message || ''} 请修复此项检查后重试，未上传新的资源包。`)
     }
     return result
   }
   private buildRequest(source: string, output: string, version: string, notes: string) {
     return normalizeEditorContentOperationRequestV1(this.workspace, this.appRoot, {
-      operation: 'build', taskId: 'RED-200', channel: 'local-dev', mode: 'snapshot', source, output,
+      operation: 'build', taskId: 'RED-200', channel: 'authoring', mode: 'snapshot', source, output,
       packageId: 'rvb.official-content', publisherId: 'rvb.official', displayName: 'RED vs BLUE 资源更新', version, ...(notes ? { description: notes.slice(0, 1000).replace(/[\uD800-\uDBFF]$/, '') } : {}),
     })
   }
@@ -139,7 +140,7 @@ export class ResourceRelease {
             } else operations.push({ op: 'remove', targetPath: relative, expectedHash: previous.snapshot[relative] })
           }
           const unsignedPatch = path.join(artifactDirectory, 'patch-unsigned.rvbpack'), signedPatch = path.join(artifactDirectory, 'content-patch.rvbpack')
-          await this.step({ ...build, mode: 'patch', sourceDir: patchRoot, outputArchive: unsignedPatch, parentProfileHash, operations })
+          await this.step({ ...build, mode: 'patch', sourceDir: patchRoot, outputArchive: unsignedPatch, parentProfileHash, operations, base: { kind: 'archive', archive: chainBase }, patches: chainPatches })
           await this.step({ ...build, operation: 'sign', channel: 'qa', inputArchive: unsignedPatch, outputArchive: signedPatch, keyFile, command: { name: 'sign', args: ['<automatic-patch>', '<redacted-key>'] } })
           const resolved = await this.step({ ...build, operation: 'resolve', channel: 'qa', base: { kind: 'archive', archive: chainBase }, patches: [...chainPatches, signedPatch], trustedPublisherKeyIds: trust, command: { name: 'resolve', args: ['<previous-chain>', '<automatic-patch>'] } })
           const resolvedProfileHash = resolved.report?.identity?.resolvedProfileHash
@@ -150,7 +151,7 @@ export class ResourceRelease {
           chain = { base: previousChain.base, patches: [...previousChain.patches, { contentHash: accepted.contentHash, artifactId: nonce, sha256: patch.sha256, publisherKeyId: keyId }] }
         }
       }
-      const index = Buffer.from(JSON.stringify({ schema: 'rvb-content-release/v1', channel: 'test', version, contentHash: accepted.contentHash, archive: 'content.rvbpack', archiveSha256: hash(bytes), identity: checked.report?.identity, distribution: patch ? 'snapshot-and-patch' : 'full-snapshot', ...(patch ? { patch } : {}), automaticClientDiscovery: false }, null, 2) + '\n')
+      const index = Buffer.from(JSON.stringify({ schema: 'rvb-content-release/v1', channel: 'test', version, contentHash: accepted.contentHash, archive: 'content.rvbpack', archiveSha256: hash(bytes), identity: checked.report?.identity, distribution: patch ? 'snapshot-and-patch' : 'full-snapshot', ...(patch ? { patch } : {}), automaticClientDiscovery: true }, null, 2) + '\n')
       fs.writeFileSync(path.join(artifactDirectory, 'content-update.json'), index, { flag: 'wx' })
       bundle = { contentHash: accepted.contentHash, archiveSha256: hash(bytes), indexSha256: hash(index), notes, version, artifactId: nonce, snapshot: accepted.snapshot, publisherKeyId: keyId, chain, ...(patch ? { patchSha256: patch.sha256 } : {}) }
       fs.writeFileSync(recordPath, JSON.stringify(bundle, null, 2) + '\n', { flag: 'wx' })
@@ -159,6 +160,38 @@ export class ResourceRelease {
     const archive = fs.readFileSync(path.join(directory, bundle.artifactId, 'content.rvbpack'))
     const index = fs.readFileSync(path.join(directory, bundle.artifactId, 'content-update.json'))
     if (hash(archive) !== bundle.archiveSha256 || hash(index) !== bundle.indexSha256) throw new Error('本地待发布文件发生变化，未上传')
+    // Recheck cached retries as well: a client upgrade may have revoked this signer.
+    const verified = await this.step({
+      ...this.buildRequest(accepted.source, 'archives/publish-check.rvbpack', bundle.version, bundle.notes),
+      operation: 'validate', channel: 'qa', archive: path.join(directory, bundle.artifactId, 'content.rvbpack'),
+      trustedPublisherKeyIds: [bundle.publisherKeyId], patches: [], command: { name: 'validate', args: ['<publish-check>'] },
+    })
+    const capabilities = verified.report?.identity?.capabilities
+    let chainHasScripts = false
+    if (bundle.patchSha256) {
+      if (!bundle.chain || !bundle.chain.patches.length) throw new Error('补丁来源链缺失，未上传')
+      const chainPath = (ref: ArchiveRef, filename: string) => {
+        if (!/^[a-f0-9]{64}$/.test(ref.contentHash) || !/^[a-f0-9-]{36}$/.test(ref.artifactId) || !/^[a-f0-9]{64}$/.test(ref.sha256) || !/^[a-f0-9]{64}$/.test(ref.publisherKeyId)) throw new Error('历史补丁链记录无效')
+        const file = path.join(this.privateRoot, hash(settings.repository + '\0' + ref.contentHash), ref.artifactId, filename)
+        if (hash(fs.readFileSync(file)) !== ref.sha256) throw new Error('历史补丁链文件校验失败')
+        return file
+      }
+      const chainChecked = await this.step({
+        ...this.buildRequest(accepted.source, 'archives/chain-check.rvbpack', bundle.version, bundle.notes),
+        operation: 'resolve', channel: 'qa', base: { kind: 'archive', archive: chainPath(bundle.chain.base, 'content.rvbpack') },
+        patches: bundle.chain.patches.map(ref => chainPath(ref, 'content-patch.rvbpack')),
+        trustedPublisherKeyIds: [...new Set([bundle.chain.base.publisherKeyId, ...bundle.chain.patches.map(ref => ref.publisherKeyId)])],
+        command: { name: 'resolve', args: ['<publish-chain-check>'] },
+      })
+      const chainCapabilities = chainChecked.report?.identity?.sourceCapabilities
+      chainHasScripts = Array.isArray(chainCapabilities) && chainCapabilities.includes('trusted-executable-content')
+      if (!Array.isArray(chainCapabilities)) throw new Error('打包工具缺少补丁来源能力报告，请升级编辑器；未上传')
+    }
+    if (chainHasScripts || (Array.isArray(capabilities) && capabilities.includes('trusted-executable-content'))) {
+      const trusted = trustedPublicationKeys(this.appRoot)
+      const keys = [bundle.publisherKeyId, ...(bundle.chain ? [bundle.chain.base.publisherKeyId, ...bundle.chain.patches.map(ref => ref.publisherKeyId)] : [])]
+      if (keys.some(key => !trusted.includes(key))) throw new Error('此签名身份尚未被当前客户端版本信任。请先将发行者公钥 ID 配入客户端并发布一次客户端升级，然后再发布脚本资源包；本次未上传。')
+    }
     const assets = [{ name: 'content.rvbpack', bytes: archive }, { name: 'content-update.json', bytes: index }]
     if (bundle.patchSha256) {
       const patchBytes = fs.readFileSync(path.join(directory, bundle.artifactId, 'content-patch.rvbpack'))
@@ -172,6 +205,6 @@ export class ResourceRelease {
       const temporary = previousPath + '.' + randomUUID() + '.tmp'
       fs.writeFileSync(temporary, JSON.stringify(bundle), { flag: 'wx' }); fs.renameSync(temporary, previousPath)
     }
-    return { ...result, version: bundle.version, hasPatch: !!bundle.patchSha256, automaticClientDiscovery: false }
+    return { ...result, version: bundle.version, hasPatch: !!bundle.patchSha256, automaticClientDiscovery: true }
   }
 }
