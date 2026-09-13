@@ -62,6 +62,9 @@ let automaticUpdates = true
 let resourceUpdates: OfficialResourceUpdates | null = null
 let binaryUpdates: ClientBinaryUpdates | null = null
 const updateAdmissionToken = randomBytes(24).toString('hex')
+let startupInProgress = true
+let startupCancelled = false
+let startupCompletedStages = 0
 
 type GameProfileIdentity = Readonly<{
   schemaVersion: 'rvb-game-profile-identity/v1'
@@ -345,6 +348,7 @@ function handleTrusted(
   ipcMain.handle(channel, (event, ...args) => {
     assertTrustedIpcSender(event, channel, trustedTargets(roles))
     assertOfficialUpdateIpcAllowed(channel, officialUpdateApplying)
+    if (startupCancelled) throw new Error(LOCAL_GAME_OPEN_CANCELLED)
     return listener(event, ...args)
   })
 }
@@ -495,6 +499,22 @@ function requestApplicationExit(): void {
     void enqueueProfileMutation(async () => { requestApplicationExit() })
     return
   }
+  if (startupInProgress) {
+    startupCancelled = true
+    // Cancel a menu navigation that may already be in flight. Keep a visible,
+    // read-only exit page until durable shutdown succeeds (or can be retried).
+    if (mainWin && !mainWin.isDestroyed() && (
+      mainWin.webContents.getURL() !== startupPageUrl() || mainWin.webContents.isLoadingMainFrame()
+    )) {
+      mainWin.webContents.stop()
+      void mainWin.loadURL(startupPageUrl()).then(() => {
+        reportStartupProgress(startupCompletedStages, appExitPromise
+          ? '正在安全退出，等待本机服务保存数据…'
+          : '数据尚未确认保存，请再次关闭窗口重试退出。', !appExitPromise)
+      }).catch(error => console.error('[client-startup] exit page failed:', error))
+    }
+    reportStartupProgress(startupCompletedStages, '正在安全退出，等待本机服务保存数据…')
+  }
   if (allowAppExit) {
     app.exit(0)
     return
@@ -508,6 +528,7 @@ function requestApplicationExit(): void {
     .catch(error => {
       console.error('[client] durable application shutdown failed; processes remain fail-closed:', error)
       appExitPromise = null
+      reportStartupProgress(startupCompletedStages, '数据尚未确认保存，请稍后再次关闭窗口重试退出。', true)
       dialog.showErrorBox(
         '无法安全退出',
         '战斗记录尚未确认写入数据库，游戏服务仍保持运行。请稍后再次退出；不要强制结束进程。',
@@ -663,7 +684,7 @@ function waitForLocalServerReady(port: number, timeoutMs = 20000): Promise<boole
     }
 
     const probe = () => {
-      if (!serverProcess) { finish(false); return }
+      if (startupCancelled || !serverProcess) { finish(false); return }
       let retried = false
       const retryOnce = () => {
         if (retried) return
@@ -690,7 +711,7 @@ function waitForGameAuthorityReady(port: number, timeoutMs = 20000): Promise<boo
   const deadline = Date.now() + timeoutMs
   return new Promise(resolve => {
     const probe = () => {
-      if (!gameServerProcess) {
+      if (startupCancelled || !gameServerProcess) {
         resolve(false)
         return
       }
@@ -820,6 +841,7 @@ async function startLocalGameAuthorityOnce(
   localGameReady = false
   localAuthorityProfileIdentity = null
   actualGamePort = await findFreePort(GAME_PORT_HINT)
+  if (startupCancelled) throw new Error(LOCAL_GAME_OPEN_CANCELLED)
   const appRoot = getAppRoot()
   const entry = findColyseusEntry(appRoot)
   if (!entry) {
@@ -827,7 +849,10 @@ async function startLocalGameAuthorityOnce(
     return
   }
   const binding = profileBinding ?? stableProfileBinding()
+  reportStartupProgress(3, '正在启动本机数据库…')
   const databaseUrl = await resolveAuthorityDatabaseUrl()
+  if (startupCancelled) throw new Error(LOCAL_GAME_OPEN_CANCELLED)
+  reportStartupProgress(4, '正在启动对局服务…')
   console.log(`[client] Colyseus/PostgreSQL game port: ${actualGamePort}`)
   gameServerProcess = spawn(getNodeBin(), [entry], {
     cwd: appRoot,
@@ -1752,6 +1777,7 @@ async function recoverProfileOnStartup(expectedGeneration?: number): Promise<voi
 }
 
 function assertLocalGameOpeningCurrent(expectedGeneration: number): void {
+  if (startupCancelled) throw new Error(LOCAL_GAME_OPEN_CANCELLED)
   localGameLifecycle.assertOpeningCurrent(expectedGeneration)
 }
 
@@ -1908,6 +1934,41 @@ handleTrusted('pack-list', ['game'], async () => {
 
 let mainWin: BrowserWindow | null = null
 
+function startupPageUrl(): string {
+  return pathToFileURL(path.join(__dirname, '..', 'startup', 'index.html')).href
+}
+
+function reportStartupProgress(completed: number, message: string, failed = false): void {
+  if (!startupInProgress || !mainWin || mainWin.isDestroyed()) return
+  startupCompletedStages = completed
+  if (mainWin.webContents.getURL() !== startupPageUrl()) return
+  console.info(`[client-startup] ${completed}/6 ${message}`)
+  void mainWin.webContents.executeJavaScript(
+    `window.renderStartupProgress?.(${JSON.stringify(completed)}, ${JSON.stringify(message)}, ${failed})`,
+  ).catch(error => console.warn('[client-startup] progress rendering failed:', error))
+}
+
+async function showStartupWindow(): Promise<BrowserWindow> {
+  const win = createGameWindow()
+  win.on('close', event => {
+    if (startupInProgress && !allowAppExit) {
+      event.preventDefault()
+      requestApplicationExit()
+    }
+  })
+  win.on('closed', () => {
+    if (startupInProgress) requestApplicationExit()
+  })
+  await win.loadURL(startupPageUrl())
+  // Let the renderer paint before starting the expensive local services.
+  await Promise.race([
+    win.webContents.executeJavaScript('new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))'),
+    // Minimized windows may suspend animation frames. They must still boot.
+    new Promise(resolve => setTimeout(resolve, 250)),
+  ])
+  return win
+}
+
 function getApplicationIconPath(): string {
   const root = app.isPackaged
     ? path.join(process.resourcesPath, 'branding')
@@ -1936,7 +1997,7 @@ function createGameWindow(): BrowserWindow {
     },
   })
 
-  restrictWindowNavigation(win, isGameClientUrl)
+  restrictWindowNavigation(win, url => isGameClientUrl(url) || (startupInProgress && url === startupPageUrl()))
   win.webContents.on('will-navigate', event => { if (officialUpdateApplying) event.preventDefault() })
   win.setMenuBarVisibility(false)
 
@@ -2112,12 +2173,15 @@ function setupOfficialUpdates(): void {
   setInterval(() => { if (automaticUpdates && resourceUpdates?.status.phase === 'waiting' && !officialUpdateApplying) void resourceUpdates.applyPending() }, 15000).unref()
 }
 
-function loadLocalGame(): void {
-  const win = createGameWindow()
-  win.loadURL(`${CLIENT_SCHEME}://app/index.html?v=${Date.now()}`)
+function loadLocalGame(existingWindow?: BrowserWindow): void {
+  if (startupCancelled) return
+  const win = existingWindow ?? createGameWindow()
 
   // 仅当本地服务器实际启动后，才注入默认服务器 URL（once：只注入一次，不影响后续页面导航）
   win.webContents.once('did-finish-load', () => {
+    if (startupCancelled) return
+    if (!isGameClientUrl(win.webContents.getURL())) return
+    startupInProgress = false
     if (!gameServerProcess || !localGameReady) return
     win.webContents.executeJavaScript(`
       (function() {
@@ -2134,6 +2198,13 @@ function loadLocalGame(): void {
         if (typeof refreshUserUI === 'function') refreshUserUI();
       })();
     `)
+  })
+  void win.loadURL(`${CLIENT_SCHEME}://app/index.html?v=${Date.now()}`).catch(async error => {
+    console.error('[client] main menu failed to load:', error)
+    if (win.isDestroyed() || startupCancelled) return
+    startupInProgress = true
+    await win.loadURL(startupPageUrl())
+    reportStartupProgress(5, '主菜单加载失败，请关闭后重试。', true)
   })
 }
 
@@ -2590,7 +2661,13 @@ process.on('SIGTERM', requestApplicationExit)
 app.whenReady().then(async () => {
   if (process.platform === 'win32') app.setAppUserModelId('com.redvsblue.client')
   if (process.platform === 'darwin' && !app.isPackaged) app.dock?.setIcon(getApplicationIconPath())
+  const win = await showStartupWindow()
+  if (startupCancelled || win.isDestroyed()) return
+  const generation = localGameLifecycle.beginOpening()
+  reportStartupProgress(0, '正在准备游戏资源…')
   await setupPackProtocol()
+  assertLocalGameOpeningCurrent(generation)
+  reportStartupProgress(1, '正在清理旧页面缓存…')
   // 启动时清除上一版本残留的 Service Worker / Cache Storage，避免旧缓存遮蔽新页面
   try {
     await session.defaultSession.clearStorageData({
@@ -2605,7 +2682,9 @@ app.whenReady().then(async () => {
     // Host & Play and Training both depend on the local authority. Prepare the
     // complete stack once at application startup so the normal player path is
     // the main menu, not a server-selection gate.
-    await startStableLocalServerAndRecover()
+    assertLocalGameOpeningCurrent(generation)
+    reportStartupProgress(2, '正在加载资源配置与本机服务…')
+    await startStableLocalServerAndRecover(generation)
     if (localGameReady) {
       localAuthorityRecoveryBudget.recordSuccess()
       localAuthorityRecoveryStatus = 'ready'
@@ -2614,12 +2693,19 @@ app.whenReady().then(async () => {
       localAuthorityNotice = '本机服务尚未就绪；打开“我当主机”即可手动重试。'
     }
   } catch (error) {
+    if (startupCancelled || win.isDestroyed()) return
     localAuthorityRecoveryStatus = 'manual-required'
     localAuthorityNotice = localAuthorityStartupErrorMessage(error)
     console.error('[client] automatic local service startup failed:', error)
   }
-  loadLocalGame()
+  if (startupCancelled || win.isDestroyed()) return
+  reportStartupProgress(5, '正在打开主菜单…')
   setupOfficialUpdates()
+  loadLocalGame(win)
+}).catch(error => {
+  if (startupCancelled) return
+  console.error('[client-startup] startup failed:', error)
+  reportStartupProgress(0, '启动失败，请关闭窗口后重试。', true)
 })
 
 app.on('window-all-closed', () => {
@@ -2639,5 +2725,6 @@ app.on('before-quit', event => {
 app.on('quit', () => { try { process.exit(0) } catch {} })
 
 app.on('activate', () => {
+  if (startupInProgress || startupCancelled) return
   if (!mainWin || mainWin.isDestroyed()) loadLocalGame()
 })
