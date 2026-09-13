@@ -56,6 +56,15 @@ test('complete bundle publishes only after both platforms are uploaded and check
   assert.ok(g.published)
 })
 test('default upload leaves a verified draft',()=>{const f=fixture(),g=github(f);publishBundle(f.directory,{gh:g.gh,verifyApk});assert.equal(g.published,false)})
+test('new draft can be uploaded before its tag endpoint exists',()=>{
+  const f=fixture(),g=github(f)
+  const gh=args=>{
+    if(args[0]==='api' && args.at(-1).includes('/releases/tags/'))throw Error('HTTP 404: unpublished tag')
+    return g.gh(args)
+  }
+  assert.equal(publishBundle(f.directory,{gh,verifyApk}).published,false)
+  assert.equal(g.calls.filter(a=>a[1]==='upload').length,6)
+})
 for(const options of [{wrongTag:true},{wrongTag:true,annotated:true},{corruptRemote:true},{failUpload:true}])test('refuse unsafe remote state '+JSON.stringify(options),()=>{
   const f=fixture(),g=github(f,options);assert.throws(()=>publishBundle(f.directory,{gh:g.gh,verifyApk,publish:true}));assert.equal(g.published,false)
 })

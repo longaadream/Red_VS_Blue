@@ -110,8 +110,10 @@ export function publishBundle(directory, { gh = defaultGh, publish = false, veri
   if (release && (!release.draft || release.target_commitish !== record.sourceCommit)) throw Error('Release already public or belongs to another source commit')
   if (!release) {
     gh(['release', 'create', record.tag, '--repo', repo, '--target', record.sourceCommit, '--draft', '--title', `RED vs BLUE ${record.tag} · Windows / Android`, '--notes', 'Windows 与 Android 同步发布。安装器、APK 和平台更新清单请按设备选择；资源包使用独立频道。'])
-    release = api([`repos/${repo}/releases/tags/${record.tag}`])
+    // A newly created draft may not yet have a resolvable tag endpoint.
+    release = JSON.parse(gh(['api', '--paginate', '--slurp', `repos/${repo}/releases?per_page=100`])).flat().find(r => r.tag_name === record.tag)
   }
+  if (!release || !release.draft || release.prerelease || release.target_commitish !== record.sourceCommit) throw Error('Expected draft missing or changed before upload')
   const receiptBytes = fs.readFileSync(path.join(directory, 'release-bundle.json'))
   const expected = [...record.assets, { name: 'release-bundle.json', size: receiptBytes.length, sha256: sha256(receiptBytes) }]
   for (const asset of expected) {
