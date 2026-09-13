@@ -1,0 +1,46 @@
+{
+  "portrait": {
+    "src": "images/itachi.jpg",
+    "alt": "部署候选：宇智波鼬头像",
+    "hidden": false,
+    "width": 512
+  },
+  "missing": {
+    "hidden": true,
+    "src": null
+  },
+  "layouts": [
+    {
+      "width": 1280,
+      "height": 720,
+      "top": 422,
+      "bottom": 702,
+      "viewport": 720,
+      "scrollbar": "none",
+      "webkit": "none",
+      "tabIndex": 0,
+      "scroll": {
+        "top": 758,
+        "max": 758,
+        "actionVisible": true,
+        "focused": true
+      }
+    },
+    {
+      "width": 844,
+      "height": 390,
+      "top": 51.203125,
+      "bottom": 215,
+      "viewport": 390,
+      "scrollbar": "none",
+      "webkit": "none",
+      "tabIndex": 0,
+      "scroll": {
+        "top": 908,
+        "max": 908,
+        "actionVisible": true,
+        "focused": true
+      }
+    }
+  ]
+}

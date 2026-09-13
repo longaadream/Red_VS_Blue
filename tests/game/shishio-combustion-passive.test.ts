@@ -117,7 +117,7 @@ describe('RED-76 Shishio combustion passive', () => {
     withRuleRuntime(new RuleRuntime({ rootSeed: ROOT_SEED, tick: 1 }), () => {
       const first = dealDamage(shishio, target, 4, 'true', state, 'red-76-direct-damage')
       expect(first).toMatchObject({ success: true, damage: 4 })
-      expect(target.skills[0].currentCooldown).toBe(2)
+      expect(target.skills[0].currentCooldown).toBe(1)
       expect(shishio.currentHp).toBe(7)
       expect(shishio.statusTags.find((tag: any) => tag.type === 'shishio-dmg-counter')?.intensity).toBe(4)
 
@@ -144,5 +144,31 @@ describe('RED-76 Shishio combustion passive', () => {
       expect(blockedHeal).toMatchObject({ success: false, heal: 0, targetHp: 6 })
       expect(shishio.currentHp).toBe(6)
     })
+  })
+
+  it('suppresses the next enemy turn for one cooldown and preserves longer cooldowns', () => {
+    const shishio = makePiece({ instanceId: 'shishio', templateId: 'red-shishio', ownerPlayerId: 'player-red', rules: loadShishioRules() })
+    const target = makePiece({ instanceId: 'target', ownerPlayerId: 'player-blue', x: 1, skills: [
+      { skillId: 'ashbringer', currentCooldown: 0 },
+      { skillId: 'sleep-dart', currentCooldown: 3 },
+    ] })
+    let state = makeState({ pieces: [shishio, target], turnNumber: 5 })
+    withRuleRuntime(new RuleRuntime({ rootSeed: ROOT_SEED, tick: 1 }), () => {
+      dealDamage(shishio as any, target as any, 1, 'true', state, 'red-206-pressure')
+    })
+    expect(target.skills.map(skill => skill.currentCooldown)).toEqual([1, 3])
+    const step = (action: Parameters<typeof runBattleAction>[1]) => {
+      state = runBattleAction(state, action, { rootSeed: ROOT_SEED }).state
+    }
+    step({ type: 'endTurn', playerId: 'player-red' })
+    step({ type: 'beginPhase' })
+    expect(state.pieces[1].skills.map(skill => skill.currentCooldown)).toEqual([1, 3])
+    expect(() => step({ type: 'useBasicSkill', playerId: 'player-blue', pieceId: 'target', skillId: 'ashbringer', targetPieceId: 'shishio' })).toThrow(/cooldown/)
+    step({ type: 'endTurn', playerId: 'player-blue' })
+    expect(state.pieces[1].skills.map(skill => skill.currentCooldown)).toEqual([0, 2])
+    step({ type: 'beginPhase' })
+    step({ type: 'endTurn', playerId: 'player-red' })
+    step({ type: 'beginPhase' })
+    expect(state.pieces[1].skills.map(skill => skill.currentCooldown)).toEqual([0, 2])
   })
 })

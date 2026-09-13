@@ -91,6 +91,8 @@
     let activeProgressMs = 0
     let activeTimelineStartedAt = 0
     let skipSettling = false
+    let holdingResponse = false
+    let responseOrigin = null
 
     function remember(rootId) {
       if (playedRoots.has(rootId)) return false
@@ -162,8 +164,9 @@
     }
 
     function settleAll() {
-      if (active) onPhase('settle', active)
+      if (active && !holdingResponse) onPhase('settle', active)
       clearTimers()
+      holdingResponse = false
       active = null
       activeProgressMs = 0
       activeTimelineStartedAt = 0
@@ -176,6 +179,32 @@
       if (disposed || !model) return
       const groups = groupEvents(model.presentationEvents)
       const isViewerTurn = !!(model.turn && model.turn.isViewerTurn)
+      const response = model.interaction && model.interaction.pendingResponse
+      if (!response) responseOrigin = null
+      if (response && !responseOrigin) {
+        const announcement = groups.slice().reverse().find(function (group) {
+          return group.root.result && group.root.result.pending && (!primed || !playedRoots.has(group.root.rootEventId))
+        })
+        responseOrigin = groups.find(function (group) {
+          return !group.root.parentEventId && announcement && group.root.rootEventId === announcement.root.rootEventId
+        }) || null
+      }
+      if (response && response.isForViewer && response.isOffTurn) {
+        const held = holdingResponse ? active : responseOrigin
+        if (held) {
+          clearTimers()
+          groups.forEach(function (group) { remember(group.root.rootEventId) })
+          active = held
+          pending = []
+          holdingResponse = true
+          primed = true
+          lastIsViewerTurn = isViewerTurn
+          activeProgressMs = 0
+          onPhase('hold', active)
+          return
+        }
+      }
+      if (holdingResponse) settleAll()
       if (!primed) {
         groups.forEach(function (group) { remember(group.root.rootEventId) })
         primed = true
@@ -198,7 +227,7 @@
     }
 
     function skip() {
-      if (disposed || !active) return false
+      if (disposed || !active || holdingResponse) return false
       if (skipSettling) {
         completeActive()
         if (!active) return true
@@ -213,6 +242,7 @@
     function setSpeed(nextSpeed) {
       const normalized = Number(nextSpeed) === 2 ? 2 : 1
       if (normalized === speed) return
+      if (holdingResponse) { speed = normalized; return }
       if (active) {
         activeProgressMs += Math.max(0, now() - activeTimelineStartedAt) * speed
         activeProgressMs = Math.min(reducedMotion ? REDUCED_DURATION_MS : actionDuration(active), activeProgressMs)
@@ -223,6 +253,8 @@
 
     function dispose() {
       disposed = true
+      holdingResponse = false
+      responseOrigin = null
       clearTimers()
       active = null
       activeProgressMs = 0
@@ -236,6 +268,7 @@
     return {
       update: update,
       reset: function (model) {
+        responseOrigin = null
         settleAll(); playedRoots.clear(); playedOrder.length = 0; primed = false
         update(model)
       },
@@ -250,7 +283,8 @@
           speed: speed,
           playedRootCount: playedRoots.size,
           timerCount: timers.length,
-          activeProgressMs: active ? Math.min(actionDuration(active), activeProgressMs + Math.max(0, now() - activeTimelineStartedAt) * speed) : 0,
+          holdingResponse: holdingResponse,
+          activeProgressMs: active && !holdingResponse ? Math.min(actionDuration(active), activeProgressMs + Math.max(0, now() - activeTimelineStartedAt) * speed) : 0,
         }
       },
     }
@@ -422,7 +456,7 @@
       const cue = rootEvent.presentation && rootEvent.presentation.cue || 'directional'
       const actionLabel = identity.isSkill ? identity.skillName : (meta.label || '战场动作')
       const resultVisible = currentPhase === 'result' || currentPhase === 'settle' || currentPhase === 'static'
-      const pathVisible = currentPhase === 'path' || resultVisible
+      const pathVisible = currentPhase === 'path' || currentPhase === 'hold' || resultVisible
       const travelVisible = pathVisible && cue !== 'area'
       const areaCells = cells.area.length ? cells.area : cells.targets
       if (cue === 'area' && pathVisible) {
@@ -446,12 +480,12 @@
         + (card ? renderCard(rootEvent, card) : '<span class="battle-vignette-label">'
         + (identity.isSkill ? renderPortrait(identity) : '<span class="battle-vignette-action-icon" aria-hidden="true"><img src="' + escapeHtml(meta.assetPath) + '" alt=""></span>')
         + '<span class="battle-vignette-copy">'
-        + (identity.isSkill ? '<span class="battle-vignette-kicker">'
-          + (rootEvent.result && rootEvent.result.pending ? '连锁触发' : rootEvent.kind === 'choiceResolved' ? '响应技能' : rootEvent.kind === 'chargeSkill' ? '充能释放' : '技能释放')
+        + (identity.isSkill || currentPhase === 'hold' ? '<span class="battle-vignette-kicker">'
+          + (currentPhase === 'hold' ? '触发响应的行动' : rootEvent.result && rootEvent.result.pending ? '连锁触发' : rootEvent.kind === 'choiceResolved' ? '响应技能' : rootEvent.kind === 'chargeSkill' ? '充能释放' : '技能释放')
           + ' · ' + escapeHtml(identity.sourceName) + '</span>' : '')
         + '<span class="battle-vignette-action-name" title="' + escapeHtml(actionLabel) + '">'
         + escapeHtml(actionLabel) + '</span></span></span>')
-        + '<span class="battle-vignette-skip-hint">点按战场略过</span></div>'
+        + '<span class="battle-vignette-skip-hint">' + (currentPhase === 'hold' ? '等待你响应 · 可打开行动记录查看' : '点按战场略过') + '</span></div>'
         + renderComicBeat(resultVisible)
     }
 
@@ -487,7 +521,7 @@
     }
 
     function handlePointerDown(event) {
-      if (!currentGroup) return
+      if (!currentGroup || currentPhase === 'hold') return
       if (event.target && typeof event.target.closest === 'function' && event.target.closest('[data-vignette-control]')) {
         consume(event)
         return

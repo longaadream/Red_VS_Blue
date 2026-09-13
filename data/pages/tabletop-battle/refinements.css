@@ -201,3 +201,43 @@ body .is-card-reveal .battle-vignette-skip-hint {
 @media(prefers-reduced-motion:reduce) {
   body .is-card-reveal .battle-vignette-status { animation: none; transform: translate(-50%,-50%); }
 }
+
+/* Keep response context readable without intercepting target selection. */
+body .battle-vignette-layer.is-phase-hold { pointer-events: none !important; }
+body .is-phase-hold .battle-vignette-veil { display: none; }
+body .is-phase-hold .battle-vignette-status {
+  animation: none !important;
+  opacity: 1 !important;
+  top: 76px !important;
+  transform: translateX(-50%) !important;
+  width: min(440px, calc(100% - 150px)) !important;
+  pointer-events: none !important;
+}
+body .is-phase-hold .battle-played-card.card-item { min-height: 0; max-height: 160px; }
+body .is-phase-hold .battle-played-card .card-art { display: none; }
+body .is-phase-hold .battle-played-card .card-desc { font-size: 12px !important; }
+body .is-phase-hold .battle-card-reveal-kicker { font-size: 14px; margin-bottom: 4px; }
+
+/* Mounted on body so board transforms and every battle dialog remain below it. */
+body #actionHistoryDock {
+  position: fixed !important;
+  z-index: 2147483647 !important;
+  top: calc(var(--battle-hud-offset, 68px) + 12px) !important;
+  max-height: calc(100dvh - var(--battle-hud-offset, 68px) - 24px) !important;
+  opacity: 1 !important;
+  filter: none !important;
+  border-color: #ffe08a !important;
+  box-shadow: 0 0 0 2px #302318, 0 0 15px #ffd36a !important;
+}
+body #actionHistoryDock .action-history-collapsed-button {
+  background: #ffe08a !important;
+  color: #281e17 !important;
+  outline: 2px solid #fff0b7;
+  outline-offset: -2px;
+}
+body #actionHistoryDock .action-history-empty { color: #ffe9b6; padding: 8px; text-align: center; }
+body.is-viewing-history :is(#pieceInfoModal, #cardDetailModal, #optionPickerOverlay,
+  #trainingSetupOverlay, #resEditorSheet, #surrenderConfirmOverlay, #resultOverlay, #logOverlay) {
+  visibility: hidden !important;
+  pointer-events: none !important;
+}

@@ -282,7 +282,7 @@
       updating = true
       updatePlaybackBase = beforePlayback
       try {
-        if (!historicalRoot && vignetteUi && vignetteUi.update) vignetteUi.update(model)
+        if (vignetteUi && vignetteUi.update) vignetteUi.update(model)
       } finally { updating = false; updatePlaybackBase = null }
       const playing = vignetteUi && vignetteUi.sequencesBoard && vignetteUi.getDiagnostics().activeRootId
       if (!playing) playbackModel = null

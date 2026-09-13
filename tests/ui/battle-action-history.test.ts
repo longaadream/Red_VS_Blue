@@ -246,7 +246,7 @@ describe('RED-166 icon action history', () => {
       sameSidePopover: true,
       statusOverlay: true,
       dialog: true,
-    })).toEqual(['target-mode', 'dialog'])
+    })).toEqual([])
   })
 
   it('uses registered display names and never exposes an unknown internal skill id', () => {
@@ -472,15 +472,17 @@ describe('RED-166 icon action history', () => {
     expect(collapsedButton.setAttribute).toHaveBeenCalledWith('aria-label', '收起动作历史')
 
     ui.update({ ...model, selection: { mode: 'target' } })
-    expect(classNames.has('is-collapsed')).toBe(true)
-    expect(classNames.has('is-user-expanded')).toBe(false)
-    expect(ui.getActiveRootId()).toBeNull()
-    expect(classNames.has('is-preview-open')).toBe(false)
+    expect(classNames.has('is-collapsed')).toBe(false)
+    expect(classNames.has('is-user-expanded')).toBe(true)
+    expect(ui.getActiveRootId()).toBe('action-1:0')
+    expect(classNames.has('is-preview-open')).toBe(true)
     ui.update(model)
     expect(classNames.has('is-collapsed')).toBe(false)
     expect(classNames.has('is-user-expanded')).toBe(true)
 
     listeners.get('pointerout')?.({ relatedTarget: null } as never)
+    expect(ui.getActiveRootId()).toBe('action-1:0')
+    listeners.get('click')?.(clickEvent)
     expect(ui.getActiveRootId()).toBeNull()
     listeners.get('click')?.(clickEvent)
     expect(ui.getActiveRootId()).toBe('action-1:0')

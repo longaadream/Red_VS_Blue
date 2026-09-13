@@ -116,6 +116,21 @@ function timeoutPending(state: BattleState, rootSeed = 108): BattleState {
 
 
 describe('RED-97 authoritative pending interaction lifecycle', () => {
+  it('settles skill cooldowns once after the end-turn selection, including a serialized resume', () => {
+    const initial = minatoWatcherState()
+    initial.pieces[0].skills = [{ skillId: 'minato-rasengan', currentCooldown: 2 }]
+    const pending = applyBattleAction(initial, { type: 'endTurn', playerId: 'player-red' })
+    expect(pending.pieces[0].skills[0].currentCooldown).toBe(2)
+    const submitted = pendingTargetAction(pending)
+    const completed = applyBattleAction(JSON.parse(JSON.stringify(pending)), submitted)
+    expect(completed.turn.phase).toBe('end')
+    expect(completed.pieces[0].skills[0].currentCooldown).toBe(1)
+    expect(() => applyBattleAction(completed, submitted)).toThrow()
+    expect(() => applyBattleAction(completed, { type: 'endTurn', playerId: 'player-red' })).toThrow()
+    const next = applyBattleAction(completed, { type: 'beginPhase' })
+    expect(next.pieces[0].skills[0].currentCooldown).toBe(1)
+  })
+
   it('resolves the mandatory Minato anchor before committing end-turn settlement once', () => {
     const targetPending = endMinatoSelection()
     const completed = applyBattleAction(targetPending, pendingTargetAction(targetPending))
@@ -1472,6 +1487,18 @@ describe('RED-121 legacy direct target transaction adapter', () => {
 })
 
 describe('RED-108 authoritative pending timeout resolution', () => {
+  it.each(['start', 'action'] as const)('ticks cooldowns once when a %s phase choice times out and ends the owner turn', phase => {
+    const initial = minatoWatcherState(phase)
+    initial.pieces[0].skills = [{ skillId: 'minato-rasengan', currentCooldown: 2 }]
+    const pending = applyBattleAction(initial, phase === 'start'
+      ? { type: 'beginPhase' }
+      : { type: 'endTurn', playerId: 'player-red' })
+    expect(pending.pieces[0].skills[0].currentCooldown).toBe(2)
+    const resolved = timeoutPending(pending, 20613)
+    expect(resolved.turn).toMatchObject({ currentPlayerId: 'player-blue', phase: 'action' })
+    expect(resolved.pieces[0].skills[0].currentCooldown).toBe(1)
+  })
+
   it('resolves the mandatory Minato end-turn target instead of cancelling it on timeout', () => {
     const resolved = timeoutPending(endMinatoSelection(), 108)
 

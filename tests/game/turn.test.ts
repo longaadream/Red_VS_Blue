@@ -26,6 +26,7 @@ import type { PieceInstance } from '@/lib/game/piece'
 import { finalizePendingTargetSession, prepareAction } from '@/lib/game/targeting'
 import { makeState, makePiece, makeTile } from '../helpers/minimal-state'
 import { globalTriggerSystem, type TriggerContext } from '@/lib/game/triggers'
+import { projectBattlePresentationEvents, projectBattlePresentationEventsForViewer } from '@/lib/game/battle-presentation-events'
 
 function withTargetCredentials(state: BattleState, action: Extract<BattleAction, { type: 'useBasicSkill' | 'useChargeSkill' | 'playCard' }>): BattleAction {
   const draft = { ...action }
@@ -456,6 +457,33 @@ describe('projectile target validation', () => {
 })
 
 describe('interrupted skill release', () => {
+  it.each(['useBasicSkill', 'useChargeSkill'] as const)('keeps %s targets private after interrupted release without embedded definitions', actionType => {
+    const caster = makePiece({ instanceId: 'secret-caster', ownerPlayerId: 'player-red', x: 0, y: 0 })
+    const target = makePiece({ instanceId: 'secret-target', ownerPlayerId: 'player-red', x: 1, y: 0 })
+    caster.skills = [{ skillId: 'secret-skill', currentCooldown: 0, usesRemaining: -1 }]
+    const state = makeState({ pieces: [caster, target] })
+    state.players[0].chargePoints = 3
+    state.skillsById['secret-skill'] = {
+      id: 'secret-skill', name: '秘密技能', description: '', kind: 'active', type: actionType === 'useChargeSkill' ? 'super' : 'normal',
+      cooldownTurns: 1, maxCharges: 0, chargeCost: actionType === 'useChargeSkill' ? 1 : 0, powerMultiplier: 1, actionPointCost: 1,
+      range: 'single', concealTargetInBattleLog: true,
+      targeting: { steps: [{ kind: 'target', type: 'piece', filter: 'ally', range: 3 }] },
+      code: 'function executeSkill(){return {success:true};}',
+    }
+    const command = withTargetCredentials(state, { type: actionType, playerId: 'player-red', pieceId: caster.instanceId, skillId: 'secret-skill', targetPieceId: target.instanceId })
+    vi.mocked(globalTriggerSystem.checkTriggers).mockImplementationOnce((battle: BattleState) => {
+      battle.pieces.find(piece => piece.instanceId === caster.instanceId)!.currentHp = 0
+      return TRIGGER_OK
+    })
+    const after = applyBattleAction(state, command)
+    expect(after.actions?.some(action => action.payload?.interrupted)).toBe(true)
+    state.skillsById = {}; after.skillsById = {}
+    const events = projectBattlePresentationEvents({ actionId: 'secret-interrupted', command, beforeState: state, afterState: after })
+    for (const viewer of ['player-blue', 'spectator', undefined]) {
+      expect(JSON.stringify(projectBattlePresentationEventsForViewer(events, viewer))).not.toContain(target.instanceId)
+    }
+    expect(projectBattlePresentationEventsForViewer(events, 'player-red')[0].targetPieceIds).toContain(target.instanceId)
+  })
   it('releases a skill once against a generic before-skill replacement target', () => {
     const caster = makePiece({ instanceId: 'rewrite-caster', ownerPlayerId: 'player-red', x: 0, y: 0 })
     const original = makePiece({ instanceId: 'rewrite-original', ownerPlayerId: 'player-blue', x: 1, y: 0, faction: 'blue' })

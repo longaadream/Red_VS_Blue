@@ -139,6 +139,56 @@ describe('RED-167 action vignette queue', () => {
     vi.restoreAllMocks()
   })
 
+  it('holds the initiating action throughout an off-turn response without consuming target clicks', () => {
+    const phases: string[] = []
+    const queue = loadModule().createQueue({ onPhase: (phase: string) => phases.push(phase) })
+    queue.update({ presentationEvents: [], turn: { isViewerTurn: false } })
+    const events = [root(1, { actorPlayerId: 'enemy', sourcePieceId: 'attacker', skillId: 'shot' }),
+      child(1, 1, { kind: 'passive', sourcePieceId: 'responder', result: { pending: true } })]
+    const waiting = { presentationEvents: events, turn: { isViewerTurn: false },
+      interaction: { pendingResponse: { selectionId: 'first', isForViewer: true, isOffTurn: true } } }
+    queue.update(waiting)
+    vi.advanceTimersByTime(60_000)
+    expect(queue.getDiagnostics().activeRootId).toBe('action-1:0')
+    expect(phases.at(-1)).toBe('hold')
+    expect(queue.skip()).toBe(false)
+    queue.setSpeed(2)
+    queue.update({ ...waiting, presentationEvents: [], interaction: {
+      pendingResponse: { selectionId: 'second', isForViewer: true, isOffTurn: true },
+    } })
+    vi.advanceTimersByTime(60_000)
+    expect(queue.getDiagnostics().activeRootId).toBe('action-1:0')
+    queue.update({ ...waiting, presentationEvents: [], interaction: {
+      pendingResponse: { selectionId: 'other-player', isForViewer: false, isOffTurn: true },
+    } })
+    vi.runAllTimers()
+    expect(queue.getDiagnostics().activeRootId).toBeNull()
+    queue.update({ ...waiting, presentationEvents: [], interaction: {
+      pendingResponse: { selectionId: 'back-to-me', isForViewer: true, isOffTurn: true },
+    } })
+    expect(queue.getDiagnostics().activeRootId).toBe('action-1:0')
+    queue.update({ presentationEvents: [root(2)], turn: { isViewerTurn: false }, interaction: {} })
+    vi.runAllTimers()
+    expect(queue.getDiagnostics().activeRootId).toBeNull()
+    queue.dispose()
+  })
+
+  it('holds a pending root on initial delivery, but not for another viewer or spectator', () => {
+    const events = [root(1), child(1, 1, { kind: 'passive', result: { pending: true } })]
+    const queue = loadModule().createQueue({ reducedMotion: true })
+    queue.update({ presentationEvents: events, interaction: {
+      pendingResponse: { selectionId: 'first', isForViewer: true, isOffTurn: true },
+    }, turn: { isViewerTurn: false } })
+    vi.advanceTimersByTime(10_000)
+    expect(queue.getDiagnostics().activeRootId).toBe('action-1:0')
+    queue.update({ presentationEvents: events, interaction: {
+      pendingResponse: { selectionId: 'first', isForViewer: false, isOffTurn: true },
+    }, turn: { isViewerTurn: false } })
+    vi.runAllTimers()
+    expect(queue.getDiagnostics().activeRootId).toBeNull()
+    queue.dispose()
+  })
+
   it('does not invent a source at (0,0) for a card without a caster', () => {
     expect(loadModule().eventCells({ root: root(1, { kind: 'card' }), children: [] }, { pieces: [] }).source).toBeNull()
   })
