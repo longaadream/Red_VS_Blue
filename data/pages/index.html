@@ -559,6 +559,15 @@
         <button onclick="closeHostSheet()" style="background:transparent;border:none;color:#64748b;font-size:22px;cursor:pointer">×</button>
       </div>
       <p style="font-size:13px;color:#64748b;margin-bottom:14px">本机作为服务器，好友通过 IP 地址连接</p>
+      <div id="hostIdentity" style="display:none;margin-bottom:14px">
+        <label for="hostName">主机名称</label>
+        <form onsubmit="event.preventDefault(); saveHostName()" style="display:flex;gap:8px;margin:8px 0">
+          <input id="hostName" maxlength="64" style="min-width:0;flex:1;padding:8px" />
+          <button class="btn-ghost" type="submit" style="width:auto">保存</button>
+        </form>
+        <div id="hostId" style="font-family:monospace;overflow-wrap:anywhere"></div>
+        <div id="hostNameResult" role="status"></div>
+      </div>
       <div id="hostStatus" style="margin-bottom:14px">
         <div class="lan-scanning"><span class="spin">⟳</span><span>正在启动服务器…</span></div>
       </div>
@@ -693,6 +702,15 @@
       await showHostSheet(true)
     }
 
+    async function saveHostName() {
+      const result = document.getElementById('hostNameResult')
+      try {
+        const info = await (window.RvBHost || window.electronAPI).setHostName(document.getElementById('hostName').value)
+        document.getElementById('hostName').value = info.serverName
+        result.textContent = '已保存；好友重新搜索即可看到新名称'
+      } catch (error) { result.textContent = '保存失败：' + error.message }
+    }
+
     async function showHostSheet(forceRetry) {
       document.getElementById('hostOverlay').classList.add('show')
       document.getElementById('hostStatus').innerHTML = '<div class="lan-scanning"><span class="spin">⟳</span><span>正在启动服务器…</span></div>'
@@ -705,6 +723,10 @@
       if ((window.RvBHost || window.electronAPI) && (window.RvBHost || window.electronAPI).getHostInfo) {
         try {
           let info = await (window.RvBHost || window.electronAPI).getHostInfo()
+          document.getElementById('hostIdentity').style.display = info?.serverId && (window.RvBHost || window.electronAPI).setHostName ? 'block' : 'none'
+          document.getElementById('hostName').value = info?.serverName || ''
+          document.getElementById('hostId').textContent = '主机 ID：' + (info?.serverId ? info.serverId.slice(0, 12).toUpperCase() : '')
+          document.getElementById('hostNameResult').textContent = ''
           let retryResult = null
           if (!info?.running && (forceRetry === true || !!window.RvBHost) && typeof (window.RvBHost || window.electronAPI).ensureLocalAuthority === 'function') {
             retryResult = await (window.RvBHost || window.electronAPI).ensureLocalAuthority()
@@ -850,27 +872,6 @@
       document.getElementById('lanScanningRow').style.display = 'flex'
       document.getElementById('lanProgressFill').style.width = '0%'
 
-      // UDP 广播发现（Android / Electron 双端，约 3 秒出结果）
-      if (window.RvBBridge && typeof window.RvBBridge.discoverHosts === 'function') {
-        // Android 路径：Java 后台监听，结果通过全局回调传回
-        window._onUdpHostFound = function(info) {
-          if (!info || !info.ip || !info.port) return
-          addLanServer({ url: 'http://' + info.ip + ':' + info.port,
-            ip: info.ip, port: info.port, name: (info.name || '局域网主机') + ' 📡' })
-        }
-        window.RvBBridge.discoverHosts(3000)
-      } else if ((window.RvBHost || window.electronAPI) && typeof (window.RvBHost || window.electronAPI).startDiscoverHosts === 'function') {
-        // Electron 路径：Node dgram 后台监听，结果通过 IPC 事件推送
-        const discovery = window.RvBHost || window.electronAPI
-        if (discovery.offUdpDiscovery) discovery.offUdpDiscovery()
-        discovery.onUdpHostFound(function(info) {
-          if (!info || !info.ip || !info.port) return
-          addLanServer({ url: 'http://' + info.ip + ':' + info.port,
-            ip: info.ip, port: info.port, name: (info.name || '局域网主机') + ' 📡' })
-        })
-        discovery.startDiscoverHosts(3000).catch(error => console.warn('[LAN] UDP unavailable; HTTP search continues', error))
-      }
-
       startQuickScan()
     }
 
@@ -889,6 +890,8 @@
       document.getElementById('lanRescanBtn').style.display = 'none'
       document.getElementById('lanScanningRow').style.display = 'flex'
       document.getElementById('lanProgressFill').style.width = '0%'
+      _lanFound = []
+      document.getElementById('lanServerList').innerHTML = '<div class="lan-empty">尚未发现主机</div>'
       _lanScanner = RvBLanDiscover.startLanScan({
         full: false,
         onFound: addLanServer,
@@ -909,6 +912,8 @@
       document.getElementById('lanRescanBtn').style.display = 'none'
       document.getElementById('lanScanningRow').style.display = 'flex'
       document.getElementById('lanProgressFill').style.width = '0%'
+      _lanFound = []
+      document.getElementById('lanServerList').innerHTML = '<div class="lan-empty">尚未发现主机</div>'
       _lanScanner = RvBLanDiscover.startLanScan({
         full: true,
         onFound: addLanServer,
@@ -923,7 +928,7 @@
 
     function addLanServer(info) {
       if (!document.getElementById('lanOverlay').classList.contains('show')) return
-      const existing = _lanFound.find(s => s.url === info.url)
+      const existing = _lanFound.find(s => s.url === info.url || (info.serverId && s.serverId === info.serverId))
       if (existing) {
         existing.name = info.name || existing.name
         return
@@ -935,7 +940,7 @@
       const div = document.createElement('div')
       div.className = 'lan-server-item'
       div.onclick = () => connectLanServer(info.url)
-      div.innerHTML = `<div><div class="lan-server-name">${escHtml(info.name || 'RED vs BLUE')}</div><div class="lan-server-url">${escHtml(info.url)}</div></div><span style="color:#3b82f6;font-size:13px;font-weight:700;flex-shrink:0">连接 ›</span>`
+      div.innerHTML = `<div><div class="lan-server-name">${escHtml(info.name || 'RED vs BLUE')}</div><div class="lan-server-url">${info.serverId ? 'ID: ' + escHtml(info.serverId.slice(0, 12).toUpperCase()) + ' · ' : ''}${escHtml(info.url)}</div></div><span style="color:#3b82f6;font-size:13px;font-weight:700;flex-shrink:0">连接 ›</span>`
       list.appendChild(div)
     }
 
@@ -1664,9 +1669,10 @@
       updatePackBadge()
       if (window.Capacitor && window.Capacitor.isNativePlatform() && !window.RvBBridge) {
         const packButton = document.getElementById('packDesc').closest('button')
-        packButton.onclick = () => loadPage('android-maintenance.html')
-        packButton.querySelector('.utility-title').textContent = '更新与资源'
-        document.getElementById('packDesc').textContent = '检查更新 · 导入资源包'
+        packButton.onclick = () => {
+          sessionStorage.setItem('rvb_maintenance_section', 'resources')
+          loadPage('android-maintenance.html')
+        }
       }
       updateTutorialEntry()
       // Show connected server in server section if saved
@@ -1680,5 +1686,6 @@
       if (e.key === 'Enter' && document.activeElement === document.getElementById('urlInput')) doConnect()
     })
   </script>
+<script src="js/official-updates.js"></script>
 </body>
 </html>

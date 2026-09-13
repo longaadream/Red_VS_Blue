@@ -4,16 +4,18 @@ import {
   mkdirSync,
   readdirSync,
   readFileSync,
+  renameSync,
   rmSync,
   writeFileSync,
 } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { bindStableRuntimeProfileV1, getRuntimeProfileReferenceV1, openRuntimeVerifiedSnapshotV1 } from '@/lib/content-pipeline/runtime/profile-runtime'
 
 import type { PackCapabilityV1, PackFileMediaTypeV1 } from '@/lib/content-pipeline/contracts'
-import { sha256HexV1 } from '@/lib/content-pipeline/core/hash'
+import { sha256HexV1, computeResolvedProfileIdentitiesV1 } from '@/lib/content-pipeline/core/hash'
 import { resolveProfileV1, type ResolvedSnapshotViewV1 } from '@/lib/content-pipeline/core/resolver'
 import type { ContentPackSourceV1 } from '@/lib/content-pipeline/core/source'
 import {
@@ -27,6 +29,9 @@ const compatibility = { engineAbi: 'rvb-engine/v1', contentAbi: 'rvb-content/v1'
 const temporaryRoots: string[] = []
 
 afterEach(() => {
+  vi.unstubAllEnvs()
+  vi.restoreAllMocks()
+  delete globalThis.__rvbProfileRuntimeContextV1
   while (temporaryRoots.length > 0) {
     rmSync(temporaryRoots.pop()!, { recursive: true, force: true })
   }
@@ -109,6 +114,60 @@ function createStore(root: string, base: ResolvedSnapshotViewV1): ProfileStoreV1
 }
 
 describe('RED-115 Profile store and activation state', () => {
+  it('reuses verified runtime identity until activation or runtime binding changes', () => {
+    const root = temporaryRoot()
+    const base = resolvedSnapshot({ packageId: 'rvb.base', marker: 80, jsonValue: 80 })
+    const store = createStore(root, base)
+    const candidate = resolvedSnapshot({ packageId: 'rvb.cached', marker: 81, jsonValue: 81 })
+    const installed = store.installCandidate(candidate)
+    store.commitActivation(store.beginActivation(installed.resolvedProfileHash).activationId, installed.resolvedProfileHash)
+    vi.stubEnv('APP_ROOT_DIR', root)
+    vi.stubEnv('USER_DATA_DIR', root)
+    for (const key of ['RVB_PROFILE_ROOT', 'RVB_RESOLVED_PROFILE_HASH', 'RVB_PROFILE_ACTIVATION_ID', 'RVB_AUTHORITY_CONTENT_HASH', 'RVB_PROFILE_ENGINE_ABI', 'RVB_PROFILE_CONTENT_ABI']) vi.stubEnv(key, undefined)
+    globalThis.__rvbProfileRuntimeContextV1 = { appRoot: root, userDataDir: root, store }
+    const verify = vi.spyOn(store, 'verifyReference')
+    const first = getRuntimeProfileReferenceV1()
+    const verificationCount = verify.mock.calls.length
+    expect(verificationCount).toBeGreaterThan(0)
+    for (let i = 0; i < 25; i++) expect(getRuntimeProfileReferenceV1()).toEqual(first)
+    expect(verify).toHaveBeenCalledTimes(verificationCount)
+    expect(Object.isFrozen(first)).toBe(true)
+
+    const open = vi.spyOn(store, 'openVerifiedSnapshot').mockImplementationOnce(() => { throw Error('verification interrupted') })
+    expect(() => openRuntimeVerifiedSnapshotV1()).toThrow('verification interrupted')
+    const afterFailure = verify.mock.calls.length
+    getRuntimeProfileReferenceV1()
+    expect(verify.mock.calls.length).toBeGreaterThan(afterFailure)
+    open.mockRestore()
+
+    vi.stubEnv('RVB_PROFILE_ACTIVATION_ID', 'cache-key-change')
+    verify.mockImplementationOnce(reference => {
+      ProfileStoreV1.prototype.verifyReference.call(store, reference)
+      const state = JSON.parse(readFileSync(store.statePath, 'utf8'))
+      state.revision++
+      writeFileSync(store.statePath, JSON.stringify(state))
+    })
+    expect(() => getRuntimeProfileReferenceV1()).toThrow('activation changed during verification')
+    expect(getRuntimeProfileReferenceV1()).toEqual(first)
+    vi.stubEnv('RVB_PROFILE_ACTIVATION_ID', undefined)
+
+    const next = store.installCandidate(resolvedSnapshot({ packageId: 'rvb.next', marker: 82, jsonValue: 82 }))
+    store.commitActivation(store.beginActivation(next.resolvedProfileHash).activationId, next.resolvedProfileHash)
+    expect(getRuntimeProfileReferenceV1().resolvedProfileHash).toBe(next.resolvedProfileHash)
+    bindStableRuntimeProfileV1()
+    getRuntimeProfileReferenceV1()
+    const boundCount = verify.mock.calls.length
+    getRuntimeProfileReferenceV1()
+    expect(verify).toHaveBeenCalledTimes(boundCount)
+    vi.stubEnv('RVB_PROFILE_ROOT', path.join(root, 'wrong-root'))
+    expect(() => getRuntimeProfileReferenceV1()).toThrow('runtime root mismatch')
+    vi.stubEnv('RVB_PROFILE_ROOT', store.profileRoot(next)!)
+    writeFileSync(path.join(store.profileRoot(next)!, 'data/rules/profile.json'), '{}')
+    expect(() => store.openVerifiedSnapshot(next)).toThrow('PROFILE_HASH_MISMATCH')
+    // A new process/context must never reuse a previously trusted reference.
+    globalThis.__rvbProfileRuntimeContextV1 = { appRoot: root, userDataDir: root, store }
+    expect(() => getRuntimeProfileReferenceV1()).toThrow()
+  })
   it('opens an installed Profile only through the canonical verified immutable Snapshot seam', () => {
     const root = temporaryRoot()
     const base = resolvedSnapshot({ packageId: 'rvb.base', marker: 40, jsonValue: 40 })
@@ -354,6 +413,25 @@ describe('RED-115 Profile store and activation state', () => {
 
     expect(() => store.verifyReference(installed)).toThrow(/PROFILE_HASH_MISMATCH/)
     expect(() => store.verifyReference({ ...installed, capabilities: [] })).toThrow(/PROFILE_HASH_MISMATCH/)
+  })
+
+  it('rejects undeclared scripts even with self-consistent disk metadata and pointer hashes', () => {
+    const root = temporaryRoot()
+    const base = resolvedSnapshot({ packageId: 'rvb.base', marker: 27, jsonValue: 27 })
+    const store = createStore(root, base)
+    const installed = store.installCandidate(resolvedSnapshot({ packageId: 'rvb.tamper-script', marker: 28, jsonValue: 28 }))
+    const profileRoot = store.profileRoot(installed)!
+    const metadataPath = path.join(profileRoot, '.rvb/profile.json')
+    const metadata = JSON.parse(readFileSync(metadataPath, 'utf8'))
+    const bytes = encoder.encode('{"skillCode":"return 1"}')
+    writeFileSync(path.join(profileRoot, 'data/rules/profile.json'), bytes)
+    const descriptor = metadata.files.find((file: { descriptor: { path: string } }) => file.descriptor.path === 'data/rules/profile.json').descriptor
+    descriptor.size = bytes.length; descriptor.sha256 = sha256HexV1(bytes)
+    const derived = computeResolvedProfileIdentitiesV1({ schemaVersion: metadata.schemaVersion, compatibility: metadata.compatibility, capabilities: metadata.capabilities, base: metadata.base, patches: metadata.patches, files: metadata.files })
+    metadata.resolvedProfileHash = derived.resolvedProfileHash; metadata.authorityContentHash = derived.authorityContentHash
+    writeFileSync(metadataPath, JSON.stringify(metadata))
+    renameSync(profileRoot, path.join(root, 'profiles', derived.resolvedProfileHash))
+    expect(() => store.verifyReference({ ...installed, resolvedProfileHash: derived.resolvedProfileHash, authorityContentHash: derived.authorityContentHash })).toThrow('undeclared executable content')
   })
 
   it('recovers a corrupted installed stable pointer to Bundled Base before server startup', () => {

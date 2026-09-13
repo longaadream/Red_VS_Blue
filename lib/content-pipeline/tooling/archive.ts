@@ -123,18 +123,20 @@ function deriveCapabilities(files: readonly ToolingFileV1[]): readonly PackCapab
 
 export function contentPolicyForChannelV1(
   channel: ContentToolingChannelV1,
+  trustedScriptPublisherKeyIds: readonly string[] = [],
 ): ContentValidationPolicyV1 {
-  if (channel === 'local-dev') {
+  if (channel === 'local-dev' || channel === 'authoring') {
     return {
-      kind: 'local-dev',
+      kind: channel,
       expectedCompatibility: EXPECTED_COMPATIBILITY_V1,
       allowUnsigned: true,
     }
   }
-  return { kind: 'external', expectedCompatibility: EXPECTED_COMPATIBILITY_V1 }
+  return { kind: 'external', expectedCompatibility: EXPECTED_COMPATIBILITY_V1,
+    trustedScriptPublisherKeyIds: channel === 'community' ? [] : trustedScriptPublisherKeyIds }
 }
 
-export function buildPackSourceV1(request: BuildContentOperationV1): ContentPackSourceV1 {
+export function buildPackSourceV1(request: BuildContentOperationV1, parent?: ResolvedSnapshotViewV1): ContentPackSourceV1 {
   const sourceRoot = path.resolve(request.sourceDir)
   const sourceStat = lstatSync(sourceRoot)
   if (!sourceStat.isDirectory() || sourceStat.isSymbolicLink()) {
@@ -145,6 +147,19 @@ export function buildPackSourceV1(request: BuildContentOperationV1): ContentPack
     )
   }
   const files = walkSource(sourceRoot)
+  const capabilityFiles = [...files]
+  if (request.mode === 'patch' && parent) {
+    if (parent.profile.resolvedProfileHash !== request.parentProfileHash) throw new Error('Patch build parent identity mismatch')
+    for (const operation of PackPatchOperationsV1Schema.parse(request.operations)) {
+      if (operation.op === 'add') continue
+      const descriptor = parent.files.find(file => file.path === operation.targetPath)
+      const bytes = parent.readFile(operation.targetPath)
+      if (!descriptor || !bytes || descriptor.sha256 !== operation.expectedHash) throw new Error('Patch build parent precondition failed')
+      capabilityFiles.push({ path: descriptor.path, mediaType: descriptor.mediaType, bytes,
+        jsonValue: descriptor.mediaType === 'application/json' ? parseStrictJsonBytesV1(bytes) : undefined,
+        hasExecutableContent: parent.hasExecutableContent(descriptor.path) })
+    }
+  }
   const common = {
     schemaVersion: 'rvb-pack/v1' as const,
     packageId: request.packageId,
@@ -153,7 +168,7 @@ export function buildPackSourceV1(request: BuildContentOperationV1): ContentPack
     ...(request.description ? { description: request.description } : {}),
     publisher: { id: request.publisherId, keyId: null },
     compatibility: EXPECTED_COMPATIBILITY_V1,
-    capabilities: request.capabilities ?? deriveCapabilities(files),
+    capabilities: request.capabilities ?? deriveCapabilities(capabilityFiles),
     files: files.map(file => ({
       path: file.path,
       mediaType: file.mediaType,
@@ -227,10 +242,11 @@ export function validateArchiveSourceV1(
   source: ContentPackSourceV1,
   channel: ContentToolingChannelV1,
   context?: Readonly<{ parent: ResolvedSnapshotViewV1 }>,
+  trustedScriptPublisherKeyIds: readonly string[] = [],
 ): ValidatedPackV1 {
   return validatePackSourceV1(
     source,
-    contentPolicyForChannelV1(channel),
+    contentPolicyForChannelV1(channel, trustedScriptPublisherKeyIds),
     context,
   )
 }

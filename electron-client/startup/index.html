@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; base-uri 'none'; form-action 'none'">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RED vs BLUE · 正在启动</title>
+  <link rel="stylesheet" href="startup.css">
+</head>
+<body>
+  <main aria-labelledby="title">
+    <div class="brand"><span>RED</span> <small>vs</small> <span>BLUE</span></div>
+    <h1 id="title">正在启动游戏</h1>
+    <p id="stage" role="status" aria-live="polite">正在准备启动窗口…</p>
+    <progress id="progress" aria-label="已完成的启动阶段" max="6" value="0"></progress>
+    <div class="meta"><span id="count">0 / 6 个阶段已完成</span><span id="elapsed">已用时 0 秒</span></div>
+    <p class="hint" id="hint">首次启动需要初始化本机服务，请稍候。完成后将自动进入主菜单。</p>
+    <p class="hint">可以关闭窗口退出，无需重复打开程序。</p>
+  </main>
+  <script src="startup.js"></script>
+</body>
+</html>

@@ -19,6 +19,7 @@ import {
 import { computeResolvedProfileIdentitiesV1, sha256HexV1 } from '../core/hash'
 import type { ResolvedSnapshotViewV1 } from '../core/resolver'
 import { createReadonlyContentTreeV1 } from '../core/source'
+import { hasExecutableContentV1, parseStrictJsonBytesV1 } from '../core/json-safety'
 
 export const PROFILE_STATE_SCHEMA_VERSION_V1 = 'rvb-profile-state/v1' as const
 export const PROFILE_REFERENCE_SCHEMA_VERSION_V1 = 'rvb-profile-reference/v1' as const
@@ -114,6 +115,8 @@ interface ProfileLikeV1 {
 export interface ProfileStoreOptionsV1 {
   readonly rootDir: string
   readonly bundledBase: ResolvedSnapshotViewV1
+  /** Host adapter must reconstruct and revalidate the original signed package chain. */
+  readonly openScriptProvenance?: (profileHash: string) => ResolvedSnapshotViewV1
   readonly now?: () => string
   readonly createActivationId?: () => string
 }
@@ -286,6 +289,7 @@ export class ProfileStoreV1 {
   readonly lockPath: string
   readonly auditDir: string
   private readonly bundledBase: ResolvedSnapshotViewV1
+  private readonly openScriptProvenance?: ProfileStoreOptionsV1['openScriptProvenance']
   private readonly now: () => string
   private readonly createActivationId: () => string
 
@@ -296,6 +300,7 @@ export class ProfileStoreV1 {
     this.lockPath = path.join(this.rootDir, 'activation.lock')
     this.auditDir = path.join(this.rootDir, 'audit')
     this.bundledBase = options.bundledBase
+    this.openScriptProvenance = options.openScriptProvenance
     this.now = options.now ?? (() => new Date().toISOString())
     this.createActivationId = options.createActivationId ?? randomUUID
   }
@@ -485,6 +490,13 @@ export class ProfileStoreV1 {
       : path.join(this.profilesDir, reference.resolvedProfileHash)
   }
 
+  private verifiedScriptView(reference: ProfileReferenceV1): ResolvedSnapshotViewV1 {
+    if (!this.openScriptProvenance) throw new ProfileStoreErrorV1('PROFILE_STATE_INVALID', 'script publisher verification unavailable')
+    const view = this.openScriptProvenance(reference.resolvedProfileHash)
+    if (!referenceMatchesProfile(reference, view.profile)) throw new ProfileStoreErrorV1('PROFILE_HASH_MISMATCH', 'script provenance')
+    return view
+  }
+
   verifyReference(reference: ProfileReferenceV1): void {
     if (reference.kind === 'bundled-base') {
       if (!referenceMatchesProfile(reference, this.bundledBase.profile)) {
@@ -560,6 +572,7 @@ export class ProfileStoreV1 {
       }
     }
     walk(root)
+    let observedScript = false
     for (const file of profile.files) {
       const absolute = path.resolve(root, ...file.descriptor.path.split('/'))
       if (!absolute.startsWith(`${root}${path.sep}`) || !existsSync(absolute)) {
@@ -572,7 +585,10 @@ export class ProfileStoreV1 {
       ) {
         throw new ProfileStoreErrorV1('PROFILE_HASH_MISMATCH', file.descriptor.path)
       }
+      if (file.descriptor.path.endsWith('.json')) observedScript ||= hasExecutableContentV1(parseStrictJsonBytesV1(bytes))
     }
+    if (observedScript && !profile.capabilities.includes('trusted-executable-content')) throw new ProfileStoreErrorV1('PROFILE_HASH_MISMATCH', 'undeclared executable content')
+    if (profile.capabilities.includes('trusted-executable-content')) this.verifiedScriptView(reference)
   }
 
   /** Opens exactly one already-installed, integrity-verified immutable Snapshot. */
@@ -601,6 +617,7 @@ export class ProfileStoreV1 {
     ) throw new ProfileStoreErrorV1('PROFILE_HASH_MISMATCH', reference.resolvedProfileHash)
     // The canonical verifier also rejects links and undeclared entries.
     this.verifyReference(reference)
+    if (profile.capabilities.includes('trusted-executable-content')) return this.verifiedScriptView(reference)
     const tree = createReadonlyContentTreeV1(profile.files.map(file => {
       const bytes = new Uint8Array(readFileSync(path.join(root, ...file.descriptor.path.split('/'))))
       if (bytes.byteLength !== file.descriptor.size || sha256HexV1(bytes) !== file.descriptor.sha256) {
@@ -725,6 +742,7 @@ export class ProfileStoreV1 {
         }
       }
 
+      if (view.profile.capabilities.includes('trusted-executable-content')) this.verifyReference(reference)
       const next: ProfileStateV1 = {
         ...current,
         revision: current.revision + 1,

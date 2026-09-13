@@ -1,3 +1,4 @@
+import { getHostDiscovery, setHostName, ipv4Broadcast } from './host-discovery'
 import { app, BrowserWindow, dialog, ipcMain, net as electronNet, protocol, safeStorage, session } from 'electron'
 import { spawn, ChildProcess, execSync } from 'child_process'
 import * as path from 'path'
@@ -12,6 +13,12 @@ import { resolveDevelopmentProfile } from './development-profile'
 import { findFreePort } from './local-port'
 import { readClientProtocolBattleData, resolveClientProtocolFile } from './client-protocol-resource'
 import { EmbeddedPostgresController } from './embedded-postgres'
+import { LOCAL_STARTUP_STATUS_SCRIPT } from './local-startup-status'
+import { OfficialResourceUpdates } from './official-resource-updates'
+import { ClientBinaryUpdates } from './client-binary-updates'
+import { installedResourceVersion, resolvedResourceVersion } from './resource-update-identity'
+import { officialUpdateFetch, prepareOfficialUpdateNetwork } from './official-update-fetch'
+import { assertOfficialUpdateIpcAllowed } from './official-update-ipc'
 import {
   LocalAuthorityRecoveryBudget,
   LOCAL_GAME_OPEN_CANCELLED,
@@ -51,6 +58,15 @@ const PROFILE_ARCHIVE_MAX_BYTES = 32 * 1024 * 1024
 const PROFILE_ADMIN_KEY = randomBytes(32).toString('hex')
 let allowAppExit = false
 let appExitPromise: Promise<void> | null = null
+let officialUpdateApplying = false
+let automaticUpdates = true
+let resourceUpdates: OfficialResourceUpdates | null = null
+let binaryUpdates: ClientBinaryUpdates | null = null
+const updateAdmissionToken = randomBytes(24).toString('hex')
+let startupInProgress = true
+let startupCancelled = false
+let startupCompletedStages = 0
+let initialLocalStartupPromise: Promise<void> | null = null
 
 type GameProfileIdentity = Readonly<{
   schemaVersion: 'rvb-game-profile-identity/v1'
@@ -257,6 +273,12 @@ function getHtmlRoot(): string {
     : path.join(__dirname, '../../data/pages')
 }
 
+function hostDiscoveryFile(): string {
+  const file = path.join(getUserData(), 'host-discovery.json')
+  getHostDiscovery(file)
+  return file
+}
+
 function getUserData(): string {
   return app.getPath('userData')
 }
@@ -327,6 +349,8 @@ function handleTrusted(
 ): void {
   ipcMain.handle(channel, (event, ...args) => {
     assertTrustedIpcSender(event, channel, trustedTargets(roles))
+    assertOfficialUpdateIpcAllowed(channel, officialUpdateApplying)
+    if (startupCancelled) throw new Error(LOCAL_GAME_OPEN_CANCELLED)
     return listener(event, ...args)
   })
 }
@@ -473,6 +497,27 @@ function forceKillServer(): void {
 }
 
 function requestApplicationExit(): void {
+  if (officialUpdateApplying && !allowAppExit) {
+    void enqueueProfileMutation(async () => { requestApplicationExit() })
+    return
+  }
+  if (startupInProgress || initialLocalStartupPromise) {
+    startupInProgress = true
+    startupCancelled = true
+    // Cancel a menu navigation that may already be in flight. Keep a visible,
+    // read-only exit page until durable shutdown succeeds (or can be retried).
+    if (mainWin && !mainWin.isDestroyed() && (
+      mainWin.webContents.getURL() !== startupPageUrl() || mainWin.webContents.isLoadingMainFrame()
+    )) {
+      mainWin.webContents.stop()
+      void mainWin.loadURL(startupPageUrl()).then(() => {
+        reportStartupProgress(startupCompletedStages, appExitPromise
+          ? '正在安全退出，等待本机服务保存数据…'
+          : '数据尚未确认保存，请再次关闭窗口重试退出。', !appExitPromise)
+      }).catch(error => console.error('[client-startup] exit page failed:', error))
+    }
+    reportStartupProgress(startupCompletedStages, '正在安全退出，等待本机服务保存数据…')
+  }
   if (allowAppExit) {
     app.exit(0)
     return
@@ -486,6 +531,7 @@ function requestApplicationExit(): void {
     .catch(error => {
       console.error('[client] durable application shutdown failed; processes remain fail-closed:', error)
       appExitPromise = null
+      reportStartupProgress(startupCompletedStages, '数据尚未确认保存，请稍后再次关闭窗口重试退出。', true)
       dialog.showErrorBox(
         '无法安全退出',
         '战斗记录尚未确认写入数据库，游戏服务仍保持运行。请稍后再次退出；不要强制结束进程。',
@@ -513,7 +559,7 @@ const localAuthorityRecoveryBudget = new LocalAuthorityRecoveryBudget(
 )
 let localAuthorityRecoveryPromise: Promise<void> | null = null
 let localAuthorityNotice: string | null = null
-let localAuthorityRecoveryStatus: 'ready' | 'recovering' | 'manual-required' = 'ready'
+let localAuthorityRecoveryStatus: 'starting' | 'ready' | 'recovering' | 'manual-required' = 'ready'
 type ProfileProcessBinding = {
   reference?: DesktopProfileReference
   profileRoot: string
@@ -641,7 +687,7 @@ function waitForLocalServerReady(port: number, timeoutMs = 20000): Promise<boole
     }
 
     const probe = () => {
-      if (!serverProcess) { finish(false); return }
+      if (startupCancelled || !serverProcess) { finish(false); return }
       let retried = false
       const retryOnce = () => {
         if (retried) return
@@ -668,7 +714,7 @@ function waitForGameAuthorityReady(port: number, timeoutMs = 20000): Promise<boo
   const deadline = Date.now() + timeoutMs
   return new Promise(resolve => {
     const probe = () => {
-      if (!gameServerProcess) {
+      if (startupCancelled || !gameServerProcess) {
         resolve(false)
         return
       }
@@ -798,6 +844,7 @@ async function startLocalGameAuthorityOnce(
   localGameReady = false
   localAuthorityProfileIdentity = null
   actualGamePort = await findFreePort(GAME_PORT_HINT)
+  if (startupCancelled) throw new Error(LOCAL_GAME_OPEN_CANCELLED)
   const appRoot = getAppRoot()
   const entry = findColyseusEntry(appRoot)
   if (!entry) {
@@ -805,7 +852,10 @@ async function startLocalGameAuthorityOnce(
     return
   }
   const binding = profileBinding ?? stableProfileBinding()
+  reportStartupProgress(3, '正在启动本机数据库…')
   const databaseUrl = await resolveAuthorityDatabaseUrl()
+  if (startupCancelled) throw new Error(LOCAL_GAME_OPEN_CANCELLED)
+  reportStartupProgress(4, '正在启动对局服务…')
   console.log(`[client] Colyseus/PostgreSQL game port: ${actualGamePort}`)
   gameServerProcess = spawn(getNodeBin(), [entry], {
     cwd: appRoot,
@@ -814,10 +864,12 @@ async function startLocalGameAuthorityOnce(
       NODE_ENV: 'production',
       RVB_COLYSEUS_PORT: String(actualGamePort),
       RVB_COLYSEUS_HOST: '0.0.0.0',
+      RVB_UPDATE_ADMISSION_TOKEN: officialUpdateApplying ? updateAdmissionToken : '',
       RVB_POSTGRES_URL: databaseUrl,
       RVB_TURN_TIMER_ENABLED: '1',
       APP_ROOT_DIR: appRoot,
       USER_DATA_DIR: getUserData(),
+      RVB_HOST_DISCOVERY_FILE: hostDiscoveryFile(),
       RVB_PROFILE_ROOT: binding.profileRoot,
       RVB_RESOLVED_PROFILE_HASH: binding.reference?.resolvedProfileHash,
       RVB_AUTHORITY_CONTENT_HASH: binding.reference?.authorityContentHash,
@@ -1728,6 +1780,7 @@ async function recoverProfileOnStartup(expectedGeneration?: number): Promise<voi
 }
 
 function assertLocalGameOpeningCurrent(expectedGeneration: number): void {
+  if (startupCancelled) throw new Error(LOCAL_GAME_OPEN_CANCELLED)
   localGameLifecycle.assertOpeningCurrent(expectedGeneration)
 }
 
@@ -1884,6 +1937,41 @@ handleTrusted('pack-list', ['game'], async () => {
 
 let mainWin: BrowserWindow | null = null
 
+function startupPageUrl(): string {
+  return pathToFileURL(path.join(__dirname, '..', 'startup', 'index.html')).href
+}
+
+function reportStartupProgress(completed: number, message: string, failed = false): void {
+  console.info(`[client-startup] ${completed}/6 ${message}`)
+  if (!startupInProgress || !mainWin || mainWin.isDestroyed()) return
+  startupCompletedStages = completed
+  if (mainWin.webContents.getURL() !== startupPageUrl()) return
+  void mainWin.webContents.executeJavaScript(
+    `window.renderStartupProgress?.(${JSON.stringify(completed)}, ${JSON.stringify(message)}, ${failed})`,
+  ).catch(error => console.warn('[client-startup] progress rendering failed:', error))
+}
+
+async function showStartupWindow(): Promise<BrowserWindow> {
+  const win = createGameWindow()
+  win.on('close', event => {
+    if ((startupInProgress || initialLocalStartupPromise) && !allowAppExit) {
+      event.preventDefault()
+      requestApplicationExit()
+    }
+  })
+  win.on('closed', () => {
+    if (startupInProgress || initialLocalStartupPromise) requestApplicationExit()
+  })
+  await win.loadURL(startupPageUrl())
+  // Let the renderer paint before starting the expensive local services.
+  await Promise.race([
+    win.webContents.executeJavaScript('new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))'),
+    // Minimized windows may suspend animation frames. They must still boot.
+    new Promise(resolve => setTimeout(resolve, 250)),
+  ])
+  return win
+}
+
 function getApplicationIconPath(): string {
   const root = app.isPackaged
     ? path.join(process.resourcesPath, 'branding')
@@ -1912,7 +2000,14 @@ function createGameWindow(): BrowserWindow {
     },
   })
 
-  restrictWindowNavigation(win, isGameClientUrl)
+  restrictWindowNavigation(win, url => isGameClientUrl(url) || (startupInProgress && url === startupPageUrl()))
+  win.webContents.on('will-navigate', event => { if (officialUpdateApplying) event.preventDefault() })
+  win.webContents.on('did-finish-load', () => {
+    if (startupCancelled || win.isDestroyed()) return
+    const url = new URL(win.webContents.getURL())
+    if (url.protocol !== CLIENT_SCHEME + ':' || url.hostname !== 'app' || url.pathname !== '/index.html') return
+    void win.webContents.executeJavaScript(LOCAL_STARTUP_STATUS_SCRIPT).catch(error => console.warn('[client-startup] status unavailable:', error))
+  })
   win.setMenuBarVisibility(false)
 
   win.webContents.on('before-input-event', (_event, input) => {
@@ -1954,28 +2049,155 @@ function openAdminWindow(): void {
   win.on('closed', () => { adminWin = null })
 }
 
-function loadLocalGame(): void {
-  const win = createGameWindow()
-  win.loadURL(`${CLIENT_SCHEME}://app/index.html?v=${Date.now()}`)
+function officialUpdateStatus() {
+  return { automatic: automaticUpdates, clientVersion: app.getVersion(), resource: resourceUpdates?.status ?? { phase: 'idle', message: '正在准备本机服务' }, client: binaryUpdates?.status ?? { phase: 'idle', message: '正在准备更新服务' } }
+}
 
-  // 仅当本地服务器实际启动后，才注入默认服务器 URL（once：只注入一次，不影响后续页面导航）
+function notifyOfficialUpdates() {
+  if (mainWin && !mainWin.isDestroyed()) mainWin.webContents.send('official-update-status', officialUpdateStatus())
+}
+
+async function canApplyOfficialUpdate(): Promise<boolean> {
+  if (initialLocalStartupPromise) return false
+  if (!localServerReady || !mainWin || mainWin.isDestroyed() || appExitPromise) return false
+  const win = mainWin
+  const stillAtMenu = () => {
+    if (mainWin !== win || win.isDestroyed() || win.webContents.isLoadingMainFrame()) return false
+    const url = new URL(win.webContents.getURL() || 'about:blank')
+    return url.protocol === `${CLIENT_SCHEME}:` && url.hostname === 'app' && url.pathname === '/index.html'
+  }
+  if (!stillAtMenu()) return false
+  const report = await profileApiRequest('/api/content-profile')
+  const rooms = await updateAuthorityAdmission('status')
+  return stillAtMenu() && report.server?.healthy === true && report.server?.activationId === null && report.server?.lease?.active === false && rooms.idle === true
+}
+
+function updateAuthorityAdmission(action: 'status' | 'acquire' | 'release'): Promise<{ idle?: boolean; acquired?: boolean }> {
+  const proc = gameServerProcess
+  if (!proc) return Promise.resolve({ idle: true, acquired: true })
+  if (!proc.connected) return Promise.reject(new Error('无法确认本机房间是否空闲'))
+  const requestId = randomBytes(16).toString('hex')
+  return new Promise((resolve, reject) => {
+    const cleanup = () => { clearTimeout(timer); proc.removeListener('message', onMessage); proc.removeListener('exit', onExit) }
+    const onExit = () => { cleanup(); reject(new Error('房间服务正在切换，请稍后重试')) }
+    const onMessage = (value: JsonObject) => { if (value?.type === 'rvb:update:result' && value.requestId === requestId) { cleanup(); resolve(value) } }
+    const timer = setTimeout(() => { cleanup(); reject(new Error('无法确认房间占用；已推迟更新')) }, 5000)
+    proc.on('message', onMessage); proc.once('exit', onExit)
+    proc.send({ type: 'rvb:update:control', action, token: updateAdmissionToken, requestId }, error => { if (error) { cleanup(); reject(error) } })
+  })
+}
+
+function setupOfficialUpdates(): void {
+  const settingsFile = path.join(getUserData(), 'official-updates.json')
+  try { automaticUpdates = JSON.parse(fs.readFileSync(settingsFile, 'utf8')).automatic !== false } catch { /* First launch uses automatic checks. */ }
+  const saveSettings = () => {
+    fs.mkdirSync(getUserData(), { recursive: true })
+    fs.writeFileSync(settingsFile + '.tmp', JSON.stringify({ schema: 'rvb-official-updates/v1', automatic: automaticUpdates }))
+    fs.renameSync(settingsFile + '.tmp', settingsFile)
+  }
+  let publishers: string[] = []
+  try { publishers = JSON.parse(fs.readFileSync(path.join(getAppRoot(), 'config/content-script-publishers.json'), 'utf8')).keyIds } catch { /* Empty pin list fails closed. */ }
+  resourceUpdates = new OfficialResourceUpdates(officialUpdateFetch, app.getVersion(), publishers, {
+    stable: async () => {
+      const state = readDesktopProfileState(getPackRoot())
+      if (!state) throw new Error('本机资源服务尚未就绪，请稍后重试')
+      return { ...state.stable, version: installedResourceVersion(getPackRoot(), state.stable), candidateHash: state.candidate?.resolvedProfileHash }
+    },
+    canApply: canApplyOfficialUpdate,
+    apply: (archive, index, expectedStableHash) => enqueueProfileMutation(async () => {
+      // Serialize with manual imports, lock renderer navigation and starting rooms,
+      // then fence actual Colyseus room creation as well as Next/PVE leases.
+      officialUpdateApplying = true
+      try {
+        const state = readDesktopProfileState(getPackRoot())
+        if (state?.stable.resolvedProfileHash !== expectedStableHash || state.candidate && state.candidate.resolvedProfileHash !== expectedStableHash) throw new Error('资源状态已改变，请先处理资源管理中的候选')
+        if (!await canApplyOfficialUpdate()) throw new Error('请返回主菜单并退出房间后更新')
+        if (!(await updateAuthorityAdmission('acquire')).acquired) throw new Error('本机还有房间，请关闭房间后更新')
+        const installed = await installProfileArchive(archive)
+        const reference = installed.reference as DesktopProfileReference
+        if (!reference || resolvedResourceVersion(installed.profile) !== index.version || reference.compatibility.engineAbi !== index.identity.engineAbi || reference.compatibility.contentAbi !== index.identity.contentAbi) throw new Error('已签名资源与发布清单不匹配，未启用候选')
+        if (!await canApplyOfficialUpdate()) throw new Error('房间已开始使用资源，请退出房间后在资源管理中应用候选')
+        await activateProfileHash(reference.resolvedProfileHash)
+        if (readDesktopProfileState(getPackRoot())?.stable.resolvedProfileHash !== reference.resolvedProfileHash) throw new Error('资源更新未完成，已保留原版本')
+        return reference.resolvedProfileHash
+      } finally {
+        await updateAuthorityAdmission('release').catch(error => console.error('[updates] admission release failed:', error))
+        officialUpdateApplying = false
+      }
+    }),
+    applied: receipt => {
+      // Active profile is the authoritative receipt; this file is diagnostic only.
+      try { fs.writeFileSync(path.join(getUserData(), 'official-resource-receipt.json'), JSON.stringify({ ...receipt, appliedAt: new Date().toISOString() })) } catch (error) { console.warn('[updates] receipt write failed:', error) }
+    },
+    changed: notifyOfficialUpdates,
+  })
+  try {
+    // Development/portable builds must never run an installer against themselves.
+    const executable = app.getPath('exe')
+    const uninstaller = path.join(path.dirname(executable), `Uninstall ${path.basename(executable, '.exe')}.exe`)
+    const supported = app.isPackaged && process.platform === 'win32' && fs.existsSync(path.join(process.resourcesPath, 'app-update.yml')) && fs.existsSync(uninstaller)
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const updater = supported ? new (require('./update-runtime.cjs').NsisUpdater)() : null
+    binaryUpdates = new ClientBinaryUpdates(updater, notifyOfficialUpdates, prepareOfficialUpdateNetwork)
+  } catch (error) {
+    console.error('[updates] binary updater initialization failed:', error)
+    binaryUpdates = new ClientBinaryUpdates(null, notifyOfficialUpdates)
+  }
+  const check = async () => {
+    if (officialUpdateApplying || appExitPromise) return officialUpdateStatus()
+    await Promise.all([resourceUpdates!.check(), binaryUpdates!.check()])
+    return officialUpdateStatus()
+  }
+  handleTrusted('official-update-status', ['game'], () => officialUpdateStatus())
+  handleTrusted('official-update-check', ['game'], check)
+  handleTrusted('official-update-automatic', ['game'], (_event, enabled) => {
+    if (typeof enabled !== 'boolean') throw new Error('自动更新设置无效')
+    automaticUpdates = enabled; saveSettings(); notifyOfficialUpdates(); return officialUpdateStatus()
+  })
+  handleTrusted('official-update-install', ['game'], () => enqueueProfileMutation(async () => {
+    if (!binaryUpdates?.isReady() || officialUpdateApplying || !await canApplyOfficialUpdate()) throw new Error('请在更新下载完成后，退出房间并返回主菜单')
+    const answer = await dialog.showMessageBox(mainWin!, { type: 'question', title: '安装客户端更新', message: '现在关闭游戏并安装已下载的客户端更新？', buttons: ['稍后', '重启并安装'], defaultId: 0, cancelId: 0 })
+    if (answer.response !== 1) return { cancelled: true }
+    officialUpdateApplying = true
+    try {
+      if (!await canApplyOfficialUpdate()) throw new Error('游戏状态已改变，请退出房间再试')
+      if (!(await updateAuthorityAdmission('acquire')).acquired) throw new Error('本机还有房间，请关闭房间后更新')
+      await killServer(true)
+      // quitAndInstall starts the installer synchronously, then quits Electron.
+      // Durable authority shutdown must complete before allowing that quit.
+      allowAppExit = true
+      binaryUpdates.install()
+      if (binaryUpdates.status.phase === 'error') throw new Error('安装程序未能启动，请稍后重试')
+      return { ok: true }
+    } catch (error) {
+      allowAppExit = false
+      try { await startStableLocalServerAndRecover() }
+      finally { await updateAuthorityAdmission('release').catch(failure => console.error('[updates] admission release failed:', failure)); officialUpdateApplying = false }
+      throw error
+    }
+  }))
+  setTimeout(() => { if (automaticUpdates) void check() }, 15000).unref()
+  setInterval(() => { if (automaticUpdates) void check() }, 15 * 60 * 1000).unref()
+  // A downloaded candidate is retried locally on return to the menu; no polling
+  // GitHub every few seconds. A disabled automatic preference pauses this too.
+  setInterval(() => { if (automaticUpdates && resourceUpdates?.status.phase === 'waiting' && !officialUpdateApplying) void resourceUpdates.applyPending() }, 15000).unref()
+}
+
+function loadLocalGame(existingWindow?: BrowserWindow): Promise<void> {
+  if (startupCancelled) return Promise.resolve()
+  const win = existingWindow ?? createGameWindow()
+
   win.webContents.once('did-finish-load', () => {
-    if (!gameServerProcess || !localGameReady) return
-    win.webContents.executeJavaScript(`
-      (function() {
-        var url = 'http://127.0.0.1:${actualGamePort}';
-        if (window.RvBUtils && RvBUtils.saveServerConfig) {
-          RvBUtils.saveServerConfig({ mode: 'local', url: url });
-        } else {
-          localStorage.setItem('rvb_server_url', url);
-          localStorage.setItem('rvb_lobby_server_mode', 'local');
-          localStorage.setItem('rvb_local_server_url', url);
-          localStorage.setItem('rvb_remote_server_url', url);
-        }
-        if (typeof updateFloatBar === 'function') updateFloatBar();
-        if (typeof refreshUserUI === 'function') refreshUserUI();
-      })();
-    `)
+    if (startupCancelled) return
+    if (!isGameClientUrl(win.webContents.getURL())) return
+    startupInProgress = false
+  })
+  return win.loadURL(`${CLIENT_SCHEME}://app/index.html?v=${Date.now()}`).catch(async error => {
+    console.error('[client] main menu failed to load:', error)
+    if (win.isDestroyed() || startupCancelled) return
+    startupInProgress = true
+    await win.loadURL(startupPageUrl())
+    reportStartupProgress(5, '主菜单加载失败，请关闭后重试。', true)
   })
 }
 
@@ -2191,6 +2413,13 @@ handleTrusted('ensure-local-authority', ['game'], async () => {
   if (localGameLifecycle.shutdownInProgress) {
     return { ok: false, error: '本机服务正在停止，请稍后重试。' }
   }
+  // Menu actions join the initial startup; treating it as a crash recovery
+  // would restart Profile recovery and may discard its still-starting process.
+  if (initialLocalStartupPromise) {
+    await initialLocalStartupPromise
+    if (startupCancelled || localGameLifecycle.shutdownInProgress) return { ok: false, error: '本机服务正在停止，请稍后重试。' }
+    return { ok: localGameReady, error: localGameReady ? undefined : localAuthorityNotice }
+  }
   if (localGameReady && gameServerProcess) {
     return { ok: true, notice: localAuthorityNotice }
   }
@@ -2217,7 +2446,7 @@ handleTrusted('ensure-local-authority', ['game'], async () => {
 
 // 查询当前模式
 handleTrusted('get-mode', ['game'], () => ({
-  isLocal: localGameReady,
+  isLocal: localGameReady && localAuthorityProfileIdentity !== null,
   localUrl: `http://127.0.0.1:${actualGamePort}`,
   profileRuntimeUrl: `http://127.0.0.1:${actualLocalPort}`,
   profileIdentity: localProfileIdentity,
@@ -2227,7 +2456,7 @@ handleTrusted('get-mode', ['game'], () => ({
     status: localAuthorityRecoveryStatus,
     ...localAuthorityRecoveryBudget.snapshot(),
   },
-  ready: localGameReady,
+  ready: localGameReady && localAuthorityProfileIdentity !== null,
 }))
 
 // 重启本地服务器
@@ -2245,13 +2474,17 @@ handleTrusted('restart-server', ['admin'], async () => {
 
 // 获取本机局域网 IPv4 地址列表（供 LAN 扫描定位子网）
 handleTrusted('get-lan-ips', ['game'], () => {
-  return getLanIpList()
+  return getLanIpList(true)
 })
 
+handleTrusted('set-host-name', ['game'], (_event, name: unknown) => setHostName(hostDiscoveryFile(), name))
+
 // 获取主机信息（端口 + LAN IP 列表），供"我当主机"功能使用
-handleTrusted('get-host-info', ['game'], () => {
+handleTrusted('get-host-info', ['game'], async () => {
+  if (initialLocalStartupPromise) await initialLocalStartupPromise
   const ips = getLanIpList(true)
   return {
+    ...getHostDiscovery(hostDiscoveryFile()),
     port: actualGamePort,
     ips,
     running: gameServerProcess !== null && localGameReady,
@@ -2289,19 +2522,22 @@ handleTrusted('start-host-broadcast', ['game'], () => {
   if (broadcastTimer) { clearInterval(broadcastTimer); broadcastTimer = null }
   if (broadcastSocket) { try { broadcastSocket.close() } catch {} broadcastSocket = null }
 
-  const myIps = getLanIpList()
-  const hostname = os.hostname()
-  const port = actualGamePort
-
   const send = () => {
+    const interfaces = Object.values(os.networkInterfaces()).flatMap(items => items ?? [])
+    const myIps = getLanIpList(true)
+    const port = actualGamePort
     for (const ip of myIps) {
-      const payload = JSON.stringify({ magic: 'RVB_DISCOVER', name: hostname, ip, port })
+      const iface = interfaces.find(iface => iface.address === ip)
+      if (!iface) continue // VPN adapters can change between interface snapshots.
+      const identity = getHostDiscovery(hostDiscoveryFile())
+      const payload = JSON.stringify({ magic: 'RVB_DISCOVER', ...identity, name: identity.serverName, ip, port })
       const buf = Buffer.from(payload)
-      const subnet = ip.substring(0, ip.lastIndexOf('.') + 1) + '255'
+      const subnet = ipv4Broadcast(ip, iface.netmask)
       for (const target of [subnet, '255.255.255.255']) {
         try {
           const sock = dgram.createSocket('udp4')
-          sock.bind(() => {
+          sock.on('error', () => { try { sock.close() } catch { /* Already closed. */ } })
+          sock.bind(0, ip, () => {
             sock.setBroadcast(true)
             sock.send(buf, 0, buf.length, DISCOVERY_PORT, target, () => sock.close())
           })
@@ -2321,12 +2557,30 @@ handleTrusted('stop-host-broadcast', ['game'], () => {
 })
 
 // 发现主机：监听 UDP 广播 timeoutMs 毫秒，通过 webContents.send 推送结果
-handleTrusted('start-discover-hosts', ['game'], (event, timeoutMs: number) => {
-  const timeout = timeoutMs > 0 ? timeoutMs : 3000
+const discoverySessions = new Map<number, { scanId: string; stop(): void }>()
+handleTrusted('stop-discover-hosts', ['game'], (event, scanId: string) => {
+  const active = discoverySessions.get(event.sender.id)
+  if (active?.scanId === scanId) active.stop()
+})
+handleTrusted('start-discover-hosts', ['game'], (event, timeoutMs: number, scanId: string) => {
+  if (typeof scanId !== 'string' || !/^[a-zA-Z0-9-]{1,80}$/.test(scanId)) throw Error('Invalid discovery session')
+  discoverySessions.get(event.sender.id)?.stop()
+  const timeout = Number.isFinite(timeoutMs) && timeoutMs > 0 ? Math.min(timeoutMs, 10000) : 3000
   const sender = event.sender
 
   const seen = new Set<string>()
   let sock: dgram.Socket | null = null
+  const stop = () => {
+    clearTimeout(timer)
+    try { sock?.close() } catch { /* Already closed or not bound. */ }
+    if (discoverySessions.get(sender.id)?.scanId === scanId) discoverySessions.delete(sender.id)
+  }
+  discoverySessions.set(sender.id, { scanId, stop })
+  const timer = setTimeout(() => {
+    stop()
+    if (!sender.isDestroyed()) sender.send('udp-discovery-done')
+  }, timeout)
+
   try {
     sock = dgram.createSocket({ type: 'udp4', reuseAddr: true })
     sock.bind(DISCOVERY_PORT, () => {
@@ -2336,19 +2590,16 @@ handleTrusted('start-discover-hosts', ['game'], (event, timeoutMs: number) => {
       try {
         const info = JSON.parse(msg.toString('utf8'))
         if (info.magic !== 'RVB_DISCOVER') return
+        if (getLanIpList(true).includes(info.ip) || info.serverId === getHostDiscovery(hostDiscoveryFile()).serverId) return
         const key = info.ip + ':' + info.port
         if (seen.has(key)) return
         seen.add(key)
-        if (!sender.isDestroyed()) sender.send('udp-host-found', info)
+        if (!sender.isDestroyed() && discoverySessions.get(sender.id)?.scanId === scanId) sender.send('udp-host-found', { ...info, discoveryScanId: scanId })
       } catch {}
     })
-    sock.on('error', () => { try { sock!.close() } catch {} })
-  } catch { return { ok: false } }
+    sock.on('error', stop)
+  } catch { stop(); return { ok: false } }
 
-  setTimeout(() => {
-    try { sock!.close() } catch {}
-    if (!sender.isDestroyed()) sender.send('udp-discovery-done')
-  }, timeout)
 
   return { ok: true }
 })
@@ -2414,7 +2665,13 @@ process.on('SIGTERM', requestApplicationExit)
 app.whenReady().then(async () => {
   if (process.platform === 'win32') app.setAppUserModelId('com.redvsblue.client')
   if (process.platform === 'darwin' && !app.isPackaged) app.dock?.setIcon(getApplicationIconPath())
+  const win = await showStartupWindow()
+  if (startupCancelled || win.isDestroyed()) return
+  const generation = localGameLifecycle.beginOpening()
+  reportStartupProgress(0, '正在准备游戏资源…')
   await setupPackProtocol()
+  assertLocalGameOpeningCurrent(generation)
+  reportStartupProgress(1, '正在清理旧页面缓存…')
   // 启动时清除上一版本残留的 Service Worker / Cache Storage，避免旧缓存遮蔽新页面
   try {
     await session.defaultSession.clearStorageData({
@@ -2426,23 +2683,51 @@ app.whenReady().then(async () => {
   }
 
   try {
-    // Host & Play and Training both depend on the local authority. Prepare the
-    // complete stack once at application startup so the normal player path is
-    // the main menu, not a server-selection gate.
-    await startStableLocalServerAndRecover()
+    // Recover the installed profile before reading its menu. PostgreSQL and
+    // the battle authority are prepared after the menu has loaded.
+    assertLocalGameOpeningCurrent(generation)
+    reportStartupProgress(2, '正在加载资源配置与本机服务…')
+    await startStableProfileServerAndRecover(generation)
+    assertLocalGameOpeningCurrent(generation)
+    localAuthorityRecoveryStatus = 'starting'
+    setupOfficialUpdates()
+    initialLocalStartupPromise = (async () => {
+      reportStartupProgress(5, '正在打开主菜单…')
+      await loadLocalGame(win)
+      assertLocalGameOpeningCurrent(generation)
+      await startLocalGameAuthority(stableProfileBinding())
+      assertLocalGameOpeningCurrent(generation)
+    })().catch(error => {
+      if (startupCancelled) return
+      localAuthorityRecoveryStatus = 'manual-required'
+      localAuthorityNotice = localAuthorityStartupErrorMessage(error)
+      console.error('[client] background local service startup failed:', error)
+    })
+    await initialLocalStartupPromise
+    if (startupCancelled || win.isDestroyed()) return
     if (localGameReady) {
       localAuthorityRecoveryBudget.recordSuccess()
       localAuthorityRecoveryStatus = 'ready'
+      localAuthorityNotice = null
     } else {
       localAuthorityRecoveryStatus = 'manual-required'
       localAuthorityNotice = '本机服务尚未就绪；打开“我当主机”即可手动重试。'
     }
   } catch (error) {
+    if (startupCancelled || win.isDestroyed()) return
     localAuthorityRecoveryStatus = 'manual-required'
     localAuthorityNotice = localAuthorityStartupErrorMessage(error)
     console.error('[client] automatic local service startup failed:', error)
+    // Preserve the existing manual recovery menu if Profile startup failed.
+    if (!resourceUpdates) setupOfficialUpdates()
+    await loadLocalGame(win)
+  } finally {
+    initialLocalStartupPromise = null
   }
-  loadLocalGame()
+}).catch(error => {
+  if (startupCancelled) return
+  console.error('[client-startup] startup failed:', error)
+  reportStartupProgress(0, '启动失败，请关闭窗口后重试。', true)
 })
 
 app.on('window-all-closed', () => {
@@ -2462,5 +2747,6 @@ app.on('before-quit', event => {
 app.on('quit', () => { try { process.exit(0) } catch {} })
 
 app.on('activate', () => {
+  if (startupInProgress || startupCancelled) return
   if (!mainWin || mainWin.isDestroyed()) loadLocalGame()
 })

@@ -26,6 +26,22 @@ class TestAdventureStore implements AdventureRepository {
 }
 async function port(){const s=createServer();await new Promise<void>(r=>s.listen(0,'127.0.0.1',r));const p=(s.address() as {port:number}).port;await new Promise<void>(r=>s.close(()=>r()));return p}
 describe('real adventure SDK transport',()=>{
+  it('blocks PVE creation during updates and holds the update fence until disposal',async()=>{
+    const candidate=createColyseusBattleServer({repository:new FakeAuthorityRepository(),adventureRepository:new TestAdventureStore(),reconnectGraceMs:100})
+    const p=await port();await candidate.server.listen(p,'127.0.0.1')
+    const sdk=new Client(`ws://127.0.0.1:${p}`),profileIdentity={...getServerGameProfileIdentityV1()}
+    try{
+      expect(candidate.updateAdmission.acquire('update')).toBe(true)
+      await expect(sdk.create('adventure',{playerId:'host',profileIdentity})).rejects.toThrow('更新资源')
+      candidate.updateAdmission.release('update')
+      const room=await sdk.create('adventure',{playerId:'host',profileIdentity})
+      room.onMessage('adventure.state',()=>{})
+      expect(candidate.updateAdmission.acquire('update')).toBe(false)
+      await room.leave()
+      await vi.waitFor(()=>expect(candidate.updateAdmission.status().idle).toBe(true),{timeout:3000})
+      expect(candidate.updateAdmission.acquire('update')).toBe(true)
+    }finally{await candidate.server.gracefullyShutdown(false)}
+  },15000)
   it('starts with two players, rejects guest saves and restores a host checkpoint',async()=>{
     const store=new TestAdventureStore(),candidate=createColyseusBattleServer({repository:new FakeAuthorityRepository(),adventureRepository:store,reconnectGraceMs:300})
     const p=await port();await candidate.server.listen(p,'127.0.0.1')
@@ -57,6 +73,7 @@ describe('real adventure SDK transport',()=>{
       await expect(h('snapshot')).rejects.toThrow()
       Object.assign(profileIdentity,{authorityContentHash:correctHash})
       const started=await h('start');expect(started.snapshot).toBeTruthy()
+      expect(candidate.updateAdmission.acquire('active-adventure-update')).toBe(false)
       const activeListing=await fetch(`http://127.0.0.1:${p}/rooms?mode=pve`).then(r=>r.json())
       expect(activeListing.rooms).toContainEqual(expect.objectContaining({id:host.roomId,status:'playing'}))
       let view=await h('snapshot')
@@ -74,6 +91,7 @@ describe('real adventure SDK transport',()=>{
       const restore=bind(restoredRoom)
       try{const loaded=await restore('start',{saveId:view.runId});expect(loaded.snapshot?.revision).toBe(view.snapshot?.revision)}finally{await restoredRoom.leave()}
       await Promise.all([host.leave(),guest.leave()])
+      expect(candidate.updateAdmission.acquire('leaving-adventure-update')).toBe(false)
       await new Promise(r=>setTimeout(r,900))
       expect((await getProfileLeaseReportV1()).roomIds).not.toContain(host.roomId)
     }finally{await candidate.server.gracefullyShutdown(false)}

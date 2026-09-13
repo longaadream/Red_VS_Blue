@@ -23,9 +23,9 @@ export function importResourceProject(input: { archive: string; parent: string; 
   if (archive.manifest.kind === 'patch' && !input.baseArchive) return { needsBase: true as const }
   const base = archive.manifest.kind === 'patch' ? readArchive(input.baseArchive!) : archive
   if (base.manifest.kind !== 'snapshot') throw new Error('请选择完整原包；当前导入支持完整包，或完整包加一个匹配的补丁')
-  // Authoring permits unsigned source packs, but never skips integrity, signature,
-  // compatibility, passive-asset or executable-content validation.
-  const policy = contentPolicyForChannelV1('local-dev')
+  // This creates an editing project, never a playable/network eligible installation.
+  // Authored JSON scripts remain text; integrity, signatures and asset validation still apply.
+  const policy = contentPolicyForChannelV1('authoring')
   const view = resolveProfileV1({ base: { source: base.source, policy }, patches: archive === base ? [] : [{ source: archive.source, policy }] })
   const parent = fs.realpathSync(input.parent)
   if (!fs.statSync(parent).isDirectory()) throw new Error('请选择保存项目的文件夹')

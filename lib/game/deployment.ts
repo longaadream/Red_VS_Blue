@@ -3,6 +3,7 @@ import type { PieceInstance } from './piece'
 export { DEPLOYMENT_FIRST_MOVE_FREE_STATUS } from './piece'
 import { readSanitizedBattleActionTrace, readSanitizedBattleReplay } from './battle-trace'
 import { manhattanDistance } from './spatial'
+import { projectSkillPresentation } from './skill-presentation'
 import {
   systemAuthoritativeRuleClock,
   type AuthoritativeRuleClock,
@@ -69,6 +70,7 @@ export function toPublicBattleState(
 ): BattleState {
   const projected = cloneSerializable(state)
   const viewerId = String(viewerPlayerId ?? '').trim().toLowerCase()
+  projectSkillPresentation(state, projected, viewerPlayerId)
   for (const player of projected.players) {
     if (viewerId && player.playerId.trim().toLowerCase() === viewerId) continue
     player.hand = player.hand.map((_card, index) => ({
@@ -151,9 +153,13 @@ export function toPublicBattleState(
   const terminalTrace = projected.terminalResult && mayReadTerminalTrace
     ? readSanitizedBattleActionTrace(projected)
     : []
-  const terminalReplay = projected.terminalResult && mayReadTerminalTrace
+  let terminalReplay = projected.terminalResult && mayReadTerminalTrace
     ? readSanitizedBattleReplay(projected)
     : undefined
+  // Older checkpoints may contain unprojected declarations. Withhold that
+  // archive instead of redacting it and invalidating its checkpoint hashes.
+  if (terminalReplay && [terminalReplay.initialState, ...terminalReplay.frames.map(frame => frame.postState)]
+    .some(checkpoint => checkpoint.extensions?.skillPresentation)) terminalReplay = undefined
   if (debugBattle) {
     if (!mayReadTerminalTrace) delete projected.extensions!.debugBattle
     debugBattle.appliedActionIds = []

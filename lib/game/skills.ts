@@ -484,6 +484,8 @@ export type SelectionStepDefinition =
       title: string
       options: SelectionOptionDefinition[]
       canCancel?: boolean
+      minSelections?: number
+      maxSelections?: number
     }
   | {
       kind: 'target'

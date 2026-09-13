@@ -292,13 +292,24 @@ function completePreparedAction(
   if (prepared.kind === 'invalid') return []
   if (prepared.kind === 'ready') return [action]
   if (prepared.kind === 'needOption') {
-    return [...prepared.options]
+    const values = [...prepared.options]
       .sort((left, right) => compareStableText(stableJson(left.value), stableJson(right.value)))
-      .flatMap(option => completePreparedAction(state, {
+      .map(option => option.value)
+    const selections: unknown[] = prepared.max > 1 ? [] : values
+    if (prepared.max > 1) {
+      // Deterministic bounded combinations, including every authored 8-option subset.
+      const visit = (start: number, count: number, picked: unknown[]) => {
+        if (selections.length >= 256) return
+        if (picked.length === count) { selections.push(picked); return }
+        for (let index=start; index<=values.length-(count-picked.length) && selections.length<256; index++) visit(index+1,count,[...picked,values[index]])
+      }
+      for (let count=prepared.min; count<=prepared.max && selections.length<256; count++) visit(0,count,[])
+    }
+    return selections.flatMap(selectedOption => completePreparedAction(state, {
         ...action,
         selectionId: prepared.selectionId,
         stateRevision: prepared.stateRevision,
-        selectedOption: option.value,
+        selectedOption,
       } as BattleAction, depth + 1))
   }
   return [...prepared.candidates]

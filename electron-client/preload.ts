@@ -1,6 +1,15 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
 
 contextBridge.exposeInMainWorld('electronAPI', {
+  getOfficialUpdateStatus: () => ipcRenderer.invoke('official-update-status'),
+  checkOfficialUpdates: () => ipcRenderer.invoke('official-update-check'),
+  setAutomaticUpdates: (enabled: boolean) => ipcRenderer.invoke('official-update-automatic', enabled),
+  installClientUpdate: () => ipcRenderer.invoke('official-update-install'),
+  onOfficialUpdateStatus: (callback: (status: unknown) => void) => {
+    const listener = (_event: unknown, status: unknown) => callback(status)
+    ipcRenderer.on('official-update-status', listener)
+    return () => ipcRenderer.removeListener('official-update-status', listener)
+  },
   // 读取已保存的远程服务器地址
   getRemoteUrl: () => ipcRenderer.invoke('get-remote-url'),
   // 保存远程服务器地址（连接成功后调用，不跳转页面）
@@ -29,14 +38,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // 获取本机局域网 IP（供 LAN 自动发现）
   getLanIps: () => ipcRenderer.invoke('get-lan-ips'),
   // 获取主机信息（端口 + LAN IPs），Electron 客户端内嵌服务器用
+  setHostName: (name: string) => ipcRenderer.invoke('set-host-name', name),
   getHostInfo: () => ipcRenderer.invoke('get-host-info'),
   // UDP LAN 主机广播（我当主机时启动，stopHostBroadcast 时停止）
   startHostBroadcast: () => ipcRenderer.invoke('start-host-broadcast'),
   stopHostBroadcast: () => ipcRenderer.invoke('stop-host-broadcast'),
   // UDP 主机发现：触发后 Java/Node 后台监听，结果通过 onUdpHostFound 回调推送
-  startDiscoverHosts: (timeoutMs: number) => ipcRenderer.invoke('start-discover-hosts', timeoutMs),
+  startDiscoverHosts: (timeoutMs: number, scanId: string) => ipcRenderer.invoke('start-discover-hosts', timeoutMs, scanId),
   onUdpHostFound: (cb: (info: any) => void) => ipcRenderer.on('udp-host-found', (_e, info) => cb(info)),
   onUdpDiscoveryDone: (cb: () => void) => ipcRenderer.on('udp-discovery-done', () => cb()),
+  stopDiscoverHosts: (scanId: string) => ipcRenderer.invoke('stop-discover-hosts', scanId),
   offUdpDiscovery: () => {
     ipcRenderer.removeAllListeners('udp-host-found')
     ipcRenderer.removeAllListeners('udp-discovery-done')

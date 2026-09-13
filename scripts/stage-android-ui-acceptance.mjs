@@ -7,6 +7,8 @@ import { build } from 'esbuild'
 import { Script } from 'node:vm'
 
 const root = path.resolve(import.meta.dirname, '..')
+const publicDemo = process.env.RVB_ANDROID_PUBLIC_DEMO === '1'
+if (publicDemo && (process.env.RVB_ANDROID_QA_CERT || process.env.RVB_ANDROID_DISTRIBUTION_CONFIG || process.env.RVB_ANDROID_HOST_ABI)) throw Error('Public Demo must not contain QA or ABI overrides')
 for(const file of fs.readdirSync(path.join(root,'data/pages')).filter(name=>name.endsWith('.html'))){
   const html=fs.readFileSync(path.join(root,'data/pages',file),'utf8')
   for(const script of html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/g))if(!/type\s*=/.test(script[1]))new Script(script[2],{filename:file})
@@ -48,13 +50,13 @@ if(process.env.RVB_ANDROID_QA_CERT){
   fs.mkdirSync(path.join(res,'raw'),{recursive:true});fs.copyFileSync(path.resolve(process.env.RVB_ANDROID_QA_CERT),path.join(res,'raw/android_qa_ca.pem'))
   qaTrust='<debug-overrides><trust-anchors><certificates src="@raw/android_qa_ca" /></trust-anchors></debug-overrides>'
 }
-fs.writeFileSync(path.join(res,'xml/android_distribution_network.xml'),`<network-security-config><base-config cleartextTrafficPermitted="true"><trust-anchors><certificates src="system" /></trust-anchors></base-config><domain-config cleartextTrafficPermitted="true"><domain>localhost</domain><domain>127.0.0.1</domain></domain-config>${qaTrust}</network-security-config>`)
+fs.writeFileSync(path.join(res,'xml/android_distribution_network.xml'),`<network-security-config><base-config cleartextTrafficPermitted="true"><trust-anchors><certificates src="system" /></trust-anchors></base-config><domain-config cleartextTrafficPermitted="true"><domain includeSubdomains="false">localhost</domain><domain includeSubdomains="false">127.0.0.1</domain></domain-config>${qaTrust}</network-security-config>`)
 await build({entryPoints:[path.join(root,'android-client/maintenance.ts')],outfile:path.join(pages,'js/android-maintenance.js'),bundle:true,platform:'browser',format:'iife',minify:true})
 const files=api.readClientProtocolBattleData({htmlRoot:path.join(root,'data/pages'),appRoot:root,activePackRoot:null,isPackaged:false})
 fs.writeFileSync(path.join(pages,'__battle-data.json'),JSON.stringify({schemaVersion:'rvb-client-battle-data/v1',files}))
 fs.writeFileSync(path.join(pages,'__tutorial-profile.json'),JSON.stringify(api.createGameProfileIdentityV1(api.getBundledBaseProfileV1(root).profile)))
 await build({entryPoints:[path.join(root,'scripts/crypto-lib-entry.js')],outfile:path.join(pages,'js/crypto-lib.js'),bundle:true,platform:'browser',format:'iife',globalName:'CryptoLib',define:{'process.env.NODE_ENV':'"production"'},minify:true})
-fs.writeFileSync(path.join(generated,'capacitor.config.json'),JSON.stringify({appId:'com.redvsblue.client.uiqa',appName:'红蓝对决·界面验收',webDir:'public',server:{androidScheme:'https'},plugins:{SystemBars:{hidden:true}}}))
+fs.writeFileSync(path.join(generated,'capacitor.config.json'),JSON.stringify({appId:publicDemo?'com.redvsblue.client':'com.redvsblue.client.uiqa',appName:publicDemo?'红蓝对决·试玩版':'红蓝对决·界面验收',webDir:'public',server:{androidScheme:'https'},plugins:{SystemBars:{hidden:true}}}))
 fs.writeFileSync(path.join(generated,'capacitor.plugins.json'),'[]')
 for (const required of ['battle.html','css/battle-landscape.css','js/battle-ui/mobile-battle-controls.js','js/game-engine.js','tabletop-battle/character-dock.js','__battle-data.json']) {
   if(!fs.statSync(path.join(pages,required)).size) throw Error('Missing acceptance asset: '+required)

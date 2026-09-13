@@ -131,18 +131,44 @@ public class AndroidMaintenancePlugin extends Plugin {
         android.content.pm.Signature[] values=Build.VERSION.SDK_INT>=28?p.signingInfo.getApkContentsSigners():p.signatures;
         if(values==null||values.length==0)throw new IOException("APK无有效签名");Set<String> result=new TreeSet<>();for(android.content.pm.Signature s:values)result.add(ContentFiles.hex(s.toByteArray()));return result;
     }
-    private void validateApk() throws Exception {
-        if(pendingUpdate==null)throw new IOException("请先检查更新");File file=apk();
+    private void validateApk() throws Exception { validateApk(apk()); }
+    private void validateApk(File file) throws Exception {
+        if(pendingUpdate==null)throw new IOException("请先检查更新");
         if(!file.isFile()||file.length()!=pendingUpdate.getLong("size")||!ContentFiles.hash(file).equals(pendingUpdate.getString("sha256")))throw new IOException("APK完整性校验失败");
         PackageManager pm=getContext().getPackageManager();int flags=Build.VERSION.SDK_INT>=28?PackageManager.GET_SIGNING_CERTIFICATES:PackageManager.GET_SIGNATURES;
         PackageInfo candidate=pm.getPackageArchiveInfo(file.getAbsolutePath(),flags), current=pm.getPackageInfo(getContext().getPackageName(),flags);
         if(candidate==null||!current.packageName.equals(candidate.packageName)||version(candidate)!=pendingUpdate.getLong("versionCode")||version(candidate)<=version(current)||!signatures(current).equals(signatures(candidate)))throw new IOException("APK包名、版本或签名不匹配");
         if(Build.VERSION.SDK_INT>=24 && candidate.applicationInfo!=null && candidate.applicationInfo.minSdkVersion>Build.VERSION.SDK_INT)throw new IOException("APK不兼容当前系统");
     }
-    @PluginMethod public void downloadUpdate(PluginCall call){run(call,()->{if(pendingUpdate==null)throw new IOException("请先检查更新");cancel=false;
-        File partial=new File(getContext().getCacheDir(),"updates/download.part");try{download(pendingUpdate.getString("url"),partial,pendingUpdate.getLong("size"));
-            if(apk().exists()&&!apk().delete())throw new IOException("无法替换下载缓存");if(!partial.renameTo(apk()))throw new IOException("无法保存下载");validateApk();progress="下载校验完成，可以安装";return new JSObject().put("ready",true);
-        }finally{if(partial.exists())ContentFiles.remove(getContext().getCacheDir(),partial);}
+    private ApkUpdateTransfer.Delta matchingDelta(File base, long current) throws Exception {
+        JSONArray deltas=pendingUpdate.optJSONArray("deltas");
+        if(deltas==null || deltas.length()>8)return null;
+        String baseHash=null;
+        for(int i=0;i<deltas.length();i++) {
+            JSONObject d=deltas.optJSONObject(i);
+            if(d==null || !"rvb-apk-copy-gzip/v1".equals(d.optString("format")) || d.optLong("fromVersionCode",-1)!=current)continue;
+            long size=d.optLong("size",-1);
+            if(size<1 || size>=pendingUpdate.getLong("size") || !d.optString("sha256").matches("[0-9a-f]{64}") || !d.optString("baseSha256").matches("[0-9a-f]{64}"))continue;
+            try {
+                URL url=new URL(d.optString("url"));
+                if(!"https".equals(url.getProtocol()) || url.getUserInfo()!=null || url.getRef()!=null)continue;
+            } catch(java.net.MalformedURLException invalid) { continue; }
+            if(baseHash==null)baseHash=ApkDelta.hash(base,()->{if(cancel||!maintenancePage)throw new IOException("已取消下载");});
+            if(baseHash.equals(d.getString("baseSha256")))return new ApkUpdateTransfer.Delta(d.getString("url"),size,d.getString("sha256"),baseHash);
+        }
+        return null;
+    }
+    @PluginMethod public void downloadUpdate(PluginCall call){run(call,()->{
+        if(pendingUpdate==null)throw new IOException("请先检查更新");cancel=false;
+        PackageInfo current=getContext().getPackageManager().getPackageInfo(getContext().getPackageName(),0);
+        File base=new File(getContext().getApplicationInfo().sourceDir);
+        ApkUpdateTransfer.Delta delta=null;
+        try { delta=matchingDelta(base,version(current)); }
+        catch(Exception unavailable) { if(cancel||!maintenancePage)throw unavailable; progress="无法读取差量基包，改为完整下载"; }
+        String mode=ApkUpdateTransfer.run(base,new File(getContext().getCacheDir(),"updates"),
+            pendingUpdate.getString("url"),pendingUpdate.getLong("size"),pendingUpdate.getString("sha256"),delta,
+            this::download,this::validateApk,()->{if(cancel||!maintenancePage)throw new IOException("已取消下载");},message->progress=message);
+        return new JSObject().put("ready",true).put("mode",mode);
     });}
     @PluginMethod public void installUpdate(PluginCall call){run(call,()->{if(AndroidHostService.active())throw new IOException("请先停止手机开房，再安装应用更新");validateApk();requirePage();
         getActivity().runOnUiThread(()->{try{
