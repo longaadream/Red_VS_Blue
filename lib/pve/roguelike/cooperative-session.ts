@@ -182,7 +182,8 @@ export class CooperativeAdventureSession extends AdventureSession {
     captain.x=cell.x;captain.y=cell.y;party.anchor={x:cell.x,y:cell.y}
     stage.pieces.push(captain);stage.players.splice(stage.players.length-1,0,copy(sample.players.find(p=>p.playerId===seat.playerId)!))
     coop.humanIds.push(seat.playerId);coop.order.push(seat.playerId);coop.parties[seat.playerId]=party
-    if(adventureSupplies)initializeAdventureCards(stage,seat.playerId,adventureSupplies.initialRelicIds)
+    const startingCards=adventureCards(sample)?.players[seat.playerId]
+    if(startingCards)initializeAdventureCards(stage,seat.playerId,startingCards.relicIds)
     this.personal[seat.playerId]=emptyProgress()
     this.personal[seat.playerId].coins=Math.min(this.content.cooperation?.lateJoinCoinCap??20,this.content.zones.filter(z=>this.cleared.includes(z.id)).reduce((sum,z)=>sum+z.reward,0))
     this.initial.pieces.push(copy(captain));this.initial.players.push(copy(sample.players.find(p=>p.playerId===seat.playerId)!))

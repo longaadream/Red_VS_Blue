@@ -6,6 +6,7 @@ import { getServerGameProfileIdentityV1 } from '@/lib/content-pipeline/runtime/p
 import {planAdventureEnemies} from '@/lib/pve/roguelike/plans'
 import { adventureBoundary, selectAdventureActor } from '@/lib/game/adventure-boundary'
 import { areMatchAllies } from '@/lib/game/match-teams'
+import { adventureCards } from '@/lib/game/adventure-card-state'
 
 async function setup(count=4,act=0){
   const profile=getServerGameProfileIdentityV1(), content=structuredClone(act?campaignAct(adventureContent,act,42):adventureContent)
@@ -14,6 +15,13 @@ async function setup(count=4,act=0){
   return {state,session:new CooperativeAdventureSession(state,content,profile),seats,content}
 }
 describe('cooperative adventure authority',()=>{
+  it.each([['blood','blood-ledger'],['light','star-lantern'],['skirmish','calibration-magazine']])('keeps the %s starter supply when joining later',async(familyId,relicId)=>{
+    const {session}=await setup(1)
+    const first=session.snapshot()
+    if(first.state.turn.phase==='start')session.human({type:'beginPhase'},first.revision,'coop-0')
+    await session.addPlayer({playerId:'late',name:'同行者',pieceIds:['tracer','ana'],familyId})
+    expect(adventureCards(session.snapshot('late').state)?.players.late.relicIds).toEqual([relicId])
+  })
   it('creates four independent parties and one hostile faction',async()=>{
     const {state,session,seats}=await setup()
     expect(state.players).toHaveLength(5)

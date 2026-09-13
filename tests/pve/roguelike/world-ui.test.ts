@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from 'vitest'
 function fixture() {
   const open = vi.fn()
   const selectPiece = vi.fn()
-  const context = vm.createContext({ window: {}, pendingSkill: null, pendingCardAction: null, pendingActionFeedback: null,
+  const context = vm.createContext({ window: { matchMedia: () => ({matches:false}) }, pendingSkill: null, pendingCardAction: null, pendingActionFeedback: null,
     targetSubmissionPending: false, adventureBusy: false, pendingMove: true, validMoves: new Set(['6,5']),
     myPlayerId: 'human', G: { pieces: [{ instanceId: 'captain', ownerPlayerId: 'human', currentHp: 5, x: 5, y: 5 }] },
     adventureSnapshot: { world: { sites: [{ id: 'camp', x: 5, y: 5 }, { id: 'loot', x: 6, y: 5 }] } }, open, selectPiece })
@@ -46,7 +46,7 @@ describe('adventure site click priority', () => {
   })
   it('follows the captain after each committed action but leaves repeated renders and manual inspection alone', () => {
     const {context,selectPiece}=fixture(), focusCell=vi.fn(()=>true)
-    context.window={BattleRenderer3D:{focusCell}}
+    Object.assign(context.window,{BattleRenderer3D:{focusCell}})
     context.G.map={id:'act-map'}
     Object.assign(context.adventureSnapshot.world,{captainId:'captain',actNumber:1,seed:42})
     vm.runInContext('focusAdventureAct(); focusAdventureAct()',context)
@@ -56,11 +56,11 @@ describe('adventure site click priority', () => {
     expect(focusCell).toHaveBeenCalledTimes(1)
     context.adventureSnapshot.revision=1
     vm.runInContext('focusAdventureAct()',context)
-    expect(focusCell).toHaveBeenLastCalledWith(6,5)
+    expect(focusCell).toHaveBeenLastCalledWith(6,5,undefined)
     expect(focusCell).toHaveBeenCalledTimes(2)
     context.adventureSnapshot.world.actNumber=2
     vm.runInContext('focusAdventureAct()',context)
-    expect(focusCell).toHaveBeenLastCalledWith(6,5)
+    expect(focusCell).toHaveBeenLastCalledWith(6,5,undefined)
     expect(focusCell).toHaveBeenCalledTimes(3)
     vm.runInContext('selectAdventurePartyPiece(G.pieces[0])',context)
     expect(selectPiece).toHaveBeenCalledWith('captain')
@@ -72,10 +72,10 @@ describe('adventure site click priority', () => {
     context.G.map={id:'map'}
     Object.assign(context.adventureSnapshot.world,{captainId:'captain',active:'fight',zones:[{id:'fight',x:10,y:20,width:16,height:16}]})
     expect(context.window.focusAdventureContext()).toBe(true)
-    expect(focusCell).toHaveBeenLastCalledWith(17.5,27.5)
+    expect(focusCell).toHaveBeenLastCalledWith(17.5,27.5,undefined)
     context.adventureSnapshot.world.active=undefined
     context.window.focusAdventureContext()
-    expect(focusCell).toHaveBeenLastCalledWith(5,5)
+    expect(focusCell).toHaveBeenLastCalledWith(5,5,undefined)
   })
   it('preserves legal movement to an empty event cell', () => {
     const { click, open } = fixture()

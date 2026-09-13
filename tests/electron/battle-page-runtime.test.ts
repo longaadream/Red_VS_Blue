@@ -539,6 +539,7 @@ describe('battle page runtime source', () => {
     const html = readBattlePage()
     const queryMoveCells = vi.fn(() => new Set(['2,1']))
     const context = vm.createContext({
+      ADVENTURE_MODE: false,
       window: { BattleLegalActions: { queryMoveCells } },
       BattleLegalActions: { queryMoveCells },
       GameEngine: {},

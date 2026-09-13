@@ -343,6 +343,25 @@ async function verifyTutorialWithoutAuthority(port, target, timeoutMs = 30000) {
     document.getElementById('tutorialShortcut').click()
     return true
   })()`, false)
+  const lessonMenu = await waitForTargets(
+    port,
+    candidate => candidate.url === 'rvb-client://app/tutorial.html',
+    timeoutMs,
+  )
+  const menuDeadline = Date.now() + timeoutMs
+  let lessonReady = false
+  while (Date.now() < menuDeadline) {
+    lessonReady = await evaluate(lessonMenu, `!!document.querySelector('a[href^="battle.html?mode=tutorial&lesson="]')`)
+    if (lessonReady) break
+    await delay(100)
+  }
+  assert(lessonReady, 'First playable lesson did not appear')
+  await evaluate(lessonMenu, `(() => {
+    const firstLesson = document.querySelector('a[href^="battle.html?mode=tutorial&lesson="]')
+    if (!firstLesson) throw new Error('First playable lesson is missing')
+    firstLesson.click()
+    return true
+  })()`, false)
   const tutorialTarget = await waitForTargets(
     port,
     candidate => candidate.url.startsWith('rvb-client://app/battle.html?mode=tutorial'),
@@ -358,7 +377,7 @@ async function verifyTutorialWithoutAuthority(port, target, timeoutMs = 30000) {
         loadingDisplay: document.getElementById('loadingOverlay')?.style.display || '',
         loadingMessage: document.getElementById('loadingMsg')?.textContent || '',
         loadingColor: document.getElementById('loadingMsg')?.style.color || '',
-        dialogPresent: document.getElementById('tutorialDialog') !== null,
+        dialogPresent: document.getElementById('tutorialLessonDialog') !== null,
         scenarioId: window.__RVB_TUTORIAL__?.scenarioId || '',
         engineReady: !!window.GameEngine?.applyBattleAction,
         electronApiReady: !!window.electronAPI,

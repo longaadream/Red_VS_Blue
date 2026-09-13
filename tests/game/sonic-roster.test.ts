@@ -16,7 +16,7 @@ describe('Sonic roster mechanics', () => {
 
   it('does not render momentum outside the existing status-tag UI', () => {
     const battlePage = readFileSync(resolve(process.cwd(), 'data/pages/battle.html'), 'utf8')
-    const statsTemplate = battlePage.match(/const statsHtml = `([\s\S]*?)`\s*\/\/ Skills/)
+    const statsTemplate = battlePage.match(/const statsHtml = `([\s\S]*?)`\s*(?:const adventureWarning[^\n]*\s*)?\/\/ Skills/)
 
     expect(statsTemplate).not.toBeNull()
     expect(statsTemplate?.[1]).not.toContain('momentum')
