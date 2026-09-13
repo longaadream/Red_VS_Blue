@@ -1,0 +1,203 @@
+{
+  "id": "graph-demo",
+  "name": "流程图测试技能",
+  "description": "选择本棋子5格内1个敌方棋子（目标1）。选择本棋子7格内1个空的可行走地格（目标2）。选择模式：显示镜像、保持原样（选1至2项）。若选中了第1项，则使目标1的显示读取本棋子的数据。在目标1上显示“查克拉进度”。在目标2显示“分身位置”标记。在目标1播放“分身出现”提示。否则，移除本技能的显示效果“binding”。",
+  "kind": "active",
+  "type": "normal",
+  "code": "function executeSkill(context) { if(typeof flow==='undefined'||!flow.presentation) throw new Error('客户端不支持技能表现接口，请更新客户端'); var _g0, _g1, _g2, _g3, _g4, _g5, _g6, _g7, _g8, _g9, _g10; var _trace = []; var _pc = \"start\"; for (var _step = 0; _step < 64; _step++) { switch (_pc) { case \"start\":  _trace.push({ nodeId: \"start\", kind: \"start\" }); _pc = \"node-1\"; break; case \"node-1\": _g1 = selectTarget({\"type\":\"piece\",\"range\":5,\"filter\":\"enemy\"}); if (!_g1 || _g1.needsTargetSelection) return _g1; _trace.push({ nodeId: \"node-1\", kind: \"select-piece\" }); _pc = \"node-2\"; break; case \"node-2\": _g2 = selectTarget({\"type\":\"grid\",\"range\":7,\"filter\":\"all\"}); if (!_g2 || _g2.needsTargetSelection) return _g2; _trace.push({ nodeId: \"node-2\", kind: \"select-cell\" }); _pc = \"node-3\"; break; case \"node-3\": _g3 = selectOption({\"kind\":\"option\",\"title\":\"选择模式\",\"options\":[{\"label\":\"显示镜像\",\"value\":\"option-0\"},{\"label\":\"保持原样\",\"value\":\"option-1\"}],\"selectionMode\":\"multi\",\"minSelections\":1,\"maxSelections\":2,\"canCancel\":true}); if (_g3 === undefined || _g3 === null || _g3.needsOptionSelection) return _g3; _trace.push({ nodeId: \"node-3\", kind: \"select-options\" }); _pc = \"node-4\"; break; case \"node-4\": _pc = (Array.isArray(_g3) ? _g3.includes(\"option-0\") : _g3 === \"option-0\") ? \"node-5\" : \"node-9\"; _trace.push({ nodeId: \"node-4\", kind: \"condition-option\" });  break; case \"node-9\": flow.presentation.remove(\"binding\"); _trace.push({ nodeId: \"node-9\", kind: \"display-remove\" }); _pc = \"end\"; break; case \"node-5\": flow.presentation.bind({id:\"binding\",targetId:_g1.instanceId,sourceId:context.piece.instanceId,fields:[\"health\"],mode:\"live\",onSourceMissing:\"snapshot\",audience:\"public\",lifetime:\"while-alive\"}); _trace.push({ nodeId: \"node-5\", kind: \"display-bind\" }); _pc = \"node-6\"; break; case \"node-6\": flow.presentation.indicator({id:\"indicator\",targetId:_g1.instanceId,label:\"查克拉进度\",value:3,max:6,audience:\"owner\",lifetime:\"while-alive\"}); _trace.push({ nodeId: \"node-6\", kind: \"display-indicator\" }); _pc = \"node-7\"; break; case \"node-7\": flow.presentation.mark({id:\"marker\",cells:[{x:_g2.x,y:_g2.y}],label:\"分身位置\",icon:\"✦\",audience:\"public\",lifetime:\"while-alive\"}); _trace.push({ nodeId: \"node-7\", kind: \"display-marker\" }); _pc = \"node-8\"; break; case \"node-8\": flow.presentation.emit({id:\"cue\"+':'+context.battle.turn.turnNumber+':'+(context.battle.targetingRevision||0),kind:\"sound\",sound:\"success\",targetId:_g1.instanceId,text:\"分身出现\",audience:\"public\",lifetime:'battle'}); _trace.push({ nodeId: \"node-8\", kind: \"display-cue\" }); _pc = \"end\"; break; case \"end\": return { success: true, message: '技能流程结算完成', graphTrace: _trace };   break; default: throw new Error('无效的技能图节点'); } } throw new Error('技能图超过执行预算'); }",
+  "cooldownTurns": 1,
+  "actionPointCost": 1,
+  "maxCharges": 0,
+  "powerMultiplier": 1,
+  "extension": {
+    "preserved": true
+  },
+  "skillGraph": {
+    "version": "rvb-skill-graph/v1",
+    "entry": "start",
+    "nodes": [
+      {
+        "id": "start",
+        "kind": "start",
+        "params": {},
+        "x": 25,
+        "y": 25,
+        "next": "node-1"
+      },
+      {
+        "id": "end",
+        "kind": "end",
+        "params": {},
+        "x": 290,
+        "y": 525
+      },
+      {
+        "id": "node-1",
+        "kind": "select-piece",
+        "params": {
+          "relation": "enemy",
+          "range": 5,
+          "includeSelf": "no"
+        },
+        "x": 290,
+        "y": 25,
+        "next": "node-2"
+      },
+      {
+        "id": "node-2",
+        "kind": "select-cell",
+        "params": {
+          "range": 7
+        },
+        "x": 25,
+        "y": 150,
+        "next": "node-3"
+      },
+      {
+        "id": "node-3",
+        "kind": "select-options",
+        "params": {
+          "title": "选择模式",
+          "options": "显示镜像|保持原样",
+          "min": 1,
+          "max": 2
+        },
+        "x": 290,
+        "y": 150,
+        "next": "node-4"
+      },
+      {
+        "id": "node-4",
+        "kind": "condition-option",
+        "params": {
+          "choice": "node-3",
+          "value": 1
+        },
+        "x": 25,
+        "y": 275,
+        "yes": "node-5",
+        "no": "node-9"
+      },
+      {
+        "id": "node-5",
+        "kind": "display-bind",
+        "params": {
+          "slot": "binding",
+          "target": "node-1",
+          "sourcePiece": "self",
+          "fields": "health",
+          "mode": "live",
+          "fallback": "snapshot",
+          "audience": "public",
+          "lifetime": "while-alive"
+        },
+        "x": 290,
+        "y": 275,
+        "next": "node-6"
+      },
+      {
+        "id": "node-6",
+        "kind": "display-indicator",
+        "params": {
+          "slot": "indicator",
+          "target": "node-1",
+          "label": "查克拉进度",
+          "basis": "fixed",
+          "value": 3,
+          "max": 6,
+          "audience": "owner",
+          "lifetime": "while-alive"
+        },
+        "x": 25,
+        "y": 400,
+        "next": "node-7"
+      },
+      {
+        "id": "node-7",
+        "kind": "display-marker",
+        "params": {
+          "slot": "marker",
+          "cell": "node-2",
+          "label": "分身位置",
+          "icon": "✦",
+          "audience": "public",
+          "lifetime": "while-alive"
+        },
+        "x": 290,
+        "y": 400,
+        "next": "node-8"
+      },
+      {
+        "id": "node-8",
+        "kind": "display-cue",
+        "params": {
+          "slot": "cue",
+          "target": "node-1",
+          "kind": "sound",
+          "sound": "success",
+          "label": "分身出现",
+          "audience": "public"
+        },
+        "x": 25,
+        "y": 525,
+        "next": "end"
+      },
+      {
+        "id": "node-9",
+        "kind": "display-remove",
+        "params": {
+          "slot": "binding"
+        },
+        "x": 25,
+        "y": 650,
+        "next": "end"
+      }
+    ]
+  },
+  "graphCompilerVersion": "rvb-skill-graph-compiler/v1",
+  "range": "single",
+  "previewCode": "function calculatePreview() { return { description: \"选择本棋子5格内1个敌方棋子（目标1）。选择本棋子7格内1个空的可行走地格（目标2）。选择模式：显示镜像、保持原样（选1至2项）。若选中了第1项，则使目标1的显示读取本棋子的数据。在目标1上显示“查克拉进度”。在目标2显示“分身位置”标记。在目标1播放“分身出现”提示。否则，移除本技能的显示效果“binding”。\", expectedValues: {} }; }",
+  "targeting": {
+    "steps": [
+      {
+        "kind": "target",
+        "type": "piece",
+        "range": 5,
+        "distanceMetric": "manhattan",
+        "filter": "enemy",
+        "excludeSourcePiece": true
+      },
+      {
+        "kind": "target",
+        "type": "grid",
+        "range": 7,
+        "distanceMetric": "manhattan",
+        "filter": "all",
+        "requireWalkable": true,
+        "requireUnoccupied": true,
+        "forbiddenTileEffectTypes": [
+          "tails-flight-reservation"
+        ]
+      },
+      {
+        "kind": "option",
+        "title": "选择模式",
+        "options": [
+          {
+            "label": "显示镜像",
+            "value": "option-0"
+          },
+          {
+            "label": "保持原样",
+            "value": "option-1"
+          }
+        ],
+        "selectionMode": "multi",
+        "minSelections": 1,
+        "maxSelections": 2,
+        "canCancel": true
+      }
+    ]
+  },
+  "requiresTarget": true
+}

@@ -1,0 +1,12 @@
+// Applied only by build-android-release.ps1; leaves the UI issue's Gradle file alone.
+gradle.projectsEvaluated {
+    def app = gradle.rootProject.project(':app')
+    def stage = app.tasks.findByName('stageDemo')
+    if (stage == null) throw new GradleException('Integrate the Android public demo build from the UI issue before synchronized release')
+    stage.doLast {
+        app.exec {
+            workingDir gradle.rootProject.projectDir.parentFile
+            commandLine 'node', 'scripts/android-release-source.mjs'
+        }
+    }
+}

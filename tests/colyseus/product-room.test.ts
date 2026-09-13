@@ -26,6 +26,24 @@ import { FakeAuthorityRepository } from './fake-authority-repository'
 import { guestIdentity } from '../helpers/guest-identity'
 
 describe('RED-161 Colyseus product room', () => {
+  it('fences real room creation and restored rooms during a desktop resource update', async () => {
+    const repository = new FakeAuthorityRepository()
+    const persisted = createDevelopmentBattleRoom('update-fence-restored')
+    await repository.initializeRoom(persisted, createInitialCheckpoint(persisted))
+    const candidate = createColyseusBattleServer({ repository })
+    const port = await availablePort()
+    await candidate.server.listen(port, '127.0.0.1')
+    const client = new ColyseusClient(`ws://127.0.0.1:${port}`)
+    try {
+      expect(candidate.updateAdmission.acquire('update')).toBe(true)
+      await expect(client.create('battle', { battleId: 'blocked' })).rejects.toThrow('更新资源')
+      candidate.updateAdmission.release('update')
+      await expect(candidate.restoreProductRooms()).resolves.toEqual(['update-fence-restored'])
+      expect(candidate.updateAdmission.status().idle).toBe(false)
+      expect(candidate.updateAdmission.acquire('update')).toBe(false)
+    } finally { await candidate.server.gracefullyShutdown(false) }
+    expect(candidate.updateAdmission.status().idle).toBe(true)
+  }, 20_000)
   it('isolates an incompatible durable room instead of crashing authority startup', async () => {
     const repository = new FakeAuthorityRepository()
     const incompatibleRoom = structuredClone(createDevelopmentBattleRoom('incompatible-profile-room'))

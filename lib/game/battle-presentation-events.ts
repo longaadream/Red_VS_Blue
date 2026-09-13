@@ -1,6 +1,6 @@
 import type { BattleAction, BattleActionLog, BattleState } from './turn'
 import { traceProjectile } from './spatial'
-import { recordedBattlePresentation } from './battle-presentation-recording'
+import { recordedBattlePresentation, recordedSkillPresentation } from './battle-presentation-recording'
 
 export type BattlePresentationEventKind =
   | 'move'
@@ -455,11 +455,21 @@ function selectedOptionLabel(command: Record<string, unknown>, beforeState: Batt
     : '已选择'
 }
 
-function isPrivateResult(command: Record<string, unknown>, beforeState: BattleState): boolean {
+function isPrivateResult(command: Record<string, unknown>, beforeState: BattleState, afterState: BattleState): boolean {
   const directSkillId = text(command.skillId)
   const sourceSkillId = pendingSource(beforeState).id
   const skillId = directSkillId ?? sourceSkillId
-  return !!skillId && beforeState.skillsById?.[skillId]?.concealTargetInBattleLog === true
+  if (!skillId) return false
+  if (recordedSkillPresentation(afterState, skillId)?.concealTargetInBattleLog === true) return true
+  if (beforeState.skillsById?.[skillId]?.concealTargetInBattleLog === true
+    || afterState.skillsById?.[skillId]?.concealTargetInBattleLog === true) return true
+  // The executor may load the definition from the pinned content repository.
+  // Preserve its privacy decision even when snapshots omit skill definitions.
+  return appendedActions(beforeState, afterState).some(entry => {
+    const payload = actionPayload(entry)
+    return (entry.type === 'useBasicSkill' || entry.type === 'useChargeSkill')
+      && payload.skillId === skillId && payload.concealTargetInBattleLog === true
+  })
 }
 
 function hasPrivateTrigger(beforeState: BattleState, afterState: BattleState): boolean {
@@ -467,6 +477,7 @@ function hasPrivateTrigger(beforeState: BattleState, afterState: BattleState): b
     const payload = actionPayload(entry)
     const skillId = text(payload.skillId) ?? ''
     return PRIVATE_RESULT_RULE_IDS.has(text(payload.ruleId) ?? '')
+      || payload.concealTargetInBattleLog === true
       || beforeState.skillsById?.[skillId]?.concealTargetInBattleLog === true
       || afterState.skillsById?.[skillId]?.concealTargetInBattleLog === true
   })
@@ -475,7 +486,7 @@ function hasPrivateTrigger(beforeState: BattleState, afterState: BattleState): b
     !== JSON.stringify(afterState.extensions?.recallData ?? null)
 }
 
-function rootDraft(command: Record<string, unknown>, beforeState: BattleState, children: EventDraft[]): EventDraft | undefined {
+function rootDraft(command: Record<string, unknown>, beforeState: BattleState, afterState: BattleState, children: EventDraft[]): EventDraft | undefined {
   const config = ROOT_ACTIONS[String(command.type || '')]
   if (!config) return undefined
   const pending = pendingSource(beforeState)
@@ -485,7 +496,10 @@ function rootDraft(command: Record<string, unknown>, beforeState: BattleState, c
   const cardId = commandCardId(command, beforeState)
   const skillId = text(command.skillId) ?? (pending.type === 'skill' ? pending.id : undefined)
   const ruleId = pending.type === 'rule' ? pending.id : undefined
-  const skillName = skillId ? text(beforeState.skillsById?.[skillId]?.name) : undefined
+  const execution = appendedActions(beforeState, afterState).find(entry => actionPayload(entry).skillId === skillId)
+  const skillName = skillId ? text(beforeState.skillsById?.[skillId]?.name)
+    ?? text(afterState.skillsById?.[skillId]?.name) ?? text(recordedSkillPresentation(afterState, skillId)?.name)
+    ?? text(execution && actionPayload(execution).skillName) : undefined
   const sourcePiece = sourcePieceId
     ? beforeState.pieces.find(piece => piece.instanceId === sourcePieceId)
     : undefined
@@ -503,7 +517,7 @@ function rootDraft(command: Record<string, unknown>, beforeState: BattleState, c
     : undefined
   const actorPlayerId = text(command.playerId) ?? pending.playerId ?? text(beforeState.turn?.currentPlayerId)
   const optionLabel = selectedOptionLabel(command, beforeState)
-  const privateResult = isPrivateResult(command, beforeState)
+  const privateResult = isPrivateResult(command, beforeState, afterState)
   const presentation = presentationFor(command, beforeState, children)
   return {
     kind: config.kind,
@@ -953,7 +967,7 @@ export function projectBattlePresentationEvents(
     seenDeaths.add(targetId)
     return true
   })
-  const root = rootDraft(command, input.beforeState, children) ?? (children.length > 0 ? {
+  const root = rootDraft(command, input.beforeState, input.afterState, children) ?? (children.length > 0 ? {
     kind: 'passive' as const,
     iconId: 'action-passive',
     actorPlayerId: text(command.playerId) ?? text(input.beforeState.turn?.currentPlayerId),
@@ -973,10 +987,12 @@ export function projectBattlePresentationEvents(
       delete root.presentation
     }
   }
-  if (isPrivateResult(command, input.beforeState) || hasPrivateTrigger(input.beforeState, input.afterState)) {
+  if (isPrivateResult(command, input.beforeState, input.afterState) || hasPrivateTrigger(input.beforeState, input.afterState)) {
     const viewerId = root.actorPlayerId
     children = children.map(draft => markPrivate(draft, viewerId))
   }
+  const awaiting = input.afterState.pendingOptionSelection ?? input.afterState.pendingTargetSelection
+  if (awaiting?.transaction) root.result = { ...root.result, pending: true }
   // Announce only the responding skill's identity to its chooser, never its
   // candidates or options. Its eventual resolution remains a separate action.
   children.push(...pendingSkillDrafts(input.beforeState, input.afterState, root.sourcePieceId))

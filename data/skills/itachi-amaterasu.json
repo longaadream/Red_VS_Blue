@@ -2,7 +2,9 @@
   "id": "itachi-amaterasu",
   "name": "天照之缚",
   "description": "选择5格内的1个敌方棋子，将其所在格变为天照地格，并使其获得1层天照。",
-  "keywords": [],
+  "keywords": [
+    "天照"
+  ],
   "targetText": "5格内的1个敌方棋子",
   "effectTags": [
     "field",

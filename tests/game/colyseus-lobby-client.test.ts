@@ -108,6 +108,23 @@ beforeEach(() => {
 })
 
 describe('RED-158 Colyseus lobby client', () => {
+  it.each(['rooms.create', 'rooms.action', 'rooms.spectate', 'rooms.delete'])('releases a late successful %s admission after timeout', async method => {
+    const late = new FakeLobbyRoom('late-room')
+    const leave = vi.spyOn(late, 'leave')
+    let release!: (room: FakeLobbyRoom) => void
+    const pending = new Promise<FakeLobbyRoom>(resolve => { release = resolve })
+    const operation = vi.spyOn(FakeColyseusClient.prototype, method === 'rooms.create' ? 'create' : 'joinById').mockReturnValueOnce(pending)
+    try {
+      const client = loadLobbyClient(vi.fn())
+      await expect(client.requestAt('http://127.0.0.1:38621', method, {
+        roomId: 'late-room', action: 'join', playerId: 'player-blue', hostId: 'player-blue', spectatorId: 'player-blue',
+      }, 10)).rejects.toThrow('timeout')
+      release(late)
+      await pending
+      await new Promise(resolve => setTimeout(resolve, 0))
+      expect(leave).toHaveBeenCalledOnce()
+    } finally { operation.mockRestore() }
+  })
   it('resolves a private invitation and uses spectator admission without a player seat', async () => {
     const fetchMock = vi.fn(async () => jsonResponse({ room: { id: 'room-a' } }))
     const client = loadLobbyClient(fetchMock)

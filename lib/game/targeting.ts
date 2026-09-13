@@ -251,6 +251,8 @@ interface OptionSpec {
   title: string
   options: Array<{ label: string; value: unknown; description?: string }>
   canCancel?: boolean
+  minSelections?: number
+  maxSelections?: number
 }
 
 type SelectionStepSpec = TargetSpec | OptionSpec
@@ -335,6 +337,9 @@ function getDeclaredSteps(definition: any, kind: 'skill' | 'card'): SelectionSte
     for (const raw of configuredSteps) {
       if (raw?.kind === 'option') {
         if (!Array.isArray(raw.options) || raw.options.length === 0) return undefined
+        const minSelections = raw.minSelections ?? 1, maxSelections = raw.maxSelections ?? 1
+        if (!Number.isSafeInteger(minSelections) || !Number.isSafeInteger(maxSelections)
+          || minSelections < 1 || maxSelections < minSelections || maxSelections > Math.min(64, raw.options.length)) return undefined
         steps.push({
           kind: 'option',
           title: String(raw.title || '请选择'),
@@ -344,6 +349,7 @@ function getDeclaredSteps(definition: any, kind: 'skill' | 'card'): SelectionSte
             description: option?.description == null ? undefined : String(option.description),
           })),
           canCancel: raw.canCancel !== false,
+          ...(raw.minSelections === undefined && raw.maxSelections === undefined ? {} : {minSelections,maxSelections}),
         })
         continue
       }
@@ -1045,6 +1051,7 @@ export function prepareAction(state: BattleState, draftCommand: BattleAction | a
   for (let stepIndex = 0; stepIndex < source.steps.length; stepIndex += 1) {
     const step = source.steps[stepIndex]
     if (step.kind === 'option') {
+      const min = step.minSelections ?? 1, max = step.maxSelections ?? 1
       if (!hasSelectedOption) {
         return {
           kind: 'needOption',
@@ -1052,14 +1059,17 @@ export function prepareAction(state: BattleState, draftCommand: BattleAction | a
           selectionId: selectionIdForAction(state, draftCommand, source),
           stateRevision: getTargetingStateRevision(state),
           step: stepIndex,
-          min: 1,
-          max: 1,
+          min,
+          max,
           options: step.options,
           title: step.title,
           canCancel: step.canCancel !== false,
         }
       }
-      if (!step.options.some(option => Object.is(option.value, draftCommand.selectedOption))) {
+      const values = max > 1 ? draftCommand.selectedOption : [draftCommand.selectedOption]
+      if (!Array.isArray(values) || values.length < min || values.length > max
+        || values.some((value, index) => values.slice(0, index).some(other => Object.is(other, value)))
+        || values.some(value => !step.options.some(option => Object.is(option.value, value)))) {
         return { kind: 'invalid', code: 'OPTION_SELECTION_INVALID', message: 'Selected option is not declared for this action' }
       }
       continue

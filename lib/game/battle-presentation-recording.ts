@@ -1,4 +1,5 @@
 import type { BattleState } from './turn'
+import type { SkillDefinition } from './skills'
 import type { BattlePresentationEvent } from './battle-presentation-events'
 import { snapshotBattlePresentationStatuses, diffBattlePresentationStatuses, snapshotBattlePresentationTileEffects, diffBattlePresentationTileEffects } from './battle-presentation-events'
 
@@ -7,9 +8,11 @@ type Source = Pick<Draft, 'sourcePieceId' | 'actorPlayerId' | 'skillId' | 'ruleI
 type PieceFrame = { id: string; x?: number | null; y?: number | null; hp: number; appearance?: Draft['pieceSnapshot'] }
 export type PresentationBatchKind = 'statusAdded' | 'statusRemoved' | 'tileEffectAdded' | 'tileEffectRemoved'
 type PresentationBatch = { kind: PresentationBatchKind; id: string }
-type Recording = { pieces: Map<string, PieceFrame>; statuses: ReturnType<typeof snapshotBattlePresentationStatuses>; tiles: ReturnType<typeof snapshotBattlePresentationTileEffects>; events: Draft[]; source: Source; batch?: PresentationBatch; batchSequence: number }
+type SkillMetadata = Pick<SkillDefinition, 'name' | 'concealTargetInBattleLog'>
+type Recording = { pieces: Map<string, PieceFrame>; statuses: ReturnType<typeof snapshotBattlePresentationStatuses>; tiles: ReturnType<typeof snapshotBattlePresentationTileEffects>; events: Draft[]; skills: Map<string, SkillMetadata>; source: Source; batch?: PresentationBatch; batchSequence: number }
 let active: Recording | undefined
 const recordings = new WeakMap<BattleState, Draft[]>()
+const resolvedSkills = new WeakMap<BattleState, Map<string, SkillMetadata>>()
 
 function pieces(state: BattleState): Map<string, PieceFrame> {
   return new Map(state.pieces.map(p => [p.instanceId, { id: p.instanceId, x: p.x, y: p.y, hp: p.currentHp,
@@ -20,7 +23,7 @@ function pieces(state: BattleState): Map<string, PieceFrame> {
 /** Synchronous, opt-in observation only. No state fields, RNG, logs or timers. */
 export function recordBattlePresentation<T>(before: BattleState, run: () => T, stateOf: (result: T) => BattleState): T {
   const previous = active
-  const recording: Recording = { pieces: pieces(before), statuses: snapshotBattlePresentationStatuses(before), tiles: snapshotBattlePresentationTileEffects(before), events: [], source: {}, batchSequence: 0 }
+  const recording: Recording = { pieces: pieces(before), statuses: snapshotBattlePresentationStatuses(before), tiles: snapshotBattlePresentationTileEffects(before), events: [], skills: new Map(), source: {}, batchSequence: 0 }
   active = recording
   try {
     const result = run()
@@ -30,6 +33,7 @@ export function recordBattlePresentation<T>(before: BattleState, run: () => T, s
     // effects are replayed only when the response actually commits them.
     const pending = after.pendingOptionSelection ?? after.pendingTargetSelection
     recordings.set(after, pending?.transaction ? [] : recording.events)
+    resolvedSkills.set(after, recording.skills)
     return result
   } finally {
     active = previous
@@ -38,6 +42,15 @@ export function recordBattlePresentation<T>(before: BattleState, run: () => T, s
 
 export function recordedBattlePresentation(state: BattleState): readonly Draft[] | undefined {
   return recordings.get(state)
+}
+
+/** Retain the executor's pinned definition even when a response suspends before logging. */
+export function recordResolvedSkillPresentation(skill: SkillDefinition): void {
+  active?.skills.set(skill.id, { name: skill.name, concealTargetInBattleLog: skill.concealTargetInBattleLog })
+}
+
+export function recordedSkillPresentation(state: BattleState, skillId: string): SkillMetadata | undefined {
+  return resolvedSkills.get(state)?.get(skillId)
 }
 
 export function recordBattlePresentationBlock(source: Source, targetId: string, absorbed: number, blocked: boolean): void {

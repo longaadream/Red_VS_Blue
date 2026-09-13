@@ -61,7 +61,7 @@ describe('RED-161 default player transport', () => {
     expect(main).toContain('void recoverUnexpectedLocalAuthorityExit(code)')
     expect(main).toContain('signal=${signal ?? \'null\'}')
     expect(main).toContain("localUrl: `http://127.0.0.1:${actualGamePort}`")
-    expect(main).toContain("var url = 'http://127.0.0.1:${actualGamePort}';")
+    expect(main).toContain('executeJavaScript(LOCAL_STARTUP_STATUS_SCRIPT)')
     expect(packageJson.scripts['build:electron:client']).toContain('npm run build:colyseus')
     expect(packageJson.scripts['build:electron:client']).toContain('npm run prepare:embedded-postgres')
     expect(colyseusBuild).toContain("'@prisma/client'")
@@ -112,7 +112,8 @@ describe('RED-161 default player transport', () => {
     const index = await readFile(path.join(ROOT, 'data', 'pages', 'index.html'), 'utf8')
     const readyHandler = main.slice(main.indexOf('app.whenReady().then'), main.indexOf("app.on('window-all-closed'"))
 
-    expect(readyHandler).toContain('await startStableLocalServerAndRecover(generation)')
+    expect(readyHandler).toContain('await startStableProfileServerAndRecover(generation)')
+    expect(readyHandler).toContain('await startLocalGameAuthority(stableProfileBinding())')
     expect(readyHandler).toContain('loadLocalGame(win)')
     expect(readyHandler).not.toContain('openConnectWindow()')
     expect(main).toContain("handleTrusted('ensure-local-authority', ['game']")

@@ -7,8 +7,9 @@ android {
         applicationId "com.redvsblue.client"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode Integer.parseInt(System.getenv('RVB_ANDROID_VERSION_CODE') ?: '18')
-        versionName System.getenv('RVB_ANDROID_VERSION_NAME') ?: "0.1.0"
+        versionCode Integer.parseInt(System.getenv('RVB_ANDROID_VERSION_CODE') ?: '21')
+        versionName System.getenv('RVB_ANDROID_VERSION_NAME') ?: "0.1.2"
+        manifestPlaceholders = [rvbAppLabel: '红蓝对决·安卓测试版']
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -23,6 +24,15 @@ android {
             versionNameSuffix "-RED199-candidate"
             matchingFallbacks = ['debug']
         }
+        demo {
+            initWith uiAcceptance
+            manifestPlaceholders = [rvbAppLabel: '红蓝对决·试玩版']
+            applicationIdSuffix ""
+            versionNameSuffix "-demo"
+            debuggable false
+            signingConfig null
+            matchingFallbacks = ['release', 'debug']
+        }
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
@@ -33,6 +43,13 @@ android {
         uiAcceptance.res.srcDir "$buildDir/generated/android-distribution-res"
         uiAcceptance.assets.srcDir "$buildDir/generated/android-host-assets"
         uiAcceptance.jniLibs.srcDir "$buildDir/generated/android-host-jni"
+        demo {
+            java.srcDir "src/uiAcceptance/java"
+            res.srcDirs = ["src/uiAcceptance/res", "$buildDir/generated/android-distribution-res"]
+            manifest.srcFile "src/uiAcceptance/AndroidManifest.xml"
+            assets.srcDirs = ["$buildDir/generated/ui-acceptance-assets", "$buildDir/generated/android-host-assets"]
+            jniLibs.srcDir "$buildDir/generated/android-host-jni"
+        }
     }
     packagingOptions { jniLibs { useLegacyPackaging true; keepDebugSymbols += ['**/librvb_node.so'] } }
 }
@@ -49,6 +66,15 @@ def stageUiAcceptance = tasks.register('stageUiAcceptance', Exec) {
 }
 tasks.configureEach { task ->
     if (task.name == 'preUiAcceptanceBuild') task.dependsOn(stageUiAcceptance)
+}
+
+def stageDemo = tasks.register('stageDemo', Exec) {
+    workingDir rootProject.projectDir.parentFile
+    environment 'RVB_ANDROID_PUBLIC_DEMO', '1'
+    commandLine 'node', 'scripts/stage-android-ui-acceptance.mjs'
+}
+tasks.configureEach { task ->
+    if (task.name == 'preDemoBuild') task.dependsOn(stageDemo)
 }
 
 dependencies {

@@ -1,0 +1,15 @@
+{
+  "ok": true,
+  "checks": [
+    "real Electron paste/format/undo/redo",
+    "Ctrl+S saves embedded JSON; reload preserves escapes/comments and unknown fields",
+    "syntax error preserves file and draft",
+    "rule body uses skillCode and synchronizes JSON/code modes",
+    "import preview and explicit target; undo import (deterministic picker fixture)",
+    "save lock makes code read-only",
+    "external revision conflict preserved",
+    "accepted JSON skill/rule code exported through real editor IPC and utility worker"
+  ],
+  "archiveBytes": 3300,
+  "screenshot": "builtin-code-ide.png"
+}

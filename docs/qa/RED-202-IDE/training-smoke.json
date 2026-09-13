@@ -1,0 +1,19 @@
+{
+  "ok": true,
+  "acceptedHash": "d486f138f70663014ad05779e0542c5469b30d199a13710bcb95c4dd29f5a829",
+  "combat": {
+    "healedHp": 7,
+    "targetHp": 6,
+    "before": 9
+  },
+  "checks": [
+    "enabled UI opens actual training",
+    "accepted attack 5, unaccepted attack 99 excluded",
+    "real battle creates Aizen with attack 5",
+    "Cero actually damages opponent and heals Ulquiorra from 6 to 7",
+    "reopen new accepted attack 6; previous window stays 5",
+    "no native bridge",
+    "HTTP and WebRTC loopback probes blocked",
+    "temporary preparation files removed"
+  ]
+}

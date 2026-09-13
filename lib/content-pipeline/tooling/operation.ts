@@ -61,6 +61,9 @@ const EMPTY_IDENTITY: ContentToolingIdentityV1 = Object.freeze({
 })
 
 function assertOperationPolicy(request: ContentPipelineOperationV1): void {
+  if (request.channel === 'authoring' && request.operation === 'smoke') {
+    throw new ContentToolingRefusalErrorV1('AUTHORING_PREVIEW_ONLY', 'policy', 'Authoring packages are for editing only; sign and explicitly trust the publisher before runtime testing.')
+  }
   if (request.channel === 'stable' && request.stableConfirmed !== true) {
     throw new ContentToolingRefusalErrorV1(
       'STABLE_CONFIRMATION_REQUIRED',
@@ -87,6 +90,7 @@ function assertOperationPolicy(request: ContentPipelineOperationV1): void {
   }
   if (
     request.channel !== 'local-dev'
+    && request.channel !== 'authoring'
     && (request.operation === 'validate'
       || request.operation === 'resolve'
       || request.operation === 'smoke')
@@ -149,10 +153,11 @@ function identityFromProfile(
 function packInput(
   archive: string,
   channel: ContentPipelineOperationV1['channel'],
+  trustedScriptPublisherKeyIds: readonly string[] = [],
 ): ResolvePackInputV1 {
   return {
     source: readArchiveFileV1(archive),
-    policy: contentPolicyForChannelV1(channel),
+    policy: contentPolicyForChannelV1(channel, trustedScriptPublisherKeyIds),
   }
 }
 
@@ -170,7 +175,7 @@ function assertTrustedSources(
   request: ContentPipelineOperationV1,
   sources: readonly ContentPackSourceV1[],
 ): void {
-  if (request.channel === 'local-dev') return
+  if (request.channel === 'local-dev' || request.channel === 'authoring') return
   const trusted = new Set(request.trustedPublisherKeyIds ?? [])
   for (const source of sources) {
     const manifest = parseArchiveManifestV1(source)
@@ -191,11 +196,11 @@ function resolveReferences(
   request: ContentPipelineOperationV1,
   baseReference: ResolveContentOperationV1['base'],
   patchArchives: readonly string[],
-): Readonly<{ snapshot: ResolvedSnapshotViewV1; publisherKeyId: string | null }> {
+): Readonly<{ snapshot: ResolvedSnapshotViewV1; publisherKeyId: string | null; sourceCapabilities: ContentToolingIdentityV1['capabilities'] }> {
   const base = baseReference.kind === 'bundled'
     ? createBundledBasePackInputV1(request.appRoot)
-    : packInput(baseReference.archive, request.channel)
-  const patches = patchArchives.map(archive => packInput(archive, request.channel))
+    : packInput(baseReference.archive, request.channel, request.trustedPublisherKeyIds)
+  const patches = patchArchives.map(archive => packInput(archive, request.channel, request.trustedPublisherKeyIds))
   const snapshot = resolveProfileV1({
     base,
     patches,
@@ -207,6 +212,7 @@ function resolveReferences(
   assertTrustedSources(request, externalSources)
   return {
     snapshot,
+    sourceCapabilities: [...new Set([base.source, ...patches.map(patch => patch.source)].flatMap(source => parseArchiveManifestV1(source).capabilities))].sort(),
     publisherKeyId: externalSources.length > 0
       ? publisherKeyIdOfSource(externalSources.at(-1)!)
       : null,
@@ -223,7 +229,7 @@ function validateArchive(
   const source = readArchiveFileV1(request.archive)
   const manifest = parseArchiveManifestV1(source)
   if (manifest.kind === 'snapshot') {
-    const validated = validateArchiveSourceV1(source, request.channel)
+    const validated = validateArchiveSourceV1(source, request.channel, undefined, request.trustedPublisherKeyIds)
     assertTrustedSources(request, [source])
     return validated
   }
@@ -241,7 +247,7 @@ function validateArchive(
     request.base,
     request.patches ?? [],
   ).snapshot
-  const validated = validateArchiveSourceV1(source, request.channel, { parent })
+  const validated = validateArchiveSourceV1(source, request.channel, { parent }, request.trustedPublisherKeyIds)
   assertTrustedSources(request, [source])
   return validated
 }
@@ -305,6 +311,12 @@ async function runPveSmokeV1(
   const runtimeStore = new ProfileStoreV1({
     rootDir: path.join(runtimeRoot, 'resource-pack'),
     bundledBase: bundled,
+    // This ephemeral smoke store retains the original immutable view resolved
+    // and trusted above; it is never reopened as a player installation.
+    openScriptProvenance: hash => {
+      if (hash !== snapshot.profile.resolvedProfileHash) throw new Error('Smoke profile identity changed')
+      return snapshot
+    },
   })
   if (snapshot.profile.resolvedProfileHash !== bundled.profile.resolvedProfileHash) {
     const candidate = runtimeStore.installCandidate(snapshot)
@@ -630,7 +642,8 @@ export async function runContentPipelineOperationV1(
     assertOperationPolicy(request)
     switch (request.operation) {
       case 'build': {
-        const source = buildPackSourceV1(request)
+        const parent = request.mode === 'patch' && request.base ? resolveReferences(request, request.base, request.patches ?? []).snapshot : undefined
+        const source = buildPackSourceV1(request, parent)
         identity = request.mode === 'snapshot'
           ? identityFromPack(validateArchiveSourceV1(source, request.channel))
           : identityFromUnsignedSource(source)
@@ -638,7 +651,7 @@ export async function runContentPipelineOperationV1(
         break
       }
       case 'sign': {
-        if (request.channel === 'local-dev') {
+        if (request.channel === 'local-dev' || request.channel === 'authoring') {
           throw new ContentToolingRefusalErrorV1(
             'SIGNING_CHANNEL_INVALID',
             'policy',
@@ -657,9 +670,8 @@ export async function runContentPipelineOperationV1(
             ...rewritten.source,
             signatureBytes: canonicalJsonBytesV1(envelope),
           }
-          writeArchiveFileV1(request.outputArchive, signedSource)
           identity = rewritten.manifest.kind === 'snapshot'
-            ? identityFromPack(validateArchiveSourceV1(signedSource, request.channel))
+            ? identityFromPack(validateArchiveSourceV1(signedSource, request.channel, undefined, [keyId]))
             : {
               packageHash,
               publisherKeyId: envelope.keyId,
@@ -670,6 +682,7 @@ export async function runContentPipelineOperationV1(
               engineAbi: rewritten.manifest.compatibility.engineAbi,
               contentAbi: rewritten.manifest.compatibility.contentAbi,
             }
+          writeArchiveFileV1(request.outputArchive, signedSource)
         } finally {
           secretKey.fill(0)
         }
@@ -681,7 +694,7 @@ export async function runContentPipelineOperationV1(
       }
       case 'resolve': {
         const resolved = resolveSnapshot(request)
-        identity = identityFromProfile(resolved.snapshot, resolved.publisherKeyId)
+        identity = { ...identityFromProfile(resolved.snapshot, resolved.publisherKeyId), sourceCapabilities: resolved.sourceCapabilities }
         break
       }
       case 'smoke': {

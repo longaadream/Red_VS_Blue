@@ -4,6 +4,10 @@ import * as fs from 'fs'
 import { assertTrustedIpcSender, isFileUrlWithinRoot } from './ipc-trust'
 import { CreativeWorkbench } from './workbench'
 import { ResourceRelease } from './resource-release'
+import { preparePublicationIdentity } from './publication-identity'
+import { openTrainingPreview, closeTrainingPreviews } from './training-preview'
+import type { TrainingSnapshot } from './training-resources'
+import { readCodeImport } from './code-import'
 import { assertSkillGraphArtifact } from './skill-graph'
 import { assertContentProjectRoot, createContentProject, openContentProject, readDocumentSnapshot, writeDocumentSnapshot } from './content-project'
 import {
@@ -148,6 +152,7 @@ app.whenReady().then(() => {
   createWindow()
 })
 app.on('window-all-closed', () => app.quit())
+app.on('before-quit', closeTrainingPreviews)
 app.on('activate', () => { if (!win || win.isDestroyed()) createWindow() })
 
 function handleTrusted(channel: string, listener: Parameters<typeof ipcMain.handle>[1]): void {
@@ -164,6 +169,15 @@ function handleTrusted(channel: string, listener: Parameters<typeof ipcMain.hand
 // ─── IPC: 文件列表 ─────────────────────────────────────────────────────────────
 
 handleTrusted('project-info', () => ({ root: ensureAuthoringWorkspace() }))
+handleTrusted('code-import', async (_event, mode) => {
+  if (mode !== 'files' && mode !== 'folder') throw new Error('无效的导入方式')
+  const result = await dialog.showOpenDialog(win!, {
+    title: mode === 'folder' ? '选择 AI 代码文件夹（只读取第一层）' : '选择要粘贴进草稿的代码文件',
+    properties: mode === 'folder' ? ['openDirectory'] : ['openFile', 'multiSelections'],
+    filters: [{ name: 'JavaScript / 文本', extensions: ['js', 'txt'] }],
+  })
+  return result.canceled ? [] : readCodeImport(result.filePaths, mode)
+})
 function editorLauncher() {
   const portable = process.env.PORTABLE_EXECUTABLE_FILE
   return app.isPackaged ? [portable && path.isAbsolute(portable) ? portable : process.execPath] : [process.execPath, path.join(__dirname, 'main.js')]
@@ -446,7 +460,7 @@ function publicationSettings() {
 }
 handleTrusted('publication-settings', () => {
   const settings = publicationSettings()
-  return { repository: settings.repository, hasToken: !!settings.encryptedToken, keyFile: settings.keyFile, encryptionAvailable: safeStorage.isEncryptionAvailable(), automaticClientDiscovery: false, trainingHandoffAvailable: false }
+  return { repository: settings.repository, hasToken: !!settings.encryptedToken, keyFile: settings.keyFile, encryptionAvailable: safeStorage.isEncryptionAvailable(), automaticClientDiscovery: false, trainingHandoffAvailable: true }
 })
 handleTrusted('publication-choose-key', async () => {
   if (!win) throw new Error('编辑器窗口不可用')
@@ -459,6 +473,11 @@ handleTrusted('publication-choose-key', async () => {
   // A selection is staged in memory; merely opening the picker never changes saved settings.
   pendingPublicationKey = filename
   return filename
+})
+handleTrusted('publication-create-key', () => {
+  const identity = preparePublicationIdentity(app.getPath('userData'))
+  pendingPublicationKey = identity.filename
+  return identity
 })
 let pendingPublicationKey: string | null = null
 handleTrusted('publication-save-settings', (_event, input: unknown) => {
@@ -488,6 +507,13 @@ handleTrusted('workbench-export', (_event, id: string, acceptedHash: string, not
     const result = await releaseService(workspace).export(id, acceptedHash, notes)
     shell.showItemInFolder(result.path)
     return result
+  })
+})
+handleTrusted('workbench-training', (_event, taskId: string, acceptedHash: string) => {
+  const workspace = ensureAuthoringWorkspace()
+  return contentOperationQueue.enqueue(async () => {
+    const snapshot = await runContentWorker({ operation: 'prepare-training-preview', workspace, taskId, acceptedHash, appRoot: getProjectRoot(), privateRoot: path.join(app.getPath('userData'), 'training-previews') }) as TrainingSnapshot
+    return openTrainingPreview(getProjectRoot(), snapshot, process.argv.includes('--editor-smoke-hidden'))
   })
 })
 handleTrusted('workbench-publish', (_event, id: string, acceptedHash: string, notes: string) => {

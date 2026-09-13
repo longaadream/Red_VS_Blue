@@ -13,8 +13,9 @@
     "!**/node_modules/**"
   ],
   "extraResources": [
+    { "from": "config/content-script-publishers.json", "to": "app/config/content-script-publishers.json" },
     { "from": "data",    "to": "app/data" },
-    { "from": "public/images", "to": "app/public/images" },
+    { "from": "public", "to": "app/public" },
     { "from": "scripts", "to": "app/scripts" },
     { "from": "node_modules/jszip",             "to": "app/node_modules/jszip" },
     { "from": "node_modules/jszip/node_modules/readable-stream", "to": "app/node_modules/jszip/node_modules/readable-stream" },
