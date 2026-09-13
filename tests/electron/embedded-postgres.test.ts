@@ -112,8 +112,9 @@ describe.skipIf(process.platform !== 'win32')('RED-161 embedded PostgreSQL LAN a
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'rvb-pg-async-check-'))
     temporaryRoots.push(root)
     fs.writeFileSync(path.join(root, 'runtime-manifest.json'), '{}')
-    let release!: (value: Buffer) => void
-    const pending = new Promise<Buffer>(resolve => { release = resolve })
+    type ReadResult = Awaited<ReturnType<typeof fs.promises.readFile>>
+    let release!: (value: ReadResult) => void
+    const pending = new Promise<ReadResult>(resolve => { release = resolve })
     const read = vi.spyOn(fs.promises, 'readFile').mockReturnValueOnce(pending)
     const protect = vi.fn()
     const controller = new EmbeddedPostgresController({
