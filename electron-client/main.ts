@@ -2530,7 +2530,7 @@ handleTrusted('start-host-broadcast', ['game'], () => {
       const iface = interfaces.find(iface => iface.address === ip)
       if (!iface) continue // VPN adapters can change between interface snapshots.
       const identity = getHostDiscovery(hostDiscoveryFile())
-      const payload = JSON.stringify({ magic: 'RVB_DISCOVER', ...identity, name: identity.serverName, ip, port })
+      const payload = JSON.stringify({ magic: 'RVB_DISCOVER', ...identity, name: identity.serverName, ip, ips: myIps, port })
       const buf = Buffer.from(payload)
       const subnet = ipv4Broadcast(ip, iface.netmask)
       for (const target of [subnet, '255.255.255.255']) {

@@ -25,7 +25,7 @@ describe('LAN single-origin discovery', () => {
       getLanIps: async () => ['26.111.123.250'],
       getRemoteUrl: async () => '',
     } } as unknown as { RvBLanDiscover: LanDiscoverApi }
-    new Script(readFileSync('data/pages/js/lan-discover.js', 'utf8')).runInContext(createContext({ window, URL, RvBColyseus: { requestAt } }))
+    new Script(readFileSync('data/pages/js/lan-discover.js', 'utf8')).runInContext(createContext({ AbortController, window, URL, RvBColyseus: { requestAt } }))
     const found = await new Promise<DiscoveredServer[]>(resolve => window.RvBLanDiscover.startLanScan({ onDone: resolve }))
     expect(found).toEqual([{ url: 'http://26.200.7.9:38622', ip: '26.200.7.9', port: 38622 }])
     expect(requestAt.mock.calls[0][0]).toBe('http://26.200.7.9:38622')
@@ -36,7 +36,7 @@ describe('LAN single-origin discovery', () => {
       getLanIps: async () => ['192.168.1.24'],
       getHostInfo: async () => ({ ips: ['192.168.1.24', '192.168.1.25'], serverId: 'self-id' }),
     } } as unknown as { RvBLanDiscover: LanDiscoverApi }
-    new Script(readFileSync('data/pages/js/lan-discover.js', 'utf8')).runInContext(createContext({ window, RvBColyseus: { requestAt } }))
+    new Script(readFileSync('data/pages/js/lan-discover.js', 'utf8')).runInContext(createContext({ AbortController, window, RvBColyseus: { requestAt } }))
     const found = await new Promise<DiscoveredServer[]>(resolve => window.RvBLanDiscover.startLanScan({ onDone: resolve }))
     expect(found.some(server => server.ip === '192.168.1.24' || server.ip === '192.168.1.25')).toBe(false)
     expect(found.length).toBeGreaterThan(0)
@@ -49,7 +49,7 @@ describe('LAN single-origin discovery', () => {
     const onFound = vi.fn(), onProgress = vi.fn(), onDone = vi.fn()
     const requestAt = vi.fn(async () => { await waiting; return { ok: true, protocol: 'rvb-colyseus' } })
     const window = { electronAPI: { getLanIps: async () => ['10.41.179.205'] } } as { electronAPI: { getLanIps(): Promise<string[]> }; RvBLanDiscover: LanDiscoverApi }
-    new Script(readFileSync('data/pages/js/lan-discover.js', 'utf8')).runInContext(createContext({ window, RvBColyseus: { requestAt }, setTimeout, clearTimeout }))
+    new Script(readFileSync('data/pages/js/lan-discover.js', 'utf8')).runInContext(createContext({ AbortController, window, RvBColyseus: { requestAt }, setTimeout, clearTimeout }))
     const scan = window.RvBLanDiscover.startLanScan({ onFound, onProgress, onDone })
     await new Promise(resolve => setTimeout(resolve, 0))
     expect(requestAt).toHaveBeenCalled()
@@ -66,7 +66,7 @@ describe('LAN single-origin discovery', () => {
       throw Error('unreachable')
     })
     const window = { RvBHost: { getLanIps: async () => ['10.41.179.205'] } } as { RvBHost: { getLanIps(): Promise<string[]> }; RvBLanDiscover: LanDiscoverApi }
-    const context = createContext({ window, RvBColyseus: { requestAt }, setTimeout, clearTimeout })
+    const context = createContext({ AbortController, window, RvBColyseus: { requestAt }, setTimeout, clearTimeout })
     new Script(readFileSync('data/pages/js/lan-discover.js', 'utf8')).runInContext(context)
     const found = await new Promise<DiscoveredServer[]>(resolve => window.RvBLanDiscover.startLanScan({ onDone: resolve }))
     expect(found.some((server: DiscoveredServer) => server.url === 'http://10.41.179.82:2567')).toBe(true)
@@ -84,7 +84,7 @@ describe('LAN single-origin discovery', () => {
     const browserWindow = {
       electronAPI: { getLanIps: async () => ['192.168.1.24'] },
     }
-    const context = createContext({
+    const context = createContext({ AbortController,
       window: browserWindow,
       RvBColyseus: { requestAt },
       setTimeout,
@@ -138,13 +138,15 @@ describe('LAN single-origin discovery', () => {
       startDiscoverHosts: vi.fn((_timeout: number, token: string) => { scanId = token; return undefined }),
     }
     const window = { electronAPI: native } as unknown as { RvBLanDiscover: LanDiscoverApi }
-    new Script(readFileSync('data/pages/js/lan-discover.js', 'utf8')).runInContext(createContext({ window, RvBColyseus: { requestAt: async () => null } }))
+    let reachable = false
+    new Script(readFileSync('data/pages/js/lan-discover.js', 'utf8')).runInContext(createContext({ AbortController, window, RvBColyseus: { requestAt: async () => reachable ? { ok: true, protocol: 'rvb-colyseus' } : null } }))
     window.RvBLanDiscover.startLanScan({}).cancel()
     release()
     await new Promise(resolve => setTimeout(resolve, 0))
     expect(native.startDiscoverHosts).not.toHaveBeenCalled()
     let scan!: { cancel(): void }
     await new Promise<void>(resolve => { scan = window.RvBLanDiscover.startLanScan({ onFound, onDone: () => resolve() }) })
+    reachable = true
     for (const info of [
       { ip: '10.0.0.2', port: 2567 }, { ip: '10.0.0.3', port: 38621 },
       { ip: '127.0.0.1', port: 2567 }, { ip: '10.0.0.8', port: 2567, serverId: 'self' },
@@ -154,7 +156,7 @@ describe('LAN single-origin discovery', () => {
     udp({ ip: '10.0.0.8', port: 2567, serverId: 'peer-1', name: '同名' })
     udp({ ip: '10.0.0.9', port: 2567, serverId: 'peer-2', name: '同名' })
     udp({ ip: '10.0.0.10', port: 2567, serverId: 'peer-1', name: '同名' })
-    expect(onFound).toHaveBeenCalledTimes(2)
+    await vi.waitFor(() => expect(onFound).toHaveBeenCalledTimes(2))
     udp({ ip: '10.0.0.11', port: 2567, discoveryScanId: 'previous-scan' })
     expect(onFound).toHaveBeenCalledTimes(2)
     scan.cancel()
@@ -165,7 +167,7 @@ describe('LAN single-origin discovery', () => {
   it('continues HTTP discovery when UDP startup throws synchronously', async () => {
     const native = { getLanIps: async () => ['10.0.0.2'], onUdpHostFound: vi.fn(), startDiscoverHosts: () => { throw Error('UDP unavailable') } }
     const window = { electronAPI: native } as unknown as { RvBLanDiscover: LanDiscoverApi }
-    new Script(readFileSync('data/pages/js/lan-discover.js', 'utf8')).runInContext(createContext({ window, RvBColyseus: { requestAt: async (url: string) => url === 'http://10.0.0.3:2567' ? { ok: true, protocol: 'rvb-colyseus' } : null } }))
+    new Script(readFileSync('data/pages/js/lan-discover.js', 'utf8')).runInContext(createContext({ AbortController, window, RvBColyseus: { requestAt: async (url: string) => url === 'http://10.0.0.3:2567' ? { ok: true, protocol: 'rvb-colyseus' } : null } }))
     const found = await new Promise<DiscoveredServer[]>(resolve => window.RvBLanDiscover.startLanScan({ onDone: resolve }))
     expect(found).toEqual([{ ip: '10.0.0.3', port: 2567, url: 'http://10.0.0.3:2567' }])
   })
