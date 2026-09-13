@@ -1,7 +1,7 @@
 ;(function () {
   'use strict'
   const PORTS = [2567, 38621]
-  const TIMEOUT_MS = 900
+  const TIMEOUT_MS = 2000
   const DEFAULT_SUBNETS = ['192.168.1', '192.168.0', '192.168.2', '10.0.0']
   const validIp = ip => typeof ip === 'string' && /^\d{1,3}(\.\d{1,3}){3}$/.test(ip) && ip.split('.').every(part => Number(part) <= 255)
 
@@ -52,6 +52,18 @@
       const subnets = usable.length ? [...new Set(usable.map(ip => ip.split('.').slice(0, 3).join('.')))] : DEFAULT_SUBNETS
       const ports = full ? [...PORTS, ...Array.from({ length: 9 }, (_, i) => 38622 + i)] : PORTS
       const tasks = []
+      // Virtual LAN peers need not share our /24. Probe the last successful
+      // direct connection first, without scanning millions of VPN addresses.
+      try {
+        const saved = window.localStorage?.getItem('rvb_lan_server_url')
+          || (native?.getRemoteUrl ? await native.getRemoteUrl() : null)
+          || window.localStorage?.getItem('rvb_remote_server_url')
+        if (saved) {
+          const peer = new URL(saved)
+          const port = Number(peer.port || (peer.protocol === 'https:' ? 443 : 80))
+          if (peer.protocol === 'http:' && validIp(peer.hostname) && !isSelf({ ip: peer.hostname })) tasks.push({ ip: peer.hostname, port })
+        }
+      } catch (error) { onError?.(error) }
       for (const subnet of subnets) for (let octet = 1; octet <= 254; octet++) {
         const ip = subnet + '.' + octet
         if (!isSelf({ ip })) for (const port of ports) tasks.push({ ip, port })

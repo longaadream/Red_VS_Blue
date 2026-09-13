@@ -44,3 +44,8 @@ export function hostDiscoveryFromEnvironment(): HostDiscoveryInfo | undefined {
     return undefined
   }
 }
+export function ipv4Broadcast(address: string, netmask: string): string {
+  const ip = address.split('.').map(Number), mask = netmask.split('.').map(Number)
+  if (ip.length !== 4 || mask.length !== 4 || [...ip, ...mask].some(value => !Number.isInteger(value) || value < 0 || value > 255)) throw Error('Invalid IPv4 network')
+  return ip.map((value, i) => value | (255 ^ mask[i])).join('.')
+}

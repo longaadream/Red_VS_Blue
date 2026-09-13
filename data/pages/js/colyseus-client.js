@@ -456,7 +456,7 @@
     if (method === 'rooms.spectate') {
       var spectatorAdmission = await joinOptions(payload.spectatorId, base, payload.roomId)
       spectatorAdmission.spectator = true
-      var viewer = await withTimeout(client.joinById(payload.roomId, spectatorAdmission), timeoutMs, method)
+      var viewer = await withRoomTimeout(client.joinById(payload.roomId, spectatorAdmission), timeoutMs, method)
       try { return await roomRpc(viewer, 'rooms.get', {}, timeoutMs) }
       finally { await viewer.leave() }
     }
@@ -474,7 +474,7 @@
       if (_createInFlight[createFlightKey]) return _createInFlight[createFlightKey]
       var creationKey = hostId + ':' + Date.now() + '-' + (_reqSeq++)
       _createInFlight[createFlightKey] = (async function () {
-        var room = await withTimeout(client.create('battle', {
+        var room = await withRoomTimeout(client.create('battle', {
           auth: await admissionProof(base, hostId, 'create'),
           product: true,
           creationKey: creationKey,
@@ -503,7 +503,7 @@
       admission.playerName = payload.playerName || admission.playerName
       admission.alignment = payload.alignment || admission.alignment
       admission.profileIdentity = payload.profileIdentity || admission.profileIdentity
-      var joinedRoom = await withTimeout(client.joinById(payload.roomId, admission), timeoutMs, method)
+      var joinedRoom = await withRoomTimeout(client.joinById(payload.roomId, admission), timeoutMs, method)
       try {
         var joinedSnapshot = await roomRpc(joinedRoom, 'rooms.get', { roomId: payload.roomId }, timeoutMs)
         return { success: true, room: joinedSnapshot }
@@ -512,7 +512,7 @@
       }
     }
     if (method === 'rooms.delete') {
-      var deleteRoom = await withTimeout(client.joinById(payload.roomId, {
+      var deleteRoom = await withRoomTimeout(client.joinById(payload.roomId, {
         auth: await admissionProof(base, payload.playerId, payload.roomId),
         product: true,
         playerId: payload.playerId,
@@ -573,11 +573,24 @@
     }
   }
 
-  function withTimeout(promise, timeoutMs, label) {
+  function withRoomTimeout(promise, timeoutMs, label) {
+    return withTimeout(promise, timeoutMs, label, function (room) {
+      if (room.reconnection) room.reconnection.enabled = false
+      return room.leave()
+    })
+  }
+
+  function withTimeout(promise, timeoutMs, label, onLateSuccess) {
     return new Promise(function (resolve, reject) {
-      var timer = setTimeout(function () { reject(new Error('Colyseus request timeout: ' + label)) }, timeoutMs || 5000)
+      var expired = false
+      var timer = setTimeout(function () { expired = true; reject(new Error('Colyseus request timeout: ' + label)) }, timeoutMs || 5000)
       Promise.resolve(promise).then(function (value) {
         clearTimeout(timer)
+        if (expired) {
+          if (onLateSuccess) Promise.resolve().then(function () { return onLateSuccess(value) })
+            .catch(function (error) { console.error('[Colyseus] late admission cleanup failed', label, error) })
+          return
+        }
         resolve(value)
       }, function (error) {
         clearTimeout(timer)

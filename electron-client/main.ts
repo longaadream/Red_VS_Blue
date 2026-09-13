@@ -1,4 +1,4 @@
-import { getHostDiscovery, setHostName } from './host-discovery'
+import { getHostDiscovery, setHostName, ipv4Broadcast } from './host-discovery'
 import { app, BrowserWindow, dialog, ipcMain, net as electronNet, protocol, safeStorage, session } from 'electron'
 import { spawn, ChildProcess, execSync } from 'child_process'
 import * as path from 'path'
@@ -2474,7 +2474,7 @@ handleTrusted('restart-server', ['admin'], async () => {
 
 // 获取本机局域网 IPv4 地址列表（供 LAN 扫描定位子网）
 handleTrusted('get-lan-ips', ['game'], () => {
-  return getLanIpList()
+  return getLanIpList(true)
 })
 
 handleTrusted('set-host-name', ['game'], (_event, name: unknown) => setHostName(hostDiscoveryFile(), name))
@@ -2521,19 +2521,20 @@ handleTrusted('start-host-broadcast', ['game'], () => {
   if (broadcastTimer) { clearInterval(broadcastTimer); broadcastTimer = null }
   if (broadcastSocket) { try { broadcastSocket.close() } catch {} broadcastSocket = null }
 
-  const myIps = getLanIpList()
-  const port = actualGamePort
-
   const send = () => {
+    const interfaces = Object.values(os.networkInterfaces()).flatMap(items => items ?? [])
+    const myIps = getLanIpList(true)
+    const port = actualGamePort
     for (const ip of myIps) {
       const identity = getHostDiscovery(hostDiscoveryFile())
       const payload = JSON.stringify({ magic: 'RVB_DISCOVER', ...identity, name: identity.serverName, ip, port })
       const buf = Buffer.from(payload)
-      const subnet = ip.substring(0, ip.lastIndexOf('.') + 1) + '255'
+      const subnet = ipv4Broadcast(ip, interfaces.find(iface => iface.address === ip)!.netmask)
       for (const target of [subnet, '255.255.255.255']) {
         try {
           const sock = dgram.createSocket('udp4')
-          sock.bind(() => {
+          sock.on('error', () => { try { sock.close() } catch { /* Already closed. */ } })
+          sock.bind(0, ip, () => {
             sock.setBroadcast(true)
             sock.send(buf, 0, buf.length, DISCOVERY_PORT, target, () => sock.close())
           })

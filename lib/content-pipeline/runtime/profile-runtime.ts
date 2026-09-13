@@ -135,16 +135,45 @@ function referenceForRuntime(context: ProfileRuntimeContextV1): ProfileReference
   )
 }
 
+const verifiedRuntimeReferences = new WeakMap<ProfileRuntimeContextV1, {
+  key: string
+  reference: ProfileReferenceV1
+}>()
+
+function runtimeReferenceKey(context: ProfileRuntimeContextV1): string {
+  // Only the small activation pointer is inspected on the hot path. Content
+  // and publisher provenance remain fully verified at lifecycle boundaries.
+  const pointer = existsSync(context.store.statePath) ? readFileSync(context.store.statePath, 'utf8') : null
+  return JSON.stringify([pointer, ...[
+    'RVB_PROFILE_ROOT', 'RVB_RESOLVED_PROFILE_HASH', 'RVB_PROFILE_ACTIVATION_ID',
+    'RVB_AUTHORITY_CONTENT_HASH', 'RVB_PROFILE_ENGINE_ABI', 'RVB_PROFILE_CONTENT_ABI',
+  ].map(name => process.env[name] ?? null)])
+}
+
 export function getRuntimeProfileReferenceV1(): ProfileReferenceV1 {
   const context = getProfileRuntimeContextV1()
+  if (!existsSync(context.store.statePath)) context.store.readState()
+  const key = runtimeReferenceKey(context)
+  const cached = verifiedRuntimeReferences.get(context)
+  if (cached?.key === key) return cached.reference
+  verifiedRuntimeReferences.delete(context)
   const reference = referenceForRuntime(context)
   const root = getRuntimeProfileRootV1(context, reference)
   assertRuntimeEnvironment(context, reference, root)
-  return reference
+  const frozen = Object.freeze({ ...reference,
+    compatibility: Object.freeze({ ...reference.compatibility }),
+    capabilities: Object.freeze([...reference.capabilities]),
+  })
+  if (runtimeReferenceKey(context) !== key) {
+    throw new ProfileStoreErrorV1('PROFILE_STATE_INVALID', 'activation changed during verification; retry')
+  }
+  verifiedRuntimeReferences.set(context, { key, reference: frozen })
+  return frozen
 }
 
 export function openRuntimeVerifiedSnapshotV1(): ResolvedSnapshotViewV1 {
   const context = getProfileRuntimeContextV1()
+  verifiedRuntimeReferences.delete(context)
   const reference = referenceForRuntime(context)
   const root = getRuntimeProfileRootV1(context, reference)
   assertRuntimeEnvironment(context, reference, root)
@@ -261,6 +290,7 @@ export async function reconcileRuntimePveAuthorityV1(
 
 export async function getProfileServerReportV1(): Promise<ProfileServerReportV1> {
   const context = getProfileRuntimeContextV1()
+  verifiedRuntimeReferences.delete(context)
   const reference = referenceForRuntime(context)
   const root = getRuntimeProfileRootV1(context, reference)
   let profileIntegrity = false
@@ -418,6 +448,7 @@ export async function beginProfileActivationV1(targetProfileHash: string): Promi
 
 export function bindRuntimeProfileV1(activationId: string, targetProfileHash: string): void {
   const context = getProfileRuntimeContextV1()
+  verifiedRuntimeReferences.delete(context)
   const state = context.store.readState()
   if (
     state.activation?.activationId !== activationId
@@ -438,6 +469,7 @@ export function bindStableRuntimeProfileV1(
 ): void {
   const context = getProfileRuntimeContextV1()
   const stable = context.store.readState().stable
+  verifiedRuntimeReferences.delete(context)
   process.env.RVB_PROFILE_ROOT = getRuntimeProfileRootV1(context, stable)
   process.env.RVB_RESOLVED_PROFILE_HASH = stable.resolvedProfileHash
   process.env.RVB_AUTHORITY_CONTENT_HASH = stable.authorityContentHash

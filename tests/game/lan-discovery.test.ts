@@ -19,6 +19,17 @@ type LanDiscoverApi = {
 }
 
 describe('LAN single-origin discovery', () => {
+  it('probes the saved VPN peer outside our /24 before subnet addresses', async () => {
+    const requestAt = vi.fn(async (url: string) => url === 'http://26.200.7.9:38622' ? { ok: true, protocol: 'rvb-colyseus' } : null)
+    const window = { localStorage: { getItem: (key: string) => key === 'rvb_lan_server_url' ? 'http://26.200.7.9:38622' : null }, electronAPI: {
+      getLanIps: async () => ['26.111.123.250'],
+      getRemoteUrl: async () => '',
+    } } as unknown as { RvBLanDiscover: LanDiscoverApi }
+    new Script(readFileSync('data/pages/js/lan-discover.js', 'utf8')).runInContext(createContext({ window, URL, RvBColyseus: { requestAt } }))
+    const found = await new Promise<DiscoveredServer[]>(resolve => window.RvBLanDiscover.startLanScan({ onDone: resolve }))
+    expect(found).toEqual([{ url: 'http://26.200.7.9:38622', ip: '26.200.7.9', port: 38622 }])
+    expect(requestAt.mock.calls[0][0]).toBe('http://26.200.7.9:38622')
+  })
   it('excludes every local interface while preserving a same-name peer', async () => {
     const requestAt = vi.fn(async () => ({ ok: true, protocol: 'rvb-colyseus', serverName: '同名主机', serverId: 'peer-id' }))
     const window = { electronAPI: {
