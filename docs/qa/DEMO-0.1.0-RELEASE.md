@@ -42,4 +42,7 @@
 - 教程相关 3 个测试文件共 39 项通过；修改的 JavaScript 通过 ESLint。
 - 新安装 uiAcceptance APK 验证 640×360、800×360、914×411 教程正文、44px 按钮、收起/展开及棋子触控。顶部间隙命中棋盘检查通过。
 - Android PVE 实测移动、部署详情及两次独立存档通过；移动表现入口调用一次。证据位于 `output/demo-release/android-floating-*.log` 与 `output/pve-roguelike/android-ui/`。
-- 本轮只构建 UI 验收包，发布签名继续由另一任务处理；既有 Windows 分发 ZIP 尚未包含本轮界面改动。
+- Android 本轮只构建 UI 验收包，发布签名继续由另一任务处理。
+- Windows 分发 ZIP 已同步 `03ca6e9` 界面修复；358 页面资源、424 离线数据和 44 图片校验通过，内嵌 PostgreSQL 校验通过。更新后独立副本的离线教程、房间创建/加入、宿主恢复与退出清理冒烟通过，日志 `output/demo-release/windows-floating-smoke.log`。
+- Windows ZIP SHA-256：`596a7b7f0b829c30fbe480319594f3951dc4919eeac55afa118c11e57b2dc48b`。
+- `03ca6e9` 的 GitHub Main baseline 与 ESLint 均通过。PR 仍为 Draft，尚未合并或发布。
