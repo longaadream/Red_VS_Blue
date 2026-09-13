@@ -112,8 +112,8 @@ describe('RED-161 default player transport', () => {
     const index = await readFile(path.join(ROOT, 'data', 'pages', 'index.html'), 'utf8')
     const readyHandler = main.slice(main.indexOf('app.whenReady().then'), main.indexOf("app.on('window-all-closed'"))
 
-    expect(readyHandler).toContain('await startStableLocalServerAndRecover()')
-    expect(readyHandler).toContain('loadLocalGame()')
+    expect(readyHandler).toContain('await startStableLocalServerAndRecover(generation)')
+    expect(readyHandler).toContain('loadLocalGame(win)')
     expect(readyHandler).not.toContain('openConnectWindow()')
     expect(main).toContain("handleTrusted('ensure-local-authority', ['game']")
     expect(main).toContain("path.join(logDir, 'authority.log')")

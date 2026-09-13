@@ -10,6 +10,7 @@
     "electron-client/dist/**",
     "electron-client/admin/**",
     "electron-client/connect/**",
+    "electron-client/startup/**",
     "package.json",
     "!node_modules/**"
   ],
