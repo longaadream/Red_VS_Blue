@@ -1,3 +1,4 @@
+import { getHostDiscovery, setHostName } from './host-discovery'
 import { app, BrowserWindow, dialog, ipcMain, net as electronNet, protocol, safeStorage, session } from 'electron'
 import { spawn, ChildProcess, execSync } from 'child_process'
 import * as path from 'path'
@@ -255,6 +256,12 @@ function getHtmlRoot(): string {
   return app.isPackaged
     ? path.join(process.resourcesPath, 'app', 'www')
     : path.join(__dirname, '../../data/pages')
+}
+
+function hostDiscoveryFile(): string {
+  const file = path.join(getUserData(), 'host-discovery.json')
+  getHostDiscovery(file)
+  return file
 }
 
 function getUserData(): string {
@@ -818,6 +825,7 @@ async function startLocalGameAuthorityOnce(
       RVB_TURN_TIMER_ENABLED: '1',
       APP_ROOT_DIR: appRoot,
       USER_DATA_DIR: getUserData(),
+      RVB_HOST_DISCOVERY_FILE: hostDiscoveryFile(),
       RVB_PROFILE_ROOT: binding.profileRoot,
       RVB_RESOLVED_PROFILE_HASH: binding.reference?.resolvedProfileHash,
       RVB_AUTHORITY_CONTENT_HASH: binding.reference?.authorityContentHash,
@@ -2248,10 +2256,13 @@ handleTrusted('get-lan-ips', ['game'], () => {
   return getLanIpList()
 })
 
+handleTrusted('set-host-name', ['game'], (_event, name: unknown) => setHostName(hostDiscoveryFile(), name))
+
 // 获取主机信息（端口 + LAN IP 列表），供"我当主机"功能使用
 handleTrusted('get-host-info', ['game'], () => {
   const ips = getLanIpList(true)
   return {
+    ...getHostDiscovery(hostDiscoveryFile()),
     port: actualGamePort,
     ips,
     running: gameServerProcess !== null && localGameReady,
@@ -2290,12 +2301,12 @@ handleTrusted('start-host-broadcast', ['game'], () => {
   if (broadcastSocket) { try { broadcastSocket.close() } catch {} broadcastSocket = null }
 
   const myIps = getLanIpList()
-  const hostname = os.hostname()
   const port = actualGamePort
 
   const send = () => {
     for (const ip of myIps) {
-      const payload = JSON.stringify({ magic: 'RVB_DISCOVER', name: hostname, ip, port })
+      const identity = getHostDiscovery(hostDiscoveryFile())
+      const payload = JSON.stringify({ magic: 'RVB_DISCOVER', ...identity, name: identity.serverName, ip, port })
       const buf = Buffer.from(payload)
       const subnet = ip.substring(0, ip.lastIndexOf('.') + 1) + '255'
       for (const target of [subnet, '255.255.255.255']) {
@@ -2321,12 +2332,30 @@ handleTrusted('stop-host-broadcast', ['game'], () => {
 })
 
 // 发现主机：监听 UDP 广播 timeoutMs 毫秒，通过 webContents.send 推送结果
-handleTrusted('start-discover-hosts', ['game'], (event, timeoutMs: number) => {
-  const timeout = timeoutMs > 0 ? timeoutMs : 3000
+const discoverySessions = new Map<number, { scanId: string; stop(): void }>()
+handleTrusted('stop-discover-hosts', ['game'], (event, scanId: string) => {
+  const active = discoverySessions.get(event.sender.id)
+  if (active?.scanId === scanId) active.stop()
+})
+handleTrusted('start-discover-hosts', ['game'], (event, timeoutMs: number, scanId: string) => {
+  if (typeof scanId !== 'string' || !/^[a-zA-Z0-9-]{1,80}$/.test(scanId)) throw Error('Invalid discovery session')
+  discoverySessions.get(event.sender.id)?.stop()
+  const timeout = Number.isFinite(timeoutMs) && timeoutMs > 0 ? Math.min(timeoutMs, 10000) : 3000
   const sender = event.sender
 
   const seen = new Set<string>()
   let sock: dgram.Socket | null = null
+  const stop = () => {
+    clearTimeout(timer)
+    try { sock?.close() } catch { /* Already closed or not bound. */ }
+    if (discoverySessions.get(sender.id)?.scanId === scanId) discoverySessions.delete(sender.id)
+  }
+  discoverySessions.set(sender.id, { scanId, stop })
+  const timer = setTimeout(() => {
+    stop()
+    if (!sender.isDestroyed()) sender.send('udp-discovery-done')
+  }, timeout)
+
   try {
     sock = dgram.createSocket({ type: 'udp4', reuseAddr: true })
     sock.bind(DISCOVERY_PORT, () => {
@@ -2336,19 +2365,16 @@ handleTrusted('start-discover-hosts', ['game'], (event, timeoutMs: number) => {
       try {
         const info = JSON.parse(msg.toString('utf8'))
         if (info.magic !== 'RVB_DISCOVER') return
+        if (getLanIpList(true).includes(info.ip) || info.serverId === getHostDiscovery(hostDiscoveryFile()).serverId) return
         const key = info.ip + ':' + info.port
         if (seen.has(key)) return
         seen.add(key)
-        if (!sender.isDestroyed()) sender.send('udp-host-found', info)
+        if (!sender.isDestroyed() && discoverySessions.get(sender.id)?.scanId === scanId) sender.send('udp-host-found', { ...info, discoveryScanId: scanId })
       } catch {}
     })
-    sock.on('error', () => { try { sock!.close() } catch {} })
-  } catch { return { ok: false } }
+    sock.on('error', stop)
+  } catch { stop(); return { ok: false } }
 
-  setTimeout(() => {
-    try { sock!.close() } catch {}
-    if (!sender.isDestroyed()) sender.send('udp-discovery-done')
-  }, timeout)
 
   return { ok: true }
 })

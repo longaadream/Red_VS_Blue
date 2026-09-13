@@ -27,11 +27,11 @@ describe('main menu LAN entry', () => {
     expect(goLobby).toHaveBeenCalledTimes(cosmeticOnly ? 1 : 0)
   })
 
-  it('starts HTTP scanning even when desktop UDP returns no value', () => {
-    const { context, startLanScan, electronAPI } = menu()
+  it('delegates both discovery transports to the cancellable scanner', () => {
+    const { context, startLanScan } = menu()
     expect(() => new Script('showJoinSheet()').runInContext(context)).not.toThrow()
     expect(startLanScan).toHaveBeenCalledOnce()
-    expect(electronAPI.onUdpHostFound).toHaveBeenCalledOnce()
+
   })
   it('requests the real full scan and renders bounded progress', () => {
     const { context, startLanScan, get } = menu()

@@ -47,6 +47,7 @@ export interface CreateColyseusBattleServerOptions {
   journalOptions?: PostgresAuthorityJournalOptions
   fixtureFactory?: BattleRoomFixtureFactory
   poolMax?: number
+  hostDiscovery?: () => { serverId: string; serverName: string } | undefined
   healthIdentity?: {
     runtime: string
     database: string
@@ -219,6 +220,7 @@ export function createColyseusBattleServer(options: CreateColyseusBattleServerOp
             ok: ready,
             protocol: 'rvb-colyseus',
             ...healthIdentity,
+            ...options.hostDiscovery?.(),
             ...(healthError ? { error: healthError } : {}),
           })
         } catch (error) {
@@ -226,6 +228,7 @@ export function createColyseusBattleServer(options: CreateColyseusBattleServerOp
             ok: false,
             protocol: 'rvb-colyseus',
             ...healthIdentity,
+            ...options.hostDiscovery?.(),
             error: error instanceof Error ? error.message : String(error),
           })
         }
@@ -234,6 +237,7 @@ export function createColyseusBattleServer(options: CreateColyseusBattleServerOp
         ok: true,
         protocol: 'rvb-colyseus',
         ...healthIdentity,
+            ...options.hostDiscovery?.(),
       }))
       app.get('/admission/challenge', (_request, response) => {
         try { response.status(200).json(admission.challenge()) }

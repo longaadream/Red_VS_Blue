@@ -23,8 +23,11 @@ public class AndroidHostPlugin extends Plugin {
             (ni.getName().matches("(?i).*(wlan|swlan|ap|eth|bridge).*" )?primary:other).add(address.getHostAddress());
         }}}
         for(String ip:primary)ips.put(ip);if(primary.isEmpty())for(String ip:other)ips.put(ip);
-        return new JSObject().put("running","running".equals(AndroidHostService.state)).put("state",AndroidHostService.state).put("notice",AndroidHostService.error).put("port",2567).put("ips",ips).put("profileIdentity",AndroidHostService.ready==null?JSONObject.NULL:AndroidHostService.ready.optJSONObject("profileIdentity"));
+        JSONObject identity=HostDiscoveryInfo.read(getContext());
+        JSONArray localIps=new JSONArray();for(String ip:primary)localIps.put(ip);for(String ip:other)localIps.put(ip);
+        return new JSObject().put("serverId",identity.getString("serverId")).put("serverName",identity.getString("serverName")).put("localIps",localIps).put("running","running".equals(AndroidHostService.state)).put("state",AndroidHostService.state).put("notice",AndroidHostService.error).put("port",2567).put("ips",ips).put("profileIdentity",AndroidHostService.ready==null?JSONObject.NULL:AndroidHostService.ready.optJSONObject("profileIdentity"));
     }
+    @PluginMethod public void setName(PluginCall call){run(call,()->{HostDiscoveryInfo.rename(getContext(),call.getString("name"));return status();});}
     @PluginMethod public void info(PluginCall call){run(call,this::status);}
     @PluginMethod public void start(PluginCall call){
         if(Build.VERSION.SDK_INT>=33&&getPermissionState("notifications")!=PermissionState.GRANTED){requestPermissionForAlias("notifications",call,"notificationResult");return;}
