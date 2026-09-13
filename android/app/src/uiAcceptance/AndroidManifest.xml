@@ -5,7 +5,7 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
-    <application android:label="红蓝对决·安卓测试版" android:allowBackup="false" android:networkSecurityConfig="@xml/android_distribution_network" tools:replace="android:label,android:allowBackup,android:networkSecurityConfig">
+    <application android:label="${rvbAppLabel}" android:allowBackup="false" android:networkSecurityConfig="@xml/android_distribution_network" tools:replace="android:label,android:allowBackup,android:networkSecurityConfig">
         <provider android:name="androidx.core.content.FileProvider" android:authorities="${applicationId}.fileprovider" tools:node="replace" android:exported="false" android:grantUriPermissions="true">
             <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/update_paths" />
         </provider>
