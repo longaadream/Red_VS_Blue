@@ -108,6 +108,35 @@ describe('RED-170 embedded PostgreSQL health monitor', () => {
 })
 
 describe.skipIf(process.platform !== 'win32')('RED-161 embedded PostgreSQL LAN authority', () => {
+  it('shares pending asynchronous verification and never starts from an unverified runtime', async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'rvb-pg-async-check-'))
+    temporaryRoots.push(root)
+    fs.writeFileSync(path.join(root, 'runtime-manifest.json'), '{}')
+    let release!: (value: Buffer) => void
+    const pending = new Promise<Buffer>(resolve => { release = resolve })
+    const read = vi.spyOn(fs.promises, 'readFile').mockReturnValueOnce(pending)
+    const protect = vi.fn()
+    const controller = new EmbeddedPostgresController({
+      runtimeRoot: path.join(root, 'pgsql'), stateRoot: path.join(root, 'state'), findFreePort,
+      protectSecret: protect, unprotectSecret: buffer => buffer.toString(),
+    })
+    const first = controller.start(), second = controller.start()
+    try {
+      await new Promise(resolve => setImmediate(resolve))
+      expect(read).toHaveBeenCalledTimes(1)
+      expect(protect).not.toHaveBeenCalled()
+      expect(controller.isRunning).toBe(false)
+      release(Buffer.from('{}'))
+      const results = await Promise.allSettled([first, second])
+      expect(results.map(result => result.status)).toEqual(['rejected', 'rejected'])
+      expect(protect).not.toHaveBeenCalled()
+    } finally {
+      release(Buffer.from('{}'))
+      await Promise.allSettled([first, second])
+      read.mockRestore()
+    }
+  })
+
   it('initializes once, enforces loopback/SCRAM, persists, and detects a database crash', async () => {
     const projectRoot = path.resolve(__dirname, '../..')
     const runtimeRoot = path.join(projectRoot, '_client-postgres', 'pgsql')
