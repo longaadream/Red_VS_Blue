@@ -50,7 +50,7 @@ if(process.env.RVB_ANDROID_QA_CERT){
   fs.mkdirSync(path.join(res,'raw'),{recursive:true});fs.copyFileSync(path.resolve(process.env.RVB_ANDROID_QA_CERT),path.join(res,'raw/android_qa_ca.pem'))
   qaTrust='<debug-overrides><trust-anchors><certificates src="@raw/android_qa_ca" /></trust-anchors></debug-overrides>'
 }
-fs.writeFileSync(path.join(res,'xml/android_distribution_network.xml'),`<network-security-config><base-config cleartextTrafficPermitted="true"><trust-anchors><certificates src="system" /></trust-anchors></base-config><domain-config cleartextTrafficPermitted="true"><domain>localhost</domain><domain>127.0.0.1</domain></domain-config>${qaTrust}</network-security-config>`)
+fs.writeFileSync(path.join(res,'xml/android_distribution_network.xml'),`<network-security-config><base-config cleartextTrafficPermitted="true"><trust-anchors><certificates src="system" /></trust-anchors></base-config><domain-config cleartextTrafficPermitted="true"><domain includeSubdomains="false">localhost</domain><domain includeSubdomains="false">127.0.0.1</domain></domain-config>${qaTrust}</network-security-config>`)
 await build({entryPoints:[path.join(root,'android-client/maintenance.ts')],outfile:path.join(pages,'js/android-maintenance.js'),bundle:true,platform:'browser',format:'iife',minify:true})
 const files=api.readClientProtocolBattleData({htmlRoot:path.join(root,'data/pages'),appRoot:root,activePackRoot:null,isPackaged:false})
 fs.writeFileSync(path.join(pages,'__battle-data.json'),JSON.stringify({schemaVersion:'rvb-client-battle-data/v1',files}))
