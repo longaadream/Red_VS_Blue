@@ -11,7 +11,9 @@
     let cancelled = false
     const scanId = Date.now().toString(36) + '-' + Math.random().toString(36).slice(2)
     let stopUdp = () => {}
-    const controller = { cancel() { cancelled = true; stopUdp() } }
+    const inFlight = new Set()
+    const queued = []
+    const controller = { cancel() { cancelled = true; stopUdp(); for (const task of queued.splice(0)) task.resolve(); for (const request of inFlight) request.abort() } }
     async function run() {
       let addresses = [], own = {}
       // Resolve local identity before registering UDP or launching HTTP probes.
@@ -38,9 +40,44 @@
         found.push(result)
         onFound?.(result)
       }
+      const udpProbes = new Map()
+      async function checkHost(info) {
+        if (cancelled || !info || !validIp(info.ip) || !Number.isInteger(info.port) || info.port < 1 || info.port > 65535 || isSelf(info)) return
+        const request = new AbortController()
+        inFlight.add(request)
+        try {
+          const url = 'http://' + info.ip + ':' + info.port
+          const health = await RvBColyseus.requestAt(url, 'system.health', {}, TIMEOUT_MS, request.signal)
+          if (health?.ok === true && health.protocol === 'rvb-colyseus') accept({ ...info, ...health, ip: info.ip, port: info.port })
+        } catch { /* A broadcast is only a candidate; unreachable interfaces must not claim the host ID. */ }
+        finally { inFlight.delete(request) }
+      }
+      let active = 0
+      function drain() {
+        while (!cancelled && active < 16 && queued.length) {
+          const task = queued.shift()
+          active++
+          checkHost(task.info).finally(() => { active--; task.resolve(); drain() })
+        }
+      }
+      function probe(info, priority = false) {
+        if (cancelled) return Promise.resolve()
+        return new Promise(resolve => {
+          queued[priority ? 'unshift' : 'push']({ info, resolve })
+          drain()
+        })
+      }
       if (native?.startDiscoverHosts && native.onUdpHostFound) {
         native.offUdpDiscovery?.()
-        native.onUdpHostFound(info => { if (info?.discoveryScanId === scanId) accept(info) })
+        native.onUdpHostFound(info => {
+          if (cancelled || info?.discoveryScanId !== scanId) return
+          const ips = [info.ip, ...(Array.isArray(info.ips) ? info.ips.slice(0, 16) : [])]
+          for (const ip of ips) {
+            const key = ip + ':' + info.port
+            if (udpProbes.has(key) || udpProbes.size >= 64) continue
+            udpProbes.set(key, probe({ ...info, ip }, true))
+          }
+        })
         stopUdp = () => {
           native.offUdpDiscovery?.()
           if (native.stopDiscoverHosts) Promise.resolve(native.stopDiscoverHosts(scanId)).catch(error => onError?.(error))
@@ -68,17 +105,12 @@
         const ip = subnet + '.' + octet
         if (!isSelf({ ip })) for (const port of ports) tasks.push({ ip, port })
       }
-      for (let i = 0; i < tasks.length && !cancelled; i += 64) {
-        await Promise.all(tasks.slice(i, i + 64).map(async ({ ip, port }) => {
-          const url = 'http://' + ip + ':' + port
-          try {
-            const health = await RvBColyseus.requestAt(url, 'system.health', {}, TIMEOUT_MS)
-            if (health?.ok === true && health.protocol === 'rvb-colyseus') accept({ ...health, ip, port })
-          } catch { /* Unreachable addresses are expected while scanning the subnet. */ }
-        }))
+      for (let i = 0; i < tasks.length && !cancelled; i += 16) {
+        await Promise.all(tasks.slice(i, i + 16).map(info => probe(info)))
         if (cancelled) return
-        onProgress?.(Math.min(i + 64, tasks.length), tasks.length)
+        onProgress?.(Math.min(i + 16, tasks.length), tasks.length)
       }
+      await Promise.all(udpProbes.values())
       if (!cancelled) onDone?.(found)
     }
     run().catch(error => { if (!cancelled) { stopUdp(); onError?.(error); onDone?.([]) } })

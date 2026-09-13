@@ -907,7 +907,7 @@
 
     function startFullScan() {
       try { if (_lanScanner) _lanScanner.cancel() } catch {}
-      document.getElementById('lanScanningText').textContent = '全量扫描中（可能需要1-2分钟）…'
+      document.getElementById('lanScanningText').textContent = '全量扫描中（可能需要数分钟，发现主机后可直接连接）…'
       document.getElementById('lanFullBtn').style.display = 'none'
       document.getElementById('lanRescanBtn').style.display = 'none'
       document.getElementById('lanScanningRow').style.display = 'flex'
@@ -945,6 +945,10 @@
     }
 
     async function connectLanServer(url) {
+      if (_lanScanner) _lanScanner.cancel()
+      _lanScanner = null
+      document.getElementById('lanScanningRow').style.display = 'none'
+      document.getElementById('lanRescanBtn').style.display = 'block'
       const errorBox = document.getElementById('lanConnectError')
       errorBox.style.display = 'block'
       errorBox.textContent = '正在连接…'
@@ -960,7 +964,7 @@
         if (await checkProfileAndGo(url, 'lan')) closeLanSheet()
         else errorBox.textContent = '未进入大厅，请检查刚才的资源版本提示。'
       } catch (error) {
-        errorBox.textContent = '无法连接 ' + url + '：' + error.message + '。请确认房主显示“服务器已运行”，并使用当前 Wi-Fi／热点地址。'
+        errorBox.textContent = '无法连接 ' + url + '：' + error.message + '。请确认房主显示“服务器已运行”。使用 Radmin 等虚拟局域网时，请填写房主的虚拟网卡 IP 和游戏端口；同一 Wi-Fi／热点才使用对应无线网卡地址。'
       }
     }
 
