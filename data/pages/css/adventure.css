@@ -87,4 +87,7 @@
   .adventure-party-open #adventureSiteActions{display:none}
   #adventurePartyDock .adventure-party{max-height:140px}
   .adventure-mode #boardStage3d{overflow:hidden}
+  .adventure-mode #adventureWallet{background:transparent;border:0;box-shadow:none;padding:0;gap:6px;pointer-events:none}
+  #adventureWallet>:not([hidden]){pointer-events:auto;box-sizing:border-box;min-height:44px;background:#c6b28b url('../tabletop-battle/assets/parchment.png') center/cover;border:2px solid #493729;border-radius:5px 9px 5px 7px;box-shadow:1px 2px #21191466}
+  #adventureWallet #adventureCoins,#adventureWallet #adventureMobileAp{min-width:0;padding:10px 7px;font-size:14px;line-height:20px}
 }

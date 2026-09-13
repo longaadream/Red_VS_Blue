@@ -21,19 +21,6 @@
 #tutorialLessonDialog .tutorial-dialog__actions { flex-wrap: wrap; }
 #tutorialLessonDialog .tutorial-dialog__objective { display: block; }
 #tutorialLessonDialog .tutorial-dialog__scene { margin-top: 0; }
-/* Keep the next action visible on short touch screens while the explanation scrolls. */
-@media (pointer: coarse) and (orientation: landscape) {
-  #tutorialLessonDialog {
-    display: flex;
-    flex-direction: column;
-  }
-  #tutorialLessonDialog::before,
-  #tutorialLessonDialog .tutorial-dialog__scene,
-  #tutorialLessonDialog .tutorial-dialog__actions { flex-shrink: 0; }
-  #tutorialLessonDialog .tutorial-dialog__text { min-height: 0; overflow-y: auto; }
-  #tutorialLessonDialog .tutorial-dialog__actions { order: -1; margin: 0 0 8px; }
-  #tutorialLessonDialog .tutorial-dialog__button { min-height: 44px; }
-}
 @media (max-height: 600px) {
   #tutorialLessonDialog { bottom: 82px; width: min(380px, calc(100vw - 20px)); max-height: calc(100dvh - 140px); }
 }
@@ -223,6 +210,48 @@ body.tutorial-mode #btnSurrender { display: none !important; }
 }
 
 /* Six paper practice cards spread on the club table. */
+.tutorial-dialog__header { display: flex; align-items: center; gap: 8px; }
+.tutorial-dialog__header .tutorial-dialog__scene { flex: 1; margin: 0; }
+.tutorial-dialog__toggle {
+  flex: none; min-width: 54px; min-height: 44px; padding: 6px;
+  border: 2px solid #5a4631; border-radius: 7px; background: #b6a07b;
+  color: #382b21; font: 14px TutorialComic, sans-serif; cursor: pointer;
+}
+.tutorial-dialog__toggle:focus-visible { outline: 3px solid #435a60; outline-offset: 2px; }
+#tutorialLessonDialog.is-collapsed {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px;
+  padding: 6px 10px; max-height: none;
+}
+#tutorialLessonDialog.is-collapsed::before,
+#tutorialLessonDialog.is-collapsed .tutorial-dialog__scene,
+#tutorialLessonDialog.is-collapsed .tutorial-dialog__text,
+#tutorialLessonDialog.is-collapsed .tutorial-dialog__actions,
+#tutorialLessonDialog.is-collapsed details { display: none; }
+#tutorialLessonDialog.is-collapsed .tutorial-dialog__header { grid-column: 2; grid-row: 1; }
+#tutorialLessonDialog.is-collapsed .tutorial-dialog__objective {
+  grid-column: 1; grid-row: 1; border: 0; background: none; padding: 0; margin: 0;
+}
+/* One scroll area preserves text height on short touch screens. */
+@media (pointer: coarse) and (orientation: landscape) {
+  #tutorialLessonDialog {
+    display: flex; flex-direction: column;
+    left: auto; right: 10px; top: 68px; bottom: auto;
+    width: min(320px, 43vw); max-height: calc(100dvh - 165px);
+    padding: 10px 12px; overflow-y: auto;
+  }
+  #tutorialLessonDialog > * { flex-shrink: 0; }
+  #tutorialLessonDialog::before { display: none; }
+  #tutorialLessonDialog .tutorial-dialog__scene { font-size: 17px; margin: 4px 0; }
+  #tutorialLessonDialog .tutorial-dialog__text { font-size: 13px; line-height: 1.5; margin: 6px 0; }
+  #tutorialLessonDialog .tutorial-dialog__objective { font-size: 12px; margin: 4px 0; padding: 6px; }
+  #tutorialLessonDialog .tutorial-dialog__actions {
+    position: sticky; bottom: -10px; z-index: 1;
+    background: var(--guide-paper); margin: 0; padding: 2px 0 6px;
+  }
+  #tutorialLessonDialog .tutorial-dialog__button { min-height: 44px; font-size: 14px; padding: 6px 10px; }
+  #tutorialLessonDialog details { margin-top: 6px; }
+}
+
 body[data-art-page=tutorial] { margin: 0; font-size: 14px; line-height: 1.6; }
 body[data-art-page=tutorial] * { box-sizing: border-box; }
 body[data-art-page=tutorial] main { max-width: 1120px; margin: auto; padding: 24px 30px 40px; }

@@ -7,7 +7,8 @@ class Element {
   textContent = ''
   classList = { toggle() {} }
   listeners = {}
-  setAttribute() {}
+  attributes = {}
+  setAttribute(name, value) { this.attributes[name] = value }
   append(...items) { this.children.push(...items) }
   appendChild(item) { this.append(item) }
   replaceChildren() { this.children = [] }
@@ -31,6 +32,29 @@ function fixture(lessonOverrides = {}) {
 }
 
 afterEach(() => vi.useRealTimers())
+
+describe('collapsible tutorial', () => {
+  it('keeps the objective and teaching state while collapsed, including after a render', async () => {
+    const f = fixture()
+    const toggle = f.root.children[0].children[1]
+    const before = f.runtime.snapshot()
+    f.root.classList.toggle = vi.fn()
+    toggle.listeners.click()
+    expect(toggle.attributes['aria-expanded']).toBe('false')
+    expect(toggle.textContent).toBe('展开')
+    expect(f.root.classList.toggle).toHaveBeenCalledWith('is-collapsed', true)
+    expect(f.runtime.snapshot()).toEqual(before)
+    expect(f.root.children[2].textContent).toBeTruthy()
+    f.click('开始本局')
+    await Promise.resolve()
+    expect(toggle.attributes['aria-expanded']).toBe('false')
+    expect(f.root.children[2].textContent).toBeTruthy()
+    toggle.listeners.click()
+    expect(toggle.attributes['aria-expanded']).toBe('true')
+    expect(f.root.classList.toggle).toHaveBeenCalledWith('is-collapsed', false)
+    expect(f.runtime.snapshot().started).toBe(true)
+  })
+})
 
 function pacedFixture() {
   vi.useFakeTimers()
@@ -184,7 +208,7 @@ describe('autonomous tutorial runtime', () => {
     const f = fixture()
     f.state.terminalResult = { winnerPlayerId: 'opponent', reason: 'core-eliminated' }
     f.runtime.showResult()
-    expect(f.root.children[1].textContent).toContain('这局失败了')
+    expect(f.root.children[1].textContent).toContain('本局失败')
     expect(f.runtime.beforeAction({ type: 'move' }).allowed).toBe(false)
   })
 
