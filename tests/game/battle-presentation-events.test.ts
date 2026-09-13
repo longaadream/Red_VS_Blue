@@ -514,6 +514,21 @@ describe('RED-165 authoritative battle presentation events', () => {
     }
   })
 
+  it('keeps resumed target choices private using execution metadata when definitions are absent', () => {
+    const before = stateWithPieces([piece('aizen', 'player-red', 10), piece('secret-ally', 'player-red', 10)])
+    before.pendingTargetSelection = { playerId: 'player-red', source: { type: 'skill', id: 'aizen-kyoka-suiguetsu', pieceId: 'aizen' } } as BattleState['pendingTargetSelection']
+    const after = structuredClone(before)
+    after.pendingTargetSelection = undefined
+    after.actions = [{ type: 'useBasicSkill', playerId: 'player-red', turn: 1, payload: {
+      pieceId: 'aizen', skillId: 'aizen-kyoka-suiguetsu', skillName: '镜花水月', concealTargetInBattleLog: true,
+    } }]
+    const events = project({ type: 'pendingTargetSelect', playerId: 'player-red', targetPieceId: 'secret-ally' } as BattleAction, before, after)
+    expect(projectBattlePresentationEventsForViewer(events, 'player-red')[0]).toMatchObject({ targetPieceIds: ['secret-ally'], label: '镜花水月' })
+    for (const viewer of ['player-blue', 'spectator', undefined]) {
+      expect(JSON.stringify(projectBattlePresentationEventsForViewer(events, viewer))).not.toContain('secret-ally')
+    }
+  })
+
   it('collapses actor-only results to one payload-free concealed child for opponents and spectators', () => {
     const before = stateWithPieces([piece('source', 'player-red', 10), piece('target', 'player-blue', 10)])
     before.skillsById['naruto-shadow-clone'] = {

@@ -25,6 +25,8 @@ import { getSkillById } from '@/lib/game/skill-repository'
 import type { BattleState } from '@/lib/game/turn'
 import type { SkillDefinition } from '@/lib/game/skills'
 import { prepareAction } from '@/lib/game/targeting'
+import { getNormalMoveRejection, getPositionChangeRejection } from '@/lib/game/spatial'
+import { addPieceStatus, expireOwnerStatuses } from '@/lib/game/status-lifecycle'
 import { makePiece, makeState, makeTile } from '../helpers/minimal-state'
 
 const DATA_ROOT = join(process.cwd(), 'data')
@@ -239,39 +241,58 @@ describe('宿主转移', () => {
 })
 
 describe('腐蚀', () => {
-  it('只在毒液实际改变敌方位置时附加一个1回合定身状态和规则', () => {
+  it('只对敌方附加共用定身，重复施加按共用时长规则叠加，不绑定腐蚀专属规则', () => {
     const venom = makePiece({ instanceId: 'venom', ownerPlayerId: 'player-red', x: 0, y: 0 })
     const enemy = makePiece({ instanceId: 'enemy', ownerPlayerId: 'player-blue', x: 4, y: 3 })
     const state = makeState({ pieces: [venom, enemy], width: 10, height: 10 })
 
     expect(executeSkill(hostTransfer(), state, 'venom', { pieceId: 'enemy' }).success).toBe(true)
     expect(enemy.statusTags).toContainEqual(expect.objectContaining({
-      type: 'venom-corrosion-immobile',
+      type: 'root', name: '定身',
       sourceId: 'venom',
       currentDuration: 1,
       remainingDuration: 1,
     }))
-    expect(enemy.rules?.filter(rule => rule.id === 'rule-venom-corrosion-immobile')).toHaveLength(1)
+    expect(enemy.rules?.filter(rule => rule.id === 'rule-venom-corrosion-immobile')).toHaveLength(0)
 
     expect(executeSkill(hostTransfer(), state, 'venom', { pieceId: 'enemy' }).success).toBe(true)
-    expect(enemy.statusTags.filter(tag => tag.type === 'venom-corrosion-immobile')).toHaveLength(1)
-    expect(enemy.rules?.filter(rule => rule.id === 'rule-venom-corrosion-immobile')).toHaveLength(1)
+    expect(enemy.statusTags.filter(tag => tag.type === 'root')).toHaveLength(1)
+    expect(enemy.statusTags.find(tag => tag.type === 'root')?.remainingDuration).toBe(2)
+    expect(enemy.rules?.filter(rule => rule.id === 'rule-venom-corrosion-immobile')).toHaveLength(0)
 
     const allyVenom = makePiece({ instanceId: 'ally-venom', ownerPlayerId: 'player-red', x: 0, y: 0 })
     const ally = makePiece({ instanceId: 'ally', ownerPlayerId: 'player-red', x: 1, y: 0 })
     const allyState = makeState({ pieces: [allyVenom, ally] })
     expect(executeSkill(hostTransfer(), allyState, 'ally-venom', { pieceId: 'ally' }).success).toBe(true)
-    expect(ally.statusTags.some(tag => tag.type === 'venom-corrosion-immobile')).toBe(false)
+    expect(ally.statusTags.some(tag => tag.type === 'root')).toBe(false)
   })
 
-  it('共生拖行成功后对被拖动敌人附加腐蚀', () => {
+  it('共生拖行成功后对被拖动敌人附加共用定身', () => {
     const venom = makePiece({ instanceId: 'venom', ownerPlayerId: 'player-red', x: 0, y: 1 })
     const enemy = makePiece({ instanceId: 'enemy', ownerPlayerId: 'player-blue', x: 4, y: 1 })
     const state = makeState({ pieces: [venom, enemy], width: 6, height: 3 })
 
     expect(executeSkill(symbioteDrag(), state, 'venom', { x: 5, y: 1 }).success).toBe(true)
     expect(enemy).toMatchObject({ x: 1, y: 1 })
-    expect(enemy.statusTags.filter(tag => tag.type === 'venom-corrosion-immobile')).toHaveLength(1)
+    expect(enemy.statusTags.filter(tag => tag.type === 'root')).toHaveLength(1)
+    expect(enemy.statusTags[0]).toMatchObject({ name: '定身', remainingDuration: 1 })
+    expect(getNormalMoveRejection(state, enemy, { x: 2, y: 1 })).not.toBeNull()
+    expect(getPositionChangeRejection(enemy, 'teleport')).toBeNull()
+    state.turn.currentPlayerId = 'player-blue'
+    state.turn.turnNumber = 2
+    expireOwnerStatuses(state, 'player-blue')
+    expect(enemy.statusTags.some(tag => tag.type === 'root')).toBe(false)
+    expect(getNormalMoveRejection(state, enemy, { x: 2, y: 1 })).toBeNull()
+  })
+
+  it('与其他来源定身共用状态并叠加时长', () => {
+    const venom = makePiece({ instanceId: 'venom', ownerPlayerId: 'player-red', x: 0, y: 1 })
+    const enemy = makePiece({ instanceId: 'enemy', ownerPlayerId: 'player-blue', x: 4, y: 1 })
+    const state = makeState({ pieces: [venom, enemy], width: 6, height: 3 })
+    addPieceStatus(state, state.pieces[1], { id: 'other-root', type: 'root', name: '定身', currentDuration: 1, sourceId: 'other-caster' })
+    executeSkill(symbioteDrag(), state, 'venom', { x: 5, y: 1 })
+    expect(enemy.statusTags.filter(tag => tag.type === 'root')).toHaveLength(1)
+    expect(enemy.statusTags[0]).toMatchObject({ name: '定身', remainingDuration: 2 })
   })
 })
 

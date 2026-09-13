@@ -503,6 +503,16 @@ describe('RED-120 Itachi combat behavior', () => {
     const consumed = state.pieces.find(piece => piece.instanceId === 'target')!
     expect(consumed.skills.find(skill => skill.skillId === 'ashbringer')?.currentCooldown).toBe(2)
     expect(consumed.statusTags.some(tag => tag.type === 'itachi-tsukuyomi')).toBe(false)
+    state = runBattleAction(state, { type: 'endTurn', playerId: 'player-blue' }, { rootSeed: ROOT_SEED }).state
+    expect(state.pieces.find(piece => piece.instanceId === 'target')!.skills[0].currentCooldown).toBe(1)
+    state = runBattleAction(state, { type: 'beginPhase' }, { rootSeed: ROOT_SEED }).state
+    state = runBattleAction(state, { type: 'endTurn', playerId: 'player-red' }, { rootSeed: ROOT_SEED }).state
+    state = runBattleAction(state, { type: 'beginPhase' }, { rootSeed: ROOT_SEED }).state
+    expect(() => runBattleAction(state, {
+      type: 'useBasicSkill', playerId: 'player-blue', pieceId: 'target', skillId: 'ashbringer', targetPieceId: 'itachi',
+    }, { rootSeed: ROOT_SEED })).toThrow(/cooldown/)
+    state = runBattleAction(state, { type: 'endTurn', playerId: 'player-blue' }, { rootSeed: ROOT_SEED }).state
+    expect(state.pieces.find(piece => piece.instanceId === 'target')!.skills[0].currentCooldown).toBe(0)
   })
 
   it('does not stack repeated Tsukuyomi applications into multiple triggers', () => {
@@ -534,7 +544,7 @@ describe('RED-120 Itachi combat behavior', () => {
     expect(target.statusTags.find((tag: any) => tag.type === 'amaterasu-burn')?.stacks).toBe(4)
   })
 
-  it('pays for Totsuka Blade, deals 200% magical damage, and floors idle active skills at one', () => {
+  it('pays for Totsuka Blade and keeps active skills unavailable throughout the next enemy turn', () => {
     const itachi = namedPiece({ instanceId: 'itachi', templateId: 'red-itachi', ownerPlayerId: 'player-red', x: 0, y: 0, attack: 3 })
     itachi.skills = [{ skillId: 'itachi-totsuka-blade', currentCooldown: 0, usesRemaining: -1 }]
     const target = namedPiece({ instanceId: 'target', ownerPlayerId: 'player-blue', x: 2, y: 0, currentHp: 30, maxHp: 30 })
@@ -556,6 +566,22 @@ describe('RED-120 Itachi combat behavior', () => {
       currentCooldown: 2,
       usesRemaining: -1,
     })
+    state = runBattleAction(state, { type: 'endTurn', playerId: 'player-red' }, { rootSeed: ROOT_SEED }).state
+    state = runBattleAction(state, { type: 'beginPhase' }, { rootSeed: ROOT_SEED }).state
+    expect(state.turn.currentPlayerId).toBe('player-blue')
+    expect(state.pieces.find(piece => piece.instanceId === 'target')!.skills.map(skill => skill.currentCooldown)).toEqual([1, 3])
+    expect(() => runBattleAction(state, {
+      type: 'useBasicSkill', playerId: 'player-blue', pieceId: 'target', skillId: 'ashbringer', targetPieceId: 'itachi',
+    }, { rootSeed: ROOT_SEED })).toThrow(/cooldown/)
+    state = runBattleAction(state, { type: 'endTurn', playerId: 'player-blue' }, { rootSeed: ROOT_SEED }).state
+    state = runBattleAction(state, { type: 'beginPhase' }, { rootSeed: ROOT_SEED }).state
+    state = runBattleAction(state, { type: 'endTurn', playerId: 'player-red' }, { rootSeed: ROOT_SEED }).state
+    state = runBattleAction(state, { type: 'beginPhase' }, { rootSeed: ROOT_SEED }).state
+    expect(state.pieces.find(piece => piece.instanceId === 'target')!.skills.map(skill => skill.currentCooldown)).toEqual([0, 2])
+  })
+
+  it('binds the shared Amaterasu keyword to Itachi', () => {
+    expect(loadSkill('itachi-amaterasu').keywords).toContain('天照')
   })
 
   it('loads the Tsukuyomi rule referenced by the status tag', () => {

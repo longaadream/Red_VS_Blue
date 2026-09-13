@@ -902,9 +902,10 @@
       "id": "shishio-combustion-passive",
       "name": "自燃",
       "before": "处于禁疗状态，所有治疗均无效。每累计造成5点直接伤害，对自身造成1点真实伤害。每回合第一次造成伤害前，使目标所有技能进入冷却。",
-      "after": "处于禁疗状态，所有治疗均无效。每累计造成5点直接伤害，对本棋子造成1点真实伤害。每回合第一次造成伤害前，使目标所有技能进入冷却。",
+      "after": "处于禁疗状态，所有治疗均无效。每累计造成5点直接伤害，对本棋子造成1点真实伤害。每回合第一次造成伤害前，使目标所有技能进入至少1回合冷却。",
       "changed": true,
-      "executableCodeChanged": false
+      "executableCodeChanged": false,
+      "followupDecision": "RED-206: 用户确认回合结束扣冷却，压制至少1回合，保留原有更长冷却。"
     },
     {
       "id": "shishio-flame-spirit",

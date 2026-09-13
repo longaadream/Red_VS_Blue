@@ -225,8 +225,6 @@
     const height = Math.max(0, Number(state.height) || 0)
     if (width > 0 && width < COLLAPSE_WIDTH) reasons.push('narrow')
     if (width <= 900 && height > 0 && height <= 500) reasons.push('compact-landscape')
-    if (state.interactionMode === 'target' || state.interactionMode === 'place') reasons.push('target-mode')
-    if (state.dialog) reasons.push('dialog')
     return reasons
   }
 
@@ -448,6 +446,7 @@
       return '<span class="action-history-sentence' + (isRoot ? ' is-root' : '') + '" data-history-event-id="' + escapeHtml(event.eventId) + '">'
         + displaySubject(event, rootEvent, !isRoot)
         + predicate
+        + (isRoot && event.result && event.result.pending ? '<span class="action-history-complement">发起行动 · 触发响应</span>' : '')
         + displayObject(event, !isRoot)
         + displayComplement(event, isSkillRelease ? identity.skillName : (meta.label || KIND_LABELS[event.kind] || '动作'))
         + '</span>'
@@ -456,7 +455,7 @@
     function render() {
       if (!dock || !list) return
       const entries = visibleRoots(roots, userExpanded ? MAX_ROOTS : VISIBLE_ROOTS)
-      dock.hidden = entries.length === 0
+      dock.hidden = false
       list.innerHTML = entries.map(function (group, index) {
         const meta = resolveIcon(group.root)
         const identity = resolveIdentity(group.root)
@@ -472,7 +471,8 @@
         const actionLabel = isSkillRelease
           ? identity.skillName
           : String(meta.label || KIND_LABELS[group.root.kind] || '未知动作')
-        const label = actionLabel + (children.length ? '，包含 ' + children.length + ' 个结果' : '')
+        const label = actionLabel + (group.root.result && group.root.result.pending ? '，发起行动并触发响应' : '')
+          + (children.length ? '，包含 ' + children.length + ' 个结果' : '')
         const rootMark = isSkillRelease
           ? renderPortrait(identity)
           : '<img src="' + escapeHtml(meta.assetPath || 'images/effect-icons/fallback.svg') + '" alt="" aria-hidden="true">'
@@ -489,7 +489,7 @@
           + '<span class="action-history-chain">' + renderSentence(group.root, group.root, true)
           + children.map(function (event) { return renderSentence(event, group.root, false) }).join('') + '</span>'
           + '</button>'
-      }).join('')
+      }).join('') || '<p class="action-history-empty">暂无行动记录</p>'
     }
 
     function overlayState() {
@@ -513,12 +513,8 @@
         interactionMode: model && model.selection && model.selection.mode,
         dialog: overlays.dialog,
       })
-      const forcedCollapsed = reasons.some(function (reason) {
-        return reason !== 'narrow' && reason !== 'compact-landscape'
-      })
-      const expanded = userExpanded && !forcedCollapsed
-      if (forcedCollapsed && activeRootId) clearHighlight()
-      const collapsed = forcedCollapsed || (reasons.length > 0 && !userExpanded)
+      const expanded = userExpanded
+      const collapsed = reasons.length > 0 && !userExpanded
       dock.classList.toggle('is-collapsed', collapsed)
       dock.classList.toggle('is-user-expanded', expanded)
       dock.dataset.collapseReason = reasons.join(' ')
@@ -638,6 +634,8 @@
       setHistoricalBoard = typeof mountInput.setHistoricalBoard === 'function' ? mountInput.setHistoricalBoard : null
       setHistoryHighlight = typeof mountInput.setHistoryHighlight === 'function' ? mountInput.setHistoryHighlight : null
       if (!dock) return
+      // Escape the board's stacking context so dialogs cannot cover the history entry.
+      if (doc && doc.body && doc.body.appendChild && dock.parentNode !== doc.body) doc.body.appendChild(dock)
       dock.innerHTML = '<button type="button" class="action-history-collapsed-button" aria-label="展开动作历史" title="动作历史">'
         + '<span class="action-history-glyph" aria-hidden="true"><i></i><i></i><i></i></span></button>'
         + '<div class="action-history-list" role="list" aria-label="最近动作"></div>'

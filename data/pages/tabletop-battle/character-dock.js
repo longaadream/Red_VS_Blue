@@ -2,7 +2,7 @@
 (function(){
  'use strict';
  const modal=document.getElementById('pieceInfoModal'),panel=document.getElementById('pieceKeywordPanel');
- const nativeRender=window.renderPieceInfoRecord,nativeContext=window.renderPieceContextMenu,nativeShow=window.showPieceInfo,nativeClose=window.closePieceInfo;
+ const nativeRender=window.renderPieceInfoRecord,nativeDeploymentError=window.renderDeploymentPieceInfoError,nativeContext=window.renderPieceContextMenu,nativeShow=window.showPieceInfo,nativeClose=window.closePieceInfo;
  let dismissed=null,lastSelected=null,keywordOpen=false,keywordName='',busy=false,casting=false,lastSignature='';
  const reopen=document.createElement('button');reopen.className='character-reopen';reopen.type='button';reopen.textContent='角色';reopen.hidden=true;reopen.title='展开选中角色';reopen.addEventListener('click',()=>{if(selectedPieceId){dismissed=null;window.showPieceInfo(selectedPieceId);}});document.body.append(reopen);
  const portrait=document.createElement('img');portrait.className='character-portrait';portrait.alt='';portrait.hidden=true;modal.querySelector('.pi-header').prepend(portrait);
@@ -34,10 +34,19 @@
   });
   modal.classList.toggle('is-selecting-target',!!(pendingSkill||pendingCardAction));
  }
+ function refreshPortrait(piece){
+  const source=PIECES_BY_ID[piece.templateId];
+  portrait.hidden=true;portrait.removeAttribute('src');portrait.alt='';
+  if(source&&source.image){portrait.src='images/'+source.image;portrait.alt=(piece.name||source.name||'角色')+'头像';portrait.hidden=false;}
+  portrait.onerror=()=>{portrait.hidden=true;};
+ }
+ function prepareDeployment(piece){
+  modal.classList.remove('character-dock');modal.setAttribute('aria-modal','true');document.body.classList.remove('character-dock-open');
+  reopen.hidden=true;setKeyword(false);refreshPortrait(piece);
+ }
  function enhance(piece){
   modal.setAttribute('aria-modal','false');modal.classList.add('character-dock');document.body.classList.add('character-dock-open');reopen.hidden=true;
-  const source=PIECES_BY_ID[piece.templateId];portrait.hidden=!(source&&source.image);if(source&&source.image){portrait.src='images/'+source.image;portrait.alt=(piece.name||source.name||'角色')+'头像';}
-  portrait.onerror=()=>{portrait.hidden=true;};
+  refreshPortrait(piece);
   const owner=String(piece.ownerPlayerId||'').toLowerCase()===String(myPlayerId||'').toLowerCase();modal.dataset.relation=owner?'ally':'enemy';
   panel.setAttribute('role','region');panel.setAttribute('aria-label','关键词说明');panel.append(keywordClose);
   modal.querySelectorAll('.keyword-badge[data-scope="piece"]').forEach(button=>{
@@ -50,10 +59,11 @@
   setKeyword(keywordOpen);refreshActions(piece);
  }
  window.renderPieceInfoRecord=function(piece,preserveKeyword){
-  if(currentPieceInfoSource==='deployment'){modal.classList.remove('character-dock');modal.setAttribute('aria-modal','true');document.body.classList.remove('character-dock-open');return nativeRender(piece,preserveKeyword);}
+  if(currentPieceInfoSource==='deployment'){prepareDeployment(piece);return nativeRender(piece,preserveKeyword);}
   const scroll=modal.querySelector('.pi-sheet').scrollTop;
   nativeRender(piece,true);enhance(piece);modal.querySelector('.pi-sheet').scrollTop=scroll;
  };
+ window.renderDeploymentPieceInfoError=function(piece){prepareDeployment(piece);return nativeDeploymentError(piece);};
  window.showPieceInfo=function(id,preserveKeyword){
   const changed=currentPieceInfoId!==id;dismissed=null;if(changed||!preserveKeyword){keywordOpen=false;keywordName='';lastSignature='';}
   nativeShow(id,true);if(changed)modal.querySelector('.pi-sheet').scrollTop=0;

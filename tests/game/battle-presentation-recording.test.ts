@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { recordBattlePresentation, recordedBattlePresentation, createBattlePresentationQueue, checkpointBattlePresentation, withBattlePresentationSource } from '@/lib/game/battle-presentation-recording'
-import { projectBattlePresentationEvents } from '@/lib/game/battle-presentation-events'
+import { projectBattlePresentationEvents, projectBattlePresentationEventsForViewer } from '@/lib/game/battle-presentation-events'
 import { runBattleAction } from '@/lib/game/battle-runner'
 import { dealDamage, healDamage, loadAllSkillsById, loadRuleById, addStatusWithEvents, removeStatusWithEvents } from '@/lib/game/skills'
 import { prepareAction } from '@/lib/game/targeting'
@@ -15,6 +15,41 @@ function run(state: BattleState, action: BattleAction) {
 }
 
 describe('ordered committed presentation recording', () => {
+  it('keeps a real secret skill private when Flying Raijin suspends before its execution log', () => {
+    const skillId = 'aizen-kyoka-suiguetsu'
+    const aizen = makePiece({ instanceId: 'blue-aizen', ownerPlayerId: 'player-blue', faction: 'blue', x: 1, y: 1,
+      skills: [{ skillId, currentCooldown: 0, usesRemaining: -1 }] })
+    const minato = makePiece({ instanceId: 'red-minato', x: 0, y: 3 })
+    minato.rules = [loadRuleById('rule-minato-flying-raijin-trigger', true)!]
+    const ally = makePiece({ instanceId: 'blue-secret-ally', ownerPlayerId: 'player-blue', faction: 'blue', x: 2, y: 1 })
+    ally.statusTags = [{ id: 'raijin-mark', type: 'flying-raijin-mark', sourceId: minato.instanceId,
+      name: '飞雷神', stacks: 1, visible: true }]
+    const before = makeState({ pieces: [aizen, minato, ally], width: 6, height: 4 })
+    before.turn.currentPlayerId = 'player-blue'
+    before.players[1].actionPoints = 10
+    before.skillsById = {}
+    const base: BattleAction = { type: 'useBasicSkill', playerId: 'player-blue', pieceId: aizen.instanceId, skillId }
+    const prepared = prepareAction(before, base)
+    if (prepared.kind !== 'needTarget') throw new Error('Expected target selection')
+    const action = { ...base, targetPieceId: ally.instanceId,
+      selectionId: prepared.selectionId, stateRevision: prepared.stateRevision } as BattleAction
+    const result = run(before, action)
+    expect(result.state.pendingOptionSelection).toMatchObject({ playerId: 'player-red' })
+    expect(result.state.pendingOptionSelection?.transaction).toBeDefined()
+    expect(recordedBattlePresentation(result.state)).toEqual([])
+    expect(result.state.players[1].actionPoints).toBe(10)
+    const events = projectBattlePresentationEvents({ actionId: 'secret-pending', command: action, beforeState: before, afterState: result.state })
+    expect(projectBattlePresentationEventsForViewer(events, 'player-blue')[0]).toMatchObject({
+      label: '镜花水月', targetPieceIds: ['blue-secret-ally'], result: { pending: true },
+    })
+    for (const viewer of ['player-red', undefined]) {
+      const projected = projectBattlePresentationEventsForViewer(events, viewer)
+      expect(projected[0].label).toBe('镜花水月')
+      expect(JSON.stringify(projected)).not.toContain('blue-secret-ally')
+      expect(projected.some(event => event.kind === 'damage')).toBe(false)
+    }
+    expect(result.stateHash).toBe(runBattleAction(before, action, { rootSeed: 169 }).stateHash)
+  })
   it('gives the real Chaos Control multiple targets and statuses one explicit batch after teleport', () => {
     const caster = makePiece({instanceId:'shadow',x:0,y:0,skills:[{skillId:'shadow-chaos-control',currentCooldown:0,usesRemaining:-1}]})
     const before = makeState({pieces:[caster,
