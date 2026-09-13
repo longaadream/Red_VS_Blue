@@ -19,6 +19,19 @@ type LanDiscoverApi = {
 }
 
 describe('LAN single-origin discovery', () => {
+  it('excludes every local interface while preserving a same-name peer', async () => {
+    const requestAt = vi.fn(async () => ({ ok: true, protocol: 'rvb-colyseus', serverName: '同名主机', serverId: 'peer-id' }))
+    const window = { electronAPI: {
+      getLanIps: async () => ['192.168.1.24'],
+      getHostInfo: async () => ({ ips: ['192.168.1.24', '192.168.1.25'], serverId: 'self-id' }),
+    } } as unknown as { RvBLanDiscover: LanDiscoverApi }
+    new Script(readFileSync('data/pages/js/lan-discover.js', 'utf8')).runInContext(createContext({ window, RvBColyseus: { requestAt } }))
+    const found = await new Promise<DiscoveredServer[]>(resolve => window.RvBLanDiscover.startLanScan({ onDone: resolve }))
+    expect(found.some(server => server.ip === '192.168.1.24' || server.ip === '192.168.1.25')).toBe(false)
+    expect(found.length).toBeGreaterThan(0)
+    expect(found[0]).toMatchObject({ name: '同名主机', serverId: 'peer-id' })
+  })
+
   it('does not publish an old batch after cancelling a scan', async () => {
     let release!: () => void
     const waiting = new Promise<void>(resolve => { release = resolve })
@@ -99,3 +112,49 @@ describe('LAN single-origin discovery', () => {
     expect(desktop).not.toContain("protocol !== 'rvb-ws'")
   })
 })
+
+  it('filters UDP self IDs and loopback, preserves same-name peers, and ignores callbacks after cancel', async () => {
+    let scanId = ''
+    type Info = { discoveryScanId?: string; ip: string; port: number; serverId?: string; name?: string }
+    let udp!: (info: Info) => void
+    let release!: () => void
+    const waiting = new Promise<void>(resolve => { release = resolve })
+    const onFound = vi.fn()
+    const native = {
+      getLanIps: async () => ['10.0.0.2'],
+      getHostInfo: async () => { await waiting; return { serverId: 'self', localIps: ['10.0.0.3'] } },
+      offUdpDiscovery: vi.fn(), onUdpHostFound: (callback: typeof udp) => { udp = info => callback({ discoveryScanId: scanId, ...info }) },
+      startDiscoverHosts: vi.fn((_timeout: number, token: string) => { scanId = token; return undefined }),
+    }
+    const window = { electronAPI: native } as unknown as { RvBLanDiscover: LanDiscoverApi }
+    new Script(readFileSync('data/pages/js/lan-discover.js', 'utf8')).runInContext(createContext({ window, RvBColyseus: { requestAt: async () => null } }))
+    window.RvBLanDiscover.startLanScan({}).cancel()
+    release()
+    await new Promise(resolve => setTimeout(resolve, 0))
+    expect(native.startDiscoverHosts).not.toHaveBeenCalled()
+    let scan!: { cancel(): void }
+    await new Promise<void>(resolve => { scan = window.RvBLanDiscover.startLanScan({ onFound, onDone: () => resolve() }) })
+    for (const info of [
+      { ip: '10.0.0.2', port: 2567 }, { ip: '10.0.0.3', port: 38621 },
+      { ip: '127.0.0.1', port: 2567 }, { ip: '10.0.0.8', port: 2567, serverId: 'self' },
+      { ip: 'evil.example', port: 2567 }, { ip: '10.0.0.8', port: -1 },
+    ]) udp(info)
+    expect(onFound).not.toHaveBeenCalled()
+    udp({ ip: '10.0.0.8', port: 2567, serverId: 'peer-1', name: '同名' })
+    udp({ ip: '10.0.0.9', port: 2567, serverId: 'peer-2', name: '同名' })
+    udp({ ip: '10.0.0.10', port: 2567, serverId: 'peer-1', name: '同名' })
+    expect(onFound).toHaveBeenCalledTimes(2)
+    udp({ ip: '10.0.0.11', port: 2567, discoveryScanId: 'previous-scan' })
+    expect(onFound).toHaveBeenCalledTimes(2)
+    scan.cancel()
+    udp({ ip: '10.0.0.11', port: 2567 })
+    expect(onFound).toHaveBeenCalledTimes(2)
+  })
+
+  it('continues HTTP discovery when UDP startup throws synchronously', async () => {
+    const native = { getLanIps: async () => ['10.0.0.2'], onUdpHostFound: vi.fn(), startDiscoverHosts: () => { throw Error('UDP unavailable') } }
+    const window = { electronAPI: native } as unknown as { RvBLanDiscover: LanDiscoverApi }
+    new Script(readFileSync('data/pages/js/lan-discover.js', 'utf8')).runInContext(createContext({ window, RvBColyseus: { requestAt: async (url: string) => url === 'http://10.0.0.3:2567' ? { ok: true, protocol: 'rvb-colyseus' } : null } }))
+    const found = await new Promise<DiscoveredServer[]>(resolve => window.RvBLanDiscover.startLanScan({ onDone: resolve }))
+    expect(found).toEqual([{ ip: '10.0.0.3', port: 2567, url: 'http://10.0.0.3:2567' }])
+  })

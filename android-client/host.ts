@@ -1,6 +1,7 @@
 import { Capacitor, registerPlugin } from '@capacitor/core'
-interface HostStatus { running: boolean; state: string; ips?: string[]; profileIdentity?: Record<string, unknown> }
+interface HostStatus { running: boolean; state: string; ips?: string[]; localIps?: string[]; serverId?: string; serverName?: string; profileIdentity?: Record<string, unknown> }
 interface NativeHost {
+  setName(options: { name: string }): Promise<HostStatus>
   info(): Promise<HostStatus>
   start(): Promise<HostStatus & { ok: boolean; localUrl?: string }>
   stop(): Promise<{ ok: boolean }>
@@ -9,6 +10,7 @@ interface NativeHost {
 if (Capacitor.isNativePlatform()) {
   const native = registerPlugin<NativeHost>('AndroidHost')
   const api = {
+    setHostName: (name: string) => native.setName({ name }),
     getHostInfo: () => native.info(),
     getLanIps: async () => (await native.info()).ips || [],
     ensureLocalAuthority: () => native.start().catch((error: Error) => ({ ok: false, error: error.message })),

@@ -1,3 +1,4 @@
+import { hostDiscoveryFromEnvironment } from '../electron-client/host-discovery'
 import fs from 'node:fs'
 import path from 'node:path'
 import readline from 'node:readline'
@@ -40,7 +41,7 @@ async function main() {
   const { getServerGameProfileIdentityV1 } = await import('../lib/content-pipeline/runtime/profile-game-identity')
   const { openHostTunnel } = await import('../lib/server/relay/host-tunnel')
   const repository = new AndroidSqliteAuthorityRepository(config.databasePath, fileURLToPath(new URL('./sqlite-worker.mjs', import.meta.url)))
-  const { server, journal } = createColyseusBattleServer({ repository, requireIdentityProof: true, healthIdentity: { runtime: 'colyseus-android', database: 'sqlite' } })
+  const { server, journal } = createColyseusBattleServer({ hostDiscovery: hostDiscoveryFromEnvironment, repository, requireIdentityProof: true, healthIdentity: { runtime: 'colyseus-android', database: 'sqlite' } })
   let tunnel: Awaited<ReturnType<typeof openHostTunnel>> | undefined
   let stopping = false, publishing = false, generation = 0
   await server.listen(2567, '0.0.0.0')

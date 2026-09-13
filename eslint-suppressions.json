@@ -110,11 +110,6 @@
       "count": 2
     }
   },
-  "data/pages/js/lan-discover.js": {
-    "@typescript-eslint/no-unused-expressions": {
-      "count": 3
-    }
-  },
   "data/pages/js/pack-fetch.js": {
     "@typescript-eslint/no-unused-vars": {
       "count": 3
