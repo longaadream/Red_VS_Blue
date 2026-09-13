@@ -149,8 +149,8 @@ function commandError(command: string, error: unknown, stderr = ''): Error {
   return new Error(`${command} failed: ${message}${detail ? `\n${detail}` : ''}`)
 }
 
-function sha256File(filePath: string): string {
-  return createHash('sha256').update(fs.readFileSync(filePath)).digest('hex')
+async function sha256File(filePath: string): Promise<string> {
+  return createHash('sha256').update(await fs.promises.readFile(filePath)).digest('hex')
 }
 
 function listFiles(root: string, relativeRoot = ''): string[] {
@@ -251,11 +251,11 @@ export class EmbeddedPostgresController {
     return target
   }
 
-  private verifyRuntime(): void {
+  private async verifyRuntime(): Promise<void> {
     if (this.runtimeVerified) return
     const packageRoot = path.dirname(this.options.runtimeRoot)
     const manifestPath = path.join(packageRoot, 'runtime-manifest.json')
-    if (!fs.existsSync(manifestPath) || sha256File(manifestPath) !== POSTGRES_MANIFEST_SHA256) {
+    if (!fs.existsSync(manifestPath) || await sha256File(manifestPath) !== POSTGRES_MANIFEST_SHA256) {
       throw new Error('Embedded PostgreSQL runtime manifest SHA-256 mismatch')
     }
     let manifest: RuntimeManifest
@@ -301,7 +301,7 @@ export class EmbeddedPostgresController {
       }
       const stat = fs.statSync(target)
       if (stat.size !== file.size) issues.push(`size mismatch ${relative}`)
-      else if (sha256File(target) !== file.sha256) issues.push(`SHA-256 mismatch ${relative}`)
+      else if (await sha256File(target) !== file.sha256) issues.push(`SHA-256 mismatch ${relative}`)
     }
     for (const relative of listFiles(packageRoot)) {
       if (relative !== 'runtime-manifest.json' && !declared.has(relative)) {
@@ -409,7 +409,7 @@ export class EmbeddedPostgresController {
   }
 
   private async startInternal(): Promise<EmbeddedPostgresConnection> {
-    this.verifyRuntime()
+    await this.verifyRuntime()
     const clusterExists = fs.existsSync(path.join(this.dataDir, 'PG_VERSION'))
     const password = this.loadOrCreatePassword(clusterExists)
     if (!clusterExists) await this.initializeCluster(password)
