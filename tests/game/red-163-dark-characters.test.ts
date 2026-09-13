@@ -14,6 +14,7 @@ import { dealDamage, loadAllSkillsById, loadRuleById } from '@/lib/game/skills'
 import { prepareAction, targetRefKey } from '@/lib/game/targeting'
 import { globalTriggerSystem } from '@/lib/game/triggers'
 import { applyBattleAction } from '@/lib/game/turn'
+import { projectBattlePresentationEvents, projectBattlePresentationEventsForViewer } from '@/lib/game/battle-presentation-events'
 import { makePiece, makeState } from '../helpers/minimal-state'
 
 function json(path: string): any {
@@ -474,6 +475,22 @@ describe('RED-163 dark character contract', () => {
     expect(publicSkillLog).toContain('镜花水月')
     expect(publicSkillLog).not.toContain(ally.name)
     expect(publicSkillLog).not.toContain(ally.instanceId)
+    // Execution supports loading the skill from the active content repository.
+    // The presentation boundary must keep that same privacy when snapshots omit definitions.
+    const sparse = structuredClone(state)
+    sparse.skillsById = {}
+    const sparseResolved = runBattleAction(sparse, selectedAction(sparse, {
+      type: 'useBasicSkill', playerId: 'player-red', pieceId: aizen.instanceId, skillId: 'aizen-kyoka-suiguetsu',
+    }, ally.instanceId), { rootSeed: 170 }).state
+    const events = projectBattlePresentationEvents({ actionId: 'kyoka-private', command: action, beforeState: sparse, afterState: sparseResolved })
+    expect(projectBattlePresentationEventsForViewer(events, 'player-red')[0].targetPieceIds).toContain(ally.instanceId)
+    for (const viewer of ['player-blue', 'spectator', undefined]) {
+      const publicEvents = projectBattlePresentationEventsForViewer(events, viewer)
+      expect(publicEvents[0]).not.toHaveProperty('targetPieceIds')
+      expect(JSON.stringify(publicEvents)).not.toContain(ally.instanceId)
+      expect(JSON.stringify(publicEvents)).not.toContain(ally.name)
+      expect(publicEvents.some(event => event.kind === 'concealed')).toBe(true)
+    }
   })
 
   it('lets the original skill resolve when Kyoka Suigetsu has no legal replacement, then expires at turn end', () => {

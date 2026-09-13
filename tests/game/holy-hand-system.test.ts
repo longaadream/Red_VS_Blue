@@ -10,6 +10,8 @@ import { globalTriggerSystem, TriggerSystem } from '@/lib/game/triggers'
 import { getPieceById } from '@/lib/game/piece-repository'
 import { prepareAction } from '@/lib/game/targeting'
 import { getSkillById } from '@/lib/game/skill-repository'
+import { toPublicBattleState } from '@/lib/game/deployment'
+import { projectBattlePresentationEvents, projectBattlePresentationEventsForViewer } from '@/lib/game/battle-presentation-events'
 import { makePiece, makeState } from '../helpers/minimal-state'
 
 const DATA_ROOT = join(process.cwd(), 'data')
@@ -535,6 +537,8 @@ describe('Velen delayed holy cards', () => {
     state.skillsById[definition.id] = definition
     state.players[0].hand = [
       { cardId: 'holy-smite', instanceId: 'prophecy-choice', ownerPlayerId: 'player-red' },
+      { cardId: 'holy-heal', instanceId: 'prophecy-heal-choice', ownerPlayerId: 'player-red' },
+      { cardId: 'holy-charge', instanceId: 'prophecy-charge-choice', ownerPlayerId: 'player-red' },
       { cardId: 'holy-heal', instanceId: 'already-enhanced', ownerPlayerId: 'player-red', contentState: { velenHolyProphecyEnhanced: true } },
       { cardId: 'filler', instanceId: 'not-holy', ownerPlayerId: 'player-red' },
     ]
@@ -545,8 +549,35 @@ describe('Velen delayed holy cards', () => {
 
     expect(pending.pendingOptionSelection).toMatchObject({
       selectionMode: 'single', presentation: 'hand', minSelections: 1, maxSelections: 1,
-      options: [{ value: 'prophecy-choice' }],
+      options: [
+        { value: 'prophecy-choice', label: loadCardById('holy-smite')!.name },
+        { value: 'prophecy-heal-choice', label: loadCardById('holy-heal')!.name },
+        { value: 'prophecy-charge-choice', label: loadCardById('holy-charge')!.name },
+      ],
     })
+    expect(definition.concealTargetInBattleLog).toBe(true)
+    const choice = {
+      type: 'pendingOptionSelect', playerId: 'player-red', selectedOption: 'prophecy-choice',
+      selectionId: pending.pendingOptionSelection.selectionId,
+      stateRevision: pending.pendingOptionSelection.stateRevision,
+    } as any
+    // Like content-loaded battles, the resumed snapshot can omit definitions.
+    pending.skillsById = {}
+    const completed = applyBattleAction(pending, choice)
+    const publicMessages = JSON.stringify(completed.actions)
+    expect(publicMessages).not.toContain('holy-smite')
+    expect(publicMessages).not.toContain('prophecy-choice')
+    expect(publicMessages).not.toContain('圣光惩击')
+    const events = projectBattlePresentationEvents({ actionId: 'prophecy-secret', command: choice, beforeState: pending, afterState: completed })
+    expect(projectBattlePresentationEventsForViewer(events, 'player-red')[0].complement).toEqual({ kind: 'option', label: '圣光惩击' })
+    for (const viewer of ['player-blue', 'spectator', undefined]) {
+      expect(toPublicBattleState(pending, viewer).pendingOptionSelection?.options).toEqual([])
+      const publicEvents = projectBattlePresentationEventsForViewer(events, viewer)
+      expect(JSON.stringify(publicEvents)).not.toContain('prophecy-choice')
+      expect(JSON.stringify(publicEvents)).not.toContain('圣光惩击')
+      expect(publicEvents.some(event => event.kind === 'concealed')).toBe(true)
+      expect(JSON.stringify(toPublicBattleState(completed, viewer).players[0].hand)).not.toContain('velenHolyProphecy')
+    }
   })
 })
   it('commits one to three immediate futures once and rejects a second ultimate use', () => {

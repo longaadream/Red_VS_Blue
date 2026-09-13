@@ -378,6 +378,15 @@
         mode: String(input.interactionMode || 'inspect'),
       },
       interaction: {
+        pendingResponse: (function () {
+          const pending = snapshot.pendingTargetSelection || snapshot.pendingOptionSelection
+          if (!pending) return null
+          return {
+            selectionId: String(pending.selectionId || ''),
+            isForViewer: !!viewerId && String(pending.playerId || '').toLowerCase() === viewerId.toLowerCase(),
+            isOffTurn: String(pending.playerId || '').toLowerCase() !== String(turn.currentPlayerId || '').toLowerCase(),
+          }
+        })(),
         selectedTargetCells: normalizeCells(interaction.selectedTargetCells),
         pendingPieceId: interaction.pendingPieceId || null,
         pendingCommandId: interaction.pendingCommandId || null,

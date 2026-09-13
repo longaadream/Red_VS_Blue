@@ -154,9 +154,9 @@ body.tutorial-mode #btnSurrender { display: none !important; }
   padding: 18px 20px;
   backdrop-filter: none;
   font-family: 'Microsoft YaHei', sans-serif;
-  scrollbar-width: thin;
-  scrollbar-color: #766147 transparent;
+  scrollbar-width: none;
 }
+.tutorial-dialog::-webkit-scrollbar { display: none; width: 0; height: 0; }
 .tutorial-dialog::before {
   content: '社长的小抄'; display: block; width: fit-content;
   background: #465a59; color: #ead7b3; border: 2px solid #302c24;

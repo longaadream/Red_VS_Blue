@@ -29,7 +29,7 @@ function writeLog(message: string) {
 
 // 重新导出类型，保持向后兼容
 import type { BoardMap } from "./map"
-import { presentationRecordingRollback } from './battle-presentation-recording'
+import { presentationRecordingRollback, recordResolvedSkillPresentation } from './battle-presentation-recording'
 import { expireOwnerStatuses } from './status-lifecycle'
 import { statusEventSink, expirePlayerStatuses, addStatusWithEvents, addPlayerStatusWithEvents, createSkillCodeFlow } from './skills'
 import { changePiecePositions, type PiecePositionChange } from './position-change'
@@ -963,6 +963,7 @@ function getSkillDefinitionOrThrow(
   if (!skillDef) {
     throw new BattleRuleError(`Skill ${requestedSkillId || '<empty>'} not found`)
   }
+  recordResolvedSkillPresentation(skillDef)
   return skillDef
 }
 
@@ -1115,6 +1116,7 @@ function pushInterruptedSkillLog(
     payload: {
       message: `${pieceName} used ${skillDef.name || skillId}, but the release was interrupted`,
       skillId,
+      ...(skillDef.concealTargetInBattleLog ? { concealTargetInBattleLog: true, skillName: skillDef.name } : {}),
       pieceId: piece.instanceId,
       interrupted: true,
     },
@@ -2374,15 +2376,10 @@ function applyBattleActionInternal(
         // consume its random stream after either side has lost its last core.
         if (finalizeBattleTerminal(next, action)) return next
 
-        // Refresh precedes deployment and begin effects; checkpoint survives pending.
+        // Rule-limit refresh precedes deployment and begin effects; checkpoint survives pending.
+        // Piece skill cooldowns settle separately at their owner's turn end.
         if (next.turn.refreshedAtTurn !== next.turn.turnNumber) {
           getActiveTriggerSystem().updateCooldowns()
-          for (const piece of next.pieces) {
-            if (!isSamePlayer(piece.ownerPlayerId, next.turn.currentPlayerId)) continue
-            for (const skill of piece.skills ?? []) {
-              if ((skill.currentCooldown ?? 0) > 0) skill.currentCooldown!--
-            }
-          }
           next.turn.refreshedAtTurn = next.turn.turnNumber
         }
 
@@ -3027,7 +3024,8 @@ function applyBattleActionInternal(
         turn: next.turn.turnNumber,
         payload: {
           message: skillMessage,
-          skillId: action.skillId,
+          skillId: finalSkillId,
+          ...(skillDef.concealTargetInBattleLog ? { concealTargetInBattleLog: true, skillName: skillDef.name } : {}),
           pieceId: action.pieceId
         }
       })
@@ -3352,7 +3350,8 @@ function applyBattleActionInternal(
         turn: next.turn.turnNumber,
         payload: {
           message: skillMessage,
-          skillId: action.skillId,
+          skillId: finalSkillId,
+          ...(skillDef.concealTargetInBattleLog ? { concealTargetInBattleLog: true, skillName: skillDef.name } : {}),
           pieceId: action.pieceId,
           chargeCost: cost
         }
@@ -3392,6 +3391,9 @@ function applyBattleActionInternal(
     case "endTurn": {
       if (!isCurrentPlayer(state, action.playerId)) {
         throw new BattleRuleError("Only the current player can end the turn")
+      }
+      if (state.turn.phase === 'end') {
+        throw new BattleRuleError('This turn has already ended')
       }
 
       const next = cloneBattleStateForEffectExecution(state)
@@ -3445,6 +3447,15 @@ function applyBattleActionInternal(
       // All end triggers and their chains settle before expiry.
       expireOwnerStatuses(next, action.playerId, statusEventSink(next))
       expirePlayerStatuses(next, action.playerId)
+
+      // All end effects (including pending choices and expiry events) finish first.
+      // Skills used this turn also tick; other owners wait for their own turn end.
+      for (const piece of next.pieces) {
+        if (!isSamePlayer(piece.ownerPlayerId, action.playerId)) continue
+        for (const skill of piece.skills ?? []) {
+          if ((skill.currentCooldown ?? 0) > 0) skill.currentCooldown!--
+        }
+      }
 
       const endingPlayer = next.players.find(
         player => isSamePlayer(player.playerId, action.playerId),

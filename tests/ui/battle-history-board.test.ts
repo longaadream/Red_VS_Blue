@@ -6,14 +6,14 @@ import { describe, it, expect, vi } from 'vitest'
 type HistoryOptions = { setHistoricalBoard(id: string | null, events?: unknown[]): ReturnType<typeof model> | null }
 type Presentation = { mount(options: unknown): void; update(model: unknown): void; animateAction(...args: unknown[]): void; captureHistory(events: unknown[], model: unknown): void; getModel(): ReturnType<typeof model>; dispose(): void }
 
-function harness() {
+function harness(vignetteUi?: unknown) {
   const window = {} as { BattlePresentation: { create(options: unknown): Presentation } }
   new Script(readFileSync(resolve('data/pages/js/battle-ui/battle-presentation.js'), 'utf8')).runInContext(createContext({ window, globalThis: window, console }))
   const listeners = new Map<string, (event: unknown) => void>()
   const doc = { body: { classList: { toggle: vi.fn() } }, addEventListener: (t: string, f: (event: unknown) => void) => listeners.set(t, f), removeEventListener: (t: string) => listeners.delete(t) }
   const renderer = { init: vi.fn(), update: vi.fn(), showHistoricalBoard: vi.fn(), setHistoryHighlight: vi.fn(), animateAction: vi.fn(), dispose: vi.fn() }
   let historyOptions: HistoryOptions
-  const ui = window.BattlePresentation.create({ renderer, domUi: { update: vi.fn(), dispose: vi.fn() }, historyUi: { mount: (o: HistoryOptions) => { historyOptions = o }, update: vi.fn(), dispose: vi.fn() } })
+  const ui = window.BattlePresentation.create({ renderer, vignetteUi, domUi: { update: vi.fn(), dispose: vi.fn() }, historyUi: { mount: (o: HistoryOptions) => { historyOptions = o }, update: vi.fn(), dispose: vi.fn() } })
   ui.mount({ boardContainer: { ownerDocument: doc } })
   return { ui, renderer, listeners, get options() { return historyOptions } }
 }
@@ -23,6 +23,22 @@ function model(x = 1, events: unknown[] = []) {
 const event = { eventId: 'a', rootEventId: 'a', parentEventId: null, kind: 'forceMove', targetPieceIds: ['victim'], result: { fromX: 1, fromY: 1, toX: 4, toY: 1 } }
 
 describe('historical main board', () => {
+  it('updates pending playback while history stays open, then restores the latest selection', () => {
+    const vignette = { mount: vi.fn(), update: vi.fn(), dispose: vi.fn() }
+    const h = harness(vignette)
+    h.ui.update(model())
+    h.ui.update(model(4, [event]))
+    h.options.setHistoricalBoard('a', [event])
+    h.renderer.update.mockClear()
+    const next = { ...model(5), interaction: { pendingResponse: null }, selection: { mode: 'inspect' } }
+    h.ui.update(next)
+    expect(vignette.update).toHaveBeenLastCalledWith(next)
+    expect(h.renderer.update).not.toHaveBeenCalled()
+    h.options.setHistoricalBoard(null)
+    expect(h.renderer.showHistoricalBoard).toHaveBeenLastCalledWith(next)
+    h.ui.dispose()
+  })
+
 
   it('keeps viewer identity when a normal action supplies its before snapshot through animation', () => {
     const h = harness(), before = model(1), after = model(4, [event])

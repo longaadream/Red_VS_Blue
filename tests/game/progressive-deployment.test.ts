@@ -1841,7 +1841,7 @@ describe('RED-138 progressive reserve deployment', () => {
     delete initial.turn.refreshedAtTurn
     initial.deployment!.status = 'turn-ready'
     initial = runBattleAction(initial, { type: 'beginPhase' }, { rootSeed: seed }).state
-    expect(initial.pieces.find(piece => piece.instanceId === pioneer.instanceId)?.skills[0].currentCooldown).toBe(1)
+    expect(initial.pieces.find(piece => piece.instanceId === pioneer.instanceId)?.skills[0].currentCooldown).toBe(2)
     const offeredPieceId = initial.deployment!.offerPieceIds![0]
     const position = initial.deployment!.legalPositions![0]
     const beforeAp = initial.players.find(player => player.playerId === PLAYERS[0])!.actionPoints
@@ -1918,7 +1918,7 @@ describe('RED-138 progressive reserve deployment', () => {
       expect((pending.extensions as any).summonChoiceCount).toBeUndefined()
       expect((pending.extensions as any).summonQueueTailCount).toBeUndefined()
       expect((pending.extensions as any).approvedBeginCount).toBeUndefined()
-      expect(pending.pieces.find(piece => piece.instanceId === pioneer.instanceId)?.skills[0].currentCooldown).toBe(1)
+      expect(pending.pieces.find(piece => piece.instanceId === pioneer.instanceId)?.skills[0].currentCooldown).toBe(2)
       expect(pending.players.find(player => player.playerId === PLAYERS[0])?.actionPoints).toBe(beforeAp)
       expect(pendingResult.trace?.deployment?.deployedPosition).toBeUndefined()
 
@@ -1941,7 +1941,7 @@ describe('RED-138 progressive reserve deployment', () => {
       expect((resolved.extensions as any).summonChoiceCount).toBe(1)
       expect((resolved.extensions as any).summonQueueTailCount).toBe(1)
       expect((resolved.extensions as any).approvedBeginCount).toBe(1)
-      expect(resolved.pieces.find(piece => piece.instanceId === pioneer.instanceId)?.skills[0].currentCooldown).toBe(1)
+      expect(resolved.pieces.find(piece => piece.instanceId === pioneer.instanceId)?.skills[0].currentCooldown).toBe(2)
       expect(resolved.deployment).toMatchObject({
         status: 'turn-ready',
         reserveCounts: { [PLAYERS[0]]: 6, [PLAYERS[1]]: 7 },

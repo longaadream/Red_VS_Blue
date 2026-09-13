@@ -140,6 +140,7 @@ const verifiedRuntimeReferences = new WeakMap<ProfileRuntimeContextV1, {
   key: string
   reference: ProfileReferenceV1
 }>()
+const initializedRuntimeContexts = new WeakSet<ProfileRuntimeContextV1>()
 
 function runtimeReferenceKey(context: ProfileRuntimeContextV1): string {
   // Only the small activation pointer is inspected on the hot path. Content
@@ -153,7 +154,12 @@ function runtimeReferenceKey(context: ProfileRuntimeContextV1): string {
 
 export function getRuntimeProfileReferenceV1(): ProfileReferenceV1 {
   const context = getProfileRuntimeContextV1()
-  if (!existsSync(context.store.statePath)) context.store.readState()
+  // A new bundled version may normalize the old activation pointer on first read.
+  // Complete startup recovery before recording the verification fence.
+  if (!initializedRuntimeContexts.has(context) || !existsSync(context.store.statePath)) {
+    context.store.readState()
+    initializedRuntimeContexts.add(context)
+  }
   const key = runtimeReferenceKey(context)
   const cached = verifiedRuntimeReferences.get(context)
   if (cached?.key === key) return cached.reference

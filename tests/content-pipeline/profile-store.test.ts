@@ -114,6 +114,18 @@ function createStore(root: string, base: ResolvedSnapshotViewV1): ProfileStoreV1
 }
 
 describe('RED-115 Profile store and activation state', () => {
+  it('normalizes an older bundled profile before fencing the first runtime lookup', () => {
+    const root = temporaryRoot()
+    const oldBase = resolvedSnapshot({ packageId: 'rvb.base', marker: 90 })
+    createStore(root, oldBase).readState()
+    const newBase = resolvedSnapshot({ packageId: 'rvb.base', marker: 91 })
+    const store = createStore(root, newBase)
+    vi.stubEnv('APP_ROOT_DIR', root)
+    vi.stubEnv('USER_DATA_DIR', root)
+    for (const key of ['RVB_PROFILE_ROOT', 'RVB_RESOLVED_PROFILE_HASH', 'RVB_PROFILE_ACTIVATION_ID', 'RVB_AUTHORITY_CONTENT_HASH', 'RVB_PROFILE_ENGINE_ABI', 'RVB_PROFILE_CONTENT_ABI']) vi.stubEnv(key, undefined)
+    globalThis.__rvbProfileRuntimeContextV1 = { appRoot: root, userDataDir: root, store }
+    expect(getRuntimeProfileReferenceV1().resolvedProfileHash).toBe(newBase.profile.resolvedProfileHash)
+  })
   it('reuses verified runtime identity until activation or runtime binding changes', () => {
     const root = temporaryRoot()
     const base = resolvedSnapshot({ packageId: 'rvb.base', marker: 80, jsonValue: 80 })

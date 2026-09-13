@@ -417,7 +417,7 @@ data/
 | `icon` | string | 否 | emoji 图标，如 `"🔥"` |
 | `kind` | `"active"` \| `"passive"` | ✅ | `active`=玩家手动释放；`passive`=由规则触发 |
 | `type` | `"normal"` \| `"super"` \| `"ultimate"` | ✅ | `normal`=普通技能；`super`=充能技能；`ultimate`=限定技（只能用一次） |
-| `cooldownTurns` | number | ✅ | 冷却回合数，0=无冷却 |
+| `cooldownTurns` | number | ✅ | 冷却计数，0=无冷却；所属玩家回合结束减1，施放当回合也减，详见 [结算规则](./SKILL_COOLDOWN_LIFECYCLE.md) |
 | `maxCharges` | number | ✅ | **实际未被游戏逻辑读取**，填 0 即可。充能技能的限制只由 `chargeCost`（消耗点数）控制 |
 | `chargeCost` | number | 否 | 仅 `type: "super"` 需要填写，表示使用该技能消耗的充能点数（如 `2`）。未填则为普通技能 |
 | `powerMultiplier` | number | ✅ | 威力系数，用于伤害计算，如 `1.5` 代表 150% |

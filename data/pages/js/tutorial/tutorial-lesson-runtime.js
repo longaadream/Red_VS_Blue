@@ -5,6 +5,7 @@
     root.className = 'tutorial-dialog'
     root.id = 'tutorialLessonDialog'
     root.setAttribute('aria-label', '社长的教学提示')
+    root.setAttribute('tabindex', '0')
     const title = document.createElement('h2')
     title.className = 'tutorial-dialog__scene'
     title.textContent = '第 ' + lesson.number + ' 局 · ' + lesson.title

@@ -386,7 +386,7 @@ describe('RED-129 波风水门回合结束锚点', () => {
   })
 })
 
-describe('RED-129 毒液腐蚀定身', () => {
+describe('RED-129 毒液公共定身', () => {
   it('blocks the displaced enemy next turn, expires at that turn end, then allows movement', () => {
     const venom = namedPiece({
       instanceId: 'venom',
@@ -425,11 +425,12 @@ describe('RED-129 毒液腐蚀定身', () => {
 
     expect(corroded).toMatchObject({ x: 0, y: 0 })
     expect(corroded.statusTags).toContainEqual(expect.objectContaining({
-      type: 'venom-corrosion-immobile',
+      type: 'root',
+      name: '定身',
       currentDuration: 1,
       remainingDuration: 1,
     }))
-    expect(corroded.rules).toContainEqual(expect.objectContaining({ id: 'rule-venom-corrosion-immobile' }))
+    expect(corroded.rules).not.toContainEqual(expect.objectContaining({ id: 'rule-venom-corrosion-immobile' }))
 
     const redEnded = runBattleAction(swapped, {
       type: 'endTurn',
@@ -439,22 +440,22 @@ describe('RED-129 毒液腐蚀定身', () => {
     expect(blueTurn.turn).toMatchObject({ currentPlayerId: 'player-blue', phase: 'action' })
     const blueApBeforeBlockedMove = blueTurn.players.find(player => player.playerId === 'player-blue')!.actionPoints
 
-    const blocked = runBattleAction(blueTurn, {
+    expect(() => runBattleAction(blueTurn, {
       type: 'move',
       playerId: 'player-blue',
       pieceId: 'corroded-enemy',
       toX: 1,
       toY: 0,
-    }, { rootSeed: ROOT_SEED }).state
-    expect(blocked.pieces.find(piece => piece.instanceId === 'corroded-enemy')).toMatchObject({ x: 0, y: 0 })
-    expect(blocked.players.find(player => player.playerId === 'player-blue')?.actionPoints).toBe(blueApBeforeBlockedMove)
+    }, { rootSeed: ROOT_SEED })).toThrow(/定身/)
+    expect(blueTurn.pieces.find(piece => piece.instanceId === 'corroded-enemy')).toMatchObject({ x: 0, y: 0 })
+    expect(blueTurn.players.find(player => player.playerId === 'player-blue')?.actionPoints).toBe(blueApBeforeBlockedMove)
 
-    const blueEnded = runBattleAction(blocked, {
+    const blueEnded = runBattleAction(blueTurn, {
       type: 'endTurn',
       playerId: 'player-blue',
     }, { rootSeed: ROOT_SEED }).state
     const expired = blueEnded.pieces.find(piece => piece.instanceId === 'corroded-enemy')!
-    expect(expired.statusTags).not.toContainEqual(expect.objectContaining({ type: 'venom-corrosion-immobile' }))
+    expect(expired.statusTags).not.toContainEqual(expect.objectContaining({ type: 'root' }))
     expect(expired.rules).not.toContainEqual(expect.objectContaining({ id: 'rule-venom-corrosion-immobile' }))
 
     const redTurn = runBattleAction(blueEnded, { type: 'beginPhase' }, { rootSeed: ROOT_SEED }).state
