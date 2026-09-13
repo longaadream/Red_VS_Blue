@@ -13,6 +13,7 @@ import { resolveDevelopmentProfile } from './development-profile'
 import { findFreePort } from './local-port'
 import { readClientProtocolBattleData, resolveClientProtocolFile } from './client-protocol-resource'
 import { EmbeddedPostgresController } from './embedded-postgres'
+import { LOCAL_STARTUP_STATUS_SCRIPT } from './local-startup-status'
 import { OfficialResourceUpdates } from './official-resource-updates'
 import { ClientBinaryUpdates } from './client-binary-updates'
 import { installedResourceVersion, resolvedResourceVersion } from './resource-update-identity'
@@ -65,6 +66,7 @@ const updateAdmissionToken = randomBytes(24).toString('hex')
 let startupInProgress = true
 let startupCancelled = false
 let startupCompletedStages = 0
+let initialLocalStartupPromise: Promise<void> | null = null
 
 type GameProfileIdentity = Readonly<{
   schemaVersion: 'rvb-game-profile-identity/v1'
@@ -499,7 +501,8 @@ function requestApplicationExit(): void {
     void enqueueProfileMutation(async () => { requestApplicationExit() })
     return
   }
-  if (startupInProgress) {
+  if (startupInProgress || initialLocalStartupPromise) {
+    startupInProgress = true
     startupCancelled = true
     // Cancel a menu navigation that may already be in flight. Keep a visible,
     // read-only exit page until durable shutdown succeeds (or can be retried).
@@ -556,7 +559,7 @@ const localAuthorityRecoveryBudget = new LocalAuthorityRecoveryBudget(
 )
 let localAuthorityRecoveryPromise: Promise<void> | null = null
 let localAuthorityNotice: string | null = null
-let localAuthorityRecoveryStatus: 'ready' | 'recovering' | 'manual-required' = 'ready'
+let localAuthorityRecoveryStatus: 'starting' | 'ready' | 'recovering' | 'manual-required' = 'ready'
 type ProfileProcessBinding = {
   reference?: DesktopProfileReference
   profileRoot: string
@@ -1939,10 +1942,10 @@ function startupPageUrl(): string {
 }
 
 function reportStartupProgress(completed: number, message: string, failed = false): void {
+  console.info(`[client-startup] ${completed}/6 ${message}`)
   if (!startupInProgress || !mainWin || mainWin.isDestroyed()) return
   startupCompletedStages = completed
   if (mainWin.webContents.getURL() !== startupPageUrl()) return
-  console.info(`[client-startup] ${completed}/6 ${message}`)
   void mainWin.webContents.executeJavaScript(
     `window.renderStartupProgress?.(${JSON.stringify(completed)}, ${JSON.stringify(message)}, ${failed})`,
   ).catch(error => console.warn('[client-startup] progress rendering failed:', error))
@@ -1951,13 +1954,13 @@ function reportStartupProgress(completed: number, message: string, failed = fals
 async function showStartupWindow(): Promise<BrowserWindow> {
   const win = createGameWindow()
   win.on('close', event => {
-    if (startupInProgress && !allowAppExit) {
+    if ((startupInProgress || initialLocalStartupPromise) && !allowAppExit) {
       event.preventDefault()
       requestApplicationExit()
     }
   })
   win.on('closed', () => {
-    if (startupInProgress) requestApplicationExit()
+    if (startupInProgress || initialLocalStartupPromise) requestApplicationExit()
   })
   await win.loadURL(startupPageUrl())
   // Let the renderer paint before starting the expensive local services.
@@ -1999,6 +2002,12 @@ function createGameWindow(): BrowserWindow {
 
   restrictWindowNavigation(win, url => isGameClientUrl(url) || (startupInProgress && url === startupPageUrl()))
   win.webContents.on('will-navigate', event => { if (officialUpdateApplying) event.preventDefault() })
+  win.webContents.on('did-finish-load', () => {
+    if (startupCancelled || win.isDestroyed()) return
+    const url = new URL(win.webContents.getURL())
+    if (url.protocol !== CLIENT_SCHEME + ':' || url.hostname !== 'app' || url.pathname !== '/index.html') return
+    void win.webContents.executeJavaScript(LOCAL_STARTUP_STATUS_SCRIPT).catch(error => console.warn('[client-startup] status unavailable:', error))
+  })
   win.setMenuBarVisibility(false)
 
   win.webContents.on('before-input-event', (_event, input) => {
@@ -2049,6 +2058,7 @@ function notifyOfficialUpdates() {
 }
 
 async function canApplyOfficialUpdate(): Promise<boolean> {
+  if (initialLocalStartupPromise) return false
   if (!localServerReady || !mainWin || mainWin.isDestroyed() || appExitPromise) return false
   const win = mainWin
   const stillAtMenu = () => {
@@ -2173,33 +2183,16 @@ function setupOfficialUpdates(): void {
   setInterval(() => { if (automaticUpdates && resourceUpdates?.status.phase === 'waiting' && !officialUpdateApplying) void resourceUpdates.applyPending() }, 15000).unref()
 }
 
-function loadLocalGame(existingWindow?: BrowserWindow): void {
-  if (startupCancelled) return
+function loadLocalGame(existingWindow?: BrowserWindow): Promise<void> {
+  if (startupCancelled) return Promise.resolve()
   const win = existingWindow ?? createGameWindow()
 
-  // 仅当本地服务器实际启动后，才注入默认服务器 URL（once：只注入一次，不影响后续页面导航）
   win.webContents.once('did-finish-load', () => {
     if (startupCancelled) return
     if (!isGameClientUrl(win.webContents.getURL())) return
     startupInProgress = false
-    if (!gameServerProcess || !localGameReady) return
-    win.webContents.executeJavaScript(`
-      (function() {
-        var url = 'http://127.0.0.1:${actualGamePort}';
-        if (window.RvBUtils && RvBUtils.saveServerConfig) {
-          RvBUtils.saveServerConfig({ mode: 'local', url: url });
-        } else {
-          localStorage.setItem('rvb_server_url', url);
-          localStorage.setItem('rvb_lobby_server_mode', 'local');
-          localStorage.setItem('rvb_local_server_url', url);
-          localStorage.setItem('rvb_remote_server_url', url);
-        }
-        if (typeof updateFloatBar === 'function') updateFloatBar();
-        if (typeof refreshUserUI === 'function') refreshUserUI();
-      })();
-    `)
   })
-  void win.loadURL(`${CLIENT_SCHEME}://app/index.html?v=${Date.now()}`).catch(async error => {
+  return win.loadURL(`${CLIENT_SCHEME}://app/index.html?v=${Date.now()}`).catch(async error => {
     console.error('[client] main menu failed to load:', error)
     if (win.isDestroyed() || startupCancelled) return
     startupInProgress = true
@@ -2420,6 +2413,13 @@ handleTrusted('ensure-local-authority', ['game'], async () => {
   if (localGameLifecycle.shutdownInProgress) {
     return { ok: false, error: '本机服务正在停止，请稍后重试。' }
   }
+  // Menu actions join the initial startup; treating it as a crash recovery
+  // would restart Profile recovery and may discard its still-starting process.
+  if (initialLocalStartupPromise) {
+    await initialLocalStartupPromise
+    if (startupCancelled || localGameLifecycle.shutdownInProgress) return { ok: false, error: '本机服务正在停止，请稍后重试。' }
+    return { ok: localGameReady, error: localGameReady ? undefined : localAuthorityNotice }
+  }
   if (localGameReady && gameServerProcess) {
     return { ok: true, notice: localAuthorityNotice }
   }
@@ -2446,7 +2446,7 @@ handleTrusted('ensure-local-authority', ['game'], async () => {
 
 // 查询当前模式
 handleTrusted('get-mode', ['game'], () => ({
-  isLocal: localGameReady,
+  isLocal: localGameReady && localAuthorityProfileIdentity !== null,
   localUrl: `http://127.0.0.1:${actualGamePort}`,
   profileRuntimeUrl: `http://127.0.0.1:${actualLocalPort}`,
   profileIdentity: localProfileIdentity,
@@ -2456,7 +2456,7 @@ handleTrusted('get-mode', ['game'], () => ({
     status: localAuthorityRecoveryStatus,
     ...localAuthorityRecoveryBudget.snapshot(),
   },
-  ready: localGameReady,
+  ready: localGameReady && localAuthorityProfileIdentity !== null,
 }))
 
 // 重启本地服务器
@@ -2480,7 +2480,8 @@ handleTrusted('get-lan-ips', ['game'], () => {
 handleTrusted('set-host-name', ['game'], (_event, name: unknown) => setHostName(hostDiscoveryFile(), name))
 
 // 获取主机信息（端口 + LAN IP 列表），供"我当主机"功能使用
-handleTrusted('get-host-info', ['game'], () => {
+handleTrusted('get-host-info', ['game'], async () => {
+  if (initialLocalStartupPromise) await initialLocalStartupPromise
   const ips = getLanIpList(true)
   return {
     ...getHostDiscovery(hostDiscoveryFile()),
@@ -2682,15 +2683,32 @@ app.whenReady().then(async () => {
   }
 
   try {
-    // Host & Play and Training both depend on the local authority. Prepare the
-    // complete stack once at application startup so the normal player path is
-    // the main menu, not a server-selection gate.
+    // Recover the installed profile before reading its menu. PostgreSQL and
+    // the battle authority are prepared after the menu has loaded.
     assertLocalGameOpeningCurrent(generation)
     reportStartupProgress(2, '正在加载资源配置与本机服务…')
-    await startStableLocalServerAndRecover(generation)
+    await startStableProfileServerAndRecover(generation)
+    assertLocalGameOpeningCurrent(generation)
+    localAuthorityRecoveryStatus = 'starting'
+    setupOfficialUpdates()
+    initialLocalStartupPromise = (async () => {
+      reportStartupProgress(5, '正在打开主菜单…')
+      await loadLocalGame(win)
+      assertLocalGameOpeningCurrent(generation)
+      await startLocalGameAuthority(stableProfileBinding())
+      assertLocalGameOpeningCurrent(generation)
+    })().catch(error => {
+      if (startupCancelled) return
+      localAuthorityRecoveryStatus = 'manual-required'
+      localAuthorityNotice = localAuthorityStartupErrorMessage(error)
+      console.error('[client] background local service startup failed:', error)
+    })
+    await initialLocalStartupPromise
+    if (startupCancelled || win.isDestroyed()) return
     if (localGameReady) {
       localAuthorityRecoveryBudget.recordSuccess()
       localAuthorityRecoveryStatus = 'ready'
+      localAuthorityNotice = null
     } else {
       localAuthorityRecoveryStatus = 'manual-required'
       localAuthorityNotice = '本机服务尚未就绪；打开“我当主机”即可手动重试。'
@@ -2700,11 +2718,12 @@ app.whenReady().then(async () => {
     localAuthorityRecoveryStatus = 'manual-required'
     localAuthorityNotice = localAuthorityStartupErrorMessage(error)
     console.error('[client] automatic local service startup failed:', error)
+    // Preserve the existing manual recovery menu if Profile startup failed.
+    if (!resourceUpdates) setupOfficialUpdates()
+    await loadLocalGame(win)
+  } finally {
+    initialLocalStartupPromise = null
   }
-  if (startupCancelled || win.isDestroyed()) return
-  reportStartupProgress(5, '正在打开主菜单…')
-  setupOfficialUpdates()
-  loadLocalGame(win)
 }).catch(error => {
   if (startupCancelled) return
   console.error('[client-startup] startup failed:', error)
