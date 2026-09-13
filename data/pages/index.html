@@ -1669,9 +1669,10 @@
       updatePackBadge()
       if (window.Capacitor && window.Capacitor.isNativePlatform() && !window.RvBBridge) {
         const packButton = document.getElementById('packDesc').closest('button')
-        packButton.onclick = () => loadPage('android-maintenance.html')
-        packButton.querySelector('.utility-title').textContent = '更新与资源'
-        document.getElementById('packDesc').textContent = '检查更新 · 导入资源包'
+        packButton.onclick = () => {
+          sessionStorage.setItem('rvb_maintenance_section', 'resources')
+          loadPage('android-maintenance.html')
+        }
       }
       updateTutorialEntry()
       // Show connected server in server section if saved
