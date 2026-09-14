@@ -5,6 +5,7 @@ import { runBattleAction } from '@/lib/game/battle-runner'
 import { dealDamage, healDamage, loadAllSkillsById, loadRuleById, addStatusWithEvents, removeStatusWithEvents } from '@/lib/game/skills'
 import { prepareAction } from '@/lib/game/targeting'
 import { globalTriggerSystem } from '@/lib/game/triggers'
+import { changePiecePositions } from '@/lib/game/position-change'
 import type { BattleAction, BattleState } from '@/lib/game/turn'
 import { makePiece, makeState } from '../helpers/minimal-state'
 
@@ -15,6 +16,15 @@ function run(state: BattleState, action: BattleAction) {
 }
 
 describe('ordered committed presentation recording', () => {
+  it.each(['teleport', 'swap', 'dash'] as const)('records authoritative %s semantics for playback', kind => {
+    const state = makeState({ pieces: [makePiece({ instanceId: 'mover', x: 0, y: 0 })] })
+    recordBattlePresentation(state, () => {
+      changePiecePositions(state, [{ pieceId: 'mover', x: 2, y: 0 }], kind, kind === 'dash' ? { path: {} } : {})
+      return state
+    }, s => s)
+    expect(recordedBattlePresentation(state)).toContainEqual(expect.objectContaining({ kind: 'forceMove',
+      result: expect.objectContaining({ movementKind: kind, fromX: 0, toX: 2 }) }))
+  })
   it('keeps a real secret skill private when Flying Raijin suspends before its execution log', () => {
     const skillId = 'aizen-kyoka-suiguetsu'
     const aizen = makePiece({ instanceId: 'blue-aizen', ownerPlayerId: 'player-blue', faction: 'blue', x: 1, y: 1,

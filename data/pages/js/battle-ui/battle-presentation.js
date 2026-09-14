@@ -58,6 +58,7 @@
       const before = playbackModel || currentModel
       const after = Object.assign({}, before, { pieces: JSON.parse(JSON.stringify(before.pieces || [])), effects: JSON.parse(JSON.stringify(before.effects || [])) })
       const events = [group.root].concat(group.children || [])
+      const movementKinds = {}
       events.forEach(function (event) {
         const result = event.result || {}
         if ((event.kind === 'tileEffectAdded' || event.kind === 'tileEffectRemoved') && event.targetCell && result.effectId) {
@@ -76,6 +77,7 @@
           }
           if (!piece) return
           if ((event.kind === 'move' || event.kind === 'forceMove') && result.toX != null && result.toY != null) {
+            movementKinds[id] = result.movementKind || (event.kind === 'move' ? 'walk' : '')
             piece.x = result.toX; piece.y = result.toY
           } else if (event.kind === 'damage' || event.kind === 'heal') {
             const hp = piece.health ? piece.health.current : piece.hp || 0
@@ -101,7 +103,7 @@
       playbackModel = after
       if (phase === 'settle' && renderer.settlePresentation) renderer.settlePresentation(after)
       else if (renderer.animateAction) renderer.animateAction({ motionEventKey: 'beat:' + group.rootEventId,
-        sourcePieceId: group.root.sourcePieceId, targetPieceId: (group.root.targetPieceIds || [])[0] }, before, after)
+        movementKinds: movementKinds, sourcePieceId: group.root.sourcePieceId, targetPieceId: (group.root.targetPieceIds || [])[0] }, before, after)
       renderer.update(after)
     }
 

@@ -1,6 +1,6 @@
 import type { BattleAction, BattleActionLog, BattleState } from './turn'
 import { traceProjectile } from './spatial'
-import { recordedBattlePresentation, recordedSkillPresentation } from './battle-presentation-recording'
+import { recordedBattlePresentation, recordedSkillPresentation, recordedPositionKind } from './battle-presentation-recording'
 
 export type BattlePresentationEventKind =
   | 'move'
@@ -804,6 +804,7 @@ function pieceDrafts(command: Record<string, unknown>, beforeState: BattleState,
           ...(finite(previous.x) !== undefined ? { fromX: finite(previous.x)! } : {}),
           ...(finite(previous.y) !== undefined ? { fromY: finite(previous.y)! } : {}),
           toX: finite(piece.x)!, toY: finite(piece.y)!,
+          ...recordedPositionKind(afterState, piece.instanceId, finite(previous.x)!, finite(previous.y)!, finite(piece.x)!, finite(piece.y)!),
         },
         priority: 75, skippable: true,
       })

@@ -1,7 +1,9 @@
 {
   "id": "rule-tails-flight-reservation-block",
   "name": "双尾飞行落点预留",
-  "description": "预留落点在搬运结算前不可进入。",
-  "trigger": { "type": "beforeMove" },
-  "skillCode": "var effects=battle.extensions&&battle.extensions.tileEffects||[];var reserved=effects.some(function(e){return e.type==='tails-flight-reservation'&&e.x===context.targetX&&e.y===context.targetY;});if(reserved)return {success:true,blocked:true,message:'该地格已被双尾飞行预留'};return {success:false,message:''};"
+  "description": "旧对局兼容规则：飞行预留只记录落点，不阻止进入。",
+  "trigger": {
+    "type": "beforeMove"
+  },
+  "skillCode": "return {success:false,message:''};"
 }

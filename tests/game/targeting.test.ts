@@ -291,7 +291,7 @@ describe('authoritative target preparation', () => {
     caster.skills = [{ skillId: 'blink-contract', currentCooldown: 0, usesRemaining: -1 }] as never
     const state = makeState({ pieces: [caster], width: 5, height: 5 })
     state.skillsById['blink-contract'] = {
-      ...targetedSkill('blink-contract', "function executeSkill(context) { var caster = context.piece; var pos = selectTarget({ type: 'grid', range: 2, filter: 'all' }); if (!pos || pos.needsTargetSelection) return pos; caster.x = pos.x; caster.y = pos.y; return { success: true, message: 'blink' }; }"),
+      ...targetedSkill('blink-contract', "function executeSkill(context) { var caster = context.piece; var pos = selectTarget({ type: 'grid', range: 2, filter: 'all' }); if (!pos || pos.needsTargetSelection) return pos; flow.effects.move([{pieceId:caster.instanceId,x:pos.x,y:pos.y}], 'teleport'); return { success: true, message: 'blink' }; }"),
       targeting: {
         steps: [{ kind: 'target', type: 'grid', filter: 'all', range: 2, distanceMetric: 'chebyshev' }],
       },

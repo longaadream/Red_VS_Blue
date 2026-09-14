@@ -5,6 +5,7 @@
 > RED-192 公共规则更新：状态通过 `addStatusEffectById` / `removeStatusEffectById` 进入统一合并与计时，玩家状态使用对应玩家入口。新状态须在 `STATUS_DEFINITIONS` 声明叠加策略；普通持续效果不另写回合倒计时。技能和pending回调可调用 `context.changePositions(changes, kind)` 做批量位移；普通移动、技能落点与禁锢共享约束。伤害来源可显式声明 `kind: 'player' | 'environment'`，不得任选友军充当卡牌来源。每步数值向下取整；详情见 [规则生命周期](RULE_LIFECYCLE.md) 和 [基础规则词典](../product/RULE_DICTIONARY.md)。
 
 > 状态：现役实现说明（RED-137）
+> RED-209：所有棋盘位移统一使用 `flow.effects.move(changes, kind, path?)`；pending 使用 `ctx.flow`。被阻挡返回 `success:false`，不另写随机或就近 fallback；要依赖位移成功的后续效果应检查返回值。连续路径使用 `flow.query.tracePath`，传送和换位只接触落点。禁止直接改棋子 x/y。旧 `context.changePositions` 是兼容入口，新内容遵循 [公共流程接口](CONTENT_FLOW_RUNTIME.md#位置接口red-209)。
 > 适用范围：当前仓库内受信任的技能、卡牌、规则和延迟效果代码
 > 依据：以本仓库运行时代码和兼容审计脚本为准；文档与实现冲突时应停止导入并修正文档或实现
 

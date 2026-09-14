@@ -13,6 +13,23 @@ function browser() {
   return window
 }
 describe('projected skill display in the actual browser consumers',()=>{
+  it('passes authoritative teleport/swap kinds to the renderer without mutating the model',()=>{
+    const w=browser(),renderer={init:vi.fn(),update:vi.fn(),dispose:vi.fn(),animateAction:vi.fn()},domUi={update:vi.fn(),dispose:vi.fn()}
+    let phase:any
+    const vignetteUi={mount:(options:any)=>{phase=options.onPlaybackPhase},update:vi.fn(),dispose:vi.fn()}
+    const controller=w.BattlePresentation.create({renderer,domUi,vignetteUi})
+    controller.mount({})
+    const model={viewer:{id:'red'},board:{},turn:{},effects:[],pieces:[{id:'a',x:0,y:0}],presentationEvents:[]}
+    controller.update(model)
+    const group={rootEventId:'root',root:{kind:'forceMove',rootEventId:'root',eventId:'root',targetPieceIds:['a'],
+      result:{movementKind:'teleport',fromX:0,fromY:0,toX:2,toY:0}},children:[]}
+    const before=JSON.stringify(model)
+    phase('path',group)
+    expect(renderer.animateAction).toHaveBeenCalledWith(expect.objectContaining({movementKinds:{a:'teleport'}}),expect.anything(),
+      expect.objectContaining({pieces:[expect.objectContaining({id:'a',x:2,y:0})]}))
+    expect(JSON.stringify(model)).toBe(before)
+    controller.dispose()
+  })
   it('renders binding, progress and map markers from a real authority projection, with escaped labels',()=>{
     const state=makeState({pieces:[makePiece({instanceId:'a',currentHp:9}),makePiece({instanceId:'b',currentHp:1,x:1})]})
     state.pieces[0].name='本体'

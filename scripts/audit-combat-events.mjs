@@ -77,7 +77,7 @@ for (const file of globSync('lib/game/**/*.ts')) {
   const visit = (node) => {
     const isTriggerCall = ts.isCallExpression(node) && (
       (ts.isPropertyAccessExpression(node.expression) && node.expression.name.text === 'checkTriggers')
-      || (ts.isIdentifier(node.expression) && node.expression.text === 'checkSynchronousTriggers')
+      || (ts.isIdentifier(node.expression) && ['checkSynchronousTriggers', 'dispatchPositionContact'].includes(node.expression.text))
     )
     if (isTriggerCall && ts.isCallExpression(node)) {
       const contextNode = node.arguments[1]

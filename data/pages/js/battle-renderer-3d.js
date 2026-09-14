@@ -1823,7 +1823,7 @@
         return
       }
       if (previousPiece.x !== nextPiece.x || previousPiece.y !== nextPiece.y) {
-        _animateMove(obj, nextPiece.x, nextPiece.y)
+        _animateMove(obj, nextPiece.x, nextPiece.y, action && action.movementKinds && action.movementKinds[nextPiece.id])
       }
       const healthDelta = _pieceHealth(nextPiece) - _pieceHealth(previousPiece)
       if (healthDelta < 0) {
@@ -1843,7 +1843,7 @@
     }
   }
 
-  function _animateMove(obj, targetX, targetZ) {
+  function _animateMove(obj, targetX, targetZ, movementKind) {
     const targetY = _tileSurfaceHeightAt(targetX, targetZ)
     const from = { x: obj.group.position.x, y: obj.group.position.y, z: obj.group.position.z }
     const fromBaseY = Number.isFinite(obj.motionBaseY) ? obj.motionBaseY : obj.baseY
@@ -1851,6 +1851,16 @@
     obj.baseX = targetX
     obj.baseY = targetY
     obj.baseZ = targetZ
+    // Teleport and swap have no traversed board cells: snap, then mark arrival.
+    if (movementKind === 'teleport' || movementKind === 'swap') {
+      _cancelAnimation(obj.motionId + ':position')
+      obj.motionBaseY = targetY
+      obj.group.position.set(targetX, targetY, targetZ)
+      _flashOutline(obj, movementKind === 'swap' ? 0x22d3ee : 0xa78bfa, MOTION_SECONDS.action)
+      _animateLanding(obj)
+      return
+    }
+    if (movementKind === 'dash') _flashOutline(obj, 0xf59e0b, MOTION_SECONDS.action)
     if (_reducedMotion) {
       obj.motionBaseY = targetY
       obj.group.position.set(targetX, targetY, targetZ)
