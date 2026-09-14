@@ -13,3 +13,12 @@
 - 原目录签名/编辑器未提交改动保持不变，构建在 red181-main-sync 隔离目录进行。
 
 安装包用于当前分支测试，版本沿用 main 0.1.4，文件及说明明确标为 PVE 测试候选。禁止以旧包的检查代替新包；打包后需资源校验、签名与来源验证、实际客户端冒烟和摘要清单。
+
+## 测试包交付结果
+
+- 两个平台实际打包源码均为 `5cc6f272e5f072c1186a4575188d3fa0ed23f9cb`，包含 main `ebe47eee059d18b5282856759a1a04edbc553d67`。后续冒烟脚本和本记录修改不改变包内源码。
+- Windows NSIS 构建和资源完整性检查通过；实际打包客户端教程、房间创建/加入、宿主恢复、退出进程清理冒烟通过。原冒烟脚本将 preload 就绪误认为后台宿主已就绪，现最多等待 90 秒，保留 ready 断言，遇人工恢复状态立即失败。
+- Android 使用原有签名构建成功，验证非 debuggable、签名、源码及资源摘要、ARM64/x86_64 宿主内容；在模拟器安装并启动成功。版本号 23 / 0.1.4-demo。尚不代表多型号真机或四人联机完整验收。
+- 肉钩普通拉拽和遇障碍回归通过；类型与静态检查通过；打包源码 GitHub Main baseline / ESLint 检查通过。
+- 本地产物位于 `dist/test-player-20260914/`，提供 Windows.exe、Android.apk、测试说明及 SHA256SUMS.txt；未创建 Release、标签或更新公开下载源。
+- 实际包日志和截图位于 `output/main-sync/`，Windows 最终结果为 `windows-player-smoke-final.log`，Android 构建为 `android-player-build.log`。

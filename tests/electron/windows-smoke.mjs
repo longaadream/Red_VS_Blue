@@ -633,7 +633,13 @@ async function smokeClient(expectedIdentity = null, sharedUserDataDir = null, ne
       await delay(250)
     }
     assert(gameBridgeReady, 'Client game preload bridge did not become ready')
-    const mode = await evaluate(gameTarget, `window.electronAPI.getMode()`)
+    let mode = await evaluate(gameTarget, `window.electronAPI.getMode()`)
+    const authorityDeadline = Date.now() + 90000
+    while (!mode?.ready && Date.now() < authorityDeadline) {
+      if (mode?.localAuthorityRecovery?.blocked || mode?.localAuthorityRecovery?.status === 'manual-required') break
+      await delay(250)
+      mode = await evaluate(gameTarget, `window.electronAPI.getMode()`)
+    }
     assert(mode?.ready === true, `Client local authority was not ready after automatic startup: ${JSON.stringify(mode)}`)
 
     const authorityEntry = path.join(
