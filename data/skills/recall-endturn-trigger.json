@@ -1,7 +1,7 @@
 {
   "id": "recall-endturn-trigger",
   "name": "回溯触发（回合结束）",
-  "description": "对手回合结束时，强制触发回溯。",
+  "description": "对手回合结束时触发回溯。",
   "keywords": [],
   "targetText": "本棋子",
   "effectTags": [

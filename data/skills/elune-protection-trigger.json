@@ -1,9 +1,9 @@
 {
   "id": "elune-protection-trigger",
   "name": "艾露恩的守护触发",
-  "description": "友方棋子将受到致命伤害时，免疫此次伤害，并恢复5点生命。",
+  "description": "友军将受致命伤害时免疫该次伤害，并回复该友军5点。",
   "keywords": [],
-  "targetText": "本棋子",
+  "targetText": "将受致命伤害的友军",
   "effectTags": [
     "免伤",
     "治疗"

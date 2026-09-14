@@ -1,7 +1,7 @@
 {
   "id": "nano-boost-damage",
   "name": "纳米激素增伤",
-  "description": "每份纳米激素使造成的伤害+1，可叠加。",
+  "description": "每份纳米激素使伤害+1，可叠加。",
   "kind": "passive",
   "type": "normal",
   "cooldownTurns": 0,

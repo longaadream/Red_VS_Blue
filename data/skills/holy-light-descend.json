@@ -1,9 +1,9 @@
 {
   "id": "holy-light-descend",
   "name": "圣光降临",
-  "description": "选择本棋子6格内1个地格。对该格中的友方棋子恢复9点生命，对敌方棋子造成9点法术伤害；距离该格1格时，数值为7；距离该格2至3格时，数值为4。",
+  "description": "选择地格（6）。以该格为中心回复友军生命、对敌人造成伤害：中心9点，距离1格7点，距离2–3格4点。",
   "keywords": [],
-  "targetText": "6格内1个地格",
+  "targetText": "地格（6）",
   "effectTags": [
     "治疗",
     "范围伤害"
@@ -17,6 +17,6 @@
   "actionPointCost": 3,
   "chargeCost": 1,
   "code": "function executeSkill(context) { const sourcePiece = context.piece; const targetCell = selectTarget({ type: 'grid', range: 6 }); if (!targetCell || targetCell.needsTargetSelection) return targetCell; const centerX = targetCell.x; const centerY = targetCell.y; const atDistance = function(dist) { return battle.pieces.filter(function(piece) { return piece.currentHp > 0 && Math.abs(piece.x - centerX) + Math.abs(piece.y - centerY) === dist; }); }; const applyRing = function(pieces, value) { const allies = pieces.filter(function(piece) { return arePlayersAllied(battle, piece.ownerPlayerId, sourcePiece.ownerPlayerId); }); const enemies = pieces.filter(function(piece) { return !arePlayersAllied(battle, piece.ownerPlayerId, sourcePiece.ownerPlayerId); }); if (allies.length) healDamage(sourcePiece, allies, value, battle, context.skill.id); if (enemies.length) dealDamage(sourcePiece, enemies, value, 'magical', battle, context.skill.id); }; applyRing(atDistance(0), 9); applyRing(atDistance(1), 7); applyRing(atDistance(2), 4); applyRing(atDistance(3), 4); return { success: true, message: sourcePiece.name + '释放了圣光降临' }; }",
-  "previewCode": "function calculatePreview() { return { description: \"选择本棋子6格内1个地格。对该格中的友方棋子恢复9点生命，对敌方棋子造成9点法术伤害；距离该格1格时，数值为7；距离该格2至3格时，数值为4。\", expectedValues: { centerHeal: 9, centerDamage: 9, adjacentHeal: 7, adjacentDamage: 7, distantHeal: 4, distantDamage: 4 } }; }",
+  "previewCode": "function calculatePreview() { return { description: \"选择地格（6）。以该格为中心回复友军生命、对敌人造成伤害：中心9点，距离1格7点，距离2–3格4点。\", expectedValues: { centerHeal: 9, centerDamage: 9, adjacentHeal: 7, adjacentDamage: 7, distantHeal: 4, distantDamage: 4 } }; }",
   "range": "area"
 }

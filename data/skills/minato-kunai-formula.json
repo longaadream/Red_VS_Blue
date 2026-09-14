@@ -1,9 +1,11 @@
 {
   "id": "minato-kunai-formula",
   "name": "苦无术式",
-  "description": "选择1个友方棋子（包括本棋子）并传送至1个飞雷神锚点处，清除该锚点并给该棋子附加1层飞雷神标记。",
-  "keywords": [],
-  "targetText": "1个友方棋子，然后1个飞雷神锚点",
+  "description": "选择全图友军，传送至所选飞雷神锚点，移除该锚点，赋予目标飞雷神标记 x 1。",
+  "keywords": [
+    "传送"
+  ],
+  "targetText": "友军→飞雷神锚点",
   "effectTags": [
     "位移",
     "标记"

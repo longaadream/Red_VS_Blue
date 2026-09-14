@@ -1,7 +1,7 @@
 {
   "id": "grant-lucky-coin",
   "name": "发放幸运币",
-  "description": "游戏开始时，你获得1张【幸运币】。",
+  "description": "游戏开始时获得1张【幸运币】。",
   "keywords": [],
   "targetText": "己方玩家",
   "effectTags": [

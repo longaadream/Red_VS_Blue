@@ -1,8 +1,10 @@
 {
   "id": "grimmjow-destruction-instinct",
   "name": "破坏本能",
-  "description": "每次攻击后，本棋子受到1点真实伤害。",
-  "keywords": [],
+  "description": "每次攻击后自身受到1点真实伤害。",
+  "keywords": [
+    "真实伤害"
+  ],
   "targetText": "被动",
   "effectTags": [
     "真实伤害"

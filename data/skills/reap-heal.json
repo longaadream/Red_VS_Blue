@@ -1,7 +1,7 @@
 {
   "id": "reap-heal",
   "name": "收割治疗",
-  "description": "使本棋子恢复等同于本次实际伤害50%的生命。",
+  "description": "回复自身0.5x本次实际伤害点。",
   "keywords": [],
   "targetText": "本棋子",
   "effectTags": [

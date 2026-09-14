@@ -1,7 +1,7 @@
 {
   "id": "ulquiorra-resurreccion",
   "name": "归刃·黑翼大魔",
-  "description": "本棋子累计造成或受到3次伤害后，在你的下一个回合开始时归刃：攻击力+1、移动力+1，并获得【黑虚闪】。",
+  "description": "累计造成或受到3次伤害后，在你的下回合开始时归刃：攻击力+1、移动力+1，获得【黑虚闪】。",
   "keywords": [],
   "targetText": "被动",
   "effectTags": [

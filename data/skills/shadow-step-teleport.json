@@ -1,8 +1,10 @@
 {
   "id": "shadow-step-teleport",
   "name": "暗影步传送",
-  "description": "你的回合开始时，将本棋子传送至预设地格。",
-  "keywords": [],
+  "description": "你的回合开始时传送至预设地格。",
+  "keywords": [
+    "传送"
+  ],
   "targetText": "本棋子",
   "effectTags": [
     "位移"
