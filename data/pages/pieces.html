@@ -6,6 +6,8 @@
   <title>棋子图鉴 - RED vs BLUE</title>
   <script src="js/pack-fetch.js"></script>
   <script src="js/hand-card-face.js"></script>
+  <script src="js/skill-description.js"></script>
+  <link rel="stylesheet" href="css/skill-description.css" />
   <link rel="stylesheet" href="css/tabletop/related-hand-cards.css" />
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
@@ -379,7 +381,7 @@
           const lockedBadge = descIdPrefix === 'tsdesc' ? ' <span class="skill-badge badge-super">可解锁</span>' : ''
           nameEl.innerHTML = `${skillData.name || sid} <span class="skill-badge ${badgeClass}">${badgeText}</span>${lockedBadge}`
         }
-        descEl.textContent = skillData.description || ''
+        descEl.innerHTML = RvBSkillDescription.render(skillData.description, skillData.keywords)
         const chips = []
         if (skillData.actionPointCost) chips.push(`⚡${skillData.actionPointCost} 行动点`)
         if (skillData.cooldownTurns)   chips.push(`⏱${skillData.cooldownTurns} 回合冷却`)

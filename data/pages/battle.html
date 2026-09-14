@@ -6,6 +6,8 @@
   <title>对战 - RED vs BLUE</title>
   <script src="js/pack-fetch.js"></script>
   <script src="js/hand-card-face.js"></script>
+  <script src="js/skill-description.js"></script>
+  <link rel="stylesheet" href="css/skill-description.css" />
   <link rel="stylesheet" href="css/tabletop/related-hand-cards.css" />
   <script src="js/server-utils.js"></script>
   <script src="js/developer-tools/match-trace.js"></script>
@@ -3697,7 +3699,7 @@
             <span class="pi-skill-name">${escHtml(skName)}</span>
             <span class="pi-skill-badge">${typeLabel}</span>
           </div>
-          <div class="pi-skill-desc">${escHtml(desc)}</div>
+          <div class="pi-skill-desc">${RvBSkillDescription.render(desc, keywords)}</div>
           ${keywords.length ? `<div class="keyword-badges pi-keywords">${keywords.map(name => keywordBadgeHtml(name, 'piece', activePieceKeyword)).join('')}</div>` : ''}
           ${metaParts.length ? `<div class="pi-skill-meta">${metaParts.join(' · ')}</div>` : ''}
         </div>`

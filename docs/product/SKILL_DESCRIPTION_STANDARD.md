@@ -1,7 +1,7 @@
 # 棋子技能描述语言标准
 
 更新：2026-09-14。采用用户确认的紧凑描述格式，保留RED-209位移语义。
-本轮已核对144项清单，更新142份技能JSON及78份预览；弃用的凛冬咆哮与已符合要求的率先出阵保持原样。见[逐项落地记录](../qa/RED-209-skill-text-applied.json)。关键词渲染与新手提示尚未实现。
+本轮已核对144项清单，更新142份技能JSON及78份预览；弃用的凛冬咆哮与已符合要求的率先出阵保持原样。见[逐项落地记录](../qa/RED-209-skill-text-applied.json)。图鉴、选棋详情和战斗详情已按技能keywords加粗正文关键词，保持主题文字颜色；新手提示尚未实现。
 历史记录见[RED-192审计](../qa/RED-192-skill-language-audit.json)，玩法见[基础规则词典](RULE_DICTIONARY.md)，执行入口见[作者手册](../technical/SKILLCODE_AUTHORING_STANDARD.md)。
 
 ## 1. 基本原则
