@@ -1072,7 +1072,7 @@
           <div class="detail-stat"><div class="detail-stat-val" style="color:#4ade80">${s.moveRange || 3}</div><div class="detail-stat-label">移动</div></div>
         </div>
         ${p.description ? `<div class="detail-desc">${p.description}</div>` : ''}
-        <div class="detail-skills-label">技能</div>
+        <div class="detail-skills-label">技能 <button type="button" class="skill-reading-tips" onclick="RvBSkillDescription.showGuide(true)">Tips · 描述说明</button></div>
         <div id="detailSkillList"><div style="color:#475569;font-size:13px">加载中...</div></div>
         <div id="detailRelatedCards"></div>
         <div id="detailKeywords"></div>
@@ -1155,6 +1155,7 @@
       } else {
         keywordsContainer.innerHTML = ''
       }
+      if (overlay.classList.contains('show')) RvBSkillDescription.showGuide()
     }
 
     function closePieceDetail() {

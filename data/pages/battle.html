@@ -3722,7 +3722,7 @@
 
       document.getElementById('pieceInfoContent').innerHTML =
         statsHtml + tagsHtml +
-        `<div class="pi-section-label">技能</div>` + skillsHtml + relatedCardsHtml
+        `<div class="pi-section-label">技能 <button type="button" class="skill-reading-tips" onclick="RvBSkillDescription.showGuide(true)">Tips · 描述说明</button></div>` + skillsHtml + relatedCardsHtml
 
       document.getElementById('pieceKeywordPanel').innerHTML = renderKeywordPanel(
         currentPieceKeywords,
@@ -3734,6 +3734,7 @@
       modal.style.display = 'flex'
       const closeButton = modal.querySelector('.pi-close')
       if (!preserveKeyword && closeButton) closeButton.focus()
+      RvBSkillDescription.showGuide()
     }
     function showPieceInfo(instanceId, preserveKeyword) {
       if (!G) return

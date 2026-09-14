@@ -347,7 +347,7 @@
           ${stats.attackRange ? `<div class="stat-cell"><div class="stat-val" style="color:#a855f7">${stats.attackRange}</div><div class="stat-lbl">射程</div></div>` : ''}
         </div>
         <div class="skills-panel">
-          <div style="font-size:12px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">技能</div>
+          <div style="font-size:12px;font-weight:700;color:#64748b;letter-spacing:1px;margin-bottom:8px">技能 <button type="button" class="skill-reading-tips" onclick="event.stopPropagation(); RvBSkillDescription.showGuide(true)">Tips · 描述说明</button></div>
           ${skills || '<div style="font-size:13px;color:#475569">无技能</div>'}
           ${transformedSkillsHtml ? `
           <div style="font-size:12px;font-weight:700;color:#7c3aed;text-transform:uppercase;letter-spacing:1px;margin:12px 0 8px">可解锁技能</div>
@@ -382,6 +382,7 @@
           nameEl.innerHTML = `${skillData.name || sid} <span class="skill-badge ${badgeClass}">${badgeText}</span>${lockedBadge}`
         }
         descEl.innerHTML = RvBSkillDescription.render(skillData.description, skillData.keywords)
+        if (descEl.getClientRects().length) RvBSkillDescription.showGuide()
         const chips = []
         if (skillData.actionPointCost) chips.push(`⚡${skillData.actionPointCost} 行动点`)
         if (skillData.cooldownTurns)   chips.push(`⏱${skillData.cooldownTurns} 回合冷却`)
