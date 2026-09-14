@@ -20,7 +20,7 @@ RED-192 的现役内容现在可直接在编辑器「技能 / 规则 → 流程�
 | `query.piece/player(id)` | 当前权威对象，供可信代码节点读取；写效果优先用下列公共接口 |
 | `query.pieces({ownerId, relation, originId, range, includeDead})` | 按所属方、敌我和曼哈顿范围查棋子 ID；默认只含存活棋子 |
 | `query.distance(a,b) / path(origin,direction,options)` | 距离 / 既有投射物路径查询 |
-| `query.tracePath(origin,direction,options)` | 位移路径查询：有序 cells、encounters、lastLandableCell、blocked、reachedTarget。options 指定 excludePieceId、maxDistance 及穿过友军/敌军/不可行走地格的许可 |
+| `query.tracePath(origin,direction,options)` | 位移路径查询：有序 cells、encounters、lastLandableCell、blocked、reachedTarget。options 指定 excludePieceId、maxDistance、passAllies/passEnemies；terrain 选 walkable（默认）、projectile（弹射物通行）或 any |
 | `query.landingCells(candidates,movingPieceIds?)` | 保留候选顺序，过滤占用、地形和预留；整组提交可将组内棋子视为同时离开 |
 | `query.random(items)` | 使用既有规则随机流选一项；空集合返回 null |
 | `event.read()` | 读取本次事件的类型、伤害、治疗等现有标量 |
@@ -31,7 +31,7 @@ RED-192 的现役内容现在可直接在编辑器「技能 / 规则 → 流程�
 | `choice.deferTarget({playerId,targetType,candidates,effectCode,payload,canCancel})` | 生成规则应 return 的单选请求；候选使用 `{type:'piece',pieceId}` 或 `{type:'cell',x,y}`，回调必须自包含，数据放 payload |
 | `effects.damage(source,targetId,amount,type,skillId?)` | 原有伤害结果；source 可为棋子 ID，或现有玩家/环境来源对象；包含防护与实际生命损失 |
 | `effects.heal(source,targetId,amount,skillId?)` | 原有治疗结果 |
-| `effects.move(changes,kind,path?)` | 整组校验并提交，返回 `{success,changes,message?}`。被占用、预留、禁锢或路径阻挡时返回 success:false；重复身份、非整数等错误请求抛错。path 提供连续位移的穿越许可，走格默认检查路径 |
+| `effects.move(changes,kind,path?)` | 整组校验并提交，返回 `{success,changes,message?}`。被占用、预留、禁锢或路径阻挡时返回 success:false；重复身份、非整数等错误请求抛错。走格/冲刺/推拉检查连续路径，path 可覆盖通行规则；传送/换位只检查落点 |
 | `status.add/remove(targetId,statusOrId,scope?)` | 棋子或玩家状态；add 先核查 relatedRules，再通过现役 helper 安装状态和规则 |
 | `rules.add/remove(targetId,ruleId,scope?)` | 安装 / 移除已有规则定义；scope 默认 piece，可选 player |
 | `resources.add(playerId,'actionPoints'或'chargePoints',amount)` | 资源增减，逐步向下取整，结果不得为负或非有限数 |
@@ -63,7 +63,7 @@ const trace = flow.query.tracePath(origin, direction,
 flow.effects.move([{ pieceId: id, ...trace.lastLandableCell }], 'dash', { passEnemies: true });
 ```
 
-`beforeMove/afterMove` 只描述普通走格动作。所有位移发 `beforePiecePositionChange`，有效提交后发 `afterPiecePathContact` 和 `afterPiecePositionChange`。`flow.event.read()` 提供 movementKind、fromX/fromY、targetX/targetY、pathCells/contactCells；before 可修改目标或阻挡。传送/换位只报告终点，连续位移必须显式提供 path 许可。重复格去重，起点排除。无实际位置变化不触发接触。
+`beforeMove/afterMove` 只描述普通走格动作。所有位移发 `beforePiecePositionChange`，有效提交后发 `afterPiecePathContact` 和 `afterPiecePositionChange`。`flow.event.read()` 提供 movementKind、fromX/fromY、targetX/targetY、pathCells/contactCells；before 可修改目标或阻挡。传送/换位只报告终点，连续位移默认只通过可行走空格，特殊穿越能力必须显式提供 path 许可。重复格去重，起点排除。无实际位置变化不触发接触。
 
 落点校验对整组完成后才写坐标；之后先拾取/记账，再执行反应。普通移动在坐标提交前核验并扣除 AP。鸣人分身和回溯由宿主延迟接触反应至必要复合效果完成，但拾取在每次成功提交时立即确定，防止后续反应再次位移而丢失已经过格。交互型触发继续抛出原有 pending 信号，由动作事务挂起和重放，不得捕获并改成“位移取消”。
 

@@ -117,7 +117,6 @@ export type NormalMoveRejectionCode =
   | 'terrain-blocked'
   | 'piece-blocked'
   | 'target-occupied'
-  | 'target-reserved'
 
 export interface NormalMoveRejection {
   code: NormalMoveRejectionCode
@@ -358,13 +357,15 @@ export function traceProjectile<
       }
     }
 
-    const explicitPassable = tile.props?.bulletPassable ?? tile.props?.bullet
-    const blocksProjectile = typeof explicitPassable === 'boolean'
-      ? !explicitPassable
-      : tile.props?.type === 'wall' || tile.props?.type === 'cover'
+    const blocksProjectile = isProjectileTerrainBlocked(tile)
     events.push({ type: 'terrain', x, y, distance, tile, blocksProjectile })
   }
   return events
+}
+
+function isProjectileTerrainBlocked(tile: SpatialTile): boolean {
+  const explicitPassable = tile.props?.bulletPassable ?? tile.props?.bullet
+  return typeof explicitPassable === 'boolean' ? !explicitPassable : tile.props?.type === 'wall' || tile.props?.type === 'cover'
 }
 
 export function getNormalMoveRejection(
@@ -416,9 +417,6 @@ export function getNormalMoveRejection(
     }
   }
 
-  if (!isLegalSkillLanding(state, target, { movingPieceIds: piece.instanceId ? [piece.instanceId] : [] })) {
-    return { code: 'target-reserved', message: 'Target tile is reserved by another effect', at: target }
-  }
   return null
 }
 
@@ -438,9 +436,8 @@ export function getLegalNormalMoveTargets(
         y: piece.y + direction.y * distance,
       }
       if (!isInsideBounds(target, state.map)) break
-      const rejection = getNormalMoveRejection(state, piece, target)
-      if (rejection?.code === 'target-reserved') continue
-      if (rejection) break
+      if (getNormalMoveRejection(state, piece, target)) break
+      if (!isLegalSkillLanding(state, target, { movingPieceIds: piece.instanceId ? [piece.instanceId] : [] })) continue
       targets.push(target)
     }
   }
@@ -477,13 +474,14 @@ export interface MovementTraceOptions {
   maxDistance: number
   passAllies?: boolean
   passEnemies?: boolean
-  passBlockedTerrain?: boolean
+  terrain?: 'walkable' | 'projectile' | 'any'
   blockedTerrainTypes?: readonly string[]
 }
 
 /** Ordered movement facts, independent of damage, costs and coordinate writes. */
 export function traceMovementPath(state: SpatialBattleState, origin: GridPosition, direction: GridPosition, options: MovementTraceOptions) {
   if (!Number.isSafeInteger(options.maxDistance) || options.maxDistance < 0
+    || !['walkable', 'projectile', 'any'].includes(options.terrain ?? 'walkable')
     || !Number.isInteger(direction.x) || !Number.isInteger(direction.y)
     || Math.abs(direction.x) + Math.abs(direction.y) !== 1 || !isInsideBounds(origin, state.map)) {
     throw new RangeError('Movement trace requires a bounded cardinal path')
@@ -499,7 +497,9 @@ export function traceMovementPath(state: SpatialBattleState, origin: GridPositio
     if (!isInsideBounds(cell, state.map) || !tile) {
       encounters.push({ type: 'boundary', ...cell }); blocked = true; break
     }
-    if ((!tile.props?.walkable && !options.passBlockedTerrain)
+    const terrainBlocked = options.terrain === 'any' ? false
+      : options.terrain === 'projectile' ? isProjectileTerrainBlocked(tile) : !tile.props?.walkable
+    if (terrainBlocked
       || options.blockedTerrainTypes?.includes(tile.props?.type ?? '')) {
       encounters.push({ type: 'terrain', ...cell }); blocked = true; break
     }

@@ -69,7 +69,7 @@ export function changePiecePositions(battle: BattleState, changes: readonly Piec
       const rejection = getNormalMoveRejection(battle, piece, entry.to)
       if (rejection) return cancel(rejection.message)
     }
-    if (kind === 'walk' || kind === 'dash' || options.path) {
+    if (kind !== 'teleport' && kind !== 'swap') {
       const dx = entry.to.x - entry.from.x, dy = entry.to.y - entry.from.y
       if (dx !== 0 && dy !== 0) return cancel('位移路径必须沿同一行或同一列')
       const trace = traceMovementPath(battle, entry.from, { x: Math.sign(dx), y: Math.sign(dy) }, {

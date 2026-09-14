@@ -1,0 +1,65 @@
+{
+  "issue": "RED-209",
+  "baseSha": "2263c0273af793d0163059411491a846b96b3090",
+  "date": "2026-09-14",
+  "finalGame": {
+    "command": "npm.cmd test -- tests/game --maxWorkers=1",
+    "passed": 1346,
+    "failed": 9,
+    "total": 1355,
+    "testFiles": 120,
+    "durationSeconds": 129.06,
+    "failures": [
+      "FAIL  tests/game/ai-semantics.test.ts > AI semantic contract > audits every current manifest and makes a changed admission manifest fail closed",
+      "FAIL  tests/game/battle-ui-boundary.test.ts > battle presentation boundary > keeps renderer and DOM responsibilities behind explicit modules",
+      "FAIL  tests/game/player-colyseus-contract.test.ts > RED-116 Electron lobby profile bridge > pins the local Profile Identity before navigating to the server lobby",
+      "FAIL  tests/game/player-colyseus-contract.test.ts > RED-116 Electron lobby profile bridge > resolves the client local runtime through trusted game IPC",
+      "FAIL  tests/game/red-183-regressions.test.ts > RED-183 character rules and selection UI regressions > keeps selection, encyclopedia, history, tutorial, and related-card UI contracts visible in source",
+      "FAIL  tests/game/skillcode-static-audit.test.ts > RED-45 data parse and production loader smoke > parses every JSON definition and loads every skill, rule, and card",
+      "FAIL  tests/game/skillcode-static-audit.test.ts > RED-45 skillCode static compatibility audit > classifies every executable field and every lexical free variable",
+      "FAIL  tests/game/sonic-roster.test.ts > Sonic roster mechanics > documents the complete momentum acquisition and consumption contract",
+      "FAIL  tests/game/targeting.test.ts > Demo targeting admission fixture > covers the current admitted piece, skill, and card manifests with a stable preparation hash"
+    ],
+    "allFailuresReproducedOnBase": true
+  },
+  "checks": {
+    "typecheck": "passed",
+    "lint": "passed",
+    "encoding": "passed",
+    "mainBaseline": "passed; behind=0",
+    "build": "browser, practice and Android engines built",
+    "candidateTests": "107/107 passed",
+    "pullAndSpatialTests": "90/90 passed",
+    "independentPositionTests": "19/19 passed"
+  },
+  "artifacts": [
+    {
+      "file": "lib/game/position-change.ts",
+      "sha256": "be8e8ce4f586782f5fdd19eb1491bad39bee3f270be83f0b89e50e1c117d70f5"
+    },
+    {
+      "file": "lib/game/spatial.ts",
+      "sha256": "676afeb5d58cf416b11274db0126b0e04ebc48e14634624c95b905db1dad01ca"
+    },
+    {
+      "file": "lib/game/tile-contact.ts",
+      "sha256": "38433c4f91085cd88cf762e01f142a09be2b0617f4444d3938f0e52d41e4e220"
+    },
+    {
+      "file": "lib/game/position-write-guard.ts",
+      "sha256": "ed55a2db392bec065cf83d63e41d475f583b061f3bf22c07e9e787c598a1b54a"
+    },
+    {
+      "file": "data/pages/js/game-engine.js",
+      "sha256": "9771351ef924daab9ba58b0f02d0561144385048f3695ae9ab3c2845bb5d9212"
+    },
+    {
+      "file": "data/pages/js/practice/engine.js",
+      "sha256": "c781c6b0e352d3c3c178f85676993c4a1e58d3f253b74ddb1ab0b4e6c985b5b9"
+    },
+    {
+      "file": "android-client/www/js/game-engine.js",
+      "sha256": "9771351ef924daab9ba58b0f02d0561144385048f3695ae9ab3c2845bb5d9212"
+    }
+  ]
+}
