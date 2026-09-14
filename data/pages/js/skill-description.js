@@ -31,7 +31,7 @@
 
   function showGuide(manual) {
     if (guide || (!manual && acknowledged)) return
-    try { if (!manual && root.localStorage.getItem(guideKey) === '1') return } catch (_) { /* 本页仍可记住确认。 */ }
+    try { if (!manual && root.localStorage.getItem(guideKey) === '1') return } catch { /* 本页仍可记住确认。 */ }
     const previousFocus = document.activeElement
     guide = document.createElement('dialog')
     guide.className = 'skill-reading-guide'
@@ -48,7 +48,7 @@
     guide.addEventListener('keydown', function (event) { event.stopPropagation() })
     guide.querySelector('button').addEventListener('click', function () {
       acknowledged = true
-      try { root.localStorage.setItem(guideKey, '1') } catch (_) { /* 存储不可用时仅本页免打扰。 */ }
+      try { root.localStorage.setItem(guideKey, '1') } catch { /* 存储不可用时仅本页免打扰。 */ }
       guide.close()
       guide.remove()
       guide = null
