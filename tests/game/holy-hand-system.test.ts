@@ -649,7 +649,7 @@ describe('Turalyon holy-hand mobility', () => {
     expect(prepared.options).toEqual([
       { label: '圣光惩戒', value: 'holy-smite' },
       { label: '圣光治疗', value: 'holy-heal' },
-      { label: '圣光冲锋', value: 'holy-charge' },
+      { label: '圣光充能', value: 'holy-charge' },
     ])
     expect(state.players[0]).toMatchObject({ actionPoints: 2 })
     expect(state.players[0].hand).toHaveLength(1)

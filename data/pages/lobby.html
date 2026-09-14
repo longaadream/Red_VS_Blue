@@ -644,11 +644,12 @@
     async function spectateRoom(roomId) {
       const { id: spectatorId, displayName: spectatorName } = RvBIdentity.getIdentity()
       try {
+        const connection = RvBUtils.getConnectionConfig()
         const profileIdentity = await getLocalGameProfileIdentity()
-        await lobbyRequest('rooms.spectate', { roomId, spectatorId, spectatorName, profileIdentity })
-        window.location.href = 'battle.html?roomId=' + encodeURIComponent(roomId)
-          + '&playerId=' + encodeURIComponent(spectatorId)
-          + '&mode=spectate'
+        await RvBColyseus.requestAt(connection.url, 'rooms.spectate', { roomId, spectatorId, spectatorName, profileIdentity }, 6000)
+        const target = new URLSearchParams({ roomId, playerId: spectatorId, playerName: spectatorName, mode: 'spectate', serverUrl: connection.url })
+        if (connection.mode) target.set('server', connection.mode)
+        window.location.href = 'battle.html?' + target.toString()
       } catch (e) { alert('观战失败：' + formatProfileError(e)) }
     }
 

@@ -1,0 +1,30 @@
+{
+  "result": {
+    "alignment": "dark",
+    "count": 8,
+    "preset": "暗方测试棋组"
+  },
+  "layouts": [
+    {
+      "width": 1280,
+      "height": 720,
+      "display": "block",
+      "text": "棋组构筑",
+      "visible": true
+    },
+    {
+      "width": 844,
+      "height": 390,
+      "display": "block",
+      "text": "棋组构筑",
+      "visible": true
+    },
+    {
+      "width": 390,
+      "height": 844,
+      "display": "block",
+      "text": "棋组构筑",
+      "visible": true
+    }
+  ]
+}

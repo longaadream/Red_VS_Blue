@@ -5020,6 +5020,12 @@
     // Connect the Colyseus client for the selected authority origin.
     function connectBattleColyseus() {
       if (typeof RvBColyseus === 'undefined') return
+      RvBColyseus.on('error', function(error) {
+        const reason = error && error.message ? error.message : String(error)
+        const message = (SPECTATE_MODE ? '观战连接失败：' : '对局连接失败：') + reason
+        showMsg(message, 'err')
+        addLog(message, 'err')
+      })
 
       RvBColyseus.on('connect', function() {
         colyseusConnected = true
