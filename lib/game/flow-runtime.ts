@@ -147,9 +147,7 @@ export function createFlowRuntime(battle: BattleState, context: any, surface: Fl
       heal: (source: any, targetId: string, amount: number, skillId = effectId()) =>
         call('healDamage', resolveSource(source), piece(targetId), Math.max(0, numeric(amount)), battle, skillId),
       move: (changes: Array<{ pieceId: string; x: number; y: number }>, kind: Parameters<typeof changePiecePositions>[2] = 'teleport', path?: PositionChangeOptions['path']) => {
-        const flight = holder()?.statusTags?.find((tag: { type?: string; flightId?: string }) => tag.type === 'tails-flight-reservation')
-        const flightId = delegates.positionRuleId?.() === 'rule-tails-flight-resolve' ? flight?.flightId : undefined
-        return changePiecePositions(battle, changes, kind, { path, flightId,
+        return changePiecePositions(battle, changes, kind, { path,
           reservedCells: surface === 'skill' ? [] : context.reservedCells ?? [] })
       },
     },

@@ -13,7 +13,6 @@ export interface PositionChangeFact {
 }
 export interface PositionChangeOptions {
   reservedCells?: readonly GridPosition[]
-  flightId?: string
   path?: Omit<MovementTraceOptions, 'excludePieceId' | 'maxDistance'>
   /** Engine-only action boundary: AP/log commit precedes contact. */
   deferContacts?: boolean
@@ -62,7 +61,7 @@ export function changePiecePositions(battle: BattleState, changes: readonly Piec
     if (reason) return cancel(reason)
     const key = `${entry.to.x},${entry.to.y}`
     if (!Number.isSafeInteger(entry.to.x) || !Number.isSafeInteger(entry.to.y) || cells.has(key)
-      || !isLegalSkillLanding(battle, entry.to, { movingPieceIds: ids, reservedCells: options.reservedCells, flightId: options.flightId })) return cancel('位移落点被阻挡或已失效')
+      || !isLegalSkillLanding(battle, entry.to, { movingPieceIds: ids, reservedCells: options.reservedCells })) return cancel('位移落点被阻挡或已失效')
     cells.add(key)
     if (entry.from.x === entry.to.x && entry.from.y === entry.to.y) continue
     if (kind === 'walk') {

@@ -66,9 +66,9 @@ describe('RED-192 rule dictionary', () => {
     expect(result.actions?.filter(action => action.type === 'chargeCrystalDropped')).toHaveLength(2)
     expect(result.terminalResult).toBeUndefined()
   })
-  it('rejects teleporting into a reserved landing without moving any piece', () => {
+  it('rejects teleporting into an explicitly blocked landing without moving any piece', () => {
     const state = fixture(), before = state.pieces.map((piece: any) => [piece.x, piece.y])
-    state.extensions.tileEffects = [{ type: 'tails-flight-reservation', x: 1, y: 0 }]
+    state.extensions.tileEffects = [{ type: 'landing-blocker', blocksLanding: true, x: 1, y: 0 }]
     expect(changePiecePositions(state, [{ pieceId: 'source', x: 1, y: 0 }], 'teleport').success).toBe(false)
     expect(state.pieces.map((piece: any) => [piece.x, piece.y])).toEqual(before)
   })

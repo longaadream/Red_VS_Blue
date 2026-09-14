@@ -75,7 +75,6 @@ export interface SkillLandingOptions {
   movingPieceIds?: readonly string[]
   /** Cells already promised to an earlier or enclosing effect in the same action. */
   reservedCells?: readonly GridPosition[]
-  flightId?: string
 }
 
 export interface ProjectileTraceOptions {
@@ -241,8 +240,7 @@ export function isLegalSkillLanding(
 
   const reserved = new Set((options.reservedCells ?? []).map(gridPositionKey))
   for (const effect of state.extensions?.tileEffects ?? []) {
-    if (options.flightId && (effect as { flightId?: string }).flightId === options.flightId) continue
-    if ((effect.blocksLanding || effect.type === 'tails-flight-reservation')
+    if (effect.blocksLanding
       && effect.x != null && effect.y != null) reserved.add(gridPositionKey({ x: effect.x, y: effect.y }))
   }
   if (reserved.has(gridPositionKey(position))) return false

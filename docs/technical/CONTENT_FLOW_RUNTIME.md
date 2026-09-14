@@ -21,7 +21,7 @@ RED-192 的现役内容现在可直接在编辑器「技能 / 规则 → 流程�
 | `query.pieces({ownerId, relation, originId, range, includeDead})` | 按所属方、敌我和曼哈顿范围查棋子 ID；默认只含存活棋子 |
 | `query.distance(a,b) / path(origin,direction,options)` | 距离 / 既有投射物路径查询 |
 | `query.tracePath(origin,direction,options)` | 位移路径查询：有序 cells、encounters、lastLandableCell、blocked、reachedTarget。options 指定 excludePieceId、maxDistance、passAllies/passEnemies；terrain 选 walkable（默认）、projectile（弹射物通行）或 any |
-| `query.landingCells(candidates,movingPieceIds?)` | 保留候选顺序，过滤占用、地形和预留；整组提交可将组内棋子视为同时离开 |
+| `query.landingCells(candidates,movingPieceIds?)` | 保留候选顺序，过滤占用、地形和显式落点阻挡；整组提交可将组内棋子视为同时离开 |
 | `query.random(items)` | 使用既有规则随机流选一项；空集合返回 null |
 | `event.read()` | 读取本次事件的类型、伤害、治疗等现有标量 |
 | `event.modify(field,value)` | before 事件修改允许的数值字段，写回原上下文；不允许事后改伤害 |
@@ -31,7 +31,7 @@ RED-192 的现役内容现在可直接在编辑器「技能 / 规则 → 流程�
 | `choice.deferTarget({playerId,targetType,candidates,effectCode,payload,canCancel})` | 生成规则应 return 的单选请求；候选使用 `{type:'piece',pieceId}` 或 `{type:'cell',x,y}`，回调必须自包含，数据放 payload |
 | `effects.damage(source,targetId,amount,type,skillId?)` | 原有伤害结果；source 可为棋子 ID，或现有玩家/环境来源对象；包含防护与实际生命损失 |
 | `effects.heal(source,targetId,amount,skillId?)` | 原有治疗结果 |
-| `effects.move(changes,kind,path?)` | 整组校验并提交，返回 `{success,changes,message?}`。被占用、预留、禁锢或路径阻挡时返回 success:false；重复身份、非整数等错误请求抛错。走格/冲刺/推拉检查连续路径，path 可覆盖通行规则；传送/换位只检查落点 |
+| `effects.move(changes,kind,path?)` | 整组校验并提交，返回 `{success,changes,message?}`。被占用、显式落点阻挡、禁锢或路径阻挡时返回 success:false；重复身份、非整数等错误请求抛错。走格/冲刺/推拉检查连续路径，path 可覆盖通行规则；传送/换位只检查落点 |
 | `status.add/remove(targetId,statusOrId,scope?)` | 棋子或玩家状态；add 先核查 relatedRules，再通过现役 helper 安装状态和规则 |
 | `rules.add/remove(targetId,ruleId,scope?)` | 安装 / 移除已有规则定义；scope 默认 piece，可选 player |
 | `resources.add(playerId,'actionPoints'或'chargePoints',amount)` | 资源增减，逐步向下取整，结果不得为负或非有限数 |
@@ -97,3 +97,5 @@ if (typeof remaining === 'number') {
 生成全清单：先运行 `node scripts/build-skill-graph.mjs`，再运行 `node scripts/export-content-flows.mjs`。测试覆盖全文件解析、模板被动链接、控制分支与回调、节点编辑/语法/过期 hash、真实规则的事件修改、扩展投影与死亡清理、目标回调恢复、鸣人显示镜像，以及真实 Electron 打开/关联跳转/节点保存。
 
 本次可整体回退增量提交。新旧内容文件仍保留唯一原脚本；若用户已经编写使用 `flow` 的内容，回退运行时前必须备份并同步回退对应内容，旧引擎不会识别 `flow`。不降级进行中的对局，不替用户合并或发布。
+
+双尾飞行规则修订（2026-09-14）：预留标记仅记录未来落点，不阻挡走格、冲刺、推拉、传送或换位。结算时任一落点被其他棋子占据或无法落脚，整组取消并清理本次飞行状态；占位者在结算前离开则正常搬运。旧 beforeMove 阻挡规则停止挂载，保留无阻挡兼容定义。神威转移同步移除预留禁入筛选。真实 blocksLanding 效果和动作内部 reservedCells 约束仍有效。

@@ -900,14 +900,14 @@ describe('Sonic roster mechanics', () => {
     })).toThrow(BattleRuleError)
   })
 
-  it('prevents ordinary movement into a Double Tail Flight reserved landing tile', () => {
+  it('allows ordinary movement into a Double Tail Flight marker with the legacy rule', () => {
     const piece = makePiece({ instanceId: 'p1', x: 0, y: 0 })
     const state = makeState({ pieces: [piece] })
     state.extensions = { tileEffects: [{ type: 'tails-flight-reservation', x: 1, y: 0 }] }
     attachRule(state.players[0], 'rule-tails-flight-reservation-block')
 
     const next = applyBattleAction(state, { type: 'move', playerId: 'player-red', pieceId: 'p1', toX: 1, toY: 0 })
-    expect(next.pieces[0]).toMatchObject({ x: 0, y: 0 })
+    expect(next.pieces[0]).toMatchObject({ x: 1, y: 0 })
   })
 
   it('makes a Double Tail Flight immune target take no damage', () => {

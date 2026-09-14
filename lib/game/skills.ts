@@ -1494,7 +1494,6 @@ export function loadRuleById(
               surface: 'ruleSkillCode', contentId: ruleId, code: codeEnvironment, entry: 'rule skillCode body',
             });
             const flow = createSkillCodeFlow(battle, context, 'rule', {
-              positionRuleId: () => ruleId,
               dealDamage: globalDealDamage, healDamage: globalHealDamage, addCardToHand,
               addStatusEffectById, removeStatusEffectById, addPlayerRuleById, removePlayerRuleById,
               addRuleById, removeRuleById, addPlayerStatusEffectById, removePlayerStatusEffectById,

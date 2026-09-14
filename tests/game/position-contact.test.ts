@@ -80,12 +80,12 @@ describe('RED-209 position and contact contract', () => {
     expect(next.actions?.some(a => a.type === 'move' || a.type === 'positionChanged')).toBe(false)
   })
 
-  it('traces passable allies and blockers while excluding reserved landing cells', () => {
+  it('traces passable allies and blockers while excluding explicit landing blockers', () => {
     const a = makePiece({ instanceId: 'a', x: 0, y: 0 })
     const ally = makePiece({ instanceId: 'ally', x: 1, y: 0 })
     const enemy = makePiece({ instanceId: 'enemy', ownerPlayerId: 'player-blue', x: 4, y: 0 })
     const state = makeState({ pieces: [a, ally, enemy], width: 6, height: 2 })
-    state.extensions!.tileEffects = [{ type: 'tails-flight-reservation', x: 3, y: 0 }]
+    state.extensions!.tileEffects = [{ type: 'landing-blocker', blocksLanding: true, x: 3, y: 0 }]
     const trace = traceMovementPath(state, a, { x: 1, y: 0 }, { excludePieceId: 'a', maxDistance: 5, passAllies: true })
     expect(trace.cells).toEqual([{ x: 1, y: 0 }, { x: 2, y: 0 }, { x: 3, y: 0 }])
     expect(trace.lastLandableCell).toEqual({ x: 2, y: 0 })

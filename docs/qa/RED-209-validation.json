@@ -4,11 +4,11 @@
   "date": "2026-09-14",
   "finalGame": {
     "command": "npm.cmd test -- tests/game --maxWorkers=1",
-    "passed": 1346,
+    "passed": 1355,
     "failed": 9,
-    "total": 1355,
-    "testFiles": 120,
-    "durationSeconds": 129.06,
+    "total": 1364,
+    "testFiles": 121,
+    "durationSeconds": 135.24,
     "failures": [
       "FAIL  tests/game/ai-semantics.test.ts > AI semantic contract > audits every current manifest and makes a changed admission manifest fail closed",
       "FAIL  tests/game/battle-ui-boundary.test.ts > battle presentation boundary > keeps renderer and DOM responsibilities behind explicit modules",
@@ -30,16 +30,17 @@
     "build": "browser, practice and Android engines built",
     "candidateTests": "107/107 passed",
     "pullAndSpatialTests": "90/90 passed",
-    "independentPositionTests": "19/19 passed"
+    "independentPositionTests": "19/19 passed",
+    "flightMarkerTests": "9/9 passed; independently reviewed affected group 67/67 passed"
   },
   "artifacts": [
     {
       "file": "lib/game/position-change.ts",
-      "sha256": "be8e8ce4f586782f5fdd19eb1491bad39bee3f270be83f0b89e50e1c117d70f5"
+      "sha256": "d1e0a70b24c9f10f2a9688394a0d4f71287addfcbded0d2a579076f192ead239"
     },
     {
       "file": "lib/game/spatial.ts",
-      "sha256": "676afeb5d58cf416b11274db0126b0e04ebc48e14634624c95b905db1dad01ca"
+      "sha256": "4e078f8ad9ff0b2fb47770e6c291b155442156e863e6dee10b3485bd487de8a4"
     },
     {
       "file": "lib/game/tile-contact.ts",
@@ -51,15 +52,16 @@
     },
     {
       "file": "data/pages/js/game-engine.js",
-      "sha256": "9771351ef924daab9ba58b0f02d0561144385048f3695ae9ab3c2845bb5d9212"
+      "sha256": "e5cbe0a782db0f038fe94ae642d274c62584d3aa39fcd4ea972c98e3b80d042d"
     },
     {
       "file": "data/pages/js/practice/engine.js",
-      "sha256": "c781c6b0e352d3c3c178f85676993c4a1e58d3f253b74ddb1ab0b4e6c985b5b9"
+      "sha256": "e183a39ebf24f2562f544ca4bb27a18d91cb6c44460f27554d6b05274a969c51"
     },
     {
       "file": "android-client/www/js/game-engine.js",
-      "sha256": "9771351ef924daab9ba58b0f02d0561144385048f3695ae9ab3c2845bb5d9212"
+      "sha256": "e5cbe0a782db0f038fe94ae642d274c62584d3aa39fcd4ea972c98e3b80d042d"
     }
-  ]
+  ],
+  "flightMarkerRevision": "2026-09-14: flight markers allow entry; occupied expiry cancels both transfers and cleans statuses; vacated expiry succeeds; Obito candidates and execution allow marked destinations; actual blocksLanding remains enforced."
 }
