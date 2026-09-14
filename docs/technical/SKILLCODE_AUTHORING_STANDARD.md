@@ -5,7 +5,7 @@
 > RED-192 公共规则更新：状态通过 `addStatusEffectById` / `removeStatusEffectById` 进入统一合并与计时，玩家状态使用对应玩家入口。新状态须在 `STATUS_DEFINITIONS` 声明叠加策略；普通持续效果不另写回合倒计时。技能和pending回调可调用 `context.changePositions(changes, kind)` 做批量位移；普通移动、技能落点与禁锢共享约束。伤害来源可显式声明 `kind: 'player' | 'environment'`，不得任选友军充当卡牌来源。每步数值向下取整；详情见 [规则生命周期](RULE_LIFECYCLE.md) 和 [基础规则词典](../product/RULE_DICTIONARY.md)。
 
 > 状态：现役实现说明（RED-137）
-> RED-209：所有棋盘位移统一使用 `flow.effects.move(changes, kind, path?)`；pending 使用 `ctx.flow`。被阻挡返回 `success:false`，不另写随机或就近 fallback；要依赖位移成功的后续效果应检查返回值。连续路径使用 `flow.query.tracePath`，传送和换位只接触落点。禁止直接改棋子 x/y。旧 `context.changePositions` 是兼容入口，新内容遵循 [公共流程接口](CONTENT_FLOW_RUNTIME.md#位置接口red-209)。
+> RED-209 强制要求：所有棋盘位移统一使用 `flow.effects.move(changes, kind, path?)`；pending 使用 `ctx.flow.effects.move`。被阻挡返回 `success:false`，不另写随机或就近 fallback；要依赖位移成功的后续效果应检查返回值。连续路径使用 `flow.query.tracePath`，传送和换位只接触落点。**禁止直接修改棋子 x/y，包括动态字段、Object.assign、对象替换及绕过写保护。**作者不得调用底层 `writePiecePosition`；部署、召唤、复活和离场走权威生命周期。旧 `context.changePositions` 是兼容入口，新内容遵循 [公共流程接口](CONTENT_FLOW_RUNTIME.md#位置接口red-209) 和 [引擎坐标边界](ENGINE_CORE.md#5-空间与战斗事实)。
 > 适用范围：当前仓库内受信任的技能、卡牌、规则和延迟效果代码
 > 依据：以本仓库运行时代码和兼容审计脚本为准；文档与实现冲突时应停止导入并修正文档或实现
 
@@ -299,7 +299,7 @@ context.healQueue.push({
 
 传送作用于当前技能的 `sourcePiece`，会验证地图范围、地块是否可行走以及目标格是否被占用。显式提供经过选择或算法验证的坐标；无参数调用当前会使用默认目标或确定性随机空格作为兼容回退，新增内容不应依赖这个隐式行为。
 
-RED-189：主技能执行上下文允许第三参数指定场上存活棋子。此分支要求显式整数坐标，拒绝禁锢、无法行动以及非法或占用落点，失败时不做随机回退。阵营与选取范围必须由 targeting 与内容脚本显式校验；地格步骤可声明 forbiddenTileEffectTypes，统一从候选与提交校验中排除指定类型地格效果（例如预留格）。该扩展不改变规则 triggerSkill 的受限能力，也不扩展冻结的沙箱 ABI。技能传送不收集充能结晶，不消耗普通移动的免费首移标签。
+RED-189兼容分支允许第三参数指定场上存活棋子，要求显式整数坐标，拒绝禁锢、无法行动以及非法或占用落点，失败时不做随机回退。阵营与选取范围由 targeting 与内容脚本显式校验；forbiddenTileEffectTypes 仅表达技能明确排除的地格效果，不能把双尾飞行标记当通用阻挡。RED-209已将该分支接入统一位置提交：成功传送会收集落点充能结晶，没有沿途接触，不消耗普通移动的免费首移标签。该兼容能力不扩展冻结的沙箱ABI；新增内容使用 flow.effects.move。
 
 ### 7.2 `traceProjectile(origin, direction, options?)`
 
@@ -442,7 +442,7 @@ if (!target || target.currentHp <= 0) {
 }
 
 dealDamage(sourcePiece, target, 4, 'magical');
-return { success: true, message: `${sourcePiece.name}造成了4点魔法伤害` };
+return { success: true, message: `${sourcePiece.name}造成了4点伤害` };
 ```
 
 ### 11.2 先选模式，再选目标
@@ -550,7 +550,7 @@ function calculatePreview(piece, skillDef, currentCooldown) {
 | 禁止做法 | 会造成什么问题 | 使用什么替代 |
 | --- | --- | --- |
 | 直接修改 `currentHp` | 绕过护盾、免疫、死亡、复活、日志 | `dealDamage` / `healDamage` |
-| 直接修改 `x`、`y` | 绕过地图、占用和空间校验 | `teleport` 或权威移动命令 |
+| 直接修改 `x`、`y`，或调用底层写入器绕过提交 | 绕过空间、整组原子性、接触拾取及事件 | `flow.effects.move`；pending 用 `ctx.flow.effects.move`；生命周期用对应权威入口 |
 | 直接 push/splice 手牌 | 无实例 ID、上限、弃牌和事件 | 手牌 Helper |
 | 直接 push/splice 规则或技能 | 无去重、来源、事件或冷却初始化 | 对应 Helper |
 | 在触发器中嵌套 `dealDamage` | 伤害重入、顺序不确定 | `damageQueue` |
