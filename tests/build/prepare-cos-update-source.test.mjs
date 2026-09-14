@@ -29,9 +29,9 @@ function fixture(t, version = '0.1.3') {
   return { clientDirectory, resourceDirectory, outputDirectory, index, pack, exe, name }
 }
 
-test('prepares separate immutable assets and last-published manifests without Android feed', t => {
+test('prepares separate immutable assets and last-published manifests with Android feed', t => {
   const f = fixture(t), receipt = prepareCosUpdateSource(f)
-  assert.deepEqual(receipt.publishLast, ['resource/latest.json', 'latest.yml'])
+  assert.deepEqual(receipt.publishLast, ['resource/latest.json', 'android-latest.json', 'latest.yml'])
   const windows = yaml.load(fs.readFileSync(path.join(f.outputDirectory, 'latest.yml'), 'utf8'))
   assert.equal(windows.path, '0.1.3/' + f.name)
   assert.equal(windows.files[0].url, windows.path)
@@ -42,7 +42,8 @@ test('prepares separate immutable assets and last-published manifests without An
   assert.equal(release.rvb_version, '0.0.123')
   assert.equal(release.assets[1].digest, 'sha256:' + hash(f.pack))
   assert.match(release.assets[1].browser_download_url, /^https:\/\/github.com\/longaadream\/Red_VS_Blue\/releases\/download\//)
-  assert.equal(fs.existsSync(path.join(f.outputDirectory, 'android-latest.json')), false)
+  assert.deepEqual(fs.readFileSync(path.join(f.outputDirectory, 'android-latest.json')), fs.readFileSync(path.join(f.clientDirectory, 'android-latest.json')))
+  assert.deepEqual(fs.readFileSync(path.join(f.outputDirectory, '0.1.3/RED-vs-BLUE-0.1.3-Android.apk')), fs.readFileSync(path.join(f.clientDirectory, 'RED-vs-BLUE-0.1.3-Android.apk')))
   assert.throws(() => prepareCosUpdateSource(f), /already exists/)
 })
 
@@ -74,6 +75,36 @@ for (const kind of ['pack', 'index', 'installer', 'receipt']) {
     if (kind === 'index') fs.appendFileSync(path.join(f.resourceDirectory, 'content-update.json'), ' ')
     if (kind === 'installer') fs.appendFileSync(path.join(f.clientDirectory, f.name), 'tampered')
     if (kind === 'receipt') fs.writeFileSync(path.join(f.resourceDirectory, 'verification.json'), JSON.stringify({ ok: true, signatureVerified: false }))
+    assert.throws(() => prepareCosUpdateSource(f))
+    assert.equal(fs.existsSync(f.outputDirectory), false)
+  })
+}
+
+function addDelta(f) {
+  const name = 'RED-vs-BLUE-Android-21-to-22.rvbdelta', bytes = Buffer.from('p')
+  const manifest = JSON.parse(fs.readFileSync(path.join(f.clientDirectory, 'android-latest.json')))
+  manifest.deltas.push({ format: 'rvb-apk-copy-gzip/v1', fromVersionCode: 21, baseSha256: 'd'.repeat(64), url: `https://github.com/longaadream/Red_VS_Blue/releases/download/v0.1.3/${name}`, size: bytes.length, sha256: hash(bytes) })
+  const metadata = Buffer.from(JSON.stringify(manifest))
+  fs.writeFileSync(path.join(f.clientDirectory, name), bytes)
+  fs.writeFileSync(path.join(f.clientDirectory, 'android-latest.json'), metadata)
+  const recordPath = path.join(f.clientDirectory, 'release-bundle.json'), record = JSON.parse(fs.readFileSync(recordPath))
+  for (const [assetName, data] of [[name, bytes], ['android-latest.json', metadata]]) {
+    record.assets = record.assets.filter(a => a.name !== assetName)
+    record.assets.push({ name: assetName, size: data.length, sha256: hash(data) })
+  }
+  fs.writeFileSync(recordPath, JSON.stringify(record))
+  return { name, bytes, metadata }
+}
+test('copies verified Android patch and preserves manifest identity bytes', t => {
+  const f = fixture(t), delta = addDelta(f)
+  prepareCosUpdateSource(f)
+  assert.deepEqual(fs.readFileSync(path.join(f.outputDirectory, '0.1.3', delta.name)), delta.bytes)
+  assert.deepEqual(fs.readFileSync(path.join(f.outputDirectory, 'android-latest.json')), delta.metadata)
+})
+for (const target of ['RED-vs-BLUE-0.1.3-Android.apk', 'RED-vs-BLUE-Android-21-to-22.rvbdelta']) {
+  test('corrupted Android asset fails before publishing: ' + target, t => {
+    const f = fixture(t); addDelta(f)
+    fs.appendFileSync(path.join(f.clientDirectory, target), 'tampered')
     assert.throws(() => prepareCosUpdateSource(f))
     assert.equal(fs.existsSync(f.outputDirectory), false)
   })

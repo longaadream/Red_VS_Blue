@@ -30,10 +30,10 @@ latest.yml
 资源索引、归档保持原字节；`resource/latest.json` 保存官方 GitHub asset URL、摘要和状态，
 额外 `rvb_version` 只用于定位 COS 版本目录。客户端仍校验官方身份后再映射实际下载地址。
 根 `latest.yml` 仅将安装器路径调整为版本目录，保留 SHA512、大小和版本。
-不输出 Android APK 清单：此默认域名的 APK 限制尚未通过正式自定义域名解决。
+RED-208 起使用正式域名 `https://updates.redvsblue.top`，同时输出版本目录 APK、清单引用的全部 `.rvbdelta` 和根 `android-latest.json`。安卓清单保留正式 GitHub URL 与原字节，客户端在验证后映射实际下载位置。
 
 上传顺序：先上传所有版本目录文件，匿名读取并核对大小、SHA256、Range 206，
-再上传 `resource/latest.json`，最后上传根 `latest.yml`。两份可变清单建议设置
+再上传 `resource/latest.json`、`android-latest.json`，最后上传根 `latest.yml`。三份可变清单建议设置
 `Cache-Control: no-cache`。上传失败时不要更新清单；已发版本目录文件不覆盖、不提前删除。
 此脚本不提供 COS 登录和自动上传，也不代表现有 0.1.3 客户端自动改源。
 

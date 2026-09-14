@@ -37,11 +37,11 @@ async function refresh(){
   info=await native.info()
   el('version').textContent=info.version
   ;(el('updateSource') as HTMLSelectElement).value=info.source
-  el('sourceInfo').textContent=info.source==='cos'?'COS 香港源：资源包可用；默认域名暂不支持安卓 APK，请手动切换 GitHub 更新游戏。':'GitHub 官方源：用于游戏与官方资源包更新。'
-  el('updateInfo').textContent=info.source==='cos'?'安卓游戏更新需要切换到 GitHub':info.config.updateUrl?'可检查发行者提供的新版本':'尚未配置线上更新源；当前版本仍可离线使用'
-  button('check').disabled=info.source==='cos'
-  button('download').disabled=info.source==='cos'||!updateAvailable
-  button('install').disabled=info.source==='cos'||!updateReady
+  el('sourceInfo').textContent=info.source==='cos'?'COS 香港源：用于游戏与官方资源包更新。':'GitHub 官方源：用于游戏与官方资源包更新。'
+  el('updateInfo').textContent=(info.source==='cos'||info.config.updateUrl)?'可检查发行者提供的新版本':'尚未配置线上更新源；当前版本仍可离线使用'
+  button('check').disabled=false
+  button('download').disabled=!updateAvailable
+  button('install').disabled=!updateReady
   el('profileInfo').textContent=`当前：${info.state.stable==='base'?'内置资源':info.state.stable.slice(0,12)}${info.state.candidate?' · 候选 '+info.state.candidate.slice(0,12):''}`
   button('activate').disabled=!info.state.candidate
   button('previous').disabled=info.state.previous===info.state.stable
