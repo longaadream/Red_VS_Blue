@@ -166,7 +166,7 @@ describe('Tracer Recall option resolution', () => {
       target: null,
       targetPosition: null,
       skill: { id: trigger.id, name: trigger.name, type: trigger.type, powerMultiplier: 1 },
-    } as import('@/lib/game/skills').SkillExecutionContext, state)
+    } as unknown as import('@/lib/game/skills').SkillExecutionContext, state)
 
     expect(tracer).toMatchObject({ x: 4, y: 3, currentHp: 3 })
     expect(state.extensions!.recallData).toEqual([])

@@ -704,33 +704,17 @@ describe('card preflight and interrupted release', () => {
     const anchor = makePiece({ instanceId: 'anchor', ownerPlayerId: 'player-red', x: 0, y: 0, currentHp: 20, maxHp: 20, attack: 3 })
     const state = makeState({ pieces: [anchor], currentPlayerId: 'player-red', phase: 'action' }) as any
     const red = state.players.find((p: BattleState['players'][number]) => p.playerId === 'player-red')
-    red.hand = [{ cardId: 'summon-final', instanceId: 'card-1', actionPointCost: 1 }]
+    red.hand = [{ cardId: 'relocate-test', instanceId: 'card-1', actionPointCost: 1 }]
     red.discardPile = []
     red.actionPoints = 3
-    state.extensions.kiljaedanPiece = {
-      instanceId: 'kiljaedan-hidden',
-      templateId: 'kiljaedan',
-      name: 'Kiljaedan',
-      ownerPlayerId: 'player-red',
-      faction: 'red',
-      currentHp: 1,
-      maxHp: 17,
-      attack: 4,
-      defense: 3,
-      moveRange: 4,
-      x: 0,
-      y: 0,
-      skills: [],
-      rules: [],
-    }
     state.customCards = {
-      'summon-final': {
-        id: 'summon-final',
-        name: 'Summon Final',
+      'relocate-test': {
+        id: 'relocate-test',
+        name: 'Relocate Test',
         description: '',
         type: 'active',
         actionPointCost: 1,
-        code: "function executeCard(context) { var anchor = selectTarget({ type: 'piece', filter: 'ally', range: 99 }); if (!anchor || anchor.needsTargetSelection) return anchor; var pos = selectTarget({ type: 'grid', range: 99, filter: 'all' }); if (!pos || pos.needsTargetSelection) return pos; var kj = context.battle.extensions.kiljaedanPiece; kj.x = pos.x; kj.y = pos.y; kj.currentHp = kj.maxHp; context.battle.pieces.push(kj); delete context.battle.extensions.kiljaedanPiece; return { success: true, message: 'summoned' }; }",
+        code: "function executeCard(context) { var anchor = selectTarget({ type: 'piece', filter: 'ally', range: 99 }); if (!anchor || anchor.needsTargetSelection) return anchor; var pos = selectTarget({ type: 'grid', range: 99, filter: 'all' }); if (!pos || pos.needsTargetSelection) return pos; flow.effects.move([{pieceId:anchor.instanceId,x:pos.x,y:pos.y}], 'teleport'); return { success: true, message: 'relocated' }; }",
       },
     }
     vi.mocked(globalTriggerSystem.checkTriggers).mockReturnValue({ success: true, messages: [], blocked: false } as any)
@@ -745,12 +729,11 @@ describe('card preflight and interrupted release', () => {
       extraTargets: [{ x: 2, y: 2 }],
     }) as any) as any
 
-    expect(next.extensions.kiljaedanPiece).toBeUndefined()
-    const summoned = next.pieces.find((p: PieceInstance) => p.instanceId === 'kiljaedan-hidden')
-    expect(summoned?.x).toBe(2)
-    expect(summoned?.y).toBe(2)
-    expect(summoned?.currentHp).toBe(17)
-    expect(next.players.find((p: BattleState['players'][number]) => p.playerId === 'player-red').discardPile).toEqual(['summon-final'])
+    const moved = next.pieces.find((p: PieceInstance) => p.instanceId === 'anchor')
+    expect(moved?.x).toBe(2)
+    expect(moved?.y).toBe(2)
+    expect(moved?.currentHp).toBe(20)
+    expect(next.players.find((p: BattleState['players'][number]) => p.playerId === 'player-red').discardPile).toEqual(['relocate-test'])
   })
 
   it('resolves demon-summon-1 exactly once and deterministically after an allied piece target', () => {

@@ -16,6 +16,11 @@
     redirect: '改换目标', concealed: '结果保密',
   })
 
+  function movementLabel(event) {
+    const labels = { walk: '走格', dash: '冲刺', teleport: '传送', push: '推移', pull: '拉动', swap: '换位' }
+    return labels[event.result && event.result.movementKind] || ''
+  }
+
   function escapeHtml(value) {
     return String(value == null ? '' : value)
       .replace(/&/g, '&amp;')
@@ -442,13 +447,13 @@
       const identity = isSkillRelease ? resolveIdentity(event) : null
       const predicate = isSkillRelease
         ? '<span class="action-history-predicate is-skill-release"><span>释放</span><strong>' + escapeHtml(identity.skillName) + '</strong></span>'
-        : '<span class="action-history-predicate" style="--history-accent:' + escapeHtml(meta.color || '#94a3b8') + '"><img src="' + escapeHtml(meta.assetPath || 'images/effect-icons/fallback.svg') + '" alt=""><span>' + escapeHtml(meta.label || KIND_LABELS[event.kind] || '动作') + '</span></span>'
+        : '<span class="action-history-predicate" style="--history-accent:' + escapeHtml(meta.color || '#94a3b8') + '"><img src="' + escapeHtml(meta.assetPath || 'images/effect-icons/fallback.svg') + '" alt=""><span>' + escapeHtml(movementLabel(event) || meta.label || KIND_LABELS[event.kind] || '动作') + '</span></span>'
       return '<span class="action-history-sentence' + (isRoot ? ' is-root' : '') + '" data-history-event-id="' + escapeHtml(event.eventId) + '">'
         + displaySubject(event, rootEvent, !isRoot)
         + predicate
         + (isRoot && event.result && event.result.pending ? '<span class="action-history-complement">发起行动 · 触发响应</span>' : '')
         + displayObject(event, !isRoot)
-        + displayComplement(event, isSkillRelease ? identity.skillName : (meta.label || KIND_LABELS[event.kind] || '动作'))
+        + displayComplement(event, isSkillRelease ? identity.skillName : (movementLabel(event) || meta.label || KIND_LABELS[event.kind] || '动作'))
         + '</span>'
     }
 
@@ -470,7 +475,7 @@
         const isSkillRelease = identity.isSkill
         const actionLabel = isSkillRelease
           ? identity.skillName
-          : String(meta.label || KIND_LABELS[group.root.kind] || '未知动作')
+          : String(movementLabel(group.root) || meta.label || KIND_LABELS[group.root.kind] || '未知动作')
         const label = actionLabel + (group.root.result && group.root.result.pending ? '，发起行动并触发响应' : '')
           + (children.length ? '，包含 ' + children.length + ' 个结果' : '')
         const rootMark = isSkillRelease

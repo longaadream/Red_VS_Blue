@@ -57,7 +57,7 @@ const SURFACES = {
     runtime: 'lib/game/skills.ts::executeCardFunction',
     signature: 'executeCard(context); active and reactive cards share the same wrapper',
     bindings: [
-      'context', 'battle', 'playerId', 'selectTarget', 'selectOption', 'dealDamage',
+      'context', 'battle', 'flow', 'playerId', 'selectTarget', 'selectOption', 'dealDamage',
       'healDamage', 'addCardToHand', 'discardCard', 'getHand', 'addStatusEffectById',
       'removeStatusEffectById', 'addRuleById', 'removeRuleById', 'addPlayerRuleById',
       'removePlayerRuleById', 'Math', 'Date', 'console',

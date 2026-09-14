@@ -69,7 +69,7 @@ describe('RED-192 rule dictionary', () => {
   it('rejects teleporting into a reserved landing without moving any piece', () => {
     const state = fixture(), before = state.pieces.map((piece: any) => [piece.x, piece.y])
     state.extensions.tileEffects = [{ type: 'tails-flight-reservation', x: 1, y: 0 }]
-    expect(() => changePiecePositions(state, [{ pieceId: 'source', x: 1, y: 0 }], 'teleport')).toThrow('illegal landing')
+    expect(changePiecePositions(state, [{ pieceId: 'source', x: 1, y: 0 }], 'teleport').success).toBe(false)
     expect(state.pieces.map((piece: any) => [piece.x, piece.y])).toEqual(before)
   })
   it('retains the new grant timing when an older merged source is revoked', () => {
@@ -148,7 +148,7 @@ describe('RED-192 rule dictionary', () => {
   it('validates an entire swap before moving either piece and exposes its before event', () => {
     const state = fixture(), before = state.pieces.map((p: any) => ({ x: p.x, y: p.y }))
     state.pieces[1].statusTags = [{ id: 'p', type: 'imprisoned' }]
-    expect(() => changePiecePositions(state, [{ pieceId: 'source', x: 2, y: 0 }, { pieceId: 'enemy', x: 0, y: 0 }], 'swap')).toThrow()
+    expect(changePiecePositions(state, [{ pieceId: 'source', x: 2, y: 0 }, { pieceId: 'enemy', x: 0, y: 0 }], 'swap').success).toBe(false)
     expect(state.pieces.map((p: any) => ({ x: p.x, y: p.y }))).toEqual(before)
     state.pieces[1].statusTags = []
     changePiecePositions(state, [{ pieceId: 'source', x: 2, y: 0 }, { pieceId: 'enemy', x: 0, y: 0 }], 'swap')

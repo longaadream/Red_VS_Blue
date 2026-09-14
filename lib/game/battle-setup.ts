@@ -1,3 +1,4 @@
+import { writePiecePosition } from './position-write-guard'
 import { getMap, DEFAULT_MAP_ID, loadMaps } from "@/config/maps"
 import {
   getServerGameProfileIdentityV1,
@@ -115,8 +116,7 @@ function initializeProgressiveReserveEffects(
       }
 
       const [piece] = reserve.splice(reserveIndex, 1)
-      piece.x = null
-      piece.y = null
+      writePiecePosition(piece, null, null)
       state.pieces.push(piece)
       const result = executeSkillFunction(setupSkill, {
         piece,
@@ -239,8 +239,7 @@ function initializeProgressiveOpeningVanguards(
     const reserveIndex = reserve.findIndex(candidate => candidate.instanceId === piece.instanceId)
     if (reserveIndex < 0) throw new Error(`Progressive opening vanguard disappeared for ${playerId}`)
     reserve.splice(reserveIndex, 1)
-    piece.x = finalPosition.x
-    piece.y = finalPosition.y
+    writePiecePosition(piece, finalPosition.x, finalPosition.y)
     state.pieces.push(piece)
 
     const afterResult = getActiveTriggerSystem().checkTriggers(state, {

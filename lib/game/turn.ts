@@ -1,3 +1,4 @@
+import { writePiecePosition, withPositionWriteGuard } from './position-write-guard'
 import { areMatchAllies } from './match-teams'
 // 当序列化格式出现不兼容变化时递增此值（旧状态会被 applyBattleAction 拒绝）
 export const BATTLE_STATE_VERSION = 1
@@ -31,6 +32,7 @@ import { presentationRecordingRollback, recordResolvedSkillPresentation } from '
 import { expireOwnerStatuses } from './status-lifecycle'
 import { statusEventSink, expirePlayerStatuses, addStatusWithEvents, addPlayerStatusWithEvents, createSkillCodeFlow } from './skills'
 import { changePiecePositions, type PiecePositionChange } from './position-change'
+import { settlePositionContacts } from './tile-contact'
 import type { PositionChangeKind } from './spatial'
 import {
   DEPLOYMENT_FIRST_MOVE_FREE_STATUS,
@@ -644,8 +646,7 @@ function resolveDeploymentChoices(state: BattleState, deployment: DeploymentStat
 
     const streamName = `${RANDOM_STREAM_NAMES.deploymentReroll}/${playerId}`
     const target = candidates[runtime.nextInt(streamName, candidates.length)]
-    piece.x = target.x
-    piece.y = target.y
+    writePiecePosition(piece, target.x, target.y)
   }
 
   deployment.status = 'complete'
@@ -870,8 +871,7 @@ function commitReservePieceSummon(
   }
 
   reserveEntry!.pieces.splice(reserveIndex, 1)
-  piece.x = finalPosition.x
-  piece.y = finalPosition.y
+  writePiecePosition(piece, finalPosition.x, finalPosition.y)
   const deployedPosition = { x: finalPosition.x, y: finalPosition.y }
   state.pieces.push(piece)
   updateProgressiveReserveCounts(deployment)
@@ -2619,26 +2619,29 @@ function applyBattleActionInternal(
 
       validateMove(next, piece, finalToX, finalToY)
 
-      const deploymentFirstMoveFree = consumeDeploymentFirstMoveFree(
-        piece,
-        next.turn.turnNumber,
-      )
+      let deploymentFirstMoveFree = false
       const playerMeta = getPlayerMeta(next, action.playerId)
-      if (!deploymentFirstMoveFree && playerMeta.actionPoints < 1) {
-        throw new BattleRuleError("Not enough action points to move")
-      }
 
       // 记录移动前的位置
       const fromX = piece.x
       const fromY = piece.y
 
       // 执行移动（使用触发器可能修改后的目标位置）
-      changePiecePositions(next, [{ pieceId: piece.instanceId, x: finalToX, y: finalToY }], 'walk')
+      const positionResult = changePiecePositions(next, [{ pieceId: piece.instanceId, x: finalToX, y: finalToY }], 'walk', {
+        deferContacts: true,
+        commitAction: () => {
+          deploymentFirstMoveFree = !!piece.statusTags?.some(tag => tag.type === DEPLOYMENT_FIRST_MOVE_FREE_STATUS
+            && tag.grantedTurnNumber === next.turn.turnNumber && tag.currentUses === 1)
+          if (!deploymentFirstMoveFree && playerMeta.actionPoints < 1) throw new BattleRuleError('Not enough action points to move')
+          consumeDeploymentFirstMoveFree(piece, next.turn.turnNumber)
+          if (!deploymentFirstMoveFree) playerMeta.actionPoints -= 1
+        },
+      })
+      if (!positionResult.success) return next
       finalToX = piece.x!
       finalToY = piece.y!
       
       // 消耗行动点
-      if (!deploymentFirstMoveFree) playerMeta.actionPoints -= 1
       
       // 初始化actions数组（如果不存在）
       if (!next.actions) {
@@ -2664,7 +2667,7 @@ function applyBattleActionInternal(
         }
       })
 
-      collectChargeCrystalsForPiece(next, piece, action.playerId)
+      settlePositionContacts(next, positionResult.changes)
 
       // 触发移动后的规则
       const moveResult = getActiveTriggerSystem().checkTriggers(next, {
@@ -3555,12 +3558,12 @@ function applyBattleActionInternal(
             addPlayerStatusEffectById: (playerId: string, status: PieceStatusTag) => addPlayerStatusWithEvents(next, playerId, status),
             changePositions: (changes: PiecePositionChange[], kind: PositionChangeKind) => changePiecePositions(next, changes, kind),
           }
-          result = fn({ ...pendingContext, flow: createSkillCodeFlow(next, {
+          result = withPositionWriteGuard(next, () => fn({ ...pendingContext, flow: createSkillCodeFlow(next, {
             ...pendingContext, type: 'pendingEffect',
             rulePiece: next.pieces.find(p => p.instanceId === pending.source?.pieceId),
             sourcePiece: next.pieces.find(p => p.instanceId === pending.triggerContext?.sourcePiece?.instanceId),
             triggerPlayerId: pending.triggerContext?.triggerPlayerId ?? pending.triggerContext?.playerId,
-          }, 'pending') }) || { success: true }
+          }, 'pending') })) || { success: true }
         } catch (execErr) {
           if (isEffectChainPendingSignal(execErr)) throw execErr
           throw new BattleRuleError('[STAGE6] effectCode execution error: ' + (execErr instanceof Error ? execErr.message : String(execErr)))
@@ -4575,8 +4578,7 @@ function prepareTemplatePiece<TTemplate extends TemplateSummonSource>(
   piece.templateId = spec.templateId
   piece.ownerPlayerId = spec.ownerPlayerId
   piece.faction = spec.faction
-  piece.x = spec.x
-  piece.y = spec.y
+  writePiecePosition(piece, spec.x, spec.y)
   piece.isCore = false
   piece.skills = Array.isArray(piece.skills) ? piece.skills : []
   piece.buffs = Array.isArray(piece.buffs) ? piece.buffs : []
@@ -4783,8 +4785,7 @@ export function resolveTemplateSummonBatch<TTemplate extends TemplateSummonSourc
       )
       entry.finalX = finalPosition.x
       entry.finalY = finalPosition.y
-      entry.piece.x = finalPosition.x
-      entry.piece.y = finalPosition.y
+      writePiecePosition(entry.piece, finalPosition.x, finalPosition.y)
     }
 
     const finalReservations = new Set<string>()

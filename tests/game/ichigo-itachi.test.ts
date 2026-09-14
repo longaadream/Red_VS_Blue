@@ -432,6 +432,7 @@ describe('RED-120 Ichigo combat behavior', () => {
       })
       state.extensions = state.extensions || {}
       state.extensions.amaterasuCells = amaterasuCells
+      state.players[0].rules = [loadRuleById('rule-sasuke-amaterasu-move', true)!]
       state = runBattleAction(state, selectedAction(state, {
         type: 'useBasicSkill', playerId: 'player-red', pieceId: 'ichigo', skillId: 'ichigo-black-getsuga-tensho',
       }, { x: 4, y: 1 }), { rootSeed: ROOT_SEED }).state

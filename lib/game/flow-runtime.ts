@@ -1,12 +1,12 @@
 /* Shared trusted SkillCode facade. Adapters retain authoritative engine semantics. */
 /* eslint-disable @typescript-eslint/no-explicit-any -- Legacy SkillCode contexts have distinct dynamic surfaces. */
 import type { BattleState } from './turn'
-import { changePiecePositions } from './position-change'
-import { traceProjectile, manhattanDistance } from './spatial'
+import { changePiecePositions, type PositionChangeOptions } from './position-change'
+import { traceProjectile, manhattanDistance, traceMovementPath, getLegalSkillLandingCells, type MovementTraceOptions, type GridPosition } from './spatial'
 import { getRuleMath } from './rule-runtime'
 import { areMatchAllies } from './match-teams'
 import { createSkillPresentation } from './skill-presentation'
-export type FlowSurface = 'skill' | 'rule' | 'triggerSkill' | 'pending'
+export type FlowSurface = 'skill' | 'rule' | 'triggerSkill' | 'pending' | 'card'
 type Delegate = Record<string, (...args: any[]) => any>
 /** Called at formal removal; revival creates a new incarnation. */
 export function clearRemovedPieceFlowState(battle: BattleState, ids: readonly string[]): void {
@@ -101,9 +101,14 @@ export function createFlowRuntime(battle: BattleState, context: any, surface: Fl
       distance: (a: string, b: string) => manhattanDistance(piece(a) as any, piece(b) as any),
       random: <T>(items: readonly T[]): T | null => items.length ? items[Math.floor(getRuleMath().random() * items.length)] : null,
       path: (origin: { x: number; y: number }, direction: { x: number; y: number }, options?: { maxDistance?: number; excludePieceId?: string }) => traceProjectile(battle, origin, direction, options),
+      tracePath: (origin: GridPosition, direction: GridPosition, options: MovementTraceOptions) => traceMovementPath(battle, origin, direction, options),
+      landingCells: (candidates: GridPosition[], movingPieceIds: string[] = []) => getLegalSkillLandingCells(battle, candidates, {
+        movingPieceIds, reservedCells: surface === 'skill' ? [] : context.reservedCells ?? [],
+      }),
     },
     event: {
-      read: () => Object.fromEntries(['type','playerId','damage','actualDamage','heal','amount','targetX','targetY','turnNumber'].filter(k => context[k] !== undefined).map(k => [k, context[k]])),
+      read: () => Object.fromEntries(['type','playerId','damage','actualDamage','heal','amount','targetX','targetY','turnNumber',
+        'movementKind','fromX','fromY','pathCells','contactCells'].filter(k => context[k] !== undefined).map(k => [k, json(context[k])])),
       modify: (field: 'damage' | 'heal' | 'amount' | 'targetX' | 'targetY', value: number) => {
         if (!['damage','heal','amount','targetX','targetY'].includes(field) || typeof context.type !== 'string' || !context.type.startsWith('before')) throw new Error('flow: 只能在before事件修改允许的结果字段')
         context[field] = numeric(value)
@@ -141,7 +146,12 @@ export function createFlowRuntime(battle: BattleState, context: any, surface: Fl
         call('dealDamage', resolveSource(source), piece(targetId), Math.max(0, numeric(amount)), type, battle, skillId),
       heal: (source: any, targetId: string, amount: number, skillId = effectId()) =>
         call('healDamage', resolveSource(source), piece(targetId), Math.max(0, numeric(amount)), battle, skillId),
-      move: (changes: Array<{ pieceId: string; x: number; y: number }>, kind: Parameters<typeof changePiecePositions>[2] = 'teleport') => changePiecePositions(battle, changes, kind),
+      move: (changes: Array<{ pieceId: string; x: number; y: number }>, kind: Parameters<typeof changePiecePositions>[2] = 'teleport', path?: PositionChangeOptions['path']) => {
+        const flight = holder()?.statusTags?.find((tag: { type?: string; flightId?: string }) => tag.type === 'tails-flight-reservation')
+        const flightId = delegates.positionRuleId?.() === 'rule-tails-flight-resolve' ? flight?.flightId : undefined
+        return changePiecePositions(battle, changes, kind, { path, flightId,
+          reservedCells: surface === 'skill' ? [] : context.reservedCells ?? [] })
+      },
     },
     status: {
       add: (targetId: string, status: any, scope: 'piece' | 'player' = 'piece') => {

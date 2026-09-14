@@ -154,8 +154,8 @@ describe('RED-189 Obito and Doomfist', () => {
     expect(resolved.pieces[0].skills[0].currentCooldown).toBe(3)
     expect(resolved.pendingTargetSelection).toBeUndefined()
     expect(resolved.pieces[1].statusTags).toContainEqual(freeMove)
-    expect(resolved.players[0].chargePoints).toBe(0)
-    expect(resolved.extensions!.tileEffects).toContainEqual(crystal)
+    expect(resolved.players[0].chargePoints).toBe(1)
+    expect(resolved.extensions!.tileEffects).not.toContainEqual(crystal)
   })
 
   it('rejects a reserved landing without applying a partial transfer', () => {

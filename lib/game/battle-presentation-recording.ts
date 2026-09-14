@@ -1,4 +1,14 @@
 import type { BattleState } from './turn'
+/** The engine records the movement meaning; presentation never guesses it from distance. */
+export function recordedPositionKind(state: BattleState, pieceId: string, fromX: number, fromY: number, toX: number, toY: number): Record<string, string> {
+  for (let i = (state.actions?.length ?? 0) - 1; i >= 0; i--) {
+    const action = state.actions![i]
+    const p = action.payload
+    if (action.type === 'positionChanged' && p?.pieceId === pieceId && p.fromX === fromX && p.fromY === fromY && p.toX === toX && p.toY === toY
+      && typeof p.movementKind === 'string') return { movementKind: p.movementKind }
+  }
+  return {}
+}
 import type { SkillDefinition } from './skills'
 import type { BattlePresentationEvent } from './battle-presentation-events'
 import { snapshotBattlePresentationStatuses, diffBattlePresentationStatuses, snapshotBattlePresentationTileEffects, diffBattlePresentationTileEffects } from './battle-presentation-events'
@@ -109,7 +119,8 @@ export function checkpointBattlePresentation(state: BattleState, batch?: { kind:
     }
     if ((old.x !== p.x || old.y !== p.y) && old.x != null && old.y != null && p.x != null && p.y != null) {
       active.events.push({ ...active.source, kind: 'forceMove', iconId: 'action-force-move', targetPieceIds: [p.id],
-        targetCell: { x: p.x, y: p.y }, result: { fromX: old.x, fromY: old.y, toX: p.x, toY: p.y }, priority: 75, skippable: true })
+        targetCell: { x: p.x, y: p.y }, result: { fromX: old.x, fromY: old.y, toX: p.x, toY: p.y,
+          ...recordedPositionKind(state, p.id, old.x, old.y, p.x, p.y) }, priority: 75, skippable: true })
     }
     if (p.hp !== old.hp) {
       const kind = p.hp < old.hp ? 'damage' : 'heal'

@@ -86,7 +86,7 @@ describe('trusted code-node runtime facade', () => {
   it('uses actual damage, authoritative movement and status helpers', () => {
     const battle = fixture(), flow = createSkillCodeFlow(battle, { piece: battle.pieces[0] }, 'skill')
     flow.status.add('self', { id: 'root', type: 'root', name: '定身', currentDuration: 1, visible: true })
-    expect(() => flow.effects.move([{ pieceId: 'self', x: 1, y: 0 }], 'walk')).toThrow()
+    expect(flow.effects.move([{ pieceId: 'self', x: 1, y: 0 }], 'walk').success).toBe(false)
     flow.effects.move([{ pieceId: 'self', x: 1, y: 0 }], 'teleport')
     expect(battle.pieces[0].x).toBe(1)
     flow.effects.damage('self', 'enemy', 100, 'true')

@@ -12,7 +12,7 @@ RED-192 的现役内容现在可直接在编辑器「技能 / 规则 → 流程�
 
 ## 公共 `flow` 接口
 
-新增 `rvb-flow-runtime/v1` 可信运行时接口。主动技能、内联规则和规则触发技能都有词法变量 `flow`；序列化目标回调在 `ctx.flow` 访问。复用权威状态、原有伤害/状态/位移管线，不创建另一套引擎。原有裸函数仍兼容。
+新增 `rvb-flow-runtime/v1` 可信运行时接口。主动技能、卡牌、内联规则和规则触发技能都有词法变量 `flow`；序列化目标回调在 `ctx.flow` 访问。复用权威状态、原有伤害/状态/位移管线，不创建另一套引擎。原有裸函数仍兼容。
 
 | 接口 | 用途 / 返回 |
 | --- | --- |
@@ -20,6 +20,8 @@ RED-192 的现役内容现在可直接在编辑器「技能 / 规则 → 流程�
 | `query.piece/player(id)` | 当前权威对象，供可信代码节点读取；写效果优先用下列公共接口 |
 | `query.pieces({ownerId, relation, originId, range, includeDead})` | 按所属方、敌我和曼哈顿范围查棋子 ID；默认只含存活棋子 |
 | `query.distance(a,b) / path(origin,direction,options)` | 距离 / 既有投射物路径查询 |
+| `query.tracePath(origin,direction,options)` | 位移路径查询：有序 cells、encounters、lastLandableCell、blocked、reachedTarget。options 指定 excludePieceId、maxDistance 及穿过友军/敌军/不可行走地格的许可 |
+| `query.landingCells(candidates,movingPieceIds?)` | 保留候选顺序，过滤占用、地形和预留；整组提交可将组内棋子视为同时离开 |
 | `query.random(items)` | 使用既有规则随机流选一项；空集合返回 null |
 | `event.read()` | 读取本次事件的类型、伤害、治疗等现有标量 |
 | `event.modify(field,value)` | before 事件修改允许的数值字段，写回原上下文；不允许事后改伤害 |
@@ -29,7 +31,7 @@ RED-192 的现役内容现在可直接在编辑器「技能 / 规则 → 流程�
 | `choice.deferTarget({playerId,targetType,candidates,effectCode,payload,canCancel})` | 生成规则应 return 的单选请求；候选使用 `{type:'piece',pieceId}` 或 `{type:'cell',x,y}`，回调必须自包含，数据放 payload |
 | `effects.damage(source,targetId,amount,type,skillId?)` | 原有伤害结果；source 可为棋子 ID，或现有玩家/环境来源对象；包含防护与实际生命损失 |
 | `effects.heal(source,targetId,amount,skillId?)` | 原有治疗结果 |
-| `effects.move(changes,kind)` | 原子位置变更；teleport/dash 等按原有移动种类校验，非法落点/禁锢抛错；成功无返回值 |
+| `effects.move(changes,kind,path?)` | 整组校验并提交，返回 `{success,changes,message?}`。被占用、预留、禁锢或路径阻挡时返回 success:false；重复身份、非整数等错误请求抛错。path 提供连续位移的穿越许可，走格默认检查路径 |
 | `status.add/remove(targetId,statusOrId,scope?)` | 棋子或玩家状态；add 先核查 relatedRules，再通过现役 helper 安装状态和规则 |
 | `rules.add/remove(targetId,ruleId,scope?)` | 安装 / 移除已有规则定义；scope 默认 piece，可选 player |
 | `resources.add(playerId,'actionPoints'或'chargePoints',amount)` | 资源增减，逐步向下取整，结果不得为负或非有限数 |
@@ -44,6 +46,26 @@ RED-192 的现役内容现在可直接在编辑器「技能 / 规则 → 流程�
 接口并非在所有入口都有相同权限。`flow.capabilities` 给出当前宿主实际委托的 helper；不提供的 helper 会明确报错，不返回假的成功。例如规则不能假装同步取到主动目标，需 return 延迟选择；pending 回调也不能继续引用序列化前的闭包。召唤必须有声明，正式复活不能在 beforeDamage 中返回。原有隔离 VM 的命令 ABI 不因可信 facade 自动放宽；外部可执行包仍走现有准入。
 
 状态参数沿用 `PieceStatusTag`，有限持续时间写 `currentDuration`；`-1` 表示不自动到期。独立准备进度不要塞入持续时间。接口首次访问才构造，未使用 `flow` 的旧技能不会在每次AI候选执行中分配完整接口对象。
+
+### 位置接口（RED-209）
+
+作者只提交目标位置；不直接改 `piece.x/y`，也不能借 `battle.pieces`、动态字段或对象替换绕过提交器。可信代码执行期间坐标受宿主写保护，新召唤棋子同样立即保护；部署、召唤、死亡继续走生命周期。该保护防止内容误用，不宣称是任意恶意 JavaScript 的安全沙箱。
+
+```js
+// 单体传送：阻挡时正常取消，不另找 fallback。
+const result = flow.effects.move([{ pieceId: id, x: destination.x, y: destination.y }], 'teleport');
+// 换位：两方作为同一请求提交。
+flow.effects.move([{ pieceId: a.instanceId, x: b.x, y: b.y },
+  { pieceId: b.instanceId, x: a.x, y: a.y }], 'swap');
+// 沿路径冲刺：查询用于选落点/命中，提交时重新校验路径。
+const trace = flow.query.tracePath(origin, direction,
+  { excludePieceId: id, maxDistance: 6, passEnemies: true });
+flow.effects.move([{ pieceId: id, ...trace.lastLandableCell }], 'dash', { passEnemies: true });
+```
+
+`beforeMove/afterMove` 只描述普通走格动作。所有位移发 `beforePiecePositionChange`，有效提交后发 `afterPiecePathContact` 和 `afterPiecePositionChange`。`flow.event.read()` 提供 movementKind、fromX/fromY、targetX/targetY、pathCells/contactCells；before 可修改目标或阻挡。传送/换位只报告终点，连续位移必须显式提供 path 许可。重复格去重，起点排除。无实际位置变化不触发接触。
+
+落点校验对整组完成后才写坐标；之后先拾取/记账，再执行反应。普通移动在坐标提交前核验并扣除 AP。鸣人分身和回溯由宿主延迟接触反应至必要复合效果完成，但拾取在每次成功提交时立即确定，防止后续反应再次位移而丢失已经过格。交互型触发继续抛出原有 pending 信号，由动作事务挂起和重放，不得捕获并改成“位移取消”。
 
 ## Extension：进度、次数与跨回合关联
 
