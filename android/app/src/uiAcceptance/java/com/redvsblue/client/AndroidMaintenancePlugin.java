@@ -122,15 +122,35 @@ public class AndroidMaintenancePlugin extends Plugin {
             }
         }finally{c.disconnect();}
     }
+    private HttpsURLConnection connectApk(String address,String selected)throws Exception {
+        if(!"cos".equals(selected))return connect(address);
+        URL url=new URL(address);
+        if(!"https".equals(url.getProtocol())||!"updates.redvsblue.top".equals(url.getHost())||url.getPort()!=-1||url.getUserInfo()!=null||url.getRef()!=null||url.getQuery()!=null)throw new IOException("APK镜像地址无效");
+        HttpsURLConnection c=(HttpsURLConnection)url.openConnection();
+        c.setInstanceFollowRedirects(false);c.setConnectTimeout(15000);c.setReadTimeout(15000);c.setRequestProperty("Cache-Control","no-cache");
+        try{if(c.getResponseCode()!=200)throw new IOException("所选下载源请求失败（HTTP "+c.getResponseCode()+"），请重试或手动切换源");return c;}
+        catch(Exception e){c.disconnect();throw e;}
+    }
+    private void downloadApk(String address,String selected,File file,long limit)throws Exception {
+        HttpsURLConnection c=connectApk(address,selected);
+        try{
+            if(c.getContentLengthLong()>limit)throw new IOException("下载超过大小上限");
+            try(InputStream in=c.getInputStream();FileOutputStream out=new FileOutputStream(file)){
+                byte[] bytes=new byte[32768];long count=0;int n;
+                while((n=in.read(bytes))!=-1){if(cancel||!maintenancePage)throw new IOException("已取消下载");count+=n;if(count>limit)throw new IOException("下载超过大小上限");out.write(bytes,0,n);progress="已下载 "+(count/1024)+" KiB";}out.getFD().sync();
+            }
+        }finally{c.disconnect();}
+    }
     @PluginMethod public void checkUpdate(PluginCall call) {run(call,()->{
-        pendingUpdate=null; UpdateSources.requireApk(updateSource()); String address=config().optString("updateUrl");if(address.isEmpty())throw new IOException("发行者尚未配置更新源，当前可使用本地资源包导入");
-        HttpsURLConnection c=connect(address); JSONObject update;
+        pendingUpdate=null; cancel=false; String selected=updateSource(); String address=UpdateSources.apkManifest(selected,config().optString("updateUrl"));if(address.isEmpty())throw new IOException("发行者尚未配置更新源，当前可使用本地资源包导入");
+        HttpsURLConnection c=connectApk(address,selected); JSONObject update;
         try{update=new JSONObject(new String(ContentFiles.read(c.getInputStream(),65536),StandardCharsets.UTF_8));}finally{c.disconnect();}
         if(!"rvb-android-update/v1".equals(update.getString("schemaVersion"))||!getContext().getPackageName().equals(update.getString("packageName")))throw new IOException("更新清单与应用不匹配");
         if(!update.getString("sha256").matches("[0-9a-f]{64}")||update.getLong("size")<1||update.getLong("size")>256L*1024*1024||update.getInt("minSdk")>Build.VERSION.SDK_INT)throw new IOException("更新不兼容或清单无效");
         URL url=new URL(update.getString("url"));if(!"https".equals(url.getProtocol())||url.getUserInfo()!=null)throw new IOException("更新地址必须是HTTPS");
         long current=version(getContext().getPackageManager().getPackageInfo(getContext().getPackageName(),0));
         if(update.getLong("versionCode")<=current)return new JSObject().put("available",false);
+        UpdateSources.apkAsset(selected,update.getString("versionName"),update.getString("url"));
         pendingUpdate=update;return new JSObject().put("available",true).put("update",update);
     });}
     private File apk(){return new File(getContext().getCacheDir(),"updates/candidate.apk");}
@@ -166,7 +186,7 @@ public class AndroidMaintenancePlugin extends Plugin {
         return null;
     }
     @PluginMethod public void downloadUpdate(PluginCall call){run(call,()->{
-        UpdateSources.requireApk(updateSource());
+        String selected=updateSource();
         if(pendingUpdate==null)throw new IOException("请先检查更新");cancel=false;
         PackageInfo current=getContext().getPackageManager().getPackageInfo(getContext().getPackageName(),0);
         File base=new File(getContext().getApplicationInfo().sourceDir);
@@ -175,7 +195,7 @@ public class AndroidMaintenancePlugin extends Plugin {
         catch(Exception unavailable) { if(cancel||!maintenancePage)throw unavailable; progress="无法读取差量基包，改为完整下载"; }
         String mode=ApkUpdateTransfer.run(base,new File(getContext().getCacheDir(),"updates"),
             pendingUpdate.getString("url"),pendingUpdate.getLong("size"),pendingUpdate.getString("sha256"),delta,
-            this::download,this::validateApk,()->{if(cancel||!maintenancePage)throw new IOException("已取消下载");},message->progress=message);
+            (address,target,limit)->downloadApk(UpdateSources.apkAsset(selected,pendingUpdate.getString("versionName"),address),selected,target,limit),this::validateApk,()->{if(cancel||!maintenancePage)throw new IOException("已取消下载");},message->progress=message);
         return new JSObject().put("ready",true).put("mode",mode);
     });}
     @PluginMethod public void installUpdate(PluginCall call){run(call,()->{if(AndroidHostService.active())throw new IOException("请先停止手机开房，再安装应用更新");validateApk();requirePage();

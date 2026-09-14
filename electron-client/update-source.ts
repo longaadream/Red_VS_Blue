@@ -1,5 +1,5 @@
 export type UpdateSource = 'github' | 'cos'
-export const COS_UPDATE_ROOT = 'https://rvb-updates-hk-1321590994.cos.ap-hongkong.myqcloud.com'
+export const COS_UPDATE_ROOT = 'https://updates.redvsblue.top'
 
 export function parseUpdateSource(value: unknown): UpdateSource {
   if (value !== 'github' && value !== 'cos') throw new Error('更新源无效')

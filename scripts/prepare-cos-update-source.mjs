@@ -5,13 +5,13 @@ import { pathToFileURL } from 'node:url'
 import yaml from 'js-yaml'
 import { verifyBundle } from './synchronized-release.mjs'
 
-export const COS_ORIGIN = 'https://rvb-updates-hk-1321590994.cos.ap-hongkong.myqcloud.com'
+export const COS_ORIGIN = 'https://updates.redvsblue.top'
 const repository = 'https://github.com/longaadream/Red_VS_Blue'
 const sha = bytes => createHash('sha256').update(bytes).digest('hex')
 const read = file => JSON.parse(fs.readFileSync(file, 'utf8'))
 
 // Preparation only: consume previously verified public release receipts, never sign,
-// upload, change the source release, or silently create an Android COS feed.
+// upload or change the source release. Android metadata retains official asset identities.
 export function prepareCosUpdateSource({ clientDirectory, resourceDirectory, outputDirectory, previousClientDirectory }) {
   const output = path.resolve(outputDirectory)
   if (fs.existsSync(output)) throw Error('Output already exists; use a new preparation directory')
@@ -43,12 +43,19 @@ export function prepareCosUpdateSource({ clientDirectory, resourceDirectory, out
     files.set(`${previous.version}/${oldBlockmap}`, fs.readFileSync(path.join(previousClientDirectory, oldBlockmap)))
   }
   for (const name of [exeName, exeName + '.blockmap']) files.set(`${client.version}/${name}`, fs.readFileSync(path.join(clientDirectory, name)))
+  const android = read(path.join(clientDirectory, 'android-latest.json'))
+  const apkName = `RED-vs-BLUE-${client.version}-Android.apk`
+  for (const name of [apkName, ...android.deltas.map(d => `RED-vs-BLUE-Android-${d.fromVersionCode}-to-${android.versionCode}.rvbdelta`)]) {
+    files.set(`${client.version}/${name}`, fs.readFileSync(path.join(clientDirectory, name)))
+  }
+  // Preserve package identity and hashes; native code maps only download transport.
+  files.set('android-latest.json', fs.readFileSync(path.join(clientDirectory, 'android-latest.json')))
   for (const [name, bytes] of resourceAssets) files.set(`resource/${index.version}/${name}`, bytes)
   const release = { tag_name: tag, draft: false, published_at: receipt.publishedAt, rvb_version: index.version, assets }
   files.set('resource/latest.json', Buffer.from(JSON.stringify([release], null, 2) + '\n'))
   files.set('latest.yml', Buffer.from(yaml.dump(windows)))
   // All validation precedes output creation. Local receipts are not public files.
-  const result = { schema: 'rvb-cos-preparation/v1', origin: COS_ORIGIN, clientVersion: client.version, sourceCommit: client.sourceCommit, resourceVersion: index.version, files: [...files].map(([name, bytes]) => ({ name, size: bytes.length, sha256: sha(bytes) })), publishLast: ['resource/latest.json', 'latest.yml'] }
+  const result = { schema: 'rvb-cos-preparation/v1', origin: COS_ORIGIN, clientVersion: client.version, sourceCommit: client.sourceCommit, resourceVersion: index.version, files: [...files].map(([name, bytes]) => ({ name, size: bytes.length, sha256: sha(bytes) })), publishLast: ['resource/latest.json', 'android-latest.json', 'latest.yml'] }
   fs.mkdirSync(output, { recursive: true })
   for (const [name, bytes] of files) {
     const target = path.join(output, name)

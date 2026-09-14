@@ -18,11 +18,15 @@ async function setup(selected='github'){
   return {elements,native}
 }
 describe('Android shared download-source controls',()=>{
-  it('reloads saved COS choice, blocks APK controls and keeps resource download available',async()=>{
-    const {elements}=await setup('cos')
+  it('reloads saved COS choice, supports APK controls and keeps resource download available',async()=>{
+    const {elements,native}=await setup('cos')
     expect(elements.get('updateSource')!.value).toBe('cos')
-    expect(elements.get('sourceInfo')!.textContent).toContain('手动切换 GitHub')
-    expect(elements.get('check')!.disabled).toBe(true)
+    expect(elements.get('sourceInfo')!.textContent).toContain('游戏与官方资源包更新')
+    expect(elements.get('check')!.disabled).toBe(false)
+    await elements.get('check')!.onclick!()
+    await elements.get('download')!.onclick!()
+    expect(native.downloadUpdate).toHaveBeenCalledOnce()
+    expect(elements.get('install')!.disabled).toBe(false)
     expect(elements.get('officialPack')!.disabled).toBe(false)
   })
   it('invalidates old APK state when changing source and supports manual GitHub return',async()=>{

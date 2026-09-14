@@ -5,14 +5,25 @@ import java.net.URL;
 
 /** Fixed distribution endpoints; selecting a mirror never changes publisher trust. */
 final class UpdateSources {
-    static final String COS="https://rvb-updates-hk-1321590994.cos.ap-hongkong.myqcloud.com";
+    static final String COS="https://updates.redvsblue.top";
     static final String REPOSITORY="longaadream/Red_VS_Blue";
     static String validate(String source)throws IOException {
         if(!"github".equals(source)&&!"cos".equals(source))throw new IOException("请选择 GitHub 或 COS 下载源");
         return source;
     }
-    static void requireApk(String source)throws IOException {
-        if("cos".equals(validate(source)))throw new IOException("COS 默认域名暂不支持安卓 APK，请手动切换到 GitHub 后检查更新；资源包仍可使用 COS");
+    static String apkManifest(String source,String configured)throws IOException {
+        return "cos".equals(validate(source))?COS+"/android-latest.json":configured;
+    }
+    static String apkAsset(String source,String version,String official)throws IOException {
+        validate(source);
+        if("github".equals(source))return official;
+        if(version==null||!version.matches("[0-9]+\\.[0-9]+\\.[0-9]+(?:-demo)?"))throw new IOException("APK版本无效");
+        String release=version.replaceFirst("-demo$", "");
+        String prefix="https://github.com/"+REPOSITORY+"/releases/download/v"+release+"/";
+        if(!official.startsWith(prefix))throw new IOException("APK发行地址无效");
+        String name=official.substring(prefix.length());
+        if(!name.equals("RED-vs-BLUE-"+release+"-Android.apk")&&!name.matches("RED-vs-BLUE-Android-[0-9]+-to-[0-9]+\\.rvbdelta"))throw new IOException("APK文件身份无效");
+        return COS+"/"+release+"/"+name;
     }
     static int compare(String a,String b)throws IOException {
         if(a==null||b==null||!a.matches("[0-9]+\\.[0-9]+\\.[0-9]+")||!b.matches("[0-9]+\\.[0-9]+\\.[0-9]+"))throw new IOException("资源版本格式无效");
