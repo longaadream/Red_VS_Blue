@@ -1,9 +1,10 @@
 {
   "id": "aizen-shunpo",
   "name": "瞬步",
-  "description": "灵压。选择本棋子5格内1个敌方棋子，将本棋子传送至该目标2格内1个空地格，你获得2点临时行动点。",
+  "description": "灵压。选择敌人（5），传送至目标周围空地格（2），获得2点临时行动点。",
   "keywords": [
-    "灵压"
+    "灵压",
+    "传送"
   ],
   "statusTag": {
     "id": "spiritual-pressure",
@@ -11,7 +12,7 @@
     "name": "灵压",
     "rule": "rule-spiritual-pressure"
   },
-  "targetText": "5格内1个敌方棋子，然后其2格内1个空格",
+  "targetText": "敌人（5）→目标周围空地格（2）",
   "effectTags": [
     "位移",
     "行动点"

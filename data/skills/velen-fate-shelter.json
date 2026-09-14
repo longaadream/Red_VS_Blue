@@ -1,11 +1,11 @@
 {
   "id": "velen-fate-shelter",
   "name": "命运庇护",
-  "description": "选择1个友方。你的下一个回合开始时，若本棋子与目标均存活，使其恢复8点生命并获得【圣盾】。",
+  "description": "选择全图友军。你的下回合开始时若双方存活，回复目标8点，并赋予圣盾。",
   "keywords": [
     "圣盾"
   ],
-  "targetText": "1个友方",
+  "targetText": "全图友军",
   "effectTags": [
     "治疗",
     "圣盾"
@@ -29,6 +29,6 @@
     ]
   },
   "code": "function executeSkill(context) {\n  var caster = context.piece; var target = selectTarget({ type: 'piece', range: 99, filter: 'ally' });\n  if (!target || target.needsTargetSelection) return target;\n  if (target.currentHp <= 0 || !arePlayersAllied(battle, target.ownerPlayerId, caster.ownerPlayerId)) return { success: false, message: '命运庇护只能选择存活友方' };\n  var existing = target.statusTags && target.statusTags.find(function(tag) { return tag.type === 'velen-fate-shelter'; });\n  if (existing) return { success: false, message: '目标已经获得命运庇护' };\n  addStatusEffectById(target.instanceId, { id: 'velen-fate-shelter-' + caster.instanceId + '-' + target.instanceId, name: '命运庇护', type: 'velen-fate-shelter', currentDuration: -1, currentUses: -1, intensity: 8, stacks: 1, sourceId: caster.instanceId, createdTurnNumber: battle.turn.turnNumber, relatedRules: ['rule-velen-fate-target'] });\n  addRuleById(target.instanceId, 'rule-velen-fate-target');\n  return { success: true, message: caster.name + '为' + target.name + '预见了命运庇护' };\n}",
-  "previewCode": "function calculatePreview(piece, skillDef) { return { description: skillDef.description, expectedValues: {\"heal\":8} }; }",
+  "previewCode": "function calculatePreview(piece, skillDef) { return { description: \"选择全图友军。你的下回合开始时若双方存活，回复目标8点，并赋予圣盾。\", expectedValues: {\"heal\":8} }; }",
   "range": "single"
 }

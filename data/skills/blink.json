@@ -1,9 +1,11 @@
 {
   "id": "blink",
   "name": "闪现",
-  "description": "传送到5×5范围内1个空地格。",
-  "keywords": [],
-  "targetText": "5×5范围内1个空地格",
+  "description": "选择自身周围5×5内的空地格，传送至该格。",
+  "keywords": [
+    "传送"
+  ],
+  "targetText": "自身周围5×5内空地格",
   "effectTags": [
     "位移"
   ],

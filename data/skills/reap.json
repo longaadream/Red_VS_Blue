@@ -1,7 +1,7 @@
 {
   "id": "reap",
   "name": "收割",
-  "description": "本棋子造成实际伤害后，恢复等同于实际伤害50%的生命。",
+  "description": "造成实际伤害后，回复自身0.5x实际伤害点。",
   "keywords": [],
   "targetText": "本棋子",
   "effectTags": [

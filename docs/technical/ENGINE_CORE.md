@@ -42,6 +42,39 @@ pending interaction 激活时只允许匹配的继续或合法取消命令。错
 
 ## 5. 空间与战斗事实
 
+### 强制使用统一位移入口
+
+**禁止直接修改任何权威棋子的 `x/y`。所有棋盘位移严格走 RED-209 新位移体系。**
+
+| 调用层 | 唯一允许的业务入口 |
+| --- | --- |
+| 技能、卡牌、规则 | `flow.effects.move(changes, kind, path?)` |
+| pending / 延迟目标回调 | `ctx.flow.effects.move(changes, kind, path?)` |
+| 引擎动作处理 | `changePiecePositions(battle, changes, kind, options?)` |
+| 部署、召唤、复活、死亡、离场 | 对应权威生命周期，内部使用受控写入；内容不可直接赋坐标 |
+
+`changes` 使用 `{ pieceId, x, y }`，明确 `walk/dash/teleport/push/pull/swap` 类型。
+旧 `teleport`、`context.changePositions` 只作为内部汇入统一体系的兼容入口；新增内容使用 `flow.effects.move`。
+不得通过别名、动态属性、`Object.assign`、对象替换或关闭写保护绕过。`writePiecePosition` 只属于提交器与
+已授权生命周期的底层实现，不得为了方便从新业务分支直接调用。构造目标坐标数据不是修改权威棋子。
+
+`flow.query.tracePath` / `traceMovementPath` 只产生有序路径事实；提交时重新检查。占用、禁锢和路径失效返回
+`success:false`，不得部分提交整组或自行寻找替代落点。只有依赖位移成功的后续效果才由成功结果继续执行；
+pending 信号、契约错误仍交给权威事务，不吞成普通取消。
+
+- `beforeMove/afterMove` 仅用于普通走格；定身只限制主动走格。
+- `beforePiecePositionChange/afterPiecePositionChange` 覆盖棋盘位移；禁锢限制棋盘位移，不阻止死亡或离场。
+- `afterPiecePathContact` 使用实际接触事实，排除起点、同次去重；走格/冲刺/推拉有连续路径，传送/换位只有落点。
+- 整组先提交位置并统一拾取记账，再执行接触反应；原地或取消不拾取。接触延迟只由宿主复合效果控制，作者不得跳过。
+- 双尾飞行标记不封锁格子；到期按实际占位整组提交或取消。不能把旧“预留即阻挡”逻辑重新写回。
+
+实现依据：[位置提交](../../lib/game/position-change.ts)、[写保护](../../lib/game/position-write-guard.ts)、
+[流程入口](../../lib/game/flow-runtime.ts)、[接触结算](../../lib/game/tile-contact.ts)。
+行为契约见 [ADR-0034](../decisions/ADR-0034-position-contact.md)。新增位移必须覆盖成功、阻挡/原地、整组原子性、
+路径接触与拾取、定身/禁锢及涉及的 pending 重放测试。
+
+### 空间查询
+
 `lib/game/spatial.ts` 提供曼哈顿距离、方形范围、直线事实、占位与普通移动校验。
 `traceProjectile()` 只返回按顺序排列的棋子/地形事实，技能自行决定伤害、穿透和停止语义。
 

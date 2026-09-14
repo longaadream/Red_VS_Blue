@@ -132,7 +132,7 @@
     "name": "位移",
     "category": "mechanic",
     "shortDescription": "棋子改变所在格子。",
-    "longDescription": "走格、冲刺、传送、推拉和换位都属于位移。落点被占用、预留或不能停留时，位移取消；换位双方同时成功或同时取消。",
+    "longDescription": "走格、冲刺、传送、推拉和换位都属于位移。落点被占用、明确阻挡或不能停留时，位移取消；换位双方同时成功或同时取消。双尾飞行标记不阻挡进入，到期按实际占位结算。",
     "highlight": true
   },
   {
@@ -157,6 +157,14 @@
     "category": "mechanic",
     "shortDescription": "经过或落在该格时拾取，获得1充能。",
     "longDescription": "走格或沿路径位移时，拾取实际经过格及终点的结晶；传送和换位只拾取落点的结晶。每个结晶只能拾取一次，充能归移动棋子所属玩家。原地不动或位移取消时不拾取。部署和召唤仍可拾取落点结晶。",
+    "highlight": true
+  },
+  {
+    "id": "meditation",
+    "name": "打坐",
+    "category": "control",
+    "shortDescription": "无法主动走格或使用技能。",
+    "longDescription": "打坐期间无法主动走格或使用技能。准备进度、推进时机和结束奖励由对应技能说明。",
     "highlight": true
   }
 ]

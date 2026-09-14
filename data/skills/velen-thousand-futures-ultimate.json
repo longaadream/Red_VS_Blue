@@ -1,8 +1,8 @@
 {
   "id": "velen-thousand-futures-ultimate",
   "name": "万千未来",
-  "description": "选择手中1至3张未强化的普通圣光手牌，立即使它们永久强化。每局限用1次。",
-  "targetText": "手中1至3张未强化的圣光手牌",
+  "description": "选择手中1–3张未强化的普通圣光手牌，将其永久强化。每局1次。",
+  "targetText": "手中1–3张未强化的普通圣光手牌",
   "effectTags": [
     "强化",
     "手牌"
@@ -18,6 +18,6 @@
     "steps": []
   },
   "code": "function executeSkill(context) {\n  var caster = context.piece; var player = battle.players.find(function(p) { return p.playerId === caster.ownerPlayerId; });\n  if (!player) return { success: false, message: '未找到玩家' };\nfunction enhanceHolyCard(card) {\n  if (!card.contentState) card.contentState = {}; card.contentState.velenHolyProphecyEnhanced = true; delete card.contentState.velenHolyProphecy;\n  if (card.cardId === 'holy-smite') { card.effectModifiers = [{ effect: 'damage', operation: 'multiply', value: 1.5 }]; card.presentation = { variant: 'enhanced', badge: '预言强化', description: '预言强化：对敌方生命值最低的棋子造成7点真实伤害。' }; }\n  else if (card.cardId === 'holy-heal') { card.effectModifiers = [{ effect: 'heal', operation: 'multiply', value: 1.5 }]; card.presentation = { variant: 'enhanced', badge: '预言强化', description: '预言强化：治疗己方生命值最低的棋子12点生命。' }; }\n  else if (card.cardId === 'holy-charge') { card.effectModifiers = [{ effect: 'statusIntensity', operation: 'multiply', value: 1.5, statusType: 'damage-buff' }]; card.presentation = { variant: 'enhanced', badge: '预言强化', description: '预言强化：使己方所有棋子下次造成的伤害提高3点。' }; }\n}\n  function isOrdinaryHoly(card) {\n  return card && ['holy-smite', 'holy-heal', 'holy-charge'].indexOf(card.cardId) !== -1;\n}\n  var eligible = player.hand.filter(function(card) { return isOrdinaryHoly(card) && !(card.contentState && card.contentState.velenHolyProphecyEnhanced); });\n  if (eligible.length === 0) return { success: false, message: '没有可强化的圣光手牌' };\n  var options = eligible.map(function(card) { return { label: (card.name || card.cardId) + '（' + card.instanceId + '）', value: card.instanceId }; });\n  var choice = selectOption({ title: '万千未来：选择立即强化的手牌', options: options, selectionMode: 'multi', presentation: 'hand', minSelections: 1, maxSelections: 3 });\n  if (choice === undefined || choice === null || choice.needsOptionSelection) return choice;\n  if (!Array.isArray(choice) || choice.length < 1 || choice.length > 3) return { success: false, message: '万千未来选择无效' };\n  var unique = [];\n  for (var i = 0; i < choice.length; i++) { if (unique.indexOf(choice[i]) !== -1) return { success: false, message: '不能重复选择同一张手牌' }; unique.push(choice[i]); }\n  var selected = unique.map(function(id) { return eligible.find(function(card) { return card.instanceId === id; }); });\n  if (selected.some(function(card) { return !card; })) return { success: false, message: '选择的手牌已无法强化' };\n  selected.forEach(function(card) { enhanceHolyCard(card); });\n  return { success: true, message: caster.name + '从' + selected.length + '种圣光的可能中选定了未来' };\n}",
-  "previewCode": "function calculatePreview(piece, skillDef) { return { description: skillDef.description, expectedValues: {\"maxCards\":3} }; }",
+  "previewCode": "function calculatePreview(piece, skillDef) { return { description: \"选择手中1–3张未强化的普通圣光手牌，将其永久强化。每局1次。\", expectedValues: {\"maxCards\":3} }; }",
   "range": "self"
 }

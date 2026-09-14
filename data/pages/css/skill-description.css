@@ -1,0 +1,39 @@
+.skill-description-keyword {
+  font-weight: 700;
+  color: inherit;
+}
+
+.skill-reading-guide {
+  position: fixed;
+  inset: 0;
+  margin: auto;
+  width: min(420px, calc(100vw - 32px));
+  max-height: calc(100dvh - 32px);
+  overflow: auto;
+  padding: 24px;
+  border: 2px solid #8d7047;
+  border-radius: 14px;
+  background: #e7d4a7;
+  color: #392c20;
+  font: 14px/1.6 sans-serif;
+  box-shadow: 0 16px 48px #0008;
+}
+.skill-reading-guide::backdrop { background: #0008; }
+.skill-reading-guide h2 { margin: 0 0 16px; font-size: 20px; }
+.skill-reading-guide dl { margin: 0; }
+.skill-reading-guide dt { font-weight: 700; margin-top: 12px; }
+.skill-reading-guide dd { margin: 0; }
+.skill-reading-guide p { margin: 16px 0; }
+.skill-reading-guide button {
+  width: 100%; padding: 10px; border: 1px solid #6c5130;
+  border-radius: 8px; background: #594127; color: #fff4da;
+  font: inherit; cursor: pointer;
+}
+.skill-reading-guide button:focus-visible { outline: 3px solid #126279; outline-offset: 3px; }
+.skill-reading-tips {
+  margin-left: 8px; padding: 4px 8px; border: 1px solid currentColor;
+  border-radius: 6px; background: transparent; color: inherit;
+  font: 12px/1.5 sans-serif; cursor: pointer; letter-spacing: normal;
+  text-transform: none;
+}
+.skill-reading-tips:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
