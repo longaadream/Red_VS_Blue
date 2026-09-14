@@ -30,6 +30,7 @@ public class AndroidMaintenancePlugin extends Plugin {
     private volatile boolean cancel=false;
     private volatile String progress="";
     private JSONObject pendingUpdate;
+    private String updateSource() { return "cos".equals(getContext().getSharedPreferences("official-updates-v1",0).getString("source","github"))?"cos":"github"; }
     private static boolean operationPending=false;
     private String verifiedActive=null;
     private File root() { File f=new File(getContext().getFilesDir(),"content-v1"); f.mkdirs(); return f; }
@@ -78,10 +79,16 @@ public class AndroidMaintenancePlugin extends Plugin {
     private long version(PackageInfo p){return Build.VERSION.SDK_INT>=28?p.getLongVersionCode():p.versionCode;}
     @PluginMethod public void info(PluginCall call) {
         try { requirePage(); PackageInfo p=getContext().getPackageManager().getPackageInfo(getContext().getPackageName(),0);
-            call.resolve(new JSObject().put("version",p.versionName).put("versionCode",version(p)).put("packageName",p.packageName).put("state",state()).put("config",config()).put("progress",progress));
+            call.resolve(new JSObject().put("version",p.versionName).put("versionCode",version(p)).put("packageName",p.packageName).put("state",state()).put("config",config()).put("progress",progress).put("source",updateSource()));
         }catch(Exception e){call.reject(e.getMessage(),e);}
     }
     @PluginMethod public void cancel(PluginCall call) { try{requirePage();cancel=true;call.resolve();}catch(Exception e){call.reject(e.getMessage());} }
+    @PluginMethod public void setUpdateSource(PluginCall call){run(call,()->{
+        String selected=UpdateSources.validate(call.getString("source"));
+        if(!getContext().getSharedPreferences("official-updates-v1",0).edit().putString("source",selected).commit())throw new IOException("无法保存下载源");
+        pendingUpdate=null;progress="";
+        return new JSObject().put("source",selected);
+    });}
     @PluginMethod public void trustPublisher(PluginCall call){
         try{requirePage();String key=call.getString("keyId");if(key==null||!key.matches("[a-f0-9]{64}"))throw new IOException("发行者指纹非法");
             getActivity().runOnUiThread(()->{
@@ -116,7 +123,7 @@ public class AndroidMaintenancePlugin extends Plugin {
         }finally{c.disconnect();}
     }
     @PluginMethod public void checkUpdate(PluginCall call) {run(call,()->{
-        pendingUpdate=null; String address=config().optString("updateUrl");if(address.isEmpty())throw new IOException("发行者尚未配置更新源，当前可使用本地资源包导入");
+        pendingUpdate=null; UpdateSources.requireApk(updateSource()); String address=config().optString("updateUrl");if(address.isEmpty())throw new IOException("发行者尚未配置更新源，当前可使用本地资源包导入");
         HttpsURLConnection c=connect(address); JSONObject update;
         try{update=new JSONObject(new String(ContentFiles.read(c.getInputStream(),65536),StandardCharsets.UTF_8));}finally{c.disconnect();}
         if(!"rvb-android-update/v1".equals(update.getString("schemaVersion"))||!getContext().getPackageName().equals(update.getString("packageName")))throw new IOException("更新清单与应用不匹配");
@@ -159,6 +166,7 @@ public class AndroidMaintenancePlugin extends Plugin {
         return null;
     }
     @PluginMethod public void downloadUpdate(PluginCall call){run(call,()->{
+        UpdateSources.requireApk(updateSource());
         if(pendingUpdate==null)throw new IOException("请先检查更新");cancel=false;
         PackageInfo current=getContext().getPackageManager().getPackageInfo(getContext().getPackageName(),0);
         File base=new File(getContext().getApplicationInfo().sourceDir);
@@ -196,6 +204,64 @@ public class AndroidMaintenancePlugin extends Plugin {
     }
     @PluginMethod public void downloadPack(PluginCall call){run(call,()->{cancel=false;File archive=new File(getContext().getCacheDir(),"pack-download.zip");
         try{download(call.getString("url"),archive,ContentFiles.ARCHIVE_LIMIT);return extract(archive);}finally{if(archive.exists())ContentFiles.remove(getContext().getCacheDir(),archive);}
+    });}
+    private byte[] officialBytes(String address,String selected,int limit,boolean asset)throws Exception {
+        for(int redirects=0;redirects<4;redirects++){
+            if(cancel||!maintenancePage)throw new IOException("已取消下载");
+            URL url=new URL(address);HttpsURLConnection c=(HttpsURLConnection)url.openConnection();
+            c.setInstanceFollowRedirects(false);c.setConnectTimeout(15000);c.setReadTimeout(15000);c.setRequestProperty("Cache-Control","no-cache");
+            try{
+                int code=c.getResponseCode();
+                if(code>=300&&code<400){String location=c.getHeaderField("Location");if(location==null)throw new IOException("更新重定向缺少地址");String target=new URL(url,location).toString();if(!asset||!UpdateSources.redirectAllowed(selected,target))throw new IOException("更新下载重定向不受信任");address=target;continue;}
+                if(code!=200)throw new IOException("所选下载源请求失败（HTTP "+code+"），请稍后重试或手动切换下载源");
+                if(c.getContentLengthLong()>limit)throw new IOException("更新文件超出大小限制");
+                try(InputStream in=c.getInputStream();ByteArrayOutputStream out=new ByteArrayOutputStream()){
+                    byte[] buffer=new byte[32768];int n;while((n=in.read(buffer))!=-1){if(cancel||!maintenancePage)throw new IOException("已取消下载");if(out.size()>limit-n)throw new IOException("更新文件超出大小限制");out.write(buffer,0,n);}
+                    return out.toByteArray();
+                }
+            }finally{c.disconnect();}
+        }throw new IOException("更新下载重定向过多");
+    }
+    private byte[] officialAsset(JSONObject release,String name,String hash,int limit,String selected)throws Exception {
+        JSONArray assets=release.getJSONArray("assets");JSONObject found=null;
+        for(int i=0;i<assets.length();i++){JSONObject a=assets.getJSONObject(i);if(name.equals(a.optString("name"))){if(found!=null)throw new IOException("官方资源文件重复");found=a;}}
+        if(found==null||!"uploaded".equals(found.optString("state"))||found.optLong("size",-1)<1||found.getLong("size")>limit||!found.optString("digest").matches("sha256:[a-f0-9]{64}"))throw new IOException("官方资源文件缺失或身份无效");
+        if(hash!=null&&!found.getString("digest").equals("sha256:"+hash))throw new IOException("清单与官方文件摘要不一致");
+        String address=UpdateSources.asset(selected,release.getString("tag_name"),release.optString("rvb_version"),name,found.getString("browser_download_url"));
+        byte[] bytes=officialBytes(address,selected,limit,true);
+        if(bytes.length!=found.getLong("size")||!found.getString("digest").equals("sha256:"+ContentFiles.hex(java.security.MessageDigest.getInstance("SHA-256").digest(bytes))))throw new IOException("资源文件完整性校验失败");
+        return bytes;
+    }
+    @PluginMethod public void downloadOfficialPack(PluginCall call){run(call,()->{
+        cancel=false;progress="正在检查官方资源";String selected=updateSource();List<JSONObject> releases=new ArrayList<>();
+        for(int page=1;page<=3;page++){
+            String address="cos".equals(selected)?UpdateSources.COS+"/resource/latest.json":"https://api.github.com/repos/"+UpdateSources.REPOSITORY+"/releases?per_page=100&page="+page;
+            JSONArray values=new JSONArray(new String(officialBytes(address,selected,2*1024*1024,false),StandardCharsets.UTF_8));
+            if(values.length()>100)throw new IOException("官方版本列表过长");
+            for(int i=0;i<values.length();i++){JSONObject r=values.getJSONObject(i);if(r.has("draft")&&!r.getBoolean("draft")&&r.optString("tag_name").matches("content-test-[a-f0-9]{64}")&&r.optJSONArray("assets")!=null)releases.add(r);}
+            if("cos".equals(selected)||values.length()<100)break;
+            if(page==3)throw new IOException("官方版本列表过长，未能确认最新资源");
+        }
+        releases.sort((a,b)->b.optString("published_at").compareTo(a.optString("published_at")));
+        JSONObject newest=null,newestRelease=null;Exception invalid=null;JSONArray publishers=config().getJSONArray("trustedPublisherKeyIds");
+        for(JSONObject release:releases.subList(0,Math.min(10,releases.size()))){
+            try{
+                JSONObject index=new JSONObject(new String(officialAsset(release,"content-update.json",null,65536,selected),StandardCharsets.UTF_8));
+                boolean trusted=false;JSONObject identity=index.getJSONObject("identity");for(int i=0;i<publishers.length();i++)if(publishers.getString(i).equals(identity.optString("publisherKeyId")))trusted=true;
+                if(!"rvb-content-release/v1".equals(index.optString("schema"))||!"test".equals(index.optString("channel"))||!index.optString("contentHash").matches("[a-f0-9]{64}")||!release.getString("tag_name").equals("content-test-"+index.getString("contentHash"))||!"content.rvbpack".equals(index.optString("archive"))||!index.optString("archiveSha256").matches("[a-f0-9]{64}")||!trusted)throw new IOException("官方资源清单或发行者不受信任");
+                UpdateSources.compare(index.getString("version"),index.getString("version"));
+                if("cos".equals(selected)&&!index.getString("version").equals(release.optString("rvb_version")))throw new IOException("COS 资源路径与版本不一致");
+                if(newest==null||UpdateSources.compare(index.getString("version"),newest.getString("version"))>0){newest=index;newestRelease=release;}
+            }catch(Exception e){if(cancel||!maintenancePage)throw e;invalid=e;}
+        }
+        if(newest==null){if(invalid!=null)throw invalid;throw new IOException("所选下载源尚未提供官方资源清单");}
+        PackageInfo current=getContext().getPackageManager().getPackageInfo(getContext().getPackageName(),0);
+        if(newest.has("minimumClientVersion")&&UpdateSources.compare(current.versionName.replaceFirst("-.*$",""),newest.getString("minimumClientVersion"))<0)throw new IOException("此资源需要先更新客户端");
+        progress="正在下载官方资源 "+newest.getString("version");
+        byte[] bytes=officialAsset(newestRelease,"content.rvbpack",newest.getString("archiveSha256"),32*1024*1024,selected);
+        File archive=new File(getContext().getCacheDir(),"official-pack-download.zip");
+        try{ContentFiles.write(archive,bytes);JSONObject identity=newest.getJSONObject("identity");return extract(archive).put("version",newest.getString("version")).put("publisherKeyId",identity.getString("publisherKeyId")).put("engineAbi",identity.getString("engineAbi")).put("contentAbi",identity.getString("contentAbi"));}
+        finally{if(archive.exists())ContentFiles.remove(getContext().getCacheDir(),archive);}
     });}
     private long diskBytes(File directory){long total=0;File[] list=directory.listFiles();if(list!=null)for(File f:list)total+=f.isDirectory()?diskBytes(f):f.length();return total;}
     private JSObject extract(File archive) throws Exception {

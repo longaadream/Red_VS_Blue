@@ -3,7 +3,7 @@ import path from 'node:path'
 import { spawn } from 'node:child_process'
 import { tmpdir } from 'node:os'
 const root = process.cwd()
-const output = path.resolve(root, 'docs/qa/RED-202-IDE/auto-update-smoke')
+const output = path.resolve(root, process.env.RVB_UPDATE_SMOKE_OUTPUT || 'docs/qa/RED-202-IDE/auto-update-smoke')
 fs.mkdirSync(output, { recursive: true })
 const executable = process.env.RVB_GRAPH_ELECTRON_BINARY || path.join(root, 'node_modules/electron/dist/electron.exe')
 const userData = fs.mkdtempSync(path.join(tmpdir(), 'rvb-update-smoke-'))

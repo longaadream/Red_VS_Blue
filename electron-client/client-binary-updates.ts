@@ -1,3 +1,4 @@
+import { binaryFeed, type UpdateSource } from './update-source'
 export type BinaryUpdateStatus = { phase: string; message: string; version?: string; percent?: number }
 export interface BinaryUpdater {
   autoDownload: boolean
@@ -7,6 +8,7 @@ export interface BinaryUpdater {
   on: (event: string, listener: (info: { percent?: number; version?: string }) => void) => unknown
   checkForUpdates: () => Promise<unknown>
   downloadUpdate: () => Promise<unknown>
+  setFeedURL?: (options: ReturnType<typeof binaryFeed>) => void
   quitAndInstall: (silent: boolean, restart: boolean) => void
 }
 
@@ -16,6 +18,15 @@ export class ClientBinaryUpdates {
   status: BinaryUpdateStatus = { phase: 'idle', message: '等待检查客户端版本' }
   private running?: Promise<void>
   private downloaded = false
+  isBusy() { return Boolean(this.running) || ['checking', 'downloading'].includes(this.status.phase) }
+  setSource(source: UpdateSource) {
+    if (this.running || this.downloaded) throw new Error('请等待当前更新完成；已下载的客户端请先安装再切换源')
+    if (this.updater) {
+      if (!this.updater.setFeedURL) throw new Error('当前更新器不支持切换源')
+      this.updater.setFeedURL(binaryFeed(source))
+      this.set('idle', '更新源已切换，请检查更新')
+    }
+  }
   constructor(private updater: BinaryUpdater | null, private changed: () => void, private prepareNetwork: () => Promise<unknown> = async () => {}) {
     if (!updater) { this.status = { phase: 'unsupported', message: '当前为开发版或非 Windows 安装版；客户端自动更新需使用新版安装包' }; return }
     updater.autoDownload = false
@@ -42,7 +53,7 @@ export class ClientBinaryUpdates {
         this.set('downloading', '正在下载客户端更新', result.updateInfo?.version)
         await this.updater!.downloadUpdate()
       } else this.set('current', '客户端已是当前稳定版本')
-    })().catch(() => this.set('error', '暂时无法获取客户端更新，当前版本继续可用；可稍后重试')).finally(() => { this.running = undefined })
+    })().catch(() => this.set('error', '暂时无法获取客户端更新，当前版本继续可用；可切换下载源后重试')).finally(() => { this.running = undefined; this.changed() })
     return this.running
   }
   isReady() { return this.downloaded && this.status.phase === 'downloaded' }
