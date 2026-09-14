@@ -68,7 +68,7 @@ it('two Shishio casters apply each permanent burning tile only once', () => {
   const state = stateWith([...casters, mover])
   for (const player of state.players.slice(1, 3)) player.rules = [loadRuleById('rule-shishio-burn-move', true)!]
   state.extensions!.shishioBurnTiles = [{ x: mover.x, y: mover.y, sourcePieceId: casters[0].instanceId, ownerPlayerId: 'red1' }, { x: 5, y: 4, sourcePieceId: casters[1].instanceId, ownerPlayerId: 'red2' }]
-  new TriggerSystem().checkTriggers(state, { type: 'afterMove', playerId: 'blue1', sourcePiece: mover } as unknown as TriggerContext)
+  new TriggerSystem().checkTriggers(state, { type: 'afterPiecePositionChange', playerId: 'blue1', sourcePiece: mover } as unknown as TriggerContext)
   expect(mover.currentHp).toBe(50)
 })
 it('two Sasuke player rules stack and damage once while preserving the tile source', () => {

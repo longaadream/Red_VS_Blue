@@ -6,6 +6,8 @@
   <title>选择棋子 - RED vs BLUE</title>
   <script src="js/pack-fetch.js"></script>
   <script src="js/hand-card-face.js"></script>
+  <script src="js/skill-description.js"></script>
+  <link rel="stylesheet" href="css/skill-description.css" />
   <link rel="stylesheet" href="css/tabletop/related-hand-cards.css" />
   <script src="js/server-utils.js"></script>
   <script src="js/crypto-lib.js"></script>
@@ -309,7 +311,7 @@
   <section class="deck-builder" aria-label="预设棋组">
     <div id="deckGallery" class="deck-gallery" aria-label="已保存棋组"></div>
     <div class="deck-builder-row">
-      <div class="deck-builder-title">预设棋组</div>
+      <div class="deck-builder-title">棋组构筑</div>
       <select id="deckPresetSelect" aria-label="选择预设棋组" onchange="loadSelectedPreset()">
         <option value="">选择一套预设…</option>
       </select>
@@ -1076,7 +1078,7 @@
           <div class="detail-stat"><div class="detail-stat-val" style="color:#4ade80">${s.moveRange || 3}</div><div class="detail-stat-label">移动</div></div>
         </div>
         ${p.description ? `<div class="detail-desc">${p.description}</div>` : ''}
-        <div class="detail-skills-label">技能</div>
+        <div class="detail-skills-label">技能 <button type="button" class="skill-reading-tips" onclick="RvBSkillDescription.showGuide(true)">Tips · 描述说明</button></div>
         <div id="detailSkillList"><div style="color:#475569;font-size:13px">加载中...</div></div>
         <div id="detailRelatedCards"></div>
         <div id="detailKeywords"></div>
@@ -1110,7 +1112,7 @@
               <span class="skill-type-badge ${typeCls[sk.type] || ''}">${typeLabel[sk.type] || sk.type || '主动'}</span>
             </div>
             <div class="skill-meta">行动点：${sk.actionPointCost || 0}${sk.chargeCost ? ' | 充能点：' + sk.chargeCost : ''} | 冷却：${sk.cooldownTurns || 0} 回合${sk.range ? ' | 范围：' + sk.range : ''}${sk._derived && sk._trigger ? ' | 由 ' + sk._trigger + ' 获得' : ''}</div>
-            <div class="skill-desc">${sk.description || '暂无描述'}</div>
+            <div class="skill-desc">${RvBSkillDescription.render(sk.description || '暂无描述', sk.keywords)}</div>
           </div>`)
           .join('')
         : '<div style="color:#475569;font-size:13px">暂无技能</div>'
@@ -1159,6 +1161,7 @@
       } else {
         keywordsContainer.innerHTML = ''
       }
+      if (overlay.classList.contains('show')) RvBSkillDescription.showGuide()
     }
 
     function closePieceDetail() {

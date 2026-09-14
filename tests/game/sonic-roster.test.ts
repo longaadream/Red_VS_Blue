@@ -42,7 +42,7 @@ describe('Sonic roster mechanics', () => {
 
   it('uses the requested Sonic and Shadow skill descriptions and Super Form costs', () => {
     const expected = {
-      'sonic-spin-dash': '获得动能。选择1个正方向5格内的空格并向其冲刺，可穿过无法行走地格，对路径敌方棋子造成等同于本棋子攻击力150%的物理伤害。动能3：冲刺最大距离+2。动能5：命中敌方棋子沉默1回合。',
+      'sonic-spin-dash': '获得动能。向一个正方向5格内的空地或掩体冲刺，可穿过棋子和不可行走地格，终点须为空格。对路径敌方棋子造成等同于本棋子攻击力150%的物理伤害。动能3：冲刺最大距离+2。动能5：使命中的敌方棋子获得沉默，持续1回合。',
       'shadow-ride-sweep': '获得动能。选择1个正方向上7格内的1个空格并向其冲刺，对路径上敌方棋子造成等同于本棋子攻击力100%的物理伤害。动能5：弹射物。冲刺后选择1个垂直于冲刺方向的方向，对路径上每格往该方向4格范围内的所有敌方棋子造成5点伤害，可穿透棋子。动能7：路径伤害+2。',
       'sonic-super-form': '你获得2临时行动点。本回合本棋子使用技能不消耗动能，回合结束后保留。',
     }
@@ -901,14 +901,14 @@ describe('Sonic roster mechanics', () => {
     })).toThrow(BattleRuleError)
   })
 
-  it('prevents ordinary movement into a Double Tail Flight reserved landing tile', () => {
+  it('allows ordinary movement into a Double Tail Flight marker with the legacy rule', () => {
     const piece = makePiece({ instanceId: 'p1', x: 0, y: 0 })
     const state = makeState({ pieces: [piece] })
     state.extensions = { tileEffects: [{ type: 'tails-flight-reservation', x: 1, y: 0 }] }
     attachRule(state.players[0], 'rule-tails-flight-reservation-block')
 
     const next = applyBattleAction(state, { type: 'move', playerId: 'player-red', pieceId: 'p1', toX: 1, toY: 0 })
-    expect(next.pieces[0]).toMatchObject({ x: 0, y: 0 })
+    expect(next.pieces[0]).toMatchObject({ x: 1, y: 0 })
   })
 
   it('makes a Double Tail Flight immune target take no damage', () => {

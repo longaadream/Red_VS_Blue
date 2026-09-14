@@ -1,7 +1,7 @@
 {
   "id": "hashirama-edo-regen",
   "name": "秽土转生·自愈",
-  "description": "你的回合结束时，若本棋子的生命值低于最大生命值的50%，恢复2点生命。",
+  "description": "你的回合结束时若生命低于50%，回复自身2点。",
   "keywords": [],
   "targetText": "被动",
   "effectTags": [

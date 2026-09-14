@@ -1,9 +1,10 @@
 {
   "id": "aizen-shunpo",
   "name": "瞬步",
-  "description": "灵压。选择本棋子5格内1个敌方棋子，将本棋子传送至该目标2格内1个空地格，你获得2点临时行动点。",
+  "description": "灵压。选择敌人（5），传送至目标周围空地格（2），获得2点临时行动点。",
   "keywords": [
-    "灵压"
+    "灵压",
+    "传送"
   ],
   "statusTag": {
     "id": "spiritual-pressure",
@@ -11,7 +12,7 @@
     "name": "灵压",
     "rule": "rule-spiritual-pressure"
   },
-  "targetText": "5格内1个敌方棋子，然后其2格内1个空格",
+  "targetText": "敌人（5）→目标周围空地格（2）",
   "effectTags": [
     "位移",
     "行动点"
@@ -47,5 +48,5 @@
       }
     ]
   },
-  "code": "function executeSkill(context) { var caster = context.piece; var enemy = selectTarget({ type: 'piece', range: 5, filter: 'enemy' }); if (!enemy || enemy.needsTargetSelection) return enemy; var pos = selectTarget({ type: 'grid', range: 99, filter: 'all' }); if (!pos || pos.needsTargetSelection) return pos; if (Math.abs(enemy.x - pos.x) + Math.abs(enemy.y - pos.y) > 2) return { success: false, message: '落点超出范围' }; caster.x = pos.x; caster.y = pos.y; var player = battle.players.find(function(item) { return item.playerId === caster.ownerPlayerId; }); if (player) player.actionPoints += 2; return { success: true, message: caster.name + '发动瞬步并获得2点临时行动点' }; }"
+  "code": "function executeSkill(context) { var caster = context.piece; var enemy = selectTarget({ type: 'piece', range: 5, filter: 'enemy' }); if (!enemy || enemy.needsTargetSelection) return enemy; var pos = selectTarget({ type: 'grid', range: 99, filter: 'all' }); if (!pos || pos.needsTargetSelection) return pos; if (Math.abs(enemy.x - pos.x) + Math.abs(enemy.y - pos.y) > 2) return { success: false, message: '落点超出范围' }; if (!flow.effects.move([{pieceId:caster.instanceId,x:pos.x,y:pos.y}], 'teleport').success) return {success:true,message:'位移被阻挡，本次位移效果取消'}; var player = battle.players.find(function(item) { return item.playerId === caster.ownerPlayerId; }); if (player) player.actionPoints += 2; return { success: true, message: caster.name + '发动瞬步并获得2点临时行动点' }; }"
 }

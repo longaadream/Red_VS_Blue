@@ -1,11 +1,11 @@
 {
   "id": "obito-space-time",
   "name": "神威",
-  "description": "万花筒。选择地图上1个敌方棋子，将其强制移出战场。每局限用1次。",
+  "description": "万花筒。选择全图敌人，将其移出战场。每局1次。",
   "keywords": [
     "万花筒"
   ],
-  "targetText": "地图上的1个敌方棋子",
+  "targetText": "全图敌人",
   "effectTags": [
     "remove"
   ],
@@ -37,5 +37,5 @@
     ]
   },
   "code": "function executeSkill(context) { var caster = context.piece; var target = selectTarget({ type: 'piece', range: 99, filter: 'enemy' }); if (!target || target.needsTargetSelection) return target; var targetName = target.name || target.templateId; if (!context.forceRemoveEnemyPieceById(target.instanceId)) return { success: false, message: '目标无法被神威移除' }; return { success: true, message: caster.name + '发动神威，将' + targetName + '强制移出战场' }; }",
-  "previewCode": "function calculatePreview() { return { description: \"万花筒。选择地图上1个敌方棋子，将其强制移出战场。每局限用1次。\", expectedValues: {} }; }"
+  "previewCode": "function calculatePreview() { return { description: \"万花筒。选择全图敌人，将其移出战场。每局1次。\", expectedValues: {} }; }"
 }

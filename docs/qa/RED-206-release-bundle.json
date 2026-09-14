@@ -1,0 +1,40 @@
+{
+  "schemaVersion": "rvb-client-release/v1",
+  "version": "0.1.2",
+  "tag": "v0.1.2",
+  "sourceCommit": "c2667203bc129dcb326df558938dd333fdc3db41",
+  "androidVersionCode": 21,
+  "androidSignerSha256": "62efaf54f0b2f02c7b4c69cf965747bdc5b6e63c78e70c7d55888cbbbfc8d3cc",
+  "assets": [
+    {
+      "name": "RED-vs-BLUE-0.1.2-Setup.exe",
+      "size": 232985369,
+      "sha256": "44ef3535e5e635becbadfbb8310cbe4efcc55dd831e5b745981a0e160bf64c0e"
+    },
+    {
+      "name": "RED-vs-BLUE-0.1.2-Setup.exe.blockmap",
+      "size": 233878,
+      "sha256": "dbe33457f632cfa9acbd32b8f4e1a255ca99b178fd507decc27be90e93d5f403"
+    },
+    {
+      "name": "latest.yml",
+      "size": 351,
+      "sha256": "7b43b87927b46d993e73028cf75eaa9c10a70b753a21a35c00ff88062a7fba65"
+    },
+    {
+      "name": "RED-vs-BLUE-0.1.2-Android.apk",
+      "size": 89292264,
+      "sha256": "e3f9aa5d60f009a669c0123520164cce1fa5212b459251276da5d49a77e34985"
+    },
+    {
+      "name": "RED-vs-BLUE-Android-20-to-21.rvbdelta",
+      "size": 1642347,
+      "sha256": "c2e0cb9183ec31c411021bd0bde50c1c24a683fc0b476b34f0146697c2d80deb"
+    },
+    {
+      "name": "android-latest.json",
+      "size": 1048,
+      "sha256": "8153dcc2f5573e635d0a12854f7900e412157818fcc19ddbaa6a124e29852c92"
+    }
+  ]
+}

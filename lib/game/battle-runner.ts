@@ -550,7 +550,7 @@ function getActionId(action: BattleAction): string | undefined {
 }
 
 function collectRuntimeCursors(metadata: DebugBattleMetadata): Record<string, number> {
-  const cursors: Record<string, number> = { ...(metadata.authority?.runtimeCursors ?? {}) }
+  const cursors: Record<string, number> = {}
   for (const entry of metadata.actionLog) {
     const streams = (entry as Partial<BattleActionTrace>).randomStreams
     if (!Array.isArray(streams)) continue
@@ -559,7 +559,9 @@ function collectRuntimeCursors(metadata: DebugBattleMetadata): Record<string, nu
       cursors[stream.name] = stream.endCursor
     }
   }
-  return cursors
+  // Compacted logs retain system-initialize, which predates the committed
+  // authority cursor. Never let that historical trace rewind an active stream.
+  return { ...cursors, ...metadata.authority?.runtimeCursors }
 }
 
 function mergeRuntimeCursors(

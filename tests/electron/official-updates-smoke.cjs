@@ -13,11 +13,12 @@ app.whenReady().then(async () => {
   const { NsisUpdater } = require(path.join(root, 'electron-client/dist/update-runtime.cjs'))
   const runtime = new NsisUpdater({ provider: 'github', owner: 'longaadream', repo: 'Red_VS_Blue' })
   assert.equal(typeof runtime.checkForUpdates, 'function')
-  let state = { automatic: true, clientVersion: '0.1.0', resource: { phase: 'current', message: '官方资源更新已应用', version: '0.0.123' }, client: { phase: 'current', message: '客户端已是当前稳定版本' } }
+  let state = { automatic: true, source: 'github', sourceLocked: false, clientVersion: '0.1.0', resource: { phase: 'current', message: '官方资源更新已应用', version: '0.0.123' }, client: { phase: 'current', message: '客户端已是当前稳定版本' } }
   const calls = []
   ipcMain.handle('official-update-status', () => state)
   ipcMain.handle('official-update-automatic', (_event, enabled) => { calls.push('setting'); state.automatic = enabled; return state })
-  ipcMain.handle('official-update-check', () => { calls.push('check'); state.client = { phase: 'downloaded', message: '客户端更新已下载，返回主菜单后可重启安装', version: '0.2.0' }; return state })
+  ipcMain.handle('official-update-source', (_event, source) => { calls.push('source'); state.source = source; return state })
+  ipcMain.handle('official-update-check', () => { calls.push('check'); state.sourceLocked = true; state.client = { phase: 'downloaded', message: '客户端更新已下载，返回主菜单后可重启安装', version: '0.2.0' }; return state })
   ipcMain.handle('official-update-install', () => { calls.push('install-request'); return { cancelled: true } })
   const win = new BrowserWindow({ show: false, width: 1000, height: 760, webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true, preload: path.join(root, 'electron-client/dist/preload.js') } })
   // Real menu markup, CSS reset and tabletop theme; gameplay scripts are omitted.
@@ -30,15 +31,22 @@ app.whenReady().then(async () => {
     document.querySelector('.official-update-entry').click();
     await new Promise(r => setTimeout(r, 100));
     if (!document.querySelector('dialog').open) throw Error('panel missing');
+    const source = document.querySelector('[data-source]');
+    if (source.value !== 'github') throw Error('default source missing');
+    source.value = 'cos'; source.dispatchEvent(new Event('change'));
+    await new Promise(r => setTimeout(r, 100));
+    if (source.value !== 'cos') throw Error('source selection not saved');
     document.querySelector('[data-automatic]').click();
     await new Promise(r => setTimeout(r, 100));
     document.querySelector('[data-check]').click();
     await new Promise(r => setTimeout(r, 100));
     if (document.querySelector('[data-install]').hidden) throw Error('install button missing');
+    if (!source.disabled) throw Error('source must lock while installer ready');
     document.querySelector('[data-install]').click();
     await new Promise(r => setTimeout(r, 100));
   })()`)
-  assert.deepEqual(calls, ['setting', 'check', 'install-request'])
+  assert.deepEqual(calls, ['source', 'setting', 'check', 'install-request'])
+  assert.equal(state.source, 'cos')
   assert.equal(state.automatic, false)
   const layout = await win.webContents.executeJavaScript(`(() => {
     const button = document.querySelector('.official-update-entry').getBoundingClientRect();

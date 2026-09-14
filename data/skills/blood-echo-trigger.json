@@ -1,7 +1,7 @@
 {
   "id": "blood-echo-trigger",
   "name": "血色回响·触发",
-  "description": "友方棋子失去圣盾时，你获得1张【圣光充能】。",
+  "description": "友军失去圣盾时，获得1张【圣光充能】。",
   "targetText": "失去圣盾的友方",
   "effectTags": [
     "圣光",
@@ -15,5 +15,9 @@
   "maxCharges": 0,
   "powerMultiplier": 1,
   "actionPointCost": 0,
-  "code": "function executeSkill(context) {\n  if (context.statusId !== 'divine-shield') return { success: false, message: '' };\n  var sourcePiece = context.sourcePiece || context.piece;\n  if (!sourcePiece) return { success: false, message: '' };\n  var bound = context.rulePiece;\n  var liadrin = bound && battle.pieces.find(function(piece) { return piece.instanceId === bound.instanceId && piece.templateId === 'liadrin' && piece.currentHp > 0; });\n  if (!liadrin || !arePlayersAllied(battle, liadrin.ownerPlayerId, sourcePiece.ownerPlayerId)) return { success: false, message: '' };\n  if (!liadrin) return { success: false, message: '' };\n  var player = battle.players.find(function(item) { return item.playerId === liadrin.ownerPlayerId; });\n  if (!player) return { success: false, message: '' };\n  var added = addCardToHand('holy-charge', player.playerId);\n  return { success: added, message: added ? '血色回响生成了1张圣光充能' : '' };\n}"
+  "code": "function executeSkill(context) {\n  if (context.statusId !== 'divine-shield') return { success: false, message: '' };\n  var sourcePiece = context.sourcePiece || context.piece;\n  if (!sourcePiece) return { success: false, message: '' };\n  var bound = context.rulePiece;\n  var liadrin = bound && battle.pieces.find(function(piece) { return piece.instanceId === bound.instanceId && piece.templateId === 'liadrin' && piece.currentHp > 0; });\n  if (!liadrin || !arePlayersAllied(battle, liadrin.ownerPlayerId, sourcePiece.ownerPlayerId)) return { success: false, message: '' };\n  if (!liadrin) return { success: false, message: '' };\n  var player = battle.players.find(function(item) { return item.playerId === liadrin.ownerPlayerId; });\n  if (!player) return { success: false, message: '' };\n  var added = addCardToHand('holy-charge', player.playerId);\n  return { success: added, message: added ? '血色回响生成了1张圣光充能' : '' };\n}",
+  "keywords": [
+    "圣盾",
+    "充能"
+  ]
 }

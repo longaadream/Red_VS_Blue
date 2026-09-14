@@ -1,4 +1,5 @@
 import { DEPLOYMENT_FIRST_MOVE_FREE_STATUS } from './piece'
+import { areMatchAllies, type MatchTeam } from './match-teams'
 
 export interface GridPosition {
   x: number
@@ -45,6 +46,7 @@ export interface SpatialPiece {
 }
 
 export interface SpatialBattleState {
+  players?: readonly { playerId: string; teamId?: MatchTeam }[]
   extensions?: { tileEffects?: Array<{ type?: string; x?: number; y?: number; blocksLanding?: boolean }>; [key: string]: unknown }
   map: SpatialMap
   pieces: readonly SpatialPiece[]
@@ -228,6 +230,7 @@ export function isLegalSkillLanding(
   position: GridPosition,
   options: SkillLandingOptions = {},
 ): boolean {
+  if (!Number.isSafeInteger(position.x) || !Number.isSafeInteger(position.y) || !isInsideBounds(position, state.map)) return false
   if ((options.movingPieceIds ?? []).some(id => {
     const piece = state.pieces.find(candidate => candidate.instanceId === id)
     return piece && getPositionChangeRejection(piece, 'teleport') !== null
@@ -237,7 +240,7 @@ export function isLegalSkillLanding(
 
   const reserved = new Set((options.reservedCells ?? []).map(gridPositionKey))
   for (const effect of state.extensions?.tileEffects ?? []) {
-    if ((effect.blocksLanding || effect.type === 'tails-flight-reservation')
+    if (effect.blocksLanding
       && effect.x != null && effect.y != null) reserved.add(gridPositionKey({ x: effect.x, y: effect.y }))
   }
   if (reserved.has(gridPositionKey(position))) return false
@@ -352,13 +355,15 @@ export function traceProjectile<
       }
     }
 
-    const explicitPassable = tile.props?.bulletPassable ?? tile.props?.bullet
-    const blocksProjectile = typeof explicitPassable === 'boolean'
-      ? !explicitPassable
-      : tile.props?.type === 'wall' || tile.props?.type === 'cover'
+    const blocksProjectile = isProjectileTerrainBlocked(tile)
     events.push({ type: 'terrain', x, y, distance, tile, blocksProjectile })
   }
   return events
+}
+
+function isProjectileTerrainBlocked(tile: SpatialTile): boolean {
+  const explicitPassable = tile.props?.bulletPassable ?? tile.props?.bullet
+  return typeof explicitPassable === 'boolean' ? !explicitPassable : tile.props?.type === 'wall' || tile.props?.type === 'cover'
 }
 
 export function getNormalMoveRejection(
@@ -430,6 +435,7 @@ export function getLegalNormalMoveTargets(
       }
       if (!isInsideBounds(target, state.map)) break
       if (getNormalMoveRejection(state, piece, target)) break
+      if (!isLegalSkillLanding(state, target, { movingPieceIds: piece.instanceId ? [piece.instanceId] : [] })) continue
       targets.push(target)
     }
   }
@@ -459,4 +465,50 @@ export function getLegalNormalMoveTargetsForPlayer(
       && statusTag.currentUses === 1) === true
   if (player.actionPoints < 1 && !hasCurrentTurnDeploymentFirstMoveFree) return []
   return getLegalNormalMoveTargets(state, piece)
+}
+
+export interface MovementTraceOptions {
+  excludePieceId?: string
+  maxDistance: number
+  passAllies?: boolean
+  passEnemies?: boolean
+  terrain?: 'walkable' | 'projectile' | 'any'
+  blockedTerrainTypes?: readonly string[]
+}
+
+/** Ordered movement facts, independent of damage, costs and coordinate writes. */
+export function traceMovementPath(state: SpatialBattleState, origin: GridPosition, direction: GridPosition, options: MovementTraceOptions) {
+  if (!Number.isSafeInteger(options.maxDistance) || options.maxDistance < 0
+    || !['walkable', 'projectile', 'any'].includes(options.terrain ?? 'walkable')
+    || !Number.isInteger(direction.x) || !Number.isInteger(direction.y)
+    || Math.abs(direction.x) + Math.abs(direction.y) !== 1 || !isInsideBounds(origin, state.map)) {
+    throw new RangeError('Movement trace requires a bounded cardinal path')
+  }
+  const cells: GridPosition[] = []
+  const encounters: Array<{ type: 'piece' | 'terrain' | 'boundary'; x: number; y: number; pieceId?: string }> = []
+  let lastLandableCell: GridPosition = { ...origin }
+  let blocked = false
+  const mover = state.pieces.find(p => p.instanceId === options.excludePieceId)
+  for (let step = 1; step <= Math.min(options.maxDistance, state.map.width + state.map.height); step++) {
+    const cell = { x: origin.x + direction.x * step, y: origin.y + direction.y * step }
+    const tile = state.map.tiles.find(t => t.x === cell.x && t.y === cell.y)
+    if (!isInsideBounds(cell, state.map) || !tile) {
+      encounters.push({ type: 'boundary', ...cell }); blocked = true; break
+    }
+    const terrainBlocked = options.terrain === 'any' ? false
+      : options.terrain === 'projectile' ? isProjectileTerrainBlocked(tile) : !tile.props?.walkable
+    if (terrainBlocked
+      || options.blockedTerrainTypes?.includes(tile.props?.type ?? '')) {
+      encounters.push({ type: 'terrain', ...cell }); blocked = true; break
+    }
+    const occupant = getLivingOccupantAt(state.pieces, cell, options.excludePieceId)
+    if (occupant) {
+      encounters.push({ type: 'piece', ...cell, pieceId: occupant.instanceId })
+      const allied = areMatchAllies({ players: state.players ?? [] }, mover?.ownerPlayerId ?? '', occupant.ownerPlayerId ?? '')
+      if (!(allied ? options.passAllies : options.passEnemies)) { blocked = true; break }
+    }
+    cells.push(cell)
+    if (!occupant && isLegalSkillLanding(state, cell, { movingPieceIds: options.excludePieceId ? [options.excludePieceId] : [] })) lastLandableCell = cell
+  }
+  return { cells, encounters, lastLandableCell, blocked, reachedTarget: cells.length === options.maxDistance }
 }

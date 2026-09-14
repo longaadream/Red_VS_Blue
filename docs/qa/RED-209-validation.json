@@ -1,0 +1,67 @@
+{
+  "issue": "RED-209",
+  "baseSha": "2263c0273af793d0163059411491a846b96b3090",
+  "date": "2026-09-14",
+  "finalGame": {
+    "command": "npm.cmd test -- tests/game --maxWorkers=1",
+    "passed": 1355,
+    "failed": 9,
+    "total": 1364,
+    "testFiles": 121,
+    "durationSeconds": 135.24,
+    "failures": [
+      "FAIL  tests/game/ai-semantics.test.ts > AI semantic contract > audits every current manifest and makes a changed admission manifest fail closed",
+      "FAIL  tests/game/battle-ui-boundary.test.ts > battle presentation boundary > keeps renderer and DOM responsibilities behind explicit modules",
+      "FAIL  tests/game/player-colyseus-contract.test.ts > RED-116 Electron lobby profile bridge > pins the local Profile Identity before navigating to the server lobby",
+      "FAIL  tests/game/player-colyseus-contract.test.ts > RED-116 Electron lobby profile bridge > resolves the client local runtime through trusted game IPC",
+      "FAIL  tests/game/red-183-regressions.test.ts > RED-183 character rules and selection UI regressions > keeps selection, encyclopedia, history, tutorial, and related-card UI contracts visible in source",
+      "FAIL  tests/game/skillcode-static-audit.test.ts > RED-45 data parse and production loader smoke > parses every JSON definition and loads every skill, rule, and card",
+      "FAIL  tests/game/skillcode-static-audit.test.ts > RED-45 skillCode static compatibility audit > classifies every executable field and every lexical free variable",
+      "FAIL  tests/game/sonic-roster.test.ts > Sonic roster mechanics > documents the complete momentum acquisition and consumption contract",
+      "FAIL  tests/game/targeting.test.ts > Demo targeting admission fixture > covers the current admitted piece, skill, and card manifests with a stable preparation hash"
+    ],
+    "allFailuresReproducedOnBase": true
+  },
+  "checks": {
+    "typecheck": "passed",
+    "lint": "passed",
+    "encoding": "passed",
+    "mainBaseline": "passed; behind=0",
+    "build": "browser, practice and Android engines built",
+    "candidateTests": "107/107 passed",
+    "pullAndSpatialTests": "90/90 passed",
+    "independentPositionTests": "19/19 passed",
+    "flightMarkerTests": "9/9 passed; independently reviewed affected group 67/67 passed"
+  },
+  "artifacts": [
+    {
+      "file": "lib/game/position-change.ts",
+      "sha256": "d1e0a70b24c9f10f2a9688394a0d4f71287addfcbded0d2a579076f192ead239"
+    },
+    {
+      "file": "lib/game/spatial.ts",
+      "sha256": "4e078f8ad9ff0b2fb47770e6c291b155442156e863e6dee10b3485bd487de8a4"
+    },
+    {
+      "file": "lib/game/tile-contact.ts",
+      "sha256": "38433c4f91085cd88cf762e01f142a09be2b0617f4444d3938f0e52d41e4e220"
+    },
+    {
+      "file": "lib/game/position-write-guard.ts",
+      "sha256": "ed55a2db392bec065cf83d63e41d475f583b061f3bf22c07e9e787c598a1b54a"
+    },
+    {
+      "file": "data/pages/js/game-engine.js",
+      "sha256": "e5cbe0a782db0f038fe94ae642d274c62584d3aa39fcd4ea972c98e3b80d042d"
+    },
+    {
+      "file": "data/pages/js/practice/engine.js",
+      "sha256": "e183a39ebf24f2562f544ca4bb27a18d91cb6c44460f27554d6b05274a969c51"
+    },
+    {
+      "file": "android-client/www/js/game-engine.js",
+      "sha256": "e5cbe0a782db0f038fe94ae642d274c62584d3aa39fcd4ea972c98e3b80d042d"
+    }
+  ],
+  "flightMarkerRevision": "2026-09-14: flight markers allow entry; occupied expiry cancels both transfers and cleans statuses; vacated expiry succeeds; Obito candidates and execution allow marked destinations; actual blocksLanding remains enforced."
+}

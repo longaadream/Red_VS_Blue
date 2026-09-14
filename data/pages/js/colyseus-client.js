@@ -422,7 +422,7 @@
     return _room.request('roomRpc', { method: method, data: payload }, { timeout: timeoutMs })
   }
 
-  async function requestAt(baseUrl, method, data, timeoutMs) {
+  async function requestAt(baseUrl, method, data, timeoutMs, signal) {
     var base = normalizedBaseUrl(baseUrl)
     var payload = data || {}
     timeoutMs = timeoutMs || 5000
@@ -434,7 +434,7 @@
       window.sessionStorage.setItem('rvb_room_invite:' + base + ':' + found.room.id, code)
       return found.room
     }
-    if (method === 'system.health') return fetchJson(base + '/healthz', timeoutMs)
+    if (method === 'system.health') return fetchJson(base + '/healthz', timeoutMs, undefined, signal)
     if (method === 'catalog.identity') return fetchJson(base + '/catalog/identity', timeoutMs)
     if (method === 'catalog.maps') return fetchJson(base + '/catalog/maps' + (payload.mode === '2v2' ? '?mode=2v2' : ''), timeoutMs)
     if (method === 'catalog.pieces') return fetchJson(base + '/catalog/pieces', timeoutMs)
@@ -532,8 +532,13 @@
     return room.request('roomRpc', { method: method, data: data || {} }, { timeout: timeoutMs || 5000 })
   }
 
-  async function fetchJson(url, timeoutMs, headers) {
+  async function fetchJson(url, timeoutMs, headers, signal) {
     var controller = new AbortController()
+    var cancel = function () { controller.abort() }
+    if (signal) {
+      if (signal.aborted) cancel()
+      else signal.addEventListener('abort', cancel, { once: true })
+    }
     var timer = setTimeout(function () { controller.abort() }, timeoutMs || 5000)
     var diagnosticUrl = requestUrlForDiagnostics(url)
     try {
@@ -542,6 +547,7 @@
       if (!response.ok) throw makeRpcError(body)
       return body
     } catch (error) {
+      if (signal && signal.aborted) throw makeRpcError({ code: 'COLYSEUS_HTTP_CANCELLED', error: 'Colyseus HTTP request cancelled' })
       if (controller.signal.aborted) {
         throw makeRpcError({
           code: 'COLYSEUS_HTTP_TIMEOUT',
@@ -557,6 +563,7 @@
       })
     } finally {
       clearTimeout(timer)
+      if (signal) signal.removeEventListener('abort', cancel)
     }
   }
 

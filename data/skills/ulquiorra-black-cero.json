@@ -1,7 +1,7 @@
 {
   "id": "ulquiorra-black-cero",
   "name": "黑虚闪",
-  "description": "灵压。对6格内1个敌方棋子造成等同于本棋子攻击力200%的法术伤害。",
+  "description": "灵压。选择敌人（6），造成2x攻击力的伤害。",
   "keywords": [
     "灵压"
   ],
@@ -11,9 +11,9 @@
     "name": "灵压",
     "rule": "rule-spiritual-pressure"
   },
-  "targetText": "6格内1个敌方棋子",
+  "targetText": "敌人（6）",
   "effectTags": [
-    "魔法伤害"
+    "伤害"
   ],
   "icon": "⚫",
   "kind": "active",

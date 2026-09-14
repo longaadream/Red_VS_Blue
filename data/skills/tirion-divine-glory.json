@@ -1,7 +1,7 @@
 {
   "id": "tirion-divine-glory",
   "name": "圣骑士的荣耀",
-  "description": "游戏开始时，本棋子获得圣盾。本棋子失去圣盾时，攻击力+1。",
+  "description": "游戏开始时获得圣盾。失去圣盾时攻击力+1。",
   "keywords": [
     "圣盾"
   ],

@@ -144,6 +144,18 @@ describe('public PVE enemy plans',()=>{
     const result=session.step(session.snapshot().revision)
     expect(result.state.pieces.find(p=>p.instanceId===cap.instanceId)).toMatchObject({x:15,y:23,currentHp:25})
   })
+  it('hooks only up to the first movement obstacle while keeping projectile damage',async()=>{
+    const state=await fixture(),w=adventureBoundary(state)!,cap=state.pieces.find(p=>p.ownerPlayerId===HUMAN)!,foe=state.pieces.find(p=>p.instanceId===w.activeEnemyIds[0])!
+    cap.x=12;cap.y=23;cap.currentHp=cap.maxHp=30;cap.defense=0;cap.rules=[]
+    foe.x=16;foe.y=23;foe.attack=5;foe.skills=[{skillId:'pve-hook',level:1,currentCooldown:0}]
+    state.pieces=[cap,foe]
+    const tile=state.map.tiles.find(t=>t.x===14&&t.y===23)!
+    tile.props.walkable=false;tile.props.bulletPassable=true
+    w.plans=planAdventureEnemies(state)
+    const session=new AdventureSession(state);enemyPhase(session)
+    const result=session.step(session.snapshot().revision)
+    expect(result.state.pieces.find(p=>p.instanceId===cap.instanceId)).toMatchObject({x:13,y:23,currentHp:25})
+  })
   it('tracking slash follows its locked target after movement instead of hitting the old square',async()=>{
     const state=await fixture(0,2),w=adventureBoundary(state)!,cap=state.pieces.find(p=>p.ownerPlayerId===HUMAN)!,foe=state.pieces.find(p=>p.instanceId===w.activeEnemyIds[0])!
     cap.x=14;cap.y=23;cap.currentHp=cap.maxHp=30;cap.defense=0;cap.rules=[]

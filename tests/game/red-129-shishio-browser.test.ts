@@ -255,7 +255,8 @@ function makeIchigoFixture(browser: any) {
       sourceId: 'toxin-owner',
     },
   ]
-  blue.rules = [browser.loadRuleById('rule-blackwidow-toxin-player', true)]
+  blue.rules = [browser.loadRuleById('rule-sasuke-amaterasu-move', true),
+    browser.loadRuleById('rule-shishio-burn-move', true), browser.loadRuleById('rule-blackwidow-toxin-player', true)]
   state.extensions = {
     ...(state.extensions ?? {}),
     amaterasuCells: [{ x: 3, y: 0 }],

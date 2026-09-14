@@ -27,6 +27,7 @@ import type { SkillDefinition } from '@/lib/game/skills'
 import { prepareAction } from '@/lib/game/targeting'
 import { getNormalMoveRejection, getPositionChangeRejection } from '@/lib/game/spatial'
 import { addPieceStatus, expireOwnerStatuses } from '@/lib/game/status-lifecycle'
+import { dropChargeCrystal } from '@/lib/game/charge-crystals'
 import { makePiece, makeState, makeTile } from '../helpers/minimal-state'
 
 const DATA_ROOT = join(process.cwd(), 'data')
@@ -104,6 +105,18 @@ function withTargetCredentials(state: BattleState, action: Record<string, any>) 
 }
 
 describe('Venom data contract', () => {
+  it('credits the dragged owner for every crossed crystal using projectile terrain rules', () => {
+    const caster = makePiece({ instanceId: 'venom', x: 0, y: 0 })
+    const enemy = makePiece({ instanceId: 'dragged', ownerPlayerId: 'player-blue', x: 4, y: 0 })
+    const state = makeState({ pieces: [caster, enemy] })
+    setTile(state, 2, 0, { type: 'hole', walkable: false, bulletPassable: true })
+    for (const x of [1, 2, 3, 4]) dropChargeCrystal(state, { id: `drag-${x}`, sourcePieceId: 'dead', x, y: 0 })
+    expect(executeSkill(symbioteDrag(), state, 'venom', { x: 5, y: 0 }).success).toBe(true)
+    expect(enemy.x).toBe(1)
+    expect(state.players.map(p => p.chargePoints)).toEqual([0, 3])
+    expect(state.actions?.find(a => a.type === 'positionChanged')?.payload?.path).toEqual([{ x: 3, y: 0 }, { x: 2, y: 0 }, { x: 1, y: 0 }])
+    expect(state.extensions?.tileEffects).toHaveLength(1)
+  })
   it('loads the approved dark-faction piece stats and skill list', () => {
     const piece = loadJson<any>('pieces', 'red-venom.json')
 

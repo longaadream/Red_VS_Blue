@@ -2,6 +2,8 @@ import { assertContentAvailable, battleContentMode, ContentUnavailableError, typ
 import { adventureCards, recordAdventurePassiveHit, type AdventureHandCard } from './adventure-card-state'
 import { adventureBoundary } from './adventure-boundary'
 import { getSkillById } from './skill-repository'
+import { writePiecePosition, withPositionWriteGuard } from './position-write-guard'
+import { beginCompoundPositionContacts } from './tile-contact'
 import { areMatchAllies } from './match-teams'
 import { addPieceStatus, removePieceStatus, expireHolderStatuses, type StatusHolder } from './status-lifecycle'
 import { checkpointBattlePresentation, recordBattlePresentationBlock, createBattlePresentationQueue } from './battle-presentation-recording'
@@ -991,11 +993,17 @@ export function executeCardFunction(
     context.cardInstance = cardInstance || context.cardInstance || null
     restoreSummonQueueContext = bindDeclaredSummonQueueContext(context, sealedContent)
 
-    const env = createCardEffectFunctions(battle, playerId, context)
+    const cardEffects = createCardEffectFunctions(battle, playerId, context)
+    const env = { ...cardEffects, flow: createSkillCodeFlow(battle, context, 'card', {
+      selectTarget: cardEffects.selectTarget, selectOption: cardEffects.selectOption,
+      dealDamage: cardEffects.dealDamage, healDamage: cardEffects.healDamage,
+      addCardToHand: cardEffects.addCardToHand, discardCard: cardEffects.discardCard, getHand: cardEffects.getHand,
+    }) }
     const fullCode = `
         (function(env) {
           const context = env.context;
           const battle = env.battle;
+          const flow = env.flow;
           const playerId = env.playerId;
           const selectTarget = env.selectTarget;
           const selectOption = env.selectOption;
@@ -1022,7 +1030,7 @@ export function executeCardFunction(
     const executeCard = getSkillExecutionCaches().dynamicCodeRuntime.compileExpression<(environment: typeof env) => SkillExecutionResult>({
       surface: 'cardCode', contentId: cardDef.id, code: fullCode, entry: 'executeCard(context)',
     })
-    const result = executeCard(env)
+    const result = withPositionWriteGuard(battle, () => executeCard(env))
     finishSealedContentExecution(battle, sealedContent)
     return result || { success: false, message: '卡牌效果无返回值' }
   } catch (error: any) {
@@ -1519,7 +1527,7 @@ export function loadRuleById(
               addSkillById, removeSkillById, selectOption, fireEvent,
               validateRule: (id: string) => { if (!loadRuleForBattle(battle, id)) throw new Error('Unknown flow rule: ' + id) },
             })
-            const result = executeRuleCode(battle, context, globalDealDamage, globalHealDamage, addCardToHand, checkToxin, addStatusEffectById, removeStatusEffectById, addPlayerRuleById, removePlayerRuleById, addRuleById, removeRuleById, addPlayerStatusEffectById, removePlayerStatusEffectById, addPlayerSkillById, removePlayerSkillById, addSkillById, removeSkillById, selectOption, fireEvent, getRuleMath(), getRuleDate(), flow);
+            const result = withPositionWriteGuard(battle, () => executeRuleCode(battle, context, globalDealDamage, globalHealDamage, addCardToHand, checkToxin, addStatusEffectById, removeStatusEffectById, addPlayerRuleById, removePlayerRuleById, addRuleById, removeRuleById, addPlayerStatusEffectById, removePlayerStatusEffectById, addPlayerSkillById, removePlayerSkillById, addSkillById, removeSkillById, selectOption, fireEvent, getRuleMath(), getRuleDate(), flow));
             if (result && result.needsOptionSelection) return result;
             return result || { success: false, message: '' };
           } catch (error) {
@@ -1570,6 +1578,8 @@ export function loadRuleById(
               )
               if (skillDef) {
                 const sealedContent = beginSealedContentExecution(battle, skillDef)
+                const positionContacts = ['naruto-shadow-clone', 'recall-move-trigger', 'recall-skill-trigger', 'recall-endturn-trigger'].includes(skillDef.id)
+                  ? beginCompoundPositionContacts(battle, [(context.rulePiece || context.piece || context.sourcePiece).instanceId]) : undefined
                 let restoreSummonQueueContext: (() => void) | undefined
                 try {
                   
@@ -1796,8 +1806,9 @@ export function loadRuleById(
                     selectTarget: undefined, teleport: undefined,
                     validateRule: (id: string) => { if (!loadRuleForBattle(battle, id)) throw new Error('Unknown flow rule: ' + id) },
                   } as unknown as Parameters<typeof createFlowRuntime>[3]) }
-                  const result = executeTriggeredSkill(flowEnvironment);
+                  const result = withPositionWriteGuard(battle, () => executeTriggeredSkill(flowEnvironment));
                   finishSealedContentExecution(battle, sealedContent)
+                  positionContacts?.flush()
                   writeLog(`[triggerSkill] Skill execution result for ${skillId}: ${JSON.stringify(result)}`);
                   battleDebugLog(`Skill execution result:`, result);
                   return result;
@@ -1819,6 +1830,7 @@ export function loadRuleById(
                 } finally {
                   restoreSummonQueueContext?.()
                   sealedContent.cleanup?.()
+                  positionContacts?.cleanup()
                 }
               } else {
                 const definitionError = new Error(
@@ -1936,6 +1948,8 @@ export type DamageType = "physical" | "magical" | "true" | "toxin"
  * 技能执行上下文，提供给技能函数使用
  */
 export interface SkillExecutionContext {
+  /** Holder of a rule-triggered skill; the event source may be a different piece. */
+  rulePiece?: PieceInstance
   piece: {
     instanceId: string
     templateId: string
@@ -2532,8 +2546,8 @@ function createEffectFunctions(battle: BattleState, sourcePiece: PieceInstance, 
         }
         const destination = resolveExactSkillLanding(battle, { x, y: y! })
         if (!destination) return { type: 'teleport', success: false }
-        changePiecePositions(battle, [{ pieceId: movingPiece.instanceId, ...destination }], 'teleport')
-        return { type: 'teleport', target: destination, success: true }
+        const moved = changePiecePositions(battle, [{ pieceId: movingPiece.instanceId, ...destination }], 'teleport')
+        return { type: 'teleport', target: destination, success: moved.success }
       }
       if (getPositionChangeRejection(sourcePiece, 'teleport')) return { type: 'teleport', success: false }
       let targetPos: { x: number, y: number } | undefined;
@@ -2559,8 +2573,8 @@ function createEffectFunctions(battle: BattleState, sourcePiece: PieceInstance, 
             const isOccupied = battle.pieces.some(p => p.x === targetPos.x && p.y === targetPos.y && p.currentHp > 0);
             if (!isOccupied) {
               // 执行传送
-              changePiecePositions(battle, [{ pieceId: sourcePiece.instanceId, ...targetPos }], 'teleport');
-              return { type: "teleport", target: targetPos, success: true };
+              const moved = changePiecePositions(battle, [{ pieceId: sourcePiece.instanceId, ...targetPos }], 'teleport');
+              return { type: "teleport", target: targetPos, success: moved.success };
             } else {
               console.warn(`Teleport failed: Position ${targetPos.x},${targetPos.y} is occupied`);
             }
@@ -2581,8 +2595,8 @@ function createEffectFunctions(battle: BattleState, sourcePiece: PieceInstance, 
           
           if (availableTiles.length > 0) {
             const randomTile = availableTiles[Math.floor(rng() * availableTiles.length)];
-            changePiecePositions(battle, [{ pieceId: sourcePiece.instanceId, x: randomTile.x, y: randomTile.y }], 'teleport');
-            return { type: "teleport", target: randomTile, success: true };
+            const moved = changePiecePositions(battle, [{ pieceId: sourcePiece.instanceId, x: randomTile.x, y: randomTile.y }], 'teleport');
+            return { type: "teleport", target: randomTile, success: moved.success };
           } else {
             console.warn("Teleport failed: No available walkable positions");
           }
@@ -3323,8 +3337,7 @@ function commitSummonAfterDeath(
   piece.attack = profile.attack
   piece.defense = profile.defense
   piece.moveRange = profile.moveRange
-  piece.x = candidate.deathX!
-  piece.y = candidate.deathY!
+  writePiecePosition(piece, candidate.deathX!, candidate.deathY!)
   piece.skills = profile.skillIds.map(skillId => ({ skillId, currentCooldown: 0 }))
   if (profile.revive) {
     piece.skills = candidate.piece.initialDefinition!.skills.map(skill => ({
@@ -3355,9 +3368,9 @@ function commitSummonAfterDeath(
     targetPiece: cloneEffectTransactionValue(piece),
     target: cloneEffectTransactionValue(piece),
     skillId: profile.skillId,
-    targetPosition: { x: piece.x, y: piece.y },
-    targetX: piece.x,
-    targetY: piece.y,
+    targetPosition: { x: candidate.deathX!, y: candidate.deathY! },
+    targetX: candidate.deathX!,
+    targetY: candidate.deathY!,
     pieceTemplateId: piece.templateId,
     faction: piece.faction,
     ...queueContext(chain, context),
@@ -3377,8 +3390,7 @@ function commitSummonAfterDeath(
   if (battle.pieces.some(entry => entry.currentHp > 0 && entry.x === finalPosition.x && entry.y === finalPosition.y)) {
     rejection('DeathBatch post-death summon position is occupied')
   }
-  piece.x = finalPosition.x
-  piece.y = finalPosition.y
+  writePiecePosition(piece, finalPosition.x, finalPosition.y)
   battle.pieces.push(piece)
 
   const afterResult = checkSynchronousTriggers(battle, {
@@ -4601,8 +4613,7 @@ function prepareStoredPieceSummon(
   }
   normalizePreparedPieceArrays(piece)
   piece.isCore = stored ? Boolean(stored.isCore) : false
-  piece.x = entry.spec.x
-  piece.y = entry.spec.y
+  writePiecePosition(piece, entry.spec.x, entry.spec.y)
   piece.ownerPlayerId = entry.source.ownerPlayerId
   piece.faction = piece.faction || entry.source.faction || fallback.faction
   piece.currentHp = piece.maxHp || fallback.maxHp
@@ -4818,8 +4829,7 @@ export function resolveDeclaredContentSummonBatch(
       )
       entry.finalX = finalPosition.x
       entry.finalY = finalPosition.y
-      entry.piece.x = finalPosition.x
-      entry.piece.y = finalPosition.y
+      writePiecePosition(entry.piece, finalPosition.x, finalPosition.y)
     }
 
     // Phase 4: revalidate every redirected position as one reservation set.
@@ -5277,6 +5287,8 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
     return { success: false, message: `技能定义无效: ${expectedSkillId || '<empty>'}` }
   }
   const sealedContent = beginSealedContentExecution(battle, skillDef)
+  const positionContacts = ['naruto-shadow-clone', 'recall-move-trigger', 'recall-skill-trigger', 'recall-endturn-trigger'].includes(skillDef.id)
+    ? beginCompoundPositionContacts(battle, [(skillDef.id.startsWith('recall-') ? context.rulePiece || context.piece : context.piece).instanceId]) : undefined
   try {
     battleDebugLog('=== executeSkillFunction called ===');
     battleDebugLog('Skill ID:', skillDef.id);
@@ -5634,8 +5646,9 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
             ...(!flowEntry ? { forceRemoveEnemyPieceById } : {}),
             validateRule: (id: string) => { if (!loadRuleForBattle(battle, id)) throw new Error('Unknown flow rule: ' + id) },
           } as unknown as Parameters<typeof createFlowRuntime>[3]) }
-          const result = executeSkill(flowEnvironment);
+          const result = withPositionWriteGuard(battle, () => executeSkill(flowEnvironment));
           finishSealedContentExecution(battle, sealedContent)
+          positionContacts?.flush()
 
           for (const snapshot of beforeState.movementBlocked) {
             const current = battle.pieces.find(piece => piece.instanceId === snapshot.instanceId)
@@ -5752,6 +5765,7 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
     throw error;
   } finally {
     sealedContent.cleanup?.()
+    positionContacts?.cleanup()
   }
 }
 

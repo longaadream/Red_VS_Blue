@@ -19,7 +19,7 @@ export function prepareOfficialUpdateNetwork(): Promise<Electron.Session> {
 }
 
 function describeNetworkError(error: Error): Error {
-  if (error.message.includes('ERR_NAME_NOT_RESOLVED')) return new Error('无法解析 GitHub 更新地址，请检查网络或系统代理后重试（ERR_NAME_NOT_RESOLVED）')
+  if (error.message.includes('ERR_NAME_NOT_RESOLVED')) return new Error('无法解析更新源地址，请检查网络、系统代理或切换下载源后重试（ERR_NAME_NOT_RESOLVED）')
   if (/ERR_PROXY_CONNECTION_FAILED|ERR_TUNNEL_CONNECTION_FAILED/.test(error.message)) return new Error('无法连接更新代理，请检查代理服务后重试（' + error.message + '）')
   return error
 }

@@ -2,9 +2,12 @@ import { registerPlugin } from '@capacitor/core'
 import { appendAndroidPack, resolveAndroidProfile, type AndroidPackInput } from '../lib/content-pipeline/android/resolve'
 import { PackSignatureEnvelopeV1Schema } from '../lib/content-pipeline/contracts'
 import { parseStrictJsonBytesV1 } from '../lib/content-pipeline/core/json-safety'
+import { assertOfficialResourceIdentity,isNewerOfficialResource,type OfficialResourceIdentity } from './official-resource-identity'
 
 interface Native {
-  info(): Promise<{version:string; versionCode:number; progress:string;config:{updateUrl:string;trustedPublisherKeyIds:string[]};state:{stable:string;previous:string;candidate:string|null}}>
+  info(): Promise<{version:string; versionCode:number; progress:string;source:'github'|'cos';config:{updateUrl:string;trustedPublisherKeyIds:string[]};state:{stable:string;previous:string;candidate:string|null}}>
+  setUpdateSource(args:{source:string}):Promise<{source:'github'|'cos'}>
+  downloadOfficialPack():Promise<{id:string;version:string;publisherKeyId:string;engineAbi:string;contentAbi:string}>
   checkUpdate():Promise<{available:boolean;update?:{versionName:string;notes:string;size:number}}>
   downloadUpdate():Promise<unknown>; installUpdate():Promise<{message:string}>; cancel():Promise<void>
   choosePack():Promise<{id?:string;cancelled?:boolean}>; downloadPack(args:{url:string}):Promise<{id:string}>
@@ -21,6 +24,7 @@ const button=(id:string)=>el(id) as HTMLButtonElement
 const say=(text:string)=>{el('message').textContent=text}
 const decode=(value:string)=>Uint8Array.from(atob(value),c=>c.charCodeAt(0))
 let busy=false
+let updateAvailable=false,updateReady=false
 let info:Awaited<ReturnType<Native['info']>>
 function assertNoReservedBattle(){
   const records=Object.keys(sessionStorage).filter(key=>key.startsWith('rvb_colyseus_reconnect:'))
@@ -32,7 +36,12 @@ function assertNoReservedBattle(){
 async function refresh(){
   info=await native.info()
   el('version').textContent=info.version
-  el('updateInfo').textContent=info.config.updateUrl?'可检查发行者提供的新版本':'尚未配置线上更新源；当前版本仍可离线使用'
+  ;(el('updateSource') as HTMLSelectElement).value=info.source
+  el('sourceInfo').textContent=info.source==='cos'?'COS 香港源：用于游戏与官方资源包更新。':'GitHub 官方源：用于游戏与官方资源包更新。'
+  el('updateInfo').textContent=(info.source==='cos'||info.config.updateUrl)?'可检查发行者提供的新版本':'尚未配置线上更新源；当前版本仍可离线使用'
+  button('check').disabled=false
+  button('download').disabled=!updateAvailable
+  button('install').disabled=!updateReady
   el('profileInfo').textContent=`当前：${info.state.stable==='base'?'内置资源':info.state.stable.slice(0,12)}${info.state.candidate?' · 候选 '+info.state.candidate.slice(0,12):''}`
   button('activate').disabled=!info.state.candidate
   button('previous').disabled=info.state.previous===info.state.stable
@@ -42,7 +51,7 @@ async function source(id:string):Promise<AndroidPackInput>{
   for(const path of meta.paths){if(path==='manifest.json'||path==='signature.json')continue;const file=await native.readSourceFile({id,path});entries.push({path,bytes:decode(file.base64)})}
   return{id,source:{manifestBytes:decode(meta.manifest),signatureBytes:decode(meta.signature),entries}}
 }
-async function importSource(id:string){
+async function importSource(id:string,expected?:OfficialResourceIdentity){
   try{
     say('正在验证签名、内容和兼容性…')
     const bundled=await source('base'),incoming=await source(id)
@@ -50,19 +59,27 @@ async function importSource(id:string){
     const parent=[]
     for(const key of parentRecord.chain)parent.push(key==='base'?bundled:await source(key))
     const envelope=PackSignatureEnvelopeV1Schema.parse(parseStrictJsonBytesV1(incoming.source.signatureBytes!))
+    if(expected && (envelope.keyId!==expected.publisherKeyId||!info.config.trustedPublisherKeyIds.includes(envelope.keyId)))throw Error('官方资源包签名发行者与清单不一致')
     const known=info.config.trustedPublisherKeyIds.includes(envelope.keyId)
     // Validate all content and the actual signature before offering a native trust decision.
     const record=appendAndroidPack(bundled,parent,incoming,[...info.config.trustedPublisherKeyIds,envelope.keyId])
+    if(expected)assertOfficialResourceIdentity(record.profile,envelope.keyId,info.config.trustedPublisherKeyIds,expected)
+    if(expected&&info.state.stable!=='base'){
+      const current=resolveAndroidProfile(bundled,parent,info.config.trustedPublisherKeyIds)
+      if(!isNewerOfficialResource(expected.version,current.profile)){await native.discardSource({id});say('当前资源版本已相同或更新，已保留现有资源。');return}
+    }
     if(!known && !(await native.trustPublisher({keyId:envelope.keyId})).trusted)throw Error('未信任发行者，资源包未安装')
     await native.commitCandidate({record});say('校验通过，已保存候选版本。点击“启用候选版本”后生效。')
   }catch(error){await native.discardSource({id}).catch(()=>{});throw error}
 }
 function action(id:string,run:()=>Promise<void>){button(id).onclick=async()=>{
-  if(busy)return;busy=true;const disabled=new Map<HTMLButtonElement,boolean>();document.querySelectorAll<HTMLButtonElement>('button:not(#cancel)').forEach(b=>{disabled.set(b,b.disabled);b.disabled=true})
-  try{await run()}catch(e){say(e instanceof Error?e.message:String(e))}finally{busy=false;disabled.forEach((value,b)=>{b.disabled=value});await refresh().catch(e=>say(String(e)))}
+  if(busy)return;busy=true;(el('updateSource') as HTMLSelectElement).disabled=true;const disabled=new Map<HTMLButtonElement,boolean>();document.querySelectorAll<HTMLButtonElement>('button:not(#cancel)').forEach(b=>{disabled.set(b,b.disabled);b.disabled=true})
+  try{await run()}catch(e){say(e instanceof Error?e.message:String(e))}finally{busy=false;(el('updateSource') as HTMLSelectElement).disabled=false;disabled.forEach((value,b)=>{b.disabled=value});await refresh().catch(e=>say(String(e)))}
 }}
-action('check',async()=>{button('download').disabled=true;button('install').disabled=true;const r=await native.checkUpdate();el('notes').textContent=r.available?`${r.update!.versionName} · ${(r.update!.size/1024/1024).toFixed(1)} MiB\n${r.update!.notes||''}`:'';say(r.available?'发现新版本，可下载更新':'当前已是最新版本');setTimeout(()=>{button('download').disabled=!r.available},0)})
-action('download',async()=>{say('正在下载 APK…');await native.downloadUpdate();say('下载和签名校验通过，可安装更新');setTimeout(()=>{button('install').disabled=false},0)})
+action('saveSource',async()=>{await native.setUpdateSource({source:(el('updateSource') as HTMLSelectElement).value});updateAvailable=false;updateReady=false;el('notes').textContent='';say('下载源已保存，请重新检查更新')})
+action('officialPack',async()=>{say('正在检查并下载所选源的官方资源…');const r=await native.downloadOfficialPack();await importSource(r.id,r)})
+action('check',async()=>{updateAvailable=false;updateReady=false;el('notes').textContent='';const r=await native.checkUpdate();updateAvailable=r.available;el('notes').textContent=r.available?`${r.update!.versionName} · ${(r.update!.size/1024/1024).toFixed(1)} MiB\n${r.update!.notes||''}`:'';say(r.available?'发现新版本，可下载更新':'当前已是最新版本')})
+action('download',async()=>{updateReady=false;say('正在下载 APK…');await native.downloadUpdate();updateReady=true;say('下载和签名校验通过，可安装更新')})
 action('install',async()=>{assertNoReservedBattle();say((await native.installUpdate()).message)})
 action('choose',async()=>{const r=await native.choosePack();if(r.id)await importSource(r.id);else say('已取消选择')})
 action('fetchPack',async()=>{const url=(el('packUrl') as HTMLInputElement).value.trim();if(!url.startsWith('https://'))throw Error('请输入HTTPS资源包地址');say('正在下载资源包…');const r=await native.downloadPack({url});await importSource(r.id)})

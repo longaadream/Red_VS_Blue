@@ -1,7 +1,7 @@
 {
   "id": "turalyon-expedition-order",
   "name": "征讨号令",
-  "description": "选择一种圣光手牌获得。",
+  "description": "选择一种圣光手牌，获得1张。",
   "targetText": "一种圣光手牌",
   "effectTags": [
     "手牌"
@@ -28,14 +28,14 @@
             "value": "holy-heal"
           },
           {
-            "label": "圣光冲锋",
+            "label": "圣光充能",
             "value": "holy-charge"
           }
         ]
       }
     ]
   },
-  "code": "function executeSkill(context) { var caster = context.piece; var choice = selectOption({ title: '征讨号令：选择一种圣光手牌', options: [{ label: '圣光惩戒', value: 'holy-smite' }, { label: '圣光治疗', value: 'holy-heal' }, { label: '圣光冲锋', value: 'holy-charge' }] }); if (choice === undefined || choice === null || choice.needsOptionSelection) return choice; if (['holy-smite','holy-heal','holy-charge'].indexOf(choice) === -1) return { success: false, message: '无效的圣光手牌选择' }; addCardToHand(choice, caster.ownerPlayerId); return { success: true, message: caster.name + '发布征讨号令，获得1张圣光手牌' }; }",
-  "previewCode": "function calculatePreview() { return { description: \"选择一种圣光手牌获得。\", expectedValues: { generatedCards: 1 } }; }",
+  "code": "function executeSkill(context) { var caster = context.piece; var choice = selectOption({ title: '征讨号令：选择一种圣光手牌', options: [{ label: '圣光惩戒', value: 'holy-smite' }, { label: '圣光治疗', value: 'holy-heal' }, { label: '圣光充能', value: 'holy-charge' }] }); if (choice === undefined || choice === null || choice.needsOptionSelection) return choice; if (['holy-smite','holy-heal','holy-charge'].indexOf(choice) === -1) return { success: false, message: '无效的圣光手牌选择' }; addCardToHand(choice, caster.ownerPlayerId); return { success: true, message: caster.name + '发布征讨号令，获得1张圣光手牌' }; }",
+  "previewCode": "function calculatePreview() { return { description: \"选择一种圣光手牌，获得1张。\", expectedValues: { generatedCards: 1 } }; }",
   "range": "self"
 }

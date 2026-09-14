@@ -1,7 +1,7 @@
 {
   "id": "grimmjow-panther-claw",
   "name": "豹王之爪",
-  "description": "灵压。对4格内1个敌方棋子连续攻击5次，每次造成等同于本棋子攻击力75%的物理伤害。",
+  "description": "灵压。选择敌人（4），攻击5次，每次造成0.75x攻击力的伤害。",
   "keywords": [
     "灵压"
   ],
@@ -11,9 +11,9 @@
     "name": "灵压",
     "rule": "rule-spiritual-pressure"
   },
-  "targetText": "4格内1个敌方棋子",
+  "targetText": "敌人（4）",
   "effectTags": [
-    "物理伤害",
+    "伤害",
     "多段攻击"
   ],
   "icon": "🖐️",

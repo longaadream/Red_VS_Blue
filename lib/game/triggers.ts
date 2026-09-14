@@ -135,6 +135,8 @@ export type TriggerType =
   | "afterMove"             // 移动后
   | "beforeMove"            // 即将移动前
   | "beforePiecePositionChange" // Any explicit board relocation, including skill movement
+  | "afterPiecePositionChange" // Successful relocation, distinct from a normal move action
+  | "afterPiecePathContact" // Actual path excluding origin, including destination once
   | "beforeSkillUse"        // 即将使用技能前
   | "afterHealDealt"        // 造成治疗后
   | "afterHealTaken"        // 受到治疗后

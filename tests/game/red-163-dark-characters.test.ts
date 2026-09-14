@@ -589,7 +589,9 @@ describe('RED-163 dark character contract', () => {
     }, prisoner.instanceId)
     const before = JSON.stringify(state)
 
-    expect(() => runBattleAction(state, action, { rootSeed: 171 })).toThrow(/cannot be moved by a skill/)
+    const resolved = runBattleAction(state, action, { rootSeed: 171 }).state
+    expect(resolved.pieces.map(piece => [piece.instanceId, piece.x, piece.y])).toEqual(state.pieces.map((piece: any) => [piece.instanceId, piece.x, piece.y]))
+    expect(resolved.pieces[0].statusTags).toEqual(state.pieces[0].statusTags)
     expect(JSON.stringify(state)).toBe(before)
   })
 

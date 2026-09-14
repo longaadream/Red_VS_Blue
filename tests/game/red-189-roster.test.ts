@@ -154,20 +154,21 @@ describe('RED-189 Obito and Doomfist', () => {
     expect(resolved.pieces[0].skills[0].currentCooldown).toBe(3)
     expect(resolved.pendingTargetSelection).toBeUndefined()
     expect(resolved.pieces[1].statusTags).toContainEqual(freeMove)
-    expect(resolved.players[0].chargePoints).toBe(0)
-    expect(resolved.extensions!.tileEffects).toContainEqual(crystal)
+    expect(resolved.players[0].chargePoints).toBe(1)
+    expect(resolved.extensions!.tileEffects).not.toContainEqual(crystal)
   })
 
-  it('rejects a reserved landing without applying a partial transfer', () => {
+  it('includes a flight marker in highlighted candidates and completes the transfer', () => {
     const state = transportFixture()
     state.extensions!.tileEffects = [{ type: 'tails-flight-reservation', x: 6, y: 1 }]
     const selecting = transferCommand(state)
     delete selecting.extraTargets
     const prepared = prepareAction(state, selecting)
     expect(prepared.kind).toBe('needTarget')
-    if (prepared.kind === 'needTarget') expect(prepared.candidates).not.toContainEqual({ type: 'cell', x: 6, y: 1 })
+    if (prepared.kind === 'needTarget') expect(prepared.candidates).toContainEqual({ type: 'cell', x: 6, y: 1 })
     const before = structuredClone(state)
-    expect(() => runBattleAction(state, transferCommand(state), { rootSeed: 189 })).toThrow()
+    const resolved = runBattleAction(state, transferCommand(state), { rootSeed: 189 }).state
+    expect(resolved.pieces.find(p => p.instanceId === 'ally')).toMatchObject({ x: 6, y: 1 })
     expect(state).toEqual(before)
   })
 

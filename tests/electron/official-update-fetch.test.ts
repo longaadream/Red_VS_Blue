@@ -47,7 +47,7 @@ it('uses an isolated system-proxy session instead of the game direct session', a
   expect(isolated.setProxy).toHaveBeenCalledWith({ mode: 'system' })
   expect(net.request).toHaveBeenCalledWith(expect.objectContaining({ session: isolated, useSessionCookies: false, redirect: 'manual' }))
   f.request.emit('error', new Error('net::ERR_NAME_NOT_RESOLVED'))
-  await expect(f.pending).rejects.toThrow('无法解析 GitHub 更新地址')
+  await expect(f.pending).rejects.toThrow('无法解析更新源地址')
 })
 it('uses an explicitly configured launcher proxy without shipping a hardcoded port', async () => {
   vi.stubEnv('RVB_UPDATE_PROXY', 'http://127.0.0.1:18765')

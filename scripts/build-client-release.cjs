@@ -9,7 +9,8 @@ const yaml = require('js-yaml')
 async function main() {
   const root = path.resolve(__dirname, '..')
   const version = JSON.parse(fs.readFileSync(path.join(root, 'package.json'))).version
-  const out = path.resolve(root, `../pr-tools/client-release/v${version}`)
+  const out = path.resolve(root, process.env.RVB_CLIENT_BUILD_OUTPUT || `../pr-tools/client-release/v${version}`)
+  if (process.env.RVB_CLIENT_BUILD_OUTPUT && fs.existsSync(out)) throw Error('Requested client build output already exists: ' + out)
   const config = JSON.parse(fs.readFileSync(path.join(root, 'config/electron-builder.client.json')))
   const electronDist = process.env.RVB_RELEASE_ELECTRON_DIST
   if (!electronDist || !fs.existsSync(path.join(electronDist, 'electron.exe'))) throw Error('Set RVB_RELEASE_ELECTRON_DIST to the validated Electron runtime')

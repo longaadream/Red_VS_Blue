@@ -2,6 +2,8 @@
 
 更新：2026-09-03（RED-158 Phase F 主线同步）
 
+位移约束更新：2026-09-14，基于已合并的 RED-209 / PR #189。
+
 ## 1. 结论
 
 Windows 玩家产品只有 Electron Client。它承载静态页面与 Profile HTTP 服务，并在启动时准备应用私有的
@@ -46,6 +48,23 @@ Electron Client
 | 内容层 | `data/**`、`lib/content-pipeline/**` | Profile、规则数据、签名内容和资源包 |
 
 ## 4. 命令与状态流
+
+### 棋子坐标的唯一提交边界
+
+**任何棋盘位移都必须经过统一位移体系，禁止调用方直接修改棋子坐标。**内容层使用
+`flow.effects.move(changes, kind, path?)`，pending 回调使用 `ctx.flow.effects.move`；规则引擎统一进入
+[`changePiecePositions`](../../lib/game/position-change.ts)。路径查询只返回事实，不能代替最终提交。
+
+禁止给 `x/y` 赋值或通过动态字段、`Object.assign`、替换棋子对象绕过；UI 动画坐标不能回写权威棋子。
+底层 `writePiecePosition` 是提交器和既有生命周期的内部能力，不是技能、规则或新业务代码的快捷入口。
+部署、召唤、复活、死亡和强制离场仍由各自权威生命周期负责，不伪装成普通位移，也不向内容开放直接坐标写入。
+
+提交器统一负责落点、路径、禁锢、整组原子性、位置事件与经过拾取；换位/编队必须一次提交整组，不能逐个写入。
+落点失效正常取消，禁止自行改到最近格或随机格。接口、事件和验证要求见
+[游戏规则核心](ENGINE_CORE.md#5-空间与战斗事实)、[公共流程接口](CONTENT_FLOW_RUNTIME.md#位置接口red-209)及
+[ADR-0034](../decisions/ADR-0034-position-contact.md)。
+
+### 权威动作流
 
 ```text
 player intent

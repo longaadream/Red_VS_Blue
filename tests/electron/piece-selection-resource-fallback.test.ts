@@ -215,6 +215,26 @@ test('standalone builder saves both alignments and reloads cards without submitt
   expect(harness.wsRequest).not.toHaveBeenCalled()
 })
 
+test('dark room selection retains the builder and can save and reload its eight-piece roster', async () => {
+  const evil = makePieces('evil', 8)
+  const harness = createHarness({
+    search: '?roomId=dark-room&playerId=alice&alignment=dark',
+    fetchPackJson: localPack([...makePieces('good', 8), ...evil]),
+    wsRequest: async () => ({ alignment: 'dark', faction: 'blue' }),
+  })
+  await harness.contract.init()
+  expect(harness.contract.getPieces().map(piece => piece.id)).toEqual(evil.map(piece => piece.id))
+  harness.contract.setSelectedIds(evil.map(piece => piece.id))
+  harness.element('deckPresetName').value = '暗方测试棋组'
+  harness.contract.savePreset()
+  harness.contract.newPreset()
+  harness.contract.choosePresetCard(0)
+  expect(harness.contract.getSelectedIds()).toEqual(evil.map(piece => piece.id))
+  expect(harness.element('deckGallery').innerHTML).toContain('暗方测试棋组')
+  expect(harness.element('confirmBtn').disabled).toBe(false)
+  expect(harness.alerts).toEqual([])
+})
+
 describe('Electron piece-selection resource contract', () => {
   const lightPieces = makePieces('good', 10)
   const darkPieces = makePieces('evil', 9)
