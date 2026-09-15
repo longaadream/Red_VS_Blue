@@ -72,7 +72,7 @@ describe('RED-163 dark character contract', () => {
     expect(json('data/pieces/dark-aizen.json')).toMatchObject({
       faction: 'evil',
       image: 'aizen.jpg',
-      stats: { maxHp: 9, attack: 4, defense: 0, moveRange: 4 },
+      stats: { maxHp: 9, attack: 5, defense: 0, moveRange: 4 },
     })
     expect(json('data/skills/aizen-kyoka-suiguetsu.json')).toMatchObject({ actionPointCost: 1 })
     const ulquiorra = json('data/pieces/dark-ulquiorra.json')
@@ -92,7 +92,7 @@ describe('RED-163 dark character contract', () => {
     })
     expect(grimmjow.skills).not.toContainEqual(expect.objectContaining({ skillId: 'grimmjow-panther-claw' }))
     expect(json('data/skills/grimmjow-hunting-instinct.json').description).toBe(
-      '敌方棋子行动后，若其位于本棋子4格内，可将本棋子移动至2格内1个空地格。若随后与该敌方棋子相邻，则攻击其2次，每次造成等同于本棋子攻击力75%的物理伤害。',
+      '敌人行动后若位于自身4格内，可移动至空地格（2）。移动后若与该敌人相邻，攻击2次，每次造成0.75x攻击力的伤害。',
     )
     for (const image of ['aizen.jpg', 'ulquiorra.jpg', 'grimmjow.jpg']) expectJpeg(`public/${image}`)
   })
@@ -167,12 +167,16 @@ describe('RED-163 dark character contract', () => {
     const state = makeState({ pieces: [ulquiorra, enemy] }) as any
 
     withRuleRuntime(new RuleRuntime({ rootSeed: 163, tick: 1 }), () => {
+      dealDamage(ulquiorra, enemy, 0, 'true', state, 'zero-outgoing')
+      dealDamage(enemy, ulquiorra, 0, 'true', state, 'zero-incoming')
+      expect(ulquiorra.currentHp).toBe(6)
+      expect(ulquiorra.statusTags.some((tag: any) => tag.type === 'ulquiorra-resurreccion-progress')).toBe(false)
       dealDamage(ulquiorra, enemy, 1, 'true', state, 'hit-1')
       dealDamage(enemy, ulquiorra, 1, 'true', state, 'hit-2')
       dealDamage(ulquiorra, enemy, 1, 'true', state, 'hit-3')
     })
 
-    expect(ulquiorra.currentHp).toBe(11)
+    expect(ulquiorra.currentHp).toBe(8)
     expect(ulquiorra.statusTags).toContainEqual(expect.objectContaining({
       type: 'ulquiorra-resurreccion-progress', intensity: 3,
     }))
@@ -180,7 +184,7 @@ describe('RED-163 dark character contract', () => {
     expect(ulquiorra.skills).not.toContainEqual(expect.objectContaining({ skillId: 'ulquiorra-black-cero' }))
 
     globalTriggerSystem.checkTriggers(state, { type: 'beginTurn', playerId: 'player-red' })
-    expect(ulquiorra).toMatchObject({ attack: 5, moveRange: 4, currentHp: 11, maxHp: 12 })
+    expect(ulquiorra).toMatchObject({ attack: 5, moveRange: 4, currentHp: 8, maxHp: 12 })
     expect(ulquiorra.skills).toContainEqual(expect.objectContaining({ skillId: 'ulquiorra-black-cero' }))
     expect(ulquiorra.statusTags).toContainEqual(expect.objectContaining({
       type: 'resurreccion', name: '归刃',
@@ -190,7 +194,7 @@ describe('RED-163 dark character contract', () => {
     withRuleRuntime(new RuleRuntime({ rootSeed: 163, tick: 2 }), () => {
       dealDamage(ulquiorra, ulquiorra, 1, 'true', state, 'self-hit')
     })
-    expect(ulquiorra.currentHp).toBe(6)
+    expect(ulquiorra.currentHp).toBe(5)
   })
 
   it('fully settles Grimmjow death before summoning his transformed form once', () => {
@@ -620,7 +624,7 @@ describe('RED-163 dark character contract', () => {
       instanceId: 'hunt-grimmjow', templateId: 'dark-grimmjow', ownerPlayerId: 'player-red', x: 0, y: 1,
       currentHp: 10, maxHp: 10, attack: 4, moveRange: 4,
     }) as any
-    grimmjow.rules = [rule('rule-grimmjow-hunt-after-move'), rule('rule-grimmjow-hunt-after-skill')]
+    grimmjow.rules = [rule('rule-grimmjow-hunt-after-move'), rule('rule-grimmjow-hunt-after-skill'), rule('rule-grimmjow-destruction-instinct')]
     const enemy = makePiece({
       instanceId: 'hunt-enemy', ownerPlayerId: 'player-blue', faction: 'blue', x: 3, y: 1,
       currentHp: 20, maxHp: 20, attack: 4, moveRange: 3,
@@ -667,6 +671,7 @@ describe('RED-163 dark character contract', () => {
       instanceId: 'panther-target', ownerPlayerId: 'player-blue', faction: 'blue', x: 2, y: 0,
       currentHp: 30, maxHp: 30, attack: 4,
     }) as any
+    grimmjow.rules = [rule('rule-grimmjow-destruction-instinct')]
     grimmjow.skills = [{ skillId: 'grimmjow-panther-claw', currentCooldown: 0, usesRemaining: -1 }]
     const state = makeState({ pieces: [grimmjow, enemy] }) as any
     state.skillsById['grimmjow-panther-claw'] = loadAllSkillsById()['grimmjow-panther-claw']

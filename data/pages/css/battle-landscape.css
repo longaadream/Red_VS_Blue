@@ -5,6 +5,24 @@
 #mobileHandToggle, #mobileSkillsToggle, #mobileCardPlay, #mobileDockToggle { display: none; }
 #tileStatusSummary { display: none; }
 
+/* Desktop tools and player cards own separate horizontal space. The real
+ * match has more tools than a training preview, so do not let them overflow
+ * a 228px container into the opponent card. */
+@media (min-width: 1100px) and (min-height: 601px) {
+  body .topbar {
+    width: 304px !important;
+    max-width: 304px !important;
+    box-sizing: border-box;
+    flex-wrap: wrap !important;
+    justify-content: flex-end !important;
+  }
+  body #playerResCards {
+    right: 350px !important;
+    flex-wrap: wrap !important;
+    gap: 12px !important;
+  }
+}
+
 @media (orientation: landscape) and (max-height: 600px) {
   :root {
     --battle-hud-offset: 60px;

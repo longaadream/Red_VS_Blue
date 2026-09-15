@@ -1,7 +1,7 @@
 {
   "id": "ulquiorra-high-speed-regeneration",
   "name": "超速再生",
-  "description": "造成或受到伤害后，回复自身2点。",
+  "description": "造成或受到伤害后，回复自身1点。",
   "keywords": [],
   "targetText": "被动",
   "effectTags": [
