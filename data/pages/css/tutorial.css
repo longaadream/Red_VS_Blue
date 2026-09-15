@@ -412,5 +412,7 @@ body.tutorial-mode:has(#tutorialLessonDialog.is-busy) #statusMsg { display: none
 @media (max-height: 600px) and (orientation: landscape) {
   body #tutorialLessonDialog, body #tutorialLessonDialog.is-guiding.is-collapsed { top: 58px; width: min(540px, calc(100vw - 140px)); padding: 3px 9px; gap: 5px; }
   body #tutorialLessonDialog .tutorial-dialog__objective { font-size: 13px; }
-  #tutorialActionBubble { width: 240px; padding: 8px 11px; font-size: 13px; }
+  #tutorialActionBubble { width: min(540px, calc(100vw - 140px)); padding: 4px 9px; font-size: 12px; line-height: 1.35; border-width: 2px; }
+  #tutorialActionBubble::after { display: none; }
+  body.tutorial-mode #statusMsg { display: none !important; }
 }

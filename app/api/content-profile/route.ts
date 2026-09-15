@@ -4,6 +4,7 @@ import {
 } from '@/lib/content-pipeline/runtime/profile-runtime'
 
 import { requireProfileAdmin } from './_shared'
+import { withStartupVerification } from '@/lib/content-pipeline/runtime/startup-verification-observer'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -11,6 +12,7 @@ export const dynamic = 'force-dynamic'
 export async function GET(request: Request) {
   const denied = requireProfileAdmin(request)
   if (denied) return denied
+  return withStartupVerification(request, async () => {
   try {
     const context = getProfileRuntimeContextV1()
     const state = context.store.readState()
@@ -26,4 +28,5 @@ export async function GET(request: Request) {
       message: error instanceof Error ? error.message : String(error),
     }, { status: 503 })
   }
+  })
 }

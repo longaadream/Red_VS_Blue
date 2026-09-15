@@ -1,6 +1,7 @@
 import { bindStableRuntimeProfileV1, logProfileEventV1, reconcileRuntimePveAuthorityV1, recoverRuntimeProfileOnStartupV1 } from '@/lib/content-pipeline/runtime/profile-runtime'
 
 import { profileApiError, requireProfileAdmin } from '../_shared'
+import { withStartupVerification } from '@/lib/content-pipeline/runtime/startup-verification-observer'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -8,6 +9,7 @@ export const dynamic = 'force-dynamic'
 export async function POST(request: Request) {
   const denied = requireProfileAdmin(request)
   if (denied) return denied
+  return withStartupVerification(request, async () => {
   try {
     const keepAdmissionPaused = new URL(request.url).searchParams.get('keepAdmissionPaused') === '1'
     process.env.RVB_PROFILE_ADMISSION_PAUSED ||= 'startup-recovery'
@@ -25,4 +27,5 @@ export async function POST(request: Request) {
     process.env.RVB_PROFILE_ADMISSION_PAUSED ||= 'startup-recovery-failed'
     return profileApiError(error)
   }
+  })
 }

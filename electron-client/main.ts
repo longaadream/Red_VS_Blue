@@ -20,6 +20,7 @@ import { installedResourceVersion, resolvedResourceVersion } from './resource-up
 import { officialUpdateFetch, prepareOfficialUpdateNetwork } from './official-update-fetch'
 import { assertOfficialUpdateIpcAllowed } from './official-update-ipc'
 import { StartupUpdateGate } from './startup-update-gate'
+import { StartupWatchdog } from './startup-watchdog'
 import { parseUpdateSource, readUpdateSettings, type UpdateSource } from './update-source'
 import {
   LocalAuthorityRecoveryBudget,
@@ -52,10 +53,9 @@ const BATTLE_AUTHORITY_SHUTDOWN_RESULT = 'rvb:battle-authority:shutdown-result'
 const SERVER_GRACEFUL_SHUTDOWN_TIMEOUT_MS = 6_500
 const LOCAL_AUTHORITY_AUTO_RECOVERY_MAX_ATTEMPTS = 3
 const LOCAL_AUTHORITY_AUTO_RECOVERY_DELAYS_MS = [250, 750, 1_500] as const
-// A saturated Windows host can spend tens of seconds loading the packaged
-// authority before it can even request its first PostgreSQL connection. Keep
-// the watchdog bounded, but do not confuse slow startup with process failure.
-const LOCAL_AUTHORITY_READY_TIMEOUT_MS = 240_000
+// Real progress renews the 90-second idle deadline. This is only the final
+// per-attempt safety ceiling, never a substitute for checking progress.
+const LOCAL_AUTHORITY_READY_TIMEOUT_MS = 900_000
 const PROFILE_ARCHIVE_MAX_BYTES = 32 * 1024 * 1024
 const PROFILE_ADMIN_KEY = randomBytes(32).toString('hex')
 let allowAppExit = false
@@ -641,8 +641,10 @@ function parseGameProfileIdentity(value: unknown): GameProfileIdentity {
   return identity as GameProfileIdentity
 }
 
-function fetchAuthorityProfileIdentity(port: number): Promise<GameProfileIdentity> {
+function fetchAuthorityProfileIdentity(port: number, timeoutMs = 30_000): Promise<GameProfileIdentity> {
   return new Promise((resolve, reject) => {
+    // The authority verifies the profile before reporting ready. Keep an absolute
+    // request deadline as a transport safeguard, not as the startup readiness check.
     const request = http.get(`http://127.0.0.1:${port}/catalog/identity`, response => {
       const chunks: Buffer[] = []
       let total = 0
@@ -663,9 +665,11 @@ function fetchAuthorityProfileIdentity(port: number): Promise<GameProfileIdentit
           reject(error)
         }
       })
+      response.on('error', reject)
     })
+    const deadline = setTimeout(() => request.destroy(new Error('LOCAL_AUTHORITY_PROFILE_IDENTITY_TIMEOUT')), timeoutMs)
+    request.on('close', () => clearTimeout(deadline))
     request.on('error', reject)
-    request.setTimeout(3_000, () => request.destroy(new Error('LOCAL_AUTHORITY_PROFILE_IDENTITY_TIMEOUT')))
   })
 }
 function waitForLocalServerReady(port: number, timeoutMs = 20000): Promise<boolean> {
@@ -715,23 +719,63 @@ function waitForLocalServerReady(port: number, timeoutMs = 20000): Promise<boole
 }
 
 function waitForGameAuthorityReady(port: number, timeoutMs = 20000): Promise<boolean> {
-  const deadline = Date.now() + timeoutMs
-  return new Promise(resolve => {
+  const child = gameServerProcess
+  if (!child) return Promise.resolve(false)
+  const watchdog = new StartupWatchdog(Date.now(), 90_000, timeoutMs)
+  return new Promise((resolve, reject) => {
+    let settled = false
+    let request: http.ClientRequest | undefined
+    let retry: ReturnType<typeof setTimeout> | undefined
+    const finish = (ready: boolean, error?: Error) => {
+      if (settled) return
+      settled = true
+      clearInterval(check)
+      clearTimeout(retry)
+      child.off('message', onProgress)
+      child.off('exit', onExit)
+      child.off('error', onError)
+      request?.destroy()
+      if (error) {
+        localAuthorityNotice = error.message
+        appendAuthorityDiagnostic('lifecycle', error.message)
+        reportStartupProgress(4, error.message, true)
+        reject(error)
+      } else resolve(ready)
+    }
+    const onProgress = (value: unknown) => {
+      const failure = value as { type?: unknown; error?: unknown } | null
+      if (failure?.type === 'rvb:authority:startup-failed' && typeof failure.error === 'string') {
+        finish(false, new Error(`${watchdog.message}失败：${failure.error.slice(0, 500)}`))
+        return
+      }
+      if (!watchdog.observe(value, Date.now())) return
+      localAuthorityNotice = watchdog.message
+      appendAuthorityDiagnostic('lifecycle', watchdog.message)
+      reportStartupProgress(4, watchdog.message)
+    }
+    const onExit = (code: number | null) => finish(false, new Error(`对局服务已退出（${code ?? 'unknown'}）：${watchdog.message}`))
+    const onError = (error: Error) => finish(false, new Error(`无法启动对局服务：${error.message}`))
+    const check = setInterval(() => {
+      if (startupCancelled) return finish(false)
+      const failure = watchdog.failure(Date.now())
+      if (failure) finish(false, new Error(failure))
+    }, 250)
+    child.on('message', onProgress)
+    child.once('exit', onExit)
+    child.once('error', onError)
+    const schedule = () => { if (!settled) retry = setTimeout(probe, 250) }
     const probe = () => {
-      if (startupCancelled || !gameServerProcess) {
-        resolve(false)
+      if (settled) return
+      if (startupCancelled || gameServerProcess !== child) {
+        finish(false)
         return
       }
-      if (Date.now() >= deadline) {
-        resolve(false)
-        return
-      }
-      const request = http.get(`http://127.0.0.1:${port}/healthz`, response => {
+      request = http.get(`http://127.0.0.1:${port}/healthz`, response => {
         response.resume()
-        if (response.statusCode === 200) resolve(true)
-        else setTimeout(probe, 250)
+        if (response.statusCode === 200) finish(true)
+        else schedule()
       })
-      request.on('error', () => setTimeout(probe, 250))
+      request.on('error', schedule)
       request.setTimeout(1000, () => request.destroy())
     }
     probe()
@@ -812,6 +856,8 @@ async function resolveAuthorityDatabaseUrl(): Promise<string> {
 
 function localAuthorityStartupErrorMessage(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error)
+  if (/^(准备游戏长时间无进展|准备游戏超过总时限|对局服务已退出|资源服务已退出|无法启动对局服务|正在.*失败：)/.test(message)) return message
+  if (/^PROFILE_API_RESPONSE_ABORTED/.test(message)) return '资源服务响应中断，请重新准备游戏。'
   if (message === LOCAL_GAME_OPEN_CANCELLED) {
     return '本地主机启动已取消，请稍后重试。'
   }
@@ -933,6 +979,7 @@ async function startLocalGameAuthorityOnce(
   }
   try {
     localAuthorityProfileIdentity = await fetchAuthorityProfileIdentity(actualGamePort)
+    localAuthorityNotice = null
   } catch (error) {
     localGameReady = false
     localAuthorityProfileIdentity = null
@@ -954,6 +1001,7 @@ function discardUnhealthyAuthorityProcess(): void {
 function recoverUnexpectedLocalAuthorityExit(code: number | null, manual = false): Promise<void> {
   if (localAuthorityRecoveryPromise) return localAuthorityRecoveryPromise
   const recovery = (async () => {
+    let lastFailure = ''
     if (manual) {
       localAuthorityRecoveryBudget.rearm()
       appendAuthorityDiagnostic('lifecycle', 'manual recovery rearmed automatic recovery budget')
@@ -974,6 +1022,7 @@ function recoverUnexpectedLocalAuthorityExit(code: number | null, manual = false
         localAuthorityNotice = localMatchAborted
           ? '上一局已终止；本机服务连续恢复 3 次失败，请在主菜单手动重试。'
           : '本机服务连续恢复 3 次失败，已停止自动恢复；需要使用时请手动重试。'
+        if (lastFailure) localAuthorityNotice += ` 最后原因：${lastFailure}`
         appendAuthorityDiagnostic('lifecycle', 'automatic recovery exhausted; manual retry required')
         return
       }
@@ -1002,6 +1051,7 @@ function recoverUnexpectedLocalAuthorityExit(code: number | null, manual = false
       try {
         await startStableLocalServerAndRecover(undefined, LOCAL_AUTHORITY_READY_TIMEOUT_MS)
       } catch (error) {
+        lastFailure = error instanceof Error ? error.message : String(error)
         console.error('[client] bounded Colyseus authority recovery attempt failed:', error)
         appendAuthorityDiagnostic(
           'lifecycle',
@@ -1172,6 +1222,7 @@ async function startLocalServer(
 type JsonObject = Record<string, any>
 
 type ProfileApiRequestOptions = {
+  startup?: boolean
   method?: 'GET' | 'POST'
   json?: JsonObject
   archive?: Buffer
@@ -1192,6 +1243,7 @@ function profileApiRequest<T extends JsonObject = JsonObject>(
   const body = options.archive
     ?? (options.json ? Buffer.from(JSON.stringify(options.json), 'utf8') : null)
   return new Promise((resolve, reject) => {
+    const startupRequestId = options.startup ? randomBytes(16).toString('hex') : null
     const request = http.request({
       hostname: '127.0.0.1',
       port: actualLocalPort,
@@ -1199,12 +1251,15 @@ function profileApiRequest<T extends JsonObject = JsonObject>(
       method: options.method ?? 'GET',
       headers: {
         'x-rvb-profile-admin-key': PROFILE_ADMIN_KEY,
+        ...(startupRequestId ? { 'x-rvb-startup-request': startupRequestId } : {}),
         ...(options.archive ? { 'content-type': 'application/zip' } : {}),
         ...(options.json ? { 'content-type': 'application/json' } : {}),
         ...(body ? { 'content-length': body.byteLength } : {}),
         ...(!app.isPackaged ? { 'x-rvb-local-dev-profile': '1' } : {}),
       },
     }, response => {
+      response.on('error', reject)
+      response.on('aborted', () => reject(new Error('PROFILE_API_RESPONSE_ABORTED')))
       const chunks: Buffer[] = []
       let total = 0
       response.on('data', (chunk: Buffer) => {
@@ -1233,7 +1288,29 @@ function profileApiRequest<T extends JsonObject = JsonObject>(
       })
     })
     request.on('error', reject)
-    request.setTimeout(30_000, () => request.destroy(new Error('PROFILE_API_TIMEOUT')))
+    if (startupRequestId) {
+      const child = serverProcess
+      const watchdog = new StartupWatchdog(Date.now())
+      const onProgress = (value: unknown) => {
+        if ((value as { requestId?: unknown } | null)?.requestId !== startupRequestId) return
+        if (watchdog.observe(value, Date.now())) {
+          localAuthorityNotice = watchdog.message
+          reportStartupProgress(2, watchdog.message)
+        }
+      }
+      const onExit = () => request.destroy(new Error(`资源服务已退出：${watchdog.message}`))
+      child?.on('message', onProgress)
+      child?.once('exit', onExit)
+      const timer = setInterval(() => {
+        const failure = watchdog.failure(Date.now())
+        if (startupCancelled || failure) request.destroy(new Error(failure ?? LOCAL_GAME_OPEN_CANCELLED))
+      }, 250)
+      request.once('close', () => {
+        clearInterval(timer)
+        child?.off('message', onProgress)
+        child?.off('exit', onExit)
+      })
+    } else request.setTimeout(30_000, () => request.destroy(new Error('PROFILE_API_TIMEOUT')))
     if (body) request.write(body)
     request.end()
   })
@@ -1761,18 +1838,18 @@ async function selectAndActivateRollback(
 async function recoverProfileOnStartup(expectedGeneration?: number): Promise<void> {
   localProfileIdentity = null
   if (!localServerReady) throw new Error('PROFILE_SERVER_NOT_READY')
-  let recovered = await profileApiRequest('/api/content-profile/recovery', { method: 'POST' })
+  let recovered = await profileApiRequest('/api/content-profile/recovery', { method: 'POST', startup: true })
   if (recovered.requiresProcessRestart === true) {
     await killServer(false, false)
     if (expectedGeneration !== undefined) assertLocalGameOpeningCurrent(expectedGeneration)
     await startLocalServer(stableProfileBinding(), expectedGeneration)
     if (!localServerReady) throw new Error('PROFILE_STARTUP_RECOVERY_RESTART_FAILED')
-    recovered = await profileApiRequest('/api/content-profile/recovery', { method: 'POST' })
+    recovered = await profileApiRequest('/api/content-profile/recovery', { method: 'POST', startup: true })
     if (recovered.requiresProcessRestart === true) {
       throw new Error('PROFILE_STARTUP_RECOVERY_DID_NOT_CONVERGE')
     }
   }
-  const report = await profileApiRequest('/api/content-profile')
+  const report = await profileApiRequest('/api/content-profile', { startup: true })
   const stableProfileHash = recovered.state?.stable?.resolvedProfileHash
   if (
     typeof stableProfileHash !== 'string'
@@ -1792,6 +1869,10 @@ async function startStableLocalServerAndRecover(
   expectedGeneration?: number,
   authorityReadyTimeoutMs?: number,
 ): Promise<void> {
+  // A missing executable cannot recover by repeatedly revalidating the Profile.
+  if (!gameServerProcess && !findColyseusEntry(getAppRoot())) {
+    throw new Error('LOCAL_AUTHORITY_ENTRY_MISSING')
+  }
   await startStableProfileServerAndRecover(expectedGeneration)
   if (expectedGeneration !== undefined) assertLocalGameOpeningCurrent(expectedGeneration)
   await startLocalGameAuthority(stableProfileBinding(), authorityReadyTimeoutMs)
@@ -2744,7 +2825,7 @@ app.whenReady().then(async () => {
       localAuthorityNotice = null
     } else {
       localAuthorityRecoveryStatus = 'manual-required'
-      localAuthorityNotice = '本机服务尚未就绪；打开“我当主机”即可手动重试。'
+      localAuthorityNotice ||= '本机服务尚未就绪；打开“我当主机”即可手动重试。'
     }
   } catch (error) {
     if (startupCancelled || win.isDestroyed()) return

@@ -223,7 +223,7 @@
       text.textContent = failure || opponentNote || message
       const prompts = {
         deploy: '增援要离所有棋子超过 5 格，包括友军。横着、竖着各算一步；第 6 格才可部署。',
-        'move-new': '这枚增援本回合第一次移动免费。点击亮起的格子。',
+        'move-new': '先点新部署的棋子，再点可移动格；本回合首次移动免费。',
         card: '点幸运币查看，再点一次打出。',
         heal: '点“圣光闪耀”，再点受伤的乌瑟尔。',
         shield: '点“圣光盾”，给乌瑟尔自己加盾。',
