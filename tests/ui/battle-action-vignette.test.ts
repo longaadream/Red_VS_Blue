@@ -5,6 +5,7 @@ import { Script, createContext } from 'node:vm'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 type VignetteModule = {
+  showsBanner: (event: Record<string, unknown>) => boolean
   eventCells(group: unknown, model: unknown): { source: unknown }
   groupEvents(events: unknown[]): Array<{ rootEventId: string; root: { eventId: string }; children: unknown[] }>
   createQueue(options?: Record<string, unknown>): {
@@ -474,7 +475,7 @@ describe('RED-167 action vignette queue', () => {
     deliver({ name: '过期卡牌', description: '不可覆盖移动' })
     await Promise.resolve()
     expect(floatLayer.children[0].innerHTML).not.toContain('过期卡牌')
-    expect(floatLayer.children[0].className).toContain('is-action-banner')
+    expect(floatLayer.children[0].className).not.toContain('is-action-banner')
     vignette.dispose()
   })
 
@@ -832,4 +833,43 @@ describe('RED-167 action vignette queue', () => {
     expect(model).toEqual(before)
     vignette.dispose()
   })
+})
+
+
+it('announces only manually initiated skills and cards, never their automatic effects', () => {
+  const ui = loadModule()
+  for (const kind of ['skill', 'chargeSkill', 'card']) {
+    expect(ui.showsBanner({ kind })).toBe(true)
+    expect(ui.showsBanner({ kind, parentEventId: 'manual-action' })).toBe(false)
+  }
+  expect(ui.showsBanner({ kind: 'choiceResolved', skillId: 'shield' })).toBe(true)
+  expect(ui.showsBanner({ kind: 'choiceResolved', skillId: 'shield', result: { cancelled: true } })).toBe(false)
+  for (const kind of ['move', 'deploy', 'passive', 'damage', 'death', 'actionPoints', 'choiceResolved']) expect(ui.showsBanner({ kind })).toBe(false)
+})
+
+it('plays a bulk attribute increase together without merging subsequent hits', () => {
+  const ui = loadModule()
+  const events = [root(1), child(1, 1, { kind: 'statChanged', sourcePieceId: 'caster', targetPieceIds: ['a'] }), child(1, 2, { kind: 'statChanged', sourcePieceId: 'caster', targetPieceIds: ['b'] }), child(1, 3, { kind: 'damage' }), child(1, 4, { kind: 'damage' })]
+  const groups = ui.groupEvents(events)
+  expect(groups).toHaveLength(4)
+  expect(groups[1].children).toHaveLength(1)
+})
+
+it('plays the same status applied to multiple targets in one beat', () => {
+  const groups = loadModule().groupEvents([root(1), ...['a', 'b', 'c'].map((id, index) => child(1, index + 1, { kind: 'statusAdded', statusType: 'empowered', sourcePieceId: 'caster', targetPieceIds: [id] }))])
+  expect(groups).toHaveLength(2)
+  expect(groups[1].children).toHaveLength(2)
+})
+
+it('finishes a batch of status applications in 250ms', () => {
+  vi.useFakeTimers()
+  try {
+    const queue = loadModule().createQueue()
+    queue.update({ presentationEvents: [], turn: { isViewerTurn: true } })
+    queue.update({ presentationEvents: [root(1, { kind: 'statusAdded', statusType: 'buff' })], turn: { isViewerTurn: true } })
+    expect(queue.getDiagnostics().activeRootId).toBe('action-1:0')
+    vi.advanceTimersByTime(250)
+    expect(queue.getDiagnostics().activeRootId).toBeNull()
+    queue.dispose()
+  } finally { vi.useRealTimers() }
 })

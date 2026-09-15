@@ -138,16 +138,19 @@ describe('sequential board playback', () => {
     presentation.dispose()
   })
 
-  it('updates one status at a time and keeps the summary in sync', () => {
+  it('applies sibling status additions together and keeps the summary in sync', () => {
     const { presentation, frames } = setup()
     presentation.update(model())
     const sequence = [events()[0], ...['a', 'b'].map((id, index) => ({
       eventId: 'hit:' + (index + 1), rootEventId: 'hit:0', parentEventId: 'hit:0', kind: 'statusAdded',
       statusId: id, statusType: id, targetPieceIds: ['target'], sequence: index + 1,
     }))]
-    presentation.update(model(20, sequence))
+    const final: any = model(20, sequence)
+    final.pieces[0].statuses = ['a', 'b'].map(id => ({ id, type: id }))
+    final.pieces[0].statusSummary = final.pieces[0].statuses
+    presentation.update(final)
     vi.advanceTimersByTime(1520)
-    expect(frames.at(-1).pieces[0].statuses.map((s: any) => s.id)).toEqual(['a'])
+    expect(frames.at(-1).pieces[0].statuses.map((s: any) => s.id)).toEqual(['a', 'b'])
     expect(frames.at(-1).pieces[0].statusSummary).toEqual(frames.at(-1).pieces[0].statuses)
     vi.advanceTimersByTime(1100)
     expect(frames.at(-1).pieces[0].statuses.map((s: any) => s.id)).toEqual(['a', 'b'])

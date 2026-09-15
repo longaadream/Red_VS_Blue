@@ -6,6 +6,7 @@
  * diagnostics, and compilation accounting.
  */
 import { areMatchAllies, nextMatchOpponent } from './match-teams'
+import { canAffectAdventureTarget, canPlaceAdventurePiece } from './adventure-boundary'
 
 export type DynamicCodeSurface =
   | 'skillCode'
@@ -76,7 +77,7 @@ export class DynamicCodeRuntime {
       // Keep eval local to this runtime. The caller supplies a parenthesized expression.
       // Bind the same pure team predicate on every dynamic surface, including
       // rule triggers and resumed effects. No global or serialized function.
-      value = (0, eval)(`(function(arePlayersAllied, nextEnemyPlayer) { return (${request.code}); })`)(areMatchAllies, nextMatchOpponent)
+      value = (0, eval)(`(function(arePlayersAllied, nextEnemyPlayer, canAffectAdventureTarget, canPlaceAdventurePiece) { return (${request.code}); })`)(areMatchAllies, nextMatchOpponent, canAffectAdventureTarget, canPlaceAdventurePiece)
     } catch (cause) {
       throw new DynamicCodeRuntimeError('compile', request.surface, request.contentId, request.contentVersion ?? '0', `unable to compile ${request.entry}`, cause)
     }

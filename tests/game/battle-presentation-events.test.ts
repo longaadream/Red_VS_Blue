@@ -686,3 +686,15 @@ describe('RED-165 authoritative battle presentation events', () => {
     ])
   })
 })
+
+
+it('distinguishes the played card from additional discarded cards', () => {
+  const before = stateWithPieces([piece('source', 'player-red', 10)])
+  before.players[0].hand = ['played', 'extra'].map(instanceId => ({ cardId: 'card-fire', instanceId, ownerPlayerId: 'player-red' }))
+  const after = structuredClone(before)
+  after.players[0].hand = []
+  const events = project({ type: 'playCard', playerId: 'player-red', cardInstanceId: 'played' } as BattleAction, before, after)
+  const discarded = events.filter(event => event.kind === 'cardDiscarded')
+  expect(discarded).toHaveLength(2)
+  expect(discarded.filter(event => event.result?.consumedByPlay)).toHaveLength(1)
+})

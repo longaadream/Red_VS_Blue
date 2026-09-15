@@ -7,13 +7,15 @@
   <link rel="stylesheet" href="css/tabletop/tabletop.css">
   <link rel="stylesheet" href="css/tutorial.css">
   <link rel="stylesheet" href="css/compact-library.css">
+  <link rel="stylesheet" href="css/rulebook.css">
+  <script src="js/battle-ui/rulebook.js" defer></script>
   <script src="js/compact-library.js"></script>
 </head>
 <body data-art-page="tutorial"><main>
   <nav class="lesson-nav"><a class="back-link" href="index.html">← 返回大厅</a><span>红蓝桌游社 · 新人练习册</span></nav>
   <header class="lesson-welcome"><div><p class="lesson-eyebrow">摆好棋子，开一局吧！</p><h1>五局练习，一步步学会。</h1>
   <p class="intro">敌人更少，残局更短。练习关键操作，再亲手赢下每一局。</p></div><div class="lesson-stamp" aria-hidden="true">新 人<br>入 社</div></header>
-  <div class="lesson-table-heading"><span>从第一局开始，也可以选你想练的</span><span aria-hidden="true">选一张练习卡 ↓</span></div>
+  <div class="lesson-table-heading"><span>从第一局开始，也可以选你想练的</span><button type="button" class="rulebook-overview" id="rulebookButton" aria-haspopup="dialog" aria-controls="rulebook" aria-expanded="false">规则总览 ↗</button></div>
   <section class="grid" id="lessons" aria-label="选择教学对局"></section>
   <div class="rules"><span class="rule-mark" aria-hidden="true">!</span><div><strong>先记住：保护自己的场上核心。</strong><br>一方场上核心全灭即判负，双方同时全灭则平局。预备棋子和普通召唤物不能代替场上核心。</div></div>
   <footer>本地练习 · 前五局开放，第六局暂未开放。暂不保存章节成绩，不计入真人战绩。<details><summary>关于这版练习</summary><p>第六局将在对战 AI 改善后再开放。</p><a href="battle.html?mode=tutorial">打开旧版引导</a></details></footer>

@@ -11,6 +11,10 @@ window.renderAdventureRoomStatus = function (value) {
     adventureDialogKind = null
     document.getElementById('adventureDialogTitle').textContent = '同行者 · ' + value.roomId
     body.replaceChildren()
+    if(new URLSearchParams(location.search).get('lobbyContext')==='lan'){
+      const address=document.createElement('div');body.append(address)
+      void window.RvBLanAddress?.show(address,adventureClient.network.server).catch(error=>{address.textContent='读取局域网地址失败：'+error.message})
+    }
     for (const seat of value.seats) {
       const row = document.createElement('p'); row.textContent = seat.name + (seat.connected ? ' · 已连接' : ' · 离线')
       body.append(row)
@@ -26,6 +30,16 @@ window.renderAdventureRoomStatus = function (value) {
     save.disabled = value.hostId !== value.playerId || !adventureSnapshot?.world.canSave
     const hint = document.createElement('p'); hint.textContent = '结算后由房主保存，每次保留独立记录。返回冒险准备，可选择旧进度继续。'
     body.append(order, saved, save, hint)
+    const leave = adventureButton(value.hostId === value.playerId ? '保存并解散队伍' : '离开队伍', async () => {
+      leave.disabled = true
+      try {
+        if (value.hostId === value.playerId) await adventureClient.network.request('dissolve')
+        await adventureClient.network.dispose()
+        disposeAdventureBattle()
+        location.href = 'adventure.html'
+      } catch (error) { hint.textContent = error.message; leave.disabled = false }
+    })
+    body.append(leave)
     if(value.hostId===value.playerId)for(const incoming of value.waiting || []) {
       const row=document.createElement('p');row.textContent=incoming.name+' 希望加入'
       const admit=adventureButton('接纳新队伍',async()=>{

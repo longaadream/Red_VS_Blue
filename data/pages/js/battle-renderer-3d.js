@@ -629,12 +629,11 @@
       // Faction is snapshot-driven and can change without respawning the mesh.
       if (obj.faction !== piece.faction) {
         obj.faction = piece.faction
-        const markerPattern = TacticalGeometry.factionMarkerPattern(piece.faction)
         obj.body.material.emissive.setHex(FACTION_COLORS[piece.faction] || FACTION_COLORS.red)
         if (obj.ring.material && obj.ring.material.dispose) obj.ring.material.dispose()
         obj.ring.material = getFactionMat(piece.faction).clone()
-        obj.factionMarkers.forEach(function (marker, index) {
-          marker.visible = markerPattern[index]
+        obj.factionMarkers.forEach(function (marker) {
+          marker.visible = false
         })
       }
 
@@ -816,16 +815,14 @@
     ring.position.y = 0.02
     group.add(ring)
 
-    // Faction remains readable without color: red uses one neutral pip and blue
-    // uses a pair. These markers share the portrait geometry but not its texture.
-    const markerPattern = TacticalGeometry.factionMarkerPattern(faction)
+    // Legacy faction dots are hidden; team color remains on the base.
     const markerMaterial = new THREE.MeshBasicMaterial({ color: 0xf2e8d5 })
-    const factionMarkers = [0, -0.11, 0.11].map(function (x, index) {
+    const factionMarkers = [0, -0.11, 0.11].map(function (x) {
       const marker = new THREE.Mesh(_portraitDiscGeom, markerMaterial)
       marker.rotation.x = -Math.PI / 2
       marker.position.set(x, PIECE_H + 0.019, -PIECE_D * 0.45)
       marker.scale.set(0.08, 0.08, 1)
-      marker.visible = markerPattern[index]
+      marker.visible = false
       group.add(marker)
       return marker
     })
@@ -1119,10 +1116,19 @@
 
   // ── Highlights ────────────────────────────────────────────────────────────────
   function setHighlights(hl) {
+    _hoverMoveTargets = new Set((hl.move || []).map(_normalizeHighlightItem).filter(Boolean).map(cell => cell.key))
+    _hoverSelectedId = hl.selected || null
+    _clearHoverPath()
     _syncHighlightGroup('move', hl.move || [])
     _syncHighlightGroup('skill', hl.skill || [])
     _syncHighlightGroup('place', hl.place || [])
     _syncSelectedHighlight(hl.selected || null)
+    const targets = new Set((hl.skill || []).map(_normalizeHighlightItem).filter(Boolean).map(cell => cell.key))
+    _pieceObjects.forEach(function (obj) {
+      if (!obj.portraitLoaded || obj.deathAnimating) return
+      const dim = targets.size > 0 && !targets.has(obj.targetX + ',' + obj.targetZ) && obj.id !== hl.selected
+      obj.portraitMesh.material.color.setHex(dim ? 0x96918a : 0xffffff)
+    })
   }
 
   function _normalizeHighlightItem(item) {
@@ -1157,6 +1163,30 @@
         const startScale = _reducedMotion ? 1 : 0.94
         mesh.scale.set(startScale, startScale, 1)
         _scene.add(mesh)
+        if (type === 'skill' && Array.from(_pieceObjects.values()).some(function (piece) {
+          return piece.group.visible && Math.abs(piece.group.position.x - cell.x) < 0.1 && Math.abs(piece.group.position.z - cell.z) < 0.1
+        })) {
+          // Child planes inherit the board plane rotation; no camera-facing sprite or texture.
+          ;[-1, 1].forEach(function (sx) { [-1, 1].forEach(function (sy) {
+            ;[0, 1].forEach(function (axis) {
+              ;[0, 1].forEach(function (ink) {
+                const stroke = new THREE.Mesh(_hlPlaneGeom, new THREE.MeshBasicMaterial({
+                  color: ink ? 0xffe69b : 0x302318, depthTest: false, depthWrite: false,
+                  transparent: true, opacity: 1, side: THREE.DoubleSide,
+                }))
+                stroke.position.set(
+                  sx * (PIECE_W / 2 + 0.06 - (axis ? 0 : 0.08)),
+                  sy * (PIECE_D / 2 + 0.06 - (axis ? 0.08 : 0)),
+                  PIECE_H + 0.02 + ink * 0.002,
+                )
+                stroke.scale.set(axis ? (ink ? 0.035 : 0.065) : 0.22, axis ? 0.22 : (ink ? 0.035 : 0.065), 1)
+                stroke.rotation.z = sx * sy * 0.045
+                stroke.renderOrder = 100 + ink
+                mesh.add(stroke)
+              })
+            })
+          }) })
+        }
         entry = { key: cell.key, mesh, x: cell.x, z: cell.z, desired: true, targetOpacity: cfg.opacity }
         objects.set(cell.key, entry)
       }
@@ -1171,6 +1201,7 @@
       _animateHighlightAppearance(type, entry, entry.mesh.scale.x, 0, 0.12, function () {
         if (entry.desired || objects.get(key) !== entry) return
         _scene.remove(entry.mesh)
+        entry.mesh.children.forEach(function (child) { if (child.material) child.material.dispose() })
         if (entry.mesh.material && entry.mesh.material.dispose) entry.mesh.material.dispose()
         objects.delete(key)
       })
@@ -1571,6 +1602,7 @@
         if (object.geometry && object.geometry.dispose) object.geometry.dispose()
         if (object.material) {
           ;(Array.isArray(object.material) ? object.material : [object.material]).forEach(function (material) {
+            if (material && material.map && material.map.dispose) material.map.dispose()
             if (material && material.dispose) material.dispose()
           })
         }
@@ -1595,8 +1627,16 @@
           ring.material.opacity = 0.72 + pulse * 0.24
         })
         ;(group.userData.beams || []).forEach(function (beam) {
-          beam.material.opacity = 0.08 + pulse * 0.08
+          beam.material.opacity = 0.45 + pulse * 0.3
         })
+        const token = group.userData.guideToken
+        const route = group.userData.guideRoute
+        if (token && route && route.length > 1) {
+          const progress = Math.min(raw / 0.8, 1) * (route.length - 1)
+          const segment = Math.min(Math.floor(progress), route.length - 2)
+          token.position.copy(route[segment]).lerp(route[segment + 1], progress - segment)
+          token.material.opacity = raw > 0.8 ? (1 - raw) * 3 : 0.6
+        }
       },
       complete: function () {
         if (group === _tutorialCueGroup) _startTutorialPulse(group)
@@ -1629,12 +1669,44 @@
     group.userData.beams = beams
     group.renderOrder = 24
 
+    ;(Array.isArray(cue.rulerCells) ? cue.rulerCells : []).forEach(function (cell) {
+      const canvas = document.createElement('canvas')
+      canvas.width = canvas.height = 96
+      const context = canvas.getContext && canvas.getContext('2d')
+      if (!context) return
+      context.fillStyle = cell.distance === 6 ? '#466f62' : '#914638'
+      context.fillRect(6, 6, 84, 84)
+      context.strokeStyle = '#ead5a6'; context.lineWidth = 5; context.strokeRect(8, 8, 80, 80)
+      context.fillStyle = '#fff0c7'; context.font = 'bold 64px sans-serif'; context.textAlign = 'center'; context.textBaseline = 'middle'
+      context.fillText(String(cell.distance), 48, 50)
+      const texture = new THREE.CanvasTexture(canvas)
+      const marker = new THREE.Mesh(new THREE.PlaneGeometry(0.78, 0.78), new THREE.MeshBasicMaterial({ map: texture, transparent: true, depthTest: false, depthWrite: false, side: THREE.DoubleSide }))
+      marker.rotation.x = -Math.PI / 2
+      marker.position.set(cell.x, _tileSurfaceHeightAt(cell.x, cell.y) + 0.12, cell.y)
+      marker.renderOrder = 27
+      marker.userData.tutorialCueRole = 'distance'
+      group.add(marker)
+    })
+
+    // Deployment restrictions are supplied by the authoritative legal-cell query.
+    ;(Array.isArray(cue.blockedCells) ? cue.blockedCells : []).forEach(function (cell) {
+      if (!Number.isInteger(cell.x) || !Number.isInteger(cell.y)) return
+      const y = _tileSurfaceHeightAt(cell.x, cell.y) + 0.08
+      const geometry = new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(cell.x - 0.16, y, cell.y - 0.16), new THREE.Vector3(cell.x + 0.16, y, cell.y + 0.16),
+        new THREE.Vector3(cell.x + 0.16, y, cell.y - 0.16), new THREE.Vector3(cell.x - 0.16, y, cell.y + 0.16),
+      ])
+      const mark = new THREE.LineSegments(geometry, new THREE.LineBasicMaterial({ color: 0x9c4939, transparent: true, opacity: 0.8, depthTest: false }))
+      mark.userData.tutorialCueRole = 'blocked'
+      group.add(mark)
+    })
+
     cells.forEach(function (cell) {
       const surfaceY = _tileSurfaceHeightAt(cell.x, cell.z)
       const ring = new THREE.Mesh(
         new THREE.RingGeometry(0.28, 0.38, 40),
         new THREE.MeshBasicMaterial({
-          color: 0x86efac, transparent: true, opacity: 0.88,
+          color: 0xe8c477, transparent: true, opacity: 0.88,
           side: THREE.DoubleSide, depthTest: false, depthWrite: false,
         }),
       )
@@ -1646,13 +1718,14 @@
       group.add(ring)
 
       const beam = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.25, 0.39, 1.15, 28, 1, true),
+        new THREE.RingGeometry(0.43, 0.48, 8),
         new THREE.MeshBasicMaterial({
-          color: 0x4ade80, transparent: true, opacity: 0.12,
+          color: 0xe8c477, transparent: true, opacity: 0.65,
           side: THREE.DoubleSide, depthTest: false, depthWrite: false,
         }),
       )
-      beam.position.set(cell.x, surfaceY + 0.62, cell.z)
+      beam.rotation.x = -Math.PI / 2
+      beam.position.set(cell.x, surfaceY + 0.065, cell.z)
       beam.renderOrder = 24
       beam.userData.tutorialCueRole = 'beam'
       beams.push(beam)
@@ -1660,11 +1733,12 @@
     })
 
     if (path.length >= 2) {
-      const geometry = new THREE.BufferGeometry().setFromPoints(path.map(function (cell) {
+      const route = path.map(function (cell) {
         return new THREE.Vector3(cell.x, _tileSurfaceHeightAt(cell.x, cell.z) + 0.10, cell.z)
-      }))
+      })
+      const geometry = new THREE.BufferGeometry().setFromPoints(route)
       const material = new THREE.LineDashedMaterial({
-        color: 0x86efac, transparent: true, opacity: 0.92,
+        color: 0xe8c477, transparent: true, opacity: 0.92,
         dashSize: 0.22, gapSize: 0.12, depthTest: false, depthWrite: false,
       })
       const line = new THREE.Line(geometry, material)
@@ -1672,6 +1746,17 @@
       line.renderOrder = 24
       line.userData.tutorialCueRole = 'path'
       group.add(line)
+      const token = new THREE.Mesh(
+        new THREE.RingGeometry(0.12, 0.24, 8),
+        new THREE.MeshBasicMaterial({ color: 0xf2dca3, transparent: true, opacity: 0.6, side: THREE.DoubleSide, depthTest: false, depthWrite: false }),
+      )
+      token.rotation.x = -Math.PI / 2
+      token.position.copy(route[_reducedMotion ? route.length - 1 : 0])
+      token.renderOrder = 26
+      token.userData.tutorialCueRole = 'guide-token'
+      group.userData.guideToken = token
+      group.userData.guideRoute = route
+      group.add(token)
       _tutorialCuePathCount = 1
     }
 
@@ -2406,7 +2491,10 @@
       e.preventDefault()
     }, { passive: false })
 
+    _listen(canvas, 'pointerleave', () => _showHoveredCell(null))
+    _listen(canvas, 'pointerdown', () => _showHoveredCell(null))
     _listen(canvas, 'pointermove', e => {
+      if (e.pointerType === 'mouse' && !_pointers.size) _showHoveredCell(screenToCell(e.clientX, e.clientY))
       if (!_pointers.has(e.pointerId)) return
       _pointers.set(e.pointerId, { x: e.clientX, y: e.clientY })
 
@@ -2574,6 +2662,59 @@
 
   // ── Raycasting ────────────────────────────────────────────────────────────────
   const _raycaster = new THREE.Raycaster()
+  let _hoveredCellRing = null
+  let _hoverPath = null
+  let _hoverKey = null
+  let _hoverMoveTargets = new Set()
+  let _hoverSelectedId = null
+
+  function _clearHoverPath() {
+    _hoverKey = null
+    if (!_hoverPath) return
+    _scene.remove(_hoverPath)
+    _hoverPath.geometry.dispose()
+    _hoverPath.material.dispose()
+    _hoverPath = null
+    _invalidate()
+  }
+
+  function _showHoveredCell(cell) {
+    if (!_scene) return
+    const key = cell ? cell.x + ',' + cell.y : null
+    if (key !== _hoverKey) {
+      _clearHoverPath()
+      _hoverKey = key
+      const source = _pieceObjects.get(_hoverSelectedId)
+      if (cell && source && _hoverMoveTargets.has(key)) {
+        const height = Math.max(source.baseY, _tileSurfaceHeightAt(cell.x, cell.y)) + 0.06
+        const geometry = new THREE.BufferGeometry().setFromPoints([
+          new THREE.Vector3(source.targetX, height, source.targetZ), new THREE.Vector3(cell.x, height, cell.y),
+        ])
+        _hoverPath = new THREE.Line(geometry, new THREE.LineDashedMaterial({ color: 0xf5d38b, dashSize: 0.14, gapSize: 0.10, depthWrite: false }))
+        _hoverPath.computeLineDistances()
+        _scene.add(_hoverPath)
+      }
+      if (_onIntent) _onIntent({ type: 'hover-cell', x: cell ? cell.x : null, y: cell ? cell.y : null })
+    }
+    if (!cell) {
+      if (_hoveredCellRing && _hoveredCellRing.visible) {
+        _hoveredCellRing.visible = false
+        _invalidate()
+      }
+      return
+    }
+    if (!_hoveredCellRing) {
+      _hoveredCellRing = new THREE.Mesh(
+        new THREE.RingGeometry(0.63, 0.69, 4, 1, Math.PI / 4),
+        new THREE.MeshBasicMaterial({ color: 0xffedaa, depthWrite: false, side: THREE.DoubleSide }),
+      )
+      _hoveredCellRing.rotation.x = -Math.PI / 2
+      _scene.add(_hoveredCellRing)
+    }
+    _hoveredCellRing.visible = true
+    _hoveredCellRing.position.set(cell.x, _tileSurfaceHeightAt(cell.x, cell.y) + 0.045, cell.y)
+    _invalidate()
+  }
 
   function screenToCell(clientX, clientY) {
     if (!_hitPlane || !_renderer || !_camera) return null
@@ -2810,9 +2951,9 @@
     }
 
     const el = document.createElement('div')
-    const kind = options.kind === 'heal' || options.kind === 'death' ? options.kind : 'damage'
+    const kind = ['heal', 'death', 'statusAdded'].includes(options.kind) ? options.kind : 'damage'
     const requestedDuration = Number(options.durationMs) || (kind === 'heal' ? 550 : 600)
-    const durationMs = _reducedMotion ? Math.min(140, requestedDuration) : Math.max(480, Math.min(650, requestedDuration))
+    const durationMs = _reducedMotion ? Math.min(140, requestedDuration) : Math.max(kind === 'statusAdded' ? 200 : 480, Math.min(650, requestedDuration))
     el.className = 'dmg-float is-' + kind + (big ? ' big' : '')
     el.style.color = color
     el.style.left  = left + 'px'
@@ -2831,6 +2972,9 @@
 
   // ── Dispose ───────────────────────────────────────────────────────────────────
   function dispose() {
+    _clearHoverPath()
+    _hoverMoveTargets.clear()
+    _hoverSelectedId = null
     _textureLoadGeneration += 1
     _mounted = false
     if (_animFrameId != null) cancelAnimationFrame(_animFrameId)
@@ -2862,6 +3006,7 @@
       geometries.forEach(function (geometry) { if (geometry.dispose) geometry.dispose() })
       materials.forEach(function (material) { if (material.dispose) material.dispose() })
     }
+    _hoveredCellRing = null
     _texCache.forEach(function (entry) { if (entry && entry.texture && entry.texture.dispose) entry.texture.dispose() })
     if (_toonRamp) _toonRamp.dispose()
     _toonRamp = null

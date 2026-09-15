@@ -21,6 +21,9 @@ type ActionHistoryUi = {
 }
 
 type BrowserModule = {
+  combineActionChains: (groups: unknown[]) => Array<{rootEventId: string; children: Array<{eventId: string}>}>
+  attributeChangeLabel: (event: Record<string, unknown>) => string
+  readableEffect: (event: Record<string, unknown>) => boolean
   aggregateEffects: (events: Array<Record<string, unknown>>) => Array<{ batchEvents: Array<Record<string, unknown>> }>
   historicalContext: (events: Array<Record<string, unknown>>) => { pieces: Array<Record<string, unknown>>; moves: Array<Record<string, unknown>>; marks: Array<Record<string, unknown>> }
   mergeRoots: (previous: RootGroup[], events: Array<Record<string, unknown>>, limit: number) => RootGroup[]
@@ -642,4 +645,60 @@ describe('RED-166 icon action history', () => {
       expect(readFileSync(resolve(pagesDir, 'images/effect-icons', asset), 'utf8')).toContain('<svg')
     }
   })
+})
+
+
+it('hides bookkeeping while preserving actual combat and discard outcomes', () => {
+  const { history } = loadActionHistory()
+  for (const kind of ['actionPoints', 'passive', 'statChanged']) expect(history.readableEffect({ kind })).toBe(false)
+  expect(history.readableEffect({ kind: 'damage', iconId: 'damage-buff' })).toBe(false)
+  expect(history.readableEffect({ kind: 'cardDiscarded', result: { consumedByPlay: true } })).toBe(false)
+  for (const kind of ['damage', 'death', 'forceMove', 'cardDiscarded', 'statusAdded']) expect(history.readableEffect({ kind })).toBe(true)
+})
+
+
+it('shows named attribute changes with delta and before/after values', () => {
+  const { history } = loadActionHistory()
+  for (const [attribute, label] of [['attack', '攻击'], ['defense', '防御'], ['moveRange', '移动范围'], ['maxHp', '生命上限']]) {
+    const event = { kind: 'statChanged', result: { attribute, amount: 2, value: 5 } }
+    expect(history.readableEffect(event)).toBe(true)
+    expect(history.attributeChangeLabel(event)).toBe(label + ' +2（3 → 5）')
+  }
+  expect(history.attributeChangeLabel({ result: { attribute: 'attack', amount: -2, value: 1 } })).toBe('攻击 -2（3 → 1）')
+  expect(history.readableEffect({ kind: 'statChanged', result: { attribute: 'attack' } })).toBe(false)
+  expect(history.readableEffect({ iconId: 'damage-buff', complement: { kind: 'attribute', attribute: 'attack', amount: 1 } })).toBe(true)
+})
+
+
+it('keeps pending responses below their initiating card without altering source records', () => {
+  const { history } = loadActionHistory()
+  const groups = [
+    { rootEventId: 'card', root: { eventId: 'card', historyChainId: 'pending:8' }, children: [] },
+    { rootEventId: 'choice1', root: { eventId: 'choice1', historyChainId: 'pending:8' }, children: [] },
+    { rootEventId: 'choice2', root: { eventId: 'choice2', historyChainId: 'pending:8' }, children: [{ eventId: 'buff' }] },
+    { rootEventId: 'other', root: { eventId: 'other', historyChainId: 'pending:9' }, children: [] },
+  ]
+  const merged = history.combineActionChains(groups)
+  expect(merged).toHaveLength(2)
+  expect(merged[0].rootEventId).toBe('card')
+  expect(merged[0].children.map(event => event.eventId)).toEqual(['choice1', 'choice2', 'buff'])
+  expect(groups[0].children).toEqual([])
+})
+
+it('renders response effects nested and resumed card effects at the root level', () => {
+  const { history, icons } = loadActionHistory()
+  const list = { innerHTML: '' }
+  const dock = { hidden: false, dataset: {}, innerHTML: '', classList: { toggle: vi.fn() }, querySelector: (selector: string) => selector === '.action-history-list' ? list : { setAttribute: vi.fn() }, addEventListener: vi.fn(), removeEventListener: vi.fn() }
+  const ui = history.create({ document: { getElementById: () => null }, window: { innerWidth: 1280, innerHeight: 720, addEventListener: vi.fn(), getComputedStyle: () => ({ display: 'none' }) }, icons, getCardDefinition: () => ({ name: '圣光充能' }) })
+  ui.mount({ element: dock })
+  const card = rootEvent(1, { kind: 'card', cardId: 'holy-charge', historyChainId: 'pending:1' })
+  const choice = rootEvent(2, { kind: 'choiceResolved', historyChainId: 'pending:1' })
+  const move = { ...choice, eventId: 'move', sequence: 1, parentEventId: choice.eventId, kind: 'forceMove', causePath: [{ id: 'scope-1', ruleId: 'advance', label: '圣铸进军' }] }
+  const buff = { ...choice, eventId: 'buff', sequence: 2, parentEventId: choice.eventId, kind: 'statusAdded', statusType: 'buff' }
+  ui.update({ pieces: [], players: [], presentationEvents: [card, choice, move, buff] })
+  expect(list.innerHTML).toContain('history-response')
+  expect(list.innerHTML).toContain('圣铸进军')
+  expect(list.innerHTML).toContain('圣光充能')
+  expect(list.innerHTML.indexOf('圣铸进军')).toBeLessThan(list.innerHTML.lastIndexOf('结算'))
+  expect(list.innerHTML).not.toContain('data-history-event-id="action-2:0"')
 })

@@ -101,6 +101,7 @@ parentPort!.on('message', ({ id, method, args }) => {
     else if (method === 'adventure.commit') adventure.commit(args[0], args[1], args[2], args[3], args[4])
     else if (method === 'adventure.receipt') value = adventure.receipt(args[0], args[1], args[2])
     else if (method === 'adventure.save') adventure.save(args[0], args[1], args[2])
+    else if (method === 'adventure.deleteSave') adventure.deleteSave(args[0], args[1], args[2])
     else if (method === 'close') { db.exec('PRAGMA wal_checkpoint(TRUNCATE)'); db.close() }
     else throw new Error('Unknown Android storage method')
     parentPort!.postMessage({ id, value })

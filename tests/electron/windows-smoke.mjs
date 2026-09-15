@@ -9,8 +9,8 @@ import { Client as ColyseusClient } from '@colyseus/sdk'
 const root = path.resolve(import.meta.dirname, '..', '..')
 const applications = {
   client: {
-    executable: path.join(root, 'dist', 'client-build', 'win-unpacked', 'RED vs BLUE.exe'),
-    helperExecutables: [path.join(root, 'dist', 'client-build', 'win-unpacked', 'resources', 'node.exe')],
+    executable: process.env.RVB_SMOKE_CLIENT_EXE ? path.resolve(process.env.RVB_SMOKE_CLIENT_EXE) : path.join(root, 'dist', 'client-build', 'win-unpacked', 'RED vs BLUE.exe'),
+    helperExecutables: [path.join(process.env.RVB_SMOKE_CLIENT_EXE ? path.dirname(path.resolve(process.env.RVB_SMOKE_CLIENT_EXE)) : path.join(root, 'dist', 'client-build', 'win-unpacked'), 'resources', 'node.exe')],
     userDataDir: process.env.RVB_SMOKE_USER_DATA_DIR
       ? path.resolve(process.env.RVB_SMOKE_USER_DATA_DIR)
       : null,
@@ -641,6 +641,10 @@ async function smokeClient(expectedIdentity = null, sharedUserDataDir = null, ne
       mode = await evaluate(gameTarget, `window.electronAPI.getMode()`)
     }
     assert(mode?.ready === true, `Client local authority was not ready after automatic startup: ${JSON.stringify(mode)}`)
+    // The current client requires the same explicit update-gate entry as a player.
+    const updateStatus = await evaluate(gameTarget, `window.electronAPI.checkOfficialUpdates()`, true, 120000)
+    assert(updateStatus.canEnter, `Startup update check did not permit entry: ${JSON.stringify(updateStatus)}`)
+    await evaluate(gameTarget, `window.electronAPI.enterAfterUpdateCheck()`)
 
     const authorityEntry = path.join(
       isolatedPackageRoot,

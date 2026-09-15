@@ -47,7 +47,10 @@
     var Colyseus = requireSdk()
     var base = normalizedBaseUrl(baseUrl || getServerUrl())
     if (!base) throw new Error('Server URL is required')
-    return new Colyseus.Client(base)
+    var client = new Colyseus.Client(base)
+    // Admission uses signed payloads, never cross-origin cookies.
+    client.http.options.credentials = 'omit'
+    return client
   }
 
   function reconnectTokenKey() {

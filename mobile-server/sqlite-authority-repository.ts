@@ -45,6 +45,7 @@ export class AndroidSqliteAuthorityRepository implements BattleServerRepository 
       commit: (...args) => this.call('adventure.commit', ...args),
       receipt: (...args) => this.call('adventure.receipt', ...args),
       save: (...args) => this.call('adventure.save', ...args),
+      deleteSave: (...args) => this.call('adventure.deleteSave', ...args),
     }
   }
   healthCheck() { return this.call<void>('healthCheck') }

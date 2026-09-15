@@ -6,6 +6,7 @@
   <title>房间 · RED vs BLUE</title>
   <script src="js/pack-fetch.js"></script>
   <script src="js/server-utils.js"></script>
+  <script src="js/lan-address.js"></script>
   <script src="js/crypto-lib.js"></script>
   <script src="js/colyseus-sdk.js"></script>
   <script src="js/colyseus-client.js"></script>
@@ -156,6 +157,7 @@
   <div class="section">
     <div class="section-label">房间信息</div>
     <div class="room-info-card">
+      <div id="lanAddress" hidden></div>
       <div class="room-info-row">
         <span class="room-info-label">房间名</span>
         <span class="room-info-value" id="roomNameLabel">—</span>
@@ -254,21 +256,17 @@
     function navigateBattle() {
       if (_navigating) return
       _navigating = true
-      window.location.href = 'battle.html'
-        + '?roomId=' + encodeURIComponent(roomId)
-        + '&playerId=' + encodeURIComponent(playerId)
-        + '&playerName=' + encodeURIComponent(playerName)
-        + (currentPlayerAlignment() ? '&alignment=' + encodeURIComponent(currentPlayerAlignment()) : '')
+      const p = RvBUtils.appendServerParams(new URLSearchParams({ roomId, playerId, playerName }))
+      if (currentPlayerAlignment()) p.set('alignment', currentPlayerAlignment())
+      window.location.href = 'battle.html?' + p.toString()
     }
 
     function navigatePieceSelection() {
       if (_navigating) return
       _navigating = true
-      window.location.href = 'piece-selection.html'
-        + '?roomId=' + encodeURIComponent(roomId)
-        + '&playerId=' + encodeURIComponent(playerId)
-        + '&playerName=' + encodeURIComponent(playerName)
-        + (currentPlayerAlignment() ? '&alignment=' + encodeURIComponent(currentPlayerAlignment()) : '')
+      const p = RvBUtils.appendServerParams(new URLSearchParams({ roomId, playerId, playerName }))
+      if (currentPlayerAlignment()) p.set('alignment', currentPlayerAlignment())
+      window.location.href = 'piece-selection.html?' + p.toString()
     }
 
     async function ensureRoomWs() {
@@ -389,7 +387,7 @@
       const players = room.players || []
       document.getElementById('playerCountLabel').textContent = players.length + ' / ' + (room.maxPlayers || 2)
 
-      if (room.inviteCode) {
+      if (room.inviteCode && (new URLSearchParams(location.search).get('lobbyContext') === 'public' || !['local', 'lan'].includes(new URLSearchParams(location.search).get('server')))) {
         document.getElementById('inviteRow').style.display = 'flex'
         document.getElementById('inviteCodeLabel').textContent = room.inviteCode
       }
@@ -498,19 +496,19 @@
       }
     }
 
-    function leaveAndGoLobby() {
+    async function leaveAndGoLobby() {
       console.log('[room] leave clicked')
       _navigating = true  // 防止 beforeunload 再次发 leave
       stopPolling()
-      // 先发 Colyseus 离开通知（fire-and-forget，不阻塞跳转）
+      // Wait for seat release before navigating to a page that may rejoin.
       if (roomId && playerId) {
         try {
           if (window.RvBColyseus && RvBColyseus.isConnected()) {
-            RvBColyseus.send({ type: 'roomAction', action: 'leave', playerId, playerName })
+            await RvBColyseus.request('rooms.action', { action: 'leave', playerId, playerName })
           }
-        } catch (e) { console.warn('[room] leave beacon failed', e) }
+        } catch (e) { _navigating = false; alert('离开失败：' + e.message); return }
       }
-      // 立即跳转，不等服务器
+      RvBColyseus.disconnect()
       goBackToLobby()
     }
 
@@ -519,7 +517,8 @@
         ? RvBUtils.appendServerParams(new URLSearchParams())
         : new URLSearchParams()
       p.set('v', Date.now().toString())
-      window.location.href = 'lobby.html?' + p.toString()
+      p.set('lobbyContext', new URLSearchParams(location.search).get('lobbyContext') || 'lan')
+      window.location.href = (p.get('lobbyContext') === 'public' ? 'multiplayer.html?' : 'lan.html?') + p.toString()
     }
 
     function copyInviteCode() {

@@ -25,7 +25,10 @@ async function main() {
         assert.equal(await button.evaluate(el => el.previousElementSibling.id), 'userPill')
         const bounds = await button.boundingBox()
         assert.equal(bounds.width, 36); assert.equal(bounds.height, 36)
-        await button.click()
+        if (platform === 'windows') {
+          assert.equal(await page.locator('dialog').evaluate(el => el.open), true, 'startup check opens first')
+          assert.equal(await page.locator('[data-recovery]').count(), 1, 'resource recovery remains reachable')
+        } else await button.click()
         if (platform === 'android') {
           const target = await page.evaluate(() => window.clickedTarget)
           assert.equal(target, 'android-maintenance.html')
@@ -41,6 +44,32 @@ async function main() {
       }
       await page.close()
     }
+    const recovery = await browser.newPage();
+    await recovery.route('https://rvb.test/**', route => route.fulfill({ contentType: 'text/html', body: '<header class="header"></header>' }));
+    await recovery.goto('https://rvb.test/index.html');
+    await recovery.evaluate(() => {
+      let ready = false;
+      let current = false;
+      const status = () => ({ startupPending: !window.entered, canEnter: ready && current, clientVersion: 'test', resource: { phase: current ? 'current' : 'error', message: 'resource' }, client: { phase: 'current', message: 'client' } });
+      window.electronAPI = {
+        getOfficialUpdateStatus: async () => status(),
+        onOfficialUpdateStatus: () => () => {},
+        checkOfficialUpdates: async () => {},
+        getMode: async () => ({ ready, localAuthorityRecovery: { status: 'failed' } }),
+        ensureLocalAuthority: async () => { ready = true; current = true; return { ok: true }; },
+        enterAfterUpdateCheck: async () => { window.entered = true; return { ...status(), startupPending: false }; },
+      };
+    });
+    await recovery.addScriptTag({ content: fs.readFileSync('data/pages/js/official-updates.js', 'utf8') });
+    await recovery.locator('[data-local-retry]').waitFor({ state: 'visible' });
+    assert.equal(await recovery.locator('[data-close]').isDisabled(), true);
+    assert.equal(await recovery.locator('[data-check]').textContent(), '重试更新检查');
+    await recovery.locator('[data-local-retry]').click();
+    await recovery.locator('[data-close]:enabled').waitFor();
+    await recovery.locator('[data-close]').click();
+    assert.equal(await recovery.evaluate(() => window.entered), true);
+    assert.equal(await recovery.locator('dialog').evaluate(el => el.open), false);
+    await recovery.close();
     const menu = fs.readFileSync('data/pages/index.html', 'utf8')
     assert.ok(menu.includes("sessionStorage.setItem('rvb_maintenance_section', 'resources')"))
     assert.ok(!menu.includes('android-maintenance.html#'))

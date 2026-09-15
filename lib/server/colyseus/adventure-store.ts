@@ -12,11 +12,31 @@ export interface AdventureRepository {
   commit(runId:string,expectedRevision:number,current:AdventureCheckpoint,receipt:AdventureReceipt,save:boolean):Promise<void>
   receipt(runId:string,actor:string,actionId:string):Promise<AdventureReceipt|undefined>
   save(runId:string,hostId:string,expectedRevision:number):Promise<void>
+  deleteSave(saveId:string,hostId:string,revision:number):Promise<void>
 }
 
 /** JSONB aggregate and its command receipt are one PostgreSQL transaction. */
 export class PostgresAdventureRepository implements AdventureRepository {
   constructor(private pool:Pool){}
+  async deleteSave(id:string,host:string,revision:number){
+    const client=await this.pool.connect()
+    try {
+      await client.query('BEGIN')
+      if(id.startsWith('save-')) {
+        await client.query('SELECT run_id FROM rvb_adventure_runs WHERE host_id=$2 AND run_id=(SELECT run_id FROM rvb_adventure_saves WHERE save_id=$1 AND host_id=$2) FOR UPDATE',[id,host])
+        const deleted=await client.query('DELETE FROM rvb_adventure_saves WHERE save_id=$1 AND host_id=$2 AND revision=$3 RETURNING run_id,revision',[id,host,revision])
+        if(!deleted.rowCount)throw new Error('存档不存在或无删除权限')
+        const row=deleted.rows[0]
+        await client.query(`UPDATE rvb_adventure_runs SET saved_json=NULL,saved_at=NULL WHERE run_id=$1 AND host_id=$2
+          AND (saved_json->>'revision')::bigint=$3 AND NOT EXISTS
+          (SELECT 1 FROM rvb_adventure_saves WHERE run_id=$1 AND revision=$3)`,[row.run_id,host,row.revision])
+      } else {
+        const result=await client.query("UPDATE rvb_adventure_runs SET saved_json=NULL,saved_at=NULL WHERE run_id=$1 AND host_id=$2 AND (saved_json->>'revision')::bigint=$3",[id,host,revision])
+        if(!result.rowCount)throw new Error('存档不存在或无删除权限')
+      }
+      await client.query('COMMIT')
+    }catch(error){await client.query('ROLLBACK');throw error}finally{client.release()}
+  }
   async initialize(){
     await this.pool.query(`CREATE TABLE IF NOT EXISTS rvb_adventure_runs (
       run_id TEXT PRIMARY KEY, host_id TEXT NOT NULL, revision BIGINT NOT NULL,

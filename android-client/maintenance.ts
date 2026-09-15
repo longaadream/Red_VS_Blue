@@ -64,7 +64,7 @@ async function importSource(id:string,expected?:OfficialResourceIdentity){
     // Validate all content and the actual signature before offering a native trust decision.
     const record=appendAndroidPack(bundled,parent,incoming,[...info.config.trustedPublisherKeyIds,envelope.keyId])
     if(expected)assertOfficialResourceIdentity(record.profile,envelope.keyId,info.config.trustedPublisherKeyIds,expected)
-    if(expected&&info.state.stable!=='base'){
+    if(expected){
       const current=resolveAndroidProfile(bundled,parent,info.config.trustedPublisherKeyIds)
       if(!isNewerOfficialResource(expected.version,current.profile)){await native.discardSource({id});say('当前资源版本已相同或更新，已保留现有资源。');return}
     }

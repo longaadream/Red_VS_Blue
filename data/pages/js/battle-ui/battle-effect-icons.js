@@ -29,6 +29,9 @@
   }
 
   const statusDefinitions = Object.freeze({
+    'aizen-black-coffin': entry('curse', VISIBILITY.BOARD, { label: '黑棺' }),
+    root: entry('control', VISIBILITY.BOARD, { label: '定身' }),
+    inoperable: entry('disable', VISIBILITY.BOARD, { iconId: 'inoperable', assetPath: 'images/effect-icons/inoperable.svg', label: '无法操作' }),
     'chaos-spear-theft': entry('curse', VISIBILITY.DETAIL, { iconId: 'chaos-spear-theft', assetPath: 'images/effect-icons/chaos-spear-theft.svg', label: '混沌之矛' }),
     'free-normal-move-every-turn': entry('buff', VISIBILITY.DETAIL, { iconId: 'free-normal-move-every-turn', assetPath: 'images/effect-icons/free-normal-move-every-turn.svg', label: '音速 / 高速模块' }),
     'immune': entry('shield', VISIBILITY.DETAIL, { iconId: 'immune', assetPath: 'images/effect-icons/immune.svg', label: '免疫' }),
@@ -48,7 +51,7 @@
     'calm-stance': entry('stance', VISIBILITY.DETAIL, { label: '平静姿态' }),
     'chidori-immobile': entry('control', VISIBILITY.BOARD, { label: '千鸟定身' }),
     'curse-ward-used': entry('internal', VISIBILITY.HIDDEN),
-    'damage-buff': entry('buff', VISIBILITY.DETAIL, { iconId: 'empowered', assetPath: 'images/effect-icons/empowered.svg', label: '强化' }),
+    'damage-buff': entry('buff', VISIBILITY.DETAIL, { iconId: 'empowered', assetPath: 'images/effect-icons/empowered.svg', label: '增益' }),
     'damage-multiplier': entry('buff', VISIBILITY.DETAIL, { iconId: 'damage-multiplier', assetPath: 'images/effect-icons/damage-multiplier.svg', label: '飞天御剑流' }),
     'deployment-first-move-free': entry('buff', VISIBILITY.DETAIL, { iconId: 'free-move', assetPath: 'images/effect-icons/free-move.svg', label: '首次移动免费' }),
     'demon-strike-charges': entry('charge', VISIBILITY.DETAIL, { label: '恶魔冲击次数' }),

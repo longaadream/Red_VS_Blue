@@ -79,6 +79,19 @@
         const element = byId(id)
         if (element && values[id] != null) element.textContent = String(values[id])
       })
+      const rack = byId('handResources')
+      if (rack) {
+        rack.hidden = !viewer
+        if (viewer) rack.setAttribute('aria-label', viewer.name + '：行动点 ' + viewer.resources.action + '，充能点 ' + viewer.resources.charge)
+      }
+      const track = byId('resApTrack')
+      if (track && viewer) {
+        const current = Math.max(0, Number(viewer.resources.action) || 0)
+        const capacity = Math.min(10, Math.max(1, Number(viewer.resources.maxAction) || 0, current))
+        track.innerHTML = Array.from({ length: capacity }, function (_, i) {
+          return '<i class="' + (i < current ? 'is-filled' : '') + '"></i>'
+        }).join('')
+      }
 
       const players = byId('playerResCards')
       if (!players) return

@@ -153,7 +153,11 @@ async function adventureDoAction(rawAction) {
   } catch (error) {
     clearPendingActionFeedback('adventure-rejected')
     if (error.adventurePaused) { pauseAdventure(error); return }
-    if (error.needsTargetSelection) enterActionTargetMode(action, targetPreparationFromError(error))
+    if (error.needsTargetSelection) {
+      if (!enterActionTargetMode(action, targetPreparationFromError(error))) {
+        setStatusMsg(error.message || '未收到有效目标，请同步进度后重试')
+      }
+    }
     else if (error.needsOptionSelection) {
       const retry = Object.assign({}, action)
       if (error.preparation) { retry.selectionId = error.preparation.selectionId; retry.stateRevision = error.preparation.stateRevision }

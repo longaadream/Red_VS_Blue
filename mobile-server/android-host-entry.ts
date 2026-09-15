@@ -1,4 +1,5 @@
 import { hostDiscoveryFromEnvironment } from '../electron-client/host-discovery'
+import { startLanBroadcast } from './lan-broadcast'
 import fs from 'node:fs'
 import path from 'node:path'
 import readline from 'node:readline'
@@ -45,12 +46,14 @@ async function main() {
   let tunnel: Awaited<ReturnType<typeof openHostTunnel>> | undefined
   let stopping = false, publishing = false, generation = 0
   await server.listen(2567, '0.0.0.0')
+  const stopBroadcast=startLanBroadcast(2567)
   const identity = getServerGameProfileIdentityV1()
   if (identity.authorityContentHash !== config.identity.authorityContentHash || identity.resolvedProfileHash !== config.identity.resolvedProfileHash || identity.runnerRevision !== config.identity.runnerRevision) throw new Error('Android native/client/host identity mismatch')
   output({ type: 'ready', port: 2567, node: process.version, profileIdentity: identity })
   async function stop() {
     if (stopping) return
     stopping = true; generation++; tunnel?.close(); tunnel = undefined
+    stopBroadcast()
     await journal.close()
     await server.gracefullyShutdown(false)
     await repository.close()

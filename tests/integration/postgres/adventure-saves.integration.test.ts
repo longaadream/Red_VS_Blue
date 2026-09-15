@@ -53,6 +53,15 @@ describe.skipIf(process.platform!=='win32'||!fs.existsSync(path.join(runtimeRoot
       expect(restoreAdventureCheckpoint(restored!.saved,profile,false).exportAggregate()).toEqual(first.aggregate)
       expect((await store.get('run'))?.current).toEqual(next)
       expect(await store.list('host')).toHaveLength(3)
+      await expect(store.deleteSave(old.runId,'guest',old.revision)).rejects.toThrow()
+      await expect(store.deleteSave('run','host',first.revision)).rejects.toThrow()
+      const deleting=(await store.list('host')).filter(s=>s.revision===next.revision)
+      await Promise.all(deleting.map(s=>store.deleteSave(s.runId,'host',s.revision)))
+      expect((await store.list('host')).map(s=>s.runId)).toEqual([old.runId])
+      expect((await store.get('run'))?.current).toEqual(next)
+      await store.deleteSave(old.runId,'host',old.revision)
+      expect(await store.list('host')).toEqual([])
+
     }finally{await pool?.end();await controller.stop()}
   },90000)
 })

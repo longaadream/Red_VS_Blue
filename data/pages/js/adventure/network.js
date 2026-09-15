@@ -14,6 +14,7 @@ window.RvBAdventureNetwork = {
     if (!profileResponse.ok) throw new Error('无法读取本机资源身份')
     const profileIdentity = await profileResponse.json()
     const client = new Colyseus.Client(server)
+    client.http.options.credentials = 'omit'
     const tokenKey = 'rvb-adventure:' + server + ':' + (options.roomId || '') + ':' + profileIdentity.resolvedProfileHash
     const token = options.roomId && sessionStorage.getItem(tokenKey)
     let room
@@ -72,7 +73,16 @@ window.RvBAdventureNetwork = {
           room.send('adventure.rpc', { requestId, actionId, type, payload, profileIdentity })
         })
       },
-      async dispose() { disposed = true; for (const item of pending.values()) { clearTimeout(item.timer); item.reject(new Error('已离开冒险')) } pending.clear(); await room.leave() },
+      async dispose() {
+        if (disposed) return
+        disposed = true
+        room.reconnection.enabled = false
+        sessionStorage.removeItem(key)
+        listeners.clear(); connectionListeners.clear()
+        for (const item of pending.values()) { clearTimeout(item.timer); item.reject(new Error('已离开冒险')) }
+        pending.clear()
+        if (room.connection.isOpen) await room.leave()
+      },
     }
     lastState = await api.request('snapshot')
     return api

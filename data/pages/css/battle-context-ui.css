@@ -1258,3 +1258,7 @@ body.target-mode-active .battle-vignette-speed-control { top: calc(env(safe-area
     background: #080f1d;
   }
 }
+
+.history-response { display: grid; gap: 4px; margin-left: 14px; padding-left: 10px; border-left: 2px dashed #6b563b; }
+.history-response-title { font-weight: 700; display: flex; align-items: center; gap: 5px; }
+.history-own-effects { display: grid; gap: 4px; }

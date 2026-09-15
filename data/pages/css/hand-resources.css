@@ -1,0 +1,57 @@
+#handResources {
+  position: fixed; z-index: 64; left: 50%; bottom: calc(var(--battle-hand-height, 138px) + env(safe-area-inset-bottom, 0px) + 14px);
+  transform: translateX(-50%); display: flex; flex-wrap: wrap; justify-content: center; gap: 8px;
+  width: max-content; max-width: calc(100vw - 32px); pointer-events: none;
+}
+#handResources[hidden] { display: none; }
+body:not(:has(#handCards .card-item)):not(:has(#pieceContextMenu.is-open)) #handResources {
+  bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+}
+#handResources .hand-resource {
+  display: flex !important; align-items: center; gap: 7px; position: relative !important;
+  padding: 7px 12px !important; min-height: 48px; margin: 0 !important;
+  border: 3px solid #34291e !important; border-radius: 17px 7px 14px 8px;
+  background: #d6bd8e !important; color: #332a20 !important; box-shadow: 3px 4px #241d18;
+  font: 13px/1.15 'Microsoft YaHei', sans-serif; transform: none !important;
+}
+#handResources strong { font: bold 32px/1 'Segoe UI', sans-serif; min-width: 23px; }
+#handResources .hand-resource-symbol { display: grid; place-items: center; width: 32px; height: 32px; border: 2px solid #34291e; border-radius: 48% 42% 46% 40%; background: #4c747c; color: #fff0c8; font-size: 27px; }
+#handResources .hand-resource-cp .hand-resource-symbol { border-radius: 3px; background: #7b5a83; font-size: 21px; }
+.hand-resource-track { display: grid; grid-template-columns: repeat(5, 8px); gap: 3px; }
+.hand-resource-track i { width: 8px; height: 12px; border: 1px solid #594632; border-radius: 2px 1px 3px 1px; background: #a28a65; }
+.hand-resource-track .is-filled { background: #4c747c; }
+#handResourceCost { flex-basis: 100%; width: fit-content; text-align: center; color: #f4e1b5; font-size: 12px; background: #382d23; padding: 3px 8px; border-radius: 4px; }
+#handResourceCost[hidden] { display: none; }
+body.full-map #handResources { display: none; }
+@media (min-width: 1000px) {
+  body.tutorial-mode #handResources { left: auto; right: 20px; bottom: 105px !important; transform: none; flex-direction: column; align-items: stretch; max-width: 205px; }
+  body.tutorial-mode #handResources .hand-resource { min-height: 38px; padding: 4px 8px !important; }
+  body.tutorial-mode #handResources strong { font-size: 26px; }
+  body.tutorial-mode #tutorialResourceGuide b { font-size: 17px; }
+}
+@media (max-width: 700px), (max-height: 540px) {
+  #handResources { gap: 5px; bottom: calc(var(--battle-hand-height, 94px) + env(safe-area-inset-bottom, 0px) + 5px); }
+  #handResources .hand-resource { padding: 4px 7px !important; min-height: 38px; gap: 5px; font-size: 11px; border-width: 2px !important; }
+  #handResources strong { font-size: 25px; }
+  #handResources .hand-resource-symbol { width: 25px; height: 25px; font-size: 22px; }
+  .hand-resource-track { grid-template-columns: repeat(5, 5px); gap: 2px; }
+  .hand-resource-track i { width: 5px; height: 9px; }
+}
+
+/* Deployment owns the lower interaction strip; resources move to the top. */
+body:has(#deploymentStatus:not([hidden])) #handResources {
+  top:calc(96px + env(safe-area-inset-top,0px)); bottom:auto!important;
+  left:50%; right:auto; transform:translateX(-50%); flex-direction:row;
+}
+@media(max-height:600px) {
+  body:has(#deploymentStatus:not([hidden])) #handResources { top:calc(55px + env(safe-area-inset-top,0px)); }
+  body:has(#deploymentStatus:not([hidden])) #handResources .hand-resource { min-height:28px; padding:2px 6px!important; }
+  body:has(#deploymentStatus:not([hidden])) #handResources strong { font-size:20px; }
+}
+.adventure-mode #handResources { left:auto; right:18px; top:calc(100px + env(safe-area-inset-top,0px)); bottom:auto!important; transform:none; max-width:220px; }
+@media(max-height:600px), (pointer:coarse) {
+  .adventure-mode #handResources { top:calc(10px + env(safe-area-inset-top,0px)); left:50%; right:auto; transform:translateX(-50%); max-width:250px; }
+  .adventure-mode #handResources .hand-resource { min-height:28px; padding:2px 5px!important; }
+  .adventure-mode #handResources strong { font-size:20px; }
+  .adventure-mode #handResources .hand-resource-track { display:none; }
+}

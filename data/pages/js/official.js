@@ -2,7 +2,7 @@
   'use strict'
   var $ = function (id) { return document.getElementById(id) }
   var current = null, activeMatch = null, busy = false, polling = false
-  var nativeApp = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform())
+  var nativeApp = location.protocol === 'rvb-client:' || !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform())
   function session() { try { return JSON.parse(sessionStorage.getItem('rvb_official_session') || 'null') } catch { return null } }
   function clearBattleReservations() {
     var prefix = 'rvb_colyseus_reconnect:' + base() + ':'
@@ -11,7 +11,7 @@
   function base() {
     if (!$('server').value.trim()) throw new Error('请先在服务器设置中填写组织者提供的官方服务器地址')
     var url = new URL($('server').value.trim())
-    if (nativeApp && url.origin === location.origin) throw new Error('这是手机内置页面地址，请填写实际的官方服务器地址')
+    if (nativeApp && url.origin === location.origin) throw new Error('这是客户端内置页面地址，请填写实际的官方服务器地址')
     if (url.username || url.password || url.search || url.hash || (url.protocol !== 'https:' && !(url.protocol === 'http:' && ['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname)))) throw new Error('账号登录必须使用 HTTPS；只有本机 localhost/127.0.0.1 可使用 HTTP')
     return url.href.replace(/\/+$/, '')
   }
@@ -122,7 +122,7 @@
   })
   var savedServer = localStorage.getItem('rvb_official_url') || ''
   if (nativeApp && savedServer.replace(/\/+$/, '') === location.origin) savedServer = ''
-  $('server').value = savedServer || (nativeApp ? '' : /^https?:$/.test(location.protocol) ? location.origin : 'http://127.0.0.1:2568')
+  $('server').value = savedServer || 'https://play.redvsblue.top'
   $('authAction').onchange()
   if ($('server').value) void connect().catch(function (error) { message(error.message) })
   else message('请先设置官方服务器地址，再登录并匹配')

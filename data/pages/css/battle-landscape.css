@@ -98,9 +98,12 @@
     width: auto !important;
     min-width: 0 !important;
     overflow-x: auto !important;
+    overflow-y: hidden !important;
+    scrollbar-width: none;
     flex-wrap: nowrap !important;
     gap: 3px !important;
   }
+  body #playerResCards::-webkit-scrollbar { display: none; }
   body .player-state-chip,
   body .player-state-chip.red,
   body .player-state-chip.blue {
@@ -325,7 +328,13 @@
   body #tileStatusPanel .ts-effect-type { display: none; }
   body.character-dock-open #tileStatusPanel { display: none !important; }
   body .pi-close, body .cd-close, body .character-keyword-close { min-width: 44px !important; min-height: 44px !important; }
-  body #targetOverlay .target-mode-card { margin-left: 0 !important; max-width: calc(100vw - 16px) !important; }
+  body #targetOverlay { background: transparent; padding-top: max(4px, env(safe-area-inset-top)); }
+  body #targetOverlay .target-mode-card {
+    margin-left: 0 !important; width: auto !important; max-width: calc(100vw - 16px) !important;
+    display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 4px 8px;
+  }
+  body #targetOverlay .target-prompt { font-size: 14px; letter-spacing: 0; }
+  body #targetOverlay .target-cancel-btn { min-height: 40px; padding: 4px 10px; }
   body.target-mode-active .board-camera-controls { top: 66px !important; }
 
   /* A compact action dock leaves the board visible. Large reading surfaces

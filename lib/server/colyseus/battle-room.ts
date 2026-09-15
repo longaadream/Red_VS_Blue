@@ -611,6 +611,16 @@ export function createBattleRoomClass(dependencies: BattleRoomDependencies) {
         room.status = 'waiting'
         room.players.forEach(candidate => { candidate.ready = false })
         await store.setRoom(this.roomId, room)
+        // Explicit departure releases admission immediately, even if the old
+        // browser socket takes longer to close during navigation.
+        const departedSession = this.sessionByPlayer.get(playerId)
+        if (departedSession) {
+          this.sessionByPlayer.delete(playerId)
+          this.playerBySession.delete(departedSession)
+          this.playerReconnections.get(departedSession)?.()
+          this.playerReconnections.delete(departedSession)
+        }
+        this.offlineSince.delete(playerId)
         await this.broadcastProductRoom()
         return { success: true, room: publicProductRoom(room) }
       }

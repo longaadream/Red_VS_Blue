@@ -1,5 +1,6 @@
 import { isContentAvailable, battleContentMode } from './content-availability'
 import { areMatchAllies } from './match-teams'
+import { canAffectAdventureTarget } from './adventure-boundary'
 /* eslint-disable @typescript-eslint/no-explicit-any -- RED-59 validates legacy data-authored definitions and action envelopes at runtime. */
 import type { PieceInstance } from './piece'
 import { getSkillById } from './skill-repository'
@@ -872,6 +873,9 @@ export function validateTargetRef(
     if (!target) return issue('TARGET_NOT_FOUND', `Piece ${ref.pieceId} was not found`)
     if (target.currentHp <= 0 || target.x == null || target.y == null) {
       return issue('TARGET_NOT_ALIVE', `Piece ${ref.pieceId} is not a living board target`)
+    }
+    if (!canAffectAdventureTarget(state, constraint.ownerPlayerId, target, sourcePiece)) {
+      return issue('TARGET_OUT_OF_RANGE', '目标不在当前战区，请先进入战区支援')
     }
     const sameOwner = areMatchAllies(state, target.ownerPlayerId, constraint.ownerPlayerId)
     if (constraint.filter === 'enemy' && sameOwner) return issue('TARGET_FILTER_MISMATCH', 'Target must be an enemy')

@@ -7,3 +7,11 @@ body[data-art-page="adventure"] .party-sheet .section-title,body[data-art-page="
 
 button,.home-link{min-height:44px}dialog{max-height:calc(100svh - 24px);overflow:auto}#saves{display:grid;gap:10px}#saves button{white-space:normal;overflow-wrap:anywhere;text-align:left}
 @media(orientation:landscape) and (max-height:600px){.adventure-desk{padding:12px max(16px,env(safe-area-inset-right)) 20px max(16px,env(safe-area-inset-left))}.desk-title{margin:12px 0}.desk-title h1{font-size:32px}.chapter-stamp{padding:5px 12px}.party-sheet,.departure-sheet{padding:16px}.piece-card img{height:130px;object-fit:contain}.family-tabs{margin:12px 0}.section-title{flex-wrap:wrap}dialog{padding:16px}}
+
+/* Solo play skips room controls; LAN players gather around the same preparation table. */
+.solo-adventure .room-browser,.solo-adventure #roomInfo,.solo-adventure .connection-settings,.solo-adventure #openJoin { display:none }
+.party-adventure #solo { display:none }
+.party-adventure .room-seats { display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px }
+.party-adventure .room-seat { flex-direction:column;align-items:center;text-align:center;min-height:150px;border:2px dashed #665239;border-radius:9px 13px 8px 12px }
+.party-adventure .room-seat img { width:76px;height:86px;object-fit:contain }
+@media(max-width:700px){.party-adventure .room-seats{grid-template-columns:repeat(2,minmax(0,1fr))}}

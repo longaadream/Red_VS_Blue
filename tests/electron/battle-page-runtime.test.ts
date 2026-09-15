@@ -74,6 +74,21 @@ function createClassList() {
   }
 }
 
+it.each([false,true])('clicking an allied skill landing cell submits pending selection (PVE=%s)', adventure => {
+  const submit=vi.fn()
+  const context=vm.createContext({
+    G:{turn:{currentPlayerId:'caster'},pieces:[{instanceId:'ally',ownerPlayerId:'teammate',currentHp:10,x:1,y:1}]},
+    myPlayerId:'caster',selectedPieceId:'ally',ADVENTURE_MODE:adventure,adventureDeployPieceId:null,
+    targetSubmissionPending:null,adventureOpenCell:()=>false,pendingOptionSelectionForOther:()=>false,
+    TRAINING_MODE:false,pendingCardAction:null,refreshBattleLegalActions:()=>{},
+    pendingSkill:{turnTargetActionType:'pendingTargetSelect',turnTargetPlayerId:'caster',validTargets:new Set(['2,1']),preparation:{targetType:'cell',selectionId:'march',stateRevision:'revision'}},
+    isPendingBoardMultiTarget:()=>false,currentTargetSourceName:()=> '圣铸进军',setStatusMsg:vi.fn(),
+    renderBoard:()=>{},renderActionBar:()=>{},renderTargetOverlay:()=>{},submitTargetAction:submit,
+  })
+  vm.runInContext(runtimeFunction(readBattlePage(),'onCellClick')+';onCellClick(2,1)',context)
+  expect(submit.mock.calls[0][0]).toMatchObject({type:'pendingTargetSelect',playerId:'caster',targetX:2,targetY:1,selectionId:'march'})
+})
+
 describe('battle page runtime source', () => {
   it('collects cell multi-selection through the real page functions and submits an authoritative legal command',()=>{
     const state=makeState(), revision=getTargetingStateRevision(state)
@@ -188,7 +203,7 @@ describe('battle page runtime source', () => {
 
     const piece = {
       templateId: 'blue-ichigo',
-      skills: [{ skillId: 'ichigo-zangetsu' }, { skillId: 'ichigo-bankai-tensa-zangetsu' }],
+      skills: [{ skillId: 'ichigo-zangetsu' }, { skillId: 'ichigo-bankai-tensa-zangetsu' }, { skillId: 'divine-shield-defense' }, { skillId: 'holy-shield-defense' }],
     }
     const displayed = (context).pieceInfoDisplaySkills(piece)
 
@@ -196,7 +211,7 @@ describe('battle page runtime source', () => {
       'ichigo-zangetsu', 'ichigo-bankai-tensa-zangetsu', 'ichigo-black-getsuga-tensho',
     ])
     expect(displayed[2]).toMatchObject({ derived: true, triggeredBy: 'ichigo-bankai-tensa-zangetsu' })
-    expect(piece.skills).toHaveLength(2)
+    expect(piece.skills).toHaveLength(4)
     expect((context).pieceDispSkills(piece).map((skill: { skillId: string }) => skill.skillId))
       .not.toContain('ichigo-black-getsuga-tensho')
   })
@@ -493,7 +508,7 @@ describe('battle page runtime source', () => {
     const doAction = vi.fn()
     const setStatusMsg = vi.fn()
     const closePieceContextMenu = vi.fn()
-    const context = vm.createContext({ doAction, setStatusMsg, closePieceContextMenu, Set, Number })
+    const context = vm.createContext({ doAction, setStatusMsg, closePieceContextMenu, refreshBattleLegalActions: vi.fn(), Set, Number })
 
     vm.runInContext(`
       let G = {
@@ -882,6 +897,8 @@ describe('battle page runtime source', () => {
       renderHand: () => { counts.hand += 1 },
       renderTargetOverlay: () => { counts.target += 1 },
       syncAuthoritativePendingPresentation: () => undefined,
+      refreshLessonVisualCue: () => undefined,
+      refreshHandResourceCost: () => undefined,
       updateRed43QaEvidence: () => undefined,
       clearTargetInteraction: () => undefined,
       recordAuthorityPerformance: () => { counts.performance += 1 },
@@ -965,6 +982,8 @@ describe('battle page runtime source', () => {
       renderHand: () => { counts.hand += 1 },
       renderTargetOverlay: () => { counts.target += 1 },
       syncAuthoritativePendingPresentation: () => undefined,
+      refreshLessonVisualCue: () => undefined,
+      refreshHandResourceCost: () => undefined,
       updateRed43QaEvidence: () => undefined,
       recordAuthorityPerformance: () => undefined,
       requestAuthorityRecovery: () => undefined,

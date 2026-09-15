@@ -28,6 +28,8 @@ async function fixture(id) {
   const lesson = sandbox.RvBTutorialLessons.get(id)
   let state = await sandbox.RvBTutorialLessons.createBattle({ createInitialBattleForPlayers, getPieceById }, lesson)
   let selected = null
+  const revealPieceSkills = vi.fn()
+  const setCue = vi.fn()
   const engine = { getCurrentInputOwnerPlayerId, planBotActions, prepareLegalBotAction }
   function commit(action) {
     const skills = state.skillsById
@@ -35,7 +37,7 @@ async function fixture(id) {
     state.skillsById = skills
   }
   const runtime = sandbox.RvBTutorialLessonRuntime.create(lesson, { getState: () => state, getSelectedPieceId: () => selected,
-    engine: async () => engine, commit, render() {}, setCue() {}, exit() {}, restart() {}, next() {} })
+    engine: async () => engine, commit, render() {}, setCue, revealPieceSkills, exit() {}, restart() {}, next() {} })
   const root = body.children[0]
   function labels() { return root.children[3].children.map(item => item.textContent) }
   async function settle() { await vi.waitFor(() => expect(runtime.snapshot().busy).toBe(false)); expect(runtime.snapshot().failure).toBe('') }
@@ -44,7 +46,7 @@ async function fixture(id) {
   async function act(action) { expect(runtime.beforeAction(action).allowed, runtime.snapshot().openingStep + ': ' + JSON.stringify(action)).toBe(true); const before = state; commit(action); await runtime.afterAcceptedAction(action, before); await settle() }
   async function legal(predicate) { const candidate = listLegalAIActions(state, lesson.player.playerId).find(c => predicate(c.action)); expect(candidate, 'legal candidate for ' + runtime.snapshot().openingStep).toBeDefined(); await act(candidate.action) }
   async function skill(skillId, targetTemplateId) { const target = state.pieces.find(p => p.templateId === targetTemplateId); await legal(a => a.skillId === skillId && a.targetPieceId === target.instanceId) }
-  return { lesson, runtime, root, labels, click, select, act, legal, skill, state: () => state }
+  return { lesson, runtime, root, labels, click, select, act, legal, skill, setCue, revealPieceSkills, state: () => state }
 }
 
 describe('six hands-on lessons', () => {
@@ -73,9 +75,8 @@ describe('six hands-on lessons', () => {
     expect(f.runtime.snapshot().openingStep).toBe('move')
     const position = f.lesson.guidedOpening.moveTo
     await f.legal(a => a.type === 'move' && a.toX === position.x && a.toY === position.y)
-    expect(f.runtime.snapshot().openingStep).toBe('move-result')
+    expect(f.runtime.snapshot().openingStep).toBe('attack')
     expect(f.runtime.beforeAction({ type: 'endTurn', playerId: f.lesson.player.playerId }).allowed).toBe(false)
-    await f.click('学习使用技能')
     await f.skill('blessed-hammer', f.lesson.guidedOpening.targetTemplateId)
     if (id === 'first-victory') {
       expect(f.state().terminalResult).toMatchObject({ winnerPlayerId: f.lesson.player.playerId, reason: 'core-eliminated' })
@@ -83,8 +84,7 @@ describe('six hands-on lessons', () => {
       expect(f.runtime.beforeAction({ type: 'endTurn', playerId: f.lesson.player.playerId }).allowed).toBe(false)
       return
     }
-    expect(f.runtime.snapshot().openingStep).toBe('attack-result')
-    await f.click('学习结束回合')
+    expect(f.runtime.snapshot().openingStep).toBe('end-turn')
     await f.legal(a => a.type === 'endTurn')
     expect(f.runtime.snapshot().openingStep).toBe('review')
     await f.click('继续本局练习')
@@ -96,27 +96,21 @@ describe('six hands-on lessons', () => {
     const f = await fixture('protect-cores')
     await f.click('开始学习')
     await f.skill('light-of-the-light', 'uther')
-    expect(f.root.children[1].textContent).toContain('5 点生命')
-    await f.click('学习圣光盾')
+    expect(f.runtime.snapshot().notices.some(n => n.text.includes('5 点生命'))).toBe(true)
+    expect(f.runtime.snapshot().openingStep).toBe('shield')
     await f.skill('shield-of-light', 'uther')
-    await f.click('学习移动与反击')
     await f.legal(a => a.type === 'move' && a.toX === 7 && a.toY === 7 && a.pieceId === f.state().pieces.find(p => p.templateId === 'uther').instanceId)
-    await f.click('学习使用技能')
     await f.skill('blessed-hammer', 'reaper')
-    expect(f.runtime.snapshot().openingStep).toBe('attack-result')
+    expect(f.runtime.snapshot().openingStep).toBe('end-turn')
   })
 
   it.each(['reinforcements', 'charge', 'full-match'])('%s teaches deployment, movement and playing a card in order', async id => {
     const f = await fixture(id)
     await f.click('开始学习')
     await f.legal(a => a.type === 'deployReservePiece')
-    await f.click('学习本回合首移')
     await f.legal(a => a.type === 'move')
-    await f.click('学习使用手牌')
     await f.legal(a => a.type === 'playCard')
-    expect(f.runtime.snapshot().openingStep).toBe('card-result')
-    const next = id === 'charge' ? '学习争夺结晶' : id === 'full-match' ? '学习安排技能' : '学习结束回合'
-    await f.click(next)
+    expect(f.labels()).toEqual(['返回课程'])
     expect(f.runtime.snapshot().openingStep).toBe(id === 'charge' ? 'fight-crystal' : id === 'full-match' ? 'practice-skill' : 'end-turn')
   })
 
@@ -124,11 +118,8 @@ describe('six hands-on lessons', () => {
     const f = await fixture('charge')
     await f.click('开始学习')
     await f.legal(a => a.type === 'deployReservePiece')
-    await f.click('学习本回合首移')
     await f.legal(a => a.type === 'move')
-    await f.click('学习使用手牌')
     await f.legal(a => a.type === 'playCard')
-    await f.click('学习争夺结晶')
     const route = []
     for (let n = 0; n < 30 && f.runtime.snapshot().openingStep === 'fight-crystal' && !f.state().terminalResult; n++) {
       const plan = planBotActions(f.state(), f.lesson.player.playerId)
@@ -146,14 +137,15 @@ describe('six hands-on lessons', () => {
       if (pickup) await f.act(pickup)
       else await f.legal(a => a.type === 'deployReservePiece' || a.type === 'endTurn')
     }
-    expect(f.runtime.snapshot().openingStep).toBe('collect-result')
-    await f.click('学习充能技能')
+    expect(f.runtime.snapshot().openingStep).toBe('charge')
+    expect(f.setCue).toHaveBeenCalledWith(expect.objectContaining({ step: 'charge', skillId: 'divine-blessing' }))
+    expect(f.revealPieceSkills).toHaveBeenCalledWith(f.state().pieces.find(p => p.templateId === 'uther' && p.ownerPlayerId === f.lesson.player.playerId).instanceId)
     for (let n = 0; n < 5 && f.runtime.snapshot().openingStep === 'charge'; n++) {
       const charge = listLegalAIActions(f.state(), f.lesson.player.playerId).find(c => c.action.type === 'useChargeSkill' && c.action.skillId === 'divine-blessing')
       if (charge) await f.act(charge.action)
       else await f.legal(a => a.type === 'deployReservePiece' || a.type === 'endTurn')
     }
-    expect(f.runtime.snapshot().openingStep).toBe('charge-result')
+    expect(f.runtime.snapshot().openingStep).toBe('end-turn')
     expect(f.state().terminalResult).toBeUndefined()
   })
 
@@ -161,11 +153,8 @@ describe('six hands-on lessons', () => {
     const f = await fixture('charge')
     await f.click('开始学习')
     await f.legal(a => a.type === 'deployReservePiece')
-    await f.click('学习本回合首移')
     await f.legal(a => a.type === 'move')
-    await f.click('学习使用手牌')
     await f.legal(a => a.type === 'playCard')
-    await f.click('学习争夺结晶')
     // Arrange the post-death crystal fixture; pickup and charge below use real rules.
     const move = listLegalAIActions(f.state(), f.lesson.player.playerId).find(c => c.action.type === 'move').action
     function crystal(id) { dropChargeCrystal(f.state(), { id, sourcePieceId: 'fallen-core-fixture', x: move.toX, y: move.toY }) }
@@ -178,14 +167,12 @@ describe('six hands-on lessons', () => {
     crystal('available')
     await f.runtime.afterAcceptedAction({ type: 'move', playerId: 'training-blue' }, f.state())
     await f.act(move)
-    expect(f.runtime.snapshot().openingStep).toBe('collect-result')
-    await f.click('学习充能技能')
+    expect(f.runtime.snapshot().openingStep).toBe('charge')
     // A normal turn restores AP when the pickup used the last point.
     await f.legal(a => a.type === 'endTurn')
     if (f.state().deployment.status === 'awaiting-reserve-deploy') await f.legal(a => a.type === 'deployReservePiece')
     await f.legal(a => a.type === 'useChargeSkill' && a.skillId === 'divine-blessing')
-    expect(f.runtime.snapshot().openingStep).toBe('charge-result')
-    await f.click('学习结束回合')
+    expect(f.runtime.snapshot().openingStep).toBe('end-turn')
     await f.legal(a => a.type === 'endTurn')
     expect(f.runtime.snapshot().openingStep).toBe('review')
     f.state().terminalResult = { winnerPlayerId: 'training-blue', reason: 'core-eliminated' }

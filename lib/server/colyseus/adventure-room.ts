@@ -1,9 +1,10 @@
 import { acquireAdventureLease, releaseAdventureLease } from '../../content-pipeline/runtime/adventure-leases'
 import { Room, type Client } from 'colyseus'
 import { createHash, randomUUID } from 'node:crypto'
-import { CooperativeAdventureSession, createCooperativeAdventure, type AdventureSeat } from '../../pve/roguelike/cooperative-session'
-import { createAdventureCheckpoint, restoreAdventureCheckpoint } from '../../pve/roguelike/checkpoint'
-import { adventureContent, adventureBuilds, ENEMY } from '../../pve/roguelike/content'
+import type { CooperativeAdventureSession, AdventureSeat } from '../../pve/roguelike/cooperative-session'
+import { existsSync } from 'node:fs'
+import { join } from 'node:path'
+import { getDataRoot } from '../../app-paths'
 import { generateAdventureContent } from '../../pve/roguelike/generation'
 import { createRootSeed } from '../../game/rule-runtime'
 import { hasAdventureCardChoice } from '../../game/adventure-card-state'
@@ -13,6 +14,13 @@ import type { AdventureRepository, AdventureReceipt } from './adventure-store'
 interface Join {playerId:string;name?:string;profileIdentity:unknown;auth?:unknown;seed?:number;saveId?:string;familyId?:string}
 interface Request {profileIdentity:unknown;requestId:string;actionId:string;type:string;payload?:Record<string,unknown>}
 export function createAdventureRoomClass(dependencies:{store?:AdventureRepository;authenticate?:(playerId:string,roomId:string,proof:unknown)=>string;reconnectGraceMs?:number}) {
+  let CooperativeAdventureSession: typeof import('../../pve/roguelike/cooperative-session').CooperativeAdventureSession
+  let createCooperativeAdventure: typeof import('../../pve/roguelike/cooperative-session').createCooperativeAdventure
+  let createAdventureCheckpoint: typeof import('../../pve/roguelike/checkpoint').createAdventureCheckpoint
+  let restoreAdventureCheckpoint: typeof import('../../pve/roguelike/checkpoint').restoreAdventureCheckpoint
+  let adventureContent: typeof import('../../pve/roguelike/content').adventureContent
+  let adventureBuilds: typeof import('../../pve/roguelike/content').adventureBuilds
+  let ENEMY: typeof import('../../pve/roguelike/content').ENEMY
   return class AdventureRoom extends Room {
     maxClients=8
     autoDispose=false
@@ -29,10 +37,23 @@ export function createAdventureRoomClass(dependencies:{store?:AdventureRepositor
     private session?:CooperativeAdventureSession
     private queue:Promise<unknown>=Promise.resolve()
     private disposed=false
+    private closing=false
     private failures=new Map<string,AdventureReceipt>()
     private emptySince=Date.now()
-    onCreate(options:Join){
+    async onCreate(options:Join){
       if(!dependencies.store)throw new Error('此服务器尚未配置冒险存档服务')
+      if (!existsSync(join(getDataRoot(), 'pve/roguelike/adventure.json'))) {
+        throw new Error('当前资源包不包含 PVE 冒险，请在资源包页面切换为内置资源或安装支持 PVE 的资源包。')
+      }
+      // PVP-only profiles must not load adventure content during server startup.
+      const [session, checkpoint, content] = await Promise.all([
+        import('../../pve/roguelike/cooperative-session'),
+        import('../../pve/roguelike/checkpoint'),
+        import('../../pve/roguelike/content'),
+      ])
+      ;({ CooperativeAdventureSession, createCooperativeAdventure } = session)
+      ;({ createAdventureCheckpoint, restoreAdventureCheckpoint } = checkpoint)
+      ;({ adventureContent, adventureBuilds, ENEMY } = content)
       this.options=options
       this.creatorKey=dependencies.authenticate?.(options.playerId,'create',options.auth)
       acquireAdventureLease(this.roomId)
@@ -147,6 +168,7 @@ export function createAdventureRoomClass(dependencies:{store?:AdventureRepositor
       for(const client of this.clients){const id=this.playerByClient.get(client.sessionId);if(id)client.send('adventure.state',{...this.view(id),...this.savedMetadata})}
     }
     private async request(client:Client,message:Request){
+      if(this.closing)throw new Error('房主已保存并解散队伍，请从存档继续')
       assertGameProfileCompatibleV1(message?.profileIdentity)
       const actor=this.playerByClient.get(client.sessionId)
       if(!actor||this.offline.has(actor))throw new Error('当前连接没有可操作席位')
@@ -154,6 +176,20 @@ export function createAdventureRoomClass(dependencies:{store?:AdventureRepositor
       const payload=message.payload??{}
       if(message.type==='snapshot')return this.view(actor)
       if(message.type==='saves')return dependencies.store!.list(actor)
+      if(message.type==='deleteSave'){
+        await dependencies.store!.deleteSave(String(payload.saveId),actor,Number(payload.revision))
+        return {deleted:true}
+      }
+      if(message.type==='dissolve'){
+        if(actor!==this.hostId)throw new Error('仅房主可以解散队伍')
+        // The current aggregate is already durably committed, including a
+        // battle in progress. Preserve it before closing any player socket.
+        if(this.session)await dependencies.store!.save(this.runId,actor,this.session.currentRevision)
+        this.closing=true
+        try{await this.lock()}catch(error){this.closing=false;throw error}
+        this.clock.setTimeout(()=>{void this.disconnect().catch(error=>{console.error('[adventure] room close failed',error)})},100)
+        return {closed:true}
+      }
       if(message.type==='selectTeam'||message.type==='ready'){
         if(this.session)throw new Error('冒险开始后不能更换初始队伍')
         if(message.type==='selectTeam'){
@@ -174,7 +210,7 @@ export function createAdventureRoomClass(dependencies:{store?:AdventureRepositor
         if(saveId){
           const saved=await dependencies.store!.get(saveId)
           if(saved?.hostId!==actor||!saved.saved)throw new Error('存档不存在或不属于你')
-          candidate=restoreAdventureCheckpoint(saved.saved,profile)
+          candidate=restoreAdventureCheckpoint(saved.saved,profile,false)
           const ids=candidate.exportAggregate().state.players.filter(p=>p.playerId!==ENEMY).map(p=>p.playerId)
           const controllers=candidate.exportAggregate().state.extensions!.adventureWorld.coop.controllers??{}
           if([...this.seats.keys()].some(id=>!ids.some(seat=>(controllers[seat]??seat)===id)))throw new Error('请使用原存档席位进入')
@@ -206,7 +242,7 @@ export function createAdventureRoomClass(dependencies:{store?:AdventureRepositor
       const fingerprint=createHash('sha256').update(JSON.stringify({type:message.type,payload})).digest('hex')
       const previous=await dependencies.store!.receipt(this.runId,actor,message.actionId)??this.failures.get(`${actor}:${message.actionId}`)
       if(previous){if(previous.fingerprint!==fingerprint)throw new Error('重复动作 ID 的内容不一致');return {receipt:previous,...this.view(actor)}}
-      const candidate=restoreAdventureCheckpoint(createAdventureCheckpoint(this.session,false),getServerGameProfileIdentityV1(),false)
+      const candidate=CooperativeAdventureSession.restoreAggregate(this.session.exportAggregate())
       try{
         if(message.type==='admit'||message.type==='takeover'){
           if(actor!==this.hostId)throw new Error('仅房主可以接纳或移交席位')
@@ -239,7 +275,7 @@ export function createAdventureRoomClass(dependencies:{store?:AdventureRepositor
       await this.publish()
     }
     private async tick(){
-      if(this.disposed)return
+      if(this.disposed||this.closing)return
       const online=[...this.playerByClient.values()].some(id=>!this.offline.has(id))
       if(online)this.emptySince=Date.now()
       else if(Date.now()-this.emptySince>(dependencies.reconnectGraceMs??30000)) {
@@ -258,14 +294,14 @@ export function createAdventureRoomClass(dependencies:{store?:AdventureRepositor
       const offline=(id:string)=>{const controller=coop.controllers?.[id]??id;return this.offline.has(controller)&&Date.now()-this.offline.get(controller)!>30000}
       const waiting=(coop.humanIds as string[]).find(id=>offline(id)&&hasAdventureCardChoice(this.aggregate().state,id))
       if(waiting&&!state.pendingOptionSelection&&!state.pendingTargetSelection){
-        const candidate=restoreAdventureCheckpoint(createAdventureCheckpoint(this.session,false),getServerGameProfileIdentityV1(),false)
+        const candidate=CooperativeAdventureSession.restoreAggregate(this.session.exportAggregate())
         candidate.skipDisconnected(waiting)
         await this.accept(candidate,{actor:'system',actionId:`skip-${snapshot.revision}`,fingerprint:`skip-${snapshot.revision}`,revision:candidate.snapshot().revision,status:'applied'});return
       }
       if(this.session.canSave()){
         const id=(coop.humanIds as string[]).find(id=>offline(id)!==coop.absent.includes(id))
         if(id){
-          const candidate=restoreAdventureCheckpoint(createAdventureCheckpoint(this.session,false),getServerGameProfileIdentityV1(),false)
+          const candidate=CooperativeAdventureSession.restoreAggregate(this.session.exportAggregate())
           candidate.setPresence(id,!offline(id))
           await this.accept(candidate,{actor:'system',actionId:`presence-${snapshot.revision}`,fingerprint:`presence-${snapshot.revision}`,revision:candidate.snapshot().revision,status:'applied'});return
         }
@@ -274,7 +310,7 @@ export function createAdventureRoomClass(dependencies:{store?:AdventureRepositor
       const human=owner!==ENEMY
       const phase=state.turn.phase==='start'||state.turn.phase==='end'
       if(human&&!phase&&!offline(owner))return
-      const candidate=restoreAdventureCheckpoint(createAdventureCheckpoint(this.session,false),getServerGameProfileIdentityV1(),false)
+      const candidate=CooperativeAdventureSession.restoreAggregate(this.session.exportAggregate())
       try{
         if(human&&offline(owner))candidate.skipDisconnected(owner)
         else if(human)candidate.human({type:phase?'beginPhase':'endTurn',playerId:owner},snapshot.revision,owner)

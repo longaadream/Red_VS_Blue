@@ -14,14 +14,14 @@
     const toggle = document.createElement('button')
     toggle.type = 'button'
     toggle.className = 'tutorial-dialog__toggle'
-    toggle.textContent = '收起'
-    toggle.setAttribute('aria-expanded', 'true')
-    toggle.setAttribute('aria-label', '收起教程提示')
-    let collapsed = false
+    toggle.textContent = '说明'
+    toggle.setAttribute('aria-expanded', 'false')
+    toggle.setAttribute('aria-label', '展开教程说明')
+    let collapsed = true
     toggle.addEventListener('click', function () {
       collapsed = !collapsed
       root.classList.toggle('is-collapsed', collapsed)
-      toggle.textContent = collapsed ? '展开' : '收起'
+      toggle.textContent = collapsed ? '说明' : '收起'
       toggle.setAttribute('aria-expanded', String(!collapsed))
       toggle.setAttribute('aria-label', collapsed ? '展开教程提示' : '收起教程提示')
       root.scrollTop = 0
@@ -36,6 +36,10 @@
     actions.className = 'tutorial-dialog__actions'
     root.append(header, text, objective, actions)
     document.body.appendChild(root)
+    const bubble = document.createElement('div')
+    bubble.id = 'tutorialActionBubble'
+    bubble.setAttribute('role', 'status')
+    document.body.appendChild(bubble)
     const seen = new Set()
     const history = []
     const review = document.createElement('details')
@@ -67,17 +71,26 @@
     function teach(step, copy, goal) {
       openingStep = step; message = copy; openingObjective = goal
       history.push({ key: 'opening-' + step, text: copy })
-      const piece = step === 'select' || step === 'shield' || step === 'heal' ? openingPiece(false) : step === 'attack' ? openingPiece(true) : null
-      const cell = step === 'move' || step === 'terrain' ? opening.moveTo : piece
-      setTeachingCue(cell ? { cells: [{ x: cell.x, y: cell.y }] } : null)
+      const own = openingPiece(false)
+      const source = step === 'heal' || step === 'charge' ? (hooks.getState().pieces || []).find(function (p) { return p.templateId === (step === 'heal' ? 'anduin' : 'uther') && p.ownerPlayerId === lesson.player.playerId }) : own
+      const target = step === 'attack' ? openingPiece(true) : own
+      const skillId = step === 'charge' ? 'divine-blessing' : step === 'heal' ? 'light-of-the-light' : step === 'shield' ? 'shield-of-light' : step === 'attack' ? opening.skillId : null
+      const cue = { step: step, cells: [], skillId: skillId }
+      if (step === 'charge' && source) cue.cells = [{ x: source.x, y: source.y }]
+      if (step === 'move' || step === 'terrain') cue.cells = [opening.moveTo]
+      else if (['select', 'heal', 'shield', 'attack'].includes(step) && target) cue.cells = [{ x: target.x, y: target.y }]
+      if (step === 'move' && own) cue.path = [{ x: own.x, y: own.y }, opening.moveTo]
+      if (skillId && source && target) cue.path = [{ x: source.x, y: source.y }, { x: target.x, y: target.y }]
+      setTeachingCue(cue)
+      if (skillId && source && hooks.revealPieceSkills) hooks.revealPieceSkills(source.instanceId)
       render()
     }
     function begin() {
       started = true
       if (opening && ['deployment', 'charge', 'full-match'].includes(opening.kind)) {
-        teach('deploy', '轮到你时，选择增援，再点击高亮格部署。部署免费。', '轮到你后，选择增援并点击高亮落点')
+        teach('deploy', '部署免费。落点须距场上所有棋子超过 5 格（横纵步数相加），只能选择高亮空格。', '选择增援 → 点击高亮落点')
       } else if (opening && opening.kind === 'protection') {
-        teach('heal', '用安度因的“圣光闪耀”治疗乌瑟尔。', '安度因 → 圣光闪耀 → 乌瑟尔')
+        teach('heal', '先补回生命，再用圣盾挡住下一次伤害。', '① 圣光闪耀 → ② 圣光盾')
       } else if (opening && opening.kind === 'terrain') {
         teach('terrain', '点击掩体查看地形。掩体可站立，阻挡弹射物。', '点击亮起的掩体格')
       } else if (opening) teach('select', '点击乌瑟尔，查看生命与技能。', '第一步：点击乌瑟尔')
@@ -140,7 +153,7 @@
         teach('attack-result', '技能已结算，查看目标生命、状态和剩余行动点。', '查看本次技能结果')
       } else if (openingStep === 'move' && action.type === 'move' && piece && piece.x === opening.moveTo.x && piece.y === opening.moveTo.y) {
         const previous = before.players.find(function (p) { return p.playerId === lesson.player.playerId })
-        teach('move-result', '乌瑟尔已经走到这里。这次移动消耗了 ' + (previous.actionPoints - own.actionPoints) + ' 点行动点，现在剩下 ' + own.actionPoints + ' 点。', '观察上方行动点，再学习攻击')
+        teach('move-result', '乌瑟尔已经走到这里。这次移动消耗了 ' + (previous.actionPoints - own.actionPoints) + ' 点行动点，现在剩下 ' + own.actionPoints + ' 点。', '查看行动点变化')
       } else if (openingStep === 'attack' && action.type === 'useBasicSkill' && action.skillId === opening.skillId) {
         const target = openingPiece(true)
         const previous = before.pieces.find(function (p) { return p.templateId === opening.targetTemplateId && p.ownerPlayerId !== lesson.player.playerId })
@@ -160,20 +173,72 @@
       actions.appendChild(button)
     }
     function leave() { dispose(); hooks.exit() }
-    function lessonButton(step, label, next) {
-      if (openingStep === step) addButton(label, function () { if (openingStep === step) next() }, true)
+    function advanceOpeningResult() {
+      if (!teaching() || disposed || failure || hooks.getState().terminalResult || hooks.getState().pendingTargetSelection || hooks.getState().pendingOptionSelection) return
+      const completedStep = openingStep
+      function nextWhen(step, next) {
+        if (completedStep === step) next()
+      }
+      nextWhen('deploy-result', function () {
+        teach('move-new', '选中新棋子，移动到高亮格。本回合首次普通移动免费。', '选中棋子，再点击可移动格')
+        const piece = hooks.getState().pieces.find(function (p) { return p.instanceId === deployedPieceId })
+        if (piece) setTeachingCue({ step: 'move-new', pieceId: piece.instanceId, cells: [{ x: piece.x, y: piece.y }] })
+      })
+      nextWhen('new-move-result', function () {
+        teach('card', '点击“幸运币”查看，再点一次打出。', '点击幸运币查看，再点击打出')
+      })
+      nextWhen('card-result', function () {
+        if (opening.kind === 'charge') teach('fight-crystal', '击败敌方核心，争夺留下的结晶。', '移动、使用技能作战，观察核心阵亡后的地面')
+        else if (opening.kind === 'full-match') teach('practice-skill', '选中棋子，使用技能攻击合法目标。', '选棋子 → 查看技能 → 使用技能与合法目标')
+        else teachEndTurn()
+      })
+      nextWhen('heal-result', function () {
+        teach('shield', '生命补好了，用乌瑟尔的“圣光盾”保护自己。', '✓ 圣光闪耀 → ② 圣光盾')
+      })
+      nextWhen('shield-result', teachMove)
+      nextWhen('collect-result', function () {
+        teach('charge', '点击乌瑟尔的“赐福”，强化所有友军的下次伤害。场上圣盾越多，强化越高。', '乌瑟尔 → 赐福；行动点、充能点都要够')
+      })
+      nextWhen('charge-result', teachEndTurn)
+      nextWhen('move-result', function () {
+        const target = openingPiece(true)
+        if (openingStep !== 'move-result') return
+        teach('attack', '使用“祝福之锤”攻击' + target.name + '：消耗 1 行动点，范围 2 格。', '点击祝福之锤，再点击' + target.name)
+      })
+      nextWhen('attack-result', teachEndTurn)
     }
     function teachMove() {
       teach('move', opening.kind === 'terrain' ? '选中乌瑟尔，移动到亮起的掩体格。' : '选中乌瑟尔，点击或拖动到亮起的目标格。', '将乌瑟尔移到亮起的目标格')
     }
     function teachEndTurn() {
-      teach('end-turn', '点击右下角“结束回合”。', '点击右下角“结束回合”')
+      teach('end-turn', '行动点从 1 点起，每次自己的新回合上限 +1，最多 10 点，并补满；剩余点数不累积。', '点击右下角“结束回合”，观察下回合行动点')
     }
     function render() {
       if (disposed) return
       const terminal = hooks.getState().terminalResult
       root.classList.toggle('is-busy', busy)
+      root.classList.toggle('is-guiding', started && !terminal && !failure)
+      root.classList.toggle('is-review', openingStep === 'review')
+      root.classList.toggle('is-collapsed', started && collapsed && !terminal && !failure)
       text.textContent = failure || opponentNote || message
+      const prompts = {
+        deploy: '增援要离所有棋子超过 5 格，包括友军。横着、竖着各算一步；第 6 格才可部署。',
+        'move-new': '这枚增援本回合第一次移动免费。点击亮起的格子。',
+        card: '点幸运币查看，再点一次打出。',
+        heal: '点“圣光闪耀”，再点受伤的乌瑟尔。',
+        shield: '点“圣光盾”，给乌瑟尔自己加盾。',
+        charge: '点乌瑟尔的“赐福”。它消耗行动点和充能点，强化全体友军。',
+        'end-turn': '行动点从 1 点起。每次自己的新回合上限 +1，并补满；最多 10 点。',
+        review: '行动点已补满。点上方“继续本局练习”，轮到你指挥了。',
+        select: '点亮起的棋子，查看它的技能。',
+        move: '点亮起的落点，也可以把棋子拖过去。',
+        attack: '点箭头标出的技能，再点亮起的敌人。',
+        collect: '走到结晶上，就能拾取充能点。',
+        'fight-crystal': '击败敌方核心，地上会留下充能结晶。',
+      }
+      bubble.hidden = !started || busy || !!terminal || !!failure || !prompts[openingStep]
+      bubble.textContent = prompts[openingStep] || ''
+      bubble.setAttribute('data-step', openingStep)
       objective.textContent = terminal ? '本局已结束' : failure ? '练习中断，可重开或返回课程' : !started ? '点击开始学习' : busy ? '等待对手行动' : teaching() ? openingObjective : '消灭敌方场上核心'
       actions.replaceChildren()
       reviewItems.replaceChildren()
@@ -190,34 +255,6 @@
       } else if (!started) {
         addButton(opening ? '开始学习' : '开始本局', begin, true)
       } else if (teaching()) {
-        lessonButton('deploy-result', '学习本回合首移', function () {
-          teach('move-new', '选中新棋子，移动到高亮格。本回合首次普通移动免费。', '选中棋子，再点击可移动格')
-          const piece = hooks.getState().pieces.find(function (p) { return p.instanceId === deployedPieceId })
-          if (piece) setTeachingCue({ cells: [{ x: piece.x, y: piece.y }] })
-        })
-        lessonButton('new-move-result', '学习使用手牌', function () {
-          teach('card', '点击“幸运币”查看，再点一次打出。', '点击幸运币查看，再点击打出')
-        })
-        lessonButton('card-result', opening.kind === 'charge' ? '学习争夺结晶' : opening.kind === 'full-match' ? '学习安排技能' : '学习结束回合', function () {
-          if (opening.kind === 'charge') teach('fight-crystal', '击败敌方核心，争夺留下的结晶。', '移动、使用技能作战，观察核心阵亡后的地面')
-          else if (opening.kind === 'full-match') teach('practice-skill', '选中棋子，使用技能攻击合法目标。', '选棋子 → 查看技能 → 使用技能与合法目标')
-          else teachEndTurn()
-        })
-        lessonButton('heal-result', '学习圣光盾', function () {
-          teach('shield', '用乌瑟尔的“圣光盾”保护自己，需要 2 行动点。', '乌瑟尔 → 圣光盾 → 乌瑟尔自己')
-        })
-        lessonButton('shield-result', '学习移动与反击', teachMove)
-        lessonButton('collect-result', '学习充能技能', function () {
-          teach('charge', '选择充能技能，确认行动点、充能点和冷却后施放。', '查看费用，亲手使用一次充能技能')
-        })
-        lessonButton('charge-result', '学习结束回合', teachEndTurn)
-        if (openingStep === 'move-result') addButton('学习使用技能', function () {
-          const target = openingPiece(true)
-          if (openingStep !== 'move-result') return
-          teach('attack', '使用“祝福之锤”攻击' + target.name + '：消耗 1 行动点，范围 2 格。', '点击祝福之锤，再点击' + target.name)
-          if (hooks.revealPieceSkills) hooks.revealPieceSkills(openingPiece(false).instanceId)
-        }, true)
-        lessonButton('attack-result', '学习结束回合', teachEndTurn)
         if (openingStep === 'review') addButton('继续本局练习', function () {
           if (openingStep !== 'review') return
           openingStep = 'free'; message = '继续作战，消灭敌方场上核心。'; setTeachingCue(null); render()
@@ -226,9 +263,16 @@
         addButton('给点思路', function () { message = lesson.help; render() })
       }
       addButton('返回课程', leave)
+      if (hooks.positionGuide) hooks.positionGuide()
     }
     function observe(action, before) {
       observeOpening(action, before)
+      advanceOpeningResult()
+      const previousPlayer = before.players && before.players.find(function (p) { return p.playerId === lesson.player.playerId })
+      const currentPlayer = hooks.getState().players && hooks.getState().players.find(function (p) { return p.playerId === lesson.player.playerId })
+      if (previousPlayer && currentPlayer && currentPlayer.maxActionPoints > previousPlayer.maxActionPoints && hooks.showResourceGrowth) {
+        hooks.showResourceGrowth(previousPlayer.maxActionPoints, currentPlayer.maxActionPoints)
+      }
       const notices = global.RvBTutorialLessons.observe(lesson, before, hooks.getState(), action, seen)
       notices.forEach(function (notice) { history.push(notice) })
       if (!teaching() && notices.length) message = notices[0].text
@@ -342,12 +386,12 @@
         busy = false
         opponentNote = ''
         if (!disposed && !failure && openingStep === 'watch' && !hooks.getState().terminalResult) {
-          teach('review', '又轮到你了。行动点会在自己的新回合开始时补充，行动记录能查看刚才发生了什么。接下来继续练习本局刚学过的操作，我会继续提醒需要注意的变化。', '观察新回合，再继续练习')
+          teach('review', '又轮到你了，行动点已补充。继续用刚学会的操作作战。', '观察新回合，再继续练习')
         }
         if (!disposed) { hooks.setCue(teachingCue); hooks.render(); showResult(); render() }
       }
     }
-    function dispose() { disposed = true; setTeachingCue(null); root.remove() }
+    function dispose() { disposed = true; setTeachingCue(null); root.remove(); bubble.remove() }
     render()
     setTeachingCue(lesson.cue || null)
     return Object.freeze({

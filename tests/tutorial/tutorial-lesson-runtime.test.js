@@ -39,14 +39,13 @@ describe('collapsible tutorial', () => {
     const toggle = f.root.children[0].children[1]
     const before = f.runtime.snapshot()
     f.root.classList.toggle = vi.fn()
-    toggle.listeners.click()
     expect(toggle.attributes['aria-expanded']).toBe('false')
-    expect(toggle.textContent).toBe('展开')
-    expect(f.root.classList.toggle).toHaveBeenCalledWith('is-collapsed', true)
+    expect(toggle.textContent).toBe('说明')
     expect(f.runtime.snapshot()).toEqual(before)
     expect(f.root.children[2].textContent).toBeTruthy()
     f.click('开始本局')
     await Promise.resolve()
+    expect(f.root.classList.toggle).toHaveBeenCalledWith('is-collapsed', true)
     expect(toggle.attributes['aria-expanded']).toBe('false')
     expect(f.root.children[2].textContent).toBeTruthy()
     toggle.listeners.click()
@@ -103,11 +102,8 @@ describe('tutorial opponent pacing', () => {
     f.click('开始学习')
     await vi.advanceTimersByTimeAsync(0)
     await f.runtime.afterAcceptedAction({ type: 'deployReservePiece', playerId: 'human', pieceId: 'ally' }, current)
-    f.click('学习本回合首移')
     await f.runtime.afterAcceptedAction({ type: 'move', playerId: 'human', pieceId: 'ally' }, current)
-    f.click('学习使用手牌')
     await f.runtime.afterAcceptedAction({ type: 'playCard', playerId: 'human' }, current)
-    f.click('学习争夺结晶')
     const beforeCrystal = current
     const crystals = [{ tileType: 'charge-crystal', x: 6, y: 2 }]
     current = { ...current, extensions: { tileEffects: crystals } }

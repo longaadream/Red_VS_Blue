@@ -132,8 +132,8 @@ export class OfficialResourceUpdates {
     const discovered = this.pending ?? await this.discover()
     if (!discovered) { this.set('current', '暂无官方测试资源更新'); return this.status }
     const { release, index } = discovered
+    if (compareVersions(index.version, stable.version) <= 0) { this.pending = undefined; this.set('current', '资源已是当前版本', stable.version); return this.status }
     if (index.minimumClientVersion && compareVersions(this.clientVersion, index.minimumClientVersion) < 0 || index.identity.engineAbi !== stable.compatibility.engineAbi || index.identity.contentAbi !== stable.compatibility.contentAbi) { this.pending = undefined; this.set('waiting', '此资源需要先更新客户端'); return this.status }
-    if (stable.kind === 'installed' && compareVersions(index.version, stable.version) <= 0) { this.pending = undefined; this.set('current', '资源已是当前版本', stable.version); return this.status }
     if (stable.candidateHash && stable.candidateHash !== stable.resolvedProfileHash) { this.set('waiting', '已有手动导入的候选资源，请先在资源管理中处理'); return this.status }
     const usePatch = Boolean(index.patch && index.patch.parentProfileHash === stable.resolvedProfileHash)
     if (!this.pending || this.pending.parent !== stable.resolvedProfileHash) {

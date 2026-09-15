@@ -46,7 +46,7 @@ type RendererApi = {
   projectCell(x: number, y: number, elevation?: number): { clientX: number; clientY: number; left: number; top: number }
   setBoardDecorations(data: { cells?: Array<{x:number;y:number;image?:unknown}>; lines?: Array<{points:Array<{x:number;y:number}>;color:number}> } | null): void
   setHistoryHighlight(cells: Array<{ x: number; y: number; role: 'source' | 'target' }>): void
-  setTutorialCue(cue: { cells?: Array<{ x: number; y: number }>; path?: Array<{ x: number; y: number }> }): void
+  setTutorialCue(cue: { blockedCells?: Array<{x:number;y:number}>; cells?: Array<{ x: number; y: number }>; path?: Array<{ x: number; y: number }> }): void
   clearTutorialCue(): void
   screenToCell(clientX: number, clientY: number): { x: number; y: number } | null
   showPresentationAreaFlash(cells: Array<{ x: number; y: number }>): void
@@ -708,6 +708,7 @@ describe('RED-68 BattleRenderer3D runtime', () => {
     harness.renderer.setTutorialCue({
       cells: [{ x: 4, y: 8 }, { x: 6, y: 8 }, { x: 4, y: 8 }],
       path: [{ x: 17, y: 8 }, { x: 4, y: 8 }],
+      blockedCells: [{ x: 5, y: 5 }],
     })
     harness.frame(80)
 
@@ -720,6 +721,13 @@ describe('RED-68 BattleRenderer3D runtime', () => {
     expect(group!.children.filter(child => child.userData.tutorialCueRole === 'ring')).toHaveLength(2)
     expect(group!.children.filter(child => child.userData.tutorialCueRole === 'beam')).toHaveLength(2)
     expect(group!.children.filter(child => child.userData.tutorialCueRole === 'path')).toHaveLength(1)
+    expect(group!.children.filter(child => child.userData.tutorialCueRole === 'blocked')).toHaveLength(1)
+    const token = group!.children.find(child => child.userData.tutorialCueRole === 'guide-token')!
+    expect(token).toBeTruthy()
+    const startX = token.position.x
+    harness.frame(400)
+    expect(token.position.x).toBeLessThan(startX)
+    expect(token.position.x).toBeGreaterThanOrEqual(4)
 
     const disposeBefore = { ...harness.disposeCounts }
     harness.renderer.clearTutorialCue()
@@ -782,9 +790,10 @@ describe('RED-68 BattleRenderer3D runtime', () => {
     expect(harness.renderers[0].pixelRatio).toBe(2)
 
     const blueGroup = harness.renderers[0].scene!.children.find((child) =>
-      child.type === 'Group' && child.children.slice(4, 7).filter((marker) => marker.visible).length === 2,
+      child.type === 'Group' && child.children[1]?.material?.emissive?.getHex() === 0x648ca6,
     )
     expect(blueGroup).toBeTruthy()
+    expect(blueGroup!.children.slice(4, 7).every(marker => !marker.visible)).toBe(true)
     const blueBody = blueGroup!.children[1]
     expect(blueBody.material!.emissive.getHex()).toBe(0x648ca6)
     const nextModel = structuredClone(model)

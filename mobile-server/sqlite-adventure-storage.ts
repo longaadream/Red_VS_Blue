@@ -6,6 +6,21 @@ import type { AdventureReceipt, AdventureStoredRun } from '../lib/server/colyseu
 /** Called only inside the existing SQLite worker, never on the room or UI thread. */
 export class SqliteAdventureStorage {
   constructor(private db: DatabaseSync) {}
+  deleteSave(id:string,host:string,revision:number) {
+    this.transaction(()=>{
+      if(id.startsWith('save-')) {
+        const row=this.db.prepare('SELECT run_id,revision FROM adventure_saves WHERE save_id=? AND host_id=? AND revision=?').get(id,host,revision)
+        if(!row)throw new Error('存档不存在或无删除权限')
+        this.db.prepare('DELETE FROM adventure_saves WHERE save_id=? AND host_id=?').run(id,host)
+        this.db.prepare(`UPDATE adventure_runs SET saved_json=NULL,saved_at=NULL WHERE run_id=? AND host_id=?
+          AND json_extract(saved_json,'$.revision')=? AND NOT EXISTS
+          (SELECT 1 FROM adventure_saves WHERE run_id=? AND revision=?)`).run(String(row.run_id),host,Number(row.revision),String(row.run_id),Number(row.revision))
+      }else{
+        const result=this.db.prepare("UPDATE adventure_runs SET saved_json=NULL,saved_at=NULL WHERE run_id=? AND host_id=? AND json_extract(saved_json,'$.revision')=?").run(id,host,revision)
+        if(Number(result.changes)!==1)throw new Error('存档不存在或无删除权限')
+      }
+    })
+  }
   initialize() {
     this.db.exec(`CREATE TABLE IF NOT EXISTS adventure_runs (
       run_id TEXT PRIMARY KEY, host_id TEXT NOT NULL, revision INTEGER NOT NULL,

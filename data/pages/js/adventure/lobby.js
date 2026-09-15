@@ -1,5 +1,9 @@
 let adventureLobby, adventureLobbyView, adventureFamilies = [], selectedFamily = 'skirmish', lobbyBusy = false
 let adventureNavigating = false
+const adventureEntry = new URLSearchParams(location.search)
+const partyMode = adventureEntry.has('party') || adventureEntry.has('server') || adventureEntry.has('joinRoom')
+const lanParty = adventureEntry.get('party') === 'lan'
+document.body.classList.add(partyMode ? 'party-adventure' : 'solo-adventure')
 const lobbyElement = id => document.getElementById(id)
 const lobbyStatus = message => { lobbyElement('lobbyStatus').textContent = message }
 function lobbyNode(tag, text, className) {
@@ -32,8 +36,8 @@ function renderAdventureTeam() {
 }
 function renderAdventureLobby(value) {
   adventureLobbyView = value
-  lobbyElement('roomInfo').hidden = false
-  lobbyElement('roomLabel').textContent = '房间 ' + value.roomId
+  lobbyElement('roomInfo').hidden = !partyMode
+  lobbyElement('roomLabel').textContent = lanParty ? '同行队伍 · 局域网' : '同行队伍'
   const seats = lobbyElement('seats'); seats.replaceChildren()
   for (let i = 0; i < 4; i++) {
     const row = lobbyNode('article', '', 'room-seat'), seat = value.seats[i]
@@ -49,6 +53,7 @@ function renderAdventureLobby(value) {
     seats.append(row)
   }
   const mine = value.seats.find(s => s.playerId === adventureLobby.playerId), host = value.hostId === adventureLobby.playerId
+  lobbyElement('leave').textContent = host ? '解散队伍' : '离开队伍'
   lobbyElement('ready').textContent = mine?.ready ? '取消准备' : '准备'
   lobbyElement('ready').hidden = !mine || Boolean(value.snapshot)
   if (!mine) lobbyStatus('已申请加入，等待房主在节点结算后接纳。')
@@ -57,7 +62,7 @@ function renderAdventureLobby(value) {
   lobbyElement('partyDifficulty').textContent = value.seats.length + ' 人同行 · 敌方随参战人数增加援兵与首领生命。'
   if (value.snapshot && !adventureNavigating) {
     adventureNavigating = true
-    const destination = 'battle.html?mode=adventure&roomId=' + encodeURIComponent(value.roomId) + '&server=' + encodeURIComponent(adventureLobby.server)
+    const destination = 'battle.html?mode=adventure&roomId=' + encodeURIComponent(value.roomId) + '&server=' + encodeURIComponent(adventureLobby.server) + '&lobbyContext=' + (lanParty ? 'lan' : 'public')
     // Release the lobby socket before the WebView opens a new battle connection.
     // The active run retains the authenticated seat after a consented leave.
     void adventureLobby.dispose().then(() => { location.href = destination }).catch(error => {
@@ -75,10 +80,13 @@ async function connectAdventureLobby(join) {
     lobbyStatus('正在连接冒险服务…')
     adventureLobby = await RvBAdventureNetwork.connect({ server: lobbyElement('server').value.trim() || undefined,
       familyId: selectedFamily, roomId: join ? lobbyElement('roomCode').value.trim() : undefined })
+    lobbyElement('server').value = adventureLobby.server
+    if(lanParty){let address=lobbyElement('lanAddress');if(!address){address=lobbyNode('div');address.id='lanAddress';lobbyElement('roomInfo').prepend(address)};await window.RvBLanAddress?.show(address,adventureLobby.server).catch(error=>{address.textContent="读取局域网地址失败："+error.message})}
+    if (lanParty && !join && (window.RvBHost || window.electronAPI)?.startHostBroadcast) await (window.RvBHost || window.electronAPI).startHostBroadcast()
     adventureLobby.subscribe(renderAdventureLobby)
     adventureLobby.onConnection((connected, message) => { if (!connected) lobbyStatus(message) })
-    void refreshAdventureRooms()
-    lobbyStatus('房间已建立。将房间号发给队友，准备好后即可出发。')
+    if (partyMode) void refreshAdventureRooms()
+    lobbyStatus(partyMode ? '队友从房间列表加入，准备好即可出发。' : '队伍已就绪。')
     return true
   } catch (error) { lobbyStatus(error.message); return false }
   finally { lobbyBusy = false }
@@ -96,13 +104,26 @@ async function listAdventureSaves() {
     if (!saves.length) { list.textContent = '还没有这台服务器上的旅途存档。'; return }
     for (const save of saves) {
       const button = lobbyNode('button', (save.kind === 'manual' ? '手动存档' : '自动存档') + ' · 第 ' + save.actNumber + ' 幕 · ' + new Date(save.savedAt).toLocaleString() + ' · 进度 ' + save.revision)
-      button.onclick = () => { lobbyElement('saveDialog').close(); void startAdventure(save.runId) }; list.append(button)
+      button.onclick = () => { lobbyElement('saveDialog').close(); void startAdventure(save.runId) }
+      const row=lobbyNode('div'), remove=lobbyNode('button','删除')
+      row.style.cssText='display:flex;gap:8px;align-items:stretch;flex-wrap:wrap';button.style.cssText='flex:1;min-width:0;white-space:normal;overflow-wrap:anywhere';remove.style.flex='0 0 64px'
+      remove.onclick=async()=>{
+        if(!confirm('删除这条存档？不会关闭当前冒险，删除后无法恢复。'))return
+        remove.disabled=true
+        try{await adventureLobby.request('deleteSave',{saveId:save.runId,revision:save.revision});row.remove();if(!list.children.length)list.textContent='还没有存档。'}
+        catch(error){let errorText=row.querySelector('[role="alert"]');if(!errorText){errorText=lobbyNode('p');errorText.setAttribute('role','alert');row.append(errorText)}errorText.textContent=error.message;remove.disabled=false}
+      }
+      row.append(button,remove);list.append(row)
     }
   } catch (error) { list.textContent = error.message }
 }
 lobbyElement('solo').onclick = async () => { if (await connectAdventureLobby(false)) await startAdventure() }
-lobbyElement('create').onclick = () => connectAdventureLobby(false)
-lobbyElement('openJoin').onclick = () => lobbyElement('joinDialog').showModal()
+lobbyElement('create').onclick = () => { if (partyMode) void connectAdventureLobby(false); else location.href = 'adventure.html?party=lan&create=1' }
+lobbyElement('openJoin').textContent = lanParty ? '寻找局域网队伍' : '加入队伍'
+lobbyElement('openJoin').onclick = () => {
+  if (lanParty || !partyMode) location.href = 'index.html?lan=join'
+  else lobbyElement('joinDialog').showModal()
+}
 lobbyElement('joinForm').onsubmit = async event => { event.preventDefault(); lobbyElement('joinDialog').close(); await connectAdventureLobby(true) }
 lobbyElement('resume').onclick = listAdventureSaves
 lobbyElement('start').onclick = () => startAdventure()
@@ -115,14 +136,18 @@ lobbyElement('copyRoom').onclick = async () => {
   catch { lobbyStatus('房间号：' + adventureLobby.roomId) }
 }
 lobbyElement('leave').onclick = async () => {
-  if (adventureLobby) await adventureLobby.dispose()
-  adventureLobby = undefined; adventureLobbyView = undefined; lobbyElement('roomInfo').hidden = true; lobbyStatus('已离开房间。')
+  try {
+    if (adventureLobbyView?.hostId === adventureLobby?.playerId) await adventureLobby.request('dissolve')
+    if (adventureLobby) await adventureLobby.dispose()
+    adventureLobby = undefined; adventureLobbyView = undefined; lobbyElement('roomInfo').hidden = true; lobbyStatus('已离开房间。')
+    if (partyMode) await refreshAdventureRooms()
+  } catch (error) { lobbyStatus(error.message) }
 }
 for (const button of document.querySelectorAll('[data-close]')) button.onclick = () => button.closest('dialog').close()
 fetch('./data/pve/roguelike/builds.json', { cache: 'no-store' }).then(response => {
   if (!response.ok) throw new Error('无法加载队伍资料')
   return response.json()
-}).then(data => { adventureFamilies = data.families; renderAdventureTeam() }).catch(error => lobbyStatus(error.message))
+}).then(data => { adventureFamilies = data.families; renderAdventureTeam(); if (adventureEntry.get('joinRoom')) { lobbyElement('roomCode').value = adventureEntry.get('joinRoom'); void connectAdventureLobby(true) } else if (adventureEntry.get('create') === '1') { void connectAdventureLobby(false) } }).catch(error => lobbyStatus(error.message))
 async function refreshAdventureRooms() {
   const status = lobbyElement('roomsStatus'), list = lobbyElement('roomCatalog'), refresh = lobbyElement('refreshRooms')
   refresh.disabled = true; status.textContent = '正在寻找冒险房间…'
@@ -154,6 +179,9 @@ async function refreshAdventureRooms() {
     status.title = error.message
   } finally { refresh.disabled = false }
 }
+if (adventureEntry.get('server')) lobbyElement('server').value = adventureEntry.get('server')
+lobbyElement('copyRoom').hidden = lanParty || !partyMode
+lobbyElement('joinDialog').hidden = lanParty || !partyMode
 lobbyElement('refreshRooms').onclick = refreshAdventureRooms
 lobbyElement('server').onchange = refreshAdventureRooms
 void refreshAdventureRooms()

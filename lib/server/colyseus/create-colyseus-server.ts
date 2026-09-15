@@ -198,9 +198,9 @@ export function createColyseusBattleServer(options: CreateColyseusBattleServerOp
   }
   class UpdateAwareAdventureRoom extends AdventureRoom {
     private releaseUpdateRoom?: () => void
-    onCreate(options: Parameters<InstanceType<typeof AdventureRoom>['onCreate']>[0]) {
+    async onCreate(options: Parameters<InstanceType<typeof AdventureRoom>['onCreate']>[0]) {
       this.releaseUpdateRoom = updateAdmission.enterRoom()
-      try { super.onCreate(options) }
+      try { await super.onCreate(options) }
       catch (error) { this.releaseUpdateRoom(); throw error }
     }
     onDispose() {

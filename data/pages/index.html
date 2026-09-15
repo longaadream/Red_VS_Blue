@@ -376,7 +376,11 @@
     .spin { display: inline-block; animation: spin .8s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg) } }
 
-  </style>
+      #lanCreateDialog { position: fixed; inset: 0; margin: auto; width: min(480px, calc(100vw - 32px)); height: fit-content; max-height: calc(100dvh - 32px); overflow: auto; border: 3px solid #665239; border-radius: 12px 16px 10px 14px; }
+    #lanCreateDialog::backdrop { background: rgba(30, 23, 16, .65); }
+    #lanCreateDialog > button { margin-bottom: 12px; min-height: 54px; }
+    #lanCreateDialog h3 { font-size: 24px; }
+</style>
   <link rel="stylesheet" href="css/tabletop/tabletop.css" />
   <link rel="stylesheet" href="css/tabletop/menu.css" />
 </head>
@@ -434,17 +438,17 @@
               <p class="panel-description">选择连接方式，创建战局或加入其他玩家。</p>
             </header>
             <div class="action-stack">
-              <button class="action-button action-feature" type="button" onclick="showHostSheet()">
+              <button class="action-button action-feature" id="createLocalRoom" type="button" onclick="document.getElementById('lanCreateDialog').showModal()">
                 <span class="action-code" aria-hidden="true">主机</span>
-                <span class="action-copy"><span class="action-title">我当主机</span><span class="action-description">创建房间，邀请好友加入</span></span>
+                <span class="action-copy"><span class="action-title">创建房间</span><span class="action-description">局域网 · 1v1 / 2v2 / PVE</span></span>
                 <span class="action-arrow" aria-hidden="true">›</span>
               </button>
               <button class="action-button" type="button" onclick="showJoinSheet()">
                 <span class="action-code" aria-hidden="true">好友</span>
-                <span class="action-copy"><span class="action-title">连接主机</span><span class="action-description">扫描并加入好友的房间</span></span>
+                <span class="action-copy"><span class="action-title">加入房间</span><span class="action-description">查找同一网络的 1v1 / 2v2 / PVE 房间</span></span>
                 <span class="action-arrow" aria-hidden="true">›</span>
               </button>
-              <button class="action-button" type="button" onclick="loadPage('lobby.html')">
+              <button class="action-button" type="button" onclick="loadPage('multiplayer.html')">
                 <span class="action-code" aria-hidden="true">在线</span>
                 <span class="action-copy"><span class="action-title">联机大厅</span><span class="action-description" id="serverStatusDesc">浏览房间、创建对局或参加官方排位</span></span>
                 <span class="action-arrow" aria-hidden="true">›</span>
@@ -584,21 +588,24 @@
   </div>
 
   <!-- ── 连接主机 Sheet ── -->
+<dialog id="lanCreateDialog" class="sheet"><h3>创建局域网房间</h3><p>选择玩法</p><button class="btn-primary" onclick="this.closest('dialog').close();createLocalRoom('1v1')">⚔ 1v1 对战 · 2人</button><button class="btn-primary" onclick="this.closest('dialog').close();createLocalRoom('2v2')">⚑ 2v2 组队 · 4人</button><button class="btn-primary" onclick="this.closest('dialog').close();createLocalRoom('pve')">♧ PVE 冒险 · 1—4人</button><form method="dialog"><button class="btn-ghost">取消</button></form></dialog>
   <div class="overlay" id="lanOverlay" onclick="closeLanSheet()">
     <div class="sheet" onclick="event.stopPropagation()">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
-        <h3 style="margin:0">连接主机</h3>
+        <h3 style="margin:0">加入房间</h3>
         <button onclick="closeLanSheet()" style="background:transparent;border:none;color:#64748b;font-size:22px;line-height:1;cursor:pointer;padding:0 4px">×</button>
       </div>
       <p id="lanSubtitle">正在扫描局域网内的游戏服务器…</p>
+      <details><summary>找不到房间？</summary>
       <form onsubmit="event.preventDefault(); connectLanServer(document.getElementById('lanManualUrl').value)" style="display:flex;gap:8px;margin:10px 0">
         <input id="lanManualUrl" type="text" inputmode="url" aria-label="房主地址" placeholder="房主显示的 IP:端口" style="min-width:0;flex:1;min-height:44px;padding:8px" />
         <button class="btn-primary" type="submit" style="min-height:44px;padding:8px 14px">直连</button>
       </form>
+      </details>
       <div id="lanConnectError" role="alert" style="display:none;margin-bottom:8px"></div>
       <div class="lan-progress-bar"><div class="lan-progress-fill" id="lanProgressFill"></div></div>
       <div class="lan-scanning" id="lanScanningRow"><span class="spin">⟳</span><span id="lanScanningText">快速扫描中（约10秒）…</span></div>
-      <div class="lan-server-list" id="lanServerList">
+      <label>玩法 <select id="lanModeFilter" onchange="filterLanRooms()"><option value="all">全部</option><option value="1v1">1v1 对战</option><option value="2v2">2v2 组队</option><option value="pve">PVE 冒险</option></select></label><div class="lan-server-list" id="lanServerList">
         <div class="lan-empty">尚未发现服务器</div>
       </div>
       <div style="display:flex;gap:8px;margin-bottom:8px">
@@ -851,6 +858,29 @@
       _hostServerUrl = ''
     }
 
+    async function createLocalRoom(matchMode = '1v1') {
+      const button = document.getElementById('createLocalRoom')
+      if (button.disabled) return
+      button.disabled = true
+      const caption = button.querySelector('.action-description')
+      caption.textContent = '正在准备房间…'
+      try {
+        const host = window.RvBHost || window.electronAPI
+        if (!host?.ensureLocalAuthority) throw new Error('请使用 Windows 或安卓客户端创建本地房间')
+        const ready = await host.ensureLocalAuthority()
+        if (!ready?.ok) throw new Error(ready?.error || '房间服务暂未就绪，请重试')
+        const mode = await host.getMode()
+        if (!mode?.localUrl) throw new Error('未取得本地房间地址')
+        if (host.startHostBroadcast) await host.startHostBroadcast()
+        await checkProfileAndGo(mode.localUrl, 'local', { create: '1', matchMode, adventure: matchMode === 'pve' })
+      } catch (error) {
+        alert('无法创建房间：' + error.message)
+      } finally {
+        button.disabled = false
+        caption.textContent = '局域网 · 1v1 / 2v2 / PVE'
+      }
+    }
+
     async function enterAsHost() {
       if (!_hostServerUrl) return
       RvBUtils.saveServerConfig({ mode: 'local', url: _hostServerUrl })
@@ -926,7 +956,11 @@
       })
     }
 
-    function addLanServer(info) {
+    function filterLanRooms() {
+      const mode = document.getElementById('lanModeFilter').value
+      document.querySelectorAll('[data-lan-mode]').forEach(row => { row.hidden = mode !== 'all' && row.dataset.lanMode !== mode })
+    }
+    async function addLanServer(info) {
       if (!document.getElementById('lanOverlay').classList.contains('show')) return
       const existing = _lanFound.find(s => s.url === info.url || (info.serverId && s.serverId === info.serverId))
       if (existing) {
@@ -939,12 +973,46 @@
       if (empty) empty.remove()
       const div = document.createElement('div')
       div.className = 'lan-server-item'
-      div.onclick = () => connectLanServer(info.url)
-      div.innerHTML = `<div><div class="lan-server-name">${escHtml(info.name || 'RED vs BLUE')}</div><div class="lan-server-url">${info.serverId ? 'ID: ' + escHtml(info.serverId.slice(0, 12).toUpperCase()) + ' · ' : ''}${escHtml(info.url)}</div></div><span style="color:#3b82f6;font-size:13px;font-weight:700;flex-shrink:0">连接 ›</span>`
+      div.textContent = (info.name || '玩家') + ' · 正在查找房间…'
       list.appendChild(div)
+      try {
+        const [result, pve] = await Promise.all([RvBColyseus.requestAt(info.url, 'rooms.list', {}, 8000), Promise.resolve().then(() => fetch(info.url + '/rooms?mode=pve', { signal: AbortSignal.timeout(8000) })).then(r => { if (!r.ok) throw new Error('PVE列表不可用'); return r.json() }).catch(() => ({ rooms: [] }))])
+        if (!_lanFound.includes(info) || !document.getElementById('lanOverlay').classList.contains('show')) return
+        div.replaceChildren()
+        div.style.display = 'block'
+        const rooms = [...(result.rooms || []), ...(pve.rooms || []).map(room => ({ ...room, mode: 'pve' }))]
+        if (!rooms.length) div.textContent = (info.name || '玩家') + ' · 暂无公开房间'
+        rooms.forEach(room => {
+          const row = document.createElement('button')
+          row.type = 'button'
+          row.className = 'btn-ghost'
+          row.style.cssText = 'display:block;width:100%;text-align:left;margin:4px 0'
+          const mode = room.mode || (room.maxPlayers === 4 ? '2v2' : '1v1')
+          row.dataset.lanMode = mode
+          const capacity = room.maxPlayers || (mode === '2v2' || mode === 'pve' ? 4 : 2)
+          const count = Array.isArray(room.players) ? room.players.length : room.players || room.playerCount || 0
+          const waiting = ['waiting', 'open'].includes(room.status) || !room.status
+          row.textContent = (room.name || '好友房间') + ' · ' + mode + ' · ' + count + '/' + capacity + (waiting ? count >= capacity ? ' · 已满' : ' · 加入 ›' : ' · 对局中')
+          row.disabled = mode === 'pve' ? room.joinable === false : !waiting || count >= capacity
+          row.onclick = () => mode === 'pve' ? checkProfileAndGo(info.url, 'lan', { adventure: true, joinRoom: room.id }) : connectLanServer(info.url, room.id)
+          div.appendChild(row)
+        })
+        const browse = document.createElement('button')
+        browse.type = 'button'
+        browse.className = 'btn-ghost'
+        browse.textContent = '查看对战房间'
+        browse.onclick = () => connectLanServer(info.url)
+        div.appendChild(browse)
+        filterLanRooms()
+      } catch (error) {
+        if (!_lanFound.includes(info)) return
+        div.textContent = (info.name || '玩家') + ' · 房间列表暂不可用，点击重试'
+        div.title = error.message
+        div.onclick = () => connectLanServer(info.url)
+      }
     }
 
-    async function connectLanServer(url) {
+    async function connectLanServer(url, roomId) {
       if (_lanScanner) _lanScanner.cancel()
       _lanScanner = null
       document.getElementById('lanScanningRow').style.display = 'none'
@@ -961,7 +1029,7 @@
         const health = await RvBColyseus.requestAt(url, 'system.health', {}, 8000)
         if (!health?.ok || health.protocol !== 'rvb-colyseus') throw new Error('该地址不是可用的游戏主机')
         RvBUtils.saveServerConfig({ mode: 'lan', url: url })
-        if (await checkProfileAndGo(url, 'lan')) closeLanSheet()
+        if (await checkProfileAndGo(url, 'lan', roomId ? { joinRoom: roomId } : undefined)) closeLanSheet()
         else errorBox.textContent = '未进入大厅，请检查刚才的资源版本提示。'
       } catch (error) {
         errorBox.textContent = '无法连接 ' + url + '：' + error.message + '。请确认房主显示“服务器已运行”。使用 Radmin 等虚拟局域网时，请填写房主的虚拟网卡 IP 和游戏端口；同一 Wi-Fi／热点才使用对应无线网卡地址。'
@@ -1537,7 +1605,8 @@
       document.getElementById('recordsOverlay').classList.remove('show')
     }
 
-    function goLobby(mode, serverUrl) {
+    function goLobby(mode, serverUrl, intent) {
+      if (intent?.adventure) { RvBUtils.saveServerConfig({ mode, url: serverUrl }); window.location.href = 'adventure.html?party=lan&server=' + encodeURIComponent(serverUrl) + (intent.joinRoom ? '&joinRoom=' + encodeURIComponent(intent.joinRoom) : intent.create ? '&create=1' : ''); return }
       if (!mode) {
         window.location.href = 'lobby.html?v=' + Date.now()
         return
@@ -1545,8 +1614,11 @@
       if (serverUrl) RvBUtils.saveServerConfig({ mode: mode, url: serverUrl })
       const params = RvBUtils.appendServerParams(new URLSearchParams())
       params.set('server', mode)
+      if (intent?.create === '1') params.set('create', '1')
+      if (intent?.matchMode) params.set('matchMode', intent.matchMode)
+      if (intent?.joinRoom) params.set('joinRoom', intent.joinRoom)
       params.set('v', Date.now().toString())
-      window.location.href = 'lobby.html?' + params.toString()
+      window.location.href = ((mode === 'lan' || mode === 'local') && !intent?.create && !intent?.joinRoom ? 'lan.html?' : 'lobby.html?') + params.toString()
     }
     async function getLocalGameProfileIdentity(serverUrl) {
       let identity
@@ -1584,7 +1656,7 @@
     }
 
 
-    async function checkProfileAndGo(serverUrl, mode) {
+    async function checkProfileAndGo(serverUrl, mode, intent) {
       let installed
       try {
         installed = await getLocalGameProfileIdentity(serverUrl)
@@ -1605,7 +1677,7 @@
         alert('无法进入大厅：' + ((error && error.message) || error))
         return false
       }
-      goLobby(mode, serverUrl)
+      goLobby(mode, serverUrl, intent)
       return true
     }
 
@@ -1631,6 +1703,7 @@
       } catch {}
     }
 
+    window.addEventListener('load', () => { if (new URLSearchParams(location.search).get('lan') === 'join') showJoinSheet() })
     // ── Service Worker ────────────────────────────────────────────────────────
     // 版本标识，方便确认运行的是最新构建
     console.log('[RVB] build=v4-room-ready proto=' + location.protocol)

@@ -8,8 +8,10 @@
   <script src="js/hand-card-face.js"></script>
   <script src="js/skill-description.js"></script>
   <link rel="stylesheet" href="css/skill-description.css" />
+  <link rel="stylesheet" href="css/rulebook.css" />
+  <script src="js/battle-ui/rulebook.js" defer></script>
   <link rel="stylesheet" href="css/tabletop/related-hand-cards.css" />
-  <script src="js/server-utils.js"></script>
+  <script src="js/server-utils.js"></script><script src="js/lan-address.js"></script>
   <script src="js/developer-tools/match-trace.js"></script>
   <script src="js/crypto-lib.js"></script>
   <script src="js/identity.js"></script>
@@ -987,6 +989,15 @@
     .pi-status-desc { color: #94a3b8; font-size: 10px; line-height: 1.45; }
     .pi-status-none { color: #64748b; font-size: 11px; margin: -2px 0 12px; }
 
+    .history-card-view { display: none; }
+    #cardDetailModal.is-history-card { align-items: center; justify-content: center; z-index: 500; }
+    #cardDetailModal.is-history-card .cd-layout { display: none; }
+    #cardDetailModal.is-history-card .history-card-view { display: block; position: relative; }
+    #historyCardFace.card-item { width: min(340px, 70vw) !important; min-width: 0 !important; height: min(510px, 78dvh) !important; transform: none !important; margin: 0; cursor: default; }
+    #historyCardFace .card-art { height: 38% !important; }
+    #historyCardFace .card-name-banner { font-size: 24px; }
+    #historyCardFace .card-desc { font-size: 18px !important; line-height: 1.5; overflow-y: auto; -webkit-line-clamp: unset; }
+    .history-card-close { position: absolute; right: -12px; top: -18px; z-index: 2; width: 36px; height: 36px; border: 2px solid #493923; border-radius: 40% 50%; background: #dcc89c; cursor: pointer; }
     /* ── Card detail modal ── */
     #cardDetailModal {
       position: fixed; inset: 0; background: rgba(0,0,0,.85);
@@ -1503,6 +1514,7 @@
   </style>
   <link rel="stylesheet" href="css/battle-tactical-table.css" />
   <link rel="stylesheet" href="css/tutorial.css" />
+  <link rel="stylesheet" href="css/hand-resources.css" />
 <link rel="stylesheet" href="tabletop-battle/skin.css">
 <link rel="stylesheet" href="tabletop-battle/comic.css">
 <link rel="stylesheet" href="tabletop-battle/dusk.css">
@@ -1552,6 +1564,10 @@
 
   <!-- Card Detail Modal -->
   <div id="cardDetailModal" role="dialog" aria-modal="true" aria-label="卡牌详情" onclick="if(event.target===this)closeCardDetail()">
+    <div class="history-card-view">
+      <button type="button" class="history-card-close" onclick="closeCardDetail()" aria-label="关闭卡牌详情">✕</button>
+      <article id="historyCardFace" class="card-item"></article>
+    </div>
     <div class="cd-layout">
       <div class="cd-sheet">
       <div class="cd-header">
@@ -1666,6 +1682,7 @@
   <!-- Topbar -->
   <div class="topbar" data-battle-ui-region="player-hud">
     <button class="back-btn" aria-label="离开对局" onclick="confirmLeave()">离开</button>
+    <button class="back-btn rulebook-entry" id="rulebookButton" aria-label="打开规则书" aria-haspopup="dialog" aria-controls="rulebook" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 5Q7 2 2 4v15q5-2 10 1 5-3 10-1V4q-5-2-10 1v15M5 8l4 1M15 9l4-1M5 12l4 1M15 13l4-1"/></svg>规则</button>
     <div class="room-name" id="roomNameLabel">对战</div>
     <div id="colyseusStatus" style="display:none;font-size:11px;padding:2px 7px;border-radius:5px;background:#1e3a2f;color:#4ade80;letter-spacing:.02em">● Colyseus</div>
     <button id="btnSurrender" class="btn-surrender" aria-label="投降" onclick="confirmSurrender()">投降</button>
@@ -1675,8 +1692,6 @@
     <button id="btnSwitchPov" aria-label="切换视角" style="display:none;background:#1e1b4b;border:1px solid #4f46e5;border-radius:8px;color:#a5b4fc;padding:5px 9px;font-size:12px;font-weight:700;cursor:pointer" onclick="switchPerspective()">切换视角 红方</button>
     <button id="btnResetCD" aria-label="重置冷却" style="display:none;background:#3b0764;border:1px solid #7c3aed;border-radius:8px;color:#d8b4fe;padding:5px 9px;font-size:12px;cursor:pointer" onclick="resetCooldowns()">冷却</button>
     <button class="btn-fullmap" id="btnFullMap" aria-label="切换全屏地图" onclick="toggleFullMap()" title="全屏地图">全图</button>
-    <div id="resApDisplay" class="res-gem ap" style="display:none" title="行动点"><span class="resource-glyph action"></span><span id="resApVal" class="res-gem-val">0</span><span class="res-gem-frac">/<span id="resApMax">10</span></span></div>
-    <div id="resCpDisplay" class="res-gem cp" style="display:none" title="充能点"><span class="resource-glyph charge"></span><span id="resCpVal" class="res-gem-val">0</span><span class="res-gem-frac">/<span id="resCpMax">0</span></span></div>
     <div id="opponentHandStack" class="opponent-hand-stack" role="img" aria-label="对方没有手牌" title="对方手牌"><strong class="opponent-hand-count" aria-hidden="true">0</strong></div>
     <button class="btn-fullmap" id="btnDebugBattleLog" hidden aria-label="打开调试战斗日志" onclick="openLog()" title="调试战斗日志">调试日志</button>
   </div>
@@ -1842,6 +1857,17 @@
         <button type="button" id="handMultiSelectConfirm" onclick="confirmPendingHandOptionSelection()" disabled
           style="border:1px solid #86efac;border-radius:999px;padding:6px 11px;background:#166534;color:#dcfce7">确认选择</button>
       </div>
+      <aside id="handResources" aria-label="我的行动点和充能点" hidden>
+        <div id="tutorialResourceGuide" hidden aria-label="每次自己的新回合，行动点上限加一并补满，最多十点"><span>自己的新回合</span><b>ϟ 1 → 2 → 3 → … → 10</b><span>上限 +1 · 补满</span></div>
+        <div id="resApDisplay" class="hand-resource hand-resource-ap" title="行动点：移动、使用技能和卡牌时消耗">
+          <span class="hand-resource-symbol" aria-hidden="true">ϟ</span><strong id="resApVal">0</strong><span>行动点</span>
+          <span id="resApTrack" class="hand-resource-track" aria-hidden="true"></span>
+        </div>
+        <div id="resCpDisplay" class="hand-resource hand-resource-cp" title="充能点：用于充能技能">
+          <span class="hand-resource-symbol" aria-hidden="true">◆</span><strong id="resCpVal">0</strong><span>充能点</span>
+        </div>
+        <small id="handResourceCost" hidden></small>
+      </aside>
       <div class="hand-scroll" id="handCards" data-battle-ui-region="hand" role="region" aria-label="手牌列表" tabindex="0"></div>
     </div>
 
@@ -1923,10 +1949,16 @@
     function getTemplateFactionForBattleFaction(faction) {
       return faction === 'red' ? 'evil' : faction === 'blue' ? 'good' : faction
     }
+    function isTrainingPieceAvailable(piece) {
+      if (!piece) return false
+      const availability = piece.availability
+      return availability === undefined || !!(availability && availability.status === 'ready'
+        && Array.isArray(availability.modes) && availability.modes.includes('pvp'))
+    }
     function getPiecesForSetupFaction(faction) {
       const alignment = getTemplateFactionForBattleFaction(faction)
       return Object.values(PIECES_BY_ID || {}).filter(function(piece) {
-        return piece && piece.faction === alignment
+        return isTrainingPieceAvailable(piece) && piece.faction === alignment
       }).sort(function(a, b) {
         return String(a.name || a.id).localeCompare(String(b.name || b.id), 'zh-CN')
       })
@@ -1951,7 +1983,7 @@
     }
     function getSelectedTrainingPieceIds(selectId) {
       const list = document.getElementById(selectId)
-      return list ? Array.from(list.querySelectorAll('input[type="checkbox"]:checked')).map(function(input) { return input.value }).filter(Boolean) : []
+      return list ? Array.from(list.querySelectorAll('input[type="checkbox"]:checked')).map(function(input) { return input.value }).filter(function(id) { return isTrainingPieceAvailable(PIECES_BY_ID[id]) }) : []
     }
     function getTrainingSetupConfig() {
       const firstFaction = document.getElementById('trainingFirstFaction')?.value || 'red'
@@ -2007,9 +2039,9 @@
     function resolveTrainingInitialPieces(faction, templateIds) {
       const pieces = getPiecesForSetupFaction(faction)
       const ids = Array.isArray(templateIds) ? templateIds : (templateIds ? [templateIds] : [])
-      const resolved = ids.map(function(id) { return PIECES_BY_ID[id] }).filter(Boolean)
+      const resolved = ids.map(function(id) { return pieces.find(function(piece) { return piece.id === id }) }).filter(Boolean)
       if (resolved.length) return resolved
-      const fallback = pieces[0] || Object.values(PIECES_BY_ID || {})[0] || null
+      const fallback = pieces[0] || null
       return fallback ? [fallback] : []
     }
     function trainingSlotLabel(playerId) {
@@ -2248,6 +2280,7 @@
     const cardDisplayMetadataFailures = new Set()
     const cardDisplayMetadataLoggedErrors = new Set()
     let battlePageDisposed = false
+    let historyCardDetailRequest = 0
     let keywordGlossaryByName = {}
     let selectedPieceId = null
     let pendingMove = false
@@ -2924,7 +2957,8 @@
         })
         displayedIds.add(skillId)
       }
-      return displayed
+      // Status implementation hooks are represented by the shield status itself.
+      return displayed.filter(function (skill) { return !['divine-shield-defense', 'holy-shield-defense'].includes(skillIdOf(skill)) })
     }
     function skillDefOf(skillId) {
       if (!skillId) return {}
@@ -3260,7 +3294,8 @@
     }
 
     function showCardDetail(cardInstanceId, cardId, preserveKeyword) {
-      const def = cardsById[cardId] || (G && G.customCards && G.customCards[cardId]) || {}
+      document.getElementById('cardDetailModal').classList.remove('is-history-card')
+      const def = getCardDisplayDefinition(cardId)
       const cardInstance = G && Array.isArray(G.players)
         ? G.players.reduce(function(found, player) {
             return found || ((player.hand || []).find(function(card) { return card.instanceId === cardInstanceId; }))
@@ -3749,7 +3784,7 @@
       modal.style.display = 'flex'
       const closeButton = modal.querySelector('.pi-close')
       if (!preserveKeyword && closeButton) closeButton.focus()
-      RvBSkillDescription.showGuide()
+      if (!TUTORIAL_MODE) RvBSkillDescription.showGuide()
     }
     function showPieceInfo(instanceId, preserveKeyword) {
       if (!G) return
@@ -4507,10 +4542,18 @@
           getState: function () { return G },
           getSelectedPieceId: function () { return selectedPieceId },
           revealPieceSkills: function (pieceId) { selectedPieceId = pieceId; restoreSelectedPieceMenu({ reopen: true }); render() },
+          positionGuide: positionTutorialBubble,
+          showResourceGrowth: function (previous, current) {
+            const guide = document.getElementById('tutorialResourceGuide')
+            if (!guide) return
+            guide.querySelector('b').textContent = 'ϟ ' + previous + ' → ' + current
+            guide.lastElementChild.textContent = '上限 +1 · 已补满'
+            guide.hidden = false
+          },
           engine: function () { return window.RvBGameEngine.ensure() },
           commit: async function (action) { await commitTutorialScriptAction(action); render() },
           render: render,
-          setCue: function (cue) { if (window.BattleRenderer3D) window.BattleRenderer3D.setTutorialCue(cue) },
+          setCue: setLessonVisualCue,
           exit: function () { window.location.href = 'tutorial.html' },
           restart: function () { window.location.reload() },
           next: function () { window.location.href = 'battle.html?mode=tutorial&lesson=' + encodeURIComponent(window.RvBTutorialLessons.all[tutorialDefinition.number].id) },
@@ -4666,7 +4709,7 @@
       const ownerPlayerId = ownerEl.value || (trainingSetupConfig && trainingSetupConfig.firstPlayerId) || 'training-red'
       const faction = getTrainingPlayerFaction(ownerPlayerId)
       const templateFaction = getTemplateFactionForBattleFaction(faction)
-      const pieces = Object.values(PIECES_BY_ID).filter(p => !p.faction || p.faction === templateFaction || p.faction === 'neutral')
+      const pieces = Object.values(PIECES_BY_ID).filter(p => isTrainingPieceAvailable(p) && (!p.faction || p.faction === templateFaction || p.faction === 'neutral'))
       sel.innerHTML = '<option value="">选择棋子...</option>' + pieces.map(p =>
         `<option value="${p.id}">${p.name || p.id}</option>`
       ).join('')
@@ -5540,6 +5583,7 @@
       validMoves = new Set()
       setMoveButtonClass(false)
       renderPieceContextMenu(sp || null)
+      refreshBattleLegalActions()
       return sp
     }
 
@@ -5796,6 +5840,102 @@
       }
     }
 
+    let lessonVisualCue = null
+    function positionTutorialBubble() {
+      const bubble = document.getElementById('tutorialActionBubble')
+      if (!bubble || bubble.hidden) return
+      const step = bubble.dataset.step
+      const selector = step === 'deploy' ? '#deploymentStatus' : ['end-turn', 'review'].includes(step) ? '#handResources' : '.tutorial-skill-hint'
+      const anchor = document.querySelector(selector)
+      const rect = anchor && anchor.getBoundingClientRect()
+      const width = bubble.offsetWidth || 280
+      const height = bubble.offsetHeight || 85
+      const usable = rect && rect.width && rect.height
+      const left = usable ? rect.left : innerWidth / 2 - width / 2
+      const top = usable ? rect.top - height - 14 : 145
+      bubble.style.left = Math.max(12, Math.min(innerWidth - width - 12, left)) + 'px'
+      bubble.style.top = Math.max(innerHeight < 600 ? 112 : 145, Math.min(innerHeight - height - 12, top)) + 'px'
+    }
+    window.addEventListener('resize', positionTutorialBubble)
+    function setLessonVisualCue(cue) {
+      lessonVisualCue = cue ? Object.assign({}, cue) : null
+      document.body.dataset.tutorialStep = cue?.step || ''
+      document.body.dataset.tutorialSkill = cue?.skillId || ''
+      if (window.BattleRenderer3D) window.BattleRenderer3D.setTutorialCue(cue)
+      refreshLessonVisualCue()
+    }
+    function refreshHandResourceCost() {
+      const costHint = document.getElementById('handResourceCost')
+      const skillSource = pendingSkill?.skillId && G?.pieces.find(function (piece) { return piece.instanceId === (pendingSkill.baseAction?.pieceId || selectedPieceId) })
+      if (costHint) {
+        costHint.hidden = !skillSource
+        if (skillSource) {
+          const cost = resolveSkillAvailability(skillSource, pendingSkill.skillId)
+          costHint.textContent = '本次消耗：行动 ' + cost.actionCost + (cost.chargeCost ? ' · 充能 ' + cost.chargeCost : '')
+        }
+      }
+    }
+    function refreshLessonVisualCue() {
+      if (!TUTORIAL_MODE) return
+      const resourceGuide = document.getElementById('tutorialResourceGuide')
+      if (resourceGuide) resourceGuide.hidden = !lessonVisualCue || !['end-turn', 'watch', 'review'].includes(lessonVisualCue.step)
+      document.querySelectorAll('[data-skill-id]').forEach(function (button) {
+        button.classList.toggle('tutorial-skill-hint', !!lessonVisualCue?.skillId && button.dataset.skillId === lessonVisualCue.skillId)
+      })
+      if (!lessonVisualCue || !G || !window.GameEngine) return
+      let cells = null
+      if (lessonVisualCue.step === 'deploy') {
+        const deployment = presentedDeployment()
+        if (deployment?.activePlayerId === myPlayerId) cells = deployment.legalPositions || []
+      } else if (lessonVisualCue.step === 'move-new' && lessonVisualCue.pieceId) {
+        cells = Array.from(BattleLegalActions.queryMoveCells({ snapshot: G, playerId: myPlayerId, pieceId: lessonVisualCue.pieceId, engine: window.GameEngine }))
+          .map(function (key) { const xy = key.split(',').map(Number); return { x: xy[0], y: xy[1] } })
+      }
+      if (cells && !cells.length && lessonVisualCue.demoKey && window.BattleRenderer3D) {
+        delete lessonVisualCue.demoKey
+        window.BattleRenderer3D.clearTutorialCue()
+      }
+      if (cells?.length && window.BattleRenderer3D) {
+        const target = cells[0]
+        const piece = G.pieces.find(function (p) { return p.instanceId === lessonVisualCue.pieceId })
+        const demo = { cells: [target], path: piece ? [{ x: piece.x, y: piece.y }, target] : [] }
+        if (lessonVisualCue.step === 'deploy') {
+          const legalKeys = new Set(cells.map(function (cell) { return cell.x + ',' + cell.y }))
+          demo.blockedCells = G.map.tiles.filter(function (tile) { return tile.props.walkable && !legalKeys.has(tile.x + ',' + tile.y) })
+            .map(function (tile) { return { x: tile.x, y: tile.y } })
+          const sources = G.pieces.filter(function (p) { return p.currentHp > 0 && Number.isInteger(p.x) && Number.isInteger(p.y) })
+          const floorKeys = new Set(G.map.tiles.filter(function (tile) { return tile.props.walkable && tile.props.type !== 'cover' }).map(function (tile) { return tile.x + ',' + tile.y }))
+          function visibleRuler(p, cell) {
+            if (Math.abs(p.x - cell.x) + Math.abs(p.y - cell.y) !== 6) return false
+            let x = p.x, y = p.y
+            for (let n = 0; n < 6; n++) {
+              if (x !== cell.x) x += Math.sign(cell.x - x)
+              else y += Math.sign(cell.y - y)
+              if (!floorKeys.has(x + ',' + y)) return false
+            }
+            return true
+          }
+          const end = cells.find(function (cell) { return sources.some(function (p) { return visibleRuler(p, cell) }) })
+          const start = end && sources.find(function (p) { return visibleRuler(p, end) })
+          if (start) {
+            let x = start.x, y = start.y
+            demo.rulerCells = []
+            for (let distance = 1; distance <= 6; distance++) {
+              if (x !== end.x) x += Math.sign(end.x - x)
+              else y += Math.sign(end.y - y)
+              demo.rulerCells.push({ x: x, y: y, distance: distance })
+            }
+            demo.cells = [end]
+          }
+        }
+        const key = JSON.stringify(demo)
+        if (lessonVisualCue.demoKey !== key) {
+          lessonVisualCue.demoKey = key
+          window.BattleRenderer3D.setTutorialCue(demo)
+        }
+      }
+    }
+
     function render(options) {
       if (!G) return
       const input = options || {}
@@ -5807,6 +5947,8 @@
       renderHand()
       renderTargetOverlay()
       updateRed43QaEvidence()
+      refreshLessonVisualCue()
+      refreshHandResourceCost()
     }
 
     function prepareCurrentBattlePresentationModel(preparedModel) {
@@ -6572,6 +6714,8 @@
 
     function renderActionBar() {
       if (!G) return
+      refreshHandResourceCost()
+      refreshLessonVisualCue()
       renderDeploymentStatus()
       renderTurnTimerStatus()
       scheduleDeadlineStatusRefresh()
@@ -6623,7 +6767,7 @@
       if (btnEnd) {
         btnEnd.disabled = !!pendingActionFeedback || !!targetSubmissionPending || _waitingForOwn || _waitingForOther || !isMyTurn || (!inStart && !inAction && !inEnd)
         btnEnd.textContent = _waitingForOther
-          ? '等待对方选择'
+          ? '等待对方操作'
           : _waitingForOwn
             ? '请完成选择'
             : inAction ? '结束回合 ->' : '继续 ->'
@@ -6635,7 +6779,14 @@
       const _canMoveSelected = !!(pendingMove && validMoves.size > 0)
       setMoveButtonDisabled(!!pendingActionFeedback || !!targetSubmissionPending || _waitingForOwn || _waitingForOther || !isMyTurn || !selectedPieceId || !inAction || !_isOwnSelected || !_canMoveSelected)
 
-      if (targetSubmissionPending) {
+      if (_waitingForOther) {
+        setStatusMsg('等待对方操作')
+        pendingMove = false
+        pendingSkill = null
+        pendingCardAction = null
+        setMoveButtonClass(false)
+        closePieceContextMenu()
+      } else if (targetSubmissionPending) {
         setStatusMsg('目标指令已提交，正在等待权威确认')
       } else if (pendingSkill && pendingSkill.turnTargetActionType) {
         setStatusMsg(_targetPromptText() || '选择回合目标')
@@ -6684,6 +6835,21 @@
     // ── Cell click ──
     function handleBattleIntent(intent) {
       if (!intent) return
+      if (intent.type === 'hover-cell') {
+        if (!pendingMove || !validMoves.has(intent.x + ',' + intent.y) || waitingForOtherPending()) return
+        if (typeof GameEngine === 'undefined' || !GameEngine.applyBattleAction) return
+        try {
+          const preview = GameEngine.safeCloneBattleState ? GameEngine.safeCloneBattleState(G) : JSON.parse(JSON.stringify(G))
+          const before = preview.players.find(player => clientOwns(player.playerId))
+          if (!before) return
+          const points = before.actionPoints
+          const result = GameEngine.applyBattleAction(preview, { type: 'move', playerId: myPlayerId, pieceId: selectedPieceId, toX: intent.x, toY: intent.y }) || preview
+          const after = result.players.find(player => player.playerId === before.playerId)
+          if (result.pendingOptionSelection || result.pendingTargetSelection) setStatusMsg('移动 · 需要选择')
+          else if (after) setStatusMsg('移动 · 消耗 ' + Math.max(0, points - after.actionPoints) + ' 行动点')
+        } catch { /* A hidden state may prevent local prediction; do not invent a cost. */ }
+        return
+      }
       if (intent.type === 'viewport-change') {
         schedulePieceContextMenuPosition()
         return
@@ -6712,6 +6878,7 @@
     }
 
     function moveSelectedPieceToCell(pieceId, x, y) {
+      refreshBattleLegalActions()
       if (!G || pieceId !== selectedPieceId || !pendingMove || pendingActionFeedback || targetSubmissionPending || pendingSkill || pendingCardAction) return false
       const hasCell = Number.isInteger(x) && Number.isInteger(y)
       const key = hasCell ? x + ',' + y : ''
@@ -6730,6 +6897,7 @@
 
     function onCellClick(x, y) {
       if (!G) return
+      refreshBattleLegalActions()
       if (ADVENTURE_MODE && adventureDeployPieceId) { adventurePlaceAt(x, y); return }
       if (targetSubmissionPending) {
         setStatusMsg('目标指令已提交，正在等待权威确认')
@@ -7282,6 +7450,10 @@
     }
 
     async function doAction(action) {
+      if (waitingForOtherPending()) {
+        setStatusMsg('等待对方操作')
+        return
+      }
       if (SPECTATE_MODE) { setStatusMsg('观战为只读模式'); return }
       if (PRACTICE_MODE) { await practiceDoAction(action); return }
       if (ADVENTURE_MODE) { await adventureDoAction(action); return }
@@ -7521,9 +7693,23 @@
     function escHtml(s) {
       return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')
     }
+    function waitingForOtherPending() {
+      if (!G) return false
+      return [G.pendingOptionSelection, G.pendingTargetSelection].some(pending =>
+        pending && pending.playerId && !clientOwns(pending.playerId))
+    }
+    ;['pointerdown', 'click', 'dblclick', 'contextmenu', 'keydown', 'wheel'].forEach(type => {
+      document.addEventListener(type, event => {
+        if (event.target?.closest?.('#rulebook, #rulebookButton')) return
+        if (!waitingForOtherPending()) return
+        event.preventDefault()
+        event.stopImmediatePropagation()
+        setStatusMsg('等待对方操作')
+      }, { capture: true, passive: false })
+    })
     function setStatusMsg(msg) {
       const el = document.getElementById('statusMsg')
-      if (el) el.textContent = msg
+      if (el) el.textContent = waitingForOtherPending() ? '等待对方操作' : msg
     }
     function showMsg(msg, type) {
       const loadingMsg = document.getElementById('loadingMsg')
@@ -7549,7 +7735,7 @@
     function clearLog() { const b = document.getElementById('logBody'); if (b) b.innerHTML = '' }
     function goBack() {
       if (PRACTICE_MODE) { disposePracticeBattle(); window.location.href = 'practice.html'; return }
-      if (ADVENTURE_MODE) { disposeAdventureBattle(); window.location.href = 'adventure.html'; return }
+      if (ADVENTURE_MODE) { if (adventureClient?.network) { document.getElementById('adventureRoomButton')?.click(); return }; disposeAdventureBattle(); window.location.href = 'adventure.html'; return }
       if (TRAINING_MODE) { window.location.href = 'index.html'; return }
       // Carry current server mode/url back to the lobby.
       try {
@@ -7735,6 +7921,19 @@
       const renderer = window.BattleRenderer3D
       battleDomUi = BattleDomUI.create({ document, onTurnAnnounce: showTurnAnnounce })
       battleActionHistory = BattleActionHistory.create({
+        getCardDefinition: function(cardId) {
+          const definition = getCardDisplayDefinition(cardId)
+          return definition.name ? definition : loadCardDisplayMetadata(cardId)
+        },
+        onCardDetail: async function(cardId) {
+          const request = ++historyCardDetailRequest
+          await loadCardDisplayMetadata(cardId)
+          if (battlePageDisposed || request !== historyCardDetailRequest) return
+          showCardDetail(null, cardId)
+          const modal = document.getElementById('cardDetailModal')
+          modal.classList.add('is-history-card')
+          document.getElementById('historyCardFace').innerHTML = HandCardFace.render({ cardId }, getCardDisplayDefinition(cardId))
+        },
         document,
         window,
         icons: BattleEffectIcons,

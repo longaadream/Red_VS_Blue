@@ -33,7 +33,7 @@ export class ClientBinaryUpdates {
     updater.autoInstallOnAppQuit = false
     updater.allowPrerelease = false
     updater.allowDowngrade = false
-    updater.on('error', () => { this.downloaded = false; this.set('error', '客户端更新失败，当前版本继续可用；可稍后重试') })
+    updater.on('error', () => { this.downloaded = false; this.set('error', '客户端更新失败，请重试或切换下载源') })
     updater.on('download-progress', info => this.set('downloading', '正在下载客户端更新', undefined, Math.max(0, Math.min(100, Math.round(info.percent || 0)))))
     updater.on('update-downloaded', info => { this.downloaded = true; this.set('downloaded', '客户端更新已下载，返回主菜单后可重启安装', info.version) })
   }
@@ -53,7 +53,7 @@ export class ClientBinaryUpdates {
         this.set('downloading', '正在下载客户端更新', result.updateInfo?.version)
         await this.updater!.downloadUpdate()
       } else this.set('current', '客户端已是当前稳定版本')
-    })().catch(() => this.set('error', '暂时无法获取客户端更新，当前版本继续可用；可切换下载源后重试')).finally(() => { this.running = undefined; this.changed() })
+    })().catch(() => this.set('error', '暂时无法获取客户端更新，可切换下载源后重试')).finally(() => { this.running = undefined; this.changed() })
     return this.running
   }
   isReady() { return this.downloaded && this.status.phase === 'downloaded' }

@@ -41,6 +41,7 @@ class FakeLobbyRoom {
 }
 
 class FakeColyseusClient {
+  http = { options: { credentials: 'include' } }
   static createCalls: Array<Record<string, unknown>> = []
   static joinCalls: Array<{ roomId: string; options: Record<string, unknown> }> = []
 

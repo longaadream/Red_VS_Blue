@@ -146,6 +146,10 @@ export function supportDistances(state: BattleState, zone: AdventureZone): Map<s
   }
   return distances
 }
+export function canPlaceAdventurePiece(state: BattleState, piece: PieceInstance, x: number, y: number): boolean {
+  try { assertAdventurePosition(state,piece,x,y);return true }
+  catch(error) { if(error instanceof BattleRuleError)return false;throw error }
+}
 export function assertAdventurePosition(state: BattleState, piece: PieceInstance, x: number, y: number): void {
   const world = adventureBoundary(state)
   if (!world || piece.x === null || piece.y === null) return
@@ -204,6 +208,20 @@ export function assertAdventureTransition(before: BattleState, after: BattleStat
     }
   }
 }
+/** Target discovery uses the same boundary as final transaction validation. */
+export function canAffectAdventureTarget(state: BattleState, actor: string, target: PieceInstance, source?: PieceInstance): boolean {
+  const world = adventureBoundary(state)
+  if (!world) return true
+  if (world.coop) {
+    const coop = world.coop
+    const zoneFor = (piece: PieceInstance) => coop.encounters[coop.playerZones[piece.ownerPlayerId]] ?? Object.values(coop.encounters).find(e => e.enemyIds.includes(piece.instanceId))
+    const zone = source ? zoneFor(source) : coop.encounters[coop.playerZones[actor]]
+    return zone ? insideZone(zone, target.x, target.y) : !zoneFor(target) && (isAdventureHuman(state, target.ownerPlayerId) || !!world.roamingEnemyIds?.includes(target.instanceId))
+  }
+  return target.ownerPlayerId === world.humanId
+    ? !world.activeZone || insideZone(world.activeZone, target.x, target.y)
+    : world.activeEnemyIds.includes(target.instanceId)
+}
 function assertCooperativeTransition(before: BattleState, after: BattleState, action?: BattleAction): void {
   const world = adventureBoundary(before)!, coop = world.coop!
   const actor = action && 'playerId' in action ? action.playerId : before.turn.currentPlayerId
@@ -215,8 +233,7 @@ function assertCooperativeTransition(before: BattleState, after: BattleState, ac
     const next = remains.find(p => p.instanceId === piece.instanceId)
     if (next?.x != null && next.y != null) assertAdventurePosition(before,piece,next.x,next.y)
     if(action?.type==='beginPhase'||action?.type==='endTurn')continue
-    const pieceZone = zoneFor(piece)
-    const untouched = zone ? !insideZone(zone,piece.x,piece.y) : !!pieceZone || !isAdventureHuman(before,piece.ownerPlayerId) && !world.roamingEnemyIds?.includes(piece.instanceId)
+    const untouched = !canAffectAdventureTarget(before, actor ?? '', piece, source)
     if (untouched && (!next || next.currentHp !== piece.currentHp || next.shield !== piece.shield)) throw new BattleRuleError('禁止跨战区伤害或治疗')
     if (untouched && next) {
       const effects = (p: PieceInstance) => [p.maxHp,p.attack,p.defense,p.moveRange,p.statusTags,p.buffs,p.debuffs,p.ruleTags,p.skills]
