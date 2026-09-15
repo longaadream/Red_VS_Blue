@@ -7,6 +7,7 @@ import type { Express } from 'express'
 import type { RankedRoomHooks } from '../official/ranked'
 
 import { getServerGameProfileIdentityV1 } from '@/lib/content-pipeline/runtime/profile-game-identity'
+import { verificationProgress } from '@/lib/content-pipeline/runtime/verification-progress'
 import { getSelectableMapCatalog } from '@/lib/game/map-selection'
 import { getAvailablePieces } from '@/lib/game/piece-repository'
 import { loadCardById } from '@/lib/game/skills'
@@ -223,15 +224,35 @@ export function createColyseusBattleServer(options: CreateColyseusBattleServerOp
     },
     greet: false,
     beforeListen: async () => {
+      let work = 0
+      const progress = (stage: string, completed = 0, total = 0) => {
+        if (process.connected) process.send?.({ type: 'rvb:authority:startup-progress', stage, work: ++work, completed, total }, () => {})
+      }
+      const onVerification = (value: unknown) => {
+        const p = value as { stage: string; completed: number; total: number }
+        progress(p.stage, p.completed, p.total)
+      }
+      verificationProgress.subscribe(onVerification)
       try {
+        progress('database')
         await preparePostgresAuthority(repository, { logger })
+        progress('adventure')
         await adventureStore?.initialize()
+        progress('profile')
+        // Readiness includes installed-profile integrity and publisher checks.
+        // Do not first run this expensive cold verification in /catalog/identity
+        // after clients have already been told the authority is ready.
+        getServerGameProfileIdentityV1()
+        progress('ready')
         ready = true
         healthError = undefined
       } catch (error) {
         ready = false
         healthError = error instanceof Error ? error.message : String(error)
+        if (process.connected) process.send?.({ type: 'rvb:authority:startup-failed', error: healthError.slice(0, 500) }, () => {})
         throw error
+      } finally {
+        verificationProgress.unsubscribe(onVerification)
       }
     },
     express: rawApp => {

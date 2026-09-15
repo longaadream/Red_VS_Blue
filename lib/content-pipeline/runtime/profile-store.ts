@@ -9,6 +9,7 @@ import {
   writeFileSync,
 } from 'node:fs'
 import { randomUUID } from 'node:crypto'
+import { reportVerificationProgress } from './verification-progress'
 import path from 'node:path'
 
 import {
@@ -573,6 +574,7 @@ export class ProfileStoreV1 {
     }
     walk(root)
     let observedScript = false
+    let verifiedFiles = 0
     for (const file of profile.files) {
       const absolute = path.resolve(root, ...file.descriptor.path.split('/'))
       if (!absolute.startsWith(`${root}${path.sep}`) || !existsSync(absolute)) {
@@ -586,9 +588,16 @@ export class ProfileStoreV1 {
         throw new ProfileStoreErrorV1('PROFILE_HASH_MISMATCH', file.descriptor.path)
       }
       if (file.descriptor.path.endsWith('.json')) observedScript ||= hasExecutableContentV1(parseStrictJsonBytesV1(bytes))
+      verifiedFiles++
+      if (verifiedFiles % 32 === 0 || verifiedFiles === profile.files.length) {
+        reportVerificationProgress('profile', verifiedFiles, profile.files.length)
+      }
     }
     if (observedScript && !profile.capabilities.includes('trusted-executable-content')) throw new ProfileStoreErrorV1('PROFILE_HASH_MISMATCH', 'undeclared executable content')
-    if (profile.capabilities.includes('trusted-executable-content')) this.verifiedScriptView(reference)
+    if (profile.capabilities.includes('trusted-executable-content')) {
+      reportVerificationProgress('signature', 0, 0)
+      this.verifiedScriptView(reference)
+    }
   }
 
   /** Opens exactly one already-installed, integrity-verified immutable Snapshot. */

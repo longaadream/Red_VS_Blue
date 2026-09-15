@@ -5850,6 +5850,13 @@
       const rect = anchor && anchor.getBoundingClientRect()
       const width = bubble.offsetWidth || 280
       const height = bubble.offsetHeight || 85
+      if (innerHeight < 600 && innerWidth > innerHeight) {
+        const mission = document.getElementById('tutorialLessonDialog')
+        const missionRect = mission && mission.getBoundingClientRect()
+        bubble.style.left = Math.max(12, (innerWidth - width) / 2) + 'px'
+        bubble.style.top = ((missionRect ? missionRect.bottom : 90) + 6) + 'px'
+        return
+      }
       const usable = rect && rect.width && rect.height
       const left = usable ? rect.left : innerWidth / 2 - width / 2
       const top = usable ? rect.top - height - 14 : 145

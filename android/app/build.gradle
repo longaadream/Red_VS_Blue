@@ -7,8 +7,8 @@ android {
         applicationId "com.redvsblue.client"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode Integer.parseInt(System.getenv('RVB_ANDROID_VERSION_CODE') ?: '23')
-        versionName System.getenv('RVB_ANDROID_VERSION_NAME') ?: "0.1.4"
+        versionCode Integer.parseInt(System.getenv('RVB_ANDROID_VERSION_CODE') ?: '25')
+        versionName System.getenv('RVB_ANDROID_VERSION_NAME') ?: "0.1.6"
         manifestPlaceholders = [rvbAppLabel: '红蓝对决·安卓测试版']
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {

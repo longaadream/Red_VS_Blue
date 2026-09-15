@@ -725,6 +725,17 @@ async function smokeClient(expectedIdentity = null, sharedUserDataDir = null, ne
       `Explicit authority retry did not rearm and recover: ${JSON.stringify(manualRecovery)}`,
     )
     const markerAfterManualRecovery = await evaluate(recoveryTarget, 'window.__rvbRecoverySmokeMarker || null')
+    const recoveredPids = await waitForExecutableProcessIds(
+      path.join(isolatedPackageRoot, 'resources', 'node.exe'), 'colyseus-server.mjs',
+    )
+    assert(recoveredPids.length === 1, 'Recovered authority process was not found uniquely')
+    const repeatedPreparation = await evaluate(recoveryTarget,
+      'Promise.all([window.electronAPI.ensureLocalAuthority(), window.electronAPI.ensureLocalAuthority()])', true, 30000)
+    assert(repeatedPreparation.every(result => result.ok === true), 'Repeated preparation failed after recovery')
+    const repeatedPids = await waitForExecutableProcessIds(
+      path.join(isolatedPackageRoot, 'resources', 'node.exe'), 'colyseus-server.mjs',
+    )
+    assert(JSON.stringify(repeatedPids) === JSON.stringify(recoveredPids), 'Repeated preparation restarted the ready authority')
     assert(
       markerAfterManualRecovery === recoveryMarker,
       'Manual authority recovery reloaded the main menu',
