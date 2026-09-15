@@ -1,0 +1,24 @@
+{
+  "id": "pve-pressure-return",
+  "name": "灵压回流",
+  "description": "一个友方下次用灵压伤害卡造成伤害后，恢复等于施放时攻击力差×2的生命。",
+  "type": "active",
+  "actionPointCost": 1,
+  "availability": {
+    "modes": [
+      "pve"
+    ],
+    "status": "draft"
+  },
+  "design": {
+    "familyId": "pressure",
+    "handbookId": "pressure-return",
+    "curve": "growth",
+    "role": "治疗配套",
+    "duration": "本回合",
+    "start": "恢复2",
+    "end": "恢复12",
+    "condition": "攻击差从1扩大到6。",
+    "note": "恢复发生在伤害后，需要先满足目标条件。"
+  }
+}

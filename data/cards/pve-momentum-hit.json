@@ -1,0 +1,24 @@
+{
+  "id": "pve-momentum-hit",
+  "name": "音速撞击",
+  "description": "使一个友方对3格内一个敌人造成8点伤害。",
+  "type": "active",
+  "actionPointCost": 1,
+  "availability": {
+    "modes": [
+      "pve"
+    ],
+    "status": "draft"
+  },
+  "design": {
+    "familyId": "momentum",
+    "handbookId": "momentum-hit",
+    "curve": "ready",
+    "role": "伤害",
+    "duration": "一次结算",
+    "start": "8伤害",
+    "end": "8伤害",
+    "condition": "不消耗动能，没有自带成长。",
+    "note": ""
+  }
+}

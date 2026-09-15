@@ -60,7 +60,7 @@
   const panel = document.createElement('dialog');
   panel.className = 'official-update-panel';
   panel.setAttribute('aria-labelledby', 'official-update-title');
-  panel.innerHTML = '<h2 id="official-update-title">官方更新</h2><p data-current></p><section class="official-update-section"><h3>资源包 · 测试频道</h3><p data-resource role="status"></p></section><section class="official-update-section"><h3>客户端 · 稳定频道</h3><p data-client role="status"></p></section><label><input type="checkbox" data-automatic> 自动检查并下载更新</label><p class="official-update-note">资源在主菜单应用；客户端需要你确认重启安装。对局中继续使用当前版本。</p><p data-error role="alert"></p><div class="official-update-footer"><button type="button" data-check>立即检查</button><button type="button" data-install hidden>重启并安装</button><button type="button" data-close>关闭</button></div>';
+  panel.innerHTML = '<h2 id="official-update-title">官方更新</h2><p data-current></p><section class="official-update-section"><h3>资源包 · 测试频道</h3><p data-resource role="status"></p></section><section class="official-update-section"><h3>客户端 · 稳定频道</h3><p data-client role="status"></p></section><section class="official-update-section"><h3>本机游戏服务</h3><p data-local role="status">正在准备游戏…</p><button type="button" data-local-retry hidden>重新准备游戏</button></section><label><input type="checkbox" data-automatic> 后台自动检查并下载</label><p class="official-update-note">启动时检查更新，完成后进入游戏。客户端更新需重启安装。</p><p data-error role="alert"></p><div class="official-update-footer"><button type="button" data-recovery>资源管理</button><button type="button" data-check>立即检查</button><button type="button" data-install hidden>重启并安装</button><button type="button" data-close disabled>进入游戏</button></div>';
   document.body.appendChild(panel);
   const sourceLabel = document.createElement('label');
   sourceLabel.innerHTML = '下载源 <select data-source aria-label="更新下载源"><option value="github">GitHub 官方源</option><option value="cos">COS 香港源</option></select>';
@@ -70,7 +70,36 @@
   sourceNote.textContent = '客户端和资源包共用所选源。更新中或客户端已下载时暂不能切换；下载失败可切换后重试。';
   sourceLabel.after(sourceNote);
   const find = selector => panel.querySelector(selector);
+  let startupPending = true;
+  let disposed = false;
+  let localTimer;
+  async function refreshLocal() {
+    if (disposed || !api.getMode) return;
+    try {
+      const mode = await api.getMode();
+      if (disposed) return;
+      const busy = ['starting', 'recovering'].includes(mode.localAuthorityRecovery?.status);
+      find('[data-local]').textContent = mode.ready ? '游戏已就绪' : busy ? '正在准备游戏…' : '游戏准备失败，请重试';
+      find('[data-local-retry]').hidden = mode.ready || busy;
+      render(await api.getOfficialUpdateStatus());
+    } catch {
+      if (!disposed) {
+        find('[data-local]').textContent = '无法获取游戏状态，请重试';
+        find('[data-local-retry]').hidden = false;
+      }
+    } finally {
+      if (!disposed) localTimer = setTimeout(refreshLocal, 1500);
+    }
+  }
   function render(status) {
+    startupPending = status.startupPending === true;
+    if (startupPending && !panel.open) panel.showModal();
+    if (disposed) return;
+    find('[data-check]').textContent = status.resource.phase === 'error' || status.client.phase === 'error' ? '重试更新检查' : '检查更新';
+    find('[data-close]').disabled = startupPending && !status.canEnter;
+    find('[data-close]').textContent = startupPending
+      ? status.canEnter && (status.resource.phase === 'error' || status.client.phase === 'error') ? '离线进入' : '进入游戏'
+      : '关闭';
     find('[data-current]').textContent = '当前客户端 ' + status.clientVersion;
     find('[data-resource]').textContent = status.resource.message + (status.resource.version ? ' · ' + status.resource.version : '');
     find('[data-client]').textContent = status.client.message + (status.client.version ? ' · ' + status.client.version : '') + (status.client.percent !== undefined ? ' · ' + status.client.percent + '%' : '');
@@ -89,11 +118,25 @@
     catch (error) { find('[data-error]').textContent = error.message || '更新暂时不可用，请稍后重试'; }
   }
   button.onclick = () => { panel.showModal(); void action(() => Promise.resolve()); };
-  find('[data-close]').onclick = () => panel.close();
+  panel.addEventListener('cancel', event => { if (startupPending) event.preventDefault(); });
+  find('[data-close]').onclick = () => action(async () => {
+    if (startupPending) render(await api.enterAfterUpdateCheck());
+    panel.close();
+  });
   find('[data-check]').onclick = () => action(async () => {
     find('[data-check]').disabled = true;
     try { await api.checkOfficialUpdates(); } finally { find('[data-check]').disabled = false; }
   });
+  find('[data-local-retry]').onclick = () => action(async () => {
+    const retry = find('[data-local-retry]');
+    retry.disabled = true;
+    find('[data-local]').textContent = '正在重新准备游戏…';
+    try {
+      const result = await api.ensureLocalAuthority();
+      if (!result.ok) throw new Error(result.error || '游戏准备失败，请重试');
+    } finally { retry.disabled = false; }
+  });
+  find('[data-recovery]').onclick = () => { window.location.href = 'pack.html'; };
   find('[data-install]').onclick = () => action(() => api.installClientUpdate());
   find('[data-automatic]').onchange = event => action(() => api.setAutomaticUpdates(event.target.checked));
   find('[data-source]').onchange = event => action(async () => {
@@ -101,6 +144,13 @@
     finally { render(await api.getOfficialUpdateStatus()); }
   });
   const unsubscribe = api.onOfficialUpdateStatus(render);
-  window.addEventListener('pagehide', unsubscribe, { once: true });
-  void action(() => Promise.resolve());
+  window.addEventListener('pagehide', () => { disposed = true; clearTimeout(localTimer); unsubscribe(); }, { once: true });
+  void refreshLocal();
+  panel.showModal();
+  void action(async () => {
+    const status = await api.getOfficialUpdateStatus();
+    render(status);
+    if (status.startupPending) await api.checkOfficialUpdates();
+    else panel.close();
+  });
 })();

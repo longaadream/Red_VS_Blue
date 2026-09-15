@@ -52,3 +52,26 @@ body[data-art-page=lobby] .game-shell .room-row{background:transparent!important
   .game-dialog { width:min(560px,calc(100vw - 24px)); max-height:calc(100dvh - 16px); margin:auto; padding:14px; overflow-y:auto; overscroll-behavior:contain; }
   .game-dialog h2 { margin:0 44px 8px 0; font-size:22px; }.game-dialog input,.game-dialog select { min-height:44px; }.game-dialog .dialog-close { position:sticky; float:right; top:0; width:44px; height:44px; z-index:2; }
 }
+
+/* Lists use one scroll surface on touch devices; cards never shrink out of reach. */
+@media (max-width:900px), (pointer:coarse) {
+  body[data-art-page]:is([data-art-page=lobby],[data-art-page=multiplayer]) { height:auto; min-height:100dvh; overflow-y:auto; touch-action:pan-y; }
+  body:is([data-art-page=lobby],[data-art-page=multiplayer]) .game-shell { display:flex; flex-direction:column; height:auto; min-height:100dvh; }
+  body:is([data-art-page=lobby],[data-art-page=multiplayer]) .game-header { min-height:52px; padding:8px 12px; flex-wrap:wrap; }
+  body:is([data-art-page=lobby],[data-art-page=multiplayer]) .game-nav { flex-direction:row; flex-wrap:wrap; padding:6px 12px; border-right:0; }
+  body:is([data-art-page=lobby],[data-art-page=multiplayer]) .game-nav>a { padding:8px 12px; min-height:44px; }
+  body:is([data-art-page=lobby],[data-art-page=multiplayer]) .game-main { display:block; overflow:visible; padding:12px; }
+  body:is([data-art-page=lobby],[data-art-page=multiplayer]) .browser-layout { display:block; }
+  body:is([data-art-page=lobby],[data-art-page=multiplayer]) .room-browser { overflow:visible; min-height:0; }
+  body:is([data-art-page=lobby],[data-art-page=multiplayer]) .room-scroll { overflow:visible; height:auto; max-height:none; flex:none; }
+  body:is([data-art-page=lobby],[data-art-page=multiplayer]) .room-preview { margin-top:16px; }
+  body[data-art-page=lobby] .room-preview { display:none; }
+  body:is([data-art-page=lobby],[data-art-page=multiplayer]) .browser-filters { flex-wrap:wrap; }
+  body:is([data-art-page=lobby],[data-art-page=multiplayer]) .view-heading { flex-wrap:wrap; }
+  body:is([data-art-page=lobby],[data-art-page=multiplayer]) .game-footer { min-height:48px; margin-top:auto; flex-wrap:wrap; padding:8px 12px; }
+  .server-settings-row { flex-wrap:wrap; }
+  .room-columns { display:none!important; }
+  .room-row { display:flex; flex-wrap:wrap; gap:8px; padding:14px; }
+  .room-row > :first-child { flex-basis:100%; }
+  .room-row button { min-height:44px; }
+}

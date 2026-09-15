@@ -1,5 +1,6 @@
 import type { BattleAction, BattleState } from './turn'
 import { isTeamMatch, type MatchTeam } from './match-teams'
+import { adventureBoundary } from './adventure-boundary'
 import { TURN_TIMEOUT_FORFEIT_STREAK } from './turn-timer'
 
 export const BATTLE_ROUND_LIMIT = 40
@@ -100,6 +101,15 @@ function coreEliminationResult(
   state: BattleState,
   settledAt: TerminalSettlementPosition,
 ): TerminalResult | null {
+  const cooperative = adventureBoundary(state)?.coop
+  if (cooperative) {
+    const living = [...state.pieces, ...Object.values(cooperative.parties).flatMap(p => p.reserves)]
+      .filter(p => p.isCore && p.currentHp > 0)
+    const humansAlive = cooperative.humanIds.some(id => !cooperative.absent.includes(id) && living.some(p => p.ownerPlayerId === id))
+    const enemiesAlive = living.some(p => p.ownerPlayerId === cooperative.enemyId)
+    if (humansAlive && (enemiesAlive || adventureBoundary(state)?.campaignHasNext)) return null
+    return teamResult(state, humansAlive ? 'red' : enemiesAlive ? 'blue' : null, 'core-eliminated', settledAt)
+  }
   if (state.players.length !== 2 && !isTeamMatch(state)) return null
 
   const progressiveDeployment = state.deployment?.mode === 'progressive-reserve-v1'
@@ -115,12 +125,13 @@ function coreEliminationResult(
     playerId: player.playerId,
     normalizedId: normalizePlayerId(player.playerId),
   }))
+  const adventureReserves = adventureBoundary(state)?.party?.reserves ?? []
   if (!progressiveDeployment) {
     const removedPieces = Array.isArray(state.extensions?.removedPieces)
       ? state.extensions.removedPieces
       : []
     const coreOwners = new Set(
-      [...state.pieces, ...state.graveyard, ...removedPieces]
+      [...state.pieces, ...state.graveyard, ...removedPieces, ...adventureReserves]
         .filter(piece => piece.isCore === true)
         .map(piece => normalizePlayerId(piece.ownerPlayerId)),
     )
@@ -137,6 +148,9 @@ function coreEliminationResult(
       ))
       .map(piece => normalizePlayerId(piece.ownerPlayerId)),
   )
+  for (const piece of adventureReserves) {
+    if (piece.isCore && piece.currentHp > 0) livingCoreOwners.add(normalizePlayerId(piece.ownerPlayerId))
+  }
   const defeated = players.filter(player => !livingCoreOwners.has(player.normalizedId))
   if (isTeamMatch(state)) {
     const aliveTeams = new Set(state.players.filter(p => livingCoreOwners.has(normalizePlayerId(p.playerId))).map(p => p.teamId))
@@ -156,6 +170,8 @@ function coreEliminationResult(
   }
 
   const loser = defeated[0]
+  const world = adventureBoundary(state)
+  if (world?.campaignHasNext && loser.playerId !== world.humanId) return null
   const winner = players.find(player => player.normalizedId !== loser.normalizedId)
   if (!winner) return null
   return {
@@ -171,6 +187,7 @@ function roundLimitResult(
   state: BattleState,
   settledAt: TerminalSettlementPosition,
 ): TerminalResult | null {
+  if (adventureBoundary(state)) return null
   if (state.turn.phase !== 'end' || settledAt.completedRound < BATTLE_ROUND_LIMIT) return null
   if (isTeamMatch(state)) return teamResult(state, null, 'round-limit', settledAt)
   return {
@@ -209,7 +226,9 @@ export function finalizeBattleTerminal(
           reason: 'timeout',
         }, settledAt)
       : null
-  const result = action.type === 'surrender'
+  const result = adventureBoundary(state)?.coop
+    ? (state.pendingOptionSelection || state.pendingTargetSelection ? null : coreEliminationResult(state, settledAt))
+    : action.type === 'surrender'
     ? surrenderResult(state, action, settledAt)
     : timeoutForfeit ?? (state.pendingOptionSelection || state.pendingTargetSelection
       ? null

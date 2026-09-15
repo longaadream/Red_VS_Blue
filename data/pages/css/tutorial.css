@@ -17,6 +17,38 @@
 
 .tutorial-dialog[hidden] { display: none; }
 
+/* Ink marks belong to the actual skill button, including when its menu moves. */
+body.tutorial-mode .tutorial-skill-hint {
+  outline: 3px dashed #f0cc80 !important;
+  outline-offset: 3px;
+  position: relative;
+}
+body.tutorial-mode[data-tutorial-step="deploy"] .deployment-choice {
+  outline: 2px dashed #f0cc80;
+  outline-offset: 2px;
+}
+body.tutorial-mode[data-tutorial-step="deploy"] .deployment-choice::after {
+  content: '↓ 选一位，再点标记格';
+  display: block;
+  font: 14px/1.4 TutorialComic, sans-serif;
+}
+body.tutorial-mode .tutorial-skill-hint::after {
+  content: '← 用这招';
+  display: block;
+  color: #f0cc80;
+  font: 16px/1.4 TutorialComic, sans-serif;
+  animation: tutorial-ink-nudge 1s ease-in-out infinite alternate;
+}
+body.tutorial-mode .character-cast.tutorial-skill-hint {
+  right: auto; bottom: auto; height: auto; min-height: 42px;
+  display: block; width: fit-content; max-width: 100%; margin: 8px 4px 4px; padding: 5px 9px;
+}
+body.tutorial-mode .character-cast.tutorial-skill-hint::after { display: inline; margin-left: 8px; color: #fff0c8; white-space: nowrap; }
+@keyframes tutorial-ink-nudge { to { translate: 4px 0; } }
+@media (prefers-reduced-motion: reduce) {
+  body.tutorial-mode .tutorial-skill-hint::after { animation: none; }
+}
+
 #tutorialLessonDialog { max-height: calc(100dvh - 180px); overflow-y: auto; }
 #tutorialLessonDialog .tutorial-dialog__actions { flex-wrap: wrap; }
 #tutorialLessonDialog .tutorial-dialog__objective { display: block; }
@@ -210,6 +242,48 @@ body.tutorial-mode #btnSurrender { display: none !important; }
 }
 
 /* Six paper practice cards spread on the club table. */
+.tutorial-dialog__header { display: flex; align-items: center; gap: 8px; }
+.tutorial-dialog__header .tutorial-dialog__scene { flex: 1; margin: 0; }
+.tutorial-dialog__toggle {
+  flex: none; min-width: 54px; min-height: 44px; padding: 6px;
+  border: 2px solid #5a4631; border-radius: 7px; background: #b6a07b;
+  color: #382b21; font: 14px TutorialComic, sans-serif; cursor: pointer;
+}
+.tutorial-dialog__toggle:focus-visible { outline: 3px solid #435a60; outline-offset: 2px; }
+#tutorialLessonDialog.is-collapsed {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px;
+  padding: 6px 10px; max-height: none;
+}
+#tutorialLessonDialog.is-collapsed::before,
+#tutorialLessonDialog.is-collapsed .tutorial-dialog__scene,
+#tutorialLessonDialog.is-collapsed .tutorial-dialog__text,
+#tutorialLessonDialog.is-collapsed .tutorial-dialog__actions,
+#tutorialLessonDialog.is-collapsed details { display: none; }
+#tutorialLessonDialog.is-collapsed .tutorial-dialog__header { grid-column: 2; grid-row: 1; }
+#tutorialLessonDialog.is-collapsed .tutorial-dialog__objective {
+  grid-column: 1; grid-row: 1; border: 0; background: none; padding: 0; margin: 0;
+}
+/* One scroll area preserves text height on short touch screens. */
+@media (pointer: coarse) and (orientation: landscape), (orientation: landscape) and (max-height: 600px) {
+  #tutorialLessonDialog {
+    display: flex; flex-direction: column;
+    left: auto; right: 10px; top: 68px; bottom: auto;
+    width: min(320px, 43vw); max-height: calc(100dvh - 165px);
+    padding: 10px 12px; overflow-y: auto;
+  }
+  #tutorialLessonDialog > * { flex-shrink: 0; }
+  #tutorialLessonDialog::before { display: none; }
+  #tutorialLessonDialog .tutorial-dialog__scene { font-size: 17px; margin: 4px 0; }
+  #tutorialLessonDialog .tutorial-dialog__text { font-size: 13px; line-height: 1.5; margin: 6px 0; }
+  #tutorialLessonDialog .tutorial-dialog__objective { font-size: 12px; margin: 4px 0; padding: 6px; }
+  #tutorialLessonDialog .tutorial-dialog__actions {
+    position: sticky; bottom: -10px; z-index: 1;
+    background: var(--guide-paper); margin: 0; padding: 2px 0 6px;
+  }
+  #tutorialLessonDialog .tutorial-dialog__button { min-height: 44px; font-size: 14px; padding: 6px 10px; }
+  #tutorialLessonDialog details { margin-top: 6px; }
+}
+
 body[data-art-page=tutorial] { margin: 0; font-size: 14px; line-height: 1.6; }
 body[data-art-page=tutorial] * { box-sizing: border-box; }
 body[data-art-page=tutorial] main { max-width: 1120px; margin: auto; padding: 24px 30px 40px; }
@@ -264,3 +338,79 @@ body[data-art-page=tutorial] footer a { color: #c4ad85; }
 body[data-art-page=tutorial] .lesson-card.is-unavailable { filter: saturate(.35); }
 body[data-art-page=tutorial] .is-unavailable .start { background: #655b4c; color: #dbcaac; cursor: default; box-shadow: none; }
 body[data-art-page=tutorial] .is-unavailable .start::after { content: none; }
+
+/* A short paper note leaves room for the skill sheet beside the board. */
+#tutorialLessonDialog { background: #cbb88f; box-shadow: 3px 4px 0 #30261c; border-radius: 5px 12px 4px 9px; }
+#tutorialLessonDialog::before { display: none; }
+#tutorialLessonDialog .tutorial-dialog__scene { font-size: 17px; }
+#tutorialLessonDialog .tutorial-dialog__text { margin: 7px 0; line-height: 1.45; }
+#tutorialLessonDialog .tutorial-dialog__objective { margin: 5px 0; padding: 5px; }
+#tutorialLessonDialog .tutorial-dialog__actions { margin-top: 5px; }
+#tutorialLessonDialog details { margin-top: 5px; padding-top: 5px; }
+@media (min-width: 1000px) {
+  #tutorialLessonDialog { max-height: min(205px, 32dvh); padding: 10px 12px; }
+  body.tutorial-mode #pieceInfoModal.character-dock { bottom: calc(min(205px, 32dvh) + 40px) !important; }
+}
+
+/* Active teaching is a single instruction strip. Long copy is opt-in. */
+body #tutorialLessonDialog.is-guiding.is-collapsed {
+  left: 16px; right: auto; top: auto; bottom: 18px;
+  width: min(340px, calc(100vw - 32px)); box-sizing: border-box;
+  max-height: none; overflow: visible; padding: 7px 10px;
+}
+body #tutorialLessonDialog.is-guiding.is-collapsed .tutorial-dialog__objective { font-size: 14px; line-height: 1.4; }
+body #tutorialLessonDialog.is-guiding.is-collapsed .tutorial-dialog__toggle { min-width: 44px; min-height: 40px; }
+body #tutorialLessonDialog.is-review.is-collapsed .tutorial-dialog__actions { display: flex; grid-column: 1 / -1; margin: 0; }
+body #tutorialLessonDialog.is-review.is-collapsed .tutorial-dialog__actions button:not(.is-primary) { display: none; }
+body.tutorial-mode:has(#tutorialLessonDialog.is-collapsed) #pieceInfoModal.character-dock { bottom: 102px !important; }
+body[data-tutorial-step="deploy"] #tutorialLessonDialog.is-collapsed .tutorial-dialog__objective::before {
+  content: '●—1—2—3—4—5 ✕  6 ✓';
+  display: block; color: #8b3c2e; font: bold 12px/1.6 monospace; white-space: nowrap;
+  border-bottom: 1px dashed #756044; margin-bottom: 4px;
+}
+body[data-tutorial-step="deploy"] #statusMsg { display: none !important; }
+body.tutorial-mode[data-tutorial-step="deploy"] .deployment-choice::after { display: none; }
+#tutorialResourceGuide { flex-basis: 100%; display: grid; justify-items: center; gap: 4px; padding: 7px 12px; background: #d6bd8e; border: 2px solid #34291e; border-radius: 6px 12px 7px 4px; color: #34291e; }
+#tutorialResourceGuide[hidden] { display: none; }
+#tutorialResourceGuide span { font-size: 12px; }
+#tutorialResourceGuide b { font: bold 22px/1.4 monospace; color: #355f69; animation: tutorial-energy-grow 1.6s ease-in-out infinite; }
+@keyframes tutorial-energy-grow { 50% { transform: translateY(-3px); color: #8b482c; } }
+@media (orientation: landscape) and (max-height: 600px) {
+  body #tutorialLessonDialog.is-guiding.is-collapsed { left: auto; right: 66px; top: 64px; bottom: auto; width: min(300px, 40vw); }
+  #tutorialResourceGuide { padding: 4px 8px; gap: 1px; }
+  #tutorialResourceGuide b { font-size: 17px; }
+}
+@media (prefers-reduced-motion: reduce) { #tutorialResourceGuide b { animation: none; } }
+
+/* Mission HUD and contextual speech replace the corner script sheet. */
+body #tutorialLessonDialog,
+body #tutorialLessonDialog.is-guiding.is-collapsed {
+  position: fixed; left: 50%; right: auto; top: 88px; bottom: auto;
+  transform: translateX(-50%); width: min(590px, calc(100vw - 140px));
+  max-height: none; padding: 7px 12px; overflow: visible;
+  border: 2px solid #382b20; border-radius: 6px 14px 7px 11px;
+  display: flex; flex-direction: row; align-items: center; gap: 10px; flex-wrap: wrap;
+}
+body #tutorialLessonDialog .tutorial-dialog__scene,
+body #tutorialLessonDialog .tutorial-dialog__text { display: none; }
+body #tutorialLessonDialog .tutorial-dialog__header { order: 2; margin-left: auto; }
+body #tutorialLessonDialog .tutorial-dialog__objective { order: 1; flex: 1; margin: 0; padding: 0; border: 0; background: none; font-size: 15px; }
+body #tutorialLessonDialog .tutorial-dialog__objective::before { content: '◇ 任务  '; color: #456c70; border: 0; display: inline; font: inherit; }
+body #tutorialLessonDialog .tutorial-dialog__actions { order: 3; margin: 0; }
+body #tutorialLessonDialog details { order: 4; flex-basis: 100%; }
+body #tutorialLessonDialog:not(.is-collapsed) .tutorial-dialog__text { display: block; order: 3; flex-basis: 100%; }
+body #tutorialLessonDialog:not(.is-collapsed) { max-height: min(400px, 70dvh); overflow-y: auto; }
+body #tutorialLessonDialog.is-review.is-collapsed .tutorial-dialog__actions { display: flex; }
+body.tutorial-mode #pieceInfoModal.character-dock,
+body.tutorial-mode:has(#tutorialLessonDialog.is-collapsed) #pieceInfoModal.character-dock { bottom: 18px !important; }
+body.tutorial-mode:has(#tutorialLessonDialog) .hand-scroll { margin-left: 0; width: 100%; }
+body[data-tutorial-step="deploy"] #tutorialLessonDialog.is-collapsed .tutorial-dialog__objective::before { content: '◇ 任务  '; display: inline; border: 0; margin: 0; font: inherit; }
+#tutorialActionBubble { position: fixed; z-index: 90; width: 280px; box-sizing: border-box; padding: 13px 15px; background: #f0dfb9; color: #3a2b20; border: 3px solid #3a2b20; border-radius: 18px 9px 17px 8px; box-shadow: 3px 4px #241b16; font: 15px/1.5 TutorialComic, sans-serif; pointer-events: none; }
+#tutorialActionBubble::after { content: ''; position: absolute; bottom: -12px; left: 26px; width: 17px; height: 17px; transform: rotate(45deg); background: #f0dfb9; border-right: 3px solid #3a2b20; border-bottom: 3px solid #3a2b20; }
+#tutorialActionBubble[hidden] { display: none; }
+body.tutorial-mode:has(#tutorialLessonDialog.is-busy) #statusMsg { display: none !important; }
+@media (max-height: 600px) and (orientation: landscape) {
+  body #tutorialLessonDialog, body #tutorialLessonDialog.is-guiding.is-collapsed { top: 58px; width: min(540px, calc(100vw - 140px)); padding: 3px 9px; gap: 5px; }
+  body #tutorialLessonDialog .tutorial-dialog__objective { font-size: 13px; }
+  #tutorialActionBubble { width: 240px; padding: 8px 11px; font-size: 13px; }
+}

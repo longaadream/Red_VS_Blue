@@ -1,0 +1,65 @@
+{
+  "schemaVersion": "rvb-pve-roguelike-supplies/v1",
+  "id": "old-town-supplies",
+  "version": "0.1.0",
+  "relics": [
+    {
+      "id": "blood-ledger",
+      "name": "血契之书",
+      "description": "每场战斗开始时，生成2张临时【血咒】。",
+      "icon": "♜",
+      "familyId": "blood",
+      "grants": [
+        {
+          "cardId": "pve-blood-curse",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "id": "star-lantern",
+      "name": "星火灯盏",
+      "description": "每场战斗开始时，生成2张临时【星火】。",
+      "icon": "✦",
+      "familyId": "light",
+      "grants": [
+        {
+          "cardId": "pve-light-spark",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "id": "calibration-magazine",
+      "name": "校准弹匣",
+      "description": "每场战斗开始时，生成2张临时【校准射击】和1张临时【掩护射击】。",
+      "icon": "⌖",
+      "familyId": "skirmish",
+      "grants": [
+        {
+          "cardId": "pve-skirmish-calibrate",
+          "count": 2
+        },
+        {
+          "cardId": "pve-skirmish-cover",
+          "count": 1
+        }
+      ]
+    }
+  ],
+  "initialRelicIds": [
+    "calibration-magazine"
+  ],
+  "rewardRelicIds": [
+    "blood-ledger",
+    "star-lantern",
+    "calibration-magazine"
+  ],
+  "rewardCardIds": [
+    "pve-blood-curse",
+    "pve-light-spark",
+    "pve-skirmish-calibrate"
+  ],
+  "rewardCopies": 2,
+  "rewardRelicLimit": 1
+}

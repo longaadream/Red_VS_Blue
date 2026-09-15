@@ -1,6 +1,7 @@
 import type { Faction, PieceTemplate } from "./piece"
 import { loadJsonFilesServer } from './file-loader'
 import { getDataRoot } from '../app-paths'
+import { isContentAvailable, type ContentMode } from './content-availability'
 
 export const DEMO_PIECE_MANIFEST_VERSION = 'demo-v0.1'
 
@@ -84,10 +85,15 @@ export function getAllPieces(): PieceTemplate[] {
   return Object.values(DEFAULT_PIECES)
 }
 
+export function getAvailablePieces(mode: ContentMode): PieceTemplate[] {
+  return getAllPieces().filter(piece => isContentAvailable(piece, mode))
+}
+
 export function getDemoPieceIds(): string[] {
-  return [...demoPieceIds]
+  return [...demoPieceIds].filter(isDemoPieceAdmitted)
 }
 
 export function isDemoPieceAdmitted(templateId: string): boolean {
-  return demoPieceIds.has(templateId)
+  const piece = getPieceById(templateId)
+  return demoPieceIds.has(templateId) && !!piece && isContentAvailable(piece, 'pvp')
 }

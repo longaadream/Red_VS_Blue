@@ -1,0 +1,47 @@
+{
+  "id": "pve-raise-dead",
+  "name": "亡者复生",
+  "description": "第2轮起，在2格内的预告位置召唤1个【食尸鬼】，本战区最多1个。",
+  "kind": "active",
+  "type": "normal",
+  "range": "self",
+  "cooldownTurns": 3,
+  "maxCharges": 0,
+  "powerMultiplier": 1,
+  "actionPointCost": 0,
+  "icon": "☠",
+  "targeting": {
+    "steps": []
+  },
+  "summonCapability": {
+    "version": 1,
+    "recipe": "stored-or-declared-piece",
+    "maxSummons": 1,
+    "storageExtensionKey": "adventureGhoulStorage",
+    "uniqueTemplateId": "pve-ghoul",
+    "fallback": {
+      "instanceIdPrefix": "adventure-ghoul-",
+      "templateId": "pve-ghoul",
+      "name": "食尸鬼",
+      "faction": "blue",
+      "maxHp": 4,
+      "attack": 2,
+      "defense": 0,
+      "moveRange": 3,
+      "skills": [
+        {
+          "skillId": "pve-claw",
+          "level": 1,
+          "currentCooldown": 0
+        }
+      ]
+    }
+  },
+  "code": "function executeSkill(context) {\n      var world = battle.extensions.adventureWorld, plan = world.plans && world.plans[0];\n      var mark = plan && plan.kind === 'summon' && plan.cells[0];\n      if (!mark || plan.sourceId !== context.piece.instanceId || plan.round !== world.party.battleRound) return {success:false,message:'没有召唤预告'};\n      if (battle.pieces.some(function(p){return p.currentHp > 0 && ((p.templateId === 'pve-ghoul' && world.activeEnemyIds.indexOf(p.instanceId) >= 0) || (p.x===mark.x && p.y===mark.y));})) return {success:false,message:'墓印被占据或食尸鬼仍在场'};\n      context.summonQueue.push({summons:[{x:mark.x,y:mark.y}],sourceId:context.piece.instanceId});\n      return {success:true,message:'亡者复生'};\n    }",
+  "availability": {
+    "modes": [
+      "pve"
+    ],
+    "status": "ready"
+  }
+}

@@ -74,3 +74,6 @@ android-client/www/*.html
 android-client/www/game-engine.js
 android-client/www/js/crypto-lib.js
 android-client/www/js/game-engine.js
+
+# Long-lived local signing material (never part of release artifacts).
+.local-signing/

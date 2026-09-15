@@ -1,0 +1,26 @@
+{
+  "id": "pve-ghoul",
+  "name": "食尸鬼",
+  "faction": "evil",
+  "rarity": "common",
+  "image": "adventure/ghoul.svg",
+  "description": "《魔兽世界》 · 召唤物",
+  "stats": {
+    "maxHp": 6,
+    "attack": 3,
+    "defense": 0,
+    "moveRange": 3
+  },
+  "skills": [
+    {
+      "skillId": "pve-claw"
+    }
+  ],
+  "rules": [],
+  "availability": {
+    "modes": [
+      "pve"
+    ],
+    "status": "ready"
+  }
+}

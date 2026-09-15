@@ -9,8 +9,8 @@ import { Client as ColyseusClient } from '@colyseus/sdk'
 const root = path.resolve(import.meta.dirname, '..', '..')
 const applications = {
   client: {
-    executable: path.join(root, 'dist', 'client-build', 'win-unpacked', 'RED vs BLUE.exe'),
-    helperExecutables: [path.join(root, 'dist', 'client-build', 'win-unpacked', 'resources', 'node.exe')],
+    executable: process.env.RVB_SMOKE_CLIENT_EXE ? path.resolve(process.env.RVB_SMOKE_CLIENT_EXE) : path.join(root, 'dist', 'client-build', 'win-unpacked', 'RED vs BLUE.exe'),
+    helperExecutables: [path.join(process.env.RVB_SMOKE_CLIENT_EXE ? path.dirname(path.resolve(process.env.RVB_SMOKE_CLIENT_EXE)) : path.join(root, 'dist', 'client-build', 'win-unpacked'), 'resources', 'node.exe')],
     userDataDir: process.env.RVB_SMOKE_USER_DATA_DIR
       ? path.resolve(process.env.RVB_SMOKE_USER_DATA_DIR)
       : null,
@@ -343,6 +343,25 @@ async function verifyTutorialWithoutAuthority(port, target, timeoutMs = 30000) {
     document.getElementById('tutorialShortcut').click()
     return true
   })()`, false)
+  const lessonMenu = await waitForTargets(
+    port,
+    candidate => candidate.url === 'rvb-client://app/tutorial.html',
+    timeoutMs,
+  )
+  const menuDeadline = Date.now() + timeoutMs
+  let lessonReady = false
+  while (Date.now() < menuDeadline) {
+    lessonReady = await evaluate(lessonMenu, `!!document.querySelector('a[href^="battle.html?mode=tutorial&lesson="]')`)
+    if (lessonReady) break
+    await delay(100)
+  }
+  assert(lessonReady, 'First playable lesson did not appear')
+  await evaluate(lessonMenu, `(() => {
+    const firstLesson = document.querySelector('a[href^="battle.html?mode=tutorial&lesson="]')
+    if (!firstLesson) throw new Error('First playable lesson is missing')
+    firstLesson.click()
+    return true
+  })()`, false)
   const tutorialTarget = await waitForTargets(
     port,
     candidate => candidate.url.startsWith('rvb-client://app/battle.html?mode=tutorial'),
@@ -358,7 +377,7 @@ async function verifyTutorialWithoutAuthority(port, target, timeoutMs = 30000) {
         loadingDisplay: document.getElementById('loadingOverlay')?.style.display || '',
         loadingMessage: document.getElementById('loadingMsg')?.textContent || '',
         loadingColor: document.getElementById('loadingMsg')?.style.color || '',
-        dialogPresent: document.getElementById('tutorialDialog') !== null,
+        dialogPresent: document.getElementById('tutorialLessonDialog') !== null,
         scenarioId: window.__RVB_TUTORIAL__?.scenarioId || '',
         engineReady: !!window.GameEngine?.applyBattleAction,
         electronApiReady: !!window.electronAPI,
@@ -614,8 +633,18 @@ async function smokeClient(expectedIdentity = null, sharedUserDataDir = null, ne
       await delay(250)
     }
     assert(gameBridgeReady, 'Client game preload bridge did not become ready')
-    const mode = await evaluate(gameTarget, `window.electronAPI.getMode()`)
+    let mode = await evaluate(gameTarget, `window.electronAPI.getMode()`)
+    const authorityDeadline = Date.now() + 90000
+    while (!mode?.ready && Date.now() < authorityDeadline) {
+      if (mode?.localAuthorityRecovery?.blocked || mode?.localAuthorityRecovery?.status === 'manual-required') break
+      await delay(250)
+      mode = await evaluate(gameTarget, `window.electronAPI.getMode()`)
+    }
     assert(mode?.ready === true, `Client local authority was not ready after automatic startup: ${JSON.stringify(mode)}`)
+    // The current client requires the same explicit update-gate entry as a player.
+    const updateStatus = await evaluate(gameTarget, `window.electronAPI.checkOfficialUpdates()`, true, 120000)
+    assert(updateStatus.canEnter, `Startup update check did not permit entry: ${JSON.stringify(updateStatus)}`)
+    await evaluate(gameTarget, `window.electronAPI.enterAfterUpdateCheck()`)
 
     const authorityEntry = path.join(
       isolatedPackageRoot,

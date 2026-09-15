@@ -11,6 +11,7 @@
     'cancel-target',
     'drop-piece',
     'viewport-change',
+    'hover-cell',
   ])
 
   function create(options) {
@@ -59,6 +60,7 @@
       const after = Object.assign({}, before, { pieces: JSON.parse(JSON.stringify(before.pieces || [])), effects: JSON.parse(JSON.stringify(before.effects || [])) })
       const events = [group.root].concat(group.children || [])
       const movementKinds = {}
+      const buffTargets = new Set()
       events.forEach(function (event) {
         const result = event.result || {}
         if ((event.kind === 'tileEffectAdded' || event.kind === 'tileEffectRemoved') && event.targetCell && result.effectId) {
@@ -86,6 +88,13 @@
             piece.health = Object.assign({}, piece.health, { current: value }); piece.hp = value
             if (amount && renderer.spawnFloater && phase !== 'settle') renderer.spawnFloater(piece.x, piece.y,
               (event.kind === 'heal' ? '+' : '−') + amount, event.kind === 'heal' ? '#4ade80' : '#f87171', false, { kind: event.kind })
+          } else if (event.kind === 'statChanged') {
+            const names = { attack: '攻击', defense: '防御', moveRange: '移动范围', maxHp: '生命上限' }
+            const amount = Number(result.amount)
+            if (names[result.attribute] && Number.isFinite(amount) && amount && renderer.spawnFloater && phase !== 'settle') {
+              renderer.spawnFloater(piece.x, piece.y, names[result.attribute] + ' ' + (amount > 0 ? '+' : '') + amount,
+                amount > 0 ? '#d9c778' : '#f87171', false, { kind: 'statChanged' })
+            }
           } else if (event.kind === 'death' || event.kind === 'eliminated') {
             piece.visible = false; piece.alive = false
           } else if (event.kind === 'statusAdded' || event.kind === 'statusRemoved') {
@@ -95,6 +104,11 @@
               const normalized = root.BattleViewModel && root.BattleViewModel.normalizeStatuses
                 ? root.BattleViewModel.normalizeStatuses({ statusTags: [status] }) : [status]
               piece.statuses = piece.statuses.concat(normalized)
+              const meta = root.BattleEffectIcons && root.BattleEffectIcons.resolveStatusType(event.statusType)
+              if (meta && meta.category === 'buff' && !buffTargets.has(id) && renderer.spawnFloater && phase !== 'settle') {
+                buffTargets.add(id)
+                renderer.spawnFloater(piece.x, piece.y, '获得增益', '#ffe69b', false, { kind: 'statusAdded', durationMs: 250 })
+              }
             }
             piece.statusSummary = piece.statuses
           }

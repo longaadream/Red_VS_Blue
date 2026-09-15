@@ -13,7 +13,7 @@ const H = 'a'.repeat(64), P = 'b'.repeat(64), K = 'c'.repeat(64)
 function fixture(options: { patch?: boolean; canApply?: boolean; version?: string; source?: UpdateSource } = {}) {
   const full = Buffer.from('signed full archive'), patch = Buffer.from('signed patch archive')
   const index: ResourceIndex = { schema: 'rvb-content-release/v1', channel: 'test', version: options.version || '0.0.123', contentHash: H, archive: 'content.rvbpack', archiveSha256: sha(full), identity: { publisherKeyId: K, engineAbi: 'engine/v1', contentAbi: 'content/v1' }, ...(options.patch ? { patch: { archive: 'content-patch.rvbpack', sha256: sha(patch), parentProfileHash: P, resolvedProfileHash: H } } : {}) }
-  const state: StableResource = { kind: 'bundled-base', resolvedProfileHash: P, version: '0.1.0', compatibility: { engineAbi: 'engine/v1', contentAbi: 'content/v1' } }
+  const state: StableResource = { kind: 'bundled-base', resolvedProfileHash: P, version: '0.0.100', compatibility: { engineAbi: 'engine/v1', contentAbi: 'content/v1' } }
   let allowed = options.canApply !== false
   let corrupt = ''
   let urlOverride = ''
@@ -231,4 +231,19 @@ it('switches binary providers only while idle and preserves a downloaded install
   expect(client.isBusy()).toBe(false)
   expect(() => client.setSource('cos')).toThrow()
   expect(client.isReady()).toBe(true)
+})
+
+it.each(['github', 'cos'] as const)('does not replace bundled content with older or equal releases from %s', async source => {
+  for (const version of ['0.0.1789388384826', '1.0.0']) {
+    const f = fixture({ source, version }); f.state.version = '1.0.0'
+    f.index.minimumClientVersion = '99.0.0'
+    expect((await f.updater.check()).phase).toBe('current')
+    expect(f.apply).not.toHaveBeenCalled()
+    expect(f.reads.some(url => url.endsWith('.rvbpack'))).toBe(false)
+  }
+})
+it('still applies a newer compatible release over bundled content', async () => {
+  const f = fixture({ version: '1.0.1' }); f.state.version = '1.0.0'
+  expect((await f.updater.check()).phase).toBe('current')
+  expect(f.apply).toHaveBeenCalledTimes(1)
 })

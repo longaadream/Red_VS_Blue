@@ -1,4 +1,5 @@
 import type { Pool, PoolClient } from 'pg'
+import { PostgresAdventureRepository } from '../colyseus/adventure-store'
 
 import {
   replayBattleAuthorityTransitions,
@@ -83,6 +84,7 @@ interface StoredInitialCheckpointRow {
 
 export class PostgresAuthorityRepository implements PostgresAuthorityBatchWriter, PostgresBattleReportReader {
   constructor(private readonly pool: Pool) {}
+  adventureRepository() { return new PostgresAdventureRepository(this.pool) }
 
   async initializeSchema(): Promise<void> {
     await this.transaction(async client => {

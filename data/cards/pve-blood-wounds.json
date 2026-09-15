@@ -1,0 +1,24 @@
+{
+  "id": "pve-blood-wounds",
+  "name": "伤口汲取",
+  "description": "使一个友方恢复1点生命；该友方本场每受伤1次，额外恢复2点。",
+  "type": "active",
+  "actionPointCost": 1,
+  "availability": {
+    "modes": [
+      "pve"
+    ],
+    "status": "draft"
+  },
+  "design": {
+    "familyId": "blood",
+    "handbookId": "blood-wounds",
+    "curve": "growth",
+    "role": "治疗",
+    "duration": "一次结算",
+    "start": "恢复1",
+    "end": "恢复13",
+    "condition": "受伤6次后使用。",
+    "note": ""
+  }
+}

@@ -23,10 +23,10 @@ describe('RED-171 game-style main menu layout contract', () => {
   })
 
   it('keeps every existing destination mapped to the approved hierarchy', () => {
-    expect(page).toMatch(/id="mode-online"[\s\S]*?onclick="showHostSheet\(\)"[\s\S]*?我当主机/)
-    expect(page).toMatch(/id="mode-online"[\s\S]*?onclick="showJoinSheet\(\)"[\s\S]*?连接主机/)
-    expect(page).toMatch(/id="mode-online"[\s\S]*?onclick="loadPage\('lobby\.html'\)"[\s\S]*?联机大厅/)
-    expect(page).toMatch(/id="mode-adventure"[\s\S]*?id="pveBtn"[\s\S]*?onclick="startPve\(\)"/)
+    expect(page).toMatch(/id="mode-online"[\s\S]*?id="createLocalRoom"[\s\S]*?lanCreateDialog[\s\S]*?创建房间/)
+    expect(page).toMatch(/id="mode-online"[\s\S]*?onclick="showJoinSheet\(\)"[\s\S]*?加入房间/)
+    expect(page).toMatch(/id="mode-online"[\s\S]*?onclick="loadPage\('multiplayer\.html'\)"[\s\S]*?联机大厅/)
+    expect(page).toMatch(/id="mode-adventure"[\s\S]*?id="pveBtn"[\s\S]*?onclick="window.location.href='adventure.html'"/)
     expect(page).toMatch(/id="mode-training"[\s\S]*?onclick="goToTraining\(\)"/)
     expect(page).toMatch(/id="mode-codex"[\s\S]*?loadPage\('pieces\.html'\)[\s\S]*?loadPage\('maps\.html'\)/)
 

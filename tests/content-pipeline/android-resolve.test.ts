@@ -25,6 +25,7 @@ describe('Android content uses the shared v1 resolver',()=>{
     expect(()=>assertOfficialResourceIdentity(record.profile,keyId,[],identity)).toThrow()
     expect(isNewerOfficialResource('1.0.0',record.profile)).toBe(false)
     expect(isNewerOfficialResource('0.9.9',record.profile)).toBe(false)
+    expect(isNewerOfficialResource('0.0.1789388384826',record.profile)).toBe(false)
     expect(isNewerOfficialResource('1.0.1',record.profile)).toBe(true)
     expect(()=>isNewerOfficialResource('2.0.9007199254740992',record.profile)).toThrow()
   })

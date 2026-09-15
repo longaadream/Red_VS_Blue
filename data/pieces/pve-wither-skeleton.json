@@ -1,0 +1,29 @@
+{
+  "id": "pve-wither-skeleton",
+  "name": "凋灵骷髅",
+  "description": "《我的世界》 · 近身追猎",
+  "faction": "evil",
+  "rarity": "rare",
+  "image": "adventure/wither-skeleton.svg",
+  "stats": {
+    "maxHp": 16,
+    "attack": 5,
+    "defense": 1,
+    "moveRange": 3
+  },
+  "skills": [
+    {
+      "skillId": "pve-claw"
+    },
+    {
+      "skillId": "pve-tracking-slash"
+    }
+  ],
+  "rules": [],
+  "availability": {
+    "modes": [
+      "pve"
+    ],
+    "status": "ready"
+  }
+}

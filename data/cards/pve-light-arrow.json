@@ -1,0 +1,24 @@
+{
+  "id": "pve-light-arrow",
+  "name": "虔诚之箭",
+  "description": "使一个友方对3格内一个敌人造成2点伤害；本场此前每使用1张圣光卡，伤害+2。",
+  "type": "active",
+  "actionPointCost": 1,
+  "availability": {
+    "modes": [
+      "pve"
+    ],
+    "status": "draft"
+  },
+  "design": {
+    "familyId": "light",
+    "handbookId": "light-arrow",
+    "curve": "growth",
+    "role": "伤害",
+    "duration": "一次结算",
+    "start": "2伤害",
+    "end": "14伤害",
+    "condition": "此前使用6张圣光卡。",
+    "note": ""
+  }
+}

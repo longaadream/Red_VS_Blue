@@ -1,4 +1,6 @@
+import { isContentAvailable, battleContentMode } from './content-availability'
 import { areMatchAllies } from './match-teams'
+import { canAffectAdventureTarget } from './adventure-boundary'
 /* eslint-disable @typescript-eslint/no-explicit-any -- RED-59 validates legacy data-authored definitions and action envelopes at runtime. */
 import type { PieceInstance } from './piece'
 import { getSkillById } from './skill-repository'
@@ -31,6 +33,7 @@ interface StatusRangeOverride {
 }
 
 export interface TargetConstraint {
+  originSelectedTargetIndex?: number
   type: 'piece' | 'cell'
   filter: TargetFilter
   range?: number
@@ -220,6 +223,7 @@ export interface PendingTargetSelectionSession {
 }
 
 interface TargetSpec {
+  originSelectedTargetIndex?: number
   kind: 'target'
   type: 'piece' | 'cell'
   filter: TargetFilter
@@ -355,6 +359,9 @@ function getDeclaredSteps(definition: any, kind: 'skill' | 'card'): SelectionSte
       }
       const type = normalizeTargetType(raw?.type)
       if (!type) return undefined
+      const originIndex = raw.originSelectedTargetIndex
+      if (originIndex !== undefined && (!Number.isInteger(originIndex) || originIndex < 0
+        || steps.filter(step => step.kind === 'target')[originIndex]?.type !== 'piece')) return undefined
       const rangeByStatus = raw.rangeByStatus
       const validRangeByStatus = typeof rangeByStatus?.statusType === 'string'
         && rangeByStatus.statusType.length > 0
@@ -372,6 +379,7 @@ function getDeclaredSteps(definition: any, kind: 'skill' | 'card'): SelectionSte
         kind: 'target',
         type,
         filter: normalizeFilter(raw.filter, raw.type),
+        originSelectedTargetIndex: originIndex,
         range: typeof raw.range === 'number' ? raw.range : undefined,
         rangeByStatus: validRangeByStatus,
         minRange: typeof raw.minRange === 'number' ? raw.minRange : undefined,
@@ -589,6 +597,9 @@ function getSource(state: BattleState, action: any): TargetSource | InvalidActio
     if (!player || !card) return { kind: 'invalid', code: 'ACTION_INVALID', message: 'Card is not in the player hand' }
     const definition = loadCardById(card.cardId) ?? state.customCards?.[card.cardId]
     if (!definition) return { kind: 'invalid', code: 'ACTION_INVALID', message: `Card ${card.cardId} not found` }
+    if (!isContentAvailable(definition, battleContentMode(state))) {
+      return { kind: 'invalid', code: 'ACTION_INVALID', message: '该卡牌未开放给当前模式' }
+    }
     if (definition.type !== 'active' && definition.type !== 'reactive') {
       return { kind: 'invalid', code: 'ACTION_INVALID', message: 'Passive cards cannot be played manually' }
     }
@@ -608,7 +619,7 @@ function getSource(state: BattleState, action: any): TargetSource | InvalidActio
     // origin. Its target type/filter remain authoritative; range is global.
     const steps = sourcePiece
       ? declaredSteps
-      : declaredSteps.map(step => step.kind === 'target' ? { ...step, range: undefined } : step)
+      : declaredSteps.map(step => step.kind === 'target' && step.originSelectedTargetIndex === undefined ? { ...step, range: undefined } : step)
     return {
       actionId: card.cardId,
       ownerPlayerId: playerId,
@@ -691,7 +702,8 @@ function constraintFor(
   const constraint: TargetConstraint = {
     ...spec,
     ownerPlayerId: source.ownerPlayerId,
-    sourcePieceId: source.sourcePieceId,
+    sourcePieceId: spec.originSelectedTargetIndex === undefined ? source.sourcePieceId
+      : (selectedTargets[spec.originSelectedTargetIndex] as Extract<TargetRef, { type: 'piece' }> | undefined)?.pieceId,
     sourceActionId: source.actionId,
     step,
     selectedTargets,
@@ -854,12 +866,16 @@ export function validateTargetRef(
   if (constraint.type !== ref.type) return issue('TARGET_TYPE_MISMATCH', `Expected ${constraint.type} target`)
   const sourcePiece = getSourcePiece(state, constraint)
   if (constraint.sourcePieceId && !sourcePiece) return issue('TARGET_SOURCE_MISSING', 'Target source is missing or defeated')
+  if (constraint.originSelectedTargetIndex !== undefined && !sourcePiece) return issue('TARGET_SOURCE_MISSING', 'Selected target origin is missing')
 
   if (ref.type === 'piece') {
     const target = state.pieces.find(piece => piece.instanceId === ref.pieceId)
     if (!target) return issue('TARGET_NOT_FOUND', `Piece ${ref.pieceId} was not found`)
     if (target.currentHp <= 0 || target.x == null || target.y == null) {
       return issue('TARGET_NOT_ALIVE', `Piece ${ref.pieceId} is not a living board target`)
+    }
+    if (!canAffectAdventureTarget(state, constraint.ownerPlayerId, target, sourcePiece)) {
+      return issue('TARGET_OUT_OF_RANGE', '目标不在当前战区，请先进入战区支援')
     }
     const sameOwner = areMatchAllies(state, target.ownerPlayerId, constraint.ownerPlayerId)
     if (constraint.filter === 'enemy' && sameOwner) return issue('TARGET_FILTER_MISMATCH', 'Target must be an enemy')

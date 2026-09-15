@@ -19,6 +19,7 @@ import { ClientBinaryUpdates } from './client-binary-updates'
 import { installedResourceVersion, resolvedResourceVersion } from './resource-update-identity'
 import { officialUpdateFetch, prepareOfficialUpdateNetwork } from './official-update-fetch'
 import { assertOfficialUpdateIpcAllowed } from './official-update-ipc'
+import { StartupUpdateGate } from './startup-update-gate'
 import { parseUpdateSource, readUpdateSettings, type UpdateSource } from './update-source'
 import {
   LocalAuthorityRecoveryBudget,
@@ -60,6 +61,7 @@ const PROFILE_ADMIN_KEY = randomBytes(32).toString('hex')
 let allowAppExit = false
 let appExitPromise: Promise<void> | null = null
 let officialUpdateApplying = false
+const startupUpdateGate = new StartupUpdateGate()
 let automaticUpdates = true
 let officialUpdateSource: UpdateSource = 'github'
 let resourceUpdates: OfficialResourceUpdates | null = null
@@ -2003,9 +2005,17 @@ function createGameWindow(): BrowserWindow {
   })
 
   restrictWindowNavigation(win, url => isGameClientUrl(url) || (startupInProgress && url === startupPageUrl()))
-  win.webContents.on('will-navigate', event => { if (officialUpdateApplying) event.preventDefault() })
+  win.webContents.on('will-navigate', (event, url) => {
+    if (officialUpdateApplying || !startupUpdateGate.entered && isGameClientUrl(url) && !['/index.html', '/pack.html'].includes(new URL(url).pathname)) event.preventDefault()
+  })
   win.webContents.on('did-finish-load', () => {
     if (startupCancelled || win.isDestroyed()) return
+    void win.webContents.insertCSS(`
+      html, body, body * { -webkit-user-select: none !important; user-select: none !important; }
+      input, textarea, [contenteditable], [contenteditable] *, [data-copyable], [data-copyable] * {
+        -webkit-user-select: text !important; user-select: text !important;
+      }
+    `).catch(error => console.warn('[client] text selection style unavailable:', error))
     const url = new URL(win.webContents.getURL())
     if (url.protocol !== CLIENT_SCHEME + ':' || url.hostname !== 'app' || url.pathname !== '/index.html') return
     void win.webContents.executeJavaScript(LOCAL_STARTUP_STATUS_SCRIPT).catch(error => console.warn('[client-startup] status unavailable:', error))
@@ -2052,7 +2062,10 @@ function openAdminWindow(): void {
 }
 
 function officialUpdateStatus() {
-  return { automatic: automaticUpdates, source: officialUpdateSource, sourceLocked: Boolean(officialUpdateApplying || resourceUpdates?.isBusy() || binaryUpdates?.isBusy() || binaryUpdates?.isReady()), clientVersion: app.getVersion(), resource: resourceUpdates?.status ?? { phase: 'idle', message: '正在准备本机服务' }, client: binaryUpdates?.status ?? { phase: 'idle', message: '正在准备更新服务' } }
+  const resource = resourceUpdates?.status ?? { phase: 'idle', message: '正在准备本机服务' }
+  const client = binaryUpdates?.status ?? { phase: 'idle', message: '正在准备更新服务' }
+  startupUpdateGate.observe(resource.phase, client.phase)
+  return { startupPending: !startupUpdateGate.entered, canEnter: startupUpdateGate.canEnter(resource.phase, client.phase, localServerReady), automatic: automaticUpdates, source: officialUpdateSource, sourceLocked: Boolean(officialUpdateApplying || resourceUpdates?.isBusy() || binaryUpdates?.isBusy() || binaryUpdates?.isReady()), clientVersion: app.getVersion(), resource, client }
 }
 
 function notifyOfficialUpdates() {
@@ -2148,9 +2161,17 @@ function setupOfficialUpdates(): void {
   }
   const check = async () => {
     if (officialUpdateApplying || appExitPromise) return officialUpdateStatus()
+    if (initialLocalStartupPromise) await initialLocalStartupPromise
     await Promise.all([resourceUpdates!.check(), binaryUpdates!.check()])
+    startupUpdateGate.checked = true
+    notifyOfficialUpdates()
     return officialUpdateStatus()
   }
+  handleTrusted('official-update-enter', ['game'], () => {
+    if (!officialUpdateStatus().canEnter) throw new Error('请先完成更新检查和已发现的更新')
+    startupUpdateGate.entered = true
+    return officialUpdateStatus()
+  })
   handleTrusted('official-update-status', ['game'], () => officialUpdateStatus())
   handleTrusted('official-update-check', ['game'], check)
   handleTrusted('official-update-source', ['game'], (_event, value) => {
@@ -2189,7 +2210,6 @@ function setupOfficialUpdates(): void {
       throw error
     }
   }))
-  setTimeout(() => { if (automaticUpdates) void check() }, 15000).unref()
   setInterval(() => { if (automaticUpdates) void check() }, 15 * 60 * 1000).unref()
   // A downloaded candidate is retried locally on return to the menu; no polling
   // GitHub every few seconds. A disabled automatic preference pauses this too.

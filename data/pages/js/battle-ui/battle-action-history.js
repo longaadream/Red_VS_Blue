@@ -97,10 +97,43 @@
     return roots.slice(-maximum)
   }
 
+  function combineActionChains(groups) {
+    const combined = [], byChain = new Map()
+    groups.forEach(function (group) {
+      const chainId = group.root.historyChainId
+      const parent = chainId && byChain.get(chainId)
+      if (parent) parent.children.push(group.root, ...group.children)
+      else {
+        const copy = { rootEventId: group.rootEventId, root: group.root, children: group.children.slice() }
+        combined.push(copy)
+        if (chainId) byChain.set(chainId, copy)
+      }
+    })
+    return combined
+  }
+
   function visibleRoots(roots, count) {
     return (Array.isArray(roots) ? roots : [])
       .slice(-Math.max(1, Number(count) || VISIBLE_ROOTS))
       .reverse()
+  }
+
+  function attributeChangeLabel(event) {
+    const details = event.complement && event.complement.kind === 'attribute' ? event.complement : event.result || {}
+    const names = { attack: '攻击', defense: '防御', moveRange: '移动范围', maxHp: '生命上限' }
+    const name = names[details.attribute]
+    const amount = finite(details.amount)
+    if (!name || amount === null || amount === 0) return ''
+    const value = finite(details.value)
+    return name + ' ' + (amount > 0 ? '+' : '') + amount + (value === null ? '' : '（' + (value - amount) + ' → ' + value + '）')
+  }
+
+  function readableEffect(event) {
+    if (event.kind === 'statChanged' || event.iconId === 'damage-buff') return !!attributeChangeLabel(event)
+
+    return !['actionPoints', 'passive', 'statChanged', 'choiceResolved'].includes(event.kind)
+      && event.iconId !== 'damage-buff'
+      && !(event.kind === 'cardDiscarded' && event.result && event.result.consumedByPlay)
   }
 
   function aggregateEffects(events) {
@@ -109,7 +142,7 @@
     ;(events || []).forEach(function (event) {
       const complement = event.complement || {}
       const key = JSON.stringify([event.kind, event.sourcePieceId || '', event.actorPlayerId || '',
-        event.skillId || '', event.ruleId || '', event.visibility || 'public', event.statusType || '',
+        event.skillId || '', event.ruleId || '', JSON.stringify(event.causePath || []), event.visibility || 'public', event.statusType || '',
         (event.targetPlayerIds || []).length ? 'player' : event.targetCell ? 'tile' : 'piece',
         complement.kind || '', complement.type || '', event.result && event.result.damageType || '',
         event.kind === 'damage' || event.kind === 'heal' ? '' : JSON.stringify(event.result || {})])
@@ -262,6 +295,7 @@
     let setHistoryHighlight = null
     let model = null
     let roots = []
+    let rawRoots = []
     let activeRootId = null
     let pinnedRootId = null
     let setHistoricalBoard = null
@@ -270,6 +304,7 @@
     let userExpanded = false
     const missingEffectDisplayMetadata = new Set()
     const pieceArchive = new Map()
+    const cardDefinitions = new Map()
 
     function rememberPieces(nextModel) {
       ;((nextModel && nextModel.pieces) || []).forEach(function (piece) {
@@ -362,6 +397,23 @@
         + (compact ? '' : '<span>' + escapeHtml(player.name || player.id) + '</span>') + '</span>' : ''
     }
 
+    function playedCard(event) {
+      const cardId = event.kind === 'card' && event.cardId
+      if (!cardId) return ''
+      if (!cardDefinitions.has(cardId) && typeof input.getCardDefinition === 'function') {
+        cardDefinitions.set(cardId, null)
+        const value = input.getCardDefinition(cardId)
+        if (value && typeof value.then === 'function') value.then(function (definition) {
+          cardDefinitions.set(cardId, definition)
+          render()
+        }).catch(function (error) { console.error('[action-history] card metadata', cardId, error) })
+        else cardDefinitions.set(cardId, value)
+      }
+      const definition = cardDefinitions.get(cardId)
+      return '<span class="action-history-entity is-card" data-history-card-id="' + escapeHtml(cardId)
+        + '" title="查看卡牌详情"><i></i><strong>' + escapeHtml(definition && definition.name || cardId) + '</strong></span>'
+    }
+
     function displayCard(cardId) {
       return cardId ? '<span class="action-history-entity is-card" title="' + escapeHtml(cardId) + '"><i></i><span>手牌</span></span>' : ''
     }
@@ -436,7 +488,7 @@
         }
         return '<span class="action-history-complement is-effect"><img src="' + escapeHtml(meta.assetPath) + '" alt="">' + escapeHtml(displayName) + '</span>'
       }
-      if (complement.kind === 'attribute') return '<span class="action-history-complement">' + escapeHtml(complement.attribute) + ' ' + (complement.amount > 0 ? '+' : '') + escapeHtml(complement.amount) + '</span>'
+      if (attributeChangeLabel(event)) return '<span class="action-history-complement">' + escapeHtml(attributeChangeLabel(event)) + '</span>'
       const badge = resultBadge(event)
       return badge ? '<span class="action-history-complement is-amount">' + escapeHtml(badge) + '</span>' : ''
     }
@@ -450,11 +502,42 @@
         : '<span class="action-history-predicate" style="--history-accent:' + escapeHtml(meta.color || '#94a3b8') + '"><img src="' + escapeHtml(meta.assetPath || 'images/effect-icons/fallback.svg') + '" alt=""><span>' + escapeHtml(movementLabel(event) || meta.label || KIND_LABELS[event.kind] || '动作') + '</span></span>'
       return '<span class="action-history-sentence' + (isRoot ? ' is-root' : '') + '" data-history-event-id="' + escapeHtml(event.eventId) + '">'
         + displaySubject(event, rootEvent, !isRoot)
-        + predicate
+        + predicate + playedCard(event)
         + (isRoot && event.result && event.result.pending ? '<span class="action-history-complement">发起行动 · 触发响应</span>' : '')
         + displayObject(event, !isRoot)
         + displayComplement(event, isSkillRelease ? identity.skillName : (movementLabel(event) || meta.label || KIND_LABELS[event.kind] || '动作'))
         + '</span>'
+    }
+
+    function renderCausalResults(events, initiating) {
+      const tree = { entries: [], byId: new Map() }
+      events.forEach(function (event) {
+        let node = tree
+        ;(event.causePath || []).forEach(function (cause) {
+          if (!node.byId.has(cause.id)) {
+            const branch = { cause, entries: [], byId: new Map() }
+            node.byId.set(cause.id, branch)
+            node.entries.push(branch)
+          }
+          node = node.byId.get(cause.id)
+        })
+        const previous = node.entries[node.entries.length - 1]
+        if (previous && previous.events) previous.events.push(event)
+        else node.entries.push({ events: [event] })
+      })
+      function renderNode(node) {
+        return node.entries.map(function (branch) {
+          if (branch.events) return '<span class="history-own-effects">'
+            + (!node.cause ? '<span class="history-response-title">' + (initiating.kind === 'card' ? playedCard(initiating) : '原行动') + '结算</span>' : '')
+            + aggregateEffects(branch.events).map(function (event) { return renderSentence(event, initiating, false) }).join('') + '</span>'
+          const cause = branch.cause
+          const label = cause.label || (cause.skillId && resolveIdentity(cause).skillName) || '响应效果'
+          return '<span class="history-response"><span class="history-response-title">'
+            + displayPiece(cause.sourcePieceId, false) + ' · ' + escapeHtml(label) + '</span>'
+            + renderNode(branch) + '</span>'
+        }).join('')
+      }
+      return renderNode(tree)
     }
 
     function render() {
@@ -464,7 +547,7 @@
       list.innerHTML = entries.map(function (group, index) {
         const meta = resolveIcon(group.root)
         const identity = resolveIdentity(group.root)
-        const children = aggregateEffects(group.children || [])
+        const children = aggregateEffects((group.children || []).filter(readableEffect))
         const visibleChildren = children.slice(0, 2)
         const overflow = Math.max(0, children.length - visibleChildren.length)
         const actor = ((model && model.players) || []).find(function (player) {
@@ -488,11 +571,11 @@
           + ' aria-pressed="' + String(selected) + '" title="' + escapeHtml(actionLabel) + '"'
           + ' style="--history-accent:' + escapeHtml(meta.color || '#94a3b8') + '">'
           + '<span class="action-history-root-icon' + (isSkillRelease ? ' is-portrait' : '') + '">' + rootMark + '</span>'
-          + (isSkillRelease ? '<span class="action-history-skill-label" aria-hidden="true">' + escapeHtml(actionLabel) + '</span>' : '')
+          + (isSkillRelease ? '<span class="action-history-skill-label" aria-hidden="true">' + escapeHtml(actionLabel) + '</span>' : group.root.kind === 'card' ? '<span class="action-history-skill-label">' + playedCard(group.root) + '</span>' : '')
           + (children.length ? '<span class="action-history-branch" aria-hidden="true">' + visibleChildren.map(renderChild).join('')
             + (overflow ? '<b class="action-history-overflow">+' + overflow + '</b>' : '') + '</span>' : '')
           + '<span class="action-history-chain">' + renderSentence(group.root, group.root, true)
-          + children.map(function (event) { return renderSentence(event, group.root, false) }).join('') + '</span>'
+          + renderCausalResults((group.children || []).filter(readableEffect), group.root) + '</span>'
           + '</button>'
       }).join('') || '<p class="action-history-empty">暂无行动记录</p>'
     }
@@ -549,9 +632,9 @@
       if (!activeRootId || !preview) return
       const group = roots.find(function (entry) { return entry.rootEventId === activeRootId })
       if (!group) return clearHighlight()
-      const row = aggregateEffects(group.children).find(function (entry) { return entry.eventId === activeEventId })
+      const row = aggregateEffects((group.children || []).filter(readableEffect)).find(function (entry) { return entry.eventId === activeEventId })
       const events = row ? row.batchEvents : [group.root].concat(group.children || [])
-      const saved = setHistoricalBoard ? setHistoricalBoard(activeRootId, events) : null
+      const saved = setHistoricalBoard ? setHistoricalBoard(row ? row.rootEventId : activeRootId, events) : null
       const paths = historicalContext(events).moves.map(function (move) {
         const piece = saved && saved.pieces.find(function (p) { return p.id === move.pieceId })
         return escapeHtml(piece && piece.name || '棋子') + '：(' + move.from.x + ', ' + move.from.y + ') → (' + move.to.x + ', ' + move.to.y + ')'
@@ -596,12 +679,47 @@
       clearHighlight()
     }
 
+    function expandHistory() {
+      if (userExpanded) return
+      userExpanded = true
+      render()
+      syncCollapse()
+    }
+
+    function handleWheel(event) {
+      stopBoardPointer(event)
+      if (event.deltaY < 0) expandHistory()
+    }
+
+    let dragStartY = null
+    function handlePointerDown(event) {
+      stopBoardPointer(event)
+      dragStartY = event.clientY
+    }
+    function handlePointerMove(event) {
+      if (dragStartY !== null && event.buttons && dragStartY - event.clientY > 24) {
+        dragStartY = null
+        expandHistory()
+      }
+    }
+
     function stopBoardPointer(event) {
       if (event && typeof event.stopPropagation === 'function') event.stopPropagation()
     }
 
+    function handleCardContext(event) {
+      if (event.target && event.target.closest && event.target.closest('[data-history-card-id]')) handleClick(event)
+    }
+
     function handleClick(event) {
       if (!event || !event.target || typeof event.target.closest !== 'function') return
+      const card = event.target.closest('[data-history-card-id]')
+      if (card && typeof input.onCardDetail === 'function') {
+        event.preventDefault()
+        event.stopPropagation()
+        input.onCardDetail(card.dataset.historyCardId)
+        return
+      }
       if (event.target.closest('[data-history-close]')) { clearHighlight(); return }
       const rootButton = event.target.closest('[data-history-root-id]')
       const collapsedButton = event.target.closest('.action-history-collapsed-button')
@@ -647,9 +765,11 @@
         + '<aside class="history-preview" aria-label="历史效果预览" hidden></aside>'
       list = dock.querySelector('.action-history-list')
       preview = dock.querySelector('.history-preview')
-      dock.addEventListener('pointerdown', stopBoardPointer)
-      dock.addEventListener('wheel', stopBoardPointer)
+      dock.addEventListener('pointerdown', handlePointerDown)
+      dock.addEventListener('wheel', handleWheel)
+      dock.addEventListener('pointermove', handlePointerMove)
       dock.addEventListener('click', handleClick)
+      dock.addEventListener('contextmenu', handleCardContext)
       dock.addEventListener('pointerover', handlePreview)
       dock.addEventListener('pointerout', handlePreviewEnd)
       dock.addEventListener('focusin', handlePreview)
@@ -664,7 +784,8 @@
       if (!nextModel) return
       rememberPieces(nextModel)
       model = nextModel
-      roots = mergeRoots(roots, nextModel.presentationEvents, MAX_ROOTS)
+      rawRoots = mergeRoots(rawRoots, nextModel.presentationEvents, MAX_ROOTS)
+      roots = combineActionChains(rawRoots)
       render()
       syncCollapse()
       if (activeRootId) highlightOverlay()
@@ -681,9 +802,11 @@
       observer = null
       if (win && win.removeEventListener) win.removeEventListener('resize', resize)
       if (dock) {
-        dock.removeEventListener('pointerdown', stopBoardPointer)
-        dock.removeEventListener('wheel', stopBoardPointer)
+        dock.removeEventListener('pointerdown', handlePointerDown)
+        dock.removeEventListener('wheel', handleWheel)
+        dock.removeEventListener('pointermove', handlePointerMove)
         dock.removeEventListener('click', handleClick)
+        dock.removeEventListener('contextmenu', handleCardContext)
         dock.removeEventListener('pointerover', handlePreview)
         dock.removeEventListener('pointerout', handlePreviewEnd)
         dock.removeEventListener('focusin', handlePreview)
@@ -696,6 +819,7 @@
       setHistoryHighlight = null
       model = null
       roots = []
+      rawRoots = []
       pieceArchive.clear()
     }
 
@@ -714,8 +838,11 @@
     create: create,
     groupEvents: groupEvents,
     aggregateEffects: aggregateEffects,
+    readableEffect: readableEffect,
+    attributeChangeLabel: attributeChangeLabel,
     historicalContext: historicalContext,
     mergeRoots: mergeRoots,
+    combineActionChains: combineActionChains,
     visibleRoots: visibleRoots,
     highlightCells: highlightCells,
     collapseReasons: collapseReasons,

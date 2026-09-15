@@ -1,0 +1,40 @@
+.rulebook-entry { display:inline-flex; align-items:center; gap:4px; min-height:36px; }
+.rulebook-entry svg { width:22px; height:22px; }
+body .topbar #rulebookButton::before { display:none!important; }
+dialog.rulebook { position:fixed; inset:0; margin:auto; width:min(1020px,calc(100vw - 24px)); height:fit-content; max-width:none; max-height:calc(100dvh - 24px); box-sizing:border-box; padding:24px 30px 16px; overflow:auto; color:#352c25; background:repeating-linear-gradient(9deg,#8d714306 0 1px,transparent 1px 5px),#e7d6ae; border:3px solid #43382b; border-radius:2px 13px 4px 9px; box-shadow:6px 8px 0 #17130e80,inset 0 0 35px #92774830; font-family:inherit; }
+.rulebook::backdrop { background:#17140ed0; }
+.rulebook header { display:flex; align-items:center; justify-content:space-between; gap:16px; padding-bottom:12px; border-bottom:3px double #645038; }
+.rulebook .rb-heading small { font-size:12px; letter-spacing:3px; }
+.rulebook h2 { margin:3px 0 0; font-size:30px; font-weight:700; }
+.rulebook [data-close] { flex-shrink:0; width:44px; height:44px; background:transparent; color:inherit; border:2px solid #554532; border-radius:7px 2px 8px 3px; font-family:inherit; font-size:30px; line-height:1; cursor:pointer; transform:rotate(3deg); }
+.rulebook button:focus-visible { outline:3px dashed #315d70; outline-offset:3px; }
+.rb-sheet { display:grid; grid-template-columns:1fr 1fr; }
+.rb-rule { padding:15px 22px 12px; }
+.rb-rule:nth-child(odd) { border-right:2px dashed #806a4760; }
+.rb-rule:nth-child(-n+2) { border-bottom:2px dashed #806a4760; }
+.rulebook h3 { margin:0 0 4px; font-size:24px; line-height:1.35; }
+.rulebook h3 span { display:inline-block; font-size:16px; margin-right:10px; border:1.5px solid #756043; padding:2px 6px; transform:rotate(-7deg); vertical-align:middle; }
+.rulebook .rb-rule svg { display:block; width:100%; height:145px; overflow:visible; fill:none; stroke:#3d3328; stroke-width:2.5; stroke-linecap:round; stroke-linejoin:round; }
+.rulebook .rb-rule p { margin:5px 0 0; font-size:19px; line-height:1.45; }
+.rulebook svg text { stroke:none; fill:#3d3328; font-family:inherit; }
+.rulebook .rb-number { font-size:29px; font-weight:bold; }
+.rulebook .rb-note { font-size:19px; }
+.rulebook .rb-pawn { fill:#c5b085; }
+.rulebook .rb-hatch { stroke-width:1.2; fill:none; }
+.rulebook .rb-blue { fill:#849b98; }
+.rulebook .rb-cut { stroke:#874435; stroke-width:3; }
+.rulebook .rb-redwash { fill:#a2583c14; stroke:#9a6146; }
+.rulebook .rb-redtext { fill:#874435; }
+.rulebook .rb-greentext { fill:#45614b; }
+.rulebook .rb-greenstroke { stroke:#45614b; }
+.rulebook .rb-dashed { stroke-dasharray:4 6; stroke-width:1.5; }
+.rulebook .rb-arrow { fill:none; stroke-width:2; }
+.rulebook footer { display:flex; justify-content:space-between; gap:10px; border-top:2px solid #806a4780; padding-top:10px; font-size:12px; color:#726047; }
+@media(max-height:600px) and (min-width:650px) { dialog.rulebook { padding:10px 18px; } .rulebook header { padding-bottom:5px; } .rulebook h2 { font-size:23px; } .rulebook .rb-heading small { display:none; } .rb-rule { padding:8px 12px; } .rulebook h3 { font-size:19px; } .rulebook .rb-rule svg { height:68px; } .rulebook .rb-rule p { font-size:15px; margin:2px 0; } .rulebook footer { padding-top:4px; font-size:10px; } }
+@media(max-width:649px) { dialog.rulebook { padding:16px; } .rb-sheet { grid-template-columns:1fr; } .rb-rule { padding:16px 2px; border-bottom:2px dashed #806a4760; } .rb-rule:nth-child(odd) { border-right:0; } .rulebook h2 { font-size:25px; } .rulebook h3 { font-size:23px; } .rulebook footer { flex-wrap:wrap; } }
+
+@media(max-height:600px) and (min-width:650px) { .rulebook .rb-rule { padding:5px 12px; } .rulebook .rb-rule svg { height:54px; } .rulebook h3 { margin-bottom:0; } .rulebook footer { display:none; } }
+body .topbar #rulebookButton { position:relative; overflow:visible; }
+body .topbar #rulebookButton .rulebook-hint { position:absolute; top:calc(100% + 10px); right:0; display:block; width:max-content; max-width:220px; padding:9px 12px; background:#e7d6ae; color:#352c25; border:2px solid #55432f; border-radius:3px 8px 4px 7px; box-shadow:2px 3px 0 #211b1680; font-family:inherit; font-size:16px; line-height:1.4; white-space:nowrap; text-indent:0; z-index:5; }
+.rulebook-overview { padding:8px 16px; min-height:44px; border:2px solid #55432f; border-radius:4px 9px 3px 7px; background:#e7d6ae; color:#352c25; font:inherit; font-size:19px; cursor:pointer; box-shadow:2px 3px 0 #55432f50; }
+.rulebook-overview:focus-visible { outline:3px dashed #315d70; outline-offset:3px; }

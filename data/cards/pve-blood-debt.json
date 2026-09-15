@@ -1,0 +1,24 @@
+{
+  "id": "pve-blood-debt",
+  "name": "血债",
+  "description": "一个友方受到2点真实伤害，再对其3格内一个敌人造成2点伤害；该友方本场此前每受伤1次，伤害+2。",
+  "type": "active",
+  "actionPointCost": 1,
+  "availability": {
+    "modes": [
+      "pve"
+    ],
+    "status": "draft"
+  },
+  "design": {
+    "familyId": "blood",
+    "handbookId": "blood-debt",
+    "curve": "growth",
+    "role": "伤害",
+    "duration": "一次结算",
+    "start": "2伤害",
+    "end": "14伤害",
+    "condition": "此前受伤6次。",
+    "note": "这张出牌本身就读取次数，不需要先装一张能力牌。"
+  }
+}

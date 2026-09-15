@@ -238,3 +238,23 @@ describe('ordered committed presentation recording', () => {
     expect(recordedBattlePresentation(state)).toBeUndefined()
   })
 })
+
+it('preserves nested response ownership and restores the initiating effect scope', () => {
+  const state = makeState({ pieces: [makePiece({ instanceId: 'a' })] })
+  recordBattlePresentation(state, () => {
+    withBattlePresentationSource(state, { sourcePieceId: 'a', ruleId: 'response', label: '响应' }, () => {
+      state.pieces[0].statusTags.push({ id: 'response-buff', type: 'buff' } as never)
+      withBattlePresentationSource(state, { sourcePieceId: 'a', ruleId: 'nested', label: '嵌套响应' }, () => {
+        state.pieces[0].statusTags.push({ id: 'nested-buff', type: 'buff' } as never)
+      })
+      state.pieces[0].statusTags.push({ id: 'response-after', type: 'buff' } as never)
+    })
+    state.pieces[0].statusTags.push({ id: 'card-buff', type: 'buff' } as never)
+    return state
+  }, s => s)
+  const events = recordedBattlePresentation(state)!.filter(event => event.kind === 'statusAdded')
+  expect(events.map(event => event.statusId)).toEqual(['response-buff', 'nested-buff', 'response-after', 'card-buff'])
+  expect(events.map(event => event.causePath?.map(source => source.ruleId) ?? [])).toEqual([
+    ['response'], ['response', 'nested'], ['response'], [],
+  ])
+})

@@ -163,3 +163,6 @@ QA 路由控制台仍记录资源包候选路径探测及既有缺失 `data/skil
 RED-80 可整体 revert 以恢复旧模块、数据、第五触发阶段、六面矩阵和 bundle。不得只恢复 `data/effects` 而不恢复 loader/执行器，也不得只恢复 helper 名称制造半迁移状态。回退后必须重跑六面差分与固定 seed 规则回放。
 
 RED-129 回退只撤销本任务在 `lib/game/**`、数据、测试和文档中的修改。不得运行 `build:game-engine`，也不得修改或重建浏览器与 Android 的两个 `game-engine.js`。
+
+### RED-181 友方位移候选
+可信动态脚本新增 canPlaceAdventurePiece(battle, piece, x, y)，仅检查冒险战区边界，PVP 返回 true；配合地形和占格查询使用。图拉扬按团队选择友方，普通操作仍受控制权约束。回归：tests/pve/roguelike/allied-march.test.ts（PVE、2v2）。

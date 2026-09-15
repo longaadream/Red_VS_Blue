@@ -95,7 +95,7 @@ describe('RED-165 battle effect icon registry', () => {
       iconId: 'resurreccion', assetPath: 'images/effect-icons/resurreccion.svg', label: '归刃', visibility: 'board',
     })
     expect(icons.resolveStatusType('damage-buff')).toMatchObject({
-      iconId: 'empowered', assetPath: 'images/effect-icons/empowered.svg', label: '强化', visibility: 'board',
+      iconId: 'empowered', assetPath: 'images/effect-icons/empowered.svg', label: '增益', visibility: 'board',
     })
     expect(icons.resolveStatusType('damage-multiplier')).toMatchObject({
       iconId: 'damage-multiplier', assetPath: 'images/effect-icons/damage-multiplier.svg', label: '飞天御剑流', visibility: 'board',

@@ -608,3 +608,11 @@ SkillCode 放入 Content Pipeline 或声称现役 `eval` 路径具备沙箱隔�
 - ADR-0004、ADR-0006、ADR-0010、ADR-0015、ADR-0017
 
 每次 Runtime 或 Helper 语义变化，都必须在同一个 PR 中更新本手册和兼容矩阵。
+
+### PVE 目标边界
+可信脚本可调用 `canAffectAdventureTarget(battle, actorPlayerId, targetPiece, sourcePiece?)`。
+它只判断当前冒险战区是否允许影响该棋子，不替代阵营、生命、射程校验；PVP 返回 true。
+直接遍历 `battle.pieces` 的伤害、治疗和增益脚本必须先过滤此条件。技能应传入施法棋子；玩家手牌不传 sourcePiece。
+最终事务仍执行跨战区保护，禁止通过省略过滤绕过保护。
+
+位移候选可调用 `canPlaceAdventurePiece(battle, piece, x, y)`，与最终位移共用冒险边界校验。它只判断战区边界，不检查地形、占格、禁移状态，必须配合原有落点查询。PVE 和 2v2 的友方按团队判断，技能可影响队友棋子；普通移动和主动操作仍校验棋子控制权。

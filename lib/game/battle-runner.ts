@@ -33,6 +33,7 @@ import { applyBattleAction, assertBattleNotTerminal, safeCloneBattleState } from
 import { globalTriggerSystem, TriggerSystem } from './triggers'
 import { createEffectChain, withEffectChain } from './effect-batch'
 import { assertRestrictedPositionsUnchanged } from './position-change'
+import { assertAdventureTransition, adventureBoundary, updateAdventureCaptainAnchor } from './adventure-boundary'
 
 export {
   hashBattleState,
@@ -152,9 +153,12 @@ export function runBattleAction(
         effectChain,
         () => {
           const hydratedState = withServerSkills(clonedState) as BattleState
+          Object.assign(hydratedState.skillsById, adventureBoundary(clonedState)?.skillDefinitions ?? {})
           return withEffectChain(hydratedState, effectChain, () => {
             const nextState = applyBattleAction(hydratedState, action)
             assertRestrictedPositionsUnchanged(state, nextState)
+            assertAdventureTransition(state, nextState, action)
+            updateAdventureCaptainAnchor(nextState)
             effectChain.assertHealthy()
             return nextState
           })
@@ -273,7 +277,7 @@ function ruleOccurrenceKey(rule: unknown, index: number, occurrences: Map<string
   return `${base}:occurrence:${occurrence}`
 }
 
-function captureSerializableRuleEffects(state: BattleState): SerializableRuleEffectSnapshot {
+export function captureSerializableRuleEffects(state: BattleState): SerializableRuleEffectSnapshot {
   const snapshot: SerializableRuleEffectSnapshot = new Map()
   const captureEntities = (entities: readonly RuleEntity[], kind: 'piece' | 'player') => {
     entities.forEach((entity, entityIndex) => {
@@ -295,11 +299,12 @@ function captureSerializableRuleEffects(state: BattleState): SerializableRuleEff
   }
   captureEntities(state.pieces, 'piece')
   captureEntities(state.graveyard, 'piece')
+  captureEntities(adventureBoundary(state)?.party?.reserves ?? [], 'piece')
   captureEntities(state.players, 'player')
   return snapshot
 }
 
-function withoutRuntimeRuleEffects(
+export function withoutRuntimeRuleEffects(
   state: BattleState,
   serializedRuleEffects: SerializableRuleEffectSnapshot,
 ): BattleState {
@@ -341,11 +346,16 @@ function withoutRuntimeRuleEffects(
   const pieces = state.pieces.map((piece, index) => stripEntityRules(piece, 'piece', index))
   const graveyard = state.graveyard.map((piece, index) => stripEntityRules(piece, 'piece', index))
   const players = state.players.map((player, index) => stripEntityRules(player, 'player', index))
+  const world = adventureBoundary(state)
+  const party = world?.party
+  const reserves = party?.reserves.map((piece, index) => stripEntityRules(piece, 'piece', index))
+  const reserveChanged = reserves?.some((piece, index) => piece !== party!.reserves[index])
   const changed = pieces.some((piece, index) => piece !== state.pieces[index])
     || graveyard.some((piece, index) => piece !== state.graveyard[index])
     || players.some((player, index) => player !== state.players[index])
 
-  return changed ? { ...state, pieces, graveyard, players } : state
+  return changed || reserveChanged ? { ...state, pieces, graveyard, players,
+    ...(reserveChanged ? { extensions: { ...state.extensions, adventureWorld: { ...world, party: { ...party, reserves } } } } : {}) } : state
 }
 
 /**

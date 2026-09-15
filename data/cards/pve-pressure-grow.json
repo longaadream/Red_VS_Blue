@@ -1,0 +1,24 @@
+{
+  "id": "pve-pressure-grow",
+  "name": "威势斩",
+  "description": "灵压。一个友方对3格内一个敌人造成1点伤害；该友方本场此前每完成1次造成伤害的灵压主动动作，伤害+3。",
+  "type": "active",
+  "actionPointCost": 1,
+  "availability": {
+    "modes": [
+      "pve"
+    ],
+    "status": "draft"
+  },
+  "design": {
+    "familyId": "pressure",
+    "handbookId": "pressure-grow",
+    "curve": "growth",
+    "role": "伤害",
+    "duration": "一次结算",
+    "start": "1伤害",
+    "end": "16伤害",
+    "condition": "此前5次灵压伤害动作。",
+    "note": "瞬步不造成伤害；黑棺延迟伤害不另算一次施放。"
+  }
+}

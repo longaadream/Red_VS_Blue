@@ -1,0 +1,398 @@
+{
+  "schemaVersion": "rvb-pve-roguelike-builds/v1",
+  "id": "roguelike-builds",
+  "version": "0.1.0",
+  "families": [
+    {
+      "id": "blood",
+      "name": "自残",
+      "tag": "血量换输出，恢复换续战",
+      "color": "#854a3d",
+      "icon": "damage-multiplier",
+      "summary": "固定数值的血焰过渡，低起点的血债靠受伤次数追上来。痛楚反击仍只是一张可选配套。",
+      "team": [
+        {
+          "pieceId": "guldan",
+          "name": "古尔丹",
+          "image": "adventure/guldan.jpg",
+          "role": "队长",
+          "description": "邪能赐福提供受伤与攻击提升。"
+        },
+        {
+          "pieceId": "red-illidan",
+          "name": "伊利丹",
+          "image": "adventure/illidan.jpg",
+          "role": "初始队友",
+          "description": "眼棱提供恢复，承担输出。"
+        }
+      ],
+      "loop": [
+        "血焰过渡",
+        "承受伤害 / 恢复",
+        "积累血债或血咒",
+        "选择高倍率下一击"
+      ],
+      "pair": {
+        "fixed": "pve-blood-flame",
+        "scaling": "pve-blood-debt",
+        "label": "施放者本场此前受伤次数",
+        "max": 10,
+        "initial": 0,
+        "steady": 6,
+        "base": 2,
+        "gain": 2,
+        "unit": "次",
+        "note": "两张都是1费，均先让施放者受到2点真实伤害。固定牌按实际损失2生命试算；当前卡产生的受伤不计入“此前次数”。"
+      },
+      "example": "前期血焰和止血保证能打下去。血债起步只有2伤害，需要让同一棋子真正受伤、活下来，才会超过固定输出。也可以养血咒的后续副本。",
+      "links": [
+        "古尔丹的邪能赐福可以贡献受伤事件；不能把未损失生命的事件算进去。",
+        "乌尔奇奥拉可以作为跨体系招募，借再生和归刃利用受伤。",
+        "有圣盾时可能挡掉自残，固定代价与受伤成长都按实际结算判断。"
+      ],
+      "questions": [
+        "痛楚反击暂定覆盖下一次主动伤害动作；多段技能是否全动作翻倍仍待定。",
+        "血债读取此前受伤次数；伤口汲取读取结算前已完成的受伤事件。",
+        "每个伤害动作对同一棋子最多记录一次受伤，避免逐弹丸重复计数。"
+      ],
+      "cardIds": [
+        "pve-blood-flame",
+        "pve-blood-stop",
+        "pve-blood-ward",
+        "pve-blood-cut",
+        "pve-blood-debt",
+        "pve-blood-drink",
+        "pve-blood-revenge",
+        "pve-blood-wounds",
+        "pve-blood-curse",
+        "pve-blood-etch"
+      ]
+    },
+    {
+      "id": "shield",
+      "name": "圣盾",
+      "tag": "稳定挡伤，积累失盾收益",
+      "color": "#82602c",
+      "icon": "divine-shield",
+      "summary": "一张盾就能使用固定碎盾伤害；更慢的余响、多人持盾和反伤提供不同上限。",
+      "team": [
+        {
+          "pieceId": "blue-tirion-fordring",
+          "name": "提里奥弗丁",
+          "image": "adventure/tirion-fordring.jpg",
+          "role": "队长",
+          "description": "开局圣盾，失盾时攻击力+1。"
+        },
+        {
+          "pieceId": "uther",
+          "name": "乌瑟尔",
+          "image": "adventure/uther.jpg",
+          "role": "初始队友",
+          "description": "圣光盾补盾，赐福利用场上圣盾。"
+        }
+      ],
+      "loop": [
+        "补盾挡伤",
+        "碎盾冲击过渡",
+        "反复失盾 / 维持盾阵",
+        "余响或誓约之剑"
+      ],
+      "pair": {
+        "fixed": "pve-shield-burst",
+        "scaling": "pve-shield-afterglow",
+        "label": "本场此前己方失盾次数",
+        "max": 10,
+        "initial": 0,
+        "steady": 8,
+        "base": 2,
+        "gain": 3,
+        "unit": "次",
+        "note": "两张都是1费，均移除施放者的圣盾。次数不含当前这次主动移除；比较的是“稳定8”与“2+3×次数”。"
+      },
+      "example": "固定碎盾冲击能尽早击杀威胁。余响同样需要移除一面盾，但初期弱得多；要靠乌瑟尔补盾、弗丁反复失盾，或者队友形成盾阵。",
+      "links": [
+        "莉亚德琳可把圣盾换成圣光卡，让两个体系交叉。",
+        "主动失盾与真正受伤分别记录，不能用失盾代替自残次数。"
+      ],
+      "questions": [
+        "“此前失盾次数”不含当前卡移除的盾；别把这一步偷偷加进试算。",
+        "重复给予已有圣盾的棋子圣盾，不会制造一次失盾。",
+        "供牌受10张总手牌限制；生成的余响战后清除。"
+      ],
+      "cardIds": [
+        "pve-shield-cover",
+        "pve-shield-burst",
+        "pve-shield-wall",
+        "pve-shield-formation",
+        "pve-shield-afterglow",
+        "pve-shield-oath",
+        "pve-shield-return",
+        "pve-shield-thorns",
+        "pve-shield-echo",
+        "pve-shield-polish"
+      ]
+    },
+    {
+      "id": "light",
+      "name": "圣光",
+      "tag": "前期直接用，后期靠用牌积累",
+      "color": "#776127",
+      "icon": "action-heal",
+      "summary": "固定裁决与治疗负责过渡；低伤害的箭、星火，以及恢复量相关卡负责成长。",
+      "team": [
+        {
+          "pieceId": "tyrande",
+          "name": "泰兰德",
+          "image": "adventure/tyrande.jpg",
+          "role": "队长",
+          "description": "生成圣光、增幅下一张，并通过月华治疗。"
+        },
+        {
+          "pieceId": "turalyon",
+          "name": "图拉扬",
+          "image": "adventure/turalyon.jpg",
+          "role": "初始队友",
+          "description": "定向生成普通圣光卡，首张普通圣光卡配合行军。"
+        }
+      ],
+      "loop": [
+        "固定伤害 / 治疗",
+        "棋子补充圣光卡",
+        "用牌与实际治疗累积",
+        "低基础卡反超"
+      ],
+      "pair": {
+        "fixed": "pve-light-verdict",
+        "scaling": "pve-light-arrow",
+        "label": "本场此前使用的圣光卡",
+        "max": 12,
+        "initial": 0,
+        "steady": 8,
+        "base": 2,
+        "gain": 2,
+        "unit": "张",
+        "note": "本版裁决与虔诚之箭都是1费、单次伤害的圣光卡。当前这张不计入“此前用牌”；对照不含泰兰德等共同增幅。"
+      },
+      "example": "不用先打出“虔诚能力”。虔诚之箭直接读取本场圣光用牌数量，本身打出一次就消耗。也能提前拿星火，牺牲早期伤害换后续副本的成长。",
+      "links": [
+        "普通圣光卡由现有棋子提供，天然推动次数型卡牌。",
+        "新牌有圣光标签，但不自动获得普通圣光卡专属强化或行军判定。",
+        "莉亚德琳提供额外供牌，不必让所有圣光队伍都依赖圣盾。"
+      ],
+      "questions": [
+        "当前卡的使用与治疗不提前算进自己的伤害或治疗。",
+        "泰兰德的增幅是外部配合，不决定一张卡属于即时还是成长。",
+        "星火、虔诚之箭等新卡不加入原有随机普通圣光卡池，供应另由奖励或遗物解决。"
+      ],
+      "cardIds": [
+        "pve-light-verdict",
+        "pve-light-comfort",
+        "pve-light-call",
+        "pve-light-burst",
+        "pve-light-arrow",
+        "pve-light-prayer",
+        "pve-light-spark",
+        "pve-light-moon",
+        "pve-light-overheal",
+        "pve-light-study"
+      ]
+    },
+    {
+      "id": "momentum",
+      "name": "动能",
+      "tag": "固定工具起步，跑动提高转化",
+      "color": "#3f666b",
+      "icon": "momentum-core",
+      "summary": "先用固定撞击、维修和移动卡渡过前期；积攒动能后，让释放、惯性与装甲获得高收益。",
+      "team": [
+        {
+          "pieceId": "sonic",
+          "name": "索尼克",
+          "image": "adventure/sonic.png",
+          "role": "队长",
+          "description": "每回合一次免费普通移动，动能强化原有技能。"
+        },
+        {
+          "pieceId": "tails",
+          "name": "塔尔斯",
+          "image": "adventure/tails.png",
+          "role": "初始队友",
+          "description": "动能强化治疗与支援，装甲提供配合。"
+        }
+      ],
+      "loop": [
+        "固定撞击过渡",
+        "普通移动积攒",
+        "选择释放或保留",
+        "惯性与转化收益"
+      ],
+      "pair": {
+        "fixed": "pve-momentum-hit",
+        "scaling": "pve-momentum-release",
+        "label": "释放前当前动能",
+        "max": 24,
+        "initial": 0,
+        "steady": 8,
+        "base": 0,
+        "gain": 1,
+        "step": 2,
+        "unit": "点",
+        "note": "两张都是1费单次伤害。撞击固定8；释放消耗全部动能，每完整2点造成2伤害，还要承担放弃原有技能动能加成的代价。"
+      },
+      "example": "有免费移动，不等于一开始就有很多动能。音速撞击解决第一波敌人；动能释放起点为0，必须花时间跑动或获得更多移动机会，才值得选它。",
+      "links": [
+        "疾行有固定3格的即时价值，动能收益来自棋子原有核心。",
+        "普通移动可配合游击包抄；瞬移与图拉扬行军不自动视为普通移动。",
+        "塔尔斯的支援让存动能也有用途，释放并非唯一正确操作。"
+      ],
+      "questions": [
+        "原有动能按实际普通移动获得；本页不凭空增加探索阶段的收益。",
+        "当前动能在释放后清零，但累计获得计数不会因此倒退。",
+        "里程碑的移动仍要遵循障碍与合法落点，不是逐次增长的无条件传送。"
+      ],
+      "cardIds": [
+        "pve-momentum-hit",
+        "pve-momentum-step",
+        "pve-momentum-repair",
+        "pve-momentum-brake",
+        "pve-momentum-release",
+        "pve-momentum-inertia",
+        "pve-momentum-armor",
+        "pve-momentum-recovery",
+        "pve-momentum-mile",
+        "pve-momentum-flywheel"
+      ]
+    },
+    {
+      "id": "pressure",
+      "name": "灵压",
+      "tag": "小攻差能过渡，大攻差才爆发",
+      "color": "#675576",
+      "icon": "damage-multiplier",
+      "summary": "固定破道在刚够灵压门槛时更强；低基础灵压弹、压制与归刃配合提供后期空间。",
+      "team": [
+        {
+          "pieceId": "dark-aizen",
+          "name": "蓝染惣右介",
+          "image": "adventure/aizen.jpg",
+          "role": "队长",
+          "description": "瞬步调整位置并获得临时行动点；黑棺负责伤害。"
+        },
+        {
+          "pieceId": "dark-ulquiorra",
+          "name": "乌尔奇奥拉",
+          "image": "adventure/ulquiorra.jpg",
+          "role": "初始队友",
+          "description": "受伤和伤害推进归刃，获得黑虚闪。"
+        }
+      ],
+      "loop": [
+        "增攻 / 侵蚀开门",
+        "固定破道过渡",
+        "提高攻击差或归刃",
+        "高系数卡兑现"
+      ],
+      "pair": {
+        "fixed": "pve-pressure-hado",
+        "scaling": "pve-pressure-bolt",
+        "label": "施放者攻击力 − 目标攻击力",
+        "max": 10,
+        "initial": 1,
+        "steady": 8,
+        "base": 0,
+        "gain": 2,
+        "gate": true,
+        "unit": "点",
+        "note": "两张都是1费、同样受灵压限制的单次伤害牌。攻击差必须大于0；相等或更低时两张都不能对该目标使用。"
+      },
+      "example": "只比敌人高1攻击时，破道打8，灵压弹只打2；高6攻击时，破道仍打8，灵压弹变为12。成长来自投入攻击差和卡牌系数，不是“持续能力”这个形式。",
+      "links": [
+        "蓝染的瞬步能安排出牌位置和行动点，但不会凭空增加灵压伤害动作计数。",
+        "乌尔奇奥拉可通过原有伤害、再生、变身获得归刃余波收益。",
+        "自残和减攻都是可选配套，不要求灵压队必须跨体系才能起步。"
+      ],
+      "questions": [
+        "灵压始终比较当前攻击，目标必须严格更低。",
+        "归刃余波按完成的伤害动作计数，当前这张不提前给自己加数。",
+        "所有新卡名称为草案，不将以前临时拟的“威压”当作现有关键词。"
+      ],
+      "cardIds": [
+        "pve-pressure-hado",
+        "pve-pressure-focus",
+        "pve-pressure-seal",
+        "pve-pressure-erode",
+        "pve-pressure-bolt",
+        "pve-pressure-crush",
+        "pve-pressure-grow",
+        "pve-pressure-resurge",
+        "pve-pressure-study",
+        "pve-pressure-return"
+      ]
+    },
+    {
+      "id": "skirmish",
+      "name": "游击",
+      "tag": "先有稳定火力，再投资交火位置",
+      "color": "#587054",
+      "icon": "action-move",
+      "summary": "掩护射击和机动卡拿来就能用；交叉火力、包抄与校准需要命中、站位或多场投入。",
+      "team": [
+        {
+          "pieceId": "tracer",
+          "name": "猎空",
+          "image": "adventure/tracer.jpg",
+          "role": "队长",
+          "description": "敌人移动或用技能后，近处目标可能被脉冲手枪命中。"
+        },
+        {
+          "pieceId": "ana",
+          "name": "安娜",
+          "image": "adventure/ana.jpg",
+          "role": "初始队友",
+          "description": "治疗稳住队伍，睡眠和激素创造机会。"
+        }
+      ],
+      "loop": [
+        "掩护射击过渡",
+        "移动布置交火位置",
+        "被动命中 / 队友靠近",
+        "交叉火力或包抄"
+      ],
+      "pair": {
+        "fixed": "pve-skirmish-cover",
+        "scaling": "pve-skirmish-fire",
+        "label": "本场己方被动命中该目标的次数",
+        "max": 10,
+        "initial": 0,
+        "steady": 8,
+        "base": 2,
+        "gain": 3,
+        "unit": "次",
+        "note": "两张都是1费、3格单体伤害。交叉火力读取这个目标此前真正受到的被动伤害，不是敌人移动格数，也不是全场任意目标。"
+      },
+      "example": "刚接战时，用固定8伤害清理危险目标更可靠。要让交叉火力超过它，需要猎空站得住、被动命中同一目标；包抄则把投入转移到队友数量和位置。",
+      "links": [
+        "机动牌给索尼克等棋子使用时，也可能通过原有普通移动获得动能。",
+        "猎空被动可能打醒安娜的睡眠目标，需要取舍控场与输出。",
+        "敌人的实际程序行动决定被动机会，不能假设每轮稳定触发若干次。"
+      ],
+      "questions": [
+        "交叉火力按目标分别计数；死亡目标的记录不会转移给新敌人。",
+        "被动的多目标伤害按一次动作计供牌，但可以为各受伤目标分别登记命中。",
+        "包抄不计施放者本人；多名队友贡献合并为一次伤害。"
+      ],
+      "cardIds": [
+        "pve-skirmish-cover",
+        "pve-skirmish-step",
+        "pve-skirmish-aid",
+        "pve-skirmish-smoke",
+        "pve-skirmish-fire",
+        "pve-skirmish-flank",
+        "pve-skirmish-pursuit",
+        "pve-skirmish-net",
+        "pve-skirmish-calibrate",
+        "pve-skirmish-recycle"
+      ]
+    }
+  ]
+}

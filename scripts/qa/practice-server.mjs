@@ -21,7 +21,7 @@ http.createServer((req, res) => {
     if (pathname.split('/').some(part => part === '..') || pathname.includes('\\')) throw new Error('invalid path')
     const candidates = [path.join(root, 'data/pages', pathname),
       ...(pathname.startsWith('data/') ? [path.join(root, pathname)] : []),
-      ...(pathname.startsWith('images/') ? [path.join(root, 'public', pathname.slice(7))] : [])]
+      ...(pathname.startsWith('images/') ? [path.join(root, 'public', pathname), path.join(root, 'public', pathname.slice(7))] : [])]
     const target = candidates.find(file => fs.existsSync(file) && fs.statSync(file).isFile())
     if (!target) { res.writeHead(404); res.end('Not found'); return }
     res.setHeader('Content-Type', contentTypes[path.extname(target)] || 'application/octet-stream')

@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto'
 import { resolve } from 'node:path'
 
 import { describe, expect, it, vi } from 'vitest'
+import { isContentAvailable } from '@/lib/game/content-availability'
 
 const TRIGGER_OK = { success: true, messages: [], blocked: false }
 vi.mock('@/lib/game/triggers', () => ({
@@ -532,8 +533,10 @@ describe('authoritative target preparation', () => {
 
 describe('Demo targeting admission fixture', () => {
   it('covers the current admitted piece, skill, and card manifests with a stable preparation hash', () => {
-    const pieceIds = JSON.parse(readFileSync(resolve(process.cwd(), 'data/pieces/manifest.json'), 'utf8')) as string[]
-    const cardIds = JSON.parse(readFileSync(resolve(process.cwd(), 'data/cards/manifest.json'), 'utf8')) as string[]
+    const admitted = (kind: string) => (JSON.parse(readFileSync(resolve(process.cwd(), `data/${kind}/manifest.json`), 'utf8')) as string[])
+      .filter(id => isContentAvailable(JSON.parse(readFileSync(resolve(process.cwd(), `data/${kind}/${id}.json`), 'utf8')), 'pvp'))
+    const pieceIds = admitted('pieces')
+    const cardIds = admitted('cards')
     const skillIds = [...new Set(pieceIds.flatMap(pieceId => {
       const piece = JSON.parse(readFileSync(resolve(process.cwd(), `data/pieces/${pieceId}.json`), 'utf8'))
       return (piece.skills || []).map((skill: { skillId: string }) => skill.skillId)

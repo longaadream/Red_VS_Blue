@@ -26,6 +26,7 @@ const server = createServer((request, response) => {
   const candidates = relative.startsWith('data/') ? [{ base: root, relative }] : [
     { base: resolve(root, 'data/pages'), relative },
     { base: resolve(root, 'public'), relative: portraitRelative },
+    { base: resolve(root, 'public'), relative },
   ]
   const bases = candidates
   const file = bases.map(({ base, relative: path }) => ({ base, file: resolve(base, path) })).find(({ base, file }) =>

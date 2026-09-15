@@ -1,3 +1,4 @@
+import { assertAdventurePosition } from './adventure-boundary'
 import { assertAuthorizedPositions, writePiecePosition } from './position-write-guard'
 import type { BattleState } from './turn'
 import { BattleRuleError } from './battle-types'
@@ -43,6 +44,7 @@ export function changePiecePositions(battle: BattleState, changes: readonly Piec
   for (const entry of prepared) {
     const piece = before.find(p => p!.instanceId === entry.pieceId)!
     if (!battle.pieces.includes(piece) || piece.currentHp <= 0) return cancel('位移棋子已失效')
+    assertAdventurePosition(battle, piece, entry.to.x, entry.to.y)
     const rejection = getPositionChangeRejection(piece, kind)
     if (rejection) return cancel(rejection)
     const context: TriggerContext = { type: 'beforePiecePositionChange', sourcePiece: piece, playerId: piece.ownerPlayerId,
@@ -57,6 +59,7 @@ export function changePiecePositions(battle: BattleState, changes: readonly Piec
   for (const entry of prepared) {
     const piece = battle.pieces.find(p => p.instanceId === entry.pieceId)
     if (!piece || !before.includes(piece) || piece.currentHp <= 0 || piece.x !== entry.from.x || piece.y !== entry.from.y) return cancel('前置反应使位移起点失效')
+    assertAdventurePosition(battle, piece, entry.to.x, entry.to.y)
     const reason = getPositionChangeRejection(piece, kind)
     if (reason) return cancel(reason)
     const key = `${entry.to.x},${entry.to.y}`

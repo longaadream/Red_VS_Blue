@@ -1,0 +1,27 @@
+{
+  "id": "pve-arrow",
+  "name": "弓箭射击",
+  "description": "弹射物。沿预告方向，对路径上4格内的第1个敌方目标造成等同攻击力的伤害。",
+  "kind": "active",
+  "type": "normal",
+  "range": "self",
+  "cooldownTurns": 0,
+  "maxCharges": 0,
+  "powerMultiplier": 1,
+  "actionPointCost": 0,
+  "icon": "➶",
+  "targeting": {
+    "steps": []
+  },
+  "keywords": [
+    "弹射物"
+  ],
+  "previewCode": "function calculatePreview(piece,skillDef) { return {description:skillDef.description,expectedValues:{damage:piece.attack}}; }",
+  "code": "function executeSkill(context) {\n    var source=context.piece, world=battle.extensions.adventureWorld, plan=world.plans && world.plans[0];\n    if(!plan || plan.sourceId!==source.instanceId || plan.kind!=='attack' || source.x!==plan.origin.x || source.y!==plan.origin.y) return {success:false,message:'预告计划已失效'};\n    for(var i=0;i<plan.cells.length;i++) {\n      var cell=plan.cells[i],tile=battle.map.tiles.find(function(t){return t.x===cell.x&&t.y===cell.y;});\n      if(!tile || tile.props.bulletPassable===false)break;\n      var target=battle.pieces.find(function(p){return p.currentHp>0&&p.x===cell.x&&p.y===cell.y;});\n      if(target) {\n        if(target.ownerPlayerId!==source.ownerPlayerId) dealDamage(source,target,source.attack,'physical',battle,context.skill.id);\n        return {success:true,message:source.name+'执行弓箭射击'};\n      }\n    }\n    return {success:true,message:source.name+'的弓箭射击落空'};\n  }",
+  "availability": {
+    "modes": [
+      "pve"
+    ],
+    "status": "ready"
+  }
+}

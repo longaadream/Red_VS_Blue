@@ -1,0 +1,24 @@
+{
+  "id": "pve-skirmish-smoke",
+  "name": "烟幕",
+  "description": "使两个相邻友方各获得4点护盾。",
+  "type": "active",
+  "actionPointCost": 1,
+  "availability": {
+    "modes": [
+      "pve"
+    ],
+    "status": "draft"
+  },
+  "design": {
+    "familyId": "skirmish",
+    "handbookId": "skirmish-smoke",
+    "curve": "ready",
+    "role": "防护",
+    "duration": "至你的下回合开始",
+    "start": "总护盾8",
+    "end": "总护盾8",
+    "condition": "保护结伴行动的队友，分摊固定防护。",
+    "note": ""
+  }
+}

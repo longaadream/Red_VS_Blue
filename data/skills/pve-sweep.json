@@ -1,0 +1,25 @@
+{
+  "id": "pve-sweep",
+  "name": "横扫",
+  "description": "对相邻预告格内的所有敌方目标造成等同攻击力的伤害。",
+  "kind": "active",
+  "type": "normal",
+  "range": "self",
+  "cooldownTurns": 0,
+  "maxCharges": 0,
+  "powerMultiplier": 1,
+  "actionPointCost": 0,
+  "icon": "⚔",
+  "targeting": {
+    "steps": []
+  },
+  "keywords": [],
+  "previewCode": "function calculatePreview(piece,skillDef) { return {description:skillDef.description,expectedValues:{damage:piece.attack}}; }",
+  "code": "function executeSkill(context) { var source=context.piece,plan=battle.extensions.adventureWorld.plans[0]; if(!plan||plan.sourceId!==source.instanceId||plan.kind!=='attack'||source.x!==plan.origin.x||source.y!==plan.origin.y)return {success:false,message:'预告计划已失效'}; for(var i=0;i<plan.cells.length;i++){var cell=plan.cells[i],target=battle.pieces.find(function(p){return p.currentHp>0&&p.ownerPlayerId!==source.ownerPlayerId&&p.x===cell.x&&p.y===cell.y;});if(target)dealDamage(source,target,source.attack,'physical',battle,context.skill.id);}return {success:true,message:source.name+'执行横扫'}; }",
+  "availability": {
+    "modes": [
+      "pve"
+    ],
+    "status": "ready"
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "id": "pve-skirmish-recycle",
+  "name": "弹药回收",
+  "description": "生成1张临时【交叉火力】；本回合己方每通过被动击败1个敌人，额外生成1张。",
+  "type": "active",
+  "actionPointCost": 1,
+  "availability": {
+    "modes": [
+      "pve"
+    ],
+    "status": "draft"
+  },
+  "design": {
+    "familyId": "skirmish",
+    "handbookId": "skirmish-recycle",
+    "curve": "growth",
+    "role": "供牌",
+    "duration": "一次结算",
+    "start": "1张低基础牌",
+    "end": "4张",
+    "condition": "本回合被动击败3个敌人。",
+    "note": "会占用手牌与行动点；生成卡本身不会反过来触发被动计数。"
+  }
+}

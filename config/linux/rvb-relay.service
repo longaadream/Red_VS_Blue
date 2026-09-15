@@ -1,0 +1,20 @@
+[Unit]
+Description=Red vs Blue player room relay
+After=network.target
+[Service]
+User=rvb
+Group=rvb
+WorkingDirectory=/opt/rvb/relay-v1
+Environment=HOST=127.0.0.1
+Environment=PORT=8080
+Environment=RVB_RELAY_PUBLIC_ORIGIN=https://play.redvsblue.top
+Environment=RVB_RELAY_TRUSTED_PROXIES=127.0.0.1,::1
+ExecStart=/opt/rvb/runtime/node-v24.21.0-linux-x64/bin/node /opt/rvb/relay-v1/relay.mjs
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+[Install]
+WantedBy=multi-user.target

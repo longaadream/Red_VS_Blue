@@ -1,0 +1,31 @@
+{
+  "id": "pve-stormtrooper",
+  "name": "帝国冲锋队员",
+  "description": "《星球大战》 · 远程封路",
+  "faction": "evil",
+  "rarity": "rare",
+  "image": "adventure/stormtrooper.svg",
+  "stats": {
+    "maxHp": 14,
+    "attack": 4,
+    "defense": 0,
+    "moveRange": 3
+  },
+  "skills": [
+    {
+      "skillId": "pve-blaster"
+    },
+    {
+      "skillId": "pve-overwatch"
+    }
+  ],
+  "rules": [
+    "rule-pve-overwatch"
+  ],
+  "availability": {
+    "modes": [
+      "pve"
+    ],
+    "status": "ready"
+  }
+}

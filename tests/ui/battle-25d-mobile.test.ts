@@ -154,7 +154,7 @@ describe('RED-68 renderer and responsive UI contract', () => {
     expect(renderer).toMatch(/function _handleClick[\s\S]*?screenToCell/)
     expect(renderer).toMatch(/const hitRadius = Math\.max\(22,/)
     expect(renderer).toContain('factionMarkers')
-    expect(renderer).toContain('TacticalGeometry.factionMarkerPattern')
+    expect(renderer).toContain('marker.visible = false')
   })
 
   it('centralizes tactical tokens and provides playable portrait, landscape, safe-area, and target-mode layouts', () => {

@@ -1,0 +1,24 @@
+{
+  "id": "pve-momentum-brake",
+  "name": "急刹",
+  "description": "使一个友方获得8点护盾，本回合不能再进行普通移动。",
+  "type": "active",
+  "actionPointCost": 1,
+  "availability": {
+    "modes": [
+      "pve"
+    ],
+    "status": "draft"
+  },
+  "design": {
+    "familyId": "momentum",
+    "handbookId": "momentum-brake",
+    "curve": "ready",
+    "role": "防护",
+    "duration": "护盾至你的下回合开始",
+    "start": "护盾8",
+    "end": "护盾8",
+    "condition": "用当下的跑动机会换固定防护。",
+    "note": ""
+  }
+}

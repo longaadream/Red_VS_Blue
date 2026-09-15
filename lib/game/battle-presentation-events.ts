@@ -99,6 +99,8 @@ export interface BattlePresentationEvent {
   actorPlayerId?: string
   sourcePieceId?: string
   skillId?: string
+  causePath?: Array<{ id: string; sourcePieceId?: string; actorPlayerId?: string; skillId?: string; ruleId?: string; label?: string }>
+  historyChainId?: string
   cardId?: string
   ruleId?: string
   targetPieceIds?: string[]
@@ -763,7 +765,11 @@ function handDrafts(command: Record<string, unknown>, beforeState: BattleState, 
     const beforeCards = new Map(previous.hand.map(card => [card.instanceId, card]))
     const afterCards = new Map(player.hand.map(card => [card.instanceId, card]))
     for (const card of [...previous.hand].sort((left, right) => left.instanceId.localeCompare(right.instanceId))) {
-      if (!afterCards.has(card.instanceId)) drafts.push(make('cardDiscarded', 'action-card-discard', player.playerId))
+      if (!afterCards.has(card.instanceId)) {
+        const draft = make('cardDiscarded', 'action-card-discard', player.playerId)
+        if (command.type === 'playCard' && command.cardInstanceId === card.instanceId) draft.result = { count: 1, consumedByPlay: true }
+        drafts.push(draft)
+      }
     }
     for (const card of [...player.hand].sort((left, right) => left.instanceId.localeCompare(right.instanceId))) {
       const previousCard = beforeCards.get(card.instanceId)
@@ -997,12 +1003,15 @@ export function projectBattlePresentationEvents(
   // Announce only the responding skill's identity to its chooser, never its
   // candidates or options. Its eventual resolution remains a separate action.
   children.push(...pendingSkillDrafts(input.beforeState, input.afterState, root.sourcePieceId))
+  const transaction = (input.beforeState.pendingOptionSelection ?? input.beforeState.pendingTargetSelection)?.transaction ?? awaiting?.transaction
+  const historyChainId = transaction ? 'pending:' + transaction.baseTargetingRevision : undefined
   const rootEventId = `${actionId}:0`
   return [root, ...children].map((draft, sequence) => ({
     eventId: `${actionId}:${sequence}`,
     rootEventId,
     ...(sequence > 0 ? { parentEventId: rootEventId } : {}),
     actionId,
+    ...(historyChainId ? { historyChainId } : {}),
     sequence,
     ...draft,
     history: historyContext(draft, input.beforeState, input.afterState),
@@ -1059,6 +1068,7 @@ export function projectBattlePresentationEventsForViewer(
         eventId: event.eventId,
         rootEventId: event.rootEventId,
         actionId: event.actionId,
+        historyChainId: event.historyChainId,
         sequence: event.sequence,
         kind: event.kind,
         iconId: event.iconId,

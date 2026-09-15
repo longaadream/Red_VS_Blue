@@ -1,0 +1,24 @@
+{
+  "id": "pve-shield-return",
+  "name": "回光",
+  "description": "使一个友方恢复1点生命；本场己方每失去1个圣盾，额外恢复2点。",
+  "type": "active",
+  "actionPointCost": 1,
+  "availability": {
+    "modes": [
+      "pve"
+    ],
+    "status": "draft"
+  },
+  "design": {
+    "familyId": "shield",
+    "handbookId": "shield-return",
+    "curve": "growth",
+    "role": "治疗",
+    "duration": "一次结算",
+    "start": "恢复1",
+    "end": "恢复13",
+    "condition": "本场失盾6次。",
+    "note": ""
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "id": "pve-overwatch",
+  "name": "警戒射击",
+  "description": "弹射物。敌方棋子移动后，若停在本棋子四方向5格内，对其造成等同攻击力的伤害。每个玩家回合限1次。",
+  "kind": "passive",
+  "type": "normal",
+  "range": "self",
+  "cooldownTurns": 0,
+  "maxCharges": 0,
+  "powerMultiplier": 1,
+  "actionPointCost": 0,
+  "icon": "⚔",
+  "targeting": {
+    "steps": []
+  },
+  "keywords": [
+    "弹射物"
+  ],
+  "previewCode": "function calculatePreview(piece,skillDef) { return {description:skillDef.description,expectedValues:{damage:piece.attack}}; }",
+  "code": "function executeSkill(context){var source=context.rulePiece,target=context.sourcePiece,world=battle.extensions.adventureWorld;if(!source||!target||!world||source.currentHp<=0||target.currentHp<=0||source.x===null||target.x===null||arePlayersAllied(battle,source.ownerPlayerId,target.ownerPlayerId)||battle.turn.currentPlayerId===source.ownerPlayerId)return {success:false,message:''};var zone=world.coop?Object.values(world.coop.encounters).find(function(z){return z.enemyIds.includes(source.instanceId);}):world.activeEnemyIds.includes(source.instanceId)?world.activeZone:null;if(!zone||target.x<zone.x||target.y<zone.y||target.x>=zone.x+zone.width||target.y>=zone.y+zone.height)return {success:false,message:''};if(source.x!==target.x&&source.y!==target.y)return {success:false,message:''};var distance=Math.abs(source.x-target.x)+Math.abs(source.y-target.y);if(distance<1||distance>5)return {success:false,message:''};source.contentState=source.contentState||{};if(source.contentState.pveOverwatchTurn===battle.turn.turnNumber)return {success:false,message:''};var dx=Math.sign(target.x-source.x),dy=Math.sign(target.y-source.y);for(var n=1;n<=distance;n++){var x=source.x+dx*n,y=source.y+dy*n,t=battle.map.tiles.find(function(t){return t.x===x&&t.y===y;});if(!t||t.props.bulletPassable===false)return {success:false,message:''};var hit=battle.pieces.find(function(p){return p.currentHp>0&&p.x===x&&p.y===y;});if(hit&&hit.instanceId!==target.instanceId)return {success:false,message:''};}source.contentState.pveOverwatchTurn=battle.turn.turnNumber;dealDamage(source,target,source.attack,'physical',battle,'pve-overwatch');return {success:true,message:source.name+'发动警戒射击'};}",
+  "availability": {
+    "modes": [
+      "pve"
+    ],
+    "status": "ready"
+  }
+}

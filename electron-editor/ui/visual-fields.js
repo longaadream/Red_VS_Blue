@@ -155,6 +155,35 @@
       function refresh() {
         container.replaceChildren()
         if (catalog.errors?.length) container.append(element('p', `部分目录读取失败：${catalog.errors.join('；')}`, 'vf-error'))
+        if (['pieces', 'cards', 'skills', 'maps', 'rules'].includes(subdir)) {
+          const draft = getDraft(), node = section('可用模式', 'availability')
+          const availability = draft.availability
+          if (availability && (!Array.isArray(availability.modes) || !['ready', 'draft'].includes(availability.status))) problem(node)
+          else {
+            const select = element('select'); select.setAttribute('aria-label', '可用模式')
+            for (const [value, label] of [['pvp,pve', 'PVP 与 PVE'], ['pvp', '仅 PVP'], ['pve', '仅 PVE']]) {
+              const option = element('option', label); option.value = value; select.append(option)
+            }
+            select.value = availability?.modes.length === 1 ? availability.modes[0] : 'pvp,pve'
+            select.onchange = () => commit('availability', { ...availability, modes: select.value.split(','), status: availability?.status || 'ready' })
+            const status = element('select'); status.setAttribute('aria-label', '内容状态')
+            for (const [value, label] of [['ready', '可用'], ['draft', '草案（不可上场）']]) { const option = element('option', label); option.value = value; status.append(option) }
+            status.value = availability?.status || 'ready'
+            status.onchange = () => commit('availability', { ...availability, modes: availability?.modes || ['pvp', 'pve'], status: status.value })
+            node.append(select, status)
+          }
+        }
+        if (subdir === 'cards' && getDraft().adventurePower !== undefined) {
+          const power = getDraft().adventurePower, node = section('PVE 卡牌威力', 'adventurePower')
+          if (!power || typeof power.baseDamage !== 'number' || typeof power.usesGrowth !== 'boolean') problem(node)
+          else {
+            const base = element('input'); base.type = 'number'; base.min = '0'; base.step = 'any'; base.value = power.baseDamage; base.setAttribute('aria-label', '基础威力')
+            base.onchange = () => { if (base.value !== '' && base.checkValidity()) commit('adventurePower', { ...power, baseDamage: Number(base.value) }) }
+            const label = element('label', '使用同名牌成长'), growth = element('input'); growth.type = 'checkbox'; growth.checked = power.usesGrowth
+            growth.onchange = () => commit('adventurePower', { ...power, usesGrowth: growth.checked })
+            label.append(growth); node.append(base, label)
+          }
+        }
         if (subdir === 'pieces') {
           associations()
           ruleAssociations('rules', '棋子规则', '作用于这枚棋子的可执行规则。')

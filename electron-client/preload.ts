@@ -3,6 +3,7 @@ import { contextBridge, ipcRenderer, webUtils } from 'electron'
 contextBridge.exposeInMainWorld('electronAPI', {
   getOfficialUpdateStatus: () => ipcRenderer.invoke('official-update-status'),
   checkOfficialUpdates: () => ipcRenderer.invoke('official-update-check'),
+  enterAfterUpdateCheck: () => ipcRenderer.invoke('official-update-enter'),
   setAutomaticUpdates: (enabled: boolean) => ipcRenderer.invoke('official-update-automatic', enabled),
   setOfficialUpdateSource: (source: string) => ipcRenderer.invoke('official-update-source', source),
   installClientUpdate: () => ipcRenderer.invoke('official-update-install'),

@@ -1,0 +1,24 @@
+{
+  "id": "pve-pressure-focus",
+  "name": "凝聚灵压",
+  "description": "使一个友方攻击力+3。",
+  "type": "active",
+  "actionPointCost": 1,
+  "availability": {
+    "modes": [
+      "pve"
+    ],
+    "status": "draft"
+  },
+  "design": {
+    "familyId": "pressure",
+    "handbookId": "pressure-focus",
+    "curve": "ready",
+    "role": "增攻",
+    "duration": "本回合",
+    "start": "攻击+3",
+    "end": "攻击+3",
+    "condition": "稳定打开更多灵压目标；不随使用次数增强。",
+    "note": ""
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "id": "pve-light-burst",
+  "name": "光耀",
+  "description": "对一个友方周围3×3范围内的所有敌人各造成4点伤害。",
+  "type": "active",
+  "actionPointCost": 2,
+  "availability": {
+    "modes": [
+      "pve"
+    ],
+    "status": "draft"
+  },
+  "design": {
+    "familyId": "light",
+    "handbookId": "light-burst",
+    "curve": "ready",
+    "role": "范围伤害",
+    "duration": "一次结算",
+    "start": "每人4",
+    "end": "每人4",
+    "condition": "伤害固定，适合清理聚集的小兵。",
+    "note": "命中人数是场景收益，不是永久成长。"
+  }
+}

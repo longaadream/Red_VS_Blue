@@ -1,0 +1,24 @@
+{
+  "id": "pve-pressure-bolt",
+  "name": "灵压弹",
+  "description": "灵压。一个友方对3格内一个敌人造成伤害，数值为双方攻击力差×2。",
+  "type": "active",
+  "actionPointCost": 1,
+  "availability": {
+    "modes": [
+      "pve"
+    ],
+    "status": "draft"
+  },
+  "design": {
+    "familyId": "pressure",
+    "handbookId": "pressure-bolt",
+    "curve": "growth",
+    "role": "伤害",
+    "duration": "一次结算",
+    "start": "2伤害",
+    "end": "12伤害",
+    "condition": "攻击差从1扩大到6。",
+    "note": "去掉原先偏高的攻击力保底，让它真的有前期代价。"
+  }
+}

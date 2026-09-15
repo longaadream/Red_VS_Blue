@@ -1,0 +1,24 @@
+{
+  "id": "pve-pressure-study",
+  "name": "灵压修炼",
+  "description": "你的【灵压弹】每1点攻击力差对应的伤害+1。",
+  "type": "active",
+  "actionPointCost": 2,
+  "availability": {
+    "modes": [
+      "pve"
+    ],
+    "status": "draft"
+  },
+  "design": {
+    "familyId": "pressure",
+    "handbookId": "pressure-study",
+    "curve": "growth",
+    "role": "投入养成",
+    "duration": "本次冒险",
+    "start": "当前0伤害",
+    "end": "同样攻差6：12→24",
+    "condition": "投入两张修炼；不影响原有黑棺、黑虚闪。",
+    "note": ""
+  }
+}

@@ -452,3 +452,22 @@ async function availablePort(): Promise<number> {
   await new Promise<void>((resolve, reject) => probe.close(error => error ? reject(error) : resolve()))
   return port
 }
+
+it('explicit departure releases admission before the old socket closes', async () => {
+  const candidate = createColyseusBattleServer({ repository: new FakeAuthorityRepository() })
+  const port = await availablePort()
+  await candidate.server.listen(port, '127.0.0.1')
+  const sdk = new ColyseusClient(`ws://127.0.0.1:${port}`)
+  const profileIdentity = getServerGameProfileIdentityV1()
+  const options = { product:true, playerId:'leave-test', playerName:'Tester', profileIdentity, mapId:'open-expanse', visibility:'public' }
+  const old = await sdk.create('battle', options)
+  let next: ColyseusClientRoom | undefined
+  try {
+    await requestRoomRpc(old, 'rooms.action', { action:'leave', playerId:options.playerId, profileIdentity })
+    next = await sdk.joinById(old.roomId, options)
+    const room = await requestRoomRpc(next, 'rooms.get', { roomId:old.roomId })
+    expect(room.players).toHaveLength(1)
+    await old.leave()
+    await expect(requestRoomRpc(next, 'rooms.get', { roomId:old.roomId })).resolves.toMatchObject({id:old.roomId})
+  } finally { if(old.connection.isOpen) await old.leave(); if(next) await next.leave(); await candidate.server.gracefullyShutdown(false) }
+}, 20000)

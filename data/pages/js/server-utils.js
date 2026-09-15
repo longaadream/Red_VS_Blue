@@ -236,6 +236,8 @@
     var url = getServerUrl()
     if (mode) params.set('server', mode)
     if (url) params.set('serverUrl', url)
+    var context = new URLSearchParams(window.location.search).get('lobbyContext')
+    if (context === 'public' || context === 'lan') params.set('lobbyContext', context)
     return params
   }
 

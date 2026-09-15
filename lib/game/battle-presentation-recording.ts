@@ -14,12 +14,12 @@ import type { BattlePresentationEvent } from './battle-presentation-events'
 import { snapshotBattlePresentationStatuses, diffBattlePresentationStatuses, snapshotBattlePresentationTileEffects, diffBattlePresentationTileEffects } from './battle-presentation-events'
 
 type Draft = Omit<BattlePresentationEvent, 'eventId' | 'rootEventId' | 'parentEventId' | 'actionId' | 'sequence'>
-type Source = Pick<Draft, 'sourcePieceId' | 'actorPlayerId' | 'skillId' | 'ruleId' | 'label'>
+type Source = Pick<Draft, 'sourcePieceId' | 'actorPlayerId' | 'skillId' | 'ruleId' | 'label' | 'causePath'>
 type PieceFrame = { id: string; x?: number | null; y?: number | null; hp: number; appearance?: Draft['pieceSnapshot'] }
 export type PresentationBatchKind = 'statusAdded' | 'statusRemoved' | 'tileEffectAdded' | 'tileEffectRemoved'
 type PresentationBatch = { kind: PresentationBatchKind; id: string }
 type SkillMetadata = Pick<SkillDefinition, 'name' | 'concealTargetInBattleLog'>
-type Recording = { pieces: Map<string, PieceFrame>; statuses: ReturnType<typeof snapshotBattlePresentationStatuses>; tiles: ReturnType<typeof snapshotBattlePresentationTileEffects>; events: Draft[]; skills: Map<string, SkillMetadata>; source: Source; batch?: PresentationBatch; batchSequence: number }
+type Recording = { pieces: Map<string, PieceFrame>; statuses: ReturnType<typeof snapshotBattlePresentationStatuses>; tiles: ReturnType<typeof snapshotBattlePresentationTileEffects>; events: Draft[]; skills: Map<string, SkillMetadata>; source: Source; batch?: PresentationBatch; batchSequence: number; sourceSequence: number }
 let active: Recording | undefined
 const recordings = new WeakMap<BattleState, Draft[]>()
 const resolvedSkills = new WeakMap<BattleState, Map<string, SkillMetadata>>()
@@ -33,7 +33,7 @@ function pieces(state: BattleState): Map<string, PieceFrame> {
 /** Synchronous, opt-in observation only. No state fields, RNG, logs or timers. */
 export function recordBattlePresentation<T>(before: BattleState, run: () => T, stateOf: (result: T) => BattleState): T {
   const previous = active
-  const recording: Recording = { pieces: pieces(before), statuses: snapshotBattlePresentationStatuses(before), tiles: snapshotBattlePresentationTileEffects(before), events: [], skills: new Map(), source: {}, batchSequence: 0 }
+  const recording: Recording = { pieces: pieces(before), statuses: snapshotBattlePresentationStatuses(before), tiles: snapshotBattlePresentationTileEffects(before), events: [], skills: new Map(), source: {}, batchSequence: 0, sourceSequence: 0 }
   active = recording
   try {
     const result = run()
@@ -65,7 +65,7 @@ export function recordedSkillPresentation(state: BattleState, skillId: string): 
 
 export function recordBattlePresentationBlock(source: Source, targetId: string, absorbed: number, blocked: boolean): void {
   if (!active || (!blocked && absorbed <= 0)) return
-  active.events.push({ ...source, kind: 'block', iconId: 'action-block', targetPieceIds: [targetId],
+  active.events.push({ ...active.source, ...source, kind: 'block', iconId: 'action-block', targetPieceIds: [targetId],
     result: { absorbed, blocked }, complement: { kind: 'amount', amount: absorbed }, priority: 90, skippable: true })
 }
 
@@ -108,7 +108,7 @@ export function createBattlePresentationQueue(state: BattleState) {
 export function checkpointBattlePresentation(state: BattleState, batch?: { kind: 'damage' | 'heal'; id: string } & Source): void {
   if (!active) return
   const next = pieces(state)
-  const source: Source = batch ? { sourcePieceId: batch.sourcePieceId, actorPlayerId: batch.actorPlayerId, skillId: batch.skillId } : active.source
+  const source: Source = batch ? { ...active.source, sourcePieceId: batch.sourcePieceId, actorPlayerId: batch.actorPlayerId, skillId: batch.skillId } : active.source
   for (const p of next.values()) {
     const old = active.pieces.get(p.id)
     if (!old) {
@@ -155,9 +155,10 @@ export function withBattlePresentationSource<T>(state: BattleState, source: Sour
   const previous = recording.source
   const previousBatch = recording.batch
   recording.batch = undefined
-  recording.source = source
+  const identity = { sourcePieceId: source.sourcePieceId, actorPlayerId: source.actorPlayerId, skillId: source.skillId, ruleId: source.ruleId, label: source.label }
+  recording.source = { ...source, causePath: [...(previous.causePath ?? []), { ...identity, id: 'scope-' + (++recording.sourceSequence) }] }
   const index = recording.events.length
-  recording.events.push({ ...source, kind: 'passive', iconId: 'action-passive', priority: 80, skippable: true })
+  recording.events.push({ ...recording.source, kind: 'passive', iconId: 'action-passive', priority: 80, skippable: true })
   try {
     const result = run()
     checkpointBattlePresentation(state)

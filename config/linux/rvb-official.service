@@ -1,0 +1,22 @@
+[Unit]
+Description=Red vs Blue official service and private control panel
+After=network.target postgresql.service
+[Service]
+User=rvb
+Group=rvb
+WorkingDirectory=/opt/rvb/official-current
+Environment=APP_ROOT_DIR=/opt/rvb/official-current
+Environment=USER_DATA_DIR=/var/lib/rvb-official
+Environment=RVB_POSTGRES_URL=postgresql://rvb@localhost/rvb_official?host=/var/run/postgresql
+Environment=PORT=2568
+ExecStart=/opt/rvb/runtime/node-v24.21.0-linux-x64/bin/node /opt/rvb/official-current/official-server.mjs
+Restart=on-failure
+RestartSec=5
+UMask=0077
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/rvb-official
+ProtectHome=true
+PrivateTmp=true
+[Install]
+WantedBy=multi-user.target

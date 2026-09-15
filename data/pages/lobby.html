@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>联机大厅 - RED vs BLUE</title>
+  <script src="js/lobby-entry.js"></script>
   <script src="js/pack-fetch.js"></script>
   <script src="js/server-utils.js"></script>
   <script src="js/colyseus-sdk.js"></script>
@@ -235,9 +236,9 @@
 
   <div class="game-shell">
     <header class="game-header"><a class="game-brand" href="index.html"><span>RED</span><small>vs</small><span>BLUE</span></a><span class="header-divider"></span><h1>联机大厅</h1><div class="header-end user-pill"><span class="user-dot" id="userDot"></span><span id="userName">本地玩家</span></div><a class="back-link" href="index.html">返回主菜单</a></header>
-    <nav class="game-nav" aria-label="联机导航"><a class="selected" href="lobby.html"><img src="images/tabletop/ui-map.svg" alt="">房间大厅</a><a href="official.html"><img src="images/tabletop/ui-confirm.svg" alt="">官方排位</a><a href="multiplayer.html"><img src="images/tabletop/ui-tools.svg" alt="">服务器</a><div class="nav-note">自由对战<br>1v1 / 2v2<br><small>P2P 与转发房间不计分</small></div></nav>
+    <nav class="game-nav" aria-label="联机导航"><a class="selected" href="multiplayer.html"><img src="images/tabletop/ui-map.svg" alt="">房间大厅</a><a href="official.html"><img src="images/tabletop/ui-confirm.svg" alt="">官方排位</a><div class="nav-note">自由对战<br>1v1 / 2v2<br><small>P2P 与转发房间不计分</small></div></nav>
     <main class="game-main">
-      <div class="view-heading"><div><p class="kicker">CUSTOM GAMES</p><h2>房间大厅</h2></div><div class="toolbar"><button class="button" onclick="document.getElementById('inviteDialog').showModal()">邀请码加入</button><button class="button primary" id="openCreateRoom" onclick="openCreateSheet()">创建房间</button></div></div>
+      <div class="view-heading"><div><p class="kicker">CUSTOM GAMES</p><h2>房间大厅 <small id="networkContext"></small></h2></div><div class="toolbar"><button class="button" id="inviteEntry" onclick="document.getElementById('inviteDialog').showModal()">邀请码加入</button><button class="button primary" id="openCreateRoom" onclick="openCreateSheet()">创建房间</button></div></div>
       <div class="browser-layout"><section class="room-browser">
         <div class="browser-filters"><input id="roomSearch" type="search" aria-label="搜索房间" placeholder="搜索房间或地图" oninput="filterLobbyRooms()"><select id="modeFilter" aria-label="模式筛选" onchange="filterLobbyRooms()"><option value="all">全部模式</option><option value="1v1">1v1</option><option value="2v2">2v2</option></select><select id="stateFilter" aria-label="状态筛选" onchange="filterLobbyRooms()"><option value="all">全部状态</option><option value="waiting">可加入</option><option value="watch">可观战</option></select><button class="button" onclick="loadRooms()" id="refreshBtn">刷新</button></div>
         <div class="room-columns"><span>房间 / 地图</span><span>模式</span><span>人数</span><span>状态</span><span></span></div>
@@ -246,7 +247,7 @@
       </section><aside class="room-preview"><div class="preview-label">房间详情</div><img class="preview-emblem" src="images/tabletop/desk-emblem.svg" alt=""><h3 id="selectedRoomName">选择一个房间</h3><p id="selectedRoomInfo">在列表中选择房间，查看模式、地图和席位。</p><div id="selectedRoomActions"></div><div class="preview-note">想和朋友单独开一局？<br>创建私密房间后分享邀请码。</div></aside></div>
       <div id="rejoinBar" class="rejoin-strip" style="display:none"><span>你有一场进行中的对局</span><button class="button primary" id="rejoinBtn" onclick="rejoinBattle()">重新加入</button><button class="button" onclick="dismissRejoin()">忽略</button></div><div id="rejoinFeedback" role="status" style="display:none"></div>
     </main>
-    <footer class="game-footer"><div class="connection-indicator"><span id="floatStatus">连接中</span><span class="server-address" id="serverUrlDisplay">未连接</span></div><a href="multiplayer.html">更换服务器 / 连接设置</a></footer>
+    <footer class="game-footer"><div class="connection-indicator"><span id="floatStatus">连接中</span><span class="server-address" id="serverUrlDisplay">未连接</span></div><a href="multiplayer.html">返回房间大厅</a></footer>
   </div>
   <dialog class="game-dialog" id="inviteDialog"><form method="dialog"><button class="dialog-close" aria-label="关闭">×</button></form><h2>通过房间邀请码加入</h2><p>输入房主提供的12位房间邀请码。</p><div class="invite-row"><input class="invite-input" id="inviteInput" placeholder="12位房间邀请码" maxlength="12"><button class="button primary" onclick="joinByCode()">加入</button><button class="button" onclick="joinByCode(true)">观战</button></div></dialog>
 
@@ -257,7 +258,7 @@
       <div class="field-label">地图</div>
       <select id="mapSelect" disabled><option value="">正在加载地图…</option></select>
       <label class="field-label" for="matchMode">对局模式</label>
-      <select id="matchMode" onchange="mapsLoaded=false;loadMaps()"><option value="1v1">1v1 · 双人对战</option><option value="2v2">2v2 · 蓝1 → 红1 → 红2 → 蓝2</option></select>
+      <select id="matchMode" onchange="mapsLoaded=false;loadMaps()"><option value="1v1">1v1 · 双人对战</option><option value="2v2">2v2 · 四人组队</option></select>
       <div class="field-label">可见性</div>
       <div class="toggle-row">
         <span>公开房间（所有人可见）</span>
@@ -309,6 +310,11 @@
     async function applyLobbyServerMode() {
       const params = new URLSearchParams(window.location.search)
       const mode = params.get('server')
+      const lan = (mode === 'lan' || mode === 'local') && params.get('lobbyContext') !== 'public'
+      document.getElementById('inviteEntry').hidden = lan
+      document.getElementById('inviteDialog').hidden = lan
+      const context = document.getElementById('networkContext')
+      if (context) context.textContent = (mode === 'lan' || mode === 'local') && params.get('lobbyContext') !== 'public' ? '· 局域网' : ''
       const url = params.get('serverUrl') || params.get('url')
       if (url) {
         RvBUtils.saveServerConfig({ mode: mode || RvBUtils.getServerModeForUrl(url), url })
@@ -635,6 +641,9 @@
         if (faction) body.alignment = faction
         await lobbyRequest('rooms.action', body)
         window.location.href = 'room.html?roomId=' + encodeURIComponent(roomId)
+          + '&server=' + encodeURIComponent(getLobbyServerMode())
+          + '&serverUrl=' + encodeURIComponent(RvBUtils.getServerUrl())
+          + '&lobbyContext=' + encodeURIComponent(new URLSearchParams(location.search).get('lobbyContext') || 'lan')
           + '&playerId=' + encodeURIComponent(playerId)
           + '&playerName=' + encodeURIComponent(playerName)
           + (faction ? '&alignment=' + encodeURIComponent(faction) : '')
@@ -745,7 +754,7 @@
           return false
         } finally {
           mapsLoadPromise = null
-          document.getElementById('matchMode').disabled = false
+          document.getElementById('matchMode').disabled = ['1v1', '2v2'].includes(new URLSearchParams(location.search).get('matchMode'))
         }
       })()
       return mapsLoadPromise
@@ -911,6 +920,10 @@
       await checkRejoin()
       await loadMaps()
       loadRooms()
+      const entry = new URLSearchParams(window.location.search)
+      if (['1v1', '2v2'].includes(entry.get('matchMode'))) { document.getElementById('matchMode').value = entry.get('matchMode'); document.getElementById('matchMode').disabled = true; mapsLoaded = false }
+      if (entry.get('create') === '1') await openCreateSheet()
+      else if (entry.get('joinRoom')) showFactionPicker(entry.get('joinRoom'))
     })
     window.addEventListener('unload', () => { if (pollTimer) clearInterval(pollTimer) })
   </script>

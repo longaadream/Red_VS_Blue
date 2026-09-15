@@ -7,11 +7,22 @@
   const SKIP_SETTLE_MS = 60
   const MAX_PLAYED_ROOTS = 256
 
+  function showsBanner(event) {
+    return !!event && !event.parentEventId && !(event.result && event.result.cancelled)
+      && (['skill', 'chargeSkill', 'card'].includes(event.kind) || (event.kind === 'choiceResolved' && !!event.skillId))
+  }
+
+  function isStatusBeat(group) {
+    return group && group.root && ['statusAdded', 'statusRemoved'].includes(group.root.kind)
+  }
+
   function actionDuration(group) {
+    if (isStatusBeat(group)) return 250
     return group && group.root && group.root.kind === 'card' ? CARD_DURATION_MS : NORMAL_DURATION_MS
   }
 
   function phaseTime(phase, group) {
+    if (isStatusBeat(group)) return ({ path: 20, result: 40, settle: 220 }[phase] || 0)
     return phase === 'settle' ? actionDuration(group) - 320 : ({ path: 120, result: 420 }[phase] || 0)
   }
 
@@ -59,11 +70,17 @@
       .flatMap(function (group) {
         const beats = []
         ;[group.root].concat(group.children).forEach(function (event) {
+          if (['actionPoints', 'cardDiscarded', 'cardChanged'].includes(event.kind)) return
+          if (event.parentEventId && event.kind === 'passive' && !(event.result && event.result.pending)) return
           const previous = beats[beats.length - 1]
           const simultaneous = ['damage', 'heal', 'spawn', 'death', 'statusAdded', 'statusRemoved', 'tileEffectAdded', 'tileEffectRemoved'].includes(event.kind)
             && event.batchId && previous && previous.root.kind === event.kind
             && previous.root.batchId === event.batchId
-          if (simultaneous) previous.children.push(event)
+          const bulkStrengthening = previous && ['statChanged', 'statusAdded', 'statusRemoved'].includes(event.kind) && previous.root.kind === event.kind
+            && (event.kind === 'statChanged' || event.statusType === previous.root.statusType)
+            && event.sourcePieceId === previous.root.sourcePieceId
+            && event.skillId === previous.root.skillId && event.ruleId === previous.root.ruleId
+          if (simultaneous || bulkStrengthening) previous.children.push(event)
           else beats.push({ rootEventId: event.eventId, root: event, children: [], identityEvents: [group.root].concat(group.children) })
         })
         return beats
@@ -132,8 +149,8 @@
       const duration = reducedMotion ? REDUCED_DURATION_MS : actionDuration(active)
       if (!reducedMotion) {
         ;[
-          { at: 120, phase: 'path' },
-          { at: 420, phase: 'result' },
+          { at: phaseTime('path', active), phase: 'path' },
+          { at: phaseTime('result', active), phase: 'result' },
           { at: phaseTime('settle', active), phase: 'settle' },
         ].forEach(function (entry) {
           if (entry.at <= activeProgressMs) return
@@ -468,6 +485,14 @@
           showPath({ source: cells.source, end: cells.end || cells.targets[0], selected: cells.selected })
         } else if (clearPath) clearPath()
       }
+      layer.dataset.phase = currentPhase
+      layer.dataset.rootId = currentGroup.rootEventId
+      if (!showsBanner(rootEvent)) {
+        layer.hidden = false
+        layer.className = 'battle-vignette-layer is-phase-' + currentPhase
+        layer.innerHTML = renderComicBeat(resultVisible)
+        return
+      }
       layer.hidden = false
       layer.className = 'battle-vignette-layer is-phase-' + currentPhase + ' is-cue-' + cue
         + (card ? ' is-card-reveal' : identity.isSkill ? ' is-skill-banner' : ' is-action-banner')
@@ -652,6 +677,7 @@
   root.BattleActionVignette = {
     create: create,
     createQueue: createQueue,
+    showsBanner: showsBanner,
     groupEvents: groupEvents,
     eventCells: eventCells,
     constants: Object.freeze({

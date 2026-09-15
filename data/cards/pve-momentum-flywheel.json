@@ -1,0 +1,24 @@
+{
+  "id": "pve-momentum-flywheel",
+  "name": "飞轮组",
+  "description": "一个友方下次使用【动能释放】时，只消耗一半动能，仍按释放前的动能结算伤害。",
+  "type": "active",
+  "actionPointCost": 1,
+  "availability": {
+    "modes": [
+      "pve"
+    ],
+    "status": "draft"
+  },
+  "design": {
+    "familyId": "momentum",
+    "handbookId": "momentum-flywheel",
+    "curve": "growth",
+    "role": "节省资源",
+    "duration": "本场下一次释放",
+    "start": "保留0",
+    "end": "保留8",
+    "condition": "释放前动能16；消耗向上取整。",
+    "note": "本版是一次性的释放准备；不能默认与超级形态再重复返还。"
+  }
+}

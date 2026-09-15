@@ -1,0 +1,24 @@
+{
+  "id": "pve-pressure-erode",
+  "name": "灵压侵蚀",
+  "description": "一个友方对3格内一个敌人造成4点伤害，并使其攻击力−1。",
+  "type": "active",
+  "actionPointCost": 1,
+  "availability": {
+    "modes": [
+      "pve"
+    ],
+    "status": "draft"
+  },
+  "design": {
+    "familyId": "pressure",
+    "handbookId": "pressure-erode",
+    "curve": "ready",
+    "role": "伤害 / 减攻",
+    "duration": "减攻至目标下回合结束",
+    "start": "4伤害 / −1攻击",
+    "end": "4伤害 / −1攻击",
+    "condition": "不带灵压限制，可先把目标压到门槛以下。",
+    "note": "这是明确的新卡草案；不是原有技能或额外的“灵压资源”。"
+  }
+}

@@ -1,3 +1,4 @@
+import { isContentAvailable } from './content-availability'
 import { createInitialBattleForPlayers } from './battle-setup'
 import { withoutServerSkills } from './battle-storage'
 import { hashBattleState, runBattleAction } from './battle-runner'
@@ -91,7 +92,7 @@ function resolveDebugPieces(
 
   const seen = new Set(requested.map(piece => piece.id))
   const pieceFaction = alignmentToPieceFaction(alignment)
-  const allPieces = Object.values(loadDebugPieces())
+  const allPieces = Object.values(loadDebugPieces()).filter(piece => isContentAvailable(piece, 'pvp'))
   const preferred = allPieces.filter(piece => piece.faction === pieceFaction && !seen.has(piece.id))
   const fallback = allPieces.filter(piece => !seen.has(piece.id) && !preferred.some(preferredPiece => preferredPiece.id === piece.id))
 

@@ -1,0 +1,24 @@
+{
+  "id": "pve-blood-flame",
+  "name": "血焰",
+  "description": "一个友方受到2点真实伤害，再对其3格内一个敌人造成实际损失生命值×3的伤害。",
+  "type": "active",
+  "actionPointCost": 1,
+  "availability": {
+    "modes": [
+      "pve"
+    ],
+    "status": "draft"
+  },
+  "design": {
+    "familyId": "blood",
+    "handbookId": "blood-flame",
+    "curve": "ready",
+    "role": "伤害",
+    "duration": "一次结算",
+    "start": "6伤害",
+    "end": "6伤害",
+    "condition": "实际损失2生命；无自带成长。",
+    "note": "原方案保留；仍可接受血焰淬炼等外部强化。"
+  }
+}

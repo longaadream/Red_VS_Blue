@@ -1,0 +1,24 @@
+{
+  "id": "pve-pressure-resurge",
+  "name": "归刃余波",
+  "description": "一个友方对3格内一个敌人造成2点伤害；其本场每造成或受到1次伤害，伤害+1。若当前已变身，伤害翻倍。",
+  "type": "active",
+  "actionPointCost": 1,
+  "availability": {
+    "modes": [
+      "pve"
+    ],
+    "status": "draft"
+  },
+  "design": {
+    "familyId": "pressure",
+    "handbookId": "pressure-resurge",
+    "curve": "growth",
+    "role": "伤害",
+    "duration": "一次结算",
+    "start": "2伤害",
+    "end": "20伤害",
+    "condition": "累计8次伤害事件，且当前已变身。",
+    "note": "不带灵压限制。可配合乌尔奇奥拉，也允许其他变身棋子。"
+  }
+}

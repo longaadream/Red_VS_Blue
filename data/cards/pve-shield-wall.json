@@ -1,0 +1,24 @@
+{
+  "id": "pve-shield-wall",
+  "name": "金色壁垒",
+  "description": "使一个友方获得8点护盾。",
+  "type": "active",
+  "actionPointCost": 1,
+  "availability": {
+    "modes": [
+      "pve"
+    ],
+    "status": "draft"
+  },
+  "design": {
+    "familyId": "shield",
+    "handbookId": "shield-wall",
+    "curve": "ready",
+    "role": "防护",
+    "duration": "本场",
+    "start": "护盾8",
+    "end": "护盾8",
+    "condition": "数值固定，用来扛多次小伤害。",
+    "note": "数值护盾不会触发失去圣盾的收益。"
+  }
+}

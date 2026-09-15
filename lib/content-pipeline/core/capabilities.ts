@@ -6,6 +6,9 @@ import type {
 import { compareUnicodeCodePointsV1 } from '../contracts'
 
 export const PVE_SCHEMA_VERSIONS_V1 = Object.freeze([
+  'rvb-pve-roguelike-adventure/v1',
+  'rvb-pve-roguelike-builds/v1',
+  'rvb-pve-roguelike-supplies/v1',
   'rvb-pve-content-manifest/v1',
   'rvb-pve-campaign/v1',
   'rvb-pve-chapter/v1',
@@ -50,6 +53,10 @@ export function deriveFileCapabilitiesV1(input: {
     result.add('raster-assets')
   }
   if (input.hasExecutableContent) result.add('trusted-executable-content')
+  const availability = input.jsonValue && typeof input.jsonValue === 'object' && !Array.isArray(input.jsonValue)
+    ? input.jsonValue.availability : undefined
+  if (availability && typeof availability === 'object' && !Array.isArray(availability)
+    && Array.isArray(availability.modes) && availability.modes.includes('pve')) result.add('pve-content')
   return sortCapabilitiesV1(result)
 }
 

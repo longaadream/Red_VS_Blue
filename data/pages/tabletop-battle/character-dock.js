@@ -27,6 +27,12 @@
     try{selectedPieceId=live.instanceId;await dispatchBattleIntent({type:'select-skill',skillId:id});}
     finally{casting=false;lastSignature='';syncSelected(true);}
    });}
+   button.dataset.skillId=id;
+   button.classList.toggle('tutorial-skill-hint',document.body.dataset.tutorialSkill===id);
+   if(document.body.dataset.tutorialSkill===id&&!button.dataset.tutorialRevealed){
+    button.dataset.tutorialRevealed='true';
+    requestAnimationFrame(()=>{if(button.isConnected&&document.body.dataset.tutorialSkill===id)button.scrollIntoView({block:'nearest',inline:'nearest'});});
+   }
    button.setAttribute('aria-label','释放：'+(definition.name||id));button.title=targetBusy?'请先完成当前操作':available.unavailableReason||'释放 '+(definition.name||id);
    button.disabled=targetBusy||!available.available;button.textContent='释放';row.classList.toggle('cast-unavailable',!available.available);
    let reason=row.querySelector('.character-cast-reason');if(!reason){reason=document.createElement('div');reason.className='character-cast-reason';row.append(reason);}

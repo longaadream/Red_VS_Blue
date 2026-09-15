@@ -57,6 +57,29 @@ function fixtureSnapshot() {
 }
 
 describe('battle presentation boundary', () => {
+  it('keeps hand resources on the viewer during the opponent turn and shows depleted points', () => {
+    const viewModel = loadBrowserModule('js/battle-ui/battle-view-model.js', 'BattleViewModel')
+    const domUi = loadBrowserModule('js/battle-ui/battle-dom-ui.js', 'BattleDomUI')
+    const snapshot = fixtureSnapshot()
+    snapshot.players.push({ ...snapshot.players[0], playerId: 'opponent', actionPoints: 9, chargePoints: 8 })
+    snapshot.turn.currentPlayerId = 'opponent'
+    const elements = Object.fromEntries(['handResources', 'resApVal', 'resCpVal', 'resApTrack'].map(id => [id, {
+      textContent: '', innerHTML: '', hidden: true, setAttribute: vi.fn(),
+    }]))
+    const ui = domUi.create({ document: { getElementById: (id: string) => elements[id] || null } })
+    ui.update(viewModel.create({ snapshot, viewerId: 'player-red' }))
+    expect(elements.resApVal.textContent).toBe('2')
+    expect(elements.resCpVal.textContent).toBe('1')
+    expect(elements.resApTrack.innerHTML.match(/is-filled/g)).toHaveLength(2)
+    expect(elements.handResources.hidden).toBe(false)
+    snapshot.players[0].actionPoints = 0
+    snapshot.players[0].chargePoints = 0
+    ui.update(viewModel.create({ snapshot, viewerId: 'player-red' }))
+    expect(elements.resApVal.textContent).toBe('0')
+    expect(elements.resCpVal.textContent).toBe('0')
+    expect(elements.resApTrack.innerHTML).not.toContain('is-filled')
+  })
+
   it('shows player-wide protection and rules, then reflects consumed protection without rule code', () => {
     const viewModel = loadBrowserModule('js/battle-ui/battle-view-model.js', 'BattleViewModel')
     const domUi = loadBrowserModule('js/battle-ui/battle-dom-ui.js', 'BattleDomUI')

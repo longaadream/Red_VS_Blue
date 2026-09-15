@@ -2,6 +2,7 @@ import { createMapFromAscii, type AsciiMapConfig, type BoardMap } from './map'
 import fs from 'fs'
 import path from 'path'
 import { getDataRoot } from '../app-paths'
+import { isContentAvailable, type ContentMode } from './content-availability'
 
 const MAPS_DIR = path.join(getDataRoot(), 'maps')
 
@@ -35,9 +36,9 @@ export async function loadMaps() {
   ensureLoaded()
 }
 
-export function getAllMaps(): BoardMap[] {
+export function getAllMaps(mode:ContentMode='pvp'): BoardMap[] {
   ensureLoaded()
-  return Object.values(mapsCache)
+  return Object.values(mapsCache).filter(map=>isContentAvailable(map,mode))
 }
 
 export function getMapById(id: string): BoardMap | undefined {

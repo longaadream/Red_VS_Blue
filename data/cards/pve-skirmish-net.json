@@ -1,0 +1,24 @@
+{
+  "id": "pve-skirmish-net",
+  "name": "火力网",
+  "description": "一个友方每通过被动实际造成伤害后，生成1张临时【交叉火力】。",
+  "type": "active",
+  "actionPointCost": 2,
+  "availability": {
+    "modes": [
+      "pve"
+    ],
+    "status": "draft"
+  },
+  "design": {
+    "familyId": "skirmish",
+    "handbookId": "skirmish-net",
+    "curve": "growth",
+    "role": "供牌",
+    "duration": "至你的下回合开始",
+    "start": "0张",
+    "end": "3张",
+    "condition": "生效期间该棋子被动造成伤害3次。",
+    "note": "覆盖敌方行动阶段；高收益需要敌人行动、合适站位和后续出牌行动点。"
+  }
+}

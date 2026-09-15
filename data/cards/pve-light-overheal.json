@@ -1,0 +1,24 @@
+{
+  "id": "pve-light-overheal",
+  "name": "疗愈回声",
+  "description": "使一个友方恢复2点生命；本场己方每实际恢复2点生命，额外恢复1点。",
+  "type": "active",
+  "actionPointCost": 1,
+  "availability": {
+    "modes": [
+      "pve"
+    ],
+    "status": "draft"
+  },
+  "design": {
+    "familyId": "light",
+    "handbookId": "light-overheal",
+    "curve": "growth",
+    "role": "治疗",
+    "duration": "一次结算",
+    "start": "恢复2",
+    "end": "恢复17",
+    "condition": "此前己方实际恢复30生命。",
+    "note": "不计过量治疗，不计当前卡尚未完成的治疗。"
+  }
+}

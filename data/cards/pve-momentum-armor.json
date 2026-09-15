@@ -1,0 +1,24 @@
+{
+  "id": "pve-momentum-armor",
+  "name": "蓄能护甲",
+  "description": "使一个友方获得护盾，数值为2+其当前动能。",
+  "type": "active",
+  "actionPointCost": 1,
+  "availability": {
+    "modes": [
+      "pve"
+    ],
+    "status": "draft"
+  },
+  "design": {
+    "familyId": "momentum",
+    "handbookId": "momentum-armor",
+    "curve": "growth",
+    "role": "防护",
+    "duration": "本场",
+    "start": "护盾2",
+    "end": "护盾16",
+    "condition": "当前动能14；不消耗动能。",
+    "note": ""
+  }
+}

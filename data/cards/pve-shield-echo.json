@@ -1,0 +1,24 @@
+{
+  "id": "pve-shield-echo",
+  "name": "圣盾回响",
+  "description": "每有一个己方棋子失去圣盾，生成1张临时【碎盾余响】。",
+  "type": "active",
+  "actionPointCost": 2,
+  "availability": {
+    "modes": [
+      "pve"
+    ],
+    "status": "draft"
+  },
+  "design": {
+    "familyId": "shield",
+    "handbookId": "shield-echo",
+    "curve": "growth",
+    "role": "供牌",
+    "duration": "本回合",
+    "start": "0张",
+    "end": "3张",
+    "condition": "本回合让3个圣盾消失。",
+    "note": "需要盾源与出牌行动点，不是白给完整构筑。"
+  }
+}
