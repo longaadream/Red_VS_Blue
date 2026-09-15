@@ -217,7 +217,7 @@ function runQuietCommand(
 }
 
 export class EmbeddedPostgresController {
-  private readonly binRoot: string
+  private binRoot: string
   private readonly dataRoot: string
   private readonly dataDir: string
   private readonly credentialPath: string
@@ -322,6 +322,30 @@ export class EmbeddedPostgresController {
     }
   }
 
+  private prepareRuntimePath(): void {
+    if (process.platform !== 'win32' || !/[^\x00-\x7f]/.test(this.options.runtimeRoot)) return
+    // PostgreSQL's Windows bootstrap passes its installation path through the
+    // ANSI code page, even for a UTF-8 cluster. A junction keeps the verified
+    // binaries in place while giving all child processes an ASCII entry point.
+    const aliasRoot = path.resolve(this.dataRoot)
+    if (/[^\x00-\x7f]/.test(aliasRoot)) {
+      throw new Error('数据库程序路径包含中文，且用户数据路径无法建立英文兼容入口。请将游戏安装到纯英文目录后重试；无需删除存档。')
+    }
+    fs.mkdirSync(aliasRoot, { recursive: true })
+    const target = path.resolve(this.options.runtimeRoot)
+    const alias = path.join(aliasRoot, `runtime-${createHash('sha256').update(target).digest('hex').slice(0, 20)}`)
+    try {
+      fs.symlinkSync(target, alias, 'junction')
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw commandError('数据库英文路径入口创建', error)
+    }
+    if (!fs.lstatSync(alias).isSymbolicLink()
+      || fs.realpathSync(alias).toLowerCase() !== fs.realpathSync(target).toLowerCase()) {
+      throw new Error('数据库兼容目录指向异常，已停止启动；请检查本机日志。')
+    }
+    this.binRoot = path.join(alias, 'bin')
+  }
+
   private removeFile(filePath: string): void {
     (this.options.removeFile ?? fs.unlinkSync)(filePath)
   }
@@ -410,6 +434,7 @@ export class EmbeddedPostgresController {
 
   private async startInternal(): Promise<EmbeddedPostgresConnection> {
     await this.verifyRuntime()
+    this.prepareRuntimePath()
     const clusterExists = fs.existsSync(path.join(this.dataDir, 'PG_VERSION'))
     const password = this.loadOrCreatePassword(clusterExists)
     if (!clusterExists) await this.initializeCluster(password)

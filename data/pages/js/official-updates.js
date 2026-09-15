@@ -79,7 +79,7 @@
       const mode = await api.getMode();
       if (disposed) return;
       const busy = ['starting', 'recovering'].includes(mode.localAuthorityRecovery?.status);
-      find('[data-local]').textContent = mode.ready ? '游戏已就绪' : busy ? '正在准备游戏…' : '游戏准备失败，请重试';
+      find('[data-local]').textContent = mode.ready ? '游戏已就绪' : busy ? '正在准备游戏…' : (mode.localAuthorityNotice || '游戏准备失败，请重试');
       find('[data-local-retry]').hidden = mode.ready || busy;
       render(await api.getOfficialUpdateStatus());
     } catch {

@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 1,
+  "baseline": "74c1494894579936b368aea5ac90aa2abbba1b98cec76348eccbe47e2485cadc",
+  "history": [
+    "RED-201: aizen attack 5; ulquiorra regeneration 1",
+    "grimmjow-destruction-rule: per-damage self hit",
+    "current-main: retain position API and concise descriptions"
+  ],
+  "files": [
+    {
+      "path": "data/pieces/dark-aizen.json",
+      "sha256": "28c19d3c993ea1e2ee910d232319aba7f980ed57584cc523255b57e96b9a5bf0"
+    },
+    {
+      "path": "data/pieces/dark-grimmjow.json",
+      "sha256": "62ccc9a07697247588c3eb34711f43126d5f4ca245767652d398efb858aded1c"
+    },
+    {
+      "path": "data/rules/manifest.json",
+      "sha256": "5f03028c02d16f85cf2285c8bc972e1a5850f88bafb93aefa70fe6dfdf000696"
+    },
+    {
+      "path": "data/rules/rule-grimmjow-destruction-instinct.json",
+      "sha256": "c59a6cc458ed193e25236635d9fe09e97dfba5c3aebe3c890a356bbbc7bb4a53"
+    },
+    {
+      "path": "data/rules/rule-grimmjow-hunt-after-move.json",
+      "sha256": "80eeabf016b2fc043464cb974e1429c56a7a4c1276c5a8dbc56d75bfa84b592a"
+    },
+    {
+      "path": "data/rules/rule-grimmjow-hunt-after-skill.json",
+      "sha256": "cb5c4c6b1dfbff6b852f4a71c039befb7e4c6b6b832c6f5f70e8713dcbc0089d"
+    },
+    {
+      "path": "data/rules/rule-ulquiorra-damage-dealt.json",
+      "sha256": "385544354cda46910236409c42a07d7596b9b7d9027771d89b151ae4063d9281"
+    },
+    {
+      "path": "data/rules/rule-ulquiorra-damage-taken.json",
+      "sha256": "bd32cba761250c012463d85c46c93e9709b7baa5a07feefbf534b6e9403e1e2c"
+    },
+    {
+      "path": "data/skills/grimmjow-destruction-instinct.json",
+      "sha256": "f7107187d44fafb90eb85267e0b2dfc671a0116faa1f7070ec1d3e8431de8749"
+    },
+    {
+      "path": "data/skills/grimmjow-gran-rey-cero.json",
+      "sha256": "e7a5e4b279ad16315f534d18f3c882a2b73bd75ea69ac5e7020b1f7a51cbd9dd"
+    },
+    {
+      "path": "data/skills/grimmjow-panther-claw.json",
+      "sha256": "9a91d1209eb604af67f42d45b6a277941d36135350799121216ca6e94dd8964c"
+    },
+    {
+      "path": "data/skills/ulquiorra-high-speed-regeneration.json",
+      "sha256": "c7d19c605ae375a7ecf28890460c8e64dd6c273a7d1f7cb952ed4f8d2c5ae0ec"
+    }
+  ]
+}

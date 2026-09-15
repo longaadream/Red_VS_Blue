@@ -1,0 +1,9 @@
+{
+  "id": "rule-grimmjow-destruction-instinct",
+  "name": "破坏本能",
+  "description": "格里姆乔每次实际造成伤害后，对自身造成1点真实伤害；排除破坏本能自身的伤害。",
+  "trigger": {
+    "type": "afterDamageDealt"
+  },
+  "skillCode": "const grimm = context.rulePiece;\nif (!grimm || grimm.currentHp <= 0) return { success: false };\nif (!context.sourcePiece || context.sourcePiece.instanceId !== grimm.instanceId) return { success: false };\nif (!(context.damage > 0) || context.skillId === 'grimmjow-destruction-instinct') return { success: false };\ncontext.damageQueue.push({\n  attacker: grimm,\n  target: grimm,\n  damage: 1,\n  damageType: 'true',\n  skillId: 'grimmjow-destruction-instinct'\n});\nreturn { success: true };"
+}
