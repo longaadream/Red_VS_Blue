@@ -4,9 +4,21 @@ import os from 'node:os'
 import path from 'node:path'
 import { createHash } from 'node:crypto'
 import { spawnSync } from 'node:child_process'
-import { validate, verifyPackage, serve } from '../../scripts/server-admin/admin.mjs'
+import { validate, verifyPackage, serve, normalizeShellScript } from '../../scripts/server-admin/admin.mjs'
 
 describe('server admin boundaries', () => {
+  it('executes Windows CRLF scripts with a BOM as Linux shell input', async () => {
+    const source = await fs.readFile('scripts/server-admin/remote.sh', 'utf8')
+    const windows = '\uFEFF' + source.replace(/\r?\n/g, '\r\n')
+    const bash = 'C:/Program Files/Git/bin/bash.exe'
+    expect(normalizeShellScript(windows)).not.toMatch(/[\r\uFEFF]/)
+    const fixed = spawnSync(bash, ['-n'], { encoding: 'utf8', input: normalizeShellScript(windows) })
+    expect(fixed.error).toBeUndefined()
+    expect(fixed.status, fixed.stderr).toBe(0)
+    const run = spawnSync(bash, ['-s'], { encoding: 'utf8', input: normalizeShellScript('\uFEFFset -eu\r\nservice=rvb-game\r\ncase "$service" in rvb-game) echo READY;; esac\r\n') })
+    expect(run.status, run.stderr).toBe(0)
+    expect(run.stdout.trim()).toBe('READY')
+  })
   const config = { host: '38.22.90.175', key: path.resolve('key'), service: 'rvb-game' }
   it('rejects shell syntax and invalid deployment identities', () => {
     for (const bad of [{ host: '-oProxyCommand=evil' }, { user: 'root;id' }, { release: '../current' }, { database: 'db;id' }, { port: '99999' }, { service: 'sshd' }]) {

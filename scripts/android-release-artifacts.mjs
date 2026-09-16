@@ -60,6 +60,8 @@ export function verifyApkContents(zip, sourceCommit) {
   }
   const config = JSON.parse(zip.readAsText('assets/android-distribution.json'))
   if (config.updateUrl !== 'https://github.com/longaadream/Red_VS_Blue/releases/latest/download/android-latest.json') throw Error('APK must use the public Android update feed')
+  const configuredPublishers = JSON.parse(fs.readFileSync(path.resolve('config/content-script-publishers.json'), 'utf8')).keyIds
+  if (!Array.isArray(config.trustedPublisherKeyIds) || config.trustedPublisherKeyIds.length === 0 || configuredPublishers.some(key => !config.trustedPublisherKeyIds.includes(key))) throw Error('APK must trust every configured official content publisher')
   if (zip.getEntries().some(e => /android_qa_ca|(?:^|\/)users\.json$|\.p12$|\.clixml$/i.test(e.entryName))) throw Error('APK includes QA trust or private data')
   if (!zip.getEntries().some(e => /^classes\d*\.dex$/.test(e.entryName) && e.getData().includes(Buffer.from('Lcom/redvsblue/client/ApkDelta;')))) throw Error('APK does not contain the delta updater')
 }

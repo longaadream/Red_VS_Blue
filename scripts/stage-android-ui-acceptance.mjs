@@ -40,8 +40,10 @@ for(const name of fs.readdirSync(pages).filter(name=>name.endsWith('.html'))){co
 for(const file of base.entries){const target=path.join(pages,file.path);fs.mkdirSync(path.dirname(target),{recursive:true});fs.writeFileSync(target,file.bytes)}
 fs.writeFileSync(path.join(generated,'android-base.json'),JSON.stringify({manifest:Buffer.from(base.manifestBytes).toString('base64'),signature:Buffer.from(base.signatureBytes).toString('base64'),paths:base.entries.map(f=>f.path)}))
 fs.writeFileSync(path.join(generated,'android-base-profile.json'),JSON.stringify({profile:api.getBundledBaseProfileV1(root).profile,chain:['base']}))
-const distribution=process.env.RVB_ANDROID_DISTRIBUTION_CONFIG?JSON.parse(fs.readFileSync(path.resolve(process.env.RVB_ANDROID_DISTRIBUTION_CONFIG),'utf8')):{updateUrl:'https://github.com/longaadream/Red_VS_Blue/releases/latest/download/android-latest.json',trustedPublisherKeyIds:[]}
+const officialPublishers=JSON.parse(fs.readFileSync(path.join(root,'config/content-script-publishers.json'),'utf8')).keyIds
+const distribution=process.env.RVB_ANDROID_DISTRIBUTION_CONFIG?JSON.parse(fs.readFileSync(path.resolve(process.env.RVB_ANDROID_DISTRIBUTION_CONFIG),'utf8')):{updateUrl:'https://github.com/longaadream/Red_VS_Blue/releases/latest/download/android-latest.json',trustedPublisherKeyIds:officialPublishers}
 if(Object.keys(distribution).some(key=>!['updateUrl','trustedPublisherKeyIds'].includes(key))||typeof distribution.updateUrl!=='string'||(distribution.updateUrl&&!distribution.updateUrl.startsWith('https://'))||!Array.isArray(distribution.trustedPublisherKeyIds)||distribution.trustedPublisherKeyIds.some(key=>typeof key!=='string'||!/^[a-f0-9]{64}$/.test(key)))throw Error('Invalid Android distribution config (public metadata only)')
+if(publicDemo&&distribution.trustedPublisherKeyIds.length===0)throw Error('Public Demo must trust at least one configured content publisher')
 fs.writeFileSync(path.join(generated,'android-distribution.json'),JSON.stringify(distribution))
 const res=path.join(root,'android/app/build/generated/android-distribution-res')
 fs.rmSync(res,{recursive:true,force:true});fs.mkdirSync(path.join(res,'xml'),{recursive:true})

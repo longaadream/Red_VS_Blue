@@ -5128,14 +5128,23 @@
         addLog('Colyseus 已连接', 'info')
       })
 
-      RvBColyseus.on('disconnect', function() {
+      RvBColyseus.on('disconnect', function(event) {
         deferredSelectionPresentation = null
         if (battlePresentation) battlePresentation.beginSkillRecovery()
 
         colyseusConnected = false
         var el = document.getElementById('colyseusStatus')
         if (el) el.style.display = 'none'
-        addLog('Colyseus 断开，等待重连', 'info')
+        var terminalDisconnect = !!(event && event.terminal)
+        addLog(terminalDisconnect ? 'Colyseus 重连失败，请退出对局后重新进入' : 'Colyseus 断开，等待重连', terminalDisconnect ? 'err' : 'info')
+        if (terminalDisconnect) {
+          pendingSkill = null
+          pendingCardAction = null
+          renderTargetOverlay()
+          setStatusMsg('连接已终止，无法继续提交操作；请退出对局后重新进入')
+          renderActionBar()
+          return
+        }
         if (pendingActionFeedback) {
           setStatusMsg('连接已断开；原指令仍待确认，重连后将自动同步，请勿重复操作')
           renderActionBar()
