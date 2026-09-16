@@ -657,9 +657,21 @@
 .action-history-sentence:hover { outline:1px dashed #bc9b6c; outline-offset:2px; }
 .action-history-player-avatar { display:inline-grid; place-items:center; width:22px; height:22px; border:2px solid #3b2b20; border-radius:6px; background:#80594c; color:#f0dfbe; font-size:12px; }
 .action-history-player-avatar[data-faction="blue"] { background:#42636e; }
-.phase-bar:has(.player-effect-icon) { overflow:visible !important; }
-body #playerResCards .player-state-chip { overflow:visible; }
-body #playerResCards .player-state-tags { display:flex; position:absolute; top:calc(100% + 3px); left:5px; gap:5px; overflow:visible; }
+.phase-bar:has(.player-effect-icon) { overflow:visible !important; z-index:96 !important; }
+body #playerResCards { overflow:visible !important; }
+body #playerResCards .player-state-chip { overflow:visible; z-index:1; }
+/* Statuses intentionally float below the compact player card. Give them their
+   own HUD layer so board helpers and the tile slip cannot cover the icons. */
+body #playerResCards .player-state-tags {
+  display:flex;
+  position:absolute;
+  top:calc(100% + 3px);
+  left:5px;
+  gap:5px;
+  overflow:visible;
+  z-index:4;
+}
+body #playerResCards .player-state-tags:empty { display:none; }
 .player-effect-icon { display:inline-flex; position:relative; width:29px; height:29px; padding:2px; background:#443a2d; border:2px solid #af9367; border-radius:8px 6px 9px 7px; pointer-events:auto; cursor:help; }
 .player-effect-icon>img { width:100%; height:100%; }
 .player-effect-tip { display:none; position:absolute; left:0; top:calc(100% + 5px); width:210px; padding:10px; border:2px solid #49382a; border-radius:7px 11px; background:#c6b18a; color:#302720; box-shadow:3px 4px #231c16; text-align:left; z-index:100; }
