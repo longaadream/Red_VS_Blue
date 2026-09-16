@@ -1,10 +1,10 @@
 {
-  "version": "0.1.8",
+  "version": "0.1.9",
   "windows": {
-    "url": "https://updates.redvsblue.top/0.1.8/RED-vs-BLUE-0.1.8-Setup.exe"
+    "url": "https://updates.redvsblue.top/0.1.9/RED-vs-BLUE-0.1.9-Setup.exe"
   },
   "android": {
-    "url": "https://updates.redvsblue.top/0.1.8/RED-vs-BLUE-0.1.8-Android.apk"
+    "url": "https://updates.redvsblue.top/0.1.9/RED-vs-BLUE-0.1.9-Android.apk"
   },
   "resource": {
     "version": "1.0.5",
@@ -13,16 +13,16 @@
   },
   "notes": [
     {
-      "title": "对局音效与反馈",
-      "body": "新增伤害、治疗、移动、按钮音效，支持音量与震动设置。"
+      "title": "Android 资源更新",
+      "body": "修复官方资源清单被误判为不受信任的问题。"
     },
     {
-      "title": "账号与联机体验",
-      "body": "主页登录服务器账号，优化排位流程、对局工具栏及训练营取消选择。"
+      "title": "联机断线反馈",
+      "body": "连接无法恢复时结束挂起选择，并提示退出对局后重新进入。"
     },
     {
-      "title": "结算与资源",
-      "body": "战报按需获取，优化 PVE 调度；整合历史角色修改，夏特大招范围调整为 5×5。"
+      "title": "Windows 同步更新",
+      "body": "Windows 客户端同步战斗界面修复，并更新服务器运维工具。"
     }
   ]
 }
