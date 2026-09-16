@@ -176,9 +176,9 @@
   <div class="section">
     <div class="section-label">导入资源包</div>
 
-    <input type="file" id="fileInput" accept=".zip" onchange="onFileSelected(this)">
+    <input type="file" id="fileInput" accept=".rvbpack,.zip,application/zip,application/octet-stream" onchange="onFileSelected(this)">
     <label for="fileInput" class="file-btn">
-      📂 从本地文件选择 .zip
+      📂 选择资源包（.rvbpack / .zip）
     </label>
 
     <button class="btn-secondary" onclick="toggleUrlSection()">🔗 从 URL 下载</button>
@@ -530,7 +530,7 @@
       const file = input.files[0]
       if (!file) return
       input.value = ''
-      await importZip(file, file.name.replace('.zip', ''))
+      await importZip(file, file.name.replace(/\.(rvbpack|zip)$/i, ''))
     }
 
     async function downloadFromUrl() {
@@ -560,7 +560,7 @@
           if (total) setProgress(Math.round(loaded / total * 35), '下载中 ' + Math.round(loaded / total * 100) + '%…')
         }
         const blob = new Blob(chunks)
-        const name = url.split('/').pop().replace('.zip', '') || 'pack'
+        const name = new URL(url).pathname.split('/').pop().replace(/\.(rvbpack|zip)$/i, '') || 'pack'
         await importZip(blob, name)
       } catch (e) {
         hideProgress()
@@ -742,5 +742,6 @@
       }
     })
   </script>
+<script src="js/battle-audio.js" defer></script><script src="js/button-audio.js" defer></script>
 </body>
 </html>

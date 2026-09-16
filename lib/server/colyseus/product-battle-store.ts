@@ -19,6 +19,7 @@ export class ProductBattleStore {
   closeSetup(): void { if (!this.authorityStore) this.setupClosed = true }
   closeAuthority(): void { this.setupClosed = true; this.authorityStore?.closeAuthority() }
   readonly terminalAuthorityPersistencePolicy = 'durable-barrier' as const
+  readonly terminalTracePolicy = 'journal' as const
 
   constructor(
     private room: Room,

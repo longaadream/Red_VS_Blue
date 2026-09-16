@@ -1,6 +1,7 @@
 ;(function () {
   'use strict'
   var $ = function (id) { return document.getElementById(id) }, id = new URLSearchParams(location.search).get('matchId'), state, selected = null, pending = false, loading = false, offset = 0, built = false
+  var refreshTask = null
   function message(text) { $('matchMessage').textContent = text }
   function clock() { if (!state || !state.deadlineAt) return; var seconds = Math.max(0, Math.ceil((state.deadlineAt - (Date.now() + offset)) / 1000)); $('deadline').textContent = state.phase === 'veto' ? String(seconds) : Math.floor(seconds / 60) + ':' + String(seconds % 60).padStart(2, '0') }
   function detail(map) { $('detailName').textContent = map.name; RvBRanked.drawMap($('detailMap'), map); $('mapDialog').showModal() }
@@ -8,8 +9,8 @@
     if (state.phase === 'battle') { location.replace(RvBRanked.url(state.legacy ? 'room.html' : 'battle.html', id, state.players && state.players.find(function (p) { return p.id === RvBRanked.session().account.id }).alignment)); return }
     if (state.phase === 'finished') { $('withdraw').hidden = true; $('stageTitle').textContent = state.status === 'void' ? '本局已取消' : '本局已结算'; $('stageHint').textContent = '返回排位大厅查看记录。'; $('vetoStage').hidden = $('mapStage').hidden = true; $('confirmBan').hidden = $('chooseRoster').hidden = true; $('returnLobby').hidden = false; return }
     var me = state.players.find(function (p) { return p.id === RvBRanked.session().account.id }), veto = state.phase === 'veto'
-    $('stageTitle').textContent = veto ? '禁用一张地图' : state.phase === 'starting' ? '双方阵容已锁定' : '本局地图已确定'
-    $('stageHint').textContent = veto ? '双方秘密选择，提交后锁定；允许禁用同一张地图。' : '阵容选择已开始计时，请尽快进入选人。'
+    $('stageTitle').textContent = veto ? '匹配成功 · 先禁用一张地图' : state.phase === 'starting' ? '双方阵容已锁定' : '地图已确定 · 接下来选阵营'
+    $('stageHint').textContent = veto ? '选择不想玩的地图，确认后提交。双方选择互相保密。' : '先选光方或暗方，再从该阵营选出 8 枚棋子。'
     $('stepVeto').className = veto ? 'active' : 'done'; $('stepMap').className = veto ? '' : 'active'
     $('deadlineLabel').textContent = veto ? '禁图剩余时间' : '阵容剩余时间'
     $('players').replaceChildren()
@@ -29,14 +30,35 @@
       }); built = true
     }
     document.querySelectorAll('.ranked-map-card').forEach(function (card) { var chosen = card.dataset.mapId === (me.banSubmitted ? me.ban : selected); card.classList.toggle('selected', chosen); var button = card.querySelector('.choose-map'); button.disabled = pending || me.banSubmitted || !veto; button.setAttribute('aria-pressed', String(chosen)); button.textContent = chosen ? me.banSubmitted ? '已禁用' : '已选，待确认' : '选择禁用' })
-    $('confirmBan').disabled = pending || me.banSubmitted || selected === null; $('confirmBan').textContent = me.banSubmitted ? '等待对方提交' : pending ? '正在提交…' : '确认禁用'
-    $('dockTitle').textContent = veto ? me.banSubmitted ? '你的禁图已提交' : '选择地图后确认禁用' : state.phase === 'starting' ? '服务器正在创建对局' : '根据地图组建你的阵容'
+    var chosenMap = state.maps.find(function (map) { return map.id === selected })
+    $('confirmBan').disabled = pending || me.banSubmitted || selected === null; $('confirmBan').textContent = me.banSubmitted ? '已提交 · 等待对方' : pending ? '正在提交…' : chosenMap ? '确认禁用「' + chosenMap.name + '」' : '先选择一张地图'
+    $('rankedDock').classList.toggle('awaiting-confirmation', veto && !!chosenMap && !me.banSubmitted)
+    $('vetoInstruction').textContent = me.banSubmitted ? '禁图已提交，等待对方。' : chosenMap ? '已选「' + chosenMap.name + '」，还未提交。点击下方亮起的确认按钮。' : '选中一张不想玩的地图，再点击下方「确认禁用」。'
+    $('dockTitle').textContent = veto ? me.banSubmitted ? '你的禁图已提交' : chosenMap ? '还差一步：确认提交' : '请选择要禁用的地图' : state.phase === 'starting' ? '服务器正在创建对局' : '接下来：选择光方或暗方'
     $('dockHint').textContent = veto ? '30 秒未提交视为放弃禁图；双方提交后立即抽图。' : '120 秒结束后，保留已选棋子并随机补齐。'
     if (state.mapId) { var map = state.maps.find(function (m) { return m.id === state.mapId }); $('chosenName').textContent = map.name; RvBRanked.drawMap($('chosenMap'), map); $('banSummary').textContent = state.players.map(function (p) { return p.name + '：' + (p.ban ? '禁用 ' + state.maps.find(function (m) { return m.id === p.ban }).name : '放弃禁图') }).join('\n') }
     clock()
   }
-  async function refresh() { if (loading || pending) return; loading = true; try { state = await RvBRanked.api('/official/pregame/' + encodeURIComponent(id)); offset = state.serverNow - Date.now(); render(); message('') } catch (e) { message(e.message + '；正在重试，不会重新分配比赛。') } finally { loading = false } }
-  $('confirmBan').onclick = async function () { if (pending || loading || selected === null) return; pending = true; render(); try { state = await RvBRanked.api('/official/pregame/' + encodeURIComponent(id), { action: 'ban', mapId: selected }); message('') } catch (e) { message(e.message) } finally { pending = false; render() } }
+  function refresh() {
+    if (loading || pending) return refreshTask
+    loading = true
+    refreshTask = (async function () {
+      try { state = await RvBRanked.api('/official/pregame/' + encodeURIComponent(id)); offset = state.serverNow - Date.now(); render(); message('') }
+      catch (e) { message(e.message + '；正在重试，不会重新分配比赛。') }
+      finally { loading = false }
+    })()
+    return refreshTask
+  }
+  $('confirmBan').onclick = async function () {
+    if (pending || selected === null) return
+    pending = true; render()
+    try {
+      await refreshTask
+      var me = state.players.find(function (p) { return p.id === RvBRanked.session().account.id })
+      if (state.phase !== 'veto' || me.banSubmitted) return
+      state = await RvBRanked.api('/official/pregame/' + encodeURIComponent(id), { action: 'ban', mapId: selected }); message('')
+    } catch (e) { message(e.message) } finally { pending = false; render() }
+  }
   $('chooseRoster').onclick = function () { location.href = RvBRanked.url('piece-selection.html', id) }
   $('withdraw').onclick = function () { $('withdrawDialog').showModal() }
   $('withdrawDialog').addEventListener('close', async function () {

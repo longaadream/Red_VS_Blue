@@ -28,6 +28,7 @@
     const seenRoots = new Set()
     let historicalRoot = null
     let boardContainer = null
+    let impact = null
     let pendingBefore = null
     let historicalSelection = ''
     let playbackModel = null
@@ -38,8 +39,10 @@
     const appliedBeats = new Set()
     const skillPlayback = root.BattleSkillPresentation ? root.BattleSkillPresentation.createPlayback() : null
     let skillRecovering = false
+    let recoveryBaselinePending = false
 
     function playbackPhase(phase, group) {
+      if (phase === 'settle' && impact) impact.stop()
       if (historicalRoot || !currentModel) return
       const rootId = group.root.rootEventId
       const frames = playbackBoards.get(rootId)
@@ -59,6 +62,8 @@
       const before = playbackModel || currentModel
       const after = Object.assign({}, before, { pieces: JSON.parse(JSON.stringify(before.pieces || [])), effects: JSON.parse(JSON.stringify(before.effects || [])) })
       const events = [group.root].concat(group.children || [])
+      if (phase !== 'settle' && !skillRecovering && !recoveryBaselinePending && skillAudio && skillAudio.playEvents) skillAudio.playEvents(events)
+      if (phase !== 'settle' && !skillRecovering && !recoveryBaselinePending && impact) impact.playEvents(events)
       const movementKinds = {}
       const buffTargets = new Set()
       events.forEach(function (event) {
@@ -114,6 +119,12 @@
           }
         })
       })
+      // Playback owns visual facts; selection and legal actions follow live authority.
+      after.selection = currentModel.selection
+      after.interaction = currentModel.interaction
+      after.legal = currentModel.legal
+      after.interactionPieces = currentModel.pieces
+      after.turn = currentModel.turn
       playbackModel = after
       if (phase === 'settle' && renderer.settlePresentation) renderer.settlePresentation(after)
       else if (renderer.animateAction) renderer.animateAction({ motionEventKey: 'beat:' + group.rootEventId,
@@ -122,6 +133,7 @@
     }
 
     function playbackIdle() {
+      if (impact) impact.stop()
       if (updating) {
         playbackRoot = null
         playbackModel = updatePlaybackBase ? Object.assign({}, currentModel, boardCopy(updatePlaybackBase)) : null
@@ -132,6 +144,7 @@
       if (mounted && !historicalRoot && currentModel && !updating) {
         if (renderer.settlePresentation) renderer.settlePresentation(currentModel)
         else renderer.update(currentModel)
+        if (typeof input.onPlaybackIdle === 'function') input.onPlaybackIdle()
       }
     }
 
@@ -156,6 +169,7 @@
     }
 
     function setHistoricalBoard(rootId, events) {
+      if (impact) impact.stop()
       // Rebuilding emits resize, which can ask for an unavailable record again.
       // Returning to the live board must be idempotent before notifying listeners.
       if (!rootId && !historicalRoot) return null
@@ -222,6 +236,7 @@
       if (mounted) dispose()
       const mountInput = mountOptions || {}
       boardContainer = mountInput.boardContainer
+      impact = root.BattleImpact ? root.BattleImpact.create(boardContainer) : null
       const doc = boardContainer && boardContainer.ownerDocument
       mounted = true
       try {
@@ -271,15 +286,21 @@
       const previousViewer = currentModel && currentModel.viewer && currentModel.viewer.id
       const nextViewer = model.viewer && model.viewer.id
       const viewerChanged = currentModel && previousViewer !== nextViewer
-      if (viewerChanged) {
-        if (vignetteUi && vignetteUi.reset) vignetteUi.reset(model)
-        else if (vignetteUi && vignetteUi.settleAll) vignetteUi.settleAll()
+      const resetBaseline = viewerChanged || skillRecovering || recoveryBaselinePending
+      recoveryBaselinePending = false
+      if (resetBaseline) {
+        if (impact) impact.stop()
+        updating = true
+        try {
+          if (vignetteUi && vignetteUi.reset) vignetteUi.reset(model)
+          else if (vignetteUi && vignetteUi.settleAll) vignetteUi.settleAll()
+        } finally { updating = false }
         playbackModel = null; playbackRoot = null; appliedBeats.clear(); playbackBoards.clear()
         seenRoots.clear(); pendingBefore = null
         if (historyUi && historyUi.clearHighlight) historyUi.clearHighlight()
       }
-      if (!viewerChanged) captureHistory(model.presentationEvents, pendingBefore || currentModel)
-      const beforePlayback = viewerChanged ? null : pendingBefore || currentModel
+      if (!resetBaseline) captureHistory(model.presentationEvents, pendingBefore || currentModel)
+      const beforePlayback = resetBaseline ? null : pendingBefore || currentModel
       const freshRoots = (model.presentationEvents || []).filter(function (event) {
         return !event.parentEventId && !seenRoots.has(event.rootEventId)
       })
@@ -291,6 +312,13 @@
       ;(model.presentationEvents || []).filter(function (e) { return !e.parentEventId }).forEach(function (e) { seenRoots.add(e.rootEventId) })
       while (seenRoots.size > 200) seenRoots.delete(seenRoots.values().next().value)
       currentModel = model
+      if (playbackModel) {
+        playbackModel.selection = model.selection
+        playbackModel.interaction = model.interaction
+        playbackModel.legal = model.legal
+        playbackModel.interactionPieces = model.pieces
+        playbackModel.turn = model.turn
+      }
       domUi.update(model)
       if (!playbackModel && beforePlayback && vignetteUi && vignetteUi.sequencesBoard) {
         playbackModel = Object.assign({}, model, boardCopy(beforePlayback))
@@ -339,6 +367,7 @@
       if (doc) ['pointerdown', 'click', 'contextmenu', 'keydown'].forEach(function (type) { doc.removeEventListener(type, guardHistoryInput, true) })
       renderer.dispose()
       if (skillAudio) skillAudio.dispose()
+      if (impact) { impact.dispose(); impact = null }
       domUi.dispose()
       if (vignetteUi && vignetteUi.dispose) vignetteUi.dispose()
       mounted = false
@@ -347,6 +376,7 @@
       historyBoards.clear(); seenRoots.clear()
       if (skillPlayback) skillPlayback.reset()
       skillRecovering = false
+      recoveryBaselinePending = false
       playbackModel = null; playbackRoot = null; appliedBeats.clear(); playbackBoards.clear()
     }
 
@@ -364,8 +394,14 @@
       dispose: dispose,
       getModel: function () { return currentModel },
       captureHistory: captureHistory,
-      beginSkillRecovery: function () { skillRecovering = true },
-      completeSkillRecovery: function () { if (skillRecovering && skillPlayback) skillPlayback.reset(); skillRecovering = false },
+      beginSkillRecovery: function () { skillRecovering = true; if (impact) impact.stop() },
+      completeSkillRecovery: function () {
+        if (skillRecovering) {
+          if (skillPlayback) skillPlayback.reset()
+          recoveryBaselinePending = true
+        }
+        skillRecovering = false
+      },
       sequencesBoard: !!(vignetteUi && vignetteUi.sequencesBoard),
     }
   }

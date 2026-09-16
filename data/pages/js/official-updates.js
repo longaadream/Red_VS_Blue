@@ -60,17 +60,18 @@
   const panel = document.createElement('dialog');
   panel.className = 'official-update-panel';
   panel.setAttribute('aria-labelledby', 'official-update-title');
-  panel.innerHTML = '<h2 id="official-update-title">官方更新</h2><p data-current></p><section class="official-update-section"><h3>资源包 · 测试频道</h3><p data-resource role="status"></p></section><section class="official-update-section"><h3>客户端 · 稳定频道</h3><p data-client role="status"></p></section><section class="official-update-section"><h3>本机游戏服务</h3><p data-local role="status">正在准备游戏…</p><button type="button" data-local-retry hidden>重新准备游戏</button></section><label><input type="checkbox" data-automatic> 后台自动检查并下载</label><p class="official-update-note">启动时检查更新，完成后进入游戏。客户端更新需重启安装。</p><p data-error role="alert"></p><div class="official-update-footer"><button type="button" data-recovery>资源管理</button><button type="button" data-check>立即检查</button><button type="button" data-install hidden>重启并安装</button><button type="button" data-close disabled>进入游戏</button></div>';
+  panel.innerHTML = '<h2 id="official-update-title">检查更新</h2><p data-current></p><section class="official-update-section"><h3>资源包 · 测试频道</h3><p data-resource role="status"></p></section><section class="official-update-section"><h3>客户端 · 稳定频道</h3><p data-client role="status"></p></section><section class="official-update-section"><h3>本机游戏服务</h3><p data-local role="status">正在准备游戏…</p><button type="button" data-local-retry hidden>重新准备游戏</button></section><label><input type="checkbox" data-automatic> 后台自动检查并下载</label><p class="official-update-note">检查不会阻止离线游玩。发现更新后可稍后处理；客户端安装需要重启。</p><p data-error role="alert"></p><div class="official-update-footer"><button type="button" data-recovery>资源管理</button><button type="button" data-check>立即检查</button><button type="button" data-install hidden>重启并安装</button><button type="button" data-close disabled>进入游戏</button></div>';
   document.body.appendChild(panel);
   const sourceLabel = document.createElement('label');
   sourceLabel.innerHTML = '下载源 <select data-source aria-label="更新下载源"><option value="github">GitHub 官方源</option><option value="cos">COS 香港源</option></select>';
   panel.insertBefore(sourceLabel, panel.querySelector('.official-update-section'));
   const sourceNote = document.createElement('p');
   sourceNote.className = 'official-update-note';
-  sourceNote.textContent = '客户端和资源包共用所选源。更新中或客户端已下载时暂不能切换；下载失败可切换后重试。';
+  sourceNote.textContent = '客户端和资源包共用所选源。检查较慢时可直接切换，旧来源的结果会被取消。';
   sourceLabel.after(sourceNote);
   const find = selector => panel.querySelector(selector);
   let startupPending = true;
+  let canEnter = false;
   let disposed = false;
   let localTimer;
   async function refreshLocal() {
@@ -93,6 +94,7 @@
   }
   function render(status) {
     startupPending = status.startupPending === true;
+    canEnter = status.canEnter === true;
     if (startupPending && !panel.open) panel.showModal();
     if (disposed) return;
     find('[data-check]').textContent = status.resource.phase === 'error' || status.client.phase === 'error' ? '重试更新检查' : '检查更新';
@@ -110,7 +112,7 @@
     const label = status.client.phase === 'downloaded' ? '更新已就绪' : status.resource.phase === 'applying' ? '正在更新资源…' : '官方更新';
     button.title = label;
     button.setAttribute('aria-label', label);
-    button.dataset.notice = String(status.client.phase === 'downloaded' || status.resource.phase === 'applying');
+    button.dataset.notice = String(status.client.phase === 'downloaded' || status.client.phase === 'downloading' || ['waiting', 'downloading', 'applying'].includes(status.resource.phase));
   }
   async function action(operation) {
     find('[data-error]').textContent = '';
@@ -118,7 +120,10 @@
     catch (error) { find('[data-error]').textContent = error.message || '更新暂时不可用，请稍后重试'; }
   }
   button.onclick = () => { panel.showModal(); void action(() => Promise.resolve()); };
-  panel.addEventListener('cancel', event => { if (startupPending) event.preventDefault(); });
+  panel.addEventListener('cancel', event => {
+    if (startupPending && !canEnter) event.preventDefault();
+    else if (startupPending) void action(async () => { render(await api.enterAfterUpdateCheck()); panel.close(); });
+  });
   find('[data-close]').onclick = () => action(async () => {
     if (startupPending) render(await api.enterAfterUpdateCheck());
     panel.close();
@@ -140,7 +145,7 @@
   find('[data-install]').onclick = () => action(() => api.installClientUpdate());
   find('[data-automatic]').onchange = event => action(() => api.setAutomaticUpdates(event.target.checked));
   find('[data-source]').onchange = event => action(async () => {
-    try { await api.setOfficialUpdateSource(event.target.value); }
+    try { await api.setOfficialUpdateSource(event.target.value); await api.checkOfficialUpdates(); }
     finally { render(await api.getOfficialUpdateStatus()); }
   });
   const unsubscribe = api.onOfficialUpdateStatus(render);

@@ -23,10 +23,11 @@ describe('RED-171 game-style main menu layout contract', () => {
   })
 
   it('keeps every existing destination mapped to the approved hierarchy', () => {
-    expect(page).toMatch(/id="mode-online"[\s\S]*?id="createLocalRoom"[\s\S]*?lanCreateDialog[\s\S]*?创建房间/)
-    expect(page).toMatch(/id="mode-online"[\s\S]*?onclick="showJoinSheet\(\)"[\s\S]*?加入房间/)
-    expect(page).toMatch(/id="mode-online"[\s\S]*?onclick="loadPage\('multiplayer\.html'\)"[\s\S]*?联机大厅/)
+    expect(page).toMatch(/id="mode-online"[\s\S]*?局域网联机[\s\S]*?id="createLocalRoom"[\s\S]*?创建 LAN 房间/)
+    expect(page).toMatch(/id="mode-online"[\s\S]*?加入 LAN 房间[\s\S]*?互联网联机/)
+    expect(page).toMatch(/id="mode-online"[\s\S]*?服务器大厅[\s\S]*?登录 \/ 排位对战/)
     expect(page).toMatch(/id="mode-adventure"[\s\S]*?id="pveBtn"[\s\S]*?onclick="window.location.href='adventure.html'"/)
+    expect(page).toMatch(/id="mode-adventure"[\s\S]*?加入局域网冒险[\s\S]*?服务器冒险/)
     expect(page).toMatch(/id="mode-training"[\s\S]*?onclick="goToTraining\(\)"/)
     expect(page).toMatch(/id="mode-codex"[\s\S]*?loadPage\('pieces\.html'\)[\s\S]*?loadPage\('maps\.html'\)/)
 
@@ -34,6 +35,21 @@ describe('RED-171 game-style main menu layout contract', () => {
     expect(page).toMatch(/class="utility-bar"[\s\S]*?loadPage\('pack\.html'\)/)
     expect(page).toMatch(/class="utility-bar"[\s\S]*?loadPage\('developer-tools\.html'\)/)
     expect(page).toMatch(/id="userPill"[\s\S]*?onclick="openIdentitySheet\(\)"/)
+  })
+
+  it('separates local player identity from persistent per-server accounts', () => {
+    const utilities = readFileSync(resolve(process.cwd(), 'data/pages/js/server-utils.js'), 'utf8')
+    const official = readFileSync(resolve(process.cwd(), 'data/pages/js/official.js'), 'utf8')
+    const colyseus = readFileSync(resolve(process.cwd(), 'data/pages/js/colyseus-client.js'), 'utf8')
+
+    expect(page).toContain('aria-label="打开本机玩家资料"')
+    expect(page).toContain('不是互联网服务器账号')
+    expect(utilities).toContain("var OFFICIAL_SESSION_PREFIX = 'rvb_official_session:'")
+    expect(utilities).toContain('function readOfficialSession(url)')
+    expect(utilities).toContain('function saveOfficialSession(value)')
+    expect(official).toContain('window.RvBUtils.saveOfficialSession')
+    expect(colyseus).toContain('window.RvBUtils.readOfficialSession(requested)')
+    expect(readFileSync(resolve(process.cwd(), 'data/pages/js/ranked-session.js'), 'utf8')).toContain('window.RvBUtils.readOfficialSession(selectedUrl)')
   })
 
   it('keeps the first-session tutorial visible without opening the training tab', () => {

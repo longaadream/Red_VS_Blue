@@ -112,6 +112,8 @@ export interface DeploymentRoomStore {
     lastErrorContext?: Record<string, unknown>
   }
   terminalAuthorityPersistencePolicy?: 'background' | 'durable-barrier'
+  /** Full history remains in the durable journal, not in the final live state. */
+  terminalTracePolicy?: 'journal'
   drainBattleAuthorityPersistence?(roomId?: string): Promise<void>
 }
 
@@ -778,7 +780,7 @@ export async function dispatchRoomBattleAction(
       nextAuthorityState = cloneBattleAuthorityJson(nextAuthorityState)
       actionResult = { ...actionResult, state: nextAuthorityState }
       const isTerminal = nextAuthorityState.terminalResult?.status === 'finished'
-      if (isTerminal && store.readBattleAuthorityHistory) {
+      if (isTerminal && store.terminalTracePolicy !== 'journal' && store.readBattleAuthorityHistory) {
         const materializedState = structuredClone(compactBattleTraceForAuthority(nextAuthorityState))
         const existingHistory = await store.readBattleAuthorityHistory(normalizedRoomId)
         const currentHistory = commands.map((command, index) => ({
@@ -790,6 +792,10 @@ export async function dispatchRoomBattleAction(
         const canonicalMaterializedState = cloneBattleAuthorityJson(materializedState)
         nextAuthorityState = canonicalMaterializedState
         actionResult = { ...actionResult, state: canonicalMaterializedState }
+      }
+      if (isTerminal && store.terminalTracePolicy === 'journal') {
+        nextAuthorityState = compactBattleTraceForAuthority(nextAuthorityState)
+        actionResult = { ...actionResult, state: nextAuthorityState }
       }
       const previousPublicState = toTimerSafePublicBattleState(previousAuthorityState)
       const nextPublicState = toTimerSafePublicBattleState(nextAuthorityState)

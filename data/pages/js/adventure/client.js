@@ -15,7 +15,7 @@ window.RvBAdventureClient = {
         async request(type, payload) {
           const result = await network.request(type === 'start' ? 'snapshot' : type, payload)
           if (!result.snapshot) throw new Error('等待房主开始冒险')
-          return result.snapshot
+          return { ...result.snapshot, requestMs: result.requestMs, timings: result.timings }
         },
       }
     }

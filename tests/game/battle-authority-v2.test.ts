@@ -467,11 +467,15 @@ describe('RED-109 authority v2 coordinator', () => {
     expect((store.room.battleState as unknown as ServerBattleState & { state: { deployment: { revision: number } } }).state.deployment.revision).toBe(0)
   })
 
-  it('uses one fully materialized terminal state for transition, live update, checkpoint and restore', async () => {
+  it.each(['legacy', 'journal'] as const)('keeps %s terminal state consistent across delivery, checkpoint and restore', async policy => {
     const room = makeRoom()
     room.battleAuthorityVersion = 0
     delete room.battleAuthorityTransitionHash
     const store = new AuthorityV2MemoryStore(room)
+    if (policy === 'journal') {
+      Object.assign(store, { terminalTracePolicy: 'journal' })
+      store.readBattleAuthorityHistory = async () => { throw new Error('Full history must not be loaded during terminal commit') }
+    }
     const clock = { now: () => 2_000 }
 
     await dispatchRoomBattleAction(store, room.id, 'player-red', {
@@ -498,13 +502,19 @@ describe('RED-109 authority v2 coordinator', () => {
     const terminalState = terminal.nextAuthorityState!
     expect(JSON.parse(JSON.stringify(terminalState))).toEqual(terminalState)
     const actionLog = terminalState.extensions?.debugBattle?.actionLog ?? []
-    expect(actionLog).toHaveLength(4)
+    expect(actionLog).toHaveLength(policy === 'journal' ? 1 : 4)
     expect(actionLog.map((entry: unknown) => (entry as { actionId?: string }).actionId)).toEqual([
       'system-initialize',
+      ...(policy === 'journal' ? [] : [
       'terminal-history-red-lock',
       'terminal-history-blue-lock',
       'terminal-history-surrender',
+      ]),
     ])
+    if (policy === 'journal') {
+      expect(terminalState.extensions?.debugBattle?.replay?.frames).toHaveLength(0)
+      expect(store.transitions.flatMap(t => t.replayFrames)).toHaveLength(3)
+    }
 
     const terminalTransition = store.transitions.at(-1)!
     const terminalCheckpoint = store.checkpoints.at(-1)!

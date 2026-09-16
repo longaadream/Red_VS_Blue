@@ -1,5 +1,11 @@
 (function (global) {
   'use strict'
+  const STATUS_PREFIX = 'rvb_tutorial_status:'
+
+  function saveLessonStatus(storage, lessonId, status) {
+    if (!storage || !lessonId || status !== 'completed') return
+    try { storage.setItem(STATUS_PREFIX + lessonId, JSON.stringify({ status: status, updatedAt: Date.now() })) } catch {}
+  }
   function create(lesson, hooks) {
     const root = document.createElement('aside')
     root.className = 'tutorial-dialog'
@@ -283,6 +289,7 @@
       if (!terminal || disposed || terminalShown) return
       terminalShown = true
       const won = terminal.winnerPlayerId === lesson.player.playerId
+      if (won) saveLessonStatus(global.localStorage, lesson.id, 'completed')
       const reasons = { 'core-eliminated': '一方场上核心全灭', 'mutual-core-elimination': '双方场上核心同时全灭', 'round-limit': '达到轮次上限', surrender: '投降', 'timeout-surrender': '超时投降' }
       message = (terminal.winnerPlayerId ? won ? '你赢下了本局。' : '本局失败。' : '本局平局。') + '原因：' + (reasons[terminal.reason] || terminal.reason) + '。'
       setTeachingCue(null)
@@ -416,5 +423,5 @@
       snapshot: function () { return { lessonId: lesson.id, started: started, busy: busy, failure: failure, openingStep: openingStep, notices: history.slice() } },
     })
   }
-  global.RvBTutorialLessonRuntime = Object.freeze({ create: create })
+  global.RvBTutorialLessonRuntime = Object.freeze({ create: create, saveLessonStatus: saveLessonStatus })
 })(typeof window !== 'undefined' ? window : globalThis)

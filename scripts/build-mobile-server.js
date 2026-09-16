@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-require-imports -- Build script runs as CommonJS under Node. */
 /**
  * build-mobile-server.js
  *
@@ -52,7 +53,8 @@ const resolvePlugin = {
     build.onResolve({ filter: /^(?:node:)?fs$/ },   () => ({ path: shimDir + '/fs-shim.ts' }))
     build.onResolve({ filter: /^(?:node:)?path$/ }, () => ({ path: shimDir + '/path-shim.ts' }))
     build.onResolve({ filter: /^(?:node:)?os$/ },   () => ({ path: shimDir + '/os-shim.ts' }))
-    build.onResolve({ filter: /^(?:node:)?(zlib|crypto|stream|net|http|https|child_process|worker_threads)$/ }, () => ({
+    build.onResolve({ filter: /^(?:node:)?crypto$/ }, () => ({ path: shimDir + '/crypto-shim.ts' }))
+    build.onResolve({ filter: /^(?:node:)?(zlib|stream|net|http|https|child_process|worker_threads)$/ }, () => ({
       path: shimDir + '/empty-shim.ts'
     }))
 

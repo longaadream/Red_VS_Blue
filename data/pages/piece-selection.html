@@ -14,7 +14,7 @@
   <script src="js/identity.js"></script>
   <script src="js/colyseus-sdk.js"></script>
   <script src="js/colyseus-client.js"></script>
-  <script src="js/deck-presets.js"></script>
+  <script src="js/deck-presets.js?v=2"></script>
   <script src="js/ranked-session.js"></script>
   <link rel="stylesheet" href="css/tabletop/ranked-match.css" />
   <style>
@@ -76,6 +76,9 @@
     .deck-card[aria-pressed="true"] { border-color:#60a5fa; background:#172b49; }
     .deck-card strong { display:block; margin-bottom:8px; font-size:16px; }
     .deck-card span { color:#94a3b8; font-size:12px; line-height:1.7; }
+    .deck-card em { display:block; margin-top:8px; color:#bfdbfe; font-size:12px; font-style:normal; }
+    .deck-section-title { color:#cbd5e1; font-size:12px; font-weight:800; letter-spacing:.08em; margin-top:4px; }
+    .piece-role { display:inline-block; margin-top:7px; padding:2px 7px; border-radius:999px; background:#334155; color:#cbd5e1; font-size:10px; }
 
     .piece-grid {
       display: grid;
@@ -292,6 +295,7 @@
   </style>
   <link rel="stylesheet" href="css/tabletop/tabletop.css" />
   <link rel="stylesheet" href="css/compact-library.css" />
+  <link rel="stylesheet" href="css/ranked-feedback.css" />
 </head>
 <body data-art-page="piece-selection">
 
@@ -302,13 +306,17 @@
     <div id="factionBadge" style="font-size:13px;padding:4px 10px;border-radius:6px;background:#1e293b;border:1px solid #334155;color:#64748b;flex-shrink:0">加载中...</div>
   </div>
 
-  <div class="alignment-panel">
+  <div id="rankedAlignmentIntro" class="ranked-alignment-intro" hidden><p>第 2 步 · 选择阵营</p><h2>光方还是暗方？</h2><span>本局只能使用同一阵营的 8 枚棋子。选定后查看该阵营的棋子与推荐阵容。</span></div>
+  <div class="alignment-panel" id="alignmentPanel">
     <button class="alignment-btn light" id="alignmentLightBtn" onclick="switchDeckAlignment('light')" disabled>光方</button>
     <button class="alignment-btn dark" id="alignmentDarkBtn" onclick="switchDeckAlignment('dark')" disabled>暗方</button>
   </div>
   <div id="alignmentLockNotice" class="alignment-lock-notice">阵营将在大厅准备后锁定</div>
 
-  <section class="deck-builder" aria-label="预设棋组">
+  <section class="deck-builder" id="rosterBuilder" aria-label="预设棋组">
+    <div class="deck-section-title">推荐入门阵容</div>
+    <div id="recommendedDeckGallery" class="deck-gallery recommended-deck-gallery" aria-label="推荐入门阵容"></div>
+    <div class="deck-section-title">我的棋组</div>
     <div id="deckGallery" class="deck-gallery" aria-label="已保存棋组"></div>
     <div class="deck-builder-row">
       <div class="deck-builder-title">棋组构筑</div>
@@ -326,7 +334,7 @@
   </section>
 
   <!-- Piece list -->
-  <div class="section">
+  <div class="section" id="rosterPieces">
     <div class="section-label" id="sectionLabel">可用棋子</div>
     <div class="hint-bar">右键或长按棋子可查看技能详情</div>
     <div id="pieceGrid" class="piece-grid" style="margin-top:8px">
@@ -682,7 +690,7 @@
       if (playerAlignment === 'light' || playerAlignment === 'good') {
         return pieces.filter(piece => piece.faction === 'good')
       }
-      return pieces
+      return params.get('ranked') === '1' ? [] : pieces
     }
 
     async function sendRoomAction(payload) {
@@ -733,6 +741,14 @@
       const darkBtn = document.getElementById('alignmentDarkBtn')
       const lockNotice = document.getElementById('alignmentLockNotice')
       const alignmentLocked = playerAlignment === 'light' || playerAlignment === 'dark' || playerAlignment === 'good' || playerAlignment === 'evil'
+      const ranked = params.get('ranked') === '1'
+      const needsAlignment = ranked && !alignmentLocked
+      document.body.classList.toggle('ranked-roster', ranked)
+      document.body.classList.toggle('awaiting-ranked-alignment', needsAlignment)
+      document.getElementById('rankedAlignmentIntro').hidden = !needsAlignment
+      document.getElementById('rosterBuilder').hidden = needsAlignment
+      document.getElementById('rosterPieces').hidden = needsAlignment
+      document.getElementById('alignmentPanel').classList.toggle('needs-alignment', needsAlignment)
       if (lightBtn) lightBtn.classList.toggle('active', playerAlignment === 'light' || playerAlignment === 'good')
       if (darkBtn) darkBtn.classList.toggle('active', playerAlignment === 'dark' || playerAlignment === 'evil')
       if (lightBtn) lightBtn.disabled = (!deckBuilderMode && params.get('ranked') !== '1') || alignmentLoading
@@ -742,7 +758,7 @@
         : alignmentLocked
         ? '阵营已在大厅锁定。可载入棋组，也可在本页自由构筑、调整并保存本阵营的 8 枚棋子。'
         : '正在读取大厅分配的阵营'
-      if (lockNotice && params.get('ranked') === '1') lockNotice.textContent = '根据本局地图选择阵营和8枚棋子。120秒结束后自动补齐并锁定，随后进入正常逐步部署。'
+      if (lockNotice && ranked) lockNotice.textContent = needsAlignment ? '先选阵营，再组建阵容。倒计时持续进行。' : '第 3 步 · 选择本阵营的 8 枚棋子。切换阵营会清空当前选择；超时自动补齐。'
       if (!badge) return
       const orderLabel = playerFaction === 'red' ? '座位 red' : playerFaction === 'blue' ? '座位 blue' : null
       if (playerAlignment === 'dark' || playerAlignment === 'evil') {
@@ -858,6 +874,30 @@
             + escapeHtml(preset.name) + '</strong><span>' + (alignment === 'evil' ? '暗方' : '光方') + ' · 8 枚棋子<br>' + escapeHtml(names) + '</span></button>'
         }).join('') : '<p>还没有' + (alignment === 'evil' ? '暗方' : '光方') + '棋组。请选择下方 8 枚棋子，命名后保存。</p>'
       }
+      const recommendedGallery = document.getElementById('recommendedDeckGallery')
+      if (recommendedGallery) renderRecommendedDecks(recommendedGallery, alignment)
+    }
+
+    function renderRecommendedDecks(gallery, alignment = currentAlignmentKey()) {
+      const recommended = window.RvBDeckPresets.recommended(alignment, PIECE_TEMPLATES)
+      gallery.innerHTML = recommended.map(function (preset, index) {
+        return '<button type="button" class="deck-card" ' + (preset.available ? '' : 'disabled ') + 'onclick="loadRecommendedPreset(' + index + ')"><strong>'
+          + escapeHtml(preset.name) + '</strong><span>' + escapeHtml(preset.style) + '<br>'
+          + escapeHtml(preset.opening) + '</span><em>' + (preset.available ? '点击载入并查看搭配提示' : '当前资源缺少这套阵容所需棋子') + '</em></button>'
+      }).join('') || '<p>当前资源没有可用的完整推荐阵容。</p>'
+    }
+
+    function loadRecommendedPreset(index) {
+      const alignment = currentAlignmentKey()
+      const preset = window.RvBDeckPresets.recommended(alignment, PIECE_TEMPLATES)[index]
+      if (!preset || !preset.available) return
+      editingPresetId = ''
+      selectedIds = new Set(preset.pieceIds)
+      document.getElementById('deckPresetSelect').value = ''
+      document.getElementById('deckPresetName').value = preset.name.replace(/^.+? · /, '')
+      renderPieces()
+      updateConfirmBar()
+      setPresetStatus('已载入「' + preset.name + '」。搭配：' + preset.pairing + ' 替换：' + preset.replacement)
     }
 
     function choosePresetCard(index) {
@@ -950,6 +990,7 @@
 
     function renderPieces() {
       const grid = document.getElementById('pieceGrid')
+      if (params.get('ranked') === '1' && !currentAlignmentKey()) { grid.innerHTML = ''; return }
       if (!PIECE_TEMPLATES.length) {
         const message = pieceLoadError || '暂无可用棋子'
         const color = pieceLoadError ? '#f87171' : '#475569'
@@ -976,8 +1017,12 @@
             HP: ${s.maxHp || '?'} · ATK: ${s.attack || '?'}<br>
             DEF: ${s.defense || 0} · MOV: ${s.moveRange || 3}
           </div>
+          ${window.RvBDeckPresets.roleFor(p) ? '<span class="piece-role">' + escapeHtml(window.RvBDeckPresets.roleFor(p)) + '</span>' : ''}
         </div>`
       }).join('')
+
+      const recommendedGallery = document.getElementById('recommendedDeckGallery')
+      if (recommendedGallery) renderRecommendedDecks(recommendedGallery)
 
       // Long-press for touch devices
       setupLongPress()
@@ -1169,6 +1214,7 @@
     }
 
     function togglePiece(id) {
+      if (params.get('ranked') === '1' && !currentAlignmentKey()) return
       if (selectedIds.has(id)) selectedIds.delete(id)
       else selectedIds.add(id)
       updateConfirmBar()
@@ -1178,6 +1224,10 @@
     function updateConfirmBar() {
       const n = selectedIds.size
       document.getElementById('selectedCount').textContent = '已选 ' + n + ' / 8 个棋子'
+      if (params.get('ranked') === '1') {
+        document.getElementById('selectedCount').textContent = currentAlignmentKey() ? '已选 ' + n + ' / 8 枚 · ' + (currentAlignmentKey() === 'good' ? '光方' : '暗方') : '请先选择光方或暗方'
+        document.getElementById('confirmBtn').textContent = currentAlignmentKey() ? '锁定阵容 · 进入对战' : '先选择阵营'
+      }
       document.getElementById('confirmBtn').disabled = !playerAlignment || n !== 8
       if (params.get('ranked') === '1' && window.RvBRankedSelection) window.RvBRankedSelection.changed()
     }
@@ -1268,5 +1318,6 @@
     window.addEventListener('unload', () => { if (pollTimer) clearInterval(pollTimer) })
   </script>
   <script src="js/ranked-selection.js"></script>
+<script src="js/battle-audio.js" defer></script><script src="js/button-audio.js" defer></script>
 </body>
 </html>

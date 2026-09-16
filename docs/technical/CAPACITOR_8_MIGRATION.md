@@ -18,14 +18,17 @@ Set `JAVA_HOME` to a JDK 21 installation, then run from the repository root:
 ```powershell
 npm.cmd ci
 npm.cmd run build:android
-Set-Location android
-.\gradlew.bat assembleDebug
 ```
 
-`build:android` copies the generated web assets and runs `cap sync android`.
-After `assembleDebug` succeeds, install the resulting debug APK on an API 24+
-device or emulator and verify that the launcher activity opens and game assets
-load.
+`build:android` builds the current `UiAcceptanceActivity` shell, including the
+native host, update bridge and full staged resources. Install
+`dist/android-ui-acceptance/RedVsBlue-RED199-UI-Acceptance.apk` on an API 24+
+device and verify that the launcher activity opens and game assets load.
+This isolated acceptance app uses package ID `com.redvsblue.client.uiqa`.
+Do not run `assembleDebug`: that variant uses the obsolete `MainActivity` shell.
+Public packages use `scripts/build-android-release.ps1` and `assembleDemo`.
+Acceptance versionCode defaults to 26; pass `-VersionCode` to the PowerShell
+script for later candidates. An existing higher environment override is retained.
 
 The Gradle project deliberately does not set `org.gradle.java.home`; this keeps
 the required JDK 21 selection explicit in the local environment or Android

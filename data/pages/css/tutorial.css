@@ -336,6 +336,14 @@ body[data-art-page=tutorial] footer a { color: #c4ad85; }
 }
 @media (prefers-reduced-motion: reduce) { .lesson-card, .tutorial-dialog__button { transition: none !important; } }
 body[data-art-page=tutorial] .lesson-card.is-unavailable { filter: saturate(.35); }
+.tutorial-quickstart { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; margin:0 0 18px; }
+.tutorial-quickstart>div { display:grid; grid-template-columns:34px 1fr; gap:9px; align-items:center; padding:10px 12px; color:#55432f; background:#c8b58f; border:2px solid #5b4732; border-radius:7px 13px 6px 10px; box-shadow:2px 3px #21191466; }
+.tutorial-quickstart b { display:grid; place-items:center; width:32px; height:32px; border-radius:50%; background:#465f60; color:#f2ddb4; font:18px TutorialComic,sans-serif; }
+.tutorial-quickstart span { display:grid; font-size:12px; line-height:1.45; }
+.tutorial-quickstart strong { color:#35291f; font-size:14px; }
+body[data-art-page=tutorial] .lesson-card.is-complete { box-shadow:inset 0 0 0 3px #506b58, 3px 6px #1d1612; }
+body[data-art-page=tutorial] .lesson-card.is-next { outline:4px solid #d4ae56; outline-offset:4px; }
+@media(max-width:760px){.tutorial-quickstart{grid-template-columns:1fr}.tutorial-quickstart>div{min-height:56px}}
 body[data-art-page=tutorial] .is-unavailable .start { background: #655b4c; color: #dbcaac; cursor: default; box-shadow: none; }
 body[data-art-page=tutorial] .is-unavailable .start::after { content: none; }
 

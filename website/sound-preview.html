@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>基础音效试听</title><link rel="stylesheet" href="styles.css"><script src="assets/battle-audio.js" defer></script><script src="assets/battle-impact.js" defer></script>
+<style>.sound-settings{display:flex;gap:24px;flex-wrap:wrap;align-items:center;margin:24px 0}.sound-settings label{display:flex;align-items:center;gap:12px}.sound-stage{padding:24px;border:3px solid #584631;border-radius:12px;background:#dec79d;max-width:620px;margin:24px 0;overflow:hidden}.sound-board{display:flex;align-items:center;justify-content:center;gap:40px;min-height:100px;background:repeating-conic-gradient(#ccb58b 0% 25%,#ecd6a8 0% 50%) 50% / 48px 48px;border:2px solid #745a3d}.sound-piece{font-size:44px;background:#41646a;color:#fff0cc;border:3px solid #30291e;border-radius:50%;width:70px;height:70px;text-align:center;line-height:64px}.sound-value{font:bold 40px monospace;color:#793e2c;min-width:100px;text-shadow:1px 2px #f5e7ce}.sound-group{margin:28px 0}.sound-group h2{font-size:24px;margin:0 0 12px}.sound-group .actions{flex-wrap:wrap}.sound-status{min-height:28px;margin:10px 0 0}</style>
+<script src="assets/button-audio.js" defer></script></head><body><main class="wrap"><section><p class="eyebrow">音效与打击反馈 · 试听</p><h1>轻一点，还是重一点？</h1><p>同类声音分三档。重伤害附带短暂震动，移动和治疗不震。</p>
+<div class="sound-settings"><label>音量 <input data-sound-volume type="range" min="0" max="100" aria-label="音效音量"><output data-sound-label></output></label><label><input data-screen-shake type="checkbox">重伤害画面震动</label></div>
+<div class="sound-stage"><div class="sound-board" id="soundBoard"><span class="sound-piece">♟</span><span class="sound-value" id="soundValue">—</span></div><p class="sound-status" id="soundStatus" role="status">选择下方按钮试听</p></div>
+<div class="sound-group"><h2>伤害</h2><div class="actions"><button class="button" data-kind="damage" data-value="2">轻击 · 2 点</button><button class="button" data-kind="damage" data-value="5">中击 · 5 点</button><button class="button" data-kind="damage" data-value="10">重击 · 10 点</button></div></div>
+<div class="sound-group"><h2>治疗</h2><div class="actions"><button class="button secondary" data-kind="heal" data-value="2">小治疗 · 2 点</button><button class="button secondary" data-kind="heal" data-value="5">中治疗 · 5 点</button><button class="button secondary" data-kind="heal" data-value="10">大治疗 · 10 点</button></div></div>
+<div class="sound-group"><h2>移动</h2><div class="actions"><button class="button" data-kind="move" data-value="1">短距离 · 1 格</button><button class="button" data-kind="move" data-value="3">中距离 · 3 格</button><button class="button" data-kind="move" data-value="6">长距离 · 6 格</button><button class="button secondary" data-kind="teleport" data-value="6">传送</button></div></div>
+<div class="sound-group"><h2>按钮</h2><button class="button" type="button">点击试听</button></div><p class="note">群体效果取同批最高档，不按人数叠加响度。系统开启“减少动态效果”时不震动。</p><a href="index.html">← 查看官网预览</a>
+</section></main><script>
+window.addEventListener('DOMContentLoaded',function(){
+ const audio=BattleAudio.create(),impact=BattleImpact.create(document.getElementById('soundBoard'));
+ document.querySelectorAll('[data-kind]').forEach(button=>button.addEventListener('click',function(){
+  const kind=button.dataset.kind,value=Number(button.dataset.value),movement=kind==='move'||kind==='teleport';
+  const events=[{kind:movement?'move':kind,result:movement?{fromX:0,fromY:0,toX:value,toY:0,movementKind:kind==='teleport'?'teleport':'walk'}:{amount:value}}];
+  audio.playEvents(events);impact.playEvents(events);
+  document.getElementById('soundValue').textContent=movement?value+'格':(kind==='heal'?'+':'−')+value;
+  document.getElementById('soundStatus').textContent=button.textContent;
+ }));
+ window.addEventListener('pagehide',()=>{audio.dispose();impact.dispose()},{once:true});
+})
+</script></body></html>

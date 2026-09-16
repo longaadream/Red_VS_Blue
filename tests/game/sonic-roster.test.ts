@@ -221,6 +221,24 @@ describe('Sonic roster mechanics', () => {
     expect(enemy.rules.map((rule) => rule.id)).toEqual(expect.arrayContaining(['rule-silenced-block', 'rule-chidori-immobile']))
   })
 
+  it('limits Shadow chaos control to the 5 by 5 area centered on its landing cell', () => {
+    const definition = JSON.parse(readFileSync(resolve(process.cwd(), 'data/skills/shadow-chaos-control.json'), 'utf8'))
+    const shadow = makePiece({ instanceId: 'shadow', templateId: 'shadow', ownerPlayerId: 'player-red', x: 0, y: 0 })
+    const inside = makePiece({ instanceId: 'inside', ownerPlayerId: 'player-blue', x: 4, y: 4 })
+    const outside = makePiece({ instanceId: 'outside', ownerPlayerId: 'player-blue', x: 5, y: 2 })
+    const state = makeState({ pieces: [shadow, inside, outside], width: 8, height: 8 })
+
+    const result = executeSkillFunction(definition, {
+      piece: shadow, target: null, targetPosition: { x: 2, y: 2 }, targets: [{ info: null, pos: { x: 2, y: 2 } }],
+      skill: definition, battle: state,
+    }, state)
+
+    expect(result.success).toBe(true)
+    expect(definition.description).toContain('落点周围5×5')
+    expect(inside.statusTags.some((tag) => tag.type === 'silenced')).toBe(true)
+    expect(outside.statusTags.some((tag) => tag.type === 'silenced')).toBe(false)
+  })
+
   it('only exposes empty floor and cover cells for Shadow chaos control', () => {
     const definition = JSON.parse(readFileSync(resolve(process.cwd(), 'data/skills/shadow-chaos-control.json'), 'utf8'))
     const shadow = makePiece({

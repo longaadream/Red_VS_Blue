@@ -48,7 +48,12 @@
   body[data-art-page=piece-selection] .alignment-btn { min-height:44px; padding:4px 10px!important; font-size:17px!important; }
   body[data-art-page=piece-selection] .alignment-lock-notice { display:none; }
   body[data-art-page=piece-selection] .deck-builder { grid-column:1; grid-row:3; margin:0 8px 6px; padding:8px!important; width:auto; overflow:auto; align-content:start; gap:6px; }
-  body[data-art-page=piece-selection] .deck-gallery { display:none; } /* Same presets remain in the select. */
+  body[data-art-page=piece-selection] #deckGallery { display:none; } /* Saved presets remain in the select. */
+  body[data-art-page=piece-selection] .recommended-deck-gallery { display:grid; grid-template-columns:1fr; gap:6px; }
+  body[data-art-page=piece-selection] .recommended-deck-gallery .deck-card { padding:9px 10px; }
+  body[data-art-page=piece-selection] .recommended-deck-gallery .deck-card strong { margin-bottom:3px; font-size:13px; }
+  body[data-art-page=piece-selection] .recommended-deck-gallery .deck-card span { display:block; font-size:10px; line-height:1.35; }
+  body[data-art-page=piece-selection] .recommended-deck-gallery .deck-card em { margin-top:3px; font-size:10px; }
   body[data-art-page=piece-selection] .deck-builder-row { gap:4px; }
   body[data-art-page=piece-selection] .deck-builder-title { display:block; flex-basis:100%; }
   body[data-art-page=piece-selection] .deck-builder :is(select,input) { width:100%; flex-basis:100%; min-width:0; min-height:44px; font-size:14px!important; padding:4px 7px!important; }

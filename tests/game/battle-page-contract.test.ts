@@ -1062,4 +1062,40 @@ new Script([
       /function reconcileDeploymentPieceInfo[\s\S]*?deployment\.revision !== currentPieceInfoDeploymentRevision[\s\S]*?closePieceInfo/,
     )
   })
+
+  it('cancels a training reaction as the player that owns the pending selection', () => {
+    const battlePage = readPage('battle.html')
+    const submittedActions: unknown[] = []
+    const context = createContext({
+      G: {
+        pendingTargetSelection: {
+          playerId: 'training-red', selectionId: 'hunt-selection', stateRevision: 12,
+        },
+        pieces: [],
+      },
+      myPlayerId: 'training-blue',
+      targetSubmissionPending: false,
+      pendingTargetSelectionForMe: () => true,
+      pendingOptionSelectionForMe: () => false,
+      doAction: (action: unknown) => { submittedActions.push(action); return Promise.resolve() },
+      clearTargetInteraction: () => {},
+      setMoveButtonClass: () => {},
+      renderBoard: () => {},
+      renderPieceContextMenu: () => {},
+      renderActionBar: () => {},
+      renderTargetOverlay: () => {},
+      setStatusMsg: () => {},
+      selectedPieceId: null,
+      locallyCancelledSelectionId: null,
+    })
+    new Script(readNamedFunction(battlePage, 'cancelTargetSelection')).runInContext(context)
+
+    new Script('cancelTargetSelection()').runInContext(context)
+    expect(JSON.parse(JSON.stringify(submittedActions))).toEqual([{
+      type: 'cancelPendingSelection',
+      playerId: 'training-red',
+      selectionId: 'hunt-selection',
+      stateRevision: 12,
+    }])
+  })
 })

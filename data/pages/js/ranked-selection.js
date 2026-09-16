@@ -44,10 +44,10 @@
       if (saved.account.id !== playerId) throw new Error('账号与比赛身份不一致')
       RvBUtils.saveRemoteServerUrl(saved.url); RvBUtils.switchServerMode('remote')
       var strip = document.createElement('div'); strip.className = 'ranked-roster-strip'
-      strip.innerHTML = '<strong>官方排位</strong><span id="rankedRosterMap">读取地图…</span><small>超时随机补齐，不自动部署</small><span id="rankedRosterClock">02:00</span><button id="rankedViewMap" type="button">查看地图</button><div id="rankedRosterError" class="ranked-roster-error" role="status"></div>'
+      strip.innerHTML = '<strong>排位对战</strong><span id="rankedRosterMap">读取地图…</span><small>禁图完成 · 选择阵营 → 组建阵容 → 对战</small><span id="rankedRosterClock" aria-label="阵容剩余时间">02:00</span><button id="rankedViewMap" type="button">查看地图</button><div id="rankedRosterError" class="ranked-roster-error" role="status"></div>'
       document.querySelector('.topbar').after(strip)
       document.getElementById('rankedViewMap').onclick = window.RvBRankedSelection.viewMap
-      document.getElementById('serverLabel').textContent = '官方排位 · 阵容实时保存'
+      document.getElementById('serverLabel').textContent = '排位对战 · 阵容实时保存'
       document.getElementById('pageTitle').textContent = '排位 · 选择阵营与阵容'
       await poll(); setInterval(poll, 800); setInterval(clock, 250)
     },

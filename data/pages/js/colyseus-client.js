@@ -139,8 +139,11 @@
 
   function officialSession(base) {
     try {
-      var saved = JSON.parse(window.sessionStorage.getItem('rvb_official_session') || 'null')
-      return saved && saved.token && saved.account && saved.url === normalizedBaseUrl(base || getServerUrl()) ? saved : null
+      var requested = normalizedBaseUrl(base || getServerUrl())
+      var saved = window.RvBUtils && typeof window.RvBUtils.readOfficialSession === 'function'
+        ? window.RvBUtils.readOfficialSession(requested)
+        : JSON.parse(window.sessionStorage.getItem('rvb_official_session') || 'null')
+      return saved && saved.token && saved.account && saved.url === requested ? saved : null
     } catch { return null }
   }
 
@@ -197,7 +200,8 @@
     room.onMessage('officialSessionExpired', function () {
       _shouldReconnect = false
       clearReconnectToken()
-      window.sessionStorage.removeItem('rvb_official_session')
+      if (window.RvBUtils && typeof window.RvBUtils.clearOfficialSession === 'function') window.RvBUtils.clearOfficialSession(getServerUrl())
+      else window.sessionStorage.removeItem('rvb_official_session')
       window.location.href = 'official.html'
     })
     room.onMessage('officialMatchClosed', function () {

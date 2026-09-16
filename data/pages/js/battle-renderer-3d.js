@@ -1125,9 +1125,10 @@
     _syncSelectedHighlight(hl.selected || null)
     const targets = new Set((hl.skill || []).map(_normalizeHighlightItem).filter(Boolean).map(cell => cell.key))
     _pieceObjects.forEach(function (obj) {
-      if (!obj.portraitLoaded || obj.deathAnimating) return
+      if (obj.deathAnimating) return
       const dim = targets.size > 0 && !targets.has(obj.targetX + ',' + obj.targetZ) && obj.id !== hl.selected
-      obj.portraitMesh.material.color.setHex(dim ? 0x96918a : 0xffffff)
+      if (targets.has(obj.targetX + ',' + obj.targetZ)) obj.portraitMesh.material.color.setRGB(2.15, 2.15, 1.85)
+      else obj.portraitMesh.material.color.setHex(dim ? 0x96918a : 0xffffff)
     })
   }
 
@@ -2019,7 +2020,27 @@
     })
   }
 
+  function _syncTargetCandidateBrightness(obj, candidate) {
+    const factionColor = FACTION_COLORS[obj.faction] || FACTION_COLORS.red
+    if (obj.body.material.color) obj.body.material.color.setHex(candidate ? 0x78838c : 0x22272d)
+    if (obj.body.material.emissive) obj.body.material.emissive.setHex(candidate ? 0xfff1bd : factionColor)
+    obj.body.material.emissiveIntensity = candidate ? 1.05 : (obj.pending ? 0.24 : (obj.targetSelected ? 0.12 : 0.08))
+    if (obj.portraitMesh.material.color) {
+      if (candidate) obj.portraitMesh.material.color.setRGB(2.15, 2.15, 1.85)
+      else obj.portraitMesh.material.color.setHex(0xffffff)
+    }
+    if (obj.ring.material.color) obj.ring.material.color.setHex(factionColor)
+    if (obj.ring.material.emissive) obj.ring.material.emissive.setHex(candidate ? 0xffffff : factionColor)
+    obj.ring.material.emissiveIntensity = candidate ? 1.15 : 0.3
+    if (obj.ink.material.color) obj.ink.material.color.setHex(candidate ? 0x75664e : 0x211c1a)
+    if (obj.markerMaterial.color) obj.markerMaterial.color.setHex(candidate ? 0xffffff : 0xf2e8d5)
+    if (obj.summaryEl && obj.summaryEl.classList && typeof obj.summaryEl.classList.toggle === 'function') {
+      obj.summaryEl.classList.toggle('is-target-candidate', candidate)
+    }
+  }
+
   function _syncPendingFeedback(interaction) {
+    const candidateCells = new Set(((_currentModel && _currentModel.legal && _currentModel.legal.targetCells) || []).map(function (cell) { return cell.x + ',' + cell.y }))
     const selectedCells = new Set((interaction.selectedTargetCells || []).map(function (cell) { return cell.x + ',' + cell.y }))
     _hlObjects.skill.forEach(function (entry, key) {
       if (selectedCells.has(key)) entry.mesh.material.color.setHex(0x60a5fa)
@@ -2032,19 +2053,26 @@
     _pieceObjects.forEach(function (obj, pieceId) {
       const pending = pieceId === pendingId
       const targetSelected = selectedTargetIds.has(pieceId)
-      const feedbackState = pending ? 'pending' : (targetSelected ? 'target-selected' : 'none')
+      const piece = (_currentModel.pieces || []).find(function (entry) { return entry.id === pieceId })
+      const candidate = !!piece && piece.visible !== false && candidateCells.has(piece.x + ',' + piece.y)
+      const feedbackState = (pending ? 'pending' : (targetSelected ? 'target-selected' : 'none')) + (candidate ? ':candidate' : '')
       if (obj.pendingFeedbackState === feedbackState) return
       obj.pendingFeedbackState = feedbackState
       obj.pending = pending
       obj.targetSelected = targetSelected
+      obj.targetCandidate = candidate
+      _syncTargetCandidateBrightness(obj, candidate)
       if (pending || targetSelected) {
         obj.feedbackRing.material.color.setHex(pending ? 0xf59e0b : 0x60a5fa)
         obj.feedbackRing.material.opacity = 0.58
-        obj.body.material.emissiveIntensity = pending ? 0.24 : 0.12
+        if (!candidate) obj.body.material.emissiveIntensity = pending ? 0.24 : 0.12
         if (!_reducedMotion && !_anims.has(obj.motionId + ':position')) obj.group.position.y = obj.baseY + 0.04
       } else {
         obj.feedbackRing.material.opacity = 0
-        obj.body.material.emissiveIntensity = 0.08
+        if (!candidate) obj.body.material.emissiveIntensity = 0.08
+        // Candidate identity comes from the fully brightened token. The separate
+        // board-aligned target cell remains, but no extra ring is drawn on top.
+        if (candidate) obj.feedbackRing.material.opacity = 0
         if (!_anims.has(obj.motionId + ':position') && !obj.deathAnimating) obj.group.position.y = obj.baseY
       }
     })
@@ -2209,9 +2237,7 @@
       material.opacity = 1
       material.transparent = false
     })
-    if (obj.body.material.color) obj.body.material.color.setHex(0x22272d)
-    if (obj.body.material.emissive) obj.body.material.emissive.setHex(FACTION_COLORS[obj.faction] || FACTION_COLORS.red)
-    obj.body.material.emissiveIntensity = obj.pending ? 0.24 : (obj.targetSelected ? 0.12 : 0.08)
+    _syncTargetCandidateBrightness(obj, !!obj.targetCandidate)
     if (obj.ring.material.color) obj.ring.material.color.setHex(FACTION_COLORS[obj.faction] || FACTION_COLORS.red)
     if (obj.ring.material.emissive) obj.ring.material.emissive.setHex(FACTION_COLORS[obj.faction] || FACTION_COLORS.red)
     obj.ring.material.emissiveIntensity = 0.3
@@ -2579,6 +2605,10 @@
     _listen(canvas, 'contextmenu', e => {
       e.preventDefault()
       _resetPointerState(canvas)
+      if (_currentModel && _currentModel.selection && _currentModel.selection.mode === 'target') {
+        if (_onIntent) _onIntent({ type: 'cancel-target' })
+        return
+      }
       let piece = _findPieceFromPointer(e.clientX, e.clientY)
       if (!piece) {
         const coords = screenToCell(e.clientX, e.clientY)
@@ -2766,14 +2796,14 @@
 
   function _findPieceAt(x, y) {
     if (!_currentModel) return null
-    return (_currentModel.pieces || []).find(p => p.x === x && p.y === y && p.visible !== false) || null
+    return (_currentModel.interactionPieces || _currentModel.pieces || []).find(p => p.x === x && p.y === y && p.visible !== false) || null
   }
   function _findPieceFromPointer(clientX, clientY) {
     if (!_currentModel || !_renderer || !_camera) return null
     let closest = null
     let closestDistance = Infinity
 
-    ;(_currentModel.pieces || []).forEach(piece => {
+    ;(_currentModel.interactionPieces || _currentModel.pieces || []).forEach(piece => {
       if (piece.visible === false) return
       const obj = _pieceObjects.get(piece.id)
       const x = obj ? obj.group.position.x : piece.x

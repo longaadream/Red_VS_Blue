@@ -44,9 +44,9 @@ body:has(#deploymentStatus:not([hidden])) #handResources {
   left:50%; right:auto; transform:translateX(-50%); flex-direction:row;
 }
 @media(max-height:600px) {
-  body:has(#deploymentStatus:not([hidden])) #handResources { top:calc(55px + env(safe-area-inset-top,0px)); }
-  body:has(#deploymentStatus:not([hidden])) #handResources .hand-resource { min-height:28px; padding:2px 6px!important; }
-  body:has(#deploymentStatus:not([hidden])) #handResources strong { font-size:20px; }
+  /* Deployment is free and its legal cells need the full board. Resource totals
+     return as soon as the deployment choice has resolved. */
+  body:has(#deploymentStatus:not([hidden])) #handResources { display:none!important; }
 }
 .adventure-mode #handResources { left:auto; right:18px; top:calc(100px + env(safe-area-inset-top,0px)); bottom:auto!important; transform:none; max-width:220px; }
 @media(max-height:600px), (pointer:coarse) {
@@ -54,4 +54,8 @@ body:has(#deploymentStatus:not([hidden])) #handResources {
   .adventure-mode #handResources .hand-resource { min-height:28px; padding:2px 5px!important; }
   .adventure-mode #handResources strong { font-size:20px; }
   .adventure-mode #handResources .hand-resource-track { display:none; }
+}
+@media(max-height:600px), (pointer:coarse) {
+  .adventure-mode:has(#deploymentStatus:not([hidden])) #adventureMobileAp,
+  .adventure-mode:has(#deploymentStatus:not([hidden])) #adventureCoins { display:none!important; }
 }

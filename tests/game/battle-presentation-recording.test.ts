@@ -64,7 +64,7 @@ describe('ordered committed presentation recording', () => {
     const caster = makePiece({instanceId:'shadow',x:0,y:0,skills:[{skillId:'shadow-chaos-control',currentCooldown:0,usesRemaining:-1}]})
     const before = makeState({pieces:[caster,
       makePiece({instanceId:'enemy-a',ownerPlayerId:'player-blue',faction:'blue',x:3,y:1}),
-      makePiece({instanceId:'enemy-b',ownerPlayerId:'player-blue',faction:'blue',x:4,y:1})]})
+      makePiece({instanceId:'enemy-b',ownerPlayerId:'player-blue',faction:'blue',x:3,y:2})]})
     before.players[0].actionPoints=10; before.players[0].chargePoints=10
     before.skillsById=loadAllSkillsById()
     const base: BattleAction={type:'useChargeSkill',playerId:'player-red',pieceId:'shadow',skillId:'shadow-chaos-control'}
@@ -196,7 +196,10 @@ describe('ordered committed presentation recording', () => {
 
   it('records the real Grimmjow response as relocation then alternating enemy and self damage', () => {
     const grimm = makePiece({ instanceId: 'grimm', templateId: 'dark-grimmjow', x: 0, y: 1,
-      currentHp: 10, maxHp: 10, attack: 4, rules: [loadRuleById('rule-grimmjow-hunt-after-move', true)!] })
+      currentHp: 10, maxHp: 10, attack: 4, rules: [
+        loadRuleById('rule-grimmjow-hunt-after-move', true)!,
+        loadRuleById('rule-grimmjow-destruction-instinct', true)!,
+      ] })
     const enemy = makePiece({ instanceId: 'enemy', ownerPlayerId: 'player-blue', faction: 'blue', x: 3, y: 1, currentHp: 20 })
     const before = makeState({ pieces: [grimm, enemy], currentPlayerId: 'player-blue', width: 6, height: 4 })
     const pending = run(before, { type: 'move', playerId: 'player-blue', pieceId: 'enemy', toX: 2, toY: 1 }).state

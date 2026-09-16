@@ -455,3 +455,49 @@
   body #handCards .card-name-banner { font-size: 12px !important; line-height: 1.2 !important; white-space: normal !important; text-overflow: clip !important; overflow-wrap: anywhere; min-height: 30px; }
   body #handCards .card-item { -webkit-touch-callout: none; user-select: none; touch-action: pan-x; }
 }
+
+/* Toolbar width is shared by every landscape breakpoint, including desktop
+   windows shorter than 601px. Keep the first (leave) button reachable. */
+@media (orientation: landscape) {
+  body { --battle-tools-width: min(304px, 40vw); }
+  body .topbar {
+    width: var(--battle-tools-width) !important;
+    max-width: var(--battle-tools-width) !important;
+    box-sizing: border-box !important;
+    flex-wrap: nowrap !important;
+    justify-content: flex-start !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    pointer-events: auto !important;
+    touch-action: pan-x;
+    scrollbar-width: thin;
+  }
+  body .topbar > * { flex-shrink: 0 !important; }
+  body .phase-bar {
+    right: calc(var(--battle-tools-width) + 28px) !important;
+    max-width: calc(100vw - var(--battle-tools-width) - 40px) !important;
+  }
+}
+@media (orientation: landscape) and (min-height: 601px) {
+  body #playerResCards {
+    position: fixed !important;
+    left: min(250px, 25vw) !important;
+    right: calc(var(--battle-tools-width) + 40px) !important;
+    width: auto !important;
+    max-width: none !important;
+    min-width: 0 !important;
+    flex-wrap: nowrap !important;
+    justify-content: flex-start !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    gap: 12px !important;
+    pointer-events: auto !important;
+    touch-action: pan-x;
+  }
+  body #playerResCards .player-state-chip { flex-shrink: 0 !important; }
+}
+/* Older mobile skin gives every back-btn an arrow; settings has its own icon. */
+body .topbar #battleSettingsButton { font-size: 18px !important; }
+body .topbar #battleSettingsButton::before { content: none !important; }
+
+body #playerResCards .player-state-chip { flex-shrink: 0 !important; }

@@ -24,6 +24,10 @@ function pauseAdventure(error) {
   render()
 }
 function acceptAdventureSnapshot(result) {
+  if (result.requestMs !== undefined || result.timings) {
+    console.info('[adventure] rpc timing', JSON.stringify({ revision: result.revision, requestMs: result.requestMs, timings: result.timings }))
+    window.__RVB_ADVENTURE__ = Object.assign({}, window.__RVB_ADVENTURE__, { requestMs: result.requestMs, timings: result.timings })
+  }
   if (adventureSnapshot && result.revision <= adventureSnapshot.revision) return
   const old = G
   if (result.content) {
@@ -69,7 +73,10 @@ function acceptAdventureSnapshot(result) {
   else if (result.diagnostics && adventureWaitByTurn.get(result.diagnostics.turn) >= 10000)
     pauseAdventure(new Error('AI 本回合累计等待超过10秒'))
   else adventureStatus(result.inputOwner === result.aiPlayerId ? '敌方按预告行动…' : '轮到你了')
-  window.__RVB_ADVENTURE__ = { revision: result.revision, inputOwner: result.inputOwner, paused: result.paused, timings: result.timings }
+  window.__RVB_ADVENTURE__ = Object.assign({}, window.__RVB_ADVENTURE__, {
+    revision: result.revision, inputOwner: result.inputOwner, paused: result.paused,
+    ...(result.timings ? { timings: result.timings } : {})
+  })
 }
 async function initAdventureBattle() {
   try {

@@ -207,17 +207,17 @@ it('reports missing COS metadata as an error rather than claiming latest', async
   g.fetcher.mockResolvedValueOnce(new Response('[]'))
   expect((await g.updater.check()).phase).toBe('error')
 })
-it('blocks source changes during resource work and discards pending bytes when switching idle', async () => {
+it('cancels resource discovery when the source changes and discards pending bytes', async () => {
   const f = fixture({ canApply: false })
   const work = f.updater.check()
-  expect(() => f.updater.setSource('cos')).toThrow()
+  expect(() => f.updater.setSource('cos')).not.toThrow()
   await work
-  f.updater.setSource('cos'); f.allow(); await f.updater.check()
+  f.allow(); await f.updater.check()
   expect(f.reads).toContain(COS_UPDATE_ROOT + '/resource/0.0.123/content.rvbpack')
   expect(f.apply).toHaveBeenCalledOnce()
   expect(f.updater.isBusy()).toBe(false)
 })
-it('switches binary providers only while idle and preserves a downloaded installer', async () => {
+it('switches binary providers during discovery and preserves a downloaded installer', async () => {
   const { updater } = binaryFixture()
   const setFeedURL = vi.fn()
   const client = new ClientBinaryUpdates(Object.assign(updater, { setFeedURL }), vi.fn())
@@ -226,11 +226,70 @@ it('switches binary providers only while idle and preserves a downloaded install
   client.setSource('github')
   expect(setFeedURL).toHaveBeenLastCalledWith(binaryFeed('github'))
   const work = client.check()
-  expect(() => client.setSource('cos')).toThrow()
+  expect(() => client.setSource('cos')).not.toThrow()
   await work
-  expect(client.isBusy()).toBe(false)
-  expect(() => client.setSource('cos')).toThrow()
+  expect(client.isReady()).toBe(false)
+  await client.check()
   expect(client.isReady()).toBe(true)
+  expect(() => client.setSource('github')).toThrow()
+})
+it('reports an installer error emitted after a completed download', async () => {
+  const { updater, client } = binaryFixture()
+  await client.check()
+  updater.quitAndInstall.mockImplementationOnce(() => { updater.emit('error', new Error('installer failed')) })
+  client.install()
+  expect(client.status.phase).toBe('error')
+  expect(client.isReady()).toBe(false)
+})
+it('does not apply or remain busy when the source changes during a delayed apply check', async () => {
+  let releaseGate!: (value: boolean) => void
+  const gate = new Promise<boolean>(resolve => { releaseGate = resolve })
+  const apply = vi.fn(async () => H)
+  const updater = new OfficialResourceUpdates(async () => new Response('[]'), '0.1.0', [K], {
+    stable: async () => ({ kind: 'bundled-base', resolvedProfileHash: P, version: '0.0.100', compatibility: { engineAbi: 'engine/v1', contentAbi: 'content/v1' } }),
+    canApply: () => gate,
+    apply,
+    applied: vi.fn(),
+  })
+  const index: ResourceIndex = { schema: 'rvb-content-release/v1', channel: 'test', version: '0.0.123', contentHash: H, archive: 'content.rvbpack', archiveSha256: H, identity: { publisherKeyId: K, engineAbi: 'engine/v1', contentAbi: 'content/v1' } }
+  Object.assign(updater, { pending: { release: { tag_name: `content-test-${H}`, draft: false, published_at: '', assets: [] }, index, bytes: Buffer.from('pending'), parent: P, patch: false } })
+  const oldRun = updater.check()
+  await Promise.resolve()
+  await Promise.resolve()
+  updater.setSource('cos')
+  releaseGate(true)
+  await oldRun
+  expect(apply).not.toHaveBeenCalled()
+  expect(updater.status.phase).toBe('idle')
+  expect(updater.isBusy()).toBe(false)
+})
+
+it('waits for the old provider check to settle before checking and downloading from a new source', async () => {
+  const events = new EventEmitter()
+  let releaseOld!: (value: unknown) => void
+  const oldCheck = new Promise(resolve => { releaseOld = resolve })
+  const checkForUpdates = vi.fn()
+    .mockReturnValueOnce(oldCheck)
+    .mockResolvedValueOnce({ isUpdateAvailable: false })
+  const updater = Object.assign(events, {
+    autoDownload: true, autoInstallOnAppQuit: true, allowPrerelease: true, allowDowngrade: true,
+    checkForUpdates, downloadUpdate: vi.fn(), setFeedURL: vi.fn(), quitAndInstall: vi.fn(),
+  })
+  const client = new ClientBinaryUpdates(updater as BinaryUpdater, vi.fn())
+  const oldRun = client.check()
+  await Promise.resolve()
+  client.setSource('cos')
+  const newRun = client.check()
+  await Promise.resolve()
+  expect(checkForUpdates).toHaveBeenCalledTimes(1)
+  events.emit('error', new Error('old source failed'))
+  expect(client.status.phase).toBe('idle')
+  releaseOld({ isUpdateAvailable: true, updateInfo: { version: '9.9.9' } })
+  await oldRun
+  await newRun
+  expect(checkForUpdates).toHaveBeenCalledTimes(2)
+  expect(updater.downloadUpdate).not.toHaveBeenCalled()
+  expect(client.status.phase).toBe('current')
 })
 
 it.each(['github', 'cos'] as const)('does not replace bundled content with older or equal releases from %s', async source => {

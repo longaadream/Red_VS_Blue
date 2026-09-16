@@ -10,6 +10,7 @@ import { createRootSeed } from '../../game/rule-runtime'
 import { hasAdventureCardChoice } from '../../game/adventure-card-state'
 import { assertGameProfileCompatibleV1, getServerGameProfileIdentityV1 } from '../../content-pipeline/runtime/profile-game-identity'
 import type { AdventureRepository, AdventureReceipt } from './adventure-store'
+import { scheduleAdventureTick } from './adventure-tick-scheduler'
 
 interface Join {playerId:string;name?:string;profileIdentity:unknown;auth?:unknown;seed?:number;saveId?:string;familyId?:string}
 interface Request {profileIdentity:unknown;requestId:string;actionId:string;type:string;payload?:Record<string,unknown>}
@@ -36,6 +37,7 @@ export function createAdventureRoomClass(dependencies:{store?:AdventureRepositor
     private creatorKey?:string
     private session?:CooperativeAdventureSession
     private queue:Promise<unknown>=Promise.resolve()
+    private tickSchedule={scheduled:false}
     private disposed=false
     private closing=false
     private failures=new Map<string,AdventureReceipt>()
@@ -58,8 +60,13 @@ export function createAdventureRoomClass(dependencies:{store?:AdventureRepositor
       this.creatorKey=dependencies.authenticate?.(options.playerId,'create',options.auth)
       acquireAdventureLease(this.roomId)
       this.onMessage('adventure.rpc',(client,message:Request)=>{
+        const receivedAt=Date.now()
         void this.enqueue(async()=>{
-          try{client.send('adventure.reply',{requestId:message.requestId,result:await this.request(client,message)})}
+          const startedAt=Date.now()
+          try{
+            const result=await this.request(client,message)
+            client.send('adventure.reply',{requestId:message.requestId,result,timings:{queueMs:startedAt-receivedAt,serverMs:Date.now()-startedAt}})
+          }
           catch(error){
             const detail=error as Error&Record<string,unknown>
             client.send('adventure.reply',{requestId:message.requestId,error:{message:detail.message??String(error),code:detail.code,
@@ -68,9 +75,13 @@ export function createAdventureRoomClass(dependencies:{store?:AdventureRepositor
           }
         })
       })
-      this.clock.setInterval(()=>{void this.enqueue(()=>this.tick()).catch(error=>{
-        this.broadcast('adventure.error',{message:error instanceof Error?error.message:String(error)})
-      })},250)
+      this.clock.setInterval(()=>{
+        // A slow durable commit must not let timer work pile up ahead of player input.
+        // One queued/running AI tick is enough; the next interval will observe the new state.
+        scheduleAdventureTick(this.tickSchedule,operation=>this.enqueue(operation),()=>this.tick(),error=>{
+          this.broadcast('adventure.error',{message:error instanceof Error?error.message:String(error)})
+        })
+      },250)
     }
     private enqueue<T>(operation:()=>Promise<T>):Promise<T>{
       const result=this.queue.then(operation);this.queue=result.catch(()=>undefined);return result

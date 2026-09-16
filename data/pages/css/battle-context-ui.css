@@ -634,7 +634,7 @@
   inset: 0;
   z-index: 16;
   overflow: hidden;
-  pointer-events: auto;
+  pointer-events: none;
   touch-action: manipulation;
   isolation: isolate;
 }

@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>棋子图鉴 - RED vs BLUE</title>
   <script src="js/pack-fetch.js"></script>
+  <script src="js/gallery-content.js"></script>
   <script src="js/hand-card-face.js"></script>
   <script src="js/skill-description.js"></script>
   <link rel="stylesheet" href="css/skill-description.css" />
@@ -208,7 +209,7 @@
         for (const id of ids) {
           try {
             const p = await fetchJson(`./data/pieces/${id}.json`)
-            pieces.push(p)
+            if (RvBGalleryContent.isGalleryPiece(p)) pieces.push(p)
           } catch { /* skip broken files */ }
         }
         allPieces = pieces
@@ -483,5 +484,6 @@
       renderList()
     })
   </script>
+<script src="js/battle-audio.js" defer></script><script src="js/button-audio.js" defer></script>
 </body>
 </html>
