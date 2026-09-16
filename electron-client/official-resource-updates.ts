@@ -41,10 +41,16 @@ export class OfficialResourceUpdates {
   status: ResourceUpdateStatus = { phase: 'idle', message: '启动后检查官方测试资源更新' }
   private running?: Promise<ResourceUpdateStatus>
   private pending?: { release: Release; index: ResourceIndex; bytes: Buffer; parent: string; patch: boolean }
+  private generation = 0
+  private activeReads = new Set<AbortController>()
   constructor(private fetcher: Fetcher, private clientVersion: string, private publishers: readonly string[], private hooks: ResourceUpdateHooks, private source: UpdateSource = 'github') {}
   isBusy() { return Boolean(this.running) || ['checking', 'downloading', 'applying'].includes(this.status.phase) }
   setSource(source: UpdateSource) {
-    if (this.running) throw new Error('正在更新资源，请稍后切换源')
+    if (['downloading', 'applying'].includes(this.status.phase)) throw new Error('资源正在下载或应用，请稍后切换源')
+    this.generation += 1
+    this.activeReads.forEach(controller => controller.abort())
+    this.activeReads.clear()
+    this.running = undefined
     this.source = source
     this.pending = undefined
     this.set('idle', '更新源已切换，请检查更新')
@@ -55,6 +61,7 @@ export class OfficialResourceUpdates {
   }
   private async read(url: string, max: number, asset = false): Promise<Buffer> {
     const controller = new AbortController(), timer = setTimeout(() => controller.abort(), 120000)
+    this.activeReads.add(controller)
     try {
       for (let redirects = 0; redirects < 4; redirects++) {
         const response = await this.fetcher(url, { redirect: 'manual', signal: controller.signal, headers: { Accept: 'application/vnd.github+json', 'Cache-Control': 'no-cache', 'X-GitHub-Api-Version': '2022-11-28' } })
@@ -74,7 +81,7 @@ export class OfficialResourceUpdates {
         return Buffer.concat(chunks)
       }
       throw new Error('更新下载重定向过多')
-    } finally { clearTimeout(timer) }
+    } finally { clearTimeout(timer); this.activeReads.delete(controller) }
   }
   private async asset(release: Release, name: string, hash: string | undefined, max: number) {
     const matching = release.assets.filter(a => a.name === name)
@@ -120,16 +127,26 @@ export class OfficialResourceUpdates {
   }
   check(): Promise<ResourceUpdateStatus> {
     if (this.running) return this.running
-    this.running = this.run().catch(error => { this.set('error', error instanceof Error ? error.message : String(error)); return this.status }).finally(() => { this.running = undefined; this.hooks.changed?.(this.status) })
-    return this.running
+    const generation = this.generation
+    const running = this.run(generation).catch(error => {
+      if (generation === this.generation) this.set('error', error instanceof Error ? error.message : String(error))
+      return this.status
+    }).finally(() => {
+      if (this.running === running) this.running = undefined
+      if (generation === this.generation) this.hooks.changed?.(this.status)
+    })
+    this.running = running
+    return running
   }
   applyPending(): Promise<ResourceUpdateStatus> {
     return this.pending ? this.check() : Promise.resolve(this.status)
   }
-  private async run() {
+  private async run(generation = this.generation) {
     this.set('checking', '正在检查官方测试资源')
     const stable = await this.hooks.stable()
+    if (generation !== this.generation) return this.status
     const discovered = this.pending ?? await this.discover()
+    if (generation !== this.generation) return this.status
     if (!discovered) { this.set('current', '暂无官方测试资源更新'); return this.status }
     const { release, index } = discovered
     if (compareVersions(index.version, stable.version) <= 0) { this.pending = undefined; this.set('current', '资源已是当前版本', stable.version); return this.status }
@@ -141,11 +158,17 @@ export class OfficialResourceUpdates {
       let bytes: Buffer, patch = usePatch
       try { bytes = await this.asset(release, usePatch ? index.patch!.archive : index.archive, usePatch ? index.patch!.sha256 : index.archiveSha256, MAX_PACK) }
       catch (error) { if (!usePatch) throw error; patch = false; bytes = await this.asset(release, index.archive, index.archiveSha256, MAX_PACK) }
+      if (generation !== this.generation) return this.status
       this.pending = { release, index, bytes, parent: stable.resolvedProfileHash, patch }
     }
-    if (!await this.hooks.canApply()) { this.set('waiting', '资源已下载，返回主菜单并退出房间后应用', index.version); return this.status }
+    const pending = this.pending
+    if (!pending) return this.status
+    const canApply = await this.hooks.canApply()
+    if (generation !== this.generation) return this.status
+    if (!canApply) { this.set('waiting', '资源已下载，返回主菜单并退出房间后应用', index.version); return this.status }
     this.set('applying', '正在校验签名并应用资源更新', index.version)
-    const profileHash = await this.hooks.apply(this.pending.bytes, index, this.pending.parent)
+    const profileHash = await this.hooks.apply(pending.bytes, index, pending.parent)
+    if (generation !== this.generation) return this.status
     this.pending = undefined
     this.hooks.applied({ contentHash: index.contentHash, profileHash, version: index.version })
     this.set('current', '官方资源更新已应用', index.version)

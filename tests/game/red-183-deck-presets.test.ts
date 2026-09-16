@@ -10,6 +10,15 @@ type PresetApi = {
   upsert(store: unknown, preset: unknown): { version: number; presets: Array<Record<string, unknown>> }
   remove(store: unknown, id: string): { version: number; presets: Array<Record<string, unknown>> }
   isValidSelection(pieceIds: string[], alignment: string | null, pieces: Array<Record<string, unknown>>): boolean
+  recommended(alignment: string | null, pieces: Array<Record<string, unknown>>): Array<{
+    id: string
+    alignment: string
+    pieceIds: string[]
+    opening: string
+    pairing: string
+    replacement: string
+  }>
+  roleFor(piece: Record<string, unknown>): string
 }
 
 function loadApi(): PresetApi {
@@ -64,5 +73,31 @@ describe('RED-183 versioned deck preset persistence', () => {
     expect(api.isValidSelection(preset().pieceIds as string[], 'good', pieces.map((piece, index) => (
       index === 7 ? { ...piece, faction: 'evil' } : piece
     )))).toBe(false)
+  })
+
+  it('offers two complete starter rosters per alignment without mutating the built-in definitions', () => {
+    const api = loadApi()
+    const manifest = JSON.parse(readFileSync(resolve(process.cwd(), 'data/pieces/manifest.json'), 'utf8')) as string[]
+    const pieces = manifest.map(id => JSON.parse(readFileSync(resolve(process.cwd(), `data/pieces/${id}.json`), 'utf8')))
+      .filter(piece => !piece.id.startsWith('pve-'))
+
+    for (const alignment of ['good', 'evil']) {
+      const recommendations = api.recommended(alignment, pieces)
+      expect(recommendations).toHaveLength(2)
+      for (const recommendation of recommendations) {
+        expect(api.isValidSelection(recommendation.pieceIds, alignment, pieces)).toBe(true)
+        expect(recommendation.opening.length).toBeGreaterThan(10)
+        expect(recommendation.pairing.length).toBeGreaterThan(10)
+        expect(recommendation.replacement.length).toBeGreaterThan(10)
+      }
+      recommendations[0].pieceIds.pop()
+      expect(api.recommended(alignment, pieces)[0].pieceIds).toHaveLength(8)
+    }
+  })
+
+  it('uses concise tactical roles instead of biography copy', () => {
+    const api = loadApi()
+    expect(api.roleFor({ id: 'turalyon', description: 'very long biography' })).toBe('团队支援 / 协同移动')
+    expect(api.roleFor({ id: 'unknown', description: '控制敌人。后续人物介绍' })).toBe('控制敌人')
   })
 })

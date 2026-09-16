@@ -115,11 +115,6 @@
       "count": 3
     }
   },
-  "electron-client/main.ts": {
-    "@typescript-eslint/no-unused-vars": {
-      "count": 1
-    }
-  },
   "electron-client/preload.ts": {
     "@typescript-eslint/no-explicit-any": {
       "count": 1
@@ -230,17 +225,6 @@
       "count": 1
     }
   },
-  "mobile-server/fs-shim.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 8
-    },
-    "@typescript-eslint/no-unused-vars": {
-      "count": 9
-    },
-    "import/no-anonymous-default-export": {
-      "count": 1
-    }
-  },
   "mobile-server/mobile-server-entry.ts": {
     "@typescript-eslint/no-explicit-any": {
       "count": 1
@@ -297,11 +281,6 @@
   "scripts/build-game-engine.js": {
     "@typescript-eslint/no-unused-vars": {
       "count": 1
-    }
-  },
-  "scripts/build-mobile-server.js": {
-    "@typescript-eslint/no-require-imports": {
-      "count": 3
     }
   },
   "scripts/cleanup-client-resources.js": {

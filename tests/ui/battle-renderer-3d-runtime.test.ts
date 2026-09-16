@@ -1056,6 +1056,33 @@ describe('RED-68 BattleRenderer3D runtime', () => {
     harness.renderer.dispose()
   })
 
+  it('brightens the complete target token without adding a token ring and restores it after selection', () => {
+    const harness = createHarness(844, 390, false)
+    const model = runtimeModel()
+    const piece = model.pieces[0]
+    model.legal.targetCells = [{ x: piece.x, y: piece.y }]
+    harness.renderer.init({ container: harness.container })
+    harness.renderer.update(model)
+    harness.frame(16)
+    const group = harness.renderers[0].scene!.children.find(child => child.userData.pieceId === piece.id)!
+    const colors = () => group.children.map(child => child.material?.color as unknown as { r: number } | undefined)
+    const body = group.children.find(child => child.material?.emissiveIntensity === 1.05)!
+    const factionRing = group.children.find(child => child.material?.emissiveIntensity === 1.15)!
+    const feedbackRing = group.children.find(child => child.userData.motionRole === 'feedback-ring')!
+    harness.renderer.update(model)
+    harness.frame(16)
+    expect(colors().some(color => color && color.r > 1)).toBe(true)
+    expect(body).toBeTruthy()
+    expect(factionRing).toBeTruthy()
+    expect(feedbackRing.material!.opacity).toBe(0)
+    model.legal.targetCells = []
+    harness.renderer.update(model)
+    expect(colors().some(color => color && color.r > 1)).toBe(false)
+    expect(body.material!.emissiveIntensity).toBe(0.08)
+    expect(factionRing.material!.emissiveIntensity).toBe(0.3)
+    harness.renderer.dispose()
+  })
+
   it('shows authoritative waiting feedback and retargets movement from the visible position without replaying an event', () => {
     const harness = createHarness(844, 390, false)
     const model = runtimeModel()

@@ -750,18 +750,25 @@ public class MainActivity extends BridgeActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        // BridgeActivity must create its window and bridge before we touch either.
+        // Some vendor Android builds return a null WindowInsetsController before
+        // super.onCreate(), which previously made the app exit as soon as it was opened.
+        super.onCreate(savedInstanceState);
+
         // Fullscreen: hide status bar across all Android versions
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
-            getWindow().getInsetsController().hide(android.view.WindowInsets.Type.statusBars());
-            getWindow().getInsetsController().setSystemBarsBehavior(
-                android.view.WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
+            android.view.WindowInsetsController controller = getWindow().getInsetsController();
+            if (controller != null) {
+                controller.hide(android.view.WindowInsets.Type.statusBars());
+                controller.setSystemBarsBehavior(
+                    android.view.WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
+            }
         } else {
             getWindow().setFlags(
                 android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN,
                 android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN
             );
         }
-        super.onCreate(savedInstanceState);
 
         handleZipIntent(getIntent());
 

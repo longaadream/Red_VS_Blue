@@ -21,6 +21,8 @@
   <script src="js/colyseus-client.js"></script>
   <script src="js/three.min.js"></script>
   <script src="js/battle-ui/battle-effect-icons.js"></script>
+  <script src="js/battle-audio.js"></script>
+  <script src="js/battle-impact.js"></script>
   <script src="js/battle-ui/battle-skill-presentation.js"></script>
   <script src="js/battle-ui/battle-view-model.js"></script>
   <script src="js/practice/client.js"></script>
@@ -269,6 +271,10 @@
       transform-origin: 50% 50%; border: 1px solid rgba(248,250,252,.76);
       border-radius: 999px; background: rgba(2,6,23,.9); color: #f8fafc;
       box-shadow: 0 1px 4px rgba(0,0,0,.82); white-space: nowrap;
+    }
+    .piece-board-summary.is-target-candidate {
+      filter: brightness(1.9) saturate(1.12);
+      box-shadow: 0 0 10px rgba(255,241,189,.82), 0 1px 4px rgba(0,0,0,.82);
     }
     .piece-board-health {
       min-width: 10px; text-align: center; font-size: 9px; line-height: 1;
@@ -1682,6 +1688,7 @@
   <!-- Topbar -->
   <div class="topbar" data-battle-ui-region="player-hud">
     <button class="back-btn" aria-label="离开对局" onclick="confirmLeave()">离开</button>
+    <button type="button" class="back-btn" id="battleSettingsButton" aria-label="打开对局设置" aria-haspopup="dialog" aria-controls="battleSettings" title="设置">⚙</button>
     <button class="back-btn rulebook-entry" id="rulebookButton" aria-label="打开规则书" aria-haspopup="dialog" aria-controls="rulebook" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 5Q7 2 2 4v15q5-2 10 1 5-3 10-1V4q-5-2-10 1v15M5 8l4 1M15 9l4-1M5 12l4 1M15 13l4-1"/></svg>规则</button>
     <div class="room-name" id="roomNameLabel">对战</div>
     <div id="colyseusStatus" style="display:none;font-size:11px;padding:2px 7px;border-radius:5px;background:#1e3a2f;color:#4ade80;letter-spacing:.02em">● Colyseus</div>
@@ -2585,6 +2592,11 @@
 
     function enterActionTargetMode(action, preparation) {
       if (!action || !preparation || preparation.kind !== 'needTarget') return false
+      if (typeof battleActionVignette !== 'undefined' && battleActionVignette && battleActionVignette.isAnimating({ presentationEvents: latestBattlePresentationEvents })) {
+        const snapshot = G
+        deferredSelectionPresentation = function () { if (G === snapshot && !G.terminalResult) enterActionTargetMode(action, preparation) }
+        return true
+      }
       if (targetSubmissionPending) {
         targetSubmissionPending = null
         recordTargetClear('authoritative-next-target-step')
@@ -2919,7 +2931,19 @@
     }
     function pieceDispSkills(p) {
       const display = typeof BattleSkillPresentation === 'undefined' ? {} : BattleSkillPresentation.display(G,p.instanceId)
-      if (display.skills !== undefined) return display.skills
+      const reconcileRuntimeSkillState = function (skills, runtimeSkills) {
+        const runtimeById = new Map((runtimeSkills || []).map(skill => [skillIdOf(skill), skill]))
+        return (skills || []).map(skill => {
+          const displaySkill = typeof skill === 'string' ? { skillId: skill } : skill
+          const runtimeSkill = runtimeById.get(skillIdOf(displaySkill))
+          if (!runtimeSkill) return displaySkill
+          return Object.assign({}, displaySkill, {
+            currentCooldown: runtimeSkill.currentCooldown ?? 0,
+            ...(runtimeSkill.usesRemaining === undefined ? {} : { usesRemaining: runtimeSkill.usesRemaining }),
+          })
+        })
+      }
+      if (display.skills !== undefined) return reconcileRuntimeSkillState(display.skills, p.skills)
       if (p.masterPieceId && G && G.pieces) {
         const master = G.pieces.find(m => m.instanceId === p.masterPieceId && m.currentHp > 0)
         if (master) return master.skills || []
@@ -2929,9 +2953,9 @@
       if (p.displaySkills !== undefined && p.skills && p.skills.length) {
         const baseIds = new Set(base.map(s => s && (s.skillId || s.id || s) || ''))
         const extra = p.skills.filter(s => { const id = s && (s.skillId || s.id || s) || ''; return id && !baseIds.has(id) })
-        if (extra.length) return [...base, ...extra]
+        if (extra.length) return reconcileRuntimeSkillState([...base, ...extra], p.skills)
       }
-      return base
+      return reconcileRuntimeSkillState(base, p.skills)
     }
     function skillIdOf(sk) {
       if (!sk) return ''
@@ -3371,8 +3395,10 @@
     // Option picker
     // Stored option values avoid inline JSON breaking HTML attributes.
     let _pickerOptions = []
+    let deferredSelectionPresentation = null
 
     function isPendingHandSelection(pending) {
+      if (typeof battleActionVignette !== 'undefined' && battleActionVignette && battleActionVignette.isAnimating({ presentationEvents: latestBattlePresentationEvents })) return false
       return !!(pending && pendingOptionSelectionForMe()
         && pending.presentation === 'hand'
         && (pending.selectionMode === 'single' || pending.selectionMode === 'multi'))
@@ -3514,6 +3540,11 @@
     }
 
     function showOptionPicker(title, options, originalAction) {
+      if (typeof battleActionVignette !== 'undefined' && battleActionVignette && battleActionVignette.isAnimating({ presentationEvents: latestBattlePresentationEvents })) {
+        const snapshot = G
+        deferredSelectionPresentation = function () { if (G === snapshot && !G.terminalResult) showOptionPicker(title, options, originalAction) }
+        return
+      }
       pendingOptionAction = originalAction
       _pickerOptions = options
       const selectionId = originalAction && originalAction.selectionId
@@ -5098,6 +5129,7 @@
       })
 
       RvBColyseus.on('disconnect', function() {
+        deferredSelectionPresentation = null
         if (battlePresentation) battlePresentation.beginSkillRecovery()
 
         colyseusConnected = false
@@ -5553,7 +5585,7 @@
         locallyCancelledSelectionId = pendingTarget && pendingTarget.selectionId
         doAction({
           type: 'cancelPendingSelection',
-          playerId: myPlayerId,
+          playerId: pendingTarget.playerId || myPlayerId,
           selectionId: pendingTarget && pendingTarget.selectionId,
           stateRevision: pendingTarget && pendingTarget.stateRevision,
         })
@@ -5766,6 +5798,7 @@
 
     let _pendingChoiceShown = null  // track which pendingOptionSelection we've shown
     function syncAuthoritativePendingPresentation() {
+      if (battleActionVignette && battleActionVignette.isAnimating({ presentationEvents: latestBattlePresentationEvents })) return
       const pbc = G.pendingOptionSelection
       if (pendingOptionSelectionForMe()) {
         const key = pbc.selectionId || (pbc.playerId + ':' + (G.turn ? G.turn.turnNumber : 0) + ':' + (pbc.options || []).map(o => o.value || o.id || o.label).join(','))
@@ -7112,7 +7145,7 @@
         locallyCancelledSelectionId = pendingSelection && pendingSelection.selectionId
         void doAction({
           type: 'cancelPendingSelection',
-          playerId: myPlayerId,
+          playerId: pendingSelection.playerId || myPlayerId,
           selectionId: pendingSelection && pendingSelection.selectionId,
           stateRevision: pendingSelection && pendingSelection.stateRevision,
         }).then(() => window.focusAdventureContext?.())
@@ -7172,7 +7205,7 @@
         locallyCancelledSelectionId = pendingSelection && pendingSelection.selectionId
         void doAction({
           type: 'cancelPendingSelection',
-          playerId: myPlayerId,
+          playerId: pendingSelection.playerId || myPlayerId,
           selectionId: pendingSelection && pendingSelection.selectionId,
           stateRevision: pendingSelection && pendingSelection.stateRevision,
         })
@@ -7613,14 +7646,17 @@
 
     function handleGameOver() {
       if (!G || !G.terminalResult) return
+      deferredSelectionPresentation = null
       if (PRACTICE_MODE) { showPracticeResult(); return }
       if (ADVENTURE_MODE) { showAdventureResult(); return }
       if (TUTORIAL_MODE && params.has('lesson') && tutorialRuntime) { tutorialRuntime.showResult(); return }
       const terminalResult = G.terminalResult
       if (pollTimer) { clearInterval(pollTimer); pollTimer = null }
       try { if (!SPECTATE_MODE) localStorage.removeItem('rvb_active_battle') } catch {}
-      if (!completedMatchTraceRecord) storeCompletedMatchTrace()
-      if (completedMatchTraceRecord && typeof RvBColyseus !== 'undefined') RvBColyseus.disconnect()
+      const traceMeta = G.extensions && G.extensions.debugBattle
+      const journalTrace = traceMeta && traceMeta.authority && traceMeta.authority.replayFrameCount > 0 && !(traceMeta.replay && traceMeta.replay.frames && traceMeta.replay.frames.length)
+      if (!journalTrace && !completedMatchTraceRecord) storeCompletedMatchTrace()
+      if (typeof RvBColyseus !== 'undefined') RvBColyseus.disconnect()
       if (recordSaved) return
       recordSaved = true
       if (!TRAINING_MODE && !SPECTATE_MODE) {
@@ -7657,8 +7693,9 @@
       }
       document.getElementById('resultOverlay').style.display = 'flex'
       if (!TRAINING_MODE && !SPECTATE_MODE) {
-      // Load the verified PostgreSQL authority report asynchronously.
-      _signGameRecord()
+      // Full replay verification is explicitly requested, never part of match completion.
+      document.getElementById('recordStatus').textContent = '比赛已结束，战报可按需下载'
+      document.getElementById('recordDownloadBtn').style.display = 'inline-block'
       }
     }
 
@@ -7680,12 +7717,16 @@
         document.getElementById('recordDownloadBtn').style.display = 'inline-block'
       } catch (error) {
         _signedRecord = null
-        statusEl.textContent = '权威战报尚未 DURABLE，暂不可下载'
+        statusEl.textContent = '战报获取失败，可点击重试；不影响比赛结果'
         console.warn('[battle-report] authority report unavailable', error)
       }
     }
 
-    function downloadGameRecord() {
+    async function downloadGameRecord() {
+      const button = document.getElementById('recordDownloadBtn')
+      if (button.disabled) return
+      button.disabled = true
+      try { if (!_signedRecord) await _signGameRecord() } finally { button.disabled = false }
       if (!_signedRecord) return
       const blob = new Blob([JSON.stringify(_signedRecord, null, 2)], { type: 'application/json' })
       const url = URL.createObjectURL(blob)
@@ -7961,6 +8002,12 @@
         historyUi: battleActionHistory,
         vignetteUi: battleActionVignette,
         onIntent: handleBattleIntent,
+        onPlaybackIdle: function () {
+          const show = deferredSelectionPresentation
+          deferredSelectionPresentation = null
+          if (G && show) show()
+          if (G) render()
+        },
       })
       battlePresentation.mount({
         boardContainer: document.getElementById('boardStage3d'),
@@ -8117,5 +8164,19 @@
 <script src="tabletop-battle/refinements.js"></script>
 <script src="tabletop-battle/character-dock.js"></script>
 <script src="js/battle-ui/mobile-battle-controls.js"></script>
+<script src="js/button-audio.js" defer></script>
+<style>
+#battleSettings{box-sizing:border-box;width:min(420px,calc(100vw - 32px));max-height:calc(100dvh - 32px);overflow:auto;padding:24px;border:3px solid #796344;border-radius:18px;background:#f0e2bf;color:#403021;box-shadow:5px 6px 0 #30251d;font:inherit;touch-action:pan-y}
+#battleSettings::backdrop{background:rgba(0,0,0,.5)}
+#battleSettings h2{margin:0 0 20px}#battleSettings label{display:flex;align-items:center;gap:12px;min-height:44px;margin:12px 0;flex-wrap:wrap}#battleSettings input[type=range]{flex:1;min-width:100px;accent-color:#49685b}#battleSettings button{min-height:44px;padding:8px 20px;border:2px solid #796344;border-radius:10px;background:#d6bd8d;color:#403021;font:inherit;cursor:pointer}#battleSettings p{font-size:13px;opacity:.8}
+</style>
+<dialog id="battleSettings" aria-labelledby="battleSettingsTitle">
+<h2 id="battleSettingsTitle">对局设置</h2>
+<label>音效音量 <input data-sound-volume type="range" min="0" max="100" step="1" aria-label="音效音量"><output data-sound-label></output></label>
+<label><input data-screen-shake type="checkbox">重伤害画面震动</label>
+<p>设置自动保存。打开菜单不会暂停对局或回合计时。</p>
+<button type="button" data-close-settings autofocus>返回对局</button>
+</dialog>
+<script src="js/battle-settings.js" defer></script>
 </body>
 </html>

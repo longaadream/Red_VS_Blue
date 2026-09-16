@@ -13,9 +13,10 @@ app.whenReady().then(async () => {
   const { NsisUpdater } = require(path.join(root, 'electron-client/dist/update-runtime.cjs'))
   const runtime = new NsisUpdater({ provider: 'github', owner: 'longaadream', repo: 'Red_VS_Blue' })
   assert.equal(typeof runtime.checkForUpdates, 'function')
-  let state = { automatic: true, source: 'github', sourceLocked: false, clientVersion: '0.1.0', resource: { phase: 'current', message: '官方资源更新已应用', version: '0.0.123' }, client: { phase: 'current', message: '客户端已是当前稳定版本' } }
+  let state = { startupPending: true, canEnter: true, automatic: true, source: 'github', sourceLocked: false, clientVersion: '0.1.0', resource: { phase: 'current', message: '官方资源更新已应用', version: '0.0.123' }, client: { phase: 'current', message: '客户端已是当前稳定版本' } }
   const calls = []
   ipcMain.handle('official-update-status', () => state)
+  ipcMain.handle('get-mode', () => ({ ready: true, localAuthorityRecovery: { status: 'ready' } }))
   ipcMain.handle('official-update-automatic', (_event, enabled) => { calls.push('setting'); state.automatic = enabled; return state })
   ipcMain.handle('official-update-source', (_event, source) => { calls.push('source'); state.source = source; return state })
   ipcMain.handle('official-update-check', () => { calls.push('check'); state.sourceLocked = true; state.client = { phase: 'downloaded', message: '客户端更新已下载，返回主菜单后可重启安装', version: '0.2.0' }; return state })
@@ -28,9 +29,9 @@ app.whenReady().then(async () => {
   await win.loadFile(menuFile)
   await win.webContents.executeJavaScript(fs.readFileSync(path.join(root, 'data/pages/js/official-updates.js'), 'utf8'))
   await win.webContents.executeJavaScript(`(async () => {
-    document.querySelector('.official-update-entry').click();
     await new Promise(r => setTimeout(r, 100));
-    if (!document.querySelector('dialog').open) throw Error('panel missing');
+    if (!document.querySelector('dialog.official-update-panel').open) document.querySelector('.official-update-entry').click();
+    if (!document.querySelector('dialog.official-update-panel').open) throw Error('update panel missing');
     const source = document.querySelector('[data-source]');
     if (source.value !== 'github') throw Error('default source missing');
     source.value = 'cos'; source.dispatchEvent(new Event('change'));
@@ -45,12 +46,12 @@ app.whenReady().then(async () => {
     document.querySelector('[data-install]').click();
     await new Promise(r => setTimeout(r, 100));
   })()`)
-  assert.deepEqual(calls, ['source', 'setting', 'check', 'install-request'])
+  assert.deepEqual(calls, ['check', 'source', 'check', 'setting', 'check', 'install-request'])
   assert.equal(state.source, 'cos')
   assert.equal(state.automatic, false)
   const layout = await win.webContents.executeJavaScript(`(() => {
     const button = document.querySelector('.official-update-entry').getBoundingClientRect();
-    const dialog = document.querySelector('dialog').getBoundingClientRect();
+    const dialog = document.querySelector('dialog.official-update-panel').getBoundingClientRect();
     const check = document.querySelector('[data-check]').getBoundingClientRect();
     const close = document.querySelector('[data-close]').getBoundingClientRect();
     return { buttonWidth:button.width, buttonHeight:button.height, x:dialog.x, y:dialog.y, width:dialog.width, height:dialog.height, viewportWidth:innerWidth, viewportHeight:innerHeight, checkY:check.y, closeY:close.y };

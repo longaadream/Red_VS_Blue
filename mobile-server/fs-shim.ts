@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-unused-vars -- Node fs-compatible signatures intentionally retain unused parameters. */
+
 // Shim for the 'fs' Node.js module — populated with game data inlined at build time
 // via the esbuild virtual:game-data plugin in scripts/build-mobile-server.js.
 //
@@ -5,14 +7,14 @@
 // Example: readFileSync('data/skills/fireball.json', 'utf-8') → skill JSON string.
 
 declare const __GAME_DATA__: {
-  skills: Record<string, any>
-  pieces: Record<string, any>
-  maps: Record<string, any>
-  cards: Record<string, any>
-  rules: Record<string, any>
-  effects: Record<string, any>
-  tiles: Record<string, any>
-  statusEffects: Record<string, any>
+  skills: Record<string, unknown>
+  pieces: Record<string, unknown>
+  maps: Record<string, unknown>
+  cards: Record<string, unknown>
+  rules: Record<string, unknown>
+  effects: Record<string, unknown>
+  tiles: Record<string, unknown>
+  statusEffects: Record<string, unknown>
 }
 
 const vfs = new Map<string, string>()
@@ -101,8 +103,15 @@ export function mkdirSync(_p: string, _opts?: unknown): void {}
 export function appendFileSync(_p: string, _data: string): void {}
 export function writeFileSync(_p: string, _data: string): void {}
 export function rmSync(_p: string, _opts?: unknown): void {}
-
-export default {
-  existsSync, readdirSync, readFileSync,
-  mkdirSync, appendFileSync, writeFileSync, rmSync,
+export function linkSync(_source: string, _destination: string): void {
+  throw Object.assign(new Error('Filesystem links are unavailable in the Android in-memory authority'), { code: 'ENOSYS' })
 }
+export function renameSync(_source: string, _destination: string): void {
+  throw Object.assign(new Error('Filesystem renames are unavailable in the Android in-memory authority'), { code: 'ENOSYS' })
+}
+
+const fsShim = {
+  existsSync, readdirSync, readFileSync,
+  mkdirSync, appendFileSync, writeFileSync, rmSync, linkSync, renameSync,
+}
+export default fsShim

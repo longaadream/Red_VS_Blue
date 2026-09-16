@@ -1,0 +1,22 @@
+#rosterBuilder[hidden],#rosterPieces[hidden],#rankedAlignmentIntro[hidden]{display:none!important}
+.ranked-alignment-intro{text-align:center;max-width:720px;margin:32px auto 16px;padding:20px;color:#efdab4}
+.ranked-alignment-intro h2{font:36px var(--table-heading);margin:8px 0}
+.ranked-alignment-intro p{color:#d5b375}.ranked-alignment-intro span{line-height:1.7}
+body.ranked-roster .alignment-panel.needs-alignment{width:min(700px,100%);margin:0 auto 28px;padding:12px;justify-content:center;flex-wrap:wrap;gap:18px}
+body.ranked-roster .needs-alignment .alignment-btn{min-height:100px;min-width:150px;flex:1;font-size:28px!important;border-width:3px}
+body.ranked-roster .needs-alignment .alignment-lock-notice{display:block;width:100%;text-align:center}
+@media(min-width:640px) and (max-height:900px) and (orientation:landscape){
+ body[data-art-page=piece-selection].ranked-roster{grid-template-rows:56px auto 48px minmax(0,1fr) 58px}
+ body.ranked-roster .ranked-roster-strip{grid-column:1/-1;grid-row:2;max-width:none;margin:0;padding:6px 14px;gap:8px}
+ body[data-art-page=piece-selection].ranked-roster .alignment-panel{grid-row:3}
+ body[data-art-page=piece-selection].ranked-roster .deck-builder{grid-row:4}
+ body[data-art-page=piece-selection].ranked-roster .section{grid-row:3/5}
+ body[data-art-page=piece-selection].ranked-roster .confirm-bar{grid-row:5}
+ body[data-art-page=piece-selection].awaiting-ranked-alignment{display:flex;flex-direction:column;overflow-y:auto;height:100dvh}
+ body.awaiting-ranked-alignment .ranked-roster-strip{flex-shrink:0;width:100%}
+ body.awaiting-ranked-alignment .ranked-alignment-intro{margin:12px auto 0;padding:8px 20px}
+ body[data-art-page=piece-selection].awaiting-ranked-alignment .alignment-panel{flex-shrink:0;margin:0 auto 12px}
+ body.awaiting-ranked-alignment .confirm-bar{margin-top:auto;flex-shrink:0}
+}
+@media(max-width:639px){body.ranked-roster{overflow-y:auto}.ranked-alignment-intro{margin:16px auto;padding:12px}.ranked-alignment-intro h2{font-size:30px}}
+body.ranked-roster .deck-card span,body.ranked-roster .deck-card em{color:#594632}

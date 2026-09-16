@@ -2,10 +2,15 @@
   'use strict'
   function session() {
     var saved
-    try { saved = JSON.parse(sessionStorage.getItem('rvb_official_session') || 'null') } catch {}
-    if (!saved || !saved.token || !saved.account) throw new Error('请先登录官方服务器账号')
+    var selectedUrl = localStorage.getItem('rvb_official_url') || (window.RvBUtils && window.RvBUtils.getServerUrl ? window.RvBUtils.getServerUrl() : '')
+    try {
+      saved = window.RvBUtils && typeof window.RvBUtils.readOfficialSession === 'function'
+        ? window.RvBUtils.readOfficialSession(selectedUrl)
+        : JSON.parse(sessionStorage.getItem('rvb_official_session') || 'null')
+    } catch {}
+    if (!saved || !saved.token || !saved.account) throw new Error('请先登录所选服务器账号')
     var url = new URL(saved.url)
-    if (url.username || url.password || url.search || url.hash || (url.protocol !== 'https:' && !(url.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname)))) throw new Error('官方服务器地址不安全')
+    if (url.username || url.password || url.search || url.hash || (url.protocol !== 'https:' && !(url.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname)))) throw new Error('排位服务器地址不安全')
     return saved
   }
   async function api(route, body) {

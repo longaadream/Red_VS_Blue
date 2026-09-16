@@ -2,8 +2,10 @@
   'use strict'
   var $ = function (id) { return document.getElementById(id) }
   var current = null, activeMatch = null, busy = false, polling = false
+  var announcedMatch = null, matchAudio = window.BattleAudio ? window.BattleAudio.create() : null
+  if (matchAudio) window.addEventListener('pagehide', function () { matchAudio.dispose() }, { once: true })
   var nativeApp = location.protocol === 'rvb-client:' || !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform())
-  function session() { try { return JSON.parse(sessionStorage.getItem('rvb_official_session') || 'null') } catch { return null } }
+  function session() { return window.RvBUtils.readOfficialSession(base()) }
   function clearBattleReservations() {
     var prefix = 'rvb_colyseus_reconnect:' + base() + ':'
     Object.keys(sessionStorage).forEach(function (key) { if (key.startsWith(prefix)) sessionStorage.removeItem(key) })
@@ -21,7 +23,7 @@
     $('accountButton').textContent = signedIn ? current.account.name : '登录账号'
     $('seatName').textContent = signedIn ? current.account.name : '你的席位'
     $('seatHint').textContent = signedIn ? '先禁图，再选择阵营与阵容' : '登录后准备匹配'
-    if (!signedIn) { $('join').hidden = true; $('cancel').hidden = true; $('enter').hidden = true; $('queueStatus').textContent = '登录后即可参加排位' }
+    if (!signedIn) { $('matchReady').hidden = true; announcedMatch = null; $('join').hidden = true; $('cancel').hidden = true; $('enter').hidden = true; $('queueStatus').textContent = '登录后即可参加排位' }
   }
   function selectRankTab(name) {
     document.querySelectorAll('[data-rank-tab]').forEach(function (tab) { var selected = tab.dataset.rankTab === name; tab.setAttribute('aria-selected', String(selected)); $('rank-' + tab.dataset.rankTab).hidden = !selected })
@@ -36,7 +38,7 @@
     var response = await fetch(origin + path, { method: body === undefined ? 'GET' : 'POST', headers: headers, body: body === undefined ? undefined : JSON.stringify(body), signal: AbortSignal.timeout(20000), cache: 'no-store' })
     if (!(response.headers.get('content-type') || '').toLowerCase().includes('application/json')) throw new Error('此地址未返回排位服务数据，请检查服务器地址和端口')
     var result = await response.json()
-    if (!response.ok) { if (response.status === 401 && path === '/official/me') { sessionStorage.removeItem('rvb_official_session'); $('profile').hidden = true; $('auth').hidden = false; current = null; activeMatch = null; accountState(false) }; throw new Error(result.error || '请求失败') }
+    if (!response.ok) { if (response.status === 401 && path === '/official/me') { window.RvBUtils.clearOfficialSession(origin); $('profile').hidden = true; $('auth').hidden = false; current = null; activeMatch = null; accountState(false) }; throw new Error(result.error || '请求失败') }
     return result
   }
   function cell(row, text) { var td = document.createElement('td'); td.textContent = text; row.appendChild(td) }
@@ -59,6 +61,15 @@
         $('queueStatus').textContent = activeMatch ? '匹配成功，请进入比赛。比赛结束后自动结算。' : current.queued ? '正在等待真人对手或空闲对局名额…' : current.cooldownUntil ? '匹配冷却至 ' + new Date(current.cooldownUntil).toLocaleString() : current.season.maintenance ? '排位维护中，正在进行的比赛可继续。' : '准备好后开始匹配。'
         $('join').hidden = !!activeMatch || current.queued; $('join').disabled = busy || !!current.cooldownUntil || current.season.maintenance
         $('cancel').hidden = !current.queued; $('enter').hidden = !activeMatch
+        $('matchReady').hidden = !activeMatch
+        if (activeMatch && announcedMatch !== activeMatch) {
+          announcedMatch = activeMatch
+          selectRankTab('prepare')
+          $('enter').focus()
+          $('matchReady').scrollIntoView({ block: 'center', behavior: 'auto' })
+          if (matchAudio) matchAudio.play('notice')
+        }
+        if (!activeMatch) announcedMatch = null
         $('history').replaceChildren()
         current.history.forEach(function (match) {
           var item = document.createElement('article'), result = match.result, mine = result && result.first ? (result.first.id === current.account.id ? result.first : result.second) : null
@@ -74,10 +85,10 @@
   }
   async function connect() {
     var info = await api('/official/info')
-    if (info.kind !== 'rvb-official-v1') throw new Error('此地址不是官方排位服务')
+    if (info.kind !== 'rvb-official-v1') throw new Error('此地址不是排位服务')
     localStorage.setItem('rvb_official_url', base())
-    message('官方服务器已连接。')
-    $('connection').close(); $('connectionStatus').textContent = '官方服务器 · 已连接'
+    message('服务器已连接。')
+    $('connection').close(); $('connectionStatus').textContent = '排位服务器 · 已连接'
     await refresh()
   }
   function busyControls() {
@@ -97,9 +108,10 @@
   }
   $('authForm').onsubmit = run(async function () {
     var action = $('authAction').value
+    var actionOrigin = base()
     var result = await api('/official/auth/' + action, { email: $('email').value, password: $('password').value, name: $('name').value, code: $('code').value })
     $('password').value = ''; $('code').value = ''
-    if (action === 'login') { clearBattleReservations(); sessionStorage.setItem('rvb_official_session', JSON.stringify({ url: base(), token: result.token, account: result.account })); message('登录成功。'); $('accountDialog').close(); await refresh() }
+    if (action === 'login') { clearBattleReservations(); window.RvBUtils.saveOfficialSession({ url: actionOrigin, token: result.token, account: result.account }); message('登录成功。'); $('accountDialog').close(); await refresh() }
     else { message(result.message); $('authAction').value = action === 'register' ? 'verify' : action === 'forgot' ? 'reset' : 'login'; $('authAction').onchange() }
   })
   $('join').onclick = run(async function () {
@@ -114,7 +126,15 @@
     await api('/official/queue/join', { profileIdentity: JSON.parse(identity) }); await refresh()
   })
   $('cancel').onclick = run(async function () { await api('/official/queue/cancel', {}); await refresh() })
-  $('logout').onclick = run(async function () { await api('/official/queue/cancel', {}); await api('/official/auth/logout', {}); clearBattleReservations(); sessionStorage.removeItem('rvb_official_session'); current = null; $('profile').hidden = true; $('auth').hidden = false; message('已退出账号。'); accountState(false); await refresh() })
+  $('logout').onclick = run(async function () {
+    var origin = base()
+    try { await api('/official/queue/cancel', {}); await api('/official/auth/logout', {}) }
+    finally {
+      clearBattleReservations(); window.RvBUtils.clearOfficialSession(origin); current = null
+      $('profile').hidden = true; $('auth').hidden = false; accountState(false)
+    }
+    message('已退出账号。'); await refresh()
+  })
   $('enter').onclick = run(async function () {
     if (!activeMatch || !current) return
     window.RvBUtils.saveRemoteServerUrl(base()); window.RvBUtils.switchServerMode('remote')
@@ -124,6 +144,7 @@
   if (nativeApp && savedServer.replace(/\/+$/, '') === location.origin) savedServer = ''
   $('server').value = savedServer || 'https://play.redvsblue.top'
   $('authAction').onchange()
+  if (new URLSearchParams(location.search).get('account') === '1') $('accountDialog').showModal()
   if ($('server').value) void connect().catch(function (error) { message(error.message) })
   else message('请先设置官方服务器地址，再登录并匹配')
   setInterval(refresh, 4000)

@@ -776,7 +776,7 @@ function waitForGameAuthorityReady(port: number, timeoutMs = 20000): Promise<boo
         else schedule()
       })
       request.on('error', schedule)
-      request.setTimeout(1000, () => request.destroy())
+      request.setTimeout(1000, () => request?.destroy())
     }
     probe()
   })
@@ -2146,7 +2146,7 @@ function officialUpdateStatus() {
   const resource = resourceUpdates?.status ?? { phase: 'idle', message: '正在准备本机服务' }
   const client = binaryUpdates?.status ?? { phase: 'idle', message: '正在准备更新服务' }
   startupUpdateGate.observe(resource.phase, client.phase)
-  return { startupPending: !startupUpdateGate.entered, canEnter: startupUpdateGate.canEnter(resource.phase, client.phase, localServerReady), automatic: automaticUpdates, source: officialUpdateSource, sourceLocked: Boolean(officialUpdateApplying || resourceUpdates?.isBusy() || binaryUpdates?.isBusy() || binaryUpdates?.isReady()), clientVersion: app.getVersion(), resource, client }
+  return { startupPending: !startupUpdateGate.entered, canEnter: startupUpdateGate.canEnter(resource.phase, client.phase, localServerReady), automatic: automaticUpdates, source: officialUpdateSource, sourceLocked: Boolean(officialUpdateApplying || resource.phase === 'downloading' || resource.phase === 'applying' || client.phase === 'downloading' || binaryUpdates?.isReady()), clientVersion: app.getVersion(), resource, client }
 }
 
 function notifyOfficialUpdates() {
@@ -2249,7 +2249,7 @@ function setupOfficialUpdates(): void {
     return officialUpdateStatus()
   }
   handleTrusted('official-update-enter', ['game'], () => {
-    if (!officialUpdateStatus().canEnter) throw new Error('请先完成更新检查和已发现的更新')
+    if (!officialUpdateStatus().canEnter) throw new Error('请等待本机游戏服务准备完成')
     startupUpdateGate.entered = true
     return officialUpdateStatus()
   })
@@ -2339,45 +2339,6 @@ function loadOnlineGame(serverUrl: string): void {
 }
 
 let connectWin: BrowserWindow | null = null
-
-function openConnectWindow(errorMessage?: string): void {
-  if (connectWin && !connectWin.isDestroyed()) {
-    connectWin.focus()
-    if (errorMessage) showConnectWindowError(connectWin, errorMessage)
-    return
-  }
-  const win = new BrowserWindow({
-    width: 500,
-    height: 400,
-    title: '连接服务器',
-    icon: getApplicationIconPath(),
-    autoHideMenuBar: true,
-    webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
-      contextIsolation: true,
-      nodeIntegration: false,
-      sandbox: true,
-      webSecurity: true,
-    },
-  })
-  const connectPath = path.join(getConnectRoot(), 'index.html')
-  restrictWindowNavigation(win, (url) => isFileUrlWithinRoot(url, getConnectRoot()))
-  win.loadURL(`file:///${connectPath.replace(/\\/g, '/')}?v=${Date.now()}`)
-  if (errorMessage) win.webContents.once('did-finish-load', () => showConnectWindowError(win, errorMessage))
-  connectWin = win
-  win.on('closed', () => { connectWin = null })
-}
-
-function showConnectWindowError(win: BrowserWindow, message: string): void {
-  void win.webContents.executeJavaScript(`
-    (function () {
-      var error = document.getElementById('err');
-      if (!error) return;
-      error.textContent = ${JSON.stringify(message)};
-      error.style.display = 'block';
-    })();
-  `).catch(error => console.error('[client] failed to show authority abort reason:', error))
-}
 
 type AuthorityPlayerContext = 'idle' | 'remote-match' | 'local-match'
 

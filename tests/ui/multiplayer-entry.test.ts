@@ -9,10 +9,11 @@ function setup() {
   const get = (id: string) => { if (!nodes.has(id)) nodes.set(id, node()); return nodes.get(id)! }
   get('serverKind').value = 'official'; get('gameMode').value = 'pve'
   const profile = { schemaVersion: 1, engineAbi: 'a', runnerRevision: 'b', resolvedProfileHash: 'c', authorityContentHash: 'd' }
-  const location = { href: '' }, storage = { getItem: () => null, setItem: vi.fn() }
+  const location = { href: '', search: '' }, storage = { getItem: () => null, setItem: vi.fn() }
   const host = { ensureLocalAuthority: vi.fn(async () => ({ ok: true })), getMode: async () => ({ localUrl: 'http://127.0.0.1:2567', profileIdentity: profile, localAuthorityProfileIdentity: profile }), relayControl: vi.fn(async () => ({ ok: true, published: { url: 'https://play.redvsblue.top/hosts/ab', inviteCode: '12345678' } })), startHostBroadcast: vi.fn(async () => ({})) }
   const fetch = vi.fn(async (url: string) => ({ ok: true, json: async () => url.includes('/invites/') ? { url: 'https://play.redvsblue.top/hosts/ab' } : url.endsWith('/hosts') ? { hosts: [{ url: 'https://play.redvsblue.top/hosts/ab', name: 'A' }] } : url.endsWith('/rooms?mode=pve') ? { rooms: [{ id: 'pv', name: '旅途', players: 2, maxPlayers: 4, joinable: true }] } : url.endsWith('/rooms') ? { rooms: [{ id: 'full', mode: '1v1', players: [{}, {}], maxPlayers: 2, status: 'waiting' }] } : { ok: true, protocol: 'rvb-colyseus' } }))
-  const context = createContext({ URL, URLSearchParams, AbortSignal, console, location, fetch, localStorage: storage, setInterval: () => {}, window: { RvBHost: host }, navigator: {}, document: { getElementById: get, createElement: node, querySelectorAll: (selector: string) => selector === '.modalError' ? [] : [...nodes.values()] }, RvBIdentity: { getIdentity: () => ({ displayName: '测试' }), ensureIdentity: async () => ({}) }, RvBColyseus: { requestCatalogIdentityAt: async () => ({ profileIdentity: profile }) }, RvBUtils: { saveServerConfig: vi.fn(), appendServerParams: (p: URLSearchParams) => p } })
+  const utils = { readOfficialSession: () => ({ token: 'test', account: { id: 'test' } }), saveServerConfig: vi.fn(), appendServerParams: (p: URLSearchParams) => p }
+  const context = createContext({ URL, URLSearchParams, AbortSignal, console, location, fetch, localStorage: storage, setInterval: () => {}, window: { RvBHost: host, RvBUtils: utils }, navigator: {}, document: { getElementById: get, createElement: node, querySelectorAll: (selector: string) => selector === '.modalError' ? [] : [...nodes.values()] }, RvBIdentity: { getIdentity: () => ({ displayName: '测试' }), ensureIdentity: async () => ({}) }, RvBColyseus: { requestCatalogIdentityAt: async () => ({ profileIdentity: profile }) }, RvBUtils: utils })
   new Script(script).runInContext(context)
   return { get, location, host, fetch }
 }
@@ -74,6 +75,14 @@ it('has only room lobby and ranked navigation', () => {
     expect(nav.match(/<a /g)).toHaveLength(2)
     expect(nav).not.toContain('>服务器</a>')
   }
+})
+it('opens the server lobby in PVE mode and requires its account for internet play', () => {
+  const source=readFileSync('data/pages/js/multiplayer.js','utf8')
+  expect(source).toContain("var entryMode = new URLSearchParams(location.search).get('mode')")
+  expect(source).toMatch(/if \(entryMode === 'pve'\)[\s\S]*?byId\('gameMode'\)\.value = 'pve'[\s\S]*?byId\('inviteMode'\)\.value = 'pve'[\s\S]*?byId\('publicModeFilter'\)\.value = 'pve'/)
+  expect(source).toContain('function requireServerAccount()')
+  expect(source).toContain("location.href = 'official.html'")
+  expect(source).toMatch(/async function enter[\s\S]*?if \(!local\) requireServerAccount\(\)/)
 })
 it('preserves a public host context through room, selection, battle and return', () => {
   const source=readFileSync('data/pages/js/server-utils.js','utf8')

@@ -47,7 +47,7 @@ window.RvBAdventureNetwork = {
       const item = pending.get(value.requestId); if (!item) return
       clearTimeout(item.timer); pending.delete(value.requestId)
       if (value.error) item.reject(Object.assign(new Error(value.error.message), value.error))
-      else item.resolve(value.result)
+      else item.resolve(value.result, value.timings)
     })
     room.onDrop(() => { connected = false; for (const listener of connectionListeners) listener(false, '连接中断，正在重连…') })
     room.onReconnect(() => { connected = true; remember(); for (const listener of connectionListeners) listener(true); void api.request('snapshot').then(value => { lastState = value; for (const listener of listeners) listener(value) }) })
@@ -58,8 +58,12 @@ window.RvBAdventureNetwork = {
       request(type, payload = {}, actionId = crypto.randomUUID()) {
         if (!connected || disposed) return Promise.reject(new Error('请等待连接恢复'))
         const requestId = crypto.randomUUID()
+        const started = performance.now()
         return new Promise((resolve, reject) => {
-          pending.set(requestId, { resolve, reject, timer: setTimeout(async () => {
+          pending.set(requestId, { resolve(value, timings) {
+            if (Array.isArray(value) || !value || typeof value !== 'object') { resolve(value); return }
+            resolve({ ...value, requestMs: performance.now() - started, timings })
+          }, reject, timer: setTimeout(async () => {
             pending.delete(requestId)
             if (['human', 'interact', 'supply'].includes(type) && connected) {
               try {

@@ -14,8 +14,49 @@
   var LOCAL_SERVER_KEY = 'rvb_local_server_url'
   var LAN_SERVER_KEY = 'rvb_lan_server_url'
   var REMOTE_SERVER_KEY = 'rvb_remote_server_url'
+  var OFFICIAL_SESSION_PREFIX = 'rvb_official_session:'
   function normalizeServerUrl(url) {
     return String(url || '').trim().replace(/\/+$/, '')
+  }
+
+  function officialSessionKey(url) {
+    return OFFICIAL_SESSION_PREFIX + encodeURIComponent(normalizeServerUrl(url))
+  }
+
+  function readOfficialSession(url) {
+    var normalized = normalizeServerUrl(url)
+    if (!normalized) return null
+    try {
+      var persisted = JSON.parse(localStorage.getItem(officialSessionKey(normalized)) || 'null')
+      if (persisted && persisted.url === normalized && persisted.token && persisted.account) return persisted
+      var legacy = JSON.parse(sessionStorage.getItem('rvb_official_session') || 'null')
+      if (legacy && normalizeServerUrl(legacy.url) === normalized && legacy.token && legacy.account) {
+        legacy.url = normalized
+        localStorage.setItem(officialSessionKey(normalized), JSON.stringify(legacy))
+        return legacy
+      }
+    } catch {}
+    return null
+  }
+
+  function saveOfficialSession(value) {
+    if (!value || !value.url || !value.token || !value.account) return false
+    var normalized = normalizeServerUrl(value.url)
+    var session = Object.assign({}, value, { url: normalized })
+    try {
+      localStorage.setItem(officialSessionKey(normalized), JSON.stringify(session))
+      sessionStorage.setItem('rvb_official_session', JSON.stringify(session))
+      return true
+    } catch { return false }
+  }
+
+  function clearOfficialSession(url) {
+    var normalized = normalizeServerUrl(url)
+    try {
+      if (normalized) localStorage.removeItem(officialSessionKey(normalized))
+      var active = JSON.parse(sessionStorage.getItem('rvb_official_session') || 'null')
+      if (!normalized || (active && normalizeServerUrl(active.url) === normalized)) sessionStorage.removeItem('rvb_official_session')
+    } catch {}
   }
 
   function getServerUrl() {
@@ -700,5 +741,8 @@
     mobileServerFetch: mobileServerFetch,
     serverFetch: serverFetch,
     validateAndSaveServer: validateAndSaveServer,
+    readOfficialSession: readOfficialSession,
+    saveOfficialSession: saveOfficialSession,
+    clearOfficialSession: clearOfficialSession,
   }
 })()

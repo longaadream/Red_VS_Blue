@@ -1,6 +1,6 @@
 {
   "name": "my-project",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "description": "RED vs BLUE Game Server",
   "author": "Anakin Long Scatterer",
   "private": true,
@@ -26,8 +26,8 @@
     "build:game-engine": "npm run build:practice-ai && node scripts/build-game-engine.js",
     "build:mobile-server": "node scripts/build-mobile-server.js",
     "build:crypto-lib": "node scripts/build-crypto-lib.js",
-    "build:android": "npm run build:game-engine && npm run build:mobile-server && npm run build:crypto-lib && node scripts/sync-android-assets.js && npx cap sync android",
-    "build:android:apk": "npm run build:game-engine && npm run build:mobile-server && node scripts/sync-android-assets.js && npx cap sync android && cd android && JAVA_HOME=\"/c/Program Files/Android/Android Studio/jbr\" ANDROID_HOME=\"/c/Users/lngsc/AppData/Local/Android/Sdk\" ./gradlew assembleDebug",
+    "build:android": "powershell -NoProfile -File scripts/build-android-ui-acceptance.ps1",
+    "build:android:apk": "npm run build:android",
     "build:content-pipeline:editor-bundle": "node scripts/rvb.mjs bundle-editor-worker",
     "candidate:content-pipeline": "node scripts/rvb.mjs content-candidate RED-118",
     "dev:electron:editor": "npm run preflight:electron:editor && npm run build:content-pipeline:editor-bundle && npx tsc -p electron-editor/tsconfig.json && npx electron electron-editor/dist/main.js",

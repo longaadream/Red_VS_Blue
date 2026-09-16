@@ -661,6 +661,38 @@ describe('RED-163 dark character contract', () => {
     expect(secondResolved.pieces.find((piece: any) => piece.instanceId === grimmjow.instanceId)).toMatchObject({ currentHp: 6, x: 2, y: 2 })
   })
 
+  it('treats cancelling Hunting Instinct as the completed default reaction', () => {
+    const grimmjow = makePiece({
+      instanceId: 'cancel-hunt-grimmjow', templateId: 'dark-grimmjow', ownerPlayerId: 'player-red', x: 0, y: 1,
+      currentHp: 10, maxHp: 10, attack: 4, moveRange: 4,
+    }) as any
+    grimmjow.rules = [rule('rule-grimmjow-hunt-after-move'), rule('rule-grimmjow-hunt-after-skill')]
+    const enemy = makePiece({
+      instanceId: 'cancel-hunt-enemy', ownerPlayerId: 'player-blue', faction: 'blue', x: 3, y: 1,
+      currentHp: 20, maxHp: 20, attack: 4, moveRange: 3,
+    }) as any
+    const state = makeState({ pieces: [grimmjow, enemy], currentPlayerId: 'player-blue', width: 6, height: 4 }) as any
+    state.players[1].actionPoints = 3
+
+    const pending = runBattleAction(state, {
+      type: 'move', playerId: 'player-blue', pieceId: enemy.instanceId, toX: 2, toY: 1,
+    }, { rootSeed: 170 }).state as any
+    expect(pending.pendingTargetSelection).toMatchObject({
+      playerId: 'player-red', canCancel: true, title: '狩猎本能：选择落点',
+    })
+    const selection = pending.pendingTargetSelection
+
+    const resolved = runBattleAction(pending, {
+      type: 'cancelPendingSelection', playerId: 'player-red',
+      selectionId: selection.selectionId, stateRevision: selection.stateRevision,
+    } as any, { rootSeed: 170 }).state as any
+
+    expect(resolved.pendingTargetSelection).toBeUndefined()
+    expect(resolved.pendingOptionSelection).toBeUndefined()
+    expect(resolved.pieces.find((piece: any) => piece.instanceId === grimmjow.instanceId)).toMatchObject({ x: 0, y: 1, currentHp: 10 })
+    expect(resolved.pieces.find((piece: any) => piece.instanceId === enemy.instanceId)).toMatchObject({ x: 2, y: 1, currentHp: 20 })
+  })
+
   it('settles Panther Claw as five independent hits and five self-damage instances', () => {
     const grimmjow = makePiece({
       instanceId: 'panther', templateId: 'dark-grimmjow', ownerPlayerId: 'player-red', x: 0, y: 0,

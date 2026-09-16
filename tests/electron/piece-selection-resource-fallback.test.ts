@@ -31,6 +31,7 @@ type PageContract = {
 }
 
 type MockElement = {
+  hidden: boolean
   value: string
   classList: {
     add: (name: string) => void
@@ -58,6 +59,7 @@ function makePieces(faction: 'good' | 'evil', count: number): Piece[] {
 function createElement(): MockElement {
   const classes = new Set<string>()
   return {
+    hidden: false,
     value: '',
     classList: {
       add: name => { classes.add(name) },
@@ -139,7 +141,7 @@ function createHarness(options: {
     clearInterval: options.useIntervals ? clearInterval : () => {},
     clearTimeout,
     console,
-    document: { getElementById: element },
+    document: { getElementById: element, body: element('body') },
     fetch: vi.fn(),
     location,
     localStorage,
@@ -186,6 +188,23 @@ function localPack(pieces: Piece[]) {
     return piece
   }
 }
+
+test('ranked hides all pieces until alignment is chosen, then shows only that alignment', async () => {
+  const good = makePieces('good', 8), evil = makePieces('evil', 8)
+  const h = createHarness({ search: '?ranked=1&roomId=match&playerId=alice', fetchPackJson: localPack([...good, ...evil]), wsRequest: async () => ({}) })
+  await h.contract.loadPieces()
+  h.contract.updateFactionBadge()
+  expect(h.contract.getPieces()).toEqual([])
+  expect(h.element('rosterPieces').hidden).toBe(true)
+  expect(h.element('rosterBuilder').hidden).toBe(true)
+  expect(h.element('rankedAlignmentIntro').hidden).toBe(false)
+  await h.contract.switchDeckAlignment('light')
+  expect(h.contract.getPieces().map(p => p.id)).toEqual(good.map(p => p.id))
+  expect(h.element('rosterPieces').hidden).toBe(false)
+  expect(h.element('rankedAlignmentIntro').hidden).toBe(true)
+  await h.contract.switchDeckAlignment('dark')
+  expect(h.contract.getPieces().map(p => p.id)).toEqual(evil.map(p => p.id))
+})
 
 test('standalone builder saves both alignments and reloads cards without submitting a room action', async () => {
   const good = makePieces('good', 8)

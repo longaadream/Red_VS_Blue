@@ -12,7 +12,117 @@ function browser() {
   for(const name of ['battle-skill-presentation','battle-view-model','battle-dom-ui','battle-presentation']) new Script(readFileSync(resolve('data/pages/js/battle-ui/'+name+'.js'),'utf8')).runInContext(context)
   return window
 }
+
+function queuedAudio() {
+  const w=browser(),context=createContext({window:w,globalThis:w,console})
+  const impact={playEvents:vi.fn(),stop:vi.fn(),dispose:vi.fn()}
+  w.BattleImpact={create:()=>impact}
+  for(const path of ['battle-audio.js','battle-ui/battle-action-vignette.js']) new Script(readFileSync(resolve('data/pages/js/'+path),'utf8')).runInContext(context)
+  const play=vi.fn(),renderer={init:vi.fn(),update:vi.fn(),dispose:vi.fn()}
+  let queue:any
+  const vignetteUi={
+    sequencesBoard:true,
+    mount:(options:any)=>{queue=w.BattleActionVignette.createQueue({
+      onPhase:options.onPlaybackPhase,onIdle:options.onPlaybackIdle,
+      now:()=>Date.now(),setTimeout:(fn:()=>void,delay:number)=>setTimeout(fn,delay),clearTimeout:(id:ReturnType<typeof setTimeout>)=>clearTimeout(id),
+    })},
+    update:(model:any)=>queue.update(model),reset:(model:any)=>queue.reset(model),
+    settleAll:()=>queue.settleAll(),getDiagnostics:()=>queue.getDiagnostics(),dispose:()=>queue.dispose(),
+  }
+  const p=w.BattlePresentation.create({renderer,domUi:{update:vi.fn(),dispose:vi.fn()},vignetteUi,
+    skillAudio:{playEvents:(events:any[])=>w.BattleAudio.soundsFor(events).forEach((kind:string)=>play(kind)),dispose:vi.fn()}})
+  p.mount({})
+  const model=(events:any[])=>({viewer:{id:'red'},board:{},turn:{isViewerTurn:false},effects:[],pieces:[],presentationEvents:events})
+  p.update(model([]))
+  return {p,play,model,impact,skip:()=>queue.skip()}
+}
 describe('projected skill display in the actual browser consumers',()=>{
+  it('triggers impact only at the live result, once, and cancels on skip/recovery',()=>{
+    vi.useFakeTimers()
+    const {p,model,impact,skip}=queuedAudio()
+    const event={eventId:'hit',rootEventId:'hit',kind:'damage',sequence:0,result:{amount:10}}
+    try {
+      p.update(model([event]));expect(impact.playEvents).not.toHaveBeenCalled()
+      vi.advanceTimersByTime(420);expect(impact.playEvents).toHaveBeenCalledTimes(1)
+      skip();expect(impact.stop).toHaveBeenCalled()
+      vi.runAllTimers();p.update(model([event]));expect(impact.playEvents).toHaveBeenCalledTimes(1)
+      p.beginSkillRecovery();p.completeSkillRecovery()
+      p.update(model([event,{...event,eventId:'recovered',rootEventId:'recovered'}]));vi.runAllTimers()
+      expect(impact.playEvents).toHaveBeenCalledTimes(1)
+    } finally {p.dispose();vi.useRealTimers()}
+    expect(impact.dispose).toHaveBeenCalledTimes(1)
+  })
+  it('plays a movement sound for the player action through the real queue',()=>{
+    vi.useFakeTimers()
+    const {p,play,model}=queuedAudio()
+    const events=[{eventId:'walk',rootEventId:'walk',kind:'move',sequence:0,sourcePieceId:'a',result:{fromX:1,fromY:1,toX:2,toY:1}}]
+    try {
+      p.update({...model([]),turn:{isViewerTurn:true}})
+      p.update({...model(events),turn:{isViewerTurn:true}})
+      vi.advanceTimersByTime(120)
+      expect(play).toHaveBeenCalledExactlyOnceWith('move')
+      vi.runAllTimers()
+      p.update({...model(events),turn:{isViewerTurn:true}})
+      expect(play).toHaveBeenCalledTimes(1)
+    } finally {p.dispose();vi.useRealTimers()}
+  })
+  it('silences an already queued result during recovery before another snapshot arrives',()=>{
+    vi.useFakeTimers()
+    const {p,play,model}=queuedAudio()
+    try {
+      p.update(model([{eventId:'queued',rootEventId:'queued',kind:'damage',sequence:0,result:{amount:2}}]))
+      p.beginSkillRecovery()
+      vi.runAllTimers()
+      expect(play).not.toHaveBeenCalled()
+    } finally {p.dispose();vi.useRealTimers()}
+  })
+  it.each([false,true])('does not replay basic sounds on recovery and plays subsequent new actions (intermediate snapshot: %s)',intermediate=>{
+    vi.useFakeTimers()
+    const {p,play,model}=queuedAudio()
+    const damage=(id:string)=>({eventId:id,rootEventId:id,kind:'damage',sequence:0,result:{amount:2}})
+    try {
+      p.beginSkillRecovery()
+      if(intermediate){p.update(model([damage('during-recovery')]));vi.runAllTimers()}
+      p.completeSkillRecovery()
+      const recovered=[damage('during-recovery'),damage('catch-up')]
+      p.update(model(recovered));vi.runAllTimers()
+      expect(play).not.toHaveBeenCalled()
+      p.update(model([...recovered,damage('new-action')]));vi.runAllTimers()
+      expect(play).toHaveBeenCalledExactlyOnceWith('damage')
+    } finally {p.dispose();vi.useRealTimers()}
+  })
+  it('plays one sound for each real queue AOE batch while preserving separate hit batches',()=>{
+    vi.useFakeTimers()
+    const {p,play,model}=queuedAudio()
+    const root={eventId:'action:0',rootEventId:'action:0',kind:'skill',sequence:0}
+    const hit=(sequence:number,batchId:string)=>({eventId:'action:'+sequence,rootEventId:root.eventId,parentEventId:root.eventId,
+      kind:'damage',sequence,batchId,targetPieceIds:['target-'+sequence],result:{amount:2}})
+    try {
+      const events=[root,hit(1,'aoe-first'),hit(2,'aoe-first'),hit(3,'aoe-second'),hit(4,'aoe-second')]
+      p.update(model(events));vi.runAllTimers()
+      expect(play.mock.calls).toEqual([['damage'],['damage']])
+      p.update(model(events));vi.runAllTimers()
+      expect(play).toHaveBeenCalledTimes(2)
+    } finally {p.dispose();vi.useRealTimers()}
+  })
+  it('plays basic audio once per animated action and stays silent when animations are skipped',()=>{
+    const w=browser(), renderer={init:vi.fn(),update:vi.fn(),dispose:vi.fn()},domUi={update:vi.fn(),dispose:vi.fn()}
+    let phase:any
+    const skillAudio={playEvents:vi.fn(),dispose:vi.fn()}
+    const vignetteUi={mount:(o:any)=>{phase=o.onPlaybackPhase},update:vi.fn(),dispose:vi.fn()}
+    const p=w.BattlePresentation.create({renderer,domUi,vignetteUi,skillAudio})
+    p.mount({})
+    p.update({viewer:{id:'red'},board:{},turn:{},effects:[],pieces:[],presentationEvents:[]})
+    expect(skillAudio.playEvents).not.toHaveBeenCalled()
+    const group=(id:string)=>({rootEventId:id,root:{kind:'damage',rootEventId:id,eventId:id,result:{amount:2}},children:[]})
+    phase('result',group('one'));phase('result',group('one'));phase('settle',group('one'))
+    expect(skillAudio.playEvents).toHaveBeenCalledTimes(1)
+    phase('settle',group('skipped'));phase('result',group('skipped'))
+    expect(skillAudio.playEvents).toHaveBeenCalledTimes(1)
+    phase('static',group('reduced-motion'))
+    expect(skillAudio.playEvents).toHaveBeenCalledTimes(2)
+    p.dispose()
+  })
   it('passes authoritative teleport/swap kinds to the renderer without mutating the model',()=>{
     const w=browser(),renderer={init:vi.fn(),update:vi.fn(),dispose:vi.fn(),animateAction:vi.fn()},domUi={update:vi.fn(),dispose:vi.fn()}
     let phase:any

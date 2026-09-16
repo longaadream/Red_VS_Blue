@@ -181,6 +181,12 @@
     .panel-title { font-size: clamp(26px, 3.3vw, 44px); line-height: 1.08; letter-spacing: -.03em; color: #f8fafc; }
     .panel-description { margin-top: 10px; max-width: 52ch; color: #94a3b8; font-size: 14px; line-height: 1.55; }
     .action-stack { flex: 1; display: grid; gap: 10px; align-content: center; }
+    .connection-groups { flex: 1; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; align-content: center; }
+    .connection-group { min-width: 0; padding: 14px; border: 1px solid #293750; border-radius: 14px; background: rgba(9, 16, 29, .5); }
+    .connection-group__title { margin: 0 0 4px; color: #f8fafc; font-size: 15px; font-weight: 900; }
+    .connection-group__hint { margin: 0 0 10px; min-height: 34px; color: #7f8da4; font-size: 11px; line-height: 1.45; }
+    .connection-group .action-stack { display: grid; align-content: start; }
+    .connection-group .action-button { min-height: 68px; }
     .action-button {
       width: 100%;
       min-height: 78px;
@@ -254,6 +260,7 @@
       .mode-hint { display: none; }
       .mode-stage { padding: 20px 14px; }
       .panel-layout { min-height: 390px; }
+      .connection-groups { grid-template-columns: 1fr; }
       .action-button { min-height: 74px; grid-template-columns: 50px minmax(0, 1fr) auto; gap: 12px; padding: 12px; }
       .action-code { width: 50px; height: 44px; }
       .utility-button { flex-direction: column; gap: 3px; text-align: center; }
@@ -280,6 +287,11 @@
       .panel-title { font-size: 22px; }
       .panel-description { margin-top: 4px; font-size: 11px; }
       .action-stack { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; }
+      .connection-groups { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
+      .connection-group { padding: 7px; }
+      .connection-group__title { font-size: 12px; }
+      .connection-group__hint { display: none; }
+      .connection-group .action-stack { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .action-button { min-height: 0; grid-template-columns: 1fr; align-content: center; gap: 4px; padding: 8px 10px; }
       .action-code { display: none; }
       .action-title { font-size: 14px; }
@@ -383,6 +395,8 @@
 </style>
   <link rel="stylesheet" href="css/tabletop/tabletop.css" />
   <link rel="stylesheet" href="css/tabletop/menu.css" />
+  <script src="js/battle-audio.js" defer></script>
+  <script src="js/battle-impact.js" defer></script>
 </head>
 <body data-art-page="index">
   <div class="game-shell">
@@ -392,13 +406,18 @@
         <span class="brand-vs">vs</span>
         <span class="brand-blue">BLUE</span>
       </h1>
-      <button id="userPill" class="user-pill" type="button" onclick="openIdentitySheet()" aria-label="打开账号管理">
+      <button id="userPill" class="user-pill" type="button" onclick="openIdentitySheet()" aria-label="登录或管理服务器账号">
         <span class="user-dot" id="userDot"></span>
         <span id="userName">玩家</span>
         <span class="user-elo" id="userElo"></span>
       </button>
     </header>
 
+    <details style="margin:0 0 12px auto;max-width:300px;color:var(--ink, #ead4a3)">
+      <summary style="cursor:pointer;padding:8px">音效设置</summary>
+      <label style="display:flex;align-items:center;gap:12px;padding:12px">音效音量 <input data-sound-volume type="range" min="0" max="100" step="1" aria-label="音效音量" style="min-width:0;width:130px"><output data-sound-label></output></label>
+      <label style="display:flex;align-items:center;gap:12px;padding:12px"><input data-screen-shake type="checkbox">重伤害画面震动</label>
+    </details>
     <main class="menu-workspace">
       <nav class="mode-nav" aria-label="主要游戏模式">
         <button class="tutorial-shortcut" id="tutorialShortcut" type="button" onclick="goToTutorial()" aria-describedby="tutorialEntryDescription">
@@ -435,24 +454,25 @@
           <div class="panel-layout">
             <header class="panel-header">
               <h2 class="panel-title">联机对战</h2>
-              <p class="panel-description">选择连接方式，创建战局或加入其他玩家。</p>
+              <p class="panel-description">局域网可离线游玩；互联网房间和排位需要登录所选服务器。</p>
             </header>
-            <div class="action-stack">
-              <button class="action-button action-feature" id="createLocalRoom" type="button" onclick="document.getElementById('lanCreateDialog').showModal()">
-                <span class="action-code" aria-hidden="true">主机</span>
-                <span class="action-copy"><span class="action-title">创建房间</span><span class="action-description">局域网 · 1v1 / 2v2 / PVE</span></span>
-                <span class="action-arrow" aria-hidden="true">›</span>
-              </button>
-              <button class="action-button" type="button" onclick="showJoinSheet()">
-                <span class="action-code" aria-hidden="true">好友</span>
-                <span class="action-copy"><span class="action-title">加入房间</span><span class="action-description">查找同一网络的 1v1 / 2v2 / PVE 房间</span></span>
-                <span class="action-arrow" aria-hidden="true">›</span>
-              </button>
-              <button class="action-button" type="button" onclick="loadPage('multiplayer.html')">
-                <span class="action-code" aria-hidden="true">在线</span>
-                <span class="action-copy"><span class="action-title">联机大厅</span><span class="action-description" id="serverStatusDesc">浏览房间、创建对局或参加官方排位</span></span>
-                <span class="action-arrow" aria-hidden="true">›</span>
-              </button>
+            <div class="connection-groups">
+              <section class="connection-group" aria-labelledby="lanGroupTitle">
+                <h3 class="connection-group__title" id="lanGroupTitle">局域网联机</h3>
+                <p class="connection-group__hint">同一 Wi-Fi、热点或虚拟局域网，无需服务器账号。</p>
+                <div class="action-stack">
+                  <button class="action-button action-feature" id="createLocalRoom" type="button" onclick="document.getElementById('lanCreateDialog').showModal()"><span class="action-code" aria-hidden="true">主机</span><span class="action-copy"><span class="action-title">创建 LAN 房间</span><span class="action-description">显示 IP，邀请身边好友</span></span><span class="action-arrow" aria-hidden="true">›</span></button>
+                  <button class="action-button" type="button" onclick="showJoinSheet()"><span class="action-code" aria-hidden="true">查找</span><span class="action-copy"><span class="action-title">加入 LAN 房间</span><span class="action-description">自动搜索或输入房主 IP 直连</span></span><span class="action-arrow" aria-hidden="true">›</span></button>
+                </div>
+              </section>
+              <section class="connection-group" aria-labelledby="internetGroupTitle">
+                <h3 class="connection-group__title" id="internetGroupTitle">互联网联机</h3>
+                <p class="connection-group__hint">选择社区或官方服务器；账号和战绩跟随该服务器。</p>
+                <div class="action-stack">
+                  <button class="action-button action-feature" type="button" onclick="loadPage('multiplayer.html')"><span class="action-code" aria-hidden="true">大厅</span><span class="action-copy"><span class="action-title">服务器大厅</span><span class="action-description" id="serverStatusDesc">浏览服务器房间与合作冒险</span></span><span class="action-arrow" aria-hidden="true">›</span></button>
+                  <button class="action-button" type="button" onclick="loadPage('official.html')"><span class="action-code" aria-hidden="true">排位</span><span class="action-copy"><span class="action-title">登录 / 排位对战</span><span class="action-description">登录当前服务器账号并开始匹配</span></span><span class="action-arrow" aria-hidden="true">›</span></button>
+                </div>
+              </section>
             </div>
           </div>
         </div>
@@ -465,10 +485,12 @@
             </header>
             <div class="action-stack">
               <button class="action-button action-feature" id="pveBtn" type="button" onclick="window.location.href='adventure.html'">
-                <span class="action-code" aria-hidden="true">PVE</span>
-                <span class="action-copy"><span class="action-title">踏上冒险</span><span class="action-description" id="pveBtnDesc">选好队伍，独行或与朋友结伴</span></span>
+                <span class="action-code" aria-hidden="true">单人</span>
+                <span class="action-copy"><span class="action-title">单人冒险</span><span class="action-description" id="pveBtnDesc">离线准备队伍，独自踏上冒险</span></span>
                 <span class="action-arrow" id="pveBtnArrow" aria-hidden="true">›</span>
               </button>
+              <button class="action-button" type="button" onclick="showJoinSheet()"><span class="action-code" aria-hidden="true">LAN</span><span class="action-copy"><span class="action-title">加入局域网冒险</span><span class="action-description">查找同一网络的冒险队伍</span></span><span class="action-arrow" aria-hidden="true">›</span></button>
+              <button class="action-button" type="button" onclick="loadPage('multiplayer.html?mode=pve')"><span class="action-code" aria-hidden="true">在线</span><span class="action-copy"><span class="action-title">服务器冒险</span><span class="action-description">登录服务器后与远方好友组队</span></span><span class="action-arrow" aria-hidden="true">›</span></button>
             </div>
           </div>
         </div>
@@ -616,62 +638,25 @@
   </div>
 
   <!-- ── 身份 Sheet ── -->
-  <div class="overlay" id="identityOverlay" onclick="closeIdentitySheet()">
-    <div class="sheet" onclick="event.stopPropagation()" style="max-height:85vh;overflow-y:auto">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
-        <h3 style="margin:0" id="identitySheetTitle">我的账号</h3>
-        <button onclick="closeIdentitySheet()" style="background:transparent;border:none;color:#64748b;font-size:22px;line-height:1;cursor:pointer;padding:0 4px">×</button>
+  <dialog id="accountDialog" aria-labelledby="accountTitle" style="width:min(420px,calc(100vw - 32px));max-height:85vh;overflow:auto;padding:24px;background:#f0e2bf;color:#403021;border:3px solid #796344;border-radius:18px">
+    <h3 id="accountTitle">服务器账号</h3>
+    <form id="homeLoginForm">
+      <label>服务器<input id="homeAccountServer" type="url" required value="https://play.redvsblue.top" style="display:block;width:100%;box-sizing:border-box;margin:8px 0;padding:10px"></label>
+      <p id="homeAccountStatus" role="status"></p>
+      <div id="homeLoginFields">
+        <label>邮箱<input id="homeAccountEmail" type="email" autocomplete="username" required style="display:block;width:100%;box-sizing:border-box;margin:8px 0;padding:10px"></label>
+        <label>密码<input id="homeAccountPassword" type="password" autocomplete="current-password" required style="display:block;width:100%;box-sizing:border-box;margin:8px 0;padding:10px"></label>
+        <button type="submit" id="homeLoginSubmit">登录</button>
+        <button type="button" id="homeAccountManage">注册 / 找回密码</button>
       </div>
-      <!-- View: main -->
-      <div id="identityViewMain">
-        <div id="identityError" role="alert" style="display:none;background:#2a1014;border:1px solid #b91c1c;border-radius:10px;padding:11px 13px;margin-bottom:14px;color:#fca5a5;font-size:13px;line-height:1.5"></div>
-        <div style="background:#0f172a;border:1px solid #1e293b;border-radius:10px;padding:12px 14px;margin-bottom:16px">
-          <div style="font-size:11px;color:#475569;margin-bottom:4px">玩家 ID</div>
-          <div id="identityIdDisplay" style="font-size:13px;color:#94a3b8;font-family:monospace"></div>
-        </div>
-        <label style="font-size:13px;color:#94a3b8;display:block;margin-bottom:6px">显示名称</label>
-        <input id="identityNameInput" type="text" maxlength="20" placeholder="输入你的显示名称"
-          style="width:100%;background:#0f172a;border:1px solid #334155;border-radius:10px;color:#e2e8f0;font-size:15px;padding:12px 14px;outline:none;box-sizing:border-box;margin-bottom:12px" />
-        <button onclick="saveIdentityName()"
-          style="width:100%;padding:13px;background:#3b82f6;color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:12px">保存名称</button>
-        <div style="font-size:12px;color:#64748b;line-height:1.5;margin-bottom:12px">账号、战绩和资源包都保存在当前设备，不会自动同步到别的电脑。</div>
-        <div style="background:#0f172a;border:1px solid #1e293b;border-radius:10px;padding:12px 14px;margin-bottom:12px">
-          <div style="font-size:12px;color:#94a3b8;margin-bottom:8px">本机账号</div>
-          <div id="identityAccountList" style="display:flex;flex-direction:column;gap:8px"></div>
-        </div>
-        <div style="display:flex;gap:8px">
-          <button onclick="identityShowMnemonic()"
-            style="flex:1;padding:11px;background:transparent;border:1px solid #334155;color:#94a3b8;border-radius:10px;font-size:14px;cursor:pointer">查看助记词</button>
-          <button onclick="createAnotherIdentity()"
-            style="flex:1;padding:11px;background:transparent;border:1px solid #334155;color:#94a3b8;border-radius:10px;font-size:14px;cursor:pointer">新建账号</button>
-          <button onclick="identityShowImport()"
-            style="flex:1;padding:11px;background:transparent;border:1px solid #334155;color:#94a3b8;border-radius:10px;font-size:14px;cursor:pointer">导入账号</button>
-        </div>
-      </div>
-      <!-- View: mnemonic -->
-      <div id="identityViewMnemonic" style="display:none">
-        <div style="background:#1a1106;border:1px solid #b45309;border-radius:10px;padding:12px 14px;margin-bottom:16px;font-size:13px;color:#fbbf24">
-          ⚠ 请抄写下来保管好，丢失后账号无法找回
-        </div>
-        <div id="mnemonicGrid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px"></div>
-        <button onclick="copyMnemonic()"
-          style="width:100%;padding:12px;background:#1e293b;border:1px solid #334155;color:#e2e8f0;border-radius:10px;font-size:14px;cursor:pointer;margin-bottom:8px" id="copyMnemonicBtn">复制全部</button>
-        <button onclick="identityShowMain()"
-          style="width:100%;padding:12px;background:transparent;border:1px solid #334155;color:#64748b;border-radius:10px;font-size:14px;cursor:pointer">返回</button>
-      </div>
-      <!-- View: import -->
-      <div id="identityViewImport" style="display:none">
-        <p style="font-size:13px;color:#64748b;margin-bottom:12px">输入12个英文助记词（空格分隔）来恢复账号。当前账号数据将被覆盖。</p>
-        <textarea id="importMnemonicInput" rows="4" placeholder="word1 word2 word3 ... word12"
-          style="width:100%;background:#0f172a;border:1px solid #334155;border-radius:10px;color:#e2e8f0;font-size:14px;padding:12px 14px;outline:none;box-sizing:border-box;resize:none;margin-bottom:8px;font-family:monospace"></textarea>
-        <div id="importErr" style="color:#f87171;font-size:13px;margin-bottom:8px;display:none"></div>
-        <button onclick="doImportMnemonic()" id="importBtn"
-          style="width:100%;padding:12px;background:#3b82f6;color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:8px">导入</button>
-        <button onclick="identityShowMain()"
-          style="width:100%;padding:12px;background:transparent;border:1px solid #334155;color:#64748b;border-radius:10px;font-size:14px;cursor:pointer">取消</button>
-      </div>
-    </div>
-  </div>
+      <button type="button" id="homeLogout" hidden>退出登录</button>
+    </form>
+    <hr>
+    <label>离线 / LAN 昵称<input id="homeGuestName" maxlength="20" style="display:block;width:100%;box-sizing:border-box;margin:8px 0;padding:10px"></label>
+    <button type="button" id="homeGuestSave">保存昵称</button>
+    <p>教程、单人和 LAN 可离线游玩；互联网联机须登录服务器账号。</p>
+    <button type="button" id="homeAccountClose">返回游戏</button>
+  </dialog>
 
   <!-- ── 战绩 Sheet ── -->
   <div class="overlay" id="recordsOverlay" onclick="closeRecordsSheet()">
@@ -1261,192 +1246,12 @@
     }
 
     function refreshUserUI() {
-      try {
-        const identity = RvBIdentity.getIdentity()
-        if (identityUiError) {
-          document.getElementById('userName').textContent = '账号错误'
-          document.getElementById('userDot').style.background = '#ef4444'
-        } else {
-          document.getElementById('userName').textContent = identity ? (identity.displayName || '玩家') : '设置账号'
-          document.getElementById('userDot').style.background = identity ? '#22c55e' : '#f59e0b'
-        }
-      } catch (e) {
-        showIdentityError(e, '读取账号')
-      }
+      if (window.RvBHomeAccount) window.RvBHomeAccount.refresh()
       _updateRecordsSummary()
     }
 
-    function identityShowMain() {
-      document.getElementById('identityViewMain').style.display = 'block'
-      document.getElementById('identityViewMnemonic').style.display = 'none'
-      document.getElementById('identityViewImport').style.display = 'none'
-      renderIdentityAccountList()
-      document.getElementById('identitySheetTitle').textContent = '我的账号'
-    }
-
-    function renderIdentityAccountList() {
-      const listEl = document.getElementById('identityAccountList')
-      if (!listEl || !window.RvBIdentity || typeof RvBIdentity.listIdentities !== 'function') return
-      const accounts = RvBIdentity.listIdentities()
-      if (!accounts.length) {
-        listEl.innerHTML = '<div style="font-size:12px;color:#64748b">暂无本机账号</div>'
-        return
-      }
-      listEl.innerHTML = accounts.map(account => {
-        const isActive = !!account.isActive
-        const action = isActive
-          ? '<span style="font-size:12px;color:#22c55e;font-weight:700">当前使用</span>'
-          : `<button onclick="switchIdentityAccount('${escHtml(account.id)}')" style="padding:6px 10px;background:transparent;border:1px solid #334155;color:#cbd5e1;border-radius:999px;font-size:12px;cursor:pointer">切换</button>`
-        return `<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 10px;border:1px solid ${isActive ? '#2563eb' : '#1e293b'};border-radius:10px;background:${isActive ? 'rgba(30,64,175,.16)' : 'rgba(15,23,42,.55)'}">
-          <div style="min-width:0">
-            <div style="font-size:13px;color:#e2e8f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(account.displayName || '玩家')}</div>
-            <div style="font-size:11px;color:#64748b;font-family:monospace">${escHtml(account.id)}</div>
-          </div>
-          ${action}
-        </div>`
-      }).join('')
-    }
-
-    function identityShowMnemonic() {
-      const words = RvBIdentity.getMnemonic()
-      if (!words) return
-      const grid = document.getElementById('mnemonicGrid')
-      grid.innerHTML = words.map((w, i) =>
-        `<div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:8px;text-align:center"><span style="font-size:10px;color:#475569;display:block">${i+1}</span><span style="font-size:14px;font-family:monospace;color:#e2e8f0">${w}</span></div>`
-      ).join('')
-      document.getElementById('copyMnemonicBtn').textContent = '复制全部'
-      document.getElementById('identityViewMain').style.display = 'none'
-      document.getElementById('identityViewMnemonic').style.display = 'block'
-      document.getElementById('identitySheetTitle').textContent = '助记词备份'
-    }
-
-    function identityShowImport() {
-      document.getElementById('importMnemonicInput').value = ''
-      document.getElementById('importErr').style.display = 'none'
-      document.getElementById('importBtn').textContent = '导入'
-      document.getElementById('importBtn').disabled = false
-      document.getElementById('identityViewMain').style.display = 'none'
-      document.getElementById('identityViewImport').style.display = 'block'
-      document.getElementById('identitySheetTitle').textContent = '导入账号'
-    }
-
-    async function openIdentitySheet() {
-      let identity = RvBIdentity.getIdentity()
-      if (!identity) {
-        document.getElementById('userName').textContent = '创建中…'
-        try {
-          const created = await RvBIdentity.ensureIdentity()
-          identity = assertIdentityPersisted(created, '初始化账号')
-          clearIdentityError()
-        } catch (e) {
-          showIdentityError(e, '初始化账号')
-        }
-      } else {
-        clearIdentityError()
-      }
-      if (identity) {
-        document.getElementById('identityIdDisplay').textContent = (identity.displayName || '玩家') + ' · ' + identity.id
-        document.getElementById('identityNameInput').value = identity.displayName || ''
-      }
-      identityShowMain()
-      document.getElementById('identityOverlay').classList.add('show')
-    }
-
-    function closeIdentitySheet() {
-      document.getElementById('identityOverlay').classList.remove('show')
-      refreshUserUI()
-    }
-
-    async function saveIdentityName() {
-      const name = document.getElementById('identityNameInput').value.trim()
-      if (!name) return
-      try {
-        if (typeof RvBIdentity.setDisplayName !== 'function') {
-          throw new Error('身份模块不支持保存名称')
-        }
-        const updated = RvBIdentity.setDisplayName(name)
-        const identity = assertIdentityPersisted(updated, '保存名称')
-        clearIdentityError()
-        document.getElementById('identityIdDisplay').textContent = name + ' · ' + identity.id
-        closeIdentitySheet()
-      } catch (e) {
-        showIdentityError(e, '保存名称')
-        identityShowMain()
-        document.getElementById('identityOverlay').classList.add('show')
-      }
-    }
-
-    function switchIdentityAccount(id) {
-      try {
-        if (typeof RvBIdentity.switchIdentity === 'function') {
-          const switched = RvBIdentity.switchIdentity(id)
-          const identity = assertIdentityPersisted(switched, '切换账号')
-          if (identity) {
-            document.getElementById('identityIdDisplay').textContent = (identity.displayName || '玩家') + ' 路 ' + identity.id
-            document.getElementById('identityNameInput').value = identity.displayName || ''
-          }
-          clearIdentityError()
-          renderIdentityAccountList()
-          refreshUserUI()
-        }
-      } catch (e) {
-        showIdentityError(e, '切换账号')
-        alert(e.message || '切换账号失败')
-      }
-    }
-
-    async function createAnotherIdentity() {
-      const ok = window.confirm('将创建一个新的本机账号，并自动切换到它。建议创建后立刻备份助记词。')
-      if (!ok) return
-      try {
-        const created = await RvBIdentity.createIdentity('玩家')
-        const identity = assertIdentityPersisted(created, '创建账号')
-        if (identity) {
-          document.getElementById('identityIdDisplay').textContent = (identity.displayName || '玩家') + ' 路 ' + identity.id
-          document.getElementById('identityNameInput').value = identity.displayName || ''
-        }
-        clearIdentityError()
-        renderIdentityAccountList()
-        refreshUserUI()
-        identityShowMnemonic()
-      } catch (e) {
-        showIdentityError(e, '创建账号')
-        alert(e.message || '创建账号失败')
-      }
-    }
-
-    function copyMnemonic() {
-      const words = RvBIdentity.getMnemonic()
-      if (!words) return
-      const text = words.join(' ')
-      if (navigator.clipboard) {
-        navigator.clipboard.writeText(text).then(() => {
-          document.getElementById('copyMnemonicBtn').textContent = '已复制！'
-          setTimeout(() => { document.getElementById('copyMnemonicBtn').textContent = '复制全部' }, 1500)
-        })
-      }
-    }
-
-    async function doImportMnemonic() {
-      const input = document.getElementById('importMnemonicInput').value.trim()
-      const errEl = document.getElementById('importErr')
-      const btn = document.getElementById('importBtn')
-      errEl.style.display = 'none'
-      btn.textContent = '导入中…'; btn.disabled = true
-      try {
-        const imported = await RvBIdentity.importFromMnemonic(input)
-        assertIdentityPersisted(imported, '导入账号')
-        clearIdentityError()
-        renderIdentityAccountList()
-        refreshUserUI()
-        btn.textContent = '导入成功！'
-        setTimeout(() => { closeIdentitySheet() }, 800)
-      } catch (e) {
-        showIdentityError(e, '导入账号')
-        errEl.textContent = e.message || '导入失败'
-        errEl.style.display = 'block'
-        btn.textContent = '导入'; btn.disabled = false
-      }
+    function openIdentitySheet() {
+      window.RvBHomeAccount.open()
     }
 
     // ── PostgreSQL authority battle reports ───────────────────────────────────
@@ -1764,5 +1569,7 @@
     })
   </script>
 <script src="js/official-updates.js"></script>
+<script src="js/home-account.js"></script>
+<script src="js/button-audio.js" defer></script>
 </body>
 </html>

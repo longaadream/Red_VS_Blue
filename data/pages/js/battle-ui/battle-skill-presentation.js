@@ -32,6 +32,7 @@
     }
   }
   function createAudio() {
+    if (root.BattleAudio) return root.BattleAudio.create()
     let context = null
     return {
       play: function (preset) {

@@ -1,16 +1,10 @@
-/** Remembers discovered updates across failures and renderer reloads. */
+/** The startup page is informational. Local play only waits for local authority. */
 export class StartupUpdateGate {
   entered = false
   checked = false
-  private resourceRequired = false
-  private clientRequired = false
-  observe(resource: string, client: string) {
-    if (['downloading', 'waiting', 'applying'].includes(resource)) this.resourceRequired = true
-    if (resource === 'current') this.resourceRequired = false
-    if (['downloading', 'downloaded'].includes(client)) this.clientRequired = true
-  }
+  observe(resource: string, client: string) { void resource; void client }
   canEnter(resource: string, client: string, localReady: boolean) {
-    return this.checked && localReady && !this.resourceRequired && !this.clientRequired
-      && ['current', 'error'].includes(resource) && ['current', 'error', 'unsupported'].includes(client)
+    void client
+    return localReady && resource !== 'applying'
   }
 }

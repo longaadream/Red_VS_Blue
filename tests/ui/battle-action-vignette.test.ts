@@ -11,9 +11,10 @@ type VignetteModule = {
   createQueue(options?: Record<string, unknown>): {
     update(model: unknown): void
     skip(): boolean
+    isAnimating(model?: unknown): boolean
     setSpeed(speed: number): void
     dispose(): void
-    getDiagnostics(): { activeRootId: string | null; pendingRootIds: string[]; speed: number; playedRootCount: number }
+    getDiagnostics(): { activeRootId: string | null; pendingRootIds: string[]; speed: number; playedRootCount: number; holdingResponse: boolean; timerCount: number }
   }
   create(options?: Record<string, unknown>): {
     mount(options: unknown): void
@@ -149,6 +150,8 @@ describe('RED-167 action vignette queue', () => {
     const waiting = { presentationEvents: events, turn: { isViewerTurn: false },
       interaction: { pendingResponse: { selectionId: 'first', isForViewer: true, isOffTurn: true } } }
     queue.update(waiting)
+    expect(queue.getDiagnostics().holdingResponse).toBe(false)
+    expect(phases).not.toContain('hold')
     vi.advanceTimersByTime(60_000)
     expect(queue.getDiagnostics().activeRootId).toBe('action-1:0')
     expect(phases.at(-1)).toBe('hold')
@@ -188,6 +191,27 @@ describe('RED-167 action vignette queue', () => {
     vi.runAllTimers()
     expect(queue.getDiagnostics().activeRootId).toBeNull()
     queue.dispose()
+  })
+
+  it('plays a new response root before exposing a chained pending selection', () => {
+    const queue = loadModule().createQueue({ reducedMotion: true })
+    queue.update({ presentationEvents: [], turn: { isViewerTurn: false } })
+    const first = [root(1), child(1, 1, { result: { pending: true } })]
+    queue.update({ presentationEvents: first, turn: { isViewerTurn: false }, interaction: {
+      pendingResponse: { selectionId: 'first', isForViewer: true, isOffTurn: true },
+    } })
+    vi.advanceTimersByTime(10_000)
+    expect(queue.getDiagnostics().holdingResponse).toBe(true)
+    const chained = first.concat(root(2, { kind: 'choiceResolved', result: { pending: true } }))
+    queue.update({ presentationEvents: chained, turn: { isViewerTurn: false }, interaction: {
+      pendingResponse: { selectionId: 'second', isForViewer: true, isOffTurn: true },
+    } })
+    expect(queue.getDiagnostics().holdingResponse).toBe(false)
+    expect(queue.getDiagnostics().activeRootId).toBe('action-2:0')
+    expect(queue.isAnimating({ presentationEvents: chained })).toBe(true)
+    vi.advanceTimersByTime(10_000)
+    expect(queue.getDiagnostics().holdingResponse).toBe(true)
+    expect(queue.getDiagnostics().timerCount).toBe(0)
   })
 
   it('does not invent a source at (0,0) for a card without a caster', () => {
@@ -475,7 +499,7 @@ describe('RED-167 action vignette queue', () => {
     deliver({ name: '过期卡牌', description: '不可覆盖移动' })
     await Promise.resolve()
     expect(floatLayer.children[0].innerHTML).not.toContain('过期卡牌')
-    expect(floatLayer.children[0].className).not.toContain('is-action-banner')
+    expect(floatLayer.children[0].dataset.rootId).toBe('action-3:0')
     vignette.dispose()
   })
 
@@ -643,7 +667,7 @@ describe('RED-167 action vignette queue', () => {
     expect(layer.innerHTML).not.toContain('battle-vignette-result')
     expect(layer.innerHTML).not.toContain('>4<')
 
-    const speedPointerEvent = {
+    const speedPointerEvent = { button: 2,
       target: { closest: () => ({ dataset: { vignetteControl: 'speed' } }) },
       preventDefault: vi.fn(),
       stopPropagation: vi.fn(),
@@ -653,7 +677,7 @@ describe('RED-167 action vignette queue', () => {
     expect(speedPointerEvent.preventDefault).toHaveBeenCalledTimes(1)
     expect(layer.dataset.phase).toBe('result')
 
-    const event = {
+    const event = { button: 2,
       target: { closest: () => null },
       preventDefault: vi.fn(),
       stopPropagation: vi.fn(),
@@ -768,7 +792,7 @@ describe('RED-167 action vignette queue', () => {
     ['focus', 0],
     ['path', 120],
     ['result', 420],
-  ] as const)('consumes battlefield input during %s without changing commands, logs, payloads, or hash', (phase, elapsedMs) => {
+  ] as const)('allows battlefield input during %s without changing commands, logs, payloads, or hash', (phase, elapsedMs) => {
     const vignetteModule = loadModule()
     const floatLayer = new FakeElement()
     const board = new FakeElement()
@@ -825,10 +849,10 @@ describe('RED-167 action vignette queue', () => {
     layer.dispatch('pointerdown', event)
     if (!event.stopPropagation.mock.calls.length) board.dispatch('pointerdown', event)
 
-    expect(event.preventDefault).toHaveBeenCalledTimes(1)
-    expect(event.stopPropagation).toHaveBeenCalledTimes(1)
-    expect(event.stopImmediatePropagation).toHaveBeenCalledTimes(1)
-    expect(battlePointerCount).toBe(0)
+    expect(event.preventDefault).not.toHaveBeenCalled()
+    expect(event.stopPropagation).not.toHaveBeenCalled()
+    expect(event.stopImmediatePropagation).not.toHaveBeenCalled()
+    expect(battlePointerCount).toBe(1)
     expect(submittedPayloads).toEqual([])
     expect(model).toEqual(before)
     vignette.dispose()
@@ -838,13 +862,13 @@ describe('RED-167 action vignette queue', () => {
 
 it('announces only manually initiated skills and cards, never their automatic effects', () => {
   const ui = loadModule()
-  for (const kind of ['skill', 'chargeSkill', 'card']) {
+  for (const kind of ['move', 'skill', 'chargeSkill', 'card']) {
     expect(ui.showsBanner({ kind })).toBe(true)
     expect(ui.showsBanner({ kind, parentEventId: 'manual-action' })).toBe(false)
   }
   expect(ui.showsBanner({ kind: 'choiceResolved', skillId: 'shield' })).toBe(true)
   expect(ui.showsBanner({ kind: 'choiceResolved', skillId: 'shield', result: { cancelled: true } })).toBe(false)
-  for (const kind of ['move', 'deploy', 'passive', 'damage', 'death', 'actionPoints', 'choiceResolved']) expect(ui.showsBanner({ kind })).toBe(false)
+  for (const kind of ['deploy', 'passive', 'damage', 'death', 'actionPoints', 'choiceResolved']) expect(ui.showsBanner({ kind })).toBe(false)
 })
 
 it('plays a bulk attribute increase together without merging subsequent hits', () => {

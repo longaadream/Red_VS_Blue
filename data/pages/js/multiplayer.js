@@ -6,12 +6,18 @@
   var lastFailure = ''
   var officialUrl = 'https://play.redvsblue.top'
   var candidate = { version: '0.1.0', relayUrl: officialUrl }
+  var entryMode = new URLSearchParams(location.search).get('mode')
   fetch('config/multiplayer.json').then(function (response) { return response.json() }).then(function (value) { candidate = value; if (!byId('relayUrl').value && value.relayUrl) byId('relayUrl').value = value.relayUrl }).catch(function () {})
   var byId = function (id) { return document.getElementById(id) }
   byId('relayUrl').value = localStorage.getItem('rvb_relay_url') || ''
   var identity = RvBIdentity.getIdentity()
   byId('hostName').value = (identity && identity.displayName || '玩家') + ' 的主机'
   byId('serverKind').onchange = function () { byId('relayUrl').hidden = byId('serverKind').value === 'official'; byId('customSettings').hidden = byId('serverKind').value === 'official' }
+  if (entryMode === 'pve') {
+    byId('gameMode').value = 'pve'
+    byId('inviteMode').value = 'pve'
+    byId('publicModeFilter').value = 'pve'
+  }
   function rootUrl() {
     var url = new URL(byId('serverKind').value === 'official' ? officialUrl : byId('relayUrl').value.trim())
     if (url.pathname !== '/' || url.search || url.hash || url.username || url.password || !/^https?:$/.test(url.protocol)) throw new Error('请输入转发服务器根地址')
@@ -23,6 +29,16 @@
     var response = await fetch(url, { signal: AbortSignal.timeout(8000) })
     if (!response.ok) throw new Error(response.status === 404 ? '主机不存在或已离线' : '服务器请求失败：' + response.status)
     return response.json()
+  }
+  function requireServerAccount() {
+    var server = rootUrl()
+    var session = window.RvBUtils && typeof window.RvBUtils.readOfficialSession === 'function'
+      ? window.RvBUtils.readOfficialSession(server)
+      : null
+    if (session) return session
+    localStorage.setItem('rvb_official_url', server)
+    location.href = 'official.html'
+    throw new Error('互联网联机需要先登录所选服务器账号')
   }
   async function run(task) {
     if (busy) return
@@ -42,6 +58,7 @@
   async function enter(url, local, mode, roomId) {
     var address = new URL(url)
     if (!['https:', 'http:'].includes(address.protocol) || address.username || address.password || address.hash || address.search) throw new Error('无效主机地址')
+    if (!local) requireServerAccount()
     await RvBIdentity.ensureIdentity()
     var health = await json(url + '/healthz')
     if (!health.ok || health.protocol !== 'rvb-colyseus') throw new Error('玩家主机尚未就绪')
@@ -75,6 +92,7 @@
     }
   }
   byId('publish').onclick = function () { run(async function () {
+    requireServerAccount()
     if (!(window.RvBHost || window.electronAPI) || !(window.RvBHost || window.electronAPI).relayControl) throw new Error('发布主机需要支持开房的安卓或 Windows 客户端')
     var ready = await (window.RvBHost || window.electronAPI).ensureLocalAuthority()
     if (!ready.ok) throw new Error(ready.error)

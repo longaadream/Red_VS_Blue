@@ -13,7 +13,7 @@ function page(protocol: string, android = false, available = true) {
   const values = new Map([['rvb_game_profile_identity', JSON.stringify({ authorityContentHash: 'stale' })]])
   const calls: { url: string; options?: RequestInit }[] = []
   vm.runInNewContext(source, {
-    window: { Capacitor: android ? { isNativePlatform: () => true } : undefined },
+    window: { Capacitor: android ? { isNativePlatform: () => true } : undefined, RvBUtils: { readOfficialSession: () => null } },
     location: { protocol, origin: protocol === 'rvb-client:' ? 'rvb-client://app' : 'https://localhost' },
     document: { hidden: true, getElementById: node, querySelector: node, querySelectorAll: () => [] },
     localStorage: { getItem: (key: string) => values.get(key), setItem: (key: string, value: string) => values.set(key, value) },

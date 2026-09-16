@@ -9,7 +9,7 @@
 
   function showsBanner(event) {
     return !!event && !event.parentEventId && !(event.result && event.result.cancelled)
-      && (['skill', 'chargeSkill', 'card'].includes(event.kind) || (event.kind === 'choiceResolved' && !!event.skillId))
+      && (['move', 'skill', 'chargeSkill', 'card'].includes(event.kind) || (event.kind === 'choiceResolved' && !!event.skillId))
   }
 
   function isStatusBeat(group) {
@@ -110,6 +110,8 @@
     let skipSettling = false
     let holdingResponse = false
     let responseOrigin = null
+    let responseForViewer = false
+    let responseSelectionId = null
 
     function remember(rootId) {
       if (playedRoots.has(rootId)) return false
@@ -164,6 +166,11 @@
       if (disposed || active) return
       active = pending.shift() || null
       if (!active) {
+        if (responseForViewer && responseOrigin) {
+          active = responseOrigin
+          holdingResponse = true
+          onPhase('hold', active)
+        }
         onIdle()
         return
       }
@@ -197,7 +204,11 @@
       const groups = groupEvents(model.presentationEvents)
       const isViewerTurn = !!(model.turn && model.turn.isViewerTurn)
       const response = model.interaction && model.interaction.pendingResponse
-      if (!response) responseOrigin = null
+      const nextSelectionId = response && response.selectionId || null
+      const hasUnplayedGroup = groups.some(function (group) { return !playedRoots.has(group.root.rootEventId) })
+      const responseChanged = nextSelectionId !== responseSelectionId && (!holdingResponse || hasUnplayedGroup)
+      if (!holdingResponse || hasUnplayedGroup) responseSelectionId = nextSelectionId
+      if (!response || (responseChanged && hasUnplayedGroup)) responseOrigin = null
       if (response && !responseOrigin) {
         const announcement = groups.slice().reverse().find(function (group) {
           return group.root.result && group.root.result.pending && (!primed || !playedRoots.has(group.root.rootEventId))
@@ -206,26 +217,14 @@
           return !group.root.parentEventId && announcement && group.root.rootEventId === announcement.root.rootEventId
         }) || null
       }
-      if (response && response.isForViewer && response.isOffTurn) {
-        const held = holdingResponse ? active : responseOrigin
-        if (held) {
-          clearTimers()
-          groups.forEach(function (group) { remember(group.root.rootEventId) })
-          active = held
-          pending = []
-          holdingResponse = true
-          primed = true
-          lastIsViewerTurn = isViewerTurn
-          activeProgressMs = 0
-          onPhase('hold', active)
-          return
-        }
-      }
+      responseForViewer = !!(response && response.isForViewer && response.isOffTurn)
+      if (holdingResponse && responseForViewer && !responseChanged) return
       if (holdingResponse) settleAll()
       if (!primed) {
         groups.forEach(function (group) { remember(group.root.rootEventId) })
         primed = true
         lastIsViewerTurn = isViewerTurn
+        startNext()
         return
       }
       const freshRoots = new Set()
@@ -272,6 +271,7 @@
       disposed = true
       holdingResponse = false
       responseOrigin = null
+      responseSelectionId = null
       clearTimers()
       active = null
       activeProgressMs = 0
@@ -286,6 +286,7 @@
       update: update,
       reset: function (model) {
         responseOrigin = null
+        responseSelectionId = null
         settleAll(); playedRoots.clear(); playedOrder.length = 0; primed = false
         update(model)
       },
@@ -293,6 +294,9 @@
       setSpeed: setSpeed,
       settleAll: settleAll,
       dispose: dispose,
+      isAnimating: function (nextModel) {
+        return !!((active && !holdingResponse) || pending.length || (primed && nextModel && groupEvents(nextModel.presentationEvents).some(function (group) { return !playedRoots.has(group.root.rootEventId) })))
+      },
       getDiagnostics: function () {
         return {
           activeRootId: active ? active.rootEventId : null,
@@ -397,6 +401,10 @@
         render()
       },
       onIdle: function () {
+        if (currentPhase === 'hold' && queue.getDiagnostics().holdingResponse) {
+          if (playbackIdle) playbackIdle()
+          return
+        }
         currentPhase = null
         currentGroup = null
         displayedCard = null
@@ -510,7 +518,7 @@
           + ' · ' + escapeHtml(identity.sourceName) + '</span>' : '')
         + '<span class="battle-vignette-action-name" title="' + escapeHtml(actionLabel) + '">'
         + escapeHtml(actionLabel) + '</span></span></span>')
-        + '<span class="battle-vignette-skip-hint">' + (currentPhase === 'hold' ? '等待你响应 · 可打开行动记录查看' : '点按战场略过') + '</span></div>'
+        + '<span class="battle-vignette-skip-hint">' + (currentPhase === 'hold' ? '等待你响应 · 可打开行动记录查看' : '右键 / 空格跳过动画') + '</span></div>'
         + renderComicBeat(resultVisible)
     }
 
@@ -546,6 +554,7 @@
     }
 
     function handlePointerDown(event) {
+      if (event.button !== 2) return
       if (!currentGroup || currentPhase === 'hold') return
       if (event.target && typeof event.target.closest === 'function' && event.target.closest('[data-vignette-control]')) {
         consume(event)
@@ -553,6 +562,21 @@
       }
       consume(event)
       suppressClickUntil = now() + 160
+      queue.skip()
+    }
+
+    function handleSkipKey(event) {
+      if (event.code !== 'Space' || event.repeat || event.altKey || event.ctrlKey || event.metaKey) return
+      if (event.target && event.target.closest && event.target.closest('input, textarea, select, button, [contenteditable="true"], dialog')) return
+      if (!currentGroup || currentPhase === 'hold') return
+      consume(event)
+      queue.skip()
+    }
+
+    function handleSkipContext(event) {
+      if (model && model.selection && model.selection.mode === 'target') return
+      if (!currentGroup || currentPhase === 'hold') return
+      consume(event)
       queue.skip()
     }
 
@@ -617,6 +641,8 @@
       syncSpeedControl()
       floatLayer.appendChild(speedControl)
       if (win && win.addEventListener) win.addEventListener('click', consumeTrailingClick, true)
+      if (win && win.addEventListener) win.addEventListener('keydown', handleSkipKey, true)
+      if (boardContainer) boardContainer.addEventListener('contextmenu', handleSkipContext, true)
     }
 
     function update(nextModel) {
@@ -633,6 +659,8 @@
       if (clearAreaFlash) clearAreaFlash()
       if (clearPath) clearPath()
       if (win && win.removeEventListener) win.removeEventListener('click', consumeTrailingClick, true)
+      if (win && win.removeEventListener) win.removeEventListener('keydown', handleSkipKey, true)
+      if (boardContainer) boardContainer.removeEventListener('contextmenu', handleSkipContext, true)
       if (layer) {
         layer.removeEventListener('pointerdown', handlePointerDown)
         if (layer.remove) layer.remove()
@@ -667,6 +695,7 @@
       resize: resize,
       dispose: dispose,
       skip: queue.skip,
+      isAnimating: queue.isAnimating,
       settleAll: queue.settleAll,
       setSpeed: setSpeed,
       getDiagnostics: queue.getDiagnostics,

@@ -216,6 +216,62 @@ describe('battle page runtime source', () => {
       .not.toContain('ichigo-black-getsuga-tensho')
   })
 
+  it('uses authoritative runtime cooldowns when display skills are stale', () => {
+    const context = vm.createContext({
+      G: {},
+      BattleSkillPresentation: {
+        display: () => ({
+          skills: [{ skillId: 'kiljaedan-fel-fire', currentCooldown: 0, presentationOnly: true }],
+        }),
+      },
+    })
+    new vm.Script([
+      runtimeFunction(readBattlePage(), 'pieceDispSkills'),
+      runtimeFunction(readBattlePage(), 'skillIdOf'),
+    ].join('\n')).runInContext(context)
+
+    const displayed = (context).pieceDispSkills({
+      instanceId: 'kiljaedan-1',
+      skills: [{ skillId: 'kiljaedan-fel-fire', currentCooldown: 2, usesRemaining: -1 }],
+    })
+
+    expect(displayed[0]).toMatchObject({
+      skillId: 'kiljaedan-fel-fire',
+      currentCooldown: 2,
+      usesRemaining: -1,
+      presentationOnly: true,
+    })
+  })
+
+  it('defers receipt-driven target and option dialogs until animation completion', () => {
+    const context = vm.createContext({
+      battleActionVignette: { isAnimating: () => true },
+      latestBattlePresentationEvents: [],
+      deferredSelectionPresentation: null,
+      G: {},
+    })
+    new vm.Script([
+      runtimeFunction(readBattlePage(), 'enterActionTargetMode'),
+      runtimeFunction(readBattlePage(), 'showOptionPicker'),
+    ].join('\n')).runInContext(context)
+    const action = { type: 'playCard', cardId: 'holy' }
+    const preparation = { kind: 'needTarget', selectionId: 'target-1' }
+    expect(context.enterActionTargetMode(action, preparation)).toBe(true)
+    const target = vi.fn()
+    context.enterActionTargetMode = target
+    context.deferredSelectionPresentation()
+    expect(target).toHaveBeenCalledWith(action, preparation)
+    context.showOptionPicker('选择', ['a', 'b'], action)
+    const picker = vi.fn()
+    context.showOptionPicker = picker
+    context.deferredSelectionPresentation()
+    expect(picker).toHaveBeenCalledWith('选择', ['a', 'b'], action)
+    picker.mockClear()
+    context.G = {}
+    context.deferredSelectionPresentation()
+    expect(picker).not.toHaveBeenCalled()
+  })
+
   it('keeps a single-card hand selection out of the generic option picker and submits through hand controls', async () => {
     const overlay = { classList: { remove: vi.fn() } }
     const showOptionPicker = vi.fn()
@@ -230,6 +286,8 @@ describe('battle page runtime source', () => {
           options: [{ value: 'holy-card-1' }],
         },
       },
+      battleActionVignette: { isAnimating: vi.fn().mockReturnValue(true) },
+      latestBattlePresentationEvents: [],
       pendingHandOptionSelection: { selectionId: null, selectedValues: [], submitting: false },
       pendingOptionSelectionForMe: () => true,
       pendingTargetSelectionForMe: () => false,
@@ -254,6 +312,10 @@ describe('battle page runtime source', () => {
       'async ' + runtimeFunction(readBattlePage(), 'cancelPendingHandOptionSelection'),
     ].join('\n')).runInContext(context)
 
+    ;(context).syncAuthoritativePendingPresentation()
+    expect(context.pendingHandOptionSelection.selectionId).toBeNull()
+    expect(showOptionPicker).not.toHaveBeenCalled()
+    context.battleActionVignette.isAnimating.mockReturnValue(false)
     ;(context).syncAuthoritativePendingPresentation()
 
     expect(showOptionPicker).not.toHaveBeenCalled()

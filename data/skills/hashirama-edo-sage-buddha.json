@@ -1,7 +1,7 @@
 {
   "id": "hashirama-edo-sage-buddha",
   "name": "仙术·顶上化佛",
-  "description": "选择自身周围5×5内地格，传送至该格，重置其他技能冷却，获得【木遁·真数千手】和【仙术·大自然愈合】各1张。",
+  "description": "选择地格（2），传送至该格，重置其他技能冷却，获得【木遁·真数千手】和【仙术·大自然愈合】各1张。",
   "keywords": [
     "传送"
   ],
@@ -33,5 +33,5 @@
     ]
   },
   "code": "function executeSkill(context) { var caster = context.piece; var pos = selectTarget({ type: 'grid', range: 2, filter: 'all' }); if (!pos || pos.needsTargetSelection) return pos; var targetTile = battle.map && battle.map.tiles && battle.map.tiles.find(function(t) { return t.x === pos.x && t.y === pos.y; }); if (!targetTile || !targetTile.props || !targetTile.props.walkable) return { success: false, message: '目标格不可移动' }; var blocked = battle.pieces.find(function(p) { return p.x === pos.x && p.y === pos.y && p.currentHp > 0 && p.instanceId !== caster.instanceId; }); if (blocked) return { success: false, message: '目标格已被占用' }; if (!flow.effects.move([{pieceId:caster.instanceId,x:pos.x,y:pos.y}], 'teleport').success) return {success:true,message:'位移被阻挡，本次位移效果取消'}; var msgs = [caster.name + '施放仙术·顶上化佛，瞬移至(' + pos.x + ',' + pos.y + ')']; if (caster.skills) { for (var j = 0; j < caster.skills.length; j++) { var s = caster.skills[j]; if (s.skillId !== 'hashirama-edo-sage-buddha' && s.currentCooldown > 0) { s.currentCooldown = 0; } } msgs.push('其他技能冷却已重置'); } addCardToHand('hashirama-edo-thousand-hands', caster.ownerPlayerId); var hand1 = getHand(caster.ownerPlayerId); for (var k1 = hand1.length - 1; k1 >= 0; k1--) { if (hand1[k1].cardId === 'hashirama-edo-thousand-hands' && !hand1[k1].boundPieceInstanceId) { hand1[k1].boundPieceInstanceId = caster.instanceId; break; } } addCardToHand('hashirama-edo-nature-heal', caster.ownerPlayerId); var hand2 = getHand(caster.ownerPlayerId); for (var k2 = hand2.length - 1; k2 >= 0; k2--) { if (hand2[k2].cardId === 'hashirama-edo-nature-heal' && !hand2[k2].boundPieceInstanceId) { hand2[k2].boundPieceInstanceId = caster.instanceId; break; } } msgs.push('获得【木遁·真数千手】和【仙术·大自然愈合】各1张'); return { success: true, message: msgs.join('，') }; }",
-  "previewCode": "function calculatePreview(piece, skillDef) { return { description: \"选择自身周围5×5内地格，传送至该格，重置其他技能冷却，获得【木遁·真数千手】和【仙术·大自然愈合】各1张。\", expectedValues: {}, chargeCost: 3 }; }"
+  "previewCode": "function calculatePreview(piece, skillDef) { return { description: \"选择地格（2），传送至该格，重置其他技能冷却，获得【木遁·真数千手】和【仙术·大自然愈合】各1张。\", expectedValues: {}, chargeCost: 3 }; }"
 }

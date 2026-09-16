@@ -32,6 +32,7 @@ export class CandidateBattleStore implements DeploymentRoomStore {
   closeAuthority(): void { this.closed = true }
   private assertOpen(): void { if (this.closed) throw Object.assign(new Error('比赛已被管理员关闭'), { code: 'AUTHORITY_CLOSED' }) }
   readonly terminalAuthorityPersistencePolicy = 'durable-barrier' as const
+  readonly terminalTracePolicy = 'journal' as const
   private readonly receipts = new Map<string, BattleAuthorityReceipt>()
   private readonly transitions: BattleAuthorityTransitionRecord[]
 
