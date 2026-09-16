@@ -31,8 +31,11 @@ function run(command, args, stdin = '', timeoutMs = 180000) {
   })
 }
 function sshArgs(c) { return ['-i', c.key, '-p', c.port, '-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=yes', '-o', 'ConnectTimeout=10', `${c.user}@${c.host}`] }
+export function normalizeShellScript(script) {
+  return script.replace(/^\uFEFF/, '').replace(/\r\n?/g, '\n')
+}
 async function remote(c, action) {
-  const script = await fs.readFile(path.join(here, 'remote.sh'), 'utf8')
+  const script = normalizeShellScript(await fs.readFile(path.join(here, 'remote.sh'), 'utf8'))
   return run('ssh', [...sshArgs(c), `bash -s -- ${action} ${c.service} '${c.database}' '${c.release}'`], script)
 }
 export async function verifyPackage(directory) {

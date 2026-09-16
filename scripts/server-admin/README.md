@@ -1,5 +1,7 @@
 # 服务器管理
 
+Windows 检出或解压的远程脚本会在发送前移除 UTF-8 BOM，并将 CRLF/CR 换行规范化为 LF，避免 Linux Bash 解析失败。更新便携包后需关闭旧管理进程并重新运行 start.cmd。
+
 从仓库目录启动：
 
 ```powershell

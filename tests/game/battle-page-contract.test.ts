@@ -1098,4 +1098,12 @@ new Script([
       stateRevision: 12,
     }])
   })
+
+  it('leaves terminal disconnects in an explicit non-interactive state', () => {
+    const battlePage = readPage('battle.html')
+
+    expect(battlePage).toContain("RvBColyseus.on('disconnect', function(event)")
+    expect(battlePage).toContain('var terminalDisconnect = !!(event && event.terminal)')
+    expect(battlePage).toMatch(/if \(terminalDisconnect\) \{[\s\S]*?pendingSkill = null[\s\S]*?pendingCardAction = null[\s\S]*?renderTargetOverlay\(\)[\s\S]*?连接已终止，无法继续提交操作；请退出对局后重新进入[\s\S]*?renderActionBar\(\)[\s\S]*?return/)
+  })
 })
