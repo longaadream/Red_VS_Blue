@@ -1,7 +1,7 @@
 {
   "id": "watcher-calm",
   "name": "平静",
-  "description": "获得2点护盾，并进入平静姿态。退出平静姿态时，恢复1点行动点。",
+  "description": "令观者获得2点护盾并进入平静姿态。",
   "keywords": [
     "护盾"
   ],

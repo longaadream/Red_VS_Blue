@@ -1,0 +1,33 @@
+{
+  "id": "alfonso-water-dash",
+  "name": "惊鸿掠水",
+  "description": "冲刺至正方向最远合法地格（8），对路径上首个敌人造成2倍伤害。",
+  "keywords": [
+    "位移"
+  ],
+  "targetText": "正方向地格（8）",
+  "kind": "active",
+  "type": "normal",
+  "actionPointCost": 1,
+  "chargeCost": 1,
+  "cooldownTurns": 1,
+  "range": "area",
+  "code": "function executeSkill(context){var c=context.piece;var p=selectTarget({type:'grid',range:8,filter:'all'});if(!p||p.needsTargetSelection)return p;var dx=Math.sign(p.x-c.x),dy=Math.sign(p.y-c.y);var tr=flow.query.tracePath(c,{x:dx,y:dy},{maxDistance:8,excludePieceId:c.instanceId,passEnemies:true});var hit=null;var encounters=tr.encounters||[];for(var i=0;i<encounters.length;i++){if(encounters[i].type!=='piece')continue;var target=flow.query.piece(encounters[i].pieceId);if(target&&target.currentHp>0&&!arePlayersAllied(battle,target.ownerPlayerId,c.ownerPlayerId)){hit=target;break;}}if(hit)dealDamage(c,hit,c.attack*2,'physical',battle,context.skill.id);var land=tr.lastLandableCell;if(land)flow.effects.displace([{pieceId:c.instanceId,x:land.x,y:land.y}],'dash',{passEnemies:true});return{success:true,message:c.name+'向正方向冲刺'};}",
+  "icon": "✦",
+  "effectTags": ["位移", "伤害"],
+  "maxCharges": 0,
+  "powerMultiplier": 1,
+  "targeting": {
+    "steps": [
+      {
+        "kind": "target",
+        "type": "grid",
+        "filter": "all",
+        "range": 8,
+        "excludeSourceCell": true,
+        "sameRowOrColumn": true,
+        "distanceMetric": "manhattan"
+      }
+    ]
+  }
+}

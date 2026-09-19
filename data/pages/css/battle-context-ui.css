@@ -655,7 +655,12 @@
 .is-viewing-history .battle-vignette-veil, .is-viewing-history .battle-vignette-status,
 .is-viewing-history .battle-comic-beat { visibility:hidden; }
 .action-history-sentence:hover { outline:1px dashed #bc9b6c; outline-offset:2px; }
-.action-history-player-avatar { display:inline-grid; place-items:center; width:22px; height:22px; border:2px solid #3b2b20; border-radius:6px; background:#80594c; color:#f0dfbe; font-size:12px; }
+  .action-history-player-avatar { display:inline-grid; place-items:center; width:22px; height:22px; border:2px solid #3b2b20; border-radius:6px; background:#80594c; color:#f0dfbe; font-size:12px; }
+  .phase-bar:has(.player-effect-icon) { overflow:visible !important; z-index:96 !important; }
+  body #playerResCards { overflow:visible !important; }
+  body #playerResCards .player-state-chip { overflow:visible; z-index:1; }
+  body #playerResCards .player-state-tags { display:flex; position:absolute; z-index:4; }
+  body #playerResCards .player-state-tags:empty { display:none; }
 .action-history-player-avatar[data-faction="blue"] { background:#42636e; }
 .phase-bar:has(.player-effect-icon) { overflow:visible !important; }
 body #playerResCards .player-state-chip { overflow:visible; }
@@ -774,6 +779,35 @@ body #playerResCards .player-state-tags { display:flex; position:absolute; top:c
 
 .battle-vignette-avatar[data-faction="red"] { border-color: #f87171; }
 .battle-vignette-avatar[data-faction="blue"] { border-color: #60a5fa; }
+
+/* Played cards need a distinct reveal so an opponent action cannot blend
+   into the ordinary skill banner or the hand at the bottom of the board. */
+.battle-card-reveal {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  min-width: min(270px, 48vw);
+  padding: 8px 10px 10px;
+  border: 2px solid #d7b26b;
+  border-radius: 12px;
+  background: linear-gradient(145deg, rgba(73, 48, 32, .98), rgba(40, 29, 23, .96));
+  box-shadow: 0 0 0 3px rgba(21, 16, 13, .72), 0 10px 24px rgba(0, 0, 0, .48);
+}
+.battle-card-reveal-kicker {
+  color: #ffe7a6;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: .08em;
+  text-shadow: 0 1px 2px #1b120d;
+}
+.battle-card-reveal .battle-played-card {
+  width: min(230px, 42vw);
+  transform: translateY(0) scale(1.04);
+  filter: drop-shadow(0 5px 8px rgba(0, 0, 0, .48));
+}
+.battle-vignette-layer.is-card-reveal .battle-vignette-status {
+  min-width: min(300px, 56vw);
+}
 
 .battle-vignette-avatar img {
   position: absolute;

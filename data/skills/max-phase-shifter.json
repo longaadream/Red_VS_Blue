@@ -1,0 +1,36 @@
+{
+  "id": "max-phase-shifter",
+  "name": "相位偏移器",
+  "description": "传送至正方向地格（2）。本回合可额外释放1次；再次释放消耗1行动点。",
+  "keywords": [
+    "位移"
+  ],
+  "targetText": "正方向地格（2）",
+  "effectTags": [
+    "位移"
+  ],
+  "icon": "🌀",
+  "kind": "active",
+  "type": "normal",
+  "cooldownTurns": 3,
+  "maxCharges": 0,
+  "powerMultiplier": 1,
+  "actionPointCost": 0,
+  "recastActionPointCost": 1,
+  "targeting": {
+    "steps": [
+      {
+        "kind": "target",
+        "type": "grid",
+        "filter": "all",
+        "range": 2,
+        "sameRowOrColumn": true,
+        "distanceMetric": "manhattan",
+        "requireWalkable": true,
+        "requireUnoccupied": true,
+        "excludeSourceCell": true
+      }
+    ]
+  },
+  "code": "function executeSkill(context) { var source = context.piece; var battleState = context.battle; var player = battleState.players.find(function(item) { return item.playerId === source.ownerPlayerId; }); var recast = (source.statusTags || []).find(function(tag) { return tag.type === 'max-phase-recast' && Number(tag.turnNumber) === Number(battleState.turn.turnNumber); }); if (recast && (!player || Number(player.actionPoints || 0) < 1)) return { success: false, message: '再次释放相位偏移器需要1行动点' }; var pos = selectTarget({ type: 'grid', range: 2, filter: 'all' }); if (!pos || pos.needsTargetSelection) return pos; var dx = pos.x - source.x; var dy = pos.y - source.y; if ((dx !== 0 && dy !== 0) || (dx === 0 && dy === 0)) return { success: false, message: '请选择正方向地格' }; var tile = battleState.map.tiles.find(function(item) { return item.x === pos.x && item.y === pos.y; }); var occupied = battleState.pieces.some(function(piece) { return piece.currentHp > 0 && piece.instanceId !== source.instanceId && piece.x === pos.x && piece.y === pos.y; }); if (!tile || !tile.props || !tile.props.walkable || occupied) return { success: false, message: '请选择合法地格' }; if (recast) flow.resources.add(source.ownerPlayerId, 'actionPoints', -1); if (!flow.effects.displace([{ pieceId: source.instanceId, x: pos.x, y: pos.y }], 'teleport').success) return { success: true, message: '位移被阻挡，本次位移效果取消' }; if (recast) { removeStatusEffectById(source.instanceId, recast.id); } else { (source.statusTags || []).slice().forEach(function(tag) { if (tag.type === 'max-phase-recast' && Number(tag.turnNumber) !== Number(battleState.turn.turnNumber)) removeStatusEffectById(source.instanceId, tag.id); }); addStatusEffectById(source.instanceId, { id: 'max-phase-recast-' + source.instanceId, type: 'max-phase-recast', name: '相位偏移器·再次释放', visible: false, turnNumber: battleState.turn.turnNumber, currentDuration: 1, currentUses: 1, relatedRules: ['rule-max-phase-recast-expire'] }); addRuleById(source.instanceId, 'rule-max-phase-recast-expire'); } flow.skills.resetCooldown(source.instanceId, ['max-phase-shifter']); if (recast) { var skillState = (source.skills || []).find(function(item) { return item.skillId === 'max-phase-shifter'; }); if (skillState) skillState.currentCooldown = 3; } return { success: true, message: source.name + '相位偏移至(' + pos.x + ',' + pos.y + ')' + (recast ? '，消耗1行动点完成再次释放' : '，本回合可消耗1行动点再次释放') }; }"
+}

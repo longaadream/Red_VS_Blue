@@ -17,11 +17,13 @@
   }
 
   function actionDuration(group) {
+    if (group && group.root && ['tileEffectAdded', 'tileEffectRemoved'].includes(group.root.kind)) return 240
     if (isStatusBeat(group)) return 250
     return group && group.root && group.root.kind === 'card' ? CARD_DURATION_MS : NORMAL_DURATION_MS
   }
 
   function phaseTime(phase, group) {
+    if (group && group.root && ['tileEffectAdded', 'tileEffectRemoved'].includes(group.root.kind)) return ({ path: 0, result: 20, settle: 200 }[phase] || 0)
     if (isStatusBeat(group)) return ({ path: 20, result: 40, settle: 220 }[phase] || 0)
     return phase === 'settle' ? actionDuration(group) - 320 : ({ path: 120, result: 420 }[phase] || 0)
   }
@@ -80,7 +82,11 @@
             && (event.kind === 'statChanged' || event.statusType === previous.root.statusType)
             && event.sourcePieceId === previous.root.sourcePieceId
             && event.skillId === previous.root.skillId && event.ruleId === previous.root.ruleId
-          if (simultaneous || bulkStrengthening) previous.children.push(event)
+          const tileTogether = previous && ['tileEffectAdded', 'tileEffectRemoved'].includes(event.kind)
+            && previous.root.kind === event.kind
+            && (event.result?.presentation || 'simultaneous') === (previous.root.result?.presentation || 'simultaneous')
+            && (event.result?.presentation !== 'expand' || event.result?.presentationStep === previous.root.result?.presentationStep)
+          if (tileTogether || simultaneous && !['tileEffectAdded', 'tileEffectRemoved'].includes(event.kind) || bulkStrengthening) previous.children.push(event)
           else beats.push({ rootEventId: event.eventId, root: event, children: [], identityEvents: [group.root].concat(group.children) })
         })
         return beats

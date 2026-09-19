@@ -1,7 +1,7 @@
 {
   "id": "hidan-undying",
   "name": "不死神体",
-  "description": "每局1次：受到致命伤害时保留1点生命，并进入濒死[2]。期间不会死亡，结束时死亡。",
+  "description": "每局1次：受到致命伤害时保留1点生命，并进入濒死[2]。期间免疫致命伤害，结束时死亡。",
   "keywords": [],
   "targetText": "被动",
   "effectTags": [

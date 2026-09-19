@@ -79,9 +79,12 @@ describe('sequential board playback', () => {
       targetCell:{x:index,y:0},result:{effectId:id,effectType:'fire',icon:''},
     })))]
     presentation.update(model(20,sequence))
-    vi.advanceTimersByTime(1520)
+    // Tile batches intentionally use the short presentation lane. Verify the
+    // add batch is visible before the remove batch settles instead of relying
+    // on the old long-action timing.
+    vi.advanceTimersByTime(1220)
     expect(frames.at(-1).effects).toHaveLength(2)
-    vi.advanceTimersByTime(1100)
+    vi.advanceTimersByTime(400)
     expect(frames.at(-1).effects).toHaveLength(0)
     expect(frames.every(frame=>[0,2].includes(frame.effects.length))).toBe(true)
     presentation.dispose()

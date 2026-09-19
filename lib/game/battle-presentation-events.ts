@@ -856,7 +856,7 @@ function tileDrafts(command: Record<string, unknown>, beforeState: BattleState, 
   return drafts
 }
 
-type TileEffectSnapshot = { id: string; type: string; x: number; y: number; icon: string }
+type TileEffectSnapshot = { id: string; type: string; x: number; y: number; icon: string; presentation: string; presentationStep: number }
 
 export function snapshotBattlePresentationTileEffects(state: BattleState): Map<string, TileEffectSnapshot> {
   const effects = Array.isArray(state.extensions?.tileEffects) ? state.extensions.tileEffects : []
@@ -868,7 +868,7 @@ export function snapshotBattlePresentationTileEffects(state: BattleState): Map<s
     const type = text(record.tileType) ?? text(record.type)
     if (x === undefined || y === undefined || !type) return []
     const id = text(record.id) ?? text(record.instanceId) ?? text(record.effectId) ?? `${type}:${x},${y}:${text(record.sourceId) ?? ''}`
-    return [[id, { id, type, x, y, icon: text(record.icon) ?? '' }] as const]
+    return [[id, { id, type, x, y, icon: text(record.icon) ?? '', presentation: text(record.presentation) ?? 'simultaneous', presentationStep: finite(record.presentationStep) ?? 0 }] as const]
   }))
 }
 
@@ -881,13 +881,13 @@ export function diffBattlePresentationTileEffects(before: Map<string, TileEffect
     kind: added ? 'tileEffectAdded' : 'tileEffectRemoved',
     iconId: added ? 'action-tile-effect-add' : 'action-tile-effect-remove',
     actorPlayerId: text(command.playerId), targetCell: { x: effect.x, y: effect.y },
-    result: { effectId: effect.id, effectType: effect.type, icon: effect.icon },
+    result: { effectId: effect.id, effectType: effect.type, icon: effect.icon, presentation: effect.presentation, presentationStep: effect.presentationStep },
     complement: { kind: 'tileEffect', id: effect.id, type: effect.type },
     priority: 50, skippable: true,
   })
   return [
     ...[...before].filter(([id]) => !after.has(id)).sort(([a], [b]) => a.localeCompare(b)).map(([, effect]) => make(effect, false)),
-    ...[...after].filter(([id]) => !before.has(id)).sort(([a], [b]) => a.localeCompare(b)).map(([, effect]) => make(effect, true)),
+    ...[...after].filter(([id]) => !before.has(id)).sort(([, a], [, b]) => a.presentationStep - b.presentationStep || a.id.localeCompare(b.id)).map(([, effect]) => make(effect, true)),
   ]
 }
 

@@ -1,0 +1,29 @@
+{
+  "id": "el-primo-elbow",
+  "name": "飞身肘击",
+  "description": "传送至地格（7），破坏相邻地格内的墙和掩体，并对其中所有敌人造成1倍伤害。然后移速+1。",
+  "keywords": ["传送", "破墙"],
+  "targetText": "地格（7）",
+  "kind": "active",
+  "type": "super",
+  "actionPointCost": 2,
+  "chargeCost": 2,
+  "cooldownTurns": 2,
+  "maxCharges": 0,
+  "powerMultiplier": 1,
+  "range": "area",
+  "targeting": {
+    "steps": [{ "kind": "target", "type": "grid", "filter": "all", "range": 7, "requireWalkable": true, "requireUnoccupied": true, "excludeSourceCell": true }]
+  },
+  "effectTags": ["位移", "破墙", "伤害", "强化"],
+  "icon": "💪",
+  "code": "function executeSkill(context){var c=context.piece,p=selectTarget({type:'grid',range:7,filter:'all'});if(!p||p.needsTargetSelection)return p;var tile=battle.map.tiles.find(function(t){return t.x===p.x&&t.y===p.y;});if(!tile||!tile.props.walkable)return{success:false,message:'目标地格不可行走'};if(!flow.effects.displace([{pieceId:c.instanceId,x:p.x,y:p.y}],'teleport').success)return{success:true,message:'位移被阻挡，本次位移效果取消'};var cells=[];for(var dx=-1;dx<=1;dx++)for(var dy=-1;dy<=1;dy++)cells.push({x:c.x+dx,y:c.y+dy});flow.effects.destroyWalls(cells);var es=battle.pieces.filter(function(x){return x.currentHp>0&&!arePlayersAllied(battle,x.ownerPlayerId,c.ownerPlayerId)&&Math.abs(x.x-c.x)<=1&&Math.abs(x.y-c.y)<=1});if(es.length)dealDamage(c,es,c.attack,'physical',battle,context.skill.id);c.moveRange=(c.moveRange||0)+1;return{success:true,message:c.name+'飞身肘击并破墙'};}",
+  "chargeCostModifiers": [
+    {
+      "source": "battleExtensionPlayerNumber",
+      "path": "contentCounters.elPrimoChargeDiscount",
+      "operation": "subtract",
+      "minimum": 0
+    }
+  ]
+}

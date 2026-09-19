@@ -191,6 +191,39 @@
     }
   }
 
+  function coltZoneEffects(snapshot) {
+    const extensions = snapshot.extensions || {}
+    const zones = extensions.coltZones || {}
+    const pieces = snapshot.pieces || []
+    const tiles = (snapshot.map && snapshot.map.tiles) || []
+    const tileAt = function (x, y) {
+      return tiles.find(function (tile) { return tile.x === x && tile.y === y })
+    }
+    return Object.keys(zones).flatMap(function (sourceId) {
+      const zone = zones[sourceId]
+      const source = pieces.find(function (piece) { return piece.instanceId === sourceId && piece.currentHp > 0 })
+      if (!source || !zone || !Number.isInteger(zone.dx) || !Number.isInteger(zone.dy)) return []
+      const effects = []
+      for (let distance = 1; distance <= 6; distance++) {
+        const x = source.x + zone.dx * distance
+        const y = source.y + zone.dy * distance
+        const tile = tileAt(x, y)
+        if (!tile) break
+        effects.push({
+          id: 'colt-zone-' + sourceId + '-' + x + '-' + y,
+          type: 'colt-zone',
+          icon: '◎',
+          label: zone.kind === 'storm' ? '子弹风暴区域' : '左轮手枪区域',
+          sourceId: sourceId,
+          x: x,
+          y: y,
+        })
+        if (zone.kind !== 'storm' && tile.props && tile.props.bulletPassable === false) break
+      }
+      return effects
+    })
+  }
+
   function normalizeSkillSummaries(value) {
     const summaries = {}
     Object.keys(value || {}).forEach(function (key) {
@@ -356,7 +389,7 @@
         tiles: (map.tiles || []).map(normalizeTile),
       },
       pieces: pieces,
-      effects: ((snapshot.extensions && snapshot.extensions.tileEffects) || []).concat((presentation.markers || []).map(function (marker) { return Object.assign({type:({'⚡':'flying-raijin-anchor','✦':'blizzard'})[marker.icon] || 'skill-marker'},marker) })).map(normalizeEffect),
+      effects: ((snapshot.extensions && snapshot.extensions.tileEffects) || []).concat(coltZoneEffects(snapshot), (presentation.markers || []).map(function (marker) { return Object.assign({type:({'⚡':'flying-raijin-anchor','✦':'blizzard'})[marker.icon] || 'skill-marker'},marker) })).map(normalizeEffect),
       skillMarkers: presentation.markers || [],
       skillIndicators: presentation.indicators || [],
       skillCues: presentation.cues || [],
@@ -397,6 +430,7 @@
       legal: {
         moveCells: normalizeCells(legal.moveCells),
         targetCells: normalizeCells(legal.targetCells),
+        rangeCells: normalizeCells(legal.rangeCells),
         placementCells: normalizeCells(legal.placementCells),
       },
     }

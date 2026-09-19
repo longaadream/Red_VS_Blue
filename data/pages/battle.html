@@ -975,6 +975,8 @@
     }
     .pi-skill-desc { font-size: 11px; color: #94a3b8; line-height: 1.45; }
     .pi-skill-meta { font-size: 10px; color: #475569; margin-top: 3px; }
+    .skill-cost-dynamic { display:inline-flex; align-items:center; gap:3px; color:#fbbf24; font-weight:800; }
+    .skill-cost-dynamic::before { content:'↕'; font-size:11px; }
     .pi-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 10px; }
     .pi-keywords { margin-top: 8px; }
     .pi-status-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
@@ -1050,6 +1052,8 @@
       background: #1d4ed8; border-color: #60a5fa; color: #eff6ff;
       box-shadow: 0 0 0 1px rgba(147,197,253,.2) inset;
     }
+    .keyword-badge.is-dynamic { border-color:#f59e0b; color:#fde68a; box-shadow:0 0 0 1px rgba(245,158,11,.22) inset; }
+    .keyword-badge.is-dynamic::after { content:' · 动态'; font-size:9px; opacity:.9; }
     .keyword-panel {
       width: 240px; background: #0f172a; border: 1px solid #334155;
       border-radius: 14px; padding: 14px; color: #cbd5e1;
@@ -1761,6 +1765,7 @@
               <div id="pieceContextSkills" class="piece-context-skills"></div>
             </div>
             <aside id="actionHistoryDock" class="action-history-dock" data-battle-ui-region="action-history" aria-label="最近动作" hidden></aside>
+            <aside id="adventureIntentDock" class="adventure-intent-dock" data-battle-ui-region="enemy-intent" aria-label="敌方行动预告" hidden></aside>
             <aside id="tileStatusPanel" role="dialog" aria-modal="false" aria-hidden="true" aria-labelledby="tileStatusTitle">
               <div class="ts-sheet">
                 <div class="ts-header">
@@ -2592,11 +2597,7 @@
 
     function enterActionTargetMode(action, preparation) {
       if (!action || !preparation || preparation.kind !== 'needTarget') return false
-      if (typeof battleActionVignette !== 'undefined' && battleActionVignette && battleActionVignette.isAnimating({ presentationEvents: latestBattlePresentationEvents })) {
-        const snapshot = G
-        deferredSelectionPresentation = function () { if (G === snapshot && !G.terminalResult) enterActionTargetMode(action, preparation) }
-        return true
-      }
+      flushPresentationBeforePendingSelection()
       if (targetSubmissionPending) {
         targetSubmissionPending = null
         recordTargetClear('authoritative-next-target-step')
@@ -3014,7 +3015,18 @@
     function skillChargeCostLabel(piece, skillData) {
       const baseCost = Math.max(0, Number(skillData && skillData.chargeCost || 0))
       const currentCost = effectiveSkillChargeCost(piece, skillData)
-      return currentCost === baseCost ? String(currentCost) : currentCost + '/' + baseCost
+      return currentCost === baseCost ? String(currentCost) : '当前 ' + currentCost + '（基础 ' + baseCost + '）'
+    }
+    function skillHasDynamicChargeCost(skillData) {
+      return Array.isArray(skillData && skillData.chargeCostModifiers) && skillData.chargeCostModifiers.length > 0
+    }
+    function skillChargeCostMeta(piece, skillData) {
+      if (!skillHasDynamicChargeCost(skillData)) return ''
+      const baseCost = Math.max(0, Number(skillData && skillData.chargeCost || 0))
+      const currentCost = effectiveSkillChargeCost(piece, skillData)
+      return currentCost === baseCost
+        ? '<span class="skill-cost-dynamic">费用可变 · 当前 ' + currentCost + '</span>'
+        : '<span class="skill-cost-dynamic">费用可变 · 当前 ' + currentCost + '（基础 ' + baseCost + '）</span>'
     }
     function pieceDispTags(p) {
       const display = typeof BattleSkillPresentation === 'undefined' ? {} : BattleSkillPresentation.display(G,p.instanceId)
@@ -3043,7 +3055,8 @@
       }
     }
     function keywordBadgeHtml(name, scope, activeName) {
-      return `<button type="button" class="keyword-badge${name === activeName ? ' active' : ''}" data-scope="${scope}" data-keyword="${escHtml(name)}">${escHtml(name)}</button>`
+      const dynamic = name === '万花筒'
+      return `<button type="button" class="keyword-badge${name === activeName ? ' active' : ''}${dynamic ? ' is-dynamic' : ''}" data-scope="${scope}" data-keyword="${escHtml(name)}"${dynamic ? ' title="万花筒：充能费用会随条件变化"' : ''}>${escHtml(name)}</button>`
     }
     function renderKeywordPanel(keywordNames, activeName, emptyText) {
       if (!keywordNames.length) {
@@ -3396,9 +3409,18 @@
     // Stored option values avoid inline JSON breaking HTML attributes.
     let _pickerOptions = []
     let deferredSelectionPresentation = null
+    // Authority state is usable while presentation catches up. Flush visuals before local pending input.
+    function flushPresentationBeforePendingSelection() {
+      if (typeof battlePresentation !== 'undefined' && battlePresentation && battlePresentation.settleForSelection) {
+        battlePresentation.settleForSelection()
+        return
+      }
+      if (typeof battleActionVignette === 'undefined' || !battleActionVignette) return
+      if (typeof battleActionVignette.settleAll === 'function') battleActionVignette.settleAll()
+      else if (typeof battleActionVignette.skip === 'function') battleActionVignette.skip()
+    }
 
     function isPendingHandSelection(pending) {
-      if (typeof battleActionVignette !== 'undefined' && battleActionVignette && battleActionVignette.isAnimating({ presentationEvents: latestBattlePresentationEvents })) return false
       return !!(pending && pendingOptionSelectionForMe()
         && pending.presentation === 'hand'
         && (pending.selectionMode === 'single' || pending.selectionMode === 'multi'))
@@ -3540,11 +3562,7 @@
     }
 
     function showOptionPicker(title, options, originalAction) {
-      if (typeof battleActionVignette !== 'undefined' && battleActionVignette && battleActionVignette.isAnimating({ presentationEvents: latestBattlePresentationEvents })) {
-        const snapshot = G
-        deferredSelectionPresentation = function () { if (G === snapshot && !G.terminalResult) showOptionPicker(title, options, originalAction) }
-        return
-      }
+      flushPresentationBeforePendingSelection()
       pendingOptionAction = originalAction
       _pickerOptions = options
       const selectionId = originalAction && originalAction.selectionId
@@ -3764,8 +3782,11 @@
         if (!isPassive) {
           const apCost = skd.actionPointCost ?? 0
           if (!programEnemy) metaParts.push(`行动 ${apCost}`)
+          if (!programEnemy && Number(skd.recastActionPointCost || 0) > 0) metaParts.push(`再次释放 ${skd.recastActionPointCost} 行动点`)
           if (skillUsesCharge(skd)) {
             metaParts.push(`充能 ${skillChargeCostLabel(piece, skd)}`)
+            const chargeMeta = skillChargeCostMeta(piece, skd)
+            if (chargeMeta) metaParts.push(chargeMeta)
           }
           if (cooldownTurns > 0 || currentCooldown > 0) {
             const cdColor = currentCooldown > 0 ? 'color:#f87171' : 'color:#4ade80'
@@ -5560,6 +5581,9 @@
         document.getElementById('targetPromptText').textContent = targetSubmissionPending
           ? '指令已提交 · 等待权威确认'
           : _targetPromptText()
+        const rangeLegend = document.getElementById('targetRangeLegend')
+        const preparation = (pendingSkill || pendingCardAction || {}).preparation
+        if (rangeLegend) rangeLegend.hidden = !(preparation && preparation.rangeCells && preparation.rangeCells.length)
         const multiSummary = document.getElementById('targetMultiSummary')
         const confirmButton = document.getElementById('targetConfirmButton')
         const multiActive = isPendingBoardMultiTarget()
@@ -5576,6 +5600,8 @@
         }
         const cancelButton = document.getElementById('targetCancelButton')
         if (cancelButton) {
+          const authoritativeSelection = G && (G.pendingTargetSelection || G.pendingOptionSelection)
+          cancelButton.hidden = !!(authoritativeSelection && authoritativeSelection.canCancel === false)
           cancelButton.disabled = !!targetSubmissionPending
           cancelButton.textContent = targetSubmissionPending ? '等待确认…' : '取消目标选择'
         }
@@ -5590,8 +5616,11 @@
         return
       }
       if (G && (pendingTargetSelectionForMe() || pendingOptionSelectionForMe())) {
-        const pendingTarget = G.pendingTargetSelection
-        locallyCancelledSelectionId = pendingTarget && pendingTarget.selectionId
+        const pendingTarget = G.pendingTargetSelection || G.pendingOptionSelection
+        if (pendingTarget.canCancel === false) {
+          setStatusMsg('请先完成当前规则选择')
+          return
+        }
         doAction({
           type: 'cancelPendingSelection',
           playerId: pendingTarget.playerId || myPlayerId,
@@ -5794,6 +5823,7 @@
         legal: {
           moveCells: isCurrentSnapshot ? validMoves : new Set(),
           targetCells: targetCells,
+          rangeCells: isCurrentSnapshot ? ((pendingSkill || pendingCardAction || {}).preparation?.rangeCells || []) : [],
           placementCells: isCurrentSnapshot && ADVENTURE_MODE && adventureDeployPieceId
             ? authorityCellSet(adventureSnapshot?.deployment?.cells)
             : progressivePlacementCells.size
@@ -5807,7 +5837,7 @@
 
     let _pendingChoiceShown = null  // track which pendingOptionSelection we've shown
     function syncAuthoritativePendingPresentation() {
-      if (battleActionVignette && battleActionVignette.isAnimating({ presentationEvents: latestBattlePresentationEvents })) return
+      if (pendingOptionSelectionForMe() || pendingTargetSelectionForMe()) flushPresentationBeforePendingSelection()
       const pbc = G.pendingOptionSelection
       if (pendingOptionSelectionForMe()) {
         const key = pbc.selectionId || (pbc.playerId + ':' + (G.turn ? G.turn.turnNumber : 0) + ':' + (pbc.options || []).map(o => o.value || o.id || o.label).join(','))
@@ -5866,6 +5896,7 @@
               targetType: pbt.targetType === 'piece' ? 'piece' : 'cell',
               filter: pbt.filter || 'all',
               range: pbt.range,
+              rangeCells: pbt.rangeCells,
               candidates: Array.isArray(pbt.candidates) ? pbt.candidates : [],
               selectionMode: pbt.selectionMode,
               minSelections: pbt.minSelections,
@@ -5920,7 +5951,11 @@
         costHint.hidden = !skillSource
         if (skillSource) {
           const cost = resolveSkillAvailability(skillSource, pendingSkill.skillId)
-          costHint.textContent = '本次消耗：行动 ' + cost.actionCost + (cost.chargeCost ? ' · 充能 ' + cost.chargeCost : '')
+          const pendingSkillData = pendingSkill?.skillId ? skillDefOf(pendingSkill.skillId) : null
+          const chargeText = pendingSkillData && skillUsesCharge(pendingSkillData)
+            ? ' · 充能 ' + skillChargeCostLabel(skillSource, pendingSkillData) + (skillHasDynamicChargeCost(pendingSkillData) ? '（动态）' : '')
+            : ''
+          costHint.textContent = '本次消耗：行动 ' + cost.actionCost + chargeText
         }
       }
     }
@@ -6439,7 +6474,10 @@
         const titleParts = [rawName]
         if (rawDesc) titleParts.push(rawDesc)
         titleParts.push('行动点消耗：' + apCost)
-        if (isCharge) titleParts.push('充能点消耗：' + skillChargeCostLabel(piece, skData))
+        if (isCharge) {
+          titleParts.push('充能点消耗：' + skillChargeCostLabel(piece, skData))
+          if (skillHasDynamicChargeCost(skData)) titleParts.push('费用可变：条件满足后自动降低')
+        }
         if (availability.unavailableReason) titleParts.push('不可用：' + availability.unavailableReason)
 
         return '<button type="button" class="piece-context-skill' + (isCharge ? ' is-charge' : '') +
@@ -6451,6 +6489,7 @@
           '<span class="piece-context-skill-name">' + escHtml(rawName) + '</span>' +
           '<span class="piece-context-skill-cost">' +
             (status || ('行动 ' + apCost + (isCharge ? ' · 充能 ' + skillChargeCostLabel(piece, skData) : ''))) +
+            (isCharge && skillHasDynamicChargeCost(skData) ? ' <span class="skill-cost-dynamic">动态</span>' : '') +
           '</span></button>'
       }).join('') : '<span class="piece-context-empty">' + (isOwner ? '暂无主动技能' : '查看详情') + '</span>'
       skillsContainer.innerHTML = skillButtons
@@ -7151,7 +7190,6 @@
           setStatusMsg('当前规则选择必须完成，不能清除棋子选择')
           return
         }
-        locallyCancelledSelectionId = pendingSelection && pendingSelection.selectionId
         void doAction({
           type: 'cancelPendingSelection',
           playerId: pendingSelection.playerId || myPlayerId,
@@ -7211,7 +7249,6 @@
           setStatusMsg('请先完成当前规则选择')
           return
         }
-        locallyCancelledSelectionId = pendingSelection && pendingSelection.selectionId
         void doAction({
           type: 'cancelPendingSelection',
           playerId: pendingSelection.playerId || myPlayerId,
@@ -7464,7 +7501,8 @@
           }
           showOptionPicker(e.title||'请选择', e.options||[], optionRetry)
         } else {
-          const errMsg = e.message || String(e) || '操作失败'
+          const rawErrMsg = e.message || String(e) || '操作失败'
+          const errMsg = (typeof e.code === 'string' && e.code.indexOf('TARGET_') === 0 || /不可行走|not walkable|没有合法|无合法/i.test(rawErrMsg)) ? '没有合法地格' : rawErrMsg
           red50Evidence.rejections.push({ code: e.code || '', message: errMsg, at: Date.now() })
           const rejectedPending = (
             (action.type === 'pendingTargetSelect' && G && G.pendingTargetSelection)
@@ -8139,6 +8177,7 @@
     <div class="target-mode-card">
       <div class="target-source-name" id="targetSourceName">当前技能</div>
       <div class="target-prompt" id="targetPromptText">选择目标</div>
+      <div id="targetRangeLegend" hidden style="font-size:12px;color:#453727"><span style="color:#347b91">■</span> 施法范围 · 高亮目标可选</div>
       <div class="target-multi-summary" id="targetMultiSummary" style="display:none"></div>
       <button type="button" class="target-confirm-btn" id="targetConfirmButton" style="display:none" onclick="dispatchBattleIntent({type:'confirm-target-selection'})">确认选择</button>
       <button type="button" class="target-cancel-btn" id="targetCancelButton" onclick="dispatchBattleIntent({type:'cancel-target'})">取消目标选择</button>
@@ -8189,3 +8228,4 @@
 <script src="js/battle-settings.js" defer></script>
 </body>
 </html>
+

@@ -1,0 +1,33 @@
+{
+  "id": "el-primo",
+  "name": "艾尔·普里莫",
+  "faction": "good",
+  "image": "el-primo.jpg",
+  "stats": {
+    "maxHp": 17,
+    "attack": 4,
+    "defense": 2,
+    "moveRange": 4,
+    "speed": 4
+  },
+  "skills": [
+    {
+      "skillId": "el-primo-iron-tank",
+      "level": 1
+    },
+    {
+      "skillId": "el-primo-punch",
+      "level": 1
+    },
+    {
+      "skillId": "el-primo-elbow",
+      "level": 1
+    }
+  ],
+  "rarity": "epic",
+  "description": "输出 / 机动",
+  "isDefault": false,
+  "rules": [
+    "rule-el-primo-injury-counter"
+  ]
+}

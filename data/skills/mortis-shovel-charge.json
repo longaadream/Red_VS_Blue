@@ -1,0 +1,19 @@
+{
+  "id": "mortis-shovel-charge",
+  "name": "铁铲突击",
+  "description": "冲刺至正方向地格（3），对路径上所有敌人造成4点伤害。",
+  "keywords": [],
+  "targetText": "正方向地格（3）",
+  "effectTags": ["位移", "伤害"],
+  "icon": "🪓",
+  "kind": "active",
+  "type": "normal",
+  "cooldownTurns": 0,
+  "maxCharges": 0,
+  "powerMultiplier": 1,
+  "actionPointCost": 1,
+  "range": "single",
+  "requiresTarget": true,
+  "targeting": { "steps": [{ "kind": "target", "type": "grid", "filter": "all", "range": 3, "sameRowOrColumn": true, "distanceMetric": "manhattan", "requireWalkable": true, "requireUnoccupied": true, "excludeSourceCell": true }] },
+  "code": "function executeSkill(context) { var source = context.piece; var pos = selectTarget({ type: 'grid', range: 3, filter: 'all' }); if (!pos || pos.needsTargetSelection) return pos; var dx = pos.x - source.x; var dy = pos.y - source.y; if ((dx !== 0 && dy !== 0) || (dx === 0 && dy === 0)) return { success: false, message: '请选择正方向地格' }; var distance = Math.abs(dx) + Math.abs(dy); if (distance > 3) return { success: false, message: '目标地格超出3格' }; var direction = { x: dx === 0 ? 0 : (dx > 0 ? 1 : -1), y: dy === 0 ? 0 : (dy > 0 ? 1 : -1) }; var trace = flow.query.tracePath(source, direction, { excludePieceId: source.instanceId, maxDistance: distance, passAllies: true, passEnemies: true }); if (!trace.lastLandableCell || trace.lastLandableCell.x !== pos.x || trace.lastLandableCell.y !== pos.y) return { success: false, message: '路径上没有合法落点' }; var enemies = []; (trace.encounters || []).forEach(function(encounter) { if (encounter.type !== 'piece') return; var target = flow.query.piece(encounter.pieceId); if (target && target.currentHp > 0 && !arePlayersAllied(battle, target.ownerPlayerId, source.ownerPlayerId) && enemies.every(function(item) { return item.instanceId !== target.instanceId; })) enemies.push(target); }); if (!flow.effects.displace([{ pieceId: source.instanceId, x: pos.x, y: pos.y }], 'dash', { passAllies: true, passEnemies: true }).success) return { success: true, message: '位移被阻挡，本次位移效果取消' }; if (enemies.length) dealDamage(source, enemies, 4, 'physical', battle, context.skill.id); return { success: true, message: source.name + '铁铲突击至(' + pos.x + ',' + pos.y + ')' + (enemies.length ? '，对路径上' + enemies.length + '名敌人造成4点伤害' : '') }; }"
+}

@@ -17,6 +17,32 @@ function adventureStatus(message, failed) {
   const bar = document.getElementById('adventureStatus')
   if (bar) { bar.textContent = message; bar.style.color = failed ? '#ffd0af' : '#ddc9a4' }
 }
+function renderAdventureIntentDock() {
+  const dock = document.getElementById('adventureIntentDock')
+  if (!dock) return
+  const world = adventureSnapshot?.world
+  const state = adventureSnapshot?.state
+  const enemyId = adventureSnapshot?.aiPlayerId || 'adventure-enemy'
+  const plans = (world?.plans || []).filter(plan => {
+    const piece = state?.pieces?.find(p => p.instanceId === plan.sourceId)
+    return piece && piece.ownerPlayerId === enemyId && piece.currentHp > 0
+  })
+  if (!plans.length) { dock.hidden = true; dock.replaceChildren(); return }
+  dock.hidden = false
+  const title = document.createElement('div'); title.className = 'adventure-intent-dock-title'; title.textContent = '敌方行动预告'
+  const list = document.createElement('div'); list.className = 'adventure-intent-dock-list'
+  for (const plan of plans.slice(0, 4)) {
+    const piece = state.pieces.find(p => p.instanceId === plan.sourceId)
+    const skillId = plan.action?.skillId
+    const skill = skillId && typeof skillDefOf === 'function' ? skillDefOf(skillId) : null
+    const label = plan.kind === 'move' ? '移动' : (skill?.name || skillId || (plan.kind === 'summon' ? '召唤' : '攻击'))
+    const row = document.createElement('div'); row.className = 'adventure-intent-dock-row'
+    const name = document.createElement('strong'); name.textContent = piece.name || piece.templateId || '敌方棋子'
+    const intent = document.createElement('span'); intent.textContent = label + (plan.trackingTargetId ? ' · 锁定目标' : '')
+    row.append(name, intent); list.append(row)
+  }
+  dock.replaceChildren(title, list)
+}
 function pauseAdventure(error) {
   adventureStopped = true
   adventureStatus('冒险已暂停：' + (error.message || error) + ' · 可返回重新开局', true)
@@ -68,6 +94,7 @@ function acceptAdventureSnapshot(result) {
   if (result.action?.playerId === result.humanPlayerId) restoreSelectedPieceMenu({ reopen: result.action.type === 'move' })
   render()
   renderAdventureWorld()
+  renderAdventureIntentDock()
   if (G.terminalResult) showAdventureResult()
   else if (result.paused) pauseAdventure(new Error(result.paused))
   else if (result.diagnostics && adventureWaitByTurn.get(result.diagnostics.turn) >= 10000)

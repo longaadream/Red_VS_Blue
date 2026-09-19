@@ -1,0 +1,32 @@
+{
+  "id": "alfonso-kick",
+  "name": "龙骧虎步",
+  "description": "弹射物。选择正方向，对首个敌人造成2点伤害；若目标位于相邻地格，再造成0.5倍伤害。",
+  "keywords": [
+    "弹射物"
+  ],
+  "targetText": "正方向",
+  "kind": "active",
+  "type": "normal",
+  "actionPointCost": 1,
+  "cooldownTurns": 0,
+  "range": "area",
+  "code": "function executeSkill(context){var c=context.piece;var pos=selectTarget({type:'grid',range:6,filter:'all'});if(!pos||pos.needsTargetSelection)return pos;var dx=Math.sign(pos.x-c.x),dy=Math.sign(pos.y-c.y);var events=traceProjectile({x:c.x,y:c.y},{x:dx,y:dy},{excludePieceId:c.instanceId});var hit=null;for(var i=0;i<events.length;i++){if(events[i].type==='piece'){if(!arePlayersAllied(battle,events[i].piece.ownerPlayerId,c.ownerPlayerId)){hit=events[i].piece;break;}}if(events[i].type==='terrain'&&events[i].blocksProjectile)break;}if(!hit)return{success:true,message:c.name+'的鞋子未命中'};var r=dealDamage(c,hit,2,'physical',battle,context.skill.id);if(Math.abs(hit.x-c.x)+Math.abs(hit.y-c.y)===1)dealDamage(c,hit,Math.floor(c.attack*.5),'physical',battle,context.skill.id);return{success:true,message:c.name+'踢出鞋子造成伤害'};}",
+  "icon": "✦",
+  "effectTags": ["伤害"],
+  "maxCharges": 0,
+  "powerMultiplier": 1,
+  "targeting": {
+    "steps": [
+      {
+        "kind": "target",
+        "type": "grid",
+        "filter": "all",
+        "range": 6,
+        "excludeSourceCell": true,
+        "sameRowOrColumn": true,
+        "distanceMetric": "manhattan"
+      }
+    ]
+  }
+}

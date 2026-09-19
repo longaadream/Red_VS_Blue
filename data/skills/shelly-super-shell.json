@@ -1,0 +1,32 @@
+{
+  "id": "shelly-super-shell",
+  "name": "超级霰弹",
+  "description": "选择正方向，破除4格内的墙和掩体，对路径上距离1/2/3/4格的所有敌人分别造成4/2/1.5/1倍伤害。",
+  "keywords": ["破墙"],
+  "targetText": "正方向",
+  "effectTags": ["伤害", "破墙"],
+  "icon": "💥",
+  "kind": "active",
+  "type": "super",
+  "cooldownTurns": 2,
+  "maxCharges": 2,
+  "chargeCost": 2,
+  "powerMultiplier": 1,
+  "actionPointCost": 0,
+  "range": "single",
+  "requiresTarget": true,
+  "targeting": {
+    "steps": [
+      {
+        "kind": "target",
+        "type": "grid",
+        "filter": "all",
+        "range": 4,
+        "sameRowOrColumn": true,
+        "excludeSourceCell": true
+      }
+    ]
+  },
+  "code": "function executeSkill(context) { var source = context.piece; var targetPosition = selectTarget({ type: 'grid', range: 4, filter: 'all' }); if (!targetPosition || targetPosition.needsTargetSelection) return targetPosition; var dx = targetPosition.x - source.x; var dy = targetPosition.y - source.y; if ((dx !== 0 && dy !== 0) || (dx === 0 && dy === 0)) return { success: false, message: '请选择正方向' }; var direction = { x: Math.sign(dx), y: Math.sign(dy) }; var cells = []; for (var distance = 1; distance <= 4; distance++) { var cell = { x: source.x + direction.x * distance, y: source.y + direction.y * distance }; if (!battle.map.tiles.some(function(tile) { return tile.x === cell.x && tile.y === cell.y; })) break; cells.push(cell); } var broken = flow.effects.destroyWalls(cells).changedCells.length; var hit = 0; var multipliers = [4, 2, 1.5, 1]; cells.forEach(function(cell, index) { var enemies = battle.pieces.filter(function(piece) { return piece.currentHp > 0 && piece.x === cell.x && piece.y === cell.y && !arePlayersAllied(battle, piece.ownerPlayerId, source.ownerPlayerId); }); enemies.forEach(function(enemy) { dealDamage(source, enemy, Math.floor(source.attack * multipliers[index]), 'physical', battle, context.skill.id); hit++; }); }); return { success: true, message: source.name + '使用超级霰弹，破坏' + broken + '个地形并命中' + hit + '名敌人' }; }",
+  "previewCode": "function calculatePreview(piece) { return { description: '选择正方向，破除4格内的墙和掩体，对路径上距离1/2/3/4格的所有敌人分别造成4/2/1.5/1倍伤害。', expectedValues: { damageByDistance: [piece.attack * 4, piece.attack * 2, Math.floor(piece.attack * 1.5), piece.attack] } }; }"
+}

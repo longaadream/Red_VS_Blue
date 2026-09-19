@@ -1,7 +1,7 @@
 {
   "id": "rule-hidan-undying-tick",
   "name": "濒死倒计时",
-  "description": "飞段濒死状态在己方回合结束时结算，时间到后真正死亡",
+  "description": "你的回合结束时结算濒死[2]；持续时间结束后死亡。",
   "trigger": {
     "type": "endTurn"
   },

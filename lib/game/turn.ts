@@ -1680,6 +1680,11 @@ function applyBattleActionInternal(
       trustedContinuation.skipTargetingValidation = true
       trustedContinuation.skipBeforeSkillUse = true
     }
+    // The skill has already resolved before an afterSkillUsed trigger asks for
+    // a target.  Resume the trigger only; do not execute the skill a second time.
+    if (mode === 'skillAfterSkillTrigger') {
+      return next
+    }
     if (mode === 'cardReleaseOption') {
       trustedContinuation.skipTargetingValidation = true
       trustedContinuation.skipBeforeCardPlay = true
@@ -2779,11 +2784,13 @@ function applyBattleActionInternal(
       const skillUseContext = {
         type: "beforeSkillUse" as const,
         sourcePiece: piece,
-        targetPiece: action.targetPieceId
+        // A coordinate target is a cell selection even when a stale client
+        // also includes the piece occupying that cell.  Only an ID-only
+        // target is allowed to drive piece-target triggers (for example
+        // Flying Raijin).
+        targetPiece: action.targetPieceId && action.targetX === undefined && action.targetY === undefined
           ? next.pieces.find(p => p.instanceId === action.targetPieceId && p.currentHp > 0)
-          : (action.targetX !== undefined && action.targetY !== undefined
-            ? next.pieces.find(p => p.x === action.targetX && p.y === action.targetY && p.currentHp > 0)
-            : undefined),
+          : undefined,
         targetX: action.targetX,
         targetY: action.targetY,
         playerId: action.playerId,
@@ -2801,6 +2808,10 @@ function applyBattleActionInternal(
           candidate.instanceId === beforeSkillUseResult.targetReplacementPieceId && candidate.currentHp > 0
         ))
         if (!skillUseContext.targetPiece) throw new BattleRuleError('Replacement skill target is unavailable')
+      }
+      // A blocked attempt is feedback only; it must not become an action-log entry.
+      if (beforeSkillUseResult.blocked) {
+        throw new BattleRuleError(beforeSkillUseResult.messages.join('；') || '无法行动')
       }
       // 检查是否有规则阻止了技能使用
       if (beforeSkillUseResult.success) {
@@ -2821,9 +2832,6 @@ function applyBattleActionInternal(
       }
 
       // 检查是否有规则明确阻止了行动（在添加消息之后检查）
-      if (beforeSkillUseResult.blocked) {
-        return next; // 返回包含消息的状态，不执行技能
-      }
       if (beforeSkillUseResult.needsOptionSelection || beforeSkillUseResult.needsTargetSelection) {
         // 存入状态，由正确的玩家客户端响应（不 throw，避免路由给错误的客户端）
         setPendingInteraction(next, beforeSkillUseResult, skillUseContext, {
@@ -2933,14 +2941,22 @@ function applyBattleActionInternal(
 
       // 检查是否需要目标选择
       if (result.needsTargetSelection) {
-        // 创建一个包含目标选择信息的错误对象
-        const targetSelectionError = new BattleRuleError('需要选择目标') as any
-        targetSelectionError.needsTargetSelection = true
-        targetSelectionError.targetType = result.targetType || 'piece'
-        targetSelectionError.range = result.range || 5
-        targetSelectionError.filter = result.filter || 'enemy'
-        targetSelectionError.targetIndex = (result as any).targetIndex
-        throw targetSelectionError
+        if (releaseRuntime && releaseRuntimeSnapshot) releaseRuntime.restore(releaseRuntimeSnapshot)
+        setPendingInteraction(next, result as any as TriggerResult, {
+          type: 'afterSkillUsed',
+          sourcePiece: piece,
+          skillId: finalSkillId,
+          reservedCells: skillUseContext.reservedCells,
+        }, {
+          continuationContext: {
+            type: 'afterSkillUsed',
+            sourcePiece: piece,
+            skillId: finalSkillId,
+            reservedCells: skillUseContext.reservedCells,
+          },
+          pendingAction: { ...action, __pendingContinuationMode: 'skillAfterSkillTrigger' },
+        })
+        return next
       }
 
       // 检查是否需要选项选择
@@ -3094,11 +3110,9 @@ function applyBattleActionInternal(
       const skillUseContext = {
         type: "beforeSkillUse" as const,
         sourcePiece: piece,
-        targetPiece: action.targetPieceId
+        targetPiece: action.targetPieceId && action.targetX === undefined && action.targetY === undefined
           ? next.pieces.find(p => p.instanceId === action.targetPieceId && p.currentHp > 0)
-          : (action.targetX !== undefined && action.targetY !== undefined
-            ? next.pieces.find(p => p.x === action.targetX && p.y === action.targetY && p.currentHp > 0)
-            : undefined),
+          : undefined,
         targetX: action.targetX,
         targetY: action.targetY,
         playerId: action.playerId,
@@ -3144,6 +3158,10 @@ function applyBattleActionInternal(
         }
       }
 
+      // A blocked attempt is feedback only; it must not become an action-log entry.
+      if (beforeSkillUseResult.blocked) {
+        throw new BattleRuleError(beforeSkillUseResult.messages.join('；') || '无法行动')
+      }
       // 检查是否有规则阻止了技能使用
       if (beforeSkillUseResult.success) {
         // 初始化actions数组
@@ -3163,9 +3181,6 @@ function applyBattleActionInternal(
       }
       
       // 检查是否有规则明确阻止了行动（在添加消息之后检查）
-      if (beforeSkillUseResult.blocked) {
-        return next; // 返回包含消息的状态，不执行技能
-      }
       if (beforeSkillUseResult.needsOptionSelection || beforeSkillUseResult.needsTargetSelection) {
         setPendingInteraction(next, beforeSkillUseResult, skillUseContext, {
           continuationContext: skillUseContext,
@@ -3259,14 +3274,22 @@ function applyBattleActionInternal(
 
       // 检查是否需要目标选择
       if (result.needsTargetSelection) {
-        // 创建一个包含目标选择信息的错误对象
-        const targetSelectionError = new BattleRuleError('需要选择目标') as any
-        targetSelectionError.needsTargetSelection = true
-        targetSelectionError.targetType = result.targetType || 'piece'
-        targetSelectionError.range = result.range || 5
-        targetSelectionError.filter = result.filter || 'enemy'
-        targetSelectionError.targetIndex = (result as any).targetIndex
-        throw targetSelectionError
+        if (releaseRuntime && releaseRuntimeSnapshot) releaseRuntime.restore(releaseRuntimeSnapshot)
+        setPendingInteraction(next, result as any as TriggerResult, {
+          type: 'afterSkillUsed',
+          sourcePiece: piece,
+          skillId: finalSkillId,
+          reservedCells: skillUseContext.reservedCells,
+        }, {
+          continuationContext: {
+            type: 'afterSkillUsed',
+            sourcePiece: piece,
+            skillId: finalSkillId,
+            reservedCells: skillUseContext.reservedCells,
+          },
+          pendingAction: { ...action, __pendingContinuationMode: 'skillAfterSkillTrigger' },
+        })
+        return next
       }
 
       // 检查是否需要选项选择

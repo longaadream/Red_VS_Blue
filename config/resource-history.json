@@ -4,20 +4,22 @@
   "history": [
     "RED-201: aizen attack 5; ulquiorra regeneration 1",
     "grimmjow-destruction-rule: per-damage self hit",
-    "current-main: retain position API and concise descriptions"
+    "current-main: retain position API and concise descriptions",
+    "RED-211: retain 1.0.5 history; shorten Aizen and Grimmjow names; remove gran-rey-cero from Grimmjow skill list per 1010 balance plan; preserve stats and rules",
+    "RED-211 role fixes: preserve the damage-multiplier language standard and register the new character rules"
   ],
   "files": [
     {
       "path": "data/pieces/dark-aizen.json",
-      "sha256": "28c19d3c993ea1e2ee910d232319aba7f980ed57584cc523255b57e96b9a5bf0"
+      "sha256": "8e19d76d56e24af080debeb80857eb52aaabb891562cb7b488a959b62d842feb"
     },
     {
       "path": "data/pieces/dark-grimmjow.json",
-      "sha256": "62ccc9a07697247588c3eb34711f43126d5f4ca245767652d398efb858aded1c"
+      "sha256": "d92467c1d515ade086ccce4242a9c4b7c582fefa721751b2e23331d23922aca5"
     },
     {
       "path": "data/rules/manifest.json",
-      "sha256": "5f03028c02d16f85cf2285c8bc972e1a5850f88bafb93aefa70fe6dfdf000696"
+      "sha256": "c689a01c7ca1c8cfdbc0ff356389604aba69bf9316e8459b7dd8774205cff16c"
     },
     {
       "path": "data/rules/rule-grimmjow-destruction-instinct.json",
@@ -45,11 +47,11 @@
     },
     {
       "path": "data/skills/grimmjow-gran-rey-cero.json",
-      "sha256": "e7a5e4b279ad16315f534d18f3c882a2b73bd75ea69ac5e7020b1f7a51cbd9dd"
+      "sha256": "7d13632c341aaaa77a238a45eb97e1b4629d0222fd1244966ac62dbc9f3dac08"
     },
     {
       "path": "data/skills/grimmjow-panther-claw.json",
-      "sha256": "9a91d1209eb604af67f42d45b6a277941d36135350799121216ca6e94dd8964c"
+      "sha256": "7389b50b4c25b89986bbb9f6033024584d6832b1e7e5e31d0458bcdc3fa2b019"
     },
     {
       "path": "data/skills/ulquiorra-high-speed-regeneration.json",

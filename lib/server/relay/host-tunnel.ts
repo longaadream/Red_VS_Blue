@@ -7,6 +7,7 @@ export interface HostTunnelOptions {
   name: string
   visible?: boolean
   publishKey?: string
+  turnTimerEnabled?: boolean
   onClosed?: () => void
 }
 
@@ -44,7 +45,7 @@ export function openHostTunnel(options: HostTunnelOptions): Promise<{ published:
   }
   return new Promise((resolve, reject) => {
     const deadline = setTimeout(() => { reject(new Error('转发服务器连接超时')); close() }, 10000)
-    socket.on('open', () => sendPacket(socket, { type: 'register', name: options.name, visible: options.visible === true }))
+    socket.on('open', () => sendPacket(socket, { type: 'register', name: options.name, visible: options.visible === true, turnTimerEnabled: options.turnTimerEnabled }))
     socket.on('error', () => { if (!settled) reject(new Error('无法连接转发服务器，请检查地址和发布密钥')); close() })
     socket.on('close', () => {
       clearTimeout(deadline)

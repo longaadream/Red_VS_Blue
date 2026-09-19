@@ -1,0 +1,19 @@
+{
+  "id": "mortis-bat-support",
+  "name": "蝙蝠增援",
+  "description": "选择正方向，对7格内所有敌人造成4点伤害，并回复等同于实际总伤害。",
+  "keywords": [],
+  "targetText": "正方向",
+  "effectTags": ["伤害", "治疗"],
+  "icon": "🦇",
+  "kind": "active",
+  "type": "normal",
+  "cooldownTurns": 1,
+  "maxCharges": 0,
+  "powerMultiplier": 1,
+  "actionPointCost": 1,
+  "range": "single",
+  "requiresTarget": true,
+  "targeting": { "steps": [{ "kind": "target", "type": "grid", "filter": "all", "range": 7, "sameRowOrColumn": true, "distanceMetric": "manhattan", "excludeSourceCell": true }] },
+  "code": "function executeSkill(context) { var source = context.piece; var counter = (source.statusTags || []).find(function(tag) { return tag.type === 'mortis-damage-counter'; }); if (!counter || Number(counter.readyCharges || counter.intensity || 0) <= 0) return { success: false, message: '尚未解锁蝙蝠增援' }; var pos = selectTarget({ type: 'grid', range: 7, filter: 'all' }); if (!pos || pos.needsTargetSelection) return pos; var dx = pos.x - source.x; var dy = pos.y - source.y; if ((dx !== 0 && dy !== 0) || (dx === 0 && dy === 0)) return { success: false, message: '请选择正方向' }; var direction = { x: dx === 0 ? 0 : (dx > 0 ? 1 : -1), y: dy === 0 ? 0 : (dy > 0 ? 1 : -1) }; var cells = []; for (var distance = 1; distance <= 7; distance++) cells.push({ x: source.x + direction.x * distance, y: source.y + direction.y * distance }); var enemies = battle.pieces.filter(function(piece) { return piece.currentHp > 0 && !arePlayersAllied(battle, piece.ownerPlayerId, source.ownerPlayerId) && cells.some(function(cell) { return cell.x === piece.x && cell.y === piece.y; }); }); var ready = Math.max(0, Number(counter.readyCharges || counter.intensity || 0) - 1); counter.readyCharges = ready; counter.intensity = ready; if (ready <= 0) removeSkillById(source.instanceId, 'mortis-bat-support'); if (!enemies.length) return { success: true, message: source.name + '释放蝙蝠增援，但7格内没有敌人' }; var result = dealDamage(source, enemies, 4, 'physical', battle, context.skill.id); var totalDamage = Number(result.totalDamage || result.damage || 0); if (totalDamage > 0) healDamage(source, source, totalDamage, battle, context.skill.id); return { success: true, message: source.name + '释放蝙蝠增援，对' + enemies.length + '名敌人造成' + totalDamage + '点伤害并回复等量生命' }; }"
+}

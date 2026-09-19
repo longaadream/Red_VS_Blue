@@ -1,0 +1,21 @@
+{
+  "id": "mortis",
+  "name": "莫提斯",
+  "faction": "evil",
+  "rarity": "mythic",
+  "description": "输出 / 治疗 / 机动",
+  "image": "mortis.jpg",
+  "stats": { "maxHp": 14, "attack": 3, "defense": 0, "moveRange": 4, "speed": 4 },
+  "initialStatusTags": [
+    { "id": "mortis-damage-counter", "type": "mortis-damage-counter", "name": "暗夜造物", "visible": true, "stacks": 0, "intensity": 0, "hitCount": 0, "readyCharges": 0, "currentDuration": -1, "currentUses": -1, "relatedRules": ["rule-mortis-damage-counter"] }
+  ],
+  "skills": [
+    { "skillId": "mortis-night-construct", "level": 1 },
+    { "skillId": "mortis-shovel-charge", "level": 1 }
+  ],
+  "transformedSkills": [
+    { "skillId": "mortis-bat-support", "triggeredBy": "mortis-night-construct" }
+  ],
+  "rules": ["rule-mortis-damage-counter"],
+  "isDefault": false
+}

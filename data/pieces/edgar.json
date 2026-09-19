@@ -1,0 +1,20 @@
+{
+  "id": "edgar",
+  "name": "艾德加",
+  "faction": "evil",
+  "rarity": "epic",
+  "description": "输出 / 机动",
+  "image": "edgar.jpg",
+  "stats": {
+    "maxHp": 14,
+    "attack": 4,
+    "defense": 1,
+    "moveRange": 4,
+    "speed": 4
+  },
+  "skills": [
+    { "skillId": "edgar-fisticuffs", "level": 1 },
+    { "skillId": "edgar-pogo-jump", "level": 1 }
+  ],
+  "isDefault": false
+}

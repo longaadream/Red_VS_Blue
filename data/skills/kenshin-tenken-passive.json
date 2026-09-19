@@ -1,7 +1,7 @@
 {
   "id": "kenshin-tenken-passive",
   "name": "飞天御剑流·剑速",
-  "description": "移动后下次攻击伤害变为1.5倍。",
+  "description": "移动后，下次攻击伤害增加50%。",
   "keywords": [],
   "targetText": "被动",
   "effectTags": [

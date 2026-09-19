@@ -2,6 +2,14 @@ import type { BattleState } from './turn'
 
 export const CHARGE_CRYSTAL_TILE_TYPE = 'charge-crystal' as const
 
+export type TileEffectPresentationMode = 'simultaneous' | 'expand'
+
+export function resolveTileEffectPresentation(mode: unknown): TileEffectPresentationMode {
+  return mode === 'simultaneous' || mode === 'expand'
+    ? mode
+    : 'simultaneous'
+}
+
 export interface ChargeCrystalTileEffect {
   id: string
   sourceId: string
@@ -15,6 +23,35 @@ function tileEffects(state: BattleState): unknown[] {
   state.extensions ??= {}
   if (!Array.isArray(state.extensions.tileEffects)) state.extensions.tileEffects = []
   return state.extensions.tileEffects
+}
+
+/**
+ * Commits a group of tile effects as one authoritative state change. The
+ * presentation layer may animate each cell independently, but the rule layer
+ * and network patch only need one revision for the whole group.
+ */
+export function appendTileEffectsBatch<T extends object>(
+  state: BattleState,
+  effects: readonly T[],
+): T[] {
+  if (!Array.isArray(effects) || effects.length === 0) return []
+  const existing = tileEffects(state)
+  const ids = new Set(existing.flatMap(effect => {
+    if (!effect || typeof effect !== 'object') return []
+    const id = (effect as Record<string, unknown>).id
+    return typeof id === 'string' ? [id] : []
+  }))
+  for (const effect of effects) {
+    if (!effect || typeof effect !== 'object') throw new Error('Tile effect batch contains an invalid effect')
+    const id = (effect as Record<string, unknown>).id
+    if (typeof id === 'string') {
+      if (ids.has(id)) throw new Error(`Duplicate tile effect ID: ${id}`)
+      ids.add(id)
+    }
+  }
+  const committed = effects.map(effect => ({ ...effect }))
+  existing.push(...committed)
+  return committed
 }
 
 export function isChargeCrystal(value: unknown): value is ChargeCrystalTileEffect {
@@ -45,8 +82,7 @@ export function dropChargeCrystal(
     y: input.y,
     visible: true,
   }
-  effects.push(crystal)
-  return crystal
+  return appendTileEffectsBatch(state, [crystal])[0]
 }
 
 export function collectChargeCrystalsAt(

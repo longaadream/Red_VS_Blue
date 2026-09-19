@@ -29,7 +29,7 @@
       <div class="card-art">${art}${badge}</div>
       <div class="card-name-banner">${escape(def.name || cardId)}</div>
       <div class="card-body"><div class="card-desc">${escape(description)}</div>
-      <div class="card-type-badge">${type}${cooldown > 0 ? `<span class="card-cooldown"> CD${escape(cooldown)}</span>` : ''}</div></div>`
+      <div class="card-type-badge">${type}${Number.isFinite(Number(cooldown)) ? `<span class="card-cooldown"> ${escape(cooldown)}回合冷却</span>` : ''}</div></div>`
   }
   function preview(cardId, definition) {
     const def = definition || {}
@@ -37,3 +37,4 @@
   }
   root.HandCardFace = Object.freeze({ render, preview })
 })(typeof window !== 'undefined' ? window : globalThis)
+

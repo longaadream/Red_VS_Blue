@@ -1,0 +1,29 @@
+{
+  "id": "edgar-fisticuffs",
+  "name": "近身搏击",
+  "description": "选择敌人（1），造成0.75倍伤害。命中后回复1。",
+  "keywords": [],
+  "targetText": "敌人（1）",
+  "effectTags": ["伤害", "治疗"],
+  "icon": "🥊",
+  "kind": "active",
+  "type": "normal",
+  "cooldownTurns": 0,
+  "maxCharges": 0,
+  "powerMultiplier": 0.75,
+  "actionPointCost": 1,
+  "range": "single",
+  "requiresTarget": true,
+  "targeting": {
+    "steps": [
+      {
+        "kind": "target",
+        "type": "piece",
+        "filter": "enemy",
+        "range": 1
+      }
+    ]
+  },
+  "code": "function executeSkill(context) { var source = context.piece; var target = selectTarget({ type: 'piece', range: 1, filter: 'enemy' }); if (!target || target.needsTargetSelection) return target; var damage = Math.floor(source.attack * 0.75); var result = dealDamage(source, target, damage, 'physical', battle, context.skill.id); if ((result.damage || 0) > 0 && source.currentHp > 0) healDamage(source, source, 1, battle, context.skill.id); return { success: true, message: source.name + '对' + target.name + '造成' + (result.damage || 0) + '点伤害' + ((result.damage || 0) > 0 ? '并回复1点生命' : '') }; }",
+  "previewCode": "function calculatePreview(piece) { return { description: '对1格内敌人造成0.75倍伤害，若命中回复1点生命。', expectedValues: { damage: Math.floor(piece.attack * 0.75), healing: 1 } }; }"
+}

@@ -264,6 +264,10 @@
         <span>公开房间（所有人可见）</span>
         <input type="checkbox" id="visibilityToggle" checked>
       </div>
+      <div class="toggle-row">
+        <span>启用回合计时器</span>
+        <input type="checkbox" id="turnTimerEnabledToggle" checked>
+      </div>
       <div id="createErr" class="err-msg"></div>
       <button class="btn-primary" id="createRoomBtn" onclick="doCreateRoom()" disabled>创建并加入</button>
       <button class="btn-cancel" onclick="closeCreateSheet()">取消</button>
@@ -781,7 +785,8 @@
           await reconcileLobbyServerMode()
           const profileIdentity = await getLocalGameProfileIdentity()
           const mode = document.getElementById('matchMode').value
-          const room = await lobbyRequest('rooms.create', { name: playerName + ' 的 ' + mode + ' 房间', mode, hostId, hostName: playerName, publicKey, mapId, visibility, profileIdentity })
+          const turnTimerEnabled = document.getElementById('turnTimerEnabledToggle').checked
+          const room = await lobbyRequest('rooms.create', { name: playerName + ' 的 ' + mode + ' 房间', mode, hostId, hostName: playerName, publicKey, mapId, visibility, turnTimerEnabled, profileIdentity })
           if (room.id) { closeCreateSheet(); showFactionPicker(room.id, 'join') }
           else throw new Error('未返回房间 ID')
         } catch (e) {

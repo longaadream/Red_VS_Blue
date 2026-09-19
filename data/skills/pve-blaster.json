@@ -1,7 +1,7 @@
 {
   "id": "pve-blaster",
   "name": "爆能射击",
-  "description": "弹射物。沿预告方向，对路径上5格内的第1个敌方目标造成等同攻击力的伤害。",
+  "description": "弹射物。沿预告方向，对路径上5格内的第1个敌方目标造成1倍伤害。",
   "kind": "active",
   "type": "normal",
   "range": "self",

@@ -6,6 +6,7 @@ import { traceProjectile, manhattanDistance, traceMovementPath, getLegalSkillLan
 import { getRuleMath } from './rule-runtime'
 import { areMatchAllies } from './match-teams'
 import { createSkillPresentation } from './skill-presentation'
+import { appendTileEffectsBatch, resolveTileEffectPresentation, type TileEffectPresentationMode } from './charge-crystals'
 export type FlowSurface = 'skill' | 'rule' | 'triggerSkill' | 'pending' | 'card'
 type Delegate = Record<string, (...args: any[]) => any>
 /** Called at formal removal; revival creates a new incarnation. */
@@ -149,6 +150,46 @@ export function createFlowRuntime(battle: BattleState, context: any, surface: Fl
       move: (changes: Array<{ pieceId: string; x: number; y: number }>, kind: Parameters<typeof changePiecePositions>[2] = 'teleport', path?: PositionChangeOptions['path']) => {
         return changePiecePositions(battle, changes, kind, { path,
           reservedCells: surface === 'skill' ? [] : context.reservedCells ?? [] })
+      },
+      // Explicit skill displacement. Unlike the legacy `move` facade this name
+      // makes it clear that the action is a position change, not a normal move.
+      displace: (changes: Array<{ pieceId: string; x: number; y: number }>, kind: Parameters<typeof changePiecePositions>[2] = 'dash', path?: PositionChangeOptions['path']) => {
+        return changePiecePositions(battle, changes, kind, { path,
+          reservedCells: surface === 'skill' ? [] : context.reservedCells ?? [] })
+      },
+      tileBatch: (effects: readonly Record<string, unknown>[], presentationOrOptions?: TileEffectPresentationMode | { presentation?: TileEffectPresentationMode; origin?: { x: number; y: number } }) => {
+        if (!Array.isArray(effects)) throw new Error('flow: 地格效果批次必须是数组')
+        const options = typeof presentationOrOptions === 'object' && presentationOrOptions !== null ? presentationOrOptions : { presentation: presentationOrOptions }
+        const mode = resolveTileEffectPresentation(options.presentation)
+        const xs = effects.map(effect => Number(effect?.x)), ys = effects.map(effect => Number(effect?.y))
+        if (effects.length && (xs.some(value => !Number.isFinite(value)) || ys.some(value => !Number.isFinite(value)))) throw new Error('flow: 地格效果坐标无效')
+        const centerX = options.origin && Number.isFinite(options.origin.x) ? options.origin.x : (Math.min(...xs) + Math.max(...xs)) / 2
+        const centerY = options.origin && Number.isFinite(options.origin.y) ? options.origin.y : (Math.min(...ys) + Math.max(...ys)) / 2
+        const normalized = effects.map(effect => {
+          if (!effect || typeof effect !== 'object') throw new Error('flow: 地格效果无效')
+          return { ...json(effect), presentation: mode,
+            presentationStep: mode === 'expand' ? Math.max(Math.abs(Number(effect.x) - centerX), Math.abs(Number(effect.y) - centerY)) : 0 }
+        })
+        return appendTileEffectsBatch(battle, normalized)
+      },
+      destroyWalls: (cells: readonly { x: number; y: number }[], options: { includeCover?: boolean } = {}) => {
+        if (!Array.isArray(cells)) throw new Error('flow: 破墙目标必须是数组')
+        const includeCover = options.includeCover !== false
+        const changedCells: Array<{ x: number; y: number }> = []
+        const seen = new Set<string>()
+        for (const cell of cells) {
+          if (!cell || !Number.isInteger(cell.x) || !Number.isInteger(cell.y)) throw new Error('flow: 破墙坐标无效')
+          const id = `${cell.x},${cell.y}`
+          if (seen.has(id)) continue
+          seen.add(id)
+          const tile = battle.map.tiles.find(candidate => candidate.x === cell.x && candidate.y === cell.y)
+          if (!tile) continue
+          const type = tile.props?.type
+          if (type !== 'wall' && !(includeCover && type === 'cover')) continue
+          tile.props = { type: 'floor', walkable: true, bulletPassable: true }
+          changedCells.push({ x: tile.x, y: tile.y })
+        }
+        return { success: true, changedCells }
       },
     },
     status: {

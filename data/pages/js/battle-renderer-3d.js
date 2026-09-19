@@ -66,12 +66,14 @@
   }
   const FACTION_COLORS = { red: 0xb05b50, blue: 0x648ca6 }
   const HL_COLORS = {
+    range:    { color: 0x62b9d2, opacity: 0.42 },
     move:     { color: 0x29494e, opacity: 0.86 },
     skill:    { color: 0x653a31, opacity: 0.86 },
     place:    { color: 0x51435e, opacity: 0.86 },
     selected: { color: 0x273e4d, opacity: 0.94 },
   }
   const TILE_EFFECT_VISUALS = Object.freeze({
+    'colt-zone': Object.freeze({ color: 0xf59e0b, colorCss: '#fcd34d', bg: 'rgba(120,53,15,.78)', border: '#f59e0b', icon: 'images/effect-icons/action-damage.svg' }),
     'charge-crystal': Object.freeze({ color: 0xc084fc, colorCss: '#e9d5ff', bg: 'rgba(88,28,135,.82)', border: '#c084fc', icon: 'images/effect-icons/verb-charge-points.svg' }),
     'flying-raijin-anchor': Object.freeze({ color: 0x38bdf8, colorCss: '#7dd3fc', bg: 'rgba(8,47,73,.78)', border: '#38bdf8', icon: 'images/tile-effects/flying-raijin-anchor.svg' }),
     'shadow-step': Object.freeze({ color: 0xa855f7, colorCss: '#d8b4fe', bg: 'rgba(88,28,135,.72)', border: '#a855f7', icon: 'images/tile-effects/shadow-step.svg' }),
@@ -108,13 +110,15 @@
   const _listeners = []
 
   let _mapW = 0, _mapH = 0
+  let _renderedMapKey = null
+  let _tileContentKey = null
   let _boardBase = null
   let _boardFront = null
   const _tileObjects = new Map()       // "x,z" → { surfaceY, type }
   const _tileBatches = new Map()       // terrain type → THREE.InstancedMesh
   const _pieceObjects = new Map()      // instanceId → {group, body, ring, portraitMesh, labelDiv, targetX, targetZ}
   const _tileEffectObjects = new Map()
-  const _hlObjects = { move: new Map(), skill: new Map(), place: new Map(), selected: null, selectedId: null }
+  const _hlObjects = { range: new Map(), move: new Map(), skill: new Map(), place: new Map(), selected: null, selectedId: null }
   let _boardDecorations = null
   let _boardDecorationsHistorical = false
   let _historyHighlightGroup = null
@@ -189,6 +193,7 @@
     if (_hlMats[type]) return _hlMats[type]
     const cfg = HL_COLORS[type] || HL_COLORS.move
     const mat = new THREE.MeshBasicMaterial({ color: cfg.color, transparent: true, opacity: cfg.opacity, depthWrite: false })
+    if (type === 'range') { _hlMats[type] = mat; return mat }
     const skinHighlightUrl = 'tabletop-battle/assets/highlight-' + (['move','skill','place','selected'].includes(type) ? type : 'move') + '.svg';
     loadTexture(skinHighlightUrl, function(texture) {
       mat.map = texture; mat.color.setHex(0xffffff); mat.needsUpdate = true; _invalidate();
@@ -507,7 +512,23 @@
   }
 
   // ── Tile map ─────────────────────────────────────────────────────────────────
-  function _buildTiles(map) {
+  function _tileContentSignature(map) {
+    return (Array.isArray(map && map.tiles) ? map.tiles : []).map(function (tile) {
+      const props = tile && tile.props
+      const type = props && props.type ? props.type : (tile && tile.type ? tile.type : 'floor')
+      return [tile && tile.x, tile && tile.y, type].join(':')
+    }).sort().join('|')
+  }
+
+  function _buildTiles(map, options) {
+    const preserveCamera = !!(options && options.preserveCamera)
+    const camera = preserveCamera && _camera && _cameraTarget ? {
+      x: _cameraTarget.x,
+      y: _cameraTarget.y,
+      z: _cameraTarget.z,
+      zoom: _camera.zoom,
+      overview: _cameraInOverview,
+    } : null
     _clearPresentationAreaFlash()
     _clearPresentationPath()
     _tileBatches.forEach(batch => { _scene.remove(batch); if (batch.dispose) batch.dispose() })
@@ -528,6 +549,7 @@
 
     _mapW = map.width
     _mapH = map.height
+    _renderedMapKey = map.id + ':' + map.width + 'x' + map.height
 
     const boardBaseGeometry = new THREE.BoxGeometry(_mapW + 1.25, BOARD_BASE_H, _mapH + 1.25)
     const boardBaseMaterial = new THREE.MeshBasicMaterial({ color: 0x302720 })
@@ -549,6 +571,7 @@
       tilesByType.get(type).push({ x: tile.x, y: tile.y, surfaceY: tileHeight })
       _tileObjects.set(tile.x + ',' + tile.y, { surfaceY: tileHeight, type: type })
     })
+    _tileContentKey = _tileContentSignature(map)
     tilesByType.forEach(function (tiles, type) {
       const batch = new THREE.InstancedMesh(_tileGeom, getTileMat(type), tiles.length)
       const transform = new THREE.Object3D()
@@ -571,6 +594,14 @@
     _updateCameraProjection(_container.clientWidth || 320, _container.clientHeight || 320)
     _camera.zoom = _preferredInitialZoom(_container.clientWidth || 320, _container.clientHeight || 320)
     _cameraInOverview = true
+
+    if (camera) {
+      _cameraTarget.set(camera.x, camera.y, camera.z)
+      _camera.zoom = camera.zoom
+      _cameraInOverview = camera.overview
+      _positionCameraFromTarget()
+      _camera.updateProjectionMatrix()
+    }
 
     // The interaction plane remains a flat board-sized plane. It owns no rules;
     // rounding and bounds checks stay in screenToCell().
@@ -1119,6 +1150,11 @@
     _hoverMoveTargets = new Set((hl.move || []).map(_normalizeHighlightItem).filter(Boolean).map(cell => cell.key))
     _hoverSelectedId = hl.selected || null
     _clearHoverPath()
+    const candidateKeys = new Set((hl.skill || []).map(_normalizeHighlightItem).filter(Boolean).map(cell => cell.key))
+    _syncHighlightGroup('range', (hl.range || []).filter(function (cell) {
+      const normalized = _normalizeHighlightItem(cell)
+      return normalized && !candidateKeys.has(normalized.key)
+    }))
     _syncHighlightGroup('move', hl.move || [])
     _syncHighlightGroup('skill', hl.skill || [])
     _syncHighlightGroup('place', hl.place || [])
@@ -2328,6 +2364,7 @@
       tutorialCueCellCount: _tutorialCueCellCount,
       tutorialCuePathCount: _tutorialCuePathCount,
       highlightCounts: {
+        range: _hlObjects.range.size,
         move: _hlObjects.move.size,
         skill: _hlObjects.skill.size,
         place: _hlObjects.place.size,
@@ -2899,11 +2936,13 @@
   function update(model) {
     if (!model || !model.board || !_mounted) return
 
-    // Build / update tiles on first call or map change
     const mapKey = model.board.id + ':' + model.board.width + 'x' + model.board.height
-    if (!_currentModel || !_currentModel.board || _currentModel.board.id + ':' + _currentModel.board.width + 'x' + _currentModel.board.height !== mapKey) {
+    const tileContentKey = _tileContentSignature(model.board)
+    const mapChanged = _renderedMapKey !== mapKey
+    const tileContentChanged = _tileContentKey !== tileContentKey
+    if (mapChanged || tileContentChanged) {
       clearBoardDecorations()
-      _buildTiles(model.board)
+      _buildTiles(model.board, { preserveCamera: !mapChanged })
     }
 
     _boardDecorationsHistorical = false
@@ -2912,6 +2951,7 @@
     setHighlights({
       move: model.legal && model.legal.moveCells,
       skill: model.legal && model.legal.targetCells,
+      range: model.legal && model.legal.rangeCells,
       place: model.legal && model.legal.placementCells,
       selected: model.selection && model.selection.pieceId,
     })
@@ -3069,6 +3109,7 @@
     _pressedHighlight = null
     _pieceDrag = null
     _hlObjects.move.clear()
+    _hlObjects.range.clear()
     _hlObjects.skill.clear()
     _hlObjects.place.clear()
     _hlObjects.selected = null
@@ -3094,6 +3135,8 @@
     _onIntent = null
     _hitPlane = null
     _currentModel = null
+    _renderedMapKey = null
+    _tileContentKey = null
     _mapW = 0
     _mapH = 0
     _boardBase = null

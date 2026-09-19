@@ -1,0 +1,22 @@
+{
+  "id": "alfonso-freeze",
+  "name": "威震八方",
+  "description": "对2格内所有敌人施加冰冻[1]。",
+  "keywords": [
+    "冰冻"
+  ],
+  "targetText": "2格内所有敌人",
+  "kind": "active",
+  "type": "normal",
+  "actionPointCost": 1,
+  "cooldownTurns": 3,
+  "range": "area",
+  "code": "function executeSkill(context){var c=context.piece;var es=battle.pieces.filter(function(p){return p.currentHp>0&&!arePlayersAllied(battle,p.ownerPlayerId,c.ownerPlayerId)&&Math.abs(p.x-c.x)+Math.abs(p.y-c.y)<=2});es.forEach(function(p){addStatusEffectById(p.instanceId,{id:'freeze-'+Date.now()+'-'+p.instanceId,type:'freeze',name:'冰冻',visible:true,currentDuration:1,intensity:1,relatedRules:['rule-freeze-prevent-move','rule-freeze-prevent-skill']});addRuleById(p.instanceId,'rule-freeze-prevent-move');addRuleById(p.instanceId,'rule-freeze-prevent-skill');addSkillById(p.instanceId,'freeze-prevent');});return{success:true,message:c.name+'使周围敌人冰冻'};}",
+  "icon": "✦",
+  "effectTags": ["控制"],
+  "maxCharges": 0,
+  "powerMultiplier": 1,
+  "targeting": {
+    "steps": []
+  }
+}

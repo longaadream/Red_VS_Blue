@@ -1,7 +1,7 @@
 {
   "id": "watcher-rage",
   "name": "暴怒",
-  "description": "对3格内1名敌人造成等同攻击力的物理伤害，并进入暴怒姿态。暴怒状态下，造成伤害翻倍，受到伤害也翻倍。",
+  "description": "令观者对一名敌人（3）造成1倍伤害并进入暴怒姿态。",
   "keywords": [],
   "targetText": "3格内1名敌人",
   "effectTags": [

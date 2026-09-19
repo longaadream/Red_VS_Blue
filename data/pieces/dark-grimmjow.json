@@ -1,6 +1,6 @@
 {
   "id": "dark-grimmjow",
-  "name": "葛力姆乔·贾卡杰克",
+  "name": "格里姆乔",
   "faction": "evil",
   "description": "以回合外追猎和多段攻击逼迫敌人，并在首次死亡时归刃。",
   "rarity": "legendary",
@@ -18,10 +18,6 @@
     },
     {
       "skillId": "grimmjow-hunting-instinct",
-      "level": 1
-    },
-    {
-      "skillId": "grimmjow-gran-rey-cero",
       "level": 1
     },
     {

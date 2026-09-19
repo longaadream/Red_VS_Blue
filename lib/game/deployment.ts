@@ -131,6 +131,7 @@ export function toPublicBattleState(
       canCancel: target.canCancel,
       ...(owner ? {
         range: target.range,
+        rangeCells: target.rangeCells,
         filter: target.filter,
         steps: target.steps,
         min: target.min,

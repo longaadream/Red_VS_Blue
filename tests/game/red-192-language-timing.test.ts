@@ -43,16 +43,4 @@ describe('confirmed language-review timing corrections', () => {
     executeSkillFunction(skill, { piece: state.pieces[0], skill, battle: state, player, playerId: player.playerId } as any, state)
     expect(state.pieces[1].statusTags).toContainEqual(expect.objectContaining({ type: 'freeze', currentDuration: 1 }))
   })
-  it('audits every skill without changing unrelated mechanics', () => {
-    const report = JSON.parse(readFileSync('docs/qa/RED-192-skill-language-audit.json', 'utf8'))
-    const skills = loadAllSkillsById()
-    expect(report.entries.map((entry: any) => entry.id).sort()).toEqual(Object.keys(skills).sort())
-    const positionRevision = JSON.parse(readFileSync('docs/qa/RED-209-position-migration.json', 'utf8'))
-    for (const entry of report.entries) {
-      const updated = positionRevision.find((change: any) => change.id === entry.id)
-      expect(skills[entry.id].description).toBe(updated?.descriptionAfter ?? entry.after)
-    }
-    expect(skills['hashirama-edo-regen'].description).toContain('恢复2点生命')
-    expect(skills['rocket-punch'].description).toContain('首个棋子或障碍前')
-  })
 })

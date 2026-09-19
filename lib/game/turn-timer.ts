@@ -10,6 +10,10 @@ export function isTurnTimerEnabled(): boolean {
   return configured === '1' || configured === 'true' || configured === 'on'
 }
 
+export function isRoomTurnTimerEnabled(room: { turnTimerEnabled?: boolean }): boolean {
+  return room.turnTimerEnabled ?? isTurnTimerEnabled()
+}
+
 export interface AuthoritativeRuleClock {
   now(): number
 }

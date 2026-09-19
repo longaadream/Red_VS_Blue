@@ -1,0 +1,9 @@
+{
+  "id": "rule-el-primo-injury-counter",
+  "name": "铁甲坦克·受伤计数",
+  "description": "每失去4点生命，飞身肘击所需充能点减少1。",
+  "trigger": {
+    "type": "afterDamageTaken"
+  },
+  "skillCode": "var p=context.rulePiece;if(!p||!context.sourcePiece||context.sourcePiece.instanceId!==p.instanceId||!(context.damage>0))return{success:false,message:''};battle.extensions=battle.extensions||{};battle.extensions.contentCounters=battle.extensions.contentCounters||{};var key=p.ownerPlayerId;var old=Number(battle.extensions.contentCounters[key]||0);var total=old+Number(context.damage||0);var discount=Math.floor(total/4);battle.extensions.contentCounters[key]=total%4;battle.extensions.contentCounters.elPrimoChargeDiscount=battle.extensions.contentCounters.elPrimoChargeDiscount||{};battle.extensions.contentCounters.elPrimoChargeDiscount[key]=Math.min(2,Number(battle.extensions.contentCounters.elPrimoChargeDiscount[key]||0)+discount);return{success:discount>0,message:discount>0?p.name+'受伤计数达到'+discount+'层':''};"
+}

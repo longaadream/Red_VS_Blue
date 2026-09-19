@@ -1,7 +1,7 @@
 {
   "id": "pve-sweep",
   "name": "横扫",
-  "description": "对相邻预告格内的所有敌方目标造成等同攻击力的伤害。",
+  "description": "对相邻预告格内的所有敌方目标造成1倍伤害。",
   "kind": "active",
   "type": "normal",
   "range": "self",

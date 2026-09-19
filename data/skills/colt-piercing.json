@@ -1,0 +1,31 @@
+{
+  "id": "colt-piercing",
+  "name": "穿甲银弹",
+  "description": "选择正方向，破墙，并对6格内所有敌人造成4点伤害。",
+  "keywords": ["破墙"],
+  "targetText": "正方向",
+  "kind": "active",
+  "type": "normal",
+  "actionPointCost": 1,
+  "chargeCost": 0,
+  "cooldownTurns": 4,
+  "maxCharges": 0,
+  "powerMultiplier": 1,
+  "range": "area",
+  "targeting": {
+    "steps": [
+      {
+        "kind": "target",
+        "type": "grid",
+        "filter": "all",
+        "range": 6,
+        "excludeSourceCell": true,
+        "sameRowOrColumn": true,
+        "distanceMetric": "manhattan"
+      }
+    ]
+  },
+  "effectTags": ["伤害", "破墙"],
+  "icon": "🏹",
+  "code": "function executeSkill(context){var c=context.piece,p=selectTarget({type:'grid',range:6,filter:'all'});if(!p||p.needsTargetSelection)return p;var dx=Math.sign(p.x-c.x),dy=Math.sign(p.y-c.y);if((dx===0&&dy===0)||(dx!==0&&dy!==0))return{success:false,message:'请选择施法者以外的方向格'};var cells=[];for(var i=1;i<=6;i++)cells.push({x:c.x+dx*i,y:c.y+dy*i});flow.effects.destroyWalls(cells);var es=battle.pieces.filter(function(x){return x.currentHp>0&&!arePlayersAllied(battle,x.ownerPlayerId,c.ownerPlayerId)&&cells.some(function(q){return q.x===x.x&&q.y===x.y;});});if(es.length)dealDamage(c,es,4,'physical',battle,context.skill.id);return{success:true,message:c.name+'发射穿甲银弹'};}"
+}

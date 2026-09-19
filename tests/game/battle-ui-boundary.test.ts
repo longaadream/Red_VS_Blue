@@ -57,6 +57,15 @@ function fixtureSnapshot() {
 }
 
 describe('battle presentation boundary', () => {
+  it('keeps cast range separate from selectable targets', () => {
+    const viewModel = loadBrowserModule('js/battle-ui/battle-view-model.js', 'BattleViewModel')
+    const model = viewModel.create({
+      snapshot: fixtureSnapshot(), viewerId: 'player-red',
+      legal: { rangeCells: [{ x: 0, y: 0 }, { x: 1, y: 0 }], targetCells: [{ x: 0, y: 0 }] },
+    })
+    expect(model.legal.rangeCells).toEqual([{ x: 0, y: 0 }, { x: 1, y: 0 }])
+    expect(model.legal.targetCells).toEqual([{ x: 0, y: 0 }])
+  })
   it('keeps hand resources on the viewer during the opponent turn and shows depleted points', () => {
     const viewModel = loadBrowserModule('js/battle-ui/battle-view-model.js', 'BattleViewModel')
     const domUi = loadBrowserModule('js/battle-ui/battle-dom-ui.js', 'BattleDomUI')
@@ -602,6 +611,44 @@ describe('battle presentation boundary', () => {
 
     expect(Array.from(targets)).toEqual(['0,0'])
     expect(validateSkillActionByDryRun).toHaveBeenCalledTimes(1)
+  })
+
+  it('keeps cell-targeted probes distinct from piece filters', () => {
+    const legalActions = loadBrowserModule('js/battle-ui/battle-legal-actions.js', 'BattleLegalActions')
+    const snapshot = fixtureSnapshot()
+    const validateSkillActionByDryRun = vi.fn((_state, action) => {
+      if (action.targetX === 1 && action.targetY === 0) return true
+      throw Object.assign(new Error('needs target'), { needsTargetSelection: true, targetIndex: 0 })
+    })
+
+    const targets = legalActions.querySkillTargetCells({
+      snapshot,
+      baseAction: { type: 'useBasicSkill', playerId: 'player-red', pieceId: 'piece-red', skillId: 'test' },
+      targetType: 'cell',
+      filter: 'enemy',
+      engine: { safeCloneBattleState: (state: unknown) => structuredClone(state), validateSkillActionByDryRun },
+    })
+
+    expect(Array.from(targets)).toEqual(['1,0'])
+    expect(validateSkillActionByDryRun).toHaveBeenCalledTimes(snapshot.map.tiles.length)
+  })
+
+  it('does not attach an occupied piece id to a cell target', () => {
+    const legalActions = loadBrowserModule('js/battle-ui/battle-legal-actions.js', 'BattleLegalActions')
+    expect(legalActions.appendTarget(
+      { type: 'useBasicSkill' },
+      { instanceId: 'water-gate' },
+      0,
+      0,
+      'cell',
+    )).toEqual({ type: 'useBasicSkill', targetX: 0, targetY: 0 })
+    expect(legalActions.appendTarget(
+      { type: 'useBasicSkill' },
+      { instanceId: 'water-gate' },
+      0,
+      0,
+      'piece',
+    )).toMatchObject({ targetPieceId: 'water-gate', targetX: 0, targetY: 0 })
   })
 
   it('keeps renderer and DOM responsibilities behind explicit modules', () => {

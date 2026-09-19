@@ -24,7 +24,7 @@ function dependencyPlan(files, base, dependencyRoot) {
   const result = new Map()
   for (const relative of files) {
     const source = path.resolve(base, relative)
-    if (!fs.statSync(source).isFile()) continue
+    if (!fs.existsSync(source) || !fs.statSync(source).isFile()) continue
     const real = fs.realpathSync(source)
     if (!inside(dependencyRoot, real)) continue
     const target = path.relative(dependencyRoot, real)
@@ -52,7 +52,7 @@ async function copyTracedDependencies(projectRoot, standaloneDir, destination) {
     for (const relative of JSON.parse(fs.readFileSync(trace, 'utf8')).files) {
       const file = path.resolve(path.dirname(trace), relative)
       declared.add(path.relative(base, file))
-      if (fs.statSync(file).isFile() && /\.(?:cjs|mjs|js)$/.test(file)) entries.add(file)
+      if (fs.existsSync(file) && fs.statSync(file).isFile() && /\.(?:cjs|mjs|js)$/.test(file)) entries.add(file)
     }
   }
   // Trace again across the real dependency root. Next's project-root trace can

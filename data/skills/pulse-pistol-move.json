@@ -1,7 +1,7 @@
 {
   "id": "pulse-pistol-move",
   "name": "脉冲手枪（移动触发）",
-  "description": "敌人移动或使用技能后，对自身周围5x5内随机敌人造成攻击力的伤害。",
+  "description": "敌人移动或使用技能后，对自身周围5x5内随机敌人造成1倍伤害。",
   "icon": "🔫",
   "kind": "passive",
   "type": "normal",

@@ -1,7 +1,7 @@
 {
   "id": "pve-skirmish-flank",
   "name": "包抄",
-  "description": "一个友方对3格内一个敌人造成1点伤害；目标3格内每有一个其他己方棋子，额外造成等同施放者攻击力的伤害。",
+  "description": "一个友方对3格内一个敌人造成1点伤害；目标3格内每有一个其他己方棋子，额外造成1倍伤害。",
   "type": "active",
   "actionPointCost": 1,
   "availability": {

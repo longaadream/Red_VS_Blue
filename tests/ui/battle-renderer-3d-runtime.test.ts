@@ -67,7 +67,7 @@ type RendererApi = {
     } | null
     tutorialCueCellCount: number
     tutorialCuePathCount: number
-    highlightCounts: { move: number; skill: number; place: number; selected: number; historyPoints: number; historyPaths: number }
+    highlightCounts: { range: number; move: number; skill: number; place: number; selected: number; historyPoints: number; historyPaths: number }
   }
   getPerformanceDiagnostics(): {
     renderCount: number
@@ -141,6 +141,7 @@ type RuntimeModelFixture = {
   legal: {
     moveCells: Array<{ x: number; y: number }>
     targetCells: Array<{ x: number; y: number }>
+    rangeCells?: Array<{ x: number; y: number }>
     placementCells: Array<{ x: number; y: number }>
   }
   selection: { pieceId: string | null; mode?: string }
@@ -544,6 +545,40 @@ describe('RED-68 BattleRenderer3D runtime', () => {
     const terrainTypes = new Set(model.board.tiles.map(tile => tile.props.type || 'floor'))
     expect(terrainBatches.length).toBeLessThanOrEqual(terrainTypes.size)
 
+    harness.renderer.dispose()
+  })
+
+  it('rebuilds changed terrain while preserving the camera and active piece motion', () => {
+    const harness = createHarness(1280, 720, false)
+    const model = runtimeModel()
+    model.board.tiles[0].props.type = 'wall'
+
+    harness.renderer.init({ container: harness.container })
+    harness.renderer.update(model)
+    harness.frame(16)
+    harness.renderer.zoomBy(1.45)
+    harness.frame(16)
+    const cameraPoint = harness.renderer.projectCell(4, 5)
+    const pieceId = model.pieces[0].id
+    const nextModel = structuredClone(model)
+    nextModel.board.tiles[0].props.type = 'floor'
+    nextModel.pieces[0].x += 1
+
+    harness.renderer.animateAction({ type: 'move', pieceId, motionEventKey: 'terrain-wall-removal' }, model, nextModel)
+    harness.renderer.update(nextModel)
+
+    expect(harness.renderer.getPerformanceDiagnostics()).toMatchObject({
+      terrainBatchCount: 1,
+      terrainInstanceCount: nextModel.board.tiles.length,
+    })
+    expect(distance(cameraPoint, harness.renderer.projectCell(4, 5))).toBeLessThan(0.01)
+    expect(harness.renderer.getMotionDiagnostics().activeAnimations).toContain(`piece:${pieceId}:position`)
+
+    const terrainBatches = harness.renderers[0].scene!.children.filter(child => child.isInstancedMesh)
+    const unchangedDisposals = harness.disposeCounts.geometry
+    harness.renderer.update(structuredClone(nextModel))
+    expect(harness.renderers[0].scene!.children.filter(child => child.isInstancedMesh)).toEqual(terrainBatches)
+    expect(harness.disposeCounts.geometry).toBe(unchangedDisposals)
     harness.renderer.dispose()
   })
 
@@ -1212,6 +1247,7 @@ describe('RED-68 BattleRenderer3D runtime', () => {
     const harness = createHarness(844, 390, false)
     const model = runtimeModel()
     model.legal.targetCells = [{ x: 2, y: 2 }, { x: 4, y: 3 }]
+    model.legal.rangeCells = [{ x: 2, y: 2 }, { x: 4, y: 3 }, { x: 3, y: 2 }]
     harness.renderer.init({ container: harness.container })
     harness.renderer.update(model)
     const point = harness.renderer.projectCell(2, 2)
@@ -1222,6 +1258,7 @@ describe('RED-68 BattleRenderer3D runtime', () => {
     canvas.dispatch('pointerup', { pointerId: 52, pointerType: 'mouse', button: 0, clientX: point.clientX, clientY: point.clientY })
 
     expect(harness.renderer.getMotionDiagnostics().highlightCounts.skill).toBe(2)
+    expect(harness.renderer.getMotionDiagnostics().highlightCounts.range).toBe(1)
     for (let index = 0; index < 10; index += 1) harness.frame(16)
     harness.renderer.update(structuredClone(model))
     expect(harness.renderer.getMotionDiagnostics().activeAnimations.filter((key) => (
@@ -1230,10 +1267,12 @@ describe('RED-68 BattleRenderer3D runtime', () => {
 
     const cleared = structuredClone(model)
     cleared.legal.targetCells = []
+    cleared.legal.rangeCells = []
     harness.renderer.update(cleared)
     expect(harness.renderer.getMotionDiagnostics().highlightCounts.skill).toBe(2)
     for (let index = 0; index < 9; index += 1) harness.frame(16)
     expect(harness.renderer.getMotionDiagnostics().highlightCounts.skill).toBe(0)
+    expect(harness.renderer.getMotionDiagnostics().highlightCounts.range).toBe(0)
     harness.renderer.dispose()
   })
 

@@ -42,8 +42,8 @@ describe('Sonic roster mechanics', () => {
 
   it('uses the requested Sonic and Shadow skill descriptions and Super Form costs', () => {
     const expected = {
-      'sonic-spin-dash': '获得动能。向一个正方向5格内的空地或掩体冲刺，可穿过棋子和不可行走地格，终点须为空格。对路径敌方棋子造成等同于本棋子攻击力150%的物理伤害。动能3：冲刺最大距离+2。动能5：使命中的敌方棋子获得沉默，持续1回合。',
-      'shadow-ride-sweep': '获得动能。选择1个正方向上7格内的1个空格并向其冲刺，对路径上敌方棋子造成等同于本棋子攻击力100%的物理伤害。动能5：弹射物。冲刺后选择1个垂直于冲刺方向的方向，对路径上每格往该方向4格范围内的所有敌方棋子造成5点伤害，可穿透棋子。动能7：路径伤害+2。',
+      'sonic-spin-dash': '选择一个地格（5），冲刺至此处并对路径上的敌方单位造成1.5倍伤害。',
+      'shadow-ride-sweep': '获得动能。选择1个正方向上7格内的地格并向其冲刺，对路径上敌方棋子造成1倍伤害。动能5：弹射物。冲刺后选择1个垂直于冲刺方向的方向，对路径上敌方棋子造成5点伤害，可穿透棋子。动能7：所有伤害+2。',
       'sonic-super-form': '你获得2临时行动点。本回合本棋子使用技能不消耗动能，回合结束后保留。',
     }
     for (const [skillId, description] of Object.entries(expected)) {
@@ -90,7 +90,7 @@ describe('Sonic roster mechanics', () => {
       piece: shadow, target, targetPosition: null, targets: [{ info: target, pos: null }], skill: definition, battle: state,
     }, state)
 
-    expect(definition.description).toBe('对4格内1个敌方棋子造成等同于本棋子攻击力50%的物理伤害，并偷取其2点移动力至你的下一个回合开始时。')
+    expect(definition.description).toBe('对4格内1个敌方棋子造成0.5倍物理伤害，并偷取其2点移动力至你的下一个回合开始时。')
     expect(result.success).toBe(true)
     expect(target.currentHp).toBe(15)
     expect(target.moveRange).toBe(3)
@@ -947,3 +947,4 @@ describe('Sonic roster mechanics', () => {
     expect(next.pieces[0].currentHp).toBe(11)
   })
 })
+

@@ -1,7 +1,7 @@
 {
   "id": "arthas-howling-blast",
   "name": "凛冬咆哮",
-  "description": "对4×4范围内所有敌方棋子造成等同于本棋子攻击力75%的法术伤害，并有25%概率冰冻目标1回合。",
+  "description": "对4×4范围内所有敌方棋子造成0.75倍法术伤害，并有25%概率冰冻目标1回合。",
   "keywords": [],
   "targetText": "本棋子周围3×3范围内所有敌方棋子",
   "effectTags": [

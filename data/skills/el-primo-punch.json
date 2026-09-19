@@ -1,0 +1,21 @@
+{
+  "id": "el-primo-punch",
+  "name": "愤怒铁拳",
+  "description": "选择敌人（1），造成4次0.25倍伤害。",
+  "keywords": [],
+  "targetText": "敌人（1）",
+  "kind": "active",
+  "type": "normal",
+  "actionPointCost": 1,
+  "chargeCost": 0,
+  "cooldownTurns": 0,
+  "maxCharges": 0,
+  "powerMultiplier": 1,
+  "range": "area",
+  "targeting": {
+    "steps": [{ "kind": "target", "type": "piece", "filter": "enemy", "range": 1 }]
+  },
+  "effectTags": [],
+  "icon": "🥊",
+  "code": "function executeSkill(context){var c=context.piece,t=selectTarget({type:'piece',range:1,filter:'enemy'});if(!t||t.needsTargetSelection)return t;var total=0;for(var i=0;i<4;i++){var r=dealDamage(c,t,Math.floor(c.attack*.25),'physical',battle,context.skill.id);total+=r.damage||0;}return{success:true,message:c.name+'连续挥拳造成'+total+'点伤害'};}"
+}

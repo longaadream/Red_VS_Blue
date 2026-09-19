@@ -97,7 +97,7 @@ describe('RED-183 versioned deck preset persistence', () => {
 
   it('uses concise tactical roles instead of biography copy', () => {
     const api = loadApi()
-    expect(api.roleFor({ id: 'turalyon', description: 'very long biography' })).toBe('团队支援 / 协同移动')
+    expect(api.roleFor({ id: 'turalyon', description: 'very long biography' })).toBe('辅助 / 机动')
     expect(api.roleFor({ id: 'unknown', description: '控制敌人。后续人物介绍' })).toBe('控制敌人')
   })
 })

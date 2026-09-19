@@ -1,7 +1,7 @@
 {
   "id": "pve-arrow",
   "name": "弓箭射击",
-  "description": "弹射物。沿预告方向，对路径上4格内的第1个敌方目标造成等同攻击力的伤害。",
+  "description": "弹射物。沿预告方向，对路径上4格内的第1个敌方目标造成1倍伤害。",
   "kind": "active",
   "type": "normal",
   "range": "self",

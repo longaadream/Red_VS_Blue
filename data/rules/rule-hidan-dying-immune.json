@@ -1,7 +1,7 @@
 {
   "id": "rule-hidan-dying-immune",
   "name": "濒死免疫",
-  "description": "飞段处于「濒死」状态时，免疫所有伤害",
+  "description": "濒死期间免疫致命伤害。",
   "priority": 100,
   "trigger": {
     "type": "beforeDamageTaken"
