@@ -2240,8 +2240,13 @@ function setupOfficialUpdates(): void {
     console.error('[updates] binary updater initialization failed:', error)
     binaryUpdates = new ClientBinaryUpdates(null, notifyOfficialUpdates)
   }
-  const check = async () => {
+  const check = async (manual = false) => {
     if (officialUpdateApplying || appExitPromise) return officialUpdateStatus()
+    if (!manual && !automaticUpdates) {
+      startupUpdateGate.checked = true
+      notifyOfficialUpdates()
+      return officialUpdateStatus()
+    }
     if (initialLocalStartupPromise) await initialLocalStartupPromise
     await Promise.all([resourceUpdates!.check(), binaryUpdates!.check()])
     startupUpdateGate.checked = true
@@ -2254,7 +2259,7 @@ function setupOfficialUpdates(): void {
     return officialUpdateStatus()
   })
   handleTrusted('official-update-status', ['game'], () => officialUpdateStatus())
-  handleTrusted('official-update-check', ['game'], check)
+  handleTrusted('official-update-check', ['game'], () => check(true))
   handleTrusted('official-update-source', ['game'], (_event, value) => {
     const source = parseUpdateSource(value)
     if (officialUpdateStatus().sourceLocked || appExitPromise) throw new Error('更新正在进行或客户端已下载，请完成当前更新后再切换源')

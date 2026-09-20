@@ -1,5 +1,5 @@
 {
-  "id": "el-primo-iron-tank",
+  "id": "passive-injury-charge-discount",
   "name": "铁甲坦克",
   "description": "每累计受到4点伤害，飞身肘击的充能消耗减少1点，最多减少2点。",
   "keywords": ["充能"],
@@ -8,9 +8,7 @@
   "icon": "🛡️",
   "kind": "passive",
   "type": "normal",
-  "cooldownTurns": 0,
   "maxCharges": 0,
   "powerMultiplier": 1,
-  "actionPointCost": 0,
   "relatedRules": ["rule-el-primo-injury-counter"]
 }

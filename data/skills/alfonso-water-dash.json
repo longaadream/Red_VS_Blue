@@ -1,18 +1,18 @@
 {
   "id": "alfonso-water-dash",
   "name": "惊鸿掠水",
-  "description": "冲刺至正方向最远合法地格（8），对路径上首个敌人造成2倍伤害。",
+  "description": "选择一个正方向持续冲刺，对路径上首个敌人造成2倍伤害，若四格内有未命中过的敌人，随机传送至一名身旁并造成2倍伤害，可重复。",
   "keywords": [
     "位移"
   ],
-  "targetText": "正方向地格（8）",
+  "targetText": "正方向地格",
   "kind": "active",
-  "type": "normal",
+  "type": "super",
   "actionPointCost": 1,
   "chargeCost": 1,
   "cooldownTurns": 1,
   "range": "area",
-  "code": "function executeSkill(context){var c=context.piece;var p=selectTarget({type:'grid',range:8,filter:'all'});if(!p||p.needsTargetSelection)return p;var dx=Math.sign(p.x-c.x),dy=Math.sign(p.y-c.y);var tr=flow.query.tracePath(c,{x:dx,y:dy},{maxDistance:8,excludePieceId:c.instanceId,passEnemies:true});var hit=null;var encounters=tr.encounters||[];for(var i=0;i<encounters.length;i++){if(encounters[i].type!=='piece')continue;var target=flow.query.piece(encounters[i].pieceId);if(target&&target.currentHp>0&&!arePlayersAllied(battle,target.ownerPlayerId,c.ownerPlayerId)){hit=target;break;}}if(hit)dealDamage(c,hit,c.attack*2,'physical',battle,context.skill.id);var land=tr.lastLandableCell;if(land)flow.effects.displace([{pieceId:c.instanceId,x:land.x,y:land.y}],'dash',{passEnemies:true});return{success:true,message:c.name+'向正方向冲刺'};}",
+  "code": "function executeSkill(context){var c=context.piece;var p=selectTarget({type:'grid',range:30,filter:'all'});if(!p||p.needsTargetSelection)return p;var dx=Math.sign(p.x-c.x),dy=Math.sign(p.y-c.y);if((dx!==0&&dy!==0)||(dx===0&&dy===0))return{success:false,message:'请选择正方向'};var tr=flow.query.tracePath(c,{x:dx,y:dy},{excludePieceId:c.instanceId,maxDistance:100});var encounters=tr.encounters||[];var hitIds=[];for(var i=0;i<encounters.length;i++){if(encounters[i].type!=='piece')continue;var t=flow.query.piece(encounters[i].pieceId);if(t&&t.currentHp>0&&!arePlayersAllied(battle,t.ownerPlayerId,c.ownerPlayerId)){dealDamage(c,t,c.attack*2,'physical',battle,context.skill.id);hitIds.push(t.instanceId);}break;}var land=tr.lastLandableCell;if(land)flow.effects.displace([{pieceId:c.instanceId,x:land.x,y:land.y}],'dash');var maxBounces=10,bounces=0;while(bounces<maxBounces){var candidates=battle.pieces.filter(function(piece){return piece.currentHp>0&&!arePlayersAllied(battle,piece.ownerPlayerId,c.ownerPlayerId)&&hitIds.indexOf(piece.instanceId)===-1&&Math.abs(piece.x-c.x)+Math.abs(piece.y-c.y)<=4;});if(!candidates.length)break;var next=candidates[Math.floor(Math.random()*candidates.length)];var dirs=[{x:1,y:0},{x:-1,y:0},{x:0,y:1},{x:0,y:-1}];var adj=dirs.map(function(d){return{x:next.x+d.x,y:next.y+d.y};}).filter(function(cell){var tile=battle.map.tiles.find(function(tt){return tt.x===cell.x&&tt.y===cell.y;});if(!tile||!tile.props||!tile.props.walkable)return false;return!battle.pieces.some(function(pp){return pp.currentHp>0&&pp.instanceId!==c.instanceId&&pp.x===cell.x&&pp.y===cell.y;});});if(!adj.length){hitIds.push(next.instanceId);bounces++;continue;}var dest=adj[Math.floor(Math.random()*adj.length)];flow.effects.displace([{pieceId:c.instanceId,x:dest.x,y:dest.y}],'teleport');dealDamage(c,next,c.attack*2,'physical',battle,context.skill.id);hitIds.push(next.instanceId);bounces++;}return{success:true,message:c.name+'惊鸿掠水，共命中'+hitIds.length+'名敌人'};}",
   "icon": "✦",
   "effectTags": ["位移", "伤害"],
   "maxCharges": 0,
@@ -23,7 +23,7 @@
         "kind": "target",
         "type": "grid",
         "filter": "all",
-        "range": 8,
+        "range": 30,
         "excludeSourceCell": true,
         "sameRowOrColumn": true,
         "distanceMetric": "manhattan"

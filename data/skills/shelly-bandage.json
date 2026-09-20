@@ -8,9 +8,7 @@
   "icon": "🩹",
   "kind": "passive",
   "type": "normal",
-  "cooldownTurns": 0,
   "maxCharges": 0,
   "powerMultiplier": 1,
-  "actionPointCost": 0,
   "code": "function executeSkill() { return { success: true, message: '' }; }"
 }

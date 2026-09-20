@@ -436,7 +436,8 @@
     }
     .resource-orb.action { border-color: rgba(59,130,246,.48); color: #dbeafe; }
     .resource-orb.charge { border-color: rgba(168,85,247,.48); color: #f3e8ff; }
-    .player-state-tags { display: none; }
+    .player-state-tags { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 2px; }
+    .player-state-tags:empty { display: none; }
     .player-state-tags .status-tag {
       font-size: 9px; padding: 2px 5px; border-radius: 999px;
       background: rgba(51,65,85,.58); border: 1px solid rgba(148,163,184,.24);
@@ -1323,12 +1324,16 @@
       width: auto !important;
       max-width: min(560px, calc(100vw - 390px)) !important;
       grid-template-columns: minmax(108px, auto) auto !important;
+      overflow: visible !important;
     }
     #playerResCards {
       width: auto !important;
       display: flex !important;
       grid-template-columns: none !important;
       flex-wrap: nowrap !important;
+    }
+    body #playerResCards.player-state-strip {
+      overflow: visible !important;
     }
     .player-state-chip {
       width: auto;
@@ -1339,6 +1344,7 @@
       gap: 4px !important;
       padding: 3px 5px !important;
       overflow: visible !important;
+      position: relative !important;
       opacity: .84;
     }
     .player-state-chip.active { opacity: 1; }
@@ -1495,6 +1501,28 @@
     .turn-clock.fast { color: #fbbf24; }
     .turn-clock.fast.burning { color: #fb7185; }
     .turn-clock[hidden] { display: none !important; }
+    #turnClockCorner {
+      position: fixed; right: 14px; bottom: 100px; z-index: 82;
+      display: flex; flex-direction: column; align-items: center; gap: 2px;
+      background: #ccb086;
+      border: 1px solid #8d704c; border-radius: 2px;
+      padding: 5px 12px 6px; pointer-events: none;
+      box-shadow: 2px 4px 0 #211b12a0;
+    }
+    #turnClockCorner[hidden] { display: none !important; }
+    #turnClockCorner .clock-label {
+      font-size: 10px; font-weight: 900; letter-spacing: .08em; text-transform: uppercase;
+      color: #68573e;
+    }
+    #turnClockCorner .clock-value {
+      font-size: 22px; font-weight: 950; font-variant-numeric: tabular-nums;
+      color: #342b20; line-height: 1; letter-spacing: .02em;
+    }
+    #turnClockCorner.burning { border-color: #a54332; }
+    #turnClockCorner.burning .clock-value { color: #a54332; }
+    #turnClockCorner.burning .clock-label { color: #a54332; }
+    #turnClockCorner.fast .clock-value { color: #7a5a1a; }
+    #turnClockCorner.fast .clock-label { color: #7a5a1a; }
     @media (max-width: 600px) {
       .turn-summary-secondary.pending-timer-active {
         position: fixed;
@@ -1558,6 +1586,7 @@
   </div>
 
   <div id="statusMsg" role="status" aria-live="polite">选择棋子开始行动</div>
+  <div id="turnClockCorner" hidden aria-label="回合计时" aria-live="off"><span class="clock-label">回合计时</span><span class="clock-value">--:--</span></div>
 
   <aside id="red43QaPanel" aria-live="polite">
     <div class="red43-qa-title">RED-43 · OWNER TARGET QA</div>
