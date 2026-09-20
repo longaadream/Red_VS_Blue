@@ -200,7 +200,7 @@
   },
   "lib/game/turn.ts": {
     "@typescript-eslint/no-explicit-any": {
-      "count": 78
+      "count": 76
     },
     "@typescript-eslint/no-require-imports": {
       "count": 2
