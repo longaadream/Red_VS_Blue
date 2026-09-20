@@ -35,6 +35,8 @@ function populateVfs() {
       vfs.set(`data/${dir}/${id}.json`, JSON.stringify(obj))
     }
   }
+  // trusted-executable-content capability check reads this at runtime
+  vfs.set('config/content-script-publishers.json', '{"schema":"rvb-script-publishers/v1","keyIds":["2e4c9045bf25982b105297bdde208d501010af1009203eab1f7ca77f6e26839e"]}')
 }
 
 populateVfs()
@@ -69,6 +71,14 @@ export function existsSync(p: string): boolean {
     if (k.startsWith(prefix)) return true
   }
   return false
+}
+
+export function lstatSync(p: string): { isFile(): boolean; isDirectory(): boolean; isSymbolicLink(): boolean } {
+  const n = norm(p)
+  const isFile = vfs.has(n)
+  const isDir = !isFile && (() => { const pfx = n.endsWith('/') ? n : n + '/'; for (const k of vfs.keys()) { if (k.startsWith(pfx)) return true } return false })()
+  if (!isFile && !isDir) throw Object.assign(new Error(`ENOENT: '${p}'`), { code: 'ENOENT' })
+  return { isFile: () => isFile, isDirectory: () => isDir, isSymbolicLink: () => false }
 }
 
 export function readdirSync(dirPath: string, options?: { withFileTypes?: boolean }): FakeDirent[] | string[] {
@@ -111,7 +121,7 @@ export function renameSync(_source: string, _destination: string): void {
 }
 
 const fsShim = {
-  existsSync, readdirSync, readFileSync,
+  existsSync, lstatSync, readdirSync, readFileSync,
   mkdirSync, appendFileSync, writeFileSync, rmSync, linkSync, renameSync,
 }
 export default fsShim
