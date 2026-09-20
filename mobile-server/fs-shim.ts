@@ -51,12 +51,14 @@ function dirent(name: string): FakeDirent {
 // ── Normalise a path so it matches vfs keys (starts with 'data/...') ─────────
 
 function norm(p: string): string {
-  // Replace backslashes, collapse double slashes
   let s = p.replace(/\\/g, '/').replace(/\/+/g, '/')
-  // Strip leading './' or '/'
   s = s.replace(/^\.\//, '').replace(/^\/+/, '')
-  // If the path contains '/data/' somewhere in the middle, strip the prefix
-  const idx = s.indexOf('/data/')
+  // Strip any app-root prefix before a known vfs-root segment (/data/ or /config/).
+  // Use lastIndexOf so absolute Android paths like /data/data/<pkg>/files/config/...
+  // resolve correctly even when '/data/' appears earlier in the prefix.
+  const dataIdx = s.lastIndexOf('/data/')
+  const confIdx = s.lastIndexOf('/config/')
+  const idx = Math.max(dataIdx, confIdx)
   if (idx > 0) s = s.substring(idx + 1)
   return s
 }
