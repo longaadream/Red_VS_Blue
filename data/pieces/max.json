@@ -1,0 +1,15 @@
+{
+  "id": "max",
+  "name": "麦克斯",
+  "faction": "good",
+  "rarity": "mythic",
+  "description": "输出 / 辅助 / 机动",
+  "image": "max.jpg",
+  "stats": { "maxHp": 13, "attack": 4, "defense": 0, "moveRange": 5, "speed": 5 },
+  "skills": [
+    { "skillId": "max-speed-shot", "level": 1 },
+    { "skillId": "max-full-speed", "level": 1 },
+    { "skillId": "max-phase-shifter", "level": 1 }
+  ],
+  "isDefault": false
+}

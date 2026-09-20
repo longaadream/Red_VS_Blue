@@ -1,7 +1,7 @@
 {
   "id": "arthas-lich-covenant",
   "name": "巫妖誓约",
-  "description": "选择友军（3），赋予巫妖誓约：死亡后满血复活，攻击力+50%，重置所有技能冷却。",
+  "description": "选择友军（3），使其获得巫妖誓约：所附属单位下次死亡时，在其死亡位置再次召唤该单位并使其额外获得50%攻击力。",
   "keywords": [],
   "targetText": "友军（3）",
   "effectTags": [
@@ -18,7 +18,7 @@
   "actionPointCost": 2,
   "range": "single",
   "code": "function executeSkill(context) { var caster = context.piece; var target = selectTarget({ type: 'piece', range: 3, filter: 'ally' }); if (!target || target.needsTargetSelection) return target; var hasCovenantBuff = target.statusTags && target.statusTags.some(function(t) { return t.type === 'lich-covenant'; }); if (hasCovenantBuff) return { success: false, message: target.name + '已拥有巫妖誓约' }; addStatusEffectById(target.instanceId, { id: 'lich-covenant-' + target.instanceId, name: '巫妖誓约', type: 'lich-covenant', currentDuration: -1, currentUses: -1, intensity: 1, stacks: 1, relatedRules: ['rule-arthas-lich-covenant'] }); addRuleById(target.instanceId, 'rule-arthas-lich-covenant'); return { success: true, message: caster.name + '对' + target.name + '施加了巫妖誓约' }; }",
-  "previewCode": "function calculatePreview() { return { description: \"选择友军（3），赋予巫妖誓约：死亡后满血复活，攻击力+50%，重置所有技能冷却。\", expectedValues: {} }; }",
+  "previewCode": "function calculatePreview() { return { description: \"选择友军（3），使其获得巫妖誓约：所附属单位下次死亡时，在其死亡位置再次召唤该单位并使其额外获得50%攻击力。\", expectedValues: {} }; }",
   "targeting": {
     "steps": [
       {

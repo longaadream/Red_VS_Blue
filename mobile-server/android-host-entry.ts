@@ -62,7 +62,7 @@ async function main() {
   lines.on('line', line => {
     if (line.length > 16384) return
     void (async () => {
-      let request: { id?: string; action?: string; relayUrl?: string; name?: string; visible?: boolean; publishKey?: string } | undefined
+      let request: { id?: string; action?: string; relayUrl?: string; name?: string; visible?: boolean; publishKey?: string; turnTimerEnabled?: boolean } | undefined
       try {
         request = JSON.parse(line) as NonNullable<typeof request>
         let result: unknown = { published: tunnel?.published ?? null }
@@ -75,7 +75,7 @@ async function main() {
           publishing = true; const current = ++generation
           tunnel?.close(); tunnel = undefined
           try {
-            const next = await openHostTunnel({ relayUrl: String(request.relayUrl), localOrigin: 'http://127.0.0.1:2567', name: String(request.name || '').slice(0, 60), visible: request.visible === true, publishKey: String(request.publishKey || ''), onClosed: () => { if (generation === current) tunnel = undefined } })
+            const next = await openHostTunnel({ relayUrl: String(request.relayUrl), localOrigin: 'http://127.0.0.1:2567', name: String(request.name || '').slice(0, 60), visible: request.visible === true, turnTimerEnabled: request.turnTimerEnabled === true, publishKey: String(request.publishKey || ''), onClosed: () => { if (generation === current) tunnel = undefined } })
             if (current !== generation || stopping) { next.close(); throw new Error('发布已取消') }
             tunnel = next; result = { published: next.published }
           } finally { publishing = false }

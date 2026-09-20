@@ -897,3 +897,21 @@ it('finishes a batch of status applications in 250ms', () => {
     queue.dispose()
   } finally { vi.useRealTimers() }
 })
+
+
+it('groups default tile effects into one simultaneous beat', () => {
+  const groups = loadModule().groupEvents([root(1), ...[1, 2, 3].map(i => child(1, i, {
+    kind: 'tileEffectAdded', targetCell: { x: i, y: 0 }, result: { effectId: 'tile-' + i },
+  }))])
+  expect(groups).toHaveLength(2)
+  expect(groups[1].children).toHaveLength(2)
+})
+
+it('groups expanding tile effects by ring even when they share a batch', () => {
+  const groups = loadModule().groupEvents([root(1), ...[0, 1, 1, 2].map((step, i) => child(1, i + 1, {
+    kind: 'tileEffectAdded', batchId: 'area', targetCell: { x: i, y: 0 },
+    result: { effectId: 'tile-' + i, presentation: 'expand', presentationStep: step },
+  }))])
+  expect(groups).toHaveLength(4)
+  expect(groups[2].children).toHaveLength(1)
+})

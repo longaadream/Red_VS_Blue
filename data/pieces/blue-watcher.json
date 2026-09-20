@@ -28,5 +28,16 @@
     "watcher-calm",
     "watcher-rage"
   ],
-  "isDefault": false
+  "isDefault": false,
+  "initialStatusTags": [
+    {
+      "id": "watcher-initial-calm-stance",
+      "type": "calm-stance",
+      "name": "平静姿态",
+      "currentDuration": -1,
+      "currentUses": -1,
+      "intensity": 1,
+      "stacks": 1
+    }
+  ]
 }

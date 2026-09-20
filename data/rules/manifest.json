@@ -97,6 +97,7 @@
   "rule-watcher-shield",
   "rule-momentum-gain",
   "rule-momentum-consume",
+  "rule-max-phase-recast-expire",
   "rule-sonic-free-move",
   "rule-tails-armor-recovery",
   "rule-tails-flight-resolve",
@@ -108,5 +109,9 @@
   "rule-tails-flight-immune-target",
   "rule-soul-fracture-player",
   "rule-pve-overwatch",
-  "rule-grimmjow-destruction-instinct"
+  "rule-grimmjow-destruction-instinct",
+  "rule-shelly-bandage",
+  "rule-mortis-damage-counter",
+  "rule-colt-zone-endturn",
+  "rule-el-primo-injury-counter"
 ]

@@ -27,7 +27,7 @@ import {
   systemDeploymentRuleClock,
   type DeploymentRuleClock,
 } from './deployment'
-import { isTurnTimerEnabled } from './turn-timer'
+import { isRoomTurnTimerEnabled } from './turn-timer'
 import {
   scheduleRoomDeploymentTimeout,
   createPublicBattleSnapshot,
@@ -144,7 +144,7 @@ async function startBattleFromLockedRostersQueued(
     if (
       !initialState.terminalResult
       && initialState.deployment?.mode === 'progressive-reserve-v1'
-      && isTurnTimerEnabled()
+      && isRoomTurnTimerEnabled(room)
     ) {
       const timerStartedAt = clock.now()
       initialState = runBattleAction(initialState, {

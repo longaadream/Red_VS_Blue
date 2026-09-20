@@ -49,14 +49,11 @@ afterEach(() => globalTriggerSystem.clearRules())
 describe('RED-130 data contract', () => {
   it('publishes the approved curse coefficient and Itachi AP cost', () => {
     const curseRule = loadJson<{ description: string }>('rules', 'rule-rafaam-curse-ward.json')
-    const curseSkill = loadSkill('rafaam-curse-ward')
     const amaterasu = loadSkill('itachi-amaterasu')
 
     expect(curseRule.description).toContain('50%')
     expect(curseRule.description).toContain('向下取整')
-    expect(curseSkill.description).toContain('50%')
     // Rounding is a shared dictionary rule; the numerical behavior is tested below.
-    expect(curseSkill.description).toContain('此次伤害加本棋子攻击力的50%')
     expect(amaterasu).toMatchObject({ actionPointCost: 2 })
   })
 

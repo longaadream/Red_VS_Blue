@@ -1,0 +1,20 @@
+{
+  "id": "max-speed-shot",
+  "name": "速射能量炮",
+  "description": "弹射物。选择正方向，对4格内首个敌人造成4次1点伤害。",
+  "keywords": ["弹射物"],
+  "targetText": "正方向",
+  "effectTags": ["伤害"],
+  "icon": "🔫",
+  "kind": "active",
+  "type": "normal",
+  "form": "projectile",
+  "cooldownTurns": 0,
+  "maxCharges": 0,
+  "powerMultiplier": 1,
+  "actionPointCost": 1,
+  "range": "single",
+  "requiresTarget": true,
+  "targeting": { "steps": [{ "kind": "target", "type": "grid", "filter": "all", "range": 4, "sameRowOrColumn": true, "distanceMetric": "manhattan", "excludeSourceCell": true }] },
+  "code": "function executeSkill(context) { var source = context.piece; var pos = selectTarget({ type: 'grid', range: 4, filter: 'all' }); if (!pos || pos.needsTargetSelection) return pos; var dx = pos.x - source.x; var dy = pos.y - source.y; if ((dx !== 0 && dy !== 0) || (dx === 0 && dy === 0)) return { success: false, message: '请选择正方向' }; var direction = { x: dx === 0 ? 0 : (dx > 0 ? 1 : -1), y: dy === 0 ? 0 : (dy > 0 ? 1 : -1) }; var events = traceProjectile({ x: source.x, y: source.y }, direction, { excludePieceId: source.instanceId, maxDistance: 4 }); for (var i = 0; i < events.length; i++) { var event = events[i]; if (event.type === 'piece') { if (arePlayersAllied(battle, event.piece.ownerPlayerId, source.ownerPlayerId)) return { success: true, message: source.name + '的速射能量炮被友方棋子阻挡' }; var hits = 0; var damage = 0; for (var shot = 0; shot < 4 && event.piece.currentHp > 0; shot++) { var result = dealDamage(source, event.piece, 1, 'physical', battle, context.skill.id); damage += Number(result.damage || 0); hits += 1; } return { success: true, message: source.name + '的速射能量炮命中' + event.piece.name + '，进行' + hits + '次射击并造成' + damage + '点伤害' }; } if (event.type === 'terrain' && event.blocksProjectile) return { success: true, message: source.name + '的速射能量炮被地形阻挡' }; } return { success: true, message: source.name + '的速射能量炮未命中敌人' }; }"
+}

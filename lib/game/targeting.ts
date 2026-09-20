@@ -129,6 +129,7 @@ export interface NeedTargetActionPreparation {
   canCancel: boolean
   targetType: 'piece' | 'cell'
   range?: number
+  rangeCells?: Array<{ x: number; y: number }>
   filter: TargetFilter
   diagnostics: TargetQueryDiagnostics
 }
@@ -212,6 +213,7 @@ export interface PendingTargetSelectionSession {
   maxSelections?: number
   selectedTargets?: TargetRef[]
   candidates?: TargetRef[]
+  rangeCells?: Array<{ x: number; y: number }>
   fixedCandidates?: boolean
   resumeOnCancel?: boolean
   rollbackOnCancel?: boolean
@@ -950,6 +952,112 @@ export function validateTargetRef(
   return validateSourceSpecificCell(state, constraint, ref)
 }
 
+interface TargetRangeGeometry {
+  origin: GridPosition
+  range: number
+  minRange: number
+  distanceMetric: 'manhattan' | 'chebyshev'
+}
+
+function finiteTargetRange(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined
+}
+
+function targetRefPosition(state: BattleState, ref: TargetRef | undefined): GridPosition | undefined {
+  if (!ref) return undefined
+  if (ref.type === 'cell') {
+    return Number.isFinite(ref.x) && Number.isFinite(ref.y) ? { x: ref.x, y: ref.y } : undefined
+  }
+  const piece = state.pieces.find(candidate => candidate.instanceId === ref.pieceId && candidate.currentHp > 0)
+  return piece && Number.isFinite(piece.x) && Number.isFinite(piece.y)
+    ? { x: piece.x!, y: piece.y! }
+    : undefined
+}
+
+function targetRangeDistance(from: GridPosition, to: GridPosition, metric: TargetRangeGeometry['distanceMetric']): number {
+  return metric === 'chebyshev'
+    ? Math.max(Math.abs(from.x - to.x), Math.abs(from.y - to.y))
+    : Math.abs(from.x - to.x) + Math.abs(from.y - to.y)
+}
+
+/**
+ * Returns the geometric cells covered by a bounded target constraint. This is
+ * intentionally independent from target legality: walls, occupants, filters,
+ * and target-specific rules belong in `enumerateCandidates`, while this
+ * overlay describes the cast area the client can paint beneath those results.
+ */
+function enumerateRangeCells(
+  state: BattleState,
+  constraint: TargetConstraint,
+): Array<{ x: number; y: number }> | undefined {
+  const sourcePiece = getSourcePiece(state, constraint)
+  const sourceOrigin = sourcePiece && Number.isFinite(sourcePiece.x) && Number.isFinite(sourcePiece.y)
+    ? { x: sourcePiece.x!, y: sourcePiece.y! }
+    : undefined
+  const geometries: TargetRangeGeometry[] = []
+  const primaryRange = finiteTargetRange(constraint.range)
+
+  if (primaryRange !== undefined) {
+    // A finite source-relative range is not meaningful without the actual
+    // positioned source. Do not invent an origin from map bounds or pieces.
+    if (!sourceOrigin) return undefined
+    geometries.push({
+      origin: sourceOrigin,
+      range: primaryRange,
+      minRange: finiteTargetRange(constraint.minRange) ?? 0,
+      distanceMetric: constraint.distanceMetric === 'chebyshev' ? 'chebyshev' : 'manhattan',
+    })
+  }
+
+  const secondary = constraint.distanceFromSelectedTarget
+  const secondaryRange = finiteTargetRange(secondary?.range)
+  if (secondary && secondaryRange !== undefined) {
+    const secondaryOrigin = targetRefPosition(
+      state,
+      constraint.selectedTargets?.[secondary.index],
+    )
+    // The secondary origin is authoritative only when the selected target is
+    // still a positioned piece or an explicit cell reference.
+    if (!secondaryOrigin) return undefined
+    geometries.push({
+      origin: secondaryOrigin,
+      range: secondaryRange,
+      minRange: finiteTargetRange(secondary.minRange) ?? 0,
+      // The validator's secondary-distance rule is Manhattan-only.
+      distanceMetric: 'manhattan',
+    })
+  }
+
+  // A minimum-only constraint is unbounded and therefore has no safe full
+  // overlay. A finite secondary constraint may still provide the bounded
+  // geometry when there is no primary max range.
+  if (geometries.length === 0) return undefined
+
+  const cells: Array<{ x: number; y: number }> = []
+  const seen = new Set<string>()
+  for (const tile of state.map.tiles || []) {
+    if (!Number.isFinite(tile.x) || !Number.isFinite(tile.y)) continue
+    const cell = { x: tile.x, y: tile.y }
+    if (constraint.sameRowOrColumn && sourceOrigin
+      && cell.x !== sourceOrigin.x && cell.y !== sourceOrigin.y) {
+      continue
+    }
+    if (constraint.type === 'cell' && constraint.excludeSourceCell && sourceOrigin
+      && cell.x === sourceOrigin.x && cell.y === sourceOrigin.y) {
+      continue
+    }
+    if (!geometries.every(geometry => {
+      const distance = targetRangeDistance(geometry.origin, cell, geometry.distanceMetric)
+      return distance >= geometry.minRange && distance <= geometry.range
+    })) continue
+    const key = gridPositionKey(cell)
+    if (seen.has(key)) continue
+    seen.add(key)
+    cells.push(cell)
+  }
+  return cells
+}
+
 function enumerateCandidates(
   state: BattleState,
   constraint: TargetConstraint,
@@ -1095,6 +1203,7 @@ export function prepareAction(state: BattleState, draftCommand: BattleAction | a
     const constraint = constraintFor(source, step, stepIndex, selected.slice(0, selectedTargetIndex), draftCommand.selectedOption)
     if (!submittedTarget) {
       const { candidates, diagnostics } = enumerateCandidates(state, constraint)
+      const rangeCells = enumerateRangeCells(state, constraint)
       return {
         kind: 'needTarget',
         protocolVersion: TARGET_SELECTION_PROTOCOL_VERSION,
@@ -1107,6 +1216,7 @@ export function prepareAction(state: BattleState, draftCommand: BattleAction | a
         canCancel: true,
         targetType: step.type,
         range: step.range,
+        ...(rangeCells === undefined ? {} : { rangeCells }),
         filter: step.filter,
         diagnostics,
       }
@@ -1251,8 +1361,10 @@ export function finalizePendingTargetSession(
 ): PendingTargetSelectionSession {
   const sourcePieceId = pendingSourcePieceId(pending)
   const activeStep = pending.steps?.[pending.step || 0]
+  const pendingWithoutRangeCells = { ...pending }
+  delete pendingWithoutRangeCells.rangeCells
   const normalized: PendingTargetSelectionSession = {
-    ...pending,
+    ...pendingWithoutRangeCells,
     ownerPlayerId: pending.ownerPlayerId || pending.playerId,
     source: pending.source || {
       type: pending.triggerContext ? 'rule' : 'pending',
@@ -1278,6 +1390,8 @@ export function finalizePendingTargetSession(
   normalized.candidates = pending.fixedCandidates && Array.isArray(pending.candidates)
     ? pending.candidates.map(candidate => ({ ...candidate }))
     : enumerateCandidates(state, pendingConstraint(normalized)).candidates
+  const rangeCells = enumerateRangeCells(state, pendingConstraint(normalized))
+  if (rangeCells !== undefined) normalized.rangeCells = rangeCells
   return normalized
 }
 

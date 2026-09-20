@@ -2,7 +2,7 @@
   "id": "red-venom",
   "name": "毒液",
   "faction": "evil",
-  "description": "与宿主艾迪·布洛克结合的共生体，以宿主转移和共生拖行重排敌方站位，并用腐蚀将其定身。",
+  "description": "与宿主艾迪·布洛克结合的共生体，以宿主转移和共生拖行重排敌方站位。",
   "rarity": "rare",
   "image": "venom.jpg",
   "stats": {
@@ -12,10 +12,6 @@
     "moveRange": 4
   },
   "skills": [
-    {
-      "skillId": "venom-corrosion",
-      "level": 1
-    },
     {
       "skillId": "venom-host-transfer",
       "level": 1

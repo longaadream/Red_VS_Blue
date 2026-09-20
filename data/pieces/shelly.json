@@ -1,0 +1,23 @@
+{
+  "id": "shelly",
+  "name": "雪莉",
+  "faction": "good",
+  "rarity": "epic",
+  "description": "输出 / 机动",
+  "image": "shelly.jpg",
+  "stats": {
+    "maxHp": 14,
+    "attack": 4,
+    "defense": 0,
+    "moveRange": 4,
+    "speed": 4
+  },
+  "skills": [
+    { "skillId": "shelly-bandage", "level": 1 },
+    { "skillId": "shelly-shotgun", "level": 1 },
+    { "skillId": "shelly-super-shell", "level": 1 },
+    { "skillId": "shelly-dash", "level": 1 }
+  ],
+  "rules": ["rule-shelly-bandage"],
+  "isDefault": false
+}

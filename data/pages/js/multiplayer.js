@@ -96,7 +96,7 @@
     if (!(window.RvBHost || window.electronAPI) || !(window.RvBHost || window.electronAPI).relayControl) throw new Error('发布主机需要支持开房的安卓或 Windows 客户端')
     var ready = await (window.RvBHost || window.electronAPI).ensureLocalAuthority()
     if (!ready.ok) throw new Error(ready.error)
-    var result = await (window.RvBHost || window.electronAPI).relayControl({ action: 'publish', relayUrl: rootUrl(), name: byId('hostName').value.trim(), visible: byId('visible').checked, publishKey: byId('serverKind').value === 'custom' ? byId('publishKey').value : '' })
+    var result = await (window.RvBHost || window.electronAPI).relayControl({ action: 'publish', relayUrl: rootUrl(), name: byId('hostName').value.trim(), visible: byId('visible').checked, turnTimerEnabled: byId('turnTimerEnabled').checked, publishKey: byId('serverKind').value === 'custom' ? byId('publishKey').value : '' })
     if (!result.ok) throw new Error(result.error)
     byId('publishKey').value = ''
     showPublication(result.published)

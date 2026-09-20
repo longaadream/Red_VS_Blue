@@ -1,0 +1,33 @@
+{
+  "id": "colt",
+  "name": "柯尔特",
+  "faction": "good",
+  "image": "colt.jpg",
+  "stats": {
+    "maxHp": 9,
+    "attack": 6,
+    "defense": 0,
+    "moveRange": 3,
+    "speed": 3
+  },
+  "skills": [
+    {
+      "skillId": "colt-revolver",
+      "level": 1
+    },
+    {
+      "skillId": "colt-bullet-storm",
+      "level": 1
+    },
+    {
+      "skillId": "colt-piercing",
+      "level": 1
+    }
+  ],
+  "rarity": "epic",
+  "description": "远程射手：用射击区域封锁直线，并以穿甲银弹破墙。",
+  "isDefault": false,
+  "rules": [
+    "rule-colt-zone-endturn"
+  ]
+}

@@ -1,7 +1,7 @@
 {
   "id": "hashirama-edo-thousand-hands",
   "name": "木遁·真数千手",
-  "description": "选择任意1名敌人，造成等同于柱间当前攻击力的物理伤害。",
+  "description": "选择任意1名敌人，造成1倍物理伤害。",
   "keywords": [],
   "targetText": "任意1名敌人",
   "effectTags": [
@@ -10,9 +10,18 @@
   "type": "active",
   "actionPointCost": 2,
   "targeting": {
-    "source": { "templateId": "hashirama-edo", "boundInstanceField": "boundPieceInstanceId" },
+    "source": {
+      "templateId": "hashirama-edo",
+      "boundInstanceField": "boundPieceInstanceId"
+    },
     "steps": [
-      { "kind": "target", "type": "piece", "filter": "enemy", "range": 99, "distanceMetric": "manhattan" }
+      {
+        "kind": "target",
+        "type": "piece",
+        "filter": "enemy",
+        "range": 99,
+        "distanceMetric": "manhattan"
+      }
     ]
   },
   "cardType": "wood",

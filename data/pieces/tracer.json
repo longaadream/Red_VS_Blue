@@ -3,6 +3,7 @@
   "name": "猎空",
   "faction": "good",
   "rarity": "epic",
+  "description": "未来世界的时间骑兵，以实验性时光加速装置武装自身。能在战场上高速闪现，并在危急时刻回溯至数秒前的位置与血量。",
   "stats": {
     "maxHp": 7,
     "attack": 3,

@@ -4,29 +4,33 @@
   const STORAGE_KEY = 'rvb_piece_deck_presets'
   const SCHEMA_VERSION = 1
   const PIECE_ROLES = Object.freeze({
-    ana: '远程治疗 / 控制', anduin: '群体治疗 / 保护', 'blue-ichigo': '近战爆发 / 追击',
-    'blue-kenshin': '机动刺客 / 终结', 'blue-minato': '传送突进 / 标记', 'blue-naruto': '近程爆发 / 分身',
-    'blue-tirion-fordring': '前排战士 / 真实伤害', 'blue-watcher': '姿态战士 / 应变',
-    'hashirama-edo': '范围控制 / 支援', jaina: '范围法师 / 控制', liadrin: '圣光成长 / 群体恢复',
-    tracer: '机动射手 / 骚扰', turalyon: '团队支援 / 协同移动', tyrande: '远程支援 / 圣光强化',
-    sonic: '高速突进 / 收割', tails: '机动支援 / 位移救援', uther: '前排保护 / 增益', velen: '延迟治疗 / 预判',
-    arthas: '前排控制 / 复生', 'dark-aizen': '幻术控制 / 压制', 'dark-grimmjow': '追猎战士 / 多段攻击',
-    'dark-ulquiorra': '持续作战 / 再生', guldan: '远程法师 / 灵魂资源', kiljaedan: '后期法师 / 斩杀',
-    reaper: '近战刺客 / 自我恢复', 'red-blackwidow': '远程狙击 / 持续伤害',
-    'red-doomsday-fist': '突进战士 / 范围攻击', 'red-hidan': '反伤战士 / 诅咒',
-    'red-illidan': '机动战士 / 持续输出', 'red-itachi': '技能控制 / 地格压制',
-    'red-obito': '位移控制 / 阵型重塑', 'red-rafaam': '诅咒法师 / 时间控制',
-    'red-sasuke': '成长输出 / 地格压制', 'red-shishio': '近战爆发 / 自损',
-    'red-venom': '位移控制 / 定身', shadow: '爆发刺客 / 时空操控'
+    ana: '治疗 / 控制', anduin: '治疗 / 辅助', 'blue-ichigo': '输出 / 机动',
+    'blue-kenshin': '输出 / 机动', 'blue-minato': '机动 / 控制', 'blue-naruto': '输出 / 辅助',
+    'blue-tirion-fordring': '输出 / 辅助', 'blue-watcher': '输出 / 控制',
+    'hashirama-edo': '控制 / 辅助', jaina: '输出 / 控制', liadrin: '治疗 / 辅助',
+    tracer: '输出 / 机动', turalyon: '辅助 / 机动', tyrande: '辅助 / 治疗',
+    sonic: '输出 / 机动', tails: '辅助 / 机动', uther: '辅助 / 治疗', velen: '治疗 / 辅助',
+    arthas: '输出 / 控制', 'dark-aizen': '控制 / 输出', 'dark-grimmjow': '输出 / 机动',
+    'dark-ulquiorra': '输出 / 治疗', guldan: '输出 / 辅助', kiljaedan: '输出 / 控制',
+    reaper: '输出 / 机动', 'red-blackwidow': '输出 / 控制',
+    'red-doomsday-fist': '输出 / 机动', 'red-hidan': '输出 / 辅助',
+    'red-illidan': '输出 / 机动', 'red-itachi': '控制 / 输出',
+    'red-obito': '控制 / 机动', 'red-rafaam': '控制 / 辅助',
+    'red-sasuke': '输出 / 控制', 'red-shishio': '输出 / 辅助',
+    'red-venom': '控制 / 机动', shadow: '输出 / 机动',
+    shelly: '输出 / 控制', max: '输出 / 辅助',
+    'el-primo': '输出 / 辅助', colt: '输出 / 控制',
+    edgar: '输出 / 机动', mortis: '输出 / 机动',
+    alfonso: '输出 / 控制'
   })
   const RECOMMENDED_PRESETS = Object.freeze([
     Object.freeze({
-      id: 'recommended-good-steady', name: '光方 · 稳健入门', alignment: 'good',
-      pieceIds: Object.freeze(['turalyon', 'uther', 'anduin', 'ana', 'jaina', 'blue-tirion-fordring', 'velen', 'blue-naruto']),
-      style: '保护核心，稳步换血',
-      opening: '鸣人作为先遣先占安全位置，再用前排接应；治疗与法师留在后方维持阵线。',
-      pairing: '图拉扬、乌瑟尔负责保护；安度因、安娜和维伦维持队伍；吉安娜与鸣人完成输出。',
-      replacement: '想提高机动性，可用索尼克或猎空替换一名治疗或前排。'
+      id: 'recommended-good-steady', name: '光方 · 1.0.10 新手均衡', alignment: 'good',
+      pieceIds: Object.freeze(['uther', 'anduin', 'blue-tirion-fordring', 'jaina', 'ana', 'shelly', 'el-primo', 'max']),
+      style: '前排稳住，远程输出，机动收尾',
+      opening: '先用乌瑟尔和艾尔·普里莫站住前线，安度因保持治疗距离；雪莉和吉安娜从侧后方制造压力。',
+      pairing: '乌瑟尔和艾尔·普里莫负责前线；安度因和安娜负责治疗与辅助；雪莉、提里奥和吉安娜负责输出与控制；麦克斯负责机动支援。',
+      replacement: '想提高机动收割，可用猎空替换提里奥；想提高远程压制，可用柯尔特替换提里奥。'
     }),
     Object.freeze({
       id: 'recommended-good-mobile', name: '光方 · 机动突击', alignment: 'good',
@@ -38,11 +42,11 @@
     }),
     Object.freeze({
       id: 'recommended-evil-pressure', name: '暗方 · 压制入门', alignment: 'evil',
-      pieceIds: Object.freeze(['arthas', 'guldan', 'kiljaedan', 'red-rafaam', 'red-blackwidow', 'red-doomsday-fist', 'red-illidan', 'red-venom']),
-      style: '正面压制，持续消耗',
-      opening: '用前排封住主要通路，远程角色从安全位置持续制造压力。',
-      pairing: '阿尔萨斯、末日铁拳和伊利丹顶住前线；古尔丹、基尔加丹、拉法姆与黑百合提供远程压制。',
-      replacement: '需要更强追击时，可用夏特、葛力姆乔或死神替换一名远程棋子。'
+      pieceIds: Object.freeze(['arthas', 'reaper', 'red-blackwidow', 'red-doomsday-fist', 'red-illidan', 'red-venom', 'edgar', 'guldan']),
+      style: '控制入口，输出追击，机动收割',
+      opening: '阿尔萨斯和末日铁拳先控制入口，黑百合和古尔丹从后方输出；伊利丹、毒液和艾德加等待缺口再突进。',
+      pairing: '阿尔萨斯与毒液提供控制，死神、伊利丹和艾德加负责机动输出，黑百合、古尔丹和末日铁拳补足持续火力。',
+      replacement: '想增加持续作战，可用乌尔奇奥拉替换艾德加；想增加范围控制，可用拉法姆替换古尔丹。'
     }),
     Object.freeze({
       id: 'recommended-evil-hunt', name: '暗方 · 高速追猎', alignment: 'evil',

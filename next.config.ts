@@ -3,14 +3,26 @@ import path from 'path'
 
 const nextConfig: NextConfig = {
   output: 'standalone',
-  // Opt-in for local acceptance builds on memory-constrained developer PCs.
-  ...(process.env.RVB_BUILD_LOW_MEMORY === '1' ? {
-    experimental: { cpus: 1, webpackMemoryOptimizations: true },
-  } : {}),
-  // 钉死 trace root 为项目根，避免 Next.js 把上一级目录认成 monorepo 根
-  // 导致 .next/standalone/v0-game-menu-design/... 这种嵌套（参考 package.json
-  // build 末尾的 cp '.next/static' '.next/standalone/.next/static'：那段假设无嵌套）
-  outputFileTracingRoot: path.resolve(__dirname),
+  // Widen filesystem root to cover the node_modules junction target (points to ../red181/node_modules in worktree)
+  turbopack: {
+    root: path.resolve(__dirname, '..'),
+  },
+  // Resource-pack imports are streamed through the local Next server. Keep
+  // its proxy limit aligned with PROFILE_ARCHIVE_LIMITS_V1 (32 MiB), otherwise
+  // larger valid .rvbpack files are truncated before ADM-ZIP can read them.
+  experimental: {
+    proxyClientMaxBodySize: '32mb',
+    ...(process.env.RVB_BUILD_LOW_MEMORY === '1' ? {
+      cpus: 1,
+      webpackMemoryOptimizations: true,
+    } : {}),
+  },
+  // Must match turbopack.root — Next.js enforces equality. stage-client-resources.js handles nested standalone output.
+  outputFileTracingRoot: path.resolve(__dirname, '..'),
+  // Exclude staging/build output dirs so their stale files don't appear in .nft.json traces.
+  outputFileTracingExcludes: {
+    '**': ['release-018-build/_client-stage/**', 'release-018-build/_client-node/**', 'release-018-build/_client-colyseus/**'],
+  },
   typescript: {
     ignoreBuildErrors: true,
   },

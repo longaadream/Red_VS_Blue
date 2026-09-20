@@ -14,11 +14,12 @@
     return snapshot && snapshot.map && Array.isArray(snapshot.map.tiles) ? snapshot.map.tiles : []
   }
 
-  function targetCandidateCells(snapshot, targetType, filter) {
+  function targetCandidateCells(snapshot, targetType) {
     const type = String(targetType || '').toLowerCase()
-    const targetFilter = String(filter || '').toLowerCase()
+    // A cell-targeted skill may intentionally choose an empty or occupied
+    // cell.  Only an explicit piece target should collapse the probe set to
+    // occupied cells; filters are interpreted by the authoritative validator.
     const pieceOnly = ['piece', 'character', 'self'].includes(type)
-      || ['ally', 'allies', 'friendly', 'enemy', 'enemies'].includes(targetFilter)
     if (!pieceOnly) return candidateCells(snapshot)
     const occupied = new Set((snapshot.pieces || []).filter(function (piece) {
       return piece.currentHp > 0 && piece.x != null && piece.y != null
@@ -34,21 +35,22 @@
     }) || null
   }
 
-  function appendTarget(action, piece, x, y) {
+  function appendTarget(action, piece, x, y, targetType) {
     const next = Object.assign({}, action)
     delete next.clientActionId
     delete next.requestId
     delete next.validTargets
+    const pieceTarget = ['piece', 'character', 'self'].includes(String(targetType || '').toLowerCase())
     const hasPrimary = !!(next.targetPieceId || next.targetX !== undefined || next.targetY !== undefined)
     if (!hasPrimary) {
-      if (piece) next.targetPieceId = piece.instanceId
+      if (piece && pieceTarget) next.targetPieceId = piece.instanceId
       next.targetX = x
       next.targetY = y
       return next
     }
     const extraTargets = Array.isArray(next.extraTargets) ? next.extraTargets.slice() : []
     const extra = { x: x, y: y }
-    if (piece) extra.pieceId = piece.instanceId
+    if (piece && pieceTarget) extra.pieceId = piece.instanceId
     extraTargets.push(extra)
     next.extraTargets = extraTargets
     return next
@@ -195,7 +197,7 @@
     const result = new Set()
     targetCandidateCells(input.snapshot, input.targetType, input.filter).forEach(function (tile) {
       const piece = livePieceAt(input.snapshot, tile.x, tile.y)
-      const action = appendTarget(input.baseAction, piece, tile.x, tile.y)
+      const action = appendTarget(input.baseAction, piece, tile.x, tile.y, input.targetType)
       if (targetCandidateAccepted(input.engine, input.snapshot, action, true, input.targetIndex)) {
         result.add(cellKey(tile.x, tile.y))
       }
@@ -209,7 +211,7 @@
     const result = new Set()
     targetCandidateCells(input.snapshot, input.targetType, input.filter).forEach(function (tile) {
       const piece = livePieceAt(input.snapshot, tile.x, tile.y)
-      const action = appendTarget(input.baseAction, piece, tile.x, tile.y)
+      const action = appendTarget(input.baseAction, piece, tile.x, tile.y, input.targetType)
       if (targetCandidateAccepted(input.engine, input.snapshot, action, false, input.targetIndex)) {
         result.add(cellKey(tile.x, tile.y))
       }
@@ -225,7 +227,7 @@
     targetCandidateCells(input.snapshot, pending.targetType, pending.filter).forEach(function (tile) {
       const piece = livePieceAt(input.snapshot, tile.x, tile.y)
       const action = { type: 'pendingTargetSelect', playerId: input.playerId, targetX: tile.x, targetY: tile.y }
-      if (piece) action.targetPieceId = piece.instanceId
+      if (piece && ['piece', 'character', 'self'].includes(String(pending.targetType || '').toLowerCase())) action.targetPieceId = piece.instanceId
       if (actionAccepted(input.engine, input.snapshot, action, false)) result.add(cellKey(tile.x, tile.y))
     })
     return result

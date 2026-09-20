@@ -107,9 +107,9 @@ export function getEffectiveChargeCost(
   return Math.max(0, cost)
 }
 
-function checkSynchronousTriggers(battle: BattleState, context: import('./triggers').TriggerContext): TriggerResult {
+function checkSynchronousTriggers(battle: BattleState, context: import('./triggers').TriggerContext, options: { allowInteractive?: boolean } = {}): TriggerResult {
   const result = getActiveTriggerSystem().checkTriggers(battle, context)
-  if (result.needsOptionSelection || result.needsTargetSelection) {
+  if (!options.allowInteractive && (result.needsOptionSelection || result.needsTargetSelection)) {
     const kind = result.needsOptionSelection ? 'option' : 'target'
     const error = new Error(`[${String(context?.type || 'unknown')}] interactive ${kind} trigger is unsupported at this call site`) as Error & { code?: string }
     error.name = 'InteractiveTriggerUnsupportedError'
@@ -2098,6 +2098,8 @@ export interface SkillDefinition extends ModeScopedContent {
   requiresTarget?: boolean
   /** 行动点消耗 */
   actionPointCost: number
+  /** 同回合再次释放时的额外行动点消耗，仅用于明确展示内容规则。 */
+  recastActionPointCost?: number
   /** 技能图标 */
   icon?: string
   /** Pure, machine-readable option/target declaration (RED-59). */
@@ -5719,7 +5721,31 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
               sourcePiece,
               skillId: skillDef.id,
               reservedCells: context.reservedCells,
-            });
+            }, { allowInteractive: true });
+
+            // afterSkillUsed 可以继续请求交互（例如狩猎本能选择落点），
+            // 透传给行动层，避免被同步触发器包装器吞掉。
+            if (skillUsedResult.needsOptionSelection || skillUsedResult.needsTargetSelection) {
+              return {
+                ...result,
+                success: false,
+                needsOptionSelection: skillUsedResult.needsOptionSelection,
+                needsTargetSelection: skillUsedResult.needsTargetSelection,
+                options: skillUsedResult.options,
+                title: skillUsedResult.title,
+                playerId: skillUsedResult.playerId,
+                targetType: skillUsedResult.targetType,
+                range: skillUsedResult.range,
+                filter: skillUsedResult.filter,
+                targetCandidates: skillUsedResult.targetCandidates,
+                minSelections: skillUsedResult.minSelections,
+                maxSelections: skillUsedResult.maxSelections,
+                pendingRuleId: skillUsedResult.pendingRuleId,
+                pendingRuleSourceId: skillUsedResult.pendingRuleSourceId,
+                pendingQueue: skillUsedResult.pendingQueue,
+                message: skillUsedResult.messages.join("；") || result.message,
+              } as SkillExecutionResult;
+            }
 
             // 处理触发效果的消息
             if (skillUsedResult.success && skillUsedResult.messages.length > 0) {

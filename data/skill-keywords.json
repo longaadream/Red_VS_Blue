@@ -80,6 +80,14 @@
     "highlight": false
   },
   {
+    "id": "wall-break",
+    "name": "破墙",
+    "category": "mechanic",
+    "shortDescription": "破坏墙和掩体。",
+    "longDescription": "破墙会将指定范围内的墙和掩体变为普通地格。",
+    "highlight": false
+  },
+  {
     "id": "charge",
     "name": "充能",
     "category": "resource",
@@ -165,6 +173,30 @@
     "category": "control",
     "shortDescription": "无法主动走格或使用技能。",
     "longDescription": "打坐期间无法主动走格或使用技能。准备进度、推进时机和结束奖励由对应技能说明。",
+    "highlight": true
+  },
+  {
+    "id": "immune",
+    "name": "免疫",
+    "category": "defense",
+    "shortDescription": "免疫指定效果。",
+    "longDescription": "免疫期间不会受到指定效果影响。",
+    "highlight": true
+  },
+  {
+    "id": "swift",
+    "name": "迅捷",
+    "category": "movement",
+    "shortDescription": "本回合下一次普通移动不消耗行动点。",
+    "longDescription": "本回合内，附属目标下一次普通移动不消耗行动点，可叠加。",
+    "highlight": true
+  },
+  {
+    "id": "inoperable-sleep",
+    "name": "休眠",
+    "category": "control",
+    "shortDescription": "不能移动或使用技能。",
+    "longDescription": "休眠期间不能移动或使用技能，持续时间和解除条件由技能说明决定。",
     "highlight": true
   }
 ]

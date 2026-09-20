@@ -15,6 +15,8 @@
 import { applyBattleAction } from '../lib/game/turn'
 import { createInitialBattleForPlayers } from '../lib/game/battle-setup'
 import { hashBattleState, type BattleActionTrace } from '../lib/game/battle-runner'
+import { recordBattlePresentation } from '../lib/game/battle-presentation-recording'
+import { projectBattlePresentationEvents, projectBattlePresentationEventsForViewer } from '../lib/game/battle-presentation-events'
 import { stampPendingDeploymentAuthorityVersion } from '../lib/game/battle-trace'
 import { createRootSeed } from '../lib/game/rule-runtime'
 import { loadAllSkillsById, loadRuleById } from '../lib/game/skills'
@@ -116,6 +118,7 @@ interface Room {
   createdAt: number
   version: number
   visibility: 'public' | 'private'
+  turnTimerEnabled?: boolean
   inviteCode?: string
   gameRecord?: GameRecord
 }
@@ -240,6 +243,7 @@ function handleGetRooms(): string {
     hostId: r.hostId,
     createdAt: r.createdAt,
     visibility: r.visibility,
+    turnTimerEnabled: r.turnTimerEnabled,
     inviteCode: r.inviteCode,
   }))
   return ok({ rooms: roomList })
@@ -265,6 +269,7 @@ function handleCreateRoom(body: Record<string, unknown>): string {
     createdAt: Date.now(),
     version: 0,
     visibility: ((body.visibility as string) || 'public') as 'public' | 'private',
+    turnTimerEnabled: body.turnTimerEnabled !== false,
   }
   rooms.set(roomId, room)
   return ok(room as unknown as Record<string, unknown>, 201)
@@ -796,9 +801,23 @@ async function handleTraining(method: string, body: Record<string, unknown>): Pr
     const state = (battleState || _trainingState) as unknown
     try {
       rehydrateBattleRules(state as BattleState)
-      const newState = applyBattleAction(state as BattleState, action as Parameters<typeof applyBattleAction>[1])
+      const beforeState = state as BattleState
+      const newState = recordBattlePresentation(
+        beforeState,
+        () => applyBattleAction(beforeState, action as Parameters<typeof applyBattleAction>[1]),
+        r => r,
+      )
       _trainingState = newState as unknown as Record<string, unknown>
-      return ok(_trainingState)
+      const events = projectBattlePresentationEventsForViewer(
+        projectBattlePresentationEvents({
+          actionId: `training-${Date.now()}`,
+          command: action as Parameters<typeof applyBattleAction>[1],
+          beforeState,
+          afterState: newState,
+        }),
+        undefined,
+      )
+      return ok({ state: _trainingState, events })
     } catch (e: unknown) {
       const err2 = e as Record<string, unknown>
       if (err2.needsTargetSelection) {

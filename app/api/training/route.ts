@@ -6,6 +6,8 @@ import { loadJsonFilesServer } from "@/lib/game/file-loader"
 import { reloadSkills } from "@/lib/game/skill-repository"
 import { loadRuleById } from "@/lib/game/skills"
 import { runBattleAction } from "@/lib/game/battle-runner"
+import { recordBattlePresentation } from "@/lib/game/battle-presentation-recording"
+import { projectBattlePresentationEvents, projectBattlePresentationEventsForViewer } from "@/lib/game/battle-presentation-events"
 import { createDebugDuel } from "@/lib/game/debug-battle"
 import { normalizePlayerAlignment } from "@/lib/game/room-model"
 import { isPlayerSeat } from "@/lib/game/match-identity"
@@ -134,23 +136,32 @@ export async function PUT(req: NextRequest) {
     // 重新加载技能文件（开发模式热重载）
     reloadSkills()
 
-    console.log('[PUT] Before applyBattleAction, pieces:', battleState.pieces.map(p => `${p.templateId}(${p.instanceId})`))
-    // 使用原版的 applyBattleAction 处理战斗逻辑
-    const newState = runBattleAction(battleState, action).state
-    console.log('[PUT] After applyBattleAction, pieces count:', newState.pieces.length)
-    console.log('[PUT] After applyBattleAction, pieces:', newState.pieces.map(p => `${p.templateId}(${p.instanceId})`))
-    console.log('[PUT] Graveyard:', newState.graveyard?.map(p => `${p.templateId}(${p.instanceId})`))
-    
+    const result = recordBattlePresentation(
+      battleState,
+      () => runBattleAction(battleState, action),
+      r => r.state,
+    )
+    const newState = result.state
+
     // 临时修复：去除重复的棋子
-    const uniquePieces = newState.pieces.filter((piece, index, self) => 
+    const uniquePieces = newState.pieces.filter((piece, index, self) =>
       index === self.findIndex((p) => p.instanceId === piece.instanceId)
     )
     if (uniquePieces.length !== newState.pieces.length) {
-      console.log('[PUT] Found duplicate pieces, deduplicating...')
       newState.pieces = uniquePieces
     }
-    
-    return NextResponse.json(newState)
+
+    const events = projectBattlePresentationEventsForViewer(
+      projectBattlePresentationEvents({
+        actionId: `training-${Date.now()}`,
+        command: action,
+        beforeState: battleState,
+        afterState: newState,
+      }),
+      undefined,
+    )
+
+    return NextResponse.json({ state: newState, events })
   } catch (error) {
     console.error("Error executing battle action:", error)
 

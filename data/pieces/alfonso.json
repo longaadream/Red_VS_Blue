@@ -1,0 +1,30 @@
+{
+  "id": "alfonso",
+  "name": "阿方",
+  "faction": "good",
+  "image": "alfonso.jpg",
+  "stats": {
+    "maxHp": 14,
+    "attack": 6,
+    "defense": 0,
+    "moveRange": 3,
+    "speed": 3
+  },
+  "skills": [
+    {
+      "skillId": "alfonso-kick",
+      "level": 1
+    },
+    {
+      "skillId": "alfonso-water-dash",
+      "level": 1
+    },
+    {
+      "skillId": "alfonso-freeze",
+      "level": 1
+    }
+  ],
+  "rarity": "epic",
+  "description": "输出 / 机动 / 控制",
+  "isDefault": false
+}

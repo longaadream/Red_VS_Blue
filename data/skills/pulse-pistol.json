@@ -1,7 +1,7 @@
 {
   "id": "pulse-pistol",
   "name": "脉冲手枪",
-  "description": "敌人移动或使用技能后，对自身周围5x5内随机敌人造成攻击力的伤害。",
+  "description": "敌人移动或使用技能后，对自身周围5×5范围内随机1名敌人造成1倍物理伤害。",
   "keywords": [],
   "targetText": "自身周围5x5内随机敌人",
   "effectTags": [

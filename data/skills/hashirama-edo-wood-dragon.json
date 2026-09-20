@@ -1,7 +1,7 @@
 {
   "id": "hashirama-edo-wood-dragon",
   "name": "木遁·木龙之术",
-  "description": "选择敌人（6），造成攻击力的伤害。永久夺取其受伤前50%攻击力与防御力，以及其施放前已损生命的50%作为生命上限。回复自身等于夺取生命上限的点数。",
+  "description": "选择敌人（6），造成1倍伤害。永久夺取其受伤前50%攻击力与防御力，以及其施放前已损生命的50%作为生命上限。回复自身等于夺取生命上限的点数。",
   "keywords": [],
   "targetText": "敌人（6）",
   "effectTags": [
@@ -18,5 +18,5 @@
   "powerMultiplier": 1,
   "actionPointCost": 3,
   "code": "function executeSkill(context) { var caster = context.piece; var target = selectTarget({ type: 'piece', range: 6, filter: 'enemy' }); if (!target || target.needsTargetSelection) return target; var stolenAtk = Math.floor(target.attack * 0.5); var stolenDef = Math.floor((target.defense || 0) * 0.5); var lostHp = Math.max(0, target.maxHp - target.currentHp); var stolenMaxHp = Math.floor(lostHp * 0.5); dealDamage(caster, target, Math.floor(caster.attack * 1.0), 'physical', battle, 'hashirama-edo-wood-dragon'); target.attack = Math.max(1, target.attack - stolenAtk); target.defense = Math.max(0, (target.defense || 0) - stolenDef); caster.attack += stolenAtk; caster.defense = (caster.defense || 0) + stolenDef; if (stolenMaxHp > 0) { target.maxHp = Math.max(target.currentHp, target.maxHp - stolenMaxHp); caster.maxHp += stolenMaxHp; healDamage(caster, caster, stolenMaxHp, battle, 'hashirama-edo-wood-dragon'); } var msg = caster.name + ' 使用木遁·木龙之术，从 ' + target.name + ' 汲取力量，夺取' + stolenAtk + ' 攻击、' + stolenDef + ' 防御、' + stolenMaxHp + ' 生命上限并恢复' + stolenMaxHp + ' 生命'; return { success: true, message: msg }; }",
-  "previewCode": "function calculatePreview(piece, skillDef) { return { description: \"选择敌人（6），造成攻击力的伤害。永久夺取其受伤前50%攻击力与防御力，以及其施放前已损生命的50%作为生命上限。回复自身等于夺取生命上限的点数。\", expectedValues: { damage: piece.attack } }; }"
+  "previewCode": "function calculatePreview(piece, skillDef) { return { description: \"选择敌人（6），造成1倍伤害。永久夺取其受伤前50%攻击力与防御力，以及其施放前已损生命的50%作为生命上限。回复自身等于夺取生命上限的点数。\", expectedValues: { damage: piece.attack } }; }"
 }

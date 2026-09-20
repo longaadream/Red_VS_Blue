@@ -1,0 +1,7 @@
+{
+  "id": "rule-shelly-bandage",
+  "name": "止血绷带",
+  "description": "当雪莉的血量降至6及以下时恢复4点生命，每局限一次。",
+  "trigger": { "type": "afterDamageTaken" },
+  "skillCode": "var piece = context.rulePiece; if (!piece || !context.piece || context.piece.instanceId !== piece.instanceId || !(context.damage > 0) || piece.currentHp <= 0 || piece.currentHp > 6) return { success: false, message: '' }; if ((piece.spentPassives || []).indexOf('shelly-bandage') !== -1) return { success: false, message: '' }; piece.spentPassives = (piece.spentPassives || []).concat(['shelly-bandage']); var before = piece.currentHp; piece.currentHp = Math.min(piece.maxHp, piece.currentHp + 4); addStatusEffectById(piece.instanceId, { id: 'shelly-bandage-used-' + piece.instanceId, type: 'shelly-bandage-used', name: '止血绷带已触发', stacks: 1, currentDuration: -1, currentUses: -1 }); return { success: true, message: piece.name + '触发止血绷带，恢复' + (piece.currentHp - before) + '点生命' };"
+}

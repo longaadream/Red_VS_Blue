@@ -1,0 +1,14 @@
+{
+  "id": "mortis-night-construct",
+  "name": "暗夜造物",
+  "description": "每累计造成3次伤害，解锁1次【蝙蝠增援】。",
+  "keywords": [],
+  "targetText": "被动",
+  "effectTags": ["被动"],
+  "icon": "🦇",
+  "kind": "passive",
+  "type": "normal",
+  "maxCharges": 0,
+  "powerMultiplier": 1,
+  "targeting": { "steps": [] }
+}

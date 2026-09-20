@@ -38,16 +38,18 @@ function minatoWatcherState(phase: 'start' | 'action' = 'action'): BattleState {
   })
 }
 
-function endMinatoSelection(): BattleState {
+function endMinatoSelection(canCancel: boolean): BattleState {
   const pending = applyBattleAction(minatoWatcherState(), {
     type: 'endTurn',
     playerId: 'player-red',
   })
+  expect(pending.pendingTargetSelection?.canCancel).toBe(true)
+  if (!canCancel) pending.pendingTargetSelection!.canCancel = false
   expect(pending.turn.phase).toBe('action')
   expect(pending.pendingTargetSelection).toMatchObject({
     playerId: 'player-red',
     source: { type: 'rule', id: 'rule-minato-anchor-end-turn', pieceId: 'minato' },
-    canCancel: false,
+    canCancel,
   })
   expect(pending.pendingTargetSelection?.transaction?.currentInteraction).toMatchObject({
     eventType: 'endTurn',
@@ -132,7 +134,7 @@ describe('RED-97 authoritative pending interaction lifecycle', () => {
   })
 
   it('resolves the mandatory Minato anchor before committing end-turn settlement once', () => {
-    const targetPending = endMinatoSelection()
+    const targetPending = endMinatoSelection(false)
     const completed = applyBattleAction(targetPending, pendingTargetAction(targetPending))
 
     expect(completed.turn.phase).toBe('end')
@@ -142,7 +144,7 @@ describe('RED-97 authoritative pending interaction lifecycle', () => {
   })
 
   it('forbids cancelling mandatory Minato and keeps the Watcher begin-turn choice non-cancellable', () => {
-    const targetPending = endMinatoSelection()
+    const targetPending = endMinatoSelection(false)
     const pending = targetPending.pendingTargetSelection!
     const before = JSON.stringify(targetPending)
     expect(() => applyBattleAction(targetPending, {
@@ -170,8 +172,25 @@ describe('RED-97 authoritative pending interaction lifecycle', () => {
     expect(completed.extensions?.minatoAnchors || []).toEqual([])
   })
 
+  it('allows cancelling the optional Minato anchor and advances without creating one', () => {
+    const pending = endMinatoSelection(true)
+    const selection = pending.pendingTargetSelection!
+
+    const cancelled = applyBattleAction(pending, {
+      type: 'cancelPendingSelection',
+      playerId: 'player-red',
+      selectionId: selection.selectionId,
+      stateRevision: selection.stateRevision,
+    })
+
+    expect(cancelled.pendingTargetSelection).toBeUndefined()
+    expect(cancelled.pendingOptionSelection).toBeUndefined()
+    expect(cancelled.extensions?.minatoAnchors || []).toEqual([])
+    expect(cancelled.turn).toMatchObject({ currentPlayerId: 'player-red', phase: 'end' })
+  })
+
   it('keeps Minato pending unchanged after stale or invalid submissions and accepts a legal retry', () => {
-    const targetPending = endMinatoSelection()
+    const targetPending = endMinatoSelection(false)
     const before = JSON.stringify(targetPending)
 
     expect(() => applyBattleAction(targetPending, pendingTargetAction(targetPending, {
@@ -1500,7 +1519,7 @@ describe('RED-108 authoritative pending timeout resolution', () => {
   })
 
   it('resolves the mandatory Minato end-turn target instead of cancelling it on timeout', () => {
-    const resolved = timeoutPending(endMinatoSelection(), 108)
+    const resolved = timeoutPending(endMinatoSelection(false), 108)
 
     expect(resolved.pendingTargetSelection).toBeUndefined()
     expect(resolved.pendingOptionSelection).toBeUndefined()
@@ -1513,8 +1532,8 @@ describe('RED-108 authoritative pending timeout resolution', () => {
   })
 
   it('selects the same legal anchor for the same seed when the target cannot be cancelled', () => {
-    const firstPending = endMinatoSelection()
-    const secondPending = endMinatoSelection()
+    const firstPending = endMinatoSelection(false)
+    const secondPending = endMinatoSelection(false)
     expect(firstPending.pendingTargetSelection?.canCancel).toBe(false)
     expect(secondPending.pendingTargetSelection?.canCancel).toBe(false)
 
@@ -1532,7 +1551,7 @@ describe('RED-108 authoritative pending timeout resolution', () => {
   })
 
   it('fails explicitly when a mandatory target has no authoritative candidate', () => {
-    const pending = endMinatoSelection()
+    const pending = endMinatoSelection(false)
     pending.map.tiles = []
     pending.pendingTargetSelection!.candidates = []
     pending.turnTimer = createRunningTurnTimer(pending, 0)
@@ -1547,7 +1566,7 @@ describe('RED-108 authoritative pending timeout resolution', () => {
   })
 
   it('logs context and safely skips an impossible mandatory pending in production', () => {
-    const pending = endMinatoSelection()
+    const pending = endMinatoSelection(false)
     pending.map.tiles = []
     pending.pendingTargetSelection!.candidates = []
 

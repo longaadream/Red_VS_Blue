@@ -2,7 +2,7 @@
   "id": "rule-hidan-undying",
   "priority": -101,
   "name": "不死神体",
-  "description": "受到致命伤害时，HP强制保留1点并进入「濒死」状态；濒死状态持续1回合，结束后才真正死亡（一战仅触发一次）",
+  "description": "每局1次：受到致命伤害时保留1点生命，并进入濒死[2]。期间免疫致命伤害，结束时死亡。",
   "trigger": {
     "type": "beforeDamageApplied"
   },

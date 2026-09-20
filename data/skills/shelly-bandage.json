@@ -1,0 +1,14 @@
+{
+  "id": "shelly-bandage",
+  "name": "止血绷带",
+  "description": "生命降至6点及以下时，回复4。每局限一次。",
+  "keywords": ["治疗"],
+  "targetText": "被动",
+  "effectTags": ["治疗"],
+  "icon": "🩹",
+  "kind": "passive",
+  "type": "normal",
+  "maxCharges": 0,
+  "powerMultiplier": 1,
+  "code": "function executeSkill() { return { success: true, message: '' }; }"
+}

@@ -16,7 +16,6 @@
   "actionPointCost": 0,
   "code": "function executeSkill(context) { return { success: true }; }",
   "keywords": [
-    "圣盾",
-    "充能"
+    "圣盾"
   ]
 }

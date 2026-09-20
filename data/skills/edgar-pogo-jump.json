@@ -1,0 +1,30 @@
+{
+  "id": "edgar-pogo-jump",
+  "name": "撑“杆”跳跃",
+  "description": "传送至地格（5），对相邻地格内所有敌人造成3点伤害，然后移速+1。",
+  "keywords": ["传送"],
+  "targetText": "地格（5）",
+  "effectTags": ["位移", "伤害", "强化"],
+  "icon": "🪄",
+  "kind": "active",
+  "type": "super",
+  "cooldownTurns": 3,
+  "maxCharges": 1,
+  "chargeCost": 1,
+  "powerMultiplier": 1,
+  "actionPointCost": 0,
+  "targeting": {
+    "steps": [
+      {
+        "kind": "target",
+        "type": "grid",
+        "filter": "all",
+        "range": 5,
+        "requireWalkable": true,
+        "requireUnoccupied": true
+      }
+    ]
+  },
+  "code": "function executeSkill(context) { var source = context.piece; var targetPosition = selectTarget({ type: 'grid', range: 5, filter: 'all' }); if (!targetPosition || targetPosition.needsTargetSelection) return targetPosition; var tile = battle.map.tiles.find(function(item) { return item.x === targetPosition.x && item.y === targetPosition.y; }); if (!tile || !tile.props || !tile.props.walkable) return { success: false, message: '目标地格不可行走' }; var occupied = battle.pieces.some(function(piece) { return piece.currentHp > 0 && piece.instanceId !== source.instanceId && piece.x === targetPosition.x && piece.y === targetPosition.y; }); if (occupied) return { success: false, message: '目标地格已有棋子' }; if (!flow.effects.displace([{ pieceId: source.instanceId, x: targetPosition.x, y: targetPosition.y }], 'teleport').success) return { success: true, message: '位移被阻挡，本次位移效果取消' }; var enemies = battle.pieces.filter(function(piece) { return piece.currentHp > 0 && !arePlayersAllied(battle, piece.ownerPlayerId, source.ownerPlayerId) && Math.abs(piece.x - source.x) <= 1 && Math.abs(piece.y - source.y) <= 1; }); if (enemies.length) dealDamage(source, enemies, 3, 'physical', battle, context.skill.id); source.moveRange = (source.moveRange || 0) + 1; return { success: true, message: source.name + '跳跃至(' + targetPosition.x + ',' + targetPosition.y + ')并对周围敌人造成3点伤害，移速+1' }; }",
+  "previewCode": "function calculatePreview() { return { description: '传送至地格（5），对相邻地格内所有敌人造成3点伤害，然后移速+1。', expectedValues: { damage: 3, area: '3×3', moveRange: 1 } }; }"
+}

@@ -63,6 +63,19 @@
           ? '当前对局未提供回合计时'
           : '回合剩余 ' + Math.floor(model.turn.remainingSeconds) + ' 秒')
       }
+      const cornerClock = byId('turnClockCorner')
+      if (cornerClock) {
+        const hasTime = model.turn.remainingSeconds != null && model.turn.remainingSeconds !== ''
+        cornerClock.hidden = !hasTime
+        if (hasTime) {
+          const clockVal = cornerClock.querySelector('.clock-value')
+          ;(clockVal || cornerClock).textContent = formatTimer(model.turn.remainingSeconds)
+          const burning = !!(model.turn.burning)
+          const fast = !!(model.turn.fast)
+          cornerClock.classList.toggle('burning', burning)
+          cornerClock.classList.toggle('fast', fast)
+        }
+      }
 
       const viewer = model.viewer || model.players.find(function (player) { return player.isCurrent }) || model.players[0]
       const apDisplay = byId('resApDisplay')

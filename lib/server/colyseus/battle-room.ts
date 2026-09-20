@@ -78,6 +78,7 @@ export interface BattleRoomCreateOptions {
   name?: string
   mapId?: string
   visibility?: 'public' | 'private'
+  turnTimerEnabled?: boolean
 }
 
 export interface BattleRoomJoinOptions {
@@ -211,6 +212,7 @@ export function createBattleRoomClass(dependencies: BattleRoomDependencies) {
             players: [],
             mapId,
             visibility: options.visibility === 'private' ? 'private' : 'public',
+            turnTimerEnabled: typeof options.turnTimerEnabled === 'boolean' ? options.turnTimerEnabled : undefined,
             inviteCode: options.visibility === 'private' ? randomBytes(6).toString('hex').toUpperCase() : undefined,
             spectatingEnabled: true,
             spectators: [],

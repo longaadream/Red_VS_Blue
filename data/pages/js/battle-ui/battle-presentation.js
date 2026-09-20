@@ -40,6 +40,7 @@
     const skillPlayback = root.BattleSkillPresentation ? root.BattleSkillPresentation.createPlayback() : null
     let skillRecovering = false
     let recoveryBaselinePending = false
+    let settlingSelection = false
 
     function playbackPhase(phase, group) {
       if (phase === 'settle' && impact) impact.stop()
@@ -144,7 +145,7 @@
       if (mounted && !historicalRoot && currentModel && !updating) {
         if (renderer.settlePresentation) renderer.settlePresentation(currentModel)
         else renderer.update(currentModel)
-        if (typeof input.onPlaybackIdle === 'function') input.onPlaybackIdle()
+        if (!settlingSelection && typeof input.onPlaybackIdle === 'function') input.onPlaybackIdle()
       }
     }
 
@@ -328,12 +329,15 @@
       try {
         if (vignetteUi && vignetteUi.update) vignetteUi.update(model)
       } finally { updating = false; updatePlaybackBase = null }
+      const response = model.interaction && model.interaction.pendingResponse
+      const selecting = !!((response && response.isForViewer) || (model.selection && model.selection.mode === 'target'))
+      if (selecting) settleForSelection()
       const playing = vignetteUi && vignetteUi.sequencesBoard && vignetteUi.getDiagnostics().activeRootId
       if (!playing) playbackModel = null
       if (!historicalRoot) renderer.update(playbackModel || model)
       if (historyUi && historyUi.update) historyUi.update(model)
       if (skillPlayback && !skillRecovering) skillPlayback.consume(model).forEach(function (cue) {
-        if (historicalRoot) return
+        if (historicalRoot || selecting) return
         if (cue.kind === 'float' && renderer.spawnFloater) renderer.spawnFloater(cue.x,cue.y,cue.text,'#e9d5ff',false,{kind:'skill'})
         if (cue.kind === 'flash' && renderer.showPresentationAreaFlash) renderer.showPresentationAreaFlash([{x:cue.x,y:cue.y}],{transient:true})
         if (cue.kind === 'sound' && skillAudio) skillAudio.play(cue.sound || 'notice')
@@ -343,6 +347,22 @@
     function animateAction(action, previousModel, nextModel) {
       pendingBefore = previousModel && Object.assign(boardCopy(previousModel), { viewer: { id: previousModel.viewer && previousModel.viewer.id } })
       if (mounted && !historicalRoot && renderer.animateAction && (!(vignetteUi && vignetteUi.sequencesBoard) || action.type === 'ui-reject')) renderer.animateAction(action, previousModel, nextModel)
+    }
+
+    function settleForSelection() {
+      if (!mounted || settlingSelection) return
+      settlingSelection = true
+      try {
+        if (vignetteUi && vignetteUi.settleAll) vignetteUi.settleAll()
+        if (impact) impact.stop()
+        playbackModel = null
+        playbackRoot = null
+        if (historicalRoot) setHistoricalBoard(null)
+        if (currentModel) {
+          if (renderer.settlePresentation) renderer.settlePresentation(currentModel)
+          else renderer.update(currentModel)
+        }
+      } finally { settlingSelection = false }
     }
 
     function spawnFloater(x, y, text, color, big, options) {
@@ -384,6 +404,7 @@
       mount: mount,
       update: update,
       animateAction: animateAction,
+      settleForSelection: settleForSelection,
       spawnFloater: spawnFloater,
       dispatch: dispatch,
       resize: resize,

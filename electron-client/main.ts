@@ -2240,8 +2240,13 @@ function setupOfficialUpdates(): void {
     console.error('[updates] binary updater initialization failed:', error)
     binaryUpdates = new ClientBinaryUpdates(null, notifyOfficialUpdates)
   }
-  const check = async () => {
+  const check = async (manual = false) => {
     if (officialUpdateApplying || appExitPromise) return officialUpdateStatus()
+    if (!manual && !automaticUpdates) {
+      startupUpdateGate.checked = true
+      notifyOfficialUpdates()
+      return officialUpdateStatus()
+    }
     if (initialLocalStartupPromise) await initialLocalStartupPromise
     await Promise.all([resourceUpdates!.check(), binaryUpdates!.check()])
     startupUpdateGate.checked = true
@@ -2254,7 +2259,7 @@ function setupOfficialUpdates(): void {
     return officialUpdateStatus()
   })
   handleTrusted('official-update-status', ['game'], () => officialUpdateStatus())
-  handleTrusted('official-update-check', ['game'], check)
+  handleTrusted('official-update-check', ['game'], () => check(true))
   handleTrusted('official-update-source', ['game'], (_event, value) => {
     const source = parseUpdateSource(value)
     if (officialUpdateStatus().sourceLocked || appExitPromise) throw new Error('更新正在进行或客户端已下载，请完成当前更新后再切换源')
@@ -2464,7 +2469,7 @@ handleTrusted('open-local-game', ['connect'], async () => {
   }
 })
 
-handleTrusted('relay-control', ['game'], async (_event, options: { action?: string; relayUrl?: string; name?: string; visible?: boolean; publishKey?: string }) => {
+handleTrusted('relay-control', ['game'], async (_event, options: { action?: string; relayUrl?: string; name?: string; visible?: boolean; turnTimerEnabled?: boolean; publishKey?: string }) => {
   if (!options || !['status', 'publish', 'stop'].includes(options.action || '')) return { ok: false, error: '无效操作' }
   if (!gameServerProcess?.connected || !localGameReady) return { ok: false, error: '请先启动本机服务' }
   const proc = gameServerProcess
@@ -2479,7 +2484,7 @@ handleTrusted('relay-control', ['game'], async (_event, options: { action?: stri
     proc.on('message', onMessage); proc.once('exit', onExit)
     proc.send({ type: 'rvb:relay:control', requestId, action: options.action,
       relayUrl: String(options.relayUrl || '').slice(0, 1024), name: String(options.name || '').slice(0, 60),
-      visible: options.visible === true, publishKey: String(options.publishKey || '').slice(0, 512),
+      visible: options.visible === true, turnTimerEnabled: options.turnTimerEnabled === true, publishKey: String(options.publishKey || '').slice(0, 512),
     }, error => { if (error) finish({ ok: false, error: '主机连接已关闭' }) })
   })
 })

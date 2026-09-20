@@ -1,0 +1,31 @@
+{
+  "id": "colt-bullet-storm",
+  "name": "子弹风暴",
+  "description": "选择正方向，生成随自身移动的6格射击区域[3]。每回合结束时，破墙并对区域内所有敌人造成1倍伤害。与【左轮手枪】互斥。",
+  "keywords": ["破墙"],
+  "targetText": "正方向",
+  "kind": "active",
+  "type": "super",
+  "actionPointCost": 2,
+  "chargeCost": 2,
+  "cooldownTurns": 4,
+  "maxCharges": 0,
+  "powerMultiplier": 1,
+  "range": "area",
+  "targeting": {
+    "steps": [
+      {
+        "kind": "target",
+        "type": "grid",
+        "filter": "all",
+        "range": 6,
+        "excludeSourceCell": true,
+        "sameRowOrColumn": true,
+        "distanceMetric": "manhattan"
+      }
+    ]
+  },
+  "effectTags": ["伤害", "破墙"],
+  "icon": "🌪",
+  "code": "function executeSkill(context){var c=context.piece,p=selectTarget({type:'grid',range:6,filter:'all'});if(!p||p.needsTargetSelection)return p;var dx=Math.sign(p.x-c.x),dy=Math.sign(p.y-c.y);if((dx===0&&dy===0)||(dx!==0&&dy!==0))return{success:false,message:'请选择施法者以外的方向格'};if(!battle.extensions)battle.extensions={};if(!battle.extensions.coltZones)battle.extensions.coltZones={};battle.extensions.coltZones[c.instanceId]={sourceId:c.instanceId,kind:'storm',dx:dx,dy:dy,turns:3};var zoneId='colt-zone-'+c.instanceId;removeStatusEffectById(c.instanceId,zoneId);addStatusEffectById(c.instanceId,{id:zoneId,type:'colt-zone',name:'子弹风暴区域',description:'随施法者位置移动；与左轮手枪互斥。',currentDuration:-1,currentUses:-1,stacks:3,intensity:3});return{success:true,message:c.name+'布置子弹风暴区域（随自身移动，持续3回合）'};}"
+}

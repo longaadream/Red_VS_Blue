@@ -55,6 +55,7 @@ import { assertActionPlayer } from './targeting'
 import {
   getCurrentInputOwnerPlayerId,
   isAcceptedGameplayAction,
+  isRoomTurnTimerEnabled,
   isTurnTimerEnabled,
   projectPendingTimer,
   projectTurnTimer,
@@ -368,10 +369,10 @@ export function createPublicBattleSnapshot(
     serverNow,
     durableAuthorityVersion: room.battleAuthorityDurableVersion,
     persistenceStatus: room.battleAuthorityPersistenceStatus,
-    turnTimer: state.terminalResult || !isTurnTimerEnabled()
+    turnTimer: state.terminalResult || !isRoomTurnTimerEnabled(room)
       ? undefined
       : projectTurnTimer((storage.state as BattleState).turnTimer, serverNow),
-    pendingTimer: state.terminalResult || !isTurnTimerEnabled()
+    pendingTimer: state.terminalResult || !isRoomTurnTimerEnabled(room)
       ? undefined
       : projectPendingTimer((storage.state as BattleState).turnTimer, serverNow),
   }
@@ -618,7 +619,7 @@ export async function dispatchRoomBattleAction(
         }
       }
 
-      const timerEnabled = isTurnTimerEnabled()
+      const timerEnabled = isRoomTurnTimerEnabled(room)
       const continuesPendingInteraction =
         (action.type === 'pendingOptionSelect' && !!state.pendingOptionSelection)
         || (action.type === 'pendingTargetSelect' && !!state.pendingTargetSelection)
@@ -1035,10 +1036,9 @@ export async function scheduleRoomBattleTimeout(
 ): Promise<void> {
   const normalizedRoomId = roomId.trim().toLowerCase()
   clearRoomBattleTimeout(normalizedRoomId)
-  if (!isTurnTimerEnabled()) return
-
   const room = await store.getRoom(normalizedRoomId)
   if (!room) return
+  if (!isRoomTurnTimerEnabled(room)) return
   const storage = getBattleStorage(room)
   const state = storage?.state as BattleState | undefined
   if (!state || state.terminalResult) return

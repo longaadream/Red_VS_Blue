@@ -1,0 +1,7 @@
+{
+  "id": "rule-mortis-damage-counter",
+  "name": "暗夜造物·伤害计数",
+  "description": "莫提斯每造成3次伤害，解锁一次蝙蝠增援。",
+  "trigger": { "type": "afterDamageDealt" },
+  "skillCode": "var piece = context.rulePiece; if (!piece || !context.sourcePiece || context.sourcePiece.instanceId !== piece.instanceId || !(context.damage > 0) || !context.targetPiece || context.targetPiece.instanceId === piece.instanceId) return { success: false, message: '' }; piece.statusTags = piece.statusTags || []; var counter = piece.statusTags.find(function(tag) { return tag.type === 'mortis-damage-counter'; }); if (!counter) { counter = { id: 'mortis-damage-counter-' + piece.instanceId, type: 'mortis-damage-counter', name: '暗夜造物', visible: true, stacks: 0, intensity: 0, hitCount: 0, readyCharges: 0, currentDuration: -1, currentUses: -1 }; piece.statusTags.push(counter); } counter.hitCount = Number(counter.hitCount || 0) + 1; var unlocked = 0; while (counter.hitCount >= 3) { counter.hitCount -= 3; counter.readyCharges = Number(counter.readyCharges || counter.intensity || 0) + 1; unlocked += 1; } counter.stacks = counter.hitCount; counter.intensity = Number(counter.readyCharges || 0); if (unlocked > 0) addSkillById(piece.instanceId, 'mortis-bat-support'); return { success: unlocked > 0, message: unlocked > 0 ? piece.name + '解锁蝙蝠增援' + (unlocked > 1 ? '×' + unlocked : '') : '' };"
+}

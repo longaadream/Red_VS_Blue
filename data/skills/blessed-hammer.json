@@ -1,7 +1,7 @@
 {
   "id": "blessed-hammer",
   "name": "祝福之锤",
-  "description": "选择敌人（2），造成攻击力的伤害。",
+  "description": "选择敌人（2），造成1倍伤害。",
   "keywords": [],
   "targetText": "敌人（2）",
   "effectTags": [
@@ -15,6 +15,6 @@
   "powerMultiplier": 1,
   "actionPointCost": 1,
   "code": "function executeSkill(context) { const sourcePiece = context.piece; const targetEnemy = selectTarget({ type: 'piece', range: 2, filter: 'enemy' }); if (!targetEnemy || targetEnemy.needsTargetSelection) { return targetEnemy; } const damage = sourcePiece.attack; const damageResult = dealDamage(sourcePiece, targetEnemy, damage, 'physical', context.battle, context.skill.id); return { message: sourcePiece.name + '的祝福之锤对' + targetEnemy.name + '造成' + damageResult.damage + '点物理伤害', success: true }; }",
-  "previewCode": "function calculatePreview(piece, skillDef) { const damage = piece.attack; return { description: \"选择敌人（2），造成攻击力的伤害。\", expectedValues: { damage: damage } }; }",
+  "previewCode": "function calculatePreview(piece, skillDef) { const damage = piece.attack; return { description: \"选择敌人（2），造成1倍伤害。\", expectedValues: { damage: damage } }; }",
   "range": "single"
 }

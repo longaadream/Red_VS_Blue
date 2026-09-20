@@ -87,9 +87,10 @@ describe('RED-77 freeze authority without an attack event', () => {
     const state = makeFrozenActionState()
     const triggerSpy = vi.spyOn(globalTriggerSystem, 'checkTriggers')
 
-    const next = applyBattleAction(state, {
+    expect(() => applyBattleAction(state, {
       type: actionType, playerId: 'player-red', pieceId: 'frozen-piece', skillId,
-    }) as any
+    })).toThrow(/无法使用技能|冰冻状态阻止技能释放|无法行动/)
+    const next = state as any
     const eventTypes = triggerSpy.mock.calls.map(([, context]) => context.type)
     const frozenSkill = next.pieces
       .find((piece: any) => piece.instanceId === 'frozen-piece')
@@ -100,9 +101,7 @@ describe('RED-77 freeze authority without an attack event', () => {
     expect(next.pieces.find((piece: any) => piece.instanceId === 'target-piece').currentHp).toBe(20)
     expect(next.extensions.executed).toBeUndefined()
     expect(next.actions.filter((action: any) => action.type === actionType)).toEqual([])
-    expect(next.actions).toEqual(expect.arrayContaining([
-      expect.objectContaining({ type: 'triggerEffect', payload: expect.objectContaining({ message: expect.stringContaining('无法使用技能') }) }),
-    ]))
+    expect(next.actions).toEqual([])
     expect(eventTypes).toEqual(['beforeSkillUse'])
     expect(eventTypes).not.toContain('beforeAttack')
     expect(eventTypes).not.toContain('afterSkillUsed')

@@ -1,7 +1,7 @@
 {
   "id": "sonic-free-move-passive",
   "name": "音速",
-  "description": "你的回合开始时获得1次免费普通移动。",
+  "description": "你的回合开始时，获得1次本回合可用的免费移动。",
   "kind": "passive",
   "type": "passive",
   "icon": "💨",
@@ -10,5 +10,6 @@
   ],
   "relatedRules": [
     "rule-sonic-free-move"
-  ]
+  ],
+  "keywords": []
 }

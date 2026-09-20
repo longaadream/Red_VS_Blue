@@ -2,9 +2,7 @@
   "id": "elune-protection",
   "name": "艾露恩的守护",
   "description": "召唤时若全队尚无艾露恩守护则获得1次。友军将受致命伤害时消耗守护，免疫该次伤害，并回复该友军5点。全队共享，自身死亡后仍有效。",
-  "keywords": [
-    "召唤"
-  ],
+  "keywords": [],
   "targetText": "己方全队",
   "effectTags": [
     "免伤",

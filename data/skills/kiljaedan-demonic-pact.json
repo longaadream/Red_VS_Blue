@@ -2,9 +2,7 @@
   "id": "kiljaedan-demonic-pact",
   "name": "恶魔仪式",
   "description": "游戏开始时进入虚空，获得【恶魔召唤(1)】。依次打出5张召唤牌后，在指定地格召唤自身。",
-  "keywords": [
-    "召唤"
-  ],
+  "keywords": [],
   "targetText": "被动",
   "effectTags": [
     "passive",

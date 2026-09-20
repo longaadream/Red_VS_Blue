@@ -1,7 +1,7 @@
 {
   "id": "pve-tracking-slash",
   "name": "追魂斩",
-  "description": "每逢偶数战斗轮，锁定4格内1个敌方目标。敌方行动时对其造成等同攻击力的伤害，无视距离与阻挡。",
+  "description": "每逢偶数战斗轮，锁定4格内1个敌方目标。敌方行动时对其造成1倍伤害，无视距离与阻挡。",
   "kind": "active",
   "type": "normal",
   "range": "self",

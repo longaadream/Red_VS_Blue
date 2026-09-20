@@ -453,11 +453,11 @@ describe('versioned headless AI environment', () => {
       consumerId: 'rule-minato-anchor-end-turn',
       eventType: 'endTurn',
     })
-    expect(enteredPending.state.pendingTargetSelection?.canCancel).toBe(false)
+    expect(enteredPending.state.pendingTargetSelection?.canCancel).toBe(true)
     expect(enteredPending.state.pendingTargetSelection?.triggerContext).toBeUndefined()
     const pending = listLegalAIActions(enteredPending.state, 'player-red')
     expect(pending.some(item => item.kind === 'pending-target')).toBe(true)
-    expect(pending.some(item => item.kind === 'cancel-selection')).toBe(false)
+    expect(pending.some(item => item.kind === 'cancel-selection')).toBe(true)
     for (const item of pending) {
       expect(
         simulateAITransition(enteredPending.state, item, { rootSeed: FIXED_SEED }).accepted,

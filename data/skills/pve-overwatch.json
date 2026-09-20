@@ -1,7 +1,7 @@
 {
   "id": "pve-overwatch",
   "name": "警戒射击",
-  "description": "弹射物。敌方棋子移动后，若停在本棋子四方向5格内，对其造成等同攻击力的伤害。每个玩家回合限1次。",
+  "description": "弹射物。敌方棋子移动后，若停在本棋子四方向5格内，对其造成1倍伤害。每个玩家回合限1次。",
   "kind": "passive",
   "type": "normal",
   "range": "self",

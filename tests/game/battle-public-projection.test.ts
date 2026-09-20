@@ -200,6 +200,7 @@ describe('battle public pending projection', () => {
       canCancel: false,
       selectedTargets: [],
       candidates: [{ type: 'cell', x: 2, y: 3 }],
+      rangeCells: [{ x: 2, y: 3 }, { x: 2, y: 4 }],
       effectCode: 'private-effect-code',
       continuationContext: { private: 'continuation' },
       pendingAction: { type: 'endTurn', playerId: 'player-red' },
@@ -237,9 +238,11 @@ describe('battle public pending projection', () => {
 
     expect(owner!.candidates).toEqual([{ type: 'cell', x: 2, y: 3 }])
     expect(owner!.range).toBe(99)
+    expect(owner!.rangeCells).toEqual([{ x: 2, y: 3 }, { x: 2, y: 4 }])
     for (const projection of [opponent, spectator]) {
       expect(projection!.candidates).toEqual([])
       expect(projection!.range).toBeUndefined()
+      expect(projection!.rangeCells).toBeUndefined()
       expect(projection!.filter).toBeUndefined()
       expect(projection!.selectedTargets).toBeUndefined()
     }

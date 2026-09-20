@@ -1,7 +1,7 @@
 {
   "id": "grimmjow-panther-claw",
   "name": "豹王之爪",
-  "description": "灵压。选择敌人（4），攻击5次，每次造成0.75x攻击力的伤害。",
+  "description": "灵压。选择敌人（4），攻击5次，每次造成0.75倍伤害。",
   "keywords": [
     "灵压"
   ],

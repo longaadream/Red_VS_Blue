@@ -1,0 +1,9 @@
+{
+  "id": "rule-max-phase-recast-expire",
+  "name": "相位偏移器冷却结算",
+  "description": "相位偏移器本回合未再次释放时，回合结束进入正常冷却。",
+  "trigger": {
+    "type": "endTurn"
+  },
+  "skillCode": "var piece = context.rulePiece; if (!piece || piece.currentHp <= 0 || context.playerId !== piece.ownerPlayerId) return { success: false, message: '' }; var tag = (piece.statusTags || []).find(function(item) { return item.type === 'max-phase-recast' && Number(item.turnNumber) === Number(battle.turn.turnNumber); }); if (!tag) { removeRuleById(piece.instanceId, 'rule-max-phase-recast-expire'); return { success: false, message: '' }; } var skillState = (piece.skills || []).find(function(item) { return item.skillId === 'max-phase-shifter'; }); if (skillState) skillState.currentCooldown = Math.max(Number(skillState.currentCooldown || 0), 3); removeStatusEffectById(piece.instanceId, tag.id); return { success: true, message: piece.name + '本回合未再次释放相位偏移器，技能进入冷却' };"
+}

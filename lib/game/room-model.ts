@@ -118,6 +118,7 @@ export interface Room {
   visibility?: 'private' | 'public'
   inviteCode?: string
   spectatingEnabled?: boolean
+  turnTimerEnabled?: boolean
   version?: number
   battleAuthorityVersion?: number
   battleAuthorityTransitionHash?: string

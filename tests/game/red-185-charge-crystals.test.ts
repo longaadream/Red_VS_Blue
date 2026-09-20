@@ -3,7 +3,8 @@ import { beforeEach, describe, expect, it } from 'vitest'
 
 import { observeBattleForAIV2 } from '@/lib/game/ai-environment'
 import { projectBattlePresentationEvents } from '@/lib/game/battle-presentation-events'
-import { dropChargeCrystal } from '@/lib/game/charge-crystals'
+import { appendTileEffectsBatch, dropChargeCrystal, resolveTileEffectPresentation } from '@/lib/game/charge-crystals'
+import { createFlowRuntime } from '@/lib/game/flow-runtime'
 import { dealDamage } from '@/lib/game/skills'
 import { globalTriggerSystem } from '@/lib/game/triggers'
 import { applyBattleAction, summonPiece } from '@/lib/game/turn'
@@ -11,6 +12,47 @@ import { makePiece, makeState } from '../helpers/minimal-state'
 
 describe('RED-185 contested charge crystals', () => {
   beforeEach(() => globalTriggerSystem.clearRules())
+
+  it('defaults tile effect presentation to simultaneous and only accepts explicit modes', () => {
+    expect(resolveTileEffectPresentation(undefined)).toBe('simultaneous')
+    expect(resolveTileEffectPresentation('invalid')).toBe('simultaneous')
+    expect(resolveTileEffectPresentation('expand')).toBe('expand')
+  })
+
+  it('commits a tile effect batch atomically for presentation fan-out', () => {
+    const state = makeState() as any
+    const committed = appendTileEffectsBatch(state, [
+      { id: 'batch-a', tileType: 'amaterasu', x: 1, y: 1 },
+      { id: 'batch-b', tileType: 'amaterasu', x: 2, y: 1 },
+    ])
+    expect(committed).toHaveLength(2)
+    expect(state.extensions.tileEffects).toEqual(committed)
+    expect(() => appendTileEffectsBatch(state, [{ id: 'batch-a', tileType: 'amaterasu', x: 3, y: 1 }])).toThrow('Duplicate tile effect ID')
+  })
+
+  it('exposes the same simultaneous-default batch contract to SkillCode flow', () => {
+    const state = makeState() as any
+    const flow = createFlowRuntime(state, { piece: state.pieces[0], skill: { id: 'batch-test' } }, 'skill', {})
+    const committed = flow.effects.tileBatch([
+      { id: 'flow-a', tileType: 'blizzard', x: 1, y: 1 },
+      { id: 'flow-b', tileType: 'blizzard', x: 2, y: 1 },
+    ])
+    expect(committed).toEqual([
+      expect.objectContaining({ id: 'flow-a', presentation: 'simultaneous' }),
+      expect.objectContaining({ id: 'flow-b', presentation: 'simultaneous' }),
+    ])
+    expect(() => flow.effects.tileBatch([{ id: 'flow-a', tileType: 'blizzard', x: 3, y: 1 }])).toThrow('Duplicate tile effect ID')
+  })
+
+  it('uses an explicit origin for expand instead of the bounding-box center', () => {
+    const state = makeState() as any
+    const flow = createFlowRuntime(state, { piece: state.pieces[0], skill: { id: 'origin-test' } }, 'skill', {})
+    const committed = flow.effects.tileBatch([
+      { id: 'origin-a', tileType: 'effect', x: 10, y: 10 },
+      { id: 'origin-b', tileType: 'effect', x: 12, y: 10 },
+    ], { presentation: 'expand', origin: { x: 10, y: 10 } })
+    expect(committed.map((effect: any) => effect.presentationStep)).toEqual([0, 2])
+  })
 
   it('drops a neutral persistent crystal for a finalized core death without immediate CP', () => {
     const attacker = makePiece({ instanceId: 'attacker', ownerPlayerId: 'player-red', x: 0, y: 0 }) as any

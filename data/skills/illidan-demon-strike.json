@@ -1,7 +1,7 @@
 {
   "id": "illidan-demon-strike",
   "name": "恶魔冲击",
-  "description": "选择全图敌人，造成攻击力的伤害。恶魔变形期间可用2次。",
+  "description": "选择全图敌人，造成1倍伤害。恶魔变形期间可用2次。",
   "keywords": [],
   "targetText": "全图敌人",
   "effectTags": [
@@ -15,5 +15,5 @@
   "powerMultiplier": 1,
   "actionPointCost": 1,
   "code": "function executeSkill(context) { var caster = context.piece; var target = selectTarget({ type: 'piece', range: 99, filter: 'enemy' }); if (!target || target.needsTargetSelection) return target; var result = dealDamage(caster, target, caster.attack, 'physical', battle, context.skill.id); return { success: true, message: caster.name + '使用恶魔冲击，对' + target.name + '造成' + result.damage + '点伤害' }; }",
-  "previewCode": "function calculatePreview(piece, skillDef) { return { description: \"选择全图敌人，造成攻击力的伤害。恶魔变形期间可用2次。\", expectedValues: { damage: piece.attack } }; }"
+  "previewCode": "function calculatePreview(piece, skillDef) { return { description: \"选择全图敌人，造成1倍伤害。恶魔变形期间可用2次。\", expectedValues: { damage: piece.attack } }; }"
 }

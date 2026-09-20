@@ -531,6 +531,7 @@ describe('battle page route contract', () => {
         mercenary: { id: 'mercenary', name: 'Mercenary' },
       },
       trainingSetupConfig: null,
+      isTrainingPieceAvailable: () => true,
       getTrainingPlayerFaction: (playerId: string) => playerId === 'training-red' ? 'red' : 'blue',
       document: {
         getElementById: (id: string) => {
@@ -572,6 +573,7 @@ describe('battle page route contract', () => {
       targetSubmissionPending: false,
       placingMode: true,
       pendingOptionSelectionForOther: () => false,
+      refreshBattleLegalActions: () => undefined,
       document: {
         getElementById: (id: string) => {
           if (id === 'placeTemplate') return { value: 'ana' }
@@ -615,6 +617,7 @@ describe('battle page route contract', () => {
       pendingMove: false,
       selectedPieceId: null,
       pendingOptionSelectionForOther: () => false,
+      refreshBattleLegalActions: () => undefined,
       submitTargetAction: (action: unknown) => submittedActions.push(action),
       setStatusMsg: (message: string) => statusMessages.push(message),
       currentTargetSourceName: () => '恶魔召唤（1）',
@@ -737,6 +740,7 @@ describe('battle page route contract', () => {
       latestAuthorityVersion: 7,
       latestAuthorityStateHash: 'hash-7',
       colyseusConnected: true,
+      waitingForOtherPending: () => false,
       RvBColyseus: {
         isConnected: () => true,
         send: (message: unknown) => sentMessages.push(message),
@@ -797,6 +801,7 @@ new Script([
         isAuthoritySyncing: () => true,
         send: () => { sent = true },
       },
+      waitingForOtherPending: () => false,
       SPECTATE_MODE: false,
       PRACTICE_MODE: false,
       ADVENTURE_MODE: false,
@@ -819,6 +824,7 @@ new Script([
     const commands: unknown[] = [], messages: string[] = []
     const context = createContext({
       SPECTATE_MODE: spectating, PRACTICE_MODE: false, ADVENTURE_MODE: true,
+      waitingForOtherPending: () => false,
       adventureDoAction: async (action: unknown) => { commands.push(action) },
       setStatusMsg: (message: string) => messages.push(message),
       RvBColyseus: { send: () => { throw new Error('Adventure must not submit a room command') } },
@@ -886,7 +892,7 @@ new Script([
     expect(battlePage).toContain('aria-label="查看棋子完整技能与状态"')
     expect(battlePage).toContain('function showPieceInfo(instanceId, preserveKeyword)')
     expect(battlePage).toMatch(/statsHtml \+ \(adventureWarning[\s\S]*?\+ tagsHtml/)
-    expect(battlePage).toContain('\`<div class="pi-section-label">技能</div>\` + skillsHtml')
+    expect(battlePage).toContain('\`<div class="pi-section-label">技能 <button type="button" class="skill-reading-tips" onclick="RvBSkillDescription.showGuide(true)">Tips · 描述说明</button></div>\` + skillsHtml + relatedCardsHtml')
   })
 
   it('renders registered status SVGs in piece detail without undefined optional metadata', () => {
@@ -985,6 +991,7 @@ new Script([
       pendingActionFeedback: null,
       localDeploymentChoiceId: 'tyrande-1',
       pendingOptionSelectionForOther: () => false,
+      refreshBattleLegalActions: () => undefined,
       doAction: (action: unknown) => submittedActions.push(action),
       setStatusMsg: (message: string) => statusMessages.push(message),
     })
@@ -1097,6 +1104,84 @@ new Script([
       selectionId: 'hunt-selection',
       stateRevision: 12,
     }])
+  })
+
+  it('keeps mandatory target selections intact when cancellation is unavailable', () => {
+    const battlePage = readPage('battle.html')
+    const submittedActions: unknown[] = []
+    const clearedReasons: string[] = []
+    const statusMessages: string[] = []
+    const rendered: string[] = []
+    const context = createContext({
+      G: {
+        pendingTargetSelection: {
+          playerId: 'training-red', selectionId: 'mandatory-selection', stateRevision: 19, canCancel: false,
+        },
+        pendingOptionSelection: null,
+        pieces: [],
+      },
+      myPlayerId: 'training-red',
+      targetSubmissionPending: false,
+      pendingTargetSelectionForMe: () => true,
+      pendingOptionSelectionForMe: () => false,
+      doAction: (action: unknown) => { submittedActions.push(action); return Promise.resolve() },
+      clearTargetInteraction: (reason: string) => { clearedReasons.push(reason) },
+      setMoveButtonClass: () => undefined,
+      renderBoard: () => { rendered.push('board') },
+      renderPieceContextMenu: () => { rendered.push('piece-menu') },
+      renderActionBar: () => { rendered.push('action-bar') },
+      renderTargetOverlay: () => { rendered.push('target-overlay') },
+      setStatusMsg: (message: string) => { statusMessages.push(message) },
+      selectedPieceId: null,
+    })
+    new Script(readNamedFunction(battlePage, 'cancelTargetSelection')).runInContext(context)
+
+    new Script('cancelTargetSelection()').runInContext(context)
+
+    expect(submittedActions).toEqual([])
+    expect(clearedReasons).toEqual([])
+    expect(rendered).toEqual([])
+    expect(statusMessages.at(-1)).toBe('请先完成当前规则选择')
+  })
+
+  it('cancels an optional pending option selection without dereferencing a missing target', () => {
+    const battlePage = readPage('battle.html')
+    const submittedActions: unknown[] = []
+    const clearedReasons: string[] = []
+    const statusMessages: string[] = []
+    const context = createContext({
+      G: {
+        pendingTargetSelection: null,
+        pendingOptionSelection: {
+          playerId: 'training-red', selectionId: 'optional-selection', stateRevision: 20, canCancel: true,
+        },
+        pieces: [],
+      },
+      myPlayerId: 'training-red',
+      targetSubmissionPending: false,
+      pendingTargetSelectionForMe: () => false,
+      pendingOptionSelectionForMe: () => true,
+      doAction: (action: unknown) => { submittedActions.push(action); return Promise.resolve() },
+      clearTargetInteraction: (reason: string) => { clearedReasons.push(reason) },
+      setMoveButtonClass: () => undefined,
+      renderBoard: () => undefined,
+      renderPieceContextMenu: () => undefined,
+      renderActionBar: () => undefined,
+      renderTargetOverlay: () => undefined,
+      setStatusMsg: (message: string) => { statusMessages.push(message) },
+      selectedPieceId: null,
+    })
+    new Script(readNamedFunction(battlePage, 'cancelTargetSelection')).runInContext(context)
+
+    expect(() => new Script('cancelTargetSelection()').runInContext(context)).not.toThrow()
+    expect(JSON.parse(JSON.stringify(submittedActions))).toEqual([{
+      type: 'cancelPendingSelection',
+      playerId: 'training-red',
+      selectionId: 'optional-selection',
+      stateRevision: 20,
+    }])
+    expect(clearedReasons).toEqual(['user-cancelled'])
+    expect(statusMessages.at(-1)).toBe('已取消目标选择')
   })
 
   it('leaves terminal disconnects in an explicit non-interactive state', () => {

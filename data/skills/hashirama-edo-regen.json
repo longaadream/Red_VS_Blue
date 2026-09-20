@@ -1,7 +1,7 @@
 {
   "id": "hashirama-edo-regen",
   "name": "秽土转生·自愈",
-  "description": "你的回合结束时若生命低于50%，回复自身2点。",
+  "description": "你的回合结束时若生命低于50%，回复2。",
   "keywords": [],
   "targetText": "被动",
   "effectTags": [
