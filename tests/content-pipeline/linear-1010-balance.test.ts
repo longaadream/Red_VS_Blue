@@ -3,7 +3,7 @@ import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 const root = path.resolve(process.cwd())
-const readJson = (relative: string) => JSON.parse(fs.readFileSync(path.join(root, relative), 'utf8')) as Record<string, any>
+const readJson = (relative: string) => JSON.parse(fs.readFileSync(path.join(root, relative), 'utf8')) as Record<string, unknown>
 
 describe('RED-211 documented balance changes', () => {
   it('keeps Ulquiorra ranges and damage wording aligned', () => {

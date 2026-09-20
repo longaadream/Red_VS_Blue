@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- Validate authored rules through authoritative fixtures. */
 import { beforeEach, describe, expect, it } from 'vitest'
-import { readFileSync } from 'node:fs'
+
 import { runBattleAction } from '../../lib/game/battle-runner'
 import { loadAllSkillsById, executeSkillFunction } from '../../lib/game/skills'
 import { prepareAction } from '../../lib/game/targeting'
