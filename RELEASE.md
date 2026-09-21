@@ -20,6 +20,25 @@ $env:RVB_TASK = "<task-id>"
 2e4c9045bf25982b105297bdde208d501010af1009203eab1f7ca77f6e26839e
 ```
 
+## 签名材料边界
+
+三类签名材料都属于发布机密，不进入 GitHub：
+
+| 用途 | 需要的材料 | 传入方式 | 是否应在仓库中出现 |
+| --- | --- | --- | --- |
+| 资源包 | 官方内容签名私钥 | `RVB_CONTENT_SIGNING_KEY` / `--key-file` | 只有公开 `keyId` |
+| Windows 安装包 | 发布证书或证书链、证书口令 | Electron Builder 的 `CSC_LINK`、`CSC_KEY_PASSWORD` 或 CI secret | 只有签名配置和校验摘要 |
+| Android APK | `red-vs-blue-release.p12`、对应 `password.clixml` | `scripts/build-android-release.ps1 -SigningDirectory <protected-dir>` | 只有签名证书 SHA-256 |
+
+Android 发布目录至少包含：
+
+```text
+<protected-signing-dir>/red-vs-blue-release.p12
+<protected-signing-dir>/password.clixml
+```
+
+Windows 和 Android 的私钥不会随源码、资源包、PR 或安装包发布。构建记录必须保存 `sourceCommit`、版本号、文件 SHA-256，以及 Android 的公开证书 SHA-256。没有这些材料时只能构建未签名或无法证明来源的候选包，不能标记为正式发布。
+
 ## 1. 构建、签名和验证资源包
 
 资源包源目录必须只包含 `data` 和 `images`，不要把 `data/pages` 或客户端构建目录打进去：
@@ -105,6 +124,15 @@ npm run build:colyseus-server
 ```
 
 Windows 客户端和 Android 包使用项目已有构建脚本；版本号、签名和摘要写入发布 PR，不在文档中写死机器路径。
+
+正式跨平台构建必须从干净提交开始，并记录来源提交：
+
+```powershell
+git status --short
+$env:RVB_RELEASE_SOURCE_COMMIT = (git rev-parse HEAD)
+```
+
+构建完成后，使用发布脚本生成的 `release-bundle.json` 检查 `sourceCommit`、Windows 清单、Android 签名摘要和所有资产 SHA-256。`output/`、`dist/` 下的旧文件不能当作当前提交的构建结果。
 
 ## 4. 安全处理
 
