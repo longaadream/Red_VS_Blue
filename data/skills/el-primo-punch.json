@@ -17,5 +17,5 @@
   },
   "effectTags": [],
   "icon": "🥊",
-  "code": "function executeSkill(context){var c=context.piece,t=selectTarget({type:'piece',range:1,filter:'enemy'});if(!t||t.needsTargetSelection)return t;var total=0;for(var i=0;i<4;i++){var r=dealDamage(c,t,Math.floor(c.attack*.25),'physical',battle,context.skill.id);total+=r.damage||0;}return{success:true,message:c.name+'连续挥拳造成'+total+'点伤害'};}"
+  "code": "function executeSkill(context){var c=context.piece,b=context.battle;var target=selectTarget({type:'piece',range:1,filter:'enemy'});if(!target||target.needsTargetSelection)return target;var t=b.pieces.find(function(p){return p.instanceId===target.instanceId&&p.currentHp>0;});if(!t)return{success:false,message:'目标不存在或不相邻'};var total=0,hits=0;for(var i=0;i<4;i++){if(t.currentHp<=0)break;var r=dealDamage(c,t,Math.floor(c.attack*.25),'physical',b,context.skill.id);total+=r.damage||0;hits++;}return{success:true,message:c.name+'连续挥拳'+hits+'次，造成'+total+'点伤害'};}"
 }
