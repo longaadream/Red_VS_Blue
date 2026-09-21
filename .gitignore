@@ -77,3 +77,4 @@ android-client/www/js/game-engine.js
 
 # Long-lived local signing material (never part of release artifacts).
 .local-signing/
+.local-secrets/
