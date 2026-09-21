@@ -86,7 +86,8 @@ export class OfficialResourceUpdates {
   private async asset(release: Release, name: string, hash: string | undefined, max: number) {
     const matching = release.assets.filter(a => a.name === name)
     const asset = matching[0]
-    if (matching.length !== 1 || asset.state !== 'uploaded' || !Number.isSafeInteger(asset.size) || asset.size <= 0 || asset.size > max || !/^sha256:[a-f0-9]{64}$/.test(asset.digest) || !isAssetUrl(asset.browser_download_url, release.tag_name, name)) throw new Error('官方资源文件缺失或身份无效')
+    const urlValid = this.source === 'cos' ? true : isAssetUrl(asset.browser_download_url, release.tag_name, name)
+    if (matching.length !== 1 || asset.state !== 'uploaded' || !Number.isSafeInteger(asset.size) || asset.size <= 0 || asset.size > max || !/^sha256:[a-f0-9]{64}$/.test(asset.digest) || !urlValid) throw new Error('官方资源文件缺失或身份无效')
     if (hash && asset.digest !== `sha256:${hash}`) throw new Error('清单与官方文件摘要不一致')
     const url = this.source === 'cos' ? resourceMirrorUrl(release.rvb_version || '', name) : asset.browser_download_url
     const bytes = await this.read(url, max, this.source === 'github')
@@ -99,7 +100,7 @@ export class OfficialResourceUpdates {
       const url = this.source === 'cos' ? `${COS_UPDATE_ROOT}/resource/latest.json` : `https://api.github.com/repos/${OFFICIAL_REPOSITORY}/releases?per_page=100&page=${page}`
       const values = JSON.parse((await this.read(url, 2 * 1024 * 1024)).toString()) as Release[]
       if (!Array.isArray(values)) throw new Error('官方版本列表格式无效')
-      releases.push(...values.filter(r => r.draft === false && /^content-test-[a-f0-9]{64}$/.test(r.tag_name) && Array.isArray(r.assets)))
+      releases.push(...values.filter(r => r.draft === false && /^content-(test|stable)-[a-f0-9]{64}$/.test(r.tag_name) && Array.isArray(r.assets)))
       if (this.source === 'cos') {
         if (!releases.length || releases.length > 100) throw new Error('COS 资源版本清单为空或无效')
         break

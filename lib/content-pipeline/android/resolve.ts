@@ -28,7 +28,7 @@ export function resolveAndroidProfile(
       if (!trustedKeyIds.includes(signature.keyId)) throw Error('资源包发行者尚未受信任')
     }
     sources[computePackageHashV1(manifest)] = input.id
-    inputs.push({ source: input.source, policy: { kind: isBundled ? 'bundled-base' : 'external', expectedCompatibility: compatibility } })
+    inputs.push({ source: input.source, policy: { kind: isBundled ? 'bundled-base' : 'external', expectedCompatibility: compatibility, ...(isBundled ? {} : { trustedScriptPublisherKeyIds: trustedKeyIds }) } })
   }
   const view = resolveProfileV1({ base: inputs[0], patches: inputs.slice(1) })
   return { profile: view.profile, sources, chain: all.map(input => input.id) }

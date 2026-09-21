@@ -31,7 +31,7 @@ function alfonsoState(
     currentHp: 20,
     maxHp: 20,
   }))
-  const state = makeState({ pieces: [alfonso, ...enemies], width: 10, height: 8 })
+  const state = makeState({ pieces: [alfonso, ...enemies], width: 40, height: 8 })
   for (const skillId of skillIds) state.skillsById[skillId] = loadSkill(skillId)
   return { state, alfonso, enemies }
 }
@@ -58,7 +58,7 @@ function selectedCellAction(
 describe('Alfonso roster skills', () => {
   it.each([
     { skillId: 'alfonso-kick', range: 6 },
-    { skillId: 'alfonso-water-dash', range: 8 },
+    { skillId: 'alfonso-water-dash', range: 30 },
   ])('$skillId declares a cardinal grid target', ({ skillId, range }) => {
     const { state } = alfonsoState([skillId], [])
     if (skillId === 'alfonso-water-dash') state.players[0].chargePoints = 1
@@ -93,7 +93,7 @@ describe('Alfonso roster skills', () => {
     expect(next.pieces.find(piece => piece.instanceId === enemies[1].instanceId)?.currentHp).toBe(20)
   })
 
-  it('dashes through enemies, damaging only the first before landing at the last open cell', () => {
+  it('dashes through the path and repeats damage for nearby unhit enemies', () => {
     const { state, alfonso, enemies } = alfonsoState(['alfonso-water-dash'], [
       { instanceId: 'near', x: 4, y: 1 },
       { instanceId: 'far', x: 6, y: 1 },
@@ -103,8 +103,9 @@ describe('Alfonso roster skills', () => {
     const next = applyBattleAction(state, selectedCellAction(state, 'alfonso-water-dash', 9, 1))
 
     expect(next.pieces.find(piece => piece.instanceId === enemies[0].instanceId)?.currentHp).toBe(8)
-    expect(next.pieces.find(piece => piece.instanceId === enemies[1].instanceId)?.currentHp).toBe(20)
-    expect(next.pieces.find(piece => piece.instanceId === alfonso.instanceId)).toMatchObject({ x: 9, y: 1 })
+    expect(next.pieces.find(piece => piece.instanceId === enemies[1].instanceId)?.currentHp).toBe(8)
+    const landed = next.pieces.find(piece => piece.instanceId === alfonso.instanceId)!
+    expect(Math.abs(landed.x - enemies[1].x) + Math.abs(landed.y - enemies[1].y)).toBe(1)
   })
 
   it('freezes nearby enemies and installs both freeze rules', () => {
