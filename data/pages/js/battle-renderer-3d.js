@@ -2361,13 +2361,16 @@
     const distance = Math.hypot(dx, dz) || 1
     const offsetX = dx / distance * 0.10
     const offsetZ = dz / distance * 0.10
+    const lungeDuration = Math.min(MOTION_SECONDS.action, 0.19)
     _startAnimation(source.motionId + ':position', {
-      duration: 0.19,
+      duration: lungeDuration,
       easing: function (progress) { return progress },
       update: function (_, raw) {
-        const phase = raw <= (0.09 / 0.19)
-          ? EASE.out(raw / (0.09 / 0.19))
-          : 1 - EASE.in((raw - (0.09 / 0.19)) / (0.10 / 0.19))
+        const approach = lungeDuration * 0.47
+        const retreat = lungeDuration - approach
+        const phase = raw <= (approach / lungeDuration)
+          ? EASE.out(raw / (approach / lungeDuration))
+          : 1 - EASE.in((raw - (approach / lungeDuration)) / (retreat / lungeDuration))
         source.group.position.set(from.x + offsetX * phase, from.y, from.z + offsetZ * phase)
       },
       complete: function () { source.group.position.set(from.x, from.y, from.z) },
