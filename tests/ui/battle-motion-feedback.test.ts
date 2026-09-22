@@ -44,6 +44,10 @@ describe('RED-69 battle motion contract', () => {
     for (const token of [
       '--motion-press: 80ms',
       '--motion-fast: 100ms',
+      '--motion-move: 120ms',
+      '--motion-dash: 145ms',
+      '--motion-teleport: 80ms',
+      '--motion-attack: 130ms',
       '--motion-action: 180ms',
       '--motion-result: 200ms',
       '--ease-out: cubic-bezier(0.22, 1, 0.36, 1)',
@@ -57,7 +61,7 @@ describe('RED-69 battle motion contract', () => {
     expect(renderer).toContain('action: 180')
     expect(renderer).toContain('result: 200')
     expect(renderer).not.toMatch(/duration:\s*0\.[4-9]/)
-    expect(renderer).toContain('const lungeDuration = Math.min(MOTION_SECONDS.action, 0.19)')
+    expect(renderer).toContain('const lungeDuration = MOTION_SECONDS.attack')
   })
 
   it('keeps target and status feedback short, simultaneous, and reduced-motion safe', () => {

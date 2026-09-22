@@ -623,6 +623,10 @@ canvas:focus-visible {
 :root {
   --motion-press: 80ms;
   --motion-fast: 100ms;
+  --motion-move: 120ms;
+  --motion-dash: 145ms;
+  --motion-teleport: 80ms;
+  --motion-attack: 130ms;
   --motion-action: 180ms;
   --motion-result: 200ms;
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);

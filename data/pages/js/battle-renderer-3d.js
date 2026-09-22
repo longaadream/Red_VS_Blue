@@ -24,6 +24,10 @@
   const MOTION_TOKENS = Object.freeze({
     press: 80,
     fast: 100,
+    move: 120,
+    dash: 145,
+    teleport: 80,
+    attack: 130,
     action: 180,
     result: 200,
     reject: 120,
@@ -2013,6 +2017,10 @@
     const from = { x: obj.group.position.x, y: obj.group.position.y, z: obj.group.position.z }
     const fromBaseY = Number.isFinite(obj.motionBaseY) ? obj.motionBaseY : obj.baseY
     const visibleArc = Math.max(0, Math.min(0.08, from.y - fromBaseY))
+    const distance = Math.hypot(targetX - from.x, targetZ - from.z)
+    const travelDuration = movementKind === 'dash'
+      ? MOTION_SECONDS.dash
+      : Math.min(0.16, MOTION_SECONDS.move + Math.max(0, distance - 1) * 0.012)
     obj.baseX = targetX
     obj.baseY = targetY
     obj.baseZ = targetZ
@@ -2021,11 +2029,11 @@
       _cancelAnimation(obj.motionId + ':position')
       obj.motionBaseY = targetY
       obj.group.position.set(targetX, targetY, targetZ)
-      _flashOutline(obj, movementKind === 'swap' ? 0x22d3ee : 0xa78bfa, MOTION_SECONDS.action)
+      _flashOutline(obj, movementKind === 'swap' ? 0x22d3ee : 0xa78bfa, MOTION_SECONDS.teleport)
       _animateLanding(obj)
       return
     }
-    if (movementKind === 'dash') _flashOutline(obj, 0xf59e0b, MOTION_SECONDS.action)
+    if (movementKind === 'dash') _flashOutline(obj, 0xf59e0b, MOTION_SECONDS.dash)
     if (_reducedMotion) {
       obj.motionBaseY = targetY
       obj.group.position.set(targetX, targetY, targetZ)
@@ -2033,7 +2041,7 @@
       return
     }
     _startAnimation(obj.motionId + ':position', {
-      duration: Math.min(0.32, MOTION_SECONDS.action),
+      duration: travelDuration,
       easing: EASE.inOut,
       update: function (progress, raw) {
         const pathBaseY = fromBaseY + (targetY - fromBaseY) * progress
@@ -2361,7 +2369,7 @@
     const distance = Math.hypot(dx, dz) || 1
     const offsetX = dx / distance * 0.10
     const offsetZ = dz / distance * 0.10
-    const lungeDuration = Math.min(MOTION_SECONDS.action, 0.19)
+    const lungeDuration = MOTION_SECONDS.attack
     _startAnimation(source.motionId + ':position', {
       duration: lungeDuration,
       easing: function (progress) { return progress },
