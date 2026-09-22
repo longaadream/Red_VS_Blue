@@ -2846,6 +2846,9 @@
     ;(_currentModel.interactionPieces || _currentModel.pieces || []).forEach(piece => {
       if (piece.visible === false) return
       const obj = _pieceObjects.get(piece.id)
+      // A lethal result removes the piece from hit testing immediately; its
+      // fade-out remains purely visual and must not create a second target.
+      if (obj && obj.deathAnimating) return
       const x = obj ? obj.group.position.x : piece.x
       const y = obj ? obj.group.position.z : piece.y
       const point = projectCell(x, y, (obj ? obj.group.position.y : _tileSurfaceHeightAt(x, y)) + PIECE_H + 0.014)

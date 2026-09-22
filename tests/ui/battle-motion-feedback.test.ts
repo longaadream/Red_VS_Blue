@@ -81,6 +81,11 @@ describe('RED-69 battle motion contract', () => {
     expect(renderer).toMatch(/if \(!obj \|\| obj\.pending\) return null[\s\S]*?_cancelAnimation\(obj\.motionId \+ ':position'\)/)
   })
 
+  it('removes dying pieces from pointer targeting before their fade-out completes', () => {
+    const renderer = readPage('js/battle-renderer-3d.js')
+    expect(renderer).toMatch(/const obj = _pieceObjects\.get\(piece\.id\)[\s\S]*?if \(obj && obj\.deathAnimating\) return/)
+  })
+
   it('keeps timeout and disconnect recovery correlated without discarding pending presentation state', () => {
     const battlePage = readPage('battle.html')
 
