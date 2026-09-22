@@ -1,8 +1,10 @@
 ;(function (root) {
   'use strict'
 
-  const NORMAL_DURATION_MS = 1100
-  const CARD_DURATION_MS = 1800
+  const SINGLE_EFFECT_DURATION_MS = 24
+  const COMPOSITE_STEP_DURATION_MS = 200
+  const NORMAL_DURATION_MS = COMPOSITE_STEP_DURATION_MS
+  const CARD_DURATION_MS = COMPOSITE_STEP_DURATION_MS
   const REDUCED_DURATION_MS = 120
   const SKIP_SETTLE_MS = 60
   const MAX_PLAYED_ROOTS = 256
@@ -12,20 +14,34 @@
       && (['move', 'skill', 'chargeSkill', 'card'].includes(event.kind) || (event.kind === 'choiceResolved' && !!event.skillId))
   }
 
-  function isStatusBeat(group) {
-    return group && group.root && ['statusAdded', 'statusRemoved'].includes(group.root.kind)
+  function isAutomaticGroup(group) {
+    return !!(group && group.root && group.root.parentEventId)
   }
 
-  function actionDuration(group) {
-    if (group && group.root && ['tileEffectAdded', 'tileEffectRemoved'].includes(group.root.kind)) return 240
-    if (isStatusBeat(group)) return 250
-    return group && group.root && group.root.kind === 'card' ? CARD_DURATION_MS : NORMAL_DURATION_MS
+  function actionDuration() {
+    // Every event gets its own readable post-action beat. The event queue
+    // below deliberately keeps adjacent results separate, so a multi-hit or
+    // triggered chain cannot collapse into one burst.
+    return COMPOSITE_STEP_DURATION_MS
+  }
+
+  function hideBannerForModel(event, model) {
+    if (!event) return true
+    if (event.kind === 'move' || event.kind === 'forceMove') return true
+    const viewerId = model && model.viewer && String(model.viewer.id || '').toLowerCase()
+    const source = model && (model.pieces || []).find(function (piece) {
+      return String(piece.id || '') === String(event.sourcePieceId || '')
+    })
+    const own = !!(viewerId && source && source.ownerPlayerId
+      && String(source.ownerPlayerId).toLowerCase() === viewerId)
+    return own && ['skill', 'chargeSkill', 'card'].includes(event.kind)
   }
 
   function phaseTime(phase, group) {
-    if (group && group.root && ['tileEffectAdded', 'tileEffectRemoved'].includes(group.root.kind)) return ({ path: 0, result: 20, settle: 200 }[phase] || 0)
-    if (isStatusBeat(group)) return ({ path: 20, result: 40, settle: 220 }[phase] || 0)
-    return phase === 'settle' ? actionDuration(group) - 320 : ({ path: 120, result: 420 }[phase] || 0)
+    const duration = actionDuration(group)
+    return phase === 'settle'
+      ? Math.max(32, duration - 40)
+      : ({ path: Math.min(40, duration * 0.18), result: Math.min(120, duration * 0.42) }[phase] || 0)
   }
 
   function eventOrder(left, right) {
@@ -74,20 +90,7 @@
         ;[group.root].concat(group.children).forEach(function (event) {
           if (['actionPoints', 'cardDiscarded', 'cardChanged'].includes(event.kind)) return
           if (event.parentEventId && event.kind === 'passive' && !(event.result && event.result.pending)) return
-          const previous = beats[beats.length - 1]
-          const simultaneous = ['damage', 'heal', 'spawn', 'death', 'statusAdded', 'statusRemoved', 'tileEffectAdded', 'tileEffectRemoved'].includes(event.kind)
-            && event.batchId && previous && previous.root.kind === event.kind
-            && previous.root.batchId === event.batchId
-          const bulkStrengthening = previous && ['statChanged', 'statusAdded', 'statusRemoved'].includes(event.kind) && previous.root.kind === event.kind
-            && (event.kind === 'statChanged' || event.statusType === previous.root.statusType)
-            && event.sourcePieceId === previous.root.sourcePieceId
-            && event.skillId === previous.root.skillId && event.ruleId === previous.root.ruleId
-          const tileTogether = previous && ['tileEffectAdded', 'tileEffectRemoved'].includes(event.kind)
-            && previous.root.kind === event.kind
-            && (event.result?.presentation || 'simultaneous') === (previous.root.result?.presentation || 'simultaneous')
-            && (event.result?.presentation !== 'expand' || event.result?.presentationStep === previous.root.result?.presentationStep)
-          if (tileTogether || simultaneous && !['tileEffectAdded', 'tileEffectRemoved'].includes(event.kind) || bulkStrengthening) previous.children.push(event)
-          else beats.push({ rootEventId: event.eventId, root: event, children: [], identityEvents: [group.root].concat(group.children) })
+          beats.push({ rootEventId: event.eventId, root: event, children: [], identityEvents: [group.root].concat(group.children) })
         })
         return beats
       })
@@ -243,6 +246,20 @@
       })
       if (controlReturnedToViewer && !hasPendingBanner) {
         settleAll()
+      }
+      const manualIncoming = incoming.some(function (group) { return !isAutomaticGroup(group) })
+      if (active && !holdingResponse && isAutomaticGroup(active) && manualIncoming) {
+        const elapsed = activeProgressMs + Math.max(0, now() - activeTimelineStartedAt) * speed
+        if (elapsed >= phaseTime('result', active)) {
+          // The automatic result is already visible; its remaining post-action
+          // tail must not hold up a newly submitted action.
+          clearTimers()
+          onPhase('settle', active)
+          active = null
+          activeProgressMs = 0
+          activeTimelineStartedAt = 0
+          skipSettling = false
+        }
       }
       pending.push.apply(pending, incoming)
       startNext()
@@ -501,10 +518,10 @@
       }
       layer.dataset.phase = currentPhase
       layer.dataset.rootId = currentGroup.rootEventId
-      if (!showsBanner(rootEvent)) {
+      if (!showsBanner(rootEvent) || hideBannerForModel(rootEvent, model)) {
         layer.hidden = false
         layer.className = 'battle-vignette-layer is-phase-' + currentPhase
-        layer.innerHTML = renderComicBeat(resultVisible)
+        layer.innerHTML = hideBannerForModel(rootEvent, model) ? '' : renderComicBeat(resultVisible)
         return
       }
       layer.hidden = false
@@ -713,9 +730,12 @@
     create: create,
     createQueue: createQueue,
     showsBanner: showsBanner,
+    hideBannerForModel: hideBannerForModel,
     groupEvents: groupEvents,
     eventCells: eventCells,
     constants: Object.freeze({
+      singleEffectDurationMs: SINGLE_EFFECT_DURATION_MS,
+      compositeStepDurationMs: COMPOSITE_STEP_DURATION_MS,
       normalDurationMs: NORMAL_DURATION_MS,
       cardDurationMs: CARD_DURATION_MS,
       reducedDurationMs: REDUCED_DURATION_MS,

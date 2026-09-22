@@ -42,21 +42,30 @@ describe('RED-69 battle motion contract', () => {
     const renderer = readPage('js/battle-renderer-3d.js')
 
     for (const token of [
-      '--motion-press: 100ms',
-      '--motion-fast: 140ms',
-      '--motion-action: 240ms',
-      '--motion-result: 280ms',
+      '--motion-press: 80ms',
+      '--motion-instant: 16ms',
+      '--motion-fast: 100ms',
+      '--motion-move: 120ms',
+      '--motion-dash: 145ms',
+      '--motion-teleport: 80ms',
+      '--motion-attack: 130ms',
+      '--motion-action: 200ms',
+      '--motion-result: 200ms',
       '--ease-out: cubic-bezier(0.22, 1, 0.36, 1)',
       '--ease-in: cubic-bezier(0.4, 0, 1, 1)',
       '--ease-in-out: cubic-bezier(0.65, 0, 0.35, 1)',
     ]) expect(css).toContain(token)
 
     expect(renderer).toContain('MOTION_TOKENS')
-    expect(renderer).toContain('press: 100')
-    expect(renderer).toContain('fast: 140')
-    expect(renderer).toContain('action: 240')
-    expect(renderer).toContain('result: 280')
+    expect(renderer).toContain('press: 80')
+    expect(renderer).toContain('fast: 100')
+    expect(renderer).toContain('action: 200')
+    expect(renderer).toContain('result: 200')
     expect(renderer).not.toMatch(/duration:\s*0\.[4-9]/)
+    expect(renderer).toContain('const lungeDuration = MOTION_SECONDS.attack')
+    expect(renderer).toContain('function _singleEffectPresentation(previousModel, nextModel)')
+    expect(renderer).toContain('function _ownPresentationAction(action, model)')
+    expect(renderer).toContain('}, instant ? MOTION_TOKENS.instant : MOTION_TOKENS.action)')
   })
 
   it('keeps target and status feedback short, simultaneous, and reduced-motion safe', () => {
@@ -76,6 +85,36 @@ describe('RED-69 battle motion contract', () => {
     expect(renderer).not.toContain('items.forEach((item, index)')
   })
 
+  it('accepts a new drag while presentation travel is still active', () => {
+    const renderer = readPage('js/battle-renderer-3d.js')
+    expect(renderer).toMatch(/function _pieceDragCandidateAt[\s\S]*?if \(!obj \|\| obj\.pending\) return null/)
+    expect(renderer).not.toMatch(/function _pieceDragCandidateAt[\s\S]*?_cancelAnimation\(obj\.motionId \+ ':position'\)/)
+  })
+
+  it('removes dying pieces from pointer targeting before their fade-out completes', () => {
+    const renderer = readPage('js/battle-renderer-3d.js')
+    expect(renderer).toMatch(/const obj = _pieceObjects\.get\(piece\.id\)[\s\S]*?if \(obj && obj\.deathAnimating\) return/)
+  })
+
+  it('queues action presentation while the authoritative model remains immediately available', () => {
+    const renderer = readPage('js/battle-renderer-3d.js')
+    expect(renderer).toContain('_actionAnimationQueue.push')
+    expect(renderer).toContain('_animateActionNow(item.action, item.previousModel, item.nextModel)')
+    expect(renderer).toContain('MOTION_TOKENS.action')
+  })
+
+  it('uses authoritative piece coordinates while selecting a target', () => {
+    const renderer = readPage('js/battle-renderer-3d.js')
+    expect(renderer).toContain("const targetMode = !!(_currentModel.selection && _currentModel.selection.mode === 'target')")
+    expect(renderer).toContain('const x = targetMode ? piece.x : (obj ? obj.group.position.x : piece.x)')
+    expect(renderer).toContain('const y = targetMode ? piece.y : (obj ? obj.group.position.z : piece.y)')
+  })
+
+  it('exposes queued action count for animation diagnostics', () => {
+    const renderer = readPage('js/battle-renderer-3d.js')
+    expect(renderer).toContain('queuedActionCount: _actionAnimationQueue.length')
+  })
+
   it('keeps timeout and disconnect recovery correlated without discarding pending presentation state', () => {
     const battlePage = readPage('battle.html')
 
@@ -88,6 +127,34 @@ describe('RED-69 battle motion contract', () => {
     expect(battlePage).toContain("requestAuthorityRecovery('pending-action-reconnect', pendingActionFeedback.clientActionId)")
     expect(battlePage).toMatch(/function disposeBattlePage\(\)[\s\S]*?clearPendingActionFeedback\('page-dispose'/)
     expect(battlePage).toMatch(/interaction:\s*\{[\s\S]*?pendingPieceId:/)
+  })
+
+  it('provides repeatable DM feedback for the shared illegal-action messages', () => {
+    const battlePage = readPage('battle.html')
+    expect(battlePage).toContain('function dmFeedbackLine(msg)')
+    expect(battlePage).toContain('你现在还不能行动。')
+    expect(battlePage).toContain('function showDmFeedback(msg)')
+    expect(battlePage).toContain('id="dmBubble"')
+  })
+
+  it('keeps the prominent corner timer wired to authoritative visibility', () => {
+    const battlePage = readPage('battle.html')
+    expect(battlePage).toContain('id="turnClockCorner"')
+    expect(battlePage).toContain("const TIMER_PREVIEW_MODE = params.get('timerPreview') === '1'")
+    expect(battlePage).toContain('corner.hidden = !view.visible')
+    expect(battlePage).toContain('right: 18px')
+    const lobbyPage = readPage('lobby.html')
+    expect(lobbyPage).toContain('id="turnTimerEnabledToggle"')
+    expect(lobbyPage).toContain('turnTimerEnabled')
+  })
+
+  it('does not settle or cancel active presentation when entering target selection', () => {
+    const presentation = readPage('js/battle-ui/battle-presentation.js')
+    const settle = presentation.slice(presentation.indexOf('function settleForSelection()'), presentation.indexOf('function spawnFloater('))
+    expect(settle).toContain('renderer.update(currentModel)')
+    expect(settle).not.toContain('renderer.settlePresentation')
+    expect(settle).not.toContain('vignetteUi.settleAll')
+    expect(settle).not.toContain('impact.stop')
   })
 
   it('keeps one pending command until an exact receipt and preserves it across timeout recovery', () => {

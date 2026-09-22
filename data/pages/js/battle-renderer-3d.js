@@ -22,13 +22,18 @@
   let _overviewZoom = 1
   let _cameraInOverview = true
   const MOTION_TOKENS = Object.freeze({
-    press: 100,
-    fast: 140,
-    action: 240,
-    result: 280,
-    reject: 160,
-    hit: 150,
-    heal: 180,
+    instant: 16,
+    press: 80,
+    fast: 100,
+    move: 120,
+    dash: 145,
+    teleport: 80,
+    attack: 130,
+    action: 200,
+    result: 200,
+    reject: 120,
+    hit: 100,
+    heal: 120,
     easeOut: Object.freeze([0.22, 1, 0.36, 1]),
     easeIn: Object.freeze([0.4, 0, 1, 1]),
     easeInOut: Object.freeze([0.65, 0, 0.35, 1]),
@@ -128,6 +133,8 @@
   let _tutorialCueCellCount = 0
   let _tutorialCuePathCount = 0
   const _anims = new Map()             // one controller per owner/property
+  const _actionAnimationQueue = []
+  let _actionAnimationTimer = null
   const _playedEventKeys = new Set()
   const _playedEventOrder = []
   const _pendingAppearanceCues = new Map()
@@ -1907,6 +1914,33 @@
     return JSON.stringify((piece && (piece.statuses || piece.statusEffects)) || [])
   }
 
+  function _singleEffectPresentation(previousModel, nextModel) {
+    const events = Array.isArray(nextModel && nextModel.presentationEvents)
+      ? nextModel.presentationEvents.filter(Boolean)
+      : []
+    const roots = new Set(events.map(function (event) { return event.rootEventId || event.eventId }).filter(Boolean))
+    const results = events.filter(function (event) {
+      return event.result != null || event.kind === 'damage' || event.kind === 'heal' || event.kind === 'death'
+    })
+    let changedPieces = 0
+    ;(nextModel && nextModel.pieces || []).forEach(function (piece) {
+      const previous = _pieceById(previousModel, piece.id)
+      if (previous && (_pieceHealth(previous) !== _pieceHealth(piece)
+        || previous.x !== piece.x || previous.y !== piece.y
+        || previous.visible !== piece.visible
+        || _statusSignature(previous) !== _statusSignature(piece))) changedPieces += 1
+    })
+    return roots.size <= 1 && results.length <= 1 && changedPieces <= 1
+  }
+
+  function _ownPresentationAction(action, model) {
+    const viewerId = model && model.viewer && String(model.viewer.id || '').toLowerCase()
+    if (!viewerId) return false
+    const actorId = action && (action.sourcePieceId || action.attackerId || action.actorId || action.pieceId)
+    const actor = actorId && _pieceById(model, actorId)
+    return !!(actor && actor.ownerPlayerId && String(actor.ownerPlayerId).toLowerCase() === viewerId)
+  }
+
   function _diffSignature(previousModel, nextModel) {
     return ((nextModel && nextModel.pieces) || []).map(function (nextPiece) {
       const previousPiece = _pieceById(previousModel, nextPiece.id)
@@ -1935,7 +1969,7 @@
     return true
   }
 
-  function animateAction(action, previousModel, nextModel) {
+  function _animateActionNow(action, previousModel, nextModel) {
     if (!_mounted || !nextModel) return
     const eventKey = _eventKey(action || {}, previousModel, nextModel)
     if (!_rememberEvent(eventKey)) return
@@ -1944,6 +1978,7 @@
       if (rejected) _flashOutline(rejected, 0xef4444, MOTION_SECONDS.reject)
       return
     }
+    const instant = _singleEffectPresentation(previousModel, nextModel) && _ownPresentationAction(action, nextModel)
 
     const damagedTargets = []
     ;(nextModel.pieces || []).forEach(function (nextPiece) {
@@ -1959,17 +1994,17 @@
         return
       }
       if (previousPiece.x !== nextPiece.x || previousPiece.y !== nextPiece.y) {
-        _animateMove(obj, nextPiece.x, nextPiece.y, action && action.movementKinds && action.movementKinds[nextPiece.id])
+        _animateMove(obj, nextPiece.x, nextPiece.y, action && action.movementKinds && action.movementKinds[nextPiece.id], instant)
       }
       const healthDelta = _pieceHealth(nextPiece) - _pieceHealth(previousPiece)
       if (healthDelta < 0) {
         damagedTargets.push(nextPiece.id)
-        _animateHit(obj)
+        _animateHit(obj, instant)
       } else if (healthDelta > 0) {
-        _animateHeal(obj)
+        _animateHeal(obj, instant)
       }
-      if (_statusSignature(previousPiece) !== _statusSignature(nextPiece)) _animateStatusChange(obj)
-      if (previousPiece.visible !== false && nextPiece.visible === false) _animateDeath(obj)
+      if (_statusSignature(previousPiece) !== _statusSignature(nextPiece)) _animateStatusChange(obj, instant)
+      if (previousPiece.visible !== false && nextPiece.visible === false) _animateDeath(obj, instant)
     })
 
     const sourceId = action && (action.sourcePieceId || action.attackerId || action.actorId || action.pieceId)
@@ -1979,24 +2014,69 @@
     }
   }
 
-  function _animateMove(obj, targetX, targetZ, movementKind) {
+  // Authoritative snapshots may arrive faster than the presentation can show
+  // them. Keep the snapshots for interaction immediately, but serialize the
+  // short-lived action presentation so movement, hit and death read in order.
+  function animateAction(action, previousModel, nextModel) {
+    if (!_mounted || !nextModel) return
+    // Automatic aftermath keeps its post-action lane, while a newly submitted
+    // action starts immediately and can overlap the remaining visual tail.
+    if (!action || action.isAutomatic !== true) {
+      _animateActionNow(action, previousModel, nextModel)
+      return
+    }
+    _actionAnimationQueue.push({ action, previousModel, nextModel })
+    if (_actionAnimationTimer == null) _drainActionAnimationQueue()
+  }
+
+  function _drainActionAnimationQueue() {
+    if (!_actionAnimationQueue.length || _actionAnimationTimer != null) return
+    const item = _actionAnimationQueue.shift()
+    const instant = _singleEffectPresentation(item.previousModel, item.nextModel)
+      && _ownPresentationAction(item.action, item.nextModel)
+    _animateActionNow(item.action, item.previousModel, item.nextModel)
+    _actionAnimationTimer = setTimeout(function () {
+      _actionAnimationTimer = null
+      _drainActionAnimationQueue()
+    }, instant ? MOTION_TOKENS.instant : MOTION_TOKENS.action)
+  }
+
+  function _clearActionAnimationQueue() {
+    _actionAnimationQueue.length = 0
+    if (_actionAnimationTimer != null) {
+      clearTimeout(_actionAnimationTimer)
+      _actionAnimationTimer = null
+    }
+  }
+
+  function _animateMove(obj, targetX, targetZ, movementKind, instant) {
     const targetY = _tileSurfaceHeightAt(targetX, targetZ)
     const from = { x: obj.group.position.x, y: obj.group.position.y, z: obj.group.position.z }
     const fromBaseY = Number.isFinite(obj.motionBaseY) ? obj.motionBaseY : obj.baseY
     const visibleArc = Math.max(0, Math.min(0.08, from.y - fromBaseY))
+    const distance = Math.hypot(targetX - from.x, targetZ - from.z)
+    const travelDuration = movementKind === 'dash'
+      ? MOTION_SECONDS.dash
+      : Math.min(0.16, MOTION_SECONDS.move + Math.max(0, distance - 1) * 0.012)
     obj.baseX = targetX
     obj.baseY = targetY
     obj.baseZ = targetZ
+    if (instant) {
+      _cancelAnimation(obj.motionId + ':position')
+      obj.motionBaseY = targetY
+      obj.group.position.set(targetX, targetY, targetZ)
+      return
+    }
     // Teleport and swap have no traversed board cells: snap, then mark arrival.
     if (movementKind === 'teleport' || movementKind === 'swap') {
       _cancelAnimation(obj.motionId + ':position')
       obj.motionBaseY = targetY
       obj.group.position.set(targetX, targetY, targetZ)
-      _flashOutline(obj, movementKind === 'swap' ? 0x22d3ee : 0xa78bfa, MOTION_SECONDS.action)
+      _flashOutline(obj, movementKind === 'swap' ? 0x22d3ee : 0xa78bfa, MOTION_SECONDS.teleport)
       _animateLanding(obj)
       return
     }
-    if (movementKind === 'dash') _flashOutline(obj, 0xf59e0b, MOTION_SECONDS.action)
+    if (movementKind === 'dash') _flashOutline(obj, 0xf59e0b, MOTION_SECONDS.dash)
     if (_reducedMotion) {
       obj.motionBaseY = targetY
       obj.group.position.set(targetX, targetY, targetZ)
@@ -2004,7 +2084,7 @@
       return
     }
     _startAnimation(obj.motionId + ':position', {
-      duration: Math.min(0.32, MOTION_SECONDS.action),
+      duration: travelDuration,
       easing: EASE.inOut,
       update: function (progress, raw) {
         const pathBaseY = fromBaseY + (targetY - fromBaseY) * progress
@@ -2031,7 +2111,7 @@
     const startX = PIECE_W * 1.06 * 0.92
     const startY = PIECE_D * 1.08 * 0.92
     _startAnimation(obj.motionId + ':landing', {
-      duration: 0.12,
+      duration: 0.08,
       easing: EASE.out,
       update: function (progress) {
         shadow.scale.set(
@@ -2204,9 +2284,9 @@
     })
   }
 
-  function _animateHit(obj) {
-    _flashOutline(obj, 0xffffff, MOTION_SECONDS.hit)
-    if (_reducedMotion) return
+  function _animateHit(obj, instant) {
+    _flashOutline(obj, 0xffffff, instant ? MOTION_SECONDS.instant : MOTION_SECONDS.hit)
+    if (_reducedMotion || instant) return
     const from = obj.group.scale.x
     _startAnimation(obj.motionId + ':scale', {
       duration: MOTION_SECONDS.hit,
@@ -2221,12 +2301,12 @@
     })
   }
 
-  function _animateHeal(obj) {
-    _flashOutline(obj, 0x4ade80, MOTION_SECONDS.heal)
+  function _animateHeal(obj, instant) {
+    _flashOutline(obj, 0x4ade80, instant ? MOTION_SECONDS.instant : MOTION_SECONDS.heal)
   }
 
-  function _animateStatusChange(obj) {
-    _flashOutline(obj, 0x67e8f9, MOTION_SECONDS.fast)
+  function _animateStatusChange(obj, instant) {
+    _flashOutline(obj, 0x67e8f9, instant ? MOTION_SECONDS.instant : MOTION_SECONDS.fast)
   }
 
   function _animateSummon(obj) {
@@ -2291,7 +2371,7 @@
     }
   }
 
-  function _animateDeath(obj) {
+  function _animateDeath(obj, instant) {
     _cancelAnimation(obj.motionId + ':position')
     _cancelAnimation(obj.motionId + ':scale')
     obj.deathAnimating = true
@@ -2301,7 +2381,7 @@
     materials.forEach(function (material) { material.transparent = true })
     if (obj.body.material.color) obj.body.material.color.setHex(0x59616a)
     if (obj.body.material.emissive) obj.body.material.emissive.setHex(0x30363d)
-    const duration = _reducedMotion ? MOTION_SECONDS.fast : MOTION_SECONDS.result
+    const duration = instant ? MOTION_SECONDS.instant : (_reducedMotion ? MOTION_SECONDS.fast : MOTION_SECONDS.result)
     _startAnimation(obj.motionId + ':visibility', {
       duration,
       easing: EASE.in,
@@ -2332,13 +2412,16 @@
     const distance = Math.hypot(dx, dz) || 1
     const offsetX = dx / distance * 0.10
     const offsetZ = dz / distance * 0.10
+    const lungeDuration = MOTION_SECONDS.attack
     _startAnimation(source.motionId + ':position', {
-      duration: 0.19,
+      duration: lungeDuration,
       easing: function (progress) { return progress },
       update: function (_, raw) {
-        const phase = raw <= (0.09 / 0.19)
-          ? EASE.out(raw / (0.09 / 0.19))
-          : 1 - EASE.in((raw - (0.09 / 0.19)) / (0.10 / 0.19))
+        const approach = lungeDuration * 0.47
+        const retreat = lungeDuration - approach
+        const phase = raw <= (approach / lungeDuration)
+          ? EASE.out(raw / (approach / lungeDuration))
+          : 1 - EASE.in((raw - (approach / lungeDuration)) / (retreat / lungeDuration))
         source.group.position.set(from.x + offsetX * phase, from.y, from.z + offsetZ * phase)
       },
       complete: function () { source.group.position.set(from.x, from.y, from.z) },
@@ -2351,6 +2434,7 @@
   function getMotionDiagnostics() {
     return {
       activeAnimations: Array.from(_anims.keys()).sort(),
+      queuedActionCount: _actionAnimationQueue.length + (_actionAnimationTimer != null ? 1 : 0),
       playedEventCount: _playedEventKeys.size,
       floaterCount: _floaters.size,
       pendingPieceIds: Array.from(_pieceObjects.values()).filter(function (obj) { return obj.pending }).map(function (obj) { return obj.id }).sort(),
@@ -2474,7 +2558,9 @@
     const piece = _findPieceFromPointer(clientX, clientY)
     if (!piece || piece.id !== selection.pieceId) return null
     const obj = _pieceObjects.get(piece.id)
-    if (!obj || obj.pending || _anims.has(obj.motionId + ':position')) return null
+    if (!obj || obj.pending) return null
+    // Spatial motion is presentation-only. The drag is accepted immediately;
+    // the queued travel animation remains responsible for its visual sequence.
     return {
       pointerId: pointerId,
       pieceId: piece.id,
@@ -2839,12 +2925,19 @@
     if (!_currentModel || !_renderer || !_camera) return null
     let closest = null
     let closestDistance = Infinity
+    const targetMode = !!(_currentModel.selection && _currentModel.selection.mode === 'target')
 
     ;(_currentModel.interactionPieces || _currentModel.pieces || []).forEach(piece => {
       if (piece.visible === false) return
       const obj = _pieceObjects.get(piece.id)
-      const x = obj ? obj.group.position.x : piece.x
-      const y = obj ? obj.group.position.z : piece.y
+      // A lethal result removes the piece from hit testing immediately; its
+      // fade-out remains purely visual and must not create a second target.
+      if (obj && obj.deathAnimating) return
+      // Targeting follows the authoritative snapshot, not the presentation
+      // position. A piece can therefore be selected at its new legal cell while
+      // its travel animation is still catching up visually.
+      const x = targetMode ? piece.x : (obj ? obj.group.position.x : piece.x)
+      const y = targetMode ? piece.y : (obj ? obj.group.position.z : piece.y)
       const point = projectCell(x, y, (obj ? obj.group.position.y : _tileSurfaceHeightAt(x, y)) + PIECE_H + 0.014)
       if (!point) return
       const dx = clientX - point.clientX
@@ -2966,6 +3059,7 @@
   // Replace only the rendered board, preserving the user's camera and authority model.
   function settlePresentation(model) {
     if (!_mounted) return
+    _clearActionAnimationQueue()
     Array.from(_anims.keys()).forEach(_cancelAnimation)
     _pieceObjects.forEach(function (obj) { _restorePieceVisual(obj); obj.group.scale.set(1, 1, 1) })
     _floaterTimers.forEach(function (timer) { clearTimeout(timer) })
@@ -2977,6 +3071,7 @@
 
   function showHistoricalBoard(model) {
     if (!_mounted || !model || !model.board) return
+    _clearActionAnimationQueue()
     _cancelPieceDrag()
     Array.from(_anims.keys()).forEach(_cancelAnimation)
     _clearPresentationAreaFlash()
@@ -3099,6 +3194,7 @@
     Object.keys(_tileEffectMats).forEach(function (key) { delete _tileEffectMats[key] })
     Object.keys(_tileEffectIconMats).forEach(function (key) { delete _tileEffectIconMats[key] })
     _anims.clear()
+    _clearActionAnimationQueue()
     _playedEventKeys.clear()
     _playedEventOrder.length = 0
     _pendingAppearanceCues.clear()

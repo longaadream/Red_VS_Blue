@@ -1179,6 +1179,17 @@
       color: #cbd5e1; text-align: center; text-shadow: 0 1px 4px rgba(0,0,0,.9);
       font-size: 12px; font-weight: 700; pointer-events: none; backdrop-filter: none;
     }
+    #dmBubble {
+      position: fixed; left: 16px; bottom: 124px; z-index: 84; max-width: min(440px, calc(100vw - 32px));
+      padding: 18px 24px; border: 3px solid #e5c27c; border-radius: 22px 22px 22px 7px;
+      background: linear-gradient(145deg, rgba(55, 39, 29, .98), rgba(24, 20, 18, .98)); color: #fff1c9;
+      box-shadow: 0 4px 0 #24170e, 0 8px 22px rgba(0,0,0,.42), inset 0 0 0 1px rgba(255,240,190,.16);
+      font-size: 18px; font-weight: 900; line-height: 1.55; opacity: 0; transform: translateX(-30px) scale(.96);
+      pointer-events: none; transition: opacity 120ms ease-out, transform 180ms cubic-bezier(.22,1,.36,1);
+    }
+    #dmBubble::after { content: ''; position: absolute; left: 18px; bottom: -12px; width: 19px; height: 19px;
+      background: #2f231b; border-right: 3px solid #e5c27c; border-bottom: 3px solid #e5c27c; transform: skewY(-28deg) rotate(24deg); }
+    #dmBubble.is-visible { opacity: 1; transform: translateX(0) scale(1); }
     @media (max-width: 760px) {
       #targetOverlay { padding-top: 116px; }
       .target-prompt { font-size: 17px; }
@@ -1502,21 +1513,21 @@
     .turn-clock.fast.burning { color: #fb7185; }
     .turn-clock[hidden] { display: none !important; }
     #turnClockCorner {
-      position: fixed; right: 14px; bottom: 100px; z-index: 82;
+      position: fixed; right: 18px; left: auto; bottom: calc(var(--battle-hand-height, 138px) + 14px); z-index: 86;
       display: flex; flex-direction: column; align-items: center; gap: 2px;
-      background: #ccb086;
-      border: 1px solid #8d704c; border-radius: 2px;
-      padding: 5px 12px 6px; pointer-events: none;
-      box-shadow: 2px 4px 0 #211b12a0;
+      min-width: 116px; background: linear-gradient(145deg, #e3c890, #b6935c);
+      border: 3px solid #513b25; border-radius: 13px 8px 13px 8px;
+      padding: 9px 14px 10px; pointer-events: none;
+      box-shadow: 4px 5px 0 #211b12c7, 0 0 18px rgba(232,191,102,.25);
     }
     #turnClockCorner[hidden] { display: none !important; }
     #turnClockCorner .clock-label {
-      font-size: 10px; font-weight: 900; letter-spacing: .08em; text-transform: uppercase;
-      color: #68573e;
+      font-size: 11px; font-weight: 950; letter-spacing: .08em; text-transform: uppercase;
+      color: #49351f;
     }
     #turnClockCorner .clock-value {
-      font-size: 22px; font-weight: 950; font-variant-numeric: tabular-nums;
-      color: #342b20; line-height: 1; letter-spacing: .02em;
+      font-size: 32px; font-weight: 950; font-variant-numeric: tabular-nums;
+      color: #2b2118; line-height: 1; letter-spacing: .03em;
     }
     #turnClockCorner.burning { border-color: #a54332; }
     #turnClockCorner.burning .clock-value { color: #a54332; }
@@ -1524,6 +1535,9 @@
     #turnClockCorner.fast .clock-value { color: #7a5a1a; }
     #turnClockCorner.fast .clock-label { color: #7a5a1a; }
     @media (max-width: 600px) {
+      #dmBubble { left: 10px; bottom: 108px; max-width: calc(100vw - 20px); padding: 15px 19px; font-size: 16px; }
+      #turnClockCorner { right: 10px; bottom: calc(var(--battle-hand-height, 138px) + 9px); min-width: 100px; }
+      #turnClockCorner .clock-value { font-size: 27px; }
       .turn-summary-secondary.pending-timer-active {
         position: fixed;
         top: 38px;
@@ -1586,6 +1600,7 @@
   </div>
 
   <div id="statusMsg" role="status" aria-live="polite">选择棋子开始行动</div>
+  <div id="dmBubble" role="status" aria-live="assertive" aria-hidden="true"></div>
   <div id="turnClockCorner" hidden aria-label="回合计时" aria-live="off"><span class="clock-label">回合计时</span><span class="clock-value">--:--</span></div>
 
   <aside id="red43QaPanel" aria-live="polite">
@@ -1949,6 +1964,15 @@
     const RED43_QA_MODE = params.get('qa') === 'RED-43'
     const RED167_QA_MODE = params.get('qa') === 'RED-167'
     const DEBUG_BATTLE_LOG = params.get('debugBattleLog') === '1'
+    const TIMER_PREVIEW_MODE = params.get('timerPreview') === '1'
+    const TIMER_PREVIEW_STARTED_AT = Date.now()
+    const TIMER_PREVIEW_TIMER = TIMER_PREVIEW_MODE ? {
+      status: 'running',
+      deadlineAt: TIMER_PREVIEW_STARTED_AT + 45_000,
+      burnStartsAt: TIMER_PREVIEW_STARTED_AT + 15_000,
+      burning: false,
+      fast: false,
+    } : null
     if (TUTORIAL_MODE) document.body.classList.add('tutorial-mode')
     const debugBattleLogButton = document.getElementById('btnDebugBattleLog')
     if (debugBattleLogButton) debugBattleLogButton.hidden = !DEBUG_BATTLE_LOG
@@ -6668,10 +6692,11 @@
 
     function renderTurnTimerStatus() {
       const clock = document.getElementById('turnClock')
+      const corner = document.getElementById('turnClockCorner')
       const frozenClock = document.getElementById('turnClockFrozen')
       if (!clock || typeof RvBTurnTimerStatus === 'undefined') return
       const view = RvBTurnTimerStatus.create({
-        timer: authoritativeTurnTimer,
+        timer: authoritativeTurnTimer || TIMER_PREVIEW_TIMER,
         pendingTimer: authoritativePendingTimer,
         now: currentAuthorityNow(),
       })
@@ -6689,6 +6714,17 @@
         'aria-label',
         view.visible ? view.label + '，剩余 ' + view.remainingSeconds + ' 秒' : '回合计时不可用',
       )
+      if (corner) {
+        const cornerValue = corner.querySelector('.clock-value')
+        const cornerLabel = corner.querySelector('.clock-label')
+        corner.hidden = !view.visible
+        corner.classList.toggle('burning', view.visible && view.burning)
+        corner.classList.toggle('fast', view.visible && view.fast)
+        if (cornerValue) cornerValue.textContent = authoritativePendingTimer ? '响应 ' + view.clockText : view.clockText
+        if (cornerLabel) cornerLabel.textContent = authoritativePendingTimer ? '响应计时' : '回合计时'
+        corner.title = view.label
+        corner.setAttribute('aria-label', view.visible ? view.label + '，剩余 ' + view.remainingSeconds + ' 秒' : '回合计时不可用')
+      }
     }
 
     function scheduleDeadlineStatusRefresh() {
@@ -7831,9 +7867,55 @@
         setStatusMsg('等待对方操作')
       }, { capture: true, passive: false })
     })
+    let lastDmFeedback = { key: '', at: 0 }
+    let dmFeedbackTimer = null
+    function dmFeedbackLine(msg) {
+      const text = String(msg || '')
+      if (/不是你的回合|当前回合不属于你/.test(text)) return '你现在还不能行动。'
+      if (/棋子正在pending|棋子.*仍在等待权威确认|上一条指令仍在等待权威确认/.test(text)) return '你要操作的棋子还在结算中。'
+      if (/目标正在pending|目标.*仍在等待权威确认/.test(text)) return '这个目标还在结算中。'
+      if (/冷却|CD/.test(text)) return '这个技能还在冷却。'
+      if (/充能点不足|CP不足/.test(text)) return '你的充能点不够。'
+      if (/行动点不足|AP不足/.test(text)) return '你的行动点不够。'
+      if (/超出移动范围|移动范围不足/.test(text)) return '你不能移动到那里。'
+      if (/路径被阻挡|无法移动到该位置/.test(text)) return '这条路被挡住了。'
+      if (/目标位置被占用|部署位置非法/.test(text)) return '那个位置不能进入。'
+      if (/目标类型错误|目标不在权威合法目标集合内|目标不在技能范围内/.test(text)) return '这个目标不符合技能要求。'
+      if (/技能需要目标但没有目标/.test(text)) return '这个技能需要一个目标。'
+      if (/目标数量超限制|最多选择.*个/.test(text)) return '你选择的目标太多了。'
+      if (/目标数量不足|请选择.*至.*目标/.test(text)) return '你还需要选择更多目标。'
+      return null
+    }
+    function showDmFeedback(msg) {
+      const line = dmFeedbackLine(msg)
+      if (!line) return
+      const now = Date.now()
+      const key = line + '|' + String(msg)
+      if (lastDmFeedback.key === key && now - lastDmFeedback.at < 700) return
+      lastDmFeedback = { key, at: now }
+      const bubble = document.getElementById('dmBubble')
+      if (!bubble) return
+      bubble.textContent = line
+      bubble.classList.remove('is-visible')
+      bubble.setAttribute('aria-hidden', 'false')
+      requestAnimationFrame(() => bubble.classList.add('is-visible'))
+      if (dmFeedbackTimer) clearTimeout(dmFeedbackTimer)
+      dmFeedbackTimer = setTimeout(() => {
+        bubble.classList.remove('is-visible')
+        bubble.setAttribute('aria-hidden', 'true')
+      }, 1800)
+      if (window.speechSynthesis && !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+        try { window.speechSynthesis.cancel(); const utterance = new SpeechSynthesisUtterance(line); utterance.lang = 'zh-CN'; utterance.rate = 1.08; window.speechSynthesis.speak(utterance) } catch (_) {}
+      }
+      if (TIMER_PREVIEW_MODE && !authoritativeTurnTimer && !authoritativePendingTimer) {
+        deadlines.push(Number(TIMER_PREVIEW_TIMER.deadlineAt), Number(TIMER_PREVIEW_TIMER.burnStartsAt))
+      }
+    }
     function setStatusMsg(msg) {
       const el = document.getElementById('statusMsg')
-      if (el) el.textContent = waitingForOtherPending() ? '等待对方操作' : msg
+      const shown = waitingForOtherPending() ? '等待对方操作' : msg
+      if (el) el.textContent = shown
+      showDmFeedback(shown)
     }
     function showMsg(msg, type) {
       const loadingMsg = document.getElementById('loadingMsg')

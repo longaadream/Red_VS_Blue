@@ -55,7 +55,7 @@
       const movement = group.root.kind === 'move' || group.root.kind === 'forceMove'
       if (!(phase === 'static' || phase === 'settle' || phase === (movement ? 'path' : 'result'))) return
       if (appliedBeats.has(group.rootEventId)) {
-        if (phase === 'settle' && renderer.settlePresentation && playbackModel) renderer.settlePresentation(playbackModel)
+        if (phase === 'settle' && renderer.update && playbackModel) renderer.update(playbackModel)
         return
       }
       appliedBeats.add(group.rootEventId)
@@ -127,9 +127,10 @@
       after.interactionPieces = currentModel.pieces
       after.turn = currentModel.turn
       playbackModel = after
-      if (phase === 'settle' && renderer.settlePresentation) renderer.settlePresentation(after)
+      if (phase === 'settle' && renderer.update) renderer.update(after)
       else if (renderer.animateAction) renderer.animateAction({ motionEventKey: 'beat:' + group.rootEventId,
-        movementKinds: movementKinds, sourcePieceId: group.root.sourcePieceId, targetPieceId: (group.root.targetPieceIds || [])[0] }, before, after)
+        movementKinds: movementKinds, sourcePieceId: group.root.sourcePieceId, targetPieceId: (group.root.targetPieceIds || [])[0],
+        isAutomatic: !!group.root.parentEventId }, before, after)
       renderer.update(after)
     }
 
@@ -353,14 +354,14 @@
       if (!mounted || settlingSelection) return
       settlingSelection = true
       try {
-        if (vignetteUi && vignetteUi.settleAll) vignetteUi.settleAll()
-        if (impact) impact.stop()
+        // Entering target selection changes interaction state only. Existing
+        // movement/impact presentation must continue in order; pending is a
+        // rules gate, not a request to skip visual events already in flight.
         playbackModel = null
         playbackRoot = null
         if (historicalRoot) setHistoricalBoard(null)
         if (currentModel) {
-          if (renderer.settlePresentation) renderer.settlePresentation(currentModel)
-          else renderer.update(currentModel)
+          renderer.update(currentModel)
         }
       } finally { settlingSelection = false }
     }
