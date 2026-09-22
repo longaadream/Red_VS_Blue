@@ -121,6 +121,14 @@ describe('RED-69 battle motion contract', () => {
     expect(battlePage).toMatch(/interaction:\s*\{[\s\S]*?pendingPieceId:/)
   })
 
+  it('provides repeatable DM feedback for the shared illegal-action messages', () => {
+    const battlePage = readPage('battle.html')
+    expect(battlePage).toContain('function dmFeedbackLine(msg)')
+    expect(battlePage).toContain('你现在还不能行动。')
+    expect(battlePage).toContain('function showDmFeedback(msg)')
+    expect(battlePage).toContain('id="dmBubble"')
+  })
+
   it('keeps one pending command until an exact receipt and preserves it across timeout recovery', () => {
     const battlePage = readPage('battle.html')
     const statusMessages: string[] = []

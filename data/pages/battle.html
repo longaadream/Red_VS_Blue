@@ -1179,6 +1179,14 @@
       color: #cbd5e1; text-align: center; text-shadow: 0 1px 4px rgba(0,0,0,.9);
       font-size: 12px; font-weight: 700; pointer-events: none; backdrop-filter: none;
     }
+    #dmBubble {
+      position: fixed; left: 12px; bottom: 112px; z-index: 84; max-width: min(360px, calc(100vw - 24px));
+      padding: 10px 14px; border: 2px solid #c8a96b; border-radius: 14px 14px 14px 3px;
+      background: rgba(30, 24, 20, .96); color: #f7e7bd; box-shadow: 4px 5px 0 rgba(0,0,0,.34);
+      font-size: 13px; font-weight: 800; line-height: 1.4; opacity: 0; transform: translateX(-24px);
+      pointer-events: none; transition: opacity 120ms ease-out, transform 180ms cubic-bezier(.22,1,.36,1);
+    }
+    #dmBubble.is-visible { opacity: 1; transform: translateX(0); }
     @media (max-width: 760px) {
       #targetOverlay { padding-top: 116px; }
       .target-prompt { font-size: 17px; }
@@ -1586,6 +1594,7 @@
   </div>
 
   <div id="statusMsg" role="status" aria-live="polite">选择棋子开始行动</div>
+  <div id="dmBubble" role="status" aria-live="assertive" aria-hidden="true"></div>
   <div id="turnClockCorner" hidden aria-label="回合计时" aria-live="off"><span class="clock-label">回合计时</span><span class="clock-value">--:--</span></div>
 
   <aside id="red43QaPanel" aria-live="polite">
@@ -7831,9 +7840,52 @@
         setStatusMsg('等待对方操作')
       }, { capture: true, passive: false })
     })
+    let lastDmFeedback = { key: '', at: 0 }
+    let dmFeedbackTimer = null
+    function dmFeedbackLine(msg) {
+      const text = String(msg || '')
+      if (/不是你的回合|等待对方操作/.test(text)) return '你现在还不能行动。'
+      if (/棋子.*pending|指令仍在等待|权威确认/.test(text)) return '你要操作的棋子还在结算中。'
+      if (/目标.*pending|目标指令已提交/.test(text)) return '这个目标还在结算中。'
+      if (/冷却|CD/.test(text)) return '这个技能还在冷却。'
+      if (/充能点不足|CP不足/.test(text)) return '你的充能点不够。'
+      if (/行动点不足|AP不足/.test(text)) return '你的行动点不够。'
+      if (/移动范围|高亮格/.test(text)) return '你不能移动到那里。'
+      if (/路径被阻挡|无法移动/.test(text)) return '这条路被挡住了。'
+      if (/位置被占用|部署.*位置|部署.*高亮/.test(text)) return '那个位置不能进入。'
+      if (/目标类型|目标不在|合法目标/.test(text)) return '这个目标不符合技能要求。'
+      if (/需要目标|请选择.*目标/.test(text)) return '这个技能需要一个目标。'
+      if (/最多|最大选择|超过/.test(text)) return '你选择的目标太多了。'
+      if (/至少|最少|请选择.*至/.test(text)) return '你还需要选择更多目标。'
+      return null
+    }
+    function showDmFeedback(msg) {
+      const line = dmFeedbackLine(msg)
+      if (!line) return
+      const now = Date.now()
+      const key = line + '|' + String(msg)
+      if (lastDmFeedback.key === key && now - lastDmFeedback.at < 700) return
+      lastDmFeedback = { key, at: now }
+      const bubble = document.getElementById('dmBubble')
+      if (!bubble) return
+      bubble.textContent = line
+      bubble.classList.remove('is-visible')
+      bubble.setAttribute('aria-hidden', 'false')
+      requestAnimationFrame(() => bubble.classList.add('is-visible'))
+      if (dmFeedbackTimer) clearTimeout(dmFeedbackTimer)
+      dmFeedbackTimer = setTimeout(() => {
+        bubble.classList.remove('is-visible')
+        bubble.setAttribute('aria-hidden', 'true')
+      }, 1800)
+      if (window.speechSynthesis && !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+        try { window.speechSynthesis.cancel(); const utterance = new SpeechSynthesisUtterance(line); utterance.lang = 'zh-CN'; utterance.rate = 1.08; window.speechSynthesis.speak(utterance) } catch (_) {}
+      }
+    }
     function setStatusMsg(msg) {
       const el = document.getElementById('statusMsg')
-      if (el) el.textContent = waitingForOtherPending() ? '等待对方操作' : msg
+      const shown = waitingForOtherPending() ? '等待对方操作' : msg
+      if (el) el.textContent = shown
+      showDmFeedback(shown)
     }
     function showMsg(msg, type) {
       const loadingMsg = document.getElementById('loadingMsg')
