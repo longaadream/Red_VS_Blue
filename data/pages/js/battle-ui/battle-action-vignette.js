@@ -3,7 +3,6 @@
 
   const SINGLE_EFFECT_DURATION_MS = 24
   const COMPOSITE_STEP_DURATION_MS = 200
-  const MULTI_EFFECT_STEP_DURATION_MS = 240
   const NORMAL_DURATION_MS = COMPOSITE_STEP_DURATION_MS
   const CARD_DURATION_MS = COMPOSITE_STEP_DURATION_MS
   const REDUCED_DURATION_MS = 120
@@ -20,15 +19,10 @@
   }
 
   function actionDuration(group) {
-    if (group && group.children && group.children.length === 0) return SINGLE_EFFECT_DURATION_MS
-    // A root event with children is one composite step. The event grouping
-    // above has already merged only genuinely simultaneous results, so every
-    // remaining beat gets the same readable budget and the next beat starts
-    // after it. This keeps teleport -> attack, multi-hit and triggered chains
-    // sequential instead of collapsing into one burst.
-    return group && group.children && group.children.length > 1
-      ? MULTI_EFFECT_STEP_DURATION_MS
-      : COMPOSITE_STEP_DURATION_MS
+    // Every event gets its own readable post-action beat. The event queue
+    // below deliberately keeps adjacent results separate, so a multi-hit or
+    // triggered chain cannot collapse into one burst.
+    return COMPOSITE_STEP_DURATION_MS
   }
 
   function hideBannerForModel(event, model) {
@@ -96,20 +90,7 @@
         ;[group.root].concat(group.children).forEach(function (event) {
           if (['actionPoints', 'cardDiscarded', 'cardChanged'].includes(event.kind)) return
           if (event.parentEventId && event.kind === 'passive' && !(event.result && event.result.pending)) return
-          const previous = beats[beats.length - 1]
-          const simultaneous = ['damage', 'heal', 'spawn', 'death', 'statusAdded', 'statusRemoved', 'tileEffectAdded', 'tileEffectRemoved'].includes(event.kind)
-            && event.batchId && previous && previous.root.kind === event.kind
-            && previous.root.batchId === event.batchId
-          const bulkStrengthening = previous && ['statChanged', 'statusAdded', 'statusRemoved'].includes(event.kind) && previous.root.kind === event.kind
-            && (event.kind === 'statChanged' || event.statusType === previous.root.statusType)
-            && event.sourcePieceId === previous.root.sourcePieceId
-            && event.skillId === previous.root.skillId && event.ruleId === previous.root.ruleId
-          const tileTogether = previous && ['tileEffectAdded', 'tileEffectRemoved'].includes(event.kind)
-            && previous.root.kind === event.kind
-            && (event.result?.presentation || 'simultaneous') === (previous.root.result?.presentation || 'simultaneous')
-            && (event.result?.presentation !== 'expand' || event.result?.presentationStep === previous.root.result?.presentationStep)
-          if (tileTogether || simultaneous && !['tileEffectAdded', 'tileEffectRemoved'].includes(event.kind) || bulkStrengthening) previous.children.push(event)
-          else beats.push({ rootEventId: event.eventId, root: event, children: [], identityEvents: [group.root].concat(group.children) })
+          beats.push({ rootEventId: event.eventId, root: event, children: [], identityEvents: [group.root].concat(group.children) })
         })
         return beats
       })
@@ -741,7 +722,6 @@
     constants: Object.freeze({
       singleEffectDurationMs: SINGLE_EFFECT_DURATION_MS,
       compositeStepDurationMs: COMPOSITE_STEP_DURATION_MS,
-      multiEffectStepDurationMs: MULTI_EFFECT_STEP_DURATION_MS,
       normalDurationMs: NORMAL_DURATION_MS,
       cardDurationMs: CARD_DURATION_MS,
       reducedDurationMs: REDUCED_DURATION_MS,

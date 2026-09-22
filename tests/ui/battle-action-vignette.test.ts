@@ -26,7 +26,7 @@ type VignetteModule = {
     getDiagnostics(): { activeRootId: string | null; pendingRootIds: string[]; speed: number; playedRootCount: number }
     dispose(): void
   }
-  constants: { singleEffectDurationMs: number; compositeStepDurationMs: number; multiEffectStepDurationMs: number; normalDurationMs: number; cardDurationMs: number; reducedDurationMs: number; skipSettleMs: number }
+  constants: { singleEffectDurationMs: number; compositeStepDurationMs: number; normalDurationMs: number; cardDurationMs: number; reducedDurationMs: number; skipSettleMs: number }
 }
 
 class FakeElement {
@@ -112,7 +112,6 @@ describe('RED-167 action vignette queue', () => {
   it('keeps a single-effect banner under the instant feedback budget', () => {
     expect(loadModule().constants.singleEffectDurationMs).toBeLessThan(50)
     expect(loadModule().constants.compositeStepDurationMs).toBe(200)
-    expect(loadModule().constants.multiEffectStepDurationMs).toBe(240)
   })
   it('hides friendly active banners and all ordinary movement banners', () => {
     const ui = loadModule()
@@ -136,7 +135,7 @@ describe('RED-167 action vignette queue', () => {
     expect(queue.getDiagnostics().pendingRootIds).toEqual(pending)
     queue.dispose()
   })
-  it('separates movement and repeated hits while keeping only one explicit same-kind batch together', () => {
+  it('separates every movement and repeated hit into its own animation beat', () => {
     const groups = loadModule().groupEvents([
       root(1),
       child(1, 1, { kind: 'forceMove' }),
@@ -146,7 +145,7 @@ describe('RED-167 action vignette queue', () => {
       child(1, 5, { kind: 'heal', batchId: 'hit-2' }),
     ])
     expect(groups.map(group => [group.root.eventId, group.children.length])).toEqual([
-      ['action-1:0', 0], ['action-1:1', 0], ['action-1:2', 1], ['action-1:4', 0], ['action-1:5', 0],
+      ['action-1:0', 0], ['action-1:1', 0], ['action-1:2', 0], ['action-1:3', 0], ['action-1:4', 0], ['action-1:5', 0],
     ])
   })
   beforeEach(() => vi.useFakeTimers())
@@ -885,18 +884,18 @@ it('announces only manually initiated skills and cards, never their automatic ef
   for (const kind of ['deploy', 'passive', 'damage', 'death', 'actionPoints', 'choiceResolved']) expect(ui.showsBanner({ kind })).toBe(false)
 })
 
-it('plays a bulk attribute increase together without merging subsequent hits', () => {
+it('plays each attribute increase and subsequent hit as its own beat', () => {
   const ui = loadModule()
   const events = [root(1), child(1, 1, { kind: 'statChanged', sourcePieceId: 'caster', targetPieceIds: ['a'] }), child(1, 2, { kind: 'statChanged', sourcePieceId: 'caster', targetPieceIds: ['b'] }), child(1, 3, { kind: 'damage' }), child(1, 4, { kind: 'damage' })]
   const groups = ui.groupEvents(events)
-  expect(groups).toHaveLength(4)
-  expect(groups[1].children).toHaveLength(1)
+  expect(groups).toHaveLength(5)
+  expect(groups.every(group => group.children.length === 0)).toBe(true)
 })
 
-it('plays the same status applied to multiple targets in one beat', () => {
+it('plays the same status applied to multiple targets in separate beats', () => {
   const groups = loadModule().groupEvents([root(1), ...['a', 'b', 'c'].map((id, index) => child(1, index + 1, { kind: 'statusAdded', statusType: 'empowered', sourcePieceId: 'caster', targetPieceIds: [id] }))])
-  expect(groups).toHaveLength(2)
-  expect(groups[1].children).toHaveLength(2)
+  expect(groups).toHaveLength(4)
+  expect(groups.every(group => group.children.length === 0)).toBe(true)
 })
 
 it('finishes a batch of status applications in 250ms', () => {
@@ -913,19 +912,19 @@ it('finishes a batch of status applications in 250ms', () => {
 })
 
 
-it('groups default tile effects into one simultaneous beat', () => {
+it('plays default tile effects in separate beats', () => {
   const groups = loadModule().groupEvents([root(1), ...[1, 2, 3].map(i => child(1, i, {
     kind: 'tileEffectAdded', targetCell: { x: i, y: 0 }, result: { effectId: 'tile-' + i },
   }))])
-  expect(groups).toHaveLength(2)
-  expect(groups[1].children).toHaveLength(2)
+  expect(groups).toHaveLength(4)
+  expect(groups.every(group => group.children.length === 0)).toBe(true)
 })
 
-it('groups expanding tile effects by ring even when they share a batch', () => {
+it('plays expanding tile effects as separate beats even when they share a batch', () => {
   const groups = loadModule().groupEvents([root(1), ...[0, 1, 1, 2].map((step, i) => child(1, i + 1, {
     kind: 'tileEffectAdded', batchId: 'area', targetCell: { x: i, y: 0 },
     result: { effectId: 'tile-' + i, presentation: 'expand', presentationStep: step },
   }))])
-  expect(groups).toHaveLength(4)
-  expect(groups[2].children).toHaveLength(1)
+  expect(groups).toHaveLength(5)
+  expect(groups.every(group => group.children.length === 0)).toBe(true)
 })
