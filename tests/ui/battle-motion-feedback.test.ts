@@ -49,7 +49,7 @@ describe('RED-69 battle motion contract', () => {
       '--motion-dash: 145ms',
       '--motion-teleport: 80ms',
       '--motion-attack: 130ms',
-      '--motion-action: 180ms',
+      '--motion-action: 200ms',
       '--motion-result: 200ms',
       '--ease-out: cubic-bezier(0.22, 1, 0.36, 1)',
       '--ease-in: cubic-bezier(0.4, 0, 1, 1)',
@@ -59,13 +59,13 @@ describe('RED-69 battle motion contract', () => {
     expect(renderer).toContain('MOTION_TOKENS')
     expect(renderer).toContain('press: 80')
     expect(renderer).toContain('fast: 100')
-    expect(renderer).toContain('action: 180')
+    expect(renderer).toContain('action: 200')
     expect(renderer).toContain('result: 200')
     expect(renderer).not.toMatch(/duration:\s*0\.[4-9]/)
     expect(renderer).toContain('const lungeDuration = MOTION_SECONDS.attack')
     expect(renderer).toContain('function _singleEffectPresentation(previousModel, nextModel)')
     expect(renderer).toContain('function _ownPresentationAction(action, model)')
-    expect(renderer).toContain('}, instant ? MOTION_TOKENS.instant : MOTION_TOKENS.result + 20)')
+    expect(renderer).toContain('}, instant ? MOTION_TOKENS.instant : MOTION_TOKENS.action)')
   })
 
   it('keeps target and status feedback short, simultaneous, and reduced-motion safe', () => {
@@ -100,7 +100,7 @@ describe('RED-69 battle motion contract', () => {
     const renderer = readPage('js/battle-renderer-3d.js')
     expect(renderer).toContain('_actionAnimationQueue.push')
     expect(renderer).toContain('_animateActionNow(item.action, item.previousModel, item.nextModel)')
-    expect(renderer).toContain('MOTION_TOKENS.result + 20')
+    expect(renderer).toContain('MOTION_TOKENS.action')
   })
 
   it('uses authoritative piece coordinates while selecting a target', () => {

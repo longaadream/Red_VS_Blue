@@ -2,8 +2,9 @@
   'use strict'
 
   const SINGLE_EFFECT_DURATION_MS = 24
-  const NORMAL_DURATION_MS = 180
-  const CARD_DURATION_MS = 220
+  const COMPOSITE_STEP_DURATION_MS = 200
+  const NORMAL_DURATION_MS = COMPOSITE_STEP_DURATION_MS
+  const CARD_DURATION_MS = COMPOSITE_STEP_DURATION_MS
   const REDUCED_DURATION_MS = 120
   const SKIP_SETTLE_MS = 60
   const MAX_PLAYED_ROOTS = 256
@@ -18,10 +19,13 @@
   }
 
   function actionDuration(group) {
-    if (group && group.root && ['tileEffectAdded', 'tileEffectRemoved'].includes(group.root.kind)) return 240
-    if (isStatusBeat(group)) return 250
     if (group && group.children && group.children.length === 0) return SINGLE_EFFECT_DURATION_MS
-    return group && group.root && group.root.kind === 'card' ? CARD_DURATION_MS : NORMAL_DURATION_MS
+    // A root event with children is one composite step. The event grouping
+    // above has already merged only genuinely simultaneous results, so every
+    // remaining beat gets the same readable budget and the next beat starts
+    // after it. This keeps teleport -> attack, multi-hit and triggered chains
+    // sequential instead of collapsing into one burst.
+    return COMPOSITE_STEP_DURATION_MS
   }
 
   function hideBannerForModel(event, model) {
@@ -37,8 +41,6 @@
   }
 
   function phaseTime(phase, group) {
-    if (group && group.root && ['tileEffectAdded', 'tileEffectRemoved'].includes(group.root.kind)) return ({ path: 0, result: 20, settle: 200 }[phase] || 0)
-    if (isStatusBeat(group)) return ({ path: 20, result: 40, settle: 220 }[phase] || 0)
     const duration = actionDuration(group)
     return phase === 'settle'
       ? Math.max(32, duration - 40)
@@ -735,6 +737,7 @@
     eventCells: eventCells,
     constants: Object.freeze({
       singleEffectDurationMs: SINGLE_EFFECT_DURATION_MS,
+      compositeStepDurationMs: COMPOSITE_STEP_DURATION_MS,
       normalDurationMs: NORMAL_DURATION_MS,
       cardDurationMs: CARD_DURATION_MS,
       reducedDurationMs: REDUCED_DURATION_MS,

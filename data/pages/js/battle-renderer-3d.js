@@ -29,7 +29,7 @@
     dash: 145,
     teleport: 80,
     attack: 130,
-    action: 180,
+    action: 200,
     result: 200,
     reject: 120,
     hit: 100,
@@ -2032,7 +2032,7 @@
     _actionAnimationTimer = setTimeout(function () {
       _actionAnimationTimer = null
       _drainActionAnimationQueue()
-    }, instant ? MOTION_TOKENS.instant : MOTION_TOKENS.result + 20)
+    }, instant ? MOTION_TOKENS.instant : MOTION_TOKENS.action)
   }
 
   function _clearActionAnimationQueue() {

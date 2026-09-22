@@ -26,7 +26,7 @@ type VignetteModule = {
     getDiagnostics(): { activeRootId: string | null; pendingRootIds: string[]; speed: number; playedRootCount: number }
     dispose(): void
   }
-  constants: { singleEffectDurationMs: number; normalDurationMs: number; cardDurationMs: number; reducedDurationMs: number; skipSettleMs: number }
+  constants: { singleEffectDurationMs: number; compositeStepDurationMs: number; normalDurationMs: number; cardDurationMs: number; reducedDurationMs: number; skipSettleMs: number }
 }
 
 class FakeElement {
@@ -111,6 +111,7 @@ function child(index: number, childIndex: number, overrides: Record<string, unkn
 describe('RED-167 action vignette queue', () => {
   it('keeps a single-effect banner under the instant feedback budget', () => {
     expect(loadModule().constants.singleEffectDurationMs).toBeLessThan(50)
+    expect(loadModule().constants.compositeStepDurationMs).toBe(200)
   })
   it('hides friendly active banners and all ordinary movement banners', () => {
     const ui = loadModule()
