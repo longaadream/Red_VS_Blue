@@ -1,9 +1,9 @@
 ;(function (root) {
   'use strict'
 
-  const SINGLE_EFFECT_DURATION_MS = 40
-  const NORMAL_DURATION_MS = 300
-  const CARD_DURATION_MS = 360
+  const SINGLE_EFFECT_DURATION_MS = 24
+  const NORMAL_DURATION_MS = 180
+  const CARD_DURATION_MS = 220
   const REDUCED_DURATION_MS = 120
   const SKIP_SETTLE_MS = 60
   const MAX_PLAYED_ROOTS = 256

@@ -22,7 +22,7 @@
   let _overviewZoom = 1
   let _cameraInOverview = true
   const MOTION_TOKENS = Object.freeze({
-    instant: 32,
+    instant: 16,
     press: 80,
     fast: 100,
     move: 120,

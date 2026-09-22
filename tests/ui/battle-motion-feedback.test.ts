@@ -43,7 +43,7 @@ describe('RED-69 battle motion contract', () => {
 
     for (const token of [
       '--motion-press: 80ms',
-      '--motion-instant: 32ms',
+      '--motion-instant: 16ms',
       '--motion-fast: 100ms',
       '--motion-move: 120ms',
       '--motion-dash: 145ms',
