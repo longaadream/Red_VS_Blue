@@ -42,20 +42,20 @@ describe('RED-69 battle motion contract', () => {
     const renderer = readPage('js/battle-renderer-3d.js')
 
     for (const token of [
-      '--motion-press: 100ms',
-      '--motion-fast: 140ms',
-      '--motion-action: 240ms',
-      '--motion-result: 280ms',
+      '--motion-press: 80ms',
+      '--motion-fast: 100ms',
+      '--motion-action: 180ms',
+      '--motion-result: 200ms',
       '--ease-out: cubic-bezier(0.22, 1, 0.36, 1)',
       '--ease-in: cubic-bezier(0.4, 0, 1, 1)',
       '--ease-in-out: cubic-bezier(0.65, 0, 0.35, 1)',
     ]) expect(css).toContain(token)
 
     expect(renderer).toContain('MOTION_TOKENS')
-    expect(renderer).toContain('press: 100')
-    expect(renderer).toContain('fast: 140')
-    expect(renderer).toContain('action: 240')
-    expect(renderer).toContain('result: 280')
+    expect(renderer).toContain('press: 80')
+    expect(renderer).toContain('fast: 100')
+    expect(renderer).toContain('action: 180')
+    expect(renderer).toContain('result: 200')
     expect(renderer).not.toMatch(/duration:\s*0\.[4-9]/)
   })
 

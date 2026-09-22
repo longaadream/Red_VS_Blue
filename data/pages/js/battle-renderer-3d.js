@@ -22,13 +22,13 @@
   let _overviewZoom = 1
   let _cameraInOverview = true
   const MOTION_TOKENS = Object.freeze({
-    press: 100,
-    fast: 140,
-    action: 240,
-    result: 280,
-    reject: 160,
-    hit: 150,
-    heal: 180,
+    press: 80,
+    fast: 100,
+    action: 180,
+    result: 200,
+    reject: 120,
+    hit: 100,
+    heal: 120,
     easeOut: Object.freeze([0.22, 1, 0.36, 1]),
     easeIn: Object.freeze([0.4, 0, 1, 1]),
     easeInOut: Object.freeze([0.65, 0, 0.35, 1]),
@@ -2031,7 +2031,7 @@
     const startX = PIECE_W * 1.06 * 0.92
     const startY = PIECE_D * 1.08 * 0.92
     _startAnimation(obj.motionId + ':landing', {
-      duration: 0.12,
+      duration: 0.08,
       easing: EASE.out,
       update: function (progress) {
         shadow.scale.set(

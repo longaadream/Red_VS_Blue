@@ -621,10 +621,10 @@ canvas:focus-visible {
 }
 /* RED-69: one shared, interruptible motion vocabulary for battle feedback. */
 :root {
-  --motion-press: 100ms;
-  --motion-fast: 140ms;
-  --motion-action: 240ms;
-  --motion-result: 280ms;
+  --motion-press: 80ms;
+  --motion-fast: 100ms;
+  --motion-action: 180ms;
+  --motion-result: 200ms;
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
   --ease-in: cubic-bezier(0.4, 0, 1, 1);
   --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
