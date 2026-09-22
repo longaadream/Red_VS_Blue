@@ -1181,9 +1181,9 @@
     }
     #dmBubble {
       position: fixed; left: 12px; bottom: 112px; z-index: 84; max-width: min(360px, calc(100vw - 24px));
-      padding: 10px 14px; border: 2px solid #c8a96b; border-radius: 14px 14px 14px 3px;
+      padding: 13px 18px; border: 2px solid #c8a96b; border-radius: 16px 16px 16px 4px;
       background: rgba(30, 24, 20, .96); color: #f7e7bd; box-shadow: 4px 5px 0 rgba(0,0,0,.34);
-      font-size: 13px; font-weight: 800; line-height: 1.4; opacity: 0; transform: translateX(-24px);
+      font-size: 15px; font-weight: 850; line-height: 1.5; opacity: 0; transform: translateX(-24px);
       pointer-events: none; transition: opacity 120ms ease-out, transform 180ms cubic-bezier(.22,1,.36,1);
     }
     #dmBubble.is-visible { opacity: 1; transform: translateX(0); }
@@ -7844,19 +7844,19 @@
     let dmFeedbackTimer = null
     function dmFeedbackLine(msg) {
       const text = String(msg || '')
-      if (/不是你的回合|等待对方操作/.test(text)) return '你现在还不能行动。'
-      if (/棋子.*pending|指令仍在等待|权威确认/.test(text)) return '你要操作的棋子还在结算中。'
-      if (/目标.*pending|目标指令已提交/.test(text)) return '这个目标还在结算中。'
+      if (/不是你的回合|当前回合不属于你/.test(text)) return '你现在还不能行动。'
+      if (/棋子正在pending|棋子.*仍在等待权威确认|上一条指令仍在等待权威确认/.test(text)) return '你要操作的棋子还在结算中。'
+      if (/目标正在pending|目标.*仍在等待权威确认/.test(text)) return '这个目标还在结算中。'
       if (/冷却|CD/.test(text)) return '这个技能还在冷却。'
       if (/充能点不足|CP不足/.test(text)) return '你的充能点不够。'
       if (/行动点不足|AP不足/.test(text)) return '你的行动点不够。'
-      if (/移动范围|高亮格/.test(text)) return '你不能移动到那里。'
-      if (/路径被阻挡|无法移动/.test(text)) return '这条路被挡住了。'
-      if (/位置被占用|部署.*位置|部署.*高亮/.test(text)) return '那个位置不能进入。'
-      if (/目标类型|目标不在|合法目标/.test(text)) return '这个目标不符合技能要求。'
-      if (/需要目标|请选择.*目标/.test(text)) return '这个技能需要一个目标。'
-      if (/最多|最大选择|超过/.test(text)) return '你选择的目标太多了。'
-      if (/至少|最少|请选择.*至/.test(text)) return '你还需要选择更多目标。'
+      if (/超出移动范围|移动范围不足/.test(text)) return '你不能移动到那里。'
+      if (/路径被阻挡|无法移动到该位置/.test(text)) return '这条路被挡住了。'
+      if (/目标位置被占用|部署位置非法/.test(text)) return '那个位置不能进入。'
+      if (/目标类型错误|目标不在权威合法目标集合内|目标不在技能范围内/.test(text)) return '这个目标不符合技能要求。'
+      if (/技能需要目标但没有目标/.test(text)) return '这个技能需要一个目标。'
+      if (/目标数量超限制|最多选择.*个/.test(text)) return '你选择的目标太多了。'
+      if (/目标数量不足|请选择.*至.*目标/.test(text)) return '你还需要选择更多目标。'
       return null
     }
     function showDmFeedback(msg) {
