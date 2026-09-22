@@ -22,6 +22,7 @@
   let _overviewZoom = 1
   let _cameraInOverview = true
   const MOTION_TOKENS = Object.freeze({
+    instant: 32,
     press: 80,
     fast: 100,
     move: 120,
@@ -1932,6 +1933,14 @@
     return roots.size <= 1 && results.length <= 1 && changedPieces <= 1
   }
 
+  function _ownPresentationAction(action, model) {
+    const viewerId = model && model.viewer && String(model.viewer.id || '').toLowerCase()
+    if (!viewerId) return false
+    const actorId = action && (action.sourcePieceId || action.attackerId || action.actorId || action.pieceId)
+    const actor = actorId && _pieceById(model, actorId)
+    return !!(actor && actor.ownerPlayerId && String(actor.ownerPlayerId).toLowerCase() === viewerId)
+  }
+
   function _diffSignature(previousModel, nextModel) {
     return ((nextModel && nextModel.pieces) || []).map(function (nextPiece) {
       const previousPiece = _pieceById(previousModel, nextPiece.id)
@@ -1969,7 +1978,7 @@
       if (rejected) _flashOutline(rejected, 0xef4444, MOTION_SECONDS.reject)
       return
     }
-    const instant = _singleEffectPresentation(previousModel, nextModel)
+    const instant = _singleEffectPresentation(previousModel, nextModel) && _ownPresentationAction(action, nextModel)
 
     const damagedTargets = []
     ;(nextModel.pieces || []).forEach(function (nextPiece) {
@@ -2018,11 +2027,12 @@
     if (!_actionAnimationQueue.length || _actionAnimationTimer != null) return
     const item = _actionAnimationQueue.shift()
     const instant = _singleEffectPresentation(item.previousModel, item.nextModel)
+      && _ownPresentationAction(item.action, item.nextModel)
     _animateActionNow(item.action, item.previousModel, item.nextModel)
     _actionAnimationTimer = setTimeout(function () {
       _actionAnimationTimer = null
       _drainActionAnimationQueue()
-    }, instant ? MOTION_TOKENS.press : MOTION_TOKENS.result + 20)
+    }, instant ? MOTION_TOKENS.instant : MOTION_TOKENS.result + 20)
   }
 
   function _clearActionAnimationQueue() {
@@ -2269,7 +2279,7 @@
   }
 
   function _animateHit(obj, instant) {
-    _flashOutline(obj, 0xffffff, instant ? MOTION_SECONDS.press : MOTION_SECONDS.hit)
+    _flashOutline(obj, 0xffffff, instant ? MOTION_SECONDS.instant : MOTION_SECONDS.hit)
     if (_reducedMotion || instant) return
     const from = obj.group.scale.x
     _startAnimation(obj.motionId + ':scale', {
@@ -2286,11 +2296,11 @@
   }
 
   function _animateHeal(obj, instant) {
-    _flashOutline(obj, 0x4ade80, instant ? MOTION_SECONDS.press : MOTION_SECONDS.heal)
+    _flashOutline(obj, 0x4ade80, instant ? MOTION_SECONDS.instant : MOTION_SECONDS.heal)
   }
 
   function _animateStatusChange(obj, instant) {
-    _flashOutline(obj, 0x67e8f9, instant ? MOTION_SECONDS.press : MOTION_SECONDS.fast)
+    _flashOutline(obj, 0x67e8f9, instant ? MOTION_SECONDS.instant : MOTION_SECONDS.fast)
   }
 
   function _animateSummon(obj) {
@@ -2365,7 +2375,7 @@
     materials.forEach(function (material) { material.transparent = true })
     if (obj.body.material.color) obj.body.material.color.setHex(0x59616a)
     if (obj.body.material.emissive) obj.body.material.emissive.setHex(0x30363d)
-    const duration = instant ? MOTION_SECONDS.press : (_reducedMotion ? MOTION_SECONDS.fast : MOTION_SECONDS.result)
+    const duration = instant ? MOTION_SECONDS.instant : (_reducedMotion ? MOTION_SECONDS.fast : MOTION_SECONDS.result)
     _startAnimation(obj.motionId + ':visibility', {
       duration,
       easing: EASE.in,
