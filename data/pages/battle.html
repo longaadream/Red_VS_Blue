@@ -1510,7 +1510,7 @@
     .turn-clock.fast.burning { color: #fb7185; }
     .turn-clock[hidden] { display: none !important; }
     #turnClockCorner {
-      position: fixed; right: 14px; bottom: 100px; z-index: 82;
+      position: fixed; left: 50%; right: auto; bottom: calc(var(--battle-hand-height, 138px) + 10px); transform: translateX(-50%); z-index: 82;
       display: flex; flex-direction: column; align-items: center; gap: 2px;
       background: #ccb086;
       border: 1px solid #8d704c; border-radius: 2px;
