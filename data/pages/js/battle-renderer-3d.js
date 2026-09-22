@@ -1913,6 +1913,25 @@
     return JSON.stringify((piece && (piece.statuses || piece.statusEffects)) || [])
   }
 
+  function _singleEffectPresentation(previousModel, nextModel) {
+    const events = Array.isArray(nextModel && nextModel.presentationEvents)
+      ? nextModel.presentationEvents.filter(Boolean)
+      : []
+    const roots = new Set(events.map(function (event) { return event.rootEventId || event.eventId }).filter(Boolean))
+    const results = events.filter(function (event) {
+      return event.result != null || event.kind === 'damage' || event.kind === 'heal' || event.kind === 'death'
+    })
+    let changedPieces = 0
+    ;(nextModel && nextModel.pieces || []).forEach(function (piece) {
+      const previous = _pieceById(previousModel, piece.id)
+      if (previous && (_pieceHealth(previous) !== _pieceHealth(piece)
+        || previous.x !== piece.x || previous.y !== piece.y
+        || previous.visible !== piece.visible
+        || _statusSignature(previous) !== _statusSignature(piece))) changedPieces += 1
+    })
+    return roots.size <= 1 && results.length <= 1 && changedPieces <= 1
+  }
+
   function _diffSignature(previousModel, nextModel) {
     return ((nextModel && nextModel.pieces) || []).map(function (nextPiece) {
       const previousPiece = _pieceById(previousModel, nextPiece.id)
@@ -1950,6 +1969,7 @@
       if (rejected) _flashOutline(rejected, 0xef4444, MOTION_SECONDS.reject)
       return
     }
+    const instant = _singleEffectPresentation(previousModel, nextModel)
 
     const damagedTargets = []
     ;(nextModel.pieces || []).forEach(function (nextPiece) {
@@ -1965,17 +1985,17 @@
         return
       }
       if (previousPiece.x !== nextPiece.x || previousPiece.y !== nextPiece.y) {
-        _animateMove(obj, nextPiece.x, nextPiece.y, action && action.movementKinds && action.movementKinds[nextPiece.id])
+        _animateMove(obj, nextPiece.x, nextPiece.y, action && action.movementKinds && action.movementKinds[nextPiece.id], instant)
       }
       const healthDelta = _pieceHealth(nextPiece) - _pieceHealth(previousPiece)
       if (healthDelta < 0) {
         damagedTargets.push(nextPiece.id)
-        _animateHit(obj)
+        _animateHit(obj, instant)
       } else if (healthDelta > 0) {
-        _animateHeal(obj)
+        _animateHeal(obj, instant)
       }
-      if (_statusSignature(previousPiece) !== _statusSignature(nextPiece)) _animateStatusChange(obj)
-      if (previousPiece.visible !== false && nextPiece.visible === false) _animateDeath(obj)
+      if (_statusSignature(previousPiece) !== _statusSignature(nextPiece)) _animateStatusChange(obj, instant)
+      if (previousPiece.visible !== false && nextPiece.visible === false) _animateDeath(obj, instant)
     })
 
     const sourceId = action && (action.sourcePieceId || action.attackerId || action.actorId || action.pieceId)
@@ -1997,11 +2017,12 @@
   function _drainActionAnimationQueue() {
     if (!_actionAnimationQueue.length || _actionAnimationTimer != null) return
     const item = _actionAnimationQueue.shift()
+    const instant = _singleEffectPresentation(item.previousModel, item.nextModel)
     _animateActionNow(item.action, item.previousModel, item.nextModel)
     _actionAnimationTimer = setTimeout(function () {
       _actionAnimationTimer = null
       _drainActionAnimationQueue()
-    }, MOTION_TOKENS.result + 20)
+    }, instant ? MOTION_TOKENS.press : MOTION_TOKENS.result + 20)
   }
 
   function _clearActionAnimationQueue() {
@@ -2012,7 +2033,7 @@
     }
   }
 
-  function _animateMove(obj, targetX, targetZ, movementKind) {
+  function _animateMove(obj, targetX, targetZ, movementKind, instant) {
     const targetY = _tileSurfaceHeightAt(targetX, targetZ)
     const from = { x: obj.group.position.x, y: obj.group.position.y, z: obj.group.position.z }
     const fromBaseY = Number.isFinite(obj.motionBaseY) ? obj.motionBaseY : obj.baseY
@@ -2024,6 +2045,12 @@
     obj.baseX = targetX
     obj.baseY = targetY
     obj.baseZ = targetZ
+    if (instant) {
+      _cancelAnimation(obj.motionId + ':position')
+      obj.motionBaseY = targetY
+      obj.group.position.set(targetX, targetY, targetZ)
+      return
+    }
     // Teleport and swap have no traversed board cells: snap, then mark arrival.
     if (movementKind === 'teleport' || movementKind === 'swap') {
       _cancelAnimation(obj.motionId + ':position')
@@ -2241,9 +2268,9 @@
     })
   }
 
-  function _animateHit(obj) {
-    _flashOutline(obj, 0xffffff, MOTION_SECONDS.hit)
-    if (_reducedMotion) return
+  function _animateHit(obj, instant) {
+    _flashOutline(obj, 0xffffff, instant ? MOTION_SECONDS.press : MOTION_SECONDS.hit)
+    if (_reducedMotion || instant) return
     const from = obj.group.scale.x
     _startAnimation(obj.motionId + ':scale', {
       duration: MOTION_SECONDS.hit,
@@ -2258,12 +2285,12 @@
     })
   }
 
-  function _animateHeal(obj) {
-    _flashOutline(obj, 0x4ade80, MOTION_SECONDS.heal)
+  function _animateHeal(obj, instant) {
+    _flashOutline(obj, 0x4ade80, instant ? MOTION_SECONDS.press : MOTION_SECONDS.heal)
   }
 
-  function _animateStatusChange(obj) {
-    _flashOutline(obj, 0x67e8f9, MOTION_SECONDS.fast)
+  function _animateStatusChange(obj, instant) {
+    _flashOutline(obj, 0x67e8f9, instant ? MOTION_SECONDS.press : MOTION_SECONDS.fast)
   }
 
   function _animateSummon(obj) {
@@ -2328,7 +2355,7 @@
     }
   }
 
-  function _animateDeath(obj) {
+  function _animateDeath(obj, instant) {
     _cancelAnimation(obj.motionId + ':position')
     _cancelAnimation(obj.motionId + ':scale')
     obj.deathAnimating = true
@@ -2338,7 +2365,7 @@
     materials.forEach(function (material) { material.transparent = true })
     if (obj.body.material.color) obj.body.material.color.setHex(0x59616a)
     if (obj.body.material.emissive) obj.body.material.emissive.setHex(0x30363d)
-    const duration = _reducedMotion ? MOTION_SECONDS.fast : MOTION_SECONDS.result
+    const duration = instant ? MOTION_SECONDS.press : (_reducedMotion ? MOTION_SECONDS.fast : MOTION_SECONDS.result)
     _startAnimation(obj.motionId + ':visibility', {
       duration,
       easing: EASE.in,
