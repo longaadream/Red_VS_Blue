@@ -59,8 +59,9 @@ describe('pending selection live board', () => {
         latest = { ...latest, pieces: [{ id: 'p', x: 5, y: 0 }], interaction: { pendingResponse: { selectionId: 'two', isForViewer, isOffTurn: true } }, presentationEvents: [{ eventId: 'b:0', rootEventId: 'b:0', sequence: 0, kind: 'move', sourcePieceId: 'p', result: { toX: 5, toY: 0 } }] }
         presentation.update(latest)
         presentation.settleForSelection()
-        expect(renderer.settlePresentation.mock.lastCall?.[0].pieces[0].x).toBe(5)
-        expect(queue.getDiagnostics().timerCount).toBe(0)
+        expect(renderer.update.mock.lastCall?.[0].pieces[0].x).toBe(5)
+        expect(renderer.settlePresentation).not.toHaveBeenCalled()
+        expect(queue.getDiagnostics().timerCount).toBeGreaterThan(0)
         expect(idle).not.toHaveBeenCalled()
       } else {
         expect(queue.getDiagnostics().activeRootId).toBe('a:0')

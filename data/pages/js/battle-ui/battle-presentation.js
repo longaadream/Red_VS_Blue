@@ -55,7 +55,7 @@
       const movement = group.root.kind === 'move' || group.root.kind === 'forceMove'
       if (!(phase === 'static' || phase === 'settle' || phase === (movement ? 'path' : 'result'))) return
       if (appliedBeats.has(group.rootEventId)) {
-        if (phase === 'settle' && renderer.settlePresentation && playbackModel) renderer.settlePresentation(playbackModel)
+        if (phase === 'settle' && renderer.update && playbackModel) renderer.update(playbackModel)
         return
       }
       appliedBeats.add(group.rootEventId)
@@ -127,7 +127,7 @@
       after.interactionPieces = currentModel.pieces
       after.turn = currentModel.turn
       playbackModel = after
-      if (phase === 'settle' && renderer.settlePresentation) renderer.settlePresentation(after)
+      if (phase === 'settle' && renderer.update) renderer.update(after)
       else if (renderer.animateAction) renderer.animateAction({ motionEventKey: 'beat:' + group.rootEventId,
         movementKinds: movementKinds, sourcePieceId: group.root.sourcePieceId, targetPieceId: (group.root.targetPieceIds || [])[0] }, before, after)
       renderer.update(after)

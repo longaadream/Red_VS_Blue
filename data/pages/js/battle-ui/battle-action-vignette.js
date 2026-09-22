@@ -1,7 +1,7 @@
 ;(function (root) {
   'use strict'
 
-  const SINGLE_EFFECT_DURATION_MS = 120
+  const SINGLE_EFFECT_DURATION_MS = 40
   const NORMAL_DURATION_MS = 300
   const CARD_DURATION_MS = 360
   const REDUCED_DURATION_MS = 120
@@ -734,6 +734,7 @@
     groupEvents: groupEvents,
     eventCells: eventCells,
     constants: Object.freeze({
+      singleEffectDurationMs: SINGLE_EFFECT_DURATION_MS,
       normalDurationMs: NORMAL_DURATION_MS,
       cardDurationMs: CARD_DURATION_MS,
       reducedDurationMs: REDUCED_DURATION_MS,
