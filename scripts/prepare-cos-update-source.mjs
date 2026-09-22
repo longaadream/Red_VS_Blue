@@ -12,12 +12,13 @@ const read = file => JSON.parse(fs.readFileSync(file, 'utf8'))
 
 // Preparation only: consume previously verified public release receipts, never sign,
 // upload or change the source release. Android metadata retains official asset identities.
-export function prepareCosUpdateSource({ clientDirectory, resourceDirectory, outputDirectory, previousClientDirectory }) {
+export function prepareCosUpdateSource({ clientDirectory, resourceDirectory, outputDirectory, previousClientDirectory, resourceVersionOverride }) {
   const output = path.resolve(outputDirectory)
   if (fs.existsSync(output)) throw Error('Output already exists; use a new preparation directory')
   const client = verifyBundle(clientDirectory)
   const indexBytes = fs.readFileSync(path.join(resourceDirectory, 'content-update.json'))
   const index = JSON.parse(indexBytes.toString('utf8'))
+  const resourceVersion = resourceVersionOverride ?? index.version
   const receipt = read(path.join(resourceDirectory, 'public-verification.json'))
   const verification = read(path.join(resourceDirectory, 'verification.json'))
   const tag = `content-test-${index.contentHash}`
@@ -50,12 +51,12 @@ export function prepareCosUpdateSource({ clientDirectory, resourceDirectory, out
   }
   // Preserve package identity and hashes; native code maps only download transport.
   files.set('android-latest.json', fs.readFileSync(path.join(clientDirectory, 'android-latest.json')))
-  for (const [name, bytes] of resourceAssets) files.set(`resource/${index.version}/${name}`, bytes)
-  const release = { tag_name: tag, draft: false, published_at: receipt.publishedAt, rvb_version: index.version, assets }
+  for (const [name, bytes] of resourceAssets) files.set(`resource/${resourceVersion}/${name}`, bytes)
+  const release = { tag_name: tag, draft: false, published_at: receipt.publishedAt, rvb_version: resourceVersion, assets }
   files.set('resource/latest.json', Buffer.from(JSON.stringify([release], null, 2) + '\n'))
   files.set('latest.yml', Buffer.from(yaml.dump(windows)))
   // All validation precedes output creation. Local receipts are not public files.
-  const result = { schema: 'rvb-cos-preparation/v1', origin: COS_ORIGIN, clientVersion: client.version, sourceCommit: client.sourceCommit, resourceVersion: index.version, files: [...files].map(([name, bytes]) => ({ name, size: bytes.length, sha256: sha(bytes) })), publishLast: ['resource/latest.json', 'android-latest.json', 'latest.yml'] }
+  const result = { schema: 'rvb-cos-preparation/v1', origin: COS_ORIGIN, clientVersion: client.version, sourceCommit: client.sourceCommit, resourceVersion, files: [...files].map(([name, bytes]) => ({ name, size: bytes.length, sha256: sha(bytes) })), publishLast: ['resource/latest.json', 'android-latest.json', 'latest.yml'] }
   fs.mkdirSync(output, { recursive: true })
   for (const [name, bytes] of files) {
     const target = path.join(output, name)
@@ -66,7 +67,7 @@ export function prepareCosUpdateSource({ clientDirectory, resourceDirectory, out
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
-  const [clientDirectory, resourceDirectory, outputDirectory, previousClientDirectory] = process.argv.slice(2)
-  if (!clientDirectory || !resourceDirectory || !outputDirectory) throw Error('Usage: node scripts/prepare-cos-update-source.mjs <verified-client-bundle> <verified-public-resource-directory> <new-output-directory>')
-  console.log(JSON.stringify(prepareCosUpdateSource({ clientDirectory, resourceDirectory, outputDirectory, previousClientDirectory }), null, 2))
+  const [clientDirectory, resourceDirectory, outputDirectory, previousClientDirectory, resourceVersionOverride] = process.argv.slice(2)
+  if (!clientDirectory || !resourceDirectory || !outputDirectory) throw Error('Usage: node scripts/prepare-cos-update-source.mjs <verified-client-bundle> <verified-public-resource-directory> <new-output-directory> [previous-client-bundle] [resource-version-override]')
+  console.log(JSON.stringify(prepareCosUpdateSource({ clientDirectory, resourceDirectory, outputDirectory, previousClientDirectory, resourceVersionOverride }), null, 2))
 }

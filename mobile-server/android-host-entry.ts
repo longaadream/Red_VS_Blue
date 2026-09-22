@@ -8,6 +8,7 @@ import { createBundledBasePackInputV1, getBundledBaseProfileV1 } from '../lib/co
 import { resolveAndroidProfile, type AndroidPackInput } from '../lib/content-pipeline/android/resolve'
 import { resolveProfileV1 } from '../lib/content-pipeline/core/resolver'
 import { ProfileStoreV1 } from '../lib/content-pipeline/runtime/profile-store'
+import { openInstalledProfileProvenanceV1 } from '../lib/content-pipeline/runtime/profile-archive'
 import { AndroidSqliteAuthorityRepository } from './sqlite-authority-repository'
 
 const output = (value: unknown) => console.log('RVB_HOST ' + JSON.stringify(value))
@@ -31,7 +32,11 @@ async function main() {
     if (resolved.profile.resolvedProfileHash !== config.stable) throw new Error('Android host Profile mismatch')
     const inputs = chain.map(input => ({ source: input.source, policy: { kind: input === bundled ? 'bundled-base' as const : 'external' as const, expectedCompatibility: resolved.profile.compatibility } }))
     const view = resolveProfileV1({ base: inputs[0], patches: inputs.slice(1) })
-    const store = new ProfileStoreV1({ rootDir: path.join(writable, 'resource-pack'), bundledBase: getBundledBaseProfileV1(appRoot) })
+    const store = new ProfileStoreV1({
+      rootDir: path.join(writable, 'resource-pack'),
+      bundledBase: getBundledBaseProfileV1(appRoot),
+      openScriptProvenance: hash => openInstalledProfileProvenanceV1(path.join(writable, 'resource-pack'), appRoot, hash),
+    })
     const reference = store.installCandidate(view), activation = store.beginActivation(reference.resolvedProfileHash)
     store.commitActivation(activation.activationId, reference.resolvedProfileHash)
     process.env.RVB_PROFILE_ROOT = store.profileRoot(reference)!

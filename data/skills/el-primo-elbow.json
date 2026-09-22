@@ -1,7 +1,7 @@
 {
   "id": "el-primo-elbow",
   "name": "飞身肘击",
-  "description": "传送至地格（7），破墙，并对相邻地格所有敌人造成1倍伤害。然后移速+1。",
+  "description": "传送至地格（7）。对以自身为中心的3×3范围内：破墙，对敌人造成1倍伤害，然后移速+1。",
   "keywords": ["传送", "破墙"],
   "targetText": "地格（7）",
   "kind": "active",

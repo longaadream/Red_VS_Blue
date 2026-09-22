@@ -1,7 +1,7 @@
 {
   "id": "sonic-spin-dash",
   "name": "旋转冲刺",
-  "description": "选择一个地格（5），冲刺至此处并对路径上的敌方单位造成1.5倍伤害。",
+  "description": "选择正方向冲刺最多5格，对路径首个敌人造成1.5倍伤害并停在其前方。动能5：最多7格。动能7：沉默[1]目标。",
   "keywords": [
     "动能",
     "沉默"
@@ -28,20 +28,13 @@
         "range": 5,
         "rangeByStatus": {
           "statusType": "momentum-core",
-          "minimumStacks": 3,
+          "minimumStacks": 5,
           "range": 7
         },
-        "distanceMetric": "chebyshev",
-        "requireWalkable": true,
-        "requireUnoccupied": true,
-        "allowedTerrainTypes": [
-          "floor",
-          "cover"
-        ],
         "sameRowOrColumn": true,
         "excludeSourceCell": true
       }
     ]
   },
-  "code": "function executeSkill(context){var c=context.piece,b=context.battle,core=(c.statusTags||[]).find(function(t){return t.type==='momentum-core';}),momentum=core?Number(core.stacks||0):Number(c.momentum||0),maxDistance=momentum>=3?7:5,pos=selectTarget({type:'grid',range:maxDistance,filter:'all'});if(!pos||pos.needsTargetSelection)return pos;var dx=Math.sign(pos.x-c.x),dy=Math.sign(pos.y-c.y);if((dx===0&&dy===0)||(dx!==0&&dy!==0))return {success:false,message:'请选择'+maxDistance+'格内上下左右方向'};var steps=Math.max(Math.abs(pos.x-c.x),Math.abs(pos.y-c.y));if(steps<1||steps>maxDistance)return {success:false,message:'冲刺距离须为1至'+maxDistance+'格'};var destination=b.map.tiles.find(function(t){return t.x===pos.x&&t.y===pos.y;});if(!destination||!destination.props.walkable||(destination.props.type!=='floor'&&destination.props.type!=='cover')||b.pieces.some(function(p){return p.currentHp>0&&p.x===pos.x&&p.y===pos.y&&p.instanceId!==c.instanceId;}))return {success:false,message:'冲刺终点必须是未被占据的空地或掩体'};var trace=flow.query.tracePath(c,{x:dx,y:dy},{excludePieceId:c.instanceId,maxDistance:steps,passAllies:true,passEnemies:true,terrain:'any'});var last=null,hits=[];for(var i=0;i<trace.cells.length;i++){var x=trace.cells[i].x,y=trace.cells[i].y,tile=b.map.tiles.find(function(t){return t.x===x&&t.y===y;});var occupied=b.pieces.some(function(p){return p.currentHp>0&&p.x===x&&p.y===y&&p.instanceId!==c.instanceId;});if(!occupied&&tile.props.walkable&&(tile.props.type==='floor'||tile.props.type==='cover'))last={x:x,y:y};b.pieces.filter(function(p){return p.currentHp>0&&!arePlayersAllied(battle, p.ownerPlayerId, c.ownerPlayerId)&&p.x===x&&p.y===y;}).forEach(function(p){var r=dealDamage(c,p,Math.floor(c.attack*1.5),'physical',b,context.skill.id);if(momentum>=5&&p.currentHp>0){addStatusEffectById(p.instanceId, {id:'sonic-silence-'+p.instanceId,type:'silenced',name:'沉默',stacks:1,currentDuration:1,relatedRules:['rule-silenced-block']});addRuleById(p.instanceId,'rule-silenced-block');}hits.push(p.name+'(-'+r.damage+')');});}if(!last)return {success:false,message:'没有可落脚的空地或掩体'};var distance=Math.max(Math.abs(last.x-c.x),Math.abs(last.y-c.y)),preserved=(c.statusTags||[]).some(function(t){return t.type==='preserve-momentum';}),nextMomentum=(preserved?momentum:0)+distance;if (!flow.effects.displace([{pieceId:c.instanceId,x:last.x,y:last.y}], 'dash', {\"passAllies\":true,\"passEnemies\":true,\"terrain\":\"any\"}).success) return {success:true,message:'位移被阻挡，本次位移效果取消'};if(core)core.stacks=nextMomentum;c.momentum=nextMomentum;return {success:true,message:'冲刺至('+last.x+','+last.y+')'+(hits.length?'，命中'+hits.join('、'):'')};}"
+  "code": "function executeSkill(context){var c=context.piece,b=context.battle;var core=(c.statusTags||[]).find(function(t){return t.type==='momentum-core';});var momentum=core?Number(core.stacks||0):Number(c.momentum||0);var maxDistance=momentum>=5?7:5;var pos=selectTarget({type:'grid',range:maxDistance,filter:'all'});if(!pos||pos.needsTargetSelection)return pos;var dx=Math.sign(pos.x-c.x),dy=Math.sign(pos.y-c.y);if((dx===0&&dy===0)||(dx!==0&&dy!==0))return{success:false,message:'请选择上下左右方向'};var firstEnemy=null,stopStep=0,stopX=c.x,stopY=c.y;for(var i=1;i<=maxDistance;i++){var cx=c.x+dx*i,cy=c.y+dy*i;var tile=b.map.tiles.find(function(t){return t.x===cx&&t.y===cy;});if(!tile||!tile.props.walkable||(tile.props.type!=='floor'&&tile.props.type!=='cover'))break;var enemy=b.pieces.find(function(p){return p.currentHp>0&&p.x===cx&&p.y===cy&&!arePlayersAllied(b,p.ownerPlayerId,c.ownerPlayerId);});if(enemy){firstEnemy=enemy;stopStep=i-1;stopX=c.x+dx*stopStep;stopY=c.y+dy*stopStep;break;}var occupied=b.pieces.some(function(p){return p.currentHp>0&&p.x===cx&&p.y===cy;});if(!occupied){stopStep=i;stopX=cx;stopY=cy;}}if(stopStep>0){var mv=flow.effects.displace([{pieceId:c.instanceId,x:stopX,y:stopY}],'dash',{passAllies:true,passEnemies:true,terrain:'any'});if(!mv.success)return{success:false,message:'位移被阻挡'};}var msg='';if(firstEnemy){var r=dealDamage(c,firstEnemy,Math.floor(c.attack*1.5),'physical',b,context.skill.id);msg='命中'+firstEnemy.name+'(-'+(r.damage||0)+')';if(momentum>=7&&firstEnemy.currentHp>0){addStatusEffectById(firstEnemy.instanceId,{id:'sonic-silence-'+firstEnemy.instanceId,type:'silenced',name:'沉默',stacks:1,currentDuration:1,relatedRules:['rule-silenced-block']});addRuleById(firstEnemy.instanceId,'rule-silenced-block');}}var preserved=(c.statusTags||[]).some(function(t){return t.type==='preserve-momentum';});var nextMomentum=(preserved?momentum:0)+stopStep;if(core)core.stacks=nextMomentum;c.momentum=nextMomentum;return{success:true,message:(stopStep>0?'冲刺'+stopStep+'格':'未移动')+(msg?'，'+msg:'')};}"
 }

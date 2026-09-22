@@ -25,7 +25,31 @@ const open = url => {
   child.on('error', () => console.info('[official] 浏览器未能打开，请重新运行 Open-Control-Panel.cmd'))
 }
 const adminIndex = process.argv.indexOf('--admin')
-if (process.argv.includes('--panel')) {
+const updatePackIndex = process.argv.indexOf('--update-resource-pack')
+if (updatePackIndex >= 0) {
+  const packPath = process.argv[updatePackIndex + 1]
+  if (!packPath) { console.error('[official] --update-resource-pack 需要提供文件路径'); process.exitCode = 1 }
+  else {
+    try {
+      process.env.APP_ROOT_DIR = root
+      process.env.USER_DATA_DIR = stateRoot
+      process.env.RVB_PROFILE_ROOT = root
+      const { installProfileArchiveV1 } = await import('../lib/content-pipeline/runtime/profile-archive.ts')
+      const { getProfileRuntimeContextV1 } = await import('../lib/content-pipeline/runtime/profile-runtime.ts')
+      const context = getProfileRuntimeContextV1()
+      const installed = installProfileArchiveV1({
+        store: context.store,
+        appRoot: root,
+        archive: new Uint8Array(fs.readFileSync(packPath)),
+        allowLocalDevUnsigned: false,
+      })
+      const hash = installed.reference.resolvedProfileHash
+      const { activationId } = context.store.beginActivation(hash)
+      context.store.commitActivation(activationId, hash)
+      console.info('[official] 资源包已安装并激活为 stable', JSON.stringify(installed.reference))
+    } catch (error) { console.error('[official] 资源包更新失败：', error.message); process.exitCode = 1 }
+  }
+} else if (process.argv.includes('--panel')) {
   try {
     const url = unprotectWindowsSecret(fs.readFileSync(panelFile)), parsed = new URL(url)
     if (parsed.hostname !== '127.0.0.1' || parsed.protocol !== 'http:' || parsed.pathname !== '/') throw new Error('Invalid local panel URL')
