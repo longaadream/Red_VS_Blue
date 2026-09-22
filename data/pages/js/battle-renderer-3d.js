@@ -128,6 +128,8 @@
   let _tutorialCueCellCount = 0
   let _tutorialCuePathCount = 0
   const _anims = new Map()             // one controller per owner/property
+  const _actionAnimationQueue = []
+  let _actionAnimationTimer = null
   const _playedEventKeys = new Set()
   const _playedEventOrder = []
   const _pendingAppearanceCues = new Map()
@@ -1935,7 +1937,7 @@
     return true
   }
 
-  function animateAction(action, previousModel, nextModel) {
+  function _animateActionNow(action, previousModel, nextModel) {
     if (!_mounted || !nextModel) return
     const eventKey = _eventKey(action || {}, previousModel, nextModel)
     if (!_rememberEvent(eventKey)) return
@@ -1976,6 +1978,33 @@
     const targetId = action && (action.targetPieceId || action.targetId)
     if (sourceId && targetId && damagedTargets.indexOf(targetId) >= 0 && sourceId !== targetId) {
       _animateAttackerLunge(sourceId, targetId)
+    }
+  }
+
+  // Authoritative snapshots may arrive faster than the presentation can show
+  // them. Keep the snapshots for interaction immediately, but serialize the
+  // short-lived action presentation so movement, hit and death read in order.
+  function animateAction(action, previousModel, nextModel) {
+    if (!_mounted || !nextModel) return
+    _actionAnimationQueue.push({ action, previousModel, nextModel })
+    if (_actionAnimationTimer == null) _drainActionAnimationQueue()
+  }
+
+  function _drainActionAnimationQueue() {
+    if (!_actionAnimationQueue.length || _actionAnimationTimer != null) return
+    const item = _actionAnimationQueue.shift()
+    _animateActionNow(item.action, item.previousModel, item.nextModel)
+    _actionAnimationTimer = setTimeout(function () {
+      _actionAnimationTimer = null
+      _drainActionAnimationQueue()
+    }, MOTION_TOKENS.result + 20)
+  }
+
+  function _clearActionAnimationQueue() {
+    _actionAnimationQueue.length = 0
+    if (_actionAnimationTimer != null) {
+      clearTimeout(_actionAnimationTimer)
+      _actionAnimationTimer = null
     }
   }
 
@@ -2475,9 +2504,8 @@
     if (!piece || piece.id !== selection.pieceId) return null
     const obj = _pieceObjects.get(piece.id)
     if (!obj || obj.pending) return null
-    // Spatial motion is presentation-only. A new drag owns the piece immediately
-    // and interrupts the old travel animation instead of making the player wait.
-    _cancelAnimation(obj.motionId + ':position')
+    // Spatial motion is presentation-only. The drag is accepted immediately;
+    // the queued travel animation remains responsible for its visual sequence.
     return {
       pointerId: pointerId,
       pieceId: piece.id,
@@ -2972,6 +3000,7 @@
   // Replace only the rendered board, preserving the user's camera and authority model.
   function settlePresentation(model) {
     if (!_mounted) return
+    _clearActionAnimationQueue()
     Array.from(_anims.keys()).forEach(_cancelAnimation)
     _pieceObjects.forEach(function (obj) { _restorePieceVisual(obj); obj.group.scale.set(1, 1, 1) })
     _floaterTimers.forEach(function (timer) { clearTimeout(timer) })
@@ -2983,6 +3012,7 @@
 
   function showHistoricalBoard(model) {
     if (!_mounted || !model || !model.board) return
+    _clearActionAnimationQueue()
     _cancelPieceDrag()
     Array.from(_anims.keys()).forEach(_cancelAnimation)
     _clearPresentationAreaFlash()
@@ -3105,6 +3135,7 @@
     Object.keys(_tileEffectMats).forEach(function (key) { delete _tileEffectMats[key] })
     Object.keys(_tileEffectIconMats).forEach(function (key) { delete _tileEffectIconMats[key] })
     _anims.clear()
+    _clearActionAnimationQueue()
     _playedEventKeys.clear()
     _playedEventOrder.length = 0
     _pendingAppearanceCues.clear()

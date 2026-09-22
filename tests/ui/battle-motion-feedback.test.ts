@@ -76,14 +76,22 @@ describe('RED-69 battle motion contract', () => {
     expect(renderer).not.toContain('items.forEach((item, index)')
   })
 
-  it('lets a new drag interrupt presentation travel instead of waiting for it', () => {
+  it('accepts a new drag while presentation travel is still active', () => {
     const renderer = readPage('js/battle-renderer-3d.js')
-    expect(renderer).toMatch(/if \(!obj \|\| obj\.pending\) return null[\s\S]*?_cancelAnimation\(obj\.motionId \+ ':position'\)/)
+    expect(renderer).toMatch(/function _pieceDragCandidateAt[\s\S]*?if \(!obj \|\| obj\.pending\) return null/)
+    expect(renderer).not.toMatch(/function _pieceDragCandidateAt[\s\S]*?_cancelAnimation\(obj\.motionId \+ ':position'\)/)
   })
 
   it('removes dying pieces from pointer targeting before their fade-out completes', () => {
     const renderer = readPage('js/battle-renderer-3d.js')
     expect(renderer).toMatch(/const obj = _pieceObjects\.get\(piece\.id\)[\s\S]*?if \(obj && obj\.deathAnimating\) return/)
+  })
+
+  it('queues action presentation while the authoritative model remains immediately available', () => {
+    const renderer = readPage('js/battle-renderer-3d.js')
+    expect(renderer).toContain('_actionAnimationQueue.push')
+    expect(renderer).toContain('_animateActionNow(item.action, item.previousModel, item.nextModel)')
+    expect(renderer).toContain('MOTION_TOKENS.result + 20')
   })
 
   it('keeps timeout and disconnect recovery correlated without discarding pending presentation state', () => {
