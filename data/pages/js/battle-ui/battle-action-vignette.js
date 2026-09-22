@@ -1,8 +1,9 @@
 ;(function (root) {
   'use strict'
 
-  const NORMAL_DURATION_MS = 1100
-  const CARD_DURATION_MS = 1800
+  const SINGLE_EFFECT_DURATION_MS = 120
+  const NORMAL_DURATION_MS = 300
+  const CARD_DURATION_MS = 360
   const REDUCED_DURATION_MS = 120
   const SKIP_SETTLE_MS = 60
   const MAX_PLAYED_ROOTS = 256
@@ -19,13 +20,29 @@
   function actionDuration(group) {
     if (group && group.root && ['tileEffectAdded', 'tileEffectRemoved'].includes(group.root.kind)) return 240
     if (isStatusBeat(group)) return 250
+    if (group && group.children && group.children.length === 0) return SINGLE_EFFECT_DURATION_MS
     return group && group.root && group.root.kind === 'card' ? CARD_DURATION_MS : NORMAL_DURATION_MS
+  }
+
+  function hideBannerForModel(event, model) {
+    if (!event) return true
+    if (event.kind === 'move' || event.kind === 'forceMove') return true
+    const viewerId = model && model.viewer && String(model.viewer.id || '').toLowerCase()
+    const source = model && (model.pieces || []).find(function (piece) {
+      return String(piece.id || '') === String(event.sourcePieceId || '')
+    })
+    const own = !!(viewerId && source && source.ownerPlayerId
+      && String(source.ownerPlayerId).toLowerCase() === viewerId)
+    return own && ['skill', 'chargeSkill', 'card'].includes(event.kind)
   }
 
   function phaseTime(phase, group) {
     if (group && group.root && ['tileEffectAdded', 'tileEffectRemoved'].includes(group.root.kind)) return ({ path: 0, result: 20, settle: 200 }[phase] || 0)
     if (isStatusBeat(group)) return ({ path: 20, result: 40, settle: 220 }[phase] || 0)
-    return phase === 'settle' ? actionDuration(group) - 320 : ({ path: 120, result: 420 }[phase] || 0)
+    const duration = actionDuration(group)
+    return phase === 'settle'
+      ? Math.max(32, duration - 40)
+      : ({ path: Math.min(40, duration * 0.18), result: Math.min(120, duration * 0.42) }[phase] || 0)
   }
 
   function eventOrder(left, right) {
@@ -501,10 +518,10 @@
       }
       layer.dataset.phase = currentPhase
       layer.dataset.rootId = currentGroup.rootEventId
-      if (!showsBanner(rootEvent)) {
+      if (!showsBanner(rootEvent) || hideBannerForModel(rootEvent, model)) {
         layer.hidden = false
         layer.className = 'battle-vignette-layer is-phase-' + currentPhase
-        layer.innerHTML = renderComicBeat(resultVisible)
+        layer.innerHTML = hideBannerForModel(rootEvent, model) ? '' : renderComicBeat(resultVisible)
         return
       }
       layer.hidden = false
@@ -713,6 +730,7 @@
     create: create,
     createQueue: createQueue,
     showsBanner: showsBanner,
+    hideBannerForModel: hideBannerForModel,
     groupEvents: groupEvents,
     eventCells: eventCells,
     constants: Object.freeze({

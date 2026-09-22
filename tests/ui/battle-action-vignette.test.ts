@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 type VignetteModule = {
   showsBanner: (event: Record<string, unknown>) => boolean
+  hideBannerForModel: (event: Record<string, unknown>, model: Record<string, unknown>) => boolean
   eventCells(group: unknown, model: unknown): { source: unknown }
   groupEvents(events: unknown[]): Array<{ rootEventId: string; root: { eventId: string }; children: unknown[] }>
   createQueue(options?: Record<string, unknown>): {
@@ -108,6 +109,14 @@ function child(index: number, childIndex: number, overrides: Record<string, unkn
 }
 
 describe('RED-167 action vignette queue', () => {
+  it('hides friendly active banners and all ordinary movement banners', () => {
+    const ui = loadModule()
+    const model = { viewer: { id: 'blue' }, pieces: [{ id: 'ally', ownerPlayerId: 'blue' }, { id: 'enemy', ownerPlayerId: 'red' }] }
+    expect(ui.hideBannerForModel({ kind: 'move', sourcePieceId: 'ally' }, model)).toBe(true)
+    expect(ui.hideBannerForModel({ kind: 'skill', sourcePieceId: 'ally' }, model)).toBe(true)
+    expect(ui.hideBannerForModel({ kind: 'skill', sourcePieceId: 'enemy' }, model)).toBe(false)
+    expect(ui.hideBannerForModel({ kind: 'passive', sourcePieceId: 'ally' }, model)).toBe(false)
+  })
   it('keeps authority arrival order when separate actions both number their root sequence zero', () => {
     const groups = loadModule().groupEvents([root(9, { sequence: 0 }), root(1, { sequence: 0 })])
     expect(groups.map(group => group.rootEventId)).toEqual(['action-9:0', 'action-1:0'])
