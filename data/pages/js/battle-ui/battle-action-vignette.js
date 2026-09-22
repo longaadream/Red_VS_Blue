@@ -3,6 +3,7 @@
 
   const SINGLE_EFFECT_DURATION_MS = 24
   const COMPOSITE_STEP_DURATION_MS = 200
+  const MULTI_EFFECT_STEP_DURATION_MS = 240
   const NORMAL_DURATION_MS = COMPOSITE_STEP_DURATION_MS
   const CARD_DURATION_MS = COMPOSITE_STEP_DURATION_MS
   const REDUCED_DURATION_MS = 120
@@ -25,7 +26,9 @@
     // remaining beat gets the same readable budget and the next beat starts
     // after it. This keeps teleport -> attack, multi-hit and triggered chains
     // sequential instead of collapsing into one burst.
-    return COMPOSITE_STEP_DURATION_MS
+    return group && group.children && group.children.length > 1
+      ? MULTI_EFFECT_STEP_DURATION_MS
+      : COMPOSITE_STEP_DURATION_MS
   }
 
   function hideBannerForModel(event, model) {
@@ -738,6 +741,7 @@
     constants: Object.freeze({
       singleEffectDurationMs: SINGLE_EFFECT_DURATION_MS,
       compositeStepDurationMs: COMPOSITE_STEP_DURATION_MS,
+      multiEffectStepDurationMs: MULTI_EFFECT_STEP_DURATION_MS,
       normalDurationMs: NORMAL_DURATION_MS,
       cardDurationMs: CARD_DURATION_MS,
       reducedDurationMs: REDUCED_DURATION_MS,
