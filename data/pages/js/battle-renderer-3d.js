@@ -2380,6 +2380,7 @@
   function getMotionDiagnostics() {
     return {
       activeAnimations: Array.from(_anims.keys()).sort(),
+      queuedActionCount: _actionAnimationQueue.length + (_actionAnimationTimer != null ? 1 : 0),
       playedEventCount: _playedEventKeys.size,
       floaterCount: _floaters.size,
       pendingPieceIds: Array.from(_pieceObjects.values()).filter(function (obj) { return obj.pending }).map(function (obj) { return obj.id }).sort(),

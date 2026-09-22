@@ -101,6 +101,11 @@ describe('RED-69 battle motion contract', () => {
     expect(renderer).toContain('const y = targetMode ? piece.y : (obj ? obj.group.position.z : piece.y)')
   })
 
+  it('exposes queued action count for animation diagnostics', () => {
+    const renderer = readPage('js/battle-renderer-3d.js')
+    expect(renderer).toContain('queuedActionCount: _actionAnimationQueue.length')
+  })
+
   it('keeps timeout and disconnect recovery correlated without discarding pending presentation state', () => {
     const battlePage = readPage('battle.html')
 
