@@ -2474,7 +2474,10 @@
     const piece = _findPieceFromPointer(clientX, clientY)
     if (!piece || piece.id !== selection.pieceId) return null
     const obj = _pieceObjects.get(piece.id)
-    if (!obj || obj.pending || _anims.has(obj.motionId + ':position')) return null
+    if (!obj || obj.pending) return null
+    // Spatial motion is presentation-only. A new drag owns the piece immediately
+    // and interrupts the old travel animation instead of making the player wait.
+    _cancelAnimation(obj.motionId + ':position')
     return {
       pointerId: pointerId,
       pieceId: piece.id,

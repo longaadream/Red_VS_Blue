@@ -76,6 +76,11 @@ describe('RED-69 battle motion contract', () => {
     expect(renderer).not.toContain('items.forEach((item, index)')
   })
 
+  it('lets a new drag interrupt presentation travel instead of waiting for it', () => {
+    const renderer = readPage('js/battle-renderer-3d.js')
+    expect(renderer).toMatch(/if \(!obj \|\| obj\.pending\) return null[\s\S]*?_cancelAnimation\(obj\.motionId \+ ':position'\)/)
+  })
+
   it('keeps timeout and disconnect recovery correlated without discarding pending presentation state', () => {
     const battlePage = readPage('battle.html')
 
