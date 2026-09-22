@@ -14,15 +14,11 @@
       && (['move', 'skill', 'chargeSkill', 'card'].includes(event.kind) || (event.kind === 'choiceResolved' && !!event.skillId))
   }
 
-  function isStatusBeat(group) {
-    return group && group.root && ['statusAdded', 'statusRemoved'].includes(group.root.kind)
-  }
-
   function isAutomaticGroup(group) {
     return !!(group && group.root && group.root.parentEventId)
   }
 
-  function actionDuration(group) {
+  function actionDuration() {
     // Every event gets its own readable post-action beat. The event queue
     // below deliberately keeps adjacent results separate, so a multi-hit or
     // triggered chain cannot collapse into one burst.
