@@ -1,10 +1,10 @@
 {
-  "version": "0.1.9",
+  "version": "0.1.11",
   "windows": {
-    "url": "https://updates.redvsblue.top/0.1.9/RED-vs-BLUE-0.1.9-Setup.exe"
+    "url": "https://updates.redvsblue.top/0.1.11/RED-vs-BLUE-0.1.11-Setup.exe"
   },
   "android": {
-    "url": "https://updates.redvsblue.top/0.1.9/RED-vs-BLUE-0.1.9-Android.apk"
+    "url": "https://updates.redvsblue.top/0.1.11/RED-vs-BLUE-0.1.11-Android.apk"
   },
   "resource": {
     "version": "1.0.5",

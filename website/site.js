@@ -3,7 +3,9 @@ fetch('./release.json', {cache:'no-cache'}).then(r=>{if(!r.ok)throw Error('manif
   if(!/^\d+\.\d+\.\d+$/.test(data.version))return;
   for(const el of document.querySelectorAll('[data-download]')){
     const item=data[el.dataset.download];if(!item)continue;
-    const url=new URL(item.url);if(url.protocol==='https:'&&url.origin==='https://updates.redvsblue.top')el.href=url.href;
+    const url=new URL(item.url),versionPrefix='/'+data.version+'/';
+    const pinnedClient=el.dataset.download==='windows'||el.dataset.download==='android';
+    if(url.protocol==='https:'&&url.origin==='https://updates.redvsblue.top'&&(!pinnedClient||url.pathname.startsWith(versionPrefix)))el.href=url.href;
   }
   document.querySelectorAll('[data-version]').forEach(el=>el.textContent=data.version);
   document.querySelectorAll('[data-release]').forEach(el=>el.href='https://github.com/longaadream/Red_VS_Blue/releases/tag/v'+data.version);
