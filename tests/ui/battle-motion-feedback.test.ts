@@ -94,6 +94,13 @@ describe('RED-69 battle motion contract', () => {
     expect(renderer).toContain('MOTION_TOKENS.result + 20')
   })
 
+  it('uses authoritative piece coordinates while selecting a target', () => {
+    const renderer = readPage('js/battle-renderer-3d.js')
+    expect(renderer).toContain("const targetMode = !!(_currentModel.selection && _currentModel.selection.mode === 'target')")
+    expect(renderer).toContain('const x = targetMode ? piece.x : (obj ? obj.group.position.x : piece.x)')
+    expect(renderer).toContain('const y = targetMode ? piece.y : (obj ? obj.group.position.z : piece.y)')
+  })
+
   it('keeps timeout and disconnect recovery correlated without discarding pending presentation state', () => {
     const battlePage = readPage('battle.html')
 

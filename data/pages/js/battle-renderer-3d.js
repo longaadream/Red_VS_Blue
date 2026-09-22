@@ -2870,6 +2870,7 @@
     if (!_currentModel || !_renderer || !_camera) return null
     let closest = null
     let closestDistance = Infinity
+    const targetMode = !!(_currentModel.selection && _currentModel.selection.mode === 'target')
 
     ;(_currentModel.interactionPieces || _currentModel.pieces || []).forEach(piece => {
       if (piece.visible === false) return
@@ -2877,8 +2878,11 @@
       // A lethal result removes the piece from hit testing immediately; its
       // fade-out remains purely visual and must not create a second target.
       if (obj && obj.deathAnimating) return
-      const x = obj ? obj.group.position.x : piece.x
-      const y = obj ? obj.group.position.z : piece.y
+      // Targeting follows the authoritative snapshot, not the presentation
+      // position. A piece can therefore be selected at its new legal cell while
+      // its travel animation is still catching up visually.
+      const x = targetMode ? piece.x : (obj ? obj.group.position.x : piece.x)
+      const y = targetMode ? piece.y : (obj ? obj.group.position.z : piece.y)
       const point = projectCell(x, y, (obj ? obj.group.position.y : _tileSurfaceHeightAt(x, y)) + PIECE_H + 0.014)
       if (!point) return
       const dx = clientX - point.clientX
