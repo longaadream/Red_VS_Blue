@@ -43,6 +43,22 @@ Release 至少包含：
 
 服务端归档、客户端安装包和资源包使用不同的 Release 资产，不能把服务端引擎塞进资源包。
 
+从 GitHub Release 下载当前服务端资产时，使用带提交号的文件名并先校验摘要：
+
+```bash
+export RVB_RELEASE_VERSION="0.1.10"
+export RVB_SOURCE_COMMIT="10b3e18"
+export RVB_REMOTE_ROOT="/tmp/rvb-release-$RVB_SOURCE_COMMIT"
+export RVB_SERVER_ARCHIVE="RED-vs-BLUE-$RVB_RELEASE_VERSION-Linux-Server-$RVB_SOURCE_COMMIT.tar.gz"
+mkdir -p "$RVB_REMOTE_ROOT"
+curl -fsSL -o "$RVB_REMOTE_ROOT/$RVB_SERVER_ARCHIVE" \
+  "https://github.com/longaadream/Red_VS_Blue/releases/download/v$RVB_RELEASE_VERSION/$RVB_SERVER_ARCHIVE"
+sha256sum "$RVB_REMOTE_ROOT/$RVB_SERVER_ARCHIVE"
+tar -xzf "$RVB_REMOTE_ROOT/$RVB_SERVER_ARCHIVE" -C "$RVB_REMOTE_ROOT"
+```
+
+摘要必须与同名 `.json` 资产的 `archiveSha256` 一致。解压后继续使用 `build.json` 和 `SHA256SUMS` 做部署前校验。
+
 ## 3. 准备和上传
 
 ```bash

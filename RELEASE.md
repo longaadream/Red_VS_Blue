@@ -37,6 +37,23 @@ Android 发布目录至少包含：
 <protected-signing-dir>/password.clixml
 ```
 
+本机已整理的资源包签名材料位于仓库外的 `.local-secrets` 目录；其他机器只需把同类文件放入自己的受保护目录，再设置变量：
+
+```powershell
+$env:RVB_CONTENT_SIGNING_KEY = "<protected-dir>\official-content.key"
+$androidSigningDir = "<protected-dir>\android"
+powershell.exe -NoProfile -File scripts\build-android-release.ps1 -SigningDirectory $androidSigningDir
+```
+
+Windows 发布时由 CI 或发布机注入证书：
+
+```powershell
+$env:CSC_LINK = "<protected-windows-certificate>"
+$env:CSC_KEY_PASSWORD = "<secret-store-value>"
+node scripts\build-client-release.cjs
+Remove-Item Env:CSC_LINK,Env:CSC_KEY_PASSWORD -ErrorAction SilentlyContinue
+```
+
 Windows 和 Android 的私钥不会随源码、资源包、PR 或安装包发布。构建记录必须保存 `sourceCommit`、版本号、文件 SHA-256，以及 Android 的公开证书 SHA-256。没有这些材料时只能构建未签名或无法证明来源的候选包，不能标记为正式发布。
 
 ## 1. 构建、签名和验证资源包
