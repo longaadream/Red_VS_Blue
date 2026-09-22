@@ -129,6 +129,15 @@ describe('RED-69 battle motion contract', () => {
     expect(battlePage).toContain('id="dmBubble"')
   })
 
+  it('does not settle or cancel active presentation when entering target selection', () => {
+    const presentation = readPage('js/battle-ui/battle-presentation.js')
+    const settle = presentation.slice(presentation.indexOf('function settleForSelection()'), presentation.indexOf('function spawnFloater('))
+    expect(settle).toContain('renderer.update(currentModel)')
+    expect(settle).not.toContain('renderer.settlePresentation')
+    expect(settle).not.toContain('vignetteUi.settleAll')
+    expect(settle).not.toContain('impact.stop')
+  })
+
   it('keeps one pending command until an exact receipt and preserves it across timeout recovery', () => {
     const battlePage = readPage('battle.html')
     const statusMessages: string[] = []

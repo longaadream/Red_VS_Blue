@@ -353,14 +353,14 @@
       if (!mounted || settlingSelection) return
       settlingSelection = true
       try {
-        if (vignetteUi && vignetteUi.settleAll) vignetteUi.settleAll()
-        if (impact) impact.stop()
+        // Entering target selection changes interaction state only. Existing
+        // movement/impact presentation must continue in order; pending is a
+        // rules gate, not a request to skip visual events already in flight.
         playbackModel = null
         playbackRoot = null
         if (historicalRoot) setHistoricalBoard(null)
         if (currentModel) {
-          if (renderer.settlePresentation) renderer.settlePresentation(currentModel)
-          else renderer.update(currentModel)
+          renderer.update(currentModel)
         }
       } finally { settlingSelection = false }
     }
