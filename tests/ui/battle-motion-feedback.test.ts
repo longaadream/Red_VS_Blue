@@ -137,6 +137,16 @@ describe('RED-69 battle motion contract', () => {
     expect(battlePage).toContain('id="dmBubble"')
   })
 
+  it('keeps the prominent corner timer wired to authoritative visibility', () => {
+    const battlePage = readPage('battle.html')
+    expect(battlePage).toContain('id="turnClockCorner"')
+    expect(battlePage).toContain('corner.hidden = !view.visible')
+    expect(battlePage).toContain('right: 18px')
+    const lobbyPage = readPage('lobby.html')
+    expect(lobbyPage).toContain('id="turnTimerEnabledToggle"')
+    expect(lobbyPage).toContain('turnTimerEnabled')
+  })
+
   it('does not settle or cancel active presentation when entering target selection', () => {
     const presentation = readPage('js/battle-ui/battle-presentation.js')
     const settle = presentation.slice(presentation.indexOf('function settleForSelection()'), presentation.indexOf('function spawnFloater('))
