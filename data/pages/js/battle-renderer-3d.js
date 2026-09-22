@@ -2019,6 +2019,12 @@
   // short-lived action presentation so movement, hit and death read in order.
   function animateAction(action, previousModel, nextModel) {
     if (!_mounted || !nextModel) return
+    // Automatic aftermath keeps its post-action lane, while a newly submitted
+    // action starts immediately and can overlap the remaining visual tail.
+    if (!action || action.isAutomatic !== true) {
+      _animateActionNow(action, previousModel, nextModel)
+      return
+    }
     _actionAnimationQueue.push({ action, previousModel, nextModel })
     if (_actionAnimationTimer == null) _drainActionAnimationQueue()
   }

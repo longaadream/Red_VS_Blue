@@ -129,7 +129,8 @@
       playbackModel = after
       if (phase === 'settle' && renderer.update) renderer.update(after)
       else if (renderer.animateAction) renderer.animateAction({ motionEventKey: 'beat:' + group.rootEventId,
-        movementKinds: movementKinds, sourcePieceId: group.root.sourcePieceId, targetPieceId: (group.root.targetPieceIds || [])[0] }, before, after)
+        movementKinds: movementKinds, sourcePieceId: group.root.sourcePieceId, targetPieceId: (group.root.targetPieceIds || [])[0],
+        isAutomatic: !!group.root.parentEventId }, before, after)
       renderer.update(after)
     }
 

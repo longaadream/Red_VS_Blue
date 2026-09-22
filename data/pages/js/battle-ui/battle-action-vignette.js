@@ -18,6 +18,10 @@
     return group && group.root && ['statusAdded', 'statusRemoved'].includes(group.root.kind)
   }
 
+  function isAutomaticGroup(group) {
+    return !!(group && group.root && group.root.parentEventId)
+  }
+
   function actionDuration(group) {
     // Every event gets its own readable post-action beat. The event queue
     // below deliberately keeps adjacent results separate, so a multi-hit or
@@ -246,6 +250,20 @@
       })
       if (controlReturnedToViewer && !hasPendingBanner) {
         settleAll()
+      }
+      const manualIncoming = incoming.some(function (group) { return !isAutomaticGroup(group) })
+      if (active && !holdingResponse && isAutomaticGroup(active) && manualIncoming) {
+        const elapsed = activeProgressMs + Math.max(0, now() - activeTimelineStartedAt) * speed
+        if (elapsed >= phaseTime('result', active)) {
+          // The automatic result is already visible; its remaining post-action
+          // tail must not hold up a newly submitted action.
+          clearTimers()
+          onPhase('settle', active)
+          active = null
+          activeProgressMs = 0
+          activeTimelineStartedAt = 0
+          skipSettling = false
+        }
       }
       pending.push.apply(pending, incoming)
       startNext()
