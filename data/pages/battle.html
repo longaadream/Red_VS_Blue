@@ -1964,6 +1964,15 @@
     const RED43_QA_MODE = params.get('qa') === 'RED-43'
     const RED167_QA_MODE = params.get('qa') === 'RED-167'
     const DEBUG_BATTLE_LOG = params.get('debugBattleLog') === '1'
+    const TIMER_PREVIEW_MODE = params.get('timerPreview') === '1'
+    const TIMER_PREVIEW_STARTED_AT = Date.now()
+    const TIMER_PREVIEW_TIMER = TIMER_PREVIEW_MODE ? {
+      status: 'running',
+      deadlineAt: TIMER_PREVIEW_STARTED_AT + 45_000,
+      burnStartsAt: TIMER_PREVIEW_STARTED_AT + 15_000,
+      burning: false,
+      fast: false,
+    } : null
     if (TUTORIAL_MODE) document.body.classList.add('tutorial-mode')
     const debugBattleLogButton = document.getElementById('btnDebugBattleLog')
     if (debugBattleLogButton) debugBattleLogButton.hidden = !DEBUG_BATTLE_LOG
@@ -6687,7 +6696,7 @@
       const frozenClock = document.getElementById('turnClockFrozen')
       if (!clock || typeof RvBTurnTimerStatus === 'undefined') return
       const view = RvBTurnTimerStatus.create({
-        timer: authoritativeTurnTimer,
+        timer: authoritativeTurnTimer || TIMER_PREVIEW_TIMER,
         pendingTimer: authoritativePendingTimer,
         now: currentAuthorityNow(),
       })
@@ -7897,6 +7906,9 @@
       }, 1800)
       if (window.speechSynthesis && !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
         try { window.speechSynthesis.cancel(); const utterance = new SpeechSynthesisUtterance(line); utterance.lang = 'zh-CN'; utterance.rate = 1.08; window.speechSynthesis.speak(utterance) } catch (_) {}
+      }
+      if (TIMER_PREVIEW_MODE && !authoritativeTurnTimer && !authoritativePendingTimer) {
+        deadlines.push(Number(TIMER_PREVIEW_TIMER.deadlineAt), Number(TIMER_PREVIEW_TIMER.burnStartsAt))
       }
     }
     function setStatusMsg(msg) {

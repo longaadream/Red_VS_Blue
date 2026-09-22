@@ -140,6 +140,7 @@ describe('RED-69 battle motion contract', () => {
   it('keeps the prominent corner timer wired to authoritative visibility', () => {
     const battlePage = readPage('battle.html')
     expect(battlePage).toContain('id="turnClockCorner"')
+    expect(battlePage).toContain("const TIMER_PREVIEW_MODE = params.get('timerPreview') === '1'")
     expect(battlePage).toContain('corner.hidden = !view.visible')
     expect(battlePage).toContain('right: 18px')
     const lobbyPage = readPage('lobby.html')
