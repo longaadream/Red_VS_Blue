@@ -368,7 +368,6 @@ describe('共生拖行', () => {
   })
 
   it.each<[string, DragFailureSetup]>([
-    ['相邻敌人', { enemyX: 1, enemyY: 1, targetX: 5, targetY: 1 }],
     ['非法落点', { enemyX: 4, enemyY: 1, targetX: 5, targetY: 1, blockLanding: true }],
   ])('%s算作已使用但不改变状态', (_label, setup) => {
     const venom = makePiece({ instanceId: 'venom', ownerPlayerId: 'player-red', x: 0, y: 1 })
@@ -419,6 +418,8 @@ describe('共生拖行', () => {
     expect(adjacentNext.players[0].actionPoints).toBe(1)
     expect(adjacentNext.pieces.find((piece: any) => piece.instanceId === 'venom').skills[0].currentCooldown).toBe(1)
     expect(adjacentNext.pieces.find((piece: any) => piece.instanceId === 'adjacent')).toMatchObject({ x: 1, y: 1 })
+    expect(adjacentNext.pieces.find((piece: any) => piece.instanceId === 'adjacent').statusTags)
+      .toContainEqual(expect.objectContaining({ type: 'root', remainingDuration: 1 }))
   })
 })
 
