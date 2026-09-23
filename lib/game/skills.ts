@@ -2625,6 +2625,7 @@ function createEffectFunctions(battle: BattleState, sourcePiece: PieceInstance, 
 /** RED-33 result for one target inside a deterministic damage batch. */
 export interface DamageResult {
   success: boolean
+  redirectedTo?: string
   batchId: string
   chainId: string
   parentBatchId?: string
@@ -3102,6 +3103,26 @@ function prepareDamageTarget(
   battle: BattleState,
 ): PreparedDamage {
   const queues = queueContext(chain, context)
+  let redirected = false
+  let redirectedTo: string | undefined
+  let redirectedName: string | undefined
+  const redirectBinding = chain.captureWriterBinding()
+  const damageRedirectQueue = request.redirectedDamage || sourceBlocked || sourceDamage <= 0
+    ? undefined
+    : Object.freeze({ push: (input: { target: PieceInstance }): boolean => {
+      const protector = battle.pieces.find(piece => piece === input?.target)
+      if (redirected || !protector || protector === target || protector.currentHp <= 0) return false
+      chain.enqueueMany([{
+        ...request,
+        targets: [protector],
+        skipBeforeTrigger: true,
+        redirectedDamage: Object.freeze({ originalTarget: target, sourceDamage }),
+      }], redirectBinding)
+      redirected = true
+      redirectedTo = protector.instanceId
+      redirectedName = protector.name || protector.templateId
+      return true
+    } })
   const beforeDamageTakenContext = {
     type: 'beforeDamageTaken' as const,
     piece: target,
@@ -3117,7 +3138,15 @@ function prepareDamageTarget(
     ...damageMetadata(context),
     ...queues,
   }
-  const beforeTaken: TriggerResult = sourceBlocked
+  if (damageRedirectQueue) {
+    const redirectResult = checkSynchronousTriggers(battle, {
+      ...beforeDamageTakenContext,
+      type: 'beforeDamageRedirect',
+      damageRedirectQueue,
+    })
+    appendDamageMessages(battle, request.attacker.ownerPlayerId, redirectResult.messages || [])
+  }
+  const beforeTaken: TriggerResult = sourceBlocked || redirected
     ? { success: false, blocked: true, messages: [] }
     : checkSynchronousTriggers(battle, beforeDamageTakenContext)
   appendDamageMessages(battle, request.attacker.ownerPlayerId, beforeTaken.messages || [])
@@ -3130,7 +3159,7 @@ function prepareDamageTarget(
     target.instanceId,
   )
   const cooperativeProtection = adventureBoundary(battle)?.coop
-  let blocked = sourceBlocked || Boolean(beforeTaken.blocked) || !!(cooperativeProtection
+  let blocked = redirected || sourceBlocked || Boolean(beforeTaken.blocked) || !!(cooperativeProtection
     && (cooperativeProtection.protectedUntil[target.ownerPlayerId] ?? -1) >= cooperativeProtection.round)
   const defense = request.damageType === 'physical' || request.damageType === 'magical'
     ? Number(target.defense) || 0
@@ -3228,9 +3257,10 @@ function prepareDamageTarget(
   return {
     target,
     hpBefore,
-    emitBlocked: blocked && sourceDamage > 0,
+    emitBlocked: !redirected && blocked && sourceDamage > 0,
     result: {
-      success: !blocked,
+      success: redirected || !blocked,
+      ...(redirectedTo ? { redirectedTo } : {}),
       batchId: context.batchId,
       chainId: context.chainId,
       parentBatchId: context.parentBatchId,
@@ -3245,10 +3275,12 @@ function prepareDamageTarget(
       shieldAbsorbed,
       resolvedDamage,
       damage: finalDamage,
-      blocked,
+      blocked: !redirected && blocked,
       isKilled: false,
       targetHp: target.currentHp,
-      message: blocked
+      message: redirected
+        ? targetName + '的伤害由' + redirectedName + '代受'
+        : blocked
         ? targetName + '受到的伤害被完整抵挡'
         : attackerName + '对' + targetName + '造成' + finalDamage + '点' + typeName + '伤害',
       depth: context.depth,
@@ -3681,6 +3713,13 @@ function resolveDamageBatch(
   chain: EffectChain,
   battle: BattleState,
 ): DamageBatchResult {
+  if (request.redirectedDamage) {
+    const isLiving = (piece: PieceInstance) => piece.currentHp > 0 && battle.pieces.includes(piece)
+    const protector = request.targets[0]
+    const original = request.redirectedDamage.originalTarget
+    request = { ...request, targets: protector && isLiving(protector)
+      ? [protector] : isLiving(original) ? [original] : [] }
+  }
   let canonicalTargets: PieceInstance[]
   try {
     canonicalTargets = validateDamageTargets(
@@ -3709,7 +3748,7 @@ function resolveDamageBatch(
   }
 
   const queues = queueContext(chain, context)
-  let sourceDamage = request.baseDamage
+  let sourceDamage = request.redirectedDamage?.sourceDamage ?? request.baseDamage
   let sourceBlocked = false
   if (!request.skipBeforeTrigger) {
     const beforeDamageDealtContext = {
@@ -3863,6 +3902,7 @@ function resolveDamageBatch(
         finalDamage: entry.result.damage,
         resolvedDamage: entry.result.resolvedDamage,
         blocked: entry.result.blocked,
+        ...(entry.result.redirectedTo ? { redirectedTo: entry.result.redirectedTo } : {}),
         killed: entry.result.isKilled,
       },
     })

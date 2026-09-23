@@ -9,7 +9,7 @@
   "kind": "active",
   "type": "normal",
   "actionPointCost": 1,
-  "cooldownTurns": 0,
+  "cooldownTurns": 1,
   "range": "area",
   "code": "function executeSkill(context){var c=context.piece;var pos=selectTarget({type:'grid',range:6,filter:'all'});if(!pos||pos.needsTargetSelection)return pos;var dx=Math.sign(pos.x-c.x),dy=Math.sign(pos.y-c.y);var events=traceProjectile({x:c.x,y:c.y},{x:dx,y:dy},{excludePieceId:c.instanceId});var hit=null;for(var i=0;i<events.length;i++){if(events[i].type==='piece'){if(!arePlayersAllied(battle,events[i].piece.ownerPlayerId,c.ownerPlayerId)){hit=events[i].piece;break;}}if(events[i].type==='terrain'&&events[i].blocksProjectile)break;}if(!hit)return{success:true,message:c.name+'的鞋子未命中'};var r=dealDamage(c,hit,2,'physical',battle,context.skill.id);if(Math.abs(hit.x-c.x)+Math.abs(hit.y-c.y)===1)dealDamage(c,hit,Math.floor(c.attack*.5),'physical',battle,context.skill.id);return{success:true,message:c.name+'踢出鞋子造成伤害'};}",
   "icon": "✦",

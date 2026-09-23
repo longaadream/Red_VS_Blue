@@ -112,7 +112,7 @@ describe('Max phase shifter recast', () => {
     expect(next.map.tiles.find(tile => tile.x === 1 && tile.y === 0)?.props.type).toBe('wall')
   })
 
-  it('adds permanent move range directly without a bookkeeping status', () => {
+  it('grants a current-turn free move to every living ally without changing move range', () => {
     const skill = JSON.parse(readFileSync(resolve(process.cwd(), 'data/skills/max-full-speed.json'), 'utf8'))
     const max = makePiece({ instanceId: 'max', templateId: 'max', x: 1, y: 1, moveRange: 5,
       skills: [{ skillId: skill.id, currentCooldown: 0, usesRemaining: -1 }] })
@@ -121,7 +121,14 @@ describe('Max phase shifter recast', () => {
     state.skillsById[skill.id] = skill
     state.players[0].chargePoints = 2
     const next = step(state, { type: 'useChargeSkill', playerId: 'player-red', pieceId: 'max', skillId: skill.id })
-    expect(next.pieces.find(piece => piece.instanceId === 'max')).toMatchObject({ moveRange: 6, statusTags: [] })
-    expect(next.pieces.find(piece => piece.instanceId === 'ally')).toMatchObject({ moveRange: 4, statusTags: [] })
+    expect(next.pieces.find(piece => piece.instanceId === 'max')).toMatchObject({ moveRange: 5 })
+    expect(next.pieces.find(piece => piece.instanceId === 'ally')).toMatchObject({ moveRange: 3 })
+    expect(next.pieces.find(piece => piece.instanceId === 'max')?.statusTags).toContainEqual(
+      expect.objectContaining({ type: 'deployment-first-move-free', stacking: 'independent', currentUses: 1 }),
+    )
+    expect(next.pieces.find(piece => piece.instanceId === 'ally')?.statusTags).toContainEqual(
+      expect.objectContaining({ type: 'deployment-first-move-free', stacking: 'independent', currentUses: 1 }),
+    )
+    expect(next.pieces.find(piece => piece.instanceId === 'max')?.skills[0].currentCooldown).toBe(1)
   })
 })

@@ -1,18 +1,18 @@
 {
   "id": "max-full-speed",
   "name": "全速出击",
-  "description": "自身及周围5×5范围内所有友方棋子移速+1。",
-  "keywords": [],
-  "targetText": "自身",
+  "description": "所有存活友方棋子获得迅捷。",
+  "keywords": ["迅捷"],
+  "targetText": "所有存活友方棋子",
   "effectTags": ["强化"],
   "icon": "⚡",
   "kind": "active",
   "type": "super",
-  "cooldownTurns": 2,
+  "cooldownTurns": 1,
   "maxCharges": 0,
   "chargeCost": 1,
   "powerMultiplier": 1,
   "actionPointCost": 0,
   "targeting": { "steps": [] },
-  "code": "function executeSkill(context) { var source = context.piece; var allies = battle.pieces.filter(function(piece) { return piece.currentHp > 0 && arePlayersAllied(battle, piece.ownerPlayerId, source.ownerPlayerId) && Math.abs(piece.x - source.x) <= 2 && Math.abs(piece.y - source.y) <= 2; }); allies.forEach(function(ally) { ally.moveRange = Number(ally.moveRange || 0) + 1; }); return { success: true, message: source.name + '发动全速出击，使' + allies.length + '个友方棋子移速+1' }; }"
+  "code": "function executeSkill(context) { var source = context.piece; var turnNumber = Number(battle.turn.turnNumber); var allies = battle.pieces.filter(function(piece) { return piece.currentHp > 0 && arePlayersAllied(battle, piece.ownerPlayerId, source.ownerPlayerId); }); allies.forEach(function(ally, index) { addStatusEffectById(ally.instanceId, { id: 'max-full-speed-swift-' + source.instanceId + '-' + ally.instanceId + '-' + turnNumber + '-' + index, type: 'deployment-first-move-free', name: '迅捷', visible: true, stacking: 'independent', grantedTurnNumber: turnNumber, currentDuration: 1, currentUses: 1, remainingUses: 1 }); }); return { success: true, message: source.name + '发动全速出击，使' + allies.length + '个友方棋子获得迅捷' }; }"
 }
