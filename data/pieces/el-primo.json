@@ -6,7 +6,7 @@
   "stats": {
     "maxHp": 17,
     "attack": 4,
-    "defense": 2,
+    "defense": 1,
     "moveRange": 4,
     "speed": 4
   },
@@ -21,6 +21,10 @@
     },
     {
       "skillId": "el-primo-elbow",
+      "level": 1
+    },
+    {
+      "skillId": "el-primo-meteor-belt",
       "level": 1
     }
   ],

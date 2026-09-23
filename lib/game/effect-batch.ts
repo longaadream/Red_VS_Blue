@@ -32,6 +32,11 @@ export interface DamageRequest {
   readonly damageType: EffectDamageType
   readonly skillId?: string
   readonly skipBeforeTrigger?: boolean
+  /** Internal continuation of an original attack, never accepted by damageQueue. */
+  readonly redirectedDamage?: {
+    readonly originalTarget: PieceInstance
+    readonly sourceDamage: number
+  }
   readonly killerPlayerId?: string
   readonly selectedOption?: unknown
 }
