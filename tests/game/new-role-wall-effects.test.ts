@@ -2,14 +2,18 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { applyBattleAction } from '@/lib/game/turn'
 import { prepareAction } from '@/lib/game/targeting'
-import { dealDamage, getEffectiveChargeCost, loadRuleById } from '@/lib/game/skills'
-import { makePiece, makeState } from '../helpers/minimal-state'
+import { dealDamage, getEffectiveChargeCost, loadRuleById, type SkillDefinition } from '@/lib/game/skills'
+import { asPieceInstance, makePiece, makeState } from '../helpers/minimal-state'
+
+function loadSkill(id: string): SkillDefinition {
+  return JSON.parse(readFileSync(`data/skills/${id}.json`, 'utf8')) as SkillDefinition
+}
 
 describe('new role wall destruction', () => {
   it('Primo injury counting lowers elbow cost after every four actual damage', () => {
-    const skill = JSON.parse(readFileSync('data/skills/el-primo-elbow.json', 'utf8'))
-    const primo = makePiece({ instanceId: 'primo', templateId: 'el-primo', rules: [loadRuleById('rule-el-primo-injury-counter')!] })
-    const enemy = makePiece({ instanceId: 'enemy', ownerPlayerId: 'player-blue', x: 1 })
+    const skill = loadSkill('el-primo-elbow')
+    const primo = asPieceInstance(makePiece({ instanceId: 'primo', templateId: 'el-primo', rules: [loadRuleById('rule-el-primo-injury-counter')!] }))
+    const enemy = asPieceInstance(makePiece({ instanceId: 'enemy', ownerPlayerId: 'player-blue', x: 1 }))
     const state = makeState({ pieces: [primo, enemy] })
     expect(getEffectiveChargeCost(state, primo.ownerPlayerId, skill)).toBe(2)
     dealDamage(enemy, primo, 3, 'true', state)
@@ -21,7 +25,7 @@ describe('new role wall destruction', () => {
   })
 
   it('Primo selects an empty landing cell and destroys adjacent walls on landing', () => {
-    const skill = JSON.parse(readFileSync('data/skills/el-primo-elbow.json', 'utf8'))
+    const skill = loadSkill('el-primo-elbow')
     const source = makePiece({ instanceId: 'primo', templateId: 'el-primo', x: 0, y: 0, attack: 4,
       skills: [{ skillId: skill.id, currentCooldown: 0, usesRemaining: -1 }] })
     const enemy = makePiece({ instanceId: 'enemy', ownerPlayerId: 'player-blue', x: 4, y: 3 })
@@ -44,7 +48,7 @@ describe('new role wall destruction', () => {
   })
 
   it('super shell targets through walls and destroys every wall in range before damaging enemies', () => {
-    const skill = JSON.parse(readFileSync('data/skills/shelly-super-shell.json', 'utf8'))
+    const skill = loadSkill('shelly-super-shell')
     const source = makePiece({ instanceId: 'shelly', templateId: 'shelly', x: 0, y: 1, attack: 4,
       skills: [{ skillId: skill.id, currentCooldown: 0, usesRemaining: 2 }] })
     const target = makePiece({ instanceId: 'enemy', ownerPlayerId: 'player-blue', x: 3, y: 1 })
@@ -71,7 +75,7 @@ describe('new role wall destruction', () => {
   })
 
   it('bat support is a straight-line effect and is not stopped by walls', () => {
-    const skill = JSON.parse(readFileSync('data/skills/mortis-bat-support.json', 'utf8'))
+    const skill = loadSkill('mortis-bat-support')
     const source = makePiece({ instanceId: 'mortis', templateId: 'mortis', x: 0, y: 1, currentHp: 50, maxHp: 100,
       skills: [{ skillId: skill.id, currentCooldown: 0, usesRemaining: -1 }],
       statusTags: [{ id: 'counter', type: 'mortis-damage-counter', readyCharges: 1, intensity: 1 }] })

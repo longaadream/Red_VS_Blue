@@ -1,28 +1,28 @@
 {
-  "version": "0.1.11",
+  "version": "0.1.12",
   "windows": {
-    "url": "https://updates.redvsblue.top/0.1.11/RED-vs-BLUE-0.1.11-Setup.exe"
+    "url": "https://github.com/longaadream/Red_VS_Blue/releases/download/v0.1.12/RED-vs-BLUE-0.1.12-Setup.exe"
   },
   "android": {
-    "url": "https://updates.redvsblue.top/0.1.11/RED-vs-BLUE-0.1.11-Android.apk"
+    "url": "https://github.com/longaadream/Red_VS_Blue/releases/download/v0.1.12/RED-vs-BLUE-0.1.12-Android.apk"
   },
   "resource": {
-    "version": "1.0.5",
-    "minimumClientVersion": "0.1.8",
-    "url": "https://updates.redvsblue.top/resource/1.0.5/content.rvbpack"
+    "version": "1.0.10",
+    "minimumClientVersion": "0.1.12",
+    "url": "https://github.com/longaadream/Red_VS_Blue/releases/download/content-test-e542df83c2f923daefcceae37233042765d6e50aa1a319bc6d6303fcd7feb064/content.rvbpack"
   },
   "notes": [
     {
-      "title": "Android 资源更新",
-      "body": "修复官方资源清单被误判为不受信任的问题。"
+      "title": "毒液修复",
+      "body": "共生拖行命中相邻敌人正常施加定身；修复利爪撕裂被保护时异常拒绝。"
     },
     {
-      "title": "联机断线反馈",
-      "body": "连接无法恢复时结束挂起选择，并提示退出对局后重新进入。"
+      "title": "角色平衡",
+      "body": "更新阿方、麦克斯、普里莫、死神及索尼克技能。普里莫新增流星腰带代伤。"
     },
     {
-      "title": "Windows 同步更新",
-      "body": "Windows 客户端同步战斗界面修复，并更新服务器运维工具。"
+      "title": "引擎同步",
+      "body": "Windows、Android 与服务器同步新规则引擎，请使用配套资源包1.0.10。"
     }
   ]
 }
