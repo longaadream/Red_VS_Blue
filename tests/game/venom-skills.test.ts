@@ -127,7 +127,6 @@ describe('Venom data contract', () => {
       faction: 'evil',
       stats: { maxHp: 14, attack: 3, defense: 1, moveRange: 4 },
       skills: [
-        { skillId: 'venom-corrosion', level: 1 },
         { skillId: 'venom-host-transfer', level: 1 },
         { skillId: 'venom-symbiote-drag', level: 1 },
         { skillId: 'venom-claw-rend', level: 1 },
@@ -160,8 +159,8 @@ describe('Venom data contract', () => {
 
   it('exposes the approved costs, cooldowns, ranges and descriptions', () => {
     expect(corrosion()).toMatchObject({ kind: 'passive', actionPointCost: 0, cooldownTurns: 0 })
-    expect(hostTransfer()).toMatchObject({ actionPointCost: 1, cooldownTurns: 1, targetText: '7格内任意另1个存活棋子', keywords: [], effectTags: [] })
-    expect(symbioteDrag()).toMatchObject({ actionPointCost: 1, cooldownTurns: 1, form: 'projectile', keywords: ['弹射物'], effectTags: ['弹射物'] })
+    expect(hostTransfer()).toMatchObject({ actionPointCost: 1, cooldownTurns: 1, targetText: '其他存活棋子（7）', keywords: ['定身', '换位'], effectTags: [] })
+    expect(symbioteDrag()).toMatchObject({ actionPointCost: 1, cooldownTurns: 1, form: 'projectile', keywords: ['弹射物', '定身'], effectTags: ['弹射物'] })
     expect(clawRend()).toMatchObject({ actionPointCost: 1, cooldownTurns: 1, powerMultiplier: 2, keywords: [], effectTags: [] })
   })
 
@@ -175,7 +174,15 @@ describe('Venom data contract', () => {
     ]
 
     expect(minato.name).toBe('波风水门')
-    for (const file of minatoSkillFiles) expect(loadJson<SkillData>('skills', file).keywords).toEqual([])
+    const expectedKeywords: Record<string, string[]> = {
+      'minato-flying-raijin-passive.json': ['传送'],
+      'minato-kunai-formula.json': ['传送'],
+      'minato-rasengan.json': [],
+      'minato-spiral-barrage.json': ['传送'],
+    }
+    for (const file of minatoSkillFiles) {
+      expect(loadJson<SkillData>('skills', file).keywords).toEqual(expectedKeywords[file])
+    }
   })
 })
 
@@ -368,7 +375,6 @@ describe('共生拖行', () => {
   })
 
   it.each<[string, DragFailureSetup]>([
-    ['相邻敌人', { enemyX: 1, enemyY: 1, targetX: 5, targetY: 1 }],
     ['非法落点', { enemyX: 4, enemyY: 1, targetX: 5, targetY: 1, blockLanding: true }],
   ])('%s算作已使用但不改变状态', (_label, setup) => {
     const venom = makePiece({ instanceId: 'venom', ownerPlayerId: 'player-red', x: 0, y: 1 })
@@ -419,6 +425,8 @@ describe('共生拖行', () => {
     expect(adjacentNext.players[0].actionPoints).toBe(1)
     expect(adjacentNext.pieces.find((piece: any) => piece.instanceId === 'venom').skills[0].currentCooldown).toBe(1)
     expect(adjacentNext.pieces.find((piece: any) => piece.instanceId === 'adjacent')).toMatchObject({ x: 1, y: 1 })
+    expect(adjacentNext.pieces.find((piece: any) => piece.instanceId === 'adjacent').statusTags)
+      .toContainEqual(expect.objectContaining({ type: 'root', remainingDuration: 1 }))
   })
 })
 
