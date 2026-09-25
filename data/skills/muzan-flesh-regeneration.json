@@ -1,10 +1,12 @@
 {
   "id": "muzan-flesh-regeneration",
   "name": "血肉再生",
-  "description": "被动：每个全局回合结束时，若本回合未受到实际生命损失且自身已受伤，恢复2点生命；每局最多成功恢复3次。",
-  "keywords": ["被动", "治疗"],
+  "description": "每个全局回合结束时，若本回合未受到实际生命损失且自身已受伤，恢复2点生命；每局最多成功恢复3次。",
+  "keywords": [],
   "targetText": "被动",
-  "effectTags": ["治疗"],
+  "effectTags": [
+    "治疗"
+  ],
   "icon": "🩸",
   "kind": "passive",
   "type": "normal",

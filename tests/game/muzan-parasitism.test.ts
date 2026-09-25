@@ -189,6 +189,10 @@ describe('RED-216 Muzan parasitism', () => {
     expect(completed.extensions?.flowState).toBeUndefined()
     expect(completed.graveyard.some((piece: any) => piece.instanceId === muzan.instanceId)).toBe(true)
     expect(completed.actions?.some((action: any) => action.type === 'chargeCrystalDropped' && action.payload.sourcePieceId === muzan.instanceId)).toBe(true)
+    expect(completed.extensions?.tileEffects).toContainEqual(expect.objectContaining({
+      tileType: 'charge-crystal', sourceId: muzan.instanceId, x: 4, y: 1, visible: true,
+    }))
+    expect((completed.extensions?.tileEffects as any[]).filter(effect => effect.tileType === 'charge-crystal' && effect.sourceId === muzan.instanceId)).toHaveLength(1)
     expect(completed.actions?.find((action: any) => action.type === 'deathParasitism')).toMatchObject({
       playerId: 'player-red',
       payload: {
@@ -219,6 +223,17 @@ describe('RED-216 Muzan parasitism', () => {
     expect(cancelled.players.find((player: any) => player.playerId === 'player-red')?.chargePoints).toBe(2)
     expect(cancelled.pieces.find((piece: any) => piece.instanceId === host.instanceId)?.ownerPlayerId).toBe('player-blue')
     expect(cancelled.graveyard).toContainEqual(expect.objectContaining({ instanceId: muzan.instanceId, currentHp: 0 }))
+  })
+
+  it('preserves the non-core death rule for a training-tool Muzan after parasitism', () => {
+    const { state, muzan, host, attacker } = makeParasitismState()
+    muzan.isCore = false
+    const first = runBattleAction(state, attackMuzanAction(state, attacker), { rootSeed: ROOT_SEED }).state
+    const completed = chooseCell(chooseHost(first, host.instanceId), 4, 1)
+    expect(completed.graveyard).toContainEqual(expect.objectContaining({ instanceId: muzan.instanceId, x: 4, y: 1 }))
+    expect(completed.pieces.find(piece => piece.instanceId === host.instanceId)?.ownerPlayerId).toBe('player-red')
+    expect((completed.extensions?.tileEffects as any[] | undefined)?.some(effect => effect.tileType === 'charge-crystal' && effect.sourceId === muzan.instanceId) ?? false).toBe(false)
+    expect(completed.actions?.some(action => action.type === 'chargeCrystalDropped')).toBe(false)
   })
 
   it('does not prompt when charge, host, or adjacent landing is unavailable', () => {

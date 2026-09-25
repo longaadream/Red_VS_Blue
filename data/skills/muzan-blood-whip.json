@@ -2,9 +2,7 @@
   "id": "muzan-blood-whip",
   "name": "血之鞭击",
   "description": "对全部正方向3格内的敌人造成1倍伤害。",
-  "keywords": [
-    "物理伤害"
-  ],
+  "keywords": [],
   "targetText": "无需目标",
   "effectTags": [
     "伤害",

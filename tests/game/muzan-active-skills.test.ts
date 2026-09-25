@@ -124,6 +124,23 @@ describe('RED-216 Muzan active skills', () => {
     expect(moved.currentHp).toBe(before - 5)
   })
 
+  it('Demon Body crosses an adjacent ally and a later ally without harming either', () => {
+    const caster = makePiece({ instanceId: 'muzan', ownerPlayerId: 'player-red', x: 0, y: 1, attack: 4 })
+    const allies = [1, 3].map(x => makePiece({ instanceId: `ally-${x}`, ownerPlayerId: 'player-red', x, y: 1, currentHp: 10 }))
+    const enemy = makePiece({ instanceId: 'enemy', ownerPlayerId: 'player-blue', faction: 'blue', x: 4, y: 1, currentHp: 10 })
+    const state = makeState({ pieces: [caster, ...allies, enemy], width: 8, height: 3 })
+    state.players[0].actionPoints = 2
+    installSkill(state, caster, 'muzan-demon-body')
+    const action = selectedGridAction(state, caster.instanceId, 'muzan-demon-body', 6, 1)
+    const result = runBattleAction(state, action, { rootSeed: ROOT_SEED }).state
+    expect(result.pieces.find(piece => piece.instanceId === caster.instanceId)).toMatchObject({ x: 6, y: 1 })
+    for (const ally of allies) {
+      expect(result.pieces.find(piece => piece.instanceId === ally.instanceId)).toMatchObject({ currentHp: 10, x: ally.x, y: 1 })
+      expect(result.pieces.find(piece => piece.instanceId === ally.instanceId)?.statusTags).not.toContainEqual(expect.objectContaining({ type: 'root' }))
+    }
+    expect(result.pieces.find(piece => piece.instanceId === enemy.instanceId)?.currentHp).toBe(7)
+  })
+
   it('keeps later Demon Body targets after the first target reflects lethal damage', () => {
     const caster = makePiece({ instanceId: 'muzan-body-reflect', templateId: 'dark-muzan', ownerPlayerId: 'player-red', x: 0, y: 1, attack: 4, currentHp: 15, maxHp: 15 })
     const first = makePiece({ instanceId: 'body-reflect-first', ownerPlayerId: 'player-blue', faction: 'blue', x: 2, y: 1, currentHp: 20, maxHp: 20 })
