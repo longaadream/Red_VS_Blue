@@ -9,6 +9,7 @@ import { addPieceStatus, removePieceStatus, expireHolderStatuses, type StatusHol
 import { checkpointBattlePresentation, recordBattlePresentationBlock, createBattlePresentationQueue } from './battle-presentation-recording'
 import { createFlowRuntime, clearRemovedPieceFlowState } from './flow-runtime'
 import { changePiecePositions, type PiecePositionChange } from './position-change'
+import { makeDeathParasitismCandidate, resolveDeathParasitism } from './death-parasitism'
 import type { PositionChangeKind } from './spatial'
 import type { BattleState } from "./turn"
 import type { PieceInstance } from "./piece"
@@ -1074,6 +1075,22 @@ export function assertSkillDefinition(
   if (options.requireExecutable && !isNonEmptyString(skill.code)) {
     throw new Error(`Skill definition ${skillId} has no executable code`)
   }
+  if (skill.deathParasitism !== undefined) {
+    const declaration = skill.deathParasitism
+    if (!declaration || typeof declaration !== 'object' || Array.isArray(declaration)) {
+      throw new Error(`Skill definition ${skillId} has an invalid death parasitism declaration`)
+    }
+    const value = declaration as Record<string, unknown>
+    if (value.version !== 1
+      || !Number.isSafeInteger(value.squareRadius) || Number(value.squareRadius) < 0
+      || !Number.isSafeInteger(value.chargeCost) || Number(value.chargeCost) <= 0
+      || !isNonEmptyString(value.grantSkillId)
+      || !Array.isArray(value.grantRuleIds)
+      || value.grantRuleIds.length === 0
+      || value.grantRuleIds.some(ruleId => !isNonEmptyString(ruleId))) {
+      throw new Error(`Skill definition ${skillId} has an invalid death parasitism declaration`)
+    }
+  }
   return value as SkillDefinition
 }
 
@@ -1165,6 +1182,38 @@ function ensureSkillDefinitionForAddition(
   }
   ;battle.skillsById[skillId] = definition
   return definition
+}
+
+function addDeathParasitismSkill(
+  battle: BattleState,
+  target: PieceInstance,
+  skillId: string,
+): boolean {
+  const definition = ensureSkillDefinitionForAddition(battle, skillId, target.instanceId)
+  if (!definition) return false
+  target.skills ??= []
+  if (target.skills.some(skill => skill.skillId === skillId)) return false
+  const skill = { skillId, level: 1, currentCooldown: 0, usesRemaining: -1 }
+  target.skills.push(skill)
+  const displaySkills = target.displaySkills as unknown as Array<{ skillId?: string } | string> | undefined
+  if (displaySkills !== undefined
+    && !displaySkills.some(entry => typeof entry === 'string' ? entry === skillId : entry?.skillId === skillId)) {
+    displaySkills.push({ ...skill })
+  }
+  return true
+}
+
+function addDeathParasitismRule(
+  battle: BattleState,
+  target: PieceInstance,
+  ruleId: string,
+): boolean {
+  const rule = loadRuleForBattle(battle, ruleId, { sourceId: target.instanceId })
+  if (!rule) return false
+  target.rules ??= []
+  if (target.rules.some(entry => entry?.id === ruleId)) return false
+  target.rules.push(rule)
+  return true
 }
 
 /** Trusted code-node adapter. Serialized state contains data only, never these functions. */
@@ -2044,6 +2093,19 @@ export interface SkillExecutionResult {
 export type SkillForm = "melee" | "ranged" | "magic" | "projectile" | "area" | "self"
 
 /**
+ * Engine-owned, closed declaration for a passive that may react to the
+ * holder's pending death.  The engine only understands this generic shape;
+ * character-specific skill and rule IDs stay in the content JSON.
+ */
+export interface DeathParasitismDefinition {
+  version: 1
+  squareRadius: number
+  chargeCost: number
+  grantSkillId: string
+  grantRuleIds: string[]
+}
+
+/**
  * 技能的静态定义（模板）
  * 包含技能的元数据和函数代码
  */
@@ -2106,6 +2168,8 @@ export interface SkillDefinition extends ModeScopedContent {
   targeting?: SelectionContractDefinition
   /** Trusted, closed declaration that binds a sealed summon writer for this content. */
   summonCapability?: SummonCapabilityDeclaration
+  /** Trusted, closed declaration for a death-time host transfer. */
+  deathParasitism?: DeathParasitismDefinition
   /** When true, cancelling any synthetic post-effect target rolls back the entire skill transaction. */
   rollbackPendingTargetOnCancel?: boolean
   /** When true, the generic public battle log omits this skill's selected target. */
@@ -3593,6 +3657,46 @@ function resolveDeathBatch(
     sourceId: frozen[0]?.sourceId,
     skillId: frozen[0]?.skillId,
   }
+  const deathCandidateIds = new Set(frozen.map(candidate => candidate.targetId))
+  for (const candidate of frozen) {
+    const parasitismSkillId = candidate.piece.skills
+      .map(skill => skill.skillId)
+      .find(skillId => {
+        return Boolean(battle.skillsById?.[skillId]?.deathParasitism)
+      })
+    if (!parasitismSkillId) continue
+    const definition = loadSkillForBattle(
+      battle,
+      parasitismSkillId,
+      battle.skillsById?.[parasitismSkillId],
+      { metadata: { sourceId: candidate.piece.instanceId, skillId: parasitismSkillId } },
+    )
+    if (!definition) continue
+    const parasitismCandidate = makeDeathParasitismCandidate(candidate.piece, definition)
+    if (!parasitismCandidate) continue
+    const result = resolveDeathParasitism(
+      battle,
+      parasitismCandidate,
+      deathCandidateIds,
+      {
+        addSkill: addDeathParasitismSkill,
+        addRule: addDeathParasitismRule,
+      },
+    )
+    if (!result.applied) continue
+    candidate.deathX = candidate.piece.x
+    candidate.deathY = candidate.piece.y
+    if (!result.hostId) rejection('DeathParasitism committed without a host')
+    for (const source of frozen) {
+      if (source.attacker?.instanceId !== result.hostId) continue
+      const host = battle.pieces.find(piece => piece.instanceId === result.hostId)
+      if (!host) rejection('DeathParasitism host disappeared before source freeze')
+      // Only a canonical attacker reference is mutated by the transfer.  A
+      // stable-ID snapshot must retain its frozen owner metadata, otherwise a
+      // same-ID but independent source object would fail the death-batch guard.
+      if (source.attacker === host) source.sourceOwnerPlayerId = host!.ownerPlayerId
+    }
+  }
   const assertFrozenSourceMetadata = (stage: string): void => {
     for (const candidate of frozen) {
       if (!candidate.attacker) continue
@@ -3788,6 +3892,7 @@ function resolveDamageBatch(
   chain: EffectChain,
   battle: BattleState,
 ): DamageBatchResult {
+  const originalAttackerOwnerPlayerId = request.attacker.ownerPlayerId
   if (request.redirectedDamage) {
     const isLiving = (piece: PieceInstance) => piece.currentHp > 0 && battle.pieces.includes(piece)
     const protector = request.targets[0]
@@ -3971,7 +4076,7 @@ function resolveDamageBatch(
   for (const entry of prepared) {
     battle.actions.push({
       type: 'damage',
-      playerId: request.attacker.ownerPlayerId,
+      playerId: originalAttackerOwnerPlayerId,
       turn: battle.turn?.turnNumber ?? 0,
       payload: {
         batchId: context.batchId,
@@ -3980,7 +4085,7 @@ function resolveDamageBatch(
         sourceId: request.attacker.instanceId,
         skillId: request.skillId,
         targetId: entry.target.instanceId,
-        damageSource: { kind: damageSourcePiece(request.attacker) ? 'piece' : 'kind' in request.attacker ? request.attacker.kind : 'piece', sourceId: request.attacker.instanceId, playerId: request.attacker.ownerPlayerId },
+        damageSource: { kind: damageSourcePiece(request.attacker) ? 'piece' : 'kind' in request.attacker ? request.attacker.kind : 'piece', sourceId: request.attacker.instanceId, playerId: originalAttackerOwnerPlayerId },
       damageType: request.damageType,
         rawDamage: request.baseDamage,
         modifiedDamage: entry.result.modifiedDamage,

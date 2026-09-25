@@ -1,0 +1,24 @@
+{
+  "id": "dark-muzan",
+  "name": "鬼舞辻无惨",
+  "faction": "evil",
+  "description": "以血肉再生维持战斗，并在濒死时寄生于其他棋子。",
+  "rarity": "legendary",
+  "stats": {
+    "maxHp": 15,
+    "attack": 4,
+    "defense": 1,
+    "moveRange": 4
+  },
+  "skills": [
+    { "skillId": "muzan-flesh-regeneration", "level": 1 },
+    { "skillId": "muzan-blood-whip", "level": 1 },
+    { "skillId": "muzan-demon-body", "level": 1 },
+    { "skillId": "muzan-parasitism", "level": 1 }
+  ],
+  "rules": [
+    "rule-muzan-regeneration-damage",
+    "rule-muzan-regeneration-end"
+  ],
+  "isDefault": false
+}

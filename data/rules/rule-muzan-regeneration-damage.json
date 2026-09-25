@@ -1,0 +1,9 @@
+{
+  "id": "rule-muzan-regeneration-damage",
+  "name": "血肉再生·受伤记录",
+  "description": "记录鬼舞辻无惨在本全局回合实际损失的生命值。",
+  "trigger": {
+    "type": "afterDamageTaken"
+  },
+  "skillCode": "var piece = context.rulePiece; if (!piece || !context.sourcePiece || context.sourcePiece.instanceId !== piece.instanceId || !(Number(context.damage) > 0)) return { success: false, message: '' }; var turnNumber = Number(battle.turn && battle.turn.turnNumber); if (!Number.isFinite(turnNumber)) return { success: false, message: '' }; var id = flow.refs.holder(); if (!id) return { success: false, message: '' }; flow.state.set('piece', id, 'muzan-flesh-regeneration', 'lastDamageTurn', turnNumber, 'battle'); return { success: true, message: '' };"
+}
