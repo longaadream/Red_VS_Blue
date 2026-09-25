@@ -4,6 +4,7 @@
   "faction": "evil",
   "description": "以血肉再生维持战斗，并在濒死时寄生于其他棋子。",
   "rarity": "legendary",
+  "image": "muzan.png",
   "stats": {
     "maxHp": 15,
     "attack": 4,
