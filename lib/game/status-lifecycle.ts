@@ -36,6 +36,7 @@ export const STATUS_DEFINITIONS: Readonly<Record<string, StatusDefinition>> = {
   'nano-boost': { stacking: 'intensity', description: '每份防御+3、移动力+1、伤害+1，分别相加。' },
   'blood-oath': { stacking: 'none', description: '血誓不可重复施加，按持有者回合结束计时。' },
   'icebound-fortitude': { stacking: 'none', description: '寒冰坚忍激活期间不可重复施加。' },
+  'muzan-damage-reduction': { stacking: 'none', description: '无惨之躯减伤不叠加，按持有者回合结束计时。' },
   'lich-covenant': { stacking: 'none', description: '死亡后复活一次，不叠加。' },
   'aizen-black-coffin': { stacking: 'independent', description: '每份黑棺分别记录来源和延迟伤害。' },
 }

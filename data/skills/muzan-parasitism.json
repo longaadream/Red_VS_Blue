@@ -1,0 +1,34 @@
+{
+  "id": "muzan-parasitism",
+  "name": "寄生",
+  "description": "即将死亡时，若自身为中心5×5范围内有其他棋子，可花费2点充能点，选择其中一个棋子并传送至其相邻地格，将血液注入：该棋子成为己方棋子并获得被动「血肉再生」，随后无惨死亡。",
+  "keywords": [],
+  "targetText": "被动",
+  "effectTags": [
+    "被动",
+    "位移"
+  ],
+  "icon": "🩸",
+  "kind": "passive",
+  "type": "normal",
+  "cooldownTurns": 0,
+  "maxCharges": 0,
+  "chargeCost": 2,
+  "powerMultiplier": 1,
+  "actionPointCost": 0,
+  "range": "self",
+  "targeting": {
+    "steps": []
+  },
+  "deathParasitism": {
+    "version": 1,
+    "squareRadius": 2,
+    "chargeCost": 2,
+    "grantSkillId": "muzan-flesh-regeneration",
+    "grantRuleIds": [
+      "rule-muzan-regeneration-damage",
+      "rule-muzan-regeneration-end"
+    ]
+  },
+  "code": "function executeSkill() { return { success: false, message: '这是被动技能，自动触发，无法手动使用' }; }"
+}
