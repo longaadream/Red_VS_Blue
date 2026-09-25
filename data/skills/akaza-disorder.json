@@ -1,0 +1,32 @@
+{
+  "id": "akaza-disorder",
+  "name": "破坏杀·乱式",
+  "description": "选择敌军（1）造成1倍伤害。若本回合已对该敌人造成过伤害，改为造成1.5倍伤害。",
+  "keywords": [],
+  "targetText": "敌军（1）",
+  "effectTags": ["伤害"],
+  "icon": "✦",
+  "kind": "active",
+  "type": "normal",
+  "form": "melee",
+  "cooldownTurns": 1,
+  "maxCharges": 0,
+  "powerMultiplier": 1,
+  "actionPointCost": 1,
+  "range": "single",
+  "targetType": "piece",
+  "filter": "enemy",
+  "requiresTarget": true,
+  "targeting": {
+    "steps": [
+      {
+        "kind": "target",
+        "type": "piece",
+        "filter": "enemy",
+        "range": 1
+      }
+    ]
+  },
+  "code": "function executeSkill(context) { var caster = context.piece; var target = selectTarget({ type: 'piece', range: 1, filter: 'enemy' }); if (!target || target.needsTargetSelection) return target; var turnNumber = Number(battle.turn && battle.turn.turnNumber); var alreadyDamaged = (target.statusTags || []).some(function(tag) { return tag && tag.type === 'akaza-damaged' && tag.sourceId === caster.instanceId && Number(tag.lastDamageTurn) === turnNumber; }); var multiplier = alreadyDamaged ? 1.5 : 1; var damage = Math.floor(caster.attack * multiplier); var result = flow.effects.damage(caster, target.instanceId, damage, 'physical', context.skill.id); return { success: true, message: caster.name + '使用破坏杀·乱式对' + target.name + '造成' + (result.damage || 0) + '点物理伤害' + (alreadyDamaged ? '（追击）' : '') }; }",
+  "previewCode": "function calculatePreview(piece, skillDef) { return { description: skillDef.description, expectedValues: { firstDamage: Math.floor((piece.attack || 0) * skillDef.powerMultiplier), followupDamage: Math.floor((piece.attack || 0) * 1.5) } }; }"
+}

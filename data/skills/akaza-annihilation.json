@@ -1,0 +1,34 @@
+{
+  "id": "akaza-annihilation",
+  "name": "破坏杀·灭式",
+  "description": "选择一个正方向，对该方向4格内所有敌军造成伤害。距离1/2/3或4格敌人造成1.25倍/1倍/0.5倍伤害。",
+  "keywords": [],
+  "targetText": "正方向",
+  "effectTags": ["伤害", "范围伤害"],
+  "icon": "✹",
+  "kind": "active",
+  "type": "normal",
+  "form": "area",
+  "cooldownTurns": 2,
+  "maxCharges": 0,
+  "powerMultiplier": 1,
+  "actionPointCost": 2,
+  "range": "single",
+  "targetType": "grid",
+  "filter": "all",
+  "requiresTarget": true,
+  "targeting": {
+    "steps": [
+      {
+        "kind": "target",
+        "type": "grid",
+        "filter": "all",
+        "range": 4,
+        "sameRowOrColumn": true,
+        "excludeSourceCell": true
+      }
+    ]
+  },
+  "code": "function executeSkill(context) { var source = context.piece; var targetPosition = selectTarget({ type: 'grid', range: 4, filter: 'all' }); if (!targetPosition || targetPosition.needsTargetSelection) return targetPosition; var dx = targetPosition.x - source.x; var dy = targetPosition.y - source.y; if ((dx !== 0 && dy !== 0) || (dx === 0 && dy === 0)) return { success: false, message: '请选择一个正方向' }; var direction = { x: dx === 0 ? 0 : (dx > 0 ? 1 : -1), y: dy === 0 ? 0 : (dy > 0 ? 1 : -1) }; var multipliers = { 1: 1.25, 2: 1, 3: 0.5, 4: 0.5 }; var targets = []; for (var distance = 1; distance <= 4; distance++) { var x = source.x + direction.x * distance; var y = source.y + direction.y * distance; for (var i = 0; i < battle.pieces.length; i++) { var piece = battle.pieces[i]; if (piece.currentHp > 0 && piece.x === x && piece.y === y && !arePlayersAllied(battle, piece.ownerPlayerId, source.ownerPlayerId)) targets.push({ piece: piece, distance: distance }); } } var totalDamage = 0; var hitCount = 0; for (var targetIndex = 0; targetIndex < targets.length; targetIndex++) { var entry = targets[targetIndex]; if (entry.piece.currentHp <= 0) continue; var damage = Math.floor(source.attack * multipliers[entry.distance]); var result = flow.effects.damage(source, entry.piece.instanceId, damage, 'physical', context.skill.id); totalDamage += Number(result && result.damage || 0); hitCount++; } return { success: true, message: source.name + '使用破坏杀·灭式，命中' + hitCount + '名敌军，造成' + totalDamage + '点物理伤害' }; }",
+  "previewCode": "function calculatePreview(piece) { var attack = piece.attack || 0; return { description: '选择一个正方向，对该方向4格内所有敌军造成伤害。距离1/2/3或4格敌人造成1.25倍/1倍/0.5倍伤害。', expectedValues: { damageByDistance: [Math.floor(attack * 1.25), attack, Math.floor(attack * 0.5), Math.floor(attack * 0.5)] } }; }"
+}
