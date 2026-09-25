@@ -1,0 +1,49 @@
+{
+  "id": "akaza-flash-step",
+  "name": "瞬步",
+  "description": "传送到自身为中心7x7范围内，本局内曾被自身造成过伤害的敌军的相邻地格。攻击力永久+1，可叠加。",
+  "keywords": [],
+  "targetText": "敌人（7x7）→邻格",
+  "effectTags": ["位移", "属性提升"],
+  "icon": "⚡",
+  "kind": "active",
+  "type": "normal",
+  "cooldownTurns": 3,
+  "maxCharges": 0,
+  "powerMultiplier": 1,
+  "actionPointCost": 0,
+  "range": "single",
+  "targetType": "piece",
+  "filter": "enemy",
+  "requiresTarget": true,
+  "targeting": {
+    "steps": [
+      {
+        "kind": "target",
+        "type": "piece",
+        "filter": "enemy",
+        "range": 3,
+        "distanceMetric": "chebyshev",
+        "requireOpenCardinalLanding": true,
+        "excludeSourceLanding": true,
+        "requiredTargetStatuses": ["akaza-damaged"],
+        "requiredTargetStatusFromSource": "akaza-damaged"
+      },
+      {
+        "kind": "target",
+        "type": "grid",
+        "filter": "all",
+        "range": 99,
+        "requireWalkable": true,
+        "requireUnoccupied": true,
+        "distanceFromSelectedTarget": {
+          "index": 0,
+          "range": 1,
+          "minRange": 1
+        }
+      }
+    ]
+  },
+  "code": "function executeSkill(context) { var caster = context.piece; var target = selectTarget({ type: 'piece', range: 3, filter: 'enemy' }); if (!target || target.needsTargetSelection) return target; var position = selectTarget({ type: 'grid', range: 99, filter: 'all' }); if (!position || position.needsTargetSelection) return position; if (!caster || caster.currentHp <= 0 || battle.pieces.indexOf(caster) === -1) return { success: false, message: '瞬步施法者已失效' }; if (!target || target.currentHp <= 0 || target.x == null || target.y == null || arePlayersAllied(battle, target.ownerPlayerId, caster.ownerPlayerId) || Math.max(Math.abs(target.x - caster.x), Math.abs(target.y - caster.y)) > 3) return { success: false, message: '瞬步目标已失效' }; var marked = (target.statusTags || []).some(function(tag) { return tag && tag.type === 'akaza-damaged' && tag.sourceId === caster.instanceId; }); if (!marked) return { success: false, message: '目标必须是本局内曾被猗窝座实际造成过伤害的敌军' }; if (Math.abs(position.x - target.x) + Math.abs(position.y - target.y) !== 1) return { success: false, message: '瞬步落点必须是目标的正方向相邻地格' }; var tile = battle.map.tiles.find(function(item) { return item.x === position.x && item.y === position.y; }); if (!tile || !tile.props || tile.props.walkable !== true) return { success: false, message: '瞬步落点不可行走' }; if (battle.pieces.some(function(piece) { return piece.currentHp > 0 && piece.x === position.x && piece.y === position.y; })) return { success: false, message: '瞬步落点已被占用' }; var moved = flow.effects.move([{ pieceId: caster.instanceId, x: position.x, y: position.y }], 'teleport'); if (!moved.success) return { success: true, message: '瞬步位移被阻挡，本次效果取消' }; if (!moved.changes || moved.changes.length === 0) return { success: true, message: '瞬步没有产生实际位移，本次效果取消' }; var activeCaster = battle.pieces.find(function(piece) { return piece.instanceId === caster.instanceId && piece.currentHp > 0; }); if (!activeCaster || battle.pieces.indexOf(activeCaster) === -1) return { success: true, message: '猗窝座在瞬步接触结算后已失效' }; flow.attributes.add(activeCaster.instanceId, 'attack', 1); return { success: true, message: activeCaster.name + '发动瞬步，攻击力永久+1' }; }",
+  "previewCode": "function calculatePreview(piece, skillDef) { return { description: skillDef.description, expectedValues: { attackGain: 1, resultingAttack: (piece.attack || 0) + 1 } }; }"
+}

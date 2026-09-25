@@ -1,0 +1,9 @@
+{
+  "id": "rule-akaza-damage-mark",
+  "name": "猗窝座伤害标记",
+  "description": "猗窝座对敌军造成实际伤害后，在目标身上留下永久隐藏的瞬步标记。",
+  "trigger": {
+    "type": "afterDamageDealt"
+  },
+  "skillCode": "var holder = context.rulePiece; var source = context.sourcePiece; var target = context.targetPiece; if (!holder || !source || source.instanceId !== holder.instanceId || !(context.damage > 0) || !target) return { success: false, message: '' }; var canonicalTarget = battle.pieces.find(function(piece) { return piece.instanceId === target.instanceId; }); if (!canonicalTarget || canonicalTarget.instanceId === holder.instanceId || flow.query.pieces({ originId: holder.instanceId, relation: 'enemy', includeDead: true }).indexOf(canonicalTarget.instanceId) === -1) return { success: false, message: '' }; var markerId = 'akaza-damaged-by:' + holder.instanceId; var turnNumber = battle.turn && Number.isFinite(battle.turn.turnNumber) ? battle.turn.turnNumber : 0; var marker = (canonicalTarget.statusTags || []).find(function(tag) { return tag.id === markerId; }); if (marker) { marker.type = 'akaza-damaged'; marker.sourceId = holder.instanceId; marker.visible = false; marker.currentDuration = -1; marker.remainingDuration = -1; marker.expiresAfterTurn = null; marker.lastDamageTurn = turnNumber; return { success: true, message: '' }; } var added = addStatusEffectById(canonicalTarget.instanceId, { id: markerId, type: 'akaza-damaged', sourceId: holder.instanceId, visible: false, stacking: 'independent', currentDuration: -1, remainingDuration: -1, currentUses: -1, lastDamageTurn: turnNumber }); return { success: added, message: '' };"
+}

@@ -1,0 +1,17 @@
+{
+  "id": "dark-akaza",
+  "name": "猗窝座",
+  "faction": "evil",
+  "description": "以斗气压制敌人，追击曾被自己伤害的对手。",
+  "rarity": "legendary",
+  "image": "akaza.png",
+  "stats": { "maxHp": 16, "attack": 4, "defense": 0, "moveRange": 5 },
+  "skills": [
+    { "skillId": "akaza-fighting-spirit", "level": 1 },
+    { "skillId": "akaza-disorder", "level": 1 },
+    { "skillId": "akaza-annihilation", "level": 1 },
+    { "skillId": "akaza-flash-step", "level": 1 }
+  ],
+  "rules": ["rule-akaza-fighting-spirit", "rule-akaza-damage-mark"],
+  "isDefault": false
+}
