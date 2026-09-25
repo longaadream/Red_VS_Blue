@@ -39,3 +39,20 @@
 ## 交付与回退
 
 只更新资源包不能让旧引擎获得本修复。现有 0.1.12 验收安装包未被本源码修改自动更新；需要重新构建客户端及权威服务器后验收。回退本任务代码提交及对应生成引擎，资源内容无需回退。
+
+## 用户验收发现的入口遗漏（第二轮）
+
+用户使用首轮 `9a860f38d` 客户端在训练营再次复现：`alfonso-kick` 对 `training-red-2` 首段击杀后，第二段报 `Damage target training-red-2 is not an active living piece`，上下文 `rootSeed: null`。首轮测试和教学模式启动冒烟不足以证明训练营技能执行正确。
+
+训练营的 `trainingApiFetch('PUT')` 使用 `applyBattleAction`；教学指定课程与服务器使用 `runBattleAction`。此前只有后者建立动作级 EffectChain，直接归约时每次伤害各自使用短生命周期 detached chain，第二段无法看到第一段正式死亡记录。这是同一问题的遗漏入口，而非资源脚本需要再增加判断。
+
+第二轮要求保留原始技能 JSON，覆盖直接归约、独立目标预检、链清理及后续非法伤害回滚，并用实际打包客户端的训练营路径复验首段击杀与非致命两段。新候选产物另存 `output/RED-215-r2`，首轮产物保留用于对照和回退；构建不等于人工验收或服务器部署。
+
+第二轮源代码验证：
+
+- 新增直接 `applyBattleAction` 回归先失败：原始阿方 JSON，2 HP 相邻目标，错误包含 `rootSeed: null` 和 `not an active living piece`，与用户截图相同。修复前证据：`dist/RED-215-r2/direct-apply-before-fix.log`。
+- 公共入口在没有链时建立临时 detached chain，沿用既有内容查找与错误语义；已有权威链复用。临时链用 `withEffectChain` 清理所有克隆绑定。独立预检当前仅做结构和目标检查，原本即通过，不改变该接口语义。
+- 扩大运行 `npx.cmd vitest run tests/game --maxWorkers=1`：135 文件，1470 项通过、38 项失败。另建只读基线检出 `9a860f38d`，重跑全部 19 个失败文件，得到相同 38 项失败（238 项通过）；逐项失败标题一致。失败涉及已有内容清单、界面约定、角色旧断言等，未修改快照或放宽断言。本轮不得描述为全库测试通过。
+- 独立审查指出 direct reducer 使用活动 RuleRuntime 时，事务会切换 replay runtime，因此 batch ID 回调必须在执行时读取活动 runtime，不能捕获外层 runtime；已纳入修复及连续动作回归。
+- 最终相关 14 文件、300 项通过，包含多段伤害、原技能、伤害/死亡管线、权威房间、pending 交互和回滚。连续两次直接动作在同一个 RuleRuntime 中生成 4 个不同伤害 batch ID，游标推进至 4。独立审查确认 callback 修正后无其他阻断；TypeScript、ESLint 检查通过，浏览器引擎重新生成。
+- 第二轮原始日志保存于 `dist/RED-215-r2/`。正式线上服务器是否已升级需以部署产物为准，本任务没有执行远程部署。
