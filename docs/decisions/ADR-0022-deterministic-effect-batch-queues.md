@@ -107,6 +107,10 @@ Prepare 中触发器造成的护盾、状态、日志、rule limit 或 RNG 变�
 
 ### 5. DamageBatch 与 Reap checkpoint
 
+2026-09-25，RED-215 经项目负责人批准补充兼容例外：根 SkillCode 在同一权威动作中继续对已正式死亡的原目标调用 `dealDamage`，由引擎依据瞬态链内死亡记录返回零伤害成功结果，无需修改现有脚本。该目标不再进入 Prepare／伤害事件／DeathBatch；数组保留结果位置，存活目标仍执行以下阶段。死亡记录参与链快照恢复，不进入持久化状态；未知引用、旧动作尸体、非法参数与非法重入仍拒绝。此例外不改变逐段结算和死亡立即提交的时序。
+
+同日用户验收补充：训练营调用的公共 `applyBattleAction` 也必须为一次完整动作建立共享链。没有外部链时使用临时 detached chain，保留直接入口的内容查找与错误语义，结束时清理全部克隆绑定；由 `runBattleAction` 提供的链继续复用。低层单次伤害 helper 不持有跨调用的全局死亡记录，SkillCode 不需要新增规范。
+
 Damage 保留 ADR-0010 的公开 helper、结果形状、伤害类型和 `damageQueue.push` ABI，并纳入动作级 chain：
 
 1. 验证全部活着且唯一的目标，按 `instanceId` 排序。

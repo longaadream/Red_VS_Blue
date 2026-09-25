@@ -437,8 +437,19 @@ export interface EffectChainSnapshot {
   readonly nextBatchSequence: number
   readonly batchStack: readonly EffectBatchContext[]
   readonly records: readonly EffectChainRecord[]
+  /** Process-local provenance for targets formally finalized by this chain. */
+  readonly deathProvenance?: readonly EffectDeathProvenance[]
   /** Process-local control flow only; never persisted as BattleState. */
   readonly pendingSignal?: SuspendableActionPending
+}
+
+export interface EffectDeathProvenance {
+  /** The exact BattleState object in which the target was finalized. */
+  readonly battle: object
+  /** The exact PieceInstance object that was moved to the graveyard. */
+  readonly piece: PieceInstance
+  readonly targetId: string
+  readonly deathBatchId: string
 }
 
 export interface EffectHandlerResultMap {
@@ -596,6 +607,7 @@ export class EffectChain {
   private currentState: EffectChainState = 'idle'
   private firstFatal?: EffectChainFatalError
   private firstPending?: SuspendableActionPending
+  private deathProvenance: EffectDeathProvenance[] = []
 
   constructor(input: EffectChainOptions) {
     const options = normalizeOptions(input)
@@ -662,6 +674,39 @@ export class EffectChain {
     if (!this.firstPending) return
     if (this.firstPending !== error) throw this.firstPending
     this.firstPending = undefined
+  }
+
+  /**
+   * Records a formally finalized death for this action and state instance.
+   * The references are intentionally exact: a same-ID clone or a later
+   * action's corpse must never inherit this action's follow-up allowance.
+   */
+  recordDeathProvenance(
+    battle: object,
+    piece: PieceInstance,
+    deathBatchId: string,
+  ): void {
+    this.assertHealthy()
+    if (!piece.instanceId || !deathBatchId || piece.currentHp !== 0) {
+      throw this.fatal(
+        'RVB_EFFECT_CHAIN_STATE_INVALID',
+        'EffectChain death provenance requires a finalized target and stable batch IDs',
+        'state',
+        this.batchCount,
+        this.limits.maxBatches,
+        { targetId: piece.instanceId, batchId: deathBatchId },
+      )
+    }
+    if (this.deathProvenance.some(entry => entry.battle === battle && entry.piece === piece)) return
+    this.deathProvenance.push(Object.freeze({ battle, piece, targetId: piece.instanceId, deathBatchId }))
+  }
+
+  canUseDeathProvenance(battle: object, piece: PieceInstance): boolean {
+    return this.deathProvenance.some(entry => (
+      entry.battle === battle
+      && entry.piece === piece
+      && entry.targetId === piece.instanceId
+    ))
   }
 
   captureWriterBinding(): EffectWriterBinding {
@@ -882,6 +927,7 @@ export class EffectChain {
       nextBatchSequence: this.nextBatchSequence,
       batchStack: Object.freeze(this.batchStack.slice()),
       records: Object.freeze(this.recordLog.slice()),
+      deathProvenance: Object.freeze(this.deathProvenance.slice()),
       pendingSignal: this.firstPending,
     })
   }
@@ -914,6 +960,7 @@ export class EffectChain {
     this.nextBatchSequence = snapshot.nextBatchSequence
     this.batchStack = [...snapshot.batchStack]
     this.recordLog = [...snapshot.records]
+    this.deathProvenance = [...(snapshot.deathProvenance ?? [])]
     this.currentState = snapshot.state
     this.firstPending = snapshot.pendingSignal
   }
