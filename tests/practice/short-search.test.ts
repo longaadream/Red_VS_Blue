@@ -170,7 +170,29 @@ describe('short-search bounded planning', () => {
       config: { ...deterministic, nodesPerTurn: 2 }, continuation: first.continuation })
     expect(next.nodes).toBe(0)
     expect(next.stopReason).toBe('node-budget')
-    expect(planShortSearchAction(f.state, 'player-red', 1, { ...f, actionsTakenThisTurn: 7 }).stopReason).toBe('action-budget')
+    const capped = planShortSearchAction(f.state, 'player-red', 1, { ...f,
+      config: { ...deterministic, maxActionsPerTurn: 8 }, actionsTakenThisTurn: 7 })
+    expect(capped.stopReason).toBe('action-budget')
+  })
+
+  it('keeps a useful action available after seven accepted actions under the default cap', () => {
+    const f = graph()
+    const baseList = f.environment.listLegalActions
+    f.environment.listLegalActions = (s, p) => Number(s.extensions?.stage ?? 0) === 0
+      ? [candidate('end', 'end-turn'), candidate('small')]
+      : baseList(s, p)
+    const decision = planShortSearchAction(f.state, 'player-red', 1, { ...f,
+      config: deterministic, actionsTakenThisTurn: 7 })
+    expect(decision.nextAction?.id).toBe('small')
+    expect(decision.stopReason).toBe('selected')
+  })
+
+  it('stops at the default cap boundary after twenty-three accepted actions', () => {
+    const f = graph()
+    const decision = planShortSearchAction(f.state, 'player-red', 1, { ...f,
+      config: deterministic, actionsTakenThisTurn: 23 })
+    expect(decision.nextAction?.kind).toBe('end-turn')
+    expect(decision.stopReason).toBe('action-budget')
   })
 
   it('preserves move and actor alternatives when one actor has many skills', () => {
@@ -180,6 +202,24 @@ describe('short-search bounded planning', () => {
     // Width is deliberately small; later skill IDs must not hide the only movement family.
     const selected = selectShortSearchCandidates(legal, f.environment.observe(f.state, 'player-red'), 5)
     expect(selected.some(c => c.id === 'step')).toBe(true)
+  })
+
+  it.each(['basic-skill', 'charge-skill'] as const)('prioritizes hostile grid targets for %s while retaining spread', kind => {
+    const f = graph()
+    f.state.pieces[1].x = 4
+    f.state.pieces[1].y = 0
+    const gridCandidate = (id: string, x: number, y: number) => ({
+      id, kind, protocolVersion: 1,
+      action: { type: kind === 'charge-skill' ? 'useChargeSkill' : 'useBasicSkill',
+        playerId: 'player-red', pieceId: 'red', skillId: 'grid', targetX: x, targetY: y },
+    }) as CandidateAction
+    const selected = selectShortSearchCandidates([
+      gridCandidate(`${kind}-far`, 0, 0), gridCandidate(`${kind}-mid`, 2, 0),
+      gridCandidate(`${kind}-near`, 3, 0), candidate('end', 'end-turn'),
+    ], f.environment.observe(f.state, 'player-red'), 4)
+    expect(selected.map(c => c.id)).toEqual([
+      'end', `${kind}-near`, `${kind}-far`, `${kind}-mid`,
+    ])
   })
 
   it('throws on invalid configuration and non-finite scoring', () => {

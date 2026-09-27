@@ -109,6 +109,18 @@ function child(index: number, childIndex: number, overrides: Record<string, unkn
 }
 
 describe('RED-167 action vignette queue', () => {
+  it.each([false, true])('keeps skill banners readable for 1.2s with reducedMotion=%s', reducedMotion => {
+    const queue = loadModule().createQueue({ reducedMotion, now: () => Date.now() })
+    queue.update({ presentationEvents: [], turn: { isViewerTurn: false } })
+    queue.update({ presentationEvents: [root(1), child(1, 1)], turn: { isViewerTurn: false } })
+    vi.advanceTimersByTime(1199)
+    expect(queue.getDiagnostics().activeRootId).toBe('action-1:0')
+    vi.advanceTimersByTime(1)
+    expect(queue.getDiagnostics().activeRootId).toBe('action-1:1')
+    vi.advanceTimersByTime(reducedMotion ? 120 : 200)
+    expect(queue.getDiagnostics().activeRootId).toBeNull()
+    queue.dispose()
+  })
   it('keeps a single-effect banner under the instant feedback budget', () => {
     expect(loadModule().constants.singleEffectDurationMs).toBeLessThan(50)
     expect(loadModule().constants.compositeStepDurationMs).toBe(200)
@@ -429,7 +441,7 @@ describe('RED-167 action vignette queue', () => {
     reduced.update({ presentationEvents: [], turn: { isViewerTurn: false } })
     reduced.update({ presentationEvents: [root(3)], turn: { isViewerTurn: false } })
     expect(reducedPhases).toEqual(['static'])
-    vi.advanceTimersByTime(vignetteModule.constants.reducedDurationMs)
+    vi.advanceTimersByTime(vignetteModule.constants.normalDurationMs)
     expect(reduced.getDiagnostics().activeRootId).toBeNull()
   })
 
@@ -441,7 +453,7 @@ describe('RED-167 action vignette queue', () => {
     vi.advanceTimersByTime(100)
 
     queue.setSpeed(2)
-    vi.advanceTimersByTime(499)
+    vi.advanceTimersByTime((vignetteModule.constants.normalDurationMs - 100) / 2 - 1)
     expect(queue.getDiagnostics().activeRootId).toBe('action-1:0')
     vi.advanceTimersByTime(1)
     expect(queue.getDiagnostics().activeRootId).toBeNull()
@@ -453,10 +465,10 @@ describe('RED-167 action vignette queue', () => {
     queue.update({ presentationEvents: [], turn: { isViewerTurn: true } })
     queue.update({ presentationEvents: [root(1, { kind: 'card', cardId: 'coin' }),
       root(2, { kind: 'card', cardId: 'heal' }), child(2, 1, { kind: 'passive', skillId: 'reaction', sourcePieceId: 'other', result: { pending: true } })], turn: { isViewerTurn: true } })
-    vi.advanceTimersByTime(1000)
+    vi.advanceTimersByTime(vignetteModule.constants.cardDurationMs - 200)
     expect(queue.getDiagnostics().activeRootId).toBe('action-1:0')
     queue.setSpeed(2)
-    vi.advanceTimersByTime(399)
+    vi.advanceTimersByTime(99)
     expect(queue.getDiagnostics().activeRootId).toBe('action-1:0')
     vi.advanceTimersByTime(1)
     expect(queue.getDiagnostics().activeRootId).toBe('action-2:0')

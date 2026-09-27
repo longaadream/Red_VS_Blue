@@ -7,7 +7,8 @@
     "current-main: retain position API and concise descriptions",
     "RED-211: retain 1.0.5 history; shorten Aizen and Grimmjow names; remove gran-rey-cero from Grimmjow skill list per 1010 balance plan; preserve stats and rules",
     "RED-211 role fixes: preserve the damage-multiplier language standard and register the new character rules",
-    "RED-214: RED-213 adds rule-el-primo-meteor-belt to rule manifest; preserve all existing rule IDs. df3a91c74 already shortened Ulquiorra description to 造成或受到伤害后，回复1。; healing remains 1 and executable behavior unchanged."
+    "RED-214: RED-213 adds rule-el-primo-meteor-belt to rule manifest; preserve all existing rule IDs. df3a91c74 already shortened Ulquiorra description to 造成或受到伤害后，回复1。; healing remains 1 and executable behavior unchanged.",
+    "RED-218: audited against cumulative 1.0.11 archive; retain all 121 previous rules and add rule-colt-big-stride before zone-endturn. Also acknowledge prior RED-214 Muzan/Akaza five-rule additions documented in final-akaza verification; no historical rule removed."
   ],
   "files": [
     {
@@ -20,7 +21,7 @@
     },
     {
       "path": "data/rules/manifest.json",
-      "sha256": "a7e7efd5a8b5c33474aabee10fe900bd3d3ab7d14e9079f7cc86b0a34ba6ee58"
+      "sha256": "28ab1aa7f6cd47510f4a7360c1fdb310a8d5d932746b6856914a9a3c46f797c9"
     },
     {
       "path": "data/rules/rule-grimmjow-destruction-instinct.json",

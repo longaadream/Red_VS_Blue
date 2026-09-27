@@ -1,0 +1,48 @@
+{
+  "id": "four-corner-flanks",
+  "name": "四角迂回",
+  "layout": [
+    "####################",
+    "#..................#",
+    "#.C..T..C...T..C...#",
+    "#..................#",
+    "#.........C........#",
+    "#.T.C.#......#...C.#",
+    "#.....#......#.....#",
+    "#..C...........T...#",
+    "#...T...........C..#",
+    "#.....#......#.....#",
+    "#.C...#......#.C.T.#",
+    "#........C.........#",
+    "#..................#",
+    "#...C..T...C..T..C.#",
+    "#..................#",
+    "####################"
+  ],
+  "legend": [
+    {
+      "char": "#",
+      "type": "wall",
+      "walkable": false,
+      "bulletPassable": false
+    },
+    {
+      "char": ".",
+      "type": "floor",
+      "walkable": true,
+      "bulletPassable": true
+    },
+    {
+      "char": "C",
+      "type": "cover",
+      "walkable": true,
+      "bulletPassable": false
+    },
+    {
+      "char": "T",
+      "type": "hole",
+      "walkable": false,
+      "bulletPassable": true
+    }
+  ]
+}

@@ -7,6 +7,10 @@ export const SELECTABLE_MAP_IDS = [
   'open-expanse',
   'winding-pass',
   'narrow-corridors',
+  'sparse-center',
+  'broken-waterway',
+  'four-corner-flanks',
+  'staggered-outposts',
 ] as const
 
 export type SelectableMapId = (typeof SELECTABLE_MAP_IDS)[number]

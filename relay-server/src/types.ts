@@ -3,12 +3,20 @@ export const STANDALONE_SELECTABLE_MAP_IDS = [
   'open-expanse',
   'winding-pass',
   'narrow-corridors',
+  'sparse-center',
+  'broken-waterway',
+  'four-corner-flanks',
+  'staggered-outposts',
 ] as const
 const STANDALONE_SELECTABLE_MAP_NAMES = [
   '大型洞穴',
   '开阔原野',
   '回风曲径',
   '狭廊要道',
+  '疏落中场',
+  '断续水道',
+  '四角迂回',
+  '错位散点',
 ] as const
 
 export const STANDALONE_SELECTABLE_MAP_CATALOG = STANDALONE_SELECTABLE_MAP_IDS.map((id, index) => ({

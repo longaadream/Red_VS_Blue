@@ -44,6 +44,10 @@ describe('relay deployment initialization', () => {
     'open-expanse',
     'winding-pass',
     'narrow-corridors',
+    'sparse-center',
+    'broken-waterway',
+    'four-corner-flanks',
+    'staggered-outposts',
   ] as const
 
   it.each(selectableMapIds)('uses the submitted %s map in Next Relay initialization', async mapId => {
@@ -443,9 +447,13 @@ describe('standalone Relay map persistence', () => {
     'open-expanse',
     'winding-pass',
     'narrow-corridors',
+    'sparse-center',
+    'broken-waterway',
+    'four-corner-flanks',
+    'staggered-outposts',
   ] as const
 
-  it('accepts only the exact four authoritative map IDs', () => {
+  it('accepts only the exact eight authoritative map IDs', () => {
     expect(STANDALONE_SELECTABLE_MAP_IDS).toEqual(selectableMapIds)
     expect(STANDALONE_SELECTABLE_MAP_IDS).toEqual(SELECTABLE_MAP_IDS)
     for (const mapId of selectableMapIds) {
@@ -456,12 +464,16 @@ describe('standalone Relay map persistence', () => {
       expect(validateStandaloneMapId(mapId)).toMatchObject({ ok: false, code: 'MAP_NOT_SELECTABLE' })
     }
   })
-  it('exposes the stable four-map catalog through the standalone Relay entry', () => {
+  it('exposes the stable eight-map catalog through the standalone Relay entry', () => {
     expect(STANDALONE_SELECTABLE_MAP_CATALOG).toEqual([
       { id: 'large-hole-arena', name: '大型洞穴' },
       { id: 'open-expanse', name: '开阔原野' },
       { id: 'winding-pass', name: '回风曲径' },
       { id: 'narrow-corridors', name: '狭廊要道' },
+      { id: 'sparse-center', name: '疏落中场' },
+      { id: 'broken-waterway', name: '断续水道' },
+      { id: 'four-corner-flanks', name: '四角迂回' },
+      { id: 'staggered-outposts', name: '错位散点' },
     ])
     const entry = readFileSync(resolve(process.cwd(), 'relay-server/src/index.ts'), 'utf8')
     expect(entry).toContain("app.get('/api/maps'")

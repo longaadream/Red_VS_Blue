@@ -18,7 +18,7 @@ export interface ShortSearchConfig {
 
 export const SHORT_SEARCH_DEFAULTS: Readonly<ShortSearchConfig> = Object.freeze({
   depth: 3, beamWidth: 6, rootCandidates: 24, childCandidates: 10,
-  nodesPerDecision: 128, deploymentNodesPerDecision: 384, nodesPerTurn: 896, maxActionsPerTurn: 8,
+  nodesPerDecision: 128, deploymentNodesPerDecision: 384, nodesPerTurn: 896, maxActionsPerTurn: 24,
   turnTimeMs: 4500, decisionTimeMs: 900, deploymentTimeMs: 2250,
 })
 
@@ -110,6 +110,12 @@ function priority(c: CandidateAction, observation: AIObservation) {
     const hostiles = observation.pieces.filter(p => p.currentHp > 0 && p.x !== null && p.y !== null
       && !samePlayer(p.ownerPlayerId, observation.playerId))
     if (hostiles.length) rank += Math.min(...hostiles.map(p => Math.abs(a.toX - p.x!) + Math.abs(a.toY - p.y!)))
+  }
+  if ((a.type === 'useBasicSkill' || a.type === 'useChargeSkill')
+    && a.targetX !== undefined && a.targetY !== undefined) {
+    const hostiles = observation.pieces.filter(p => p.currentHp > 0 && p.x !== null && p.y !== null
+      && !samePlayer(p.ownerPlayerId, observation.playerId))
+    if (hostiles.length) rank += Math.min(...hostiles.map(p => Math.abs(a.targetX! - p.x!) + Math.abs(a.targetY! - p.y!)))
   }
   return rank
 }

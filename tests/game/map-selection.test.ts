@@ -9,12 +9,16 @@ import {
 } from '@/lib/game/map-selection'
 
 describe('RED-119 authoritative map selection', () => {
-  it('exposes the four selectable maps in one stable order', () => {
+  it('exposes the eight selectable maps in one stable order', () => {
     expect(SELECTABLE_MAP_IDS).toEqual([
       'large-hole-arena',
       'open-expanse',
       'winding-pass',
       'narrow-corridors',
+      'sparse-center',
+      'broken-waterway',
+      'four-corner-flanks',
+      'staggered-outposts',
     ])
     expect(getSelectableMapCatalog().map(map => map.id)).toEqual(SELECTABLE_MAP_IDS)
   })

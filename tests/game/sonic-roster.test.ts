@@ -639,7 +639,7 @@ describe('Sonic roster mechanics', () => {
   it.each([
     ['left', 4, 1, 9, 0],
     ['right', 6, 9, 1, 10],
-  ])('fires ride sweep up to four cells along the %s perpendicular ray', (side, selectionY, targetY, oppositeY, beyondY) => {
+  ])('fires ride sweep to the board edge along the %s perpendicular ray', (side, selectionY, targetY, oppositeY, beyondY) => {
     const definition = JSON.parse(readFileSync(resolve(process.cwd(), 'data/skills/shadow-ride-sweep.json'), 'utf8'))
     const shadow = makePiece({
       instanceId: 'shadow', templateId: 'shadow', ownerPlayerId: 'player-red', x: 1, y: 5, attack: 9,
@@ -683,7 +683,7 @@ describe('Sonic roster mechanics', () => {
     expect(result.actions?.some((action) => String(action.payload?.message || '').includes(`垂直射击${side === 'left' ? '左侧' : '右侧'}命中`))).toBe(true)
     expect(result.pieces.find(piece => piece.instanceId === 'side-enemy')?.currentHp).toBe(15)
     expect(result.pieces.find(piece => piece.instanceId === 'opposite-enemy')?.currentHp).toBe(20)
-    expect(result.pieces.find(piece => piece.instanceId === 'beyond-enemy')?.currentHp).toBe(20)
+    expect(result.pieces.find(piece => piece.instanceId === 'beyond-enemy')?.currentHp).toBe(15)
     expect(result.pieces.find(piece => piece.instanceId === 'path-enemy')?.currentHp).toBe(11)
   })
 

@@ -1,0 +1,48 @@
+{
+  "id": "broken-waterway",
+  "name": "断续水道",
+  "layout": [
+    "####################",
+    "#..................#",
+    "#.C.......C......C.#",
+    "#.....#.....T......#",
+    "#.....#.......#....#",
+    "#..C.....C....#..C.#",
+    "#.T................#",
+    "#..TT.C.TT..C.TT...#",
+    "#...TT.C..TT.C.TT..#",
+    "#................T.#",
+    "#.C..#....C.....C..#",
+    "#....#.......#.....#",
+    "#......T.....#.....#",
+    "#.C......C.......C.#",
+    "#..................#",
+    "####################"
+  ],
+  "legend": [
+    {
+      "char": "#",
+      "type": "wall",
+      "walkable": false,
+      "bulletPassable": false
+    },
+    {
+      "char": ".",
+      "type": "floor",
+      "walkable": true,
+      "bulletPassable": true
+    },
+    {
+      "char": "C",
+      "type": "cover",
+      "walkable": true,
+      "bulletPassable": false
+    },
+    {
+      "char": "T",
+      "type": "hole",
+      "walkable": false,
+      "bulletPassable": true
+    }
+  ]
+}

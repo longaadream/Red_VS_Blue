@@ -760,6 +760,10 @@ function handleGetMaps(): string {
     'open-expanse': '开阔原野',
     'winding-pass': '回风曲径',
     'narrow-corridors': '狭廊要道',
+    'sparse-center': '疏落中场',
+    'broken-waterway': '断续水道',
+    'four-corner-flanks': '四角迂回',
+    'staggered-outposts': '错位散点',
   }
   return ok({ maps: SELECTABLE_MAP_IDS.map(id => ({ id, name: names[id] })) })
 }

@@ -20,6 +20,7 @@ RED-192 的现役内容现在可直接在编辑器「技能 / 规则 → 流程�
 | `query.piece/player(id)` | 当前权威对象，供可信代码节点读取；写效果优先用下列公共接口 |
 | `query.pieces({ownerId, relation, originId, range, includeDead})` | 按所属方、敌我和曼哈顿范围查棋子 ID；默认只含存活棋子 |
 | `query.distance(a,b) / path(origin,direction,options)` | 距离 / 既有投射物路径查询 |
+| `query.normalMoveTargets(pieceId)` | 按当前移动力、状态、地形与棋子阻挡查询普通移动落点，不要求当前回合或 AP；用于效果授予的移动 |
 | `query.tracePath(origin,direction,options)` | 位移路径查询：有序 cells、encounters、lastLandableCell、blocked、reachedTarget。options 指定 excludePieceId、maxDistance、passAllies/passEnemies；terrain 选 walkable（默认）、projectile（弹射物通行）或 any |
 | `query.landingCells(candidates,movingPieceIds?)` | 保留候选顺序，过滤占用、地形和显式落点阻挡；整组提交可将组内棋子视为同时离开 |
 | `query.random(items)` | 使用既有规则随机流选一项；空集合返回 null |
@@ -32,6 +33,7 @@ RED-192 的现役内容现在可直接在编辑器「技能 / 规则 → 流程�
 | `effects.damage(source,targetId,amount,type,skillId?)` | 原有伤害结果；source 可为棋子 ID，或现有玩家/环境来源对象；包含防护与实际生命损失 |
 | `effects.heal(source,targetId,amount,skillId?)` | 原有治疗结果 |
 | `effects.move(changes,kind,path?)` | 整组校验并提交，返回 `{success,changes,message?}`。被占用、显式落点阻挡、禁锢或路径阻挡时返回 success:false；重复身份、非整数等错误请求抛错。走格/冲刺/推拉检查连续路径，path 可覆盖通行规则；传送/换位只检查落点 |
+| `effects.freeMove(pieceId,{x,y})` | 效果授予的一次免费普通移动：先触发 beforeMove，统一校验并提交走格、记录移动与结算沿途接触，再触发 afterMove。不扣 AP，不消耗部署免费首移；不绕过定身等限制。返回 `{success,changes,message?}`。移动反应的交互边界与普通移动动作一致，不支持的待选明确报错 |
 | `status.add/remove(targetId,statusOrId,scope?)` | 棋子或玩家状态；add 先核查 relatedRules，再通过现役 helper 安装状态和规则 |
 | `rules.add/remove(targetId,ruleId,scope?)` | 安装 / 移除已有规则定义；scope 默认 piece，可选 player |
 | `resources.add(playerId,'actionPoints'或'chargePoints',amount)` | 资源增减，逐步向下取整，结果不得为负或非有限数 |

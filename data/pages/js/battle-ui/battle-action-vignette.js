@@ -3,8 +3,8 @@
 
   const SINGLE_EFFECT_DURATION_MS = 24
   const COMPOSITE_STEP_DURATION_MS = 200
-  const NORMAL_DURATION_MS = COMPOSITE_STEP_DURATION_MS
-  const CARD_DURATION_MS = COMPOSITE_STEP_DURATION_MS
+  const NORMAL_DURATION_MS = 1200
+  const CARD_DURATION_MS = NORMAL_DURATION_MS
   const REDUCED_DURATION_MS = 120
   const SKIP_SETTLE_MS = 60
   const MAX_PLAYED_ROOTS = 256
@@ -18,11 +18,10 @@
     return !!(group && group.root && group.root.parentEventId)
   }
 
-  function actionDuration() {
-    // Every event gets its own readable post-action beat. The event queue
-    // below deliberately keeps adjacent results separate, so a multi-hit or
-    // triggered chain cannot collapse into one burst.
-    return COMPOSITE_STEP_DURATION_MS
+  function actionDuration(group, reducedMotion) {
+    // Give skill/card names time to be read without stretching every hit in a chain.
+    if (group && showsBanner(group.root) && group.root.kind !== 'move') return NORMAL_DURATION_MS
+    return reducedMotion ? REDUCED_DURATION_MS : COMPOSITE_STEP_DURATION_MS
   }
 
   function hideBannerForModel(event, model) {
@@ -157,7 +156,7 @@
       if (!active) return
       clearTimers()
       activeTimelineStartedAt = now()
-      const duration = reducedMotion ? REDUCED_DURATION_MS : actionDuration(active)
+      const duration = actionDuration(active, reducedMotion)
       if (!reducedMotion) {
         ;[
           { at: phaseTime('path', active), phase: 'path' },
@@ -284,7 +283,7 @@
       if (holdingResponse) { speed = normalized; return }
       if (active) {
         activeProgressMs += Math.max(0, now() - activeTimelineStartedAt) * speed
-        activeProgressMs = Math.min(reducedMotion ? REDUCED_DURATION_MS : actionDuration(active), activeProgressMs)
+        activeProgressMs = Math.min(actionDuration(active, reducedMotion), activeProgressMs)
       }
       speed = normalized
       if (active) scheduleActiveTimeline()
