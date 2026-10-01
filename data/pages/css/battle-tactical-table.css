@@ -645,7 +645,7 @@ canvas:focus-visible {
 }
 
 .dmg-float {
-  --floater-duration: 600ms;
+  --floater-duration: 2000ms;
   font-family: BattleComic, 'Microsoft YaHei', sans-serif;
   font-size: 29px !important;
   line-height: 1.1;
@@ -670,13 +670,13 @@ canvas:focus-visible {
 .dmg-float.big { font-size: 36px !important; }
 
 .dmg-float.is-heal {
-  --floater-duration: 550ms;
+  --floater-duration: 2000ms;
   color: #dbe7b6 !important;
 }
 .dmg-float.is-heal::before { background: #47685a; }
 
 .dmg-float.is-death {
-  --floater-duration: 650ms;
+  --floater-duration: 2000ms;
   font-size: 25px !important;
   color: #d9cfbc !important;
 }
@@ -694,8 +694,8 @@ canvas:focus-visible {
 
 @keyframes rvbResultFloat {
   0% { opacity: 0; transform: translate(-50%, 3px) rotate(-12deg) scale(0.7); }
-  20% { opacity: 1; transform: translate(-50%, -6px) rotate(-7deg) scale(1.18); }
-  40% { opacity: 1; transform: translate(-50%, -10px) rotate(-7deg) scale(1); }
+  6% { opacity: 1; transform: translate(-50%, -6px) rotate(-7deg) scale(1.18); }
+  15%, 75% { opacity: 1; transform: translate(-50%, -10px) rotate(-7deg) scale(1); }
   100% { opacity: 0; transform: translate(-50%, -32px) rotate(-4deg) scale(1); }
 }
 

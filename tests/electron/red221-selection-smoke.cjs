@@ -524,6 +524,7 @@ async function runElectronSmoke() {
     evidence.screenshots.push('desktop-1280x720-target-retry.png')
 
     const beforeLegal = await snapshot('before-legal-retry')
+    await closeTileStatusIfOpen('mouse')
     await evaluate('window.__RED221_DELAY_NEXT_PUT_MS = 550; true')
     const validTargetPoint = await boardPoint(fixture.validTarget)
     const validTargetInputDebug = await evaluate(`(() => ({
@@ -555,6 +556,28 @@ async function runElectronSmoke() {
     ensure(accepted.actionPoints === beforeLegal.actionPoints - 1, `Legal retry charged an unexpected number of action points: ${JSON.stringify({ before: beforeLegal, accepted })}`)
     ensure(!accepted.pendingSkill && !accepted.targetSubmissionPending && !accepted.targetMode, `Accepted action left target mode active: ${JSON.stringify(accepted)}`)
     evidence.desktop = { ...evidence.desktop, occupiedRejected, emptyRejected, waiting, duplicateAttempt, accepted }
+
+    if (process.env.RVB_FEEDBACK_DURATION === '1') {
+      await evaluate(`showTurnAnnounce('回合提示验收', '#ecd4a6'); spawnFloater(${fixture.caster.x}, ${fixture.caster.y}, '验收 −4', '#fff', false); true`)
+      // Hidden Electron windows need an initial paint before CSS animation
+      // timelines start; this captures the first frame without showing a window.
+      await win.webContents.capturePage()
+      await delay(1100)
+      const readable = await evaluate(`({
+        turnOpacity: Number(getComputedStyle(document.getElementById('turnAnnounce')).opacity),
+        floaterVisible: Array.from(document.querySelectorAll('.dmg-float')).some(el => el.textContent === '验收 −4' && Number(getComputedStyle(el).opacity) > 0.8),
+      })`)
+      ensure(readable.turnOpacity > 0.8 && readable.floaterVisible, `Feedback disappeared before reading: ${JSON.stringify(readable)}`)
+      await screenshot('desktop-feedback-after-1100ms.png')
+      evidence.screenshots.push('desktop-feedback-after-1100ms.png')
+      await delay(2100)
+      const cleaned = await evaluate(`({
+        turnHidden: !document.getElementById('turnAnnounce').classList.contains('show'),
+        floaterRemoved: !Array.from(document.querySelectorAll('.dmg-float')).some(el => el.textContent === '验收 −4'),
+      })`)
+      ensure(cleaned.turnHidden && cleaned.floaterRemoved, `Feedback did not expire: ${JSON.stringify(cleaned)}`)
+      evidence.feedbackTiming = { readableAt1100ms: readable, cleanedAt3200ms: cleaned }
+    }
 
     // Explicit cancel uses a fresh fixture so the skill cooldown from the
     // accepted action cannot hide the cancel path.

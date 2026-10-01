@@ -37,6 +37,7 @@ type RendererApi = {
   init(options: unknown): void
   update(model: unknown): void
   showHistoricalBoard(model: unknown): void
+  settlePresentation(model: unknown, options?: { preserveFloaters: boolean }): void
   animateAction(action: unknown, previousModel: unknown, nextModel: unknown): void
   resize(): void
   spawnFloater(x: number, y: number, text: string, color: string, big: boolean, options: unknown): void
@@ -501,7 +502,9 @@ describe('RED-68 BattleRenderer3D runtime', () => {
   })
 
   it.each([false, true])('places signed number bursts beside pieces and cleans up (reduced=%s)', (reduced) => {
+    vi.useFakeTimers()
     const h = createHarness(1280, 720, false, reduced)
+    try {
     const layer = new FakeElement('div')
     layer.rect = { left: 0, top: 0, width: 1280, height: 720 }
     h.renderer.init({ container: h.container, floatLayer: layer })
@@ -514,8 +517,21 @@ describe('RED-68 BattleRenderer3D runtime', () => {
     expect(parseFloat(String(layer.children[0].style.top))).toBeCloseTo(Math.max(60, Math.min(660, point.top - 44)))
     h.renderer.spawnFloater(2, 2, '+8', '#fff', false, { kind: 'heal' })
     expect(layer.children[1].textContent).toBe('+8')
+    vi.advanceTimersByTime(1900)
+    expect(layer.children).toHaveLength(2)
+    h.renderer.settlePresentation(runtimeModel(), { preserveFloaters: true })
+    expect(layer.children).toHaveLength(2)
+    vi.advanceTimersByTime(180)
+    expect(layer.children).toHaveLength(0)
+    h.renderer.spawnFloater(2, 2, '−1', '#fff', false, { kind: 'damage' })
+    h.renderer.settlePresentation(runtimeModel())
+    expect(layer.children).toHaveLength(0)
     h.renderer.dispose()
     expect(layer.children).toHaveLength(0)
+    } finally {
+      h.renderer.dispose()
+      vi.useRealTimers()
+    }
   })
 
   it('renders static state on demand and batches terrain by material', () => {

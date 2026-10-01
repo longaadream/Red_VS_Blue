@@ -3057,15 +3057,17 @@
   }
 
   // Replace only the rendered board, preserving the user's camera and authority model.
-  function settlePresentation(model) {
+  function settlePresentation(model, options) {
     if (!_mounted) return
     _clearActionAnimationQueue()
     Array.from(_anims.keys()).forEach(_cancelAnimation)
     _pieceObjects.forEach(function (obj) { _restorePieceVisual(obj); obj.group.scale.set(1, 1, 1) })
-    _floaterTimers.forEach(function (timer) { clearTimeout(timer) })
-    _floaterTimers.clear()
-    _floaters.forEach(function (element) { element.remove() })
-    _floaters.clear()
+    if (!(options && options.preserveFloaters)) {
+      _floaterTimers.forEach(function (timer) { clearTimeout(timer) })
+      _floaterTimers.clear()
+      _floaters.forEach(function (element) { element.remove() })
+      _floaters.clear()
+    }
     update(model)
   }
 
@@ -3117,8 +3119,8 @@
 
     const el = document.createElement('div')
     const kind = ['heal', 'death', 'statusAdded'].includes(options.kind) ? options.kind : 'damage'
-    const requestedDuration = Number(options.durationMs) || (kind === 'heal' ? 550 : 600)
-    const durationMs = _reducedMotion ? Math.min(140, requestedDuration) : Math.max(kind === 'statusAdded' ? 200 : 480, Math.min(650, requestedDuration))
+    const requestedDuration = Number(options.durationMs) || 2000
+    const durationMs = Math.max(2000, Math.min(3000, requestedDuration))
     el.className = 'dmg-float is-' + kind + (big ? ' big' : '')
     el.style.color = color
     el.style.left  = left + 'px'

@@ -109,11 +109,11 @@ function child(index: number, childIndex: number, overrides: Record<string, unkn
 }
 
 describe('RED-167 action vignette queue', () => {
-  it.each([false, true])('keeps skill banners readable for 1.2s with reducedMotion=%s', reducedMotion => {
+  it.each([false, true])('keeps skill banners readable for 3s with reducedMotion=%s', reducedMotion => {
     const queue = loadModule().createQueue({ reducedMotion, now: () => Date.now() })
     queue.update({ presentationEvents: [], turn: { isViewerTurn: false } })
     queue.update({ presentationEvents: [root(1), child(1, 1)], turn: { isViewerTurn: false } })
-    vi.advanceTimersByTime(1199)
+    vi.advanceTimersByTime(2999)
     expect(queue.getDiagnostics().activeRootId).toBe('action-1:0')
     vi.advanceTimersByTime(1)
     expect(queue.getDiagnostics().activeRootId).toBe('action-1:1')
@@ -311,7 +311,7 @@ describe('RED-167 action vignette queue', () => {
     expect(layer.innerHTML).not.toContain('恢复!')
     // Numeric feedback is owned by the renderer, without a duplicate vignette label.
     expect(JSON.stringify(model)).toBe(before)
-    vi.advanceTimersByTime(2200)
+    vi.advanceTimersByTime(vignetteModule.constants.normalDurationMs + 200)
     expect(layer.hidden).toBe(true)
     vignette.dispose()
     expect(floatLayer.children).toHaveLength(0)
@@ -574,7 +574,7 @@ describe('RED-167 action vignette queue', () => {
     expect(queue.getDiagnostics().activeRootId).toBe('action-2:0')
   })
 
-  it('runs a three-minute 16-piece queue without retaining timers or unbounded roots', () => {
+  it('drains a 16-piece queue at the configured reading speed without retaining timers or unbounded roots', () => {
     const vignetteModule = loadModule()
     const queue = vignetteModule.createQueue()
     const pieces = Array.from({ length: 16 }, (_, index) => ({
@@ -594,7 +594,7 @@ describe('RED-167 action vignette queue', () => {
       })
     }
 
-    vi.advanceTimersByTime(180_000)
+    vi.advanceTimersByTime(vignetteModule.constants.normalDurationMs * 160)
 
     expect(queue.getDiagnostics()).toMatchObject({
       activeRootId: null,
