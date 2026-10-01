@@ -348,6 +348,7 @@ function createHarness(width = 390, height = 844, coarsePointer = true, reducedM
   new Script(readFileSync(resolve(pagesDir, 'js/battle-ui/battle-effect-icons.js'), 'utf8'), { filename: 'battle-effect-icons.js' }).runInContext(context)
   new Script(readFileSync(resolve(pagesDir, 'js/battle-ui/battle-status-presentation.js'), 'utf8'), { filename: 'battle-status-presentation.js' }).runInContext(context)
   new Script(readFileSync(resolve(pagesDir, 'js/battle-ui/battle-tactical-geometry.js'), 'utf8'), { filename: 'battle-tactical-geometry.js' }).runInContext(context)
+  new Script(readFileSync(resolve(pagesDir, 'js/battle-ui/battle-floater-layout.js'), 'utf8'), { filename: 'battle-floater-layout.js' }).runInContext(context)
   new Script(readFileSync(resolve(pagesDir, 'js/battle-renderer-3d.js'), 'utf8'), { filename: 'battle-renderer-3d.js' }).runInContext(context)
 
   function frame(step = 100) {
@@ -532,6 +533,69 @@ describe('RED-68 BattleRenderer3D runtime', () => {
       h.renderer.dispose()
       vi.useRealTimers()
     }
+  })
+
+  it('keeps simultaneous damage, healing and status floaters separately readable', () => {
+    vi.useFakeTimers()
+    const h = createHarness(1280, 720, false)
+    try {
+      const layer = new FakeElement('div')
+      layer.rect = { left: 0, top: 0, width: 1280, height: 720 }
+      h.renderer.init({ container: h.container, floatLayer: layer })
+      h.renderer.update(runtimeModel())
+      h.frame(16)
+      h.renderer.spawnFloater(8, 8, '−5', '#fff', false, { kind: 'damage' })
+      h.renderer.spawnFloater(8, 8, '+8', '#fff', false, { kind: 'heal' })
+      h.renderer.spawnFloater(8, 8, '定身', '#fff', false, { kind: 'statusAdded' })
+      expect(layer.children.map(child => child.textContent)).toEqual(['−5', '+8', '定身'])
+      expect(new Set(layer.children.map(child => `${child.style.left}:${child.style.top}`)).size).toBe(3)
+      expect(layer.children.every(child => child.dataset.floaterCrowded === 'false')).toBe(true)
+      vi.advanceTimersByTime(2080)
+      expect(layer.children).toHaveLength(0)
+      expect(h.renderer.getMotionDiagnostics().floaterCount).toBe(0)
+    } finally {
+      h.renderer.dispose()
+      vi.useRealTimers()
+    }
+  })
+
+  it('releases occupied floater slots on expiry, settlement, history and remount', () => {
+    vi.useFakeTimers()
+    const h = createHarness(1280, 720, false)
+    const layer = new FakeElement('div')
+    layer.rect = { left: 0, top: 0, width: 1280, height: 720 }
+    try {
+      const mount = () => {
+        h.renderer.init({ container: h.container, floatLayer: layer })
+        h.renderer.update(runtimeModel())
+        h.frame(16)
+      }
+      const spawn = () => h.renderer.spawnFloater(8, 8, '−4', '#fff', false, {})
+      mount()
+      spawn()
+      const anchor = { left: layer.children[0].style.left, top: layer.children[0].style.top }
+      const expectFreshSlot = () => {
+        spawn()
+        expect(layer.children).toHaveLength(1)
+        expect(layer.children[0].style).toMatchObject(anchor)
+      }
+      spawn()
+      h.renderer.settlePresentation(runtimeModel())
+      expectFreshSlot()
+      spawn()
+      h.renderer.showHistoricalBoard(runtimeModel())
+      expectFreshSlot()
+      spawn()
+      vi.advanceTimersByTime(2080)
+      expectFreshSlot()
+      h.renderer.dispose()
+      mount()
+      expectFreshSlot()
+    } finally {
+      h.renderer.dispose()
+      vi.useRealTimers()
+    }
+    expect(layer.children).toHaveLength(0)
   })
 
   it('renders static state on demand and batches terrain by material', () => {

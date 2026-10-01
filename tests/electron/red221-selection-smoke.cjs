@@ -315,8 +315,10 @@ async function runElectronSmoke() {
     show: false,
     width: 1280,
     height: 720,
-    webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true, backgroundThrottling: false },
+    webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true, backgroundThrottling: false,
+      offscreen: process.env.RVB_FLOATER_STACKING === '1' },
   })
+  if (process.env.RVB_FLOATER_STACKING === '1') win.webContents.setFrameRate(60)
   win.webContents.on('console-message', (_event, _level, message) => logs.push(String(message)))
   win.webContents.on('did-fail-load', (_event, code, description, url) => logs.push(`did-fail-load ${code} ${description} ${url}`))
   let debuggerAttached = false
@@ -402,6 +404,69 @@ async function runElectronSmoke() {
     mobile: {},
     rejection: {},
     screenshots: [],
+  }
+
+  const verifyFloaterStacking = async (name, legacy = false) => {
+    // Use the actual public feedback entry; no role data or combat state changes.
+    await evaluate(`(() => {
+      if (battlePresentation) BattleRenderer3D.settlePresentation(battlePresentation.getModel())
+      window.__RED223_PREVIOUS_3D__ = _use3d
+      if (${legacy}) _use3d = false
+      spawnFloater(8, 8, '−4', '#fff', false, { kind: 'damage' })
+      spawnFloater(8, 8, '+2', '#fff', false, { kind: 'heal' })
+      spawnFloater(8, 8, '定身', '#fff', false, { kind: 'statusAdded' })
+      spawnFloater(9, 8, '−6', '#fff', true, { kind: 'damage' })
+      spawnFloater(0, 0, '边缘 −3', '#fff', false, { kind: 'damage' })
+      _use3d = window.__RED223_PREVIOUS_3D__
+      return true
+    })()`)
+    await win.webContents.capturePage()
+    await evaluate(`new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))`)
+    const samples = []
+    for (const elapsed of [160, 450, 1200]) {
+      await delay(elapsed - (samples.at(-1)?.elapsed || 0))
+      await win.webContents.capturePage()
+      const sample = await evaluate(`(() => {
+        const layer = document.getElementById('floatLayer').getBoundingClientRect()
+        const labels = Array.from(document.querySelectorAll('#floatLayer .dmg-float')).map(el => {
+          const r = el.getBoundingClientRect()
+          return { text: el.textContent, left: r.left, right: r.right, top: r.top, bottom: r.bottom,
+            opacity: Number(getComputedStyle(el).opacity), pointerEvents: getComputedStyle(el).pointerEvents, crowded: el.dataset.floaterCrowded }
+        })
+        const obstacles = Array.from(document.querySelectorAll('[data-floater-obstacle]')).filter(el => !el.hidden && el.getAttribute('aria-hidden') !== 'true').map(el => {
+          const r = el.getBoundingClientRect()
+          return { left: r.left, right: r.right, top: r.top, bottom: r.bottom, width: r.width, height: r.height }
+        }).filter(r => r.width > 0 && r.height > 0)
+        return { width: layer.width, height: layer.height, left: layer.left, top: layer.top, labels, obstacles }
+      })()`)
+      ensure(sample.labels.length === 5, `${name}: expected five separately retained labels: ${JSON.stringify(sample)}`)
+      sample.labels.forEach((a, index) => {
+        ensure(a.opacity > 0.8 && a.pointerEvents === 'none', `${name}: text is invisible or blocks input: ${JSON.stringify(a)}`)
+        ensure(a.left >= sample.left && a.top >= sample.top && a.right <= sample.left + sample.width && a.bottom <= sample.top + sample.height, `${name}: clipped text: ${JSON.stringify(sample)}`)
+        sample.labels.slice(index + 1).forEach(b => {
+          const separate = a.right + 4 <= b.left || b.right + 4 <= a.left || a.bottom + 4 <= b.top || b.bottom + 4 <= a.top
+          ensure(separate, `${name}: animated text overlap at ${elapsed}ms: ${JSON.stringify({ a, b })}`)
+        })
+        sample.obstacles.forEach(b => {
+          ensure(a.right <= b.left || b.right <= a.left || a.bottom <= b.top || b.bottom <= a.top, `${name}: HUD prompt covers floating text: ${JSON.stringify({ a, b })}`)
+        })
+      })
+      samples.push({ elapsed, ...sample })
+      if (elapsed === 450) {
+        await screenshot(`${name}.png`)
+        evidence.screenshots.push(`${name}.png`)
+        if (legacy) win.setContentSize(1024, 600)
+      }
+      if (legacy && elapsed === 1200) {
+        await screenshot(`${name}-resized.png`)
+        evidence.screenshots.push(`${name}-resized.png`)
+      }
+    }
+    await delay(1100)
+    ensure(await evaluate(`document.querySelectorAll('#floatLayer .dmg-float').length === 0`), `${name}: expired text retained`)
+    evidence.floaterStacking = evidence.floaterStacking || {}
+    evidence.floaterStacking[name] = { samples, cleaned: true }
+    if (legacy) { win.setContentSize(1280, 720); await delay(200) }
   }
 
   try {
@@ -598,6 +663,15 @@ async function runElectronSmoke() {
     ensure(cancelled.selectedPieceId === fixture.casterId && !cancelled.pendingSkill && !cancelled.targetOverlay && !cancelled.targetMode, `Explicit cancel did not exit target mode: ${JSON.stringify(cancelled)}`)
     evidence.desktop.cancel = { beforeCancel, cancelled }
 
+    if (process.env.RVB_FLOATER_STACKING === '1') {
+      await delay(2200)
+      await verifyFloaterStacking('desktop-floater-stacking')
+      await cdp('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] })
+      await verifyFloaterStacking('desktop-reduced-floater-stacking')
+      await cdp('Emulation.setEmulatedMedia', { features: [] })
+      await verifyFloaterStacking('desktop-legacy-floater-stacking', true)
+    }
+
     // Inject a real authoritative pending session with the existing engine
     // protocol, then send a malformed pendingTargetSelect through the actual
     // page handler. This is the only JS-injected command: a malformed target
@@ -657,6 +731,13 @@ async function runElectronSmoke() {
     const mobileCancelled = await snapshot('mobile-after-explicit-cancel-touch')
     ensure(mobileCancelled.selectedPieceId === fixture.casterId && !mobileCancelled.pendingSkill && !mobileCancelled.targetOverlay && !mobileCancelled.targetMode, `Mobile touch cancel did not exit target mode: ${JSON.stringify(mobileCancelled)}`)
     evidence.mobile = { mobileArmed, mobileOccupiedRejected, mobileEmptyRejected, mobileCancelled }
+
+    if (process.env.RVB_FLOATER_STACKING === '1') {
+      await verifyFloaterStacking('mobile-floater-stacking')
+      await cdp('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] })
+      await verifyFloaterStacking('mobile-reduced-floater-stacking')
+      await cdp('Emulation.setEmulatedMedia', { features: [] })
+    }
 
     evidence.ok = true
     evidence.viewport = { desktop: [1280, 720], mobile: [844, 390] }

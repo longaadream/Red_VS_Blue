@@ -43,6 +43,7 @@
   <script src="js/battle-ui/deployment-status.js"></script>
   <script src="js/battle-ui/battle-tactical-geometry.js"></script>
   <script src="js/battle-ui/turn-timer-status.js"></script>
+  <script src="js/battle-ui/battle-floater-layout.js"></script>
   <script src="js/battle-renderer-3d.js"></script>
   <script src="js/battle-ui/battle-presentation.js"></script>
   <script src="js/tutorial/tutorial-scenario.js"></script>
@@ -1599,8 +1600,8 @@
     <div id="battleBootActions" hidden><button onclick="location.reload()" style="min-height:44px;padding:8px 18px">重试</button> <button onclick="goBack()" style="min-height:44px;padding:8px 18px">返回</button></div>
   </div>
 
-  <div id="statusMsg" role="status" aria-live="polite">选择棋子开始行动</div>
-  <div id="dmBubble" role="status" aria-live="assertive" aria-hidden="true"></div>
+  <div id="statusMsg" role="status" aria-live="polite" data-floater-obstacle>选择棋子开始行动</div>
+  <div id="dmBubble" role="status" aria-live="assertive" aria-hidden="true" data-floater-obstacle></div>
   <div id="turnClockCorner" hidden aria-label="回合计时" aria-live="off"><span class="clock-label">回合计时</span><span class="clock-value">--:--</span></div>
 
   <aside id="red43QaPanel" aria-live="polite">
@@ -1795,7 +1796,7 @@
         <div class="board-shell board-shell-3d">
           <div class="board-stage" id="boardStage3d" data-battle-layer="three-battlefield">
             <div id="floatLayer" style="position:absolute;inset:0;pointer-events:none;overflow:visible;z-index:12"></div>
-            <div id="pieceContextMenu" class="piece-context-menu" role="toolbar" aria-label="棋子可用技能" aria-hidden="true" data-piece-id="" data-side="right">
+            <div id="pieceContextMenu" class="piece-context-menu" role="toolbar" aria-label="棋子可用技能" aria-hidden="true" data-piece-id="" data-side="right" data-floater-obstacle>
               <div class="piece-context-heading">
                 <span class="piece-context-identity">
                   <span id="pieceContextName" class="piece-context-name"></span>
@@ -3333,6 +3334,8 @@
     }
 
     // ── Damage / heal floaters ──
+    let legacyFloaterLayout = null
+    const legacyFloaterTimers = new Set()
     function spawnFloater(x, y, text, color, big, options) {
       options = options || {}
       if (_use3d && battlePresentation) {
@@ -3352,7 +3355,14 @@
       el.style.setProperty('--floater-duration', durationMs + 'ms')
       el.textContent = text
       layer.appendChild(el)
-      setTimeout(() => el.remove(), durationMs + 80)
+      if (!legacyFloaterLayout) legacyFloaterLayout = BattleFloaterLayout.create(layer)
+      legacyFloaterLayout.add(el, x * cellSize + cellSize / 2, y * cellSize + 4)
+      const timer = setTimeout(() => {
+        el.remove()
+        legacyFloaterLayout.remove(el)
+        legacyFloaterTimers.delete(timer)
+      }, durationMs + 80)
+      legacyFloaterTimers.add(timer)
     }
 
     function battleStateMotionKey(state) {
@@ -8236,6 +8246,7 @@
     // ── Start ──
     // ── Dynamic cell sizing ───────────────────────────────────────────────────
     function recalcCellSize() {
+      if (legacyFloaterLayout) legacyFloaterLayout.resize()
       if (_use3d && battlePresentation) { battlePresentation.resize(); return }
       if (!G || !G.map) return
       const cols = G.map.width
@@ -8405,6 +8416,10 @@
       } catch (error) { showBattleBootError(error) }
     })
     function disposeBattlePage() {
+      legacyFloaterTimers.forEach(timer => clearTimeout(timer))
+      legacyFloaterTimers.clear()
+      if (legacyFloaterLayout) legacyFloaterLayout.clear()
+      document.querySelectorAll('#floatLayer .dmg-float').forEach(el => el.remove())
       if (turnAnnounceTimer) { clearTimeout(turnAnnounceTimer); turnAnnounceTimer = null }
       if (dmFeedbackTimer) { clearTimeout(dmFeedbackTimer); dmFeedbackTimer = null }
       if (ADVENTURE_MODE) disposeAdventureBattle()

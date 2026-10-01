@@ -68,13 +68,13 @@ describe('RED-69 battle motion contract', () => {
     expect(renderer).toContain('}, instant ? MOTION_TOKENS.instant : MOTION_TOKENS.action)')
   })
 
-  it('keeps target and status feedback short, simultaneous, and reduced-motion safe', () => {
+  it('keeps target and status feedback simultaneous, readable, and reduced-motion safe', () => {
     const css = readPage('css/battle-tactical-table.css')
     const renderer = readPage('js/battle-renderer-3d.js')
 
     expect(css).toContain('.piece-board-status-dot.is-entering')
     expect(css).toContain('.piece-board-status-dot.is-exiting')
-    expect(css).toMatch(/\.dmg-float[\s\S]*?--floater-duration:\s*600ms/)
+    expect(css).toMatch(/\.dmg-float[\s\S]*?--floater-duration:\s*2000ms/)
     expect(css).toContain('.dmg-float.is-heal')
     expect(css).toContain('@media (prefers-reduced-motion: reduce)')
     expect(css).not.toContain('animation:targetPulse')

@@ -145,6 +145,7 @@
   let _textureLoadGeneration = 0
   const _floaters = new Set()
   const _floaterTimers = new Set()
+  let _floaterLayout = null
   let _pressedPiece = null
   let _pressedHighlight = null
   let _reducedMotion = false
@@ -416,6 +417,7 @@
     _updateCameraProjection(w, h)
     if (_mapW && _camera && _cameraInOverview) _resetCamera()
     _notifyViewportChange()
+    if (_floaterLayout) _floaterLayout.resize()
   }
 
   function _withCameraZoomOne(callback) {
@@ -3067,6 +3069,7 @@
       _floaterTimers.clear()
       _floaters.forEach(function (element) { element.remove() })
       _floaters.clear()
+      if (_floaterLayout) _floaterLayout.clear()
     }
     update(model)
   }
@@ -3082,6 +3085,7 @@
     _floaterTimers.clear()
     _floaters.forEach(function (element) { element.remove() })
     _floaters.clear()
+    if (_floaterLayout) _floaterLayout.clear()
     _pieceObjects.forEach(function (obj) { _scene.remove(obj.group); _disposePieceObject(obj) })
     _pieceObjects.clear()
     const camera = { x: _cameraTarget.x, y: _cameraTarget.y, z: _cameraTarget.z, zoom: _camera.zoom, overview: _cameraInOverview }
@@ -3128,10 +3132,13 @@
     el.style.setProperty('--floater-duration', durationMs + 'ms')
     el.textContent = text
     layer.appendChild(el)
+    if (!_floaterLayout) _floaterLayout = window.BattleFloaterLayout.create(layer)
+    _floaterLayout.add(el, left, top)
     _floaters.add(el)
     const timer = setTimeout(function () {
       el.remove()
       _floaters.delete(el)
+      _floaterLayout.remove(el)
       _floaterTimers.delete(timer)
     }, durationMs + 80)
     _floaterTimers.add(timer)
@@ -3222,6 +3229,8 @@
     _floaterTimers.clear()
     _floaters.forEach(function (element) { element.remove() })
     _floaters.clear()
+    if (_floaterLayout) _floaterLayout.clear()
+    _floaterLayout = null
     _texCache.clear()
     _pointers.clear()
     _renderer = null

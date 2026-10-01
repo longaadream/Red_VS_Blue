@@ -646,6 +646,11 @@ canvas:focus-visible {
 
 .dmg-float {
   --floater-duration: 2000ms;
+  width: max-content;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  pointer-events: none;
+  transition: top var(--motion-fast) var(--ease-out), left var(--motion-fast) var(--ease-out);
   font-family: BattleComic, 'Microsoft YaHei', sans-serif;
   font-size: 29px !important;
   line-height: 1.1;
@@ -711,6 +716,7 @@ canvas:focus-visible {
   }
 
   .dmg-float {
+    transition: none;
     animation-name: rvbResultFadeIn !important;
     animation-duration: var(--motion-fast) !important;
   }

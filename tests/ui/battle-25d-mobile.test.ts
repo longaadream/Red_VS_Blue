@@ -132,6 +132,13 @@ describe('RED-68 renderer and responsive UI contract', () => {
     const renderer = readPage('js/battle-renderer-3d.js')
 
     expect(battlePage.indexOf('js/battle-ui/battle-tactical-geometry.js')).toBeGreaterThan(-1)
+    expect(battlePage.indexOf('js/battle-ui/battle-floater-layout.js')).toBeGreaterThan(-1)
+    expect(battlePage.indexOf('js/battle-ui/battle-floater-layout.js')).toBeLessThan(
+      battlePage.indexOf('js/battle-renderer-3d.js'),
+    )
+    const replayPage = readPage('replay.html')
+    expect(replayPage.indexOf('js/battle-ui/battle-floater-layout.js')).toBeGreaterThan(-1)
+    expect(replayPage.indexOf('js/battle-ui/battle-floater-layout.js')).toBeLessThan(replayPage.indexOf('js/battle-renderer-3d.js'))
     expect(battlePage.indexOf('js/battle-ui/battle-tactical-geometry.js')).toBeLessThan(
       battlePage.indexOf('js/battle-renderer-3d.js'),
     )
