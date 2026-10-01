@@ -316,9 +316,9 @@ async function runElectronSmoke() {
     width: 1280,
     height: 720,
     webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true, backgroundThrottling: false,
-      offscreen: process.env.RVB_FLOATER_STACKING === '1' },
+      offscreen: process.env.RVB_FLOATER_STACKING === '1' || process.env.RVB_SKILL_PREVIEW === '1' },
   })
-  if (process.env.RVB_FLOATER_STACKING === '1') win.webContents.setFrameRate(60)
+  if (process.env.RVB_FLOATER_STACKING === '1' || process.env.RVB_SKILL_PREVIEW === '1') win.webContents.setFrameRate(60)
   win.webContents.on('console-message', (_event, _level, message) => logs.push(String(message)))
   win.webContents.on('did-fail-load', (_event, code, description, url) => logs.push(`did-fail-load ${code} ${description} ${url}`))
   let debuggerAttached = false
@@ -574,6 +574,38 @@ async function runElectronSmoke() {
     const skillClickDebug = await evaluate('({ events: window.__RED221_SKILL_CLICKS, status: document.getElementById("statusMsg")?.textContent || "" })')
     ensure(armed.selectedPieceId === fixture.casterId && armed.pendingSkill?.skillId === 'venom-claw-rend', `Skill target mode did not arm: ${JSON.stringify({ armed, skillButtonDebug, skillButtonAfterScroll, skillInputTarget, skillClickDebug })}`)
     evidence.desktop = { setup, fixture, selected, armed }
+    if (process.env.RVB_SKILL_PREVIEW === '1') {
+      const original = await evaluate('JSON.stringify(G)')
+      const target = await boardPoint(fixture.validTarget)
+      win.webContents.sendInputEvent({ type: 'mouseMove', x: target.x, y: target.y })
+      await waitFor('skillPreviewController && skillPreviewController.getDiagnostics().active?.displayed', 5000, 'real skill preview')
+      const preview = await evaluate(`({ diagnostics: skillPreviewController.getDiagnostics(),
+        badge: document.querySelector('.skill-preview-badge')?.textContent,
+        floaters: Array.from(document.querySelectorAll('#floatLayer [data-preview="true"]')).map(e => e.textContent),
+        displayTimings: skillPreviewDisplayTimings, sameState: JSON.stringify(G) === ${JSON.stringify(original)},
+        puts: window.__RED221_PUTS.length, history: G.presentationEvents.length })`)
+      ensure(preview.diagnostics.requests.at(-1)?.status === 'ready', `Real skill cannot preview: ${JSON.stringify(preview)}`)
+      ensure(preview.sameState && preview.puts === 0 && preview.floaters.some(text => /−/.test(text)), `Preview changed authority or omitted damage: ${JSON.stringify(preview)}`)
+      await screenshot('desktop-skill-hypothetical.png')
+      win.webContents.sendInputEvent({ type: 'mouseMove', x: 1270, y: 10 })
+      await waitFor('!skillPreviewController.getDiagnostics().active', 5000, 'preview leave restoration')
+      ensure(await evaluate(`JSON.stringify(G) === ${JSON.stringify(original)}`), 'Leaving preview changed real state')
+      const benchmark = await evaluate(`(() => {
+        const action = Object.assign({}, pendingSkill.baseAction)
+        _appendTargetToAction(action, G.pieces.find(p => p.instanceId === __RED221_FIXTURE__.validTargetId),
+          __RED221_FIXTURE__.validTarget.x, __RED221_FIXTURE__.validTarget.y, pendingSkill.preparation.targetType)
+        const times = []
+        for (let i = 0; i < 100; i++) {
+          const result = GameEngine.previewBattleAction(G, action, myPlayerId)
+          if (result.status !== 'ready') throw new Error('Benchmark preview not ready')
+          times.push(result.durationMs)
+        }
+        times.sort((a,b) => a-b)
+        return { samples: times.length, p50: times[49], p95: times[94], worst: times[99], sameState: JSON.stringify(G) === ${JSON.stringify(original)} }
+      })()`)
+      ensure(benchmark.sameState, 'Repeated previews changed authority')
+      evidence.preview = { preview, benchmark }
+    }
     await tap(await boardPoint(fixture.invalidPiece), 'mouse')
     const occupiedRejected = await snapshot('after-invalid-occupied-mouse')
     evidence.desktop.occupiedRejected = occupiedRejected
@@ -662,6 +694,12 @@ async function runElectronSmoke() {
     ensure(beforeCancel.pendingSkill?.skillId === 'venom-claw-rend', `Cancel fixture did not enter target mode: ${JSON.stringify(beforeCancel)}`)
     ensure(cancelled.selectedPieceId === fixture.casterId && !cancelled.pendingSkill && !cancelled.targetOverlay && !cancelled.targetMode, `Explicit cancel did not exit target mode: ${JSON.stringify(cancelled)}`)
     evidence.desktop.cancel = { beforeCancel, cancelled }
+    if (process.env.RVB_SKILL_PREVIEW === '1') {
+      evidence.desktop.touchDrag = await require('./red224-skill-drag-smoke.cjs')({
+        cdp, delay, evaluate, fixtureInstaller, tap, boardPoint, closeTileStatusIfOpen,
+        skillSelector, pointFor, snapshot, ensure, waitFor,
+      })
+    }
 
     if (process.env.RVB_FLOATER_STACKING === '1') {
       await delay(2200)

@@ -37,6 +37,8 @@ type RendererApi = {
   init(options: unknown): void
   update(model: unknown): void
   showHistoricalBoard(model: unknown): void
+  showPreviewBoard(model: unknown, authoritativeModel: unknown): void
+  clearPreviewBoard(): void
   settlePresentation(model: unknown, options?: { preserveFloaters: boolean }): void
   animateAction(action: unknown, previousModel: unknown, nextModel: unknown): void
   resize(): void
@@ -596,6 +598,63 @@ describe('RED-68 BattleRenderer3D runtime', () => {
       vi.useRealTimers()
     }
     expect(layer.children).toHaveLength(0)
+  })
+
+  it('shows a hypothetical board while keeping input on authority and restores without retaining preview text', () => {
+    vi.useFakeTimers()
+    const h = createHarness(1280, 720, false)
+    const layer = new FakeElement('div')
+    layer.rect = { left: 0, top: 0, width: 1280, height: 720 }
+    try {
+      const model = runtimeModel()
+      model.selection.mode = 'target'
+      h.windowObject.adventureBoardWarning = () => '危险'
+      h.renderer.init({ container: h.container, floatLayer: layer })
+      h.renderer.update(model)
+      h.frame(16)
+      h.renderer.spawnFloater(2, 2, '实际 −1', '#fff', false, {})
+      const hypothetical = structuredClone(model)
+      hypothetical.pieces[0].x += 2
+      hypothetical.pieces[0].health.current -= 3
+      h.renderer.showPreviewBoard(hypothetical, model)
+      h.renderer.spawnFloater(2, 2, '预演 −3', '#fff', false, { preview: true })
+      expect(layer.children.map(child => child.textContent)).toEqual(['实际 −1', '预演 −3'])
+      const group = h.renderers[0].scene!.children.find(node => node.userData.pieceId === model.pieces[0].id)
+      expect(group?.position.x).toBe(hypothetical.pieces[0].x)
+      h.renderer.clearPreviewBoard()
+      expect(h.container.querySelector('.piece-board-lethal')?.hidden).toBe(false)
+      expect(layer.children.map(child => child.textContent)).toEqual(['实际 −1'])
+      const restored = h.renderers[0].scene!.children.find(node => node.userData.pieceId === model.pieces[0].id)
+      expect(restored?.position.x).toBe(model.pieces[0].x)
+      vi.advanceTimersByTime(2080)
+      expect(layer.children).toHaveLength(0)
+      expect(model.pieces[0].health.current).not.toBe(hypothetical.pieces[0].health.current)
+    } finally {
+      h.renderer.dispose()
+      vi.useRealTimers()
+    }
+  })
+
+  it('notifies pointerleave after one hover even when preview rebuilds the visible board', () => {
+    const h = createHarness(1280, 720, false)
+    const model = runtimeModel()
+    const intents: Array<Record<string, unknown>> = []
+    h.renderer.init({ container: h.container, onIntent: (intent: Record<string, unknown>) => {
+      intents.push(intent)
+      if (intent.type === 'hover-cell' && intent.x != null) h.renderer.showPreviewBoard(structuredClone(model), model)
+      if (intent.type === 'hover-cell' && intent.x == null) h.renderer.clearPreviewBoard()
+    } })
+    try {
+      h.renderer.update(model)
+      h.frame(16)
+      const point = h.renderer.projectCell(2, 2)
+      const canvas = h.renderers[0].domElement
+      canvas.dispatch('pointermove', { pointerType: 'mouse', clientX: point.clientX, clientY: point.clientY })
+      canvas.dispatch('pointerleave', { pointerType: 'mouse' })
+      expect(intents.filter(intent => intent.type === 'hover-cell')).toEqual([
+        { type: 'hover-cell', x: 2, y: 2 }, { type: 'hover-cell', x: null, y: null }
+      ])
+    } finally { h.renderer.dispose() }
   })
 
   it('renders static state on demand and batches terrain by material', () => {
