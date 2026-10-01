@@ -122,13 +122,24 @@ async function practiceDoAction(rawAction) {
     pendingSkill = null; pendingCardAction = null
     acceptPracticeSnapshot(result)
   } catch (error) {
+    const retainTarget = typeof shouldRetainTargetAfterRejection === 'function'
+      && shouldRetainTargetAfterRejection(action, error)
     clearPendingActionFeedback('practice-rejected')
     if (error.practicePaused) { pausePractice(error); return }
+    if (G && (G.pendingTargetSelection || G.pendingOptionSelection)) _pendingChoiceShown = null
     if (error.needsTargetSelection) enterActionTargetMode(action, targetPreparationFromError(error))
     else if (error.needsOptionSelection) {
+      if (typeof targetSubmissionPending !== 'undefined' && targetSubmissionPending) {
+        targetSubmissionPending = null
+        if (typeof recordTargetClear === 'function') recordTargetClear('authoritative-next-option-step')
+      }
       const retry = Object.assign({}, action)
       if (error.preparation) { retry.selectionId = error.preparation.selectionId; retry.stateRevision = error.preparation.stateRevision }
       showOptionPicker(error.title || '请选择', error.options || [], retry)
+    } else if (retainTarget) {
+      releaseTargetSubmissionForRetry(targetSubmissionPending)
+      rejectPendingActionFeedback('practice-rejected', '选择被拒绝：' + error.message + '；请重新选择', { preserveTargetInteraction: true })
+      setStatusMsg('选择被拒绝：' + error.message + '；请重新选择')
     } else {
       rejectPendingActionFeedback('practice-rejected', error.message)
       setStatusMsg(error.message)

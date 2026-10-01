@@ -2377,6 +2377,7 @@
     let pendingOptionPickerSelection = { selectionId: null, selectedValues: [] }
     let pendingHandOptionSelection = { selectionId: null, selectedValues: [], submitting: false }
     let targetSubmissionPending = null // one target command waiting for authoritative confirmation
+    let targetSubmissionDraft = null // target draft detached while its command is in flight
     let pendingBoardTargetSelection = { selectionId: null, selectedPieceIds: [] }
     let locallyCancelledSelectionId = null
     const red50Evidence = { targetCommands: [], clearEvents: [], rejections: [] }
@@ -2516,6 +2517,68 @@
       )
     }
 
+    function snapshotTargetInteraction() {
+      return {
+        skill: pendingSkill,
+        card: pendingCardAction,
+        board: pendingBoardTargetSelection ? {
+          selectionId: pendingBoardTargetSelection.selectionId,
+          selectedPieceIds: (pendingBoardTargetSelection.selectedPieceIds || []).slice(),
+          selectedCells: (pendingBoardTargetSelection.selectedCells || []).map(function (cell) { return { x: cell.x, y: cell.y } }),
+        } : null,
+      }
+    }
+
+    function rememberTargetInteraction() {
+      targetSubmissionDraft = snapshotTargetInteraction()
+      return targetSubmissionDraft
+    }
+
+    function restoreTargetInteractionDraft(draft) {
+      if (!draft) return false
+      if (draft.skill) pendingSkill = draft.skill
+      if (draft.card) pendingCardAction = draft.card
+      if (draft.board) {
+        pendingBoardTargetSelection = {
+          selectionId: draft.board.selectionId || null,
+          selectedPieceIds: (draft.board.selectedPieceIds || []).slice(),
+          selectedCells: (draft.board.selectedCells || []).map(function (cell) { return { x: cell.x, y: cell.y } }),
+        }
+      }
+      targetSubmissionDraft = null
+      if (pendingSkill || pendingCardAction) {
+        document.body.classList.add('target-mode-active')
+        renderTargetOverlay()
+      }
+      return !!(pendingSkill || pendingCardAction)
+    }
+
+    function releaseTargetSubmissionForRetry(submission) {
+      if (!submission || !targetSubmissionPending
+        || targetSubmissionPending.clientActionId !== submission.clientActionId) return false
+      targetSubmissionPending = null
+      return restoreTargetInteractionDraft(submission.draft)
+    }
+
+    function targetRejectionCanRetry(code) {
+      const normalized = String(code || '').toUpperCase()
+      if (!normalized) return true
+      if (normalized === 'BATTLE_RECEIPT_UNKNOWN') return false
+      return !/(?:VERSION_CONFLICT|AUTHORITY_VERSION_MISMATCH|PERSISTENCE|TERMINAL|TURN_EXPIRED|DEPLOYMENT_EXPIRED|PENDING_RESPONSE_EXPIRED|ACTION_INVALID|ACTION_PLAYER_MISMATCH|TARGET_DECLARATION_MISSING|OPTION_SELECTION_REQUIRED|TARGET_SELECTION_REQUIRED|PENDING_SELECTION_ACTIVE|SESSION_(?:STALE|EXPIRED|ID_MISMATCH|PLAYER_MISMATCH|ALREADY_RESOLVED)|SELECTION_(?:STALE|EXPIRED|ID_MISMATCH|PLAYER_MISMATCH|ALREADY_RESOLVED)|SOURCE_MISSING|PENDING_TARGET_CANCEL_FORBIDDEN|PENDING_(?:TARGET_SELECTION|OPTION)_(?:NOT_FOUND|STALE|ID_MISMATCH|PLAYER_MISMATCH|ALREADY_RESOLVED|CANCEL_FORBIDDEN))/.test(normalized)
+    }
+
+    function shouldRetainTargetAfterRejection(action, errorLike) {
+      const submission = targetSubmissionPending
+      const hasDraft = !!(submission && submission.draft && (submission.draft.skill || submission.draft.card))
+      if (!hasDraft) return false
+      if (errorLike && errorLike.receipt && errorLike.receipt.status !== 'rejected') return false
+      if (errorLike && (errorLike.needsTargetSelection || errorLike.needsOptionSelection)) return false
+      const code = errorLike && ((errorLike.code) || (errorLike.receipt && errorLike.receipt.code))
+      if (errorLike && !targetRejectionCanRetry(code)) return false
+      return !action || !action.type
+        || ['useBasicSkill', 'useChargeSkill', 'playCard', 'pendingTargetSelect', 'pendingOptionSelect'].includes(action.type)
+    }
+
     function applyAuthorityReceipt(receipt, serverTimings, clientApplyMs, options) {
       if (!receipt || !receipt.clientActionId) return false
       var input = options || {}
@@ -2543,7 +2606,20 @@
       }
 
       if (feedbackMatches) clearPendingActionFeedback('authority-receipt-' + receipt.status)
-      if (targetMatches) targetSubmissionPending = null
+      if (targetMatches) {
+        const submission = targetSubmissionPending
+        targetSubmissionPending = null
+        const preserveDraft = input.preserveTargetInteraction === true
+          || (input.preserveTargetInteraction !== false && receipt.status === 'rejected'
+            && targetRejectionCanRetry(receipt.code))
+        if (preserveDraft) restoreTargetInteractionDraft(submission.draft)
+      }
+      if (receipt.status === 'rejected' && !targetRejectionCanRetry(receipt.code)) {
+        requestAuthorityRecovery(receipt.code || 'selection-invalidated')
+      } else if (receipt.status === 'rejected' && G && (G.pendingTargetSelection || G.pendingOptionSelection)) {
+        _pendingChoiceShown = null
+        if (input.deferRender !== true) render()
+      }
       if (input.deferRender !== true) renderActionBar()
       if (receipt.message) setStatusMsg(receipt.message)
       if (receipt.status === 'resyncRequired') requestAuthorityRecovery(receipt.code || 'resync-required')
@@ -2557,10 +2633,11 @@
 
     function clearTargetInteraction(reason, options) {
       const input = options || {}
-      const hadTarget = !!(pendingSkill || pendingCardAction || targetSubmissionPending)
+      const hadTarget = !!(pendingSkill || pendingCardAction || targetSubmissionPending || targetSubmissionDraft)
       pendingSkill = null
       pendingCardAction = null
       targetSubmissionPending = null
+      targetSubmissionDraft = null
       pendingBoardTargetSelection = { selectionId: null, selectedPieceIds: [] }
       if (input.keepMove !== true) pendingMove = false
       if (hadTarget) recordTargetClear(reason)
@@ -2568,6 +2645,11 @@
       if (input.deferRender !== true) renderTargetOverlay()
       if (input.message) setStatusMsg(input.message)
       return hadTarget
+    }
+
+    function rejectUnsentTargetSubmission(reason, message) {
+      const restored = releaseTargetSubmissionForRetry(targetSubmissionPending)
+      rejectPendingActionFeedback(reason, message, { preserveTargetInteraction: restored || !!(pendingSkill || pendingCardAction) })
     }
 
     function currentTargetSourceName() {
@@ -2597,12 +2679,21 @@
       }
 
       const stamped = withClientActionId(prepareFreshSelectionAction(action))
-      if (!tutorialActionAllowed(stamped)) return false
+      const draft = (typeof targetSubmissionDraft !== 'undefined' && targetSubmissionDraft)
+        || ((pendingSkill || pendingCardAction) && typeof snapshotTargetInteraction === 'function'
+          ? snapshotTargetInteraction()
+          : null)
+      if (!tutorialActionAllowed(stamped)) {
+        if (draft && typeof restoreTargetInteractionDraft === 'function') restoreTargetInteractionDraft(draft)
+        return false
+      }
       targetSubmissionPending = {
         clientActionId: stamped.clientActionId,
         type: stamped.type,
         label: label || currentTargetSourceName(),
+        draft: draft,
       }
+      if (typeof targetSubmissionDraft !== 'undefined') targetSubmissionDraft = null
       red50Evidence.targetCommands.push({
         clientActionId: stamped.clientActionId,
         type: stamped.type,
@@ -4838,11 +4929,16 @@
       if (locallyCancelledSelectionId && authoritativeSelectionId !== locallyCancelledSelectionId) {
         locallyCancelledSelectionId = null
       }
-      const serverTargetInteraction = pendingSkill
-        && pendingSkill.turnTargetActionType === 'pendingTargetSelect'
+      const targetDraft = (typeof targetSubmissionDraft !== 'undefined' && targetSubmissionDraft)
+        || (typeof targetSubmissionPending !== 'undefined'
+          && targetSubmissionPending && targetSubmissionPending.draft)
+      const activeTargetSkill = pendingSkill || (targetDraft && targetDraft.skill)
+      const activeTargetCard = pendingCardAction || (targetDraft && targetDraft.card)
+      const serverTargetInteraction = activeTargetSkill
+        && activeTargetSkill.turnTargetActionType === 'pendingTargetSelect'
       if (serverTargetInteraction) {
-        const localSelectionId = pendingSkill.preparation && pendingSkill.preparation.selectionId
-        const localStateRevision = pendingSkill.preparation && pendingSkill.preparation.stateRevision
+        const localSelectionId = activeTargetSkill.preparation && activeTargetSkill.preparation.selectionId
+        const localStateRevision = activeTargetSkill.preparation && activeTargetSkill.preparation.stateRevision
         const nextPending = nextState.pendingTargetSelection
         if (!nextPending
           || !localSelectionId
@@ -4875,8 +4971,8 @@
         return '回合已切换，目标选择已清除'
       }
 
-      const preparation = (pendingSkill && pendingSkill.preparation)
-        || (pendingCardAction && pendingCardAction.preparation)
+      const preparation = (activeTargetSkill && activeTargetSkill.preparation)
+        || (activeTargetCard && activeTargetCard.preparation)
       if (preparation && Number.isFinite(Number(preparation.stateRevision))) {
         const revision = Number(nextState.targetingRevision || 0)
         if (revision !== Number(preparation.stateRevision)) {
@@ -5260,7 +5356,7 @@
       })
 
       RvBColyseus.on('authoritySyncBlocked', function() {
-        setStatusMsg('正在同步服务端状态，请等待完成后重新操作')
+        rejectUnsentTargetSubmission('authority-syncing', '正在同步服务端状态；指令未发送，选择已保留')
       })
 
       RvBColyseus.on('message', function(msg) {
@@ -5333,11 +5429,18 @@
           }
         } else if (msg.type === 'actionError') {
           var errorActionId = (msg.receipt && msg.receipt.clientActionId) || (msg.action && msg.action.clientActionId)
-          if (errorActionId && pendingActionFeedback && pendingActionFeedback.clientActionId !== errorActionId) {
+          var activePendingActionId = (pendingActionFeedback && pendingActionFeedback.clientActionId)
+            || (targetSubmissionPending && targetSubmissionPending.clientActionId)
+          var rejectionWithoutSubmission = !activePendingActionId && !!(pendingSkill || pendingCardAction)
+            && !msg.needsTargetSelection && !msg.needsOptionSelection
+          if (errorActionId && ((activePendingActionId && activePendingActionId !== errorActionId)
+            || rejectionWithoutSubmission)) {
             addLog('[authority] 已忽略过期拒绝：' + errorActionId, 'info')
             return
           }
-          if (msg.receipt) applyAuthorityReceipt(msg.receipt)
+          var submittedTarget = targetSubmissionPending
+          var retainTarget = !!errorActionId && shouldRetainTargetAfterRejection(msg.action, msg)
+          if (msg.receipt) applyAuthorityReceipt(msg.receipt, null, null, { preserveTargetInteraction: retainTarget })
           if (msg.needsTargetSelection) clearPendingActionFeedback('authoritative-target-step')
           if (msg.needsTargetSelection && enterActionTargetMode(msg.action, msg.preparation)) return
           if (msg.needsOptionSelection) clearPendingActionFeedback('authoritative-option-step')
@@ -5377,14 +5480,28 @@
             || (msg.action.type === 'pendingOptionSelect' && G && G.pendingOptionSelection)
           )
           if (rejectedPending) {
-            targetSubmissionPending = null
-            _pendingChoiceShown = null
-            addLog('服务端拒绝本次选择：' + rejectionMessage, 'err')
+            if ((!msg.receipt || msg.receipt.status === 'rejected')
+              && targetRejectionCanRetry(msg.code || (msg.receipt && msg.receipt.code))) {
+              if (submittedTarget) releaseTargetSubmissionForRetry(submittedTarget)
+              else targetSubmissionPending = null
+              _pendingChoiceShown = null
+              addLog('服务端拒绝本次选择：' + rejectionMessage, 'err')
+              rejectPendingActionFeedback(
+                'server-rejected',
+                '选择被拒绝：' + rejectionMessage + '；请重新选择',
+                { preserveTargetInteraction: true },
+              )
+              return
+            }
+          }
+          if (retainTarget) {
+            if (submittedTarget) releaseTargetSubmissionForRetry(submittedTarget)
             rejectPendingActionFeedback(
               'server-rejected',
               '选择被拒绝：' + rejectionMessage + '；请重新选择',
               { preserveTargetInteraction: true },
             )
+            addLog('服务端拒绝本次目标选择：' + rejectionMessage, 'err')
             return
           }
           rejectPendingActionFeedback('server-rejected', '服务端拒绝：' + rejectionMessage + '；目标选择已清除')
@@ -7158,6 +7275,7 @@
         delete action.preparation
         delete action.validTargets
         const targetLabel = currentTargetSourceName()
+        rememberTargetInteraction()
         pendingCardAction = null
         submitTargetAction(action, targetLabel)
         return
@@ -7189,6 +7307,7 @@
         }
         if (turnTargetType === 'piece' && piece) action.targetPieceId = piece.instanceId
         const targetLabel = currentTargetSourceName()
+        rememberTargetInteraction()
         pendingSkill = null
         setStatusMsg('已提交目标选择')
         renderBoard()
@@ -7212,8 +7331,7 @@
         const key = x + ',' + y
         const vt = pendingSkill.validTargets
         if (vt && !vt.has(key)) {
-          // Invalid target: inspect a piece if present, otherwise show a hint.
-          if (piece) { selectPiece(piece.instanceId); return }
+          // Invalid targets keep the active caster and draft so the next click can retry.
           setStatusMsg('目标不在技能范围内')
           return
         }
@@ -7231,6 +7349,7 @@
         // Set target using the first flat slot, then append later selectTarget calls to extraTargets.
         _appendTargetToAction(action, piece, x, y, pendingSkill.preparation && pendingSkill.preparation.targetType)
         const targetLabel = currentTargetSourceName()
+        rememberTargetInteraction()
         pendingSkill = null
         submitTargetAction(action, targetLabel)
         return
@@ -7282,6 +7401,10 @@
       }
       if (targetSubmissionPending) {
         setStatusMsg('目标指令已提交，正在等待权威确认')
+        return
+      }
+      if (pendingSkill || pendingCardAction) {
+        setStatusMsg('请先完成当前目标选择')
         return
       }
       if (G && G.deployment && G.deployment.status === 'awaiting-locks') {
@@ -7569,12 +7692,14 @@
           const rawErrMsg = e.message || String(e) || '操作失败'
           const errMsg = (typeof e.code === 'string' && e.code.indexOf('TARGET_') === 0 || /不可行走|not walkable|没有合法|无合法/i.test(rawErrMsg)) ? '没有合法地格' : rawErrMsg
           red50Evidence.rejections.push({ code: e.code || '', message: errMsg, at: Date.now() })
+          const retainTarget = shouldRetainTargetAfterRejection(action, e)
           const rejectedPending = (
             (action.type === 'pendingTargetSelect' && G && G.pendingTargetSelection)
             || (action.type === 'pendingOptionSelect' && G && G.pendingOptionSelection)
           )
-          if (rejectedPending) {
-            targetSubmissionPending = null
+          if ((rejectedPending && targetRejectionCanRetry(e.code)) || retainTarget) {
+            if (retainTarget) releaseTargetSubmissionForRetry(targetSubmissionPending)
+            else targetSubmissionPending = null
             _pendingChoiceShown = null
             rejectionFeedback = '选择被拒绝：' + errMsg + '；请重新选择'
             rejectPendingActionFeedback(
@@ -7629,17 +7754,17 @@
         && RvBColyseus.isAuthoritySyncing
         && RvBColyseus.isAuthoritySyncing()
       ) {
-        setStatusMsg('正在同步服务端状态，请等待完成后重新操作')
+        rejectUnsentTargetSubmission('authority-syncing', '正在同步服务端状态；指令未发送，选择已保留')
         return
       }
       action = withClientActionId(action)
+      const wasTargetSubmission = typeof targetSubmissionPending !== 'undefined' && !!targetSubmissionPending
       if (typeof beginPendingActionFeedback === 'function' && !beginPendingActionFeedback(action)) return
       if (TRAINING_MODE) { await trainingDoAction(action); return }
       const url = getServerUrl()
       if (!url) {
-        rejectPendingActionFeedback('transport-unavailable', '未连接服务器；目标选择已清除')
+        rejectUnsentTargetSubmission('transport-unavailable', '未连接服务器；指令未发送，请连接后重新选择')
         addLog('未连接服务器', 'err')
-        setStatusMsg('未连接服务器；目标选择已清除')
         return
       }
       if (!G) {
@@ -7647,6 +7772,7 @@
         addLog('游戏状态未就绪', 'err')
         return
       }
+      let authoritySendStarted = false
       try {
         document.getElementById('btnEnd').disabled = true
         setMoveButtonDisabled(true)
@@ -7655,24 +7781,36 @@
         // Submit every authority action through the active Colyseus room.
         if (colyseusConnected && typeof RvBColyseus !== 'undefined' && RvBColyseus.isConnected()) {
           var actionAuth = await createBattleActionAuth(action)
+          authoritySendStarted = true
           var submitted = RvBColyseus.send(battleAuthorityCommandMessage(action, actionAuth))
           if (submitted === false) {
-            rejectPendingActionFeedback('authority-syncing', '正在同步服务端状态；本次操作未发送')
+            rejectUnsentTargetSubmission('authority-syncing', '正在同步服务端状态；本次操作未发送，请稍后重选')
             return
           }
           schedulePendingActionPresentation()
           if (action.pieceId && G.pieces.some(p => p.instanceId === action.pieceId && p.currentHp > 0)) {
             selectedPieceId = action.pieceId
           } else if (action.type === 'endTurn' || action.type === 'beginPhase') { selectedPieceId = null }
-          pendingSkill = null; pendingCardAction = null; restoreSelectedPieceMenu({ reopen: action.type === 'move' })
+          if (!wasTargetSubmission) { pendingSkill = null; pendingCardAction = null }
+          restoreSelectedPieceMenu({ reopen: action.type === 'move' })
           return
         }
 
         addLog('Colyseus 未连接，无法发送动作；请检查网络和服务端', 'err')
-        rejectPendingActionFeedback('transport-unavailable', 'Colyseus 未连接；目标选择已清除')
+        rejectUnsentTargetSubmission('transport-unavailable', 'Colyseus 未连接；指令未发送，请连接后重新选择')
         renderActionBar()
-        setStatusMsg('Colyseus 未连接；目标选择已清除')
       } catch (e) {
+        if (targetSubmissionPending) {
+          if (!authoritySendStarted) {
+            rejectUnsentTargetSubmission('transport-failed', '指令未发送：' + e.message + '；请修正后重新选择')
+            addLog('指令构造失败：' + e.message, 'err')
+            return
+          }
+          requestAuthorityRecovery('transport-failed', targetSubmissionPending.clientActionId)
+          addLog('发送结果待确认：' + e.message, 'err')
+          setStatusMsg('发送结果待确认，正在同步服务端状态；请勿重复操作')
+          return
+        }
         rejectPendingActionFeedback('transport-failed', '发送动作失败：' + e.message + '；目标选择已清除')
         addLog('发送动作失败：' + e.message, 'err')
         renderActionBar()
@@ -7869,6 +8007,13 @@
     })
     let lastDmFeedback = { key: '', at: 0 }
     let dmFeedbackTimer = null
+    let battleFeedbackAudio = null
+    function ensureBattleFeedbackAudio() {
+      if (!battleFeedbackAudio && window.BattleAudio && typeof window.BattleAudio.create === 'function') {
+        battleFeedbackAudio = window.BattleAudio.create()
+      }
+      return battleFeedbackAudio
+    }
     function dmFeedbackLine(msg) {
       const text = String(msg || '')
       if (/不是你的回合|当前回合不属于你/.test(text)) return '你现在还不能行动。'
@@ -7890,7 +8035,7 @@
       const line = dmFeedbackLine(msg)
       if (!line) return
       const now = Date.now()
-      const key = line + '|' + String(msg)
+      const key = line
       if (lastDmFeedback.key === key && now - lastDmFeedback.at < 700) return
       lastDmFeedback = { key, at: now }
       const bubble = document.getElementById('dmBubble')
@@ -7904,9 +8049,8 @@
         bubble.classList.remove('is-visible')
         bubble.setAttribute('aria-hidden', 'true')
       }, 1800)
-      if (window.speechSynthesis && !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
-        try { window.speechSynthesis.cancel(); const utterance = new SpeechSynthesisUtterance(line); utterance.lang = 'zh-CN'; utterance.rate = 1.08; window.speechSynthesis.speak(utterance) } catch (_) {}
-      }
+      const feedbackAudio = ensureBattleFeedbackAudio()
+      if (feedbackAudio) feedbackAudio.play('invalid')
       if (TIMER_PREVIEW_MODE && !authoritativeTurnTimer && !authoritativePendingTimer) {
         deadlines.push(Number(TIMER_PREVIEW_TIMER.deadlineAt), Number(TIMER_PREVIEW_TIMER.burnStartsAt))
       }
@@ -8123,6 +8267,7 @@
     }
     window.addEventListener('load', () => {
       try {
+      ensureBattleFeedbackAudio()
       if (!window.THREE || !window.BattleRenderer3D) throw new Error('三维渲染组件未加载，请重试或检查应用更新')
       const renderer = window.BattleRenderer3D
       battleDomUi = BattleDomUI.create({ document, onTurnAnnounce: showTurnAnnounce })
@@ -8264,6 +8409,7 @@
       clearPendingActionFeedback('page-dispose')
       deadlineStatusTimer = null
       if (battlePresentation) battlePresentation.dispose()
+      if (battleFeedbackAudio) { battleFeedbackAudio.dispose(); battleFeedbackAudio = null }
     }
     window.addEventListener('pagehide', disposeBattlePage)
     window.addEventListener('unload', disposeBattlePage)

@@ -749,6 +749,8 @@ describe('battle page route contract', () => {
       myPlayerId: 'player-red',
       pendingSkill: null,
       pendingCardAction: null,
+      targetSubmissionPending: null,
+      schedulePendingActionPresentation: () => undefined,
       selectedPieceId: null,
       restoreSelectedPieceMenu: () => undefined,
       GameEngine: {
@@ -805,19 +807,27 @@ new Script([
       SPECTATE_MODE: false,
       PRACTICE_MODE: false,
       ADVENTURE_MODE: false,
+      targetSubmissionPending: null,
+      pendingSkill: null,
+      pendingCardAction: null,
+      rejectPendingActionFeedback: (_reason: string, message: string) => statusMessages.push(message),
       withClientActionId: () => {
         stamped = true
         return { type: 'move', clientActionId: 'should-not-exist' }
       },
       setStatusMsg: (message: string) => statusMessages.push(message),
     })
-    new Script(readNamedAsyncFunction(battlePage, 'doAction')).runInContext(context)
+    new Script([
+      readNamedFunction(battlePage, 'releaseTargetSubmissionForRetry'),
+      readNamedFunction(battlePage, 'rejectUnsentTargetSubmission'),
+      readNamedAsyncFunction(battlePage, 'doAction'),
+    ].join('\n')).runInContext(context)
 
     await new Script("doAction({ type: 'move', playerId: 'player-red', pieceId: 'caster', toX: 2, toY: 3 })").runInContext(context)
 
     expect(stamped).toBe(false)
     expect(sent).toBe(false)
-    expect(statusMessages.at(-1)).toBe('正在同步服务端状态，请等待完成后重新操作')
+    expect(statusMessages.at(-1)).toBe('正在同步服务端状态；指令未发送，选择已保留')
   })
 
   it.each([false, true])('routes adventure commands locally while preserving spectator read-only=%s', async (spectating) => {

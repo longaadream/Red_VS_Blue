@@ -135,6 +135,11 @@ describe('RED-69 battle motion contract', () => {
     expect(battlePage).toContain('你现在还不能行动。')
     expect(battlePage).toContain('function showDmFeedback(msg)')
     expect(battlePage).toContain('id="dmBubble"')
+    expect(battlePage).toContain('function ensureBattleFeedbackAudio()')
+    expect(battlePage).toMatch(/const key = line\s+if \(lastDmFeedback\.key === key/)
+    expect(battlePage).toContain("feedbackAudio.play('invalid')")
+    expect(battlePage).not.toContain('speechSynthesis')
+    expect(battlePage).toMatch(/function disposeBattlePage\(\)[\s\S]*?battleFeedbackAudio\.dispose\(\)/)
   })
 
   it('keeps the prominent corner timer wired to authoritative visibility', () => {

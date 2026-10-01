@@ -185,17 +185,28 @@ async function adventureDoAction(rawAction) {
     pendingSkill = null; pendingCardAction = null
     acceptAdventureSnapshot(result)
   } catch (error) {
+    const retainTarget = typeof shouldRetainTargetAfterRejection === 'function'
+      && shouldRetainTargetAfterRejection(action, error)
     clearPendingActionFeedback('adventure-rejected')
     if (error.adventurePaused) { pauseAdventure(error); return }
+    if (G && (G.pendingTargetSelection || G.pendingOptionSelection)) _pendingChoiceShown = null
     if (error.needsTargetSelection) {
       if (!enterActionTargetMode(action, targetPreparationFromError(error))) {
         setStatusMsg(error.message || '未收到有效目标，请同步进度后重试')
       }
     }
     else if (error.needsOptionSelection) {
+      if (typeof targetSubmissionPending !== 'undefined' && targetSubmissionPending) {
+        targetSubmissionPending = null
+        if (typeof recordTargetClear === 'function') recordTargetClear('authoritative-next-option-step')
+      }
       const retry = Object.assign({}, action)
       if (error.preparation) { retry.selectionId = error.preparation.selectionId; retry.stateRevision = error.preparation.stateRevision }
       showOptionPicker(error.title || '请选择', error.options || [], retry)
+    } else if (retainTarget) {
+      releaseTargetSubmissionForRetry(targetSubmissionPending)
+      rejectPendingActionFeedback('adventure-rejected', '选择被拒绝：' + error.message + '；请重新选择', { preserveTargetInteraction: true })
+      setStatusMsg('选择被拒绝：' + error.message + '；请重新选择')
     } else {
       rejectPendingActionFeedback('adventure-rejected', error.message)
       setStatusMsg(error.message)

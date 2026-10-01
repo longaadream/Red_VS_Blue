@@ -79,14 +79,18 @@ it.each([false,true])('clicking an allied skill landing cell submits pending sel
   const context=vm.createContext({
     G:{turn:{currentPlayerId:'caster'},pieces:[{instanceId:'ally',ownerPlayerId:'teammate',currentHp:10,x:1,y:1}]},
     myPlayerId:'caster',selectedPieceId:'ally',ADVENTURE_MODE:adventure,adventureDeployPieceId:null,
-    targetSubmissionPending:null,adventureOpenCell:()=>false,pendingOptionSelectionForOther:()=>false,
+    targetSubmissionPending:null,targetSubmissionDraft:null,pendingBoardTargetSelection:null,adventureOpenCell:()=>false,pendingOptionSelectionForOther:()=>false,
     TRAINING_MODE:false,pendingCardAction:null,refreshBattleLegalActions:()=>{},
     pendingSkill:{turnTargetActionType:'pendingTargetSelect',turnTargetPlayerId:'caster',validTargets:new Set(['2,1']),preparation:{targetType:'cell',selectionId:'march',stateRevision:'revision'}},
     isPendingBoardMultiTarget:()=>false,currentTargetSourceName:()=> '圣铸进军',setStatusMsg:vi.fn(),
     renderBoard:()=>{},renderActionBar:()=>{},renderTargetOverlay:()=>{},submitTargetAction:submit,
   })
-  vm.runInContext(runtimeFunction(readBattlePage(),'onCellClick')+';onCellClick(2,1)',context)
+  for (const name of ['snapshotTargetInteraction', 'rememberTargetInteraction', 'onCellClick']) {
+    vm.runInContext(runtimeFunction(readBattlePage(), name), context)
+  }
+  vm.runInContext('onCellClick(2,1)', context)
   expect(submit.mock.calls[0][0]).toMatchObject({type:'pendingTargetSelect',playerId:'caster',targetX:2,targetY:1,selectionId:'march'})
+  expect(context.targetSubmissionDraft.skill.preparation.selectionId).toBe('march')
 })
 
 describe('battle page runtime source', () => {
