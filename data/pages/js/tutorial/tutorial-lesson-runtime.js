@@ -67,7 +67,56 @@
     let openingStep = opening ? 'welcome' : 'free'
     let openingObjective = ''
     let deployedPieceId = null
+    let tutorialAiContinuation = null
+    let tutorialAiActionsTaken = 0
+    let tutorialAiTurnKey = ''
+    const ordinaryTutorialAiActions = new Set(['move', 'useBasicSkill', 'useChargeSkill', 'playCard', 'endTurn'])
     function teaching() { return !!opening && openingStep !== 'free' }
+    function normalizePlayer(value) { return String(value || '').trim().toLowerCase() }
+    function samePlayer(left, right) { return normalizePlayer(left) === normalizePlayer(right) }
+    function tutorialClock() {
+      return global.performance && typeof global.performance.now === 'function'
+        ? global.performance.now() : Date.now()
+    }
+    function currentTurnKey(state) {
+      const turn = state && state.turn || {}
+      return String(turn.turnNumber) + ':' + normalizePlayer(turn.currentPlayerId)
+    }
+    function authorityStateToken(engine, state) {
+      if (!engine || typeof engine.hashBattleState !== 'function') throw new Error('教程 AI 缺少权威状态哈希')
+      return 'hash:' + engine.hashBattleState(state)
+    }
+    function resolveTutorialRootSeed(engine, state) {
+      const lessonSeed = Number.isSafeInteger(lesson.rootSeed) && lesson.rootSeed >= 0 && lesson.rootSeed <= 0xffffffff
+        ? lesson.rootSeed >>> 0 : undefined
+      const tracedSeed = engine && typeof engine.getBattleRootSeed === 'function'
+        ? engine.getBattleRootSeed(state) : undefined
+      const normalizedTrace = Number.isSafeInteger(tracedSeed) && tracedSeed >= 0 && tracedSeed <= 0xffffffff
+        ? tracedSeed >>> 0 : undefined
+      if (lessonSeed !== undefined && normalizedTrace !== undefined && lessonSeed !== normalizedTrace) {
+        throw new Error('教程权威根种子不一致')
+      }
+      const rootSeed = lessonSeed !== undefined ? lessonSeed : normalizedTrace
+      if (rootSeed === undefined) throw new Error('教程缺少权威根种子')
+      return rootSeed
+    }
+    function resetTutorialAiBudgetIfNeeded(state) {
+      const nextKey = currentTurnKey(state)
+      if (tutorialAiTurnKey !== nextKey) {
+        tutorialAiTurnKey = nextKey
+        tutorialAiContinuation = null
+        tutorialAiActionsTaken = 0
+      }
+    }
+    function includeTutorialAiSubmissionTime(decision, elapsedMs) {
+      if (!decision || !decision.continuation || !Number.isFinite(elapsedMs) || elapsedMs <= 0) return
+      const previous = Number.isFinite(decision.continuation.elapsedMs) ? decision.continuation.elapsedMs : 0
+      tutorialAiContinuation = Object.assign({}, decision.continuation, { elapsedMs: previous + elapsedMs })
+    }
+    function clearOpponentPresentation() {
+      opponentNote = ''
+      hooks.setCue(teachingCue)
+    }
     function openingPiece(enemy) {
       return (hooks.getState().pieces || []).find(function (piece) {
         return piece.templateId === (enemy ? opening.targetTemplateId : opening.templateId)
@@ -331,11 +380,138 @@
       })
       return changes.length ? '。' + changes.slice(0, 3).join('；') + (changes.length > 3 ? '等' : '') : ''
     }
+    async function pumpTutorialSearchAction(engine, state, owner) {
+      resetTutorialAiBudgetIfNeeded(state)
+      const expectedState = state
+      const expectedOwner = owner
+      const decisionStarted = tutorialClock()
+      const expectedToken = authorityStateToken(engine, state)
+      const rootSeed = resolveTutorialRootSeed(engine, state)
+      if (typeof engine.planTutorialAiAction !== 'function') throw new Error('教程 AI 规划器不可用')
+      const decision = engine.planTutorialAiAction(state, owner, rootSeed, {
+        continuation: tutorialAiContinuation,
+        actionsTakenThisTurn: tutorialAiActionsTaken,
+        now: tutorialClock,
+      })
+      if (!decision || !decision.nextAction || !decision.nextAction.action) {
+        const reason = decision && decision.stopReason ? '（' + decision.stopReason + '）' : ''
+        throw new Error('教程 AI 未找到可执行指令' + reason)
+      }
+      if (!decision.continuation) throw new Error('教程 AI 未返回可继续的搜索预算')
+      const decisionElapsed = Number.isFinite(decision.elapsedMs) ? decision.elapsedMs : 0
+      const measuredDecisionElapsed = Math.max(0, tutorialClock() - decisionStarted)
+      // Preserve the search continuation before pacing. A stale authority
+      // snapshot still consumed search work and must not silently reset it.
+      tutorialAiContinuation = decision.continuation
+      const action = decision.nextAction.action
+      if (action.playerId !== undefined && !samePlayer(action.playerId, expectedOwner)) {
+        throw new Error('教程 AI 选择了错误行动方的指令')
+      }
+      const opponentAction = !samePlayer(owner, lesson.player.playerId)
+      const phaseOnly = action.type === 'beginPhase'
+      const description = describeOpponentAction(action, state)
+      if (opponentAction) {
+        opponentNote = '看这里：' + description
+        hooks.setCue(opponentCue(action, state))
+        render()
+        await pause(phaseOnly ? 350 : 1000)
+      }
+      if (disposed) return 'disposed'
+      const submissionStarted = tutorialClock()
+      const latest = hooks.getState()
+      const latestOwner = engine.getCurrentInputOwnerPlayerId(latest)
+      const latestToken = authorityStateToken(engine, latest)
+      if (latest !== expectedState || !samePlayer(latestOwner, expectedOwner)
+        || latestToken !== expectedToken) {
+        const submissionElapsed = Math.max(0, tutorialClock() - submissionStarted)
+        includeTutorialAiSubmissionTime(decision, submissionElapsed + Math.max(0, measuredDecisionElapsed - decisionElapsed))
+        clearOpponentPresentation()
+        return 'stale'
+      }
+      const before = latest
+      try {
+        const result = await hooks.commit(action)
+        if (result && result.accepted === false) throw new Error(result.error && result.error.message || '权威提交拒绝了行动')
+      } catch (error) {
+        const reason = error && error.code ? ' [' + error.code + ']' : ''
+        throw new Error('教程 AI 选定行动被权威拒绝' + reason + '：' + (error && error.message || String(error)))
+      }
+      if (disposed) return 'disposed'
+      const submissionElapsed = Math.max(0, tutorialClock() - submissionStarted)
+      includeTutorialAiSubmissionTime(decision, submissionElapsed + Math.max(0, measuredDecisionElapsed - decisionElapsed))
+      if (ordinaryTutorialAiActions.has(action.type) && action.playerId !== undefined
+        && samePlayer(action.playerId, expectedOwner)) tutorialAiActionsTaken += 1
+      if (opponentAction) {
+        opponentNote = description + describeResult(before, hooks.getState())
+        render()
+        await pause(phaseOnly ? 700 : 2000)
+        if (disposed) return 'disposed'
+        clearOpponentPresentation()
+      }
+      observe(action, before)
+      return 'accepted'
+    }
+    async function pumpLegacyAction(engine, state, owner) {
+      const plan = engine.planBotActions(state, owner)
+      if (!plan || !Array.isArray(plan.actions) || !plan.actions.length) throw new Error('当前局面没有可执行的人机行动')
+      const humanStructural = samePlayer(owner, lesson.player.playerId)
+      if (humanStructural && plan.kind !== 'structural') throw new Error('旧 AI 只能推进人类结构阶段')
+      let applied = false
+      let stale = false
+      for (const draft of plan.actions) {
+        if (disposed) return 'disposed'
+        const current = hooks.getState()
+        if (current.terminalResult || !samePlayer(engine.getCurrentInputOwnerPlayerId(current), owner)) break
+        const expectedToken = authorityStateToken(engine, current)
+        const action = engine.prepareLegalBotAction(current, draft, owner)
+        if (!action) continue
+        if (humanStructural && ordinaryTutorialAiActions.has(action.type)) throw new Error('旧 AI 不得替代人类普通行动')
+        const opponentAction = !samePlayer(owner, lesson.player.playerId)
+        const phaseOnly = action.type === 'beginPhase'
+        const description = describeOpponentAction(action, current)
+        if (opponentAction) {
+          opponentNote = '看这里：' + description
+          hooks.setCue(opponentCue(action, current))
+          render()
+          await pause(phaseOnly ? 350 : 1000)
+        }
+        if (disposed) return 'disposed'
+        const latest = hooks.getState()
+        if (latest !== current || !samePlayer(engine.getCurrentInputOwnerPlayerId(latest), owner)
+          || authorityStateToken(engine, latest) !== expectedToken) {
+          clearOpponentPresentation()
+          stale = true
+          break
+        }
+        const before = latest
+        try {
+          await hooks.commit(action)
+        } catch (error) {
+          if (!error || error.name !== 'BattleRuleError') throw error
+          history.push({ key: 'ai-rejected', text: error.message, turn: before.turn.turnNumber, action: action })
+          continue
+        }
+        if (disposed) return 'disposed'
+        applied = true
+        if (opponentAction) {
+          opponentNote = description + describeResult(before, hooks.getState())
+          render()
+          await pause(phaseOnly ? 700 : 2000)
+          if (disposed) return 'disposed'
+          clearOpponentPresentation()
+        }
+        observe(action, before)
+      }
+      if (stale) return 'stale'
+      if (!applied) throw new Error('人机计划已失效，请重新开始本局')
+      return 'accepted'
+    }
     async function pump() {
       if (busy || disposed || !started || failure) return
       busy = true; render()
       try {
         const engine = await hooks.engine()
+        if (disposed) return
         // Bound malfunctioning policies; interruption must never turn into a fabricated loss.
         for (let count = 0; count < 200; count++) {
           if (disposed) return
@@ -343,48 +519,18 @@
           if (state.terminalResult) { showResult(); return }
           const owner = engine.getCurrentInputOwnerPlayerId(state)
           const awaitingChoice = !!state.pendingOptionSelection || !!state.pendingTargetSelection || state.deployment && state.deployment.status === 'awaiting-reserve-deploy'
-          if (owner === lesson.player.playerId && (state.turn.phase === 'action' || awaitingChoice)) return
-          const plan = engine.planBotActions(state, owner)
-          if (!plan || !plan.actions.length) throw new Error('当前局面没有可执行的人机行动')
-          let applied = false
-          for (const draft of plan.actions) {
-            if (disposed || hooks.getState().terminalResult || engine.getCurrentInputOwnerPlayerId(hooks.getState()) !== owner) break
-            const action = engine.prepareLegalBotAction(hooks.getState(), draft, owner)
-            if (!action) continue
-            const opponentAction = owner !== lesson.player.playerId
-            const phaseOnly = action.type === 'beginPhase'
-            const description = describeOpponentAction(action, hooks.getState())
-            if (opponentAction) {
-              opponentNote = '看这里：' + description
-              hooks.setCue(opponentCue(action, hooks.getState()))
-              render()
-              await pause(phaseOnly ? 350 : 1000)
-            }
-            if (disposed) return
-            const before = hooks.getState()
-            try {
-              await hooks.commit(action)
-            } catch (error) {
-              if (!error || error.name !== 'BattleRuleError') throw error
-              // A rejected draft leaves the authority unchanged. Continue the validated
-              // batch (which contains endTurn), recording the cause for AI diagnostics.
-              history.push({ key: 'ai-rejected', text: error.message, turn: before.turn.turnNumber, action: action })
-              continue
-            }
-            if (disposed) return
-            applied = true
-            if (opponentAction) {
-              opponentNote = description + describeResult(before, hooks.getState())
-              render()
-              // Keep this result visible before another action or turn replaces it.
-              await pause(phaseOnly ? 700 : 2000)
-              if (disposed) return
-              opponentNote = ''
-              hooks.setCue(teachingCue)
-            }
-            observe(action, before)
-          }
-          if (!applied) throw new Error('人机计划已失效，请重新开始本局')
+          const humanOwner = samePlayer(owner, lesson.player.playerId)
+          if (humanOwner && (state.turn.phase === 'action' || awaitingChoice)) return
+
+          // Staged openings retain their carefully paced demonstration. During free
+          // play the new planner owns exactly one opponent action per iteration.
+          const stagedOpponent = teaching() && !humanOwner
+          const humanStructural = humanOwner && !awaitingChoice && state.turn.phase !== 'action'
+          const result = stagedOpponent || humanStructural
+            ? await pumpLegacyAction(engine, state, owner)
+            : humanOwner ? 'waiting' : await pumpTutorialSearchAction(engine, state, owner)
+          if (result === 'disposed' || result === 'waiting') return
+          if (result === 'stale') continue
         }
         throw new Error('人机行动超过本次安全上限')
       } catch (error) {
