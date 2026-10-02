@@ -28,6 +28,44 @@
    meta.innerHTML=meta.dataset.cancelOriginalHtml;delete meta.dataset.cancelOriginalHtml;meta.classList.remove('character-cast-cancel-label');meta.classList.remove('character-cast-cancel-disabled-label');
   }
  }
+  function skillCardClickTargetAllowed(target){
+   if(!target||typeof target.closest!=='function')return true;
+   return !target.closest('.character-cast,.keyword-badge,.pi-keywords,#targetSelectionControls,.character-cast-reason,button,a,input,select,textarea,[contenteditable="true"],[role="button"]');
+  }
+  function bindSkillCardActivation(row){
+   if(!row||!row.dataset||row.dataset.skillCardClickBound==='true')return;
+   row.dataset.skillCardClickBound='true';
+   let pointerId=null,startX=0,startY=0;
+   row.addEventListener('pointerdown',event=>{
+    if(event.button!==undefined&&event.button!==0)return;
+    if(event.isPrimary===false)return;
+    pointerId=event.pointerId;startX=event.clientX||0;startY=event.clientY||0;delete row.dataset.skillCardPointerMoved;
+   });
+   row.addEventListener('pointermove',event=>{
+    if(pointerId===null||event.pointerId!==pointerId)return;
+    if(Math.abs((event.clientX||0)-startX)>8||Math.abs((event.clientY||0)-startY)>8)row.dataset.skillCardPointerMoved='true';
+   });
+   row.addEventListener('pointerup',event=>{
+    if(pointerId===null||event.pointerId!==pointerId)return;
+    pointerId=null;
+   });
+   row.addEventListener('pointercancel',event=>{
+    if(pointerId===null||event.pointerId!==pointerId)return;
+    pointerId=null;
+    // A cancelled pointer must not synthesize a card activation. Keep the
+    // marker until the click path consumes it or a new pointer starts.
+    row.dataset.skillCardPointerMoved='true';
+   });
+   row.addEventListener('click',event=>{
+    if(event.defaultPrevented||(event.button!==undefined&&event.button!==0)||!skillCardClickTargetAllowed(event.target))return;
+    if(row.dataset.skillCardPointerMoved==='true'){delete row.dataset.skillCardPointerMoved;return;}
+    const selection=window.getSelection&&window.getSelection();
+    if(selection&&String(selection).trim())return;
+    const button=row.querySelector('.character-cast');
+    if(!button||button.disabled||typeof button.click!=='function')return;
+    button.click();
+   });
+  }
  function refreshActions(piece){
   const records=pieceInfoDisplaySkills(piece),rows=[...document.querySelectorAll('#pieceInfoContent .pi-skill')];
   const owned=!!myPlayerId&&String(piece.ownerPlayerId||'').toLowerCase()===String(myPlayerId).toLowerCase();
@@ -70,6 +108,7 @@
    const targetControls=row.querySelector('#targetSelectionControls');
    const controlsBetween=!!(targetControls&&targetControls.parentElement===row&&button.nextElementSibling===targetControls&&targetControls.nextElementSibling===description);
    if(description&&button.nextElementSibling!==description&&!controlsBetween)row.insertBefore(button,description);
+    bindSkillCardActivation(row);
    button.dataset.skillId=id;
    const cancelMode=isTargeting&&cancelAllowed;
    const cancelStateLabel=isTargeting?(targetSubmissionPending?'等待确认…':!cancelAllowed?'当前选择不可取消':''):'';

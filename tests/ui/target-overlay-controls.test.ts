@@ -285,6 +285,70 @@ describe('target prompt and controls separation', () => {
     expect(meta.dataset.cancelOriginalHtml).toBeUndefined()
   })
 
+  it('forwards active-card body clicks but ignores controls, text selection and scroll gestures', async () => {
+    const listeners: Record<string, Array<(event: Record<string, unknown>) => void>> = {}
+    const button = Object.assign(element(), {
+      dataset: {} as Record<string, string>,
+      click: vi.fn(),
+    })
+    let activeButton: typeof button | null = button
+    const row = Object.assign(element(), {
+      dataset: {} as Record<string, string>,
+      addEventListener: (type: string, listener: (event: Record<string, unknown>) => void) => {
+        ;(listeners[type] ||= []).push(listener)
+      },
+      querySelector: (selector: string) => selector === '.character-cast' ? activeButton : null,
+      dispatch: (type: string, event: Record<string, unknown>) => {
+        ;(listeners[type] || []).forEach(listener => listener(event))
+      },
+    })
+    let selectionText = ''
+    const context = createContext({
+      row,
+      window: { getSelection: () => ({ toString: () => selectionText }) },
+    })
+    new Script(`${characterSource('skillCardClickTargetAllowed')}\n${characterSource('bindSkillCardActivation')}\nbindSkillCardActivation(row)`).runInContext(context)
+
+    const blank = { closest: () => null }
+    const keyword = { closest: () => ({}) }
+    const pointer = { button: 0, isPrimary: true, pointerId: 1, clientX: 0, clientY: 0 }
+    row.dispatch('pointerdown', pointer)
+    row.dispatch('pointerup', pointer)
+    row.dispatch('click', { target: blank, button: 0, defaultPrevented: false })
+    expect(button.click).toHaveBeenCalledOnce()
+
+    row.dispatch('click', { target: keyword, button: 0, defaultPrevented: false })
+    expect(button.click).toHaveBeenCalledOnce()
+
+    selectionText = '选中的技能说明'
+    row.dispatch('click', { target: blank, button: 0, defaultPrevented: false })
+    expect(button.click).toHaveBeenCalledOnce()
+    selectionText = ''
+
+    row.dispatch('pointerdown', pointer)
+    row.dispatch('pointermove', { ...pointer, clientX: 20 })
+    row.dispatch('pointerup', { ...pointer, clientX: 20 })
+    await new Promise(resolve => setTimeout(resolve, 0))
+    row.dispatch('click', { target: blank, button: 0, defaultPrevented: false })
+    expect(button.click).toHaveBeenCalledOnce()
+
+    const cancelledPointer = { ...pointer, pointerId: 2 }
+    row.dispatch('pointerdown', cancelledPointer)
+    row.dispatch('pointercancel', cancelledPointer)
+    await new Promise(resolve => setTimeout(resolve, 0))
+    row.dispatch('click', { target: blank, button: 0, defaultPrevented: false })
+    expect(button.click).toHaveBeenCalledOnce()
+
+    row.dispatch('pointerdown', pointer)
+    row.dispatch('pointerup', pointer)
+    row.dispatch('click', { target: blank, button: 0, defaultPrevented: false })
+    expect(button.click).toHaveBeenCalledTimes(2)
+
+    activeButton = null
+    row.dispatch('click', { target: blank, button: 0, defaultPrevented: false })
+    expect(button.click).toHaveBeenCalledTimes(2)
+  })
+
   it('keeps the fallback cancel control when a matching skill row is closed', () => {
     const overlay = element()
     const prompt = element()

@@ -364,6 +364,19 @@ async function runElectronSmoke() {
     win.webContents.sendInputEvent({ type: 'mouseUp', x: point.x, y: point.y, button: 'left', clickCount: 1 })
     await delay(130)
   }
+  const mouseDrag = async (start, end, steps = 6) => {
+    win.webContents.sendInputEvent({ type: 'mouseMove', x: start.x, y: start.y, movementX: 0, movementY: 0 })
+    win.webContents.sendInputEvent({ type: 'mouseDown', x: start.x, y: start.y, button: 'left', clickCount: 1 })
+    for (let index = 1; index <= steps; index += 1) {
+      const progress = index / steps
+      const x = Math.round(start.x + (end.x - start.x) * progress)
+      const y = Math.round(start.y + (end.y - start.y) * progress)
+      win.webContents.sendInputEvent({ type: 'mouseMove', x, y, movementX: 0, movementY: 0 })
+      await delay(20)
+    }
+    win.webContents.sendInputEvent({ type: 'mouseUp', x: end.x, y: end.y, button: 'left', clickCount: 1 })
+    await delay(180)
+  }
   const cdp = async (method, params) => {
     if (!debuggerAttached) {
       win.webContents.debugger.attach('1.3')
@@ -484,19 +497,87 @@ async function runElectronSmoke() {
     const activeDomCheck = await evaluate(`(() => Array.from(document.querySelectorAll('#pieceInfoContent .pi-skill')).filter(row => row.querySelector('.character-cast')).every(row => row.querySelector('.character-cast')?.contains(row.querySelector('.pi-skill-header'))))()`)
     ensure(activeDomCheck, `RED-225: skill action is separate from its title row, so the title cannot be the single reading/release affordance: ${JSON.stringify(before)}`)
 
-    const visibleDescriptionPoint = await pointFor(`(() => {
-      const description = Array.from(document.querySelectorAll('#pieceInfoContent .pi-skill-desc')).find(element => {
-        const r = element.getBoundingClientRect();
-        return r.width > 0 && r.height > 0 && r.top >= 0 && r.bottom <= innerHeight;
-      })
-      if (!description) return null
-      const r = description.getBoundingClientRect()
-      return { x: r.left + Math.min(24, r.width / 2), y: r.top + r.height / 2 }
-    })()`, 'visible skill description')
-    const beforeRead = await snapshot('red225-before-description-read')
-    await mouseAt(visibleDescriptionPoint)
-    const afterDescriptionRead = await snapshot('red225-after-description-read')
-    ensure(afterDescriptionRead.pendingSkill === beforeRead.pendingSkill && afterDescriptionRead.trainingPutCalls === beforeRead.trainingPutCalls, `RED-225: reading a description changed skill selection or submitted an action: ${JSON.stringify({ beforeRead, afterDescriptionRead })}`)
+    const findActiveDescriptionPoint = async () => pointFor(`(() => {
+      const row = Array.from(document.querySelectorAll('#pieceInfoContent .pi-skill')).find(element => element.querySelector('.character-cast[data-skill-id="venom-claw-rend"]'))
+      const description = row?.querySelector('.pi-skill-desc')
+      if (!row || !description) return null
+      const sheet = row.closest('.pi-sheet')
+      const sheetRect = sheet?.getBoundingClientRect()
+      let r = description.getBoundingClientRect()
+      if (r.top < 0 || r.bottom > innerHeight || (sheetRect && (r.top < sheetRect.top || r.bottom > sheetRect.bottom))) {
+        row.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+        r = description.getBoundingClientRect()
+      }
+      return { x: r.left + Math.min(14, Math.max(4, r.width / 5)), y: r.top + r.height / 2 }
+    })()`, 'active skill description')
+    const activeDescriptionPoint = await findActiveDescriptionPoint()
+    const findActiveBlankInput = async () => evaluate(`(() => {
+      const row = Array.from(document.querySelectorAll('#pieceInfoContent .pi-skill')).find(element => element.querySelector('.character-cast[data-skill-id="venom-claw-rend"]'))
+      if (!row) return null
+      const r = row.getBoundingClientRect()
+      const ignored = element => element?.closest?.('.character-cast,.pi-skill-header,.pi-skill-desc,.keyword-badge,.pi-keywords,#targetSelectionControls,.character-cast-reason,button,a,input,select,textarea,[contenteditable="true"],[role="button"]')
+      const candidates = []
+      for (const yRatio of [0.08, 0.18, 0.82, 0.9, 0.96]) {
+        for (const xRatio of [0.03, 0.12, 0.88, 0.97]) candidates.push({ x: r.left + r.width * xRatio, y: r.top + r.height * yRatio })
+      }
+      const isInsideViewport = candidate => candidate.x >= 1 && candidate.y >= 1 && candidate.x < innerWidth - 1 && candidate.y < innerHeight - 1
+      const point = candidates.find(candidate => {
+        if (!isInsideViewport(candidate)) return false
+        const hit = document.elementFromPoint(candidate.x, candidate.y)
+        return hit && hit.closest?.('.pi-skill') === row && !ignored(hit)
+      }) || candidates.find(candidate => {
+        if (!isInsideViewport(candidate)) return false
+        const hit = document.elementFromPoint(candidate.x, candidate.y)
+        return hit && hit.closest?.('.pi-skill') === row
+      }) || null
+      if (!point) return { rowRect: { left: r.left, top: r.top, right: r.right, bottom: r.bottom, width: r.width, height: r.height }, hit: null }
+      const hit = document.elementFromPoint(point.x, point.y)
+      return { ...point, rowRect: { left: r.left, top: r.top, right: r.right, bottom: r.bottom, width: r.width, height: r.height }, hit: hit && { tag: hit.tagName, className: String(hit.className || ''), insideRow: hit.closest?.('.pi-skill') === row, ignored: !!ignored(hit) } }
+    })()`)
+    const activeBlankInput = await findActiveBlankInput()
+    ensure(activeBlankInput && Number.isFinite(activeBlankInput.x) && Number.isFinite(activeBlankInput.y) && activeBlankInput.hit?.insideRow && !activeBlankInput.hit?.ignored, `RED-225: could not locate a real blank point inside the active skill card: ${JSON.stringify(activeBlankInput)}`)
+    const activeBlankPoint = { x: Math.round(activeBlankInput.x), y: Math.round(activeBlankInput.y) }
+    await evaluate(`(() => {
+      const row = Array.from(document.querySelectorAll('#pieceInfoContent .pi-skill')).find(element => element.querySelector('.character-cast[data-skill-id="venom-claw-rend"]'))
+      window.__RED225_CARD_EVENTS = []
+      if (!row) return null
+      const describe = event => {
+        const button = row.querySelector('.character-cast')
+        return { type: event.type, phase: event.eventPhase, defaultPrevented: event.defaultPrevented, buttonDisabled: !!button?.disabled, targetMode: button?.dataset.targetMode || null, target: { tag: event.target?.tagName || null, className: String(event.target?.className || '') }, currentTarget: event.currentTarget === row ? 'row' : String(event.currentTarget?.className || event.currentTarget?.tagName || '') }
+      }
+      for (const type of ['pointerdown', 'pointerup', 'click']) row.addEventListener(type, event => window.__RED225_CARD_EVENTS.push(describe(event)), true)
+      return true
+    })()`)
+    const beforeCardClick = await snapshot('red225-before-card-description-click')
+    await mouseAt(activeDescriptionPoint)
+    const afterDescriptionClick = await snapshot('red225-after-card-description-click')
+    ensure(afterDescriptionClick.pendingSkill?.skillId === 'venom-claw-rend' && afterDescriptionClick.trainingPutCalls === beforeCardClick.trainingPutCalls, `RED-225: clicking the active skill description did not arm the skill card: ${JSON.stringify({ beforeCardClick, afterDescriptionClick, activeDescriptionPoint })}`)
+    await waitFor(`document.querySelector('.character-cast[data-skill-id="venom-claw-rend"]')?.dataset.targetMode === 'cancel'`, 5000, 'active skill card cancel state')
+    const armedBlankInput = await findActiveBlankInput()
+    ensure(armedBlankInput && Number.isFinite(armedBlankInput.x) && Number.isFinite(armedBlankInput.y) && armedBlankInput.hit?.insideRow && !armedBlankInput.hit?.ignored, `RED-225: could not locate a real blank point in the armed active skill card: ${JSON.stringify(armedBlankInput)}`)
+    const armedBlankPoint = { x: Math.round(armedBlankInput.x), y: Math.round(armedBlankInput.y) }
+    await mouseAt(armedBlankPoint)
+    const afterBlankCancel = await snapshot('red225-after-card-blank-cancel')
+    const blankCancelInputDebug = await evaluate('window.__RED225_CARD_EVENTS || []')
+    ensure(!afterBlankCancel.pendingSkill && !afterBlankCancel.targetMode && afterBlankCancel.trainingPutCalls === beforeCardClick.trainingPutCalls && afterBlankCancel.actionPoints === beforeCardClick.actionPoints, `RED-225: clicking the active skill card blank area did not cancel without charging: ${JSON.stringify({ beforeCardClick, afterDescriptionClick, afterBlankCancel, activeBlankPoint, activeBlankInput, armedBlankPoint, armedBlankInput, blankCancelInputDebug })}`)
+    const touchDescriptionPoint = await findActiveDescriptionPoint()
+    await touchAt(touchDescriptionPoint)
+    const touchCardArmed = await snapshot('red225-after-card-description-touch')
+    ensure(touchCardArmed.pendingSkill?.skillId === 'venom-claw-rend' && touchCardArmed.trainingPutCalls === beforeCardClick.trainingPutCalls, `RED-225: touching the active skill description did not arm the skill card: ${JSON.stringify({ touchCardArmed, touchDescriptionPoint })}`)
+    await waitFor(`document.querySelector('.character-cast[data-skill-id="venom-claw-rend"]')?.dataset.targetMode === 'cancel'`, 5000, 'active skill card touch cancel state')
+    const touchBlankInput = await findActiveBlankInput()
+    ensure(touchBlankInput && Number.isFinite(touchBlankInput.x) && Number.isFinite(touchBlankInput.y) && touchBlankInput.hit?.insideRow && !touchBlankInput.hit?.ignored, `RED-225: could not locate a real blank point in the touched active skill card: ${JSON.stringify(touchBlankInput)}`)
+    const touchBlankPoint = { x: Math.round(touchBlankInput.x), y: Math.round(touchBlankInput.y) }
+    await touchAt(touchBlankPoint)
+    const touchCardCancelled = await snapshot('red225-after-card-blank-touch-cancel')
+    ensure(!touchCardCancelled.pendingSkill && !touchCardCancelled.targetMode && touchCardCancelled.trainingPutCalls === beforeCardClick.trainingPutCalls && touchCardCancelled.actionPoints === beforeCardClick.actionPoints, `RED-225: touching the active skill card blank area did not cancel without charging: ${JSON.stringify({ touchCardArmed, touchCardCancelled, touchBlankPoint, touchBlankInput })}`)
+    await cdp('Emulation.setTouchEmulationEnabled', { enabled: false })
+    await evaluate('window.getSelection?.()?.removeAllRanges?.(); true')
+    const textDescriptionPoint = await findActiveDescriptionPoint()
+    const textDragEnd = { x: textDescriptionPoint.x + 40, y: textDescriptionPoint.y + 2 }
+    await mouseDrag(textDescriptionPoint, textDragEnd)
+    const afterDescriptionDrag = await snapshot('red225-after-description-text-drag')
+    ensure(!afterDescriptionDrag.pendingSkill && afterDescriptionDrag.trainingPutCalls === beforeCardClick.trainingPutCalls, `RED-225: selecting/dragging description text triggered skill activation: ${JSON.stringify({ afterDescriptionDrag, textDescriptionPoint, textDragEnd })}`)
 
     const sheetPoint = await pointFor(`(() => {
       const visible = element => {
@@ -582,8 +663,8 @@ async function runElectronSmoke() {
         scrollFallback = { used: true, windowVisible: win.isVisible(), wheelEvents: await evaluate('window.__RED225_WHEEL_EVENTS || []') }
       }
       ensure(scrollAfter.sheet.scrollTop > scrollBefore.sheet.scrollTop, `RED-225: skill list did not scroll internally: ${JSON.stringify({ scrollBefore, scrollAfter, sheetPoint, wheelDebug, wheelEvents, scrollFallback })}`)
-      const afterScrollRead = await snapshot('red225-after-description-scroll')
-      ensure(!afterScrollRead.pendingSkill && afterScrollRead.trainingPutCalls === beforeRead.trainingPutCalls, `RED-225: scrolling the description list changed skill selection or submitted an action: ${JSON.stringify(afterScrollRead)}`)
+       const afterScrollRead = await snapshot('red225-after-description-scroll')
+       ensure(!afterScrollRead.pendingSkill && afterScrollRead.trainingPutCalls === beforeCardClick.trainingPutCalls, `RED-225: scrolling the description list changed skill selection or submitted an action: ${JSON.stringify(afterScrollRead)}`)
       before.scrollAfter = scrollAfter
     } else {
       before.scrollGap = 'List fits viewport for this 3-skill fixture; long-list scroll is covered by the UI suite.'
@@ -604,30 +685,59 @@ async function runElectronSmoke() {
       await delay(180)
       alternateLayout = await inspectSkillLayout('desktop-muzan-four-skill-read')
       ensure(alternateLayout.rows.length >= 4 && alternateLayout.rows.some(row => row.passive), `RED-225: four-skill/passive reading fixture was not rendered as one list: ${JSON.stringify(alternateLayout)}`)
-      const keywordPoint = await evaluate(`(() => {
-        const badge = Array.from(document.querySelectorAll('#pieceInfoContent .keyword-badge')).find(element => {
-          const r = element.getBoundingClientRect()
-          return r.width > 0 && r.height > 0 && r.top >= 0 && r.bottom <= innerHeight
-        })
-        if (!badge) return null
-        const r = badge.getBoundingClientRect()
-        return { x: r.left + r.width / 2, y: r.top + r.height / 2 }
+      const passiveDescriptionPoint = await evaluate(`(() => {
+        const row = Array.from(document.querySelectorAll('#pieceInfoContent .pi-skill')).find(element => !element.querySelector('.character-cast') && element.querySelector('.pi-skill-desc'))
+        const description = row?.querySelector('.pi-skill-desc')
+        if (!row || !description) return null
+        row.scrollIntoView({ block: 'center', inline: 'nearest' })
+        const r = description.getBoundingClientRect()
+        return { x: r.left + Math.min(14, Math.max(4, r.width / 5)), y: r.top + r.height / 2, rowText: row.textContent?.trim() || '' }
       })()`)
-      if (keywordPoint) {
-        keywordRead.attempted = true
-        const beforeKeyword = await snapshot('red225-before-keyword-read')
-        await mouseAt(keywordPoint)
-        const afterKeyword = await snapshot('red225-after-keyword-read')
-        ensure(!afterKeyword.pendingSkill && afterKeyword.trainingPutCalls === beforeKeyword.trainingPutCalls, `RED-225: reading a keyword changed skill selection or submitted an action: ${JSON.stringify({ beforeKeyword, afterKeyword })}`)
-        keywordRead.result = await evaluate(`(() => ({ open: !!document.querySelector('#pieceKeywordPanel.is-keyword-open'), text: document.getElementById('pieceKeywordPanel')?.textContent || '' }))()`)
-        ensure(keywordRead.result.open, `RED-225: keyword read did not open its existing explanation panel: ${JSON.stringify(keywordRead)}`)
+      if (passiveDescriptionPoint) {
+        const beforePassive = await snapshot('red225-before-passive-card-click')
+        await mouseAt(passiveDescriptionPoint)
+        const afterPassive = await snapshot('red225-after-passive-card-click')
+        ensure(!afterPassive.pendingSkill && !afterPassive.pendingCardAction && afterPassive.trainingPutCalls === beforePassive.trainingPutCalls, `RED-225: clicking a passive skill description created an action: ${JSON.stringify({ beforePassive, afterPassive, passiveDescriptionPoint })}`)
+        alternateLayout.passiveClick = { beforePassive, afterPassive, passiveDescriptionPoint }
+      } else {
+        alternateLayout.passiveClick = { skipped: true, reason: 'No visible passive description point' }
       }
+      const keywordBadgeSelector = '#pieceInfoContent .keyword-badge[data-scope="piece"]'
+      const keywordBadge = await evaluate(`(() => {
+        const badge = document.querySelector(${JSON.stringify(keywordBadgeSelector)})
+        if (!badge) return null
+        badge.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+        return { text: badge.textContent?.trim() || '', found: true }
+      })()`)
+      ensure(keywordBadge?.found, `RED-225: no piece keyword badge was rendered for independent keyword reading: ${JSON.stringify(alternateLayout)}`)
+      await delay(120)
+      const keywordInput = await evaluate(`(() => {
+        const badge = document.querySelector(${JSON.stringify(keywordBadgeSelector)})
+        const sheet = badge?.closest('.pi-sheet')
+        const rect = badge?.getBoundingClientRect()
+        const sheetRect = sheet?.getBoundingClientRect()
+        const point = rect && { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }
+        const hit = point && document.elementFromPoint(point.x, point.y)
+        const style = badge ? getComputedStyle(badge) : null
+        const centerInSheet = !sheetRect || (point.x >= sheetRect.left && point.x <= sheetRect.right && point.y >= sheetRect.top && point.y <= sheetRect.bottom)
+        const visible = !!badge && !!rect && rect.width > 0 && rect.height > 0 && style.display !== 'none' && style.visibility !== 'hidden' && point.x >= 0 && point.y >= 0 && point.x <= innerWidth && point.y <= innerHeight && centerInSheet
+        return { visible, text: badge?.textContent?.trim() || '', rect: rect && { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom, width: rect.width, height: rect.height }, sheetRect: sheetRect && { left: sheetRect.left, top: sheetRect.top, right: sheetRect.right, bottom: sheetRect.bottom }, point, hit: hit && { tag: hit.tagName, className: String(hit.className || ''), isBadge: hit === badge || badge?.contains(hit) } }
+      })()`)
+      ensure(keywordInput?.visible && keywordInput.hit?.isBadge, `RED-225: piece keyword badge was not physically hittable after scrolling: ${JSON.stringify(keywordInput)}`)
+      const keywordPoint = { x: Math.round(keywordInput.point.x), y: Math.round(keywordInput.point.y) }
+      keywordRead.attempted = true
+      const beforeKeyword = await snapshot('red225-before-keyword-read')
+      await mouseAt(keywordPoint)
+      const afterKeyword = await snapshot('red225-after-keyword-read')
+      ensure(!afterKeyword.pendingSkill && afterKeyword.trainingPutCalls === beforeKeyword.trainingPutCalls, `RED-225: reading a keyword changed skill selection or submitted an action: ${JSON.stringify({ beforeKeyword, afterKeyword, keywordInput })}`)
+      keywordRead.result = await evaluate(`(() => ({ open: !!document.querySelector('#pieceKeywordPanel.is-keyword-open'), text: document.getElementById('pieceKeywordPanel')?.textContent || '' }))()`)
+      ensure(keywordRead.result.open, `RED-225: keyword read did not open its existing explanation panel: ${JSON.stringify({ keywordRead, keywordInput })}`)
     }
     await evaluate(`(() => { if (typeof showPieceInfo === 'function') showPieceInfo(${JSON.stringify(fixture.casterId)}, false); return true })()`)
     await delay(160)
     const restored = await inspectSkillLayout('desktop-caster-restored')
     ensure(restored.pieceId === fixture.casterId && restored.modal.visible, `RED-225: returning from cross-skill reading did not restore the caster sheet: ${JSON.stringify(restored)}`)
-    return { before, afterDescriptionRead, alternate: alternateLayout, keywordRead, restored }
+    return { before, cardClick: { beforeCardClick, afterDescriptionClick, activeDescriptionPoint, activeBlankPoint, activeBlankInput, armedBlankPoint, armedBlankInput, afterBlankCancel, blankCancelInputDebug, touchDescriptionPoint, touchCardArmed, touchBlankPoint, touchBlankInput, touchCardCancelled, textDescriptionPoint, textDragEnd, afterDescriptionDrag }, alternate: alternateLayout, keywordRead, restored }
   }
 
   // RED-225 target feedback is intentionally split from the reading surface:

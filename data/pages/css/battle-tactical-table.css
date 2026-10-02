@@ -749,12 +749,23 @@ canvas:focus-visible {
 .piece-context-skill, .character-cast { touch-action: none; }
 
 /* RED-225: keep the existing character sheet as the reading surface while
-   making the title row the shared click/drag affordance.  The existing action
-   button owns the title and cost; body copy, keywords and scrolling remain
-   outside that button. */
+   making each active skill card a click affordance. The existing action
+   button still owns the title, cost and drag entry; body copy remains text
+   selectable and keyword/target controls keep their own interaction. */
 body.character-dock-open #pieceInfoModal.character-dock .pi-skill:has(.character-cast) {
   position: relative !important;
   padding-bottom: 10px !important;
+  cursor: pointer;
+}
+
+body.character-dock-open #pieceInfoModal.character-dock .pi-skill:has(.character-cast) .pi-skill-desc {
+  cursor: text;
+  user-select: text;
+}
+
+body.character-dock-open #pieceInfoModal.character-dock .pi-skill:has(.character-cast) .pi-keywords,
+body.character-dock-open #pieceInfoModal.character-dock .pi-skill:has(.character-cast) #targetSelectionControls {
+  cursor: default;
 }
 
 body.character-dock-open #pieceInfoModal.character-dock .pi-skill:has(.character-cast) .character-cast {
