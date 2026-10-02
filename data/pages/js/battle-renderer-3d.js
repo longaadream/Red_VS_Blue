@@ -2198,6 +2198,13 @@
     })
   }
 
+  // Acknowledge submission without rebuilding the board or predicting its result.
+  function setPendingFeedback(pieceId) {
+    if (!_currentModel) return
+    _syncPendingFeedback(Object.assign({}, _currentModel.interaction || {}, { pendingPieceId: pieceId || null }))
+    _invalidate()
+  }
+
   function _pressFeedbackAt(pointerId, clientX, clientY) {
     _releasePressedFeedback()
     const piece = _findPieceFromPointer(clientX, clientY)
@@ -3344,6 +3351,7 @@
     showPreviewBoard,
     clearPreviewBoard,
     animateAction,
+    setPendingFeedback,
     settlePresentation,
     spawnFloater,
     resize,

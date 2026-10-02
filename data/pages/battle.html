@@ -41,6 +41,7 @@
   <script src="js/battle-ui/battle-legal-actions.js"></script>
   <script src="js/battle-ui/battle-skill-preview.js"></script>
   <script src="js/battle-ui/battle-skill-drag.js"></script>
+  <script src="js/battle-ui/battle-dom-patch.js"></script>
   <script src="js/battle-ui/battle-dom-ui.js"></script>
   <script src="js/battle-ui/deployment-status.js"></script>
   <script src="js/battle-ui/battle-tactical-geometry.js"></script>
@@ -1765,7 +1766,7 @@
 
     <!-- Board + actions + log -->
     <div class="main-panel">
-      <div class="phase-bar" data-battle-ui-region="turn-hud">
+      <div class="phase-bar" data-battle-ui-region="turn-hud" data-floater-obstacle>
         <div class="turn-summary">
           <div class="turn-summary-primary">
             <div class="turn-badge" id="turnBadge" aria-live="polite">等待中</div>
@@ -2430,6 +2431,7 @@
       pendingActionFeedbackTimer = null
       const cleared = pendingActionFeedback
       pendingActionFeedback = null
+      if (typeof window !== 'undefined' && window.BattleRenderer3D && window.BattleRenderer3D.setPendingFeedback) window.BattleRenderer3D.setPendingFeedback(null)
       if (cleared) cleared.clearReason = reason || 'cleared'
       return cleared
     }
@@ -2446,6 +2448,7 @@
         pieceId: action.pieceId || action.targetPieceId || selectedPieceId || null,
         startedAt: typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now(),
       }
+      if (typeof window !== 'undefined' && window.BattleRenderer3D && window.BattleRenderer3D.setPendingFeedback) window.BattleRenderer3D.setPendingFeedback(pendingActionFeedback.pieceId)
       pendingActionFeedbackTimer = setTimeout(function () {
         if (!pendingActionFeedback || pendingActionFeedback.clientActionId !== action.clientActionId) return
         pendingActionFeedback.timedOut = true
@@ -6412,8 +6415,17 @@
         document.getElementById('oppLabel').textContent = '[R] 红方'
       }
 
-      document.getElementById('myPieces').innerHTML = myPieces.map(p => renderPieceCard(p, p.ownerPlayerId.toLowerCase() === myPlayerId)).join('')
-      document.getElementById('oppPieces').innerHTML = oppPieces.map(p => renderPieceCard(p, false)).join('')
+      const patchPieces = function (hostId, pieces, isMine) {
+        const host = document.getElementById(hostId)
+        if (!host) return
+        const entries = pieces.map(function (piece) {
+          return { key: String(piece.instanceId), html: renderPieceCard(piece, isMine ? piece.ownerPlayerId.toLowerCase() === myPlayerId : false) }
+        })
+        if (window.BattleDomPatch) window.BattleDomPatch.patchKeyed(host, entries, { datasetKey: 'pieceId' })
+        else host.innerHTML = entries.map(function (entry) { return entry.html }).join('')
+      }
+      patchPieces('myPieces', myPieces, true)
+      patchPieces('oppPieces', oppPieces, false)
 
       const opponentHandStack = document.getElementById('opponentHandStack')
       if (opponentHandStack) {
@@ -6647,7 +6659,7 @@
       document.getElementById('pieceContextHp').textContent = pieceDispHp(piece) + '/' + pieceMaxHp(piece)
       menu.dataset.pieceId = piece.instanceId
 
-      const skillButtons = skills.length ? skills.map(sk => {
+      const skillEntries = skills.length ? skills.map(sk => {
         const sid = skillIdOf(sk)
         const availability = resolveSkillAvailability(piece, sk)
         const skData = availability.skillData
@@ -6671,7 +6683,7 @@
         }
         if (availability.unavailableReason) titleParts.push('不可用：' + availability.unavailableReason)
 
-        return '<button type="button" class="piece-context-skill' + (isCharge ? ' is-charge' : '') +
+        return { key: sid, html: '<button type="button" class="piece-context-skill' + (isCharge ? ' is-charge' : '') +
           '" data-skill-id="' + escHtml(sid) + '"' +
           ' onclick="dispatchBattleIntent({type:\'select-skill\',skillId:this.dataset.skillId})"' +
           ' title="' + escHtml(titleParts.join('\n')) + '"' +
@@ -6681,9 +6693,10 @@
           '<span class="piece-context-skill-cost">' +
             (status || ('行动 ' + apCost + (isCharge ? ' · 充能 ' + skillChargeCostLabel(piece, skData) : ''))) +
             (isCharge && skillHasDynamicChargeCost(skData) ? ' <span class="skill-cost-dynamic">动态</span>' : '') +
-          '</span></button>'
-      }).join('') : '<span class="piece-context-empty">' + (isOwner ? '暂无主动技能' : '查看详情') + '</span>'
-      skillsContainer.innerHTML = skillButtons
+          '</span></button>' }
+      }) : [{ key: 'empty', html: '<span class="piece-context-empty" data-skill-id="empty">' + (isOwner ? '暂无主动技能' : '查看详情') + '</span>' }]
+      if (window.BattleDomPatch) window.BattleDomPatch.patchKeyed(skillsContainer, skillEntries, { datasetKey: 'skillId' })
+      else skillsContainer.innerHTML = skillEntries.map(function (entry) { return entry.html }).join('')
 
       menu.classList.add('is-open')
       menu.setAttribute('aria-hidden', 'false')
@@ -6726,7 +6739,7 @@
         return
       }
 
-      container.innerHTML = hand.map((card, index) => {
+      const handEntries = hand.map((card, index) => {
         const def = getCardDisplayDefinition(card.cardId)
         const cardPresentation = card.presentation && typeof card.presentation === 'object' ? card.presentation : {}
         const isContentEnhanced = cardPresentation.variant === 'enhanced'
@@ -6753,15 +6766,17 @@
           ? cardName + (isHandChoiceCandidate ? (isHandChoiceSelected ? '，已选择' : '，可选择') : '，不可选择')
           : cardName + (cardPresentation.badge ? '，' + cardPresentation.badge : '') + '，行动点 ' + cost
         const arc = window.BattleContextLayout.handArc(index, hand.length)
-        return `<button type="button" class="${cls}" style="--hand-arc-angle:${arc.angle}deg;--hand-arc-lift:${arc.lift}px;--hand-arc-z:${arc.zIndex}"
+        return { key: card.instanceId, html: `<button type="button" class="${cls}" style="--hand-arc-angle:${arc.angle}deg;--hand-arc-lift:${arc.lift}px;--hand-arc-z:${arc.zIndex}"
           data-instance-id="${cid}" aria-label="${escHtml(cardAriaLabel)}" aria-pressed="${isHandSelection ? isHandChoiceSelected : isPending}" aria-disabled="${!canInteract}"${progressiveBlocked ? ' disabled' : ''}
           onclick="if(!consumeCardPressClick('${cid}'))onCardClick('${cid}','${cdid}')"
           ontouchstart="startCardPressTimer(event,'${cid}','${cdid}')"
           ontouchend="clearPressTimer()" ontouchcancel="clearPressTimer()" ontouchmove="moveCardPressTimer(event)"
           oncontextmenu="event.preventDefault();showCardDetail('${cid}','${cdid}')">
           ${renderHandCardFace(card, def)}
-        </button>`
-      }).join('')
+        </button>` }
+      })
+      if (window.BattleDomPatch) window.BattleDomPatch.patchKeyed(container, handEntries, { datasetKey: 'instanceId' })
+      else container.innerHTML = handEntries.map(function (entry) { return entry.html }).join('')
       renderPendingHandSelectionControls()
     }
 

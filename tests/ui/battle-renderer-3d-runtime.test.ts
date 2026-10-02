@@ -41,6 +41,7 @@ type RendererApi = {
   clearPreviewBoard(): void
   settlePresentation(model: unknown, options?: { preserveFloaters: boolean }): void
   animateAction(action: unknown, previousModel: unknown, nextModel: unknown): void
+  setPendingFeedback(pieceId: string | null): void
   resize(): void
   spawnFloater(x: number, y: number, text: string, color: string, big: boolean, options: unknown): void
   resetView(): void
@@ -1254,6 +1255,24 @@ describe('RED-68 BattleRenderer3D runtime', () => {
     expect(colors().some(color => color && color.r > 1)).toBe(false)
     expect(body.material!.emissiveIntensity).toBe(0.08)
     expect(factionRing.material!.emissiveIntensity).toBe(0.3)
+    harness.renderer.dispose()
+  })
+
+  it('acknowledges submission synchronously on the existing token without updating the board', () => {
+    const harness = createHarness(844, 390, false)
+    const model = runtimeModel()
+    const original = JSON.stringify(model)
+    harness.renderer.init({ container: harness.container })
+    harness.renderer.update(model)
+    harness.frame(16)
+    const scene = harness.renderers[0].scene!
+    const token = scene.children.find((child) => child.userData.pieceId === model.pieces[0].id)!
+    harness.renderer.setPendingFeedback(model.pieces[0].id)
+    expect(harness.renderer.getMotionDiagnostics().pendingPieceIds).toEqual([model.pieces[0].id])
+    expect(scene.children.find((child) => child.userData.pieceId === model.pieces[0].id)).toBe(token)
+    expect(JSON.stringify(model)).toBe(original)
+    harness.renderer.setPendingFeedback(null)
+    expect(harness.renderer.getMotionDiagnostics().pendingPieceIds).toEqual([])
     harness.renderer.dispose()
   })
 

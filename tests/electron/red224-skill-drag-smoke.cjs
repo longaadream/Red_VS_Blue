@@ -128,6 +128,7 @@ module.exports = async function runRed224SkillDragSmoke({
       && Number.isFinite(releasePreview.timings.nextFrameMs),
     `Preview display timing was not recorded: ${JSON.stringify(releasePreview)}`,
   )
+  if (process.env.RVB_FEEDBACK_LATENCY === '1') await require('./red224-feedback-latency.cjs').install(evaluate)
   await finishTouchDrag('touchEnd')
   await waitFor(
     `window.__RED221_PUTS.length === ${releaseBefore.trainingPutCalls + 1}`,
@@ -153,6 +154,8 @@ module.exports = async function runRed224SkillDragSmoke({
     `Touch drag release did not resolve authoritatively: ${JSON.stringify({ releaseBefore, releaseAccepted })}`,
   )
 
+  const feedbackLatency = process.env.RVB_FEEDBACK_LATENCY === '1'
+    ? await require('./red224-feedback-latency.cjs').finish(evaluate, waitFor) : null
   const cancelSetup = await prepareTouchDrag()
   const cancelBefore = await snapshot('touch-drag-before-cancel')
   await dragTouchTo(cancelSetup.source, await boardPoint(cancelSetup.fixture.validTarget))
@@ -182,7 +185,7 @@ module.exports = async function runRed224SkillDragSmoke({
   )
 
   return {
-    release: { releasePreview, releasePut, releaseBefore, releaseAccepted },
+    release: { releasePreview, releasePut, releaseBefore, releaseAccepted, feedbackLatency },
     cancel: { cancelPreview, cancelBefore, cancelled },
     illegal: { illegalBefore, illegalAfter },
   }

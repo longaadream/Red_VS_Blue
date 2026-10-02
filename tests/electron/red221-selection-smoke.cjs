@@ -554,6 +554,24 @@ async function runElectronSmoke() {
       return !!button
     })()`)
     await delay(180)
+    if (process.env.RVB_DOM_REUSE === '1') {
+      evidence.domReuse = await evaluate(`(() => {
+        const button = document.querySelector(${JSON.stringify(skillSelector)})
+        const hosts = ['pieceContextSkills', 'playerResCards', 'resApTrack', 'myPieces', 'oppPieces']
+          .map(id => document.getElementById(id)).filter(Boolean)
+        const before = hosts.map(host => Array.from(host.children))
+        const descendants = hosts.map(host => Array.from(host.querySelectorAll('*')))
+        button.focus({ preventScroll: true })
+        for (let index = 0; index < 5; index++) render()
+        return {
+          focusPreserved: document.activeElement === button,
+          rootIdentity: hosts.every((host, index) => before[index].length === host.children.length && before[index].every((node, i) => node === host.children[i])),
+          subtreeIdentity: hosts.every((host, index) => { const nodes = Array.from(host.querySelectorAll('*')); return descendants[index].length === nodes.length && descendants[index].every((node, i) => node === nodes[i]) }),
+        }
+      })()`)
+      ensure(evidence.domReuse.focusPreserved && evidence.domReuse.rootIdentity && evidence.domReuse.subtreeIdentity,
+        'Battle hot DOM hosts were rebuilt: ' + JSON.stringify(evidence.domReuse))
+    }
     const skillInputTarget = await evaluate(`(() => {
       window.__RED221_SKILL_CLICKS = []
       const button = document.querySelector(${JSON.stringify(skillSelector)})
@@ -634,6 +652,7 @@ async function runElectronSmoke() {
       inputEvents: window.__RED221_INPUT_EVENTS?.slice(-8),
       camera: battlePresentation && battlePresentation.getModel && (() => { const m = battlePresentation.getModel(); return m && { selection: m.selection, legal: m.legal } })(),
     }))()`)
+    if (process.env.RVB_FEEDBACK_LATENCY === '1') await require('./red224-feedback-latency.cjs').install(evaluate)
     await tap(validTargetPoint, 'mouse')
     const waiting = await snapshot('waiting-after-legal-mouse')
     ensure(waiting.targetSubmissionPending, `Legal retry did not enter authoritative waiting state: ${JSON.stringify({ waiting, validTargetInputDebug })}`)
@@ -653,6 +672,29 @@ async function runElectronSmoke() {
     ensure(accepted.actionPoints === beforeLegal.actionPoints - 1, `Legal retry charged an unexpected number of action points: ${JSON.stringify({ before: beforeLegal, accepted })}`)
     ensure(!accepted.pendingSkill && !accepted.targetSubmissionPending && !accepted.targetMode, `Accepted action left target mode active: ${JSON.stringify(accepted)}`)
     evidence.desktop = { ...evidence.desktop, occupiedRejected, emptyRejected, waiting, duplicateAttempt, accepted }
+    if (process.env.RVB_FEEDBACK_LATENCY === '1') {
+      evidence.desktop.feedbackLatency = await require('./red224-feedback-latency.cjs').finish(evaluate, waitFor)
+    }
+    if (process.env.RVB_COMPACT_FLOATERS === '1') {
+      await delay(3100)
+      const compact = await evaluate(`(() => {
+        for (const text of ['−4', '−2', '+3', '定身']) BattleRenderer3D.spawnFloater(
+          Math.floor(G.map.width / 2), Math.floor(G.map.height / 2), text, '#fff', false)
+        return Array.from(document.querySelectorAll('.dmg-float')).map(el => ({
+          text: el.textContent, x: parseFloat(el.style.left), y: parseFloat(el.style.top),
+          width: el.offsetWidth, height: el.offsetHeight, crowded: el.dataset.floaterCrowded,
+        }))
+      })()`)
+      ensure(compact.length === 4, 'Compact floaters dropped a result')
+      const ordered = compact.slice().sort((a, b) => a.y - b.y)
+      const gaps = ordered.slice(1).map((entry, i) => entry.y - ordered[i].y)
+      ensure(gaps.every(gap => gap > 0 && gap <= 60), 'Same-point floaters remain excessively spread: ' + JSON.stringify(compact))
+      evidence.desktop.compactFloaters = { entries: compact, centerGaps: gaps }
+      await win.webContents.capturePage()
+      await delay(150)
+      await screenshot('desktop-compact-floaters.png')
+      evidence.screenshots.push('desktop-compact-floaters.png')
+    }
 
     if (process.env.RVB_FEEDBACK_DURATION === '1') {
       await evaluate(`showTurnAnnounce('回合提示验收', '#ecd4a6'); spawnFloater(${fixture.caster.x}, ${fixture.caster.y}, '验收 −4', '#fff', false); true`)

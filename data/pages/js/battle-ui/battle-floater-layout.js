@@ -2,7 +2,12 @@
   'use strict'
 
   const MARGIN = 8
-  const GAP = 6
+  // Keep the readable text cores close together.  The burst background and
+  // the last few pixels of the rise animation may overlap slightly; reserving
+  // their full animation envelope made a four-hit result stack needlessly tall.
+  const GAP = 2
+  const CORE_PADDING_X = 3
+  const CORE_PADDING_Y = 2
   const MAX_CANDIDATES = 256
 
   function clamp(value, min, max) { return Math.max(min, Math.min(max, value)) }
@@ -10,12 +15,21 @@
     return a.left < b.right + GAP && a.right + GAP > b.left && a.top < b.bottom + GAP && a.bottom + GAP > b.top
   }
 
-  // Enclose the entire existing pop/rotation/rise animation, including its burst background.
+  // Layout the readable text core, with only a small allowance for its border.
+  // The CSS burst/rotation is decorative and deliberately does not reserve its
+  // full animated envelope.  This keeps same-anchor results around one text
+  // line apart while still avoiding collisions between the actual messages.
   function envelope(width, height) {
-    const angle = Math.PI / 15
-    const rotatedWidth = (width + 14) * 1.18 * Math.cos(angle) + (height + 10) * 1.18 * Math.sin(angle) + 8
-    const rotatedHeight = (height + 10) * 1.18 * Math.cos(angle) + (width + 14) * 1.18 * Math.sin(angle)
-    return { halfWidth: Math.ceil(rotatedWidth / 2), above: Math.ceil(40 + (rotatedHeight - height) / 2), below: Math.ceil(height + (rotatedHeight - height) / 2 + 14) }
+    // rvbResultFloat's readable phase uses translateY(-10px).  `top` is the
+    // element's anchor, not its vertical center, so the core runs from
+    // y - 10 through y - 10 + height.
+    const coreTop = -10
+    const coreBottom = coreTop + height
+    return {
+      halfWidth: Math.ceil(width / 2 + CORE_PADDING_X),
+      above: Math.ceil(-coreTop + CORE_PADDING_Y),
+      below: Math.max(CORE_PADDING_Y, Math.ceil(coreBottom + CORE_PADDING_Y)),
+    }
   }
 
   // Newest entries claim their anchor first. Older entries prefer a free slot above it.
@@ -35,7 +49,7 @@
         return { left: point.x - shape.halfWidth, right: point.x + shape.halfWidth, top: point.y - shape.above, bottom: point.y + shape.below }
       }
       function score(point) {
-        return Math.abs(point.x - origin.x) * 4 + Math.abs(point.y - origin.y) + (point.y > origin.y ? 2 * (shape.above + shape.below) : 0)
+        return Math.abs(point.x - origin.x) * 4 + Math.abs(point.y - origin.y) + (point.y > origin.y ? 4 * (shape.above + shape.below) : 0)
       }
       const candidates = []
       const seen = new Set()
