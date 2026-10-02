@@ -12,8 +12,12 @@
   const records=pieceInfoDisplaySkills(piece),rows=[...document.querySelectorAll('#pieceInfoContent .pi-skill')];
   const owned=!!myPlayerId&&String(piece.ownerPlayerId||'').toLowerCase()===String(myPlayerId).toLowerCase();
   const targetBusy=!!(pendingSkill||pendingCardAction||targetSubmissionPending||pendingActionFeedback||casting||(G&&(G.pendingTargetSelection||G.pendingOptionSelection)));
+  const targetingSkillId=pendingSkill&&pendingSkill.skillId?String(pendingSkill.skillId):targetSubmissionPending&&targetSubmissionPending.draft&&targetSubmissionPending.draft.skill&&targetSubmissionPending.draft.skill.skillId?String(targetSubmissionPending.draft.skill.skillId):'';
   rows.slice(0,records.length).forEach((row,i)=>{
    const skill=records[i],id=skillIdOf(skill),definition=skillDefOf(id),passive=definition.type==='passive'||definition.kind==='passive';
+   const isTargeting=!!targetingSkillId&&String(id)===targetingSkillId;
+   row.classList.toggle('is-targeting-skill',isTargeting);
+   row.setAttribute('aria-current',isTargeting?'true':'false');
    const meta=row.querySelector('.pi-skill-meta');if(meta)meta.textContent=meta.textContent.replace(/ 路 /g,' · ');
    if(!owned||passive||skill.derived){row.querySelectorAll('.character-cast,.character-cast-reason').forEach(element=>element.remove());row.classList.remove('cast-unavailable');return;}
    const available=resolveSkillAvailability(piece,skill);
@@ -27,6 +31,16 @@
     try{selectedPieceId=live.instanceId;await dispatchBattleIntent({type:'select-skill',skillId:id});}
     finally{casting=false;lastSignature='';syncSelected(true);}
    });}
+   // The existing skill header is the action surface. Moving it into the
+   // same real button keeps the title, type and cost readable while leaving
+   // the description and keyword badges outside the release target.
+   const header=row.querySelector('.pi-skill-header');
+   const skillMeta=row.querySelector('.pi-skill-meta');
+   if(header&&header.parentElement!==button)button.append(header);
+   if(skillMeta&&skillMeta.parentElement!==button)button.append(skillMeta);
+   const description=row.querySelector('.pi-skill-desc');
+   if(button.parentElement!==row)row.append(button);
+   if(description&&button.nextElementSibling!==description)row.insertBefore(button,description);
    button.dataset.skillId=id;
    button.classList.toggle('tutorial-skill-hint',document.body.dataset.tutorialSkill===id);
    if(document.body.dataset.tutorialSkill===id&&!button.dataset.tutorialRevealed){
@@ -34,11 +48,11 @@
     requestAnimationFrame(()=>{if(button.isConnected&&document.body.dataset.tutorialSkill===id)button.scrollIntoView({block:'nearest',inline:'nearest'});});
    }
    button.setAttribute('aria-label','释放：'+(definition.name||id));button.title=targetBusy?'请先完成当前操作':available.unavailableReason||'释放 '+(definition.name||id);
-   button.disabled=targetBusy||!available.available;button.textContent='释放';row.classList.toggle('cast-unavailable',!available.available);
+   button.disabled=targetBusy||!available.available;row.classList.toggle('cast-unavailable',!available.available);
    let reason=row.querySelector('.character-cast-reason');if(!reason){reason=document.createElement('div');reason.className='character-cast-reason';row.append(reason);}
    reason.textContent=available.unavailableReason||'';
   });
-  modal.classList.toggle('is-selecting-target',!!(pendingSkill||pendingCardAction));
+  modal.classList.toggle('is-selecting-target',!!(pendingSkill||pendingCardAction||targetSubmissionPending));
  }
  function refreshPortrait(piece){
   const source=PIECES_BY_ID[piece.templateId];
@@ -49,6 +63,14 @@
  function prepareDeployment(piece){
   modal.classList.remove('character-dock');modal.setAttribute('aria-modal','true');document.body.classList.remove('character-dock-open');
   reopen.hidden=true;setKeyword(false);refreshPortrait(piece);
+ }
+ function preserveTargetControlsBeforeRender(){
+  const controls=document.getElementById('targetSelectionControls');
+  if(!controls||!controls.parentElement||controls.parentElement===document.body)return;
+  // nativeRender replaces #pieceInfoContent.innerHTML. Move the shared
+  // controls out first so the current target session keeps its DOM node and
+  // renderTargetOverlay can mount it into the refreshed skill row afterward.
+  document.body.appendChild(controls);
  }
  function enhance(piece){
   modal.setAttribute('aria-modal','false');modal.classList.add('character-dock');document.body.classList.add('character-dock-open');reopen.hidden=true;
@@ -67,7 +89,9 @@
  window.renderPieceInfoRecord=function(piece,preserveKeyword){
   if(currentPieceInfoSource==='deployment'){prepareDeployment(piece);return nativeRender(piece,preserveKeyword);}
   const scroll=modal.querySelector('.pi-sheet').scrollTop;
+  preserveTargetControlsBeforeRender();
   nativeRender(piece,true);enhance(piece);modal.querySelector('.pi-sheet').scrollTop=scroll;
+  if((pendingSkill||pendingCardAction||targetSubmissionPending)&&typeof renderTargetOverlay==='function')renderTargetOverlay();
  };
  window.renderDeploymentPieceInfoError=function(piece){prepareDeployment(piece);return nativeDeploymentError(piece);};
  window.showPieceInfo=function(id,preserveKeyword){
@@ -75,21 +99,15 @@
   nativeShow(id,true);if(changed)modal.querySelector('.pi-sheet').scrollTop=0;
  };
  window.closePieceInfo=function(){
+  if(currentPieceInfoSource==='board'&&(pendingSkill||pendingCardAction||targetSubmissionPending)){
+   setStatusMsg('请先完成或取消当前目标选择');
+   return false;
+  }
   dismissed=selectedPieceId;keywordOpen=false;keywordName='';document.body.classList.remove('character-dock-open');
   nativeClose.apply(this,arguments);reopen.hidden=!selectedPieceId;
  };
  function syncSelected(force){
   if(busy||currentPieceInfoSource==='deployment')return;
-  // On phones, selection opens the native quick skills. Details require an
-  // explicit inspect action and must never cover target selection.
-  if(window.matchMedia('(orientation: landscape) and (max-height: 600px)').matches){
-   if(pendingSkill||pendingCardAction||targetSubmissionPending||pendingTargetSelectionForMe()||pendingOptionSelectionForMe()||currentPieceInfoId!==selectedPieceId){
-    if(currentPieceInfoId){
-     busy=true;try{nativeClose({restoreFocus:false});document.body.classList.remove('character-dock-open');}finally{busy=false;}
-    }
-   }
-   reopen.hidden=true;return;
-  }
   if(selectedPieceId!==lastSelected){dismissed=null;keywordOpen=false;keywordName='';lastSignature='';lastSelected=selectedPieceId;modal.querySelector('.pi-sheet').scrollTop=0;}
   if(!selectedPieceId){reopen.hidden=true;return;}
   if(dismissed===selectedPieceId){reopen.hidden=false;return;}
@@ -99,6 +117,12 @@
   const signature=JSON.stringify([id,pieceDispHp(piece),pieceDispStats(piece),pieceDispTags(piece),pieceInfoDisplaySkills(piece),G.turn,G.players.map(p=>[p.playerId,p.actionPoints,p.chargePoints]),!!pendingSkill,!!pendingCardAction,!!pendingActionFeedback,!!targetSubmissionPending]);
   if(!force&&signature===lastSignature)return;
   busy=true;try{lastSignature=signature;currentPieceInfoId=id;currentPieceInfoSource='board';window.renderPieceInfoRecord(piece,true);}finally{busy=false;}
+  // A skill can enter targeting from the compact board menu before the
+  // reading sheet existed. Re-run the shared renderer after opening it so
+  // the existing target footer moves into this sheet in the same turn.
+  if(pendingSkill||pendingCardAction||targetSubmissionPending){
+   if(typeof renderTargetOverlay==='function')renderTargetOverlay();
+  }
  }
  window.renderPieceContextMenu=function(piece){const r=nativeContext(piece);syncSelected(false);return r;};
  // Status/resources/turn updates call the native render; this also keeps an open enemy sheet read-only.

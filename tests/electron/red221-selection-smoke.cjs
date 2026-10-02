@@ -127,11 +127,11 @@ const fixtureInstaller = `(() => {
   const distance = (a, b) => Math.abs(a.x - b.x) + Math.abs(a.y - b.y)
   const byTemplate = id => clone.pieces.find(piece => piece.templateId === id && piece.currentHp > 0)
   const caster = byTemplate('red-venom')
-  const friendlyInvalid = byTemplate('arthas')
+  const friendlyInvalid = byTemplate('dark-muzan')
   const validEnemy = byTemplate('uther')
   const farEnemy = byTemplate('anduin')
   if (!caster || !friendlyInvalid || !validEnemy || !farEnemy) {
-    throw new Error('Fixture roster is missing red-venom, arthas, uther, or anduin')
+    throw new Error('Fixture roster is missing red-venom, dark-muzan, uther, or anduin')
   }
   let selected = null
   for (const casterCell of cells) {
@@ -373,6 +373,18 @@ async function runElectronSmoke() {
     await cdp('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
     await delay(180)
   }
+  const touchSwipe = async (start, end) => {
+    await cdp('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 })
+    await cdp('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ id: 1, x: start.x, y: start.y, radiusX: 1, radiusY: 1, force: 1 }] })
+    const steps = 6
+    for (let index = 1; index <= steps; index += 1) {
+      const progress = index / steps
+      await cdp('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ id: 1, x: Math.round(start.x + (end.x - start.x) * progress), y: Math.round(start.y + (end.y - start.y) * progress), radiusX: 1, radiusY: 1, force: 1 }] })
+      await delay(25)
+    }
+    await cdp('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
+    await delay(220)
+  }
   const tap = async (point, mode) => mode === 'touch' ? touchAt(point) : mouseAt(point)
   const clickSelector = async (selector, mode) => tap(await selectorPoint(selector), mode)
   const closeTileStatusIfOpen = async mode => {
@@ -392,6 +404,420 @@ async function runElectronSmoke() {
   const screenshot = async name => {
     fs.mkdirSync(evidenceRoot, { recursive: true })
     fs.writeFileSync(path.join(evidenceRoot, name), (await win.webContents.capturePage()).toPNG())
+  }
+
+  // RED-225 layout checks intentionally run only when requested.  They use
+  // the same real Electron input helpers as the selection regression above;
+  // the page-runtime fixture remains setup-only and never replaces the
+  // pointer/touch path under test.
+  const inspectSkillLayout = async label => evaluate(`(() => {
+    const modal = document.getElementById('pieceInfoModal')
+    const sheet = modal?.querySelector('.pi-sheet')
+    const rows = Array.from(document.querySelectorAll('#pieceInfoContent .pi-skill'))
+    const visible = element => {
+      if (!element) return false
+      const rect = element.getBoundingClientRect()
+      const style = getComputedStyle(element)
+      return rect.width > 0 && rect.height > 0 && style.display !== 'none' && style.visibility !== 'hidden'
+    }
+    const piece = G?.pieces?.find(candidate => candidate.instanceId === currentPieceInfoId)
+    const displaySkills = piece && typeof pieceInfoDisplaySkills === 'function' ? pieceInfoDisplaySkills(piece) : []
+    return {
+      label: ${JSON.stringify(label)},
+      modal: {
+        visible: visible(modal),
+        dock: !!modal?.classList.contains('character-dock'),
+        ariaModal: modal?.getAttribute('aria-modal') || null,
+      },
+      currentPieceInfoId: typeof currentPieceInfoId !== 'undefined' ? currentPieceInfoId || null : null,
+      pieceId: currentPieceInfoId || null,
+      displaySkillCount: displaySkills.length,
+      rows: rows.map((row, index) => {
+        const header = row.querySelector('.pi-skill-header')
+        const description = row.querySelector('.pi-skill-desc')
+        const cast = row.querySelector('.character-cast')
+        const headerRect = header?.getBoundingClientRect()
+        const castRect = cast?.getBoundingClientRect()
+        const rowRect = row.getBoundingClientRect()
+        const castStyle = cast ? getComputedStyle(cast) : null
+        return {
+          index,
+          text: description?.textContent?.trim() || '',
+          descriptionVisible: visible(description),
+          row: { left: rowRect.left, top: rowRect.top, width: rowRect.width, height: rowRect.height },
+          header: headerRect && { left: headerRect.left, top: headerRect.top, width: headerRect.width, height: headerRect.height },
+          cast: castRect && { left: castRect.left, top: castRect.top, width: castRect.width, height: castRect.height, disabled: cast.disabled, position: castStyle.position, topStyle: castStyle.top, bottomStyle: castStyle.bottom, ariaLabel: cast.getAttribute('aria-label') || '' },
+          ariaCurrent: row.getAttribute('aria-current') || null,
+          passive: !cast,
+          rowVisible: visible(row),
+        }
+      }),
+      sheet: sheet && {
+        clientHeight: sheet.clientHeight,
+        scrollHeight: sheet.scrollHeight,
+        scrollTop: sheet.scrollTop,
+        overflowY: getComputedStyle(sheet).overflowY,
+      },
+      target: {
+        pendingSkill: pendingSkill?.skillId || null,
+        targetOverlay: !!document.getElementById('targetOverlay')?.classList.contains('show'),
+      },
+    }
+  })()`)
+
+  const verifySkillLayout = async fixture => {
+    const before = await inspectSkillLayout('desktop-before-layout-read')
+    ensure(before.modal.visible && before.modal.dock, `RED-225: selected piece sheet is not a persistent character dock: ${JSON.stringify(before)}`)
+    ensure(before.rows.length === before.displaySkillCount && before.rows.length >= 3, `RED-225: skill descriptions are not all in one list: ${JSON.stringify(before)}`)
+    ensure(before.rows.every(row => row.text && row.descriptionVisible), `RED-225: a skill description is missing or hidden: ${JSON.stringify(before)}`)
+    const activeRows = before.rows.filter(row => row.cast)
+    ensure(activeRows.length >= 1, `RED-225: no active skill title action was exposed: ${JSON.stringify(before)}`)
+    ensure(activeRows.every(row => row.cast.width >= row.header.width * 0.9 && row.cast.height >= 40 && row.cast.ariaLabel && row.cast.top <= row.header.top + row.header.height + 4), `RED-225: active action is not a large title-row target: ${JSON.stringify(before)}`)
+    const activeDomCheck = await evaluate(`(() => Array.from(document.querySelectorAll('#pieceInfoContent .pi-skill')).filter(row => row.querySelector('.character-cast')).every(row => row.querySelector('.character-cast')?.contains(row.querySelector('.pi-skill-header'))))()`)
+    ensure(activeDomCheck, `RED-225: skill action is separate from its title row, so the title cannot be the single reading/release affordance: ${JSON.stringify(before)}`)
+
+    const visibleDescriptionPoint = await pointFor(`(() => {
+      const description = Array.from(document.querySelectorAll('#pieceInfoContent .pi-skill-desc')).find(element => {
+        const r = element.getBoundingClientRect();
+        return r.width > 0 && r.height > 0 && r.top >= 0 && r.bottom <= innerHeight;
+      })
+      if (!description) return null
+      const r = description.getBoundingClientRect()
+      return { x: r.left + Math.min(24, r.width / 2), y: r.top + r.height / 2 }
+    })()`, 'visible skill description')
+    const beforeRead = await snapshot('red225-before-description-read')
+    await mouseAt(visibleDescriptionPoint)
+    const afterDescriptionRead = await snapshot('red225-after-description-read')
+    ensure(afterDescriptionRead.pendingSkill === beforeRead.pendingSkill && afterDescriptionRead.trainingPutCalls === beforeRead.trainingPutCalls, `RED-225: reading a description changed skill selection or submitted an action: ${JSON.stringify({ beforeRead, afterDescriptionRead })}`)
+
+    const sheetPoint = await pointFor(`(() => {
+      const element = document.querySelector('#pieceInfoModal .pi-sheet')
+      if (!element) return null
+      const r = element.getBoundingClientRect()
+      return { x: r.left + r.width / 2, y: r.top + Math.min(160, r.height / 2) }
+    })()`, 'skill description scroll area')
+    const scrollBefore = await inspectSkillLayout('desktop-before-description-scroll')
+    if (scrollBefore.sheet && scrollBefore.sheet.scrollHeight > scrollBefore.sheet.clientHeight + 2) {
+      await cdp('Input.dispatchMouseEvent', { type: 'mouseWheel', x: sheetPoint.x, y: sheetPoint.y, deltaX: 0, deltaY: 360 })
+      await delay(180)
+      const scrollAfter = await inspectSkillLayout('desktop-after-description-scroll')
+      ensure(scrollAfter.sheet.scrollTop > scrollBefore.sheet.scrollTop, `RED-225: skill list did not scroll internally: ${JSON.stringify({ scrollBefore, scrollAfter })}`)
+      const afterScrollRead = await snapshot('red225-after-description-scroll')
+      ensure(!afterScrollRead.pendingSkill && afterScrollRead.trainingPutCalls === beforeRead.trainingPutCalls, `RED-225: scrolling the description list changed skill selection or submitted an action: ${JSON.stringify(afterScrollRead)}`)
+      before.scrollAfter = scrollAfter
+    } else {
+      before.scrollGap = 'List fits viewport for this 3-skill fixture; long-list scroll is covered by the UI suite.'
+    }
+
+    // Use the allied Muzan fixture only to exercise the keyword and
+    // passive-row reading surface. No action is sent and no role data is
+    // changed. Return to the real Venom board selection before casting.
+    const alternate = await evaluate(`(() => {
+      const piece = G?.pieces?.find(candidate => candidate.templateId === 'dark-muzan')
+      if (!piece || typeof showPieceInfo !== 'function') return null
+      showPieceInfo(piece.instanceId, false)
+      return { instanceId: piece.instanceId }
+    })()`)
+    let alternateLayout = null
+    let keywordRead = { attempted: false }
+    if (alternate) {
+      await delay(180)
+      alternateLayout = await inspectSkillLayout('desktop-muzan-four-skill-read')
+      ensure(alternateLayout.rows.length >= 4 && alternateLayout.rows.some(row => row.passive), `RED-225: four-skill/passive reading fixture was not rendered as one list: ${JSON.stringify(alternateLayout)}`)
+      const keywordPoint = await evaluate(`(() => {
+        const badge = Array.from(document.querySelectorAll('#pieceInfoContent .keyword-badge')).find(element => {
+          const r = element.getBoundingClientRect()
+          return r.width > 0 && r.height > 0 && r.top >= 0 && r.bottom <= innerHeight
+        })
+        if (!badge) return null
+        const r = badge.getBoundingClientRect()
+        return { x: r.left + r.width / 2, y: r.top + r.height / 2 }
+      })()`)
+      if (keywordPoint) {
+        keywordRead.attempted = true
+        const beforeKeyword = await snapshot('red225-before-keyword-read')
+        await mouseAt(keywordPoint)
+        const afterKeyword = await snapshot('red225-after-keyword-read')
+        ensure(!afterKeyword.pendingSkill && afterKeyword.trainingPutCalls === beforeKeyword.trainingPutCalls, `RED-225: reading a keyword changed skill selection or submitted an action: ${JSON.stringify({ beforeKeyword, afterKeyword })}`)
+        keywordRead.result = await evaluate(`(() => ({ open: !!document.querySelector('#pieceKeywordPanel.is-keyword-open'), text: document.getElementById('pieceKeywordPanel')?.textContent || '' }))()`)
+        ensure(keywordRead.result.open, `RED-225: keyword read did not open its existing explanation panel: ${JSON.stringify(keywordRead)}`)
+      }
+    }
+    await evaluate(`(() => { if (typeof showPieceInfo === 'function') showPieceInfo(${JSON.stringify(fixture.casterId)}, false); return true })()`)
+    await delay(160)
+    const restored = await inspectSkillLayout('desktop-caster-restored')
+    ensure(restored.pieceId === fixture.casterId && restored.modal.visible, `RED-225: returning from cross-skill reading did not restore the caster sheet: ${JSON.stringify(restored)}`)
+    return { before, afterDescriptionRead, alternate: alternateLayout, keywordRead, restored }
+  }
+
+  // RED-225 target feedback is intentionally split from the reading surface:
+  // #targetOverlay is the short, top-of-screen status line and
+  // #targetSelectionControls owns cancel/confirm inside the character sheet.
+  // Keep this helper independent from the old target-mode-card layout;
+  // a visible card under #targetOverlay is a regression for the new contract.
+  const inspectTargetControls = async label => evaluate(`(() => {
+    const visible = element => {
+      if (!element) return false
+      const rect = element.getBoundingClientRect()
+      const style = getComputedStyle(element)
+      return rect.width > 0 && rect.height > 0 && style.display !== 'none' && style.visibility !== 'hidden'
+    }
+    const rect = element => {
+      const value = element?.getBoundingClientRect()
+      return value && { left: value.left, top: value.top, right: value.right, bottom: value.bottom, width: value.width, height: value.height }
+    }
+    const overlay = document.getElementById('targetOverlay')
+    const prompt = document.getElementById('targetPromptText')
+    const controls = document.getElementById('targetSelectionControls')
+    const cancel = document.getElementById('targetCancelButton')
+    const confirm = document.getElementById('targetConfirmButton')
+    const promptStyle = prompt ? getComputedStyle(prompt) : null
+    const targetSkill = controls?.closest('#pieceInfoContent .pi-skill.is-targeting-skill')
+    const targetDescription = targetSkill?.querySelector('.pi-skill-desc')
+    const targetSkillRect = targetSkill?.getBoundingClientRect()
+    const targetDescriptionRect = targetDescription?.getBoundingClientRect()
+    const parseRgb = value => {
+      const match = String(value || '').match(/rgba?\\(\\s*(\\d+)\\s*,\\s*(\\d+)\\s*,\\s*(\\d+)/i)
+      return match ? { r: Number(match[1]), g: Number(match[2]), b: Number(match[3]) } : null
+    }
+    const promptRgb = parseRgb(promptStyle?.color)
+    const independentCard = Array.from(document.querySelectorAll('#targetOverlay .target-mode-card')).find(visible)
+    return {
+      label: ${JSON.stringify(label)},
+      overlay: { visible: visible(overlay), rect: rect(overlay), position: overlay ? getComputedStyle(overlay).position : null, childCount: overlay?.children.length || 0 },
+      prompt: {
+        text: prompt?.textContent?.trim() || '',
+        visible: visible(prompt),
+        rect: rect(prompt),
+        whiteSpace: promptStyle?.whiteSpace || null,
+        lineHeight: promptStyle?.lineHeight || null,
+        color: promptStyle?.color || null,
+        colorRgb: promptRgb,
+        fontWeight: promptStyle?.fontWeight || null,
+        textShadow: promptStyle?.textShadow || null,
+        webkitTextStroke: promptStyle?.webkitTextStroke || null,
+        backgroundColor: promptStyle?.backgroundColor || null,
+        borderStyle: promptStyle?.borderStyle || null,
+        borderWidth: promptStyle?.borderWidth || null,
+      },
+      controls: {
+        visible: visible(controls),
+        rect: rect(controls),
+        insideDock: !!controls?.closest('#pieceInfoModal.character-dock'),
+        insideOverlay: !!controls?.closest('#targetOverlay'),
+        insideTargetingSkill: !!targetSkill,
+        targetSkillClass: targetSkill?.className || null,
+        targetSkillRect: rect(targetSkill),
+        beforeDescription: !!(controls && targetDescription && controls.getBoundingClientRect().bottom <= targetDescription.getBoundingClientRect().top + 4),
+        descriptionRect: rect(targetDescription),
+        controlsParent: controls?.parentElement ? { tag: controls.parentElement.tagName, id: controls.parentElement.id || '', className: String(controls.parentElement.className || '') } : null,
+      },
+      cancel: { exists: !!cancel, visible: visible(cancel), hidden: !!cancel?.hidden, disabled: !!cancel?.disabled, rect: rect(cancel) },
+      confirm: { exists: !!confirm, visible: visible(confirm), hidden: !!confirm?.hidden, disabled: !!confirm?.disabled, rect: rect(confirm) },
+      independentCard: independentCard ? { visible: true, rect: rect(independentCard) } : null,
+      viewport: { width: innerWidth, height: innerHeight, scrollWidth: document.documentElement.scrollWidth, scrollHeight: document.documentElement.scrollHeight },
+    }
+  })()`)
+
+  const assertTargetPresentation = (snapshot, label) => {
+    const prompt = snapshot.prompt || {}
+    const controls = snapshot.controls || {}
+    const rgb = prompt.colorRgb
+    const luminance = rgb ? (rgb.r * 299 + rgb.g * 587 + rgb.b * 114) / 1000 : 0
+    const weight = Number.parseInt(prompt.fontWeight, 10)
+    const background = String(prompt.backgroundColor || '').toLowerCase()
+    const borderWidth = Number.parseFloat(prompt.borderWidth)
+    const hasOutline = (prompt.textShadow && prompt.textShadow !== 'none') || (prompt.webkitTextStroke && prompt.webkitTextStroke !== 'none' && !/^0(?:px)?\s/.test(prompt.webkitTextStroke))
+    ensure(rgb && luminance >= 150, `${label}: target prompt is not a bright readable line: ${JSON.stringify(prompt)}`)
+    ensure(Number.isFinite(weight) ? weight >= 700 : String(prompt.fontWeight).toLowerCase() === 'bold', `${label}: target prompt is not bold: ${JSON.stringify(prompt)}`)
+    ensure(hasOutline, `${label}: target prompt has no dark text outline: ${JSON.stringify(prompt)}`)
+    ensure(background === 'transparent' || /^rgba\(\s*0\s*,\s*0\s*,\s*0\s*,\s*0(?:\.0+)?\s*\)$/.test(background), `${label}: target prompt has an unexpected background: ${JSON.stringify(prompt)}`)
+    ensure(!Number.isFinite(borderWidth) || borderWidth === 0, `${label}: target prompt has an unexpected border: ${JSON.stringify(prompt)}`)
+    ensure(controls.insideTargetingSkill && controls.beforeDescription && !controls.insideOverlay, `${label}: cancel/confirm controls are not in the active skill title area before its description: ${JSON.stringify(controls)}`)
+  }
+
+  const verifyAkazaMultiStep = async fixture => {
+    const setup = await evaluate(`(() => {
+      const akaza = G?.pieces?.find(piece => piece.templateId === 'dark-akaza')
+      const enemy = G?.pieces?.find(piece => piece.templateId === 'uther' && piece.currentHp > 0)
+      const venom = G?.pieces?.find(piece => piece.templateId === 'red-venom')
+      if (!akaza || !enemy || !venom) return null
+      const blocked = new Set(['wall', 'hole', 'lava'])
+      const cells = (G.map?.tiles || []).filter(tile => {
+        const type = tile?.props?.type || tile?.type || 'floor'
+        return !blocked.has(type) && tile?.props?.walkable !== false
+      }).map(tile => ({ x: tile.x, y: tile.y }))
+      const tileAt = (x, y) => cells.find(cell => cell.x === x && cell.y === y)
+      const livingAt = (x, y, exceptId) => G.pieces.some(piece => piece.currentHp > 0 && piece.instanceId !== exceptId && piece.x === x && piece.y === y)
+      const reserved = new Set([${JSON.stringify(fixture.caster)}, ${JSON.stringify(fixture.invalidPiece)}, ${JSON.stringify(fixture.empty)}].map(cell => cell.x + ',' + cell.y))
+      akaza.x = ${JSON.stringify(fixture.caster.x)}; akaza.y = ${JSON.stringify(fixture.caster.y)}
+      const cardinal = [[1, 0], [-1, 0], [0, 1], [0, -1]]
+      const openAdjacent = cell => cardinal.map(([dx, dy]) => ({ x: cell.x + dx, y: cell.y + dy }))
+        .filter(candidate => tileAt(candidate.x, candidate.y) && !livingAt(candidate.x, candidate.y, enemy.instanceId) && !(candidate.x === akaza.x && candidate.y === akaza.y))
+      const targetCandidates = cells
+        .filter(cell => Math.max(Math.abs(cell.x - akaza.x), Math.abs(cell.y - akaza.y)) <= 3)
+        .filter(cell => !(cell.x === akaza.x && cell.y === akaza.y))
+        .filter(cell => !reserved.has(cell.x + ',' + cell.y) && !livingAt(cell.x, cell.y, enemy.instanceId))
+        .map(cell => ({ cell, adjacent: openAdjacent(cell) }))
+        .filter(entry => entry.adjacent.length >= 2)
+      const preferred = targetCandidates.find(entry => entry.cell.x === ${JSON.stringify(fixture.validTarget.x)} && entry.cell.y === ${JSON.stringify(fixture.validTarget.y)})
+      const targetEntry = preferred || targetCandidates[0]
+      if (!targetEntry) return null
+      const target = targetEntry.cell
+      const relocation = targetEntry.adjacent[0]
+      const legalLanding = targetEntry.adjacent[1]
+      enemy.x = target.x; enemy.y = target.y
+      venom.x = relocation.x; venom.y = relocation.y
+      akaza.currentHp = akaza.maxHp || akaza.currentHp
+      akaza.skills = (akaza.skills || []).map(skill => skill.skillId === 'akaza-flash-step'
+        ? Object.assign({}, skill, { currentCooldown: 0, usesRemaining: undefined }) : skill)
+      enemy.statusTags = (enemy.statusTags || []).filter(tag => tag?.type !== 'akaza-damaged')
+      enemy.statusTags.push({ id: 'akaza-damaged-by:' + akaza.instanceId, type: 'akaza-damaged', sourceId: akaza.instanceId, lastDamageTurn: G.turn.turnNumber, visible: false, currentDuration: -1, remainingDuration: -1 })
+      G.players = (G.players || []).map(player => player.playerId === 'training-red'
+        ? Object.assign({}, player, { actionPoints: 10, maxActionPoints: 10, chargePoints: 10, maxChargePoints: 10 })
+        : Object.assign({}, player, { actionPoints: 0, maxActionPoints: 10 }))
+      G.turn = Object.assign({}, G.turn, { currentPlayerId: 'training-red', phase: 'action' })
+      G.pendingTargetSelection = undefined
+      G.pendingOptionSelection = undefined
+      G.presentationEvents = []
+      selectedPieceId = null
+      pendingMove = false
+      pendingSkill = null
+      pendingCardAction = null
+      targetSubmissionPending = null
+      pendingBoardTargetSelection = { selectionId: null, selectedPieceIds: [], selectedCells: [] }
+      render()
+      return { akazaId: akaza.instanceId, enemyId: enemy.instanceId, relocation, legalLanding, attack: akaza.attack, target: { x: enemy.x, y: enemy.y } }
+    })()`)
+    if (!setup) return { skipped: 'Training profile does not expose dark-akaza, uther, and red-venom together.' }
+    const multiFlow = label => evaluate(`(() => {
+      const pending = pendingSkill
+      const preparation = pending?.preparation
+      const target = G?.pendingTargetSelection || (preparation ? {
+        step: preparation.step ?? pending.pendingTargetIndex ?? 0,
+        selectionMode: preparation.selectionMode || null,
+        canCancel: preparation.canCancel !== false,
+        selectedTargets: pending.selectedTargets || [],
+        candidates: preparation.candidates || [],
+      } : null)
+      const akaza = G?.pieces?.find(piece => piece.instanceId === ${JSON.stringify(setup.akazaId)})
+      return {
+        label: ${JSON.stringify(label)},
+        selectedPieceId: selectedPieceId || null,
+        pendingSkill: pending && { skillId: pending.skillId || null, pendingTargetIndex: pending.pendingTargetIndex ?? null, selectionId: pending.preparation?.selectionId || null },
+        target: target && { step: target.step ?? null, selectionMode: target.selectionMode || null, canCancel: target.canCancel !== false, selectedTargets: target.selectedTargets || [], candidates: target.candidates || [] },
+        overlay: !!document.getElementById('targetOverlay')?.classList.contains('show'),
+        puts: window.__RED221_PUTS?.length || 0,
+        attack: akaza?.attack ?? null,
+        position: akaza && { x: akaza.x, y: akaza.y },
+        currentPieceInfoId: typeof currentPieceInfoId !== 'undefined' ? currentPieceInfoId || null : null,
+      }
+    })()`)
+
+    // The real multistep path must start from a board click.  Close the
+    // reading sheet left by the preceding layout checks so its DOM cannot
+    // intercept the source-cell hit; retain a debug snapshot if selection
+    // still fails so a fixture/coordinate problem is distinguishable from a
+    // production target-flow problem.
+    await evaluate(`(() => {
+      if (typeof closePieceInfo === 'function') closePieceInfo({ restoreFocus: false })
+      if (typeof closePieceContextMenu === 'function') closePieceContextMenu()
+      if (typeof renderTargetOverlay === 'function') renderTargetOverlay()
+      return true
+    })()`)
+    await delay(120)
+    const akazaSourcePoint = await boardPoint({ x: fixture.caster.x, y: fixture.caster.y })
+    const akazaSelectionDebug = async () => evaluate(`(() => {
+      const point = ${JSON.stringify(akazaSourcePoint)}
+      const modal = document.getElementById('pieceInfoModal')
+      const menu = document.getElementById('pieceContextMenu')
+      const overlay = document.getElementById('targetOverlay')
+      const controls = document.getElementById('targetSelectionControls')
+      const canvas = document.querySelector('#boardStage3d canvas')
+      const rect = element => { const r = element?.getBoundingClientRect(); return r && { left: r.left, top: r.top, width: r.width, height: r.height } }
+      const hit = document.elementFromPoint(point.x, point.y)
+      const akaza = G?.pieces?.find(piece => piece.instanceId === ${JSON.stringify(setup.akazaId)})
+      return {
+        point,
+        selectedPieceId: selectedPieceId || null,
+        screenToCell: battlePresentation?.screenToCell?.(point.x, point.y) || null,
+        hit: hit && { tag: hit.tagName, id: hit.id, className: String(hit.className || ''), pointerEvents: getComputedStyle(hit).pointerEvents },
+        canvas: rect(canvas),
+        akaza: akaza && { id: akaza.instanceId, x: akaza.x, y: akaza.y },
+        modal: { rect: rect(modal), display: modal && getComputedStyle(modal).display, dock: !!modal?.classList.contains('character-dock'), pointerEvents: modal && getComputedStyle(modal).pointerEvents },
+        menu: { rect: rect(menu), open: !!menu?.classList.contains('is-open'), pointerEvents: menu && getComputedStyle(menu).pointerEvents },
+        overlay: { rect: rect(overlay), show: !!overlay?.classList.contains('show'), pointerEvents: overlay && getComputedStyle(overlay).pointerEvents },
+        controls: { rect: rect(controls), visible: !!controls && getComputedStyle(controls).display !== 'none' },
+        bodyClasses: document.body.className,
+      }
+    })()`)
+    try {
+      await tap(akazaSourcePoint, 'mouse')
+      await closeTileStatusIfOpen('mouse')
+      await waitFor(`selectedPieceId === ${JSON.stringify(setup.akazaId)}`, 5000, 'Akaza caster selection')
+    } catch (error) {
+      const debug = await akazaSelectionDebug()
+      await screenshot('desktop-akaza-caster-selection-failed.png')
+      evidence.screenshots.push('desktop-akaza-caster-selection-failed.png')
+      throw new Error(`RED-225: real Akaza caster click did not select the configured source piece: ${JSON.stringify({ debug, cause: String(error && error.message || error) })}`)
+    }
+    await evaluate(`(() => { const button = document.querySelector('.character-cast[data-skill-id="akaza-flash-step"]'); button?.scrollIntoView({ block: 'center', inline: 'nearest' }); return !!button })()`)
+    await delay(120)
+    try {
+      await clickSelector('.character-cast[data-skill-id="akaza-flash-step"]', 'mouse')
+      await waitFor(`pendingSkill?.skillId === 'akaza-flash-step' && (pendingSkill.preparation?.candidates?.length > 0 || pendingSkill.validTargets?.size > 0)`, 5000, 'Akaza first target step')
+    } catch (error) {
+      const debug = await evaluate(`(() => {
+        const button = document.querySelector('.character-cast[data-skill-id="akaza-flash-step"]')
+        const rect = element => { const r = element?.getBoundingClientRect(); return r && { left: r.left, top: r.top, width: r.width, height: r.height } }
+        return {
+          selectedPieceId: selectedPieceId || null,
+          pendingSkill: pendingSkill && { skillId: pendingSkill.skillId || null, preparation: pendingSkill.preparation || null, validTargets: pendingSkill.validTargets ? Array.from(pendingSkill.validTargets) : null },
+          authoritativeTarget: G?.pendingTargetSelection || null,
+          button: { exists: !!button, disabled: !!button?.disabled, rect: rect(button), text: button?.textContent?.trim() || '', ariaLabel: button?.getAttribute('aria-label') || null },
+          status: document.getElementById('statusMsg')?.textContent || '',
+          targetOverlay: { show: !!document.getElementById('targetOverlay')?.classList.contains('show'), text: document.getElementById('targetPromptText')?.textContent || '' },
+          controls: { show: !!document.getElementById('targetSelectionControls')?.classList.contains('show') },
+        }
+      })()`)
+      await screenshot('desktop-akaza-first-target-failed.png')
+      evidence.screenshots.push('desktop-akaza-first-target-failed.png')
+      throw new Error(`RED-225: real Akaza skill did not expose its first target step: ${JSON.stringify({ setup, debug, cause: String(error && error.message || error) })}`)
+    }
+    const first = await multiFlow('akaza-multi-step-first-target')
+    ensure(first.pendingSkill?.skillId === 'akaza-flash-step' && first.target?.step === 0, `RED-225: Akaza did not enter the first real pending target step: ${JSON.stringify(first)}`)
+
+    const visibleOtherDescription = await evaluate(`(() => {
+      const descriptions = Array.from(document.querySelectorAll('#pieceInfoContent .pi-skill-desc'))
+      const active = document.querySelector('#pieceInfoContent .pi-skill.is-targeting-skill .pi-skill-desc')
+      const description = descriptions.find(element => element !== active && (() => { const r = element.getBoundingClientRect(); return r.width > 0 && r.height > 0 && r.top >= 0 && r.bottom <= innerHeight })())
+      if (!description) return null
+      const r = description.getBoundingClientRect()
+      return { x: r.left + Math.min(24, r.width / 2), y: r.top + r.height / 2 }
+    })()`)
+    if (visibleOtherDescription) {
+      const beforeRead = await multiFlow('akaza-before-other-description-read')
+      await mouseAt(visibleOtherDescription)
+      const afterRead = await multiFlow('akaza-after-other-description-read')
+      ensure(afterRead.pendingSkill?.pendingTargetIndex === beforeRead.pendingSkill?.pendingTargetIndex && afterRead.puts === beforeRead.puts, `RED-225: reading another skill during a multi-step selection changed the pending step: ${JSON.stringify({ beforeRead, afterRead })}`)
+    }
+
+    await tap(await boardPoint({ x: setup.target.x, y: setup.target.y }), 'mouse')
+    await waitFor(`pendingSkill?.skillId === 'akaza-flash-step' && ((pendingSkill.preparation?.step ?? pendingSkill.pendingTargetIndex ?? 0) >= 1)`, 5000, 'Akaza landing target step')
+    const second = await multiFlow('akaza-multi-step-second-grid')
+    ensure(second.pendingSkill?.skillId === 'akaza-flash-step' && second.target?.step === 1, `RED-225: Akaza first target did not advance to the real landing step: ${JSON.stringify(second)}`)
+
+    const occupiedLanding = await multiFlow('akaza-second-step-candidates')
+    await tap(await boardPoint({ x: setup.relocation.x, y: setup.relocation.y }), 'mouse')
+    const rejectedLanding = await multiFlow('akaza-illegal-landing-retry')
+    ensure(rejectedLanding.pendingSkill?.skillId === 'akaza-flash-step' && rejectedLanding.target?.step === 1 && rejectedLanding.puts === occupiedLanding.puts, `RED-225: illegal multi-step landing exited or submitted the selection: ${JSON.stringify({ occupiedLanding, rejectedLanding })}`)
+    const landing = occupiedLanding.target?.candidates?.find(candidate => (candidate?.type === 'grid' || candidate?.type === 'cell') && !(candidate.x === setup.relocation.x && candidate.y === setup.relocation.y))
+    ensure(landing && Number.isFinite(landing.x) && Number.isFinite(landing.y), `RED-225: real Akaza landing step exposed no legal adjacent grid candidate: ${JSON.stringify(occupiedLanding)}`)
+    await tap(await boardPoint({ x: landing.x, y: landing.y }), 'mouse')
+    await waitFor(`!pendingSkill && !targetSubmissionPending && !G?.pendingTargetSelection`, 7000, 'Akaza multi-step completion')
+    const completed = await multiFlow('akaza-multi-step-complete')
+    ensure(completed.position?.x === landing.x && completed.position?.y === landing.y && completed.attack === setup.attack + 1, `RED-225: real Akaza multi-step result did not teleport and permanently increase attack: ${JSON.stringify({ landing, completed })}`)
+    return { setup, first, second, occupiedLanding, rejectedLanding, landing, completed }
   }
 
   const evidence = {
@@ -482,13 +908,13 @@ async function runElectronSmoke() {
         return { values, found: inputs.filter(input => wanted.has(input.value)).map(input => input.value) }
       }
       return {
-        first: choose('trainingFirstPieces', ['red-venom', 'arthas']),
+        first: choose('trainingFirstPieces', ['red-venom', 'dark-muzan', 'dark-akaza']),
         second: choose('trainingSecondPieces', ['uther', 'anduin']),
         firstFaction: document.getElementById('trainingFirstFaction')?.value,
         secondFaction: document.getElementById('trainingSecondFaction')?.value,
       }
     })()`)
-    ensure(setup.first.found.length === 2 && setup.second.found.length === 2, `Training fixture pieces missing: ${JSON.stringify(setup)}`)
+    ensure(setup.first.found.length >= 3 && setup.second.found.length === 2, `Training fixture pieces missing: ${JSON.stringify(setup)}`)
     await clickSelector('#trainingSetupOverlay button[onclick="startTrainingFromSetup()"]', 'mouse')
     await waitFor(`G && G.turn && G.turn.phase === 'action' && G.pieces?.some(piece => piece.templateId === 'red-venom') && battlePresentation && _use3d === true`, 30000, 'training battle')
     await evaluate(`window.__RED221_BASE_STATE__ = GameEngine.safeCloneBattleState(G); true`)
@@ -529,6 +955,11 @@ async function runElectronSmoke() {
     if (await evaluate('!!document.querySelector("dialog.skill-reading-guide[open]")')) {
       await clickSelector('dialog.skill-reading-guide button', 'mouse')
       await waitFor('!document.querySelector("dialog.skill-reading-guide[open]")', 5000, 'skill reading guide dismissal')
+    }
+    if (process.env.RVB_SKILL_LAYOUT === '1') {
+      evidence.layout = await verifySkillLayout(fixture)
+      await screenshot('desktop-1280x720-skill-layout-restored.png')
+      evidence.screenshots.push('desktop-1280x720-skill-layout-restored.png')
     }
     const skillButtonDebug = await evaluate(`(() => {
       const buttons = Array.from(document.querySelectorAll(${JSON.stringify(skillSelector)}))
@@ -591,6 +1022,33 @@ async function runElectronSmoke() {
     const armed = await snapshot('after-skill-click')
     const skillClickDebug = await evaluate('({ events: window.__RED221_SKILL_CLICKS, status: document.getElementById("statusMsg")?.textContent || "" })')
     ensure(armed.selectedPieceId === fixture.casterId && armed.pendingSkill?.skillId === 'venom-claw-rend', `Skill target mode did not arm: ${JSON.stringify({ armed, skillButtonDebug, skillButtonAfterScroll, skillInputTarget, skillClickDebug })}`)
+    if (process.env.RVB_SKILL_LAYOUT === '1') {
+      const targetingLayout = await inspectSkillLayout('desktop-targeting-layout')
+      const targetControls = await inspectTargetControls('desktop-target-controls')
+      ensure(targetingLayout.modal.visible && targetingLayout.rows.length === targetingLayout.displaySkillCount, `RED-225: target mode replaced or hid the skill list: ${JSON.stringify(targetingLayout)}`)
+      ensure(targetingLayout.rows.every(row => row.text && row.descriptionVisible), `RED-225: target mode made another skill description unreadable: ${JSON.stringify(targetingLayout)}`)
+      ensure(targetingLayout.rows.filter(row => row.ariaCurrent === 'true').length === 1 && targetingLayout.rows.find(row => row.ariaCurrent === 'true')?.cast?.ariaLabel?.includes('利爪撕裂'), `RED-225: target mode did not mark the active skill in the retained list: ${JSON.stringify(targetingLayout)}`)
+      ensure(targetControls.overlay.visible && targetControls.prompt.visible && targetControls.prompt.text, `RED-225: top target prompt is not visible while selecting: ${JSON.stringify(targetControls)}`)
+      ensure(targetControls.prompt.rect && targetControls.prompt.rect.top >= 0 && targetControls.prompt.rect.top <= Math.max(120, targetControls.viewport.height * 0.35) && targetControls.prompt.rect.height <= 64, `RED-225: target prompt is not a short top-of-screen line: ${JSON.stringify(targetControls)}`)
+      ensure(targetControls.controls.visible && targetControls.controls.insideDock && !targetControls.controls.insideOverlay, `RED-225: target controls are not separated into the character sheet: ${JSON.stringify(targetControls)}`)
+      assertTargetPresentation(targetControls, 'RED-225 desktop target presentation')
+      ensure(targetControls.cancel.exists && targetControls.cancel.visible && !targetControls.cancel.hidden && targetControls.cancel.rect && targetControls.cancel.rect.height >= 48 && targetControls.cancel.rect.bottom <= targetControls.viewport.height + 1, `RED-225: target cancel is not a reachable skill-panel action: ${JSON.stringify(targetControls)}`)
+      ensure(!targetControls.independentCard, `RED-225: target prompt still uses the independent target-mode card: ${JSON.stringify(targetControls)}`)
+      const focusRetention = await evaluate(`(() => {
+        const button = document.getElementById('targetCancelButton')
+        if (!button) return { supported: false }
+        button.focus({ preventScroll: true })
+        const before = document.activeElement === button
+        if (typeof renderTargetOverlay === 'function') renderTargetOverlay()
+        const after = document.activeElement === button
+        return { supported: true, before, after, activeId: document.activeElement?.id || null }
+      })()`)
+      ensure(focusRetention.supported && focusRetention.before && focusRetention.after, `RED-225: re-rendering target controls lost focus from the cancel action: ${JSON.stringify(focusRetention)}`)
+      evidence.layout = { ...(evidence.layout || {}), targeting: targetingLayout, targetControls }
+      evidence.layout.focusRetention = focusRetention
+      await screenshot('desktop-1280x720-skill-layout-targeting.png')
+      evidence.screenshots.push('desktop-1280x720-skill-layout-targeting.png')
+    }
     evidence.desktop = { setup, fixture, selected, armed }
     if (process.env.RVB_SKILL_PREVIEW === '1') {
       const original = await evaluate('JSON.stringify(G)')
@@ -787,16 +1245,65 @@ async function runElectronSmoke() {
     ensure(/拒绝|重新选择|目标/.test(rejected.status), `Rejected pending target had no actionable status feedback: ${JSON.stringify(rejected)}`)
     evidence.rejection = { rejectionSetup, invalidSubmission, rejected }
 
+    if (process.env.RVB_SKILL_LAYOUT === '1') {
+      evidence.multiStep = await verifyAkazaMultiStep(fixture)
+    }
+
     // Mobile landscape: repeat the invalid occupied/empty target checks with
     // actual touch events, capture the requested 844x390 frame, then cancel.
     win.setContentSize(844, 390)
     await delay(350)
     await evaluate(fixtureInstaller)
-    await tap(await boardPoint(fixture.caster), 'touch')
+    if (process.env.RVB_SKILL_LAYOUT === '1') {
+      await evaluate(`(() => { if (typeof closePieceInfo === 'function') closePieceInfo({ restoreFocus: false }); if (typeof closePieceContextMenu === 'function') closePieceContextMenu(); return true })()`)
+      await delay(100)
+    }
+    const mobileCasterPoint = await boardPoint(fixture.caster)
+    if (process.env.RVB_SKILL_LAYOUT === '1') {
+      await screenshot('mobile-844x390-before-caster-touch.png')
+      evidence.screenshots.push('mobile-844x390-before-caster-touch.png')
+    }
+    await tap(mobileCasterPoint, 'touch')
+    if (process.env.RVB_SKILL_LAYOUT === '1') {
+      await delay(120)
+      const mobileSelectionDebug = await evaluate(`(() => {
+        const point = ${JSON.stringify(mobileCasterPoint)}
+        const modal = document.getElementById('pieceInfoModal')
+        const menu = document.getElementById('pieceContextMenu')
+        const canvas = document.querySelector('#boardStage3d canvas')
+        const rect = element => { const r = element?.getBoundingClientRect(); return r && { left: r.left, top: r.top, width: r.width, height: r.height } }
+        const hit = document.elementFromPoint(point.x, point.y)
+        return {
+          point,
+          selectedPieceId: selectedPieceId || null,
+          screenToCell: battlePresentation?.screenToCell?.(point.x, point.y) || null,
+          hit: hit && { tag: hit.tagName, id: hit.id, className: String(hit.className || ''), pointerEvents: getComputedStyle(hit).pointerEvents },
+          canvas: rect(canvas),
+          modal: { rect: rect(modal), display: modal && getComputedStyle(modal).display, dock: !!modal?.classList.contains('character-dock'), pointerEvents: modal && getComputedStyle(modal).pointerEvents },
+          sheet: rect(modal?.querySelector('.pi-sheet')),
+          menu: { rect: rect(menu), open: !!menu?.classList.contains('is-open'), pointerEvents: menu && getComputedStyle(menu).pointerEvents },
+          bodyClasses: document.body.className,
+        }
+      })()`)
+      evidence.mobile.selectionDebug = mobileSelectionDebug
+      if (mobileSelectionDebug.selectedPieceId !== fixture.casterId) {
+        await screenshot('mobile-844x390-caster-touch-failed.png')
+        evidence.screenshots.push('mobile-844x390-caster-touch-failed.png')
+        throw new Error(`RED-225: normal mobile touch did not select the caster before skill release: ${JSON.stringify(mobileSelectionDebug)}`)
+      }
+    }
     await closeTileStatusIfOpen('touch')
-    await clickSelector('#mobileSkillsToggle', 'touch')
-    await waitFor('document.getElementById("pieceContextMenu")?.classList.contains("is-open") === true', 5000, 'mobile skill dock')
-    await clickSelector('.piece-context-skill[data-skill-id="venom-claw-rend"]', 'touch')
+    if (process.env.RVB_SKILL_LAYOUT === '1') {
+      await waitFor('document.getElementById("pieceInfoModal")?.classList.contains("character-dock") === true && document.querySelectorAll("#pieceInfoContent .pi-skill").length >= 3', 5000, 'mobile character sheet')
+      await waitFor(`selectedPieceId === ${JSON.stringify(fixture.casterId)}`, 5000, 'mobile caster selection')
+      await evaluate(`(() => { const button = document.querySelector(${JSON.stringify(skillSelector)}); button?.scrollIntoView({ block: 'center', inline: 'nearest' }); return !!button })()`)
+      await delay(120)
+      await clickSelector(skillSelector, 'touch')
+    } else {
+      await clickSelector('#mobileSkillsToggle', 'touch')
+      await waitFor('document.getElementById("pieceContextMenu")?.classList.contains("is-open") === true', 5000, 'mobile skill dock')
+      await clickSelector('.piece-context-skill[data-skill-id="venom-claw-rend"]', 'touch')
+    }
     const mobileArmed = await snapshot('mobile-after-skill-touch')
     await tap(await boardPoint(fixture.invalidPiece), 'touch')
     const mobileOccupiedRejected = await snapshot('mobile-after-invalid-occupied-touch')
@@ -805,12 +1312,238 @@ async function runElectronSmoke() {
     ensure(mobileArmed.pendingSkill?.skillId === 'venom-claw-rend', `Mobile touch did not arm the skill: ${JSON.stringify(mobileArmed)}`)
     ensure(mobileOccupiedRejected.selectedPieceId === fixture.casterId && mobileOccupiedRejected.pendingSkill?.skillId === 'venom-claw-rend', `Mobile occupied target changed the draft: ${JSON.stringify(mobileOccupiedRejected)}`)
     ensure(mobileEmptyRejected.selectedPieceId === fixture.casterId && mobileEmptyRejected.pendingSkill?.skillId === 'venom-claw-rend', `Mobile empty target changed the draft: ${JSON.stringify(mobileEmptyRejected)}`)
+    if (process.env.RVB_SKILL_LAYOUT === '1') {
+      const mobileLayout = await inspectSkillLayout('mobile-landscape-targeting-layout')
+      const mobileTargetControls = await inspectTargetControls('mobile-landscape-target-controls')
+      ensure(mobileLayout.modal.visible && mobileLayout.pieceId === fixture.casterId && mobileLayout.rows.length === mobileLayout.displaySkillCount && mobileLayout.rows.every(row => row.text && row.descriptionVisible), `RED-225: mobile landscape target mode lost the current piece's readable skill descriptions: ${JSON.stringify(mobileLayout)}`)
+      ensure(mobileLayout.rows.filter(row => row.ariaCurrent === 'true').length === 1 && mobileLayout.rows.find(row => row.ariaCurrent === 'true')?.cast?.ariaLabel?.includes('利爪撕裂'), `RED-225: mobile landscape did not mark the active skill in the retained list: ${JSON.stringify(mobileLayout)}`)
+      ensure(mobileTargetControls.overlay.visible && mobileTargetControls.prompt.visible && mobileTargetControls.prompt.text, `RED-225: mobile landscape top target prompt is not visible: ${JSON.stringify(mobileTargetControls)}`)
+      ensure(mobileTargetControls.prompt.rect && mobileTargetControls.prompt.rect.top >= 0 && mobileTargetControls.prompt.rect.top <= Math.max(120, mobileTargetControls.viewport.height * 0.35) && mobileTargetControls.prompt.rect.height <= 64, `RED-225: mobile landscape target prompt is not a short top line: ${JSON.stringify(mobileTargetControls)}`)
+      ensure(mobileTargetControls.controls.visible && mobileTargetControls.controls.insideDock && !mobileTargetControls.controls.insideOverlay, `RED-225: mobile landscape target controls are not separated into the character sheet: ${JSON.stringify(mobileTargetControls)}`)
+      assertTargetPresentation(mobileTargetControls, 'RED-225 mobile landscape target presentation')
+      ensure(mobileTargetControls.cancel.exists && mobileTargetControls.cancel.visible && !mobileTargetControls.cancel.hidden && mobileTargetControls.cancel.rect && mobileTargetControls.cancel.rect.height >= 48 && mobileTargetControls.cancel.rect.bottom <= mobileTargetControls.viewport.height + 1, `RED-225: mobile landscape cancel is not reachable in the skill panel: ${JSON.stringify(mobileTargetControls)}`)
+      ensure(!mobileTargetControls.independentCard && mobileTargetControls.viewport.scrollWidth <= mobileTargetControls.viewport.width + 1, `RED-225: mobile landscape target prompt or controls still use the old card/overflow: ${JSON.stringify(mobileTargetControls)}`)
+      evidence.mobile.layout = { mobileLayout, mobileTargetControls }
+    }
     await screenshot('mobile-844x390-target-retry.png')
     evidence.screenshots.push('mobile-844x390-target-retry.png')
+    const mobileCancelBefore = await evaluate(`(() => ({
+      pendingTargetSelection: G?.pendingTargetSelection || null,
+      pendingOptionSelection: G?.pendingOptionSelection || null,
+      locallyCancelledSelectionId: typeof locallyCancelledSelectionId !== 'undefined' ? locallyCancelledSelectionId || null : null,
+      controls: { show: !!document.getElementById('targetSelectionControls')?.classList.contains('show'), disabled: !!document.getElementById('targetCancelButton')?.disabled },
+      input: (() => {
+        const button = document.getElementById('targetCancelButton')
+        const rect = button?.getBoundingClientRect()
+        const point = rect && { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }
+        const hit = point && document.elementFromPoint(point.x, point.y)
+        window.__RED225_CANCEL_EVENTS = []
+        for (const type of ['touchstart', 'touchend', 'pointerdown', 'pointerup', 'click']) document.addEventListener(type, event => {
+          const target = event.target
+          window.__RED225_CANCEL_EVENTS.push({ type, target: target && { tag: target.tagName, id: target.id, className: String(target.className || '') }, defaultPrevented: event.defaultPrevented })
+        }, { capture: true, once: false })
+        return { point, button: rect && { left: rect.left, top: rect.top, width: rect.width, height: rect.height, pointerEvents: getComputedStyle(button).pointerEvents }, hit: hit && { tag: hit.tagName, id: hit.id, className: String(hit.className || ''), pointerEvents: getComputedStyle(hit).pointerEvents } }
+      })(),
+    }))()`)
+    ensure(mobileCancelBefore.input?.hit?.id === 'targetCancelButton', `RED-225: mobile target cancel is visually present but hit-tested by another layer: ${JSON.stringify(mobileCancelBefore)}`)
     await clickSelector('#targetCancelButton', 'touch')
     const mobileCancelled = await snapshot('mobile-after-explicit-cancel-touch')
-    ensure(mobileCancelled.selectedPieceId === fixture.casterId && !mobileCancelled.pendingSkill && !mobileCancelled.targetOverlay && !mobileCancelled.targetMode, `Mobile touch cancel did not exit target mode: ${JSON.stringify(mobileCancelled)}`)
-    evidence.mobile = { mobileArmed, mobileOccupiedRejected, mobileEmptyRejected, mobileCancelled }
+    const mobileCancelAfter = await evaluate(`(() => ({
+      pendingTargetSelection: G?.pendingTargetSelection || null,
+      pendingOptionSelection: G?.pendingOptionSelection || null,
+      events: window.__RED225_CANCEL_EVENTS || [],
+      status: document.getElementById('statusMsg')?.textContent || '',
+    }))()`)
+    ensure(mobileCancelled.selectedPieceId === fixture.casterId && !mobileCancelled.pendingSkill && !mobileCancelled.targetOverlay && !mobileCancelled.targetMode, `Mobile touch cancel did not exit target mode: ${JSON.stringify({ mobileCancelBefore, mobileCancelled, mobileCancelAfter })}`)
+    evidence.mobile = { ...(evidence.mobile || {}), mobileArmed, mobileOccupiedRejected, mobileEmptyRejected, mobileCancelled }
+
+    if (process.env.RVB_SKILL_LAYOUT === '1') {
+      // Closing the reading sheet is an explicit user choice. Opening the
+      // mobile hand afterward must not reopen that sheet as a side effect.
+      await evaluate(`(() => {
+        if (typeof closePieceInfo === 'function') closePieceInfo({ restoreFocus: false })
+        if (typeof closePieceContextMenu === 'function') closePieceContextMenu()
+        return true
+      })()`)
+      await delay(120)
+      const closedSheet = await evaluate(`(() => {
+        const modal = document.getElementById('pieceInfoModal')
+        return { visible: !!modal && getComputedStyle(modal).display !== 'none', dock: !!modal?.classList.contains('character-dock'), bodyDockOpen: document.body.classList.contains('character-dock-open') }
+      })()`)
+      ensure(!closedSheet.visible && !closedSheet.bodyDockOpen, `RED-225: explicit character-sheet close did not stay closed before hand interaction: ${JSON.stringify(closedSheet)}`)
+      await clickSelector('#mobileHandToggle', 'touch')
+      await delay(160)
+      const handAfterClosedSheet = await evaluate(`(() => {
+        const modal = document.getElementById('pieceInfoModal')
+        const hand = document.getElementById('handCards')
+        return { visible: !!modal && getComputedStyle(modal).display !== 'none', dock: !!modal?.classList.contains('character-dock'), bodyDockOpen: document.body.classList.contains('character-dock-open'), handExpanded: document.body.classList.contains('mobile-hand-expanded'), handVisibility: hand ? getComputedStyle(hand).visibility : null }
+      })()`)
+      ensure(!handAfterClosedSheet.visible && !handAfterClosedSheet.bodyDockOpen, `RED-225: opening mobile hand unexpectedly reopened the closed character sheet: ${JSON.stringify({ closedSheet, handAfterClosedSheet })}`)
+      evidence.mobile.closedSheetHand = { closedSheet, handAfterClosedSheet }
+      await clickSelector('#mobileHandToggle', 'touch')
+      await delay(120)
+    }
+
+    if (process.env.RVB_SKILL_LAYOUT === '1') {
+      // Portrait is a separate acceptance target.  Use the same real touch
+      // path, adapting to either the persistent sheet button or the existing
+      // compact mobile skill dock, whichever the responsive layout exposes.
+      win.setContentSize(390, 844)
+      await delay(300)
+      await evaluate(fixtureInstaller)
+      await evaluate(`(() => { if (typeof closePieceInfo === 'function') closePieceInfo({ restoreFocus: false }); if (typeof closePieceContextMenu === 'function') closePieceContextMenu(); return true })()`)
+      const portraitCasterPoint = await boardPoint(fixture.caster)
+      await screenshot('mobile-390x844-before-caster-touch.png')
+      evidence.screenshots.push('mobile-390x844-before-caster-touch.png')
+      await tap(portraitCasterPoint, 'touch')
+      await delay(120)
+      const portraitSelectionDebug = await evaluate(`(() => {
+        const point = ${JSON.stringify(portraitCasterPoint)}
+        const modal = document.getElementById('pieceInfoModal')
+        const menu = document.getElementById('pieceContextMenu')
+        const canvas = document.querySelector('#boardStage3d canvas')
+        const topbar = document.querySelector('.topbar')
+        const boardWrap = document.getElementById('boardWrap')
+        const tileStatusPanel = document.getElementById('tileStatusPanel')
+        const describe = element => {
+          const r = element?.getBoundingClientRect()
+          const s = element ? getComputedStyle(element) : null
+          return r && { left: r.left, top: r.top, right: r.right, bottom: r.bottom, width: r.width, height: r.height, display: s.display, position: s.position, zIndex: s.zIndex, pointerEvents: s.pointerEvents, overflow: s.overflow, cssTop: s.top, cssRight: s.right, cssBottom: s.bottom, cssLeft: s.left, transform: s.transform }
+        }
+        const rect = element => { const r = element?.getBoundingClientRect(); return r && { left: r.left, top: r.top, width: r.width, height: r.height } }
+        const hit = document.elementFromPoint(point.x, point.y)
+        return {
+          point,
+          selectedPieceId: selectedPieceId || null,
+          screenToCell: battlePresentation?.screenToCell?.(point.x, point.y) || null,
+          hit: hit && { tag: hit.tagName, id: hit.id, className: String(hit.className || ''), pointerEvents: getComputedStyle(hit).pointerEvents },
+          hitStack: document.elementsFromPoint(point.x, point.y).slice(0, 10).map(element => ({ tag: element.tagName, id: element.id || '', className: String(element.className || ''), pointerEvents: getComputedStyle(element).pointerEvents, zIndex: getComputedStyle(element).zIndex })),
+          canvas: rect(canvas),
+          canvasComputed: describe(canvas),
+          topbar: describe(topbar),
+          boardWrap: describe(boardWrap),
+          tileStatusPanel: describe(tileStatusPanel),
+          modal: { rect: rect(modal), display: modal && getComputedStyle(modal).display, dock: !!modal?.classList.contains('character-dock'), pointerEvents: modal && getComputedStyle(modal).pointerEvents },
+          sheet: rect(modal?.querySelector('.pi-sheet')),
+          menu: { rect: rect(menu), open: !!menu?.classList.contains('is-open'), pointerEvents: menu && getComputedStyle(menu).pointerEvents },
+          bodyClasses: document.body.className,
+        }
+      })()`)
+      evidence.mobile.portraitSelectionDebug = portraitSelectionDebug
+      if (portraitSelectionDebug.selectedPieceId !== fixture.casterId) {
+        await screenshot('mobile-390x844-caster-touch-failed.png')
+        evidence.screenshots.push('mobile-390x844-caster-touch-failed.png')
+        throw new Error(`RED-225: normal portrait touch did not select the caster before skill release: ${JSON.stringify(portraitSelectionDebug)}`)
+      }
+      await closeTileStatusIfOpen('touch')
+      // In portrait the persistent sheet may contain more skills than fit in
+      // the viewport. Scroll its real touch surface before resolving the
+      // action point; never dispatch a synthetic tap outside the viewport.
+      const portraitScroll = { initial: null, swipes: [], after: null }
+      const portraitSkillView = () => evaluate(`(() => {
+        const sheet = document.querySelector('#pieceInfoModal.character-dock .pi-sheet')
+        const button = document.querySelector('.character-cast[data-skill-id="venom-claw-rend"]')
+        const sheetRect = sheet?.getBoundingClientRect()
+        const buttonRect = button?.getBoundingClientRect()
+        const visible = !!buttonRect && buttonRect.width > 0 && buttonRect.height > 0 && buttonRect.top >= 0 && buttonRect.bottom <= innerHeight
+        return {
+          visible,
+          scrollTop: sheet?.scrollTop || 0,
+          scrollHeight: sheet?.scrollHeight || 0,
+          clientHeight: sheet?.clientHeight || 0,
+          sheetRect: sheetRect && { left: sheetRect.left, top: sheetRect.top, right: sheetRect.right, bottom: sheetRect.bottom, width: sheetRect.width, height: sheetRect.height },
+          buttonRect: buttonRect && { left: buttonRect.left, top: buttonRect.top, right: buttonRect.right, bottom: buttonRect.bottom, width: buttonRect.width, height: buttonRect.height },
+          sheetPointerEvents: sheet ? getComputedStyle(sheet).pointerEvents : null,
+          sheetTouchAction: sheet ? getComputedStyle(sheet).touchAction : null,
+        }
+      })()`)
+      portraitScroll.initial = await portraitSkillView()
+      let currentPortraitSkillView = portraitScroll.initial
+      for (let attempt = 0; attempt < 4 && !currentPortraitSkillView.visible; attempt += 1) {
+        const sheet = currentPortraitSkillView.sheetRect
+        ensure(sheet && sheet.width > 0 && sheet.height > 0, `RED-225: portrait skill sheet has no touchable viewport for scrolling: ${JSON.stringify(currentPortraitSkillView)}`)
+        const x = Math.round(sheet.left + sheet.width / 2)
+        const startY = Math.round(Math.min(sheet.bottom - 24, Math.max(sheet.top + 40, sheet.top + sheet.height * 0.76)))
+        const endY = Math.round(Math.max(sheet.top + 24, startY - Math.min(260, Math.max(120, sheet.height * 0.72))))
+        await touchSwipe({ x, y: startY }, { x, y: endY })
+        const after = await portraitSkillView()
+        portraitScroll.swipes.push({ attempt: attempt + 1, start: { x, y: startY }, end: { x, y: endY }, after })
+        currentPortraitSkillView = after
+      }
+      portraitScroll.after = currentPortraitSkillView
+      evidence.mobile.portraitScroll = portraitScroll
+      ensure(portraitScroll.after.visible, `RED-225: real portrait touch scroll did not bring the selected skill into the viewport: ${JSON.stringify(portraitScroll)}`)
+      const portraitAction = await evaluate(`(() => {
+        const describe = element => {
+          const r = element?.getBoundingClientRect()
+          const s = element ? getComputedStyle(element) : null
+          const center = r && { x: r.left + r.width / 2, y: r.top + r.height / 2 }
+          const hit = center && document.elementFromPoint(center.x, center.y)
+          return element && { disabled: !!element.disabled, rect: r && { left: r.left, top: r.top, width: r.width, height: r.height }, display: s.display, visibility: s.visibility, pointerEvents: s.pointerEvents, ariaLabel: element.getAttribute('aria-label') || '', center, hit: hit && { tag: hit.tagName, id: hit.id || '', className: String(hit.className || ''), pointerEvents: getComputedStyle(hit).pointerEvents } }
+        }
+        const direct = Array.from(document.querySelectorAll('.character-cast[data-skill-id="venom-claw-rend"]')).find(element => {
+          const r = element.getBoundingClientRect()
+          return r.width > 0 && r.height > 0 && !element.disabled
+        })
+        if (direct) return { kind: 'direct', selector: '.character-cast[data-skill-id="venom-claw-rend"]', direct: describe(direct) }
+        const toggle = document.getElementById('mobileSkillsToggle')
+        const toggleRect = toggle?.getBoundingClientRect()
+        if (toggle && toggleRect && toggleRect.width > 0 && toggleRect.height > 0) return { kind: 'dock', selector: '#mobileSkillsToggle', toggle: describe(toggle) }
+        const cast = Array.from(document.querySelectorAll('.character-cast[data-skill-id="venom-claw-rend"]')).map(element => {
+          const r = element.getBoundingClientRect()
+          const style = getComputedStyle(element)
+          return { disabled: !!element.disabled, rect: { left: r.left, top: r.top, width: r.width, height: r.height }, display: style.display, visibility: style.visibility, pointerEvents: style.pointerEvents, ariaLabel: element.getAttribute('aria-label') || '' }
+        })
+        const toggleStyle = toggle ? getComputedStyle(toggle) : null
+        const context = document.getElementById('pieceContextMenu')
+        const contextStyle = context ? getComputedStyle(context) : null
+        return { kind: null, cast, toggle: toggle && { hidden: !!toggle.hidden, rect: toggleRect && { left: toggleRect.left, top: toggleRect.top, width: toggleRect.width, height: toggleRect.height }, display: toggleStyle?.display || null, visibility: toggleStyle?.visibility || null, pointerEvents: toggleStyle?.pointerEvents || null }, context: context && { open: context.classList.contains('is-open'), rect: (() => { const r = context.getBoundingClientRect(); return { left: r.left, top: r.top, width: r.width, height: r.height } })(), display: contextStyle?.display || null, visibility: contextStyle?.visibility || null, pointerEvents: contextStyle?.pointerEvents || null }, sheetPointerEvents: getComputedStyle(document.getElementById('pieceInfoModal') || document.body).pointerEvents }
+      })()`)
+      evidence.mobile.portraitActionDebug = portraitAction
+      if (!portraitAction?.kind) {
+        await screenshot('mobile-390x844-portrait-action-unavailable.png')
+        evidence.screenshots.push('mobile-390x844-portrait-action-unavailable.png')
+        throw new Error(`RED-225: portrait exposed neither an enabled skill action nor the compact skill dock: ${JSON.stringify(portraitAction)}`)
+      }
+      if (portraitAction?.kind === 'dock') {
+        await clickSelector('#mobileSkillsToggle', 'touch')
+        await waitFor('document.getElementById("pieceContextMenu")?.classList.contains("is-open") === true', 5000, 'portrait skill dock')
+        await clickSelector('.piece-context-skill[data-skill-id="venom-claw-rend"]', 'touch')
+      } else {
+        ensure(portraitAction?.kind === 'direct', `RED-225: portrait offered neither a persistent skill action nor the compact skill dock: ${JSON.stringify(portraitAction)}`)
+        await clickSelector('.character-cast[data-skill-id="venom-claw-rend"]', 'touch')
+      }
+      const portraitArmed = await snapshot('portrait-after-skill-touch')
+      evidence.mobile.portraitAfterActionDebug = await evaluate(`(() => {
+        const button = document.querySelector('.character-cast[data-skill-id="venom-claw-rend"]')
+        const r = button?.getBoundingClientRect()
+        const center = r && { x: r.left + r.width / 2, y: r.top + r.height / 2 }
+        const hit = center && document.elementFromPoint(center.x, center.y)
+        const menu = document.getElementById('pieceContextMenu')
+        const menuStyle = menu && getComputedStyle(menu)
+        const menuRect = menu?.getBoundingClientRect()
+        const modal = document.getElementById('pieceInfoModal')
+        const modalStyle = modal && getComputedStyle(modal)
+        const modalRect = modal?.getBoundingClientRect()
+        return { button: button && { disabled: !!button.disabled, rect: r && { left: r.left, top: r.top, width: r.width, height: r.height }, active: document.activeElement === button }, center, hit: hit && { tag: hit.tagName, id: hit.id || '', className: String(hit.className || ''), pointerEvents: getComputedStyle(hit).pointerEvents }, menu: menu && { open: menu.classList.contains('is-open'), rect: menuRect && { left: menuRect.left, top: menuRect.top, width: menuRect.width, height: menuRect.height }, display: menuStyle.display, pointerEvents: menuStyle.pointerEvents }, sheet: modal && { display: modalStyle.display, pointerEvents: modalStyle.pointerEvents, rect: modalRect && { left: modalRect.left, top: modalRect.top, width: modalRect.width, height: modalRect.height } } }
+      })()`)
+      ensure(portraitArmed.pendingSkill?.skillId === 'venom-claw-rend', `RED-225: portrait touch did not arm the skill: ${JSON.stringify(portraitArmed)}`)
+      const portraitLayout = await inspectSkillLayout('mobile-portrait-targeting-layout')
+      const portraitTargetControls = await inspectTargetControls('mobile-portrait-target-controls')
+      ensure(portraitLayout.modal.visible && portraitLayout.rows.length === portraitLayout.displaySkillCount && portraitLayout.rows.every(row => row.text && row.descriptionVisible), `RED-225: mobile portrait target mode lost readable skill descriptions: ${JSON.stringify(portraitLayout)}`)
+      ensure(portraitTargetControls.overlay.visible && portraitTargetControls.prompt.visible && portraitTargetControls.prompt.text, `RED-225: mobile portrait top target prompt is not visible: ${JSON.stringify(portraitTargetControls)}`)
+      ensure(portraitTargetControls.prompt.rect && portraitTargetControls.prompt.rect.top >= 0 && portraitTargetControls.prompt.rect.top <= Math.max(120, portraitTargetControls.viewport.height * 0.35) && portraitTargetControls.prompt.rect.height <= 64, `RED-225: mobile portrait target prompt is not a short top line: ${JSON.stringify(portraitTargetControls)}`)
+      ensure(portraitTargetControls.controls.visible && portraitTargetControls.controls.insideDock && !portraitTargetControls.controls.insideOverlay, `RED-225: mobile portrait target controls are not separated into the character sheet: ${JSON.stringify(portraitTargetControls)}`)
+      assertTargetPresentation(portraitTargetControls, 'RED-225 mobile portrait target presentation')
+      ensure(portraitTargetControls.cancel.exists && portraitTargetControls.cancel.visible && !portraitTargetControls.cancel.hidden && portraitTargetControls.cancel.rect && portraitTargetControls.cancel.rect.height >= 48 && portraitTargetControls.cancel.rect.bottom <= portraitTargetControls.viewport.height + 1, `RED-225: mobile portrait cancel is not reachable in the skill panel: ${JSON.stringify(portraitTargetControls)}`)
+      ensure(!portraitTargetControls.independentCard && portraitTargetControls.viewport.scrollWidth <= portraitTargetControls.viewport.width + 1, `RED-225: mobile portrait target prompt or controls still use the old card/overflow: ${JSON.stringify(portraitTargetControls)}`)
+      await screenshot('mobile-390x844-skill-layout-targeting.png')
+      evidence.screenshots.push('mobile-390x844-skill-layout-targeting.png')
+      await clickSelector('#targetCancelButton', 'touch')
+      evidence.mobile.portrait = { portraitAction, portraitArmed, portraitLayout, portraitTargetControls, cancelled: await snapshot('portrait-after-cancel') }
+      win.setContentSize(1280, 720)
+      await delay(250)
+    }
 
     if (process.env.RVB_FLOATER_STACKING === '1') {
       await verifyFloaterStacking('mobile-floater-stacking')

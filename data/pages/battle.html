@@ -3990,7 +3990,7 @@
       }
 
       document.getElementById('pieceInfoContent').innerHTML =
-        statsHtml + (adventureWarning ? '<div class="adventure-piece-warning">' + escHtml(adventureWarning) + '</div>' : '') + tagsHtml +
+        '<div class="pi-piece-state">' + statsHtml + (adventureWarning ? '<div class="adventure-piece-warning">' + escHtml(adventureWarning) + '</div>' : '') + tagsHtml + '</div>' +
         `<div class="pi-section-label">技能 <button type="button" class="skill-reading-tips" onclick="RvBSkillDescription.showGuide(true)">Tips · 描述说明</button></div>` + skillsHtml + relatedCardsHtml
 
       document.getElementById('pieceKeywordPanel').innerHTML = renderKeywordPanel(
@@ -5757,26 +5757,80 @@
       return targetStepPrefix(pendingSkill.pendingTargetIndex) +
         targetTypeText(pendingSkill.targetType, pendingSkill.filter)
     }
+
+    // The instruction stays at the top of the screen; reuse only the action
+    // controls in the character sheet, with a fallback for card/rule choices.
+    function placeTargetOverlayHost(active) {
+      const overlay = document.getElementById('targetSelectionControls')
+      if (!overlay) return
+      const modal = document.getElementById('pieceInfoModal')
+      const layout = modal && modal.classList.contains('character-dock')
+        && modal.style.display !== 'none'
+        && typeof currentPieceInfoSource !== 'undefined'
+        && currentPieceInfoSource === 'board'
+        ? modal.querySelector('.pi-layout')
+        : null
+      let skillRow = null
+      const skillId = active && pendingSkill && pendingSkill.skillId
+        ? String(pendingSkill.skillId)
+        : active && targetSubmissionPending && targetSubmissionPending.draft
+          && targetSubmissionPending.draft.skill && targetSubmissionPending.draft.skill.skillId
+          ? String(targetSubmissionPending.draft.skill.skillId)
+          : ''
+      if (active && layout && skillId && typeof document.querySelectorAll === 'function') {
+        const rows = document.querySelectorAll('#pieceInfoContent .pi-skill')
+        for (let i = 0; i < rows.length; i += 1) {
+          const row = rows[i]
+          const cast = row && typeof row.querySelector === 'function'
+            ? row.querySelector('.character-cast')
+            : null
+          if (cast && cast.dataset && String(cast.dataset.skillId || '') === skillId) {
+            skillRow = row
+            break
+          }
+        }
+      }
+      // Clear a previous row marker before native rendering or a skill switch
+      // moves the same controls node to another host.
+      if (typeof document.querySelectorAll === 'function') {
+        const markedRows = document.querySelectorAll('#pieceInfoContent .pi-skill.target-skill-controls')
+        for (let i = 0; i < markedRows.length; i += 1) {
+          if (markedRows[i] !== skillRow && markedRows[i].classList) markedRows[i].classList.remove('target-skill-controls')
+        }
+      }
+      const host = skillRow || (active && layout ? layout : document.body)
+      if (skillRow) {
+        skillRow.classList.add('target-skill-controls')
+        const description = typeof skillRow.querySelector === 'function'
+          ? skillRow.querySelector('.pi-skill-desc')
+          : null
+        // Keep cancel/confirm outside the release button so its click and
+        // drag handlers cannot be mistaken for a skill release.
+        if (description && typeof skillRow.insertBefore === 'function'
+          && (overlay.parentElement !== skillRow || description.previousElementSibling !== overlay)) {
+          skillRow.insertBefore(overlay, description)
+        }
+        else if (overlay.parentElement !== skillRow && typeof skillRow.appendChild === 'function') skillRow.appendChild(overlay)
+      } else if (overlay.parentElement !== host && host && typeof host.appendChild === 'function') {
+        host.appendChild(overlay)
+      }
+      if (active && layout && !skillRow) modal.classList.add('target-footer-active')
+      else if (modal) modal.classList.remove('target-footer-active')
+    }
+
     function renderTargetOverlay() {
       const el = document.getElementById('targetOverlay')
       if (!el) return
-      const active = !targetSubmissionPending && !!(pendingSkill || pendingCardAction)
+      const active = !!(pendingSkill || pendingCardAction || targetSubmissionPending)
       document.body.classList.toggle('target-mode-active', active)
+      const controls = document.getElementById('targetSelectionControls')
+      if (controls) controls.classList.toggle('show', active)
       if (active) {
+        if (typeof placeTargetOverlayHost === 'function') placeTargetOverlayHost(true)
         closePieceContextMenu()
-        if (window.matchMedia && window.matchMedia('(max-width: 760px), (orientation: landscape) and (max-height: 500px)').matches) {
-          const pieceInfo = document.getElementById('pieceInfoModal')
-          const cardInfo = document.getElementById('cardDetailModal')
-          if (pieceInfo && pieceInfo.style.display !== 'none' && pieceInfo.style.display !== '') closePieceInfo()
-          if (cardInfo && cardInfo.style.display !== 'none' && cardInfo.style.display !== '') closeCardDetail()
-        }
-        document.getElementById('targetSourceName').textContent = currentTargetSourceName()
         document.getElementById('targetPromptText').textContent = targetSubmissionPending
           ? '指令已提交 · 等待权威确认'
           : _targetPromptText()
-        const rangeLegend = document.getElementById('targetRangeLegend')
-        const preparation = (pendingSkill || pendingCardAction || {}).preparation
-        if (rangeLegend) rangeLegend.hidden = !(preparation && preparation.rangeCells && preparation.rangeCells.length)
         const multiSummary = document.getElementById('targetMultiSummary')
         const confirmButton = document.getElementById('targetConfirmButton')
         const multiActive = isPendingBoardMultiTarget()
@@ -5801,6 +5855,7 @@
         el.classList.add('show')
       } else {
         el.classList.remove('show')
+        if (typeof placeTargetOverlayHost === 'function') placeTargetOverlayHost(false)
       }
     }
     function cancelTargetSelection() {
@@ -8172,6 +8227,10 @@
       const key = line
       if (lastDmFeedback.key === key && now - lastDmFeedback.at < 700) return
       lastDmFeedback = { key, at: now }
+      const aiming = (typeof pendingSkill !== 'undefined' && pendingSkill)
+        || (typeof pendingCardAction !== 'undefined' && pendingCardAction)
+      const prompt = document.getElementById('targetPromptText')
+      if (aiming && prompt) prompt.textContent = line
       const bubble = document.getElementById('dmBubble')
       if (!bubble) return
       bubble.textContent = line
@@ -8182,6 +8241,7 @@
       dmFeedbackTimer = setTimeout(() => {
         bubble.classList.remove('is-visible')
         bubble.setAttribute('aria-hidden', 'true')
+        if (aiming) renderTargetOverlay()
       }, 3000)
       const feedbackAudio = ensureBattleFeedbackAudio()
       if (feedbackAudio) feedbackAudio.play('invalid')
@@ -8193,6 +8253,10 @@
       const el = document.getElementById('statusMsg')
       const shown = waitingForOtherPending() ? '等待对方操作' : msg
       if (el) el.textContent = shown
+      const aiming = (typeof pendingSkill !== 'undefined' && pendingSkill)
+        || (typeof pendingCardAction !== 'undefined' && pendingCardAction)
+      const prompt = document.getElementById('targetPromptText')
+      if (aiming && prompt) prompt.textContent = shown
       showDmFeedback(shown)
     }
     function showMsg(msg, type) {
@@ -8520,7 +8584,7 @@
         if (!target || typeof target.closest !== 'function') return true
         // A battlefield pointerup can synchronously advance a card to its next
         // target step before the matching click bubbles to document.
-        return !target.closest('.card-item, #boardWrap, #targetOverlay, #mobileDockToggle')
+        return !target.closest('.card-item, #boardWrap, #targetOverlay, #targetSelectionControls, #mobileDockToggle')
       }
 
       // Click outside the hand and battlefield to cancel card targeting.
@@ -8602,16 +8666,14 @@
   </script>
 
 
-  <!-- Target selection overlay (pointer-events:none so board stays clickable) -->
+  <!-- Pure text instruction; actions remain in the skill reading panel. -->
   <div id="targetOverlay" role="status" aria-live="polite">
-    <div class="target-mode-card">
-      <div class="target-source-name" id="targetSourceName">当前技能</div>
-      <div class="target-prompt" id="targetPromptText">选择目标</div>
-      <div id="targetRangeLegend" hidden style="font-size:12px;color:#453727"><span style="color:#347b91">■</span> 施法范围 · 高亮目标可选</div>
+    <div class="target-prompt" id="targetPromptText">选择目标</div>
+  </div>
+  <div id="targetSelectionControls" role="group" aria-label="目标选择操作">
       <div class="target-multi-summary" id="targetMultiSummary" style="display:none"></div>
       <button type="button" class="target-confirm-btn" id="targetConfirmButton" style="display:none" onclick="dispatchBattleIntent({type:'confirm-target-selection'})">确认选择</button>
       <button type="button" class="target-cancel-btn" id="targetCancelButton" onclick="dispatchBattleIntent({type:'cancel-target'})">取消目标选择</button>
-    </div>
   </div>
 
   <!-- Fullscreen log overlay -->

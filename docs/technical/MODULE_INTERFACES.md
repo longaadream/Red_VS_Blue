@@ -623,6 +623,13 @@ RED-140 是已接受的目标合同，不表示当前运行时已经实现。唯
 
 RED-186 正式接入：battle.html 直接加载 tabletop-battle 样式与角色栏/卡背/地格表现适配器，资源随页面发布；不再依赖预览服务器替换。固定训练样本仅由 docs/qa/RED-186/serve.cjs 在明确 sample=1 的训练请求中注入，正常入口不加载样本。
 
+## RED-225 技能阅读与目标提示（候选接口）
+
+- 公共角色面板沿用 `pieceInfoDisplaySkills` 的完整描述。既有 `.character-cast` 按钮承载技能标题和费用；说明、关键词和滚动区域不属于拖动入口。所有命令继续通过既有 `dispatchBattleIntent` 和目标准备接口，不修改角色代码。
+- `#targetOverlay` 固定在屏幕上方，仅有 `#targetPromptText` 一行文字，不承载卡片、背景或输入。黄色填充配黑色粗字形描边，显示区域没有边框或底色。提示来自真实 pending hint 和目标类型；不推算总步骤。非法目标反馈显示在同一文字行，既有轻提示音继续受设置约束。
+- `#targetSelectionControls` 复用既有确认、取消和多目标摘要。技能目标选择时按 `pendingSkill.skillId` 找到当前 `.pi-skill`，作为标题操作区与说明之间的独立兄弟节点挂载；提交等待或原生重绘后继续复用同一节点并重新挂载。卡牌或无对应技能行的规则选择使用公共回退位置。取消仍遵守 `canCancel`；提交期间保留等待提示并禁用控件，重试和主动取消沿用 RED-221。
+- 手机横屏为面板预留侧栏，竖屏使用下方阅读区；棋盘尺寸变化由 renderer 既有 ResizeObserver 处理。瞄准时手机角色统计区收起，完整技能描述仍在独立滚动区。样式只调整本次交互尺寸和布局，使用既有字体、材质、颜色与状态边框。
+
 ## RED-224 公共技能预演（候选接口）
 
 - `GameEngine.previewBattleAction(snapshot, action, viewerId)` 同步计算查看者的技能根动作；结果为 `ready`（公开假设快照、公开表现事件、计算耗时）、`needs-input` 或 `unavailable`。它不生成提交凭证、不写真实行动历史、不发送网络命令。
