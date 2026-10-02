@@ -195,9 +195,18 @@ function isPublicRuleForViewer(
 function initialPublicRuleIds(holder: JsonRecord): Set<string> {
   const initial = isRecord(holder.initialDefinition) ? holder.initialDefinition : undefined
   const values = Array.isArray(initial?.rules) ? initial.rules : []
+  // Summons also have an initialDefinition. Its rules describe the internal
+  // incarnation, not necessarily the body visible to an opponent. In
+  // particular, hidden initial statuses can own death/immobility rules.
+  const statuses = Array.isArray(initial?.statusTags) ? initial.statusTags : []
+  const privateRuleIds = new Set(statuses.flatMap(status => (
+    isRecord(status) && status.visible === false && Array.isArray(status.relatedRules)
+      ? status.relatedRules.map(String)
+      : []
+  )))
   return new Set(values.flatMap(value => {
-    if (typeof value === 'string' && value.trim()) return [value]
-    if (isRecord(value) && typeof value.id === 'string' && value.id.trim()) return [value.id]
+    if (typeof value === 'string' && value.trim() && !privateRuleIds.has(value)) return [value]
+    if (isRecord(value) && typeof value.id === 'string' && value.id.trim() && !privateRuleIds.has(value.id)) return [value.id]
     return []
   }))
 }
@@ -240,6 +249,19 @@ function applyPublicDisplayBindings(projected: BattleState, viewerId: string): v
       }
       for (const [sourceKey, targetKey] of Object.entries(legacyFields)) {
         if (holder[sourceKey] !== undefined) holder[targetKey] = cloneJson(holder[sourceKey])
+      }
+      // Legacy source-mirror displays follow the living source's health and
+      // statuses in the board model. Use that same public appearance rather
+      // than the summon-time snapshot or the hidden 99-HP incarnation.
+      const master = projected.pieces.find(candidate => (
+        candidate.instanceId === holder.masterPieceId && candidate.currentHp > 0
+      ))
+      if (master) {
+        holder.currentHp = master.currentHp
+        holder.maxHp = master.maxHp
+        if (holder.displayStatusTags !== undefined) holder.statusTags = cloneJson(master.statusTags)
+        if (master.initialDefinition) holder.initialDefinition = cloneJson(master.initialDefinition)
+        else delete holder.initialDefinition
       }
     }
     for (const key of [
@@ -419,7 +441,15 @@ function createStickyPreviewRuntime(): { runtime: RuleRuntime; randomAccessed: (
     accessed = true
     return nextInt(streamName, maxExclusive)
   }) as RuleRuntime['nextInt']
-  return { runtime, randomAccessed: () => accessed }
+  return {
+    runtime,
+    // Suspendable actions can execute in a reconstructed runtime and restore
+    // its committed cursors into this one. Those draws bypass the method
+    // hooks above; the isolated runtime starts at zero on every attempt.
+    // Instance IDs use their own streams and do not select gameplay outcomes.
+    randomAccessed: () => accessed || Object.entries(runtime.snapshot().cursors)
+      .some(([name, cursor]) => !name.startsWith('instance-id/') && cursor > 0),
+  }
 }
 
 function previewReactionKey(
@@ -500,9 +530,40 @@ function redactActionLog(value: unknown): unknown {
   return result
 }
 
-function publicPredictedState(state: BattleState, viewerId: string, skillId: string): BattleState {
+function visiblePresentationMarkers(snapshot: BattleState, viewerId: string): JsonRecord[] {
+  const alreadyPublic = publicSkillPresentation(snapshot.extensions?.skillPresentation)
+  const presentation = alreadyPublic ?? publicSkillPresentation(
+    toPublicBattleState(snapshot, viewerId).extensions?.skillPresentation,
+  )
+  return Array.isArray(presentation?.markers) ? presentation.markers.flatMap(marker => {
+    if (!isRecord(marker)) return []
+    return [Object.fromEntries(Object.entries(marker).filter(([key]) => (
+      ['id', 'x', 'y', 'label', 'icon'].includes(key)
+    )))]
+  }) : []
+}
+
+function publicPredictedState(state: BattleState, viewerId: string, skillId: string, baselineMarkers: JsonRecord[]): BattleState {
   const projected = publicViewerExecutionSnapshot(state, viewerId) as unknown as JsonRecord
-  delete projected.extensions
+  // Return only presentation data from the already viewer-projected state.
+  // Never carry executable/private extension stores into the hypothetical board.
+  const publicProjection = toPublicBattleState(state, viewerId)
+  const publicExtensions: JsonRecord = {}
+  if (Array.isArray(publicProjection.extensions?.tileEffects)) {
+    publicExtensions.tileEffects = publicProjection.extensions.tileEffects
+      .filter(effect => isRecord(effect) && effect.visible !== false)
+      .map(effect => Object.fromEntries(Object.entries(effect).filter(([key]) => (
+        ['id', 'x', 'y', 'sourceId', 'tileType', 'type', 'icon', 'iconPosition', 'presentation', 'presentationStep'].includes(key)
+      ))))
+  }
+  const markerKey = (marker: JsonRecord) => `${String(marker.id)}:${String(marker.x)},${String(marker.y)}`
+  const markers = new Map(baselineMarkers.map(marker => [markerKey(marker), marker]))
+  for (const marker of visiblePresentationMarkers(state, viewerId)) markers.set(markerKey(marker), marker)
+  if (markers.size) {
+    publicExtensions.skillPresentation = { version: 1, bindings: [], indicators: [], cues: [], markers: [...markers.values()] }
+  }
+  if (Object.keys(publicExtensions).length) projected.extensions = publicExtensions
+  else delete projected.extensions
   delete projected.customCards
   delete projected.deployment
   delete projected.turnTimer
@@ -574,6 +635,7 @@ export function previewBattleAction(
     if (!isPureJson(safeAction)) return unavailable(started)
     const actionRecord = action as unknown as JsonRecord
     if (actionRecord.type !== 'useBasicSkill' && actionRecord.type !== 'useChargeSkill') return unavailable(started)
+    const baselineMarkers = visiblePresentationMarkers(snapshot, viewer)
     const publicSnapshot = publicViewerExecutionSnapshot(snapshot, viewer)
     if (!isPureJson(publicSnapshot)) return unavailable(started)
     if (stateHasPendingInteraction(publicSnapshot)) return needsInput(started)
@@ -648,7 +710,7 @@ export function previewBattleAction(
     const postExecutionCheck = cloneJson(predicted)
     if (!sanitizePreviewState(postExecutionCheck)) return unavailable(started)
 
-    const publicState = publicPredictedState(predicted, viewerId, skillId)
+    const publicState = publicPredictedState(predicted, viewerId, skillId, baselineMarkers)
     const rawEvents = projectBattlePresentationEvents({
       actionId: actionId(safeAction),
       command: safeAction,

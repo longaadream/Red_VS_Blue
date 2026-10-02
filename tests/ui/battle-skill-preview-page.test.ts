@@ -188,6 +188,61 @@ describe('RED-224 battle page skill preview binding', () => {
     expect(h.engine.applyBattleAction).not.toHaveBeenCalled()
   })
 
+  it('keeps a no-target preview root free of hovered coordinates', () => {
+    const h = createHarness({ status: 'ready', snapshot: { revision: 8 }, events: [] })
+    h.pendingSkill.previewOnly = true
+
+    preview(h, 2, 3)
+
+    expect(h.engine.previewBattleAction).toHaveBeenCalledOnce()
+    const action = h.engine.previewBattleAction.mock.calls[0][1]
+    expect(action).toMatchObject({
+      type: 'useBasicSkill',
+      pieceId: 'source',
+      skillId: 'skill-a',
+    })
+    expect(action).not.toHaveProperty('targetPieceId')
+    expect(action).not.toHaveProperty('targetX')
+    expect(action).not.toHaveProperty('targetY')
+    expect(h.transport).not.toHaveBeenCalled()
+  })
+
+  it('releases a no-target preview through one root action on board activation', () => {
+    const h = createHarness({ status: 'ready', snapshot: { revision: 8 }, events: [] })
+    h.pendingSkill.previewOnly = true
+    Object.assign(h.context, {
+      ADVENTURE_MODE: false,
+      TRAINING_MODE: false,
+      placingMode: false,
+      selectedPieceId: 'source',
+      pendingCardAction: null,
+      pendingMove: false,
+      refreshBattleLegalActions: vi.fn(),
+      adventureOpenCell: vi.fn(() => false),
+      pendingOptionSelectionForOther: vi.fn(() => false),
+      skillDefOf: vi.fn(() => ({ type: 'normal' })),
+      skillUsesCharge: vi.fn(() => false),
+      renderBoard: vi.fn(),
+      renderActionBar: vi.fn(),
+      renderTargetOverlay: vi.fn(),
+      setStatusMsg: vi.fn(),
+    })
+    new Script(readNamedFunction(readPage(), 'onCellClick'), { filename: 'battle.html:onCellClick' })
+      .runInContext(h.context as any)
+
+    new Script('onCellClick(2, 3)').runInContext(h.context as any)
+
+    expect(h.transport).toHaveBeenCalledOnce()
+    expect(h.transport.mock.calls[0][0]).toMatchObject({
+      type: 'useBasicSkill',
+      pieceId: 'source',
+      skillId: 'skill-a',
+    })
+    expect(h.transport.mock.calls[0][0]).not.toHaveProperty('targetX')
+    expect(h.transport.mock.calls[0][0]).not.toHaveProperty('targetY')
+    expect(h.context.pendingSkill).toBeNull()
+  })
+
   it('appends a legal target to an existing root without mutating the pending action', () => {
     const h = createHarness({ status: 'ready', snapshot: { revision: 8 }, events: [] })
     h.pendingSkill.baseAction.targetPieceId = 'first-target'

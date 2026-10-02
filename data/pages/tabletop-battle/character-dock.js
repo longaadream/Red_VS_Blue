@@ -69,7 +69,13 @@
  function refreshActions(piece){
   const records=pieceInfoDisplaySkills(piece),rows=[...document.querySelectorAll('#pieceInfoContent .pi-skill')];
   const owned=!!myPlayerId&&String(piece.ownerPlayerId||'').toLowerCase()===String(myPlayerId).toLowerCase();
-  const targetBusy=!!(pendingSkill||pendingCardAction||targetSubmissionPending||pendingActionFeedback||casting||(G&&(G.pendingTargetSelection||G.pendingOptionSelection)));
+  const authoritativeSelection=G&&(G.pendingTargetSelection||G.pendingOptionSelection);
+  const selectionLocked=!!(authoritativeSelection&&authoritativeSelection.canCancel===false);
+  const waitingForOther=typeof waitingForOtherPending==='function'&&waitingForOtherPending();
+  // A local target draft is cancelable and must leave the other skill headers
+  // interactive so a new preview can replace it. Submission and authoritative
+  // non-cancelable selections still lock the dock.
+  const targetBusy=!!(pendingCardAction||targetSubmissionPending||pendingActionFeedback||casting||selectionLocked||waitingForOther);
   const targetingSkillId=targetSkillId();
   const cancelAllowed=targetCancelAllowed();
   rows.slice(0,records.length).forEach((row,i)=>{
@@ -83,10 +89,11 @@
    let button=row.querySelector('.character-cast');
    if(!button){button=document.createElement('button');button.type='button';button.className='character-cast';row.append(button);button.addEventListener('click',async(event)=>{
     event.stopPropagation();if(button.disabled||casting)return;
-    if(button.dataset.targetMode==='cancel'){
+    const hoverPreview=typeof pendingSkill!=='undefined'&&pendingSkill&&pendingSkill.previewOrigin==='hover'&&String(pendingSkill.skillId||'')===String(id);
+    if(button.dataset.targetMode==='cancel'&&!hoverPreview){
      casting=true;button.disabled=true;setKeyword(false);
      try{selectedPieceId=piece.instanceId;await dispatchBattleIntent({type:'cancel-target'});}
-     finally{casting=false;lastSignature='';syncSelected(true);}
+     finally{casting=false;syncSelected(false);}
      return;
     }
     // Re-resolve against the current visible owner and native availability at action time.
@@ -94,8 +101,20 @@
     if(!live||!resolveSkillAvailability(live,id).available)return;
     casting=true;button.disabled=true;setKeyword(false);
     try{selectedPieceId=live.instanceId;await dispatchBattleIntent({type:'select-skill',skillId:id});}
-    finally{casting=false;lastSignature='';syncSelected(true);}
+    finally{casting=false;syncSelected(false);}
    });}
+   if(!row.dataset.skillPreviewHoverBound){
+    row.dataset.skillPreviewHoverBound='true';
+    row.addEventListener('pointerenter',event=>{
+     const pointerType=event&&event.pointerType;
+     if(pointerType&&pointerType!=='mouse')return;
+     const target=event&&event.target;
+     if(target&&typeof target.closest==='function'&&target.closest('.keyword-badge,.pi-keywords'))return;
+     const current=row.querySelector('.character-cast');
+     if(!current||current.disabled||typeof window.previewSkillCard!=='function')return;
+     window.previewSkillCard(current.dataset.skillId||id);
+    });
+   }
    // The existing skill header is the action surface. Moving it into the
    // same real button keeps the title, type and cost readable while leaving
    // the description and keyword badges outside the release target.
@@ -110,10 +129,11 @@
    if(description&&button.nextElementSibling!==description&&!controlsBetween)row.insertBefore(button,description);
     bindSkillCardActivation(row);
    button.dataset.skillId=id;
-   const cancelMode=isTargeting&&cancelAllowed;
-   const cancelStateLabel=isTargeting?(targetSubmissionPending?'等待确认…':!cancelAllowed?'当前选择不可取消':''):'';
-   if(isTargeting)button.dataset.targetMode=cancelMode?'cancel':'cancel-disabled';else delete button.dataset.targetMode;
-   button.classList.toggle('is-cancel-mode',cancelMode);button.classList.toggle('is-cancel-disabled',isTargeting&&!cancelMode);
+   const hoverPreview=!!(isTargeting&&typeof pendingSkill!=='undefined'&&pendingSkill&&pendingSkill.previewOrigin==='hover'&&String(pendingSkill.skillId||'')===String(id));
+   const cancelMode=isTargeting&&cancelAllowed&&!hoverPreview;
+   const cancelStateLabel=isTargeting&&!hoverPreview?(targetSubmissionPending?'等待确认…':!cancelAllowed?'当前选择不可取消':''):'';
+   if(isTargeting&&!hoverPreview)button.dataset.targetMode=cancelMode?'cancel':'cancel-disabled';else delete button.dataset.targetMode;
+   button.classList.toggle('is-cancel-mode',cancelMode);button.classList.toggle('is-cancel-disabled',isTargeting&&!cancelMode&&!hoverPreview);
    setCancelMeta(skillMeta,cancelMode,cancelStateLabel);
    button.classList.toggle('tutorial-skill-hint',document.body.dataset.tutorialSkill===id);
    if(document.body.dataset.tutorialSkill===id&&!button.dataset.tutorialRevealed){
@@ -121,9 +141,9 @@
     requestAnimationFrame(()=>{if(button.isConnected&&document.body.dataset.tutorialSkill===id)button.scrollIntoView({block:'nearest',inline:'nearest'});});
    }
    const skillName=definition.name||id;
-   button.setAttribute('aria-label',cancelMode?'取消：'+skillName:'释放：'+skillName);
-   button.title=cancelMode?'再次点击取消':targetSubmissionPending&&isTargeting?'等待权威确认':isTargeting&&!cancelAllowed?'当前规则选择不可取消':targetBusy?'请先完成当前操作':available.unavailableReason||'释放 '+skillName;
-   button.disabled=cancelMode?false:isTargeting||targetBusy||!available.available;row.classList.toggle('cast-unavailable',!available.available&&!cancelMode);
+   button.setAttribute('aria-label',cancelMode?'取消：'+skillName:hoverPreview?'预演：'+skillName:'释放：'+skillName);
+   button.title=cancelMode?'再次点击取消':hoverPreview?'当前为预演；点击或拖动释放':targetSubmissionPending&&isTargeting?'等待权威确认':isTargeting&&!cancelAllowed?'当前规则选择不可取消':targetBusy?'请先完成当前操作':available.unavailableReason||'释放 '+skillName;
+   button.disabled=cancelMode?false:hoverPreview?false:isTargeting||targetBusy||!available.available;row.classList.toggle('cast-unavailable',!available.available&&!cancelMode&&!hoverPreview);
    let reason=row.querySelector('.character-cast-reason');if(!reason){reason=document.createElement('div');reason.className='character-cast-reason';row.append(reason);}
    reason.textContent=cancelMode?'':available.unavailableReason||'';
   });
@@ -194,8 +214,11 @@
   // While choosing targets, keep the caster sheet; target picking must not switch the viewed actor.
   const id=(pendingSkill||pendingCardAction)&&currentPieceInfoId?currentPieceInfoId:selectedPieceId;
   const piece=G&&G.pieces.find(p=>p.instanceId===id);if(!piece)return;
-  const signature=JSON.stringify([id,pieceDispHp(piece),pieceDispStats(piece),pieceDispTags(piece),pieceInfoDisplaySkills(piece),G.turn,G.players.map(p=>[p.playerId,p.actionPoints,p.chargePoints]),!!pendingSkill,!!pendingCardAction,!!pendingActionFeedback,!!targetSubmissionPending]);
-  if(!force&&signature===lastSignature)return;
+  // Local selection/cancellation changes button state, not the character
+  // sheet's content. Replacing a hovered row would immediately re-arm the
+  // cancelled skill through pointerenter on its replacement.
+  const signature=JSON.stringify([id,pieceDispHp(piece),pieceDispStats(piece),pieceDispTags(piece),pieceInfoDisplaySkills(piece),G.turn,G.players.map(p=>[p.playerId,p.actionPoints,p.chargePoints])]);
+  if(!force&&signature===lastSignature){refreshActions(piece);return;}
   busy=true;try{lastSignature=signature;currentPieceInfoId=id;currentPieceInfoSource='board';window.renderPieceInfoRecord(piece,true);}finally{busy=false;}
   // A skill can enter targeting from the compact board menu before the
   // reading sheet existed. Re-run the shared renderer after opening it so

@@ -11,10 +11,12 @@ import {
   withRuleRuntimeCheckpoint,
 } from '@/lib/game/rule-runtime'
 import { previewBattleAction } from '@/lib/game/skill-preview'
+import { toPublicBattleState } from '@/lib/game/deployment'
+import { createSkillPresentation } from '@/lib/game/skill-presentation'
 import { TriggerSystem } from '@/lib/game/triggers'
 import { prepareAction } from '@/lib/game/targeting'
-import type { BattleAction, BattleState } from '@/lib/game/turn'
-import type { SkillDefinition } from '@/lib/game/skills'
+import { applyBattleAction, type BattleAction, type BattleState } from '@/lib/game/turn'
+import { loadRuleById, type SkillDefinition } from '@/lib/game/skills'
 import { asPieceInstance, makePiece, makeState } from '../helpers/minimal-state'
 
 function canonicalSkill(id: string): SkillDefinition {
@@ -108,6 +110,168 @@ function withoutDuration<T>(value: T): T {
 }
 
 describe('RED-224 engine skill-preview privacy', () => {
+  it.each(['authority', 'network'] as const)('keeps already visible markers without exposing private presentation (%s)', inputKind => {
+    const state = publicState()
+    const presentation = createSkillPresentation(state, 'player-blue', 'preview-test')
+    presentation.mark({ id: 'public-cell', audience: 'public', cells: [{ x: 2, y: 2 }], label: '公开地格', icon: '◆' })
+    presentation.mark({ id: 'private-cell', audience: 'owner', cells: [{ x: 3, y: 3 }], label: '秘密地格', icon: '◆' })
+    const input = inputKind === 'network' ? toPublicBattleState(state, 'player-red') : state
+    const expected = toPublicBattleState(state, 'player-red').extensions?.skillPresentation
+    const result = previewBattleAction(input, targetedAction(input), 'player-red')
+    expect(result.status).toBe('ready')
+    if (result.status !== 'ready') return
+    expect(result.snapshot.extensions?.skillPresentation?.markers).toEqual(expected?.markers)
+  })
+  it('ignores Kyoka Suigetsu in the public preview without disabling its real target rewrite', () => {
+    const state = publicState()
+    const aizen = asPieceInstance(makePiece({
+      instanceId: 'aizen', templateId: 'dark-aizen', ownerPlayerId: 'player-blue',
+      faction: 'blue', x: 1, y: 1,
+    }))
+    aizen.rules = [{ id: 'rule-aizen-kyoka-rewrite' }]
+    aizen.initialDefinition = {
+      stats: { maxHp: aizen.maxHp, attack: aizen.attack, defense: aizen.defense, moveRange: aizen.moveRange },
+      skills: [], rules: ['rule-aizen-kyoka-rewrite'], statusTags: [],
+    }
+    aizen.statusTags = [
+      { id: 'active', type: 'aizen-kyoka-active', visible: false },
+      { id: 'secret', type: 'aizen-kyoka-secret', visible: false, targetPieceId: 'target', opponentPlayerId: 'player-red' },
+    ]
+    state.pieces.push(aizen)
+    const ordinary = structuredClone(state)
+    ordinary.pieces.find(piece => piece.instanceId === 'aizen')!.statusTags = []
+    const action = targetedAction(state)
+    const before = JSON.stringify(state)
+    const preview = previewBattleAction(state, action, 'player-red')
+    expect(preview.status).toBe('ready')
+    expect(withoutDuration(preview)).toEqual(withoutDuration(
+      previewBattleAction(ordinary, targetedAction(ordinary), 'player-red'),
+    ))
+    expect(JSON.stringify(state)).toBe(before)
+    const isolated = createRuleExecutionContext(new TriggerSystem())
+    const actual = withRuleExecutionContext(isolated, () => {
+      const authority = structuredClone(state)
+      authority.pieces.find(piece => piece.instanceId === 'aizen')!.rules = [loadRuleById('rule-aizen-kyoka-rewrite', true)]
+      return applyBattleAction(authority, action)
+    })
+    expect(actual.pendingTargetSelection).toMatchObject({ playerId: 'player-blue' })
+    expect(actual.pendingTargetSelection?.candidates).toContainEqual({ type: 'piece', pieceId: 'source' })
+    expect(actual.pieces.find(piece => piece.instanceId === 'target')?.currentHp).toBe(12)
+  })
+
+  it.each([
+    ['authority', 'venom-claw-rend'], ['network', 'venom-claw-rend'],
+    ['authority', 'el-primo-punch'], ['network', 'el-primo-punch'],
+  ])('keeps a self-protected Aizen preview available and identical to an unarmed Aizen (%s, %s)', (inputKind, skillId) => {
+    const ordinary = publicState(skillId)
+    if (skillId === 'el-primo-punch') {
+      ordinary.pieces[0].templateId = 'el-primo'
+      ordinary.pieces[0].attack = 4
+      ordinary.pieces[0].rules = [{ id: 'rule-el-primo-injury-counter' }]
+    }
+    const target = ordinary.pieces.find(piece => piece.instanceId === 'target')!
+    target.templateId = 'dark-aizen'
+    target.rules = [{ id: 'rule-aizen-kyoka-rewrite' }, { id: 'rule-aizen-kyoka-expire' }]
+    target.initialDefinition = {
+      stats: { maxHp: target.maxHp, attack: target.attack, defense: target.defense, moveRange: target.moveRange },
+      skills: [], rules: ['rule-aizen-kyoka-rewrite', 'rule-aizen-kyoka-expire'], statusTags: [],
+    }
+    const armed = structuredClone(ordinary)
+    armed.pieces.find(piece => piece.instanceId === 'target')!.statusTags = [
+      { id: 'active', type: 'aizen-kyoka-active', visible: false, currentUses: 1, stacks: 1 },
+      { id: 'secret', type: 'aizen-kyoka-secret', visible: false, currentUses: 1, stacks: 1, targetPieceId: 'target', opponentPlayerId: 'player-red' },
+    ]
+    const inputs = [ordinary, armed].map(state => inputKind === 'network' ? toPublicBattleState(state, 'player-red') : state)
+    const results = inputs.map(state => previewBattleAction(state, targetedAction(state, skillId), 'player-red'))
+    expect(results.map(result => result.status)).toEqual(['ready', 'ready'])
+    expect(withoutDuration(results[1])).toEqual(withoutDuration(results[0]))
+  })
+
+  it('ignores the actual statuses produced by casting Kyoka Suigetsu on oneself', () => {
+    const state = publicState()
+    const target = state.pieces.find(piece => piece.instanceId === 'target')!
+    target.templateId = 'dark-aizen'
+    target.skills = [{ skillId: 'aizen-kyoka-suiguetsu', currentCooldown: 0, usesRemaining: -1 }]
+    target.rules = [{ id: 'rule-aizen-kyoka-rewrite' }, { id: 'rule-aizen-kyoka-expire' }]
+    target.initialDefinition = {
+      stats: { maxHp: target.maxHp, attack: target.attack, defense: target.defense, moveRange: target.moveRange },
+      skills: target.skills, rules: ['rule-aizen-kyoka-rewrite', 'rule-aizen-kyoka-expire'], statusTags: [],
+    }
+    state.turn.currentPlayerId = 'player-blue'
+    state.players.find(player => player.playerId === 'player-blue')!.actionPoints = 10
+    state.skillsById['aizen-kyoka-suiguetsu'] = canonicalSkill('aizen-kyoka-suiguetsu')
+    const draft = { type: 'useBasicSkill' as const, playerId: 'player-blue', pieceId: 'target', skillId: 'aizen-kyoka-suiguetsu' }
+    const prepared = prepareAction(state, draft)
+    if (prepared.kind !== 'needTarget') throw new Error('expected self target preparation')
+    const armed = withRuleExecutionContext(createRuleExecutionContext(new TriggerSystem()), () => applyBattleAction(state, {
+      ...draft, targetPieceId: 'target', selectionId: prepared.selectionId, stateRevision: prepared.stateRevision,
+    }))
+    expect(armed.pieces.find(piece => piece.instanceId === 'target')!.statusTags).toContainEqual(expect.objectContaining({ type: 'aizen-kyoka-secret', visible: false }))
+    armed.turn.currentPlayerId = 'player-red'
+    const ordinary = { ...armed, pieces: armed.pieces.map(piece => (
+      piece.instanceId === 'target' ? { ...piece, statusTags: [] } : piece
+    )) }
+    const results = [ordinary, armed].map(input => previewBattleAction(input, targetedAction(input), 'player-red'))
+    expect(results.map(result => result.status)).toEqual(['ready', 'ready'])
+    expect(withoutDuration(results[1])).toEqual(withoutDuration(results[0]))
+  })
+
+  it.each(['authority', 'network'] as const)('does not execute secret summon rules inherited through initialDefinition (%s)', inputKind => {
+    const real = publicState()
+    const disguised = structuredClone(real)
+    const target = disguised.pieces.find(piece => piece.instanceId === 'target')!
+    const secretRules = ['rule-naruto-clone-one-hit', 'rule-naruto-clone-died', 'rule-naruto-clone-immobile']
+    Object.assign(target, {
+      currentHp: 99, maxHp: 99, attack: 0, moveRange: 0,
+      displayCurrentHp: 12, displayMaxHp: 16, displayAttack: real.pieces[1].attack,
+      displayDefense: real.pieces[1].defense, displayMoveRange: real.pieces[1].moveRange,
+      displaySkills: [], displayStatusTags: [],
+      rules: secretRules.map(id => ({ id })),
+      statusTags: [{ id: 'secret-clone', type: 'naruto-clone', visible: false, relatedRules: secretRules }],
+      initialDefinition: {
+        stats: { maxHp: 99, attack: 0, defense: 0, moveRange: 0 }, skills: [], rules: secretRules,
+        statusTags: [{ id: 'secret-clone', type: 'naruto-clone', visible: false, relatedRules: secretRules }],
+      },
+    })
+    const input = inputKind === 'network' ? toPublicBattleState(disguised, 'player-red') : disguised
+    const before = JSON.stringify(input)
+    const realResult = previewBattleAction(real, targetedAction(real), 'player-red')
+    const cloneResult = previewBattleAction(input, targetedAction(input), 'player-red')
+    expect(realResult.status).toBe('ready')
+    expect(withoutDuration(cloneResult)).toEqual(withoutDuration(realResult))
+    if (cloneResult.status === 'ready') {
+      expect(cloneResult.snapshot.pieces.find(piece => piece.instanceId === 'target')?.currentHp).toBe(6)
+      expect(cloneResult.events.some(event => event.kind === 'death')).toBe(false)
+    }
+    expect(JSON.stringify(input)).toBe(before)
+  })
+
+  it('uses the living mirror source health instead of stale summon-time health', () => {
+    const state = publicState()
+    const target = state.pieces.find(piece => piece.instanceId === 'target')!
+    const master = structuredClone(target)
+    master.instanceId = 'master'
+    master.x = 4
+    master.y = 4
+    master.currentHp = 12
+    Object.assign(target, {
+      masterPieceId: 'master', currentHp: 99, maxHp: 99,
+      displayCurrentHp: 16, displayMaxHp: 16, displayStatusTags: [],
+      initialDefinition: { stats: { maxHp: 99, attack: 0, defense: 0, moveRange: 0 }, skills: [], rules: ['rule-naruto-clone-one-hit'], statusTags: [] },
+      rules: [{ id: 'rule-naruto-clone-one-hit' }],
+    })
+    state.pieces.push(master)
+    const before = JSON.stringify(state)
+    const result = previewBattleAction(state, targetedAction(state), 'player-red')
+    expect(result.status).toBe('ready')
+    if (result.status === 'ready') {
+      expect(result.snapshot.pieces.find(piece => piece.instanceId === 'target')?.currentHp).toBe(6)
+      expect(result.snapshot.pieces.find(piece => piece.instanceId === 'master')?.currentHp).toBe(12)
+      expect(result.events.some(event => event.kind === 'death')).toBe(false)
+    }
+    expect(JSON.stringify(state)).toBe(before)
+  })
+
   it('fails closed for a canonical random skill without advancing the source runtime, including a checkpoint call', () => {
     const state = publicState('kenshin-ryutsuisen')
     const action = targetedAction(state, 'kenshin-ryutsuisen')

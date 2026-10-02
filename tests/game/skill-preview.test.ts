@@ -329,6 +329,26 @@ describe('RED-224 isolated public skill preview', () => {
     }
   })
 
+  it('keeps public tile effects in the ready preview snapshot', () => {
+    const state = publicFixture()
+    state.extensions = {
+      tileEffects: [{
+        id: 'amaterasu-1',
+        tileType: 'amaterasu',
+        x: 1,
+        y: 0,
+      }],
+    }
+
+    const result = previewBattleAction(state, targetedAction(state), 'player-red')
+
+    expect(result.status).toBe('ready')
+    if (result.status !== 'ready') return
+    expect(result.snapshot.extensions?.tileEffects).toEqual([
+      expect.objectContaining({ id: 'amaterasu-1', tileType: 'amaterasu', x: 1, y: 0 }),
+    ])
+  })
+
   it('skips a public reaction that requests input and retries from a fresh state', () => {
     const state = publicFixture()
     const target = state.pieces.find(piece => piece.instanceId === 'uther')!
