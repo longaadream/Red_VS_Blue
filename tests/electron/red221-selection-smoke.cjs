@@ -341,7 +341,12 @@ async function runElectronSmoke() {
     return { x: Math.round(point.x), y: Math.round(point.y) }
   }
   const selectorPoint = selector => pointFor(`(() => {
-    const element = document.querySelector(${JSON.stringify(selector)})
+    const elements = Array.from(document.querySelectorAll(${JSON.stringify(selector)}))
+    const element = elements.find(candidate => {
+      const rect = candidate.getBoundingClientRect()
+      const style = getComputedStyle(candidate)
+      return rect.width > 0 && rect.height > 0 && rect.bottom >= 0 && rect.top <= innerHeight && rect.right >= 0 && rect.left <= innerWidth && style.display !== 'none' && style.visibility !== 'hidden' && style.pointerEvents !== 'none'
+    }) || elements[0]
     if (!element) return null
     const rect = element.getBoundingClientRect()
     return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2, width: rect.width, height: rect.height }
@@ -457,6 +462,9 @@ async function runElectronSmoke() {
         scrollHeight: sheet.scrollHeight,
         scrollTop: sheet.scrollTop,
         overflowY: getComputedStyle(sheet).overflowY,
+        rect: (() => { const r = sheet.getBoundingClientRect(); return { left: r.left, top: r.top, right: r.right, bottom: r.bottom, width: r.width, height: r.height } })(),
+        pointerEvents: getComputedStyle(sheet).pointerEvents,
+        zIndex: getComputedStyle(sheet).zIndex,
       },
       target: {
         pendingSkill: pendingSkill?.skillId || null,
@@ -491,17 +499,89 @@ async function runElectronSmoke() {
     ensure(afterDescriptionRead.pendingSkill === beforeRead.pendingSkill && afterDescriptionRead.trainingPutCalls === beforeRead.trainingPutCalls, `RED-225: reading a description changed skill selection or submitted an action: ${JSON.stringify({ beforeRead, afterDescriptionRead })}`)
 
     const sheetPoint = await pointFor(`(() => {
+      const visible = element => {
+        if (!element) return false
+        const r = element.getBoundingClientRect()
+        const style = getComputedStyle(element)
+        return r.width > 0 && r.height > 0 && r.top >= 0 && r.bottom <= innerHeight && style.display !== 'none' && style.visibility !== 'hidden'
+      }
+      // Hit a point that is guaranteed to remain inside the actual sheet. A
+      // description can be visually clipped at the sheet edge; using its
+      // center would dispatch the wheel to the board canvas instead.
       const element = document.querySelector('#pieceInfoModal .pi-sheet')
       if (!element) return null
       const r = element.getBoundingClientRect()
-      return { x: r.left + r.width / 2, y: r.top + Math.min(160, r.height / 2) }
+      const x = r.left + Math.min(44, r.width / 2)
+      const candidates = [0.82, 0.72, 0.62, 0.52, 0.42, 0.32].map(ratio => ({ x, y: r.top + r.height * ratio }))
+      const point = candidates.find(candidate => {
+        const hit = document.elementFromPoint(candidate.x, candidate.y)
+        return hit && (hit === element || hit.closest?.('.pi-sheet') === element) && !hit.closest?.('.pi-piece-state, .pi-header')
+      }) || candidates[0]
+      return point
     })()`, 'skill description scroll area')
     const scrollBefore = await inspectSkillLayout('desktop-before-description-scroll')
     if (scrollBefore.sheet && scrollBefore.sheet.scrollHeight > scrollBefore.sheet.clientHeight + 2) {
-      await cdp('Input.dispatchMouseEvent', { type: 'mouseWheel', x: sheetPoint.x, y: sheetPoint.y, deltaX: 0, deltaY: 360 })
+      const wheelDebug = await evaluate(`(() => {
+        const point = ${JSON.stringify(sheetPoint)}
+        const sheet = document.querySelector('#pieceInfoModal .pi-sheet')
+        window.__RED225_WHEEL_EVENTS = []
+        const describe = event => ({
+          deltaY: event.deltaY,
+          defaultPrevented: event.defaultPrevented,
+          cancelable: event.cancelable,
+          phase: event.eventPhase,
+          currentTarget: event.currentTarget === window ? 'window' : event.currentTarget === document ? 'document' : event.currentTarget === sheet ? 'sheet' : event.currentTarget?.className || event.currentTarget?.tagName || null,
+          target: { tag: event.target?.tagName, id: event.target?.id || '', className: String(event.target?.className || '') },
+        })
+        const record = event => window.__RED225_WHEEL_EVENTS.push(describe(event))
+        sheet?.addEventListener('wheel', record, { capture: true })
+        sheet?.addEventListener('wheel', record)
+        document.addEventListener('wheel', record, { capture: true })
+        document.addEventListener('wheel', record)
+        window.addEventListener('wheel', record, { capture: true })
+        window.addEventListener('wheel', record)
+        const hit = point && document.elementFromPoint(point.x, point.y)
+        const scrollChain = []
+        let node = hit
+        while (node && scrollChain.length < 8) {
+          const style = getComputedStyle(node)
+          scrollChain.push({ tag: node.tagName, id: node.id || '', className: String(node.className || ''), scrollTop: node.scrollTop, scrollHeight: node.scrollHeight, clientHeight: node.clientHeight, overflowY: style.overflowY, overscrollBehaviorY: style.overscrollBehaviorY, touchAction: style.touchAction })
+          node = node.parentElement
+        }
+        return { point, hit: hit && { tag: hit.tagName, id: hit.id || '', className: String(hit.className || ''), pointerEvents: getComputedStyle(hit).pointerEvents, zIndex: getComputedStyle(hit).zIndex }, stack: point ? document.elementsFromPoint(point.x, point.y).slice(0, 8).map(node => ({ tag: node.tagName, id: node.id || '', className: String(node.className || ''), pointerEvents: getComputedStyle(node).pointerEvents, zIndex: getComputedStyle(node).zIndex })) : [], scrollChain }
+      })()`)
+      const wheelDelta = process.env.RVB_SCROLL_NEGATIVE === '1' ? -360 : 360
+      if (process.env.RVB_SCROLL_SHOW === '1') {
+        win.show()
+        win.focus()
+        win.webContents.focus()
+        await delay(120)
+      }
+      if (process.env.RVB_SCROLL_NATIVE === '1') {
+        win.webContents.sendInputEvent({ type: 'mouseWheel', x: sheetPoint.x, y: sheetPoint.y, deltaX: 0, deltaY: wheelDelta })
+      } else {
+        await cdp('Input.dispatchMouseEvent', { type: 'mouseWheel', x: sheetPoint.x, y: sheetPoint.y, deltaX: 0, deltaY: wheelDelta })
+      }
       await delay(180)
-      const scrollAfter = await inspectSkillLayout('desktop-after-description-scroll')
-      ensure(scrollAfter.sheet.scrollTop > scrollBefore.sheet.scrollTop, `RED-225: skill list did not scroll internally: ${JSON.stringify({ scrollBefore, scrollAfter })}`)
+      const wheelEvents = await evaluate('window.__RED225_WHEEL_EVENTS || []')
+      let scrollAfter = await inspectSkillLayout('desktop-after-description-scroll')
+      let scrollFallback = null
+      // Electron does not perform Chromium's default wheel scrolling while a
+      // hidden BrowserWindow has no native focus, even though the wheel event
+      // reaches the sheet. Retry through the same real wheel input after
+      // making the test window visible; this preserves the user's scroll path
+      // and records the host-window condition instead of weakening the check.
+      if (scrollAfter.sheet.scrollTop <= scrollBefore.sheet.scrollTop) {
+        win.show()
+        win.focus()
+        win.webContents.focus()
+        await delay(120)
+        await cdp('Input.dispatchMouseEvent', { type: 'mouseWheel', x: sheetPoint.x, y: sheetPoint.y, deltaX: 0, deltaY: wheelDelta })
+        await delay(180)
+        scrollAfter = await inspectSkillLayout('desktop-after-description-scroll-focused')
+        scrollFallback = { used: true, windowVisible: win.isVisible(), wheelEvents: await evaluate('window.__RED225_WHEEL_EVENTS || []') }
+      }
+      ensure(scrollAfter.sheet.scrollTop > scrollBefore.sheet.scrollTop, `RED-225: skill list did not scroll internally: ${JSON.stringify({ scrollBefore, scrollAfter, sheetPoint, wheelDebug, wheelEvents, scrollFallback })}`)
       const afterScrollRead = await snapshot('red225-after-description-scroll')
       ensure(!afterScrollRead.pendingSkill && afterScrollRead.trainingPutCalls === beforeRead.trainingPutCalls, `RED-225: scrolling the description list changed skill selection or submitted an action: ${JSON.stringify(afterScrollRead)}`)
       before.scrollAfter = scrollAfter
@@ -551,8 +631,9 @@ async function runElectronSmoke() {
   }
 
   // RED-225 target feedback is intentionally split from the reading surface:
-  // #targetOverlay is the short, top-of-screen status line and
-  // #targetSelectionControls owns cancel/confirm inside the character sheet.
+  // #targetOverlay is the short, top-of-screen status line. Skill targeting
+  // uses the active skill title as its toggle/cancel affordance; rule/card
+  // targeting can still expose #targetSelectionControls as a fallback.
   // Keep this helper independent from the old target-mode-card layout;
   // a visible card under #targetOverlay is a regression for the new contract.
   const inspectTargetControls = async label => evaluate(`(() => {
@@ -572,7 +653,17 @@ async function runElectronSmoke() {
     const cancel = document.getElementById('targetCancelButton')
     const confirm = document.getElementById('targetConfirmButton')
     const promptStyle = prompt ? getComputedStyle(prompt) : null
-    const targetSkill = controls?.closest('#pieceInfoContent .pi-skill.is-targeting-skill')
+    const targetSkill = Array.from(document.querySelectorAll('#pieceInfoContent .pi-skill.is-targeting-skill')).find(visible)
+      || controls?.closest('#pieceInfoContent .pi-skill.is-targeting-skill')
+    const activeCast = targetSkill?.querySelector('.character-cast')
+    const activeCastStyle = activeCast ? getComputedStyle(activeCast) : null
+    const hintCandidates = targetSkill ? Array.from(targetSkill.querySelectorAll('*')).filter(element => {
+      const text = [element.textContent, element.getAttribute('title'), element.getAttribute('aria-label')]
+        .filter(Boolean).join(' ')
+      return /再次点击取消|当前选择不可取消|等待确认/.test(text)
+    }).sort((a, b) => (a.textContent || '').length - (b.textContent || '').length) : []
+    const cancelHint = hintCandidates.find(visible) || hintCandidates[0]
+    const cancelHintStyle = cancelHint ? getComputedStyle(cancelHint) : null
     const targetDescription = targetSkill?.querySelector('.pi-skill-desc')
     const targetSkillRect = targetSkill?.getBoundingClientRect()
     const targetDescriptionRect = targetDescription?.getBoundingClientRect()
@@ -612,6 +703,32 @@ async function runElectronSmoke() {
         descriptionRect: rect(targetDescription),
         controlsParent: controls?.parentElement ? { tag: controls.parentElement.tagName, id: controls.parentElement.id || '', className: String(controls.parentElement.className || '') } : null,
       },
+      activeSkill: {
+        exists: !!targetSkill,
+        visible: visible(targetSkill),
+        className: targetSkill?.className || null,
+        cast: activeCast ? {
+          visible: visible(activeCast),
+          disabled: !!activeCast.disabled,
+          rect: rect(activeCast),
+          text: activeCast.textContent?.trim() || '',
+          title: activeCast.getAttribute('title') || '',
+          ariaLabel: activeCast.getAttribute('aria-label') || '',
+          fontSize: activeCastStyle?.fontSize || null,
+          fontWeight: activeCastStyle?.fontWeight || null,
+        } : null,
+        cancelHint: cancelHint ? {
+          visible: visible(cancelHint),
+          text: cancelHint.textContent?.trim() || '',
+          title: cancelHint.getAttribute('title') || '',
+          ariaLabel: cancelHint.getAttribute('aria-label') || '',
+          tag: cancelHint.tagName,
+          className: String(cancelHint.className || ''),
+          rect: rect(cancelHint),
+          fontSize: cancelHintStyle?.fontSize || null,
+          fontWeight: cancelHintStyle?.fontWeight || null,
+        } : null,
+      },
       cancel: { exists: !!cancel, visible: visible(cancel), hidden: !!cancel?.hidden, disabled: !!cancel?.disabled, rect: rect(cancel) },
       confirm: { exists: !!confirm, visible: visible(confirm), hidden: !!confirm?.hidden, disabled: !!confirm?.disabled, rect: rect(confirm) },
       independentCard: independentCard ? { visible: true, rect: rect(independentCard) } : null,
@@ -619,7 +736,7 @@ async function runElectronSmoke() {
     }
   })()`)
 
-  const assertTargetPresentation = (snapshot, label) => {
+  const assertTargetPresentation = (snapshot, label, options = {}) => {
     const prompt = snapshot.prompt || {}
     const controls = snapshot.controls || {}
     const rgb = prompt.colorRgb
@@ -633,7 +750,50 @@ async function runElectronSmoke() {
     ensure(hasOutline, `${label}: target prompt has no dark text outline: ${JSON.stringify(prompt)}`)
     ensure(background === 'transparent' || /^rgba\(\s*0\s*,\s*0\s*,\s*0\s*,\s*0(?:\.0+)?\s*\)$/.test(background), `${label}: target prompt has an unexpected background: ${JSON.stringify(prompt)}`)
     ensure(!Number.isFinite(borderWidth) || borderWidth === 0, `${label}: target prompt has an unexpected border: ${JSON.stringify(prompt)}`)
-    ensure(controls.insideTargetingSkill && controls.beforeDescription && !controls.insideOverlay, `${label}: cancel/confirm controls are not in the active skill title area before its description: ${JSON.stringify(controls)}`)
+    if (!options.skillToggle) {
+      ensure(controls.insideTargetingSkill && controls.beforeDescription && !controls.insideOverlay, `${label}: cancel/confirm controls are not in the active skill title area before its description: ${JSON.stringify(controls)}`)
+    }
+  }
+
+  const assertSkillTogglePresentation = (snapshot, label) => {
+    const active = snapshot.activeSkill || {}
+    const cast = active.cast || {}
+    const hint = active.cancelHint || {}
+    const hintText = [hint.text, hint.title, hint.ariaLabel, cast.title, cast.ariaLabel, cast.text]
+      .filter(Boolean).join(' ')
+    const hintWeight = Number.parseInt(hint.fontWeight || cast.fontWeight, 10)
+    const hintSize = Number.parseFloat(hint.fontSize || cast.fontSize)
+    ensure(active.exists && active.visible && cast.visible && !cast.disabled, `${label}: active skill title is not a usable repeat-click toggle: ${JSON.stringify(active)}`)
+    ensure(!snapshot.cancel?.visible, `${label}: an independent target cancel button is still visible for skill targeting: ${JSON.stringify(snapshot.cancel)}`)
+    ensure(/再次点击取消/.test(hintText), `${label}: skill title has no actionable repeat-click cancel hint: ${JSON.stringify({ active, hintText })}`)
+    ensure(Number.isFinite(hintSize) && hintSize >= 16, `${label}: repeat-click cancel hint is smaller than 16px: ${JSON.stringify({ active, hint })}`)
+    ensure(Number.isFinite(hintWeight) && hintWeight >= 900, `${label}: repeat-click cancel hint is not 900 weight: ${JSON.stringify({ active, hint })}`)
+  }
+
+  const assertSkillNonCancelablePresentation = (snapshot, label) => {
+    const active = snapshot.activeSkill || {}
+    const cast = active.cast || {}
+    const hint = active.cancelHint || {}
+    const hintText = [hint.text, hint.title, hint.ariaLabel, cast.title, cast.ariaLabel, cast.text]
+      .filter(Boolean).join(' ')
+    const hintWeight = Number.parseInt(hint.fontWeight || cast.fontWeight, 10)
+    const hintSize = Number.parseFloat(hint.fontSize || cast.fontSize)
+    ensure(active.exists && active.visible && cast.visible && cast.disabled, `${label}: non-cancelable skill title was not disabled: ${JSON.stringify(active)}`)
+    ensure(!snapshot.cancel?.visible, `${label}: an independent cancel button is visible for a non-cancelable skill selection: ${JSON.stringify(snapshot.cancel)}`)
+    ensure(/当前选择不可取消/.test(hintText), `${label}: non-cancelable skill title has no clear state hint: ${JSON.stringify({ active, hintText })}`)
+    ensure(Number.isFinite(hintSize) && hintSize >= 16, `${label}: non-cancelable state hint is smaller than 16px: ${JSON.stringify({ active, hint })}`)
+    ensure(Number.isFinite(hintWeight) && hintWeight >= 900, `${label}: non-cancelable state hint is not 900 weight: ${JSON.stringify({ active, hint })}`)
+  }
+
+  const assertSkillWaitingPresentation = (snapshot, label) => {
+    const active = snapshot.activeSkill || {}
+    const cast = active.cast || {}
+    const hint = active.cancelHint || {}
+    const hintText = [hint.text, hint.title, hint.ariaLabel, cast.title, cast.ariaLabel, cast.text]
+      .filter(Boolean).join(' ')
+    ensure(active.exists && active.visible && cast.visible && cast.disabled, `${label}: waiting skill title was not disabled: ${JSON.stringify(active)}`)
+    ensure(!snapshot.cancel?.visible, `${label}: an independent cancel button is visible while authority is pending: ${JSON.stringify(snapshot.cancel)}`)
+    ensure(/等待确认/.test(hintText), `${label}: waiting skill title has no waiting hint: ${JSON.stringify({ active, hintText })}`)
   }
 
   const verifyAkazaMultiStep = async fixture => {
@@ -961,6 +1121,28 @@ async function runElectronSmoke() {
       await screenshot('desktop-1280x720-skill-layout-restored.png')
       evidence.screenshots.push('desktop-1280x720-skill-layout-restored.png')
     }
+    const clickVisibleSkillTitle = async (mode, label = 'visible skill title') => {
+      const point = await pointFor(`(() => {
+        const candidates = Array.from(document.querySelectorAll(${JSON.stringify(skillSelector)}))
+        const button = candidates.find(candidate => {
+          const style = getComputedStyle(candidate)
+          return style.display !== 'none' && style.visibility !== 'hidden' && style.pointerEvents !== 'none'
+        }) || candidates[0]
+        if (!button) return null
+        const before = button.getBoundingClientRect()
+        if (before.width <= 0 || before.height <= 0) return null
+        // A cancel leaves the skill row at its previous scroll position. Let
+        // the browser perform the same scroll-into-view a user needs before
+        // tapping a title that moved below the sheet viewport.
+        button.scrollIntoView({ block: 'center', inline: 'nearest' })
+        const rect = button.getBoundingClientRect()
+        const hit = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2)
+        if (!hit || !(hit === button || button.contains(hit))) return null
+        return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }
+      })()`, label)
+      await tap(point, mode)
+      return point
+    }
     const skillButtonDebug = await evaluate(`(() => {
       const buttons = Array.from(document.querySelectorAll(${JSON.stringify(skillSelector)}))
       const menu = document.getElementById('pieceContextMenu')
@@ -1030,26 +1212,104 @@ async function runElectronSmoke() {
       ensure(targetingLayout.rows.filter(row => row.ariaCurrent === 'true').length === 1 && targetingLayout.rows.find(row => row.ariaCurrent === 'true')?.cast?.ariaLabel?.includes('利爪撕裂'), `RED-225: target mode did not mark the active skill in the retained list: ${JSON.stringify(targetingLayout)}`)
       ensure(targetControls.overlay.visible && targetControls.prompt.visible && targetControls.prompt.text, `RED-225: top target prompt is not visible while selecting: ${JSON.stringify(targetControls)}`)
       ensure(targetControls.prompt.rect && targetControls.prompt.rect.top >= 0 && targetControls.prompt.rect.top <= Math.max(120, targetControls.viewport.height * 0.35) && targetControls.prompt.rect.height <= 64, `RED-225: target prompt is not a short top-of-screen line: ${JSON.stringify(targetControls)}`)
-      ensure(targetControls.controls.visible && targetControls.controls.insideDock && !targetControls.controls.insideOverlay, `RED-225: target controls are not separated into the character sheet: ${JSON.stringify(targetControls)}`)
-      assertTargetPresentation(targetControls, 'RED-225 desktop target presentation')
-      ensure(targetControls.cancel.exists && targetControls.cancel.visible && !targetControls.cancel.hidden && targetControls.cancel.rect && targetControls.cancel.rect.height >= 48 && targetControls.cancel.rect.bottom <= targetControls.viewport.height + 1, `RED-225: target cancel is not a reachable skill-panel action: ${JSON.stringify(targetControls)}`)
+      assertTargetPresentation(targetControls, 'RED-225 desktop target presentation', { skillToggle: true })
+      assertSkillTogglePresentation(targetControls, 'RED-225 desktop skill toggle presentation')
       ensure(!targetControls.independentCard, `RED-225: target prompt still uses the independent target-mode card: ${JSON.stringify(targetControls)}`)
       const focusRetention = await evaluate(`(() => {
-        const button = document.getElementById('targetCancelButton')
-        if (!button) return { supported: false }
+        const button = document.querySelector(${JSON.stringify(skillSelector)})
+        if (!button) return { supported: false, reason: 'active skill title missing' }
         button.focus({ preventScroll: true })
         const before = document.activeElement === button
         if (typeof renderTargetOverlay === 'function') renderTargetOverlay()
         const after = document.activeElement === button
-        return { supported: true, before, after, activeId: document.activeElement?.id || null }
+        return { supported: true, before, after, activeId: document.activeElement?.id || null, activeClass: document.activeElement?.className || null }
       })()`)
-      ensure(focusRetention.supported && focusRetention.before && focusRetention.after, `RED-225: re-rendering target controls lost focus from the cancel action: ${JSON.stringify(focusRetention)}`)
+      ensure(focusRetention.supported && focusRetention.before && focusRetention.after, `RED-225: re-rendering target controls lost focus from the active skill title toggle: ${JSON.stringify(focusRetention)}`)
       evidence.layout = { ...(evidence.layout || {}), targeting: targetingLayout, targetControls }
       evidence.layout.focusRetention = focusRetention
       await screenshot('desktop-1280x720-skill-layout-targeting.png')
       evidence.screenshots.push('desktop-1280x720-skill-layout-targeting.png')
     }
-    evidence.desktop = { setup, fixture, selected, armed }
+    // The active skill title is the single skill-mode cancel affordance. A
+    // second real click must cancel, then the same title must be able to arm
+    // the skill again. Keep this separate from card/rule fallback coverage,
+    // which still exercises #targetCancelButton below.
+    const skillToggleBeforeCancel = await snapshot('desktop-before-skill-title-toggle-cancel')
+    await clickSelector(skillSelector, 'mouse')
+    const skillToggleCancelled = await snapshot('desktop-after-skill-title-toggle-cancel')
+    ensure(skillToggleBeforeCancel.pendingSkill?.skillId === 'venom-claw-rend', `RED-225: desktop toggle fixture was not armed before the second title click: ${JSON.stringify(skillToggleBeforeCancel)}`)
+    ensure(skillToggleCancelled.selectedPieceId === fixture.casterId && !skillToggleCancelled.pendingSkill && !skillToggleCancelled.targetOverlay && !skillToggleCancelled.targetMode, `RED-225: second desktop click on the active skill title did not cancel target mode: ${JSON.stringify(skillToggleCancelled)}`)
+    await waitFor(`(() => { const button = document.querySelector(${JSON.stringify(skillSelector)}); return !!button && !button.disabled && !button.dataset.targetMode })()`, 5000, 'skill title ready after cancellation')
+    const skillRearmed = await clickVisibleSkillTitle('mouse', 'desktop skill title re-arm').then(() => snapshot('desktop-after-skill-title-rearm'))
+    ensure(skillRearmed.selectedPieceId === fixture.casterId && skillRearmed.pendingSkill?.skillId === 'venom-claw-rend', `RED-225: desktop skill title could not re-arm after toggle cancellation: ${JSON.stringify(skillRearmed)}`)
+    const noCancelSetup = await evaluate(`(() => {
+      const preparation = pendingSkill?.preparation
+      if (!pendingSkill || !preparation) return null
+      G.pendingTargetSelection = Object.assign({}, G.pendingTargetSelection || {}, {
+        playerId: myPlayerId,
+        selectionId: preparation.selectionId,
+        stateRevision: preparation.stateRevision,
+        canCancel: false,
+      })
+      renderTargetOverlay()
+      return { skillId: pendingSkill.skillId, selectionId: G.pendingTargetSelection.selectionId, canCancel: G.pendingTargetSelection.canCancel }
+    })()`)
+    ensure(noCancelSetup?.canCancel === false, `RED-225: could not install the non-cancelable target-state fixture: ${JSON.stringify(noCancelSetup)}`)
+    const noCancelControls = await inspectTargetControls('desktop-no-cancel-skill-state')
+    assertSkillNonCancelablePresentation(noCancelControls, 'RED-225 desktop non-cancelable skill state')
+    await evaluate(`(() => { if (G) delete G.pendingTargetSelection; renderTargetOverlay(); return true })()`)
+    const restoredCancelableControls = await inspectTargetControls('desktop-restored-cancelable-skill-state')
+    assertSkillTogglePresentation(restoredCancelableControls, 'RED-225 desktop restored cancelable skill state')
+    const escapeBefore = await snapshot('desktop-before-escape-cancel')
+    await cdp('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27, nativeVirtualKeyCode: 27 })
+    await cdp('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27, nativeVirtualKeyCode: 27 })
+    await delay(220)
+    const escapeCancelled = await snapshot('desktop-after-escape-cancel')
+    ensure(escapeBefore.pendingSkill?.skillId === 'venom-claw-rend' && !escapeCancelled.pendingSkill && !escapeCancelled.targetOverlay && !escapeCancelled.targetMode, `RED-225: Escape did not cancel the active skill target selection: ${JSON.stringify({ escapeBefore, escapeCancelled })}`)
+    await clickVisibleSkillTitle('mouse', 'desktop skill title re-arm after Escape')
+    const escapeRearmed = await snapshot('desktop-after-escape-rearm')
+    ensure(escapeRearmed.pendingSkill?.skillId === 'venom-claw-rend', `RED-225: skill title did not re-arm after Escape cancellation: ${JSON.stringify(escapeRearmed)}`)
+    // Escape must prioritize the active target session over the tile-details
+    // key handler. Open the real tile panel first, then arm the skill without
+    // closing that panel; Escape should cancel targeting while leaving the
+    // tile panel open for continued inspection.
+    let tileEscape = null
+    await clickVisibleSkillTitle('mouse', 'desktop tile-priority skill cancel')
+    const tileCancelled = await snapshot('desktop-before-tile-panel-open')
+    ensure(!tileCancelled.pendingSkill && !tileCancelled.targetMode, `RED-225: tile-priority fixture did not leave target mode before opening the tile panel: ${JSON.stringify(tileCancelled)}`)
+    await tap(await boardPoint(fixture.caster), 'mouse')
+    const tileOpenBeforeArm = await evaluate(`(() => {
+      const panel = document.getElementById('tileStatusPanel')
+      const style = panel && getComputedStyle(panel)
+      const rect = panel?.getBoundingClientRect()
+      return { ariaHidden: panel?.getAttribute('aria-hidden') || null, display: style?.display || null, visible: !!panel && panel.getAttribute('aria-hidden') !== 'true' && style?.display !== 'none' && !!rect && rect.width > 0 && rect.height > 0, rect: rect && { left: rect.left, top: rect.top, width: rect.width, height: rect.height }, tileKey: panel?.dataset.tileKey || null }
+    })()`)
+    ensure(tileOpenBeforeArm.visible, `RED-225: real tile status panel did not open before tile-priority Escape check: ${JSON.stringify(tileOpenBeforeArm)}`)
+    await clickVisibleSkillTitle('mouse', 'desktop tile-priority skill arm')
+    const tileEscapeBefore = await snapshot('desktop-before-tile-priority-escape')
+    ensure(tileEscapeBefore.pendingSkill?.skillId === 'venom-claw-rend', `RED-225: skill did not arm while tile panel was open: ${JSON.stringify({ tileOpenBeforeArm, tileEscapeBefore })}`)
+    await cdp('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27, nativeVirtualKeyCode: 27 })
+    await cdp('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27, nativeVirtualKeyCode: 27 })
+    await delay(220)
+    const tileEscapeAfter = await snapshot('desktop-after-tile-priority-escape')
+    const tileOpenAfterEscape = await evaluate(`(() => {
+      const panel = document.getElementById('tileStatusPanel')
+      const style = panel && getComputedStyle(panel)
+      const rect = panel?.getBoundingClientRect()
+      return { ariaHidden: panel?.getAttribute('aria-hidden') || null, display: style?.display || null, visible: !!panel && panel.getAttribute('aria-hidden') !== 'true' && style?.display !== 'none' && !!rect && rect.width > 0 && rect.height > 0, rect: rect && { left: rect.left, top: rect.top, width: rect.width, height: rect.height }, tileKey: panel?.dataset.tileKey || null }
+    })()`)
+    ensure(!tileEscapeAfter.pendingSkill && !tileEscapeAfter.targetOverlay && !tileEscapeAfter.targetMode && tileOpenAfterEscape.visible, `RED-225: Escape while tile panel was open did not cancel targeting while preserving the tile panel: ${JSON.stringify({ tileEscapeBefore, tileEscapeAfter, tileOpenBeforeArm, tileOpenAfterEscape })}`)
+    await closeTileStatusIfOpen('mouse')
+    await clickVisibleSkillTitle('mouse', 'desktop skill title re-arm after tile-priority Escape')
+    const tileRestored = await snapshot('desktop-after-tile-priority-escape-rearm')
+    ensure(tileRestored.pendingSkill?.skillId === 'venom-claw-rend', `RED-225: skill did not re-arm after tile-priority Escape: ${JSON.stringify(tileRestored)}`)
+    tileEscape = { tileCancelled, tileOpenBeforeArm, tileEscapeBefore, tileEscapeAfter, tileOpenAfterEscape, tileRestored }
+    if (process.env.RVB_SKILL_LAYOUT === '1') {
+      const rearmedControls = await inspectTargetControls('desktop-after-skill-title-rearm-controls')
+      assertSkillTogglePresentation(rearmedControls, 'RED-225 desktop rearmed skill toggle')
+      evidence.layout = { ...(evidence.layout || {}), skillToggle: { before: skillToggleBeforeCancel, cancelled: skillToggleCancelled, rearmed: skillRearmed, noCancelSetup, noCancelControls, restoredCancelableControls, escapeBefore, escapeCancelled, escapeRearmed, tileEscape, controls: rearmedControls } }
+    }
+    evidence.desktop = { setup, fixture, selected, armed, skillToggle: { before: skillToggleBeforeCancel, cancelled: skillToggleCancelled, rearmed: skillRearmed, noCancelSetup, noCancelControls, restoredCancelableControls, escapeBefore, escapeCancelled, escapeRearmed, tileEscape } }
     if (process.env.RVB_SKILL_PREVIEW === '1') {
       const original = await evaluate('JSON.stringify(G)')
       const target = await boardPoint(fixture.validTarget)
@@ -1115,6 +1375,11 @@ async function runElectronSmoke() {
     const waiting = await snapshot('waiting-after-legal-mouse')
     ensure(waiting.targetSubmissionPending, `Legal retry did not enter authoritative waiting state: ${JSON.stringify({ waiting, validTargetInputDebug })}`)
     ensure(waiting.trainingPutCalls === 1, `Legal retry submitted more than once before confirmation: ${JSON.stringify(waiting)}`)
+    let waitingControls = null
+    if (process.env.RVB_SKILL_LAYOUT === '1') {
+      waitingControls = await inspectTargetControls('desktop-waiting-skill-state')
+      assertSkillWaitingPresentation(waitingControls, 'RED-225 desktop waiting skill state')
+    }
     // A second real click while the first target is waiting must be ignored.
     await tap(await boardPoint(fixture.validTarget), 'mouse')
     const duplicateAttempt = await snapshot('after-duplicate-legal-mouse')
@@ -1129,7 +1394,7 @@ async function runElectronSmoke() {
     ensure(accepted.targetHp != null && accepted.targetHp < beforeLegal.targetHp, `Legal retry did not damage the valid target: ${JSON.stringify({ before: beforeLegal, accepted })}`)
     ensure(accepted.actionPoints === beforeLegal.actionPoints - 1, `Legal retry charged an unexpected number of action points: ${JSON.stringify({ before: beforeLegal, accepted })}`)
     ensure(!accepted.pendingSkill && !accepted.targetSubmissionPending && !accepted.targetMode, `Accepted action left target mode active: ${JSON.stringify(accepted)}`)
-    evidence.desktop = { ...evidence.desktop, occupiedRejected, emptyRejected, waiting, duplicateAttempt, accepted }
+    evidence.desktop = { ...evidence.desktop, occupiedRejected, emptyRejected, waiting, waitingControls, duplicateAttempt, accepted }
     if (process.env.RVB_FEEDBACK_LATENCY === '1') {
       evidence.desktop.feedbackLatency = await require('./red224-feedback-latency.cjs').finish(evaluate, waitFor)
     }
@@ -1176,8 +1441,9 @@ async function runElectronSmoke() {
       evidence.feedbackTiming = { readableAt1100ms: readable, cleanedAt3200ms: cleaned }
     }
 
-    // Explicit cancel uses a fresh fixture so the skill cooldown from the
-    // accepted action cannot hide the cancel path.
+    // Explicit skill-title cancel uses a fresh fixture so the skill cooldown
+    // from the accepted action cannot hide the repeat-click path. Card/rule
+    // fallback controls remain covered by their own existing runtime tests.
     await evaluate(fixtureInstaller)
     await tap(await boardPoint(fixture.caster), 'mouse')
     await closeTileStatusIfOpen('mouse')
@@ -1189,7 +1455,9 @@ async function runElectronSmoke() {
     await delay(120)
     await clickSelector(skillSelector, 'mouse')
     const beforeCancel = await snapshot('before-explicit-cancel')
-    await clickSelector('#targetCancelButton', 'mouse')
+    const beforeTitleCancel = await inspectTargetControls('before-explicit-skill-title-cancel')
+    assertSkillTogglePresentation(beforeTitleCancel, 'RED-225 desktop explicit skill-title cancel')
+    await clickSelector(skillSelector, 'mouse')
     const cancelled = await snapshot('after-explicit-cancel')
     ensure(beforeCancel.pendingSkill?.skillId === 'venom-claw-rend', `Cancel fixture did not enter target mode: ${JSON.stringify(beforeCancel)}`)
     ensure(cancelled.selectedPieceId === fixture.casterId && !cancelled.pendingSkill && !cancelled.targetOverlay && !cancelled.targetMode, `Explicit cancel did not exit target mode: ${JSON.stringify(cancelled)}`)
@@ -1298,13 +1566,26 @@ async function runElectronSmoke() {
       await waitFor(`selectedPieceId === ${JSON.stringify(fixture.casterId)}`, 5000, 'mobile caster selection')
       await evaluate(`(() => { const button = document.querySelector(${JSON.stringify(skillSelector)}); button?.scrollIntoView({ block: 'center', inline: 'nearest' }); return !!button })()`)
       await delay(120)
-      await clickSelector(skillSelector, 'touch')
+      await clickVisibleSkillTitle('touch', 'mobile landscape initial skill title')
     } else {
       await clickSelector('#mobileSkillsToggle', 'touch')
       await waitFor('document.getElementById("pieceContextMenu")?.classList.contains("is-open") === true', 5000, 'mobile skill dock')
       await clickSelector('.piece-context-skill[data-skill-id="venom-claw-rend"]', 'touch')
     }
     const mobileArmed = await snapshot('mobile-after-skill-touch')
+    let mobileTitleCancelled = null
+    let mobileRearmed = mobileArmed
+    if (process.env.RVB_SKILL_LAYOUT === '1') {
+      const mobileToggleBeforeCancel = await inspectTargetControls('mobile-before-skill-title-toggle-cancel')
+      assertSkillTogglePresentation(mobileToggleBeforeCancel, 'RED-225 mobile skill toggle presentation')
+      await clickVisibleSkillTitle('touch', 'mobile landscape skill title cancel')
+      mobileTitleCancelled = await snapshot('mobile-after-skill-title-toggle-cancel')
+      ensure(mobileTitleCancelled.selectedPieceId === fixture.casterId && !mobileTitleCancelled.pendingSkill && !mobileTitleCancelled.targetOverlay && !mobileTitleCancelled.targetMode, `RED-225: second mobile touch on the active skill title did not cancel target mode: ${JSON.stringify(mobileTitleCancelled)}`)
+      await waitFor(`(() => { const button = document.querySelector(${JSON.stringify(skillSelector)}); return !!button && !button.disabled && !button.dataset.targetMode })()`, 5000, 'mobile skill title ready after cancellation')
+      await clickVisibleSkillTitle('touch', 'mobile landscape skill title re-arm after cancel')
+      mobileRearmed = await snapshot('mobile-after-skill-title-rearm')
+      ensure(mobileRearmed.selectedPieceId === fixture.casterId && mobileRearmed.pendingSkill?.skillId === 'venom-claw-rend', `RED-225: mobile skill title could not re-arm after toggle cancellation: ${JSON.stringify(mobileRearmed)}`)
+    }
     await tap(await boardPoint(fixture.invalidPiece), 'touch')
     const mobileOccupiedRejected = await snapshot('mobile-after-invalid-occupied-touch')
     await tap(await boardPoint(fixture.empty), 'touch')
@@ -1319,15 +1600,29 @@ async function runElectronSmoke() {
       ensure(mobileLayout.rows.filter(row => row.ariaCurrent === 'true').length === 1 && mobileLayout.rows.find(row => row.ariaCurrent === 'true')?.cast?.ariaLabel?.includes('利爪撕裂'), `RED-225: mobile landscape did not mark the active skill in the retained list: ${JSON.stringify(mobileLayout)}`)
       ensure(mobileTargetControls.overlay.visible && mobileTargetControls.prompt.visible && mobileTargetControls.prompt.text, `RED-225: mobile landscape top target prompt is not visible: ${JSON.stringify(mobileTargetControls)}`)
       ensure(mobileTargetControls.prompt.rect && mobileTargetControls.prompt.rect.top >= 0 && mobileTargetControls.prompt.rect.top <= Math.max(120, mobileTargetControls.viewport.height * 0.35) && mobileTargetControls.prompt.rect.height <= 64, `RED-225: mobile landscape target prompt is not a short top line: ${JSON.stringify(mobileTargetControls)}`)
-      ensure(mobileTargetControls.controls.visible && mobileTargetControls.controls.insideDock && !mobileTargetControls.controls.insideOverlay, `RED-225: mobile landscape target controls are not separated into the character sheet: ${JSON.stringify(mobileTargetControls)}`)
-      assertTargetPresentation(mobileTargetControls, 'RED-225 mobile landscape target presentation')
-      ensure(mobileTargetControls.cancel.exists && mobileTargetControls.cancel.visible && !mobileTargetControls.cancel.hidden && mobileTargetControls.cancel.rect && mobileTargetControls.cancel.rect.height >= 48 && mobileTargetControls.cancel.rect.bottom <= mobileTargetControls.viewport.height + 1, `RED-225: mobile landscape cancel is not reachable in the skill panel: ${JSON.stringify(mobileTargetControls)}`)
+      assertTargetPresentation(mobileTargetControls, 'RED-225 mobile landscape target presentation', { skillToggle: true })
+      assertSkillTogglePresentation(mobileTargetControls, 'RED-225 mobile landscape skill toggle presentation')
       ensure(!mobileTargetControls.independentCard && mobileTargetControls.viewport.scrollWidth <= mobileTargetControls.viewport.width + 1, `RED-225: mobile landscape target prompt or controls still use the old card/overflow: ${JSON.stringify(mobileTargetControls)}`)
-      evidence.mobile.layout = { mobileLayout, mobileTargetControls }
+      evidence.mobile.layout = { mobileLayout, mobileTargetControls, mobileTitleCancelled, mobileRearmed }
     }
     await screenshot('mobile-844x390-target-retry.png')
     evidence.screenshots.push('mobile-844x390-target-retry.png')
-    const mobileCancelBefore = await evaluate(`(() => ({
+    let mobileCancelBefore = null
+    let mobileCancelAfter = null
+    let mobileCancelled
+    if (process.env.RVB_SKILL_LAYOUT === '1') {
+      // In skill mode the current title remains the only cancel affordance;
+      // touch it after the illegal-target checks to verify retry did not
+      // replace or disable the toggle.
+      const mobileTitleCancelControls = await inspectTargetControls('mobile-after-invalid-before-skill-title-cancel')
+      assertSkillTogglePresentation(mobileTitleCancelControls, 'RED-225 mobile post-retry skill toggle')
+      await clickVisibleSkillTitle('touch', 'mobile landscape skill title cancel after retry')
+      mobileCancelled = await snapshot('mobile-after-explicit-skill-title-cancel-touch')
+      ensure(mobileCancelled.selectedPieceId === fixture.casterId && !mobileCancelled.pendingSkill && !mobileCancelled.targetOverlay && !mobileCancelled.targetMode, `Mobile touch on the active skill title did not exit target mode: ${JSON.stringify({ mobileTitleCancelControls, mobileCancelled })}`)
+    } else {
+      // Keep the legacy card/rule fallback cancel path covered when the
+      // persistent skill-reading layout is not requested.
+      mobileCancelBefore = await evaluate(`(() => ({
       pendingTargetSelection: G?.pendingTargetSelection || null,
       pendingOptionSelection: G?.pendingOptionSelection || null,
       locallyCancelledSelectionId: typeof locallyCancelledSelectionId !== 'undefined' ? locallyCancelledSelectionId || null : null,
@@ -1344,18 +1639,19 @@ async function runElectronSmoke() {
         }, { capture: true, once: false })
         return { point, button: rect && { left: rect.left, top: rect.top, width: rect.width, height: rect.height, pointerEvents: getComputedStyle(button).pointerEvents }, hit: hit && { tag: hit.tagName, id: hit.id, className: String(hit.className || ''), pointerEvents: getComputedStyle(hit).pointerEvents } }
       })(),
-    }))()`)
-    ensure(mobileCancelBefore.input?.hit?.id === 'targetCancelButton', `RED-225: mobile target cancel is visually present but hit-tested by another layer: ${JSON.stringify(mobileCancelBefore)}`)
-    await clickSelector('#targetCancelButton', 'touch')
-    const mobileCancelled = await snapshot('mobile-after-explicit-cancel-touch')
-    const mobileCancelAfter = await evaluate(`(() => ({
+      }))()`)
+      ensure(mobileCancelBefore.input?.hit?.id === 'targetCancelButton', `RED-225: mobile target cancel is visually present but hit-tested by another layer: ${JSON.stringify(mobileCancelBefore)}`)
+      await clickSelector('#targetCancelButton', 'touch')
+      mobileCancelled = await snapshot('mobile-after-explicit-cancel-touch')
+      mobileCancelAfter = await evaluate(`(() => ({
       pendingTargetSelection: G?.pendingTargetSelection || null,
       pendingOptionSelection: G?.pendingOptionSelection || null,
       events: window.__RED225_CANCEL_EVENTS || [],
       status: document.getElementById('statusMsg')?.textContent || '',
-    }))()`)
+      }))()`)
+    }
     ensure(mobileCancelled.selectedPieceId === fixture.casterId && !mobileCancelled.pendingSkill && !mobileCancelled.targetOverlay && !mobileCancelled.targetMode, `Mobile touch cancel did not exit target mode: ${JSON.stringify({ mobileCancelBefore, mobileCancelled, mobileCancelAfter })}`)
-    evidence.mobile = { ...(evidence.mobile || {}), mobileArmed, mobileOccupiedRejected, mobileEmptyRejected, mobileCancelled }
+    evidence.mobile = { ...(evidence.mobile || {}), mobileArmed, mobileTitleCancelled, mobileRearmed, mobileOccupiedRejected, mobileEmptyRejected, mobileCancelled, mobileCancelBefore, mobileCancelAfter }
 
     if (process.env.RVB_SKILL_LAYOUT === '1') {
       // Closing the reading sheet is an explicit user choice. Opening the
@@ -1511,7 +1807,7 @@ async function runElectronSmoke() {
         await clickSelector('.piece-context-skill[data-skill-id="venom-claw-rend"]', 'touch')
       } else {
         ensure(portraitAction?.kind === 'direct', `RED-225: portrait offered neither a persistent skill action nor the compact skill dock: ${JSON.stringify(portraitAction)}`)
-        await clickSelector('.character-cast[data-skill-id="venom-claw-rend"]', 'touch')
+        await clickVisibleSkillTitle('touch', 'portrait direct skill title')
       }
       const portraitArmed = await snapshot('portrait-after-skill-touch')
       evidence.mobile.portraitAfterActionDebug = await evaluate(`(() => {
@@ -1528,19 +1824,29 @@ async function runElectronSmoke() {
         return { button: button && { disabled: !!button.disabled, rect: r && { left: r.left, top: r.top, width: r.width, height: r.height }, active: document.activeElement === button }, center, hit: hit && { tag: hit.tagName, id: hit.id || '', className: String(hit.className || ''), pointerEvents: getComputedStyle(hit).pointerEvents }, menu: menu && { open: menu.classList.contains('is-open'), rect: menuRect && { left: menuRect.left, top: menuRect.top, width: menuRect.width, height: menuRect.height }, display: menuStyle.display, pointerEvents: menuStyle.pointerEvents }, sheet: modal && { display: modalStyle.display, pointerEvents: modalStyle.pointerEvents, rect: modalRect && { left: modalRect.left, top: modalRect.top, width: modalRect.width, height: modalRect.height } } }
       })()`)
       ensure(portraitArmed.pendingSkill?.skillId === 'venom-claw-rend', `RED-225: portrait touch did not arm the skill: ${JSON.stringify(portraitArmed)}`)
+      const portraitToggleBeforeCancel = await inspectTargetControls('mobile-portrait-before-skill-title-toggle-cancel')
+      assertSkillTogglePresentation(portraitToggleBeforeCancel, 'RED-225 mobile portrait skill toggle presentation')
+      await clickVisibleSkillTitle('touch', 'portrait skill title cancel')
+      const portraitTitleCancelled = await snapshot('portrait-after-skill-title-toggle-cancel')
+      ensure(portraitTitleCancelled.selectedPieceId === fixture.casterId && !portraitTitleCancelled.pendingSkill && !portraitTitleCancelled.targetOverlay && !portraitTitleCancelled.targetMode, `RED-225: second portrait touch on the active skill title did not cancel target mode: ${JSON.stringify(portraitTitleCancelled)}`)
+      await waitFor(`(() => { const button = document.querySelector(${JSON.stringify(skillSelector)}); return !!button && !button.disabled && !button.dataset.targetMode })()`, 5000, 'portrait skill title ready after cancellation')
+      await clickVisibleSkillTitle('touch', 'portrait skill title re-arm after cancel')
+      const portraitRearmed = await snapshot('portrait-after-skill-title-rearm')
+      ensure(portraitRearmed.selectedPieceId === fixture.casterId && portraitRearmed.pendingSkill?.skillId === 'venom-claw-rend', `RED-225: portrait skill title could not re-arm after toggle cancellation: ${JSON.stringify(portraitRearmed)}`)
       const portraitLayout = await inspectSkillLayout('mobile-portrait-targeting-layout')
       const portraitTargetControls = await inspectTargetControls('mobile-portrait-target-controls')
       ensure(portraitLayout.modal.visible && portraitLayout.rows.length === portraitLayout.displaySkillCount && portraitLayout.rows.every(row => row.text && row.descriptionVisible), `RED-225: mobile portrait target mode lost readable skill descriptions: ${JSON.stringify(portraitLayout)}`)
       ensure(portraitTargetControls.overlay.visible && portraitTargetControls.prompt.visible && portraitTargetControls.prompt.text, `RED-225: mobile portrait top target prompt is not visible: ${JSON.stringify(portraitTargetControls)}`)
       ensure(portraitTargetControls.prompt.rect && portraitTargetControls.prompt.rect.top >= 0 && portraitTargetControls.prompt.rect.top <= Math.max(120, portraitTargetControls.viewport.height * 0.35) && portraitTargetControls.prompt.rect.height <= 64, `RED-225: mobile portrait target prompt is not a short top line: ${JSON.stringify(portraitTargetControls)}`)
-      ensure(portraitTargetControls.controls.visible && portraitTargetControls.controls.insideDock && !portraitTargetControls.controls.insideOverlay, `RED-225: mobile portrait target controls are not separated into the character sheet: ${JSON.stringify(portraitTargetControls)}`)
-      assertTargetPresentation(portraitTargetControls, 'RED-225 mobile portrait target presentation')
-      ensure(portraitTargetControls.cancel.exists && portraitTargetControls.cancel.visible && !portraitTargetControls.cancel.hidden && portraitTargetControls.cancel.rect && portraitTargetControls.cancel.rect.height >= 48 && portraitTargetControls.cancel.rect.bottom <= portraitTargetControls.viewport.height + 1, `RED-225: mobile portrait cancel is not reachable in the skill panel: ${JSON.stringify(portraitTargetControls)}`)
+      assertTargetPresentation(portraitTargetControls, 'RED-225 mobile portrait target presentation', { skillToggle: true })
+      assertSkillTogglePresentation(portraitTargetControls, 'RED-225 mobile portrait skill toggle presentation')
       ensure(!portraitTargetControls.independentCard && portraitTargetControls.viewport.scrollWidth <= portraitTargetControls.viewport.width + 1, `RED-225: mobile portrait target prompt or controls still use the old card/overflow: ${JSON.stringify(portraitTargetControls)}`)
       await screenshot('mobile-390x844-skill-layout-targeting.png')
       evidence.screenshots.push('mobile-390x844-skill-layout-targeting.png')
-      await clickSelector('#targetCancelButton', 'touch')
-      evidence.mobile.portrait = { portraitAction, portraitArmed, portraitLayout, portraitTargetControls, cancelled: await snapshot('portrait-after-cancel') }
+      await clickVisibleSkillTitle('touch', 'portrait skill title cancel after layout')
+      const portraitCancelled = await snapshot('portrait-after-skill-title-cancel')
+      ensure(portraitCancelled.selectedPieceId === fixture.casterId && !portraitCancelled.pendingSkill && !portraitCancelled.targetOverlay && !portraitCancelled.targetMode, `RED-225: portrait skill title cancel after layout checks did not exit target mode: ${JSON.stringify(portraitCancelled)}`)
+      evidence.mobile.portrait = { portraitAction, portraitArmed, portraitToggleBeforeCancel, portraitTitleCancelled, portraitRearmed, portraitLayout, portraitTargetControls, cancelled: portraitCancelled }
       win.setContentSize(1280, 720)
       await delay(250)
     }

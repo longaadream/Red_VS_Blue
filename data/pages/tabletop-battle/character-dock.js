@@ -8,11 +8,32 @@
  const portrait=document.createElement('img');portrait.className='character-portrait';portrait.alt='';portrait.hidden=true;modal.querySelector('.pi-header').prepend(portrait);
  const keywordClose=document.createElement('button');keywordClose.className='character-keyword-close';keywordClose.type='button';keywordClose.setAttribute('aria-label','收起关键词说明');keywordClose.title='收起关键词说明';keywordClose.addEventListener('click',()=>setKeyword(false));
  function setKeyword(open){keywordOpen=open;panel.classList.toggle('is-keyword-open',open);panel.setAttribute('aria-hidden',String(!open));modal.querySelectorAll('.keyword-badge').forEach(button=>{const active=open&&button.dataset.keyword===keywordName;button.classList.toggle('active',active);button.setAttribute('aria-expanded',String(active));});}
+ function targetSkillId(){
+  const local=pendingSkill&&(pendingSkill.skillId||(pendingSkill.baseAction&&pendingSkill.baseAction.skillId));
+  if(local)return String(local);
+  const draft=targetSubmissionPending&&targetSubmissionPending.draft&&targetSubmissionPending.draft.skill;
+  return draft&&draft.skillId?String(draft.skillId):'';
+ }
+ function targetCancelAllowed(){
+  if(!targetSkillId()||targetSubmissionPending)return false;
+  const selection=G&&(G.pendingTargetSelection||G.pendingOptionSelection);
+  return !(selection&&selection.canCancel===false);
+ }
+ function setCancelMeta(meta,cancelMode,stateLabel){
+  if(!meta)return;
+  if(cancelMode||stateLabel){
+   if(meta.dataset.cancelOriginalHtml===undefined)meta.dataset.cancelOriginalHtml=meta.innerHTML;
+   meta.textContent=cancelMode?'再次点击取消':stateLabel;meta.classList.toggle('character-cast-cancel-label',cancelMode);meta.classList.toggle('character-cast-cancel-disabled-label',!cancelMode);
+  }else if(meta.dataset.cancelOriginalHtml!==undefined){
+   meta.innerHTML=meta.dataset.cancelOriginalHtml;delete meta.dataset.cancelOriginalHtml;meta.classList.remove('character-cast-cancel-label');meta.classList.remove('character-cast-cancel-disabled-label');
+  }
+ }
  function refreshActions(piece){
   const records=pieceInfoDisplaySkills(piece),rows=[...document.querySelectorAll('#pieceInfoContent .pi-skill')];
   const owned=!!myPlayerId&&String(piece.ownerPlayerId||'').toLowerCase()===String(myPlayerId).toLowerCase();
   const targetBusy=!!(pendingSkill||pendingCardAction||targetSubmissionPending||pendingActionFeedback||casting||(G&&(G.pendingTargetSelection||G.pendingOptionSelection)));
-  const targetingSkillId=pendingSkill&&pendingSkill.skillId?String(pendingSkill.skillId):targetSubmissionPending&&targetSubmissionPending.draft&&targetSubmissionPending.draft.skill&&targetSubmissionPending.draft.skill.skillId?String(targetSubmissionPending.draft.skill.skillId):'';
+  const targetingSkillId=targetSkillId();
+  const cancelAllowed=targetCancelAllowed();
   rows.slice(0,records.length).forEach((row,i)=>{
    const skill=records[i],id=skillIdOf(skill),definition=skillDefOf(id),passive=definition.type==='passive'||definition.kind==='passive';
    const isTargeting=!!targetingSkillId&&String(id)===targetingSkillId;
@@ -24,6 +45,12 @@
    let button=row.querySelector('.character-cast');
    if(!button){button=document.createElement('button');button.type='button';button.className='character-cast';row.append(button);button.addEventListener('click',async(event)=>{
     event.stopPropagation();if(button.disabled||casting)return;
+    if(button.dataset.targetMode==='cancel'){
+     casting=true;button.disabled=true;setKeyword(false);
+     try{selectedPieceId=piece.instanceId;await dispatchBattleIntent({type:'cancel-target'});}
+     finally{casting=false;lastSignature='';syncSelected(true);}
+     return;
+    }
     // Re-resolve against the current visible owner and native availability at action time.
     const live=G&&G.pieces.find(p=>p.instanceId===piece.instanceId);
     if(!live||!resolveSkillAvailability(live,id).available)return;
@@ -40,20 +67,34 @@
    if(skillMeta&&skillMeta.parentElement!==button)button.append(skillMeta);
    const description=row.querySelector('.pi-skill-desc');
    if(button.parentElement!==row)row.append(button);
-   if(description&&button.nextElementSibling!==description)row.insertBefore(button,description);
+   const targetControls=row.querySelector('#targetSelectionControls');
+   const controlsBetween=!!(targetControls&&targetControls.parentElement===row&&button.nextElementSibling===targetControls&&targetControls.nextElementSibling===description);
+   if(description&&button.nextElementSibling!==description&&!controlsBetween)row.insertBefore(button,description);
    button.dataset.skillId=id;
+   const cancelMode=isTargeting&&cancelAllowed;
+   const cancelStateLabel=isTargeting?(targetSubmissionPending?'等待确认…':!cancelAllowed?'当前选择不可取消':''):'';
+   if(isTargeting)button.dataset.targetMode=cancelMode?'cancel':'cancel-disabled';else delete button.dataset.targetMode;
+   button.classList.toggle('is-cancel-mode',cancelMode);button.classList.toggle('is-cancel-disabled',isTargeting&&!cancelMode);
+   setCancelMeta(skillMeta,cancelMode,cancelStateLabel);
    button.classList.toggle('tutorial-skill-hint',document.body.dataset.tutorialSkill===id);
    if(document.body.dataset.tutorialSkill===id&&!button.dataset.tutorialRevealed){
     button.dataset.tutorialRevealed='true';
     requestAnimationFrame(()=>{if(button.isConnected&&document.body.dataset.tutorialSkill===id)button.scrollIntoView({block:'nearest',inline:'nearest'});});
    }
-   button.setAttribute('aria-label','释放：'+(definition.name||id));button.title=targetBusy?'请先完成当前操作':available.unavailableReason||'释放 '+(definition.name||id);
-   button.disabled=targetBusy||!available.available;row.classList.toggle('cast-unavailable',!available.available);
+   const skillName=definition.name||id;
+   button.setAttribute('aria-label',cancelMode?'取消：'+skillName:'释放：'+skillName);
+   button.title=cancelMode?'再次点击取消':targetSubmissionPending&&isTargeting?'等待权威确认':isTargeting&&!cancelAllowed?'当前规则选择不可取消':targetBusy?'请先完成当前操作':available.unavailableReason||'释放 '+skillName;
+   button.disabled=cancelMode?false:isTargeting||targetBusy||!available.available;row.classList.toggle('cast-unavailable',!available.available&&!cancelMode);
    let reason=row.querySelector('.character-cast-reason');if(!reason){reason=document.createElement('div');reason.className='character-cast-reason';row.append(reason);}
-   reason.textContent=available.unavailableReason||'';
+   reason.textContent=cancelMode?'':available.unavailableReason||'';
   });
   modal.classList.toggle('is-selecting-target',!!(pendingSkill||pendingCardAction||targetSubmissionPending));
  }
+ window.refreshTargetSkillButtonState=function(){
+  if(currentPieceInfoSource!=='board'||!currentPieceInfoId)return;
+  const piece=G&&G.pieces&&G.pieces.find(p=>p.instanceId===currentPieceInfoId);
+  if(piece)refreshActions(piece);
+ };
  function refreshPortrait(piece){
   const source=PIECES_BY_ID[piece.templateId];
   portrait.hidden=true;portrait.removeAttribute('src');portrait.alt='';
@@ -131,8 +172,16 @@
  // Non-modal sheet must not trap Tab. Escape gives target selection precedence over closing the sheet.
  document.removeEventListener('keydown',handlePieceInfoModalKeydown);
  document.addEventListener('keydown',event=>{
+  if(event.key!=='Escape'||event.defaultPrevented||currentPieceInfoSource==='deployment')return;
+  if(!(pendingSkill||pendingCardAction||targetSubmissionPending))return;
+  event.preventDefault();dispatchBattleIntent({type:'cancel-target'});
+ },true);
+ document.addEventListener('keydown',event=>{
   if(currentPieceInfoSource==='deployment'){handlePieceInfoModalKeydown(event);return;}
-  if(event.key!=='Escape'||event.defaultPrevented||pendingSkill||pendingCardAction)return;
+  if(event.key==='Escape'&&!event.defaultPrevented&&(pendingSkill||pendingCardAction||targetSubmissionPending)){
+   event.preventDefault();dispatchBattleIntent({type:'cancel-target'});return;
+  }
+  if(event.key!=='Escape'||event.defaultPrevented||pendingSkill||pendingCardAction||targetSubmissionPending)return;
   if(keywordOpen){event.preventDefault();setKeyword(false);}else if(document.body.classList.contains('character-dock-open')){event.preventDefault();window.closePieceInfo({restoreFocus:false});}
  });
  setKeyword(false);

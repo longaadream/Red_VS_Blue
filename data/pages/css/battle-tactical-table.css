@@ -936,6 +936,20 @@ body.character-dock-open #pieceInfoModal.character-dock .pi-skill.target-skill-c
   min-height: 48px !important;
 }
 
+body.character-dock-open #pieceInfoModal.character-dock .character-cast.is-cancel-mode .pi-skill-meta,
+body.character-dock-open #pieceInfoModal.character-dock .character-cast.is-cancel-disabled .pi-skill-meta {
+  min-height: 22px;
+  font-size: 16px !important;
+  font-weight: 900 !important;
+  line-height: 1.35;
+  letter-spacing: .2px;
+  color: var(--comic-ink, #30231c) !important;
+}
+
+body.character-dock-open #pieceInfoModal.character-dock .character-cast.is-cancel-disabled .pi-skill-meta {
+  color: var(--battle-text-muted, #655443) !important;
+}
+
 /* Card/rule targeting still uses the body fallback. Keep it above the mobile
    hand toggles when no skill row is available. */
 body #targetSelectionControls { z-index: 110; }

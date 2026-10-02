@@ -14,6 +14,13 @@ function source(name: string) {
   return page.slice(start, end)
 }
 
+function characterSource(name: string) {
+  const start = characterDock.indexOf(`function ${name}(`)
+  const end = characterDock.indexOf('\n function ', start + 1)
+  if (start < 0 || end < 0) throw new Error(`Missing character-dock function: ${name}`)
+  return characterDock.slice(start, end)
+}
+
 function markup(id: string) {
   const start = page.indexOf(`<div id="${id}"`)
   if (start < 0) throw new Error(`Missing #${id}`)
@@ -239,10 +246,95 @@ describe('target prompt and controls separation', () => {
     expect(page).toMatch(/overlay\.parentElement !== skillRow \|\| description\.previousElementSibling !== overlay/)
     expect(page).toMatch(/target-skill-controls/)
     expect(page).toMatch(/draft\.skill && targetSubmissionPending\.draft\.skill\.skillId/)
+    expect(page).toMatch(/resolve: button => button\.dataset\.targetMode \? null/)
+    expect(page).toMatch(/window\.refreshTargetSkillButtonState\(\)/)
+    expect(page).toMatch(/cancelButton\.hidden = currentSkillButton \|\|/)
+    expect(page).toMatch(/event\.key === 'Escape' && \(pendingSkill \|\| pendingCardAction \|\| targetSubmissionPending\)/)
     expect(tacticalCss).toMatch(/body #targetOverlay #targetPromptText[\s\S]*color: #ffe08a !important/)
+    expect(tacticalCss).toMatch(/character-cast\.is-cancel-mode[\s\S]*font-size: 16px[\s\S]*font-weight: 900/)
+    expect(tacticalCss).toMatch(/character-cast\.is-cancel-mode[\s\S]*color: var\(--comic-ink, #30231c\) !important/)
+    expect(tacticalCss).toMatch(/character-cast\.is-cancel-disabled[\s\S]*color: var\(--battle-text-muted, #655443\) !important/)
     expect(characterDock).toMatch(/function preserveTargetControlsBeforeRender\(\)/)
     expect(characterDock).toMatch(/preserveTargetControlsBeforeRender\(\);\s*nativeRender\(piece,true\)/)
     expect(characterDock).toMatch(/targetSubmissionPending\)\&\&typeof renderTargetOverlay==='function'\)renderTargetOverlay\(\)/)
+    expect(characterDock).toMatch(/button\.dataset\.targetMode==='cancel'/)
+    expect(characterDock).toMatch(/dispatchBattleIntent\(\{type:'cancel-target'\}\)/)
+    expect(characterDock).toMatch(/setCancelMeta\(skillMeta,cancelMode,cancelStateLabel\)/)
+    expect(characterDock).toMatch(/targetControls\.nextElementSibling===description/)
+  })
+
+  it('uses the skill cost slot for cancel state and restores its original metadata', () => {
+    const meta = Object.assign(element(), {
+      dataset: {} as Record<string, string>,
+      innerHTML: '<span>行动 1 · 冷却 1</span>',
+    })
+    const context = createContext({ meta })
+    new Script(`${characterSource('setCancelMeta')}\nsetCancelMeta(meta,true,'')`).runInContext(context)
+
+    expect(meta.textContent).toBe('再次点击取消')
+    expect(meta.classList.contains('character-cast-cancel-label')).toBe(true)
+    expect(meta.dataset.cancelOriginalHtml).toBe('<span>行动 1 · 冷却 1</span>')
+
+    new Script("setCancelMeta(meta,false,'等待确认…')").runInContext(context)
+    expect(meta.textContent).toBe('等待确认…')
+    expect(meta.classList.contains('character-cast-cancel-label')).toBe(false)
+    expect(meta.classList.contains('character-cast-cancel-disabled-label')).toBe(true)
+
+    new Script("setCancelMeta(meta,false,'')").runInContext(context)
+    expect(meta.innerHTML).toBe('<span>行动 1 · 冷却 1</span>')
+    expect(meta.dataset.cancelOriginalHtml).toBeUndefined()
+  })
+
+  it('keeps the fallback cancel control when a matching skill row is closed', () => {
+    const overlay = element()
+    const prompt = element()
+    const multiSummary = element()
+    const confirm = element()
+    const cancel = element()
+    const controls = element()
+    const modal = element()
+    const skillButton = Object.assign(element(), { dataset: { skillId: 'skill-a', targetMode: 'cancel' } })
+    modal.classList.add('character-dock')
+    modal.style.display = 'none'
+    const body = { classList: classList() }
+    const elements: Record<string, ReturnType<typeof element>> = {
+      targetOverlay: overlay,
+      targetPromptText: prompt,
+      targetMultiSummary: multiSummary,
+      targetConfirmButton: confirm,
+      targetCancelButton: cancel,
+      targetSelectionControls: controls,
+      pieceInfoModal: modal,
+    }
+    const context = createContext({
+      document: {
+        body,
+        getElementById: (id: string) => elements[id] || null,
+        querySelectorAll: () => [skillButton],
+      },
+      window: {},
+      pendingSkill: { skillId: 'skill-a', preparation: { targetType: 'piece' } },
+      pendingCardAction: null,
+      targetSubmissionPending: null,
+      pendingBoardTargetSelection: { selectionId: null, selectedPieceIds: [], selectedCells: [] },
+      G: { pendingTargetSelection: null, pendingOptionSelection: null },
+      currentPieceInfoSource: 'board',
+      closePieceContextMenu: () => undefined,
+      placeTargetOverlayHost: () => undefined,
+      targetStepPrefix: () => '',
+      targetTypeText: () => '选择一个目标',
+      isPendingBoardMultiTarget: () => false,
+      pendingBoardMultiLimits: () => ({ min: 1, max: 1 }),
+      pendingBoardMultiSummary: () => '',
+    })
+    new Script(source('_targetPromptText') + '\n' + source('renderTargetOverlay')).runInContext(context)
+    new Script('renderTargetOverlay()').runInContext(context)
+    expect(cancel.hidden).toBe(false)
+
+    modal.style.display = 'flex'
+    body.classList.add('character-dock-open')
+    new Script('renderTargetOverlay()').runInContext(context)
+    expect(cancel.hidden).toBe(true)
   })
 
   it('mounts the existing controls beside the matching skill title and before its description', () => {

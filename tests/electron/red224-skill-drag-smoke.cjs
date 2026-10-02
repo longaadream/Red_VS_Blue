@@ -51,6 +51,24 @@ module.exports = async function runRed224SkillDragSmoke({
   const prepareTouchDrag = async () => {
     const touchFixture = await evaluate(fixtureInstaller)
     await evaluate('window.__RED221_PUTS = []')
+    await evaluate(`(() => {
+      window.__RED225_DRAG_TITLE_CLICKS = []
+      if (!window.__RED225_DRAG_TITLE_CLICK_HANDLER) {
+        window.__RED225_DRAG_TITLE_CLICK_HANDLER = event => {
+          const target = event.target
+          const button = target && typeof target.closest === 'function' ? target.closest(${JSON.stringify(skillSelector)}) : null
+          if (!button) return
+          window.__RED225_DRAG_TITLE_CLICKS.push({
+            defaultPrevented: event.defaultPrevented,
+            detail: event.detail,
+            pointerType: event.pointerType || null,
+            target: { tag: target.tagName || null, className: String(target.className || '') },
+          })
+        }
+        document.addEventListener('click', window.__RED225_DRAG_TITLE_CLICK_HANDLER, true)
+      }
+      return true
+    })()`)
     await tap(await boardPoint(touchFixture.caster), 'mouse')
     await closeTileStatusIfOpen('mouse')
     await evaluate(`(() => {
@@ -142,6 +160,11 @@ module.exports = async function runRed224SkillDragSmoke({
   )
   await delay(900)
   const releaseAccepted = await snapshot('touch-drag-after-release')
+  const releaseTitleClicks = await evaluate('window.__RED225_DRAG_TITLE_CLICKS || []')
+  ensure(
+    releaseTitleClicks.length === 0,
+    `Touch drag generated a synthetic skill-title click after legal release: ${JSON.stringify({ releaseTitleClicks, releasePut, releaseBefore, releaseAccepted })}`,
+  )
   ensure(
     releaseAccepted.trainingPutCalls === releaseBefore.trainingPutCalls + 1,
     `Touch drag release did not submit exactly one PUT: ${JSON.stringify(releaseAccepted)}`,
@@ -185,7 +208,7 @@ module.exports = async function runRed224SkillDragSmoke({
   )
 
   return {
-    release: { releasePreview, releasePut, releaseBefore, releaseAccepted, feedbackLatency },
+    release: { releasePreview, releasePut, releaseBefore, releaseAccepted, releaseTitleClicks, feedbackLatency },
     cancel: { cancelPreview, cancelBefore, cancelled },
     illegal: { illegalBefore, illegalAfter },
   }
