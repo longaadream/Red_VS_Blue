@@ -117,12 +117,13 @@ async function runElectronSmoke() {
   fs.mkdirSync(evidenceRoot, { recursive: true })
   const evidence = { pages: [], cursor: null, logs: [] }
   const win = new BrowserWindow({
-    show: false,
+    show: true,
     width: 1280,
     height: 720,
     useContentSize: true,
     webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true, backgroundThrottling: false },
   })
+  win.focus()
   win.webContents.on('console-message', (_event, level, message) => evidence.logs.push({ level, message: String(message) }))
   win.webContents.on('did-fail-load', (_event, code, description, url) => evidence.logs.push({ level: 'did-fail-load', message: `${code} ${description} ${url}` }))
   const debuggerApi = win.webContents.debugger
@@ -182,24 +183,41 @@ async function runElectronSmoke() {
     ensure(startPoint && Number.isFinite(startPoint.x) && Number.isFinite(startPoint.y), 'battle training start control missing')
     await mouseClick(startPoint)
     await waitFor(`G && G.turn && G.turn.phase === 'action' && G.pieces?.length > 0 && battlePresentation && _use3d === true`, 30000, 'battle training runtime')
-    const handFixture = await evaluate(`(() => {
-      const hand=document.getElementById('handCards')
-      if (!hand) return null
-      let card=hand.querySelector(':scope > .card-item')
-      if (!card) {
-        card=document.createElement('button')
-        card.type='button'
-        card.className='card-item'
-        card.setAttribute('aria-label','RED-226 hand motion fixture')
-        card.setAttribute('data-red226-fixture', 'true')
-        card.textContent='QA hand card'
-        hand.append(card)
-      }
-      hand.removeAttribute('hidden')
-      hand.setAttribute('aria-hidden', 'false')
-      return { count: hand.querySelectorAll(':scope > .card-item').length, width: card.getBoundingClientRect().width, height: card.getBoundingClientRect().height }
+    await waitFor(`battlePresentation && !!document.querySelector('#boardStage3d canvas') && getComputedStyle(document.getElementById('loadingOverlay')).display === 'none'`, 30000, 'battle loading hidden and canvas mounted')
+    const endPoint = await evaluate(`(() => {
+      const node = document.getElementById('btnEnd')
+      if (!node) return null
+      const rect = node.getBoundingClientRect()
+      const style = getComputedStyle(node)
+      return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2, visible: rect.width > 0 && rect.height > 0 && style.display !== 'none' && style.visibility !== 'hidden' && !node.disabled }
     })()`)
-    ensure(handFixture && handFixture.count > 0 && handFixture.width > 0 && handFixture.height > 0, `battle hand fixture unavailable: ${JSON.stringify(handFixture)}`)
+    ensure(endPoint && endPoint.visible, 'battle end-turn control unavailable: ' + JSON.stringify(endPoint))
+    await mouseClick(endPoint)
+    await waitFor(`G && G.turn && G.turn.phase === 'action' && myPlayerId === 'training-blue' && G.turn.currentPlayerId === 'training-blue' && document.querySelectorAll('#handCards > .card-item').length > 0`, 30000, 'real training hand after native end turn')
+    const handEvidence = await evaluate(`(() => {
+      const hand = document.getElementById('handCards')
+      const cards = Array.from(hand?.querySelectorAll(':scope > .card-item') || [])
+      const player = G?.players?.find(item => item.playerId === myPlayerId)
+      return {
+        source: 'native end-turn -> formal renderHand()',
+        playerId: myPlayerId,
+        phase: G?.turn?.phase || null,
+        currentPlayerId: G?.turn?.currentPlayerId || null,
+        actionPoints: player?.actionPoints ?? null,
+        cards: cards.map(card => ({
+          className: String(card.className || ''),
+          instanceId: card.dataset.instanceId || null,
+          cardId: player?.hand?.find(item => item.instanceId === card.dataset.instanceId)?.cardId || null,
+          ariaLabel: card.getAttribute('aria-label'),
+          fixture: card.getAttribute('data-red226-fixture'),
+          rect: (() => { const r = card.getBoundingClientRect(); return { left:r.left, top:r.top, width:r.width, height:r.height } })(),
+        })),
+        loadingDisplay: getComputedStyle(document.getElementById('loadingOverlay')).display,
+        canvasMounted: !!document.querySelector('#boardStage3d canvas'),
+      }
+    })()`)
+    ensure(handEvidence.cards.length > 0 && handEvidence.cards.every(card => card.fixture === null), 'real training hand unavailable: ' + JSON.stringify(handEvidence))
+    await evaluate('window.__RED226_REAL_HAND_EVIDENCE__ = ' + JSON.stringify(handEvidence) + '; true')
   }
   const rootState = () => evaluate(`(() => ({
     classes: [...document.documentElement.classList],
@@ -264,6 +282,12 @@ async function runElectronSmoke() {
     const afterHover = await targetState()
     ensure(afterHover.additive.length <= 1, `${route.id} queued additive animations: ${JSON.stringify(afterHover)}`)
     ensure(afterHover.transform !== before.transform, `${route.id} hover did not change computed transform: ${JSON.stringify({ before, afterHover })}`)
+    const realHand = route.id === 'battle' ? await evaluate('window.__RED226_REAL_HAND_EVIDENCE__ || null') : null
+    let hoverScreenshot = null
+    if (route.id === 'battle') {
+      hoverScreenshot = path.join(evidenceRoot, 'final-battle-real-hand-hover.png')
+      fs.writeFileSync(hoverScreenshot, (await win.capturePage()).toPNG())
+    }
     // The window capture handler resets the decorative state before a real
     // command handler can observe a click/drag. Dispatching only the pointer
     // phases avoids navigating away from the page under test.
@@ -275,7 +299,7 @@ async function runElectronSmoke() {
     // same cancellation path used when Electron loses focus and guarantees
     // the pressed state is cleared before the leave assertion below.
     await evaluate(`window.dispatchEvent(new Event('blur')); true`)
-    mouseMove({ x: 1278, y: 718 })
+    mouseMove({ x: 1000, y: 80 })
     await evaluate(`(() => { const n=document.querySelector('[data-red226-target]'); if (!n) return false; n.dispatchEvent(new PointerEvent('pointerout',{bubbles:true,pointerType:'mouse',relatedTarget:document.body})); return true })()`)
     let restored
     try {
@@ -291,7 +315,7 @@ async function runElectronSmoke() {
     const screenshot = path.join(evidenceRoot, `final-${route.id}-desktop-1280x720.png`)
     fs.writeFileSync(screenshot, (await win.capturePage()).toPNG())
     await clearTarget()
-    return { id: route.id, target, initial, before, afterHover, afterDown, afterRestore, layout, screenshot }
+    return { id: route.id, target, initial, before, afterHover, afterDown, afterRestore, realHand, hoverScreenshot, layout, screenshot }
   }
 
   const checkCursors = async () => {

@@ -19,7 +19,9 @@
 
 Electron专项 `node tests/electron/red226-ui-motion-smoke.cjs` 通过：主菜单、图鉴、选棋子、房间、地图、战场六页检查实际computed transform、单个叠加动画与离开恢复，减少动态效果、触摸及12个移动尺寸检查通过。证据位于 `output/RED226/results.json`。选棋子844×390已有1094px宽confirm-bar，停用动效后宽度相同，本次未扩大溢出；不将已有布局问题记为修复。
 
-战场专项目前使用真实训练页面中的QA手牌fixture，证明公共动效与生产手牌CSS叠加，不等同于正式手牌扇形及命令验收。真实手牌、技能点击/取消和拖动单次提交仍在补验。
+战场专项已改为正常训练回合生成的正式手牌：点击结束回合进入后手，生产renderHandCards生成幸运币（无fixture标记），AP10；鼠标移入的rotateX/rotateY分别为2.7659°/3.1809°，按下保留扇形变换，移出恢复identity，AP不变。证据output/RED226/final-battle-real-hand-hover.png及results.json。单张正式手牌不覆盖多张扇形的每个位置，原变换叠加另有公共行为测试。
+
+独立IAB训练页面手动验证：真实阿方技能卡正文点击进入选择，再次点击正文取消，AP10不变；从龙骧虎步卡片拖到相邻合法地格，AP10→9、CD0→1、行动历史新增一次，选择结束。地格状态面板在该场景正常打开。未使用脚本直接提交命令，未操作用户原战局。
 
 完整RED225回归在地格面板打开断言处失败（`tests/electron/red221-selection-smoke.cjs:1397`，地格2,1的面板保持隐藏）。无本次动效文件的RED225对照工作区同样失败，因此未归因为新增动效；该失败使后续实机点击/拖动断言未执行，不计为通过。证据 `output/RED226/red225/results.json`。本候选尚不能声明完整体验验收完成。
 
