@@ -89,7 +89,7 @@
    let button=row.querySelector('.character-cast');
    if(!button){button=document.createElement('button');button.type='button';button.className='character-cast';row.append(button);button.addEventListener('click',async(event)=>{
     event.stopPropagation();if(button.disabled||casting)return;
-    const hoverPreview=typeof pendingSkill!=='undefined'&&pendingSkill&&pendingSkill.previewOrigin==='hover'&&String(pendingSkill.skillId||'')===String(id);
+    const hoverPreview=typeof pendingSkill!=='undefined'&&pendingSkill&&pendingSkill.previewOnly===true&&pendingSkill.previewOrigin==='hover'&&String(pendingSkill.skillId||'')===String(id);
     if(button.dataset.targetMode==='cancel'&&!hoverPreview){
      casting=true;button.disabled=true;setKeyword(false);
      try{selectedPieceId=piece.instanceId;await dispatchBattleIntent({type:'cancel-target'});}
@@ -129,7 +129,7 @@
    if(description&&button.nextElementSibling!==description&&!controlsBetween)row.insertBefore(button,description);
     bindSkillCardActivation(row);
    button.dataset.skillId=id;
-   const hoverPreview=!!(isTargeting&&typeof pendingSkill!=='undefined'&&pendingSkill&&pendingSkill.previewOrigin==='hover'&&String(pendingSkill.skillId||'')===String(id));
+   const hoverPreview=!!(isTargeting&&typeof pendingSkill!=='undefined'&&pendingSkill&&pendingSkill.previewOnly===true&&pendingSkill.previewOrigin==='hover'&&String(pendingSkill.skillId||'')===String(id));
    const cancelMode=isTargeting&&cancelAllowed&&!hoverPreview;
    const cancelStateLabel=isTargeting&&!hoverPreview?(targetSubmissionPending?'等待确认…':!cancelAllowed?'当前选择不可取消':''):'';
    if(isTargeting&&!hoverPreview)button.dataset.targetMode=cancelMode?'cancel':'cancel-disabled';else delete button.dataset.targetMode;
@@ -147,7 +147,7 @@
    let reason=row.querySelector('.character-cast-reason');if(!reason){reason=document.createElement('div');reason.className='character-cast-reason';row.append(reason);}
    reason.textContent=cancelMode?'':available.unavailableReason||'';
   });
-  modal.classList.toggle('is-selecting-target',!!(pendingSkill||pendingCardAction||targetSubmissionPending));
+  modal.classList.toggle('is-selecting-target',!!((pendingSkill&&!pendingSkill.previewOnly)||pendingCardAction||targetSubmissionPending));
  }
  window.refreshTargetSkillButtonState=function(){
   if(currentPieceInfoSource!=='board'||!currentPieceInfoId)return;

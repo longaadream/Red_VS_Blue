@@ -5606,9 +5606,9 @@
     function computeValidSkillTargets(sp) {
       if (!G || !sp || !pendingSkill) return new Set()
       // A no-target preview is a board presentation affordance, not an
-      // engine target selection. Keep its board hover set when legal-action
-      // refreshes run; there is no preparation.candidates list to rebuild.
-      if (pendingSkill.previewOnly) return new Set(pendingSkill.validTargets || [])
+      // engine target selection. Keep its eligibility separate from the
+      // legal target set so refreshing actions never highlights the board.
+      if (pendingSkill.previewOnly) return new Set()
       const valid = new Set()
       const preparation = pendingSkill.preparation
       if (!preparation || !Array.isArray(preparation.candidates)) return valid
@@ -5631,17 +5631,6 @@
       updateRed43QaEvidence()
     }
 
-    function boardCellKeySet(snapshot) {
-      const cells = new Set()
-      const tiles = snapshot && snapshot.map && Array.isArray(snapshot.map.tiles)
-        ? snapshot.map.tiles
-        : []
-      tiles.forEach(tile => {
-        if (tile && tile.x != null && tile.y != null) cells.add(tile.x + ',' + tile.y)
-      })
-      return cells
-    }
-
     function skillSelectionSwitchBlocked() {
       if ((typeof pendingCardAction !== 'undefined' && pendingCardAction)
         || targetSubmissionPending || (typeof pendingActionFeedback !== 'undefined' && pendingActionFeedback)
@@ -5662,12 +5651,19 @@
         baseAction: Object.assign({}, action),
         previewOnly: true,
         previewOrigin: origin || 'hover',
-        validTargets: boardCellKeySet(G),
-        hint: '移动到棋盘预演，点击或松手释放',
+        // Preview eligibility is intentionally separate from legal target
+        // highlights. A root action without a target may be previewed while
+        // the board remains free of target cells.
+        previewEligible: true,
+        validTargets: new Set(),
+        hint: '公开效果预演 · 点击或松手释放',
       }
       _updatePendingSkillTargets()
       renderBoard()
       renderActionBar(); renderTargetOverlay()
+      if (pendingSkill.previewOrigin === 'hover' && typeof previewSkillTarget === 'function') {
+        previewSkillTarget(null, null)
+      }
       return true
     }
 
@@ -5873,14 +5869,16 @@
     function renderTargetOverlay() {
       const el = document.getElementById('targetOverlay')
       if (!el) return
-      const active = !!(pendingSkill || pendingCardAction || targetSubmissionPending)
+      // A no-target preview is a local display state, not target selection.
+      // Keep the prompt and controls reserved for real target/card sessions.
+      const active = !!(pendingCardAction || targetSubmissionPending || (pendingSkill && !pendingSkill.previewOnly))
       document.body.classList.toggle('target-mode-active', active)
       const controls = document.getElementById('targetSelectionControls')
       if (controls) controls.classList.toggle('show', active)
       if (active) {
         if (window.refreshTargetSkillButtonState) window.refreshTargetSkillButtonState()
         if (typeof placeTargetOverlayHost === 'function') placeTargetOverlayHost(true)
-        closePieceContextMenu()
+        if (!(pendingSkill && !pendingCardAction && !targetSubmissionPending)) closePieceContextMenu()
         document.getElementById('targetPromptText').textContent = targetSubmissionPending
           ? '指令已提交 · 等待权威确认'
           : _targetPromptText()
@@ -5903,28 +5901,10 @@
           const authoritativeSelection = G && (G.pendingTargetSelection || G.pendingOptionSelection)
           const currentSkillId = pendingSkill && (pendingSkill.skillId || pendingSkill.baseAction && pendingSkill.baseAction.skillId)
             || targetSubmissionPending && targetSubmissionPending.draft && targetSubmissionPending.draft.skill && targetSubmissionPending.draft.skill.skillId
-          let currentSkillButton = false
-          const pieceInfoModal = document.getElementById('pieceInfoModal')
-          const skillSheetVisible = pieceInfoModal
-            && pieceInfoModal.classList.contains('character-dock')
-            && pieceInfoModal.style.display !== 'none'
-            && document.body.classList.contains('character-dock-open')
-            && typeof currentPieceInfoSource !== 'undefined'
-            && currentPieceInfoSource === 'board'
-          if (currentSkillId && skillSheetVisible && typeof document.querySelectorAll === 'function') {
-            const skillButtons = document.querySelectorAll('#pieceInfoContent .character-cast')
-            for (let i = 0; i < skillButtons.length; i += 1) {
-              if (skillButtons[i].dataset
-                && skillButtons[i].dataset.targetMode
-                && String(skillButtons[i].dataset.skillId || '') === String(currentSkillId)) {
-                currentSkillButton = true
-                break
-              }
-            }
-          }
-          // A current skill owns its second-click cancel affordance. Keep the
-          // shared button only for cards, rules and rows that are unavailable.
-          cancelButton.hidden = currentSkillButton || !!(authoritativeSelection && authoritativeSelection.canCancel === false)
+          // A current skill owns its full-card/skill-button cancel affordance.
+          // Keep the shared button only for cards, rules and rows that have no
+          // corresponding skill entry.
+          cancelButton.hidden = !!currentSkillId || !!(authoritativeSelection && authoritativeSelection.canCancel === false)
           cancelButton.disabled = !!targetSubmissionPending
           cancelButton.textContent = targetSubmissionPending ? '等待确认…' : '取消目标选择'
         }
@@ -6773,7 +6753,11 @@
       const trainingOpen = document.getElementById('trainingTools')?.classList.contains('is-open')
       const isTargeting = !!pendingSkill || !!pendingCardAction || !!targetSubmissionPending ||
         pendingTargetSelectionForMe() || pendingOptionSelectionForMe()
-      if (!piece || piece.currentHp <= 0 || isTargeting || trainingOpen || dismissedPieceContextId === piece.instanceId) {
+      // Keep the active skill in the compact menu so touch users can cancel
+      // with the same card. Card/rule selections and authority submission
+      // still close the menu because they have no local skill-card cancel.
+      const keepSkillMenu = !!(pendingSkill && !pendingCardAction && !targetSubmissionPending)
+      if (!piece || piece.currentHp <= 0 || (isTargeting && !keepSkillMenu) || trainingOpen || dismissedPieceContextId === piece.instanceId) {
         closePieceContextMenu()
         return
       }
@@ -7272,16 +7256,38 @@
     // ── Cell click ──
     let skillPreviewController = null
     let skillDragController = null
+    let hoverSkillPreviewReplayScheduled = false
     const skillPreviewDisplayTimings = []
     function clearSkillPreview() {
       if (skillPreviewController) skillPreviewController.clear()
     }
 
+    function replayHoverSkillPreviewAfterViewport() {
+      if (hoverSkillPreviewReplayScheduled
+        || !pendingSkill
+        || pendingSkill.previewOnly !== true
+        || pendingSkill.previewOrigin !== 'hover') return
+      hoverSkillPreviewReplayScheduled = true
+      const replay = function() {
+        hoverSkillPreviewReplayScheduled = false
+        if (battlePageDisposed || !pendingSkill
+          || pendingSkill.previewOnly !== true
+          || pendingSkill.previewOrigin !== 'hover') return
+        previewSkillTarget(null, null)
+      }
+      if (typeof requestAnimationFrame === 'function') requestAnimationFrame(replay)
+      else setTimeout(replay, 0)
+    }
+
     function previewSkillTarget(x, y) {
       const renderer = window.BattleRenderer3D
+      const previewOnly = !!(pendingSkill && pendingSkill.previewOnly)
+      const hasEligibleTarget = !!(pendingSkill && pendingSkill.validTargets && pendingSkill.validTargets.has(x + ',' + y))
       if (!_use3d || !renderer || !pendingSkill || !pendingSkill.baseAction || !pendingSkill.skillId ||
           pendingSkill.turnTargetActionType || pendingSkill.preparation && pendingSkill.preparation.selectionMode === 'multi' ||
-          targetSubmissionPending || waitingForOtherPending() || !pendingSkill.validTargets || !pendingSkill.validTargets.has(x + ',' + y) ||
+          targetSubmissionPending || waitingForOtherPending() ||
+          previewOnly && pendingSkill.previewEligible !== true ||
+          !previewOnly && !hasEligibleTarget ||
           typeof GameEngine === 'undefined' || !GameEngine.previewBattleAction) {
         clearSkillPreview()
         return
@@ -7359,7 +7365,7 @@
       }
       const action = Object.assign({}, pendingSkill.baseAction)
       if (action.extraTargets) action.extraTargets = action.extraTargets.slice()
-      if (!pendingSkill.previewOnly) {
+      if (!previewOnly) {
         const piece = G.pieces.find(p => p.x === x && p.y === y && p.currentHp > 0)
         _appendTargetToAction(action, piece, x, y, pendingSkill.preparation && pendingSkill.preparation.targetType)
       }
@@ -7377,33 +7383,28 @@
       const availability = resolveSkillAvailability(sp, skId)
       if (!availability.available) return false
       if (pendingSkill && pendingSkill.skillId === skId) return true
+
+      // Classify through the existing isolated engine preparation, without
+      // turning its target request into an active UI selection on hover.
+      if (pendingSkill) {
+        clearTargetInteraction('skill-hover-switch')
+        setMoveButtonClass(false)
+        closePieceContextMenu()
+      }
       const draftAction = {
         type: skillUsesCharge(skData) ? 'useChargeSkill' : 'useBasicSkill',
         playerId: myPlayerId,
         pieceId: selectedPieceId,
         skillId: skId,
       }
-      const localTargetProbe = window.BattleLegalActions && typeof GameEngine !== 'undefined'
-        ? BattleLegalActions.probeSkillTarget({
-            snapshot: G,
-            playerId: myPlayerId,
-            pieceId: selectedPieceId,
-            skillId: skId,
-            skillsById: skillsById,
-            engine: GameEngine,
-          })
+      if (typeof tutorialActionAllowed === 'function' && !tutorialActionAllowed(draftAction)) return false
+      const probe = window.BattleLegalActions && typeof GameEngine !== 'undefined'
+        ? BattleLegalActions.probeSkillTarget({ snapshot: G, playerId: myPlayerId,
+            pieceId: selectedPieceId, skillId: skId, skillsById, engine: GameEngine })
         : null
-      if (!localTargetProbe || (typeof tutorialActionAllowed === 'function' && !tutorialActionAllowed(draftAction))) return false
-      if (localTargetProbe.needsTarget && !localTargetProbe.preparation) return false
-      clearTargetInteraction('skill-hover-switch')
+      if (!probe || probe.needsTarget) return false
       setMoveButtonClass(false)
       closePieceContextMenu()
-      if (localTargetProbe.needsTarget) {
-        if (!enterActionTargetMode(draftAction, localTargetProbe.preparation, { preserveDock: true })) return false
-        pendingSkill.previewOrigin = 'hover'
-        if (typeof window.refreshTargetSkillButtonState === 'function') window.refreshTargetSkillButtonState()
-        return true
-      }
       return enterPreviewOnlySkillMode(draftAction, skData, 'hover')
     }
 
@@ -7427,6 +7428,7 @@
       }
       if (intent.type === 'viewport-change') {
         clearSkillPreview()
+        replayHoverSkillPreviewAfterViewport()
         schedulePieceContextMenuPosition()
         return
       }
@@ -7634,10 +7636,12 @@
       }
 
       if (pendingSkill && selectedPieceId) {
-        // Only allow clicks on highlighted valid skill targets.
+        // A no-target preview accepts a board release only as a release
+        // surface; the hovered cell must never become part of its action.
+        const previewOnly = pendingSkill.previewOnly === true
         const key = x + ',' + y
         const vt = pendingSkill.validTargets
-        if (vt && !vt.has(key)) {
+        if (!previewOnly && vt && !vt.has(key)) {
           // Invalid targets keep the active caster and draft so the next click can retry.
           setStatusMsg('目标不在技能范围内')
           return
@@ -7653,7 +7657,7 @@
               pieceId: selectedPieceId,
               skillId: pendingSkill.skillId
             }
-        if (pendingSkill.previewOnly) {
+        if (previewOnly) {
           // A no-target preview never receives the hovered cell as a target.
           // Release the prepared root action exactly once through doAction.
           pendingSkill = null
@@ -7744,7 +7748,17 @@
         }
       }
       if (selectedPieceId === instanceId) {
+        const pieceDock = document.getElementById('pieceInfoModal')
+        const shouldClosePieceDock = !!(pieceDock
+          && pieceDock.classList.contains('character-dock')
+          && pieceDock.style.display !== 'none')
         clearPieceSelection()
+        // The compact board menu and the character reading dock are separate
+        // surfaces. A second click on the selected board piece dismisses both
+        // so the following click can open the menu again.
+        if (shouldClosePieceDock && typeof window.closePieceInfo === 'function') {
+          window.closePieceInfo({ restoreFocus: false })
+        }
         return
       }
       if (G && (pendingTargetSelectionForMe() || pendingOptionSelectionForMe())) {

@@ -80,6 +80,8 @@ type RendererApi = {
     activeAnimationCount: number
     terrainBatchCount: number
     terrainInstanceCount: number
+    tileEffectCellCount: number
+    previewBoardActive: boolean
   }
   dispose(): void
 }
@@ -617,12 +619,15 @@ describe('RED-68 BattleRenderer3D runtime', () => {
       const hypothetical = structuredClone(model)
       hypothetical.pieces[0].x += 2
       hypothetical.pieces[0].health.current -= 3
+      hypothetical.effects = [{ id: 'preview-fire', type: 'amaterasu', x: 2, y: 2 }]
       h.renderer.showPreviewBoard(hypothetical, model)
+      expect(h.renderer.getPerformanceDiagnostics()).toMatchObject({ tileEffectCellCount: 1, previewBoardActive: true })
       h.renderer.spawnFloater(2, 2, '预演 −3', '#fff', false, { preview: true })
       expect(layer.children.map(child => child.textContent)).toEqual(['实际 −1', '预演 −3'])
       const group = h.renderers[0].scene!.children.find(node => node.userData.pieceId === model.pieces[0].id)
       expect(group?.position.x).toBe(hypothetical.pieces[0].x)
       h.renderer.clearPreviewBoard()
+      expect(h.renderer.getPerformanceDiagnostics()).toMatchObject({ tileEffectCellCount: 0, previewBoardActive: false })
       expect(h.container.querySelector('.piece-board-lethal')?.hidden).toBe(false)
       expect(layer.children.map(child => child.textContent)).toEqual(['实际 −1'])
       const restored = h.renderers[0].scene!.children.find(node => node.userData.pieceId === model.pieces[0].id)

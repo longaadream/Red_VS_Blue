@@ -19,6 +19,11 @@
   var HAND_CARD_MAX_TILT = 5
   var SKILL_MAX_TILT = 2
   var CONTROL_MAX_TILT = 2
+  // Battle cards and controls get a modestly clearer cue without changing
+  // the shared gallery/menu motion language on other pages.
+  var BATTLE_HAND_CARD_MAX_TILT = 6
+  var BATTLE_SKILL_MAX_TILT = 3
+  var BATTLE_CONTROL_MAX_TILT = 3
   var HOVER_SCALE = 1
   // Keep the press snapshot at neutral scale so the decorative layer never
   // changes a card's hit area while a page's native :active state responds.
@@ -31,6 +36,8 @@
   var SCALE_EPSILON = 0.0005
   var VELOCITY_EPSILON = 0.01
   var DRAG_DISTANCE = 8
+  var HOVER_CLASS = 'ui-motion-hover'
+  var PRESSED_CLASS = 'ui-motion-pressed'
 
   /*
    * These selectors are deliberately explicit. A generic `button:hover` rule
@@ -122,6 +129,18 @@
     '#packStatusCard',
   ]
 
+  var BATTLE_SURFACE_SELECTORS = [
+    '#handCards',
+    '.pi-skill',
+    '[data-battle-ui-region]',
+    '.btn-action',
+    '.btn-end',
+    '.hud-btn',
+    '.training-tools-toggle',
+    '.tb-btn',
+    '.board-view-button',
+  ]
+
   function asDocument(options) {
     var input = options || {}
     return input.document || input.root || (globalRoot && globalRoot.document) || null
@@ -161,6 +180,16 @@
     return !!(target && target.classList && typeof target.classList.contains === 'function' && target.classList.contains(name))
   }
 
+  function setMotionClasses(state) {
+    if (!state || !state.element) return
+    var activeHover = !!state.hovering && !state.dragging
+    var activePress = !!state.pressed && !state.dragging
+    if (activeHover) addClass(state.element, HOVER_CLASS)
+    else removeClass(state.element, HOVER_CLASS)
+    if (activePress) addClass(state.element, PRESSED_CLASS)
+    else removeClass(state.element, PRESSED_CLASS)
+  }
+
   function attribute(target, name) {
     if (!target || typeof target.getAttribute !== 'function') return null
     return target.getAttribute(name)
@@ -196,6 +225,23 @@
   function hasAnyMatch(target, selectors) {
     for (var i = 0; i < selectors.length; i += 1) if (safeMatches(target, selectors[i])) return true
     return false
+  }
+
+  function isBattleSurface(target) {
+    var current = target
+    while (current) {
+      if (hasAnyMatch(current, BATTLE_SURFACE_SELECTORS)) return true
+      current = parentOf(current)
+    }
+    return false
+  }
+
+  function maxTiltFor(ruleName, baseTilt, element) {
+    if (!isBattleSurface(element)) return baseTilt
+    if (ruleName === 'hand-card') return BATTLE_HAND_CARD_MAX_TILT
+    if (ruleName === 'skill-card') return BATTLE_SKILL_MAX_TILT
+    if (ruleName === 'control') return BATTLE_CONTROL_MAX_TILT
+    return baseTilt
   }
 
   function hasEnabledDescendant(target) {
@@ -287,7 +333,7 @@
     if (!target) return null
     var current = isElement(target) ? target : parentOf(target)
     var activeSkill = activeSkillRow(current, rootElement, documentRef)
-    if (activeSkill) return { name: 'skill-card', maxTilt: SKILL_MAX_TILT, element: activeSkill }
+    if (activeSkill) return { name: 'skill-card', maxTilt: maxTiltFor('skill-card', SKILL_MAX_TILT, activeSkill), element: activeSkill }
     while (current && current !== rootElement) {
       if (isExcluded(current, rootElement) || isBlockedByInteraction(current, documentRef, rootElement)) return null
       if (hasDisabledAncestor(current, rootElement)) return null
@@ -296,7 +342,7 @@
         var rule = PROFILE_RULES[i]
         if (!hasAnyMatch(current, rule.selectors)) continue
         if (!isInteractiveElement(current, rule.name)) continue
-        return { name: rule.name, maxTilt: rule.maxTilt, element: current }
+        return { name: rule.name, maxTilt: maxTiltFor(rule.name, rule.maxTilt, current), element: current }
       }
 
       current = parentOf(current)
@@ -476,6 +522,8 @@
 
     function removeState(state) {
       if (!state) return
+      removeClass(state.element, HOVER_CLASS)
+      removeClass(state.element, PRESSED_CLASS)
       cancelAnimation(state)
       states.delete(state.element)
       if (hovered === state) hovered = null
@@ -494,7 +542,11 @@
     function resetMotion() {
       activePointer = null
       hovered = null
-      states.forEach(function (state) { cancelAnimation(state) })
+      states.forEach(function (state) {
+        removeClass(state.element, HOVER_CLASS)
+        removeClass(state.element, PRESSED_CLASS)
+        cancelAnimation(state)
+      })
       states.clear()
       cancelFrame()
     }
@@ -544,6 +596,7 @@
       if (hovered && hovered !== state) {
         hovered.hovering = false
         hovered.pressed = false
+        setMotionClasses(hovered)
         hovered.target.x = 0
         hovered.target.y = 0
         setTargetScale(hovered)
@@ -553,6 +606,7 @@
       state.hovering = true
       state.pressed = false
       state.dragging = false
+      setMotionClasses(state)
       setPointerTarget(state, event)
       setTargetScale(state)
       scheduleFrame()
@@ -567,6 +621,7 @@
       state.target.x = 0
       state.target.y = 0
       setTargetScale(state)
+      setMotionClasses(state)
       if (hovered === state) hovered = null
       scheduleFrame()
     }
@@ -609,6 +664,7 @@
             activePointer.state.dragging = true
             activePointer.state.hovering = false
             activePointer.state.pressed = false
+            setMotionClasses(activePointer.state)
             activePointer.state.target.x = 0
             activePointer.state.target.y = 0
             setTargetScale(activePointer.state)
@@ -664,6 +720,7 @@
       state.velocity.x = 0
       state.velocity.y = 0
       state.velocity.scale = 0
+      setMotionClasses(state)
       writeAnimation(state)
       hovered = state
       activePointer = {
@@ -695,6 +752,7 @@
         state.hovering = true
         if (event) setPointerTarget(state, event)
       }
+      setMotionClasses(state)
       setTargetScale(state)
       scheduleFrame()
     }

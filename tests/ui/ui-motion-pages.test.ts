@@ -44,6 +44,19 @@ describe('RED-226 shared page motion integration', () => {
     expect(css).toContain('input[type="text"]')
   })
 
+  it('styles actual battle interaction states without moving anchored context menus', () => {
+    const css = readFileSync('data/pages/css/ui-motion.css', 'utf8')
+    expect(css).toContain('.ui-motion-hover')
+    expect(css).toContain('.ui-motion-pressed')
+    expect(css).toContain('#handCards > .card-item.ui-motion-hover')
+    expect(css).toContain('.pi-skill.ui-motion-hover')
+    expect(css).toContain('#battleSettingsButton.ui-motion-pressed')
+    expect(css).toContain('.topbar[data-battle-ui-region] > button.ui-motion-hover')
+    expect(css).toContain('.piece-context-skill:hover')
+    expect(css).toContain('.piece-context-skill:active')
+    expect(css).not.toMatch(/\.piece-context-menu[^{}]*\{[^}]*transform/)
+  })
+
   it('contains the runtime paths required for mouse, touch, reduced motion and teardown', () => {
     const runtime = readFileSync('data/pages/js/ui-motion.js', 'utf8')
     expect(runtime).toContain("'ui-motion-enabled'")

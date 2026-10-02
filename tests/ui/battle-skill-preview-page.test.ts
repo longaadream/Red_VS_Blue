@@ -191,6 +191,7 @@ describe('RED-224 battle page skill preview binding', () => {
   it('keeps a no-target preview root free of hovered coordinates', () => {
     const h = createHarness({ status: 'ready', snapshot: { revision: 8 }, events: [] })
     h.pendingSkill.previewOnly = true
+    h.pendingSkill.previewEligible = true
 
     preview(h, 2, 3)
 
@@ -210,6 +211,7 @@ describe('RED-224 battle page skill preview binding', () => {
   it('releases a no-target preview through one root action on board activation', () => {
     const h = createHarness({ status: 'ready', snapshot: { revision: 8 }, events: [] })
     h.pendingSkill.previewOnly = true
+    h.pendingSkill.previewEligible = true
     Object.assign(h.context, {
       ADVENTURE_MODE: false,
       TRAINING_MODE: false,

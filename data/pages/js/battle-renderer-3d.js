@@ -2477,6 +2477,8 @@
       frameScheduled: _animFrameId != null,
       activeAnimationCount: _anims.size,
       terrainBatchCount: _tileBatches.size,
+      tileEffectCellCount: _tileEffectObjects.size,
+      previewBoardActive: _previewAuthorityModel != null,
       terrainInstanceCount: Array.from(_tileBatches.values()).reduce(function (total, batch) {
         return total + Number(batch.count || 0)
       }, 0),

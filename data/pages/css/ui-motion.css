@@ -165,3 +165,71 @@
     cursor: not-allowed !important;
   }
 }
+
+/*
+ * RED-227 battle feedback.
+ *
+ * ui-motion.js owns the additive transform and marks the active element with
+ * short-lived state classes. These rules add contrast without replacing the
+ * hand fan, skill-row geometry, toolbar layout, or any battle material.
+ * Context-menu controls stay presentation-only here; their positioned parent
+ * is intentionally excluded from the delegated transform runtime.
+ */
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  html.ui-motion-enabled :where(
+    #handCards > .card-item.ui-motion-hover:not(.card-disabled),
+    .pi-skill.ui-motion-hover:has(.character-cast:not(:disabled)),
+    #battleSettingsButton.ui-motion-hover,
+    .topbar[data-battle-ui-region] > button.ui-motion-hover,
+    .hud-btn.ui-motion-hover,
+    .btn-action.ui-motion-hover,
+    .btn-end.ui-motion-hover,
+    .training-tools-toggle.ui-motion-hover,
+    .training-popover .tb-btn.ui-motion-hover,
+    .board-camera-controls .board-view-button.ui-motion-hover
+  ) {
+    filter: brightness(1.08) saturate(1.08) drop-shadow(0 5px 10px rgba(2, 6, 23, .24));
+  }
+
+  html.ui-motion-enabled :where(
+    #handCards > .card-item.ui-motion-pressed:not(.card-disabled),
+    .pi-skill.ui-motion-pressed:has(.character-cast:not(:disabled)),
+    #battleSettingsButton.ui-motion-pressed,
+    .topbar[data-battle-ui-region] > button.ui-motion-pressed,
+    .hud-btn.ui-motion-pressed,
+    .btn-action.ui-motion-pressed,
+    .btn-end.ui-motion-pressed,
+    .training-tools-toggle.ui-motion-pressed,
+    .training-popover .tb-btn.ui-motion-pressed,
+    .board-camera-controls .board-view-button.ui-motion-pressed
+  ) {
+    filter: brightness(1.16) saturate(1.1) drop-shadow(0 3px 7px rgba(2, 6, 23, .3));
+  }
+
+  html.ui-motion-enabled .pi-skill.ui-motion-hover .pi-skill-icon {
+    filter: brightness(1.18) drop-shadow(0 0 5px rgba(147, 197, 253, .34));
+  }
+
+  html.ui-motion-enabled .pi-skill.ui-motion-pressed .pi-skill-icon {
+    filter: brightness(1.28) drop-shadow(0 0 6px rgba(251, 191, 36, .42));
+  }
+
+  /* Compact skill controls have their own anchored menu geometry. Give the
+     controls a stronger state signal while leaving that parent stationary. */
+  html.ui-motion-enabled :where(
+    .piece-context-skill:hover:not(:disabled),
+    .piece-context-info:hover:not(:disabled),
+    .piece-context-collapse:hover:not(:disabled)
+  ) {
+    filter: brightness(1.12) saturate(1.08);
+    color: #f8fafc;
+  }
+
+  html.ui-motion-enabled :where(
+    .piece-context-skill:active:not(:disabled),
+    .piece-context-info:active:not(:disabled),
+    .piece-context-collapse:active:not(:disabled)
+  ) {
+    filter: brightness(1.2) saturate(1.08);
+  }
+}

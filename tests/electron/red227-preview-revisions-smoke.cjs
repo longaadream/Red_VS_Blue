@@ -128,7 +128,7 @@ async function runElectronSmoke() {
     logs: [],
   }
 
-  const win = new BrowserWindow({
+  const windowOptions = {
     show: true,
     width: 1280,
     height: 720,
@@ -139,7 +139,8 @@ async function runElectronSmoke() {
       sandbox: true,
       backgroundThrottling: false,
     },
-  })
+  }
+  let win = new BrowserWindow(windowOptions)
   win.focus()
   win.webContents.on('console-message', (_event, level, message) => {
     evidence.logs.push({ level, message: String(message) })
@@ -148,7 +149,7 @@ async function runElectronSmoke() {
     evidence.logs.push({ level: 'did-fail-load', message: code + ' ' + description + ' ' + url })
   })
 
-  const debuggerApi = win.webContents.debugger
+  let debuggerApi = win.webContents.debugger
   let debuggerAttached = false
   const cdp = async (method, params) => {
     if (!debuggerAttached) {
@@ -305,34 +306,31 @@ async function runElectronSmoke() {
     return value
   }
 
-  const configureSetup = async () => {
+  const configureSetup = async (options = {}) => {
+    const firstPiece = options.firstPiece || 'el-primo'
+    const secondPiece = options.secondPiece || 'dark-aizen'
+    const firstFaction = options.firstFaction || 'blue'
+    const secondFaction = options.secondFaction || 'red'
     await waitFor('document.readyState === "complete" && typeof PIECES_BY_ID === "object" && Object.keys(PIECES_BY_ID).length > 0', 30000, 'training content')
     await waitFor('document.getElementById("trainingSetupOverlay")?.classList.contains("show") === true', 30000, 'training setup overlay')
     await evaluate([
       '(() => {',
       "  const setSelect = (id, value) => { const node = document.getElementById(id); node.value = value; node.dispatchEvent(new Event('change', { bubbles: true })) }",
-      "  setSelect('trainingFirstFaction', 'blue')",
-      "  setSelect('trainingSecondFaction', 'red')",
+      "  setSelect('trainingFirstFaction', " + JSON.stringify(firstFaction) + ')',
+      "  setSelect('trainingSecondFaction', " + JSON.stringify(secondFaction) + ')',
       '  refreshTrainingSetupPieces()',
       '  return true',
       '})()',
     ].join('\n'))
 
     const setCheckbox = async (listId, value, label) => {
-      for (let attempt = 0; attempt < 4; attempt += 1) {
-        const input = await evaluate('(() => { const node = document.querySelector(' +
-          JSON.stringify('#' + listId + ' input[value="' + value + '"]') +
-          '); if (!node) return null; const host = node.closest("label") || node; host.scrollIntoView({ block: "center", inline: "nearest" }); const r = host.getBoundingClientRect(); return { checked: node.checked, x: r.left + r.width / 2, y: r.top + r.height / 2, width: r.width, height: r.height } })()')
-        ensure(input, label + ' checkbox missing')
-        if (input.checked) return
-        await mouseClick(input)
-        await delay(80)
-      }
-      const state = await evaluate('document.querySelector(' + JSON.stringify('#' + listId + ' input[value="' + value + '"]') + ')?.checked === true')
-      if (!state) {
-        const debug = await evaluate('Array.from(document.querySelectorAll(' + JSON.stringify('#' + listId + ' input[type="checkbox"]') + ')).map(node => { const host=node.closest("label") || node; const r=host.getBoundingClientRect(); return { value:node.value, checked:node.checked, rect:{left:r.left,top:r.top,width:r.width,height:r.height}, text:host.textContent } })')
-        throw new Error(label + ' checkbox did not select: ' + JSON.stringify(debug))
-      }
+      // Setup checkboxes are preparation, not the pointer behavior under test.
+      // Use their normal DOM activation when a long roster scrolls behind the
+      // fixed setup footer; do not repeatedly click stale host coordinates.
+      const selected = await evaluate('(() => { const node = document.querySelector(' +
+        JSON.stringify('#' + listId + ' input[value="' + value + '"]') +
+        '); if (!node) return false; if (!node.checked) node.click(); return node.checked })()')
+      ensure(selected, label + ' checkbox did not select')
     }
 
     const removeOtherChecks = async (listId, keepValue) => {
@@ -347,17 +345,16 @@ async function runElectronSmoke() {
       ensure(leftovers.length === 1 && leftovers[0] === keepValue, 'unexpected setup checkbox selection: ' + JSON.stringify(leftovers))
     }
 
-    await setCheckbox('trainingFirstPieces', 'el-primo', 'el-primo')
-    await removeOtherChecks('trainingFirstPieces', 'el-primo')
-    await setCheckbox('trainingSecondPieces', 'dark-aizen', 'dark-aizen')
-    await removeOtherChecks('trainingSecondPieces', 'dark-aizen')
+    await setCheckbox('trainingFirstPieces', firstPiece, firstPiece)
+    await removeOtherChecks('trainingFirstPieces', firstPiece)
+    await setCheckbox('trainingSecondPieces', secondPiece, secondPiece)
+    await removeOtherChecks('trainingSecondPieces', secondPiece)
     const setupForm = await evaluate('(() => { const config = getTrainingSetupConfig(); return { config, firstFaction: document.getElementById("trainingFirstFaction")?.value, secondFaction: document.getElementById("trainingSecondFaction")?.value, firstChecked: Array.from(document.querySelectorAll("#trainingFirstPieces input[type=checkbox]:checked")).map(node => node.value), secondChecked: Array.from(document.querySelectorAll("#trainingSecondPieces input[type=checkbox]:checked")).map(node => node.value) }; })()')
     evidence.setupForm = setupForm
     console.log('RED-227 setup form:', JSON.stringify(setupForm))
-    ensure(setupForm.config && setupForm.config.firstFaction === 'blue' && setupForm.config.secondFaction === 'red' && JSON.stringify(setupForm.config.firstTemplateIds) === '["el-primo"]' && JSON.stringify(setupForm.config.secondTemplateIds) === '["dark-aizen"]', 'setup form did not retain requested configuration: ' + JSON.stringify(setupForm))
+    ensure(setupForm.config && setupForm.config.firstFaction === firstFaction && setupForm.config.secondFaction === secondFaction && JSON.stringify(setupForm.config.firstTemplateIds) === JSON.stringify([firstPiece]) && JSON.stringify(setupForm.config.secondTemplateIds) === JSON.stringify([secondPiece]), 'setup form did not retain requested configuration: ' + JSON.stringify(setupForm))
     await evaluate('(() => { if (!window.GameEngine || typeof window.GameEngine.setRng !== "function" || typeof window.GameEngine.mulberry32 !== "function") throw new Error("browser GameEngine RNG injection is unavailable"); window.GameEngine.setRng(window.GameEngine.mulberry32(' + trainingRngSeed + ')); return true })()')
-    const start = await pointForElement('#trainingSetupOverlay button[onclick="startTrainingFromSetup()"]', 'training start button')
-    await mouseClick(start)
+    await evaluate('document.querySelector(\'#trainingSetupOverlay button[onclick="startTrainingFromSetup()"]\').click()')
   }
 
   const pieceByTemplate = async templateId => {
@@ -422,6 +419,8 @@ async function runElectronSmoke() {
 
   const hoverSkillTarget = async (skillId, targetTemplateId) => {
     const rects = await openSkill('el-primo', skillId)
+    await mouseHover(rects.button)
+    ensure(!(await stateSnapshot()).pendingSkill, 'targeted skill hover entered target mode')
     await mouseClick(rects.button)
     await waitFor('typeof pendingSkill !== "undefined" && pendingSkill && pendingSkill.skillId === ' + JSON.stringify(skillId), 5000, skillId + ' target mode')
     const target = await pieceByTemplate(targetTemplateId)
@@ -589,7 +588,11 @@ async function runElectronSmoke() {
     const meteor = await openSkill('el-primo', 'el-primo-meteor-belt')
     const meteorBefore = await stateSnapshot()
     await mouseHover(meteor.description)
+    ensure(await evaluate('document.querySelector("#pieceInfoContent .character-cast[data-skill-id=el-primo-meteor-belt]").closest(".pi-skill").classList.contains("ui-motion-hover")'), 'battle skill card has no hover feedback')
     await waitFor('typeof pendingSkill !== "undefined" && pendingSkill && pendingSkill.skillId === "el-primo-meteor-belt" && pendingSkill.previewOnly === true', 5000, 'meteor no-target hover')
+    await waitFor('document.querySelector(".skill-preview-badge")?.hidden === false && Array.from(document.querySelectorAll("#hpBarLayer3d .piece-board-summary")).some(node => node.dataset.pieceId === "training-red-1" && node.getAttribute("aria-label").includes("流星腰带"))', 5000, 'meteor card hover immediately shows predicted status')
+    ensure(await evaluate('(currentBattleViewModel.legal.targetCells || []).length === 0'), 'no-target hover highlighted the entire board')
+    ensure(await evaluate('document.getElementById("targetCancelButton").getBoundingClientRect().width === 0'), 'no-target hover showed cancel frame')
     const meteorHover = await stateSnapshot()
     ensure(playerById(meteorHover, 'training-red')?.actionPoints === playerById(meteorBefore, 'training-red')?.actionPoints, 'meteor hover deducted AP')
     const boardDestination = await pointForCell(11, 4)
@@ -629,13 +632,73 @@ async function runElectronSmoke() {
     await touchTap(touchPoint)
     await waitFor('pendingSkill && pendingSkill.skillId === "el-primo-punch"', 5000, 'touch skill selects target mode')
     const touchSelected = await stateSnapshot()
-    const touchCancel = await pointForElement('#targetCancelButton', 'touch cancel skill')
+    const touchCancel = await pointForElement('#pieceContextMenu .piece-context-skill[data-skill-id="el-primo-punch"]', 'touch cancel skill card')
     await touchTap(touchCancel)
     await waitFor('!pendingSkill', 5000, 'touch skill cancels target mode')
     await cdp('Emulation.setTouchEmulationEnabled', { enabled: false })
     const touchAfter = await stateSnapshot()
     ensure(playerById(touchAfter, 'training-red')?.actionPoints === touchAp, 'touch changed AP')
     evidence.mobile = { viewport: { width: 844, height: 390 }, before: touchBefore, selected: touchSelected, after: touchAfter, point: touchPoint, screenshot: await screenshot('final-red227-mobile-card-cancel.png') }
+
+    // Terrain is a separate scenario with a fresh native window. Reusing a
+    // phone-emulated Electron capture/input surface after navigation produced
+    // UnknownVizError and lost native clicks despite valid DOM hit tests.
+    debuggerApi.detach()
+    debuggerAttached = false
+    const mobileWindow = win
+    win = new BrowserWindow(windowOptions)
+    debuggerApi = win.webContents.debugger
+    win.webContents.on('console-message', (_event, level, message) => {
+      evidence.logs.push({ level, message: String(message) })
+    })
+    mobileWindow.close()
+    win.focus()
+    await loadBattle()
+    await configureSetup({ firstPiece: 'red-sasuke', secondPiece: 'el-primo', firstFaction: 'red', secondFaction: 'blue' })
+    await waitFor('G && G.turn.phase === "action" && battlePresentation && _use3d === true && getComputedStyle(document.getElementById("loadingOverlay")).display === "none"', 30000, 'terrain training runtime')
+    const terrainInitial = await stateSnapshot()
+    const sasuke = terrainInitial.pieces.find(piece => piece.templateId === 'red-sasuke')
+    ensure(sasuke, 'terrain source missing')
+    const terrainSkill = await openSkill('red-sasuke', 'sasuke-amaterasu')
+    await mouseHover(terrainSkill.description)
+    ensure(!(await stateSnapshot()).pendingSkill, 'terrain targeted skill hovered into selection')
+    await mouseClick(terrainSkill.button)
+    await waitFor('pendingSkill && pendingSkill.skillId === "sasuke-amaterasu"', 5000, 'terrain target mode')
+    const terrainCenter = { x: sasuke.x + 2, y: sasuke.y }
+    await mouseHover(await pointForCell(terrainCenter.x, terrainCenter.y))
+    await waitFor('document.querySelector(".skill-preview-badge")?.hidden === false && document.querySelector(".skill-preview-badge")?.textContent.includes("公开效果预演")', 5000, 'terrain ready preview')
+    await waitFor('BattleRenderer3D.getPerformanceDiagnostics().tileEffectCellCount === 9 && BattleRenderer3D.getPerformanceDiagnostics().previewBoardActive', 5000, 'nine terrain effects rendered in preview')
+    ensure(await evaluate('!G.extensions?.tileEffects || G.extensions.tileEffects.length === 0'), 'terrain preview mutated authority tiles')
+    const terrainAp = playerById(terrainInitial, 'training-red').actionPoints
+    ensure(await readResource('training-red') === terrainAp, 'terrain hover spent AP')
+    evidence.terrain = { center: terrainCenter, before: terrainInitial, preview: await stateSnapshot(), rendered: await evaluate('BattleRenderer3D.getPerformanceDiagnostics()'), screenshot: await screenshot('final-red227-terrain-preview.png') }
+    await pressEscape()
+    await waitFor('!pendingSkill', 5000, 'terrain preview cancellation')
+    ensure(await evaluate('BattleRenderer3D.getPerformanceDiagnostics().tileEffectCellCount === 0 && !BattleRenderer3D.getPerformanceDiagnostics().previewBoardActive'), 'terrain graphics remained after cancellation')
+    evidence.terrain.afterCancel = await stateSnapshot()
+    evidence.terrain.cancelScreenshot = await screenshot('final-red227-terrain-cancel.png')
+    await mouseClick(await pointForCell(sasuke.x, sasuke.y))
+    await waitFor('document.getElementById("pieceInfoModal").style.display === "none"', 5000, 'same piece click closes skill menu')
+    await mouseClick(await pointForCell(sasuke.x, sasuke.y))
+    await waitFor('document.getElementById("pieceInfoModal").style.display !== "none"', 5000, 'same piece click reopens skill menu')
+    const settingsPoint = await pointForElement('#battleSettingsButton', 'battle toolbar hover')
+    await mouseHover(settingsPoint)
+    ensure(await evaluate('document.getElementById("battleSettingsButton").classList.contains("ui-motion-hover")'), 'battle toolbar has no hover feedback')
+    sendMouseDown(settingsPoint)
+    await delay(40)
+    ensure(await evaluate('document.getElementById("battleSettingsButton").classList.contains("ui-motion-pressed")'), 'battle toolbar has no press feedback')
+    sendMouseUp(settingsPoint)
+    await waitFor('document.getElementById("battleSettings").open', 5000, 'battle settings open')
+    await mouseClick(await pointForElement('[data-close-settings]', 'close battle settings'))
+    // Training starts with an empty hand. Advance normally to draw the next
+    // player's production hand before checking its real card feedback.
+    const nextTurn = await pointForElement('#btnEnd', 'draw real training hand')
+    await mouseClick(nextTurn)
+    await waitFor('G.turn.currentPlayerId === "training-blue" && myPlayerId === "training-blue" && document.querySelectorAll("#handCards > .card-item").length > 0', 30000, 'real training hand after turn')
+    await mouseHover(await pointForElement('#handCards > .card-item:not(.card-disabled)', 'battle hand hover'))
+    ensure(await evaluate('Array.from(document.querySelectorAll("#handCards > .card-item")).some(node => node.classList.contains("ui-motion-hover"))'), 'battle hand has no hover feedback')
+    ensure(await evaluate('!document.getElementById("battleSettingsButton").classList.contains("ui-motion-hover")'), 'battle toolbar retained stale hover state')
+    evidence.motion = { skillCardHover: true, toolbarHover: true, toolbarPress: true, handHover: true, screenshot: await screenshot('final-red227-battle-motion.png') }
 
     evidence.results = {
       passed: true,
@@ -647,6 +710,9 @@ async function runElectronSmoke() {
       meteorPreRelease: true,
       meteorSingleRelease: true,
       touchSkillSelectAndCancel: true,
+      terrainPreview: true,
+      samePieceMenuToggle: true,
+      battleMotion: true,
     }
     fs.writeFileSync(path.join(evidenceRoot, 'results.json'), JSON.stringify(evidence, null, 2))
     console.log(JSON.stringify(evidence.results, null, 2))
@@ -654,8 +720,9 @@ async function runElectronSmoke() {
     smokeFailure = error
     console.error('RED-227 Electron smoke failed:', error && error.stack || error)
     evidence.results = { passed: false, error: String(error && error.stack || error) }
-    evidence.failureScreenshot = await screenshot('final-red227-failure.png')
     evidence.failureState = await stateSnapshot()
+    try { evidence.failureScreenshot = await screenshot('final-red227-failure.png') }
+    catch (captureError) { evidence.captureError = String(captureError) }
     fs.writeFileSync(path.join(evidenceRoot, 'results.json'), JSON.stringify(evidence, null, 2))
   } finally {
     try { if (debuggerAttached) debuggerApi.detach() } catch {}

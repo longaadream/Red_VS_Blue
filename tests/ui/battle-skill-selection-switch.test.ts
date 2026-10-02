@@ -61,6 +61,28 @@ function baseContext() {
 }
 
 describe('RED-227 skill preview selection switching', () => {
+  it('replays no-target hover after layout changes but never resurrects a cancelled draft', () => {
+    const h = baseContext()
+    const frames: Array<() => void> = []
+    h.context.pendingSkill = { skillId: 'no-target', previewOnly: true, previewOrigin: 'hover' }
+    h.context.hoverSkillPreviewReplayScheduled = false
+    h.context.battlePageDisposed = false
+    h.context.requestAnimationFrame = vi.fn((callback: () => void) => frames.push(callback))
+    h.context.previewSkillTarget = vi.fn()
+    new Script(readFunction('replayHoverSkillPreviewAfterViewport')).runInContext(h.context)
+
+    new Script('replayHoverSkillPreviewAfterViewport(); replayHoverSkillPreviewAfterViewport()').runInContext(h.context)
+    expect(frames).toHaveLength(1)
+    frames.shift()!()
+    expect(h.context.previewSkillTarget).toHaveBeenCalledWith(null, null)
+
+    h.context.previewSkillTarget.mockClear()
+    new Script('replayHoverSkillPreviewAfterViewport()').runInContext(h.context)
+    h.context.pendingSkill = null
+    frames.shift()!()
+    expect(h.context.previewSkillTarget).not.toHaveBeenCalled()
+  })
+
   it('promotes a hovered target preview on the first click instead of cancelling it', async () => {
     const h = baseContext()
     h.context.pendingSkill = {
@@ -100,9 +122,8 @@ describe('RED-227 skill preview selection switching', () => {
     })
   })
 
-  it('replaces a local hover preview with the latest skill and keeps the dock mounted', () => {
+  it('classifies a targeted card through the engine without entering target mode', () => {
     const h = baseContext()
-    const entered: unknown[] = []
     h.context.pendingSkill = {
       skillId: 'skill-old',
       previewOrigin: 'hover',
@@ -110,33 +131,56 @@ describe('RED-227 skill preview selection switching', () => {
     }
     h.context.window = {
       BattleLegalActions: {
-        probeSkillTarget: () => ({
-          needsTarget: true,
-          preparation: { kind: 'needTarget', selectionId: 's2', stateRevision: 2, candidates: [] },
-        }),
+        probeSkillTarget: vi.fn(() => ({ needsTarget: true })),
       },
     }
     h.context.BattleLegalActions = h.context.window.BattleLegalActions
     h.context.GameEngine = {}
     h.context.skillsById = {}
-    h.context.enterActionTargetMode = vi.fn((action: any, preparation: any, options: any) => {
-      entered.push({ action, preparation, options })
-      h.context.pendingSkill = { skillId: action.skillId, previewOrigin: 'hover', preparation }
-      return true
-    })
-    h.context.window.refreshTargetSkillButtonState = vi.fn()
+    h.context.skillDefOf = vi.fn(() => ({
+      type: 'normal',
+      targeting: { steps: [{ kind: 'target', type: 'piece' }] },
+    }))
+    h.context.enterActionTargetMode = vi.fn()
+    h.context.enterPreviewOnlySkillMode = vi.fn()
+    new Script([readFunction('skillSelectionSwitchBlocked'), readFunction('previewSkillCard')].join('\n'))
+      .runInContext(h.context)
+
+    const result = new Script("previewSkillCard('skill-new')").runInContext(h.context)
+
+    expect(result).toBe(false)
+    expect(h.context.clearReasons).toEqual(['skill-hover-switch'])
+    expect(h.context.pendingSkill).toBeNull()
+    expect(h.context.BattleLegalActions.probeSkillTarget).toHaveBeenCalledOnce()
+    expect(h.context.enterActionTargetMode).not.toHaveBeenCalled()
+    expect(h.context.enterPreviewOnlySkillMode).not.toHaveBeenCalled()
+    expect(h.doAction).not.toHaveBeenCalled()
+  })
+
+  it('allows a no-target hover to create only the local preview draft', () => {
+    const h = baseContext()
+    h.context.skillDefOf = vi.fn(() => ({
+      type: 'normal',
+      name: '新技能',
+      targeting: { steps: [] },
+    }))
+    h.context.window = { BattleLegalActions: { probeSkillTarget: vi.fn(() => ({ needsTarget: false })) } }
+    h.context.BattleLegalActions = h.context.window.BattleLegalActions
+    h.context.GameEngine = {}
+    h.context.skillsById = {}
+    h.context.enterPreviewOnlySkillMode = vi.fn(() => true)
     new Script([readFunction('skillSelectionSwitchBlocked'), readFunction('previewSkillCard')].join('\n'))
       .runInContext(h.context)
 
     const result = new Script("previewSkillCard('skill-new')").runInContext(h.context)
 
     expect(result).toBe(true)
-    expect(h.context.clearReasons).toEqual(['skill-hover-switch'])
-    expect(h.context.pendingSkill).toMatchObject({ skillId: 'skill-new', previewOrigin: 'hover' })
-    expect(entered).toHaveLength(1)
-    expect((entered[0] as any).options).toEqual({ preserveDock: true })
-    expect(h.context.window.refreshTargetSkillButtonState).toHaveBeenCalledOnce()
-    expect(h.doAction).not.toHaveBeenCalled()
+    expect(h.context.enterPreviewOnlySkillMode).toHaveBeenCalledWith(
+      expect.objectContaining({ skillId: 'skill-new' }),
+      expect.objectContaining({ type: 'normal' }),
+      'hover',
+    )
+    expect(h.context.BattleLegalActions.probeSkillTarget).toHaveBeenCalledOnce()
   })
 
   it('blocks hover replacement while an authoritative pending selection exists', () => {
