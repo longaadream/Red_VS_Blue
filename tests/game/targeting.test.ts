@@ -603,7 +603,8 @@ describe('Demo targeting admission fixture', () => {
     }
 
     const fixtureHash = createHash('sha256').update(JSON.stringify(fixture)).digest('hex')
-    expect(fixtureHash).toBe('814bb46ee33c83dde125f874ef9c3afe047b1f2146e70895fb311f0371c60d7f')
+    // RED-239: approved full-map Blizzard candidates replace the fallback range of five.
+    expect(fixtureHash).toBe('d1a6089556d1da07a5fc2c5ccfbf7614b34dc22aa3a25fa772c8fe3a752f1991')
   })
 })
 
