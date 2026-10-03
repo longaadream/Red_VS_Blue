@@ -56,6 +56,7 @@ type RendererApi = {
   showPresentationAreaFlash(cells: Array<{ x: number; y: number }>): void
   clearPresentationAreaFlash(): void
   showPresentationPath(path: { source?: { x: number; y: number }; end?: { x: number; y: number }; selected?: { x: number; y: number } }): void
+  showPresentationPaths(paths: Array<{ source: { x: number; y: number }; end: { x: number; y: number } }>): void
   clearPresentationPath(): void
   getMotionDiagnostics(): {
     activeAnimations: string[]
@@ -80,6 +81,8 @@ type RendererApi = {
     activeAnimationCount: number
     terrainBatchCount: number
     terrainInstanceCount: number
+    tileEffectCellCount: number
+    previewBoardActive: boolean
   }
   dispose(): void
 }
@@ -617,12 +620,15 @@ describe('RED-68 BattleRenderer3D runtime', () => {
       const hypothetical = structuredClone(model)
       hypothetical.pieces[0].x += 2
       hypothetical.pieces[0].health.current -= 3
+      hypothetical.effects = [{ id: 'preview-fire', type: 'amaterasu', x: 2, y: 2 }]
       h.renderer.showPreviewBoard(hypothetical, model)
+      expect(h.renderer.getPerformanceDiagnostics()).toMatchObject({ tileEffectCellCount: 1, previewBoardActive: true })
       h.renderer.spawnFloater(2, 2, '预演 −3', '#fff', false, { preview: true })
       expect(layer.children.map(child => child.textContent)).toEqual(['实际 −1', '预演 −3'])
       const group = h.renderers[0].scene!.children.find(node => node.userData.pieceId === model.pieces[0].id)
       expect(group?.position.x).toBe(hypothetical.pieces[0].x)
       h.renderer.clearPreviewBoard()
+      expect(h.renderer.getPerformanceDiagnostics()).toMatchObject({ tileEffectCellCount: 0, previewBoardActive: false })
       expect(h.container.querySelector('.piece-board-lethal')?.hidden).toBe(false)
       expect(layer.children.map(child => child.textContent)).toEqual(['实际 −1'])
       const restored = h.renderers[0].scene!.children.find(node => node.userData.pieceId === model.pieces[0].id)
@@ -777,6 +783,24 @@ describe('RED-68 BattleRenderer3D runtime', () => {
       selected: { x: 4, y: 4 },
     })
     harness.renderer.clearPresentationPath()
+    harness.renderer.dispose()
+  })
+
+  it('keeps multiple projectile rays visible together and clears their geometry on cancellation', () => {
+    const harness = createHarness(1280, 720, false)
+    const model = runtimeModel()
+    harness.renderer.init({ container: harness.container })
+    harness.renderer.update(model)
+    harness.frame(16)
+    const scene = harness.renderers[0].scene!
+    const rays = [2, 3, 4].map(x => ({ source: { x, y: 5 }, end: { x, y: 0 } }))
+    harness.renderer.showPresentationPaths(rays)
+    const group = scene.children.find(child => child.userData.presentationPath === true)!
+    expect(group.children).toHaveLength(3)
+    expect(group.children.map(child => child.userData.sourceCell)).toEqual(rays.map(ray => ray.source))
+    harness.renderer.clearPresentationPath()
+    expect(scene.children).not.toContain(group)
+    expect(harness.renderer.getMotionDiagnostics().presentationPath).toBeNull()
     harness.renderer.dispose()
   })
 

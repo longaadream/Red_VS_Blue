@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40" role="img" aria-label="RED BLUE pointer cursor">
+  <defs>
+    <clipPath id="cursor-arrow">
+      <path d="M3 3v29l8-8 6 12 6-3-6-12h15z"/>
+    </clipPath>
+  </defs>
+  <path d="M3 3v29l8-8 6 12 6-3-6-12h15z" fill="#f6e8c2" stroke="#171412" stroke-width="4.6" stroke-linejoin="round"/>
+  <g clip-path="url(#cursor-arrow)">
+    <path d="M-4-4h48v27L-4 10z" fill="#b64240"/>
+    <path d="M-4 10 44 27v17H-4z" fill="#3f6674"/>
+    <path d="m11 26 3-3m0 7 3-3" fill="none" stroke="#171412" stroke-width="3.8" stroke-linecap="round"/>
+    <path d="m11 26 3-3m0 7 3-3" fill="none" stroke="#f4cb76" stroke-width="1.45" stroke-linecap="round"/>
+  </g>
+  <path d="M3 3v29l8-8 6 12 6-3-6-12h15z" fill="none" stroke="#fff1ce" stroke-width="1.15" stroke-linejoin="round" opacity=".95"/>
+</svg>

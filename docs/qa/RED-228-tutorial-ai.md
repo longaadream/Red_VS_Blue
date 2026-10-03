@@ -8,7 +8,24 @@
 
 不改变角色数值、技能规则、随机算法、存档、房间机器人或发布机制。不能用代表性战术测试推断整体胜率，更不表示已验证新手留存。
 
-## 基线
+## 最新验收候选（2026-10-03）
+
+用户指出此前给出试玩步骤时未再次刷新基线。核对后确认分支相对最新 main 落后 8 个提交，依赖预演/UI 分支也已前进；此前 89 项证据只适用于首次候选。
+
+- base_branch: main
+- base_sha: `9d1b0c30801cd733ec4cede37ce1ef0889a2313a`
+- 通过显式 fetch 刷新 main 后，以 merge 方式合入（提交 `66da3eb92`），保留已推送历史；该次树不变，但重新运行原 9 文件 89 项，全部通过。
+- 同步现有 PR 基底 `codex/RED-225-skill-reading` 最新 `1ce51b0a77e6df7d1d312f2cd66e31d4cb450903`，包含 RED226/RED227 已提交候选，树与 RED226 最新 `558d9a6b85b7cd62a77258c3b88d9f7803a527e6` 一致。PR212 已合入依赖分支，并非 main；保留此分层 PR 基底，避免把依赖变化当作本任务修改。
+- 唯一冲突是生成 `data/pages/js/game-engine.js`；从合并后的源代码运行 `node scripts/build-game-engine.js` 重建，保留教程 AI 导出与最新 `preparePublicSkillAction`。不选择任一旧 bundle 覆盖另一方。相对最新依赖仍仅本任务 11 个文件变化。
+- 最终 15 文件 **172/172 通过**：原 AI/教程 9 文件及 RED227 多段选择、弹射物预演记录、技能内容、技能预演/隐私与 UI 本地选择 6 文件。执行时间 2026-10-03 11:11:27，21.37 秒。
+- 最新生成引擎地形探针：seed18704、178 合法候选、6 评估节点、264.49ms、0 拒绝，选择 `hellfire-shotgun` 攻击 (12,7) 并接受结算。网页/Android SHA256 均为 `8A3EC33EC5A5C087C6E071E876AB26184894AA93ACE71FC7C894237B880DC607`。
+- 完整类型检查、定向 ESLint、已暂存及工作区 diff 检查通过。旧 `tutorial-replay.test.ts:201` AP 断言最新候选仍失败（实际3/期待2），单独验证，没有修改规则或断言。
+- 独立整合复审通过，无实质发现；审查者独立运行生成引擎、多段选择、预演隐私与 UI 本地选择 4 文件 46/46 通过。地形探针为 5 节点、292.50ms、0 拒绝，实际接受攻击；直接装载 bundle 验证 `preparePublicSkillAction`、`previewBattleAction`、`planTutorialAiAction` 同时可用。
+- 同步后 `npm.cmd run check:main-baseline` 通过，远端 main 仍为上述 `9d1b0c308…`，behind=0。类型及静态检查已完成通过。
+
+原始日志分别在本地 `ai-main-sync.log`、`ai-latest-sync-tests.log`、`ai-latest-typecheck.log`、`ai-latest-eslint.log`、`ai-latest-known-replay.log`；不提交大日志。未进行新的 Electron 人工体验或发布。
+
+## 首次实现基线（历史记录）
 
 - base_branch: main
 - base_sha: bc76ce78e9014f50e5ef1ea445895de8979b0ea1
@@ -54,4 +71,4 @@
 
 进入前五局任意课程，完成带做并进入自由实战，结束回合观察对手的连续行动、提示停留和控制权交还。检查退出/重新开始不会提交旧动作，失败可重试当前课程。不要将关闭的第六局当成已开放功能。
 
-撤销本任务提交并恢复匹配的生成引擎即可回退；无存档迁移，无线上部署。
+回退时撤销 RED228 的适配器、运行时接入及其测试/文档，保留最新依赖的规则与预演源码，再重建匹配的生成引擎；不要为了移除教程 AI 撤销依赖同步或覆盖整个资源目录。无存档迁移，无线上部署。

@@ -56,6 +56,7 @@ function createHarness(result: Record<string, any> = { status: 'ready', snapshot
     showPreviewBoard: vi.fn(),
     spawnFloater: vi.fn(),
     showPresentationPath: vi.fn(),
+    showPresentationPaths: vi.fn(),
     setHistoryHighlight: vi.fn(),
   }
   const engine = {
@@ -188,6 +189,63 @@ describe('RED-224 battle page skill preview binding', () => {
     expect(h.engine.applyBattleAction).not.toHaveBeenCalled()
   })
 
+  it('keeps a no-target preview root free of hovered coordinates', () => {
+    const h = createHarness({ status: 'ready', snapshot: { revision: 8 }, events: [] })
+    h.pendingSkill.previewOnly = true
+    h.pendingSkill.previewEligible = true
+
+    preview(h, 2, 3)
+
+    expect(h.engine.previewBattleAction).toHaveBeenCalledOnce()
+    const action = h.engine.previewBattleAction.mock.calls[0][1]
+    expect(action).toMatchObject({
+      type: 'useBasicSkill',
+      pieceId: 'source',
+      skillId: 'skill-a',
+    })
+    expect(action).not.toHaveProperty('targetPieceId')
+    expect(action).not.toHaveProperty('targetX')
+    expect(action).not.toHaveProperty('targetY')
+    expect(h.transport).not.toHaveBeenCalled()
+  })
+
+  it('releases a no-target preview through one root action on board activation', () => {
+    const h = createHarness({ status: 'ready', snapshot: { revision: 8 }, events: [] })
+    h.pendingSkill.previewOnly = true
+    h.pendingSkill.previewEligible = true
+    Object.assign(h.context, {
+      ADVENTURE_MODE: false,
+      TRAINING_MODE: false,
+      placingMode: false,
+      selectedPieceId: 'source',
+      pendingCardAction: null,
+      pendingMove: false,
+      refreshBattleLegalActions: vi.fn(),
+      adventureOpenCell: vi.fn(() => false),
+      pendingOptionSelectionForOther: vi.fn(() => false),
+      skillDefOf: vi.fn(() => ({ type: 'normal' })),
+      skillUsesCharge: vi.fn(() => false),
+      renderBoard: vi.fn(),
+      renderActionBar: vi.fn(),
+      renderTargetOverlay: vi.fn(),
+      setStatusMsg: vi.fn(),
+    })
+    new Script(readNamedFunction(readPage(), 'onCellClick'), { filename: 'battle.html:onCellClick' })
+      .runInContext(h.context as any)
+
+    new Script('onCellClick(2, 3)').runInContext(h.context as any)
+
+    expect(h.transport).toHaveBeenCalledOnce()
+    expect(h.transport.mock.calls[0][0]).toMatchObject({
+      type: 'useBasicSkill',
+      pieceId: 'source',
+      skillId: 'skill-a',
+    })
+    expect(h.transport.mock.calls[0][0]).not.toHaveProperty('targetX')
+    expect(h.transport.mock.calls[0][0]).not.toHaveProperty('targetY')
+    expect(h.context.pendingSkill).toBeNull()
+  })
+
   it('appends a legal target to an existing root without mutating the pending action', () => {
     const h = createHarness({ status: 'ready', snapshot: { revision: 8 }, events: [] })
     h.pendingSkill.baseAction.targetPieceId = 'first-target'
@@ -243,6 +301,24 @@ describe('RED-224 battle page skill preview binding', () => {
     expect(h.renderer.spawnFloater).not.toHaveBeenCalled()
     expect(h.skillPreviewDisplayTimings).toEqual([{ durationMs: 0, nextFrameMs: 0 }])
     expect(h.requestAnimationFrame).toHaveBeenCalledOnce()
+  })
+
+  it('groups every preview presentation path into one renderer batch', () => {
+    const h = createHarness({
+      status: 'ready',
+      snapshot: { revision: 8 },
+      events: [
+        { presentation: { pathCells: [{ x: 1, y: 1 }, { x: 2, y: 2 }], endPoint: { x: 2, y: 2 } } },
+        { presentation: { pathCells: [{ x: 2, y: 2 }, { x: 3, y: 2 }], endPoint: { x: 3, y: 2 } } },
+        { presentation: { pathCells: [{ x: 1, y: 1 }, { x: 1, y: 3 }], endPoint: { x: 1, y: 3 } } },
+      ],
+    })
+
+    preview(h, 2, 3)
+
+    expect(h.renderer.showPresentationPaths).toHaveBeenCalledOnce()
+    expect(h.renderer.showPresentationPaths.mock.calls[0][0]).toHaveLength(3)
+    expect(h.renderer.showPresentationPath).not.toHaveBeenCalled()
   })
 
   it('does not compute a multi-target pending skill and clears any existing preview', () => {

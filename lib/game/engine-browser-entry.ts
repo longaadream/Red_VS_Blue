@@ -19,6 +19,7 @@ export { getBattleRootSeed, hashBattleState, hashStable, runBattleAction } from 
 export { recordBattlePresentation, createBattlePresentationQueue } from './battle-presentation-recording'
 export {
   previewBattleAction,
+  preparePublicSkillAction,
   PREVIEW_NEEDS_INPUT_REASON,
   PREVIEW_UNAVAILABLE_REASON,
 } from './skill-preview'
