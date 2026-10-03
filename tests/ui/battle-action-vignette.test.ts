@@ -15,7 +15,7 @@ type VignetteModule = {
     isAnimating(model?: unknown): boolean
     setSpeed(speed: number): void
     dispose(): void
-    getDiagnostics(): { activeRootId: string | null; pendingRootIds: string[]; speed: number; playedRootCount: number; holdingResponse: boolean; timerCount: number }
+    getDiagnostics(): { activeRootId: string | null; pendingRootIds: string[]; speed: number; playedRootCount: number; holdingResponse: boolean; timerCount: number; bannerRootId: string | null; bannerProgressMs: number }
   }
   create(options?: Record<string, unknown>): {
     mount(options: unknown): void
@@ -26,7 +26,7 @@ type VignetteModule = {
     getDiagnostics(): { activeRootId: string | null; pendingRootIds: string[]; speed: number; playedRootCount: number }
     dispose(): void
   }
-  constants: { singleEffectDurationMs: number; compositeStepDurationMs: number; normalDurationMs: number; cardDurationMs: number; reducedDurationMs: number; skipSettleMs: number }
+  constants: { singleEffectDurationMs: number; compositeStepDurationMs: number; normalDurationMs: number; cardDurationMs: number; bannerDurationMs: number; declarationDurationMs: number; reducedDurationMs: number; skipSettleMs: number }
 }
 
 class FakeElement {
@@ -109,9 +109,51 @@ function child(index: number, childIndex: number, overrides: Record<string, unkn
 }
 
 describe('RED-167 action vignette queue', () => {
+  it.each([false, true])('keeps skill banners readable for 3s with reducedMotion=%s', reducedMotion => {
+    const vignetteModule = loadModule()
+    const queue = vignetteModule.createQueue({ reducedMotion, now: () => Date.now() })
+    queue.update({ presentationEvents: [], turn: { isViewerTurn: false } })
+    queue.update({ presentationEvents: [root(1), child(1, 1)], turn: { isViewerTurn: false } })
+    const rootDuration = vignetteModule.constants.declarationDurationMs
+    if (rootDuration > 0) {
+      vi.advanceTimersByTime(rootDuration - 1)
+      expect(queue.getDiagnostics().activeRootId).toBe('action-1:0')
+      vi.advanceTimersByTime(1)
+    }
+    expect(queue.getDiagnostics()).toMatchObject({ activeRootId: 'action-1:1', bannerRootId: 'action-1:0' })
+    vi.advanceTimersByTime(reducedMotion ? 120 : 200)
+    expect(queue.getDiagnostics().activeRootId).toBeNull()
+    expect(queue.getDiagnostics().bannerRootId).toBe('action-1:0')
+    vi.advanceTimersByTime(vignetteModule.constants.normalDurationMs - rootDuration - (reducedMotion ? 120 : 200))
+    expect(queue.getDiagnostics().bannerRootId).toBeNull()
+    queue.dispose()
+  })
   it('keeps a single-effect banner under the instant feedback budget', () => {
     expect(loadModule().constants.singleEffectDurationMs).toBeLessThan(50)
     expect(loadModule().constants.compositeStepDurationMs).toBe(200)
+  })
+  it('starts child effects within one beat while keeping the action banner alive independently', () => {
+    const vignetteModule = loadModule()
+    const phases: string[] = []
+    const banners: string[] = []
+    const queue = vignetteModule.createQueue({
+      onPhase: (phase: string, group: { rootEventId: string }) => phases.push(`${group.rootEventId}:${phase}`),
+      onBanner: (phase: string, group: { rootEventId: string }) => banners.push(`${group.rootEventId}:${phase}`),
+    })
+    queue.update({ presentationEvents: [], turn: { isViewerTurn: false } })
+    queue.update({ presentationEvents: [root(1), child(1, 1)], turn: { isViewerTurn: false } })
+
+    expect(banners).toEqual(['action-1:0:show'])
+    expect(queue.getDiagnostics().activeRootId).toBe('action-1:1')
+    expect(banners).toEqual(['action-1:0:show'])
+
+    vi.advanceTimersByTime(vignetteModule.constants.compositeStepDurationMs)
+    expect(queue.getDiagnostics().activeRootId).toBeNull()
+    expect(banners).toEqual(['action-1:0:show'])
+    vi.advanceTimersByTime(vignetteModule.constants.normalDurationMs - vignetteModule.constants.compositeStepDurationMs)
+    expect(banners).toEqual(['action-1:0:show', 'action-1:0:hide'])
+    expect(phases).toContain('action-1:1:result')
+    queue.dispose()
   })
   it('hides friendly active banners and all ordinary movement banners', () => {
     const ui = loadModule()
@@ -206,6 +248,49 @@ describe('RED-167 action vignette queue', () => {
     queue.dispose()
   })
 
+  it('keeps a pending response banner and hold context beyond its normal reading lifetime', () => {
+    const vignetteModule = loadModule()
+    const queue = vignetteModule.createQueue({ reducedMotion: true })
+    queue.update({ presentationEvents: [], turn: { isViewerTurn: false } })
+    const waiting = {
+      presentationEvents: [root(1, { result: { pending: true } })],
+      interaction: { pendingResponse: { selectionId: 'pending-1', isForViewer: true, isOffTurn: true } },
+      turn: { isViewerTurn: false },
+    }
+    queue.update(waiting)
+    vi.advanceTimersByTime(vignetteModule.constants.reducedDurationMs)
+    expect(queue.getDiagnostics()).toMatchObject({
+      activeRootId: 'action-1:0',
+      holdingResponse: true,
+      bannerRootId: 'action-1:0',
+    })
+    vi.advanceTimersByTime(vignetteModule.constants.normalDurationMs * 2)
+    expect(queue.getDiagnostics()).toMatchObject({ holdingResponse: true, bannerRootId: 'action-1:0' })
+    queue.update({ ...waiting, presentationEvents: [], interaction: {
+      pendingResponse: { selectionId: 'pending-1', isForViewer: false, isOffTurn: true },
+    } })
+    expect(queue.getDiagnostics()).toMatchObject({ activeRootId: null, holdingResponse: false, bannerRootId: null })
+    queue.dispose()
+  })
+
+  it('retains a response banner when the first delivered snapshot is already pending', () => {
+    const vignetteModule = loadModule()
+    const queue = vignetteModule.createQueue({ reducedMotion: true })
+    queue.update({
+      presentationEvents: [root(7, { result: { pending: true } })],
+      interaction: { pendingResponse: { selectionId: 'initial-pending', isForViewer: true, isOffTurn: true } },
+      turn: { isViewerTurn: false },
+    })
+    expect(queue.getDiagnostics()).toMatchObject({
+      activeRootId: 'action-7:0',
+      holdingResponse: true,
+      bannerRootId: 'action-7:0',
+    })
+    vi.advanceTimersByTime(vignetteModule.constants.normalDurationMs * 2)
+    expect(queue.getDiagnostics()).toMatchObject({ holdingResponse: true, bannerRootId: 'action-7:0' })
+    queue.dispose()
+  })
+
   it('plays a new response root before exposing a chained pending selection', () => {
     const queue = loadModule().createQueue({ reducedMotion: true })
     queue.update({ presentationEvents: [], turn: { isViewerTurn: false } })
@@ -238,7 +323,7 @@ describe('RED-167 action vignette queue', () => {
       if (phase === 'focus') phases.push(group.rootEventId)
     } })
     queue.update({ presentationEvents: [], turn: { isViewerTurn: false } })
-    const events = [root(1, { sourcePieceId: 'attacker', skillId: 'shot' }),
+    const events = [root(1, { sourcePieceId: 'attacker', skillId: 'shot', presentation: { pathCells: [{ x: 0, y: 0 }, { x: 1, y: 0 }] } }),
       child(1, 1, { kind: 'passive', sourcePieceId: 'defender', skillId: 'counter', result: { pending: true } })]
     queue.update({ presentationEvents: events, turn: { isViewerTurn: false } })
     queue.update({ presentationEvents: events, turn: { isViewerTurn: true } })
@@ -299,7 +384,7 @@ describe('RED-167 action vignette queue', () => {
     expect(layer.innerHTML).not.toContain('恢复!')
     // Numeric feedback is owned by the renderer, without a duplicate vignette label.
     expect(JSON.stringify(model)).toBe(before)
-    vi.advanceTimersByTime(2200)
+    vi.advanceTimersByTime(vignetteModule.constants.normalDurationMs + 200)
     expect(layer.hidden).toBe(true)
     vignette.dispose()
     expect(floatLayer.children).toHaveLength(0)
@@ -375,9 +460,9 @@ describe('RED-167 action vignette queue', () => {
       onPhase: (phase: string, group: { rootEventId: string }) => phases.push(`${group.rootEventId}:${phase}`),
     })
     queue.update({ presentationEvents: [], turn: { isViewerTurn: false } })
-    queue.update({ presentationEvents: [root(1)], turn: { isViewerTurn: false } })
-    queue.update({ presentationEvents: [root(2)], turn: { isViewerTurn: false } })
-    vi.advanceTimersByTime(200)
+    queue.update({ presentationEvents: [root(1, { kind: 'passive' })], turn: { isViewerTurn: false } })
+    queue.update({ presentationEvents: [root(2, { kind: 'passive' })], turn: { isViewerTurn: false } })
+    vi.advanceTimersByTime(100)
 
     expect(queue.skip()).toBe(true)
     expect(phases.at(-1)).toBe('action-1:0:settle')
@@ -392,8 +477,8 @@ describe('RED-167 action vignette queue', () => {
       onPhase: (phase: string, group: { rootEventId: string }) => phases.push(`${group.rootEventId}:${phase}`),
     })
     queue.update({ presentationEvents: [], turn: { isViewerTurn: false } })
-    queue.update({ presentationEvents: [root(1)], turn: { isViewerTurn: false } })
-    queue.update({ presentationEvents: [root(2)], turn: { isViewerTurn: false } })
+    queue.update({ presentationEvents: [root(1, { kind: 'passive' })], turn: { isViewerTurn: false } })
+    queue.update({ presentationEvents: [root(2, { kind: 'passive' })], turn: { isViewerTurn: false } })
 
     expect(queue.skip()).toBe(true)
     vi.advanceTimersByTime(20)
@@ -429,7 +514,7 @@ describe('RED-167 action vignette queue', () => {
     reduced.update({ presentationEvents: [], turn: { isViewerTurn: false } })
     reduced.update({ presentationEvents: [root(3)], turn: { isViewerTurn: false } })
     expect(reducedPhases).toEqual(['static'])
-    vi.advanceTimersByTime(vignetteModule.constants.reducedDurationMs)
+    vi.advanceTimersByTime(vignetteModule.constants.normalDurationMs)
     expect(reduced.getDiagnostics().activeRootId).toBeNull()
   })
 
@@ -439,29 +524,29 @@ describe('RED-167 action vignette queue', () => {
     queue.update({ presentationEvents: [], turn: { isViewerTurn: false } })
     queue.update({ presentationEvents: [root(1)], turn: { isViewerTurn: false } })
     vi.advanceTimersByTime(100)
+    expect(queue.getDiagnostics().activeRootId).toBeNull()
+    expect(queue.getDiagnostics().bannerRootId).toBe('action-1:0')
 
     queue.setSpeed(2)
-    vi.advanceTimersByTime(499)
-    expect(queue.getDiagnostics().activeRootId).toBe('action-1:0')
+    vi.advanceTimersByTime((vignetteModule.constants.normalDurationMs - 100) / 2 - 1)
+    expect(queue.getDiagnostics().bannerRootId).toBe('action-1:0')
     vi.advanceTimersByTime(1)
-    expect(queue.getDiagnostics().activeRootId).toBeNull()
+    expect(queue.getDiagnostics().bannerRootId).toBeNull()
   })
 
-  it('holds each played card before the next card or pending skill and retimes the remaining hold', () => {
+  it('keeps each played card readable while effects continue independently', () => {
     const vignetteModule = loadModule()
     const queue = vignetteModule.createQueue({ now: () => Date.now() })
     queue.update({ presentationEvents: [], turn: { isViewerTurn: true } })
     queue.update({ presentationEvents: [root(1, { kind: 'card', cardId: 'coin' }),
       root(2, { kind: 'card', cardId: 'heal' }), child(2, 1, { kind: 'passive', skillId: 'reaction', sourcePieceId: 'other', result: { pending: true } })], turn: { isViewerTurn: true } })
-    vi.advanceTimersByTime(1000)
-    expect(queue.getDiagnostics().activeRootId).toBe('action-1:0')
+    vi.advanceTimersByTime(vignetteModule.constants.cardDurationMs - 200)
+    expect(queue.getDiagnostics()).toMatchObject({ activeRootId: null, bannerRootId: 'action-2:0' })
     queue.setSpeed(2)
-    vi.advanceTimersByTime(399)
-    expect(queue.getDiagnostics().activeRootId).toBe('action-1:0')
-    vi.advanceTimersByTime(1)
-    expect(queue.getDiagnostics().activeRootId).toBe('action-2:0')
-    vi.advanceTimersByTime(vignetteModule.constants.cardDurationMs / 2)
-    expect(queue.getDiagnostics().activeRootId).toBe('action-2:1')
+    vi.advanceTimersByTime(99)
+    expect(queue.getDiagnostics().bannerRootId).toBe('action-2:0')
+    vi.advanceTimersByTime(12)
+    expect(queue.getDiagnostics().bannerRootId).toBeNull()
     queue.dispose()
     expect(vi.getTimerCount()).toBe(0)
   })
@@ -521,9 +606,9 @@ describe('RED-167 action vignette queue', () => {
     const phases: string[] = []
     const queue = vignetteModule.createQueue({ onPhase: (phase: string) => phases.push(phase) })
     queue.update({ presentationEvents: [], turn: { isViewerTurn: false } })
-    queue.update({ presentationEvents: [root(1)], turn: { isViewerTurn: false } })
-    queue.update({ presentationEvents: [root(2)], turn: { isViewerTurn: false } })
-    queue.update({ presentationEvents: [root(2)], turn: { isViewerTurn: true } })
+    queue.update({ presentationEvents: [root(1, { kind: 'passive' })], turn: { isViewerTurn: false } })
+    queue.update({ presentationEvents: [root(2, { kind: 'passive' })], turn: { isViewerTurn: false } })
+    queue.update({ presentationEvents: [root(2, { kind: 'passive' })], turn: { isViewerTurn: true } })
 
     expect(phases).toContain('settle')
     expect(queue.getDiagnostics()).toMatchObject({ activeRootId: null, pendingRootIds: [] })
@@ -541,7 +626,7 @@ describe('RED-167 action vignette queue', () => {
     queue.update({ presentationEvents: [root(1)], turn: { isViewerTurn: true } })
 
     expect(phases).toEqual(['action-1:0:focus'])
-    expect(queue.getDiagnostics().activeRootId).toBe('action-1:0')
+    expect(queue.getDiagnostics()).toMatchObject({ activeRootId: null, bannerRootId: 'action-1:0' })
   })
 
   it('settles the opponent action before playing a new root committed as control returns', () => {
@@ -551,18 +636,19 @@ describe('RED-167 action vignette queue', () => {
       onPhase: (phase: string, group: { rootEventId: string }) => phases.push(`${group.rootEventId}:${phase}`),
     })
     queue.update({ presentationEvents: [], turn: { isViewerTurn: false } })
-    queue.update({ presentationEvents: [root(1)], turn: { isViewerTurn: false } })
-    queue.update({ presentationEvents: [root(1), root(2)], turn: { isViewerTurn: true } })
+    const firstAction = root(1, { presentation: { pathCells: [{ x: 0, y: 0 }, { x: 1, y: 0 }] } })
+    queue.update({ presentationEvents: [firstAction], turn: { isViewerTurn: false } })
+    queue.update({ presentationEvents: [firstAction, root(2)], turn: { isViewerTurn: true } })
 
     expect(phases).toEqual([
       'action-1:0:focus',
       'action-1:0:settle',
       'action-2:0:focus',
     ])
-    expect(queue.getDiagnostics().activeRootId).toBe('action-2:0')
+    expect(queue.getDiagnostics().activeRootId).toBeNull()
   })
 
-  it('runs a three-minute 16-piece queue without retaining timers or unbounded roots', () => {
+  it('drains a 16-piece queue at the configured reading speed without retaining timers or unbounded roots', () => {
     const vignetteModule = loadModule()
     const queue = vignetteModule.createQueue()
     const pieces = Array.from({ length: 16 }, (_, index) => ({
@@ -582,7 +668,7 @@ describe('RED-167 action vignette queue', () => {
       })
     }
 
-    vi.advanceTimersByTime(180_000)
+    vi.advanceTimersByTime(vignetteModule.constants.normalDurationMs * 160)
 
     expect(queue.getDiagnostics()).toMatchObject({
       activeRootId: null,
@@ -676,7 +762,9 @@ describe('RED-167 action vignette queue', () => {
     expect(layer.innerHTML).toContain('寒冰坚忍')
     expect(layer.innerHTML).not.toContain('使用技能')
     expect(layer.innerHTML).not.toContain('images/effect-icons/action-skill.svg')
-    vi.advanceTimersByTime(300)
+    // The path beat is now short; keep the assertion in its result phase while
+    // the independent action banner remains readable.
+    vi.advanceTimersByTime(20)
     expect(layer.innerHTML).not.toContain('battle-vignette-result')
     expect(layer.innerHTML).not.toContain('>4<')
 
@@ -786,10 +874,10 @@ describe('RED-167 action vignette queue', () => {
 
     vignette.update({ presentationEvents: [], pieces: [], turn: { isViewerTurn: false } })
     vignette.update({ presentationEvents: [root(91)], pieces: [], turn: { isViewerTurn: false } })
-    expect(vignette.getDiagnostics().activeRootId).toBe('action-91:0')
+    expect(vignette.getDiagnostics()).toMatchObject({ activeRootId: null, bannerRootId: 'action-91:0' })
 
     speedControl?.dispatch('click', speedClick)
-    expect(vignette.getDiagnostics()).toMatchObject({ activeRootId: 'action-91:0', speed: 1 })
+    expect(vignette.getDiagnostics()).toMatchObject({ activeRootId: null, bannerRootId: 'action-91:0', speed: 1 })
 
     vignette.setSpeed(2)
     vi.advanceTimersByTime(vignetteModule.constants.normalDurationMs / 2)
@@ -803,8 +891,8 @@ describe('RED-167 action vignette queue', () => {
 
   it.each([
     ['focus', 0],
-    ['path', 120],
-    ['result', 420],
+    ['path', 40],
+    ['result', 100],
   ] as const)('allows battlefield input during %s without changing commands, logs, payloads, or hash', (phase, elapsedMs) => {
     const vignetteModule = loadModule()
     const floatLayer = new FakeElement()
@@ -890,6 +978,72 @@ it('plays each attribute increase and subsequent hit as its own beat', () => {
   const groups = ui.groupEvents(events)
   expect(groups).toHaveLength(5)
   expect(groups.every(group => group.children.length === 0)).toBe(true)
+})
+
+it('keeps the action banner visible without a full-screen veil during multi-target status playback', () => {
+  vi.useFakeTimers()
+  const vignetteModule = loadModule()
+  const floatLayer = new FakeElement()
+  const focusedTargets: string[] = []
+  const phases: string[] = []
+  const vignette = vignetteModule.create({
+    document: { createElement: () => new FakeElement() },
+  })
+  vignette.mount({
+    boardContainer: new FakeElement(),
+    floatLayer,
+    onPlaybackPhase: (phase: string, group: { root: { targetPieceIds?: string[] } }) => {
+      const targetId = group.root.targetPieceIds?.[0]
+      if (!targetId) return
+      phases.push(`${targetId}:${phase}`)
+      if (phase === 'focus') focusedTargets.push(targetId)
+    },
+  })
+  vignette.update({ presentationEvents: [], turn: { isViewerTurn: false } })
+  vignette.update({
+    viewer: { id: 'blue' },
+    pieces: [
+      { id: 'caster', ownerPlayerId: 'red', name: '施法者' },
+      { id: 'ally-a', ownerPlayerId: 'red' },
+      { id: 'ally-b', ownerPlayerId: 'red' },
+      { id: 'ally-c', ownerPlayerId: 'red' },
+    ],
+    skillSummariesById: { 'holy-charge': { name: '圣光充能' } },
+    turn: { isViewerTurn: false },
+    presentationEvents: [
+      root(1, { sourcePieceId: 'caster', skillId: 'holy-charge' }),
+      child(1, 1, { kind: 'statusAdded', targetPieceIds: ['ally-a'], statusType: 'damage-buff' }),
+      child(1, 2, { kind: 'statusAdded', targetPieceIds: ['ally-b'], statusType: 'damage-buff' }),
+      child(1, 3, { kind: 'statusAdded', targetPieceIds: ['ally-c'], statusType: 'damage-buff' }),
+    ],
+  })
+
+  const expectBannerWithoutVeil = () => {
+    const layer = floatLayer.children[0]
+    expect(layer.hidden).toBe(false)
+    expect(layer.innerHTML).toContain('battle-vignette-status')
+    expect(layer.innerHTML).not.toContain('battle-vignette-veil')
+  }
+
+  expectBannerWithoutVeil()
+  vi.advanceTimersByTime(36)
+  expectBannerWithoutVeil()
+  vi.advanceTimersByTime(48)
+  expectBannerWithoutVeil()
+  vi.advanceTimersByTime(76)
+  expectBannerWithoutVeil()
+  vi.advanceTimersByTime(vignetteModule.constants.compositeStepDurationMs)
+  expectBannerWithoutVeil()
+  vi.advanceTimersByTime(vignetteModule.constants.compositeStepDurationMs * 2)
+  expectBannerWithoutVeil()
+  expect(focusedTargets).toEqual(['ally-a', 'ally-b', 'ally-c'])
+  expect(phases).toEqual([
+    'ally-a:focus', 'ally-a:path', 'ally-a:result', 'ally-a:settle',
+    'ally-b:focus', 'ally-b:path', 'ally-b:result', 'ally-b:settle',
+    'ally-c:focus', 'ally-c:path', 'ally-c:result', 'ally-c:settle',
+  ])
+  vignette.dispose()
+  vi.useRealTimers()
 })
 
 it('plays the same status applied to multiple targets in separate beats', () => {

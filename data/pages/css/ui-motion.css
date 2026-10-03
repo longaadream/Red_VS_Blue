@@ -1,0 +1,235 @@
+/*
+ * RED-226 public pointer language.
+ *
+ * The runtime owns html.ui-motion-enabled. Keeping the cursor rules behind
+ * both that class and a fine, hover-capable pointer means touch surfaces keep
+ * their native interaction model and never receive a fake pointer.
+ */
+@media (hover: hover) and (pointer: fine) {
+  html.ui-motion-enabled,
+  html.ui-motion-enabled body {
+    cursor: url("../images/ui-motion/cursor-default.svg") 3 3, default;
+  }
+
+  /* Text, form fields, selection and resize affordances retain their native
+     cursor semantics even while the page surface uses the RED/BLUE arrow. */
+  html.ui-motion-enabled :where(
+    input[type="text"],
+    input[type="search"],
+    input[type="email"],
+    input[type="url"],
+    input[type="tel"],
+    input[type="password"],
+    input[type="number"],
+    input[type="date"],
+    input[type="datetime-local"],
+    input[type="month"],
+    input[type="week"],
+    input[type="time"],
+    [contenteditable=""],
+    [contenteditable="true"],
+    [role="textbox"]
+  ) {
+    cursor: text;
+  }
+
+  html.ui-motion-enabled :where(
+    select,
+    option,
+    textarea,
+    input[type="range"],
+    [role="slider"],
+    iframe
+  ) {
+    cursor: auto;
+  }
+
+  /* Common selectable copy keeps text selection discoverable. Interactive
+     descendants below intentionally take the stronger pointer affordance. */
+  html.ui-motion-enabled :where(
+    p,
+    h1,
+    h2,
+    h3,
+    h4,
+    h5,
+    h6,
+    li,
+    dt,
+    dd,
+    blockquote,
+    pre,
+    code,
+    kbd,
+    samp,
+    figcaption,
+    .text-selectable,
+    [data-selectable]
+  ) {
+    cursor: text;
+  }
+
+  /* Native controls, public ARIA controls and the card/tool primitives used
+     across the static pages share one pointer cursor. */
+  html.ui-motion-enabled :where(
+    a[href],
+    area[href],
+    button:not(:disabled),
+    summary,
+    label[for],
+    input[type="button"]:not(:disabled),
+    input[type="submit"]:not(:disabled),
+    input[type="reset"]:not(:disabled),
+    input[type="file"]:not(:disabled),
+    input[type="checkbox"]:not(:disabled),
+    input[type="radio"]:not(:disabled),
+    input[type="color"]:not(:disabled),
+    [role="button"],
+    [role="link"],
+    [role="tab"],
+    [role="menuitem"],
+    [role="option"],
+    [role="checkbox"],
+    [role="radio"],
+    [role="switch"],
+    [role="treeitem"],
+    [onclick]:not([onclick*="stopPropagation"]),
+    [data-action],
+    [data-click],
+    [data-command],
+    [data-ui-motion="card"],
+    [data-motion-profile="card"],
+    [data-ui-motion="control"],
+    [data-motion-profile="control"],
+    .button,
+    .btn,
+    .tb-btn,
+    .btn-action,
+    .icon-button,
+    .tool-button
+  ):not(:disabled):not([disabled]):not([aria-disabled="true"]):not([data-disabled="true"]):not(.disabled):not(.is-disabled) {
+    cursor: url("../images/ui-motion/cursor-pointer.svg") 3 3, pointer !important;
+  }
+
+  /* The battle dock activates a skill card by delegation. Only a card with
+     an enabled cast control is actionable; passive/read-only skill rows keep
+     the surface arrow. Keep the readable description on the same public
+     click surface so its text rule cannot change the cursor back to I-beam. */
+  html.ui-motion-enabled :where(
+    .pi-skill:has(.character-cast:not(:disabled)),
+    .pi-skill:has(.character-cast:not(:disabled)) > .pi-skill-desc
+  ) {
+    cursor: url("../images/ui-motion/cursor-pointer.svg") 3 3, pointer !important;
+  }
+
+  /* Stop-propagation-only sheets are static surfaces. Reset their cursor so
+     they do not inherit a pointer from the clickable overlay; action-bearing
+     handlers stay under the normal interactive rules below/above. */
+  html.ui-motion-enabled :where(
+    [onclick="event.stopPropagation()"],
+    [onclick="event.stopPropagation();"]
+  ) {
+    cursor: url("../images/ui-motion/cursor-default.svg") 3 3, default !important;
+  }
+
+  /* The board already exposes these public classes while panning and
+     dragging. They are presentation-only and do not infer target legality. */
+  html.ui-motion-enabled :where(#boardWrap, .board-wrap) {
+    cursor: url("../images/ui-motion/cursor-grab.svg") 3 3, grab !important;
+  }
+
+  html.ui-motion-enabled :where(#boardWrap.dragging, .board-wrap.dragging) {
+    cursor: url("../images/ui-motion/cursor-grabbing.svg") 3 3, grabbing !important;
+  }
+
+  /* Target mode is deliberately limited to the real board canvas. */
+  html.ui-motion-enabled body.target-mode-active #boardWrap canvas {
+    cursor: url("../images/ui-motion/cursor-target.svg") 3 3, crosshair !important;
+  }
+
+  /* Disabled controls keep the native unavailable semantic, including pages
+     whose older component CSS used cursor: default. */
+  html.ui-motion-enabled :where(
+    button:disabled,
+    input:disabled,
+    select:disabled,
+    textarea:disabled,
+    [disabled],
+    [aria-disabled="true"],
+    [data-disabled="true"],
+    .disabled,
+    .is-disabled,
+    .card-disabled,
+    .card-choice-disabled
+  ) {
+    cursor: not-allowed !important;
+  }
+}
+
+/*
+ * RED-227 battle feedback.
+ *
+ * ui-motion.js owns the additive transform and marks the active element with
+ * short-lived state classes. These rules add contrast without replacing the
+ * hand fan, skill-row geometry, toolbar layout, or any battle material.
+ * Context-menu controls stay presentation-only here; their positioned parent
+ * is intentionally excluded from the delegated transform runtime.
+ */
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  html.ui-motion-enabled :where(
+    #handCards > .card-item.ui-motion-hover:not(.card-disabled),
+    .pi-skill.ui-motion-hover:has(.character-cast:not(:disabled)),
+    #battleSettingsButton.ui-motion-hover,
+    .topbar[data-battle-ui-region] > button.ui-motion-hover,
+    .hud-btn.ui-motion-hover,
+    .btn-action.ui-motion-hover,
+    .btn-end.ui-motion-hover,
+    .training-tools-toggle.ui-motion-hover,
+    .training-popover .tb-btn.ui-motion-hover,
+    .board-camera-controls .board-view-button.ui-motion-hover
+  ) {
+    filter: brightness(1.08) saturate(1.08) drop-shadow(0 5px 10px rgba(2, 6, 23, .24));
+  }
+
+  html.ui-motion-enabled :where(
+    #handCards > .card-item.ui-motion-pressed:not(.card-disabled),
+    .pi-skill.ui-motion-pressed:has(.character-cast:not(:disabled)),
+    #battleSettingsButton.ui-motion-pressed,
+    .topbar[data-battle-ui-region] > button.ui-motion-pressed,
+    .hud-btn.ui-motion-pressed,
+    .btn-action.ui-motion-pressed,
+    .btn-end.ui-motion-pressed,
+    .training-tools-toggle.ui-motion-pressed,
+    .training-popover .tb-btn.ui-motion-pressed,
+    .board-camera-controls .board-view-button.ui-motion-pressed
+  ) {
+    filter: brightness(1.16) saturate(1.1) drop-shadow(0 3px 7px rgba(2, 6, 23, .3));
+  }
+
+  html.ui-motion-enabled .pi-skill.ui-motion-hover .pi-skill-icon {
+    filter: brightness(1.18) drop-shadow(0 0 5px rgba(147, 197, 253, .34));
+  }
+
+  html.ui-motion-enabled .pi-skill.ui-motion-pressed .pi-skill-icon {
+    filter: brightness(1.28) drop-shadow(0 0 6px rgba(251, 191, 36, .42));
+  }
+
+  /* Compact skill controls have their own anchored menu geometry. Give the
+     controls a stronger state signal while leaving that parent stationary. */
+  html.ui-motion-enabled :where(
+    .piece-context-skill:hover:not(:disabled),
+    .piece-context-info:hover:not(:disabled),
+    .piece-context-collapse:hover:not(:disabled)
+  ) {
+    filter: brightness(1.12) saturate(1.08);
+    color: #f8fafc;
+  }
+
+  html.ui-motion-enabled :where(
+    .piece-context-skill:active:not(:disabled),
+    .piece-context-info:active:not(:disabled),
+    .piece-context-collapse:active:not(:disabled)
+  ) {
+    filter: brightness(1.2) saturate(1.08);
+  }
+}

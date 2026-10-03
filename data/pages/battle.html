@@ -39,10 +39,14 @@
   <script src="js/battle-ui/battle-status-presentation.js"></script>
   <script src="js/battle-ui/battle-context-layout.js"></script>
   <script src="js/battle-ui/battle-legal-actions.js"></script>
+  <script src="js/battle-ui/battle-skill-preview.js"></script>
+  <script src="js/battle-ui/battle-skill-drag.js"></script>
+  <script src="js/battle-ui/battle-dom-patch.js"></script>
   <script src="js/battle-ui/battle-dom-ui.js"></script>
   <script src="js/battle-ui/deployment-status.js"></script>
   <script src="js/battle-ui/battle-tactical-geometry.js"></script>
   <script src="js/battle-ui/turn-timer-status.js"></script>
+  <script src="js/battle-ui/battle-floater-layout.js"></script>
   <script src="js/battle-renderer-3d.js"></script>
   <script src="js/battle-ui/battle-presentation.js"></script>
   <script src="js/tutorial/tutorial-scenario.js"></script>
@@ -535,11 +539,11 @@
       pointer-events: none; z-index: 500; display: none; white-space: nowrap;
       text-shadow: 0 2px 12px rgba(0,0,0,.9);
     }
-    #turnAnnounce.show { display: block; animation: turnAnnounceAnim 1.8s ease-out forwards; }
+    #turnAnnounce.show { display: block; animation: turnAnnounceAnim 3s ease-out forwards; }
     @keyframes turnAnnounceAnim {
       0%   { opacity: 0; transform: translate(-50%,-50%) scale(.55); }
-      22%  { opacity: 1; transform: translate(-50%,-50%) scale(1.06); }
-      60%  { opacity: 1; transform: translate(-50%,-50%) scale(1); }
+      8%   { opacity: 1; transform: translate(-50%,-50%) scale(1.06); }
+      80%  { opacity: 1; transform: translate(-50%,-50%) scale(1); }
       100% { opacity: 0; transform: translate(-50%,-50%) scale(1.12); }
     }
 
@@ -602,7 +606,7 @@
       font-size: 16px; font-weight: 900; z-index: 50;
       transform: translateX(-50%);
       text-shadow: 0 1px 4px rgba(0,0,0,.9);
-      animation: floatUp 1.1s ease-out forwards;
+      animation: floatUp 2s ease-out forwards;
     }
     .dmg-float.big { font-size: 22px; }
     @keyframes floatUp {
@@ -1574,6 +1578,8 @@
 <link rel="stylesheet" href="tabletop-battle/character-dock.css">
 <link rel="stylesheet" href="tabletop-battle/comic-print.css">
 <link rel="stylesheet" href="css/battle-landscape.css">
+<link rel="stylesheet" href="css/ui-motion.css">
+<script src="js/ui-motion.js" defer></script>
 </head>
 <body>
 
@@ -1599,8 +1605,8 @@
     <div id="battleBootActions" hidden><button onclick="location.reload()" style="min-height:44px;padding:8px 18px">重试</button> <button onclick="goBack()" style="min-height:44px;padding:8px 18px">返回</button></div>
   </div>
 
-  <div id="statusMsg" role="status" aria-live="polite">选择棋子开始行动</div>
-  <div id="dmBubble" role="status" aria-live="assertive" aria-hidden="true"></div>
+  <div id="statusMsg" role="status" aria-live="polite" data-floater-obstacle>选择棋子开始行动</div>
+  <div id="dmBubble" role="status" aria-live="assertive" aria-hidden="true" data-floater-obstacle></div>
   <div id="turnClockCorner" hidden aria-label="回合计时" aria-live="off"><span class="clock-label">回合计时</span><span class="clock-value">--:--</span></div>
 
   <aside id="red43QaPanel" aria-live="polite">
@@ -1762,7 +1768,7 @@
 
     <!-- Board + actions + log -->
     <div class="main-panel">
-      <div class="phase-bar" data-battle-ui-region="turn-hud">
+      <div class="phase-bar" data-battle-ui-region="turn-hud" data-floater-obstacle>
         <div class="turn-summary">
           <div class="turn-summary-primary">
             <div class="turn-badge" id="turnBadge" aria-live="polite">等待中</div>
@@ -1795,7 +1801,7 @@
         <div class="board-shell board-shell-3d">
           <div class="board-stage" id="boardStage3d" data-battle-layer="three-battlefield">
             <div id="floatLayer" style="position:absolute;inset:0;pointer-events:none;overflow:visible;z-index:12"></div>
-            <div id="pieceContextMenu" class="piece-context-menu" role="toolbar" aria-label="棋子可用技能" aria-hidden="true" data-piece-id="" data-side="right">
+            <div id="pieceContextMenu" class="piece-context-menu" role="toolbar" aria-label="棋子可用技能" aria-hidden="true" data-piece-id="" data-side="right" data-floater-obstacle>
               <div class="piece-context-heading">
                 <span class="piece-context-identity">
                   <span id="pieceContextName" class="piece-context-name"></span>
@@ -2377,6 +2383,7 @@
     let pendingOptionPickerSelection = { selectionId: null, selectedValues: [] }
     let pendingHandOptionSelection = { selectionId: null, selectedValues: [], submitting: false }
     let targetSubmissionPending = null // one target command waiting for authoritative confirmation
+    let targetSubmissionDraft = null // target draft detached while its command is in flight
     let pendingBoardTargetSelection = { selectionId: null, selectedPieceIds: [] }
     let locallyCancelledSelectionId = null
     const red50Evidence = { targetCommands: [], clearEvents: [], rejections: [] }
@@ -2426,6 +2433,7 @@
       pendingActionFeedbackTimer = null
       const cleared = pendingActionFeedback
       pendingActionFeedback = null
+      if (typeof window !== 'undefined' && window.BattleRenderer3D && window.BattleRenderer3D.setPendingFeedback) window.BattleRenderer3D.setPendingFeedback(null)
       if (cleared) cleared.clearReason = reason || 'cleared'
       return cleared
     }
@@ -2442,6 +2450,7 @@
         pieceId: action.pieceId || action.targetPieceId || selectedPieceId || null,
         startedAt: typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now(),
       }
+      if (typeof window !== 'undefined' && window.BattleRenderer3D && window.BattleRenderer3D.setPendingFeedback) window.BattleRenderer3D.setPendingFeedback(pendingActionFeedback.pieceId)
       pendingActionFeedbackTimer = setTimeout(function () {
         if (!pendingActionFeedback || pendingActionFeedback.clientActionId !== action.clientActionId) return
         pendingActionFeedback.timedOut = true
@@ -2516,6 +2525,77 @@
       )
     }
 
+    function snapshotTargetInteraction() {
+      const clone = typeof cloneLocalSkillValue === 'function' ? cloneLocalSkillValue : value => value
+      return {
+        skill: clone(pendingSkill),
+        card: clone(pendingCardAction),
+        board: pendingBoardTargetSelection ? {
+          selectionId: pendingBoardTargetSelection.selectionId,
+          selectedPieceIds: (pendingBoardTargetSelection.selectedPieceIds || []).slice(),
+          selectedCells: (pendingBoardTargetSelection.selectedCells || []).map(function (cell) { return { x: cell.x, y: cell.y } }),
+        } : null,
+      }
+    }
+
+    function rememberTargetInteraction() {
+      targetSubmissionDraft = snapshotTargetInteraction()
+      return targetSubmissionDraft
+    }
+
+    function restoreTargetInteractionDraft(draft) {
+      if (!draft) return false
+      if (draft.skill) pendingSkill = draft.skill
+      if (draft.card) pendingCardAction = draft.card
+      if (draft.board) {
+        pendingBoardTargetSelection = {
+          selectionId: draft.board.selectionId || null,
+          selectedPieceIds: (draft.board.selectedPieceIds || []).slice(),
+          selectedCells: (draft.board.selectedCells || []).map(function (cell) { return { x: cell.x, y: cell.y } }),
+        }
+      }
+      targetSubmissionDraft = null
+      if (pendingSkill || pendingCardAction) {
+        document.body.classList.add('target-mode-active')
+        renderTargetOverlay()
+        if (pendingSkill && pendingSkill.localChoiceDraft && pendingSkill.preparation
+          && pendingSkill.preparation.kind === 'needOption') {
+          const prep = pendingSkill.preparation
+          showOptionPicker(prep.title || '请选择', prep.options || [], Object.assign({}, prep, {
+            localSkillDraft: true,
+            localSkillId: pendingSkill.skillId,
+          }))
+        }
+      }
+      return !!(pendingSkill || pendingCardAction)
+    }
+
+    function releaseTargetSubmissionForRetry(submission) {
+      if (!submission || !targetSubmissionPending
+        || targetSubmissionPending.clientActionId !== submission.clientActionId) return false
+      targetSubmissionPending = null
+      return restoreTargetInteractionDraft(submission.draft)
+    }
+
+    function targetRejectionCanRetry(code) {
+      const normalized = String(code || '').toUpperCase()
+      if (!normalized) return true
+      if (normalized === 'BATTLE_RECEIPT_UNKNOWN') return false
+      return !/(?:VERSION_CONFLICT|AUTHORITY_VERSION_MISMATCH|PERSISTENCE|TERMINAL|TURN_EXPIRED|DEPLOYMENT_EXPIRED|PENDING_RESPONSE_EXPIRED|ACTION_INVALID|ACTION_PLAYER_MISMATCH|TARGET_DECLARATION_MISSING|OPTION_SELECTION_REQUIRED|TARGET_SELECTION_REQUIRED|PENDING_SELECTION_ACTIVE|SESSION_(?:STALE|EXPIRED|ID_MISMATCH|PLAYER_MISMATCH|ALREADY_RESOLVED)|SELECTION_(?:STALE|EXPIRED|ID_MISMATCH|PLAYER_MISMATCH|ALREADY_RESOLVED)|SOURCE_MISSING|PENDING_TARGET_CANCEL_FORBIDDEN|PENDING_(?:TARGET_SELECTION|OPTION)_(?:NOT_FOUND|STALE|ID_MISMATCH|PLAYER_MISMATCH|ALREADY_RESOLVED|CANCEL_FORBIDDEN))/.test(normalized)
+    }
+
+    function shouldRetainTargetAfterRejection(action, errorLike) {
+      const submission = targetSubmissionPending
+      const hasDraft = !!(submission && submission.draft && (submission.draft.skill || submission.draft.card))
+      if (!hasDraft) return false
+      if (errorLike && errorLike.receipt && errorLike.receipt.status !== 'rejected') return false
+      if (errorLike && (errorLike.needsTargetSelection || errorLike.needsOptionSelection)) return false
+      const code = errorLike && ((errorLike.code) || (errorLike.receipt && errorLike.receipt.code))
+      if (errorLike && !targetRejectionCanRetry(code)) return false
+      return !action || !action.type
+        || ['useBasicSkill', 'useChargeSkill', 'playCard', 'pendingTargetSelect', 'pendingOptionSelect'].includes(action.type)
+    }
+
     function applyAuthorityReceipt(receipt, serverTimings, clientApplyMs, options) {
       if (!receipt || !receipt.clientActionId) return false
       var input = options || {}
@@ -2543,7 +2623,20 @@
       }
 
       if (feedbackMatches) clearPendingActionFeedback('authority-receipt-' + receipt.status)
-      if (targetMatches) targetSubmissionPending = null
+      if (targetMatches) {
+        const submission = targetSubmissionPending
+        targetSubmissionPending = null
+        const preserveDraft = input.preserveTargetInteraction === true
+          || (input.preserveTargetInteraction !== false && receipt.status === 'rejected'
+            && targetRejectionCanRetry(receipt.code))
+        if (preserveDraft) restoreTargetInteractionDraft(submission.draft)
+      }
+      if (receipt.status === 'rejected' && !targetRejectionCanRetry(receipt.code)) {
+        requestAuthorityRecovery(receipt.code || 'selection-invalidated')
+      } else if (receipt.status === 'rejected' && G && (G.pendingTargetSelection || G.pendingOptionSelection)) {
+        _pendingChoiceShown = null
+        if (input.deferRender !== true) render()
+      }
       if (input.deferRender !== true) renderActionBar()
       if (receipt.message) setStatusMsg(receipt.message)
       if (receipt.status === 'resyncRequired') requestAuthorityRecovery(receipt.code || 'resync-required')
@@ -2556,18 +2649,34 @@
     }
 
     function clearTargetInteraction(reason, options) {
+      clearSkillPreview()
       const input = options || {}
-      const hadTarget = !!(pendingSkill || pendingCardAction || targetSubmissionPending)
+      const hadTarget = !!(pendingSkill || pendingCardAction || targetSubmissionPending || targetSubmissionDraft)
+      const clearLocalPicker = !!(typeof pendingOptionAction !== 'undefined'
+        && pendingOptionAction && pendingOptionAction.localSkillDraft)
       pendingSkill = null
       pendingCardAction = null
       targetSubmissionPending = null
+      targetSubmissionDraft = null
       pendingBoardTargetSelection = { selectionId: null, selectedPieceIds: [] }
+      if (clearLocalPicker) {
+        pendingOptionAction = null
+        pendingOptionPickerSelection = { selectionId: null, selectedValues: [] }
+        _pickerOptions = []
+        const optionOverlay = document.getElementById('optionPickerOverlay')
+        if (optionOverlay) optionOverlay.classList.remove('show')
+      }
       if (input.keepMove !== true) pendingMove = false
       if (hadTarget) recordTargetClear(reason)
       document.body.classList.remove('target-mode-active')
       if (input.deferRender !== true) renderTargetOverlay()
       if (input.message) setStatusMsg(input.message)
       return hadTarget
+    }
+
+    function rejectUnsentTargetSubmission(reason, message) {
+      const restored = releaseTargetSubmissionForRetry(targetSubmissionPending)
+      rejectPendingActionFeedback(reason, message, { preserveTargetInteraction: restored || !!(pendingSkill || pendingCardAction) })
     }
 
     function currentTargetSourceName() {
@@ -2584,6 +2693,7 @@
     }
 
     function submitTargetAction(action, label) {
+      clearSkillPreview()
       if (targetSubmissionPending) {
         setStatusMsg('目标指令已提交，正在等待权威确认')
         return false
@@ -2597,12 +2707,21 @@
       }
 
       const stamped = withClientActionId(prepareFreshSelectionAction(action))
-      if (!tutorialActionAllowed(stamped)) return false
+      const draft = (typeof targetSubmissionDraft !== 'undefined' && targetSubmissionDraft)
+        || ((pendingSkill || pendingCardAction) && typeof snapshotTargetInteraction === 'function'
+          ? snapshotTargetInteraction()
+          : null)
+      if (!tutorialActionAllowed(stamped)) {
+        if (draft && typeof restoreTargetInteractionDraft === 'function') restoreTargetInteractionDraft(draft)
+        return false
+      }
       targetSubmissionPending = {
         clientActionId: stamped.clientActionId,
         type: stamped.type,
         label: label || currentTargetSourceName(),
+        draft: draft,
       }
+      if (typeof targetSubmissionDraft !== 'undefined') targetSubmissionDraft = null
       red50Evidence.targetCommands.push({
         clientActionId: stamped.clientActionId,
         type: stamped.type,
@@ -2648,8 +2767,9 @@
         : null
     }
 
-    function enterActionTargetMode(action, preparation) {
+    function enterActionTargetMode(action, preparation, options) {
       if (!action || !preparation || preparation.kind !== 'needTarget') return false
+      const input = options || {}
       flushPresentationBeforePendingSelection()
       if (targetSubmissionPending) {
         targetSubmissionPending = null
@@ -2687,7 +2807,7 @@
       }
       setStatusMsg(targetStepPrefix(preparation.step) + targetTypeText(preparation.targetType, preparation.filter))
       const selected = G && G.pieces ? G.pieces.find(p => p.instanceId === selectedPieceId) : null
-      renderBoard(); renderPieceContextMenu(selected || null); renderActionBar(); renderTargetOverlay()
+      renderBoard(); if (!input.preserveDock) renderPieceContextMenu(selected || null); renderActionBar(); renderTargetOverlay()
       return true
     }
     let currentCardDetail = null
@@ -3225,17 +3345,25 @@
 
     // ── Server action log flush ──
     // ── Turn announcement ──
+    let turnAnnounceTimer = null
     function showTurnAnnounce(text, color) {
       const el = document.getElementById('turnAnnounce')
       if (!el) return
+      if (turnAnnounceTimer) clearTimeout(turnAnnounceTimer)
       el.className = ''
       el.textContent = text
       el.style.color = color
       void el.offsetWidth  // reflow to restart animation
       el.className = 'show'
+      turnAnnounceTimer = setTimeout(() => {
+        el.className = ''
+        turnAnnounceTimer = null
+      }, 3080)
     }
 
     // ── Damage / heal floaters ──
+    let legacyFloaterLayout = null
+    const legacyFloaterTimers = new Set()
     function spawnFloater(x, y, text, color, big, options) {
       options = options || {}
       if (_use3d && battlePresentation) {
@@ -3247,7 +3375,7 @@
       const cellSize = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--cell-size')) || 44
       const el = document.createElement('div')
       const kind = options.kind === 'heal' || options.kind === 'death' ? options.kind : 'damage'
-      const durationMs = Math.max(480, Math.min(650, Number(options.durationMs) || (kind === 'heal' ? 550 : 600)))
+      const durationMs = Math.max(2000, Math.min(3000, Number(options.durationMs) || 2000))
       el.className = 'dmg-float is-' + kind + (big ? ' big' : '')
       el.style.color = color
       el.style.left = (x * cellSize + cellSize / 2) + 'px'
@@ -3255,7 +3383,14 @@
       el.style.setProperty('--floater-duration', durationMs + 'ms')
       el.textContent = text
       layer.appendChild(el)
-      setTimeout(() => el.remove(), durationMs + 80)
+      if (!legacyFloaterLayout) legacyFloaterLayout = BattleFloaterLayout.create(layer)
+      legacyFloaterLayout.add(el, x * cellSize + cellSize / 2, y * cellSize + 4)
+      const timer = setTimeout(() => {
+        el.remove()
+        legacyFloaterLayout.remove(el)
+        legacyFloaterTimers.delete(timer)
+      }, durationMs + 80)
+      legacyFloaterTimers.add(timer)
     }
 
     function battleStateMotionKey(state) {
@@ -3692,6 +3827,13 @@
         return
       }
       document.getElementById('optionPickerOverlay').classList.remove('show')
+      if (pendingOptionAction && pendingOptionAction.localSkillDraft && isLocalSkillDraft(pendingSkill)) {
+        const selected = selectedValues.slice()
+        pendingOptionAction = null
+        pendingOptionPickerSelection = { selectionId: null, selectedValues: [] }
+        _pickerOptions = []
+        return advanceLocalSkillOption(selected)
+      }
       const action = Object.assign(prepareFreshSelectionAction(pendingOptionAction), { selectedOption: selectedValues })
       pendingOptionAction = null
       pendingOptionPickerSelection = { selectionId: null, selectedValues: [] }
@@ -3703,6 +3845,13 @@
       if (!pendingOptionAction) return
       const opt = _pickerOptions[index]
       if (!opt) return
+      if (pendingOptionAction.localSkillDraft && isLocalSkillDraft(pendingSkill)) {
+        const value = opt.value !== undefined ? opt.value : opt
+        pendingOptionAction = null
+        pendingOptionPickerSelection = { selectionId: null, selectedValues: [] }
+        _pickerOptions = []
+        return advanceLocalSkillOption(value)
+      }
       const action = Object.assign(
         prepareFreshSelectionAction(pendingOptionAction),
         { selectedOption: opt.value !== undefined ? opt.value : opt },
@@ -3723,6 +3872,10 @@
       pendingOptionPickerSelection = { selectionId: null, selectedValues: [] }
       _pickerOptions = []
       _pendingChoiceShown = null
+      if (action && action.localSkillDraft && isLocalSkillDraft(pendingSkill)) {
+        cancelTargetSelection()
+        return
+      }
       pendingSkill = null
       if (action && action.type === 'pendingOptionSelect' && action.cancelValue !== undefined) {
         const cancelValue = action.cancelValue
@@ -3876,7 +4029,7 @@
       }
 
       document.getElementById('pieceInfoContent').innerHTML =
-        statsHtml + (adventureWarning ? '<div class="adventure-piece-warning">' + escHtml(adventureWarning) + '</div>' : '') + tagsHtml +
+        '<div class="pi-piece-state">' + statsHtml + (adventureWarning ? '<div class="adventure-piece-warning">' + escHtml(adventureWarning) + '</div>' : '') + tagsHtml + '</div>' +
         `<div class="pi-section-label">技能 <button type="button" class="skill-reading-tips" onclick="RvBSkillDescription.showGuide(true)">Tips · 描述说明</button></div>` + skillsHtml + relatedCardsHtml
 
       document.getElementById('pieceKeywordPanel').innerHTML = renderKeywordPanel(
@@ -3990,6 +4143,11 @@
       ) closePieceInfo({ restoreFocus: false })
     }
     function handlePieceInfoModalKeydown(event) {
+      if (event.key === 'Escape' && (pendingSkill || pendingCardAction || targetSubmissionPending)) {
+        event.preventDefault()
+        dispatchBattleIntent({ type: 'cancel-target' })
+        return
+      }
       const modal = document.getElementById('pieceInfoModal')
       if (!modal || modal.style.display === 'none' || modal.style.display === '') return
       if (event.key === 'Escape') {
@@ -4838,11 +4996,16 @@
       if (locallyCancelledSelectionId && authoritativeSelectionId !== locallyCancelledSelectionId) {
         locallyCancelledSelectionId = null
       }
-      const serverTargetInteraction = pendingSkill
-        && pendingSkill.turnTargetActionType === 'pendingTargetSelect'
+      const targetDraft = (typeof targetSubmissionDraft !== 'undefined' && targetSubmissionDraft)
+        || (typeof targetSubmissionPending !== 'undefined'
+          && targetSubmissionPending && targetSubmissionPending.draft)
+      const activeTargetSkill = pendingSkill || (targetDraft && targetDraft.skill)
+      const activeTargetCard = pendingCardAction || (targetDraft && targetDraft.card)
+      const serverTargetInteraction = activeTargetSkill
+        && activeTargetSkill.turnTargetActionType === 'pendingTargetSelect'
       if (serverTargetInteraction) {
-        const localSelectionId = pendingSkill.preparation && pendingSkill.preparation.selectionId
-        const localStateRevision = pendingSkill.preparation && pendingSkill.preparation.stateRevision
+        const localSelectionId = activeTargetSkill.preparation && activeTargetSkill.preparation.selectionId
+        const localStateRevision = activeTargetSkill.preparation && activeTargetSkill.preparation.stateRevision
         const nextPending = nextState.pendingTargetSelection
         if (!nextPending
           || !localSelectionId
@@ -4851,6 +5014,19 @@
           clearTargetInteraction('authoritative-pending-ended', { deferRender: input.deferRender === true })
           validMoves = new Set()
           return '权威目标选择已结束，旧选择已清除'
+        }
+      }
+      if (activeTargetSkill && activeTargetSkill.localChoiceDraft && !targetSubmissionPending) {
+        const rootStateRevision = activeTargetSkill.rootAction && activeTargetSkill.rootAction.stateRevision !== undefined
+          ? activeTargetSkill.rootAction.stateRevision
+          : activeTargetSkill.rootStateRevision
+        if (Number.isFinite(Number(rootStateRevision))) {
+          const revision = Number(nextState.targetingRevision || 0)
+          if (revision !== Number(rootStateRevision)) {
+            clearTargetInteraction('targeting-revision-changed', { deferRender: input.deferRender === true })
+            validMoves = new Set()
+            return '战局状态已更新，请重新选择技能目标'
+          }
         }
       }
       const selected = selectedPieceId && nextState.pieces
@@ -4875,8 +5051,8 @@
         return '回合已切换，目标选择已清除'
       }
 
-      const preparation = (pendingSkill && pendingSkill.preparation)
-        || (pendingCardAction && pendingCardAction.preparation)
+      const preparation = (activeTargetSkill && !activeTargetSkill.localChoiceDraft && activeTargetSkill.preparation)
+        || (activeTargetCard && activeTargetCard.preparation)
       if (preparation && Number.isFinite(Number(preparation.stateRevision))) {
         const revision = Number(nextState.targetingRevision || 0)
         if (revision !== Number(preparation.stateRevision)) {
@@ -5260,7 +5436,7 @@
       })
 
       RvBColyseus.on('authoritySyncBlocked', function() {
-        setStatusMsg('正在同步服务端状态，请等待完成后重新操作')
+        rejectUnsentTargetSubmission('authority-syncing', '正在同步服务端状态；指令未发送，选择已保留')
       })
 
       RvBColyseus.on('message', function(msg) {
@@ -5333,11 +5509,18 @@
           }
         } else if (msg.type === 'actionError') {
           var errorActionId = (msg.receipt && msg.receipt.clientActionId) || (msg.action && msg.action.clientActionId)
-          if (errorActionId && pendingActionFeedback && pendingActionFeedback.clientActionId !== errorActionId) {
+          var activePendingActionId = (pendingActionFeedback && pendingActionFeedback.clientActionId)
+            || (targetSubmissionPending && targetSubmissionPending.clientActionId)
+          var rejectionWithoutSubmission = !activePendingActionId && !!(pendingSkill || pendingCardAction)
+            && !msg.needsTargetSelection && !msg.needsOptionSelection
+          if (errorActionId && ((activePendingActionId && activePendingActionId !== errorActionId)
+            || rejectionWithoutSubmission)) {
             addLog('[authority] 已忽略过期拒绝：' + errorActionId, 'info')
             return
           }
-          if (msg.receipt) applyAuthorityReceipt(msg.receipt)
+          var submittedTarget = targetSubmissionPending
+          var retainTarget = !!errorActionId && shouldRetainTargetAfterRejection(msg.action, msg)
+          if (msg.receipt) applyAuthorityReceipt(msg.receipt, null, null, { preserveTargetInteraction: retainTarget })
           if (msg.needsTargetSelection) clearPendingActionFeedback('authoritative-target-step')
           if (msg.needsTargetSelection && enterActionTargetMode(msg.action, msg.preparation)) return
           if (msg.needsOptionSelection) clearPendingActionFeedback('authoritative-option-step')
@@ -5377,14 +5560,28 @@
             || (msg.action.type === 'pendingOptionSelect' && G && G.pendingOptionSelection)
           )
           if (rejectedPending) {
-            targetSubmissionPending = null
-            _pendingChoiceShown = null
-            addLog('服务端拒绝本次选择：' + rejectionMessage, 'err')
+            if ((!msg.receipt || msg.receipt.status === 'rejected')
+              && targetRejectionCanRetry(msg.code || (msg.receipt && msg.receipt.code))) {
+              if (submittedTarget) releaseTargetSubmissionForRetry(submittedTarget)
+              else targetSubmissionPending = null
+              _pendingChoiceShown = null
+              addLog('服务端拒绝本次选择：' + rejectionMessage, 'err')
+              rejectPendingActionFeedback(
+                'server-rejected',
+                '选择被拒绝：' + rejectionMessage + '；请重新选择',
+                { preserveTargetInteraction: true },
+              )
+              return
+            }
+          }
+          if (retainTarget) {
+            if (submittedTarget) releaseTargetSubmissionForRetry(submittedTarget)
             rejectPendingActionFeedback(
               'server-rejected',
               '选择被拒绝：' + rejectionMessage + '；请重新选择',
               { preserveTargetInteraction: true },
             )
+            addLog('服务端拒绝本次目标选择：' + rejectionMessage, 'err')
             return
           }
           rejectPendingActionFeedback('server-rejected', '服务端拒绝：' + rejectionMessage + '；目标选择已清除')
@@ -5455,8 +5652,339 @@
       return action
     }
 
+    // Public multi-stage skill preparation is local presentation state. The
+    // first target/option remains on the root action; only later owned prompts
+    // are serialized as skillChoices for the single authority submission.
+    function cloneLocalSkillValue(value, seen) {
+      if (value === null || value === undefined || typeof value !== 'object') return value
+      const cache = seen || new Map()
+      if (cache.has(value)) return cache.get(value)
+      if (value instanceof Set) {
+        const copySet = new Set()
+        cache.set(value, copySet)
+        value.forEach(item => copySet.add(cloneLocalSkillValue(item, cache)))
+        return copySet
+      }
+      if (Array.isArray(value)) {
+        const copyArray = []
+        cache.set(value, copyArray)
+        value.forEach(item => copyArray.push(cloneLocalSkillValue(item, cache)))
+        return copyArray
+      }
+      const copy = {}
+      cache.set(value, copy)
+      Object.keys(value).forEach(key => { copy[key] = cloneLocalSkillValue(value[key], cache) })
+      return copy
+    }
+
+    function isLocalSkillDraft(skill) {
+      return !!(skill && skill.localChoiceDraft === true && skill.rootAction)
+    }
+
+    function localSkillRootAction(skill) {
+      const root = cloneLocalSkillValue(skill && (skill.rootAction || skill.baseAction) || {})
+      delete root.skillChoices
+      delete root.preparation
+      delete root.validTargets
+      delete root.pendingTargetIndex
+      delete root.pendingTargetType
+      delete root.pendingTargetFilter
+      delete root.turnTargetActionType
+      delete root.turnTargetPlayerId
+      return root
+    }
+
+    function localSkillChoices(skill) {
+      return Array.isArray(skill && skill.skillChoices)
+        ? cloneLocalSkillValue(skill.skillChoices)
+        : []
+    }
+
+    function localSkillBatchAction(skill, rootAction, choices) {
+      const root = cloneLocalSkillValue(rootAction || localSkillRootAction(skill))
+      const selected = Array.isArray(choices) ? cloneLocalSkillValue(choices) : localSkillChoices(skill)
+      if (selected.length) {
+        root.skillChoices = selected
+        if (root.stateRevision === undefined && skill && Number.isSafeInteger(skill.rootStateRevision)) {
+          root.stateRevision = skill.rootStateRevision
+        }
+      }
+      else delete root.skillChoices
+      return root
+    }
+
+    function localSkillSource(skill, preparation) {
+      const source = preparation && preparation.source
+      if (source && typeof source === 'object' && typeof source.type === 'string' && typeof source.id === 'string') {
+        return cloneLocalSkillValue(source)
+      }
+      const root = skill && (skill.rootAction || skill.baseAction) || {}
+      return {
+        type: 'skill',
+        id: skill && skill.skillId || root.skillId || '',
+        ...(root.pieceId ? { pieceId: root.pieceId } : {}),
+      }
+    }
+
+    function normalizeLocalSkillPreparation(result, skill) {
+      if (!result || typeof result !== 'object') return null
+      const status = result.status || (
+        result.kind === 'needTarget' || result.kind === 'needOption' ? 'needs-input' : ''
+      )
+      if (status !== 'needs-input') return { status: status || 'unavailable', result }
+      const raw = result.preparation || result
+      if (!raw || typeof raw !== 'object') return { status: 'needs-input', preparation: null, result }
+      const preparation = cloneLocalSkillValue(raw)
+      const kind = preparation.kind === 'needOption' || preparation.kind === 'option'
+        ? 'needOption'
+        : preparation.kind === 'needTarget' || preparation.kind === 'target'
+          ? 'needTarget'
+          : null
+      if (!kind) return { status: 'needs-input', preparation: null, result }
+      preparation.kind = kind
+      preparation.source = localSkillSource(skill, preparation)
+      if (kind === 'needTarget') {
+        if (preparation.targetType === 'grid' || preparation.targetType === 'tile' || preparation.targetType === 'empty') {
+          preparation.targetType = 'cell'
+        } else if (preparation.targetType !== 'piece') {
+          preparation.targetType = 'cell'
+        }
+      }
+      if (preparation.selectionMode === 'multi') {
+        if (!Number.isInteger(preparation.minSelections) && Number.isInteger(preparation.min)) preparation.minSelections = preparation.min
+        if (!Number.isInteger(preparation.maxSelections) && Number.isInteger(preparation.max)) preparation.maxSelections = preparation.max
+      }
+      return { status: 'needs-input', preparation, result }
+    }
+
+    function prepareLocalSkillAction(rootAction, skill, choices) {
+      const engine = typeof GameEngine !== 'undefined' ? GameEngine : null
+      if (!engine || typeof engine.preparePublicSkillAction !== 'function') return null
+      const action = localSkillBatchAction(skill, rootAction, choices)
+      try {
+        return normalizeLocalSkillPreparation(
+          engine.preparePublicSkillAction(G, action, myPlayerId),
+          skill,
+        )
+      } catch (error) {
+        return { status: 'unavailable', error }
+      }
+    }
+
+    function localSkillInitialOptionPreparation(action, skillData) {
+      // Initial option prompts must come from the same public preparation
+      // surface as target prompts. Reading authored targeting steps here would
+      // duplicate rule classification and can expose stale/private metadata.
+      void skillData
+      const prepared = prepareLocalSkillAction(action, {
+        skillId: action && action.skillId,
+        rootAction: action,
+      }, [])
+      if (!prepared || prepared.status !== 'needs-input' || !prepared.preparation) return null
+      if (prepared.preparation.kind !== 'needOption' || prepared.preparation.continuation === true) return null
+      return prepared.preparation
+    }
+
+    function localSkillTargetChoice(skill, piece, x, y, preparation) {
+      const targetType = preparation && preparation.targetType
+      const choice = Object.assign({ kind: 'target', source: localSkillSource(skill, preparation) },
+        preparation && typeof preparation.promptKey === 'string' ? { promptKey: preparation.promptKey } : {})
+      if (targetType === 'piece' && piece) choice.targetPieceId = piece.instanceId
+      else { choice.targetX = x; choice.targetY = y }
+      return choice
+    }
+
+    function localSkillTargetSelectionChoice(skill, ids, preparation) {
+      const isCell = preparation && preparation.targetType === 'cell'
+      const values = Array.isArray(ids) ? ids : []
+      const first = values[0]
+      const choice = Object.assign({ kind: 'target', source: localSkillSource(skill, preparation) },
+        preparation && typeof preparation.promptKey === 'string' ? { promptKey: preparation.promptKey } : {})
+      if (isCell) {
+        choice.targetX = first.x
+        choice.targetY = first.y
+        if (values.length > 1) choice.extraTargets = values.slice(1).map(cell => ({ x: cell.x, y: cell.y }))
+      } else {
+        choice.targetPieceId = first
+        if (values.length > 1) choice.extraTargets = values.slice(1).map(pieceId => ({ pieceId }))
+      }
+      return choice
+    }
+
+    function localSkillUsesRootInput(skill) {
+      const preparation = skill && skill.preparation
+      // The public preparation API marks prompts before the root action is
+      // complete with continuation:false and only exposes an opaque promptKey
+      // for post-root continuations. Use that authority classification so a
+      // second root target stays flat even when the root already has a target.
+      if (preparation && preparation.continuation !== true) return true
+      if (preparation && typeof preparation.promptKey !== 'string') return true
+      if (preparation && preparation.continuation === true) return false
+      const root = skill && (skill.rootAction || skill.baseAction) || {}
+      return !localSkillChoices(skill).length
+        && !_actionHasFirstTarget(root)
+        && root.selectedOption === undefined
+    }
+
+    function renderLocalSkillPreparation(skill) {
+      if (!skill || !skill.localChoiceDraft) return
+      pendingBoardTargetSelection = { selectionId: null, selectedPieceIds: [], selectedCells: [] }
+      _updatePendingSkillTargets()
+      if (skill.preparation && skill.preparation.kind === 'needOption') {
+        const prep = skill.preparation
+        showOptionPicker(prep.title || '请选择', prep.options || [], Object.assign({}, prep, {
+          localSkillDraft: true,
+          localSkillId: skill.skillId,
+        }))
+        renderActionBar(); renderTargetOverlay()
+        return
+      }
+      renderBoard(); renderActionBar(); renderTargetOverlay()
+    }
+
+    function installLocalSkillDraft(action, skillData, preparation, origin, rootAction, choices) {
+      if (!action || !preparation || !preparation.kind) return false
+      const root = cloneLocalSkillValue(rootAction || action)
+      const selected = Array.isArray(choices) ? cloneLocalSkillValue(choices) : []
+      // Credentials from the initial root preparation are retained only on
+      // that root action. Subsequent local prompts are represented by choices.
+      if (!selected.length && !_actionHasFirstTarget(root) && root.selectedOption === undefined) {
+        if (preparation.continuation !== true) {
+          if (preparation.selectionId !== undefined) root.selectionId = preparation.selectionId
+          if (preparation.stateRevision !== undefined) root.stateRevision = preparation.stateRevision
+        }
+      }
+      pendingMove = false
+      pendingSkill = {
+        skillId: action.skillId,
+        skillType: skillData && (skillData.type || skillData.kind) || 'normal',
+        rootAction: root,
+        baseAction: cloneLocalSkillValue(root),
+        skillChoices: selected,
+        localChoiceDraft: true,
+        previewOrigin: origin || 'click',
+        preparation: cloneLocalSkillValue(preparation),
+        source: localSkillSource({ skillId: action.skillId, rootAction: root }, preparation),
+        // Only the root action's authority version guards this local draft.
+        // Continuation preparation revisions are synthetic public prompts and
+        // must never be replayed as authority credentials.
+        rootStateRevision: root.stateRevision !== undefined
+          ? root.stateRevision
+          : G && Number.isFinite(Number(G.targetingRevision))
+            ? Number(G.targetingRevision)
+            : null,
+        targetType: preparation.targetType,
+        filter: preparation.filter,
+        range: preparation.range,
+        pendingTargetIndex: preparation.step,
+        hint: preparation.title || null,
+      }
+      renderLocalSkillPreparation(pendingSkill)
+      return true
+    }
+
+    function submitLocalSkillBatch(rootAction, skill, choices) {
+      const finalAction = localSkillBatchAction(skill, rootAction, choices)
+      if (!finalAction || !finalAction.type) return false
+      const label = currentTargetSourceName()
+      if (skill && skill.localChoiceDraft) {
+        // Keep the last prompt and confirmed prefix editable if authority
+        // rejects the final answer. The submitted batch is a separate value.
+        const retryDraft = snapshotTargetInteraction()
+        skill.rootAction = cloneLocalSkillValue(rootAction || skill.rootAction)
+        skill.skillChoices = cloneLocalSkillValue(choices || skill.skillChoices || [])
+        skill.baseAction = cloneLocalSkillValue(skill.rootAction)
+        skill.localReady = true
+        skill.preparation = null
+        skill.validTargets = new Set()
+        skill.hint = '点击技能卡重试提交'
+        targetSubmissionDraft = retryDraft
+        pendingSkill = null
+        pendingOptionAction = null
+        pendingOptionPickerSelection = { selectionId: null, selectedValues: [] }
+        _pickerOptions = []
+        const optionOverlay = document.getElementById('optionPickerOverlay')
+        if (optionOverlay) optionOverlay.classList.remove('show')
+        clearSkillPreview()
+        renderBoard(); renderActionBar(); renderTargetOverlay()
+      }
+      return submitTargetAction(finalAction, label)
+    }
+
+    function advanceLocalSkillChoice(rootAction, skill, choices) {
+      const prepared = prepareLocalSkillAction(rootAction, skill, choices)
+      if (!prepared || prepared.status === 'unavailable') {
+        // Hidden/random or older bundles stay on the authority path. Do not
+        // invent a local prompt or send an intermediate command.
+        if (skill && skill.localChoiceDraft) return submitLocalSkillBatch(rootAction, skill, choices)
+        return false
+      }
+      if (prepared.status === 'needs-input' && prepared.preparation) {
+        const skillData = skillDefOf(skill.skillId)
+        installLocalSkillDraft(
+          localSkillBatchAction(skill, rootAction, choices),
+          skillData,
+          prepared.preparation,
+          skill.previewOrigin || 'click',
+          rootAction,
+          choices,
+        )
+        return true
+      }
+      if (prepared.status === 'ready') return submitLocalSkillBatch(rootAction, skill, choices)
+      return submitLocalSkillBatch(rootAction, skill, choices)
+    }
+
+    function advanceLocalSkillTarget(piece, x, y) {
+      if (!isLocalSkillDraft(pendingSkill) || !pendingSkill.preparation) return false
+      const root = localSkillRootAction(pendingSkill)
+      const choices = localSkillChoices(pendingSkill)
+      const choice = localSkillTargetChoice(pendingSkill, piece, x, y, pendingSkill.preparation)
+      if (localSkillUsesRootInput(pendingSkill)) _appendTargetToAction(root, piece, x, y, pendingSkill.preparation.targetType)
+      else choices.push(choice)
+      return advanceLocalSkillChoice(root, pendingSkill, choices)
+    }
+
+    function advanceLocalSkillTargetSelection(ids) {
+      if (!isLocalSkillDraft(pendingSkill) || !pendingSkill.preparation) return false
+      const values = Array.isArray(ids) ? ids : []
+      if (!values.length) return false
+      const root = localSkillRootAction(pendingSkill)
+      const choices = localSkillChoices(pendingSkill)
+      const prep = pendingSkill.preparation
+      const choice = localSkillTargetSelectionChoice(pendingSkill, values, prep)
+      if (localSkillUsesRootInput(pendingSkill)) {
+        if (prep.targetType === 'cell') {
+          root.targetX = values[0].x; root.targetY = values[0].y
+          if (values.length > 1) root.extraTargets = values.slice(1).map(cell => ({ x: cell.x, y: cell.y }))
+        } else {
+          root.targetPieceId = values[0]
+          if (values.length > 1) root.extraTargets = values.slice(1).map(pieceId => ({ pieceId }))
+        }
+      } else choices.push(choice)
+      return advanceLocalSkillChoice(root, pendingSkill, choices)
+    }
+
+    function advanceLocalSkillOption(selectedOption) {
+      if (!isLocalSkillDraft(pendingSkill) || !pendingSkill.preparation) return false
+      const root = localSkillRootAction(pendingSkill)
+      const choices = localSkillChoices(pendingSkill)
+      const choice = Object.assign({
+        kind: 'option',
+        source: localSkillSource(pendingSkill, pendingSkill.preparation),
+        selectedOption: cloneLocalSkillValue(selectedOption),
+      }, typeof pendingSkill.preparation.promptKey === 'string' ? { promptKey: pendingSkill.preparation.promptKey } : {})
+      if (localSkillUsesRootInput(pendingSkill)) root.selectedOption = cloneLocalSkillValue(selectedOption)
+      else choices.push(choice)
+      return advanceLocalSkillChoice(root, pendingSkill, choices)
+    }
+
     function computeValidSkillTargets(sp) {
       if (!G || !sp || !pendingSkill) return new Set()
+      // A no-target preview is a board presentation affordance, not an
+      // engine target selection. Keep its eligibility separate from the
+      // legal target set so refreshing actions never highlights the board.
+      if (pendingSkill.previewOnly) return new Set()
       const valid = new Set()
       const preparation = pendingSkill.preparation
       if (!preparation || !Array.isArray(preparation.candidates)) return valid
@@ -5479,10 +6007,46 @@
       updateRed43QaEvidence()
     }
 
+    function skillSelectionSwitchBlocked() {
+      if ((typeof pendingCardAction !== 'undefined' && pendingCardAction)
+        || targetSubmissionPending || (typeof pendingActionFeedback !== 'undefined' && pendingActionFeedback)
+        || (typeof waitingForOtherPending === 'function' && waitingForOtherPending())) return true
+      // Hover is presentation-only. It never replaces an authoritative
+      // target/option session, even when that session is technically
+      // cancelable; an explicit click goes through cancelTargetSelection.
+      return !!(G && (G.pendingTargetSelection || G.pendingOptionSelection))
+    }
+
+    function enterPreviewOnlySkillMode(action, skillData, origin) {
+      if (!action || !action.skillId || !G || skillSelectionSwitchBlocked()) return false
+      flushPresentationBeforePendingSelection()
+      pendingMove = false
+      pendingSkill = {
+        skillId: action.skillId,
+        skillType: skillData && (skillData.type || skillData.kind) || 'normal',
+        baseAction: Object.assign({}, action),
+        previewOnly: true,
+        previewOrigin: origin || 'hover',
+        // Preview eligibility is intentionally separate from legal target
+        // highlights. A root action without a target may be previewed while
+        // the board remains free of target cells.
+        previewEligible: true,
+        validTargets: new Set(),
+        hint: '公开效果预演 · 点击或松手释放',
+      }
+      _updatePendingSkillTargets()
+      renderBoard()
+      renderActionBar(); renderTargetOverlay()
+      if (pendingSkill.previewOrigin === 'hover' && typeof previewSkillTarget === 'function') {
+        previewSkillTarget(null, null)
+      }
+      return true
+    }
+
     // ── Target overlay ──
     function isPendingBoardMultiTarget() {
       const preparation = pendingSkill && pendingSkill.preparation
-      return !!(pendingSkill && pendingSkill.turnTargetActionType === 'pendingTargetSelect' &&
+      return !!(pendingSkill && (pendingSkill.turnTargetActionType === 'pendingTargetSelect' || pendingSkill.localChoiceDraft === true) &&
         preparation && preparation.selectionMode === 'multi' && ['piece','cell'].includes(preparation.targetType))
     }
 
@@ -5576,6 +6140,10 @@
         setStatusMsg('请选择' + limits.min + '至' + limits.max + (isCell ? '个地格' : '个棋子'))
         return false
       }
+      if (pendingSkill.localChoiceDraft) {
+        pendingBoardTargetSelection = { selectionId: null, selectedPieceIds: [], selectedCells: [] }
+        return advanceLocalSkillTargetSelection(ids)
+      }
       const preparation = pendingSkill.preparation
       const action = {
         type: pendingSkill.turnTargetActionType,
@@ -5617,26 +6185,83 @@
       return targetStepPrefix(pendingSkill.pendingTargetIndex) +
         targetTypeText(pendingSkill.targetType, pendingSkill.filter)
     }
+
+    // The instruction stays at the top of the screen; reuse only the action
+    // controls in the character sheet, with a fallback for card/rule choices.
+    function placeTargetOverlayHost(active) {
+      const overlay = document.getElementById('targetSelectionControls')
+      if (!overlay) return
+      const modal = document.getElementById('pieceInfoModal')
+      const layout = modal && modal.classList.contains('character-dock')
+        && modal.style.display !== 'none'
+        && typeof currentPieceInfoSource !== 'undefined'
+        && currentPieceInfoSource === 'board'
+        ? modal.querySelector('.pi-layout')
+        : null
+      let skillRow = null
+      const skillId = active && pendingSkill && pendingSkill.skillId
+        ? String(pendingSkill.skillId)
+        : active && targetSubmissionPending && targetSubmissionPending.draft
+          && targetSubmissionPending.draft.skill && targetSubmissionPending.draft.skill.skillId
+          ? String(targetSubmissionPending.draft.skill.skillId)
+          : ''
+      if (active && layout && skillId && typeof document.querySelectorAll === 'function') {
+        const rows = document.querySelectorAll('#pieceInfoContent .pi-skill')
+        for (let i = 0; i < rows.length; i += 1) {
+          const row = rows[i]
+          const cast = row && typeof row.querySelector === 'function'
+            ? row.querySelector('.character-cast')
+            : null
+          if (cast && cast.dataset && String(cast.dataset.skillId || '') === skillId) {
+            skillRow = row
+            break
+          }
+        }
+      }
+      // Clear a previous row marker before native rendering or a skill switch
+      // moves the same controls node to another host.
+      if (typeof document.querySelectorAll === 'function') {
+        const markedRows = document.querySelectorAll('#pieceInfoContent .pi-skill.target-skill-controls')
+        for (let i = 0; i < markedRows.length; i += 1) {
+          if (markedRows[i] !== skillRow && markedRows[i].classList) markedRows[i].classList.remove('target-skill-controls')
+        }
+      }
+      const host = skillRow || (active && layout ? layout : document.body)
+      if (skillRow) {
+        skillRow.classList.add('target-skill-controls')
+        const description = typeof skillRow.querySelector === 'function'
+          ? skillRow.querySelector('.pi-skill-desc')
+          : null
+        // Keep cancel/confirm outside the release button so its click and
+        // drag handlers cannot be mistaken for a skill release.
+        if (description && typeof skillRow.insertBefore === 'function'
+          && (overlay.parentElement !== skillRow || description.previousElementSibling !== overlay)) {
+          skillRow.insertBefore(overlay, description)
+        }
+        else if (overlay.parentElement !== skillRow && typeof skillRow.appendChild === 'function') skillRow.appendChild(overlay)
+      } else if (overlay.parentElement !== host && host && typeof host.appendChild === 'function') {
+        host.appendChild(overlay)
+      }
+      if (active && layout && !skillRow) modal.classList.add('target-footer-active')
+      else if (modal) modal.classList.remove('target-footer-active')
+    }
+
     function renderTargetOverlay() {
       const el = document.getElementById('targetOverlay')
       if (!el) return
-      const active = !targetSubmissionPending && !!(pendingSkill || pendingCardAction)
+      // A no-target preview is a local display state, not target selection.
+      // Keep the prompt and controls reserved for real target/card sessions.
+      const active = !!(pendingCardAction || targetSubmissionPending || (pendingSkill && !pendingSkill.previewOnly))
       document.body.classList.toggle('target-mode-active', active)
+      const controls = document.getElementById('targetSelectionControls')
+      if (controls) controls.classList.toggle('show', active)
       if (active) {
-        closePieceContextMenu()
-        if (window.matchMedia && window.matchMedia('(max-width: 760px), (orientation: landscape) and (max-height: 500px)').matches) {
-          const pieceInfo = document.getElementById('pieceInfoModal')
-          const cardInfo = document.getElementById('cardDetailModal')
-          if (pieceInfo && pieceInfo.style.display !== 'none' && pieceInfo.style.display !== '') closePieceInfo()
-          if (cardInfo && cardInfo.style.display !== 'none' && cardInfo.style.display !== '') closeCardDetail()
-        }
-        document.getElementById('targetSourceName').textContent = currentTargetSourceName()
+        if (window.refreshTargetSkillButtonState) window.refreshTargetSkillButtonState()
+        if (typeof placeTargetOverlayHost === 'function') placeTargetOverlayHost(true)
+        if (!(pendingSkill && !pendingCardAction && !targetSubmissionPending)) closePieceContextMenu()
         document.getElementById('targetPromptText').textContent = targetSubmissionPending
           ? '指令已提交 · 等待权威确认'
           : _targetPromptText()
-        const rangeLegend = document.getElementById('targetRangeLegend')
-        const preparation = (pendingSkill || pendingCardAction || {}).preparation
-        if (rangeLegend) rangeLegend.hidden = !(preparation && preparation.rangeCells && preparation.rangeCells.length)
         const multiSummary = document.getElementById('targetMultiSummary')
         const confirmButton = document.getElementById('targetConfirmButton')
         const multiActive = isPendingBoardMultiTarget()
@@ -5654,13 +6279,37 @@
         const cancelButton = document.getElementById('targetCancelButton')
         if (cancelButton) {
           const authoritativeSelection = G && (G.pendingTargetSelection || G.pendingOptionSelection)
-          cancelButton.hidden = !!(authoritativeSelection && authoritativeSelection.canCancel === false)
+          const currentSkillId = pendingSkill && (pendingSkill.skillId || pendingSkill.baseAction && pendingSkill.baseAction.skillId)
+            || targetSubmissionPending && targetSubmissionPending.draft && targetSubmissionPending.draft.skill && targetSubmissionPending.draft.skill.skillId
+          let currentSkillButton = false
+          const pieceInfoModal = document.getElementById('pieceInfoModal')
+          const skillSheetVisible = pieceInfoModal
+            && pieceInfoModal.classList.contains('character-dock')
+            && pieceInfoModal.style.display !== 'none'
+            && document.body.classList.contains('character-dock-open')
+            && typeof currentPieceInfoSource !== 'undefined'
+            && currentPieceInfoSource === 'board'
+          if (currentSkillId && skillSheetVisible && typeof document.querySelectorAll === 'function') {
+            const skillButtons = document.querySelectorAll('#pieceInfoContent .character-cast')
+            for (let i = 0; i < skillButtons.length; i += 1) {
+              if (skillButtons[i].dataset
+                && skillButtons[i].dataset.targetMode
+                && String(skillButtons[i].dataset.skillId || '') === String(currentSkillId)) {
+                currentSkillButton = true
+                break
+              }
+            }
+          }
+          // A current skill owns its second-click cancel affordance. Keep the
+          // shared button only for cards, rules and rows that are unavailable.
+          cancelButton.hidden = currentSkillButton || !!(authoritativeSelection && authoritativeSelection.canCancel === false)
           cancelButton.disabled = !!targetSubmissionPending
           cancelButton.textContent = targetSubmissionPending ? '等待确认…' : '取消目标选择'
         }
         el.classList.add('show')
       } else {
         el.classList.remove('show')
+        if (typeof placeTargetOverlayHost === 'function') placeTargetOverlayHost(false)
       }
     }
     function cancelTargetSelection() {
@@ -5680,6 +6329,14 @@
           selectionId: pendingTarget && pendingTarget.selectionId,
           stateRevision: pendingTarget && pendingTarget.stateRevision,
         })
+      }
+      if (isLocalSkillDraft(pendingSkill) || (pendingOptionAction && pendingOptionAction.localSkillDraft)) {
+        const optionOverlay = document.getElementById('optionPickerOverlay')
+        if (optionOverlay) optionOverlay.classList.remove('show')
+        pendingOptionAction = null
+        pendingOptionPickerSelection = { selectionId: null, selectedValues: [] }
+        _pickerOptions = []
+        _pendingChoiceShown = null
       }
       clearTargetInteraction('user-cancelled')
       setMoveButtonClass(false)
@@ -6102,12 +6759,14 @@
     }
 
     function renderBoard(preparedModel, beforeBoardUpdate) {
+      clearSkillPreview({ preserveReplay: true })
       if (!G || !G.map) return
       currentBattleViewModel = prepareCurrentBattlePresentationModel(preparedModel)
       if (!currentBattleViewModel) return
       if (typeof beforeBoardUpdate === 'function') beforeBoardUpdate(currentBattleViewModel)
       if (battlePresentation) battlePresentation.update(currentBattleViewModel)
       recalcCellSize()
+      scheduleSkillPreviewReplayAfterRedraw()
 
       // ── Compute highlights (shared between 3D and HTML paths) ───────────────
       const tiles = currentBattleViewModel.board.tiles
@@ -6274,8 +6933,17 @@
         document.getElementById('oppLabel').textContent = '[R] 红方'
       }
 
-      document.getElementById('myPieces').innerHTML = myPieces.map(p => renderPieceCard(p, p.ownerPlayerId.toLowerCase() === myPlayerId)).join('')
-      document.getElementById('oppPieces').innerHTML = oppPieces.map(p => renderPieceCard(p, false)).join('')
+      const patchPieces = function (hostId, pieces, isMine) {
+        const host = document.getElementById(hostId)
+        if (!host) return
+        const entries = pieces.map(function (piece) {
+          return { key: String(piece.instanceId), html: renderPieceCard(piece, isMine ? piece.ownerPlayerId.toLowerCase() === myPlayerId : false) }
+        })
+        if (window.BattleDomPatch) window.BattleDomPatch.patchKeyed(host, entries, { datasetKey: 'pieceId' })
+        else host.innerHTML = entries.map(function (entry) { return entry.html }).join('')
+      }
+      patchPieces('myPieces', myPieces, true)
+      patchPieces('oppPieces', oppPieces, false)
 
       const opponentHandStack = document.getElementById('opponentHandStack')
       if (opponentHandStack) {
@@ -6492,7 +7160,11 @@
       const trainingOpen = document.getElementById('trainingTools')?.classList.contains('is-open')
       const isTargeting = !!pendingSkill || !!pendingCardAction || !!targetSubmissionPending ||
         pendingTargetSelectionForMe() || pendingOptionSelectionForMe()
-      if (!piece || piece.currentHp <= 0 || isTargeting || trainingOpen || dismissedPieceContextId === piece.instanceId) {
+      // Keep the active skill in the compact menu so touch users can cancel
+      // with the same card. Card/rule selections and authority submission
+      // still close the menu because they have no local skill-card cancel.
+      const keepSkillMenu = !!(pendingSkill && !pendingCardAction && !targetSubmissionPending)
+      if (!piece || piece.currentHp <= 0 || (isTargeting && !keepSkillMenu) || trainingOpen || dismissedPieceContextId === piece.instanceId) {
         closePieceContextMenu()
         return
       }
@@ -6509,7 +7181,7 @@
       document.getElementById('pieceContextHp').textContent = pieceDispHp(piece) + '/' + pieceMaxHp(piece)
       menu.dataset.pieceId = piece.instanceId
 
-      const skillButtons = skills.length ? skills.map(sk => {
+      const skillEntries = skills.length ? skills.map(sk => {
         const sid = skillIdOf(sk)
         const availability = resolveSkillAvailability(piece, sk)
         const skData = availability.skillData
@@ -6533,7 +7205,7 @@
         }
         if (availability.unavailableReason) titleParts.push('不可用：' + availability.unavailableReason)
 
-        return '<button type="button" class="piece-context-skill' + (isCharge ? ' is-charge' : '') +
+        return { key: sid, html: '<button type="button" class="piece-context-skill' + (isCharge ? ' is-charge' : '') +
           '" data-skill-id="' + escHtml(sid) + '"' +
           ' onclick="dispatchBattleIntent({type:\'select-skill\',skillId:this.dataset.skillId})"' +
           ' title="' + escHtml(titleParts.join('\n')) + '"' +
@@ -6543,9 +7215,10 @@
           '<span class="piece-context-skill-cost">' +
             (status || ('行动 ' + apCost + (isCharge ? ' · 充能 ' + skillChargeCostLabel(piece, skData) : ''))) +
             (isCharge && skillHasDynamicChargeCost(skData) ? ' <span class="skill-cost-dynamic">动态</span>' : '') +
-          '</span></button>'
-      }).join('') : '<span class="piece-context-empty">' + (isOwner ? '暂无主动技能' : '查看详情') + '</span>'
-      skillsContainer.innerHTML = skillButtons
+          '</span></button>' }
+      }) : [{ key: 'empty', html: '<span class="piece-context-empty" data-skill-id="empty">' + (isOwner ? '暂无主动技能' : '查看详情') + '</span>' }]
+      if (window.BattleDomPatch) window.BattleDomPatch.patchKeyed(skillsContainer, skillEntries, { datasetKey: 'skillId' })
+      else skillsContainer.innerHTML = skillEntries.map(function (entry) { return entry.html }).join('')
 
       menu.classList.add('is-open')
       menu.setAttribute('aria-hidden', 'false')
@@ -6588,7 +7261,7 @@
         return
       }
 
-      container.innerHTML = hand.map((card, index) => {
+      const handEntries = hand.map((card, index) => {
         const def = getCardDisplayDefinition(card.cardId)
         const cardPresentation = card.presentation && typeof card.presentation === 'object' ? card.presentation : {}
         const isContentEnhanced = cardPresentation.variant === 'enhanced'
@@ -6615,15 +7288,17 @@
           ? cardName + (isHandChoiceCandidate ? (isHandChoiceSelected ? '，已选择' : '，可选择') : '，不可选择')
           : cardName + (cardPresentation.badge ? '，' + cardPresentation.badge : '') + '，行动点 ' + cost
         const arc = window.BattleContextLayout.handArc(index, hand.length)
-        return `<button type="button" class="${cls}" style="--hand-arc-angle:${arc.angle}deg;--hand-arc-lift:${arc.lift}px;--hand-arc-z:${arc.zIndex}"
+        return { key: card.instanceId, html: `<button type="button" class="${cls}" style="--hand-arc-angle:${arc.angle}deg;--hand-arc-lift:${arc.lift}px;--hand-arc-z:${arc.zIndex}"
           data-instance-id="${cid}" aria-label="${escHtml(cardAriaLabel)}" aria-pressed="${isHandSelection ? isHandChoiceSelected : isPending}" aria-disabled="${!canInteract}"${progressiveBlocked ? ' disabled' : ''}
           onclick="if(!consumeCardPressClick('${cid}'))onCardClick('${cid}','${cdid}')"
           ontouchstart="startCardPressTimer(event,'${cid}','${cdid}')"
           ontouchend="clearPressTimer()" ontouchcancel="clearPressTimer()" ontouchmove="moveCardPressTimer(event)"
           oncontextmenu="event.preventDefault();showCardDetail('${cid}','${cdid}')">
           ${renderHandCardFace(card, def)}
-        </button>`
-      }).join('')
+        </button>` }
+      })
+      if (window.BattleDomPatch) window.BattleDomPatch.patchKeyed(container, handEntries, { datasetKey: 'instanceId' })
+      else container.innerHTML = handEntries.map(function (entry) { return entry.html }).join('')
       renderPendingHandSelectionControls()
     }
 
@@ -6986,9 +7661,290 @@
     }
 
     // ── Cell click ──
+    let skillPreviewController = null
+    let skillDragController = null
+    let hoverSkillPreviewReplayScheduled = false
+    let skillPreviewReplayScheduled = false
+    let skillPreviewReplayContext = null
+    let skillPreviewReplayGeneration = 0
+    const skillPreviewDisplayTimings = []
+
+    function invalidateSkillPreviewReplay() {
+      skillPreviewReplayContext = null
+      skillPreviewReplayGeneration += 1
+    }
+
+    function clearSkillPreview(options) {
+      if (!options || options.preserveReplay !== true) invalidateSkillPreviewReplay()
+      else if (skillPreviewReplayContext) skillPreviewReplayContext.redrawPending = true
+      if (skillPreviewController) skillPreviewController.clear()
+    }
+
+    function skillPreviewAuthorityRevision(snapshot) {
+      const revision = Number(snapshot && snapshot.targetingRevision)
+      return Number.isSafeInteger(revision) && revision >= 0 ? revision : 0
+    }
+
+    function skillPreviewPendingStateRevision(skill) {
+      const baseAction = skill && skill.baseAction
+      if (baseAction && baseAction.stateRevision !== undefined) return baseAction.stateRevision
+      if (skill && skill.rootAction && skill.rootAction.stateRevision !== undefined) return skill.rootAction.stateRevision
+      if (skill && skill.preparation && skill.preparation.stateRevision !== undefined) return skill.preparation.stateRevision
+      if (skill && skill.rootStateRevision !== undefined) return skill.rootStateRevision
+      return undefined
+    }
+
+    function skillPreviewHistoryViewActive() {
+      return typeof document !== 'undefined'
+        && document.body
+        && document.body.classList
+        && typeof document.body.classList.contains === 'function'
+        && document.body.classList.contains('is-viewing-history')
+    }
+
+    function skillPreviewReplayIsCurrent(context, generation) {
+      const skill = pendingSkill
+      const baseAction = skill && skill.baseAction
+      return !!context
+        && context.redrawPending === true
+        && !battlePageDisposed
+        && context === skillPreviewReplayContext
+        && generation === skillPreviewReplayGeneration
+        && !skillPreviewHistoryViewActive()
+        && context.snapshot === G
+        && context.authorityRevision === skillPreviewAuthorityRevision(G)
+        && context.pendingSkill === skill
+        && context.selectedPieceId === selectedPieceId
+        && context.viewerId === myPlayerId
+        && context.skillId === (skill && skill.skillId)
+        && context.pieceId === (baseAction && baseAction.pieceId)
+        && context.previewOnly === !!(skill && skill.previewOnly)
+        && context.previewOrigin === (skill && skill.previewOrigin)
+        && context.stateRevision === skillPreviewPendingStateRevision(skill)
+    }
+
+    function scheduleSkillPreviewReplayAfterRedraw() {
+      const context = skillPreviewReplayContext
+      if (!context || context.redrawPending !== true || skillPreviewReplayScheduled) return
+      const generation = skillPreviewReplayGeneration
+      skillPreviewReplayScheduled = true
+      const replay = function () {
+        skillPreviewReplayScheduled = false
+        if (!skillPreviewReplayIsCurrent(context, generation)) {
+          if (skillPreviewReplayContext === context) invalidateSkillPreviewReplay()
+          if (skillPreviewReplayContext && skillPreviewReplayContext.redrawPending === true) {
+            scheduleSkillPreviewReplayAfterRedraw()
+          }
+          return
+        }
+        context.redrawPending = false
+        previewSkillTarget(context.targetX, context.targetY)
+      }
+      if (typeof requestAnimationFrame === 'function') requestAnimationFrame(replay)
+      else setTimeout(replay, 0)
+    }
+
+    function replayHoverSkillPreviewAfterViewport() {
+      if (hoverSkillPreviewReplayScheduled
+        || !pendingSkill
+        || pendingSkill.previewOnly !== true
+        || pendingSkill.previewOrigin !== 'hover') return
+      hoverSkillPreviewReplayScheduled = true
+      const replay = function() {
+        hoverSkillPreviewReplayScheduled = false
+        if (battlePageDisposed || !pendingSkill
+          || pendingSkill.previewOnly !== true
+          || pendingSkill.previewOrigin !== 'hover') return
+        previewSkillTarget(null, null)
+      }
+      if (typeof requestAnimationFrame === 'function') requestAnimationFrame(replay)
+      else setTimeout(replay, 0)
+    }
+
+    function previewSkillTarget(x, y) {
+      const renderer = window.BattleRenderer3D
+      const previewOnly = !!(pendingSkill && pendingSkill.previewOnly)
+      const hasEligibleTarget = !!(pendingSkill && pendingSkill.validTargets && pendingSkill.validTargets.has(x + ',' + y))
+      if (!_use3d || !renderer || !pendingSkill || !pendingSkill.baseAction || !pendingSkill.skillId ||
+          pendingSkill.turnTargetActionType || pendingSkill.preparation && pendingSkill.preparation.selectionMode === 'multi' ||
+          targetSubmissionPending || waitingForOtherPending() ||
+          skillPreviewHistoryViewActive() ||
+          previewOnly && pendingSkill.previewEligible !== true ||
+          !previewOnly && !hasEligibleTarget ||
+          typeof GameEngine === 'undefined' || !GameEngine.previewBattleAction) {
+        clearSkillPreview()
+        return
+      }
+      if (!skillPreviewController) {
+        const badge = document.createElement('div')
+        badge.className = 'skill-preview-badge'
+        badge.setAttribute('role', 'status')
+        badge.hidden = true
+        document.body.appendChild(badge)
+        skillPreviewController = BattleSkillPreview.create({
+          compute: request => GameEngine.previewBattleAction(request.snapshot, request.action, request.viewerId),
+          restore: () => { renderer.clearPreviewBoard(); badge.hidden = true },
+          notice: result => {
+            badge.hidden = false
+            badge.textContent = result.status === 'needs-input' ? '还需选择 · 暂不预演' : '此效果暂不预演'
+          },
+          onError: (error, request) => console.warn('[skill-preview]', {
+            skillId: request.action.skillId, revision: request.revision, reason: String(error.message || error)
+          }),
+          show: (result, request) => {
+            const displayStarted = performance.now()
+            const authority = currentBattleViewModel
+            const predicted = createBattlePresentationModel(result.snapshot)
+            if (!predicted || !authority) return
+            predicted.selection = authority.selection
+            predicted.interaction = authority.interaction
+            predicted.legal = authority.legal
+            predicted.interactionPieces = authority.pieces
+            renderer.showPreviewBoard(predicted, authority)
+            badge.hidden = false
+            badge.textContent = '公开效果预演 · 点击或松手释放'
+            badge.title = '只显示已知的确定性效果；实际结算可能受到隐藏效果影响'
+            const paths = []
+            const presentationPaths = []
+            ;(result.events || []).forEach(event => {
+              const value = event.result || {}
+              const ids = event.targetPieceIds || (event.sourcePieceId ? [event.sourcePieceId] : [])
+              ids.forEach(id => {
+                const piece = predicted.pieces.find(p => p.id === id) || authority.pieces.find(p => p.id === id)
+                if (!piece) return
+                let text = '', color = '#ffe69b'
+                if (event.kind === 'damage' || event.kind === 'heal') {
+                  const amount = Math.abs(Number(value.amount) || 0)
+                  if (amount) text = (event.kind === 'heal' ? '+' : '−') + amount
+                  color = event.kind === 'heal' ? '#4ade80' : '#f87171'
+                } else if (event.kind === 'statusAdded') text = event.label || '获得效果'
+                else if (event.kind === 'death' || event.kind === 'eliminated') text = '阵亡'
+                else if (event.kind === 'block') text = event.label || '阻挡'
+                else if (event.kind === 'statChanged') {
+                  const names = { attack: '攻击', defense: '防御', moveRange: '移动范围', maxHp: '生命上限' }
+                  const amount = Number(value.amount)
+                  if (names[value.attribute] && Number.isFinite(amount) && amount) text = names[value.attribute] + (amount > 0 ? '+' : '') + amount
+                }
+                if (text) renderer.spawnFloater(piece.x, piece.y, text, color, false, { kind: event.kind, preview: true })
+              })
+              if ((event.kind === 'move' || event.kind === 'forceMove') && Number.isFinite(value.fromX) && Number.isFinite(value.toX)) {
+                paths.push({ x: value.fromX, y: value.fromY, role: 'source' },
+                  { x: value.toX, y: value.toY, role: 'target', fromX: value.fromX, fromY: value.fromY })
+              }
+              if (event.presentation && event.presentation.pathCells && event.presentation.pathCells.length) {
+                const path = event.presentation.pathCells
+                presentationPaths.push({ source: path[0], end: event.presentation.endPoint || path[path.length - 1], selected: event.presentation.selectedCell })
+              }
+              if (event.presentation && event.presentation.areaCells && event.presentation.areaCells.length) {
+                renderer.showPresentationAreaFlash(event.presentation.areaCells)
+              }
+            })
+            if (paths.length) renderer.setHistoryHighlight(paths)
+            if (presentationPaths.length) {
+              if (typeof renderer.showPresentationPaths === 'function') renderer.showPresentationPaths(presentationPaths)
+              else if (typeof renderer.showPresentationPath === 'function') presentationPaths.forEach(path => renderer.showPresentationPath(path))
+            }
+            const timing = { durationMs: performance.now() - displayStarted, nextFrameMs: null }
+            skillPreviewDisplayTimings.push(timing)
+            if (skillPreviewDisplayTimings.length > 64) skillPreviewDisplayTimings.shift()
+            requestAnimationFrame(() => { timing.nextFrameMs = performance.now() - displayStarted })
+          }
+        })
+      }
+      let action
+      if (!previewOnly) {
+        const piece = G.pieces.find(p => p.x === x && p.y === y && p.currentHp > 0)
+        if (pendingSkill.localChoiceDraft === true) {
+          const root = localSkillRootAction(pendingSkill)
+          const choices = localSkillChoices(pendingSkill)
+          const choice = localSkillTargetChoice(pendingSkill, piece, x, y, pendingSkill.preparation)
+          if (localSkillUsesRootInput(pendingSkill)) _appendTargetToAction(root, piece, x, y, pendingSkill.preparation && pendingSkill.preparation.targetType)
+          else choices.push(choice)
+          action = localSkillBatchAction(pendingSkill, root, choices)
+        } else {
+          action = Object.assign({}, pendingSkill.baseAction)
+          if (action.extraTargets) action.extraTargets = action.extraTargets.slice()
+          _appendTargetToAction(action, piece, x, y, pendingSkill.preparation && pendingSkill.preparation.targetType)
+        }
+      } else {
+        action = pendingSkill.localChoiceDraft === true
+          ? localSkillBatchAction(pendingSkill)
+          : Object.assign({}, pendingSkill.baseAction)
+      }
+      skillPreviewController.request({ snapshot: G, action, viewerId: myPlayerId,
+        key: JSON.stringify(action), revision: action.stateRevision })
+      skillPreviewReplayContext = {
+        snapshot: G,
+        authorityRevision: skillPreviewAuthorityRevision(G),
+        pendingSkill: pendingSkill,
+        selectedPieceId: selectedPieceId,
+        viewerId: myPlayerId,
+        skillId: pendingSkill.skillId,
+        pieceId: action.pieceId,
+        previewOnly: previewOnly,
+        previewOrigin: pendingSkill.previewOrigin,
+        stateRevision: skillPreviewPendingStateRevision(pendingSkill),
+        targetX: x,
+        targetY: y,
+        redrawPending: false,
+      }
+      skillPreviewReplayGeneration += 1
+    }
+
+    function endSkillCardPreview(skId) {
+      if (skillSelectionSwitchBlocked() || !pendingSkill
+        || pendingSkill.previewOnly !== true || pendingSkill.previewOrigin !== 'hover'
+        || String(pendingSkill.skillId || '') !== String(skId || '')) return false
+      clearTargetInteraction('skill-hover-leave')
+      renderBoard()
+      renderActionBar()
+      return true
+    }
+
+    function previewSkillCard(skId) {
+      if (!selectedPieceId || !skId || !G || skillSelectionSwitchBlocked()) return false
+      if (typeof progressiveDeploymentPending === 'function' && progressiveDeploymentPending(G)) return false
+      const sp = G.pieces.find(p => p.instanceId === selectedPieceId)
+      if (!sp) return false
+      const skData = skillDefOf(skId)
+      if (!skData || skData.type === 'passive' || skData.kind === 'passive') return false
+      const availability = resolveSkillAvailability(sp, skId)
+      if (!availability.available) return false
+      if (pendingSkill && pendingSkill.skillId === skId) return true
+
+      // Only another transient hover may replace a hover preview. Pointer
+      // travel across the menu must not cancel an activated target draft.
+      if (pendingSkill && pendingSkill.previewOrigin !== 'hover') return false
+
+      // Let the public preparation surface classify the root. Hover may show
+      // a ready no-input action, but a target/option prompt stays dormant
+      // until an explicit activation owns the first answer.
+      if (pendingSkill) {
+        clearTargetInteraction('skill-hover-switch')
+        setMoveButtonClass(false)
+        closePieceContextMenu()
+      }
+      const draftAction = {
+        type: skillUsesCharge(skData) ? 'useChargeSkill' : 'useBasicSkill',
+        playerId: myPlayerId,
+        pieceId: selectedPieceId,
+        skillId: skId,
+      }
+      if (typeof tutorialActionAllowed === 'function' && !tutorialActionAllowed(draftAction)) return false
+      const rootPreparation = prepareLocalSkillAction(draftAction, {
+        skillId: skId,
+        rootAction: draftAction,
+      }, [])
+      if (!rootPreparation || rootPreparation.status !== 'ready') return false
+      setMoveButtonClass(false)
+      closePieceContextMenu()
+      return enterPreviewOnlySkillMode(draftAction, skData, 'hover')
+    }
+
     function handleBattleIntent(intent) {
       if (!intent) return
       if (intent.type === 'hover-cell') {
+        if (pendingSkill || intent.x == null) previewSkillTarget(intent.x, intent.y)
         if (!pendingMove || !validMoves.has(intent.x + ',' + intent.y) || waitingForOtherPending()) return
         if (typeof GameEngine === 'undefined' || !GameEngine.applyBattleAction) return
         try {
@@ -7004,10 +7960,13 @@
         return
       }
       if (intent.type === 'viewport-change') {
+        clearSkillPreview()
+        replayHoverSkillPreviewAfterViewport()
         schedulePieceContextMenuPosition()
         return
       }
       if (intent.type === 'activate-cell') {
+        clearSkillPreview()
         const result = onCellClick(intent.x, intent.y)
         if (TUTORIAL_MODE && tutorialRuntime) tutorialRuntime.afterIntent(intent)
         return result
@@ -7158,6 +8117,7 @@
         delete action.preparation
         delete action.validTargets
         const targetLabel = currentTargetSourceName()
+        rememberTargetInteraction()
         pendingCardAction = null
         submitTargetAction(action, targetLabel)
         return
@@ -7189,6 +8149,7 @@
         }
         if (turnTargetType === 'piece' && piece) action.targetPieceId = piece.instanceId
         const targetLabel = currentTargetSourceName()
+        rememberTargetInteraction()
         pendingSkill = null
         setStatusMsg('已提交目标选择')
         renderBoard()
@@ -7208,13 +8169,37 @@
       }
 
       if (pendingSkill && selectedPieceId) {
-        // Only allow clicks on highlighted valid skill targets.
+        if (pendingSkill.localChoiceDraft === true && isPendingBoardMultiTarget()) {
+          if (pendingSkill.preparation.targetType === 'cell') {
+            togglePendingBoardCell(x, y)
+            return
+          }
+          if (!piece) {
+            setStatusMsg('请选择高亮的友方棋子')
+            return
+          }
+          togglePendingBoardTarget(piece)
+          return
+        }
+        // A no-target preview accepts a board release only as a release
+        // surface; the hovered cell must never become part of its action.
+        const previewOnly = pendingSkill.previewOnly === true
         const key = x + ',' + y
         const vt = pendingSkill.validTargets
-        if (vt && !vt.has(key)) {
-          // Invalid target: inspect a piece if present, otherwise show a hint.
-          if (piece) { selectPiece(piece.instanceId); return }
+        if (!previewOnly && vt && !vt.has(key)) {
+          // Invalid targets keep the active caster and draft so the next click can retry.
           setStatusMsg('目标不在技能范围内')
+          return
+        }
+        if (pendingSkill.localChoiceDraft === true) {
+          if (pendingSkill.localReady) {
+            return submitLocalSkillBatch(localSkillRootAction(pendingSkill), pendingSkill, localSkillChoices(pendingSkill))
+          }
+          if (!pendingSkill.preparation || pendingSkill.preparation.kind !== 'needTarget') {
+            setStatusMsg('请先完成当前选项')
+            return
+          }
+          advanceLocalSkillTarget(piece, x, y)
           return
         }
         // Build action from baseAction when available, or create a fresh action.
@@ -7228,9 +8213,19 @@
               pieceId: selectedPieceId,
               skillId: pendingSkill.skillId
             }
+        if (previewOnly) {
+          // A no-target preview never receives the hovered cell as a target.
+          // Release the prepared root action exactly once through doAction.
+          pendingSkill = null
+          clearSkillPreview()
+          renderBoard(); renderActionBar(); renderTargetOverlay()
+          void doAction(action)
+          return
+        }
         // Set target using the first flat slot, then append later selectTarget calls to extraTargets.
         _appendTargetToAction(action, piece, x, y, pendingSkill.preparation && pendingSkill.preparation.targetType)
         const targetLabel = currentTargetSourceName()
+        rememberTargetInteraction()
         pendingSkill = null
         submitTargetAction(action, targetLabel)
         return
@@ -7276,12 +8271,16 @@
     }
 
     function selectPiece(instanceId) {
-      if (pendingActionFeedback) {
+      if (typeof pendingActionFeedback !== 'undefined' && pendingActionFeedback) {
         setStatusMsg('指令仍在等待权威确认，暂不能切换棋子')
         return
       }
       if (targetSubmissionPending) {
         setStatusMsg('目标指令已提交，正在等待权威确认')
+        return
+      }
+      if (pendingSkill || pendingCardAction) {
+        setStatusMsg('请先完成当前目标选择')
         return
       }
       if (G && G.deployment && G.deployment.status === 'awaiting-locks') {
@@ -7305,7 +8304,17 @@
         }
       }
       if (selectedPieceId === instanceId) {
+        const pieceDock = document.getElementById('pieceInfoModal')
+        const shouldClosePieceDock = !!(pieceDock
+          && pieceDock.classList.contains('character-dock')
+          && pieceDock.style.display !== 'none')
         clearPieceSelection()
+        // The compact board menu and the character reading dock are separate
+        // surfaces. A second click on the selected board piece dismisses both
+        // so the following click can open the menu again.
+        if (shouldClosePieceDock && typeof window.closePieceInfo === 'function') {
+          window.closePieceInfo({ restoreFocus: false })
+        }
         return
       }
       if (G && (pendingTargetSelectionForMe() || pendingOptionSelectionForMe())) {
@@ -7352,14 +8361,62 @@
         setStatusMsg('目标指令已提交，正在等待权威确认')
         return
       }
+      if (typeof pendingActionFeedback !== 'undefined' && pendingActionFeedback) {
+        setStatusMsg('上一条指令仍在等待权威确认')
+        return
+      }
       const sp = G.pieces.find(p => p.instanceId === selectedPieceId)
       if (!sp) return
       const skData = skillDefOf(skId)
       const isCharge = skillUsesCharge(skData)
       const actionType = isCharge ? 'useChargeSkill' : 'useBasicSkill'
+      const authoritativeSelection = G.pendingTargetSelection || G.pendingOptionSelection
+
+      // An explicit click is the only path allowed to cancel an
+      // authoritative selection. The shared cancel routine sends the
+      // selection id/revision and keeps server state in control.
+      if (authoritativeSelection) {
+        if (authoritativeSelection.canCancel === false) {
+          setStatusMsg('请先完成当前规则选择')
+          return
+        }
+        cancelTargetSelection()
+        return
+      }
 
       // Toggle off: clicking the active skill again cancels selection
       if (pendingSkill && pendingSkill.skillId === skId) {
+        if (pendingSkill.localChoiceDraft && pendingSkill.localReady) {
+          return submitLocalSkillBatch(localSkillRootAction(pendingSkill), pendingSkill, localSkillChoices(pendingSkill))
+        }
+        if (pendingSkill.previewOrigin === 'hover') {
+          if (pendingSkill.previewOnly) {
+            const previewAction = Object.assign({}, pendingSkill.baseAction)
+            const previewSkillData = skillDefOf(pendingSkill.skillId)
+            const publicRootPreparation = prepareLocalSkillAction(previewAction, pendingSkill, localSkillChoices(pendingSkill))
+            if (publicRootPreparation && publicRootPreparation.status === 'needs-input'
+              && publicRootPreparation.preparation) {
+              clearSkillPreview()
+              if (installLocalSkillDraft(
+                previewAction,
+                previewSkillData,
+                publicRootPreparation.preparation,
+                'click',
+                localSkillRootAction(pendingSkill),
+                localSkillChoices(pendingSkill),
+              )) return
+            }
+            clearTargetInteraction('skill-preview-clicked')
+            setMoveButtonClass(false)
+            closePieceContextMenu()
+            await doAction(previewAction)
+            return
+          }
+          pendingSkill.previewOrigin = 'click'
+          renderBoard(); renderActionBar(); renderTargetOverlay()
+          setStatusMsg(_targetPromptText() || '选择技能目标')
+          return
+        }
         clearTargetInteraction('active-skill-cancelled')
         pendingMove = false
         setMoveButtonClass(false)
@@ -7375,7 +8432,12 @@
       }
 
       const draftAction = { type: actionType, playerId: myPlayerId, pieceId: selectedPieceId, skillId: skId }
-      const localTargetProbe = window.BattleLegalActions && typeof GameEngine !== 'undefined'
+      if (typeof tutorialActionAllowed === 'function' && !tutorialActionAllowed(draftAction)) return
+      const publicRootPreparation = prepareLocalSkillAction(draftAction, {
+        skillId: skId,
+        rootAction: draftAction,
+      }, [])
+      const localTargetProbe = !publicRootPreparation && window.BattleLegalActions && typeof GameEngine !== 'undefined'
         ? BattleLegalActions.probeSkillTarget({
             snapshot: G,
             playerId: myPlayerId,
@@ -7385,16 +8447,40 @@
             engine: GameEngine,
           })
         : null
-      if (typeof tutorialActionAllowed === 'function' && !tutorialActionAllowed(draftAction)) return
       clearTargetInteraction('skill-selected')
       setMoveButtonClass(false)
-      closePieceContextMenu()
+      if (publicRootPreparation && publicRootPreparation.status === 'needs-input'
+        && publicRootPreparation.preparation
+        && installLocalSkillDraft(draftAction, skData, publicRootPreparation.preparation, 'click')) return
+      if (publicRootPreparation && publicRootPreparation.status !== 'needs-input') {
+        closePieceContextMenu()
+        await doAction(draftAction)
+        return
+      }
+      if (localTargetProbe && localTargetProbe.needsTarget && localTargetProbe.preparation) {
+        const preparation = normalizeLocalSkillPreparation(
+          { status: 'needs-input', preparation: localTargetProbe.preparation },
+          { skillId: skId, rootAction: draftAction },
+        )
+        if (preparation && preparation.preparation
+          && installLocalSkillDraft(draftAction, skData, preparation.preparation, 'click')) return
+        // Older bundles have no public local preparation surface. Preserve the
+        // existing authority target flow instead of fabricating a prompt.
+        if (typeof GameEngine === 'undefined' || typeof GameEngine.preparePublicSkillAction !== 'function') {
+          if (enterActionTargetMode(draftAction, localTargetProbe.preparation)) return
+        }
+      }
+      const initialOptionPreparation = localSkillInitialOptionPreparation(draftAction, skData)
+      if (initialOptionPreparation && installLocalSkillDraft(draftAction, skData, initialOptionPreparation, 'click')) return
       // This is presentation-only prediction: the final targeted command is
       // still validated by the Colyseus authority. The structured rejection
       // fallback handles any client/server content drift.
       if (localTargetProbe && localTargetProbe.needsTarget && localTargetProbe.preparation) {
-        if (enterActionTargetMode(draftAction, localTargetProbe.preparation)) return
+        if (typeof GameEngine === 'undefined' || typeof GameEngine.preparePublicSkillAction !== 'function') {
+          if (enterActionTargetMode(draftAction, localTargetProbe.preparation)) return
+        }
       }
+      closePieceContextMenu()
       await doAction(draftAction)
     }
 
@@ -7569,12 +8655,14 @@
           const rawErrMsg = e.message || String(e) || '操作失败'
           const errMsg = (typeof e.code === 'string' && e.code.indexOf('TARGET_') === 0 || /不可行走|not walkable|没有合法|无合法/i.test(rawErrMsg)) ? '没有合法地格' : rawErrMsg
           red50Evidence.rejections.push({ code: e.code || '', message: errMsg, at: Date.now() })
+          const retainTarget = shouldRetainTargetAfterRejection(action, e)
           const rejectedPending = (
             (action.type === 'pendingTargetSelect' && G && G.pendingTargetSelection)
             || (action.type === 'pendingOptionSelect' && G && G.pendingOptionSelection)
           )
-          if (rejectedPending) {
-            targetSubmissionPending = null
+          if ((rejectedPending && targetRejectionCanRetry(e.code)) || retainTarget) {
+            if (retainTarget) releaseTargetSubmissionForRetry(targetSubmissionPending)
+            else targetSubmissionPending = null
             _pendingChoiceShown = null
             rejectionFeedback = '选择被拒绝：' + errMsg + '；请重新选择'
             rejectPendingActionFeedback(
@@ -7629,17 +8717,17 @@
         && RvBColyseus.isAuthoritySyncing
         && RvBColyseus.isAuthoritySyncing()
       ) {
-        setStatusMsg('正在同步服务端状态，请等待完成后重新操作')
+        rejectUnsentTargetSubmission('authority-syncing', '正在同步服务端状态；指令未发送，选择已保留')
         return
       }
       action = withClientActionId(action)
+      const wasTargetSubmission = typeof targetSubmissionPending !== 'undefined' && !!targetSubmissionPending
       if (typeof beginPendingActionFeedback === 'function' && !beginPendingActionFeedback(action)) return
       if (TRAINING_MODE) { await trainingDoAction(action); return }
       const url = getServerUrl()
       if (!url) {
-        rejectPendingActionFeedback('transport-unavailable', '未连接服务器；目标选择已清除')
+        rejectUnsentTargetSubmission('transport-unavailable', '未连接服务器；指令未发送，请连接后重新选择')
         addLog('未连接服务器', 'err')
-        setStatusMsg('未连接服务器；目标选择已清除')
         return
       }
       if (!G) {
@@ -7647,6 +8735,7 @@
         addLog('游戏状态未就绪', 'err')
         return
       }
+      let authoritySendStarted = false
       try {
         document.getElementById('btnEnd').disabled = true
         setMoveButtonDisabled(true)
@@ -7655,24 +8744,36 @@
         // Submit every authority action through the active Colyseus room.
         if (colyseusConnected && typeof RvBColyseus !== 'undefined' && RvBColyseus.isConnected()) {
           var actionAuth = await createBattleActionAuth(action)
+          authoritySendStarted = true
           var submitted = RvBColyseus.send(battleAuthorityCommandMessage(action, actionAuth))
           if (submitted === false) {
-            rejectPendingActionFeedback('authority-syncing', '正在同步服务端状态；本次操作未发送')
+            rejectUnsentTargetSubmission('authority-syncing', '正在同步服务端状态；本次操作未发送，请稍后重选')
             return
           }
           schedulePendingActionPresentation()
           if (action.pieceId && G.pieces.some(p => p.instanceId === action.pieceId && p.currentHp > 0)) {
             selectedPieceId = action.pieceId
           } else if (action.type === 'endTurn' || action.type === 'beginPhase') { selectedPieceId = null }
-          pendingSkill = null; pendingCardAction = null; restoreSelectedPieceMenu({ reopen: action.type === 'move' })
+          if (!wasTargetSubmission) { pendingSkill = null; pendingCardAction = null }
+          restoreSelectedPieceMenu({ reopen: action.type === 'move' })
           return
         }
 
         addLog('Colyseus 未连接，无法发送动作；请检查网络和服务端', 'err')
-        rejectPendingActionFeedback('transport-unavailable', 'Colyseus 未连接；目标选择已清除')
+        rejectUnsentTargetSubmission('transport-unavailable', 'Colyseus 未连接；指令未发送，请连接后重新选择')
         renderActionBar()
-        setStatusMsg('Colyseus 未连接；目标选择已清除')
       } catch (e) {
+        if (targetSubmissionPending) {
+          if (!authoritySendStarted) {
+            rejectUnsentTargetSubmission('transport-failed', '指令未发送：' + e.message + '；请修正后重新选择')
+            addLog('指令构造失败：' + e.message, 'err')
+            return
+          }
+          requestAuthorityRecovery('transport-failed', targetSubmissionPending.clientActionId)
+          addLog('发送结果待确认：' + e.message, 'err')
+          setStatusMsg('发送结果待确认，正在同步服务端状态；请勿重复操作')
+          return
+        }
         rejectPendingActionFeedback('transport-failed', '发送动作失败：' + e.message + '；目标选择已清除')
         addLog('发送动作失败：' + e.message, 'err')
         renderActionBar()
@@ -7869,6 +8970,13 @@
     })
     let lastDmFeedback = { key: '', at: 0 }
     let dmFeedbackTimer = null
+    let battleFeedbackAudio = null
+    function ensureBattleFeedbackAudio() {
+      if (!battleFeedbackAudio && window.BattleAudio && typeof window.BattleAudio.create === 'function') {
+        battleFeedbackAudio = window.BattleAudio.create()
+      }
+      return battleFeedbackAudio
+    }
     function dmFeedbackLine(msg) {
       const text = String(msg || '')
       if (/不是你的回合|当前回合不属于你/.test(text)) return '你现在还不能行动。'
@@ -7890,9 +8998,13 @@
       const line = dmFeedbackLine(msg)
       if (!line) return
       const now = Date.now()
-      const key = line + '|' + String(msg)
+      const key = line
       if (lastDmFeedback.key === key && now - lastDmFeedback.at < 700) return
       lastDmFeedback = { key, at: now }
+      const aiming = (typeof pendingSkill !== 'undefined' && pendingSkill)
+        || (typeof pendingCardAction !== 'undefined' && pendingCardAction)
+      const prompt = document.getElementById('targetPromptText')
+      if (aiming && prompt) prompt.textContent = line
       const bubble = document.getElementById('dmBubble')
       if (!bubble) return
       bubble.textContent = line
@@ -7903,10 +9015,10 @@
       dmFeedbackTimer = setTimeout(() => {
         bubble.classList.remove('is-visible')
         bubble.setAttribute('aria-hidden', 'true')
-      }, 1800)
-      if (window.speechSynthesis && !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
-        try { window.speechSynthesis.cancel(); const utterance = new SpeechSynthesisUtterance(line); utterance.lang = 'zh-CN'; utterance.rate = 1.08; window.speechSynthesis.speak(utterance) } catch (_) {}
-      }
+        if (aiming) renderTargetOverlay()
+      }, 3000)
+      const feedbackAudio = ensureBattleFeedbackAudio()
+      if (feedbackAudio) feedbackAudio.play('invalid')
       if (TIMER_PREVIEW_MODE && !authoritativeTurnTimer && !authoritativePendingTimer) {
         deadlines.push(Number(TIMER_PREVIEW_TIMER.deadlineAt), Number(TIMER_PREVIEW_TIMER.burnStartsAt))
       }
@@ -7915,6 +9027,10 @@
       const el = document.getElementById('statusMsg')
       const shown = waitingForOtherPending() ? '等待对方操作' : msg
       if (el) el.textContent = shown
+      const aiming = (typeof pendingSkill !== 'undefined' && pendingSkill)
+        || (typeof pendingCardAction !== 'undefined' && pendingCardAction)
+      const prompt = document.getElementById('targetPromptText')
+      if (aiming && prompt) prompt.textContent = shown
       showDmFeedback(shown)
     }
     function showMsg(msg, type) {
@@ -8086,6 +9202,7 @@
     // ── Start ──
     // ── Dynamic cell sizing ───────────────────────────────────────────────────
     function recalcCellSize() {
+      if (legacyFloaterLayout) legacyFloaterLayout.resize()
       if (_use3d && battlePresentation) { battlePresentation.resize(); return }
       if (!G || !G.map) return
       const cols = G.map.width
@@ -8123,6 +9240,7 @@
     }
     window.addEventListener('load', () => {
       try {
+      ensureBattleFeedbackAudio()
       if (!window.THREE || !window.BattleRenderer3D) throw new Error('三维渲染组件未加载，请重试或检查应用更新')
       const renderer = window.BattleRenderer3D
       battleDomUi = BattleDomUI.create({ document, onTurnAnnounce: showTurnAnnounce })
@@ -8173,6 +9291,58 @@
         historyDock: document.getElementById('actionHistoryDock'),
       })
       _use3d = true
+      skillDragController = BattleSkillDrag.create({
+        root: document,
+        resolve: button => button.dataset.targetMode ? null : ({ skillId: button.dataset.skillId, pieceId: selectedPieceId }),
+        arm: context => {
+          if (!G || context.pieceId !== selectedPieceId || targetSubmissionPending || pendingActionFeedback || skillSelectionSwitchBlocked()) return false
+          const piece = G.pieces.find(p => p.instanceId === context.pieceId)
+          if (!piece || !resolveSkillAvailability(piece, context.skillId).available) return false
+          if (pendingSkill && pendingSkill.skillId === context.skillId) {
+            if (pendingSkill.previewOnly === true && pendingSkill.previewOrigin === 'hover') pendingSkill.previewOrigin = 'drag'
+            return true
+          }
+          const draft = { type: skillUsesCharge(skillDefOf(context.skillId)) ? 'useChargeSkill' : 'useBasicSkill',
+            playerId: myPlayerId, pieceId: context.pieceId, skillId: context.skillId }
+           if (typeof tutorialActionAllowed === 'function' && !tutorialActionAllowed(draft)) return false
+           const publicRootPreparation = prepareLocalSkillAction(draft, {
+             skillId: context.skillId,
+             rootAction: draft,
+           }, [])
+           const probe = !publicRootPreparation ? BattleLegalActions.probeSkillTarget({ snapshot: G,
+             playerId: myPlayerId, pieceId: context.pieceId, skillId: context.skillId, skillsById, engine: GameEngine }) : null
+           if (!publicRootPreparation && !probe) return false
+          clearTargetInteraction('skill-drag-selected')
+          setMoveButtonClass(false)
+           if (publicRootPreparation && publicRootPreparation.status === 'needs-input'
+             && publicRootPreparation.preparation
+             && installLocalSkillDraft(draft, skillDefOf(context.skillId), publicRootPreparation.preparation, 'drag')) return true
+           if (publicRootPreparation) return enterPreviewOnlySkillMode(draft, skillDefOf(context.skillId), 'drag')
+           if (probe && probe.needsTarget) {
+            if (!probe.preparation) return false
+             const localPreparation = normalizeLocalSkillPreparation(
+               { status: 'needs-input', preparation: probe.preparation },
+               { skillId: context.skillId, rootAction: draft },
+             )
+             if (localPreparation && localPreparation.preparation
+               && installLocalSkillDraft(draft, skillDefOf(context.skillId), localPreparation.preparation, 'drag')) return true
+             closePieceContextMenu()
+             return enterActionTargetMode(draft, probe.preparation)
+          }
+           const initialOptionPreparation = localSkillInitialOptionPreparation(draft, skillDefOf(context.skillId))
+           if (initialOptionPreparation && installLocalSkillDraft(draft, skillDefOf(context.skillId), initialOptionPreparation, 'drag')) return true
+          return enterPreviewOnlySkillMode(draft, skillDefOf(context.skillId), 'drag')
+        },
+        cellAt: (x, y) => {
+          const rect = document.getElementById('boardStage3d').getBoundingClientRect()
+          if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) return null
+          return renderer.screenToCell(x, y)
+        },
+        preview: cell => cell ? previewSkillTarget(cell.x, cell.y) : clearSkillPreview(),
+        clear: clearSkillPreview,
+        release: cell => dispatchBattleIntent({ type: 'activate-cell', x: cell.x, y: cell.y }),
+        onError: error => console.warn('[skill-drag]', { reason: String(error.message || error) })
+      })
       init().catch(showBattleBootError)
       if (RED167_QA_MODE) {
         window.__RVB_RED167_REPLAY__ = playRed167QaSequence
@@ -8211,7 +9381,7 @@
         if (!target || typeof target.closest !== 'function') return true
         // A battlefield pointerup can synchronously advance a card to its next
         // target step before the matching click bubbles to document.
-        return !target.closest('.card-item, #boardWrap, #targetOverlay, #mobileDockToggle')
+        return !target.closest('.card-item, #boardWrap, #targetOverlay, #targetSelectionControls, #mobileDockToggle')
       }
 
       // Click outside the hand and battlefield to cancel card targeting.
@@ -8254,9 +9424,17 @@
       } catch (error) { showBattleBootError(error) }
     })
     function disposeBattlePage() {
+      legacyFloaterTimers.forEach(timer => clearTimeout(timer))
+      legacyFloaterTimers.clear()
+      if (legacyFloaterLayout) legacyFloaterLayout.clear()
+      document.querySelectorAll('#floatLayer .dmg-float').forEach(el => el.remove())
+      if (turnAnnounceTimer) { clearTimeout(turnAnnounceTimer); turnAnnounceTimer = null }
+      if (dmFeedbackTimer) { clearTimeout(dmFeedbackTimer); dmFeedbackTimer = null }
       if (ADVENTURE_MODE) disposeAdventureBattle()
       if (PRACTICE_MODE) disposePracticeBattle()
       battlePageDisposed = true
+      if (skillPreviewController) skillPreviewController.dispose()
+      if (skillDragController) skillDragController.dispose()
       cardDisplayMetadataRequests.clear()
       if (pollTimer) clearInterval(pollTimer)
       pollTimer = null
@@ -8264,15 +9442,17 @@
       clearPendingActionFeedback('page-dispose')
       deadlineStatusTimer = null
       if (battlePresentation) battlePresentation.dispose()
+      if (battleFeedbackAudio) { battleFeedbackAudio.dispose(); battleFeedbackAudio = null }
     }
     window.addEventListener('pagehide', disposeBattlePage)
     window.addEventListener('unload', disposeBattlePage)
+    window.addEventListener('blur', clearSkillPreview)
 
     document.addEventListener('keydown', handlePieceInfoModalKeydown)
 
     // Escape closes the existing tile details panel.
     document.addEventListener('keydown', e => {
-      if (e.key === 'Escape') {
+      if (e.key === 'Escape' && !e.defaultPrevented) {
         const tilePanel = document.getElementById('tileStatusPanel')
         if (tilePanel && tilePanel.style.display !== 'none') {
           e.preventDefault()
@@ -8283,16 +9463,14 @@
   </script>
 
 
-  <!-- Target selection overlay (pointer-events:none so board stays clickable) -->
+  <!-- Pure text instruction; actions remain in the skill reading panel. -->
   <div id="targetOverlay" role="status" aria-live="polite">
-    <div class="target-mode-card">
-      <div class="target-source-name" id="targetSourceName">当前技能</div>
-      <div class="target-prompt" id="targetPromptText">选择目标</div>
-      <div id="targetRangeLegend" hidden style="font-size:12px;color:#453727"><span style="color:#347b91">■</span> 施法范围 · 高亮目标可选</div>
+    <div class="target-prompt" id="targetPromptText">选择目标</div>
+  </div>
+  <div id="targetSelectionControls" role="group" aria-label="目标选择操作">
       <div class="target-multi-summary" id="targetMultiSummary" style="display:none"></div>
       <button type="button" class="target-confirm-btn" id="targetConfirmButton" style="display:none" onclick="dispatchBattleIntent({type:'confirm-target-selection'})">确认选择</button>
       <button type="button" class="target-cancel-btn" id="targetCancelButton" onclick="dispatchBattleIntent({type:'cancel-target'})">取消目标选择</button>
-    </div>
   </div>
 
   <!-- Fullscreen log overlay -->
