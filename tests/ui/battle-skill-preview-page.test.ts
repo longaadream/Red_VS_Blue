@@ -150,6 +150,7 @@ function createHarness(
     'var currentBattleViewModel = null',
     'var battlePageDisposed = false',
     'var skillPreviewController = null',
+    'var hoverSkillPreviewReplayScheduled = false',
     'var skillPreviewReplayScheduled = false',
     'var skillPreviewReplayContext = null',
     'var skillPreviewReplayGeneration = 0',
@@ -166,13 +167,17 @@ function createHarness(
     readNamedFunction(html, '_appendTargetToAction'),
     readNamedFunction(html, 'invalidateSkillPreviewReplay'),
     readNamedFunction(html, 'clearSkillPreview'),
+    readNamedFunction(html, 'skillPreviewViewportCell'),
     readNamedFunction(html, 'skillPreviewAuthorityRevision'),
     readNamedFunction(html, 'skillPreviewPendingStateRevision'),
     readNamedFunction(html, 'skillPreviewHistoryViewActive'),
     readNamedFunction(html, 'skillPreviewReplayIsCurrent'),
     readNamedFunction(html, 'scheduleSkillPreviewReplayAfterRedraw'),
+    readNamedFunction(html, 'replayHoverSkillPreviewAfterViewport'),
     readNamedFunction(html, 'previewSkillTarget'),
     readNamedFunction(html, 'endSkillCardPreview'),
+    'var schedulePieceContextMenuPosition = function () {}',
+    readNamedFunction(html, 'handleBattleIntent'),
     readNamedFunction(html, 'renderBoard'),
   ].join('\n')
   new Script(script, { filename: 'battle.html:skill-preview' }).runInContext(context as any)
@@ -217,6 +222,93 @@ describe('RED-224 battle page skill preview binding', () => {
     h.renderer.showPreviewBoard.mockClear()
 
     new Script('renderBoard()', { filename: 'battle.html:renderBoard' }).runInContext(h.context as any)
+
+    expect(h.renderer.showPreviewBoard).toHaveBeenCalledOnce()
+  })
+
+  it('replays a stationary targeted preview after a viewport change', () => {
+    const h = createHarness({ status: 'ready', snapshot: { revision: 8 }, events: [] }, { deferFrames: true })
+
+    preview(h, 2, 3)
+    h.flushAnimationFrames()
+    h.renderer.showPreviewBoard.mockClear()
+
+    new Script("handleBattleIntent({ type: 'viewport-change', hoveredCell: { x: 2, y: 3 } })", { filename: 'battle.html:viewport-change' })
+      .runInContext(h.context as any)
+    h.flushAnimationFrames()
+
+    expect(h.renderer.showPreviewBoard).toHaveBeenCalledOnce()
+  })
+
+  it('replays a targeted preview against the pointer cell remapped by the viewport', () => {
+    const h = createHarness({ status: 'ready', snapshot: { revision: 8 }, events: [] }, { deferFrames: true })
+    h.pendingSkill.validTargets.add('1,2')
+    h.context.G.pieces.push({ instanceId: 'target-b', x: 1, y: 2, currentHp: 5 })
+
+    preview(h, 2, 3)
+    h.flushAnimationFrames()
+    h.renderer.showPreviewBoard.mockClear()
+    h.engine.previewBattleAction.mockClear()
+
+    new Script("handleBattleIntent({ type: 'viewport-change', hoveredCell: { x: 1, y: 2 } })", { filename: 'battle.html:viewport-remap' })
+      .runInContext(h.context as any)
+    h.flushAnimationFrames()
+
+    expect(h.engine.previewBattleAction).toHaveBeenCalledOnce()
+    expect(h.engine.previewBattleAction.mock.calls[0][1]).toMatchObject({ targetPieceId: 'target-b' })
+    expect(h.renderer.showPreviewBoard).toHaveBeenCalledOnce()
+  })
+
+  it('clears a targeted preview when a viewport change has no current pointer cell', () => {
+    const h = createHarness({ status: 'ready', snapshot: { revision: 8 }, events: [] }, { deferFrames: true })
+
+    preview(h, 2, 3)
+    h.flushAnimationFrames()
+    h.renderer.showPreviewBoard.mockClear()
+    h.renderer.clearPreviewBoard.mockClear()
+    const pendingBefore = h.context.pendingSkill
+
+    new Script("handleBattleIntent({ type: 'viewport-change', hoveredCell: null })", { filename: 'battle.html:viewport-offboard' })
+      .runInContext(h.context as any)
+    h.flushAnimationFrames()
+
+    expect(h.renderer.showPreviewBoard).not.toHaveBeenCalled()
+    expect(h.renderer.clearPreviewBoard).toHaveBeenCalledOnce()
+    expect(h.context.pendingSkill).toBe(pendingBefore)
+  })
+
+  it('does not resurrect a targeted preview after pointer leave before a viewport change', () => {
+    const h = createHarness({ status: 'ready', snapshot: { revision: 8 }, events: [] }, { deferFrames: true })
+
+    preview(h, 2, 3)
+    h.flushAnimationFrames()
+    h.context.pendingMove = false
+    new Script("handleBattleIntent({ type: 'hover-cell', x: null, y: null })", { filename: 'battle.html:pointer-leave' })
+      .runInContext(h.context as any)
+    h.renderer.showPreviewBoard.mockClear()
+    h.renderer.clearPreviewBoard.mockClear()
+
+    new Script("handleBattleIntent({ type: 'viewport-change', hoveredCell: null })", { filename: 'battle.html:viewport-after-leave' })
+      .runInContext(h.context as any)
+    h.flushAnimationFrames()
+
+    expect(h.renderer.showPreviewBoard).not.toHaveBeenCalled()
+    expect(h.renderer.clearPreviewBoard).not.toHaveBeenCalled()
+  })
+
+  it('preserves a no-target hover preview across a viewport change', () => {
+    const h = createHarness({ status: 'ready', snapshot: { revision: 8 }, events: [] }, { deferFrames: true })
+    h.pendingSkill.previewOnly = true
+    h.pendingSkill.previewEligible = true
+    h.pendingSkill.previewOrigin = 'hover'
+
+    preview(h, null, null)
+    h.flushAnimationFrames()
+    h.renderer.showPreviewBoard.mockClear()
+
+    new Script("handleBattleIntent({ type: 'viewport-change' })", { filename: 'battle.html:viewport-hover' })
+      .runInContext(h.context as any)
+    h.flushAnimationFrames()
 
     expect(h.renderer.showPreviewBoard).toHaveBeenCalledOnce()
   })

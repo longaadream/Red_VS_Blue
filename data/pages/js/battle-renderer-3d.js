@@ -104,10 +104,21 @@
   let _hpLayer = null
   let _floatLayer = null
   let _onIntent = null
+  let _hoverPointer = null
   function _notifyViewportChange() {
     _summaryPositionsDirty = true
     _invalidate()
-    if (_onIntent) _onIntent({ type: 'viewport-change' })
+    let hoveredCell = null
+    if (_hoverPointer) {
+      if (_camera && typeof _camera.updateMatrixWorld === 'function') _camera.updateMatrixWorld(true)
+      hoveredCell = screenToCell(_hoverPointer.clientX, _hoverPointer.clientY)
+    }
+    if (_onIntent) {
+      const intent = { type: 'viewport-change' }
+      if (_hoverPointer) intent.hoveredCell = hoveredCell ? { x: hoveredCell.x, y: hoveredCell.y } : null
+      _onIntent(intent)
+    }
+    if (_hoverPointer) _showHoveredCell(hoveredCell, true)
   }
   let _resizeObserver = null
   let _hitPlane = null
@@ -2652,10 +2663,19 @@
       e.preventDefault()
     }, { passive: false })
 
-    _listen(canvas, 'pointerleave', () => _showHoveredCell(null))
-    _listen(canvas, 'pointerdown', () => _showHoveredCell(null))
+    _listen(canvas, 'pointerleave', () => {
+      _hoverPointer = null
+      _showHoveredCell(null)
+    })
+    _listen(canvas, 'pointerdown', () => {
+      _hoverPointer = null
+      _showHoveredCell(null)
+    })
     _listen(canvas, 'pointermove', e => {
-      if (e.pointerType === 'mouse' && !_pointers.size) _showHoveredCell(screenToCell(e.clientX, e.clientY))
+      if (e.pointerType === 'mouse' && !_pointers.size) {
+        _hoverPointer = { clientX: e.clientX, clientY: e.clientY }
+        _showHoveredCell(screenToCell(e.clientX, e.clientY))
+      }
       if (!_pointers.has(e.pointerId)) return
       _pointers.set(e.pointerId, { x: e.clientX, y: e.clientY })
 
@@ -2728,7 +2748,10 @@
       if (allowClick && wasClick) _handleClick(e)
     }
     _listen(canvas, 'pointerup', e => endPointer(e, true))
-    _listen(canvas, 'pointercancel', e => endPointer(e, false))
+    _listen(canvas, 'pointercancel', e => {
+      _hoverPointer = null
+      endPointer(e, false)
+    })
 
     _listen(canvas, 'wheel', e => {
       _applyZoom(_camera.zoom * (e.deltaY < 0 ? 1.12 : 0.89))
@@ -2844,7 +2867,7 @@
     _invalidate()
   }
 
-  function _showHoveredCell(cell) {
+  function _showHoveredCell(cell, forceIntent) {
     if (!_scene) return
     const key = cell ? cell.x + ',' + cell.y : null
     if (key !== _hoverKey) {
@@ -2863,7 +2886,7 @@
     }
     // Visual updates may rebuild the hover path; they must not erase the
     // pointer's last notified cell (otherwise pointerleave can be lost).
-    if (key !== _hoverIntentKey) {
+    if (forceIntent || key !== _hoverIntentKey) {
       _hoverIntentKey = key
       if (_onIntent) _onIntent({ type: 'hover-cell', x: cell ? cell.x : null, y: cell ? cell.y : null })
     }
@@ -3216,6 +3239,7 @@
 
   // ── Dispose ───────────────────────────────────────────────────────────────────
   function dispose() {
+    _hoverPointer = null
     _hoverIntentKey = null
     _clearHoverPath()
     _hoverMoveTargets.clear()
