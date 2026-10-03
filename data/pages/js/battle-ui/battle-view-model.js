@@ -54,6 +54,14 @@
     return String(status.name || status.type || status.id || '?')
   }
 
+  function displayStatusLabel(status, meta, iconRegistry) {
+    if (iconRegistry && typeof iconRegistry.labelForStatus === 'function') {
+      return String(iconRegistry.labelForStatus(status) || '未知状态')
+    }
+    const explicit = status && typeof status === 'object' ? (status.name || status.label) : ''
+    return String(explicit || (meta && meta.label) || statusLabel(status) || '未知状态')
+  }
+
   function normalizeStatuses(piece, visibleTags) {
     const statuses = []
     const seen = new Set()
@@ -74,7 +82,7 @@
       statuses.push({
         id: id,
         type: type,
-        label: String(item.name || item.label || (meta && meta.label) || statusLabel(item)),
+        label: displayStatusLabel(item, meta, iconRegistry),
         description: String(item.description || item.message || ''),
         iconId: meta ? meta.iconId : 'fallback',
         iconPath: meta ? meta.assetPath : 'images/effect-icons/fallback.svg',
