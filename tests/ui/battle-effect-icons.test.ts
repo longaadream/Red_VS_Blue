@@ -109,7 +109,7 @@ describe('RED-165 battle effect icon registry', () => {
     expect(icons.resolveStatusType('aizen-kyoka-active').visibility).toBe('hidden')
     expect(icons.resolveStatusType('aizen-kyoka-secret').visibility).toBe('hidden')
     expect(icons.resolveStatusType('chidori-immobile').iconId)
-      .toBe(icons.resolveStatusType('venom-corrosion-immobile').iconId)
+      .not.toBe(icons.resolveStatusType('venom-corrosion-immobile').iconId)
     expect(icons.resolveStatusType('shishio-cooldown-fired').visibility).toBe('hidden')
     expect(icons.resolveStatusType('shishio-dmg-counter').visibility).toBe('hidden')
     expect(icons.resolveStatusType('hidan-undying-used').visibility).toBe('hidden')
@@ -234,5 +234,56 @@ describe('RED-165 battle effect icon registry', () => {
       },
     })])
     expect(model.presentationEvents[0]).not.toHaveProperty('message')
+  })
+
+  it('turns raw status ids into readable names while preserving meaningful custom names', () => {
+    const window: Record<string, unknown> = {}
+    const icons = loadBrowserModule('js/battle-ui/battle-effect-icons.js', 'BattleEffectIcons', window)
+    const viewModel = loadBrowserModule('js/battle-ui/battle-view-model.js', 'BattleViewModel', window)
+
+    expect(icons.labelForStatus({ type: 'freeze', name: 'freeze' })).toBe('冰冻')
+    expect(icons.labelForStatus({ type: 'divine-shield', name: 'Divine Shield' })).toBe('圣盾')
+    expect(icons.labelForStatus({ type: 'deployment-first-move-free', name: '本回合首次移动免费' }))
+      .toBe('本回合首次移动免费')
+    expect(icons.labelForStatus({ type: 'future-visible-effect', name: 'future-visible-effect' })).toBe('未知状态')
+    expect(icons.labelForStatus({ type: 'future-visible-effect', name: '未来护盾' })).toBe('未来护盾')
+
+    const statuses = viewModel.normalizeStatuses({ statusTags: [
+      { id: 'freeze-1', type: 'freeze', name: 'freeze' },
+      { id: 'shield-1', type: 'divine-shield', name: 'Divine Shield' },
+      { id: 'custom-1', type: 'future-visible-effect', name: '未来护盾' },
+    ] })
+    expect(statuses.map((status: { label: string }) => status.label)).toEqual(['冰冻', '圣盾', '未来护盾'])
+  })
+
+  it('ships a distinct SVG for every visible status semantic, with documented alias sharing only', () => {
+    const icons = loadBrowserModule('js/battle-ui/battle-effect-icons.js', 'BattleEffectIcons')
+    const playerFacing = Object.entries(icons.statusRegistry)
+      .filter(([, meta]) => (meta as { visibility: string }).visibility !== 'hidden') as Array<[string, { assetPath: string }]>
+    const duplicateGroups = new Map<string, string[]>()
+
+    for (const [type, meta] of playerFacing) {
+      expect(meta.assetPath, type).toMatch(/^images\/(?:effect-icons|tile-effects)\/[a-z0-9-]+\.svg$/)
+      const relative = meta.assetPath.replace(/^images\//, '')
+      const assetPath = [
+        resolve(pagesDir, 'images', relative),
+        resolve(rootDir, 'public', relative),
+      ].find(existsSync)
+      expect(assetPath, meta.assetPath).toBeTruthy()
+      if (!assetPath) continue
+      const content = readFileSync(assetPath, 'utf8')
+      const group = duplicateGroups.get(content) || []
+      group.push(type)
+      duplicateGroups.set(content, group)
+    }
+
+    const duplicates = [...duplicateGroups.values()]
+      .filter((group) => group.length > 1)
+      .map((group) => group.sort())
+    expect(duplicates).toEqual([['amaterasu', 'amaterasu-burn']])
+    expect(Object.keys(icons.statusRegistry)).toEqual(expect.arrayContaining([
+      'akaza-damaged', 'el-primo-meteor-belt', 'max-speed-shot-recast',
+      'momentum-core', 'mortis-damage-counter',
+    ]))
   })
 })

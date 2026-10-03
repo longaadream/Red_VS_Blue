@@ -29,8 +29,8 @@
   }
 
   const statusDefinitions = Object.freeze({
-    'aizen-black-coffin': entry('curse', VISIBILITY.BOARD, { label: '黑棺' }),
-    root: entry('control', VISIBILITY.BOARD, { label: '定身' }),
+    'aizen-black-coffin': entry('curse', VISIBILITY.BOARD, { iconId: 'black-coffin', assetPath: 'images/effect-icons/black-coffin.svg', label: '黑棺' }),
+    root: entry('control', VISIBILITY.BOARD, { iconId: 'root', assetPath: 'images/effect-icons/root.svg', label: '定身' }),
     inoperable: entry('disable', VISIBILITY.BOARD, { iconId: 'inoperable', assetPath: 'images/effect-icons/inoperable.svg', label: '无法操作' }),
     'chaos-spear-theft': entry('curse', VISIBILITY.DETAIL, { iconId: 'chaos-spear-theft', assetPath: 'images/effect-icons/chaos-spear-theft.svg', label: '混沌之矛' }),
     'free-normal-move-every-turn': entry('buff', VISIBILITY.DETAIL, { iconId: 'free-normal-move-every-turn', assetPath: 'images/effect-icons/free-normal-move-every-turn.svg', label: '音速 / 高速模块' }),
@@ -44,54 +44,61 @@
     'arthas-slow': entry('control', VISIBILITY.BOARD, { iconId: 'slow', assetPath: 'images/effect-icons/slow.svg', label: '减速', priority: 320 }),
     'aizen-kyoka-active': entry('internal', VISIBILITY.HIDDEN),
     'aizen-kyoka-secret': entry('internal', VISIBILITY.HIDDEN),
-    blizzard: entry('control', VISIBILITY.DETAIL, { iconId: 'freeze', assetPath: 'images/tile-effects/blizzard.svg', label: '暴风雪' }),
-    'blood-oath': entry('curse', VISIBILITY.BOARD, { label: '血誓' }),
+    blizzard: entry('control', VISIBILITY.DETAIL, { iconId: 'blizzard', assetPath: 'images/effect-icons/blizzard.svg', label: '暴风雪' }),
+    'blood-oath': entry('curse', VISIBILITY.BOARD, { iconId: 'blood-oath', assetPath: 'images/effect-icons/blood-oath.svg', label: '血誓' }),
     buff: entry('buff', VISIBILITY.DETAIL, { label: '增益' }),
-    'calm-shield': entry('shield', VISIBILITY.DETAIL, { label: '平静护盾' }),
-    'calm-stance': entry('stance', VISIBILITY.DETAIL, { label: '平静姿态' }),
-    'chidori-immobile': entry('control', VISIBILITY.BOARD, { label: '千鸟定身' }),
-    'colt-zone': entry('mark', VISIBILITY.DETAIL, { iconId: 'colt-zone', assetPath: 'images/effect-icons/action-damage.svg', label: '射击区域' }),
+    'calm-shield': entry('shield', VISIBILITY.DETAIL, { iconId: 'calm-shield', assetPath: 'images/effect-icons/calm-shield.svg', label: '平静护盾' }),
+    'calm-stance': entry('stance', VISIBILITY.DETAIL, { iconId: 'calm-stance', assetPath: 'images/effect-icons/calm-stance.svg', label: '平静姿态' }),
+    'chidori-immobile': entry('control', VISIBILITY.BOARD, { iconId: 'chidori-immobile', assetPath: 'images/effect-icons/chidori-immobile.svg', label: '千鸟定身' }),
+    'colt-zone': entry('mark', VISIBILITY.DETAIL, { iconId: 'colt-zone', assetPath: 'images/effect-icons/colt-zone.svg', label: '射击区域' }),
     'curse-ward-used': entry('internal', VISIBILITY.HIDDEN),
     'damage-buff': entry('buff', VISIBILITY.DETAIL, { iconId: 'empowered', assetPath: 'images/effect-icons/empowered.svg', label: '增益' }),
     'damage-multiplier': entry('buff', VISIBILITY.DETAIL, { iconId: 'damage-multiplier', assetPath: 'images/effect-icons/damage-multiplier.svg', label: '飞天御剑流' }),
     'deployment-first-move-free': entry('buff', VISIBILITY.DETAIL, { iconId: 'free-move', assetPath: 'images/effect-icons/free-move.svg', label: '首次移动免费' }),
-    'demon-strike-charges': entry('charge', VISIBILITY.DETAIL, { label: '恶魔冲击次数' }),
+    'demon-strike-charges': entry('charge', VISIBILITY.DETAIL, { iconId: 'demon-strike-charges', assetPath: 'images/effect-icons/demon-strike-charges.svg', label: '恶魔冲击次数' }),
     'divine-shield': entry('shield', VISIBILITY.DETAIL, { iconId: 'divine-shield', assetPath: 'images/effect-icons/divine-shield.svg', label: '圣盾' }),
     'elune-protection': entry('shield', VISIBILITY.DETAIL, { iconId: 'ward', assetPath: 'images/effect-icons/ward.svg', label: '艾露恩庇护' }),
-    'flying-raijin-mark': entry('mark', VISIBILITY.DETAIL, { iconId: 'flying-raijin-mark', assetPath: 'images/tile-effects/flying-raijin-anchor.svg', label: '飞雷神印记' }),
-    freeze: entry('control', VISIBILITY.BOARD, { iconId: 'freeze', assetPath: 'images/tile-effects/blizzard.svg', label: '冰冻', priority: 500 }),
-    'hardy-block': entry('shield', VISIBILITY.DETAIL, { label: '悍猛格挡' }),
+    'flying-raijin-mark': entry('mark', VISIBILITY.DETAIL, { iconId: 'flying-raijin-mark', assetPath: 'images/effect-icons/flying-raijin-mark.svg', label: '飞雷神印记' }),
+    freeze: entry('control', VISIBILITY.BOARD, { iconId: 'freeze', assetPath: 'images/effect-icons/freeze.svg', label: '冰冻', priority: 500 }),
+    'hardy-block': entry('shield', VISIBILITY.DETAIL, { iconId: 'hardy-block', assetPath: 'images/effect-icons/hardy-block.svg', label: '悍猛格挡' }),
     'hidan-dying': entry('revive', VISIBILITY.BOARD, { iconId: 'dying', assetPath: 'images/effect-icons/dying.svg', label: '濒死', color: '#fb7185', tone: 'danger', negative: true, priority: 480 }),
     'hidan-undying-used': entry('internal', VISIBILITY.HIDDEN),
-    'icebound-fortitude': entry('shield', VISIBILITY.DETAIL, { label: '寒冰坚忍' }),
-    'ichigo-bankai': entry('transformation', VISIBILITY.DETAIL, { label: '卍解·天锁斩月' }),
+    'icebound-fortitude': entry('shield', VISIBILITY.DETAIL, { iconId: 'icebound-fortitude', assetPath: 'images/effect-icons/icebound-fortitude.svg', label: '寒冰坚忍' }),
+    'ichigo-bankai': entry('transformation', VISIBILITY.DETAIL, { iconId: 'ichigo-bankai', assetPath: 'images/effect-icons/ichigo-bankai.svg', label: '卍解·天锁斩月' }),
     imprisoned: entry('control', VISIBILITY.BOARD, { iconId: 'imprisoned', assetPath: 'images/effect-icons/imprisoned.svg', label: '禁锢', priority: 360 }),
-    'itachi-tsukuyomi': entry('curse', VISIBILITY.BOARD, { label: '月读', priority: 400 }),
-    'kamui-shield': entry('shield', VISIBILITY.DETAIL, { label: '神威护盾' }),
-    'lethal-toxin': entry('damage-over-time', VISIBILITY.BOARD, { iconId: 'lethal-toxin', assetPath: 'images/tile-effects/lethal-toxin.svg', label: '致命毒素', priority: 240 }),
-    'lich-covenant': entry('revive', VISIBILITY.DETAIL, { label: '巫妖誓约' }),
+    'itachi-tsukuyomi': entry('curse', VISIBILITY.BOARD, { iconId: 'tsukuyomi', assetPath: 'images/effect-icons/tsukuyomi.svg', label: '月读', priority: 400 }),
+    'kamui-shield': entry('shield', VISIBILITY.DETAIL, { iconId: 'kamui-shield', assetPath: 'images/effect-icons/kamui-shield.svg', label: '神威护盾' }),
+    'lethal-toxin': entry('damage-over-time', VISIBILITY.BOARD, { iconId: 'lethal-toxin', assetPath: 'images/effect-icons/lethal-toxin.svg', label: '致命毒素', priority: 240 }),
+    'lich-covenant': entry('revive', VISIBILITY.DETAIL, { iconId: 'lich-covenant', assetPath: 'images/effect-icons/lich-covenant.svg', label: '巫妖誓约' }),
     'max-phase-recast': entry('internal', VISIBILITY.HIDDEN),
-    'nano-boost': entry('buff', VISIBILITY.DETAIL, { label: '纳米激素' }),
-    'obito-grudge': entry('counter', VISIBILITY.DETAIL, { label: '怨念' }),
-    'rafaam-temporal-distortion': entry('time', VISIBILITY.DETAIL, { label: '时空扭曲' }),
-    'rage-stance': entry('stance', VISIBILITY.DETAIL, { label: '暴怒姿态' }),
+    'nano-boost': entry('buff', VISIBILITY.DETAIL, { iconId: 'nano-boost', assetPath: 'images/effect-icons/nano-boost.svg', label: '纳米激素' }),
+    'obito-grudge': entry('counter', VISIBILITY.DETAIL, { iconId: 'obito-grudge', assetPath: 'images/effect-icons/obito-grudge.svg', label: '怨念' }),
+    'rafaam-temporal-distortion': entry('time', VISIBILITY.DETAIL, { iconId: 'temporal-distortion', assetPath: 'images/effect-icons/temporal-distortion.svg', label: '时空扭曲' }),
+    'rage-stance': entry('stance', VISIBILITY.DETAIL, { iconId: 'rage-stance', assetPath: 'images/effect-icons/rage-stance.svg', label: '暴怒姿态' }),
     resurreccion: entry('transformation', VISIBILITY.DETAIL, { iconId: 'resurreccion', assetPath: 'images/effect-icons/resurreccion.svg', label: '归刃' }),
-    'sage-mode': entry('transformation', VISIBILITY.DETAIL, { label: '仙人模式' }),
-    'sage-mode-shield': entry('shield', VISIBILITY.DETAIL, { label: '仙人之盾' }),
-    'shadow-step': entry('buff', VISIBILITY.DETAIL, { iconId: 'shadow-step', assetPath: 'images/tile-effects/shadow-step.svg', label: '暗影步' }),
+    'sage-mode': entry('transformation', VISIBILITY.DETAIL, { iconId: 'sage-mode', assetPath: 'images/effect-icons/sage-mode.svg', label: '仙人模式' }),
+    'sage-mode-shield': entry('shield', VISIBILITY.DETAIL, { iconId: 'sage-mode-shield', assetPath: 'images/effect-icons/sage-mode-shield.svg', label: '仙人之盾' }),
+    'shadow-step': entry('buff', VISIBILITY.DETAIL, { iconId: 'shadow-step', assetPath: 'images/effect-icons/shadow-step.svg', label: '暗影步' }),
     'shelly-bandage-used': entry('internal', VISIBILITY.HIDDEN),
     'shishio-cooldown-fired': entry('internal', VISIBILITY.HIDDEN),
     'shishio-dmg-counter': entry('internal', VISIBILITY.HIDDEN),
     'shishio-kills': entry('counter', VISIBILITY.DETAIL, { label: '击杀数' }),
     silenced: entry('disable', VISIBILITY.BOARD, { iconId: 'silence', label: '沉默', priority: 450 }),
     sleep: entry('control', VISIBILITY.BOARD, { iconId: 'sleep', assetPath: 'images/effect-icons/sleep.svg', label: '睡眠', color: '#e879f9', priority: 510 }),
-    'susanoo-active': entry('transformation', VISIBILITY.DETAIL, { label: '须佐能乎' }),
-    'undead-body': entry('revive', VISIBILITY.DETAIL, { label: '亡灵之躯' }),
-    'velen-fate-shelter': entry('shield', VISIBILITY.DETAIL, { label: '命运庇护' }),
-    'venom-corrosion-immobile': entry('control', VISIBILITY.BOARD, { label: '腐蚀定身' }),
-    amaterasu: entry('damage-over-time', VISIBILITY.DETAIL, { iconId: 'amaterasu', assetPath: 'images/tile-effects/amaterasu.svg', label: '天照' }),
-    'flying-raijin-anchor': entry('mark', VISIBILITY.DETAIL, { iconId: 'flying-raijin-anchor', assetPath: 'images/tile-effects/flying-raijin-anchor.svg', label: '飞雷神锚点' }),
-    'shishio-burn': entry('damage-over-time', VISIBILITY.DETAIL, { label: '永久燃烧' }),
+    'susanoo-active': entry('transformation', VISIBILITY.DETAIL, { iconId: 'susanoo', assetPath: 'images/effect-icons/susanoo.svg', label: '须佐能乎' }),
+    'undead-body': entry('revive', VISIBILITY.DETAIL, { iconId: 'undead-body', assetPath: 'images/effect-icons/undead-body.svg', label: '亡灵之躯' }),
+    'velen-fate-shelter': entry('shield', VISIBILITY.DETAIL, { iconId: 'velen-fate-shelter', assetPath: 'images/effect-icons/velen-fate-shelter.svg', label: '命运庇护' }),
+    'venom-corrosion-immobile': entry('control', VISIBILITY.BOARD, { iconId: 'venom-corrosion', assetPath: 'images/effect-icons/venom-corrosion.svg', label: '腐蚀定身' }),
+    amaterasu: entry('damage-over-time', VISIBILITY.DETAIL, { iconId: 'amaterasu', assetPath: 'images/effect-icons/amaterasu.svg', label: '天照' }),
+    'flying-raijin-anchor': entry('mark', VISIBILITY.DETAIL, { iconId: 'flying-raijin-anchor', assetPath: 'images/effect-icons/flying-raijin-anchor.svg', label: '飞雷神锚点' }),
+    'shishio-burn': entry('damage-over-time', VISIBILITY.DETAIL, { iconId: 'shishio-burn', assetPath: 'images/effect-icons/shishio-burn.svg', label: '永久燃烧' }),
+    'akaza-damaged': entry('internal', VISIBILITY.HIDDEN),
+    'el-primo-meteor-belt': entry('shield', VISIBILITY.DETAIL, { iconId: 'meteor-belt', assetPath: 'images/effect-icons/meteor-belt.svg', label: '流星腰带' }),
+    'max-speed-shot-recast': entry('internal', VISIBILITY.HIDDEN),
+    'momentum-core': entry('charge', VISIBILITY.DETAIL, { iconId: 'momentum-core', assetPath: 'images/effect-icons/momentum-core.svg', label: '动能' }),
+    'mortis-damage-counter': entry('counter', VISIBILITY.DETAIL, { iconId: 'mortis-counter', assetPath: 'images/effect-icons/mortis-counter.svg', label: '暗夜造物' }),
+    'mangekyo-witness': entry('internal', VISIBILITY.HIDDEN),
+    'naruto-clone': entry('internal', VISIBILITY.HIDDEN),
   })
 
   // Every player-meaningful status has a battlefield entry. The renderer
@@ -137,13 +144,41 @@
     'result-hidden': entry('unknown', VISIBILITY.DETAIL, { assetPath: 'images/effect-icons/complement-hidden.svg', label: '结果保密' }),
   })
 
-  const statusFallback = entry('unknown', VISIBILITY.BOARD)
+  const statusFallback = entry('unknown', VISIBILITY.BOARD, { label: '未知状态' })
   const actionFallback = entry('unknown', VISIBILITY.DETAIL)
   const forcedHidden = entry('internal', VISIBILITY.HIDDEN)
 
   function statusType(status) {
     if (typeof status === 'string') return status
     return String(status && (status.type || status.id || status.name) || '')
+  }
+
+  function isRawStatusName(value, status) {
+    const text = String(value == null ? '' : value).trim()
+    if (!text) return true
+    const type = status && typeof status === 'object' ? String(status.type || '') : ''
+    const id = status && typeof status === 'object' ? String(status.id || '') : ''
+    if ((type && text.toLowerCase() === type.toLowerCase()) || (id && text.toLowerCase() === id.toLowerCase())) return true
+    return /^[a-z0-9]+(?:[-_.][a-z0-9]+)+$/i.test(text)
+  }
+
+  function labelForStatus(status) {
+    // Resolve through the public function so presentation adapters can supply
+    // their native label/icon metadata after this registry is loaded.
+    const publicRegistry = root.BattleEffectIcons
+    const meta = publicRegistry && typeof publicRegistry.resolveStatus === 'function'
+      ? publicRegistry.resolveStatus(status)
+      : resolveStatus(status)
+    const knownType = statusRegistry[statusType(status)] !== undefined
+    if (status && typeof status === 'object') {
+      const explicit = [status.name, status.label]
+      for (let index = 0; index < explicit.length; index += 1) {
+        const candidate = String(explicit[index] == null ? '' : explicit[index]).trim()
+        if (candidate && !isRawStatusName(candidate, status)
+          && !(knownType && /^[\x00-\x7F]+$/.test(candidate))) return candidate
+      }
+    }
+    return String(meta.label || '未知状态')
   }
 
   function resolveStatusType(type) {
@@ -185,6 +220,7 @@
     actionRegistry: actionRegistry,
     resolveStatusType: resolveStatusType,
     resolveStatus: resolveStatus,
+    labelForStatus: labelForStatus,
     resolveAction: resolveAction,
     badge: badge,
   }
