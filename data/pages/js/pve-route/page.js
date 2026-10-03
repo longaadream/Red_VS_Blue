@@ -5,6 +5,40 @@
   const byId = id => document.getElementById(id)
   const text = (element, value) => { if (element) element.textContent = value == null ? '' : String(value) }
   const typeLabels = { battle: '战斗', boss: '首领', event: '事件', shop: '商店' }
+  const progress = { timer: 0, entryUntil: 0, pointerInside: false, keyboardInside: false, key: null }
+
+  function setProgressOpen(open) {
+    byId('progressOverlay').classList.toggle('is-open', open)
+    byId('progressPanel').inert = !open
+    byId('progressPanel').setAttribute('aria-hidden', String(!open))
+    byId('progressToggle').setAttribute('aria-expanded', String(open))
+    byId('progressToggle').setAttribute('aria-label', open ? '收起路线进度' : '展开路线进度')
+  }
+
+  function scheduleProgressClose(delay) {
+    clearTimeout(progress.timer)
+    progress.timer = setTimeout(() => {
+      if (!progress.pointerInside && !progress.keyboardInside) setProgressOpen(false)
+    }, Math.max(delay, progress.entryUntil - Date.now()))
+  }
+
+  function updateProgressEntry(route) {
+    if (route.phase === 'battle') {
+      clearTimeout(progress.timer)
+      progress.key = null
+      progress.entryUntil = 0
+      progress.pointerInside = false
+      progress.keyboardInside = false
+      setProgressOpen(false)
+      return
+    }
+    const key = [route.seed, route.chapterIndex, route.nodeIndex, route.phase].join(':')
+    if (progress.key === key) return
+    progress.key = key
+    progress.entryUntil = Date.now() + 5000
+    setProgressOpen(true)
+    scheduleProgressClose(5000)
+  }
 
   function setStatus(message, error) {
     const status = byId('routeStatus')
@@ -201,6 +235,7 @@
         state.frame.src = 'about:blank'
         state.frame = null
       }
+      if (state.snapshot?.route) updateProgressEntry(state.snapshot.route)
     }, 40)
   }
 
@@ -261,6 +296,34 @@
     }
   }
 
+  const progressOverlay = byId('progressOverlay')
+  progressOverlay.addEventListener('pointerenter', () => {
+    progress.pointerInside = true
+    clearTimeout(progress.timer)
+    setProgressOpen(true)
+  })
+  progressOverlay.addEventListener('pointerleave', () => {
+    progress.pointerInside = false
+    scheduleProgressClose(1000)
+  })
+  progressOverlay.addEventListener('focusin', event => {
+    if (!event.target.matches(':focus-visible')) return
+    progress.keyboardInside = true
+    clearTimeout(progress.timer)
+    setProgressOpen(true)
+  })
+  progressOverlay.addEventListener('focusout', event => {
+    if (progressOverlay.contains(event.relatedTarget)) return
+    progress.keyboardInside = false
+    scheduleProgressClose(1000)
+  })
+  byId('progressToggle').addEventListener('click', () => {
+    const open = !progressOverlay.classList.contains('is-open')
+    clearTimeout(progress.timer)
+    progress.entryUntil = 0
+    setProgressOpen(open)
+    if (open && !progress.pointerInside && !progress.keyboardInside) scheduleProgressClose(5000)
+  })
   byId('backpackButton').addEventListener('click', () => {
     const details = byId('backpackDetails')
     const open = details.hidden

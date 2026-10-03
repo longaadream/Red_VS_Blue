@@ -20,12 +20,14 @@
       </div>
     </header>
 
-    <section class="route-progress-panel" aria-labelledby="progressTitle">
+    <section id="routeContent" class="route-content" aria-live="polite">
+    <div id="progressOverlay" class="progress-overlay">
+    <section id="progressPanel" class="route-progress-panel" aria-labelledby="progressTitle" aria-hidden="true" inert>
       <div class="section-kicker"><span id="progressTitle">路线进度</span><span class="route-notice">刷新或离开后，本次进度不保留。</span><span id="chapterLabel">准备中</span></div>
       <div id="routeProgress" class="route-progress" role="list" aria-label="章节节点"></div>
     </section>
-
-    <section id="routeContent" class="route-content" aria-live="polite">
+    <button id="progressToggle" class="progress-toggle" type="button" aria-label="展开路线进度" aria-expanded="false" aria-controls="progressPanel"><span aria-hidden="true">⌄</span></button>
+    </div>
       <article class="node-panel" aria-labelledby="nodeTitle">
         <div id="nodeBadge" class="node-badge">节点</div>
         <p id="nodeType" class="node-type">正在准备</p>

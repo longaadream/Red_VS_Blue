@@ -48,7 +48,11 @@ button:focus-visible, a:focus-visible { outline: 3px solid #f4d174; outline-offs
   border-radius: 12px;
   box-shadow: 4px 6px 0 var(--shadow);
 }
-.route-progress-panel { max-width: 1240px; margin: 0 auto 18px; padding: 10px 14px 13px; }
+.progress-overlay { position: absolute; z-index: 2; inset: 0 0 auto; display: flex; flex-direction: column; align-items: center; pointer-events: none; }
+.route-progress-panel { width: 100%; margin: 0; padding: 10px 14px 13px; pointer-events: auto; }
+.progress-overlay:not(.is-open) .route-progress-panel { display: none; }
+.progress-toggle { width: 38px; height: 23px; padding: 0; border: 2px solid var(--edge); border-top: 0; border-radius: 0 0 8px 8px; background: var(--panel); color: var(--ink); font-size: 22px; line-height: 16px; box-shadow: 2px 3px 0 var(--shadow); pointer-events: auto; }
+.progress-overlay.is-open .progress-toggle span { display: inline-block; transform: rotate(180deg); }
 .section-kicker, .panel-title-row { display: flex; align-items: center; justify-content: space-between; gap: 8px 12px; flex-wrap: wrap; }
 .section-kicker { color: var(--muted); font-size: 12px; letter-spacing: .1em; }
 .route-notice { color: #7a5639; font-size: 10px; letter-spacing: .03em; }
@@ -59,7 +63,7 @@ button:focus-visible, a:focus-visible { outline: 3px solid #f4d174; outline-offs
 .progress-node small { display: block; font-size: 10px; opacity: .8; margin-top: 1px; }
 
 .route-content { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-areas: 'node node' 'party backpack'; grid-template-rows: minmax(300px, auto) auto; gap: 18px; max-width: 1240px; margin: 0 auto; }
-.node-panel { grid-area: node; min-height: 340px; padding: clamp(28px, 6vw, 76px); display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+.node-panel { grid-area: node; min-height: 450px; padding: clamp(28px, 6vw, 76px); display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
 .node-badge { min-width: 78px; padding: 7px 15px; border: 2px solid var(--edge); border-radius: 999px; background: var(--panel-light); color: var(--muted); font-size: 13px; }
 .node-type { margin: 26px 0 6px; color: var(--muted); }
 .node-panel h2 { margin: 0; color: #3c271b; font-size: clamp(32px, 5vw, 62px); font-weight: 400; }
@@ -108,13 +112,13 @@ button:focus-visible, a:focus-visible { outline: 3px solid #f4d174; outline-offs
   .route-back { grid-row: 2; }
   .route-wallet { grid-row: 2; }
   .route-content { grid-template-columns: 1fr; grid-template-areas: 'node' 'party' 'backpack'; grid-template-rows: auto; }
-  .node-panel { min-height: 285px; padding: 30px 18px; }
+  .node-panel { min-height: 395px; padding: 30px 18px; }
   .route-progress { gap: 3px; }
   .progress-node { min-height: 32px; font-size: 10px; }
   .progress-node small { font-size: 8px; }
 }
 @media (max-height: 500px) and (orientation: landscape) {
-  .route-shell { height: 100dvh; min-height: 0; overflow: hidden; display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto; gap: 6px; padding: 7px 12px 8px; }
+  .route-shell { height: 100dvh; min-height: 0; overflow: hidden; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; gap: 6px; padding: 7px 12px 8px; }
   .route-header { margin-bottom: 0; grid-template-columns: auto 1fr auto; }
   .route-heading { grid-column: 2; grid-row: 1; }
   .route-back, .route-wallet { grid-row: 1; }
