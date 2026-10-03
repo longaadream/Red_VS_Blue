@@ -24,6 +24,8 @@
 
 ## 资源、构建与验证
 
+RED-231：标准渐进部署在本轮增援结束后，即使还有预备棋子，也允许处于 `action / turn-ready` 的普通技能使用已有公开效果预演。预演隔离输入不包含部署元数据或私有预备身份；尚待部署和规则输入的局面仍不能直接预演。公开结果不等于预测隐藏效果或对手未来行动。
+
 `npm run build:practice-ai` 将独立模块编译为 `data/pages/js/practice/engine.js`。桌面开发与构建脚本已接入。VFS 只读，规则执行不访问窗口或同步网络。
 
 使用桌面当前 Profile 的 `__battle-data.json` / `__tutorial-profile.json`。正式 setup 直接加载但 manifest 未列出的 `rule-lucky-coin-gamestart.json` 从同源 URL 单独补载；使用 URL 对象避开 pack-fetch 的旧 IDB 相对路径覆盖，缺失即报错。没有更改幸运币规则内容。
