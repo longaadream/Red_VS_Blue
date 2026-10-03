@@ -1,5 +1,9 @@
 # 教程对手 AI
 
+RED-230 新增 `tactical-intuition` 标准对局样板，首页同时提供目标教学与直接 AI 实战入口。双方八枚预设棋子保持模板正常生命，标准渐进部署使用权威部署状态；玩家增援选择不由教程 AI 代选。`practice=1` 只关闭该课目标引导，不改变规则、生命或部署流程。
+
+新课从自主阶段开始，使用下述 RED-228 规划器。目标教学反馈来自已接受操作的实际前后状态，不另外计算伤害或未来威胁。旧课开场示范保持原行为。退出与重开必须使旧的异步对手操作失效，重开保留当前入口模式。
+
 关联：RED-228；基础合同：`docs/technical/AI_ENVIRONMENT.md`、`docs/technical/PVP_PRACTICE.md`。
 
 教程自由练习使用 `lib/game/tutorial-ai.ts::planTutorialAiAction`。它固定组合现有
