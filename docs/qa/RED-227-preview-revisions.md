@@ -92,3 +92,9 @@ RED-226 的旧图鉴 Electron harness 在 pieces.html 指针/动画检查之前�
 修改前回归失败；修改后4文件46/46通过，独立切换/拖动21/21通过。TypeScript、相关ESLint、encoding、diff与main-baseline通过。原生Electron新增卡内移动、离卡清除/previewBoardActive=false/AP不扣，以及随后拖放一次扣费均通过。完整长流程两次分别在后续菜单toggle、Shadow新窗口初始选棋子超时，不计整套通过，不通过重跑掩盖不稳定；第二次菜单toggle通过。当前变更的实机断言未失败。已有controller取消迟到结果、viewport取消不复活回归通过。
 
 人工验收：悬停流星腰带出现假设状态；移到卡片标题仍保留；移到棋盘/空白立即恢复；重新拖动卡片到棋盘，离卡不取消，松手只扣一次。回退本轮追加提交；无引擎bundle或存档迁移。
+
+## 训练营致胜动作预演（2026-10-03）
+
+最小复现：毒液利爪撕裂面对唯一敌方核心，剩余HP1；普通伤害预演成功，致胜输入修改前返回unavailable。根因是publicPredictedState调用正式public投影，terminalResult触发readSanitizedBattleActionTrace，而隔离预演没有pinned profile。修复只从局部浅拷贝去掉terminalResult后进行原公共投影；保留死亡/伤害与隐私过滤，不修改真实胜负、回放、角色数据，不弹正式结算。
+
+从最新origin/main 9d1b0c30801cd733ec4cede37ce1ef0889a2313a merge同步（无冲突、不改写历史），baseline behind0。修改前失败已记录，修复后预演/隐私/多步/正式terminal/UI共71项通过；打包训练引擎直接VM致胜回归通过，包含伤害结果、真实输入不变和无terminal返回。已结束输入拒绝。独立预演/隐私35项通过、无实质问题。TypeScript/相关ESLint/encoding/diff通过，bundle按脚本重建。本轮未重新运行原生UI；验证限于执行与打包边界，用户原训练营动作仍需人工复测。回退本轮修复提交并重建browser bundle。

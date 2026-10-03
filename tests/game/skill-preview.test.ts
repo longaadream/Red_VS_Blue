@@ -1,4 +1,7 @@
 import { readFileSync } from 'node:fs'
+import { createRequire } from 'node:module'
+import { resolve } from 'node:path'
+import { createContext, Script } from 'node:vm'
 
 import { describe, expect, it } from 'vitest'
 
@@ -77,6 +80,41 @@ function withoutDuration<T>(value: T): T {
 }
 
 describe('RED-224 isolated public skill preview', () => {
+  it('previews a deterministic last-core kill without settling the live battle', () => {
+    const state = publicFixture()
+    state.pieces.forEach(piece => { piece.isCore = true })
+    state.pieces.find(piece => piece.instanceId === 'uther')!.currentHp = 1
+    const action = targetedAction(state)
+    const before = JSON.stringify(state)
+    const actual = applyBattleAction(structuredClone(state), action)
+    expect(actual.terminalResult?.reason).toBe('core-eliminated')
+    const result = previewBattleAction(state, action, 'player-red')
+    expect(result.status).toBe('ready')
+    if (result.status !== 'ready') return
+    expect(result.snapshot.pieces.some(piece => piece.instanceId === 'uther')).toBe(false)
+    expect(result.events.some(event => event.kind === 'damage')).toBe(true)
+    expect(result.snapshot.terminalResult).toBeUndefined()
+    expect(JSON.stringify(result.snapshot)).not.toContain('terminalReplay')
+    expect(previewBattleAction(actual, action, 'player-red').status).toBe('unavailable')
+    expect(JSON.stringify(state)).toBe(before)
+  })
+
+  it('ships last-core preview support in the training browser engine bundle', () => {
+    const context = createContext({ require: createRequire(resolve('package.json')), process, console, TextEncoder, TextDecoder, window: {} })
+    new Script(readFileSync('data/pages/js/game-engine.js', 'utf8')).runInContext(context)
+    const browserPreview = (context.GameEngine as { previewBattleAction: typeof previewBattleAction }).previewBattleAction
+    const state = publicFixture()
+    state.pieces.forEach(piece => { piece.isCore = true })
+    state.pieces.find(piece => piece.instanceId === 'uther')!.currentHp = 1
+    const before = JSON.stringify(state)
+    const result = browserPreview(state, targetedAction(state), 'player-red')
+    expect(result.status).toBe('ready')
+    if (result.status !== 'ready') return
+    expect(result.snapshot.pieces.some(piece => piece.instanceId === 'uther')).toBe(false)
+    expect(result.snapshot.terminalResult).toBeUndefined()
+    expect(JSON.stringify(state)).toBe(before)
+  })
+
   it('previews a public single target skill and matches applyBattleAction', () => {
     const state = publicFixture()
     const action = targetedAction(state)
