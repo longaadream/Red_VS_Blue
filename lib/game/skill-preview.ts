@@ -1,12 +1,14 @@
-import type { BattlePresentationEvent } from './battle-presentation-events'
+import type { BattlePresentationEvent, BattlePresentationCollision } from './battle-presentation-events'
 import {
   projectBattlePresentationEvents,
   projectBattlePresentationEventsForViewer,
 } from './battle-presentation-events'
-import { recordBattlePresentation } from './battle-presentation-recording'
+import { recordBattlePresentation, recordedProjectilePaths } from './battle-presentation-recording'
 import { toPublicBattleState } from './deployment'
 import { createPublicRuleSource } from './public-rule-source'
+import { skillChoicePromptKey } from './skill-choice-sequence'
 import { loadSkillById } from './skills'
+import { prepareAction } from './targeting'
 import type { RuleExecutionContext } from './rule-runtime'
 import {
   createRuleExecutionContext,
@@ -50,6 +52,8 @@ export interface NeedsInputBattleActionPreview {
   status: 'needs-input'
   reason: typeof PREVIEW_NEEDS_INPUT_REASON
   durationMs: number
+  /** Generated locally from the public replay, never a server transaction. */
+  preparation?: JsonRecord
 }
 
 export type BattleActionPreview =
@@ -74,8 +78,8 @@ function unavailable(start: number): UnavailableBattleActionPreview {
   return { status: 'unavailable', reason: PREVIEW_UNAVAILABLE_REASON, durationMs: durationSince(start) }
 }
 
-function needsInput(start: number): NeedsInputBattleActionPreview {
-  return { status: 'needs-input', reason: PREVIEW_NEEDS_INPUT_REASON, durationMs: durationSince(start) }
+function needsInput(start: number, preparation?: JsonRecord): NeedsInputBattleActionPreview {
+  return { status: 'needs-input', reason: PREVIEW_NEEDS_INPUT_REASON, durationMs: durationSince(start), ...(preparation ? { preparation } : {}) }
 }
 
 function isRecord(value: unknown): value is JsonRecord {
@@ -356,6 +360,7 @@ function actionFields(action: BattleAction): BattleAction {
     'targetY',
     'targetPieceId',
     'extraTargets',
+    'skillChoices',
     'selectionId',
     'stateRevision',
   ]) {
@@ -410,7 +415,7 @@ function loadCanonicalPublicSkill(skillId: string): JsonRecord | undefined {
   }
 }
 
-function publicSkillDefinition(state: BattleState, skillId: string): JsonRecord | undefined {
+function publicSkillDefinition(state: BattleState, skillId: string, preparationOnly = false): JsonRecord | undefined {
   const embedded = state.skillsById?.[skillId] as unknown
   const canonical = loadCanonicalPublicSkill(skillId)
   if (isRecord(embedded) && isRecord(canonical)
@@ -422,9 +427,9 @@ function publicSkillDefinition(state: BattleState, skillId: string): JsonRecord 
   // The runtime detector below is sticky across checkpoints. This lexical
   // guard also closes resources that can reach randomness through a compiled
   // surface which does not receive the scoped Math object.
-  if (/\bMath\s*\.\s*random\s*\(/.test(skill.code)) return undefined
+  if (!preparationOnly && /\bMath\s*\.\s*random\s*\(/.test(skill.code)) return undefined
   // A declaration which itself names a rule/capability is not a public pure skill source.
-  if (skill.statusTag || skill.summonCapability || skill.deathParasitism) return undefined
+  if (!preparationOnly && (skill.statusTag || skill.summonCapability || skill.deathParasitism)) return undefined
   return skill
 }
 
@@ -616,10 +621,11 @@ function actionId(action: BattleAction): string {
  * public state.  This function never exposes the internal runtime or raw
  * executor output; any unsupported/uncertain result is discarded.
  */
-export function previewBattleAction(
+function runPublicSkillAction(
   snapshot: BattleState,
   action: BattleAction,
   viewerId: string,
+  collectOwnedChoices: boolean,
 ): BattleActionPreview {
   const started = nowMs()
   try {
@@ -640,7 +646,7 @@ export function previewBattleAction(
     if (!isPureJson(publicSnapshot)) return unavailable(started)
     if (stateHasPendingInteraction(publicSnapshot)) return needsInput(started)
     if (normalized(actionRecord.playerId) !== viewer) return unavailable(started)
-    if (Array.isArray(actionRecord.extraTargets) && actionRecord.extraTargets.length > 0) return needsInput(started)
+    if (!collectOwnedChoices && Array.isArray(actionRecord.extraTargets) && actionRecord.extraTargets.length > 0) return needsInput(started)
     const source = publicSnapshot.pieces.find(piece => piece.instanceId === actionRecord.pieceId)
     if (!source || normalized(source.ownerPlayerId) !== viewer) return unavailable(started)
     if (normalized(publicSnapshot.turn?.currentPlayerId) !== viewer || publicSnapshot.turn.phase !== 'action') return unavailable(started)
@@ -648,9 +654,9 @@ export function previewBattleAction(
     if (!source.skills?.some(skill => skill.skillId === actionRecord.skillId)) return unavailable(started)
 
     const skillId = typeof actionRecord.skillId === 'string' ? actionRecord.skillId : ''
-    const skill = publicSkillDefinition(publicSnapshot, skillId)
+    const skill = publicSkillDefinition(publicSnapshot, skillId, collectOwnedChoices)
     if (!skill) return unavailable(started)
-    if (selectionNeedsInput(skill, safeAction)) return needsInput(started)
+    if (!collectOwnedChoices && selectionNeedsInput(skill, safeAction)) return needsInput(started)
 
     // Use JSON-only state plus the selected public skill.  Never hydrate from
     // the server content registry in this surface.
@@ -675,6 +681,9 @@ export function previewBattleAction(
             previewReactionKey(kind, consumerId, sourceId, eventType),
           ),
           onPendingConsumer: (kind, consumerId, sourceId, eventType) => {
+            const owner = attemptState.pieces.find(piece => piece.instanceId === sourceId)?.ownerPlayerId
+              ?? attemptState.players.find(player => player.playerId === sourceId)?.playerId
+            if (collectOwnedChoices && normalized(owner) === viewer) return false
             const key = previewReactionKey(kind, consumerId, sourceId, eventType)
             if (skippedReactions.has(key)) return false
             pendingReactionKey = key
@@ -683,6 +692,28 @@ export function previewBattleAction(
         },
       })
       try {
+        if (collectOwnedChoices) {
+          const preparation = withRuleRuntime(runtimeScope.runtime, () => withRuleExecutionContext(
+            context, () => prepareAction(attemptState, safeAction),
+          ))
+          if (runtimeScope.randomAccessed() || publicRuleSource.hasUnsupportedAccess()) return unavailable(started)
+          if (preparation.kind === 'invalid') return unavailable(started)
+          if (preparation.kind !== 'ready') {
+            const publicPreparation: JsonRecord = { kind: preparation.kind, continuation: false,
+              source: { type: 'skill', id: skillId, pieceId: source.instanceId } }
+            const record = preparation as unknown as JsonRecord
+            for (const key of ['title', 'selectionId', 'stateRevision', 'targetType', 'range', 'filter', 'rangeCells',
+              'candidates', 'options', 'selectionMode', 'minSelections', 'maxSelections', 'canCancel', 'min', 'max', 'step']) {
+              if (record[key] !== undefined) publicPreparation[key] = cloneJson(record[key])
+            }
+            return needsInput(started, publicPreparation)
+          }
+          // Public input metadata can be prepared even for effects that are
+          // outside the supported preview executor. Never execute those
+          // effects merely because their root choices have been completed.
+          if (skill.statusTag || skill.summonCapability || skill.deathParasitism
+            || /\bMath\s*\.\s*random\s*\(/.test(String(skill.code))) return unavailable(started)
+        }
         predicted = recordBattlePresentation(
           attemptState,
           () => withRuleRuntime(runtimeScope.runtime, () => withRuleExecutionContext(
@@ -690,6 +721,7 @@ export function previewBattleAction(
             () => applyBattleAction(attemptState, safeAction),
           )),
           result => result,
+          { observeProjectilePaths: collectOwnedChoices },
         )
       } catch (error) {
         randomAccessed ||= runtimeScope.randomAccessed()
@@ -705,7 +737,9 @@ export function previewBattleAction(
     }
 
     if (!predicted || randomAccessed) return unavailable(started)
-    if (stateHasPendingInteraction(predicted)) return needsInput(started)
+    if (stateHasPendingInteraction(predicted)) {
+      return needsInput(started, collectOwnedChoices ? publicNextSkillChoice(predicted, viewer) : undefined)
+    }
     if (hasUnprovenExecutableState(predicted, true)) return unavailable(started)
     const postExecutionCheck = cloneJson(predicted)
     if (!sanitizePreviewState(postExecutionCheck)) return unavailable(started)
@@ -718,9 +752,63 @@ export function previewBattleAction(
       afterState: predicted,
     })
     const events = safeEvents(projectBattlePresentationEventsForViewer(rawEvents, viewerId))
+    if (collectOwnedChoices) {
+      for (const trace of recordedProjectilePaths(predicted) ?? []) {
+        const cells = [trace.origin, ...trace.facts.filter(fact => fact.type === 'cell').map(fact => ({ x: fact.x, y: fact.y }))]
+        if (cells.length < 2) continue
+        const last = trace.facts.at(-1)
+        const end = cells.at(-1)!
+        events.push({
+          eventId: `preview-path-${events.length}`, rootEventId: events[0]?.rootEventId ?? 'preview-root',
+          actionId: actionId(safeAction), sequence: events.length, kind: 'passive', iconId: 'action-passive',
+          actorPlayerId: viewerId, priority: 30, skippable: true,
+          presentation: {
+            cue: 'projectile', pathCells: cells.map(cell => ({ x: cell.x, y: cell.y })), endPoint: { ...end },
+            endReason: last?.type === 'terrain' && last.blocksProjectile ? 'blocked' : last?.type === 'boundary' ? 'boundary' : 'resolved',
+            collisions: trace.facts.flatMap<BattlePresentationCollision>(fact => {
+              if (fact.type === 'piece') return [{ kind: 'piece' as const, x: fact.x, y: fact.y, pieceId: fact.piece.instanceId, blocking: false }]
+              if (fact.type === 'terrain' && fact.blocksProjectile) return [{ kind: 'terrain' as const, x: fact.x, y: fact.y, terrainType: String(fact.tile.props?.type ?? 'terrain'), blocking: true }]
+              return []
+            }),
+          },
+        })
+      }
+    }
     return { status: 'ready', snapshot: publicState, events, durationMs: durationSince(started) }
   } catch {
     // Error details may include rule IDs, private state or loader paths.
     return unavailable(started)
   }
+}
+
+function publicNextSkillChoice(state: BattleState, viewer: string): JsonRecord | undefined {
+  const pending = state.pendingTargetSelection ?? state.pendingOptionSelection
+  if (!pending || normalized(pending.playerId) !== viewer || !pending.source) return undefined
+  const source: JsonRecord = { type: pending.source.type, id: pending.source.id }
+  if (pending.source.pieceId) source.pieceId = pending.source.pieceId
+  const result: JsonRecord = {
+    kind: state.pendingTargetSelection ? 'needTarget' : 'needOption',
+    source, continuation: true,
+    promptKey: skillChoicePromptKey(state.pendingTargetSelection ? 'target' : 'option', pending as unknown as JsonRecord),
+  }
+  const record = pending as unknown as JsonRecord
+  for (const key of ['title', 'selectionId', 'stateRevision', 'range', 'filter', 'rangeCells', 'candidates', 'options',
+    'selectionMode', 'minSelections', 'maxSelections', 'canCancel', 'min', 'max', 'step']) {
+    if (record[key] !== undefined) result[key] = cloneJson(record[key])
+  }
+  if (state.pendingTargetSelection) {
+    result.targetType = state.pendingTargetSelection.targetType === 'piece' ? 'piece' : 'cell'
+  }
+  return result
+}
+
+/** Read-only local preparation for public post-root choices. */
+export function preparePublicSkillAction(snapshot: BattleState, action: BattleAction, viewerId: string): BattleActionPreview {
+  return runPublicSkillAction(snapshot, action, viewerId, true)
+}
+
+export function previewBattleAction(snapshot: BattleState, action: BattleAction, viewerId: string): BattleActionPreview {
+  return runPublicSkillAction(snapshot, action, viewerId, Object.hasOwn(action ?? {}, 'skillChoices')
+    || (action as unknown as JsonRecord)?.selectedOption !== undefined
+    || (Array.isArray((action as unknown as JsonRecord)?.extraTargets) && ((action as unknown as JsonRecord).extraTargets as unknown[]).length > 0))
 }

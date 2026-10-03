@@ -56,6 +56,7 @@ type RendererApi = {
   showPresentationAreaFlash(cells: Array<{ x: number; y: number }>): void
   clearPresentationAreaFlash(): void
   showPresentationPath(path: { source?: { x: number; y: number }; end?: { x: number; y: number }; selected?: { x: number; y: number } }): void
+  showPresentationPaths(paths: Array<{ source: { x: number; y: number }; end: { x: number; y: number } }>): void
   clearPresentationPath(): void
   getMotionDiagnostics(): {
     activeAnimations: string[]
@@ -782,6 +783,24 @@ describe('RED-68 BattleRenderer3D runtime', () => {
       selected: { x: 4, y: 4 },
     })
     harness.renderer.clearPresentationPath()
+    harness.renderer.dispose()
+  })
+
+  it('keeps multiple projectile rays visible together and clears their geometry on cancellation', () => {
+    const harness = createHarness(1280, 720, false)
+    const model = runtimeModel()
+    harness.renderer.init({ container: harness.container })
+    harness.renderer.update(model)
+    harness.frame(16)
+    const scene = harness.renderers[0].scene!
+    const rays = [2, 3, 4].map(x => ({ source: { x, y: 5 }, end: { x, y: 0 } }))
+    harness.renderer.showPresentationPaths(rays)
+    const group = scene.children.find(child => child.userData.presentationPath === true)!
+    expect(group.children).toHaveLength(3)
+    expect(group.children.map(child => child.userData.sourceCell)).toEqual(rays.map(ray => ray.source))
+    harness.renderer.clearPresentationPath()
+    expect(scene.children).not.toContain(group)
+    expect(harness.renderer.getMotionDiagnostics().presentationPath).toBeNull()
     harness.renderer.dispose()
   })
 

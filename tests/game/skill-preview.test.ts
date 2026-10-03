@@ -102,7 +102,7 @@ describe('RED-224 isolated public skill preview', () => {
     expect(previewBattleAction({ ...state, pendingTargetSelection: {} as never }, action, 'player-red').status)
       .toBe('needs-input')
     expect(previewBattleAction(state, { ...action, extraTargets: [{ pieceId: 'uther' }] } as BattleAction, 'player-red').status)
-      .toBe('needs-input')
+      .toBe('unavailable')
     expect(previewBattleAction(state, action, 'player-blue').status).toBe('unavailable')
     expect(previewBattleAction(state, { ...action, type: 'move' } as BattleAction, 'player-red').status)
       .toBe('unavailable')

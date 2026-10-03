@@ -54,6 +54,11 @@ function baseContext() {
     setStatusMsg: (message: string) => statusMessages.push(message),
     statusMessages,
     _targetPromptText: () => '选择目标',
+    prepareLocalSkillAction: vi.fn(() => ({ status: 'ready' })),
+    localSkillChoices: vi.fn(() => []),
+    localSkillRootAction: vi.fn((skill: Record<string, any>) => skill.baseAction || {}),
+    installLocalSkillDraft: vi.fn(() => false),
+    localSkillInitialOptionPreparation: vi.fn(() => null),
     cancelTargetSelection: vi.fn(),
     doAction,
   }) as unknown as Record<string, any>
@@ -115,6 +120,7 @@ describe('RED-227 skill preview selection switching', () => {
 
     expect(h.context.clearReasons).toEqual(['skill-preview-clicked'])
     expect(h.doAction).toHaveBeenCalledOnce()
+    expect(h.context.prepareLocalSkillAction).toHaveBeenCalledOnce()
     expect(h.doAction.mock.calls[0][0]).toEqual({
       type: 'useBasicSkill',
       pieceId: 'source',
@@ -122,7 +128,7 @@ describe('RED-227 skill preview selection switching', () => {
     })
   })
 
-  it('classifies a targeted card through the engine without entering target mode', () => {
+  it('does not probe or enter target mode while hovering a declared-target skill', () => {
     const h = baseContext()
     h.context.pendingSkill = {
       skillId: 'skill-old',
@@ -135,8 +141,12 @@ describe('RED-227 skill preview selection switching', () => {
       },
     }
     h.context.BattleLegalActions = h.context.window.BattleLegalActions
-    h.context.GameEngine = {}
+    h.context.GameEngine = { preparePublicSkillAction: vi.fn() }
     h.context.skillsById = {}
+    h.context.prepareLocalSkillAction = vi.fn(() => ({
+      status: 'needs-input',
+      preparation: { kind: 'needTarget', continuation: false },
+    }))
     h.context.skillDefOf = vi.fn(() => ({
       type: 'normal',
       targeting: { steps: [{ kind: 'target', type: 'piece' }] },
@@ -151,7 +161,8 @@ describe('RED-227 skill preview selection switching', () => {
     expect(result).toBe(false)
     expect(h.context.clearReasons).toEqual(['skill-hover-switch'])
     expect(h.context.pendingSkill).toBeNull()
-    expect(h.context.BattleLegalActions.probeSkillTarget).toHaveBeenCalledOnce()
+    expect(h.context.BattleLegalActions.probeSkillTarget).not.toHaveBeenCalled()
+    expect(h.context.prepareLocalSkillAction).toHaveBeenCalledOnce()
     expect(h.context.enterActionTargetMode).not.toHaveBeenCalled()
     expect(h.context.enterPreviewOnlySkillMode).not.toHaveBeenCalled()
     expect(h.doAction).not.toHaveBeenCalled()
@@ -166,8 +177,9 @@ describe('RED-227 skill preview selection switching', () => {
     }))
     h.context.window = { BattleLegalActions: { probeSkillTarget: vi.fn(() => ({ needsTarget: false })) } }
     h.context.BattleLegalActions = h.context.window.BattleLegalActions
-    h.context.GameEngine = {}
+    h.context.GameEngine = { preparePublicSkillAction: vi.fn() }
     h.context.skillsById = {}
+    h.context.prepareLocalSkillAction = vi.fn(() => ({ status: 'ready' }))
     h.context.enterPreviewOnlySkillMode = vi.fn(() => true)
     new Script([readFunction('skillSelectionSwitchBlocked'), readFunction('previewSkillCard')].join('\n'))
       .runInContext(h.context)
@@ -180,7 +192,46 @@ describe('RED-227 skill preview selection switching', () => {
       expect.objectContaining({ type: 'normal' }),
       'hover',
     )
-    expect(h.context.BattleLegalActions.probeSkillTarget).toHaveBeenCalledOnce()
+    expect(h.context.BattleLegalActions.probeSkillTarget).not.toHaveBeenCalled()
+    expect(h.context.prepareLocalSkillAction).toHaveBeenCalledOnce()
+  })
+
+  it('prepares a root action before releasing an initially un-targeted skill', async () => {
+    const h = baseContext()
+    h.context.prepareLocalSkillAction = vi.fn(() => ({ status: 'ready' }))
+    new Script(readFunction('selectSkillCard', true)).runInContext(h.context)
+
+    await new Script("selectSkillCard('skill-no-target')").runInContext(h.context)
+
+    expect(h.context.prepareLocalSkillAction).toHaveBeenCalledOnce()
+    expect(h.context.installLocalSkillDraft).not.toHaveBeenCalled()
+    expect(h.doAction).toHaveBeenCalledOnce()
+  })
+
+  it('installs a public root prompt before any authority submission', async () => {
+    const h = baseContext()
+    const preparation = {
+      kind: 'needOption',
+      continuation: false,
+      source: { type: 'skill', id: 'skill-option', pieceId: 'source' },
+      selectionId: 'root-option',
+      stateRevision: 7,
+      options: [{ label: 'First', value: 'first' }],
+    }
+    h.context.prepareLocalSkillAction = vi.fn(() => ({ status: 'needs-input', preparation }))
+    h.context.installLocalSkillDraft = vi.fn(() => true)
+    new Script(readFunction('selectSkillCard', true)).runInContext(h.context)
+
+    await new Script("selectSkillCard('skill-option')").runInContext(h.context)
+
+    expect(h.context.prepareLocalSkillAction).toHaveBeenCalledOnce()
+    expect(h.context.installLocalSkillDraft).toHaveBeenCalledWith(
+      expect.objectContaining({ skillId: 'skill-option' }),
+      expect.anything(),
+      preparation,
+      'click',
+    )
+    expect(h.doAction).not.toHaveBeenCalled()
   })
 
   it('blocks hover replacement while an authoritative pending selection exists', () => {

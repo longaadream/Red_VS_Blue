@@ -700,6 +700,73 @@ async function runElectronSmoke() {
     ensure(await evaluate('!document.getElementById("battleSettingsButton").classList.contains("ui-motion-hover")'), 'battle toolbar retained stale hover state')
     evidence.motion = { skillCardHover: true, toolbarHover: true, toolbarPress: true, handHover: true, screenshot: await screenshot('final-red227-battle-motion.png') }
 
+    const previousWindow = win
+    win = new BrowserWindow({ width: 1440, height: 1000, show: true, webPreferences: { nodeIntegration: false, contextIsolation: true } })
+    debuggerAttached = false
+    debuggerApi = win.webContents.debugger
+    win.webContents.on('console-message', (_event, level, message) => evidence.logs.push({ level, message: String(message) }))
+    previousWindow.close()
+    win.focus()
+    await loadBattle()
+    await configureSetup({ firstPiece: 'shadow', secondPiece: 'el-primo', firstFaction: 'red', secondFaction: 'blue' })
+    await waitFor('G && G.turn.phase === "action" && battlePresentation && _use3d === true && getComputedStyle(document.getElementById("loadingOverlay")).display === "none"', 30000, 'shadow training runtime')
+    for (const [x, y] of [[8, 7], [11, 7], [10, 7]]) {
+      await selectPieceAt('shadow')
+      ensure(await evaluate('Array.from(validMoves).includes(' + JSON.stringify(x + ',' + y) + ')'), 'shadow movement cell unavailable')
+      await mouseClick(await pointForCell(x, y))
+      await waitPieceAt('shadow', x, y, 'shadow normal movement')
+      await delay(350)
+    }
+    // Set up the on-ray target through the production training placement
+    // controls. The default map walls prevent a short ordinary move from the
+    // original enemy spawn. No battle state is injected or rewritten.
+    await mouseClick(await pointForElement('#trainingToolsToggle', 'training placement tools'))
+    await evaluate('(() => { const owner = document.getElementById("placeOwner"); owner.value = "training-blue"; owner.dispatchEvent(new Event("change", { bubbles:true })); const template = document.getElementById("placeTemplate"); template.value = "el-primo"; template.dispatchEvent(new Event("change", { bubbles:true })); return template.value === "el-primo" })()')
+    await mouseClick(await pointForElement('#btnPlace', 'place a side-shot target'))
+    const enemyLanding = await evaluate('[[13,6],[12,6],[11,6],[13,8],[12,8],[11,8]].find(p => currentBattleViewModel.legal.placementCells.some(c => c.x === p[0] && c.y === p[1]))')
+    ensure(enemyLanding, 'no legal enemy side-shot placement cell')
+    await mouseClick(await pointForCell(enemyLanding[0], enemyLanding[1]))
+    await waitFor('G.pieces.some(piece => piece.templateId === "el-primo" && piece.x === ' + enemyLanding[0] + ' && piece.y === ' + enemyLanding[1] + ')', 10000, 'training target enters side-shot range')
+    const shadowBefore = await stateSnapshot()
+    const sideEnemy = shadowBefore.pieces.find(piece => piece.templateId === 'el-primo' && piece.x === enemyLanding[0] && piece.y === enemyLanding[1])
+    const sideY = enemyLanding[1] < 7 ? 6 : 8
+    const shadowAp = playerById(shadowBefore, 'training-red').actionPoints
+    const commandCount = await evaluate('window.__RVB_RED50_EVIDENCE__.targetCommands.length')
+    const chooseDash = async () => {
+      const card = await openSkill('shadow', 'shadow-ride-sweep')
+      await mouseClick(card.button)
+      await mouseClick(await pointForCell(13, 7))
+      await waitFor('pendingSkill?.localChoiceDraft && pendingSkill.preparation?.continuation === true', 5000, 'local shadow side choice')
+    }
+    await chooseDash()
+    ensure(await evaluate('!G.pendingTargetSelection && !G.pendingOptionSelection'), 'local choice reached authority early')
+    ensure(await readResource('training-red') === shadowAp, 'local dash spent AP')
+    ensure(await evaluate('window.__RVB_RED50_EVIDENCE__.targetCommands.length') === commandCount, 'local dash submitted a command')
+    const hoverSide = async () => {
+      await mouseHover(await pointForCell(13, sideY))
+      await waitFor('document.querySelector(".skill-preview-badge")?.hidden === false && BattleRenderer3D.getPerformanceDiagnostics().presentationPathCount >= 3', 5000, 'shadow final three projectile preview')
+    }
+    await hoverSide()
+    evidence.shadow = { before: shadowBefore, localPreview: await stateSnapshot(), renderer: await evaluate('BattleRenderer3D.getPerformanceDiagnostics()'), screenshot: await screenshot('final-red227-shadow-local-preview.png') }
+    const predictedHp = Number(evidence.shadow.localPreview.displayHealth.find(piece => piece.id === sideEnemy.id)?.hp)
+    ensure(predictedHp < sideEnemy.currentHp, 'final side-shot preview did not display enemy damage')
+    ensure(evidence.shadow.localPreview.pieces.find(piece => piece.id === sideEnemy.id)?.currentHp === sideEnemy.currentHp, 'preview mutated enemy HP')
+    ensure(await readResource('training-red') === shadowAp, 'side preview spent AP')
+    await pressEscape()
+    await waitFor('!pendingSkill && !G.pendingTargetSelection && !G.pendingOptionSelection', 5000, 'shadow local cancellation')
+    ensure(await readResource('training-red') === shadowAp, 'cancelled sequence spent AP')
+    await chooseDash()
+    await hoverSide()
+    await mouseClick(await pointForCell(13, sideY))
+    await waitFor('!pendingSkill && !G.pendingTargetSelection && !G.pendingOptionSelection && G.pieces.some(p => p.templateId === "shadow" && p.x === 13 && p.y === 7)', 10000, 'shadow batch commit')
+    ensure(await readResource('training-red') === shadowAp - 1, 'batch did not charge exactly once')
+    ensure(await evaluate('window.__RVB_RED50_EVIDENCE__.targetCommands.length') === commandCount + 1, 'sequence did not use one submission')
+    evidence.shadow.afterCommit = await stateSnapshot()
+    ensure(evidence.shadow.afterCommit.pieces.find(piece => piece.id === sideEnemy.id)?.currentHp === predictedHp, 'batch damage differs from deterministic preview')
+    await waitFor('currentBattleViewModel.pieces.some(piece => piece.templateId === "shadow" && piece.x === 13 && piece.y === 7) && Array.from(document.querySelectorAll("#hpBarLayer3d .piece-board-summary")).some(node => node.dataset.pieceId === ' + JSON.stringify(sideEnemy.id) + ' && node.querySelector(".piece-board-health")?.textContent === ' + JSON.stringify(String(predictedHp)) + ')', 10000, 'settled side-shot display')
+    evidence.shadow.settledDisplay = await stateSnapshot()
+    evidence.shadow.commitScreenshot = await screenshot('final-red227-shadow-batch-commit.png')
+
     evidence.results = {
       passed: true,
       desktopTraining: true,
@@ -713,6 +780,7 @@ async function runElectronSmoke() {
       terrainPreview: true,
       samePieceMenuToggle: true,
       battleMotion: true,
+      shadowLocalChoicePreviewAndSingleCommit: true,
     }
     fs.writeFileSync(path.join(evidenceRoot, 'results.json'), JSON.stringify(evidence, null, 2))
     console.log(JSON.stringify(evidence.results, null, 2))

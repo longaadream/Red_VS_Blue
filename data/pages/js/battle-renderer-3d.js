@@ -1503,25 +1503,36 @@
   }
 
   function showPresentationPath(input) {
+    return showPresentationPaths([input])
+  }
+
+  function showPresentationPaths(inputs) {
     if (!_mounted || !_scene) return
-    const source = _normalizePresentationPoint(input && input.source)
-    const end = _normalizePresentationPoint(input && input.end)
-    const selected = _normalizePresentationPoint(input && input.selected)
-    const hasTrajectory = !!(source && end && (source.x !== end.x || source.z !== end.z))
-    if (!hasTrajectory && !selected) {
+    const paths = (Array.isArray(inputs) ? inputs : []).map(function (input) {
+      const source = _normalizePresentationPoint(input && input.source)
+      const end = _normalizePresentationPoint(input && input.end)
+      const selected = _normalizePresentationPoint(input && input.selected)
+      const hasTrajectory = !!(source && end && (source.x !== end.x || source.z !== end.z))
+      return { source: source, end: end, selected: selected, hasTrajectory: hasTrajectory }
+    }).filter(function (path) { return path.hasTrajectory || path.selected })
+    if (!paths.length) {
       _clearPresentationPath()
       return
     }
-    const signature = [source && source.key || '', end && end.key || '', selected && selected.key || ''].join('|')
+    const signature = paths.map(function (path) {
+      return [path.source && path.source.key || '', path.end && path.end.key || '', path.selected && path.selected.key || ''].join('|')
+    }).join(';')
     if (_presentationPath && _presentationPath.signature === signature) return
     _clearPresentationPath()
-    const trajectory = hasTrajectory ? _createPresentationPathRibbon(source, end) : null
-    const aim = _createPresentationAimMarker(selected)
-    if (!trajectory && !aim) return
     const group = new THREE.Group()
     group.userData.presentationPath = true
-    if (trajectory) group.add(trajectory)
-    if (aim) group.add(aim)
+    paths.forEach(function (path) {
+      const trajectory = path.hasTrajectory ? _createPresentationPathRibbon(path.source, path.end) : null
+      const aim = _createPresentationAimMarker(path.selected)
+      if (trajectory) group.add(trajectory)
+      if (aim) group.add(aim)
+    })
+    if (!group.children.length) return
     _scene.add(group)
     _invalidate()
     const materials = []
@@ -1529,9 +1540,11 @@
     _presentationPath = {
       signature: signature,
       group: group,
-      source: source ? { x: source.x, y: source.z } : null,
-      end: end ? { x: end.x, y: end.z } : null,
-      selected: selected ? { x: selected.x, y: selected.z } : null,
+      pathCount: paths.filter(function (path) { return path.hasTrajectory }).length,
+      // Preserve the single-path diagnostics for existing callers.
+      source: paths[0].source ? { x: paths[0].source.x, y: paths[0].source.z } : null,
+      end: paths[0].end ? { x: paths[0].end.x, y: paths[0].end.z } : null,
+      selected: paths[0].selected ? { x: paths[0].selected.x, y: paths[0].selected.z } : null,
     }
     const targetOpacities = materials.map(function () { return 0.96 })
     if (_reducedMotion) {
@@ -2479,6 +2492,7 @@
       terrainBatchCount: _tileBatches.size,
       tileEffectCellCount: _tileEffectObjects.size,
       previewBoardActive: _previewAuthorityModel != null,
+      presentationPathCount: _presentationPath ? _presentationPath.pathCount : 0,
       terrainInstanceCount: Array.from(_tileBatches.values()).reduce(function (total, batch) {
         return total + Number(batch.count || 0)
       }, 0),
@@ -3369,6 +3383,7 @@
     showPresentationAreaFlash,
     clearPresentationAreaFlash: _clearPresentationAreaFlash,
     showPresentationPath,
+    showPresentationPaths,
     clearPresentationPath: _clearPresentationPath,
     dispose,
     getMotionDiagnostics,
