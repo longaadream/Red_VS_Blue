@@ -7780,6 +7780,16 @@
         key: JSON.stringify(action), revision: action.stateRevision })
     }
 
+    function endSkillCardPreview(skId) {
+      if (skillSelectionSwitchBlocked() || !pendingSkill
+        || pendingSkill.previewOnly !== true || pendingSkill.previewOrigin !== 'hover'
+        || String(pendingSkill.skillId || '') !== String(skId || '')) return false
+      clearTargetInteraction('skill-hover-leave')
+      renderBoard()
+      renderActionBar()
+      return true
+    }
+
     function previewSkillCard(skId) {
       if (!selectedPieceId || !skId || !G || skillSelectionSwitchBlocked()) return false
       if (typeof progressiveDeploymentPending === 'function' && progressiveDeploymentPending(G)) return false
@@ -9173,7 +9183,10 @@
           if (!G || context.pieceId !== selectedPieceId || targetSubmissionPending || pendingActionFeedback || skillSelectionSwitchBlocked()) return false
           const piece = G.pieces.find(p => p.instanceId === context.pieceId)
           if (!piece || !resolveSkillAvailability(piece, context.skillId).available) return false
-          if (pendingSkill && pendingSkill.skillId === context.skillId) return true
+          if (pendingSkill && pendingSkill.skillId === context.skillId) {
+            if (pendingSkill.previewOnly === true && pendingSkill.previewOrigin === 'hover') pendingSkill.previewOrigin = 'drag'
+            return true
+          }
           const draft = { type: skillUsesCharge(skillDefOf(context.skillId)) ? 'useChargeSkill' : 'useBasicSkill',
             playerId: myPlayerId, pieceId: context.pieceId, skillId: context.skillId }
            if (typeof tutorialActionAllowed === 'function' && !tutorialActionAllowed(draft)) return false

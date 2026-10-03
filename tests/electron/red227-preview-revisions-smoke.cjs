@@ -598,6 +598,11 @@ async function runElectronSmoke() {
     const boardDestination = await pointForCell(11, 4)
     // Hover can insert the existing inline target controls. Measure the
     // current header after that layout change, rather than drag stale bounds.
+    await mouseHover(meteor.button)
+    ensure(await evaluate('pendingSkill && pendingSkill.previewOrigin === "hover"'), 'within-card movement cancelled hover')
+    await mouseHover(await pointForCell(0, 0))
+    await waitFor('!pendingSkill && !BattleRenderer3D.getPerformanceDiagnostics().previewBoardActive', 5000, 'leaving card restores real board')
+    ensure(playerById(await stateSnapshot(), 'training-red')?.actionPoints === playerById(meteorBefore, 'training-red')?.actionPoints, 'hover leave deducted AP')
     const meteorDragStart = await pointForElement('#pieceInfoContent .character-cast[data-skill-id="el-primo-meteor-belt"]', 'meteor drag header')
     await mouseDrag(meteorDragStart, boardDestination)
     const meteorBeforeRelease = await stateSnapshot()

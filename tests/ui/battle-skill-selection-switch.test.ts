@@ -66,6 +66,38 @@ function baseContext() {
 }
 
 describe('RED-227 skill preview selection switching', () => {
+  it('ends only the matching hover preview when leaving a skill card', () => {
+    const h = baseContext()
+    new Script([readFunction('skillSelectionSwitchBlocked'), readFunction('endSkillCardPreview')].join('\n')).runInContext(h.context)
+    h.context.renderBoard = vi.fn()
+    h.context.renderActionBar = vi.fn()
+    for (const origin of ['click', 'drag']) {
+      h.context.pendingSkill = { skillId: 'no-target', previewOnly: true, previewOrigin: origin }
+      expect(new Script("endSkillCardPreview('no-target')").runInContext(h.context)).toBe(false)
+    }
+    h.context.pendingSkill = { skillId: 'no-target', previewOnly: true, previewOrigin: 'hover' }
+    expect(new Script("endSkillCardPreview('other')").runInContext(h.context)).toBe(false)
+    h.context.targetSubmissionPending = {}
+    expect(new Script("endSkillCardPreview('no-target')").runInContext(h.context)).toBe(false)
+    h.context.targetSubmissionPending = null
+    expect(new Script("endSkillCardPreview('no-target')").runInContext(h.context)).toBe(true)
+    expect(h.context.pendingSkill).toBeNull()
+    expect(h.context.clearReasons).toEqual(['skill-hover-leave'])
+  })
+
+  it('promotes an existing hover draft before drag leaves the card', () => {
+    const h = baseContext()
+    const start = battlePage.indexOf('arm: context => {') + 'arm: '.length
+    const end = battlePage.indexOf('\n        cellAt:', start)
+    new Script([readFunction('skillSelectionSwitchBlocked'), readFunction('endSkillCardPreview'),
+      'var arm = ' + battlePage.slice(start, end).trim().replace(/,$/, '')].join('\n')).runInContext(h.context)
+    h.context.pendingSkill = { skillId: 'no-target', previewOnly: true, previewOrigin: 'hover' }
+    expect(new Script("arm({pieceId: 'source', skillId: 'no-target'})").runInContext(h.context)).toBe(true)
+    expect(h.context.pendingSkill.previewOrigin).toBe('drag')
+    expect(new Script("endSkillCardPreview('no-target')").runInContext(h.context)).toBe(false)
+    expect(h.context.clearReasons).toEqual([])
+  })
+
   it('replays no-target hover after layout changes but never resurrects a cancelled draft', () => {
     const h = baseContext()
     const frames: Array<() => void> = []

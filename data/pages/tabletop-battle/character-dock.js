@@ -114,6 +114,12 @@
      if(!current||current.disabled||typeof window.previewSkillCard!=='function')return;
      window.previewSkillCard(current.dataset.skillId||id);
     });
+    row.addEventListener('pointerleave',event=>{
+     if(event&&event.pointerType&&event.pointerType!=='mouse')return;
+     if(event&&event.relatedTarget&&row.contains(event.relatedTarget))return;
+     const current=row.querySelector('.character-cast');
+     if(current&&typeof window.endSkillCardPreview==='function')window.endSkillCardPreview(current.dataset.skillId||id);
+    });
    }
    // The existing skill header is the action surface. Moving it into the
    // same real button keeps the title, type and cost readable while leaving

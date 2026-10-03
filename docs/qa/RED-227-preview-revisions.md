@@ -84,3 +84,11 @@ RED-226 的旧图鉴 Electron harness 在 pieces.html 指针/动画检查之前�
 ## 回退
 
 回退本任务提交并从对应源版本重建 `data/pages/js/game-engine.js`；无需存档迁移。依赖 RED-225/226 保持独立。合并、发布和部署仍由负责人决定。
+
+## 无目标悬停离卡结束（2026-10-03）
+
+仅公共技能卡 pointerleave 和本地 hover 草稿清理；匹配技能且 previewOnly/hover 才清除，恢复真实棋盘。卡内移动保留，拖动接管前改为 drag。角色与规则代码未改。
+
+修改前回归失败；修改后4文件46/46通过，独立切换/拖动21/21通过。TypeScript、相关ESLint、encoding、diff与main-baseline通过。原生Electron新增卡内移动、离卡清除/previewBoardActive=false/AP不扣，以及随后拖放一次扣费均通过。完整长流程两次分别在后续菜单toggle、Shadow新窗口初始选棋子超时，不计整套通过，不通过重跑掩盖不稳定；第二次菜单toggle通过。当前变更的实机断言未失败。已有controller取消迟到结果、viewport取消不复活回归通过。
+
+人工验收：悬停流星腰带出现假设状态；移到卡片标题仍保留；移到棋盘/空白立即恢复；重新拖动卡片到棋盘，离卡不取消，松手只扣一次。回退本轮追加提交；无引擎bundle或存档迁移。
