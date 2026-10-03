@@ -52,6 +52,16 @@ context.damageQueue.push({
 
 权威 `runBattleAction()` 在失败时回滚 BattleState、RuleRuntime、TriggerSystem 和 EffectChain 快照；低层 detached helper 不声称具备动作级原子性。当前志志雄自燃自伤与所有反射规则使用 `damageQueue`；收割在 `afterDamageDealt` 登记 `healQueue`，等 Damage after 与内生 DeathBatch 完成后再按共享 FIFO 治疗。
 
+## 代伤（RED-213）
+
+原始攻击在 `beforeDamageTaken` 之前派发 `beforeDamageRedirect`，提供一次性的 `context.damageRedirectQueue.push({ target: protector })`，成功返回 `true`。规则负责存活、阵营、范围和状态资格；接口验证保护者仍为战场中的存活实例且不是原目标。登记成功后跳过原目标的 `beforeDamageTaken`，不扣血、不消耗防御/护盾、不触发 `afterDamageBlocked`，返回成功结果并在日志记录 `redirectedTo`。独立阶段保证该顺序不受棋子数组排列影响。
+
+代伤仍使用现有 FIFO：绑定原攻击来源、类型、技能、选项及源方增益后的伤害，保护者从目标侧阶段开始结算，不再次执行 `beforeDamageDealt`。保留原始 `rawDamage`，以源方处理后的数值进入防御、护盾、伤害后事件及死亡流程。代伤子批次不暴露该接口，防止两个保护者循环转移。普通 `damageQueue` 不接受内部代伤字段。
+
+父范围伤害或较早的队列伤害可能先杀死保护者；此时该次代伤回退给原目标（同样不重复源增益、不再转移）。两者均已失效则跳过。每个队列伤害分别提交，避免同一保护者在一个范围批次中重复使用 HP 快照而覆盖伤害。代伤绑定、队列和标记均属于瞬态动作结算，不新增存档状态。
+
+该接口需要更新权威引擎；只更新资源包不能让旧服务器获得代伤能力。
+
 ## 生命周期与可争夺充能结晶
 
 一次 DamageBatch 中，每个起始存活且 HP Commit 后为 0 的目标冻结进入同一个内生 DeathBatch。所有冻结候选在整个 `beforePieceKilled`、`afterPieceKilled`、`onPieceDied` 阶段都保留在 `battle.pieces`；这些阶段不允许恢复其 HP 或改变死亡归类。全部 lifecycle 完成后，候选一次性从战场移除并按稳定顺序进入墓地；其中 `isCore=true` 且未声明 `noKillCharge` 的正式棋子在冻结的死亡坐标生成 `charge-crystal` 公共地格效果。DeathBatch 不再授予通用即时 CP，也不派发 `afterChargeGained`；需要“死后回场”的效果在死亡完整提交后创建新棋子并走召唤流程。

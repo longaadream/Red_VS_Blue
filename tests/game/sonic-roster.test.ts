@@ -43,6 +43,7 @@ describe('Sonic roster mechanics', () => {
   it('uses the requested Sonic and Shadow skill descriptions and Super Form costs', () => {
     const expected = {
       'sonic-spin-dash': '选择一个地格（5），冲刺至此处并对路径上的敌方单位造成1.5倍伤害。',
+      'sonic-homing-attack': '选择正方向内敌人（4），传送至其相邻地格并造成0.5倍伤害。每4层动能使伤害+1。',
       'shadow-ride-sweep': '获得动能。选择1个正方向上7格内的地格并向其冲刺，对路径上敌方棋子造成1倍伤害。动能5：弹射物。冲刺后选择1个垂直于冲刺方向的方向，对路径上敌方棋子造成5点伤害，可穿透棋子。动能7：所有伤害+2。',
       'sonic-super-form': '你获得2临时行动点。本回合本棋子使用技能不消耗动能，回合结束后保留。',
     }
@@ -119,9 +120,138 @@ describe('Sonic roster mechanics', () => {
       piece: sonic, target: enemy, targetPosition: null, targets: [{ info: enemy, pos: null }], skill: definition, battle: state,
     }, state)
 
-    expect(result).toMatchObject({ success: true, message: '追踪攻击造成5点伤害' })
+    expect(result).toMatchObject({ success: true, message: '追踪攻击造成2点伤害' })
     expect(sonic).toMatchObject({ x: 4, y: 0 })
-    expect(enemy.currentHp).toBe(7)
+    expect(enemy.currentHp).toBe(10)
+  })
+
+  it.each([
+    [0, 2],
+    [3, 2],
+    [4, 3],
+    [7, 3],
+    [8, 4],
+  ])('uses half attack plus one damage for every four momentum at %i momentum', (momentum, expectedDamage) => {
+    const definition = JSON.parse(readFileSync(resolve(process.cwd(), 'data/skills/sonic-homing-attack.json'), 'utf8'))
+    const sonic = makePiece({
+      instanceId: 'sonic', templateId: 'sonic', ownerPlayerId: 'player-red', x: 0, y: 0, attack: 5,
+    })
+    sonic.momentum = momentum
+    const enemy = makePiece({
+      instanceId: 'enemy', ownerPlayerId: 'player-blue', x: 3, y: 0, currentHp: 20, maxHp: 20,
+    })
+    const state = makeState({ pieces: [sonic, enemy], width: 6, height: 4 })
+
+    const result = executeSkillFunction(definition, {
+      piece: sonic, target: enemy, targetPosition: null, targets: [{ info: enemy, pos: null }], skill: definition, battle: state,
+    }, state)
+
+    expect(result).toMatchObject({ success: true, message: `追踪攻击造成${expectedDamage}点伤害` })
+    expect(enemy.currentHp).toBe(20 - expectedDamage)
+  })
+
+  it('keeps Homing Attack targets in range and on the same row or column', () => {
+    const definition = JSON.parse(readFileSync(resolve(process.cwd(), 'data/skills/sonic-homing-attack.json'), 'utf8'))
+    const sonic = makePiece({
+      instanceId: 'sonic', templateId: 'sonic', ownerPlayerId: 'player-red', x: 0, y: 0,
+      skills: [{ skillId: definition.id, currentCooldown: 0, usesRemaining: -1 }],
+    })
+    const forward = makePiece({ instanceId: 'forward', ownerPlayerId: 'player-blue', x: 3, y: 0 })
+    const diagonal = makePiece({ instanceId: 'diagonal', ownerPlayerId: 'player-blue', x: 2, y: 2 })
+    const beyondRange = makePiece({ instanceId: 'beyond', ownerPlayerId: 'player-blue', x: 5, y: 0 })
+    const state = makeState({ pieces: [sonic, forward, diagonal, beyondRange], width: 8, height: 6 })
+    state.skillsById[definition.id] = definition
+
+    const prepared = prepareAction(state, {
+      type: 'useBasicSkill', playerId: 'player-red', pieceId: sonic.instanceId, skillId: definition.id,
+    })
+
+    expect(prepared.kind).toBe('needTarget')
+    if (prepared.kind !== 'needTarget') return
+    expect(prepared.range).toBe(4)
+    expect(prepared.candidates).toContainEqual({ type: 'piece', pieceId: forward.instanceId })
+    expect(prepared.candidates).not.toContainEqual({ type: 'piece', pieceId: diagonal.instanceId })
+    expect(prepared.candidates).not.toContainEqual({ type: 'piece', pieceId: beyondRange.instanceId })
+  })
+
+  it('rejects a diagonal Homing Attack target before moving or dealing damage', () => {
+    const definition = JSON.parse(readFileSync(resolve(process.cwd(), 'data/skills/sonic-homing-attack.json'), 'utf8'))
+    const sonic = makePiece({
+      instanceId: 'sonic', templateId: 'sonic', ownerPlayerId: 'player-red', x: 0, y: 0, attack: 5,
+    })
+    const diagonal = makePiece({ instanceId: 'diagonal', ownerPlayerId: 'player-blue', x: 2, y: 2, currentHp: 20, maxHp: 20 })
+    const state = makeState({ pieces: [sonic, diagonal], width: 6, height: 6 })
+
+    const result = executeSkillFunction(definition, {
+      piece: sonic, target: diagonal, targetPosition: null, targets: [{ info: diagonal, pos: null }], skill: definition, battle: state,
+    }, state)
+
+    expect(result).toMatchObject({ success: false, message: '请选择正方向内的敌人' })
+    expect(sonic).toMatchObject({ x: 0, y: 0 })
+    expect(diagonal.currentHp).toBe(20)
+  })
+
+  it('rejects Homing Attack when the target has no legal adjacent landing cell', () => {
+    const definition = JSON.parse(readFileSync(resolve(process.cwd(), 'data/skills/sonic-homing-attack.json'), 'utf8'))
+    const sonic = makePiece({
+      instanceId: 'sonic', templateId: 'sonic', ownerPlayerId: 'player-red', x: 0, y: 0, attack: 5,
+      skills: [{ skillId: definition.id, currentCooldown: 0, usesRemaining: -1 }],
+    })
+    const target = makePiece({ instanceId: 'target', ownerPlayerId: 'player-blue', x: 3, y: 0, currentHp: 20, maxHp: 20 })
+    const blockers = [
+      makePiece({ instanceId: 'right-blocker', ownerPlayerId: 'player-blue', x: 4, y: 0 }),
+      makePiece({ instanceId: 'down-blocker', ownerPlayerId: 'player-blue', x: 3, y: 1 }),
+      makePiece({ instanceId: 'left-blocker', ownerPlayerId: 'player-blue', x: 2, y: 0 }),
+    ]
+    const state = makeState({ pieces: [sonic, target, ...blockers], width: 6, height: 4 })
+    state.skillsById[definition.id] = definition
+
+    const prepared = prepareAction(state, {
+      type: 'useBasicSkill', playerId: 'player-red', pieceId: sonic.instanceId, skillId: definition.id,
+    })
+    expect(prepared.kind).toBe('needTarget')
+    if (prepared.kind !== 'needTarget') return
+    expect(prepared.candidates).not.toContainEqual({ type: 'piece', pieceId: target.instanceId })
+
+    const result = executeSkillFunction(definition, {
+      piece: sonic, target, targetPosition: null, targets: [{ info: target, pos: null }], skill: definition, battle: state,
+    }, state)
+    expect(result).toMatchObject({ success: false, message: '目标相邻地格没有合法落点' })
+    expect(sonic).toMatchObject({ x: 0, y: 0 })
+    expect(target.currentHp).toBe(20)
+  })
+
+  it('lets afterSkillUsed consume the pre-teleport momentum after Homing Attack', () => {
+    const definition = JSON.parse(readFileSync(resolve(process.cwd(), 'data/skills/sonic-homing-attack.json'), 'utf8'))
+    const sonic = makePiece({
+      instanceId: 'sonic', templateId: 'sonic', ownerPlayerId: 'player-red', x: 0, y: 0, attack: 5,
+      skills: [{ skillId: definition.id, currentCooldown: 0, usesRemaining: -1 }],
+      statusTags: [{ type: 'momentum-core', stacks: 8, skillIds: [definition.id] }],
+    })
+    sonic.momentum = 8
+    attachRule(sonic, 'rule-momentum-consume')
+    const enemy = makePiece({ instanceId: 'enemy', ownerPlayerId: 'player-blue', x: 3, y: 0, currentHp: 20, maxHp: 20 })
+    const state = makeState({ pieces: [sonic, enemy], width: 6, height: 4 })
+    state.skillsById[definition.id] = definition
+    state.players[0].actionPoints = 1
+
+    const prepared = prepareAction(state, {
+      type: 'useBasicSkill', playerId: 'player-red', pieceId: sonic.instanceId, skillId: definition.id,
+    })
+    expect(prepared.kind).toBe('needTarget')
+    if (prepared.kind !== 'needTarget') return
+    const resolved = applyBattleAction(state, {
+      type: 'useBasicSkill', playerId: 'player-red', pieceId: sonic.instanceId, skillId: definition.id,
+      targetPieceId: enemy.instanceId, selectionId: prepared.selectionId, stateRevision: prepared.stateRevision,
+    })
+    const nextSonic = resolved.pieces.find(piece => piece.instanceId === sonic.instanceId)
+    const nextEnemy = resolved.pieces.find(piece => piece.instanceId === enemy.instanceId)
+
+    expect(nextEnemy?.currentHp).toBe(16)
+    expect(nextSonic).toMatchObject({ x: 4, y: 0, momentum: 0 })
+    expect(nextSonic?.statusTags).toEqual(expect.arrayContaining([
+      expect.objectContaining({ type: 'momentum-core', stacks: 0 }),
+    ]))
   })
 
   it('summarizes momentum gain, consumption and the teleport exception in the glossary', () => {
