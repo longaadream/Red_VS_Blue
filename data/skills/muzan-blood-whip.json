@@ -1,0 +1,25 @@
+{
+  "id": "muzan-blood-whip",
+  "name": "血之鞭击",
+  "description": "对全部正方向3格内的敌人造成1倍伤害。",
+  "keywords": [],
+  "targetText": "无需目标",
+  "effectTags": [
+    "伤害",
+    "范围伤害"
+  ],
+  "icon": "🩸",
+  "kind": "active",
+  "type": "normal",
+  "cooldownTurns": 1,
+  "maxCharges": 0,
+  "powerMultiplier": 1,
+  "actionPointCost": 1,
+  "range": "area",
+  "requiresTarget": false,
+  "targeting": {
+    "steps": []
+  },
+  "code": "function executeSkill(context) { var caster = context.piece; var directions = [{x:1,y:0},{x:-1,y:0},{x:0,y:1},{x:0,y:-1}]; var targets = []; var seen = {}; for (var d = 0; d < directions.length; d++) { for (var distance = 1; distance <= 3; distance++) { var x = caster.x + directions[d].x * distance; var y = caster.y + directions[d].y * distance; for (var i = 0; i < battle.pieces.length; i++) { var piece = battle.pieces[i]; if (piece.currentHp <= 0 || piece.x !== x || piece.y !== y || arePlayersAllied(battle, piece.ownerPlayerId, caster.ownerPlayerId) || seen[piece.instanceId]) continue; seen[piece.instanceId] = true; targets.push(piece); } } } var damage = Math.floor(caster.attack * context.skill.powerMultiplier); for (var t = 0; t < targets.length; t++) { var target = targets[t]; if (target.currentHp > 0) flow.effects.damage(caster, target.instanceId, damage, 'physical', context.skill.id); } return { success: true, message: caster.name + '挥出血之鞭击，命中' + targets.length + '名敌人' }; }",
+  "previewCode": "function calculatePreview(piece, skillDef) { return { description: skillDef.description, expectedValues: { damage: Math.floor((piece.attack || 0) * skillDef.powerMultiplier), range: 3 } }; }"
+}

@@ -9,6 +9,7 @@ import { addPieceStatus, removePieceStatus, expireHolderStatuses, type StatusHol
 import { checkpointBattlePresentation, recordBattlePresentationBlock, createBattlePresentationQueue } from './battle-presentation-recording'
 import { createFlowRuntime, clearRemovedPieceFlowState } from './flow-runtime'
 import { changePiecePositions, type PiecePositionChange } from './position-change'
+import { makeDeathParasitismCandidate, resolveDeathParasitism } from './death-parasitism'
 import type { PositionChangeKind } from './spatial'
 import type { BattleState } from "./turn"
 import type { PieceInstance } from "./piece"
@@ -1074,6 +1075,22 @@ export function assertSkillDefinition(
   if (options.requireExecutable && !isNonEmptyString(skill.code)) {
     throw new Error(`Skill definition ${skillId} has no executable code`)
   }
+  if (skill.deathParasitism !== undefined) {
+    const declaration = skill.deathParasitism
+    if (!declaration || typeof declaration !== 'object' || Array.isArray(declaration)) {
+      throw new Error(`Skill definition ${skillId} has an invalid death parasitism declaration`)
+    }
+    const value = declaration as Record<string, unknown>
+    if (value.version !== 1
+      || !Number.isSafeInteger(value.squareRadius) || Number(value.squareRadius) < 0
+      || !Number.isSafeInteger(value.chargeCost) || Number(value.chargeCost) <= 0
+      || !isNonEmptyString(value.grantSkillId)
+      || !Array.isArray(value.grantRuleIds)
+      || value.grantRuleIds.length === 0
+      || value.grantRuleIds.some(ruleId => !isNonEmptyString(ruleId))) {
+      throw new Error(`Skill definition ${skillId} has an invalid death parasitism declaration`)
+    }
+  }
   return value as SkillDefinition
 }
 
@@ -1165,6 +1182,38 @@ function ensureSkillDefinitionForAddition(
   }
   ;battle.skillsById[skillId] = definition
   return definition
+}
+
+function addDeathParasitismSkill(
+  battle: BattleState,
+  target: PieceInstance,
+  skillId: string,
+): boolean {
+  const definition = ensureSkillDefinitionForAddition(battle, skillId, target.instanceId)
+  if (!definition) return false
+  target.skills ??= []
+  if (target.skills.some(skill => skill.skillId === skillId)) return false
+  const skill = { skillId, level: 1, currentCooldown: 0, usesRemaining: -1 }
+  target.skills.push(skill)
+  const displaySkills = target.displaySkills as unknown as Array<{ skillId?: string } | string> | undefined
+  if (displaySkills !== undefined
+    && !displaySkills.some(entry => typeof entry === 'string' ? entry === skillId : entry?.skillId === skillId)) {
+    displaySkills.push({ ...skill })
+  }
+  return true
+}
+
+function addDeathParasitismRule(
+  battle: BattleState,
+  target: PieceInstance,
+  ruleId: string,
+): boolean {
+  const rule = loadRuleForBattle(battle, ruleId, { sourceId: target.instanceId })
+  if (!rule) return false
+  target.rules ??= []
+  if (target.rules.some(entry => entry?.id === ruleId)) return false
+  target.rules.push(rule)
+  return true
 }
 
 /** Trusted code-node adapter. Serialized state contains data only, never these functions. */
@@ -2044,6 +2093,19 @@ export interface SkillExecutionResult {
 export type SkillForm = "melee" | "ranged" | "magic" | "projectile" | "area" | "self"
 
 /**
+ * Engine-owned, closed declaration for a passive that may react to the
+ * holder's pending death.  The engine only understands this generic shape;
+ * character-specific skill and rule IDs stay in the content JSON.
+ */
+export interface DeathParasitismDefinition {
+  version: 1
+  squareRadius: number
+  chargeCost: number
+  grantSkillId: string
+  grantRuleIds: string[]
+}
+
+/**
  * 技能的静态定义（模板）
  * 包含技能的元数据和函数代码
  */
@@ -2106,6 +2168,8 @@ export interface SkillDefinition extends ModeScopedContent {
   targeting?: SelectionContractDefinition
   /** Trusted, closed declaration that binds a sealed summon writer for this content. */
   summonCapability?: SummonCapabilityDeclaration
+  /** Trusted, closed declaration for a death-time host transfer. */
+  deathParasitism?: DeathParasitismDefinition
   /** When true, cancelling any synthetic post-effect target rolls back the entire skill transaction. */
   rollbackPendingTargetOnCancel?: boolean
   /** When true, the generic public battle log omits this skill's selected target. */
@@ -2649,6 +2713,8 @@ export interface DamageResult {
   depth?: number
   enqueueSequence?: number
   deathBatchId?: string
+  /** No-op follow-up for a target finalized earlier in this action chain. */
+  skipped?: 'target-already-dead'
 }
 
 export interface DamageBatchResult {
@@ -2695,6 +2761,11 @@ interface PreparedDamage {
   hpBefore: number
   result: DamageResult
   emitBlocked: boolean
+}
+
+interface ValidatedDamageTargets {
+  readonly canonicalTargets: PieceInstance[]
+  readonly skippedTargets: PieceInstance[]
 }
 
 interface PreparedHeal {
@@ -2811,7 +2882,8 @@ function validateDamageTargets(
   battle: BattleState,
   skillId: string | undefined,
   allowUnavailable: boolean,
-): PieceInstance[] {
+  chain: EffectChain,
+): ValidatedDamageTargets {
   if (!attacker || typeof attacker.instanceId !== 'string' || !attacker.instanceId) {
     throw new DamagePipelineError(
       'RVB_DAMAGE_SOURCE_INVALID',
@@ -2835,6 +2907,7 @@ function validateDamageTargets(
   }
   const seen = new Set<string>()
   const canonicalTargets: PieceInstance[] = []
+  const skippedTargets: PieceInstance[] = []
   for (const requestedTarget of targets) {
     const targetId = requestedTarget?.instanceId
     if (!targetId) {
@@ -2853,28 +2926,87 @@ function validateDamageTargets(
     }
     seen.add(targetId)
     const canonical = battle.pieces.find(piece => piece.instanceId === targetId)
-    if (!canonical || !Number.isFinite(canonical.currentHp) || canonical.currentHp <= 0) {
-      const wasInvalidated = (
-        canonical !== undefined
-        && Number.isFinite(canonical.currentHp)
-        && canonical.currentHp <= 0
-      )
-        || (
-          canonical === undefined
-          && Number.isFinite(requestedTarget.currentHp)
-          && requestedTarget.currentHp <= 0
+    if (canonical && Number.isFinite(canonical.currentHp) && canonical.currentHp > 0) {
+      // A finalized object must never be redirected to a same-ID replacement
+      // or revived object. Live canonicalization remains supported for legacy
+      // callers that hold a non-authoritative copy of a living piece.
+      if (chain.canUseDeathProvenance(battle, requestedTarget)) {
+        throw new DamagePipelineError(
+          'RVB_DAMAGE_TARGET_UNAVAILABLE',
+          'Damage target ' + targetId + ' was finalized earlier in this effect chain',
+          damageContext(battle, attacker, skillId, { targetId }),
         )
-        || (battle.graveyard ?? []).some(piece => piece.instanceId === targetId)
-      if (allowUnavailable && wasInvalidated) continue
+      }
+      canonicalTargets.push(canonical)
+      continue
+    }
+
+    if (!canonical || !Number.isFinite(canonical.currentHp) || canonical.currentHp <= 0) {
+      const graveyardMatches = (battle.graveyard ?? []).filter(piece => piece.instanceId === targetId)
+      const finalizedInThisChain = chain.canUseDeathProvenance(battle, requestedTarget)
+      const formallyFinalizedSameTarget = (
+        requestedTarget.currentHp === 0
+        && finalizedInThisChain
+        && !battle.pieces.some(piece => piece.instanceId === targetId)
+        && graveyardMatches.length === 1
+        && graveyardMatches[0] === requestedTarget
+      )
+      if (formallyFinalizedSameTarget) {
+        skippedTargets.push(requestedTarget)
+        continue
+      }
+      // Preserve the existing queued follow-up invalidation policy. The new
+      // root-facade allowance above must not tighten unrelated queue behavior,
+      // or hide a corrupted target that this chain formally finalized.
+      const wasInvalidated = (canonical !== undefined && Number.isFinite(canonical.currentHp) && canonical.currentHp <= 0)
+        || (canonical === undefined && Number.isFinite(requestedTarget.currentHp) && requestedTarget.currentHp <= 0)
+        || graveyardMatches.length > 0
+      if (allowUnavailable && !finalizedInThisChain && wasInvalidated) continue
       throw new DamagePipelineError(
         'RVB_DAMAGE_TARGET_UNAVAILABLE',
         'Damage target ' + targetId + ' is not an active living piece',
         damageContext(battle, attacker, skillId, { targetId }),
       )
     }
-    canonicalTargets.push(canonical)
   }
-  return canonicalTargets
+  return { canonicalTargets, skippedTargets }
+}
+
+function skippedDamageResult(
+  request: DamageRequest,
+  target: PieceInstance,
+  context: EffectBatchContext<'damage'>,
+): DamageResult {
+  return {
+    success: true,
+    batchId: context.batchId,
+    chainId: context.chainId,
+    parentBatchId: context.parentBatchId,
+    sourceId: request.attacker.instanceId,
+    targetId: target.instanceId,
+    skillId: request.skillId,
+    damageType: request.damageType,
+    damageSource: {
+      kind: damageSourcePiece(request.attacker)
+        ? 'piece'
+        : 'kind' in request.attacker ? request.attacker.kind : 'piece',
+      sourceId: request.attacker.instanceId,
+      playerId: request.attacker.ownerPlayerId,
+    },
+    rawDamage: request.baseDamage,
+    modifiedDamage: 0,
+    defense: 0,
+    shieldAbsorbed: 0,
+    resolvedDamage: 0,
+    damage: 0,
+    blocked: false,
+    isKilled: false,
+    targetHp: 0,
+    message: '目标已在本效果链中结算阵亡，后续伤害跳过',
+    depth: context.depth,
+    enqueueSequence: context.parentBatchId === undefined ? undefined : context.enqueueSequence,
+    skipped: 'target-already-dead',
+  }
 }
 
 function validateHealTargets(
@@ -3525,6 +3657,46 @@ function resolveDeathBatch(
     sourceId: frozen[0]?.sourceId,
     skillId: frozen[0]?.skillId,
   }
+  const deathCandidateIds = new Set(frozen.map(candidate => candidate.targetId))
+  for (const candidate of frozen) {
+    const parasitismSkillId = candidate.piece.skills
+      .map(skill => skill.skillId)
+      .find(skillId => {
+        return Boolean(battle.skillsById?.[skillId]?.deathParasitism)
+      })
+    if (!parasitismSkillId) continue
+    const definition = loadSkillForBattle(
+      battle,
+      parasitismSkillId,
+      battle.skillsById?.[parasitismSkillId],
+      { metadata: { sourceId: candidate.piece.instanceId, skillId: parasitismSkillId } },
+    )
+    if (!definition) continue
+    const parasitismCandidate = makeDeathParasitismCandidate(candidate.piece, definition)
+    if (!parasitismCandidate) continue
+    const result = resolveDeathParasitism(
+      battle,
+      parasitismCandidate,
+      deathCandidateIds,
+      {
+        addSkill: addDeathParasitismSkill,
+        addRule: addDeathParasitismRule,
+      },
+    )
+    if (!result.applied) continue
+    candidate.deathX = candidate.piece.x
+    candidate.deathY = candidate.piece.y
+    if (!result.hostId) rejection('DeathParasitism committed without a host')
+    for (const source of frozen) {
+      if (source.attacker?.instanceId !== result.hostId) continue
+      const host = battle.pieces.find(piece => piece.instanceId === result.hostId)
+      if (!host) rejection('DeathParasitism host disappeared before source freeze')
+      // Only a canonical attacker reference is mutated by the transfer.  A
+      // stable-ID snapshot must retain its frozen owner metadata, otherwise a
+      // same-ID but independent source object would fail the death-batch guard.
+      if (source.attacker === host) source.sourceOwnerPlayerId = host!.ownerPlayerId
+    }
+  }
   const assertFrozenSourceMetadata = (stage: string): void => {
     for (const candidate of frozen) {
       if (!candidate.attacker) continue
@@ -3700,6 +3872,13 @@ function resolveDeathBatch(
     commitSummonAfterDeath(battle, candidate, context, chain, rejection)
   }
 
+  // Record only after graveyard membership and any post-death summons have
+  // committed.  The exact state and piece references keep later same-action
+  // damage from reaching a replacement entity with a reused ID.
+  for (const candidate of finalizable) {
+    chain.recordDeathProvenance(battle, candidate.piece, context.batchId)
+  }
+
   return {
     batchId: context.batchId,
     chainId: context.chainId,
@@ -3713,6 +3892,7 @@ function resolveDamageBatch(
   chain: EffectChain,
   battle: BattleState,
 ): DamageBatchResult {
+  const originalAttackerOwnerPlayerId = request.attacker.ownerPlayerId
   if (request.redirectedDamage) {
     const isLiving = (piece: PieceInstance) => piece.currentHp > 0 && battle.pieces.includes(piece)
     const protector = request.targets[0]
@@ -3720,9 +3900,9 @@ function resolveDamageBatch(
     request = { ...request, targets: protector && isLiving(protector)
       ? [protector] : isLiving(original) ? [original] : [] }
   }
-  let canonicalTargets: PieceInstance[]
+  let validatedTargets: ValidatedDamageTargets
   try {
-    canonicalTargets = validateDamageTargets(
+    validatedTargets = validateDamageTargets(
       request.attacker,
       request.targets,
       request.baseDamage,
@@ -3730,20 +3910,32 @@ function resolveDamageBatch(
       battle,
       request.skillId,
       context.depth > 0,
+      chain,
     )
   } catch (error) {
     rethrowInvalidEffectRequest(error, request, context, chain)
   }
+  const canonicalTargets = validatedTargets.canonicalTargets
+  const skippedResults = new Map(
+    validatedTargets.skippedTargets.map(target => [
+      target.instanceId,
+      skippedDamageResult(request, target, context),
+    ]),
+  )
   const stableTargets = [...canonicalTargets].sort(compareEffectTarget)
   if (stableTargets.length === 0) {
+    const results = request.targets
+      .map(target => skippedResults.get(target.instanceId))
+      .filter((result): result is DamageResult => Boolean(result))
+    const damages = results.map(result => result.damage)
     return {
-      success: false,
+      success: results.length > 0 && results.every(result => result.skipped === 'target-already-dead'),
       batchId: context.batchId,
       chainId: context.chainId,
-      damages: [],
+      damages,
       totalDamage: 0,
-      results: [],
-      message: '没有目标',
+      results,
+      message: results.length > 0 ? '后续伤害均已跳过' : '没有目标',
     }
   }
 
@@ -3884,7 +4076,7 @@ function resolveDamageBatch(
   for (const entry of prepared) {
     battle.actions.push({
       type: 'damage',
-      playerId: request.attacker.ownerPlayerId,
+      playerId: originalAttackerOwnerPlayerId,
       turn: battle.turn?.turnNumber ?? 0,
       payload: {
         batchId: context.batchId,
@@ -3893,7 +4085,7 @@ function resolveDamageBatch(
         sourceId: request.attacker.instanceId,
         skillId: request.skillId,
         targetId: entry.target.instanceId,
-        damageSource: { kind: damageSourcePiece(request.attacker) ? 'piece' : 'kind' in request.attacker ? request.attacker.kind : 'piece', sourceId: request.attacker.instanceId, playerId: request.attacker.ownerPlayerId },
+        damageSource: { kind: damageSourcePiece(request.attacker) ? 'piece' : 'kind' in request.attacker ? request.attacker.kind : 'piece', sourceId: request.attacker.instanceId, playerId: originalAttackerOwnerPlayerId },
       damageType: request.damageType,
         rawDamage: request.baseDamage,
         modifiedDamage: entry.result.modifiedDamage,
@@ -3908,8 +4100,11 @@ function resolveDamageBatch(
     })
   }
 
-  const byTargetId = new Map(prepared.map(entry => [entry.target.instanceId, entry.result]))
-  const orderedResults = canonicalTargets
+  const byTargetId = new Map<string, DamageResult>([
+    ...prepared.map(entry => [entry.target.instanceId, entry.result] as const),
+    ...skippedResults.entries(),
+  ])
+  const orderedResults = request.targets
     .map(target => byTargetId.get(target.instanceId))
     .filter((result): result is DamageResult => Boolean(result))
   const damages = orderedResults.map(result => result.damage)

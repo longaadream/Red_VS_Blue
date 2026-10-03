@@ -110,6 +110,11 @@ public class AndroidMaintenancePlugin extends Plugin {
         for(int redirects=0;redirects<5;redirects++) {
             URL url=new URL(address); if(!"https".equals(url.getProtocol())||url.getUserInfo()!=null||url.getRef()!=null)throw new IOException("下载地址必须是HTTPS");
             HttpsURLConnection c=(HttpsURLConnection)url.openConnection(); c.setInstanceFollowRedirects(false);c.setConnectTimeout(15000);c.setReadTimeout(15000);
+            // The feed is a moving "latest" document.  A stale manifest paired
+            // with the current APK is indistinguishable from a corrupt download
+            // and surfaces as a hash mismatch, so every check must revalidate it.
+            c.setRequestProperty("Cache-Control","no-cache, no-store");
+            c.setRequestProperty("Pragma","no-cache");
             int code=c.getResponseCode(); if(code>=300&&code<400){String target=c.getHeaderField("Location");c.disconnect();if(target==null)throw new IOException("重定向缺少地址");address=new URL(url,target).toString();continue;}
             if(code!=200){c.disconnect();throw new IOException("下载服务返回HTTP "+code);}return c;
         }throw new IOException("下载重定向过多");
@@ -127,7 +132,7 @@ public class AndroidMaintenancePlugin extends Plugin {
         URL url=new URL(address);
         if(!"https".equals(url.getProtocol())||!"updates.redvsblue.top".equals(url.getHost())||url.getPort()!=-1||url.getUserInfo()!=null||url.getRef()!=null||url.getQuery()!=null)throw new IOException("APK镜像地址无效");
         HttpsURLConnection c=(HttpsURLConnection)url.openConnection();
-        c.setInstanceFollowRedirects(false);c.setConnectTimeout(15000);c.setReadTimeout(15000);c.setRequestProperty("Cache-Control","no-cache");
+        c.setInstanceFollowRedirects(false);c.setConnectTimeout(15000);c.setReadTimeout(15000);c.setRequestProperty("Cache-Control","no-cache, no-store");c.setRequestProperty("Pragma","no-cache");
         try{if(c.getResponseCode()!=200)throw new IOException("所选下载源请求失败（HTTP "+c.getResponseCode()+"），请重试或手动切换源");return c;}
         catch(Exception e){c.disconnect();throw e;}
     }

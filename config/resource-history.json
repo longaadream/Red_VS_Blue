@@ -6,7 +6,8 @@
     "grimmjow-destruction-rule: per-damage self hit",
     "current-main: retain position API and concise descriptions",
     "RED-211: retain 1.0.5 history; shorten Aizen and Grimmjow names; remove gran-rey-cero from Grimmjow skill list per 1010 balance plan; preserve stats and rules",
-    "RED-211 role fixes: preserve the damage-multiplier language standard and register the new character rules"
+    "RED-211 role fixes: preserve the damage-multiplier language standard and register the new character rules",
+    "RED-214: RED-213 adds rule-el-primo-meteor-belt to rule manifest; preserve all existing rule IDs. df3a91c74 already shortened Ulquiorra description to 造成或受到伤害后，回复1。; healing remains 1 and executable behavior unchanged."
   ],
   "files": [
     {
@@ -19,7 +20,7 @@
     },
     {
       "path": "data/rules/manifest.json",
-      "sha256": "c689a01c7ca1c8cfdbc0ff356389604aba69bf9316e8459b7dd8774205cff16c"
+      "sha256": "a7e7efd5a8b5c33474aabee10fe900bd3d3ab7d14e9079f7cc86b0a34ba6ee58"
     },
     {
       "path": "data/rules/rule-grimmjow-destruction-instinct.json",
@@ -55,7 +56,7 @@
     },
     {
       "path": "data/skills/ulquiorra-high-speed-regeneration.json",
-      "sha256": "c7d19c605ae375a7ecf28890460c8e64dd6c273a7d1f7cb952ed4f8d2c5ae0ec"
+      "sha256": "def49d0a069c6cce5ec0be239d5a18dd3208d0ea4c427774a6fd26c00eea7c6e"
     }
   ]
 }

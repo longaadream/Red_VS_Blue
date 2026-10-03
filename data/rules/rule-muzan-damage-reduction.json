@@ -1,0 +1,9 @@
+{
+  "id": "rule-muzan-damage-reduction",
+  "name": "无惨之躯·伤害减免",
+  "description": "无惨之躯激活期间，受到的伤害降低50%。",
+  "trigger": {
+    "type": "beforeDamageTaken"
+  },
+  "skillCode": "var defender = context.rulePiece; if (!defender || !context.piece || context.piece.instanceId !== defender.instanceId) return { success: false, message: '' }; var status = (defender.statusTags || []).find(function(tag) { return tag.type === 'muzan-damage-reduction' && Number(tag.remainingDuration === undefined ? tag.currentDuration : tag.remainingDuration) > 0; }); if (!status || !(context.damage > 0)) return { success: false, message: '' }; context.damage = Math.floor(context.damage * 0.5); return { success: true, message: defender.name + '的无惨之躯使伤害减少50%' };"
+}

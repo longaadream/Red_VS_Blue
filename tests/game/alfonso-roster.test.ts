@@ -5,7 +5,7 @@ import { resolve } from 'node:path'
 import { applyBattleAction } from '@/lib/game/turn'
 import { type SkillDefinition } from '@/lib/game/skills'
 import { prepareAction } from '@/lib/game/targeting'
-import { makePiece, makeState } from '../helpers/minimal-state'
+import { asPieceInstance, makePiece, makeState } from '../helpers/minimal-state'
 
 function loadSkill(id: string): SkillDefinition {
   return JSON.parse(readFileSync(resolve(process.cwd(), `data/skills/${id}.json`), 'utf8')) as SkillDefinition
@@ -105,7 +105,11 @@ describe('Alfonso roster skills', () => {
     expect(next.pieces.find(piece => piece.instanceId === enemies[0].instanceId)?.currentHp).toBe(8)
     expect(next.pieces.find(piece => piece.instanceId === enemies[1].instanceId)?.currentHp).toBe(8)
     const landed = next.pieces.find(piece => piece.instanceId === alfonso.instanceId)!
-    expect(Math.abs(landed.x - enemies[1].x) + Math.abs(landed.y - enemies[1].y)).toBe(1)
+    const finalEnemy = next.pieces.find(piece => piece.instanceId === enemies[1].instanceId)!
+    if (landed.x === null || landed.y === null || finalEnemy.x === null || finalEnemy.y === null) {
+      throw new Error('Water Dash should land the caster and keep the final enemy on the board')
+    }
+    expect(Math.abs(landed.x - finalEnemy.x) + Math.abs(landed.y - finalEnemy.y)).toBe(1)
   })
 
   it('freezes nearby enemies and installs both freeze rules', () => {
@@ -114,7 +118,7 @@ describe('Alfonso roster skills', () => {
       { instanceId: 'out-of-range', x: 4, y: 1 },
     ])
     const ally = makePiece({ instanceId: 'ally', ownerPlayerId: 'player-red', x: 1, y: 2 })
-    state.pieces.push(ally)
+    state.pieces.push(asPieceInstance(ally))
 
     const cast = applyBattleAction(state, {
       type: 'useBasicSkill', playerId: 'player-red', pieceId: 'alfonso', skillId: 'alfonso-freeze',

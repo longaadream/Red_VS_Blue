@@ -68,6 +68,24 @@ export function makePiece(overrides: Partial<Omit<TestPiece, 'statusTags' | 'rul
   }
 }
 
+/** Promote a minimal fixture only at APIs that require the complete engine piece shape. */
+export function asPieceInstance(piece: TestPiece): PieceInstance {
+  const statusTags = piece.statusTags.map((tag, index) => {
+    if (typeof tag.id !== 'string' || typeof tag.type !== 'string') {
+      throw new Error(`Minimal fixture status tag ${index} must declare id and type before engine use`)
+    }
+    return tag as PieceStatusTag
+  })
+  return {
+    ...piece,
+    name: piece.name ?? piece.templateId,
+    buffs: [],
+    debuffs: [],
+    ruleTags: [],
+    statusTags,
+  }
+}
+
 export function makePlayer(playerId: PlayerId, faction: 'red' | 'blue') {
   return {
     playerId,

@@ -7,10 +7,12 @@ import { projectBattlePresentationEvents } from '@/lib/game/battle-presentation-
 import { recordBattlePresentation } from '@/lib/game/battle-presentation-recording'
 import { loadRuleById, type SkillDefinition } from '@/lib/game/skills'
 import { prepareAction } from '@/lib/game/targeting'
-import { makePiece, makeState } from '../helpers/minimal-state'
+import { asPieceInstance, makePiece, makeState } from '../helpers/minimal-state'
 
-function loadSkill(id: string): SkillDefinition {
-  return JSON.parse(readFileSync(resolve(process.cwd(), `data/skills/${id}.json`), 'utf8')) as SkillDefinition
+type ColtSkillDefinition = SkillDefinition & { effectTags: string[] }
+
+function loadSkill(id: string): ColtSkillDefinition {
+  return JSON.parse(readFileSync(resolve(process.cwd(), `data/skills/${id}.json`), 'utf8')) as ColtSkillDefinition
 }
 
 function selectedCellAction(
@@ -168,8 +170,8 @@ describe('Colt skill targeting contract', () => {
   it('does not settle another Colt’s zone through a second rule holder', () => {
     const { state, colt } = coltState(['colt-revolver'], [{ instanceId: 'enemy', x: 3, y: 1 }])
     colt.rules = [loadRuleById('rule-colt-zone-endturn')!]
-    state.pieces.push(makePiece({ instanceId: 'other-colt', ownerPlayerId: 'player-blue', x: 8, y: 6,
-      rules: [loadRuleById('rule-colt-zone-endturn')!] }))
+    state.pieces.push(asPieceInstance(makePiece({ instanceId: 'other-colt', ownerPlayerId: 'player-blue', x: 8, y: 6,
+      rules: [loadRuleById('rule-colt-zone-endturn')!] })))
     const cast = applyBattleAction(state, selectedCellAction(state, 'colt-revolver', 'useBasicSkill', 4, 1))
     const next = applyBattleAction(cast, { type: 'endTurn', playerId: 'player-red' })
     expect(next.pieces.find(piece => piece.instanceId === 'enemy')?.currentHp).toBe(14)
