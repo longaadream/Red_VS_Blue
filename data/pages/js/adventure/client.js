@@ -1,5 +1,32 @@
 window.RvBAdventureClient = {
   async create() {
+    const params = new URLSearchParams(location.search)
+    if (params.get('fixedRoute') === '1') {
+      let bridge = null
+      try {
+        if (window.parent && window.parent !== window && window.parent.location.origin === window.location.origin) {
+          bridge = window.parent.RvBPveRouteHost
+        }
+      } catch {}
+      if (!bridge || typeof bridge.createBattleClient !== 'function') {
+        throw new Error('固定路线战斗必须从固定路线页面进入')
+      }
+      const child = await bridge.createBattleClient()
+      if (!child || !child.files || typeof child.request !== 'function') {
+        throw new Error('固定路线战斗桥接无效')
+      }
+      return {
+        files: child.files,
+        request(type, payload = {}) {
+          return Promise.resolve(child.request(type, payload)).then(result => {
+            if (!result || !result.route) throw new Error('固定路线未返回有效战斗快照')
+            return result
+          })
+        },
+        // The route parent owns the Worker. Disposing a battle iframe only detaches this child.
+        dispose() { if (typeof child.dispose === 'function') child.dispose() },
+      }
+    }
     async function json(url) {
       const response = await fetch(url, { cache: 'no-store', signal: AbortSignal.timeout(20000) })
       if (!response.ok) throw new Error('冒险资源读取失败：' + response.status)
@@ -8,7 +35,6 @@ window.RvBAdventureClient = {
     const [bundle, profile] = await Promise.all([json('./__battle-data.json'), json('./__tutorial-profile.json')])
     if (bundle.schemaVersion !== 'rvb-client-battle-data/v1' || !bundle.files) throw new Error('冒险资源格式无效')
     bundle.files['data/rules/rule-lucky-coin-gamestart.json'] = await json(new URL('./data/rules/rule-lucky-coin-gamestart.json', location.href))
-    const params = new URLSearchParams(location.search)
     if (params.get('roomId')) {
       const network = await RvBAdventureNetwork.connect({ roomId: params.get('roomId'), server: params.get('server') })
       return { files: bundle.files, network, dispose: () => network.dispose(),

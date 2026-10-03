@@ -1,0 +1,37 @@
+{
+  "seed": 235,
+  "map": "large-hole-map",
+  "viewport": "1280x800",
+  "workerCount": { "parent": 1, "battleIframe": 0 },
+  "operations": [
+    { "revision": 1, "operation": "点击进入战斗", "actionPoints": 1 },
+    { "revision": 2, "operation": "原生UI免费部署安娜到(1,7)", "actionPoints": 1 },
+    { "revision": 3, "operation": "安娜麻醉镖命中食尸鬼", "enemyStatus": "sleep", "cooldown": 4, "actionPoints": 1 },
+    { "revision": 4, "operation": "安娜移动到(4,7)", "actionPoints": 0 },
+    { "revision": 11, "operation": "结束回合并等待原生敌方执行", "turnNumber": 3, "inputOwner": "adventure-human", "actionPoints": 2, "enemyMoves": ["骷髅(18,10)→(16,10)", "僵尸(18,4)→(16,4)"] },
+    { "operation": "原生投降并确认", "result": "返回节点1，提示未能取胜，只提供重新开始" }
+  ],
+  "victoryRun": {
+    "initialSeed": 235,
+    "operations": [
+      "rev2 猎空移动(6,8)，rev3 免费部署安娜(6,7)",
+      "rev10 原生敌方回合完成，rev11 猎空移动(9,8)，rev12 安娜移动(9,7)",
+      "rev19 原生敌方回合完成，rev20 掩护射击：安娜→食尸鬼，食尸鬼进入墓地，AP3→2",
+      "rev21 回溯选择10，rev22 闪现(11,8)，rev23 移动(13,8)，rev31 原生敌方回合完成",
+      "rev32 回溯选择10，rev33 闪现(11,8)，rev34 移动(13,8)",
+      "rev35 校准射击：猎空→骷髅，HP4→2；rev36 校准射击：猎空→僵尸，HP9→4；成长+3",
+      "rev43 原生敌方回合完成，骷髅HP2、僵尸HP1",
+      "rev44 安娜移动(12,7)，rev45 生物手雷目标(13,6)，僵尸进入墓地",
+      "rev46 猎空闪现(11,8)，rev47 移动(13,8)，结束回合",
+      "rev51 原生敌方技能前触发脉冲手枪，最后核心骷髅死亡，native core-eliminated winner=adventure-human",
+      "rev52 点击原生奖励校准射击，回到路线页result；队伍HP7/10，奖励牌2张，成长+3",
+      "rev53 点击继续路线进入事件；rev54 点击继续进入第二战预览",
+      "rev55 点击进入第二战winding-pass，手牌5张（奖励2+开场临时3），成长+3；父Worker1、子Worker0"
+    ],
+    "terminalActionIndex": 46,
+    "terminalTurnNumber": 10,
+    "finalPartyHp": [7, 10]
+  },
+  "otherChecks": ["真实角色技能资料", "背包遗物说明", "1280x800、844x390、667x375路线布局", "844x390初始队长定位和全图按钮"],
+  "method": "真实浏览器点击；仅读取快照和地图投影获取目标坐标。未注入生命、行动点、赢家或进度。"
+}
