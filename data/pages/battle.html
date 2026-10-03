@@ -4654,7 +4654,16 @@
           if (params.has('lesson')) {
             tutorialDefinition = window.RvBTutorialLessons.get(params.get('lesson'))
             if (!tutorialDefinition) throw new Error('未知教学场景，请从课程页重新选择')
-            await initTraining(tutorialDefinition.mapId, {})
+            const firstIsPlayer = tutorialDefinition.firstPlayerId === tutorialDefinition.player.playerId
+            const firstSide = firstIsPlayer ? tutorialDefinition.player : tutorialDefinition.opponent
+            const secondSide = firstIsPlayer ? tutorialDefinition.opponent : tutorialDefinition.player
+            await initTraining(tutorialDefinition.mapId, {
+              firstPlayerId: tutorialDefinition.firstPlayerId || tutorialDefinition.opponent.playerId,
+              firstFaction: 'red',
+              secondFaction: 'blue',
+              firstTemplateIds: firstSide.roster,
+              secondTemplateIds: secondSide.roster,
+            })
             return
           }
           if (!tutorialDefinition) {
@@ -4814,6 +4823,7 @@
             guide.hidden = false
           },
           engine: function () { return window.RvBGameEngine.ensure() },
+          practiceOnly: tutorialDefinition.tactical === true && params.get('practice') === '1',
           commit: async function (action) { await commitTutorialScriptAction(action); render() },
           render: render,
           setCue: setLessonVisualCue,

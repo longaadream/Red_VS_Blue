@@ -55,9 +55,17 @@
       help: '先看是否需要增援，再看 AP、CP、核心生命和对方位置。最后一枚场上核心消失会导致败北。',
       placement: [[PLAYER, 'uther', 6, 7], [OPPONENT, 'reaper', 12, 7]],
     },
+    {
+      id: 'tactical-intuition', number: 7, tactical: true, standard: true, normalHealth: true,
+      firstPlayerId: PLAYER, rootSeed: 18707, title: '战术直觉', size: 8, opponentSize: 8, opponentHp: null, ownTurn: 1,
+      guidedOpening: { kind: 'tactical-intuition' },
+      summary: '从目标、意图到结果，练习保护核心、进攻和调整位置。',
+      intro: '双方使用八枚预设棋子，以正常生命和标准部署开始。',
+      help: '先想清楚想达成的目标，再选择一种合法做法。提示会解释已经发生的结果，不会替你预测对手。',
+    },
   ].map(function (lesson) {
     return Object.assign(lesson, {
-      schemaVersion: 'rvb-tutorial-lesson/v1', rootSeed: 18700 + lesson.number,
+      schemaVersion: 'rvb-tutorial-lesson/v1', rootSeed: lesson.rootSeed ?? (18700 + lesson.number),
       mapId: 'large-hole-arena', player: { playerId: PLAYER, roster: light.slice(0, lesson.size) },
       opponent: { playerId: OPPONENT, roster: dark.slice(0, lesson.opponentSize) },
     })
@@ -68,7 +76,8 @@
 
   async function createBattle(engine, lesson) {
     assert(lesson && get(lesson.id), 'unknown lesson')
-    const rosters = [lesson.opponent, lesson.player].map(function (side, index) {
+    const seats = lesson.firstPlayerId === PLAYER ? [lesson.player, lesson.opponent] : [lesson.opponent, lesson.player]
+    const rosters = seats.map(function (side, index) {
       return { playerId: side.playerId, faction: index === 0 ? 'red' : 'blue', pieces: side.roster.map(function (id) {
         const piece = engine.getPieceById(id)
         assert(piece, 'missing template ' + id)
@@ -77,7 +86,7 @@
     })
     const startTime = 1750000000000
     const state = await engine.createInitialBattleForPlayers([PLAYER, OPPONENT], [], rosters, lesson.mapId, {
-      firstPlayerId: OPPONENT, rootSeed: lesson.rootSeed,
+      firstPlayerId: lesson.firstPlayerId || OPPONENT, rootSeed: lesson.rootSeed,
       profileIdentity: engine.tutorialProfileIdentity,
       deploymentEnabled: !!lesson.standard, deploymentStartedAt: startTime,
     })
@@ -85,10 +94,12 @@
     // Stage wounds on fresh tutorial instances, including reserves. Template
     // stats and normal battle initialization remain untouched.
     const stagedPieces = state.pieces.concat(Object.values(state.deployment && state.deployment.reserves || {}).flat())
-    stagedPieces.filter(function (piece) { return piece.ownerPlayerId === OPPONENT }).forEach(function (piece) {
-      assert(lesson.opponentHp > 0 && lesson.opponentHp <= piece.maxHp, 'invalid opponent staged HP')
-      piece.currentHp = lesson.opponentHp
-    })
+    if (!lesson.normalHealth && typeof lesson.opponentHp === 'number') {
+      stagedPieces.filter(function (piece) { return piece.ownerPlayerId === OPPONENT }).forEach(function (piece) {
+        assert(lesson.opponentHp > 0 && lesson.opponentHp <= piece.maxHp, 'invalid opponent staged HP')
+        piece.currentHp = lesson.opponentHp
+      })
+    }
     if (!lesson.standard) {
       const all = state.pieces.slice()
       const placed = []

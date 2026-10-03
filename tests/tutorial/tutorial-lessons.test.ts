@@ -11,7 +11,7 @@ import { getCurrentInputOwnerPlayerId } from '@/lib/game/turn-timer'
 import { toPublicBattleState } from '@/lib/game/deployment'
 import type { BattleState, BattleAction } from '@/lib/game/turn'
 
-interface Lesson { id: string; size: number; opponentSize: number; opponentHp: number; rootSeed: number }
+interface Lesson { id: string; size: number; opponentSize: number; opponentHp: number | null; rootSeed: number; normalHealth?: boolean }
 interface LessonModule {
   all: Lesson[]
   get(id: string): Lesson
@@ -34,7 +34,7 @@ describe('six independent tutorial scenarios', () => {
       const board = state.pieces.filter(p => p.ownerPlayerId === player.playerId)
       const reserve = state.deployment?.reserves?.[player.playerId] ?? []
       expect(board.length + reserve.length).toBe(player.playerId === lessons.OPPONENT ? lesson.opponentSize : lesson.size)
-      if (player.playerId === lessons.OPPONENT) {
+      if (player.playerId === lessons.OPPONENT && !lesson.normalHealth && lesson.opponentHp !== null) {
         for (const piece of board.concat(reserve)) {
           expect(piece.currentHp).toBe(lesson.opponentHp)
           expect(piece.maxHp).toBe(getPieceById(piece.templateId)!.stats.maxHp)

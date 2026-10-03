@@ -24,12 +24,15 @@
     toggle.setAttribute('aria-expanded', 'false')
     toggle.setAttribute('aria-label', '展开教程说明')
     let collapsed = true
-    toggle.addEventListener('click', function () {
-      collapsed = !collapsed
+    function setCollapsed(next) {
+      collapsed = !!next
       root.classList.toggle('is-collapsed', collapsed)
       toggle.textContent = collapsed ? '说明' : '收起'
       toggle.setAttribute('aria-expanded', String(!collapsed))
       toggle.setAttribute('aria-label', collapsed ? '展开教程提示' : '收起教程提示')
+    }
+    toggle.addEventListener('click', function () {
+      setCollapsed(!collapsed)
       root.scrollTop = 0
     })
     header.append(title, toggle)
@@ -60,18 +63,46 @@
     let teachingCue = null
     function setTeachingCue(cue) { teachingCue = cue; hooks.setCue(cue) }
     let disposed = false
+    const tacticalLesson = lesson.tactical === true
+    const opening = tacticalLesson ? null : lesson.guidedOpening
+    const practiceOnly = tacticalLesson && hooks.practiceOnly === true
+    const tacticalWelcome = '先定目标 → 看预览 → 自由行动 → 观察结果。'
+    const tacticalIntents = {
+      protect: {
+        label: '保护核心',
+        copy: '保护核心：可以尝试撤退、护盾或治疗；先看合法预览，具体能否执行以当前规则和实际结算为准。',
+      },
+      attack: {
+        label: '发起进攻',
+        copy: '发起进攻：可以尝试调整距离、选择技能或集中火力；可行性与伤害只以合法预览和实际结算为准。',
+      },
+      reposition: {
+        label: '调整站位',
+        copy: '调整站位：可以尝试走到掩体、拉开距离或为下一次攻击找位置；只观察实际位置变化，不提前判断结果。',
+      },
+    }
     let failure = ''
-    let message = lesson.intro
+    let message = tacticalLesson
+      ? practiceOnly ? '开始实战，观察实际结算。' : tacticalWelcome
+      : lesson.intro
     let terminalShown = false
-    const opening = lesson.guidedOpening
     let openingStep = opening ? 'welcome' : 'free'
     let openingObjective = ''
+    let tacticalStep = tacticalLesson ? 'welcome' : ''
+    let tacticalIntent = null
+    const tacticalIntentHistory = []
+    let tacticalOwnTurns = 0
+    let tacticalTipsReduced = false
+    let tacticalResultSequence = 0
     let deployedPieceId = null
     let tutorialAiContinuation = null
     let tutorialAiActionsTaken = 0
     let tutorialAiTurnKey = ''
     const ordinaryTutorialAiActions = new Set(['move', 'useBasicSkill', 'useChargeSkill', 'playCard', 'endTurn'])
     function teaching() { return !!opening && openingStep !== 'free' }
+    function tacticalGuidanceActive() {
+      return tacticalLesson && !practiceOnly && started && !tacticalTipsReduced
+    }
     function normalizePlayer(value) { return String(value || '').trim().toLowerCase() }
     function samePlayer(left, right) { return normalizePlayer(left) === normalizePlayer(right) }
     function tutorialClock() {
@@ -149,8 +180,32 @@
       } else if (opening && opening.kind === 'terrain') {
         teach('terrain', '点击掩体查看地形。掩体可站立，阻挡弹射物。', '点击亮起的掩体格')
       } else if (opening) teach('select', '点击乌瑟尔，查看生命与技能。', '第一步：点击乌瑟尔')
-      else { message = '接下来由你指挥，需要时点“给点思路”。'; setTeachingCue(null) }
+      else if (tacticalLesson) {
+        tacticalStep = practiceOnly ? 'free' : 'goal'
+        openingObjective = practiceOnly ? '开始实战，观察实际结算' : tacticalWelcome
+        message = practiceOnly ? '开始实战，观察实际结算。' : tacticalWelcome
+        setTeachingCue(null)
+        if (!practiceOnly) setCollapsed(false)
+      } else { message = '接下来由你指挥，需要时点“给点思路”。'; setTeachingCue(null) }
       void pump()
+    }
+
+    function chooseTacticalIntent(key) {
+      if (!tacticalGuidanceActive() || !tacticalIntents[key]) return
+      const intent = tacticalIntents[key]
+      tacticalIntent = key
+      tacticalStep = 'action'
+      openingObjective = '自由行动；完成后查看实际结果'
+      const record = {
+        key: 'tactical-intent-' + key + '-' + (tacticalIntentHistory.length + 1),
+        text: '本回合意图：' + intent.label + '。' + intent.copy,
+        intent: key,
+      }
+      tacticalIntentHistory.push({ intent: key, label: intent.label, text: intent.copy })
+      history.push(record)
+      message = intent.copy
+      setCollapsed(true)
+      render()
     }
     function openingAllows(action) {
       if (!teaching()) return true
@@ -268,11 +323,92 @@
     function teachEndTurn() {
       teach('end-turn', '行动点从 1 点起，每次自己的新回合上限 +1，最多 10 点，并补满；剩余点数不累积。', '点击右下角“结束回合”，观察下回合行动点')
     }
+
+    function statePlayer(state, playerId) {
+      return state && Array.isArray(state.players)
+        ? state.players.find(function (player) { return samePlayer(player.playerId, playerId) })
+        : null
+    }
+    function statePieceLocation(state, instanceId) {
+      if (!state || !instanceId) return null
+      const boardPiece = (state.pieces || []).find(function (piece) { return piece.instanceId === instanceId })
+      if (boardPiece) return { piece: boardPiece, zone: 'board' }
+      const reserves = state.deployment && state.deployment.reserves || {}
+      for (const ownerId of Object.keys(reserves)) {
+        const reservePiece = (reserves[ownerId] || []).find(function (piece) { return piece.instanceId === instanceId })
+        if (reservePiece) return { piece: reservePiece, zone: 'reserve' }
+      }
+      return null
+    }
+    function positionText(piece, zone) {
+      if (zone === 'reserve') return '预备区'
+      if (!piece || !Number.isFinite(piece.x) || !Number.isFinite(piece.y)) return '离场'
+      return '(' + piece.x + ', ' + piece.y + ')'
+    }
+    function tacticalActionResult(action, before, after) {
+      if (!tacticalLesson || !action || !samePlayer(action.playerId, lesson.player.playerId)) return ''
+      const previousPlayer = statePlayer(before, lesson.player.playerId)
+      const currentPlayer = statePlayer(after, lesson.player.playerId)
+      const changes = []
+      if (previousPlayer && currentPlayer) {
+        changes.push('AP ' + previousPlayer.actionPoints + '→' + currentPlayer.actionPoints)
+        changes.push('CP ' + previousPlayer.chargePoints + '→' + currentPlayer.chargePoints)
+      }
+
+      const ids = new Set()
+      ;(before && before.pieces || []).forEach(function (piece) { ids.add(piece.instanceId) })
+      ;(after && after.pieces || []).forEach(function (piece) { ids.add(piece.instanceId) })
+      const previousOwnPieces = []
+      let ownHealthObserved = false
+      ids.forEach(function (instanceId) {
+        const previousLocation = statePieceLocation(before, instanceId)
+        const currentLocation = statePieceLocation(after, instanceId)
+        const previous = previousLocation && previousLocation.piece
+        const current = currentLocation && currentLocation.piece
+        const piece = current || previous
+        if (!piece) return
+        const own = samePlayer(piece.ownerPlayerId, lesson.player.playerId)
+        const oldHp = previous && Number.isFinite(previous.currentHp) ? previous.currentHp : null
+        const newHp = current && Number.isFinite(current.currentHp) ? current.currentHp : null
+        if (own) {
+          if (oldHp !== null || newHp !== null) ownHealthObserved = true
+          if (oldHp !== null && newHp !== null && oldHp !== newHp) {
+            changes.push(piece.name + '生命 ' + oldHp + '→' + newHp)
+          } else if (oldHp !== null && newHp === null) {
+            changes.push(piece.name + '离场（离场前生命 ' + oldHp + '）')
+          }
+        } else if (oldHp !== null && newHp !== null && oldHp !== newHp) {
+          changes.push(piece.name + '生命 ' + oldHp + '→' + newHp)
+        } else if (oldHp !== null && newHp === null) {
+          changes.push(piece.name + '离场（离场前生命 ' + oldHp + '）')
+        }
+        const oldPosition = previous && positionText(previous, previousLocation && previousLocation.zone)
+        const newPosition = current ? positionText(current, currentLocation && currentLocation.zone) : '离场'
+        if (own && previous && oldPosition !== newPosition) {
+          changes.push(piece.name + '位置 ' + oldPosition + '→' + newPosition)
+        }
+        if (own && (oldHp !== null || newHp !== null)) previousOwnPieces.push(piece)
+      })
+      if (!ownHealthObserved && previousOwnPieces.length) changes.push('自身生命未变化')
+      const text = changes.length ? '本次行动实际结果：' + changes.join('；') : '本次行动实际结果：没有可见状态变化。'
+      tacticalResultSequence += 1
+      history.push({
+        key: 'tactical-result-' + tacticalResultSequence,
+        text: text,
+        action: action,
+        intent: tacticalIntent,
+      })
+      if (action.type === 'endTurn') {
+        tacticalOwnTurns += 1
+        if (tacticalOwnTurns >= 2) tacticalTipsReduced = true
+      }
+      return text
+    }
     function render() {
       if (disposed) return
       const terminal = hooks.getState().terminalResult
       root.classList.toggle('is-busy', busy)
-      root.classList.toggle('is-guiding', started && !terminal && !failure)
+      root.classList.toggle('is-guiding', started && !terminal && !failure && (teaching() || tacticalGuidanceActive()))
       root.classList.toggle('is-review', openingStep === 'review')
       root.classList.toggle('is-collapsed', started && collapsed && !terminal && !failure)
       text.textContent = failure || opponentNote || message
@@ -291,10 +427,28 @@
         collect: '走到结晶上，就能拾取充能点。',
         'fight-crystal': '击败敌方核心，地上会留下充能结晶。',
       }
-      bubble.hidden = !started || busy || !!terminal || !!failure || !prompts[openingStep]
-      bubble.textContent = prompts[openingStep] || ''
-      bubble.setAttribute('data-step', openingStep)
-      objective.textContent = terminal ? '本局已结束' : failure ? '练习中断，可重开或返回课程' : !started ? '点击开始学习' : busy ? '等待对手行动' : teaching() ? openingObjective : '消灭敌方场上核心'
+      let bubbleText = prompts[openingStep] || ''
+      let bubbleVisible = started && !busy && !terminal && !failure && !!bubbleText
+      if (tacticalLesson) {
+        bubbleText = tacticalIntent ? tacticalIntents[tacticalIntent].copy : tacticalWelcome
+        bubbleVisible = false
+      }
+      bubble.hidden = !bubbleVisible
+      bubble.textContent = bubbleText
+      bubble.setAttribute('data-step', tacticalLesson ? tacticalStep : openingStep)
+      objective.textContent = terminal
+        ? '本局已结束'
+        : failure
+          ? '练习中断，可重开或返回课程'
+          : !started
+            ? tacticalLesson ? practiceOnly ? '开始实战，观察实际结算' : tacticalWelcome : '点击开始学习'
+            : busy
+              ? '等待对手行动'
+              : teaching()
+                ? openingObjective
+                : tacticalGuidanceActive()
+                  ? (tacticalIntent ? '目标：' + tacticalIntents[tacticalIntent].label + ' · 自由行动' : tacticalWelcome)
+                  : '自由行动，按需查看帮助'
       actions.replaceChildren()
       reviewItems.replaceChildren()
       history.filter(function (notice) { return notice.key !== 'ai-rejected' }).forEach(function (notice) {
@@ -308,12 +462,19 @@
         const nextLesson = global.RvBTutorialLessons.all[lesson.number]
         if (terminal && nextLesson && nextLesson.enabled !== false) addButton('下一局', function () { dispose(); hooks.next() })
       } else if (!started) {
-        addButton(opening ? '开始学习' : '开始本局', begin, true)
+        addButton(opening ? '开始学习' : tacticalLesson ? practiceOnly ? '开始实战' : '开始学习' : '开始本局', begin, true)
       } else if (teaching()) {
         if (openingStep === 'review') addButton('继续本局练习', function () {
           if (openingStep !== 'review') return
           openingStep = 'free'; message = '继续作战，消灭敌方场上核心。'; setTeachingCue(null); render()
         }, true)
+      } else if (tacticalLesson) {
+        if (!practiceOnly && !tacticalTipsReduced) {
+          addButton(tacticalIntents.protect.label, function () { chooseTacticalIntent('protect') }, tacticalIntent === 'protect')
+          addButton(tacticalIntents.attack.label, function () { chooseTacticalIntent('attack') }, tacticalIntent === 'attack')
+          addButton(tacticalIntents.reposition.label, function () { chooseTacticalIntent('reposition') }, tacticalIntent === 'reposition')
+        }
+        if (!practiceOnly) addButton('给点思路', function () { message = lesson.help; render() })
       } else {
         addButton('给点思路', function () { message = lesson.help; render() })
       }
@@ -321,16 +482,23 @@
       if (hooks.positionGuide) hooks.positionGuide()
     }
     function observe(action, before) {
+      const after = hooks.getState()
+      const tacticalFeedback = tacticalActionResult(action, before, after)
       observeOpening(action, before)
       advanceOpeningResult()
-      const previousPlayer = before.players && before.players.find(function (p) { return p.playerId === lesson.player.playerId })
-      const currentPlayer = hooks.getState().players && hooks.getState().players.find(function (p) { return p.playerId === lesson.player.playerId })
+      const previousPlayer = before && before.players && before.players.find(function (p) { return p.playerId === lesson.player.playerId })
+      const currentPlayer = after.players && after.players.find(function (p) { return p.playerId === lesson.player.playerId })
       if (previousPlayer && currentPlayer && currentPlayer.maxActionPoints > previousPlayer.maxActionPoints && hooks.showResourceGrowth) {
         hooks.showResourceGrowth(previousPlayer.maxActionPoints, currentPlayer.maxActionPoints)
       }
-      const notices = global.RvBTutorialLessons.observe(lesson, before, hooks.getState(), action, seen)
+      const notices = global.RvBTutorialLessons && typeof global.RvBTutorialLessons.observe === 'function'
+        ? global.RvBTutorialLessons.observe(lesson, before, after, action, seen) : []
       notices.forEach(function (notice) { history.push(notice) })
-      if (!teaching() && notices.length) message = notices[0].text
+      if (!teaching() && tacticalFeedback) {
+        message = tacticalFeedback
+        if (tacticalLesson && !practiceOnly) setCollapsed(false)
+      }
+      else if (!teaching() && notices.length) message = notices[0].text
       render()
     }
     function showResult() {
@@ -506,6 +674,20 @@
       if (!applied) throw new Error('人机计划已失效，请重新开始本局')
       return 'accepted'
     }
+    async function pumpTacticalStructuralPhase(engine, state, owner) {
+      if (!state || !['start', 'end'].includes(state.turn && state.turn.phase)) return 'waiting'
+      const expectedState = state
+      const expectedToken = authorityStateToken(engine, state)
+      const latest = hooks.getState()
+      if (latest !== expectedState
+        || !samePlayer(engine.getCurrentInputOwnerPlayerId(latest), owner)
+        || authorityStateToken(engine, latest) !== expectedToken) return 'stale'
+      const before = latest
+      await hooks.commit({ type: 'beginPhase' })
+      if (disposed) return 'disposed'
+      observe({ type: 'beginPhase' }, before)
+      return 'accepted'
+    }
     async function pump() {
       if (busy || disposed || !started || failure) return
       busy = true; render()
@@ -518,7 +700,9 @@
           const state = hooks.getState()
           if (state.terminalResult) { showResult(); return }
           const owner = engine.getCurrentInputOwnerPlayerId(state)
-          const awaitingChoice = !!state.pendingOptionSelection || !!state.pendingTargetSelection || state.deployment && state.deployment.status === 'awaiting-reserve-deploy'
+          const deployment = state.deployment
+          const awaitingChoice = !!state.pendingOptionSelection || !!state.pendingTargetSelection
+            || deployment && deployment.status === 'awaiting-reserve-deploy'
           const humanOwner = samePlayer(owner, lesson.player.playerId)
           if (humanOwner && (state.turn.phase === 'action' || awaitingChoice)) return
 
@@ -526,9 +710,13 @@
           // play the new planner owns exactly one opponent action per iteration.
           const stagedOpponent = teaching() && !humanOwner
           const humanStructural = humanOwner && !awaitingChoice && state.turn.phase !== 'action'
-          const result = stagedOpponent || humanStructural
+          const legacyOpening = !tacticalLesson && (stagedOpponent || humanStructural)
+          const tacticalStructural = tacticalLesson && humanStructural
+          const result = legacyOpening
             ? await pumpLegacyAction(engine, state, owner)
-            : humanOwner ? 'waiting' : await pumpTutorialSearchAction(engine, state, owner)
+            : tacticalStructural
+              ? await pumpTacticalStructuralPhase(engine, state, owner)
+              : humanOwner ? 'waiting' : await pumpTutorialSearchAction(engine, state, owner)
           if (result === 'disposed' || result === 'waiting') return
           if (result === 'stale') continue
         }
@@ -566,7 +754,24 @@
           teachMove()
         }
       }, showResult: showResult, dispose: dispose,
-      snapshot: function () { return { lessonId: lesson.id, started: started, busy: busy, failure: failure, openingStep: openingStep, notices: history.slice() } },
+      snapshot: function () {
+        return {
+          lessonId: lesson.id,
+          started: started,
+          busy: busy,
+          failure: failure,
+          openingStep: openingStep,
+          tacticalStep: tacticalStep,
+          tactical: tacticalLesson,
+          practiceOnly: practiceOnly,
+          goalIntent: tacticalIntent,
+          goalIntents: tacticalIntentHistory.slice(),
+          ownTurns: tacticalOwnTurns,
+          activeTips: tacticalGuidanceActive(),
+          tipsReduced: tacticalTipsReduced,
+          notices: history.slice(),
+        }
+      },
     })
   }
   global.RvBTutorialLessonRuntime = Object.freeze({ create: create, saveLessonStatus: saveLessonStatus })
