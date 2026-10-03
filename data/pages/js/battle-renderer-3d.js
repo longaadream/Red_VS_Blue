@@ -104,10 +104,21 @@
   let _hpLayer = null
   let _floatLayer = null
   let _onIntent = null
+  let _hoverPointer = null
   function _notifyViewportChange() {
     _summaryPositionsDirty = true
     _invalidate()
-    if (_onIntent) _onIntent({ type: 'viewport-change' })
+    let hoveredCell = null
+    if (_hoverPointer) {
+      if (_camera && typeof _camera.updateMatrixWorld === 'function') _camera.updateMatrixWorld(true)
+      hoveredCell = screenToCell(_hoverPointer.clientX, _hoverPointer.clientY)
+    }
+    if (_onIntent) {
+      const intent = { type: 'viewport-change' }
+      if (_hoverPointer) intent.hoveredCell = hoveredCell ? { x: hoveredCell.x, y: hoveredCell.y } : null
+      _onIntent(intent)
+    }
+    if (_hoverPointer) _showHoveredCell(hoveredCell, true)
   }
   let _resizeObserver = null
   let _hitPlane = null
@@ -145,6 +156,9 @@
   let _textureLoadGeneration = 0
   const _floaters = new Set()
   const _floaterTimers = new Set()
+  let _floaterLayout = null
+  const _previewFloaterTimers = new Map()
+  let _previewAuthorityModel = null
   let _pressedPiece = null
   let _pressedHighlight = null
   let _reducedMotion = false
@@ -416,6 +430,7 @@
     _updateCameraProjection(w, h)
     if (_mapW && _camera && _cameraInOverview) _resetCamera()
     _notifyViewportChange()
+    if (_floaterLayout) _floaterLayout.resize()
   }
 
   function _withCameraZoomOne(callback) {
@@ -1351,10 +1366,10 @@
         color: 0xd09a52,
         emissive: 0xd09a52,
         transparent: true,
-        opacity: 0.56,
+        opacity: 0,
         depthWrite: false,
       })
-      flashMaterial.emissiveIntensity = _reducedMotion ? 0.72 : 0
+      flashMaterial.emissiveIntensity = 0
       const mesh = new THREE.Mesh(_hlPlaneGeom, flashMaterial)
       mesh.rotation.x = -Math.PI / 2
       mesh.position.set(cell.x, _tileSurfaceHeightAt(cell.x, cell.z) + 0.016, cell.z)
@@ -1387,21 +1402,6 @@
     }
     if (options && options.transient) _skillFlashTimer = setTimeout(_clearPresentationAreaFlash, 650)
     _invalidate()
-    if (_reducedMotion) return
-    _startAnimation('presentation:area:intensity', {
-      duration: MOTION_SECONDS.result,
-      easing: EASE.out,
-      update: function (progress, raw) {
-        const timeline = Number.isFinite(raw) ? raw : progress
-        const intensity = timeline <= 0.42
-          ? 1.15 * EASE.out(timeline / 0.42)
-          : 1.15 - 0.77 * EASE.in((timeline - 0.42) / 0.58)
-        entries.forEach(function (entry) { entry.flashMaterial.emissiveIntensity = intensity })
-      },
-      complete: function () {
-        entries.forEach(function (entry) { entry.flashMaterial.emissiveIntensity = 0.38 })
-      },
-    })
   }
 
   function _disposePresentationObject(object) {
@@ -1499,25 +1499,36 @@
   }
 
   function showPresentationPath(input) {
+    return showPresentationPaths([input])
+  }
+
+  function showPresentationPaths(inputs) {
     if (!_mounted || !_scene) return
-    const source = _normalizePresentationPoint(input && input.source)
-    const end = _normalizePresentationPoint(input && input.end)
-    const selected = _normalizePresentationPoint(input && input.selected)
-    const hasTrajectory = !!(source && end && (source.x !== end.x || source.z !== end.z))
-    if (!hasTrajectory && !selected) {
+    const paths = (Array.isArray(inputs) ? inputs : []).map(function (input) {
+      const source = _normalizePresentationPoint(input && input.source)
+      const end = _normalizePresentationPoint(input && input.end)
+      const selected = _normalizePresentationPoint(input && input.selected)
+      const hasTrajectory = !!(source && end && (source.x !== end.x || source.z !== end.z))
+      return { source: source, end: end, selected: selected, hasTrajectory: hasTrajectory }
+    }).filter(function (path) { return path.hasTrajectory || path.selected })
+    if (!paths.length) {
       _clearPresentationPath()
       return
     }
-    const signature = [source && source.key || '', end && end.key || '', selected && selected.key || ''].join('|')
+    const signature = paths.map(function (path) {
+      return [path.source && path.source.key || '', path.end && path.end.key || '', path.selected && path.selected.key || ''].join('|')
+    }).join(';')
     if (_presentationPath && _presentationPath.signature === signature) return
     _clearPresentationPath()
-    const trajectory = hasTrajectory ? _createPresentationPathRibbon(source, end) : null
-    const aim = _createPresentationAimMarker(selected)
-    if (!trajectory && !aim) return
     const group = new THREE.Group()
     group.userData.presentationPath = true
-    if (trajectory) group.add(trajectory)
-    if (aim) group.add(aim)
+    paths.forEach(function (path) {
+      const trajectory = path.hasTrajectory ? _createPresentationPathRibbon(path.source, path.end) : null
+      const aim = _createPresentationAimMarker(path.selected)
+      if (trajectory) group.add(trajectory)
+      if (aim) group.add(aim)
+    })
+    if (!group.children.length) return
     _scene.add(group)
     _invalidate()
     const materials = []
@@ -1525,9 +1536,11 @@
     _presentationPath = {
       signature: signature,
       group: group,
-      source: source ? { x: source.x, y: source.z } : null,
-      end: end ? { x: end.x, y: end.z } : null,
-      selected: selected ? { x: selected.x, y: selected.z } : null,
+      pathCount: paths.filter(function (path) { return path.hasTrajectory }).length,
+      // Preserve the single-path diagnostics for existing callers.
+      source: paths[0].source ? { x: paths[0].source.x, y: paths[0].source.z } : null,
+      end: paths[0].end ? { x: paths[0].end.x, y: paths[0].end.z } : null,
+      selected: paths[0].selected ? { x: paths[0].selected.x, y: paths[0].selected.z } : null,
     }
     const targetOpacities = materials.map(function () { return 0.96 })
     if (_reducedMotion) {
@@ -2194,6 +2207,13 @@
     })
   }
 
+  // Acknowledge submission without rebuilding the board or predicting its result.
+  function setPendingFeedback(pieceId) {
+    if (!_currentModel) return
+    _syncPendingFeedback(Object.assign({}, _currentModel.interaction || {}, { pendingPieceId: pieceId || null }))
+    _invalidate()
+  }
+
   function _pressFeedbackAt(pointerId, clientX, clientY) {
     _releasePressedFeedback()
     const piece = _findPieceFromPointer(clientX, clientY)
@@ -2466,6 +2486,9 @@
       frameScheduled: _animFrameId != null,
       activeAnimationCount: _anims.size,
       terrainBatchCount: _tileBatches.size,
+      tileEffectCellCount: _tileEffectObjects.size,
+      previewBoardActive: _previewAuthorityModel != null,
+      presentationPathCount: _presentationPath ? _presentationPath.pathCount : 0,
       terrainInstanceCount: Array.from(_tileBatches.values()).reduce(function (total, batch) {
         return total + Number(batch.count || 0)
       }, 0),
@@ -2640,10 +2663,19 @@
       e.preventDefault()
     }, { passive: false })
 
-    _listen(canvas, 'pointerleave', () => _showHoveredCell(null))
-    _listen(canvas, 'pointerdown', () => _showHoveredCell(null))
+    _listen(canvas, 'pointerleave', () => {
+      _hoverPointer = null
+      _showHoveredCell(null)
+    })
+    _listen(canvas, 'pointerdown', () => {
+      _hoverPointer = null
+      _showHoveredCell(null)
+    })
     _listen(canvas, 'pointermove', e => {
-      if (e.pointerType === 'mouse' && !_pointers.size) _showHoveredCell(screenToCell(e.clientX, e.clientY))
+      if (e.pointerType === 'mouse' && !_pointers.size) {
+        _hoverPointer = { clientX: e.clientX, clientY: e.clientY }
+        _showHoveredCell(screenToCell(e.clientX, e.clientY))
+      }
       if (!_pointers.has(e.pointerId)) return
       _pointers.set(e.pointerId, { x: e.clientX, y: e.clientY })
 
@@ -2716,7 +2748,10 @@
       if (allowClick && wasClick) _handleClick(e)
     }
     _listen(canvas, 'pointerup', e => endPointer(e, true))
-    _listen(canvas, 'pointercancel', e => endPointer(e, false))
+    _listen(canvas, 'pointercancel', e => {
+      _hoverPointer = null
+      endPointer(e, false)
+    })
 
     _listen(canvas, 'wheel', e => {
       _applyZoom(_camera.zoom * (e.deltaY < 0 ? 1.12 : 0.89))
@@ -2820,6 +2855,7 @@
   let _hoverKey = null
   let _hoverMoveTargets = new Set()
   let _hoverSelectedId = null
+  let _hoverIntentKey = null
 
   function _clearHoverPath() {
     _hoverKey = null
@@ -2831,7 +2867,7 @@
     _invalidate()
   }
 
-  function _showHoveredCell(cell) {
+  function _showHoveredCell(cell, forceIntent) {
     if (!_scene) return
     const key = cell ? cell.x + ',' + cell.y : null
     if (key !== _hoverKey) {
@@ -2847,6 +2883,11 @@
         _hoverPath.computeLineDistances()
         _scene.add(_hoverPath)
       }
+    }
+    // Visual updates may rebuild the hover path; they must not erase the
+    // pointer's last notified cell (otherwise pointerleave can be lost).
+    if (forceIntent || key !== _hoverIntentKey) {
+      _hoverIntentKey = key
       if (_onIntent) _onIntent({ type: 'hover-cell', x: cell ? cell.x : null, y: cell ? cell.y : null })
     }
     if (!cell) {
@@ -3057,29 +3098,49 @@
   }
 
   // Replace only the rendered board, preserving the user's camera and authority model.
-  function settlePresentation(model) {
+  function settlePresentation(model, options) {
     if (!_mounted) return
     _clearActionAnimationQueue()
     Array.from(_anims.keys()).forEach(_cancelAnimation)
     _pieceObjects.forEach(function (obj) { _restorePieceVisual(obj); obj.group.scale.set(1, 1, 1) })
-    _floaterTimers.forEach(function (timer) { clearTimeout(timer) })
-    _floaterTimers.clear()
-    _floaters.forEach(function (element) { element.remove() })
-    _floaters.clear()
+    if (!(options && options.preserveFloaters)) {
+      _previewFloaterTimers.clear()
+      _previewAuthorityModel = null
+      _floaterTimers.forEach(function (timer) { clearTimeout(timer) })
+      _floaterTimers.clear()
+      _floaters.forEach(function (element) { element.remove() })
+      _floaters.clear()
+      if (_floaterLayout) _floaterLayout.clear()
+    }
     update(model)
   }
 
-  function showHistoricalBoard(model) {
+  function _replaceDisplayedBoard(model, options) {
     if (!_mounted || !model || !model.board) return
     _clearActionAnimationQueue()
-    _cancelPieceDrag()
+    if (!(options && options.preview)) _cancelPieceDrag()
     Array.from(_anims.keys()).forEach(_cancelAnimation)
     _clearPresentationAreaFlash()
     _clearPresentationPath()
-    _floaterTimers.forEach(function (timer) { clearTimeout(timer) })
-    _floaterTimers.clear()
-    _floaters.forEach(function (element) { element.remove() })
-    _floaters.clear()
+    if (options && options.preview) {
+      // Reuse meshes and unchanged terrain. Hover must not repeatedly tear
+      // down the entire battlefield or reload portrait textures.
+      update(model)
+      if (!options.restore) _pieceObjects.forEach(function (obj) {
+        const warning = obj.summaryEl?.querySelector('.piece-board-lethal')
+        if (warning) warning.hidden = true
+      })
+      return
+    }
+    if (!(options && options.preview)) {
+      _floaterTimers.forEach(function (timer) { clearTimeout(timer) })
+      _floaterTimers.clear()
+      _floaters.forEach(function (element) { element.remove() })
+      _floaters.clear()
+      if (_floaterLayout) _floaterLayout.clear()
+      _previewFloaterTimers.clear()
+      _previewAuthorityModel = null
+    }
     _pieceObjects.forEach(function (obj) { _scene.remove(obj.group); _disposePieceObject(obj) })
     _pieceObjects.clear()
     const camera = { x: _cameraTarget.x, y: _cameraTarget.y, z: _cameraTarget.z, zoom: _camera.zoom, overview: _cameraInOverview }
@@ -3091,12 +3152,45 @@
     _camera.updateProjectionMatrix()
     _currentModel = model
     update(model)
-    _boardDecorationsHistorical = true
-    _pieceObjects.forEach(function (obj) {
+    _boardDecorationsHistorical = !(options && options.preview)
+    if (!(options && options.restore)) _pieceObjects.forEach(function (obj) {
       const warning = obj.summaryEl?.querySelector('.piece-board-lethal')
       if (warning) warning.hidden = true
     })
-    if (_boardDecorations) _boardDecorations.visible = false
+    if (_boardDecorations) _boardDecorations.visible = !_boardDecorationsHistorical
+  }
+
+  function showHistoricalBoard(model) {
+    _replaceDisplayedBoard(model)
+  }
+
+  function clearPreviewFloaters() {
+    _previewFloaterTimers.forEach(function (timer, element) {
+      clearTimeout(timer)
+      _floaterTimers.delete(timer)
+      _floaters.delete(element)
+      if (_floaterLayout) _floaterLayout.remove(element)
+      element.remove()
+    })
+    _previewFloaterTimers.clear()
+  }
+
+  function showPreviewBoard(model, authoritativeModel) {
+    if (!_mounted || !model || !authoritativeModel) return
+    clearPreviewFloaters()
+    _replaceDisplayedBoard(model, { preview: true })
+    // The board is hypothetical; all hit testing continues to use authority.
+    _previewAuthorityModel = authoritativeModel
+    _currentModel = authoritativeModel
+  }
+
+  function clearPreviewBoard() {
+    clearPreviewFloaters()
+    if (!_previewAuthorityModel) return
+    const authoritativeModel = _previewAuthorityModel
+    _previewAuthorityModel = null
+    _replaceDisplayedBoard(authoritativeModel, { preview: true, restore: true })
+    setHistoryHighlight([])
   }
 
   // ── spawnFloater ─────────────────────────────────────────────────────────────
@@ -3117,8 +3211,8 @@
 
     const el = document.createElement('div')
     const kind = ['heal', 'death', 'statusAdded'].includes(options.kind) ? options.kind : 'damage'
-    const requestedDuration = Number(options.durationMs) || (kind === 'heal' ? 550 : 600)
-    const durationMs = _reducedMotion ? Math.min(140, requestedDuration) : Math.max(kind === 'statusAdded' ? 200 : 480, Math.min(650, requestedDuration))
+    const requestedDuration = Number(options.durationMs) || 2000
+    const durationMs = Math.max(2000, Math.min(3000, requestedDuration))
     el.className = 'dmg-float is-' + kind + (big ? ' big' : '')
     el.style.color = color
     el.style.left  = left + 'px'
@@ -3126,17 +3220,27 @@
     el.style.setProperty('--floater-duration', durationMs + 'ms')
     el.textContent = text
     layer.appendChild(el)
+    if (!_floaterLayout) _floaterLayout = window.BattleFloaterLayout.create(layer)
+    _floaterLayout.add(el, left, top)
     _floaters.add(el)
     const timer = setTimeout(function () {
       el.remove()
       _floaters.delete(el)
+      _floaterLayout.remove(el)
+      _previewFloaterTimers.delete(el)
       _floaterTimers.delete(timer)
     }, durationMs + 80)
     _floaterTimers.add(timer)
+    if (options.preview) {
+      el.dataset.preview = 'true'
+      _previewFloaterTimers.set(el, timer)
+    }
   }
 
   // ── Dispose ───────────────────────────────────────────────────────────────────
   function dispose() {
+    _hoverPointer = null
+    _hoverIntentKey = null
     _clearHoverPath()
     _hoverMoveTargets.clear()
     _hoverSelectedId = null
@@ -3220,6 +3324,10 @@
     _floaterTimers.clear()
     _floaters.forEach(function (element) { element.remove() })
     _floaters.clear()
+    if (_floaterLayout) _floaterLayout.clear()
+    _floaterLayout = null
+    _previewFloaterTimers.clear()
+    _previewAuthorityModel = null
     _texCache.clear()
     _pointers.clear()
     _renderer = null
@@ -3265,7 +3373,10 @@
     init,
     update,
     showHistoricalBoard,
+    showPreviewBoard,
+    clearPreviewBoard,
     animateAction,
+    setPendingFeedback,
     settlePresentation,
     spawnFloater,
     resize,
@@ -3281,6 +3392,7 @@
     showPresentationAreaFlash,
     clearPresentationAreaFlash: _clearPresentationAreaFlash,
     showPresentationPath,
+    showPresentationPaths,
     clearPresentationPath: _clearPresentationPath,
     dispose,
     getMotionDiagnostics,
