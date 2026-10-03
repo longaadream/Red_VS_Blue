@@ -16,6 +16,8 @@ type PreviewHarness = {
   transport: ReturnType<typeof vi.fn>
   skillPreviewDisplayTimings: any[]
   requestAnimationFrame: ReturnType<typeof vi.fn>
+  flushNextAnimationFrame: () => void
+  flushAnimationFrames: () => void
 }
 
 function readPage() {
@@ -31,9 +33,13 @@ function readNamedFunction(html: string, name: string) {
   return html.slice(start, nextFunction)
 }
 
-function createHarness(result: Record<string, any> = { status: 'ready', snapshot: {} }): PreviewHarness {
+function createHarness(
+  result: Record<string, any> = { status: 'ready', snapshot: {} },
+  options: { deferFrames?: boolean } = {},
+): PreviewHarness {
   const html = readPage()
   const badges: any[] = []
+  const bodyClasses = new Set<string>()
   const document = {
     badges,
     createElement: vi.fn(() => {
@@ -49,7 +55,14 @@ function createHarness(result: Record<string, any> = { status: 'ready', snapshot
       badges.push(badge)
       return badge
     }),
-    body: { appendChild: vi.fn() },
+    body: {
+      appendChild: vi.fn(),
+      classList: {
+        contains: (name: string) => bodyClasses.has(name),
+        add: (name: string) => bodyClasses.add(name),
+        remove: (name: string) => bodyClasses.delete(name),
+      },
+    },
   }
   const renderer = {
     clearPreviewBoard: vi.fn(),
@@ -68,22 +81,29 @@ function createHarness(result: Record<string, any> = { status: 'ready', snapshot
     pieces: [{ id: 'target', x: 2, y: 3 }],
     selection: { mode: 'hypothetical' },
     interaction: { pendingCommandId: 'hypothetical' },
-    legal: { targetCells: [{ x: 2, y: 3 }] },
+    legal: { moveCells: [], targetCells: [{ x: 2, y: 3 }], placementCells: [] },
     interactionPieces: [],
   }
   const authority = {
+    board: { tiles: [], width: 3, height: 3 },
     pieces: [{ id: 'target', x: 2, y: 3 }],
     selection: { mode: 'target', pieceId: 'source' },
     interaction: { pendingCommandId: 'authority-command' },
-    legal: { targetCells: [{ x: 2, y: 3 }] },
+    legal: { moveCells: [], targetCells: [{ x: 2, y: 3 }], placementCells: [] },
   }
   const transport = vi.fn()
   const skillPreviewDisplayTimings: any[] = []
   const performance = { now: vi.fn(() => 0) }
+  const frameQueue: Array<() => void> = []
   const requestAnimationFrame = vi.fn((callback: () => void) => {
-    callback()
+    if (options.deferFrames) frameQueue.push(callback)
+    else callback()
     return 1
   })
+  const flushNextAnimationFrame = () => { frameQueue.shift()?.() }
+  const flushAnimationFrames = () => {
+    while (frameQueue.length) flushNextAnimationFrame()
+  }
   const windowObject: Record<string, any> = {
     BattleRenderer3D: renderer,
   }
@@ -113,6 +133,8 @@ function createHarness(result: Record<string, any> = { status: 'ready', snapshot
     validTargets: new Set(['2,3']),
   }
   const game = {
+    map: { tiles: [] },
+    targetingRevision: 7,
     pieces: [
       { instanceId: 'source', x: 1, y: 1, currentHp: 8 },
       { instanceId: 'target', x: 2, y: 3, currentHp: 5 },
@@ -123,16 +145,35 @@ function createHarness(result: Record<string, any> = { status: 'ready', snapshot
     'var pendingSkill = null',
     'var targetSubmissionPending = null',
     'var G = null',
+    'var selectedPieceId = "source"',
     'var myPlayerId = "player-a"',
     'var currentBattleViewModel = null',
+    'var battlePageDisposed = false',
     'var skillPreviewController = null',
+    'var skillPreviewReplayScheduled = false',
+    'var skillPreviewReplayContext = null',
+    'var skillPreviewReplayGeneration = 0',
     'var waitingForOtherPending = function () { return false }',
+    'var skillSelectionSwitchBlocked = function () { return false }',
+    'var clearTargetInteraction = function () { clearSkillPreview(); pendingSkill = null }',
+    'var renderActionBar = function () {}',
     'var createBattlePresentationModel = function () { return null }',
+    'var prepareCurrentBattlePresentationModel = function () { return currentBattleViewModel }',
+    'var battlePresentation = { update: function () {} }',
+    'var recalcCellSize = function () {}',
     'var _actionHasFirstTarget = function (action) { return !!(action && (action.targetPieceId || action.targetX != null || action.targetY != null)) }',
     readNamedFunction(html, '_targetPayloadFromCell'),
     readNamedFunction(html, '_appendTargetToAction'),
+    readNamedFunction(html, 'invalidateSkillPreviewReplay'),
     readNamedFunction(html, 'clearSkillPreview'),
+    readNamedFunction(html, 'skillPreviewAuthorityRevision'),
+    readNamedFunction(html, 'skillPreviewPendingStateRevision'),
+    readNamedFunction(html, 'skillPreviewHistoryViewActive'),
+    readNamedFunction(html, 'skillPreviewReplayIsCurrent'),
+    readNamedFunction(html, 'scheduleSkillPreviewReplayAfterRedraw'),
     readNamedFunction(html, 'previewSkillTarget'),
+    readNamedFunction(html, 'endSkillCardPreview'),
+    readNamedFunction(html, 'renderBoard'),
   ].join('\n')
   new Script(script, { filename: 'battle.html:skill-preview' }).runInContext(context as any)
 
@@ -158,6 +199,8 @@ function createHarness(result: Record<string, any> = { status: 'ready', snapshot
     transport,
     skillPreviewDisplayTimings,
     requestAnimationFrame,
+    flushNextAnimationFrame,
+    flushAnimationFrames,
   }
 }
 
@@ -167,6 +210,78 @@ function preview(harness: PreviewHarness, x: number | null, y: number | null) {
 }
 
 describe('RED-224 battle page skill preview binding', () => {
+  it('restores a stationary target preview after a pure board redraw', () => {
+    const h = createHarness({ status: 'ready', snapshot: { revision: 8 }, events: [] })
+
+    preview(h, 2, 3)
+    h.renderer.showPreviewBoard.mockClear()
+
+    new Script('renderBoard()', { filename: 'battle.html:renderBoard' }).runInContext(h.context as any)
+
+    expect(h.renderer.showPreviewBoard).toHaveBeenCalledOnce()
+  })
+
+  it('does not resurrect a preview after explicit cancel before redraw restoration', () => {
+    const h = createHarness({ status: 'ready', snapshot: { revision: 8 }, events: [] }, { deferFrames: true })
+
+    preview(h, 2, 3)
+    h.flushNextAnimationFrame()
+    h.renderer.showPreviewBoard.mockClear()
+    new Script('renderBoard()', { filename: 'battle.html:renderBoard' }).runInContext(h.context as any)
+    new Script('clearSkillPreview()', { filename: 'battle.html:clearSkillPreview' }).runInContext(h.context as any)
+    h.flushAnimationFrames()
+
+    expect(h.renderer.showPreviewBoard).not.toHaveBeenCalled()
+  })
+
+  it('does not resurrect a hover preview after card leave before redraw restoration', () => {
+    const h = createHarness({ status: 'ready', snapshot: { revision: 8 }, events: [] }, { deferFrames: true })
+    h.context.pendingSkill.previewOnly = true
+    h.context.pendingSkill.previewEligible = true
+    h.context.pendingSkill.previewOrigin = 'hover'
+
+    preview(h, null, null)
+    h.flushNextAnimationFrame()
+    h.renderer.showPreviewBoard.mockClear()
+    new Script('renderBoard()', { filename: 'battle.html:renderBoard' }).runInContext(h.context as any)
+    new Script("endSkillCardPreview('skill-a')", { filename: 'battle.html:endSkillCardPreview' }).runInContext(h.context as any)
+    h.flushAnimationFrames()
+
+    expect(h.renderer.showPreviewBoard).not.toHaveBeenCalled()
+  })
+
+  it('does not restore a preview after history view activates before redraw restoration', () => {
+    const h = createHarness({ status: 'ready', snapshot: { revision: 8 }, events: [] }, { deferFrames: true })
+
+    preview(h, 2, 3)
+    h.flushNextAnimationFrame()
+    h.renderer.showPreviewBoard.mockClear()
+    new Script('renderBoard()', { filename: 'battle.html:renderBoard' }).runInContext(h.context as any)
+    h.context.document.body.classList.add('is-viewing-history')
+    h.flushAnimationFrames()
+
+    expect(h.renderer.showPreviewBoard).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    ['a replaced authority snapshot', (h: PreviewHarness) => { h.context.G = { ...h.context.G, map: h.context.G.map } }],
+    ['an in-place authority revision change', (h: PreviewHarness) => { h.context.G.targetingRevision += 1 }],
+    ['a changed skill', (h: PreviewHarness) => {
+      h.context.pendingSkill = { ...h.context.pendingSkill, skillId: 'skill-b', baseAction: { ...h.context.pendingSkill.baseAction, skillId: 'skill-b' } }
+    }],
+  ])('does not restore a stale preview after %s', (_label, change) => {
+    const h = createHarness({ status: 'ready', snapshot: { revision: 8 }, events: [] }, { deferFrames: true })
+
+    preview(h, 2, 3)
+    h.flushNextAnimationFrame()
+    h.renderer.showPreviewBoard.mockClear()
+    change(h)
+    new Script('renderBoard()', { filename: 'battle.html:renderBoard' }).runInContext(h.context as any)
+    h.flushAnimationFrames()
+
+    expect(h.renderer.showPreviewBoard).not.toHaveBeenCalled()
+  })
+
   it('previews only a legal root target through the real target payload helper', () => {
     const h = createHarness({ status: 'ready', snapshot: { revision: 8 }, events: [] })
 
@@ -355,5 +470,18 @@ describe('RED-224 battle page skill preview binding', () => {
     expect(h.context.pendingSkill).toBe(h.pendingSkill)
     expect(h.transport).not.toHaveBeenCalled()
     expect(h.engine.applyBattleAction).not.toHaveBeenCalled()
+  })
+
+  it('restores an unavailable notice after a pure board redraw', () => {
+    const h = createHarness({ status: 'unavailable', reason: 'unsupported' })
+
+    preview(h, 2, 3)
+    h.renderer.clearPreviewBoard.mockClear()
+    new Script('renderBoard()', { filename: 'battle.html:renderBoard' }).runInContext(h.context as any)
+
+    expect(h.document.badges).toHaveLength(1)
+    expect(h.document.badges[0].hidden).toBe(false)
+    expect(h.document.badges[0].textContent).toBe('此效果暂不预演')
+    expect(h.renderer.showPreviewBoard).not.toHaveBeenCalled()
   })
 })

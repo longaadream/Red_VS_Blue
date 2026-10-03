@@ -9,9 +9,10 @@ import { evaluateZeroStageState } from '../practice/evaluator'
 import type { BattleState } from './turn'
 
 /**
- * The tutorial runs on the browser's main thread, so it uses a smaller wall
- * clock budget than the practice worker. Node limits remain the authority for
- * deterministic search; the clocks are measured cutoffs, not hard deadlines.
+ * Tutorial search may run in a dedicated worker, but it keeps a small measured
+ * wall-clock budget for responsive turn handoff. Node limits remain the
+ * authority for deterministic search; the clocks are soft cutoffs, not hard
+ * deadlines, and the decision records an overrun when one occurs.
  */
 export const TUTORIAL_AI_DEFAULTS: Readonly<ShortSearchConfig> = Object.freeze({
   depth: 3,
@@ -25,6 +26,7 @@ export const TUTORIAL_AI_DEFAULTS: Readonly<ShortSearchConfig> = Object.freeze({
   turnTimeMs: 2500,
   decisionTimeMs: 250,
   deploymentTimeMs: 500,
+  minimumRootCoverage: 12,
 })
 
 export interface TutorialAiOptions {
