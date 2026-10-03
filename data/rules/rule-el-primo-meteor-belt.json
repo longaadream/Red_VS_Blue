@@ -1,0 +1,8 @@
+{
+  "id": "rule-el-primo-meteor-belt",
+  "name": "流星腰带",
+  "description": "保护普里莫自身3×3内的其他友军，由普里莫代为承受伤害。",
+  "priority": 200,
+  "trigger": { "type": "beforeDamageRedirect" },
+  "skillCode": "var guard=context.rulePiece,target=context.piece;if(!guard||guard.currentHp<=0||!battle.pieces.some(function(piece){return piece.instanceId===guard.instanceId&&piece.currentHp>0;}))return{success:false,message:''};if(!target||target.instanceId===guard.instanceId||target.currentHp<=0||!arePlayersAllied(battle,target.ownerPlayerId,guard.ownerPlayerId))return{success:false,message:''};if(guard.x==null||guard.y==null||target.x==null||target.y==null||Math.abs(target.x-guard.x)>1||Math.abs(target.y-guard.y)>1)return{success:false,message:''};var status=(guard.statusTags||[]).some(function(tag){return tag.type==='el-primo-meteor-belt';});if(!status||!context.damageRedirectQueue||!context.damageRedirectQueue.push({target:guard}))return{success:false,message:''};return{success:true,blocked:true,message:guard.name+'代替'+target.name+'承受伤害'};"
+}

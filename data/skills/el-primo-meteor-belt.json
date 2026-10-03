@@ -1,0 +1,18 @@
+{
+  "id": "el-primo-meteor-belt",
+  "name": "流星腰带",
+  "description": "持续2回合，保护自身3×3内的其他友军；其受到伤害时由你代为承受。",
+  "keywords": [],
+  "targetText": "自身3×3内的其他友军",
+  "effectTags": ["保护"],
+  "icon": "☄️",
+  "kind": "active",
+  "type": "normal",
+  "actionPointCost": 1,
+  "chargeCost": 0,
+  "cooldownTurns": 3,
+  "maxCharges": 0,
+  "powerMultiplier": 1,
+  "targeting": { "steps": [] },
+  "code": "function executeSkill(context){var c=context.piece,turn=Number(battle.turn.turnNumber),statusId='el-primo-meteor-belt-'+c.instanceId+'-'+turn;addStatusEffectById(c.instanceId,{id:statusId,type:'el-primo-meteor-belt',name:'流星腰带',visible:true,stacking:'none',currentDuration:2,remainingDuration:2,stacks:1,relatedRules:['rule-el-primo-meteor-belt']});addRuleById(c.instanceId,'rule-el-primo-meteor-belt');return{success:true,message:c.name+'获得流星腰带，持续2回合'};}"
+}

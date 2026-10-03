@@ -123,6 +123,7 @@ export type TriggerType =
   | "afterDamageDealt"      // 造成伤害后
   | "afterDamageTaken"      // 受到伤害后
   | "beforeDamageDealt"     // 即将造成伤害前
+  | "beforeDamageRedirect"  // 原目标防御效果之前选择代伤者
   | "beforeDamageTaken"     // 即将受到伤害前
   | "beforeDamageShield"    // 防御结算后、数值护盾吸收前
   | "beforeDamageApplied"   // 数值护盾结算后、生命扣减前
@@ -248,6 +249,8 @@ export interface TriggerContext {
   shieldAbsorbed?: number
   /** Follow-up damage drained after the parent batch has committed. */
   damageQueue?: DamageQueueWriter
+  /** One-shot substitution; only available before an original target takes damage. */
+  damageRedirectQueue?: { push(input: { target: PieceInstance }): boolean }
   healQueue?: HealQueueWriter
   effectChainId?: string
   effectBatchId?: string

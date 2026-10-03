@@ -8,7 +8,7 @@
   "type": "normal",
   "actionPointCost": 1,
   "chargeCost": 0,
-  "cooldownTurns": 0,
+  "cooldownTurns": 1,
   "maxCharges": 0,
   "powerMultiplier": 1,
   "range": "area",
