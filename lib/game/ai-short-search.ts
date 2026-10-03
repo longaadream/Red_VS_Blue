@@ -16,6 +16,10 @@ export interface ShortSearchConfig {
   deploymentTimeMs: number
   /** Optional caller-owned root coverage; zero keeps the legacy search order. */
   minimumRootCoverage?: number
+  /** Optional tutorial-only root coverage while an end-turn baseline is best. */
+  endTurnRootCoverage?: number
+  /** Optional tutorial-only completed end-turn comparisons for ordinary roots. */
+  endTurnComparisons?: number
 }
 
 export const SHORT_SEARCH_DEFAULTS: Readonly<ShortSearchConfig> = Object.freeze({
@@ -23,6 +27,8 @@ export const SHORT_SEARCH_DEFAULTS: Readonly<ShortSearchConfig> = Object.freeze(
   nodesPerDecision: 128, deploymentNodesPerDecision: 384, nodesPerTurn: 896, maxActionsPerTurn: 24,
   turnTimeMs: 4500, decisionTimeMs: 900, deploymentTimeMs: 2250,
   minimumRootCoverage: 0,
+  endTurnRootCoverage: 0,
+  endTurnComparisons: 0,
 })
 
 /** Keep one continuation per battle/player; pass it back even if a command must be retried. */
@@ -230,10 +236,13 @@ export function planShortSearchAction(state: BattleState, playerId: string, root
   const started = now()
   const config = { ...SHORT_SEARCH_DEFAULTS, ...options.config }
   for (const [key, value] of Object.entries(config)) {
-    const minimum = key === 'minimumRootCoverage' || key.endsWith('Ms') ? 0 : 1
+    const minimum = ['minimumRootCoverage', 'endTurnRootCoverage', 'endTurnComparisons'].includes(key)
+      || key.endsWith('Ms') ? 0 : 1
     if (!Number.isSafeInteger(value) || value < minimum) throw new Error(`Invalid short-search ${key}`)
   }
   if ((config.minimumRootCoverage ?? 0) > 12) throw new Error('Invalid short-search minimumRootCoverage')
+  if ((config.endTurnRootCoverage ?? 0) > 48) throw new Error('Invalid short-search endTurnRootCoverage')
+  if ((config.endTurnComparisons ?? 0) > 3) throw new Error('Invalid short-search endTurnComparisons')
   const actionsTaken = options.actionsTakenThisTurn ?? 0
   let decisionTimeMs = config.decisionTimeMs
   let decisionNodeLimit = config.nodesPerDecision
@@ -318,6 +327,18 @@ export function planShortSearchAction(state: BattleState, playerId: string, root
   const rootCoverage = entryRootCoverageAvailable && stopBaseline && ordinaryRootActions.length
     ? Math.min(requiredRootCoverage, 1 + ordinaryRootActions.length)
     : 0
+  const endTurnRootCoverage = config.endTurnRootCoverage ?? 0
+  const endTurnComparisons = config.endTurnComparisons ?? 0
+  const endTurnCoverageAvailable = !deploymentDecision
+    && endTurnRootCoverage > 0
+    && stopBaseline
+    && ordinaryRootActions.length
+    && actionsTaken < config.maxActionsPerTurn - 1
+  const endTurnCoverage = endTurnCoverageAvailable
+    ? Math.min(endTurnRootCoverage, 1 + ordinaryRootActions.length)
+    : 0
+  const rootCandidateLimit = Math.max(config.rootCandidates, rootCoverage, endTurnRootCoverage)
+  const ordinaryRootNodes: Node[] = []
   const evalScore = (o: AIObservation) => {
     const score = options.evaluate(o)
     if (!Number.isFinite(score)) throw new Error('Non-finite public evaluation')
@@ -332,15 +353,19 @@ export function planShortSearchAction(state: BattleState, playerId: string, root
     // Allocate a per-parent quota so the first branch cannot consume the entire next depth.
     const quota = Math.max(1, Math.floor((decisionNodeLimit - nodes) / beam.length))
     for (const parent of beam) {
-      const stop = budgetStop(depth === 0 && rootCoverage > 0 && rootCoverageEvaluated < rootCoverage)
+      const legacyRootPending = depth === 0 && rootCoverage > 0 && rootCoverageEvaluated < rootCoverage
+      const endTurnRootPending = depth === 0 && endTurnCoverage > 0
+        && rootCoverageEvaluated < endTurnCoverage
+        && (!best || best.sequence[0]?.kind === 'end-turn')
+      const stop = budgetStop(legacyRootPending || endTurnRootPending)
       if (stop) { stopReason = stop; break search }
       const candidates = depth === 0 ? legal : environment.listLegalActions(parent.state, playerId)
       considered += candidates.length
-      const rootLimit = Math.min(quota, deploymentDecision ? config.deploymentNodesPerDecision
-        : depth === 0 ? Math.max(config.rootCandidates, rootCoverage) : config.childCandidates)
+      const admittedLimit = Math.min(quota, deploymentDecision ? config.deploymentNodesPerDecision
+        : depth === 0 ? rootCandidateLimit : config.childCandidates)
       const admitted = depth === 0 && rootCoverage > 0
-        ? selectRootCoverageCandidates(candidates, parent.observation, rootLimit, rootCoverage)
-        : selectShortSearchCandidates(candidates, parent.observation, rootLimit)
+        ? selectRootCoverageCandidates(candidates, parent.observation, admittedLimit, rootCoverage)
+        : selectShortSearchCandidates(candidates, parent.observation, admittedLimit)
       const ids = new Set(admitted.map(c => c.id))
       for (const c of candidates) if (!ids.has(c.id)) trace.push({ depth, candidateId: c.id,
         rootId: parent.sequence[0]?.id ?? c.id, reason: 'candidate-limit' })
@@ -348,11 +373,16 @@ export function planShortSearchAction(state: BattleState, playerId: string, root
         if (candidate.kind === 'reserve-deployment' && candidate.action.type === 'deployReservePiece'
           && candidate.action.toX === undefined) continue
         const countsTowardsRootCoverage = candidate.kind === 'end-turn' || ordinaryRootAction(candidate)
-        const rootFairnessPending = depth === 0 && rootCoverage > 0
+        const legacyRootPending = depth === 0 && rootCoverage > 0
           && countsTowardsRootCoverage && rootCoverageEvaluated < rootCoverage
-        const stop = budgetStop(rootFairnessPending)
+        const endTurnRootPending = depth === 0 && endTurnCoverage > 0
+          && countsTowardsRootCoverage && rootCoverageEvaluated < endTurnCoverage
+          && (!best || best.sequence[0]?.kind === 'end-turn')
+        const stop = budgetStop(legacyRootPending || endTurnRootPending)
         if (stop) { stopReason = stop; break search }
-        if (depth === 0 && rootCoverage > 0 && countsTowardsRootCoverage) rootCoverageEvaluated++
+        if (depth === 0 && (rootCoverage > 0 || endTurnCoverage > 0) && countsTowardsRootCoverage) {
+          rootCoverageEvaluated++
+        }
         nodes++
         const row: ShortSearchTrace = { depth, candidateId: candidate.id,
           rootId: parent.sequence[0]?.id ?? candidate.id, reason: 'evaluated' }
@@ -373,11 +403,61 @@ export function planShortSearchAction(state: BattleState, playerId: string, root
             || !samePlayer(owner(observed), playerId),
         }
         if (!best || compareNodes(child, best) < 0) best = child
+        if (depth === 0 && ordinaryRootAction(candidate) && !child.closed) ordinaryRootNodes.push(child)
         if (!child.closed) frontier.push(child)
         if (child.terminalRank === 3) break search
       }
     }
     beam = diverseBeam(frontier, config.beamWidth)
+  }
+
+  // When ending now remains the best immediate root, spend a small additional
+  // budget checking whether an ordinary action becomes better after the same
+  // authoritative end-phase settlement. These probes are deliberately closed:
+  // their post-end state must never become a search frontier or consume hidden
+  // pending input on behalf of the player.
+  if (endTurnComparisons > 0 && stopBaseline && best?.sequence[0]?.kind === 'end-turn') {
+    const comparisonRoots = ordinaryRootNodes.slice().sort(compareNodes).slice(0, endTurnComparisons)
+    for (const root of comparisonRoots) {
+      const stop = budgetStop(true)
+      if (stop) { stopReason = stop; break }
+      nodes++
+      considered++
+      const row: ShortSearchTrace = {
+        depth: 1,
+        candidateId: stopBaseline.id,
+        rootId: root.sequence[0]?.id ?? stopBaseline.id,
+        reason: 'evaluated',
+      }
+      const transition = environment.simulate(root.state, stopBaseline, { rootSeed })
+      if (!transition.accepted) {
+        trace.push({ ...row, reason: 'rejected', error: transition.error.code })
+        continue
+      }
+      if ((transition.trace as { blocked?: boolean }).blocked) {
+        trace.push({ ...row, reason: 'blocked' })
+        continue
+      }
+      const observed = environment.observe(transition.state, playerId)
+      const hasPending = !!observed.pendingOptionSelection || !!observed.pendingTargetSelection
+      const completed = !hasPending && (environment.isTerminal(transition.state)
+        || observed.turn.phase === 'end' || !samePlayer(owner(observed), playerId))
+      if (!completed) {
+        trace.push({ ...row, reason: 'blocked' })
+        continue
+      }
+      const score = evalScore(observed)
+      trace.push({ ...row, score })
+      const completedNode: Node = {
+        state: transition.state,
+        observation: observed,
+        sequence: [...root.sequence, stopBaseline],
+        score,
+        terminalRank: terminalRank(observed, playerId),
+        closed: true,
+      }
+      if (!best || compareNodes(completedNode, best) < 0) best = completedNode
+    }
   }
   return finish()
 }

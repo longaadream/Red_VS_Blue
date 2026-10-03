@@ -66,6 +66,20 @@ function baseContext() {
 }
 
 describe('RED-227 skill preview selection switching', () => {
+  it.each(['click', 'drag', undefined])('keeps an activated target draft when hovering another skill (%s)', origin => {
+    const h = baseContext()
+    const draft = { skillId: 'skill-old', previewOrigin: origin, localChoiceDraft: true,
+      preparation: { kind: 'needTarget' }, validTargets: new Set(['2,3']) }
+    h.context.pendingSkill = draft
+    h.context.prepareLocalSkillAction = vi.fn(() => ({ status: 'needs-input' }))
+    new Script([readFunction('skillSelectionSwitchBlocked'), readFunction('previewSkillCard')].join('\n')).runInContext(h.context)
+    expect(new Script("previewSkillCard('skill-new')").runInContext(h.context)).toBe(false)
+    expect(h.context.pendingSkill).toBe(draft)
+    expect(h.context.clearTargetInteraction).not.toHaveBeenCalled()
+    expect(h.context.prepareLocalSkillAction).not.toHaveBeenCalled()
+    expect(h.doAction).not.toHaveBeenCalled()
+  })
+
   it('ends only the matching hover preview when leaving a skill card', () => {
     const h = baseContext()
     new Script([readFunction('skillSelectionSwitchBlocked'), readFunction('endSkillCardPreview')].join('\n')).runInContext(h.context)

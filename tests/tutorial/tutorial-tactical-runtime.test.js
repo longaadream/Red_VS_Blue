@@ -310,6 +310,37 @@ describe('RED-230 tactical tutorial runtime', () => {
     }
   })
 
+  it('captures a partial time-budget end turn with remaining AP after prior actions', async () => {
+    vi.useFakeTimers()
+    try {
+      const f = fixture({ practiceOnly: true, owner: 'opponent', captureAiReplay: true })
+      f.setState({
+        ...f.state(),
+        players: f.state().players.map(player => player.playerId === 'opponent'
+          ? { ...player, actionPoints: 4 }
+          : player),
+      })
+      f.engine.planTutorialAiAction
+        .mockReturnValueOnce({
+          nextAction: { action: { type: 'move', playerId: 'opponent', pieceId: 'enemy', toX: 4, toY: 1 } },
+          continuation: { turnKey: 'opponent:1:opponent', nodes: 2, elapsedMs: 4 },
+          nodes: 2, considered: 3, elapsedMs: 4, stopReason: 'selected',
+        })
+        .mockReturnValueOnce({
+          nextAction: { action: { type: 'endTurn', playerId: 'opponent' } },
+          continuation: { turnKey: 'opponent:1:opponent', nodes: 3, elapsedMs: 9 },
+          nodes: 1, considered: 10, elapsedMs: 5, stopReason: 'time-budget', overTurnBudget: false,
+        })
+      f.click('开始实战')
+      await vi.advanceTimersByTimeAsync(6000)
+      expect(f.hooks.onAiDecisionResult.mock.calls[1][0].replayInput).toMatchObject({
+        actionsTakenThisTurn: 1,
+      })
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('keeps the deployment then end-turn opening flow while carrying cumulative diagnostics', async () => {
     vi.useFakeTimers()
     try {

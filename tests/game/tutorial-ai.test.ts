@@ -11,7 +11,7 @@ import { listLegalAIActions } from '@/lib/game/ai-environment'
 import { createInitialBattleForPlayers } from '@/lib/game/battle-setup'
 import { runBattleAction } from '@/lib/game/battle-runner'
 import { getPieceById } from '@/lib/game/piece-repository'
-import { planTutorialAiAction } from '@/lib/game/tutorial-ai'
+import { planTutorialAiAction, TUTORIAL_AI_DEFAULTS } from '@/lib/game/tutorial-ai'
 import { hashStable } from '@/lib/game/battle-trace'
 import { practiceEnvironment } from '@/lib/practice/environment'
 import { evaluateZeroStageState } from '@/lib/practice/evaluator'
@@ -254,6 +254,11 @@ function applyPlanned(state: any, decision: any) {
 }
 
 describe('RED-228 tutorial tactical planner', () => {
+  it('uses bounded end-turn root coverage and follow-up comparisons by default', () => {
+    expect(TUTORIAL_AI_DEFAULTS.endTurnRootCoverage).toBe(48)
+    expect(TUTORIAL_AI_DEFAULTS.endTurnComparisons).toBe(3)
+  })
+
   it('records the legacy move-only miss and replans a legal move into a real attack', () => {
     const state = fixture({
       actionPoints: 2,

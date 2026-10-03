@@ -667,7 +667,7 @@
         const captureReplay = hooks.captureAiReplay === true
           && action.type === 'endTurn'
           && (inputActionsTaken === 0
-            || (decision.stopReason === 'time-budget' && decision.overTurnBudget === true
+            || (decision.stopReason === 'time-budget'
               && Number(actingPlayer && actingPlayer.actionPoints) > 0))
         if (captureReplay) {
           details.replayInput = {

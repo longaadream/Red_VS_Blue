@@ -8331,6 +8331,10 @@
       if (!availability.available) return false
       if (pendingSkill && pendingSkill.skillId === skId) return true
 
+      // Only another transient hover may replace a hover preview. Pointer
+      // travel across the menu must not cancel an activated target draft.
+      if (pendingSkill && pendingSkill.previewOrigin !== 'hover') return false
+
       // Let the public preparation surface classify the root. Hover may show
       // a ready no-input action, but a target/option prompt stays dormant
       // until an explicit activation owns the first answer.

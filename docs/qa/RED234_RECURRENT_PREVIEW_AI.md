@@ -60,6 +60,21 @@ AI 探索对照：真实 seed 18707、红方首次部署 training-red-1 到 (1,1
 - 取证相关教程测试28通过，独立审查两套19通过（与前者重叠）；typecheck、定向 ESLint、check:encoding、diff检查通过。typecheck 首次被忽略目录中调查脚本的两处隐式any阻挡，补充脚本类型后通过；没有修改产品类型来掩盖错误。
 - 正常诊断入口：http://127.0.0.1:38680/battle.html?mode=tutorial&lesson=tactical-intuition&practice=1&tutorialPerf=1 。不含 qaReplay，不加载人工修改的0AP局面。原玩家对局未刷新或操作。若再出现只部署结束，保留该页面即可读取前两份输入。
 
-## 回退方式
+## 玩家仅使用灵魂残片案例（2026-10-03）
+
+- 读取38680原玩家页面，未刷新或提交操作。第8回合顺序为部署、灵魂残片、结束；第9回合开始时蓝方仍有4AP。结束决策 nodes=12，10 evaluated、2 rejected、105 candidate-limit，overTurnBudget=false，累计 elapsedMs≈1536.7ms。此案例是单次软截止下的有限比较，不能沿用累计预算耗尽的结论。DOM记录和截图保存在 output/RED234/user-latest-records.json、user-turn9-ap4.png。
+- 取证触发遗漏了这种已行动、未耗尽累计预算的 time-budget 结束；已扩为所有 time-budget 且AP>0的结束，维持显式门禁与最多两份。回归覆盖1普通行动、4AP、overTurnBudget=false。
+- 冻结对照修正：另一个保存的第8回合状态并不是本次玩家状态。对其添加一回合敌方freeze，正式结束只增加400 status分，moveRange、机动与未来攻击评分未增加；不能声称冻结导致几十万级评分跳变。完整对照见 output/RED234/end-component-probe.json。该另存状态有143候选，致命打击比结束高约486796分、眼棱高89186分，但不能当作本次遗漏候选一定有益的证据。
+- 教程局部修复采用有限的结束前检查，不增大累计时间/节点/动作上限、不修改评价器权重、卡牌或规则。普通练习默认关闭。用户当前精确局面仍缺完整输入，后续候选自动取证覆盖单次截止，最终体验待人工验证。
+
+## 本轮回退
 
 仅撤销 RED-234 局部提交，保留 RED-232、RED-233；无数据迁移。不合并或发布。真实玩家体验由负责人验收。
+
+## 2026-10-03 target draft / end-turn coverage candidate
+
+- Root regression reproduced three failures before the UI fix: another skill card hover cleared an explicitly activated click, drag, or legacy target draft. `previewSkillCard` now only replaces transient hover drafts; explicit selection/cancel and authoritative state invalidation retain their existing paths.
+- Controlled Uther fixture (seed 18707, positions adjusted for visibility, not the user's original replay): blessed-hammer selected an adjacent enemy and reduced Obito HP 13 to 10; shield-of-light then selected Uther and added divine shield. Both entered cooldown. Screenshot: `output/RED234/uther-both-skills.png`. This verifies submission, not every intermittent hover path or preview result.
+- Final targeted run: 8 files / 98 tests passed, including hard cumulative time cutoff, conditional root coverage, action-then-end comparison, worker, capture, and skill selection/preview tests. Typecheck, targeted ESLint, encoding, and diff checks passed.
+- Candidate normal URL: http://127.0.0.1:38681/battle.html?mode=tutorial&lesson=tactical-intuition&practice=1&tutorialPerf=1 . No qaReplay flag, hence no staged fixture. Existing user tab at 38680 was preserved.
+- The separate saved canonical state already selected a useful skill in both control and new search; it is adjacent regression evidence, not an exact replay of the user's latest partial-action end turn. AC3 remains open pending longer real games and renewed evidence captures.
