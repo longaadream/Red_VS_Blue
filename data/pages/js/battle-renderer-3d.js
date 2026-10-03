@@ -145,6 +145,9 @@
   let _textureLoadGeneration = 0
   const _floaters = new Set()
   const _floaterTimers = new Set()
+  let _floaterLayout = null
+  const _previewFloaterTimers = new Map()
+  let _previewAuthorityModel = null
   let _pressedPiece = null
   let _pressedHighlight = null
   let _reducedMotion = false
@@ -416,6 +419,7 @@
     _updateCameraProjection(w, h)
     if (_mapW && _camera && _cameraInOverview) _resetCamera()
     _notifyViewportChange()
+    if (_floaterLayout) _floaterLayout.resize()
   }
 
   function _withCameraZoomOne(callback) {
@@ -2194,6 +2198,13 @@
     })
   }
 
+  // Acknowledge submission without rebuilding the board or predicting its result.
+  function setPendingFeedback(pieceId) {
+    if (!_currentModel) return
+    _syncPendingFeedback(Object.assign({}, _currentModel.interaction || {}, { pendingPieceId: pieceId || null }))
+    _invalidate()
+  }
+
   function _pressFeedbackAt(pointerId, clientX, clientY) {
     _releasePressedFeedback()
     const piece = _findPieceFromPointer(clientX, clientY)
@@ -2820,6 +2831,7 @@
   let _hoverKey = null
   let _hoverMoveTargets = new Set()
   let _hoverSelectedId = null
+  let _hoverIntentKey = null
 
   function _clearHoverPath() {
     _hoverKey = null
@@ -2847,6 +2859,11 @@
         _hoverPath.computeLineDistances()
         _scene.add(_hoverPath)
       }
+    }
+    // Visual updates may rebuild the hover path; they must not erase the
+    // pointer's last notified cell (otherwise pointerleave can be lost).
+    if (key !== _hoverIntentKey) {
+      _hoverIntentKey = key
       if (_onIntent) _onIntent({ type: 'hover-cell', x: cell ? cell.x : null, y: cell ? cell.y : null })
     }
     if (!cell) {
@@ -3063,25 +3080,43 @@
     Array.from(_anims.keys()).forEach(_cancelAnimation)
     _pieceObjects.forEach(function (obj) { _restorePieceVisual(obj); obj.group.scale.set(1, 1, 1) })
     if (!(options && options.preserveFloaters)) {
+      _previewFloaterTimers.clear()
+      _previewAuthorityModel = null
       _floaterTimers.forEach(function (timer) { clearTimeout(timer) })
       _floaterTimers.clear()
       _floaters.forEach(function (element) { element.remove() })
       _floaters.clear()
+      if (_floaterLayout) _floaterLayout.clear()
     }
     update(model)
   }
 
-  function showHistoricalBoard(model) {
+  function _replaceDisplayedBoard(model, options) {
     if (!_mounted || !model || !model.board) return
     _clearActionAnimationQueue()
-    _cancelPieceDrag()
+    if (!(options && options.preview)) _cancelPieceDrag()
     Array.from(_anims.keys()).forEach(_cancelAnimation)
     _clearPresentationAreaFlash()
     _clearPresentationPath()
-    _floaterTimers.forEach(function (timer) { clearTimeout(timer) })
-    _floaterTimers.clear()
-    _floaters.forEach(function (element) { element.remove() })
-    _floaters.clear()
+    if (options && options.preview) {
+      // Reuse meshes and unchanged terrain. Hover must not repeatedly tear
+      // down the entire battlefield or reload portrait textures.
+      update(model)
+      if (!options.restore) _pieceObjects.forEach(function (obj) {
+        const warning = obj.summaryEl?.querySelector('.piece-board-lethal')
+        if (warning) warning.hidden = true
+      })
+      return
+    }
+    if (!(options && options.preview)) {
+      _floaterTimers.forEach(function (timer) { clearTimeout(timer) })
+      _floaterTimers.clear()
+      _floaters.forEach(function (element) { element.remove() })
+      _floaters.clear()
+      if (_floaterLayout) _floaterLayout.clear()
+      _previewFloaterTimers.clear()
+      _previewAuthorityModel = null
+    }
     _pieceObjects.forEach(function (obj) { _scene.remove(obj.group); _disposePieceObject(obj) })
     _pieceObjects.clear()
     const camera = { x: _cameraTarget.x, y: _cameraTarget.y, z: _cameraTarget.z, zoom: _camera.zoom, overview: _cameraInOverview }
@@ -3093,12 +3128,45 @@
     _camera.updateProjectionMatrix()
     _currentModel = model
     update(model)
-    _boardDecorationsHistorical = true
-    _pieceObjects.forEach(function (obj) {
+    _boardDecorationsHistorical = !(options && options.preview)
+    if (!(options && options.restore)) _pieceObjects.forEach(function (obj) {
       const warning = obj.summaryEl?.querySelector('.piece-board-lethal')
       if (warning) warning.hidden = true
     })
-    if (_boardDecorations) _boardDecorations.visible = false
+    if (_boardDecorations) _boardDecorations.visible = !_boardDecorationsHistorical
+  }
+
+  function showHistoricalBoard(model) {
+    _replaceDisplayedBoard(model)
+  }
+
+  function clearPreviewFloaters() {
+    _previewFloaterTimers.forEach(function (timer, element) {
+      clearTimeout(timer)
+      _floaterTimers.delete(timer)
+      _floaters.delete(element)
+      if (_floaterLayout) _floaterLayout.remove(element)
+      element.remove()
+    })
+    _previewFloaterTimers.clear()
+  }
+
+  function showPreviewBoard(model, authoritativeModel) {
+    if (!_mounted || !model || !authoritativeModel) return
+    clearPreviewFloaters()
+    _replaceDisplayedBoard(model, { preview: true })
+    // The board is hypothetical; all hit testing continues to use authority.
+    _previewAuthorityModel = authoritativeModel
+    _currentModel = authoritativeModel
+  }
+
+  function clearPreviewBoard() {
+    clearPreviewFloaters()
+    if (!_previewAuthorityModel) return
+    const authoritativeModel = _previewAuthorityModel
+    _previewAuthorityModel = null
+    _replaceDisplayedBoard(authoritativeModel, { preview: true, restore: true })
+    setHistoryHighlight([])
   }
 
   // ── spawnFloater ─────────────────────────────────────────────────────────────
@@ -3128,17 +3196,26 @@
     el.style.setProperty('--floater-duration', durationMs + 'ms')
     el.textContent = text
     layer.appendChild(el)
+    if (!_floaterLayout) _floaterLayout = window.BattleFloaterLayout.create(layer)
+    _floaterLayout.add(el, left, top)
     _floaters.add(el)
     const timer = setTimeout(function () {
       el.remove()
       _floaters.delete(el)
+      _floaterLayout.remove(el)
+      _previewFloaterTimers.delete(el)
       _floaterTimers.delete(timer)
     }, durationMs + 80)
     _floaterTimers.add(timer)
+    if (options.preview) {
+      el.dataset.preview = 'true'
+      _previewFloaterTimers.set(el, timer)
+    }
   }
 
   // ── Dispose ───────────────────────────────────────────────────────────────────
   function dispose() {
+    _hoverIntentKey = null
     _clearHoverPath()
     _hoverMoveTargets.clear()
     _hoverSelectedId = null
@@ -3222,6 +3299,10 @@
     _floaterTimers.clear()
     _floaters.forEach(function (element) { element.remove() })
     _floaters.clear()
+    if (_floaterLayout) _floaterLayout.clear()
+    _floaterLayout = null
+    _previewFloaterTimers.clear()
+    _previewAuthorityModel = null
     _texCache.clear()
     _pointers.clear()
     _renderer = null
@@ -3267,7 +3348,10 @@
     init,
     update,
     showHistoricalBoard,
+    showPreviewBoard,
+    clearPreviewBoard,
     animateAction,
+    setPendingFeedback,
     settlePresentation,
     spawnFloater,
     resize,

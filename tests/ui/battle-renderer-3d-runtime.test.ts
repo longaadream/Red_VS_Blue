@@ -37,8 +37,11 @@ type RendererApi = {
   init(options: unknown): void
   update(model: unknown): void
   showHistoricalBoard(model: unknown): void
+  showPreviewBoard(model: unknown, authoritativeModel: unknown): void
+  clearPreviewBoard(): void
   settlePresentation(model: unknown, options?: { preserveFloaters: boolean }): void
   animateAction(action: unknown, previousModel: unknown, nextModel: unknown): void
+  setPendingFeedback(pieceId: string | null): void
   resize(): void
   spawnFloater(x: number, y: number, text: string, color: string, big: boolean, options: unknown): void
   resetView(): void
@@ -348,6 +351,7 @@ function createHarness(width = 390, height = 844, coarsePointer = true, reducedM
   new Script(readFileSync(resolve(pagesDir, 'js/battle-ui/battle-effect-icons.js'), 'utf8'), { filename: 'battle-effect-icons.js' }).runInContext(context)
   new Script(readFileSync(resolve(pagesDir, 'js/battle-ui/battle-status-presentation.js'), 'utf8'), { filename: 'battle-status-presentation.js' }).runInContext(context)
   new Script(readFileSync(resolve(pagesDir, 'js/battle-ui/battle-tactical-geometry.js'), 'utf8'), { filename: 'battle-tactical-geometry.js' }).runInContext(context)
+  new Script(readFileSync(resolve(pagesDir, 'js/battle-ui/battle-floater-layout.js'), 'utf8'), { filename: 'battle-floater-layout.js' }).runInContext(context)
   new Script(readFileSync(resolve(pagesDir, 'js/battle-renderer-3d.js'), 'utf8'), { filename: 'battle-renderer-3d.js' }).runInContext(context)
 
   function frame(step = 100) {
@@ -532,6 +536,126 @@ describe('RED-68 BattleRenderer3D runtime', () => {
       h.renderer.dispose()
       vi.useRealTimers()
     }
+  })
+
+  it('keeps simultaneous damage, healing and status floaters separately readable', () => {
+    vi.useFakeTimers()
+    const h = createHarness(1280, 720, false)
+    try {
+      const layer = new FakeElement('div')
+      layer.rect = { left: 0, top: 0, width: 1280, height: 720 }
+      h.renderer.init({ container: h.container, floatLayer: layer })
+      h.renderer.update(runtimeModel())
+      h.frame(16)
+      h.renderer.spawnFloater(8, 8, '−5', '#fff', false, { kind: 'damage' })
+      h.renderer.spawnFloater(8, 8, '+8', '#fff', false, { kind: 'heal' })
+      h.renderer.spawnFloater(8, 8, '定身', '#fff', false, { kind: 'statusAdded' })
+      expect(layer.children.map(child => child.textContent)).toEqual(['−5', '+8', '定身'])
+      expect(new Set(layer.children.map(child => `${child.style.left}:${child.style.top}`)).size).toBe(3)
+      expect(layer.children.every(child => child.dataset.floaterCrowded === 'false')).toBe(true)
+      vi.advanceTimersByTime(2080)
+      expect(layer.children).toHaveLength(0)
+      expect(h.renderer.getMotionDiagnostics().floaterCount).toBe(0)
+    } finally {
+      h.renderer.dispose()
+      vi.useRealTimers()
+    }
+  })
+
+  it('releases occupied floater slots on expiry, settlement, history and remount', () => {
+    vi.useFakeTimers()
+    const h = createHarness(1280, 720, false)
+    const layer = new FakeElement('div')
+    layer.rect = { left: 0, top: 0, width: 1280, height: 720 }
+    try {
+      const mount = () => {
+        h.renderer.init({ container: h.container, floatLayer: layer })
+        h.renderer.update(runtimeModel())
+        h.frame(16)
+      }
+      const spawn = () => h.renderer.spawnFloater(8, 8, '−4', '#fff', false, {})
+      mount()
+      spawn()
+      const anchor = { left: layer.children[0].style.left, top: layer.children[0].style.top }
+      const expectFreshSlot = () => {
+        spawn()
+        expect(layer.children).toHaveLength(1)
+        expect(layer.children[0].style).toMatchObject(anchor)
+      }
+      spawn()
+      h.renderer.settlePresentation(runtimeModel())
+      expectFreshSlot()
+      spawn()
+      h.renderer.showHistoricalBoard(runtimeModel())
+      expectFreshSlot()
+      spawn()
+      vi.advanceTimersByTime(2080)
+      expectFreshSlot()
+      h.renderer.dispose()
+      mount()
+      expectFreshSlot()
+    } finally {
+      h.renderer.dispose()
+      vi.useRealTimers()
+    }
+    expect(layer.children).toHaveLength(0)
+  })
+
+  it('shows a hypothetical board while keeping input on authority and restores without retaining preview text', () => {
+    vi.useFakeTimers()
+    const h = createHarness(1280, 720, false)
+    const layer = new FakeElement('div')
+    layer.rect = { left: 0, top: 0, width: 1280, height: 720 }
+    try {
+      const model = runtimeModel()
+      model.selection.mode = 'target'
+      h.windowObject.adventureBoardWarning = () => '危险'
+      h.renderer.init({ container: h.container, floatLayer: layer })
+      h.renderer.update(model)
+      h.frame(16)
+      h.renderer.spawnFloater(2, 2, '实际 −1', '#fff', false, {})
+      const hypothetical = structuredClone(model)
+      hypothetical.pieces[0].x += 2
+      hypothetical.pieces[0].health.current -= 3
+      h.renderer.showPreviewBoard(hypothetical, model)
+      h.renderer.spawnFloater(2, 2, '预演 −3', '#fff', false, { preview: true })
+      expect(layer.children.map(child => child.textContent)).toEqual(['实际 −1', '预演 −3'])
+      const group = h.renderers[0].scene!.children.find(node => node.userData.pieceId === model.pieces[0].id)
+      expect(group?.position.x).toBe(hypothetical.pieces[0].x)
+      h.renderer.clearPreviewBoard()
+      expect(h.container.querySelector('.piece-board-lethal')?.hidden).toBe(false)
+      expect(layer.children.map(child => child.textContent)).toEqual(['实际 −1'])
+      const restored = h.renderers[0].scene!.children.find(node => node.userData.pieceId === model.pieces[0].id)
+      expect(restored?.position.x).toBe(model.pieces[0].x)
+      vi.advanceTimersByTime(2080)
+      expect(layer.children).toHaveLength(0)
+      expect(model.pieces[0].health.current).not.toBe(hypothetical.pieces[0].health.current)
+    } finally {
+      h.renderer.dispose()
+      vi.useRealTimers()
+    }
+  })
+
+  it('notifies pointerleave after one hover even when preview rebuilds the visible board', () => {
+    const h = createHarness(1280, 720, false)
+    const model = runtimeModel()
+    const intents: Array<Record<string, unknown>> = []
+    h.renderer.init({ container: h.container, onIntent: (intent: Record<string, unknown>) => {
+      intents.push(intent)
+      if (intent.type === 'hover-cell' && intent.x != null) h.renderer.showPreviewBoard(structuredClone(model), model)
+      if (intent.type === 'hover-cell' && intent.x == null) h.renderer.clearPreviewBoard()
+    } })
+    try {
+      h.renderer.update(model)
+      h.frame(16)
+      const point = h.renderer.projectCell(2, 2)
+      const canvas = h.renderers[0].domElement
+      canvas.dispatch('pointermove', { pointerType: 'mouse', clientX: point.clientX, clientY: point.clientY })
+      canvas.dispatch('pointerleave', { pointerType: 'mouse' })
+      expect(intents.filter(intent => intent.type === 'hover-cell')).toEqual([
+        { type: 'hover-cell', x: 2, y: 2 }, { type: 'hover-cell', x: null, y: null }
+      ])
+    } finally { h.renderer.dispose() }
   })
 
   it('renders static state on demand and batches terrain by material', () => {
@@ -1131,6 +1255,24 @@ describe('RED-68 BattleRenderer3D runtime', () => {
     expect(colors().some(color => color && color.r > 1)).toBe(false)
     expect(body.material!.emissiveIntensity).toBe(0.08)
     expect(factionRing.material!.emissiveIntensity).toBe(0.3)
+    harness.renderer.dispose()
+  })
+
+  it('acknowledges submission synchronously on the existing token without updating the board', () => {
+    const harness = createHarness(844, 390, false)
+    const model = runtimeModel()
+    const original = JSON.stringify(model)
+    harness.renderer.init({ container: harness.container })
+    harness.renderer.update(model)
+    harness.frame(16)
+    const scene = harness.renderers[0].scene!
+    const token = scene.children.find((child) => child.userData.pieceId === model.pieces[0].id)!
+    harness.renderer.setPendingFeedback(model.pieces[0].id)
+    expect(harness.renderer.getMotionDiagnostics().pendingPieceIds).toEqual([model.pieces[0].id])
+    expect(scene.children.find((child) => child.userData.pieceId === model.pieces[0].id)).toBe(token)
+    expect(JSON.stringify(model)).toBe(original)
+    harness.renderer.setPendingFeedback(null)
+    expect(harness.renderer.getMotionDiagnostics().pendingPieceIds).toEqual([])
     harness.renderer.dispose()
   })
 

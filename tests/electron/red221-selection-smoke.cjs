@@ -315,8 +315,10 @@ async function runElectronSmoke() {
     show: false,
     width: 1280,
     height: 720,
-    webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true, backgroundThrottling: false },
+    webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true, backgroundThrottling: false,
+      offscreen: process.env.RVB_FLOATER_STACKING === '1' || process.env.RVB_SKILL_PREVIEW === '1' },
   })
+  if (process.env.RVB_FLOATER_STACKING === '1' || process.env.RVB_SKILL_PREVIEW === '1') win.webContents.setFrameRate(60)
   win.webContents.on('console-message', (_event, _level, message) => logs.push(String(message)))
   win.webContents.on('did-fail-load', (_event, code, description, url) => logs.push(`did-fail-load ${code} ${description} ${url}`))
   let debuggerAttached = false
@@ -404,6 +406,69 @@ async function runElectronSmoke() {
     screenshots: [],
   }
 
+  const verifyFloaterStacking = async (name, legacy = false) => {
+    // Use the actual public feedback entry; no role data or combat state changes.
+    await evaluate(`(() => {
+      if (battlePresentation) BattleRenderer3D.settlePresentation(battlePresentation.getModel())
+      window.__RED223_PREVIOUS_3D__ = _use3d
+      if (${legacy}) _use3d = false
+      spawnFloater(8, 8, '−4', '#fff', false, { kind: 'damage' })
+      spawnFloater(8, 8, '+2', '#fff', false, { kind: 'heal' })
+      spawnFloater(8, 8, '定身', '#fff', false, { kind: 'statusAdded' })
+      spawnFloater(9, 8, '−6', '#fff', true, { kind: 'damage' })
+      spawnFloater(0, 0, '边缘 −3', '#fff', false, { kind: 'damage' })
+      _use3d = window.__RED223_PREVIOUS_3D__
+      return true
+    })()`)
+    await win.webContents.capturePage()
+    await evaluate(`new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))`)
+    const samples = []
+    for (const elapsed of [160, 450, 1200]) {
+      await delay(elapsed - (samples.at(-1)?.elapsed || 0))
+      await win.webContents.capturePage()
+      const sample = await evaluate(`(() => {
+        const layer = document.getElementById('floatLayer').getBoundingClientRect()
+        const labels = Array.from(document.querySelectorAll('#floatLayer .dmg-float')).map(el => {
+          const r = el.getBoundingClientRect()
+          return { text: el.textContent, left: r.left, right: r.right, top: r.top, bottom: r.bottom,
+            opacity: Number(getComputedStyle(el).opacity), pointerEvents: getComputedStyle(el).pointerEvents, crowded: el.dataset.floaterCrowded }
+        })
+        const obstacles = Array.from(document.querySelectorAll('[data-floater-obstacle]')).filter(el => !el.hidden && el.getAttribute('aria-hidden') !== 'true').map(el => {
+          const r = el.getBoundingClientRect()
+          return { left: r.left, right: r.right, top: r.top, bottom: r.bottom, width: r.width, height: r.height }
+        }).filter(r => r.width > 0 && r.height > 0)
+        return { width: layer.width, height: layer.height, left: layer.left, top: layer.top, labels, obstacles }
+      })()`)
+      ensure(sample.labels.length === 5, `${name}: expected five separately retained labels: ${JSON.stringify(sample)}`)
+      sample.labels.forEach((a, index) => {
+        ensure(a.opacity > 0.8 && a.pointerEvents === 'none', `${name}: text is invisible or blocks input: ${JSON.stringify(a)}`)
+        ensure(a.left >= sample.left && a.top >= sample.top && a.right <= sample.left + sample.width && a.bottom <= sample.top + sample.height, `${name}: clipped text: ${JSON.stringify(sample)}`)
+        sample.labels.slice(index + 1).forEach(b => {
+          const separate = a.right + 4 <= b.left || b.right + 4 <= a.left || a.bottom + 4 <= b.top || b.bottom + 4 <= a.top
+          ensure(separate, `${name}: animated text overlap at ${elapsed}ms: ${JSON.stringify({ a, b })}`)
+        })
+        sample.obstacles.forEach(b => {
+          ensure(a.right <= b.left || b.right <= a.left || a.bottom <= b.top || b.bottom <= a.top, `${name}: HUD prompt covers floating text: ${JSON.stringify({ a, b })}`)
+        })
+      })
+      samples.push({ elapsed, ...sample })
+      if (elapsed === 450) {
+        await screenshot(`${name}.png`)
+        evidence.screenshots.push(`${name}.png`)
+        if (legacy) win.setContentSize(1024, 600)
+      }
+      if (legacy && elapsed === 1200) {
+        await screenshot(`${name}-resized.png`)
+        evidence.screenshots.push(`${name}-resized.png`)
+      }
+    }
+    await delay(1100)
+    ensure(await evaluate(`document.querySelectorAll('#floatLayer .dmg-float').length === 0`), `${name}: expired text retained`)
+    evidence.floaterStacking = evidence.floaterStacking || {}
+    evidence.floaterStacking[name] = { samples, cleaned: true }
+    if (legacy) { win.setContentSize(1280, 720); await delay(200) }
+  }
+
   try {
     await win.loadURL(`${baseUrl}/battle.html?mode=training&playerId=training-red`)
     await waitFor(`document.readyState === 'complete' && typeof PIECES_BY_ID === 'object' && Object.keys(PIECES_BY_ID).length > 0`, 30000, 'battle.html local data')
@@ -489,6 +554,24 @@ async function runElectronSmoke() {
       return !!button
     })()`)
     await delay(180)
+    if (process.env.RVB_DOM_REUSE === '1') {
+      evidence.domReuse = await evaluate(`(() => {
+        const button = document.querySelector(${JSON.stringify(skillSelector)})
+        const hosts = ['pieceContextSkills', 'playerResCards', 'resApTrack', 'myPieces', 'oppPieces']
+          .map(id => document.getElementById(id)).filter(Boolean)
+        const before = hosts.map(host => Array.from(host.children))
+        const descendants = hosts.map(host => Array.from(host.querySelectorAll('*')))
+        button.focus({ preventScroll: true })
+        for (let index = 0; index < 5; index++) render()
+        return {
+          focusPreserved: document.activeElement === button,
+          rootIdentity: hosts.every((host, index) => before[index].length === host.children.length && before[index].every((node, i) => node === host.children[i])),
+          subtreeIdentity: hosts.every((host, index) => { const nodes = Array.from(host.querySelectorAll('*')); return descendants[index].length === nodes.length && descendants[index].every((node, i) => node === nodes[i]) }),
+        }
+      })()`)
+      ensure(evidence.domReuse.focusPreserved && evidence.domReuse.rootIdentity && evidence.domReuse.subtreeIdentity,
+        'Battle hot DOM hosts were rebuilt: ' + JSON.stringify(evidence.domReuse))
+    }
     const skillInputTarget = await evaluate(`(() => {
       window.__RED221_SKILL_CLICKS = []
       const button = document.querySelector(${JSON.stringify(skillSelector)})
@@ -509,6 +592,38 @@ async function runElectronSmoke() {
     const skillClickDebug = await evaluate('({ events: window.__RED221_SKILL_CLICKS, status: document.getElementById("statusMsg")?.textContent || "" })')
     ensure(armed.selectedPieceId === fixture.casterId && armed.pendingSkill?.skillId === 'venom-claw-rend', `Skill target mode did not arm: ${JSON.stringify({ armed, skillButtonDebug, skillButtonAfterScroll, skillInputTarget, skillClickDebug })}`)
     evidence.desktop = { setup, fixture, selected, armed }
+    if (process.env.RVB_SKILL_PREVIEW === '1') {
+      const original = await evaluate('JSON.stringify(G)')
+      const target = await boardPoint(fixture.validTarget)
+      win.webContents.sendInputEvent({ type: 'mouseMove', x: target.x, y: target.y })
+      await waitFor('skillPreviewController && skillPreviewController.getDiagnostics().active?.displayed', 5000, 'real skill preview')
+      const preview = await evaluate(`({ diagnostics: skillPreviewController.getDiagnostics(),
+        badge: document.querySelector('.skill-preview-badge')?.textContent,
+        floaters: Array.from(document.querySelectorAll('#floatLayer [data-preview="true"]')).map(e => e.textContent),
+        displayTimings: skillPreviewDisplayTimings, sameState: JSON.stringify(G) === ${JSON.stringify(original)},
+        puts: window.__RED221_PUTS.length, history: G.presentationEvents.length })`)
+      ensure(preview.diagnostics.requests.at(-1)?.status === 'ready', `Real skill cannot preview: ${JSON.stringify(preview)}`)
+      ensure(preview.sameState && preview.puts === 0 && preview.floaters.some(text => /−/.test(text)), `Preview changed authority or omitted damage: ${JSON.stringify(preview)}`)
+      await screenshot('desktop-skill-hypothetical.png')
+      win.webContents.sendInputEvent({ type: 'mouseMove', x: 1270, y: 10 })
+      await waitFor('!skillPreviewController.getDiagnostics().active', 5000, 'preview leave restoration')
+      ensure(await evaluate(`JSON.stringify(G) === ${JSON.stringify(original)}`), 'Leaving preview changed real state')
+      const benchmark = await evaluate(`(() => {
+        const action = Object.assign({}, pendingSkill.baseAction)
+        _appendTargetToAction(action, G.pieces.find(p => p.instanceId === __RED221_FIXTURE__.validTargetId),
+          __RED221_FIXTURE__.validTarget.x, __RED221_FIXTURE__.validTarget.y, pendingSkill.preparation.targetType)
+        const times = []
+        for (let i = 0; i < 100; i++) {
+          const result = GameEngine.previewBattleAction(G, action, myPlayerId)
+          if (result.status !== 'ready') throw new Error('Benchmark preview not ready')
+          times.push(result.durationMs)
+        }
+        times.sort((a,b) => a-b)
+        return { samples: times.length, p50: times[49], p95: times[94], worst: times[99], sameState: JSON.stringify(G) === ${JSON.stringify(original)} }
+      })()`)
+      ensure(benchmark.sameState, 'Repeated previews changed authority')
+      evidence.preview = { preview, benchmark }
+    }
     await tap(await boardPoint(fixture.invalidPiece), 'mouse')
     const occupiedRejected = await snapshot('after-invalid-occupied-mouse')
     evidence.desktop.occupiedRejected = occupiedRejected
@@ -537,6 +652,7 @@ async function runElectronSmoke() {
       inputEvents: window.__RED221_INPUT_EVENTS?.slice(-8),
       camera: battlePresentation && battlePresentation.getModel && (() => { const m = battlePresentation.getModel(); return m && { selection: m.selection, legal: m.legal } })(),
     }))()`)
+    if (process.env.RVB_FEEDBACK_LATENCY === '1') await require('./red224-feedback-latency.cjs').install(evaluate)
     await tap(validTargetPoint, 'mouse')
     const waiting = await snapshot('waiting-after-legal-mouse')
     ensure(waiting.targetSubmissionPending, `Legal retry did not enter authoritative waiting state: ${JSON.stringify({ waiting, validTargetInputDebug })}`)
@@ -556,6 +672,29 @@ async function runElectronSmoke() {
     ensure(accepted.actionPoints === beforeLegal.actionPoints - 1, `Legal retry charged an unexpected number of action points: ${JSON.stringify({ before: beforeLegal, accepted })}`)
     ensure(!accepted.pendingSkill && !accepted.targetSubmissionPending && !accepted.targetMode, `Accepted action left target mode active: ${JSON.stringify(accepted)}`)
     evidence.desktop = { ...evidence.desktop, occupiedRejected, emptyRejected, waiting, duplicateAttempt, accepted }
+    if (process.env.RVB_FEEDBACK_LATENCY === '1') {
+      evidence.desktop.feedbackLatency = await require('./red224-feedback-latency.cjs').finish(evaluate, waitFor)
+    }
+    if (process.env.RVB_COMPACT_FLOATERS === '1') {
+      await delay(3100)
+      const compact = await evaluate(`(() => {
+        for (const text of ['−4', '−2', '+3', '定身']) BattleRenderer3D.spawnFloater(
+          Math.floor(G.map.width / 2), Math.floor(G.map.height / 2), text, '#fff', false)
+        return Array.from(document.querySelectorAll('.dmg-float')).map(el => ({
+          text: el.textContent, x: parseFloat(el.style.left), y: parseFloat(el.style.top),
+          width: el.offsetWidth, height: el.offsetHeight, crowded: el.dataset.floaterCrowded,
+        }))
+      })()`)
+      ensure(compact.length === 4, 'Compact floaters dropped a result')
+      const ordered = compact.slice().sort((a, b) => a.y - b.y)
+      const gaps = ordered.slice(1).map((entry, i) => entry.y - ordered[i].y)
+      ensure(gaps.every(gap => gap > 0 && gap <= 60), 'Same-point floaters remain excessively spread: ' + JSON.stringify(compact))
+      evidence.desktop.compactFloaters = { entries: compact, centerGaps: gaps }
+      await win.webContents.capturePage()
+      await delay(150)
+      await screenshot('desktop-compact-floaters.png')
+      evidence.screenshots.push('desktop-compact-floaters.png')
+    }
 
     if (process.env.RVB_FEEDBACK_DURATION === '1') {
       await evaluate(`showTurnAnnounce('回合提示验收', '#ecd4a6'); spawnFloater(${fixture.caster.x}, ${fixture.caster.y}, '验收 −4', '#fff', false); true`)
@@ -597,6 +736,21 @@ async function runElectronSmoke() {
     ensure(beforeCancel.pendingSkill?.skillId === 'venom-claw-rend', `Cancel fixture did not enter target mode: ${JSON.stringify(beforeCancel)}`)
     ensure(cancelled.selectedPieceId === fixture.casterId && !cancelled.pendingSkill && !cancelled.targetOverlay && !cancelled.targetMode, `Explicit cancel did not exit target mode: ${JSON.stringify(cancelled)}`)
     evidence.desktop.cancel = { beforeCancel, cancelled }
+    if (process.env.RVB_SKILL_PREVIEW === '1') {
+      evidence.desktop.touchDrag = await require('./red224-skill-drag-smoke.cjs')({
+        cdp, delay, evaluate, fixtureInstaller, tap, boardPoint, closeTileStatusIfOpen,
+        skillSelector, pointFor, snapshot, ensure, waitFor,
+      })
+    }
+
+    if (process.env.RVB_FLOATER_STACKING === '1') {
+      await delay(2200)
+      await verifyFloaterStacking('desktop-floater-stacking')
+      await cdp('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] })
+      await verifyFloaterStacking('desktop-reduced-floater-stacking')
+      await cdp('Emulation.setEmulatedMedia', { features: [] })
+      await verifyFloaterStacking('desktop-legacy-floater-stacking', true)
+    }
 
     // Inject a real authoritative pending session with the existing engine
     // protocol, then send a malformed pendingTargetSelect through the actual
@@ -657,6 +811,13 @@ async function runElectronSmoke() {
     const mobileCancelled = await snapshot('mobile-after-explicit-cancel-touch')
     ensure(mobileCancelled.selectedPieceId === fixture.casterId && !mobileCancelled.pendingSkill && !mobileCancelled.targetOverlay && !mobileCancelled.targetMode, `Mobile touch cancel did not exit target mode: ${JSON.stringify(mobileCancelled)}`)
     evidence.mobile = { mobileArmed, mobileOccupiedRejected, mobileEmptyRejected, mobileCancelled }
+
+    if (process.env.RVB_FLOATER_STACKING === '1') {
+      await verifyFloaterStacking('mobile-floater-stacking')
+      await cdp('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] })
+      await verifyFloaterStacking('mobile-reduced-floater-stacking')
+      await cdp('Emulation.setEmulatedMedia', { features: [] })
+    }
 
     evidence.ok = true
     evidence.viewport = { desktop: [1280, 720], mobile: [844, 390] }

@@ -69,6 +69,7 @@ describe('RED-221 selection retry', () => {
       pendingBoardTargetSelection: { selectionId: null, selectedPieceIds: [] },
       pendingMove: false,
       red50Evidence: { targetCommands: [], rejections: [] },
+      clearSkillPreview: () => undefined,
       prepareFreshSelectionAction: (action: unknown) => action,
       withClientActionId: (action: Record<string, unknown>) => ({ ...action, clientActionId: 'target-1' }),
       tutorialActionAllowed: () => true,
@@ -146,6 +147,7 @@ describe('RED-221 selection retry', () => {
     const clearEvents: string[] = []
     const context = createContext({
       locallyCancelledSelectionId: null,
+      clearSkillPreview: () => undefined,
       targetSubmissionDraft: null,
       targetSubmissionPending: {
         clientActionId: 'target-1',
