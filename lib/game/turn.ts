@@ -56,6 +56,7 @@ import {
   isEffectChainFatalError,
   isEffectChainPendingSignal,
   resolveSummonRedirectPosition,
+  withEffectChain,
   uninstallEffectChain,
   type EffectBatchContext,
   type EffectChain,
@@ -4277,6 +4278,44 @@ export function assertBattleNotTerminal(state: BattleState): void {
   }
 }
 
+function createDetachedApplyEffectChain(state: BattleState, action: BattleAction): EffectChain {
+  const runtime = getActiveRuleRuntime()
+  const actionRecord = action as unknown as {
+    type?: unknown
+    pieceId?: unknown
+    playerId?: unknown
+  }
+  const turn = Number.isSafeInteger(state.turn?.turnNumber) && state.turn.turnNumber >= 0
+    ? state.turn.turnNumber
+    : 0
+  const actionType = typeof actionRecord.type === 'string' && actionRecord.type.length > 0
+    ? actionRecord.type
+    : 'action'
+  const sourceId = typeof actionRecord.pieceId === 'string' && actionRecord.pieceId.length > 0
+    ? actionRecord.pieceId
+    : typeof actionRecord.playerId === 'string' && actionRecord.playerId.length > 0
+      ? actionRecord.playerId
+      : 'unknown'
+  const rawTargetingRevision = state.targetingRevision
+  const targetingRevision = typeof rawTargetingRevision === 'number'
+    && Number.isSafeInteger(rawTargetingRevision)
+    && rawTargetingRevision >= 0
+    ? rawTargetingRevision
+    : 0
+  const actionCount = Array.isArray(state.actions) ? state.actions.length : 0
+  const actionId = `detached:apply:${actionType}:${sourceId}:${turn}:${targetingRevision}:${actionCount}`
+  return createEffectChain({
+    actionId,
+    chainId: `${actionId}:effect-chain`,
+    turn,
+    rootSeed: runtime?.rootSeed ?? null,
+    detached: true,
+    createBatchId: runtime
+      ? ({ kind }) => (getActiveRuleRuntime() ?? runtime).nextInstanceId(`${kind}-batch`, `${kind}-batch`)
+      : undefined,
+  })
+}
+
 /**
  * Public reducer wrapper. A successful command advances the target-query
  * revision exactly once, including commands that create a pending session.
@@ -4287,6 +4326,14 @@ export function applyBattleAction(
 ): BattleState {
   assertBattleNotTerminal(state)
   const activeEffectChain = getActiveEffectChain(state)
+  if (!activeEffectChain) {
+    const detachedEffectChain = createDetachedApplyEffectChain(state, action)
+    return withEffectChain(
+      state,
+      detachedEffectChain,
+      () => applyBattleAction(state, action),
+    )
+  }
   const actionIndex = Array.isArray(state.extensions?.debugBattle?.actionLog)
     ? state.extensions.debugBattle.actionLog.length
     : 0

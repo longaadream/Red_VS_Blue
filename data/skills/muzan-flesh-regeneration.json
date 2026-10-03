@@ -1,0 +1,23 @@
+{
+  "id": "muzan-flesh-regeneration",
+  "name": "血肉再生",
+  "description": "每个全局回合结束时，若本回合未受到实际生命损失且自身已受伤，恢复2点生命；每局最多成功恢复3次。",
+  "keywords": [],
+  "targetText": "被动",
+  "effectTags": [
+    "治疗"
+  ],
+  "icon": "🩸",
+  "kind": "passive",
+  "type": "normal",
+  "cooldownTurns": 0,
+  "maxCharges": 0,
+  "usesPerBattle": 3,
+  "powerMultiplier": 1,
+  "actionPointCost": 0,
+  "range": "self",
+  "targeting": {
+    "steps": []
+  },
+  "code": "function executeSkill() { return { success: false, message: '这是被动技能，自动触发，无法手动使用' }; }"
+}
