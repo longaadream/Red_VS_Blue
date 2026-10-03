@@ -114,5 +114,8 @@
   "rule-mortis-damage-counter",
   "rule-colt-zone-endturn",
   "rule-el-primo-injury-counter",
-  "rule-el-primo-meteor-belt"
+  "rule-el-primo-meteor-belt",
+  "rule-muzan-regeneration-damage",
+  "rule-muzan-regeneration-end",
+  "rule-muzan-damage-reduction"
 ]

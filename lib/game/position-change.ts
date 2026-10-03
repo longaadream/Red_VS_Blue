@@ -24,6 +24,106 @@ export type PositionChangeResult = { success: true; changes: PositionChangeFact[
   | { success: false; changes: []; message: string }
 function cancel(message: string): PositionChangeResult { return { success: false, changes: [], message } }
 
+/**
+ * Engine-only landing discovery for a single candidate that is already at
+ * zero HP but has not entered the death batch graveyard yet.  Ordinary skill
+ * and movement callers must continue to use isLegalSkillLanding directly;
+ * this helper is intentionally only consumed by the closed death-parasitism
+ * capability.
+ */
+export function getLegalDyingTeleportCells(
+  battle: BattleState,
+  dyingPiece: import('./piece').PieceInstance,
+  host: import('./piece').PieceInstance,
+): GridPosition[] {
+  if (!battle.pieces.includes(dyingPiece) || dyingPiece.currentHp !== 0
+    || !battle.pieces.includes(host) || host.currentHp <= 0
+    || dyingPiece.x == null || dyingPiece.y == null
+    || host.x == null || host.y == null) return []
+  if (getPositionChangeRejection(dyingPiece, 'teleport')) return []
+  const candidates = [
+    { x: host.x + 1, y: host.y },
+    { x: host.x - 1, y: host.y },
+    { x: host.x, y: host.y + 1 },
+    { x: host.x, y: host.y - 1 },
+  ]
+  return candidates.filter(position => isLegalSkillLanding(battle, position))
+}
+
+/**
+ * Engine-only teleport used by death-time content.  It accepts exactly one
+ * canonical HP-zero piece and never appears in the flow facade or browser
+ * entry.  The normal position writer and pre-position reactions still guard
+ * the commit; a blocked reaction is a normal cancellation.
+ */
+export function changeDyingPiecePosition(
+  battle: BattleState,
+  dyingPiece: import('./piece').PieceInstance,
+  destination: GridPosition,
+  options: { beforeCommit?: (finalDestination: GridPosition) => boolean } = {},
+): PositionChangeResult {
+  assertAuthorizedPositions(battle)
+  if (!battle.pieces.includes(dyingPiece) || dyingPiece.currentHp !== 0
+    || dyingPiece.x == null || dyingPiece.y == null) return cancel('濒死棋子已失效')
+  if (!Number.isSafeInteger(destination.x) || !Number.isSafeInteger(destination.y)) {
+    throw new BattleRuleError('濒死位移落点必须是整数')
+  }
+  const from = { x: dyingPiece.x, y: dyingPiece.y }
+  assertAdventurePosition(battle, dyingPiece, destination.x, destination.y)
+  const rejection = getPositionChangeRejection(dyingPiece, 'teleport')
+  if (rejection) return cancel(rejection)
+
+  const context: TriggerContext = {
+    type: 'beforePiecePositionChange',
+    sourcePiece: dyingPiece,
+    playerId: dyingPiece.ownerPlayerId,
+    movementKind: 'teleport',
+    fromX: from.x,
+    fromY: from.y,
+    targetX: destination.x,
+    targetY: destination.y,
+    reservedCells: [{ ...destination }],
+  }
+  const result = getRuleExecutionTriggerSystem(globalTriggerSystem).checkTriggers(battle, context)
+  if (result.needsOptionSelection || result.needsTargetSelection) return cancel('濒死位移反应已取消')
+  if (result.blocked) return cancel(result.messages.join('；') || '位移被阻止')
+  if (!battle.pieces.includes(dyingPiece) || dyingPiece.currentHp !== 0
+    || dyingPiece.x !== from.x || dyingPiece.y !== from.y) return cancel('濒死位移起点已失效')
+  const finalDestination = { x: context.targetX!, y: context.targetY! }
+  if (!Number.isSafeInteger(finalDestination.x) || !Number.isSafeInteger(finalDestination.y)) {
+    throw new BattleRuleError('濒死位移反应产生了无效落点')
+  }
+  assertAdventurePosition(battle, dyingPiece, finalDestination.x, finalDestination.y)
+  if (!isLegalSkillLanding(battle, finalDestination)) return cancel('濒死位移落点被阻挡或已失效')
+  if (options.beforeCommit && !options.beforeCommit(finalDestination)) return cancel('濒死位移提交条件已失效')
+
+  const change: PositionChangeFact = {
+    pieceId: dyingPiece.instanceId,
+    from,
+    to: finalDestination,
+    path: [finalDestination],
+    kind: 'teleport',
+  }
+  writePiecePosition(dyingPiece, finalDestination.x, finalDestination.y)
+  battle.actions ??= []
+  battle.actions.push({
+    type: 'positionChanged',
+    playerId: dyingPiece.ownerPlayerId,
+    turn: battle.turn.turnNumber,
+    payload: {
+      pieceId: dyingPiece.instanceId,
+      fromX: from.x,
+      fromY: from.y,
+      toX: finalDestination.x,
+      toY: finalDestination.y,
+      movementKind: 'teleport',
+      path: [finalDestination],
+    },
+  })
+  submitPositionContacts(battle, [change])
+  return { success: true, changes: [change] }
+}
+
 /** Single coordinate writer. A blocked landing is a normal cancellation. */
 export function changePiecePositions(battle: BattleState, changes: readonly PiecePositionChange[], kind: PositionChangeKind,
   options: PositionChangeOptions = {}): PositionChangeResult {

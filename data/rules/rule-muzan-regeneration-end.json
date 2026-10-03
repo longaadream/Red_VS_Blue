@@ -1,0 +1,9 @@
+{
+  "id": "rule-muzan-regeneration-end",
+  "name": "血肉再生·全局回合结束",
+  "description": "每个全局回合结束时，若鬼舞辻无惨本回合未受实际生命损失且已受伤，则恢复2点生命，每局最多成功恢复3次。",
+  "trigger": {
+    "type": "endTurn"
+  },
+  "skillCode": "var id = flow.refs.holder(); if (!id) return { success: false, message: '' }; var piece = flow.query.piece(id); var turnNumber = Number(battle.turn && battle.turn.turnNumber); if (!piece || !Number.isFinite(turnNumber)) return { success: false, message: '' }; var lastCheckTurn = flow.state.get('piece', id, 'muzan-flesh-regeneration', 'lastCheckTurn'); if (lastCheckTurn === turnNumber) return { success: false, message: '' }; flow.state.set('piece', id, 'muzan-flesh-regeneration', 'lastCheckTurn', turnNumber, 'battle'); if (piece.currentHp <= 0 || piece.currentHp >= piece.maxHp) return { success: false, message: '' }; var lastDamageTurn = flow.state.get('piece', id, 'muzan-flesh-regeneration', 'lastDamageTurn'); var damagedThisTurn = lastDamageTurn === turnNumber; if (!damagedThisTurn && Array.isArray(battle.actions)) { for (var index = 0; index < battle.actions.length; index++) { var action = battle.actions[index]; var payload = action && action.payload; if (action && action.type === 'damage' && Number(action.turn) === turnNumber && payload && payload.targetId === id && Number(payload.finalDamage) > 0) { damagedThisTurn = true; break; } } } if (damagedThisTurn) return { success: false, message: '' }; var successfulHeals = Number(flow.state.get('piece', id, 'muzan-flesh-regeneration', 'successfulHeals') || 0); if (successfulHeals >= 3) return { success: false, message: '' }; var result = flow.effects.heal(id, id, 2, 'muzan-flesh-regeneration'); if (!result || result.blocked || !(Number(result.heal) > 0)) return { success: false, message: '' }; flow.state.set('piece', id, 'muzan-flesh-regeneration', 'successfulHeals', successfulHeals + 1, 'battle'); return { success: true, message: piece.name + '触发血肉再生，恢复' + result.heal + '点生命' };"
+}
