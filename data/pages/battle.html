@@ -2180,6 +2180,13 @@
       record.nodes = Number.isFinite(details && details.nodes) ? details.nodes : null
       record.considered = Number.isFinite(details && details.considered) ? details.considered : null
       record.stopReason = details && details.stopReason || null
+      record.score = Number.isFinite(details && details.score) ? details.score : null
+      record.overTurnBudget = !!(details && details.overTurnBudget)
+      record.overDecisionBudget = !!(details && details.overDecisionBudget)
+      record.continuation = details && details.continuation ? Object.assign({}, details.continuation) : null
+      record.traceCounts = details && details.traceCounts ? Object.assign({}, details.traceCounts) : null
+      record.rootTrace = details && Array.isArray(details.trace)
+        ? details.trace.slice(0, 64).map(row => Object.assign({}, row)) : []
       record.counters.aiNodes = record.nodes
       record.counters.aiConsidered = record.considered
       record.aiAction = details && details.action && details.action.type || record.aiAction || null
@@ -7963,6 +7970,14 @@
     let skillPreviewReplayContext = null
     let skillPreviewReplayGeneration = 0
     const skillPreviewDisplayTimings = []
+
+    function skillPreviewViewportCell(intent) {
+      if (!intent || !Object.prototype.hasOwnProperty.call(intent, 'hoveredCell')) return null
+      const intentCell = intent.hoveredCell
+      if (!intentCell || !Number.isInteger(intentCell.x) || !Number.isInteger(intentCell.y)) return null
+      return { x: intentCell.x, y: intentCell.y }
+    }
+
     function invalidateSkillPreviewReplay() {
       skillPreviewReplayContext = null
       skillPreviewReplayGeneration += 1
@@ -8250,8 +8265,24 @@
         return
       }
       if (intent.type === 'viewport-change') {
-        clearSkillPreview()
-        replayHoverSkillPreviewAfterViewport()
+        let replayContext = skillPreviewReplayContext
+        if (replayContext && replayContext.previewOnly !== true) {
+          const pointerCell = skillPreviewViewportCell(intent)
+          if (pointerCell === null) {
+            clearSkillPreview()
+            replayContext = null
+          } else if (pointerCell) {
+            replayContext.targetX = pointerCell.x
+            replayContext.targetY = pointerCell.y
+          }
+        }
+        if (replayContext) {
+          clearSkillPreview({ preserveReplay: true })
+          scheduleSkillPreviewReplayAfterRedraw()
+        } else {
+          clearSkillPreview()
+          replayHoverSkillPreviewAfterViewport()
+        }
         schedulePieceContextMenuPosition()
         return
       }

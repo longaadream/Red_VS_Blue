@@ -1,6 +1,51 @@
 (function (global) {
   'use strict'
   const STATUS_PREFIX = 'rvb_tutorial_status:'
+  const TUTORIAL_AI_TRACE_LIMIT = 64
+  const TUTORIAL_AI_TRACE_REASONS = ['evaluated', 'rejected', 'blocked', 'duplicate', 'candidate-limit']
+
+  function tutorialAiTraceDiagnostics(trace) {
+    const rows = Array.isArray(trace) ? trace : []
+    const roots = rows.filter(function (row) {
+      return row && row.depth === 0 && TUTORIAL_AI_TRACE_REASONS.includes(row.reason)
+        && typeof row.candidateId === 'string' && typeof row.rootId === 'string'
+    })
+    const reasons = Object.fromEntries(TUTORIAL_AI_TRACE_REASONS.map(function (reason) { return [reason, 0] }))
+    roots.forEach(function (row) { reasons[row.reason] += 1 })
+    const relevant = roots.filter(function (row) { return row.reason === 'evaluated' || row.reason === 'rejected' })
+    const other = roots.filter(function (row) { return row.reason !== 'evaluated' && row.reason !== 'rejected' })
+    const selected = relevant.concat(other).slice(0, TUTORIAL_AI_TRACE_LIMIT)
+    const entries = selected.map(function (row) {
+      const entry = {
+        depth: 0,
+        candidateId: row.candidateId,
+        rootId: row.rootId,
+        reason: row.reason,
+      }
+      if (Number.isFinite(row.score)) entry.score = row.score
+      if (row.reason === 'rejected' && typeof row.error === 'string') entry.error = row.error
+      return entry
+    })
+    return {
+      entries: entries,
+      counts: {
+        total: rows.length,
+        roots: roots.length,
+        reasons: reasons,
+        returned: entries.length,
+        truncated: roots.length > entries.length,
+      },
+    }
+  }
+
+  function copyTutorialAiContinuation(continuation) {
+    if (!continuation || typeof continuation !== 'object') return null
+    const copy = {}
+    if (typeof continuation.turnKey === 'string') copy.turnKey = continuation.turnKey
+    if (Number.isSafeInteger(continuation.nodes) && continuation.nodes >= 0) copy.nodes = continuation.nodes
+    if (Number.isFinite(continuation.elapsedMs) && continuation.elapsedMs >= 0) copy.elapsedMs = continuation.elapsedMs
+    return copy
+  }
 
   function saveLessonStatus(storage, lessonId, status) {
     if (!storage || !lessonId || status !== 'completed') return
@@ -593,6 +638,7 @@
         throw new Error('教程 AI 选择了错误行动方的指令')
       }
       if (hooks.onAiDecisionResult) {
+        const traceDiagnostics = tutorialAiTraceDiagnostics(decision.trace)
         hooks.onAiDecisionResult({
           action: action,
           owner: expectedOwner,
@@ -601,6 +647,13 @@
           decisionMs: decisionElapsed,
           nodes: decision.nodes,
           considered: decision.considered,
+          score: Number.isFinite(decision.score) ? decision.score : undefined,
+          trace: traceDiagnostics.entries,
+          traceCounts: traceDiagnostics.counts,
+          overTurnBudget: decision.overTurnBudget === true,
+          overDecisionBudget: decision.overDecisionBudget === true,
+          continuation: copyTutorialAiContinuation(decision.continuation),
+          actionsTakenThisTurn: tutorialAiActionsTaken,
           stopReason: decision.stopReason,
         })
       }

@@ -61,6 +61,7 @@ function fixture({ practiceOnly = false, owner = 'human', phase = 'action', depl
       if (action.type === 'endTurn') current = { ...current, owner: 'human' }
       if (action.type === 'beginPhase') current = { ...current, owner: 'human', turn: { ...current.turn, phase: 'action' } }
     }),
+    onAiDecisionResult: vi.fn(),
     render() {}, setCue() {}, exit: vi.fn(), restart: vi.fn(), next: vi.fn(),
   }
   const runtime = sandbox.RvBTutorialLessonRuntime.create(lesson, hooks)
@@ -135,6 +136,162 @@ describe('RED-230 tactical tutorial runtime', () => {
     expect(f.button('发起进攻')).toBeUndefined()
     expect(f.engine.planTutorialAiAction).toHaveBeenCalled()
     expect(f.engine.planBotActions).not.toHaveBeenCalled()
+  })
+
+  it('forwards bounded AI diagnostics without sharing worker trace objects', async () => {
+    vi.useFakeTimers()
+    try {
+      const f = fixture({ practiceOnly: true, owner: 'opponent' })
+      const trace = [
+        { depth: 0, candidateId: 'root-end', rootId: 'root-end', score: 1.25, reason: 'evaluated' },
+        { depth: 1, candidateId: 'child-private', rootId: 'root-end', score: 99, reason: 'evaluated' },
+        { depth: 0, candidateId: 'root-rejected', rootId: 'root-rejected', reason: 'rejected', error: 'ILLEGAL' },
+        { depth: 0, candidateId: 'root-limited', rootId: 'root-limited', reason: 'candidate-limit' },
+        { depth: 0, candidateId: 'root-blocked', rootId: 'root-blocked', reason: 'blocked' },
+        { depth: 0, candidateId: 'root-duplicate', rootId: 'root-duplicate', reason: 'duplicate' },
+      ]
+      f.engine.planTutorialAiAction.mockReturnValue({
+        nextAction: { action: { type: 'endTurn', playerId: 'opponent' } },
+        score: 3.5,
+        nodes: 7,
+        considered: 9,
+        elapsedMs: 275,
+        overTurnBudget: true,
+        overDecisionBudget: true,
+        stopReason: 'time-budget',
+        continuation: { turnKey: 'opponent:1:opponent', nodes: 12, elapsedMs: 275 },
+        trace,
+      })
+
+      f.click('开始实战')
+      await vi.advanceTimersByTimeAsync(3000)
+
+      const details = f.hooks.onAiDecisionResult.mock.calls[0][0]
+      expect(details).toMatchObject({
+        score: 3.5,
+        overTurnBudget: true,
+        overDecisionBudget: true,
+        continuation: { turnKey: 'opponent:1:opponent', nodes: 12, elapsedMs: 275 },
+        actionsTakenThisTurn: 0,
+        trace: [
+          { depth: 0, candidateId: 'root-end', rootId: 'root-end', score: 1.25, reason: 'evaluated' },
+          { depth: 0, candidateId: 'root-rejected', rootId: 'root-rejected', reason: 'rejected', error: 'ILLEGAL' },
+          { depth: 0, candidateId: 'root-limited', rootId: 'root-limited', reason: 'candidate-limit' },
+          { depth: 0, candidateId: 'root-blocked', rootId: 'root-blocked', reason: 'blocked' },
+          { depth: 0, candidateId: 'root-duplicate', rootId: 'root-duplicate', reason: 'duplicate' },
+        ],
+        traceCounts: {
+          total: 6,
+          roots: 5,
+          reasons: { evaluated: 1, rejected: 1, blocked: 1, duplicate: 1, 'candidate-limit': 1 },
+          returned: 5,
+          truncated: false,
+        },
+      })
+      expect(details.trace).not.toBe(trace)
+      expect(details.trace[0]).not.toBe(trace[0])
+      expect(details.continuation).not.toBe(f.engine.planTutorialAiAction.mock.results[0].value.continuation)
+      trace[0].candidateId = 'mutated'
+      expect(details.trace[0].candidateId).toBe('root-end')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('keeps the deployment then end-turn opening flow while carrying cumulative diagnostics', async () => {
+    vi.useFakeTimers()
+    try {
+      const f = fixture({ practiceOnly: true, owner: 'opponent', phase: 'start' })
+      const deploymentDecision = {
+        nextAction: { action: { type: 'deployReservePiece', playerId: 'opponent', pieceId: 'enemy' } },
+        nodes: 3,
+        considered: 3,
+        elapsedMs: 100,
+        overTurnBudget: false,
+        overDecisionBudget: false,
+        stopReason: 'selected',
+        continuation: { turnKey: 'opponent:1:opponent', nodes: 3, elapsedMs: 100 },
+        trace: [],
+      }
+      const endTurnDecision = {
+        nextAction: { action: { type: 'endTurn', playerId: 'opponent' } },
+        nodes: 1,
+        considered: 1,
+        elapsedMs: 75,
+        overTurnBudget: true,
+        overDecisionBudget: false,
+        stopReason: 'time-budget',
+        continuation: { turnKey: 'opponent:1:opponent', nodes: 4, elapsedMs: 175 },
+        trace: [],
+      }
+      f.engine.planTutorialAiAction
+        .mockReturnValueOnce(deploymentDecision)
+        .mockReturnValueOnce(endTurnDecision)
+
+      f.click('开始实战')
+      await vi.advanceTimersByTimeAsync(7000)
+
+      expect(f.hooks.search.mock.calls.map(call => call[0].actionsTakenThisTurn)).toEqual([0, 0])
+      expect(f.hooks.search.mock.calls[1][0].continuation).toEqual(deploymentDecision.continuation)
+      expect(f.hooks.onAiDecisionResult.mock.calls.map(call => call[0].action.type)).toEqual([
+        'deployReservePiece', 'endTurn',
+      ])
+      expect(f.hooks.onAiDecisionResult.mock.calls[1][0]).toMatchObject({
+        overTurnBudget: true,
+        continuation: endTurnDecision.continuation,
+        actionsTakenThisTurn: 0,
+      })
+      expect(f.hooks.commit.mock.calls.map(call => call[0].type)).toEqual([
+        'deployReservePiece', 'endTurn', 'beginPhase',
+      ])
+      expect(f.state().owner).toBe('human')
+      expect(f.state().turn.phase).toBe('action')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('bounds root trace entries while retaining counts for omitted reasons', async () => {
+    vi.useFakeTimers()
+    try {
+      const f = fixture({ practiceOnly: true, owner: 'opponent' })
+      const trace = [
+        ...Array.from({ length: 60 }, (_, index) => ({
+          depth: 0, candidateId: 'evaluated-' + index, rootId: 'evaluated-' + index,
+          score: index, reason: 'evaluated',
+        })),
+        { depth: 0, candidateId: 'rejected', rootId: 'rejected', reason: 'rejected', error: 'ILLEGAL' },
+        ...Array.from({ length: 10 }, (_, index) => ({
+          depth: 0, candidateId: 'blocked-' + index, rootId: 'blocked-' + index, reason: 'blocked',
+        })),
+      ]
+      f.engine.planTutorialAiAction.mockReturnValue({
+        nextAction: { action: { type: 'endTurn', playerId: 'opponent' } },
+        nodes: 64,
+        considered: trace.length,
+        elapsedMs: 250,
+        stopReason: 'time-budget',
+        continuation: { turnKey: 'opponent:1:opponent', nodes: 64, elapsedMs: 250 },
+        trace,
+      })
+
+      f.click('开始实战')
+      await vi.advanceTimersByTimeAsync(3000)
+
+      const details = f.hooks.onAiDecisionResult.mock.calls[0][0]
+      expect(details.trace).toHaveLength(64)
+      expect(details.trace[60]).toMatchObject({ candidateId: 'rejected', reason: 'rejected' })
+      expect(details.trace.slice(61).every(entry => entry.reason === 'blocked')).toBe(true)
+      expect(details.traceCounts).toEqual({
+        total: 71,
+        roots: 71,
+        reasons: { evaluated: 60, rejected: 1, blocked: 10, duplicate: 0, 'candidate-limit': 0 },
+        returned: 64,
+        truncated: true,
+      })
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('reports removal, reserve placement, and enemy healing as observed state changes', async () => {
