@@ -259,6 +259,26 @@ function handCard(documentRef: FakeDocument) {
   return card
 }
 
+function activeSkill(documentRef: FakeDocument) {
+  const row = new FakeElement('div', 'pi-skill')
+  const icon = new FakeElement('span', 'pi-skill-icon')
+  const cast = new FakeElement('button', 'character-cast')
+  row.append(icon, cast)
+  documentRef.body.append(row)
+  return { row, icon, cast }
+}
+
+function battleToolbarButton(documentRef: FakeDocument) {
+  const toolbar = new FakeElement('div', 'topbar')
+  toolbar.setAttribute('data-battle-ui-region', 'player-hud')
+  const settings = new FakeElement('button', 'back-btn')
+  settings.id = 'battleSettingsButton'
+  settings.setAttribute('id', 'battleSettingsButton')
+  toolbar.append(settings)
+  documentRef.body.append(toolbar)
+  return settings
+}
+
 function button(documentRef: FakeDocument, className = 'button') {
   const control = new FakeElement('button', className)
   documentRef.body.append(control)
@@ -269,7 +289,57 @@ function pointer(type: string, target: FakeElement, values: Record<string, unkno
   return { pointerType: type, pointerId: 1, clientX: 60, clientY: 60, target, ...values }
 }
 
+function rotateY(animation: FakeAnimation) {
+  const transform = String(animation.keyframes[0].transform || '')
+  return Number(transform.match(/rotateY\((-?[0-9.]+)deg\)/)?.[1] || 0)
+}
+
 describe('RED-226 shared physical UI motion', () => {
+  it('exposes visible hover and press state on real battle hand, skill, and toolbar controls', () => {
+    const { documentRef, windowRef } = setup()
+    const card = handCard(documentRef)
+    const skill = activeSkill(documentRef)
+    const settings = battleToolbarButton(documentRef)
+
+    windowRef.dispatch('pointerover', pointer('mouse', card, { clientX: 90 }))
+    expect(card.classList.contains('ui-motion-hover')).toBe(true)
+    expect(card.classList.contains('ui-motion-pressed')).toBe(false)
+
+    windowRef.dispatch('pointerover', pointer('mouse', skill.icon, { clientX: 90 }))
+    expect(skill.row.classList.contains('ui-motion-hover')).toBe(true)
+    expect(skill.row.classList.contains('ui-motion-pressed')).toBe(false)
+
+    windowRef.dispatch('pointerover', pointer('mouse', settings, { clientX: 90 }))
+    windowRef.dispatch('pointerdown', pointer('mouse', settings))
+    expect(settings.classList.contains('ui-motion-hover')).toBe(true)
+    expect(settings.classList.contains('ui-motion-pressed')).toBe(true)
+
+    windowRef.dispatch('pointerup', pointer('mouse', settings))
+    expect(settings.classList.contains('ui-motion-pressed')).toBe(false)
+    expect(settings.classList.contains('ui-motion-hover')).toBe(true)
+
+    windowRef.dispatch('pointerout', pointer('mouse', settings, { relatedTarget: documentRef.body }))
+    expect(settings.classList.contains('ui-motion-hover')).toBe(false)
+  })
+
+  it('keeps the stronger tilt confined to battle surfaces', () => {
+    const { documentRef, windowRef } = setup()
+    const generic = button(documentRef)
+    windowRef.dispatch('pointerover', pointer('mouse', generic, { clientX: 110 }))
+    windowRef.flushFrames(20)
+    const genericTilt = Math.abs(rotateY(generic.animations[generic.animations.length - 1]))
+
+    const card = handCard(documentRef)
+    windowRef.dispatch('pointerover', pointer('mouse', card, { clientX: 110 }))
+    windowRef.flushFrames(20)
+    const battleTilt = Math.abs(rotateY(card.animations[card.animations.length - 1]))
+
+    expect(genericTilt).toBeGreaterThan(1)
+    expect(genericTilt).toBeLessThan(2.1)
+    expect(battleTilt).toBeGreaterThan(genericTilt)
+    expect(battleTilt).toBeLessThan(6.1)
+  })
+
   it('adds the fine-pointer root capability without touching the source transform', () => {
     const { documentRef, windowRef, instance } = setup()
     const card = handCard(documentRef)
@@ -282,7 +352,7 @@ describe('RED-226 shared physical UI motion', () => {
     expect(card.style.transform).toBe('translateY(-10px) scale(1.06)')
     expect(card.animations[0].options.composite).toBe('add')
     expect(card.animations[0].paused).toBe(true)
-    expect(String(card.animations[0].keyframes[0].transform)).toMatch(/rotateY\(4\./)
+    expect(String(card.animations[0].keyframes[0].transform)).toMatch(/rotateY\([45]\./)
 
     instance.destroy()
     expect(documentRef.documentElement.classList.contains('ui-motion-ready')).toBe(false)
@@ -346,6 +416,10 @@ describe('RED-226 shared physical UI motion', () => {
     windowRef.dispatch('pointerover', pointer('mouse', card, { clientX: 90 }))
     windowRef.flushFrames(16)
     windowRef.dispatch('pointerdown', pointer('mouse', card))
+    expect(card.classList.contains('ui-motion-pressed')).toBe(true)
+    windowRef.dispatch('pointermove', pointer('mouse', card, { clientX: 80 }))
+    expect(card.classList.contains('ui-motion-hover')).toBe(false)
+    expect(card.classList.contains('ui-motion-pressed')).toBe(false)
     documentRef.dispatch('pointerdown', pointer('mouse', card))
     order.push('after-window-capture')
     windowRef.flushFrames(2)

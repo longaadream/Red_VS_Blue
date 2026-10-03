@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
 import { previewBattleAction } from '@/lib/game/skill-preview'
+import { createPublicRuleSource } from '@/lib/game/public-rule-source'
 import { applyBattleAction, type BattleAction, type BattleState } from '@/lib/game/turn'
 import { prepareAction } from '@/lib/game/targeting'
 import type { SkillDefinition } from '@/lib/game/skills'
@@ -101,7 +102,7 @@ describe('RED-224 isolated public skill preview', () => {
     expect(previewBattleAction({ ...state, pendingTargetSelection: {} as never }, action, 'player-red').status)
       .toBe('needs-input')
     expect(previewBattleAction(state, { ...action, extraTargets: [{ pieceId: 'uther' }] } as BattleAction, 'player-red').status)
-      .toBe('needs-input')
+      .toBe('unavailable')
     expect(previewBattleAction(state, action, 'player-blue').status).toBe('unavailable')
     expect(previewBattleAction(state, { ...action, type: 'move' } as BattleAction, 'player-red').status)
       .toBe('unavailable')
@@ -327,6 +328,59 @@ describe('RED-224 isolated public skill preview', () => {
       expect(healResult.snapshot.pieces.find(piece => piece.instanceId === 'uther')?.currentHp).toBe(10)
       expect(healResult.events.some(event => event.kind === 'heal')).toBe(true)
     }
+  })
+
+  it('keeps public tile effects in the ready preview snapshot', () => {
+    const state = publicFixture()
+    state.extensions = {
+      tileEffects: [{
+        id: 'amaterasu-1',
+        tileType: 'amaterasu',
+        x: 1,
+        y: 0,
+      }],
+    }
+
+    const result = previewBattleAction(state, targetedAction(state), 'player-red')
+
+    expect(result.status).toBe('ready')
+    if (result.status !== 'ready') return
+    expect(result.snapshot.extensions?.tileEffects).toEqual([
+      expect.objectContaining({ id: 'amaterasu-1', tileType: 'amaterasu', x: 1, y: 0 }),
+    ])
+  })
+
+  it('previews newly created tiles from the real Amaterasu skill, without spending real AP', () => {
+    const state = publicFixture()
+    const source = state.pieces[0]
+    source.skills = [{ skillId: 'sasuke-amaterasu', currentCooldown: 0, usesRemaining: -1 }]
+    state.skillsById = { 'sasuke-amaterasu': skill('sasuke-amaterasu') }
+    const draft = { type: 'useBasicSkill' as const, playerId: 'player-red', pieceId: source.instanceId, skillId: 'sasuke-amaterasu' }
+    const prepared = prepareAction(state, draft)
+    expect(prepared.kind).toBe('needTarget')
+    if (prepared.kind !== 'needTarget') return
+    const action = { ...draft, targetX: 2, targetY: 2, selectionId: prepared.selectionId, stateRevision: prepared.stateRevision }
+    const before = JSON.stringify(state)
+    const actualTiles = applyBattleAction(structuredClone(state), action)
+    expect(actualTiles.extensions?.tileEffects).toHaveLength(9)
+    const result = previewBattleAction(state, action, 'player-red')
+    expect(result.status).toBe('ready')
+    if (result.status !== 'ready') return
+    expect(result.snapshot.extensions?.tileEffects).toHaveLength(9)
+    expect(result.snapshot.extensions?.tileEffects).toEqual(expect.arrayContaining([
+      expect.objectContaining({ tileType: 'amaterasu', x: 2, y: 2 }),
+    ]))
+    expect(JSON.stringify(state)).toBe(before)
+  })
+
+  it('allows newly attached viewer rules but still rejects undeclared opponent rule sources', () => {
+    const state = publicFixture()
+    const owned = createPublicRuleSource(state, 'player-red')
+    expect(owned.ruleResolver?.(state, 'rule-sasuke-amaterasu-move', { sourceId: 'player-red' })).toMatchObject({ id: 'rule-sasuke-amaterasu-move' })
+    expect(owned.hasUnsupportedAccess()).toBe(false)
+    const opponent = createPublicRuleSource(state, 'player-red')
+    expect(opponent.ruleResolver?.(state, 'rule-sasuke-amaterasu-move', { sourceId: 'player-blue' })).toBeNull()
+    expect(opponent.hasUnsupportedAccess()).toBe(true)
   })
 
   it('skips a public reaction that requests input and retries from a fresh state', () => {
