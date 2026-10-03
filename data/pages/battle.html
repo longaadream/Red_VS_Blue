@@ -1580,6 +1580,48 @@
 <link rel="stylesheet" href="css/battle-landscape.css">
 <link rel="stylesheet" href="css/ui-motion.css">
 <script src="js/ui-motion.js" defer></script>
+<style id="red236-yellow-feedback">
+  /* RED-236: keep the action hint and invalid-action feedback readable over the
+     usable battlefield without changing target instructions or result floaters. */
+  body:not(.target-mode-active) #statusMsg,
+  body:not(.target-mode-active) #dmBubble {
+    left: 50% !important;
+    top: 42% !important;
+    right: auto !important;
+    bottom: auto !important;
+    width: min(760px, calc(100vw - 32px)) !important;
+    max-width: min(760px, calc(100vw - 32px)) !important;
+    min-height: 0 !important;
+    padding: 0 16px !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    color: #ffe08a !important;
+    font-size: clamp(24px, 3vw, 36px) !important;
+    font-weight: 900 !important;
+    line-height: 1.25 !important;
+    text-align: center !important;
+    text-shadow: 0 3px 10px rgba(0, 0, 0, .95) !important;
+    -webkit-text-stroke: 1px #16110d;
+    paint-order: stroke fill;
+    white-space: normal !important;
+    overflow: visible !important;
+    transform: translate(-50%, -50%) scale(.96) !important;
+  }
+  body:not(.target-mode-active) #dmBubble {
+    opacity: 0;
+    transition: opacity 120ms ease-out, transform 180ms cubic-bezier(.22, 1, .36, 1);
+  }
+  body:not(.target-mode-active) #dmBubble.is-visible {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1) !important;
+  }
+  body:not(.target-mode-active):has(#dmBubble.is-visible) #statusMsg {
+    visibility: hidden !important;
+  }
+  body:not(.target-mode-active) #dmBubble::after { display: none !important; }
+</style>
 </head>
 <body>
 
@@ -3921,16 +3963,22 @@
       renderPieceIdentity(piece)
 
       // Tags (display* aware)
-      const tags = pieceDispTags(piece).filter(t => t.visible !== false)
       const statusPresentation = window.BattleStatusPresentation
+      const tags = pieceDispTags(piece).filter(t => {
+        if (!t || t.visible === false) return false
+        const meta = statusPresentation ? statusPresentation.resolve(t) : null
+        return !meta || meta.visibility !== 'hidden'
+      })
       const tagsHtml = tags.length
         ? `<div class="pi-section-label">\u5168\u90e8\u53ef\u89c1\u72b6\u6001</div><div class="pi-status-list">${tags.map(t => {
             const meta = statusPresentation
               ? statusPresentation.resolve(t)
               : { color: '#94a3b8', glyph: '\u2022', description: '\u72b6\u6001\u8be6\u60c5\u7531\u5f53\u524d\u6743\u5a01\u5feb\u7167\u63d0\u4f9b\u3002' }
             const detail = statusPresentation ? statusPresentation.detailText(t) : ''
-            const label = t.name || t.label || t.type || t.id || '?'
-            const iconPath = t.iconPath || t.assetPath || meta.assetPath || 'images/effect-icons/fallback.svg'
+            const label = statusPresentation && statusPresentation.labelForStatus
+              ? statusPresentation.labelForStatus(t)
+              : (meta.label || t.name || t.label || t.type || t.id || '\u672a\u77e5\u72b6\u6001')
+            const iconPath = meta.assetPath || 'images/effect-icons/fallback.svg'
             const description = t.description || meta.description || ''
             return `<div class="pi-status-row" data-status-id="${escHtml(t.id || t.type || '')}">
               <span class="pi-status-icon" style="--status-color:${escHtml(meta.color)}"><img class="pi-status-icon-image" src="${escHtml(iconPath)}" alt="" aria-hidden="true"></span>
@@ -6830,7 +6878,11 @@
             const boardStatuses = window.BattleStatusPresentation
               ? BattleStatusPresentation.boardSummary(piece.statusSummary || [])
               : (piece.statusSummary || []).slice(0, 2).map(status => ({ status, meta: { color: '#a78bfa' } }))
-            const tagsHtml = boardStatuses.map(entry => `<span class="piece-status-dot" style="--status-color:${escHtml(entry.meta.color)}" title="${escHtml(entry.status.label || entry.status.id || '?')}"></span>`).join('')
+            const tagsHtml = boardStatuses.map(entry => {
+              const label = entry.status.label || '未知状态'
+              const iconPath = entry.status.iconPath || entry.meta.assetPath || 'images/effect-icons/fallback.svg'
+              return `<span class="piece-status-dot" style="--status-color:${escHtml(entry.meta.color)}" title="${escHtml(label)}"><img src="${escHtml(iconPath)}" alt="" aria-hidden="true" style="display:block;width:100%;height:100%;object-fit:contain"></span>`
+            }).join('')
             const tmpl = PIECES_BY_ID[piece.templateId]
             const imgSrc = tmpl && tmpl.image ? 'images/' + tmpl.image : null
             const imgHtml = imgSrc
@@ -6993,11 +7045,20 @@
       const sel = piece.instanceId === selectedPieceId && isMe
       const stats = pieceDispStats(piece)
 
-      const tags = pieceDispTags(piece).filter(t => t.visible !== false)
+      const statusPresentation = window.BattleStatusPresentation
+      const tags = pieceDispTags(piece).filter(t => {
+        if (!t || t.visible === false) return false
+        const meta = statusPresentation ? statusPresentation.resolve(t) : null
+        return !meta || meta.visibility !== 'hidden'
+      })
       const tagsHtml = tags.map(t => {
-        const label = t.name || t.type || t.id || '?'
+        const meta = statusPresentation ? statusPresentation.resolve(t) : { assetPath: 'images/effect-icons/fallback.svg' }
+        const label = statusPresentation && statusPresentation.labelForStatus
+          ? statusPresentation.labelForStatus(t)
+          : (meta.label || t.name || t.label || t.type || t.id || '未知状态')
+        const iconPath = meta.assetPath || 'images/effect-icons/fallback.svg'
         const stacks = t.stacks ? `脳${t.stacks}` : (t.duration ? `${t.duration}T` : '')
-        return `<span class="status-tag" title="${escHtml(t.id||'')}">${escHtml(label)}${stacks ? ' ' + stacks : ''}</span>`
+        return `<span class="status-tag" title="${escHtml(label)}"><img src="${escHtml(iconPath)}" alt="" aria-hidden="true" style="width:12px;height:12px;vertical-align:-2px;object-fit:contain">${escHtml(label)}${stacks ? ' ' + stacks : ''}</span>`
       }).join('')
 
       const tmpl = PIECES_BY_ID[piece.templateId]
@@ -7817,7 +7878,12 @@
                   const amount = Math.abs(Number(value.amount) || 0)
                   if (amount) text = (event.kind === 'heal' ? '+' : '−') + amount
                   color = event.kind === 'heal' ? '#4ade80' : '#f87171'
-                } else if (event.kind === 'statusAdded') text = event.label || '获得效果'
+                } else if (event.kind === 'statusAdded') {
+                  const status = { type: event.statusType, name: event.label }
+                  text = window.BattleEffectIcons && window.BattleEffectIcons.labelForStatus
+                    ? window.BattleEffectIcons.labelForStatus(status)
+                    : (event.label || '获得效果')
+                }
                 else if (event.kind === 'death' || event.kind === 'eliminated') text = '阵亡'
                 else if (event.kind === 'block') text = event.label || '阻挡'
                 else if (event.kind === 'statChanged') {
