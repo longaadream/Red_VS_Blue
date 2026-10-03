@@ -731,3 +731,19 @@ canvas:focus-visible {
   from { opacity: 1; }
   to { opacity: 0; }
 }
+.skill-preview-badge {
+  position: fixed;
+  left: 50%;
+  bottom: 120px;
+  transform: translateX(-50%);
+  padding: 8px 16px;
+  border: 1px solid #b6c5ac;
+  border-radius: 6px;
+  background: #263b32;
+  color: #f5eed8;
+  font-size: 14px;
+  z-index: 1400;
+  pointer-events: none;
+}
+.skill-preview-badge[hidden] { display: none; }
+.piece-context-skill, .character-cast { touch-action: none; }

@@ -39,6 +39,9 @@
   <script src="js/battle-ui/battle-status-presentation.js"></script>
   <script src="js/battle-ui/battle-context-layout.js"></script>
   <script src="js/battle-ui/battle-legal-actions.js"></script>
+  <script src="js/battle-ui/battle-skill-preview.js"></script>
+  <script src="js/battle-ui/battle-skill-drag.js"></script>
+  <script src="js/battle-ui/battle-dom-patch.js"></script>
   <script src="js/battle-ui/battle-dom-ui.js"></script>
   <script src="js/battle-ui/deployment-status.js"></script>
   <script src="js/battle-ui/battle-tactical-geometry.js"></script>
@@ -1763,7 +1766,7 @@
 
     <!-- Board + actions + log -->
     <div class="main-panel">
-      <div class="phase-bar" data-battle-ui-region="turn-hud">
+      <div class="phase-bar" data-battle-ui-region="turn-hud" data-floater-obstacle>
         <div class="turn-summary">
           <div class="turn-summary-primary">
             <div class="turn-badge" id="turnBadge" aria-live="polite">等待中</div>
@@ -2428,6 +2431,7 @@
       pendingActionFeedbackTimer = null
       const cleared = pendingActionFeedback
       pendingActionFeedback = null
+      if (typeof window !== 'undefined' && window.BattleRenderer3D && window.BattleRenderer3D.setPendingFeedback) window.BattleRenderer3D.setPendingFeedback(null)
       if (cleared) cleared.clearReason = reason || 'cleared'
       return cleared
     }
@@ -2444,6 +2448,7 @@
         pieceId: action.pieceId || action.targetPieceId || selectedPieceId || null,
         startedAt: typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now(),
       }
+      if (typeof window !== 'undefined' && window.BattleRenderer3D && window.BattleRenderer3D.setPendingFeedback) window.BattleRenderer3D.setPendingFeedback(pendingActionFeedback.pieceId)
       pendingActionFeedbackTimer = setTimeout(function () {
         if (!pendingActionFeedback || pendingActionFeedback.clientActionId !== action.clientActionId) return
         pendingActionFeedback.timedOut = true
@@ -2633,6 +2638,7 @@
     }
 
     function clearTargetInteraction(reason, options) {
+      clearSkillPreview()
       const input = options || {}
       const hadTarget = !!(pendingSkill || pendingCardAction || targetSubmissionPending || targetSubmissionDraft)
       pendingSkill = null
@@ -2667,6 +2673,7 @@
     }
 
     function submitTargetAction(action, label) {
+      clearSkillPreview()
       if (targetSubmissionPending) {
         setStatusMsg('目标指令已提交，正在等待权威确认')
         return false
@@ -6235,6 +6242,7 @@
     }
 
     function renderBoard(preparedModel, beforeBoardUpdate) {
+      clearSkillPreview()
       if (!G || !G.map) return
       currentBattleViewModel = prepareCurrentBattlePresentationModel(preparedModel)
       if (!currentBattleViewModel) return
@@ -6407,8 +6415,17 @@
         document.getElementById('oppLabel').textContent = '[R] 红方'
       }
 
-      document.getElementById('myPieces').innerHTML = myPieces.map(p => renderPieceCard(p, p.ownerPlayerId.toLowerCase() === myPlayerId)).join('')
-      document.getElementById('oppPieces').innerHTML = oppPieces.map(p => renderPieceCard(p, false)).join('')
+      const patchPieces = function (hostId, pieces, isMine) {
+        const host = document.getElementById(hostId)
+        if (!host) return
+        const entries = pieces.map(function (piece) {
+          return { key: String(piece.instanceId), html: renderPieceCard(piece, isMine ? piece.ownerPlayerId.toLowerCase() === myPlayerId : false) }
+        })
+        if (window.BattleDomPatch) window.BattleDomPatch.patchKeyed(host, entries, { datasetKey: 'pieceId' })
+        else host.innerHTML = entries.map(function (entry) { return entry.html }).join('')
+      }
+      patchPieces('myPieces', myPieces, true)
+      patchPieces('oppPieces', oppPieces, false)
 
       const opponentHandStack = document.getElementById('opponentHandStack')
       if (opponentHandStack) {
@@ -6642,7 +6659,7 @@
       document.getElementById('pieceContextHp').textContent = pieceDispHp(piece) + '/' + pieceMaxHp(piece)
       menu.dataset.pieceId = piece.instanceId
 
-      const skillButtons = skills.length ? skills.map(sk => {
+      const skillEntries = skills.length ? skills.map(sk => {
         const sid = skillIdOf(sk)
         const availability = resolveSkillAvailability(piece, sk)
         const skData = availability.skillData
@@ -6666,7 +6683,7 @@
         }
         if (availability.unavailableReason) titleParts.push('不可用：' + availability.unavailableReason)
 
-        return '<button type="button" class="piece-context-skill' + (isCharge ? ' is-charge' : '') +
+        return { key: sid, html: '<button type="button" class="piece-context-skill' + (isCharge ? ' is-charge' : '') +
           '" data-skill-id="' + escHtml(sid) + '"' +
           ' onclick="dispatchBattleIntent({type:\'select-skill\',skillId:this.dataset.skillId})"' +
           ' title="' + escHtml(titleParts.join('\n')) + '"' +
@@ -6676,9 +6693,10 @@
           '<span class="piece-context-skill-cost">' +
             (status || ('行动 ' + apCost + (isCharge ? ' · 充能 ' + skillChargeCostLabel(piece, skData) : ''))) +
             (isCharge && skillHasDynamicChargeCost(skData) ? ' <span class="skill-cost-dynamic">动态</span>' : '') +
-          '</span></button>'
-      }).join('') : '<span class="piece-context-empty">' + (isOwner ? '暂无主动技能' : '查看详情') + '</span>'
-      skillsContainer.innerHTML = skillButtons
+          '</span></button>' }
+      }) : [{ key: 'empty', html: '<span class="piece-context-empty" data-skill-id="empty">' + (isOwner ? '暂无主动技能' : '查看详情') + '</span>' }]
+      if (window.BattleDomPatch) window.BattleDomPatch.patchKeyed(skillsContainer, skillEntries, { datasetKey: 'skillId' })
+      else skillsContainer.innerHTML = skillEntries.map(function (entry) { return entry.html }).join('')
 
       menu.classList.add('is-open')
       menu.setAttribute('aria-hidden', 'false')
@@ -6721,7 +6739,7 @@
         return
       }
 
-      container.innerHTML = hand.map((card, index) => {
+      const handEntries = hand.map((card, index) => {
         const def = getCardDisplayDefinition(card.cardId)
         const cardPresentation = card.presentation && typeof card.presentation === 'object' ? card.presentation : {}
         const isContentEnhanced = cardPresentation.variant === 'enhanced'
@@ -6748,15 +6766,17 @@
           ? cardName + (isHandChoiceCandidate ? (isHandChoiceSelected ? '，已选择' : '，可选择') : '，不可选择')
           : cardName + (cardPresentation.badge ? '，' + cardPresentation.badge : '') + '，行动点 ' + cost
         const arc = window.BattleContextLayout.handArc(index, hand.length)
-        return `<button type="button" class="${cls}" style="--hand-arc-angle:${arc.angle}deg;--hand-arc-lift:${arc.lift}px;--hand-arc-z:${arc.zIndex}"
+        return { key: card.instanceId, html: `<button type="button" class="${cls}" style="--hand-arc-angle:${arc.angle}deg;--hand-arc-lift:${arc.lift}px;--hand-arc-z:${arc.zIndex}"
           data-instance-id="${cid}" aria-label="${escHtml(cardAriaLabel)}" aria-pressed="${isHandSelection ? isHandChoiceSelected : isPending}" aria-disabled="${!canInteract}"${progressiveBlocked ? ' disabled' : ''}
           onclick="if(!consumeCardPressClick('${cid}'))onCardClick('${cid}','${cdid}')"
           ontouchstart="startCardPressTimer(event,'${cid}','${cdid}')"
           ontouchend="clearPressTimer()" ontouchcancel="clearPressTimer()" ontouchmove="moveCardPressTimer(event)"
           oncontextmenu="event.preventDefault();showCardDetail('${cid}','${cdid}')">
           ${renderHandCardFace(card, def)}
-        </button>`
-      }).join('')
+        </button>` }
+      })
+      if (window.BattleDomPatch) window.BattleDomPatch.patchKeyed(container, handEntries, { datasetKey: 'instanceId' })
+      else container.innerHTML = handEntries.map(function (entry) { return entry.html }).join('')
       renderPendingHandSelectionControls()
     }
 
@@ -7119,9 +7139,105 @@
     }
 
     // ── Cell click ──
+    let skillPreviewController = null
+    let skillDragController = null
+    const skillPreviewDisplayTimings = []
+    function clearSkillPreview() {
+      if (skillPreviewController) skillPreviewController.clear()
+    }
+
+    function previewSkillTarget(x, y) {
+      const renderer = window.BattleRenderer3D
+      if (!_use3d || !renderer || !pendingSkill || !pendingSkill.baseAction || !pendingSkill.skillId ||
+          pendingSkill.turnTargetActionType || pendingSkill.preparation && pendingSkill.preparation.selectionMode === 'multi' ||
+          targetSubmissionPending || waitingForOtherPending() || !pendingSkill.validTargets || !pendingSkill.validTargets.has(x + ',' + y) ||
+          typeof GameEngine === 'undefined' || !GameEngine.previewBattleAction) {
+        clearSkillPreview()
+        return
+      }
+      if (!skillPreviewController) {
+        const badge = document.createElement('div')
+        badge.className = 'skill-preview-badge'
+        badge.setAttribute('role', 'status')
+        badge.hidden = true
+        document.body.appendChild(badge)
+        skillPreviewController = BattleSkillPreview.create({
+          compute: request => GameEngine.previewBattleAction(request.snapshot, request.action, request.viewerId),
+          restore: () => { renderer.clearPreviewBoard(); badge.hidden = true },
+          notice: result => {
+            badge.hidden = false
+            badge.textContent = result.status === 'needs-input' ? '还需选择 · 暂不预演' : '此效果暂不预演'
+          },
+          onError: (error, request) => console.warn('[skill-preview]', {
+            skillId: request.action.skillId, revision: request.revision, reason: String(error.message || error)
+          }),
+          show: (result, request) => {
+            const displayStarted = performance.now()
+            const authority = currentBattleViewModel
+            const predicted = createBattlePresentationModel(result.snapshot)
+            if (!predicted || !authority) return
+            predicted.selection = authority.selection
+            predicted.interaction = authority.interaction
+            predicted.legal = authority.legal
+            predicted.interactionPieces = authority.pieces
+            renderer.showPreviewBoard(predicted, authority)
+            badge.hidden = false
+            badge.textContent = '公开效果预演 · 点击或松手释放'
+            badge.title = '只显示已知的确定性效果；实际结算可能受到隐藏效果影响'
+            const paths = []
+            ;(result.events || []).forEach(event => {
+              const value = event.result || {}
+              const ids = event.targetPieceIds || (event.sourcePieceId ? [event.sourcePieceId] : [])
+              ids.forEach(id => {
+                const piece = predicted.pieces.find(p => p.id === id) || authority.pieces.find(p => p.id === id)
+                if (!piece) return
+                let text = '', color = '#ffe69b'
+                if (event.kind === 'damage' || event.kind === 'heal') {
+                  const amount = Math.abs(Number(value.amount) || 0)
+                  if (amount) text = (event.kind === 'heal' ? '+' : '−') + amount
+                  color = event.kind === 'heal' ? '#4ade80' : '#f87171'
+                } else if (event.kind === 'statusAdded') text = event.label || '获得效果'
+                else if (event.kind === 'death' || event.kind === 'eliminated') text = '阵亡'
+                else if (event.kind === 'block') text = event.label || '阻挡'
+                else if (event.kind === 'statChanged') {
+                  const names = { attack: '攻击', defense: '防御', moveRange: '移动范围', maxHp: '生命上限' }
+                  const amount = Number(value.amount)
+                  if (names[value.attribute] && Number.isFinite(amount) && amount) text = names[value.attribute] + (amount > 0 ? '+' : '') + amount
+                }
+                if (text) renderer.spawnFloater(piece.x, piece.y, text, color, false, { kind: event.kind, preview: true })
+              })
+              if ((event.kind === 'move' || event.kind === 'forceMove') && Number.isFinite(value.fromX) && Number.isFinite(value.toX)) {
+                paths.push({ x: value.fromX, y: value.fromY, role: 'source' },
+                  { x: value.toX, y: value.toY, role: 'target', fromX: value.fromX, fromY: value.fromY })
+              }
+              if (event.presentation && event.presentation.pathCells && event.presentation.pathCells.length) {
+                const path = event.presentation.pathCells
+                renderer.showPresentationPath({ source: path[0], end: event.presentation.endPoint || path[path.length - 1], selected: event.presentation.selectedCell })
+              }
+              if (event.presentation && event.presentation.areaCells && event.presentation.areaCells.length) {
+                renderer.showPresentationAreaFlash(event.presentation.areaCells)
+              }
+            })
+            if (paths.length) renderer.setHistoryHighlight(paths)
+            const timing = { durationMs: performance.now() - displayStarted, nextFrameMs: null }
+            skillPreviewDisplayTimings.push(timing)
+            if (skillPreviewDisplayTimings.length > 64) skillPreviewDisplayTimings.shift()
+            requestAnimationFrame(() => { timing.nextFrameMs = performance.now() - displayStarted })
+          }
+        })
+      }
+      const action = Object.assign({}, pendingSkill.baseAction)
+      if (action.extraTargets) action.extraTargets = action.extraTargets.slice()
+      const piece = G.pieces.find(p => p.x === x && p.y === y && p.currentHp > 0)
+      _appendTargetToAction(action, piece, x, y, pendingSkill.preparation && pendingSkill.preparation.targetType)
+      skillPreviewController.request({ snapshot: G, action, viewerId: myPlayerId,
+        key: JSON.stringify(action), revision: action.stateRevision })
+    }
+
     function handleBattleIntent(intent) {
       if (!intent) return
       if (intent.type === 'hover-cell') {
+        if (pendingSkill || intent.x == null) previewSkillTarget(intent.x, intent.y)
         if (!pendingMove || !validMoves.has(intent.x + ',' + intent.y) || waitingForOtherPending()) return
         if (typeof GameEngine === 'undefined' || !GameEngine.applyBattleAction) return
         try {
@@ -7137,10 +7253,12 @@
         return
       }
       if (intent.type === 'viewport-change') {
+        clearSkillPreview()
         schedulePieceContextMenuPosition()
         return
       }
       if (intent.type === 'activate-cell') {
+        clearSkillPreview()
         const result = onCellClick(intent.x, intent.y)
         if (TUTORIAL_MODE && tutorialRuntime) tutorialRuntime.afterIntent(intent)
         return result
@@ -8335,6 +8453,35 @@
         historyDock: document.getElementById('actionHistoryDock'),
       })
       _use3d = true
+      skillDragController = BattleSkillDrag.create({
+        root: document,
+        resolve: button => ({ skillId: button.dataset.skillId, pieceId: selectedPieceId }),
+        arm: context => {
+          if (!G || context.pieceId !== selectedPieceId || targetSubmissionPending || pendingActionFeedback || waitingForOtherPending()) return false
+          const piece = G.pieces.find(p => p.instanceId === context.pieceId)
+          if (!piece || !resolveSkillAvailability(piece, context.skillId).available) return false
+          if (pendingSkill && pendingSkill.skillId === context.skillId) return true
+          const draft = { type: skillUsesCharge(skillDefOf(context.skillId)) ? 'useChargeSkill' : 'useBasicSkill',
+            playerId: myPlayerId, pieceId: context.pieceId, skillId: context.skillId }
+          const probe = BattleLegalActions.probeSkillTarget({ snapshot: G, playerId: myPlayerId,
+            pieceId: context.pieceId, skillId: context.skillId, skillsById, engine: GameEngine })
+          if (!probe || !probe.needsTarget || !probe.preparation ||
+              typeof tutorialActionAllowed === 'function' && !tutorialActionAllowed(draft)) return false
+          clearTargetInteraction('skill-drag-selected')
+          setMoveButtonClass(false)
+          closePieceContextMenu()
+          return enterActionTargetMode(draft, probe.preparation)
+        },
+        cellAt: (x, y) => {
+          const rect = document.getElementById('boardStage3d').getBoundingClientRect()
+          if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) return null
+          return renderer.screenToCell(x, y)
+        },
+        preview: cell => cell ? previewSkillTarget(cell.x, cell.y) : clearSkillPreview(),
+        clear: clearSkillPreview,
+        release: cell => dispatchBattleIntent({ type: 'activate-cell', x: cell.x, y: cell.y }),
+        onError: error => console.warn('[skill-drag]', { reason: String(error.message || error) })
+      })
       init().catch(showBattleBootError)
       if (RED167_QA_MODE) {
         window.__RVB_RED167_REPLAY__ = playRed167QaSequence
@@ -8425,6 +8572,8 @@
       if (ADVENTURE_MODE) disposeAdventureBattle()
       if (PRACTICE_MODE) disposePracticeBattle()
       battlePageDisposed = true
+      if (skillPreviewController) skillPreviewController.dispose()
+      if (skillDragController) skillDragController.dispose()
       cardDisplayMetadataRequests.clear()
       if (pollTimer) clearInterval(pollTimer)
       pollTimer = null
@@ -8436,6 +8585,7 @@
     }
     window.addEventListener('pagehide', disposeBattlePage)
     window.addEventListener('unload', disposeBattlePage)
+    window.addEventListener('blur', clearSkillPreview)
 
     document.addEventListener('keydown', handlePieceInfoModalKeydown)
 

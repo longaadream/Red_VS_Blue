@@ -42,6 +42,113 @@ beforeEach(() => vi.useFakeTimers())
 afterEach(() => vi.useRealTimers())
 
 describe('sequential board playback', () => {
+  it('starts movement presentation at focus and keeps a following hit behind the movement beat', () => {
+    const { presentation, frames, renderer } = setup()
+    const before: any = {
+      ...model(20),
+      pieces: [
+        { id: 'source', x: 0, y: 1, visible: true, health: { current: 10, max: 10 }, statuses: [], statusSummary: [] },
+        { id: 'target', x: 2, y: 1, visible: true, health: { current: 20, max: 20 }, statuses: [], statusSummary: [] },
+      ],
+    }
+    const sequence = [
+      { eventId: 'move:0', rootEventId: 'move:0', kind: 'move', sourcePieceId: 'source', sequence: 0,
+        result: { fromX: 0, fromY: 1, toX: 1, toY: 1 }, presentation: { pathCells: [{ x: 0, y: 1 }, { x: 1, y: 1 }] } },
+      { eventId: 'move:1', rootEventId: 'move:0', parentEventId: 'move:0', kind: 'damage', targetPieceIds: ['target'],
+        result: { amount: 3, value: 17 }, sequence: 1 },
+    ]
+    const after: any = { ...before, pieces: before.pieces.map((piece: any) => piece.id === 'source'
+      ? { ...piece, x: 1 }
+      : { ...piece, health: { current: 17, max: 20 } }), presentationEvents: sequence }
+    before.presentationEvents = []
+    presentation.update(before)
+    presentation.update(after)
+
+    expect(renderer.animateAction).toHaveBeenCalledTimes(1)
+    expect(frames.at(-1).pieces.find((piece: any) => piece.id === 'target').health.current).toBe(20)
+    vi.advanceTimersByTime(199)
+    expect(frames.at(-1).pieces.find((piece: any) => piece.id === 'target').health.current).toBe(20)
+    vi.advanceTimersByTime(1)
+    expect(frames.at(-1).pieces.find((piece: any) => piece.id === 'target').health.current).toBe(20)
+    vi.advanceTimersByTime(84)
+    expect(frames.at(-1).pieces.find((piece: any) => piece.id === 'target').health.current).toBe(17)
+    presentation.dispose()
+  })
+
+  it.each([
+    ['long walk', { fromX: 0, fromY: 1, toX: 5, toY: 1, movementKind: 'walk' }, 160],
+    ['dash', { fromX: 0, fromY: 1, toX: 1, toY: 1, movementKind: 'dash' }, 145],
+  ] as const)('at 2× playback keeps a following hit behind the %s renderer duration', (_label, movement, physicalDuration) => {
+    const { presentation, frames, renderer, queue } = setup()
+    const before: any = {
+      ...model(20),
+      pieces: [
+        { id: 'source', x: movement.fromX, y: movement.fromY, visible: true, health: { current: 10, max: 10 }, statuses: [], statusSummary: [] },
+        { id: 'target', x: 6, y: 1, visible: true, health: { current: 20, max: 20 }, statuses: [], statusSummary: [] },
+      ],
+    }
+    const sequence = [
+      { eventId: 'move:0', rootEventId: 'move:0', kind: 'move', sourcePieceId: 'source', sequence: 0,
+        result: movement, presentation: { pathCells: [{ x: movement.fromX, y: movement.fromY }, { x: movement.toX, y: movement.toY }] } },
+      { eventId: 'move:1', rootEventId: 'move:0', parentEventId: 'move:0', kind: 'damage', targetPieceIds: ['target'],
+        result: { amount: 3, value: 17 }, sequence: 1 },
+    ]
+    const after: any = { ...before, pieces: before.pieces.map((piece: any) => piece.id === 'source'
+      ? { ...piece, x: movement.toX, y: movement.toY }
+      : { ...piece, health: { current: 17, max: 20 } }), presentationEvents: sequence }
+    before.presentationEvents = []
+    queue.setSpeed(2)
+    presentation.update(before)
+    presentation.update(after)
+
+    expect(renderer.animateAction).toHaveBeenCalledTimes(1)
+    expect(frames.at(-1).pieces.find((piece: any) => piece.id === 'target').health.current).toBe(20)
+    vi.advanceTimersByTime(physicalDuration - 1)
+    expect(frames.at(-1).pieces.find((piece: any) => piece.id === 'target').health.current).toBe(20)
+    vi.advanceTimersByTime(1)
+    expect(frames.at(-1).pieces.find((piece: any) => piece.id === 'target').health.current).toBe(20)
+    // The following damage beat starts only after the physical movement beat;
+    // its result phase is 42ms at 2×.
+    vi.advanceTimersByTime(42)
+    expect(frames.at(-1).pieces.find((piece: any) => piece.id === 'target').health.current).toBe(17)
+    presentation.dispose()
+  })
+
+  it('keeps a long movement ahead of the next beat when playback slows from 2× to 1×', () => {
+    const { presentation, frames, queue } = setup()
+    const before: any = {
+      ...model(20),
+      pieces: [
+        { id: 'source', x: 0, y: 1, visible: true, health: { current: 10, max: 10 }, statuses: [], statusSummary: [] },
+        { id: 'target', x: 6, y: 1, visible: true, health: { current: 20, max: 20 }, statuses: [], statusSummary: [] },
+      ],
+    }
+    const sequence = [
+      { eventId: 'move:0', rootEventId: 'move:0', kind: 'move', sourcePieceId: 'source', sequence: 0,
+        result: { fromX: 0, fromY: 1, toX: 5, toY: 1, movementKind: 'walk' },
+        presentation: { pathCells: [{ x: 0, y: 1 }, { x: 5, y: 1 }] } },
+      { eventId: 'move:1', rootEventId: 'move:0', parentEventId: 'move:0', kind: 'damage', targetPieceIds: ['target'],
+        result: { amount: 3, value: 17 }, sequence: 1 },
+    ]
+    const after: any = { ...before, pieces: before.pieces.map((piece: any) => piece.id === 'source'
+      ? { ...piece, x: 5 }
+      : { ...piece, health: { current: 17, max: 20 } }), presentationEvents: sequence }
+    before.presentationEvents = []
+    queue.setSpeed(2)
+    presentation.update(before)
+    presentation.update(after)
+    vi.advanceTimersByTime(50)
+    queue.setSpeed(1)
+
+    vi.advanceTimersByTime(109)
+    expect(frames.at(-1).pieces.find((piece: any) => piece.id === 'target').health.current).toBe(20)
+    vi.advanceTimersByTime(1)
+    expect(frames.at(-1).pieces.find((piece: any) => piece.id === 'target').health.current).toBe(20)
+    vi.advanceTimersByTime(84)
+    expect(frames.at(-1).pieces.find((piece: any) => piece.id === 'target').health.current).toBe(17)
+    presentation.dispose()
+  })
+
   it.each(['statusAdded', 'statusRemoved', 'tileEffectAdded', 'tileEffectRemoved'])('renders every member of an explicit %s batch in the same update', kind => {
     const { presentation, frames, queue } = setup()
     const isTile = kind.startsWith('tile')

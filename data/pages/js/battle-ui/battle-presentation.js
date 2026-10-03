@@ -53,7 +53,10 @@
         renderer.update(playbackModel)
       }
       const movement = group.root.kind === 'move' || group.root.kind === 'forceMove'
-      if (!(phase === 'static' || phase === 'settle' || phase === (movement ? 'path' : 'result'))) return
+      // A movement beat starts its existing trajectory animation as soon as
+      // focus begins.  Damage/heal/status beats still wait for their result
+      // phase, preserving causal ordering after a preceding movement.
+      if (!(phase === 'static' || phase === 'settle' || phase === (movement ? 'focus' : 'result'))) return
       if (appliedBeats.has(group.rootEventId)) {
         if (phase === 'settle' && renderer.update && playbackModel) renderer.update(playbackModel)
         return
