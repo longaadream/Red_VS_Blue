@@ -55,7 +55,9 @@ export interface TargetConstraint {
   forbiddenColumns?: number[]
   forbiddenTargetStatuses?: string[]
   requiredTargetStatuses?: string[]
+  requiredTargetStatusFromSource?: string
   requireOpenCardinalLanding?: boolean
+  excludeSourceLanding?: boolean
   requireTraversableFirstStep?: boolean
   requireExtensionCell?: { path: string; sourceIdField?: string }
   ignoreOccupantSelectedTargetIndex?: number
@@ -175,7 +177,9 @@ export interface PendingTargetStep {
   forbiddenColumns?: number[]
   forbiddenTargetStatuses?: string[]
   requiredTargetStatuses?: string[]
+  requiredTargetStatusFromSource?: string
   requireOpenCardinalLanding?: boolean
+  excludeSourceLanding?: boolean
   requireTraversableFirstStep?: boolean
   requireExtensionCell?: { path: string; sourceIdField?: string }
   ignoreOccupantSelectedTargetIndex?: number
@@ -244,7 +248,9 @@ interface TargetSpec {
   forbiddenColumns?: number[]
   forbiddenTargetStatuses?: string[]
   requiredTargetStatuses?: string[]
+  requiredTargetStatusFromSource?: string
   requireOpenCardinalLanding?: boolean
+  excludeSourceLanding?: boolean
   requireTraversableFirstStep?: boolean
   requireExtensionCell?: { path: string; sourceIdField?: string }
   ignoreOccupantSelectedTargetIndex?: number
@@ -399,7 +405,9 @@ function getDeclaredSteps(definition: any, kind: 'skill' | 'card'): SelectionSte
         forbiddenColumns: Array.isArray(raw.forbiddenColumns) ? raw.forbiddenColumns : undefined,
         forbiddenTargetStatuses: Array.isArray(raw.forbiddenTargetStatuses) ? raw.forbiddenTargetStatuses : undefined,
         requiredTargetStatuses: Array.isArray(raw.requiredTargetStatuses) ? raw.requiredTargetStatuses : undefined,
+        requiredTargetStatusFromSource: typeof raw.requiredTargetStatusFromSource === 'string' ? raw.requiredTargetStatusFromSource : undefined,
         requireOpenCardinalLanding: raw.requireOpenCardinalLanding === true,
+        excludeSourceLanding: raw.excludeSourceLanding === true,
         requireTraversableFirstStep: raw.requireTraversableFirstStep === true,
         requireExtensionCell: raw.requireExtensionCell?.path
           ? { path: String(raw.requireExtensionCell.path), sourceIdField: raw.requireExtensionCell.sourceIdField == null ? undefined : String(raw.requireExtensionCell.sourceIdField) }
@@ -825,7 +833,14 @@ function validateSourceSpecificPiece(
   if (constraint.requiredTargetStatuses?.some(status => !hasStatus(target, status))) {
     return issue('TARGET_SOURCE_CONSTRAINT_FAILED', 'Target is missing a required status')
   }
-  if (constraint.requireOpenCardinalLanding && !hasOpenCardinalLanding(state, target, constraint.sourcePieceId)) {
+  if (constraint.requiredTargetStatusFromSource && !target.statusTags?.some(tag =>
+    (tag.type === constraint.requiredTargetStatusFromSource || tag.id === constraint.requiredTargetStatusFromSource)
+    && tag.sourceId === constraint.sourcePieceId,
+  )) {
+    return issue('TARGET_SOURCE_CONSTRAINT_FAILED', 'Target is missing a status from this source')
+  }
+  if (constraint.requireOpenCardinalLanding && !hasOpenCardinalLanding(state, target,
+    constraint.excludeSourceLanding ? undefined : constraint.sourcePieceId)) {
     return issue('TARGET_SOURCE_CONSTRAINT_FAILED', 'Target has no open cardinal landing cell')
   }
   return undefined
@@ -1330,7 +1345,9 @@ function pendingConstraint(pending: PendingTargetSelectionSession): TargetConstr
     forbiddenColumns: activeStep?.forbiddenColumns,
     forbiddenTargetStatuses: activeStep?.forbiddenTargetStatuses,
     requiredTargetStatuses: activeStep?.requiredTargetStatuses,
+    requiredTargetStatusFromSource: activeStep?.requiredTargetStatusFromSource,
     requireOpenCardinalLanding: activeStep?.requireOpenCardinalLanding,
+    excludeSourceLanding: activeStep?.excludeSourceLanding,
     requireTraversableFirstStep: activeStep?.requireTraversableFirstStep,
     requireExtensionCell: activeStep?.requireExtensionCell,
     ignoreOccupantSelectedTargetIndex: activeStep?.ignoreOccupantSelectedTargetIndex,
