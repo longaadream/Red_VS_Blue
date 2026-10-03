@@ -1,5 +1,7 @@
 # Same-map adventure single-player implementation
 
+> 2026-10-03, RED-235: the new fixed-route entry follows [PVE_FIXED_ROUTE.md](./PVE_FIXED_ROUTE.md), as explicitly requested in the current user session. The same-map implementation below remains the legacy mode and is not the contract for the new entry.
+
 ## 2026-09-10: three-act expansion and roaming encounters
 
 User requests both movement and site interaction on occupied special cells, unmistakable combat boundaries, larger arenas/maps, stronger IP enemies, visible rewards, at least five first-act encounters, both following acts and pursuing roaming enemies with kill rewards. This explicitly authorizes implementation of the extended single-player framework and configurable encounter numbers/economy defaults. Risk High: campaign transitions, rewards and encounter authority. Existing restrictions on new Linear transmissions remain; latest user scope supersedes the older one-act implementation limit. This amendment remains local.

@@ -6,20 +6,59 @@ let adventureStopped = false
 let adventureTimer = null
 let adventureEvents = []
 const adventureWaitByTurn = new Map()
+if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+  window.addEventListener('resize', () => {
+    if (adventureFixedRoute()) renderAdventureIntentDock()
+  })
+}
+function adventureFixedRoute() {
+  return typeof location !== 'undefined' && new URLSearchParams(location.search).get('fixedRoute') === '1'
+}
 
 function disposeAdventureBattle() {
   adventureStopped = true
   clearTimeout(adventureTimer)
   adventureClient?.dispose()
-  disposeAdventureWorld()
+  if (!adventureFixedRoute()) disposeAdventureWorld()
 }
 function adventureStatus(message, failed) {
   const bar = document.getElementById('adventureStatus')
   if (bar) { bar.textContent = message; bar.style.color = failed ? '#ffd0af' : '#ddc9a4' }
 }
+function renderFixedRouteWorld() {
+  if (!adventureFixedRoute()) return
+  renderAdventureWorld()
+  const wallet = document.getElementById('adventureWallet')
+  const siteActions = document.getElementById('adventureSiteActions')
+  if (siteActions) siteActions.hidden = true
+  if (adventureSnapshot?.state?.terminalResult) {
+    const hint = document.querySelector('#adventurePartyDock > small')
+    if (hint) hint.textContent = '战斗已结束 · 请选择奖励'
+  }
+  if (wallet) {
+    for (const selector of ['#adventureAct', '#adventureRewardButton', '#adventureMenuToggle', '#adventureRoomButton', '#adventureCoins', '#adventureMobileAp']) {
+      const item = wallet.querySelector(selector)
+      if (item) item.hidden = true
+    }
+    wallet.querySelectorAll('button').forEach(button => {
+      if (['地点', '手记', '冒险', '同行者'].includes(button.textContent.trim())) button.hidden = true
+    })
+  }
+  renderAdventureIntentDock()
+}
 function renderAdventureIntentDock() {
   const dock = document.getElementById('adventureIntentDock')
   if (!dock) return
+  if (adventureFixedRoute()) {
+    const menu = document.getElementById('btnSurrender')?.parentElement
+    const menuBottom = menu?.getBoundingClientRect().bottom || 58
+    const encounter = document.getElementById('adventureEncounter')
+    const encounterBottom = encounter && !encounter.hidden ? encounter.getBoundingClientRect().bottom : 0
+    dock.style.position = 'fixed'
+    dock.style.top = Math.max(70, menuBottom + 12, encounterBottom + 8) + 'px'
+    dock.style.left = '12px'
+    dock.style.right = 'auto'
+  }
   const world = adventureSnapshot?.world
   const state = adventureSnapshot?.state
   const enemyId = adventureSnapshot?.aiPlayerId || 'adventure-enemy'
@@ -93,6 +132,16 @@ function acceptAdventureSnapshot(result) {
   // Reset the menu before render derives legal moves from the new state.
   if (result.action?.playerId === result.humanPlayerId) restoreSelectedPieceMenu({ reopen: result.action.type === 'move' })
   render()
+  if (adventureFixedRoute()) {
+    renderFixedRouteWorld()
+    if (result.paused) pauseAdventure(new Error(result.paused))
+    else adventureStatus(result.route?.phase === 'result' ? '战斗已结算，返回路线页处理结果…' : (result.inputOwner === result.aiPlayerId ? '敌方按预告行动…' : '轮到你了'))
+    window.__RVB_ADVENTURE__ = Object.assign({}, window.__RVB_ADVENTURE__, {
+      revision: result.revision, inputOwner: result.inputOwner, paused: result.paused,
+      routePhase: result.route?.phase || 'battle',
+    })
+    return
+  }
   renderAdventureWorld()
   renderAdventureIntentDock()
   if (G.terminalResult) showAdventureResult()
@@ -107,6 +156,7 @@ function acceptAdventureSnapshot(result) {
 }
 async function initAdventureBattle() {
   try {
+    const fixedRoute = adventureFixedRoute()
     document.title = '旧城边境 · PVE - RED vs BLUE'
     const seedText = new URLSearchParams(location.search).get('seed')
     const setup = seedText === null ? {} : { seed: /^\d+$/.test(seedText) ? Number(seedText) : -1 }
@@ -143,6 +193,27 @@ async function initAdventureBattle() {
       })
     }
     document.getElementById('loadingOverlay').style.display = 'none'
+    if (fixedRoute) {
+      document.body.classList.add('fixed-route-battle')
+      // The fixed-route encounter spans the whole map. Start narrow screens at
+      // the captain instead of the empty map centre, and let Full Map use the
+      // shared battle renderer's normal fit-to-board control.
+      window.focusAdventureContext = () => false
+      if (window.matchMedia('(orientation: landscape) and (max-height: 600px)').matches) {
+        const captain = G.pieces.find(piece => piece.instanceId === adventureSnapshot.world.captainId)
+        if (captain?.x != null && captain?.y != null) window.BattleRenderer3D?.focusCell?.(captain.x, captain.y, 44)
+      }
+      const originalGoBack = window.goBack
+      window.goBack = function () {
+        if (window.parent && window.parent !== window) {
+          if (!window.confirm('退出战斗将结束本次固定路线，确定返回？')) return
+          adventureClient?.dispose()
+          window.top.location.href = 'pve-route.html'
+          return
+        }
+        if (typeof originalGoBack === 'function') originalGoBack()
+      }
+    }
     scheduleAdventureAI()
   } catch (error) {
     adventureStopped = true
@@ -170,7 +241,7 @@ function scheduleAdventureAI() {
         : { action: { type: 'beginPhase', playerId: myPlayerId }, revision: adventureSnapshot.revision })
       if (!adventureStopped) acceptAdventureSnapshot(result)
     } catch (error) { if (!adventureStopped) pauseAdventure(error) }
-    finally { adventureBusy = false; renderAdventureWorld(); scheduleAdventureAI() }
+    finally { adventureBusy = false; if (adventureFixedRoute()) renderFixedRouteWorld(); else renderAdventureWorld(); scheduleAdventureAI() }
   }, ai ? 350 : 0)
 }
 async function adventureDoAction(rawAction) {
@@ -201,9 +272,13 @@ async function adventureDoAction(rawAction) {
       setStatusMsg(error.message)
     }
     render()
-  } finally { adventureBusy = false; renderAdventureWorld(); scheduleAdventureAI() }
+  } finally { adventureBusy = false; if (adventureFixedRoute()) renderFixedRouteWorld(); else renderAdventureWorld(); scheduleAdventureAI() }
 }
 function showAdventureResult() {
+  if (adventureFixedRoute()) {
+    adventureStatus('战斗已结算，返回路线页处理结果…')
+    return
+  }
   if (!G?.terminalResult || recordSaved) return
   const winner = G.terminalResult.winnerPlayerId
   const won = winner === myPlayerId || G.terminalResult.winnerPlayerIds?.includes(myPlayerId)
