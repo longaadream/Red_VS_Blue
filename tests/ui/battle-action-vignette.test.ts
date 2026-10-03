@@ -980,6 +980,72 @@ it('plays each attribute increase and subsequent hit as its own beat', () => {
   expect(groups.every(group => group.children.length === 0)).toBe(true)
 })
 
+it('keeps the action banner visible without a full-screen veil during multi-target status playback', () => {
+  vi.useFakeTimers()
+  const vignetteModule = loadModule()
+  const floatLayer = new FakeElement()
+  const focusedTargets: string[] = []
+  const phases: string[] = []
+  const vignette = vignetteModule.create({
+    document: { createElement: () => new FakeElement() },
+  })
+  vignette.mount({
+    boardContainer: new FakeElement(),
+    floatLayer,
+    onPlaybackPhase: (phase: string, group: { root: { targetPieceIds?: string[] } }) => {
+      const targetId = group.root.targetPieceIds?.[0]
+      if (!targetId) return
+      phases.push(`${targetId}:${phase}`)
+      if (phase === 'focus') focusedTargets.push(targetId)
+    },
+  })
+  vignette.update({ presentationEvents: [], turn: { isViewerTurn: false } })
+  vignette.update({
+    viewer: { id: 'blue' },
+    pieces: [
+      { id: 'caster', ownerPlayerId: 'red', name: '施法者' },
+      { id: 'ally-a', ownerPlayerId: 'red' },
+      { id: 'ally-b', ownerPlayerId: 'red' },
+      { id: 'ally-c', ownerPlayerId: 'red' },
+    ],
+    skillSummariesById: { 'holy-charge': { name: '圣光充能' } },
+    turn: { isViewerTurn: false },
+    presentationEvents: [
+      root(1, { sourcePieceId: 'caster', skillId: 'holy-charge' }),
+      child(1, 1, { kind: 'statusAdded', targetPieceIds: ['ally-a'], statusType: 'damage-buff' }),
+      child(1, 2, { kind: 'statusAdded', targetPieceIds: ['ally-b'], statusType: 'damage-buff' }),
+      child(1, 3, { kind: 'statusAdded', targetPieceIds: ['ally-c'], statusType: 'damage-buff' }),
+    ],
+  })
+
+  const expectBannerWithoutVeil = () => {
+    const layer = floatLayer.children[0]
+    expect(layer.hidden).toBe(false)
+    expect(layer.innerHTML).toContain('battle-vignette-status')
+    expect(layer.innerHTML).not.toContain('battle-vignette-veil')
+  }
+
+  expectBannerWithoutVeil()
+  vi.advanceTimersByTime(36)
+  expectBannerWithoutVeil()
+  vi.advanceTimersByTime(48)
+  expectBannerWithoutVeil()
+  vi.advanceTimersByTime(76)
+  expectBannerWithoutVeil()
+  vi.advanceTimersByTime(vignetteModule.constants.compositeStepDurationMs)
+  expectBannerWithoutVeil()
+  vi.advanceTimersByTime(vignetteModule.constants.compositeStepDurationMs * 2)
+  expectBannerWithoutVeil()
+  expect(focusedTargets).toEqual(['ally-a', 'ally-b', 'ally-c'])
+  expect(phases).toEqual([
+    'ally-a:focus', 'ally-a:path', 'ally-a:result', 'ally-a:settle',
+    'ally-b:focus', 'ally-b:path', 'ally-b:result', 'ally-b:settle',
+    'ally-c:focus', 'ally-c:path', 'ally-c:result', 'ally-c:settle',
+  ])
+  vignette.dispose()
+  vi.useRealTimers()
+})
+
 it('plays the same status applied to multiple targets in separate beats', () => {
   const groups = loadModule().groupEvents([root(1), ...['a', 'b', 'c'].map((id, index) => child(1, index + 1, { kind: 'statusAdded', statusType: 'empowered', sourcePieceId: 'caster', targetPieceIds: [id] }))])
   expect(groups).toHaveLength(4)
