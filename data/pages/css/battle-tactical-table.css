@@ -747,3 +747,312 @@ canvas:focus-visible {
 }
 .skill-preview-badge[hidden] { display: none; }
 .piece-context-skill, .character-cast { touch-action: none; }
+
+/* RED-225: keep the existing character sheet as the reading surface while
+   making each active skill card a click affordance. The existing action
+   button still owns the title, cost and drag entry; body copy remains text
+   selectable and keyword/target controls keep their own interaction. */
+body.character-dock-open #pieceInfoModal.character-dock .pi-skill:has(.character-cast) {
+  position: relative !important;
+  padding-bottom: 10px !important;
+  cursor: pointer;
+}
+
+body.character-dock-open #pieceInfoModal.character-dock .pi-skill:has(.character-cast) .pi-skill-desc {
+  cursor: text;
+  user-select: text;
+}
+
+body.character-dock-open #pieceInfoModal.character-dock .pi-skill:has(.character-cast) .pi-keywords,
+body.character-dock-open #pieceInfoModal.character-dock .pi-skill:has(.character-cast) #targetSelectionControls {
+  cursor: default;
+}
+
+body.character-dock-open #pieceInfoModal.character-dock .pi-skill:has(.character-cast) .character-cast {
+  position: static !important;
+  display: grid !important;
+  /* Keep the complete skill title/type on the first row and the existing
+     resource/cooldown line on the second. A single column also prevents
+     longer names from being squeezed beside their cost metadata. */
+  grid-template-columns: minmax(0, 1fr) !important;
+  grid-template-rows: auto auto !important;
+  align-items: center !important;
+  gap: 6px !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  min-height: 40px !important;
+  height: auto !important;
+  margin: 0 0 4px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: inherit !important;
+  font: inherit !important;
+  opacity: 1 !important;
+  text-align: left !important;
+  cursor: pointer;
+}
+
+body.character-dock-open #pieceInfoModal.character-dock .pi-skill:has(.character-cast) .character-cast::before {
+  content: none !important;
+}
+
+body.character-dock-open #pieceInfoModal.character-dock .pi-skill:has(.character-cast) .character-cast .pi-skill-header {
+  grid-column: 1 !important;
+  grid-row: 1 !important;
+  min-width: 0;
+  margin-bottom: 0 !important;
+}
+
+body.character-dock-open #pieceInfoModal.character-dock .pi-skill:has(.character-cast) .character-cast .pi-skill-meta {
+  grid-column: 1 !important;
+  grid-row: 2 !important;
+  min-width: 0;
+  margin-top: 0 !important;
+  padding-right: 0 !important;
+  text-align: left;
+}
+
+body.character-dock-open #pieceInfoModal.character-dock .pi-skill:has(.character-cast) .character-cast .pi-skill-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+body.character-dock-open #pieceInfoModal.character-dock .pi-skill:has(.character-cast:hover) {
+  outline: 2px solid var(--battle-focus);
+  outline-offset: 1px;
+}
+
+body.character-dock-open #pieceInfoModal.character-dock .pi-skill.is-targeting-skill {
+  outline: 2px solid var(--battle-focus);
+  outline-offset: 1px;
+}
+
+/* A single instruction uses the existing font with a local readable color and
+   glyph outline, without a card, backdrop or input interception. Only action
+   controls enter the sheet. */
+body #targetOverlay {
+  position: fixed !important;
+  inset: 92px 16px auto !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  width: auto !important;
+  background: none !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  pointer-events: none !important;
+  justify-content: center !important;
+  z-index: 90 !important;
+}
+body #targetOverlay #targetPromptText {
+  margin: 0 !important;
+  padding: 0 !important;
+  font-size: 18px !important;
+  line-height: 1.5;
+  font-weight: 900 !important;
+  color: #ffe08a !important;
+  background: none !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  -webkit-text-stroke: 2px #16110d;
+  paint-order: stroke fill;
+  text-shadow: -1px 0 #16110d, 1px 0 #16110d, 0 -1px #16110d, 0 1px #16110d;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+body.target-mode-active #opponentHandStack { visibility: hidden !important; }
+body.target-mode-active #statusMsg,
+body.target-mode-active #dmBubble { display: none !important; }
+body #targetSelectionControls {
+  display: none;
+  position: fixed;
+  left: 16px;
+  bottom: 84px;
+  gap: 8px;
+  padding: 8px;
+  z-index: 90;
+  pointer-events: auto;
+}
+body #targetSelectionControls.show { display: flex; flex-wrap: wrap; }
+body #targetSelectionControls .target-multi-summary { flex-basis: 100%; }
+body #targetSelectionControls button { min-height: 48px !important; }
+body.character-dock-open #pieceInfoModal.character-dock .pi-layout {
+  position: relative !important;
+}
+
+body.target-mode-active #pieceInfoModal.character-dock .pi-layout {
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+body.target-mode-active #pieceInfoModal.character-dock .pi-layout > .pi-sheet {
+  min-height: 0 !important;
+  height: auto !important;
+  flex: 1 1 auto !important;
+}
+
+body.character-dock-open #pieceInfoModal.character-dock .pi-layout > #targetSelectionControls {
+  position: static !important;
+  flex: 0 0 auto !important;
+  align-self: stretch !important;
+  width: 100% !important;
+  box-sizing: border-box;
+  display: none;
+  align-items: stretch !important;
+  padding: 8px !important;
+  gap: 8px !important;
+  background: transparent !important;
+  pointer-events: auto !important;
+  z-index: 8;
+}
+
+body.character-dock-open #pieceInfoModal.character-dock .pi-layout > #targetSelectionControls.show {
+  display: flex !important;
+}
+
+body.character-dock-open #pieceInfoModal.character-dock .target-cancel-btn {
+  min-height: 48px !important;
+}
+
+/* Target controls belong to the active skill's title action area. They stay
+   siblings of .character-cast and are inserted before the description so
+   cancelling cannot trigger the release button or its drag handler. */
+body.character-dock-open #pieceInfoModal.character-dock .pi-skill.target-skill-controls > #targetSelectionControls {
+  position: static !important;
+  inset: auto !important;
+  width: 100% !important;
+  box-sizing: border-box;
+  display: none;
+  flex: 0 0 auto !important;
+  align-self: stretch !important;
+  margin: 4px 0 0 !important;
+  padding: 0 !important;
+  gap: 8px !important;
+  z-index: 8;
+  pointer-events: auto !important;
+}
+
+body.character-dock-open #pieceInfoModal.character-dock .pi-skill.target-skill-controls > #targetSelectionControls.show {
+  display: flex !important;
+  flex-wrap: wrap;
+}
+
+body.character-dock-open #pieceInfoModal.character-dock .pi-skill.target-skill-controls > #targetSelectionControls button {
+  min-height: 48px !important;
+}
+
+body.character-dock-open #pieceInfoModal.character-dock .character-cast.is-cancel-mode .pi-skill-meta,
+body.character-dock-open #pieceInfoModal.character-dock .character-cast.is-cancel-disabled .pi-skill-meta {
+  min-height: 22px;
+  font-size: 16px !important;
+  font-weight: 900 !important;
+  line-height: 1.35;
+  letter-spacing: .2px;
+  color: var(--comic-ink, #30231c) !important;
+}
+
+body.character-dock-open #pieceInfoModal.character-dock .character-cast.is-cancel-disabled .pi-skill-meta {
+  color: var(--battle-text-muted, #655443) !important;
+}
+
+/* Card/rule targeting still uses the body fallback. Keep it above the mobile
+   hand toggles when no skill row is available. */
+body #targetSelectionControls { z-index: 110; }
+
+@media (min-width: 761px) and (min-height: 601px) {
+  /* Give the reading surface enough vertical room for the existing header,
+     stats and several skill descriptions while keeping the hand reachable. */
+  body.target-mode-active.character-dock-open #pieceInfoModal.character-dock {
+    top: 110px !important;
+    /* The print skin's hand is a centered visual layer and can be 290px
+       tall; it does not occupy the left dock's vertical space. */
+    bottom: 84px !important;
+  }
+}
+
+/* Reserve space for the same reading surface rather than placing it over
+   selectable board cells. ResizeObserver in the renderer refits the board. */
+@media (orientation: landscape) and (max-height: 600px) {
+  body.character-dock-open #pieceInfoModal.character-dock {
+    inset: 56px auto max(8px, env(safe-area-inset-bottom)) max(6px, env(safe-area-inset-left)) !important;
+    width: min(288px, 36vw) !important;
+  }
+  body.character-dock-open #boardWrap {
+    left: calc(min(288px, 36vw) + 16px + env(safe-area-inset-left)) !important;
+  }
+}
+
+@media (max-width: 760px) and (orientation: portrait) {
+  body > :not(#orientationGuard):not(script):not(style) { visibility: visible !important; }
+  body #orientationGuard { display: none !important; }
+  body:not(.full-map) .topbar {
+    position: fixed !important;
+    inset: 52px 8px auto 8px !important;
+    width: auto !important;
+    max-width: none !important;
+    height: 44px !important;
+    min-height: 0 !important;
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    pointer-events: none !important;
+  }
+  body:not(.full-map) .topbar > * { pointer-events: auto !important; flex-shrink: 0; }
+  body #tileStatusPanel {
+    inset: 104px auto auto 8px !important;
+    width: 140px !important;
+    height: auto !important;
+    max-height: 80px !important;
+    overflow: auto;
+  }
+  body #boardWrap {
+    position: fixed !important;
+    inset: 100px 0 110px !important;
+    width: auto !important;
+    height: auto !important;
+  }
+  body.character-dock-open #pieceInfoModal.character-dock {
+    inset: auto 8px 76px !important;
+    width: auto !important;
+    height: min(46dvh, 400px) !important;
+  }
+  body.character-dock-open #boardWrap {
+    bottom: calc(min(46dvh, 400px) + 88px) !important;
+  }
+  body.character-dock-open #pieceInfoModal.character-dock #pieceKeywordPanel {
+    inset: auto 12px 84px !important;
+    width: calc(100vw - 24px) !important;
+    max-height: 32dvh !important;
+  }
+}
+
+@media (max-width: 760px), (orientation: landscape) and (max-height: 600px) {
+  body.target-mode-active #mobileHandToggle,
+  body.target-mode-active #mobileDockToggle { visibility: hidden !important; pointer-events: none !important; }
+  body.character-dock-open #pieceInfoModal.character-dock .pi-sheet { touch-action: pan-y; }
+  body.character-dock-open #pieceInfoModal.character-dock .pi-header {
+    grid-template-columns: 40px minmax(0, 1fr) 44px !important;
+    min-height: 44px !important;
+    padding: 0 0 6px !important;
+  }
+  body.character-dock-open #pieceInfoModal.character-dock .character-portrait { width: 38px; height: 38px; }
+  body.target-mode-active #pieceInfoModal.character-dock .pi-piece-state { display: none; }
+  body #targetOverlay { top: calc(env(safe-area-inset-top) + 10px) !important; }
+  body #targetOverlay #targetPromptText { font-size: 16px !important; }
+}
+
+/* The reading sheet remains present while the target session is active on
+   touch layouts.  The old target-mode rule hid this sheet to make room for a
+   fullscreen overlay; the in-sheet footer now provides that room. */
+@media (max-width: 760px), (orientation: landscape) and (max-height: 600px) {
+  body.target-mode-active.character-dock-open #pieceInfoModal.character-dock {
+    display: flex !important;
+    visibility: visible !important;
+  }
+}

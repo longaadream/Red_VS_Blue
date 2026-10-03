@@ -171,7 +171,12 @@ describe('RED-68 renderer and responsive UI contract', () => {
     expect(battlePage).toContain('css/battle-tactical-table.css')
     expect(tacticalCss).toContain('--battle-metal-edge')
     expect(tacticalCss).toContain('env(safe-area-inset-bottom)')
-    expect(tacticalCss).not.toMatch(/#orientationGuard\s*\{[^}]*display:\s*none\s*!important/)
+    // Portrait is playable in the current responsive contract. The legacy
+    // rotation dialog remains as a fallback in battle.html, while the final
+    // tactical layer explicitly reveals the board and suppresses that dialog
+    // on narrow portrait viewports.
+    expect(tacticalCss).toMatch(/@media \(max-width:\s*760px\)\s+and\s+\(orientation:\s*portrait\)[\s\S]*?body > :not\(#orientationGuard\):not\(script\):not\(style\)\s*\{\s*visibility:\s*visible\s*!important/)
+    expect(tacticalCss).toMatch(/@media \(max-width:\s*760px\)\s+and\s+\(orientation:\s*portrait\)[\s\S]*?body #orientationGuard\s*\{\s*display:\s*none\s*!important/)
     expect(battlePage).toMatch(/@media \(orientation:\s*portrait\)[\s\S]*?#orientationGuard\s*\{\s*display:\s*grid/)
     expect(battlePage).toContain('id="orientationGuard" role="dialog" aria-modal="true"')
     expect(battlePage).toMatch(/body > :not\(#orientationGuard\):not\(script\):not\(style\)\s*\{\s*visibility:\s*hidden\s*!important/)

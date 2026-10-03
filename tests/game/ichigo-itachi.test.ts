@@ -535,7 +535,7 @@ describe('RED-120 Itachi combat behavior', () => {
 
     expect(state.extensions?.amaterasuCells).toEqual([{ x: 3, y: 0 }])
     expect(state.extensions?.tileEffects).toContainEqual(expect.objectContaining({ x: 3, y: 0, tileType: 'amaterasu' }))
-    expect(target.statusTags).toContainEqual(expect.objectContaining({ type: 'amaterasu-burn', stacks: 1 }))
+    expect(target.statusTags).toContainEqual(expect.objectContaining({ type: 'amaterasu-burn', stacks: 1, intensity: 1 }))
     expect(state.players[0].rules?.map(rule => rule.id)).toEqual(expect.arrayContaining([
       'rule-sasuke-amaterasu-move', 'rule-sasuke-amaterasu-stack', 'rule-sasuke-amaterasu-damage',
     ]))
@@ -543,6 +543,20 @@ describe('RED-120 Itachi combat behavior', () => {
     executeDirect(loadSkill('sasuke-kagutsuchi'), state, itachi, target)
     expect(state.extensions?.amaterasuCells).toEqual([])
     expect(target.statusTags.find((tag: any) => tag.type === 'amaterasu-burn')?.stacks).toBe(4)
+  })
+
+  it('adds exactly one layer to an existing Amaterasu status without duplicating it', () => {
+    const itachi = namedPiece({ instanceId: 'itachi', ownerPlayerId: 'player-red', x: 0, y: 0 })
+    const target = namedPiece({ instanceId: 'target', ownerPlayerId: 'player-blue', x: 3, y: 0 })
+    target.statusTags.push({ id: 'existing-burn', type: 'amaterasu-burn', stacks: 3, intensity: 1 })
+    const state = makeState({ pieces: [itachi, target], width: 6, height: 2 })
+
+    executeDirect(loadSkill('itachi-amaterasu'), state, itachi, target)
+
+    expect(target.statusTags.filter((tag: any) => tag.type === 'amaterasu-burn')).toEqual([
+      expect.objectContaining({ id: 'existing-burn', stacks: 4, intensity: 1 }),
+    ])
+    expect(state.extensions?.amaterasuCells).toEqual([{ x: 3, y: 0 }])
   })
 
   it('pays for Totsuka Blade and keeps active skills unavailable throughout the next enemy turn', () => {

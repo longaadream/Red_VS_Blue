@@ -8,6 +8,7 @@ import { getRuleMath } from './rule-runtime'
 import { areMatchAllies } from './match-teams'
 import { createSkillPresentation } from './skill-presentation'
 import { appendTileEffectsBatch, resolveTileEffectPresentation, type TileEffectPresentationMode } from './charge-crystals'
+import { observeProjectilePath } from './battle-presentation-recording'
 export type FlowSurface = 'skill' | 'rule' | 'triggerSkill' | 'pending' | 'card'
 type Delegate = Record<string, (...args: any[]) => any>
 /** Called at formal removal; revival creates a new incarnation. */
@@ -102,7 +103,7 @@ export function createFlowRuntime(battle: BattleState, context: any, surface: Fl
       },
       distance: (a: string, b: string) => manhattanDistance(piece(a) as any, piece(b) as any),
       random: <T>(items: readonly T[]): T | null => items.length ? items[Math.floor(getRuleMath().random() * items.length)] : null,
-      path: (origin: { x: number; y: number }, direction: { x: number; y: number }, options?: { maxDistance?: number; excludePieceId?: string }) => traceProjectile(battle, origin, direction, options),
+      path: (origin: { x: number; y: number }, direction: { x: number; y: number }, options?: { maxDistance?: number; excludePieceId?: string }) => observeProjectilePath(origin, direction, options, traceProjectile(battle, origin, direction, options)),
       normalMoveTargets: (pieceId: string) => getLegalNormalMoveTargets(battle, piece(pieceId)),
       tracePath: (origin: GridPosition, direction: GridPosition, options: MovementTraceOptions) => traceMovementPath(battle, origin, direction, options),
       landingCells: (candidates: GridPosition[], movingPieceIds: string[] = []) => getLegalSkillLandingCells(battle, candidates, {

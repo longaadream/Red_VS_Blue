@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40" role="img" aria-label="RED BLUE target cursor">
+  <defs>
+    <clipPath id="cursor-arrow">
+      <path d="M3 3v29l8-8 6 12 6-3-6-12h15z"/>
+    </clipPath>
+  </defs>
+  <path d="M3 3v29l8-8 6 12 6-3-6-12h15z" fill="#f6e8c2" stroke="#171412" stroke-width="4.6" stroke-linejoin="round"/>
+  <g clip-path="url(#cursor-arrow)">
+    <path d="M-4-4h48v27L-4 10z" fill="#b64240"/>
+    <path d="M-4 10 44 27v17H-4z" fill="#3f6674"/>
+    <circle cx="13" cy="13" r="5" fill="#171412" opacity=".9"/>
+    <path d="M5 13h16M13 5v16" fill="none" stroke="#171412" stroke-width="3.4" stroke-linecap="round"/>
+    <circle cx="13" cy="13" r="4.2" fill="none" stroke="#f4cb76" stroke-width="1.45"/>
+    <path d="M6 13h14M13 6v14" fill="none" stroke="#f4cb76" stroke-width="1.2" stroke-linecap="round"/>
+  </g>
+  <path d="M3 3v29l8-8 6 12 6-3-6-12h15z" fill="none" stroke="#fff1ce" stroke-width="1.15" stroke-linejoin="round" opacity=".95"/>
+</svg>
