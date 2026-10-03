@@ -49,6 +49,17 @@ AI 探索对照：真实 seed 18707、红方首次部署 training-red-1 到 (1,1
 
 结论：守护消耗的模拟与评分在上述对照正常；累计预算可导致未比较普通行动便结束。原玩家部署后立即空过仍未精确复现，验收第3项仍未完成。本轮为专项调查，不宣称修复。不通过强制动作、重置累计预算或增大时间上限掩盖问题。
 
-## 回退
+## 默认计时查证与异常输入保存（2026-10-03）
+
+- 四种合法玩家部署路线、seed18707、至第12回合，共24个AI回合，均至少执行两个普通动作；未复现开局只部署就结束。
+- 独立默认计时回放第8回合：AI已执行两个普通动作，剩2AP，搜索返回 endTurn、time-budget、overTurnBudget=true、nodes=0。逐一正式模拟全部合法根候选，13个普通动作收益高于正式结束回合基线；同一状态取消时间截止后选择 useBasicSkill、93节点。该局面的 SHA-256 为 47345BBCD94043B2339EFC79FB488ED6BCC11C360F77F15C21452972EB74FF34。完整局面及比较结果保存在 output/RED234/focus-turn-8-beforestate.json 和 focus-end-comparisons.json。耗时受运行环境影响，不能把动作数或时间作为跨机器确定性断言。
+- 此证据确认累计预算可造成有益动作未比较即结束，不等同于用户零普通动作案例，验收第3项仍未完整验证。艾露恩守护并非上述案例的已证实原因。
+- 新候选只增加有界本地取证。显式开启 tutorialPerf=1 的 loopback 教程页面，保存前两次零普通动作结束，或累计时间耗尽且剩AP的结束输入。input continuation 在覆盖返回 continuation 前复制；页面同步深拷贝局面并删除 skillsById 展示缓存。原20条性能记录滚动保留快照，不上传数据、不更改AI策略。
+- 浏览器受控验收使用蓝方0AP、无手牌且无免费移动的局面，合法动作仅 endTurn；这是正确结束的取证功能测试，不是用户Bug复现。正式Worker结果保存决策前第2回合状态、输入普通动作数0、input continuation=null，返回 continuation 为1节点，随后进入玩家第3回合。
+- 保存的浏览器 JSON 经 Node 中正式 planTutorialAiAction 重放，仍选择 endTurn、selected、1节点；正式隔离规则模拟接受操作并进入 end 阶段。证据为 output/RED234/browser-capture-records.json、browser-capture-replay-result.json、browser-capture-smoke.png。
+- 取证相关教程测试28通过，独立审查两套19通过（与前者重叠）；typecheck、定向 ESLint、check:encoding、diff检查通过。typecheck 首次被忽略目录中调查脚本的两处隐式any阻挡，补充脚本类型后通过；没有修改产品类型来掩盖错误。
+- 正常诊断入口：http://127.0.0.1:38680/battle.html?mode=tutorial&lesson=tactical-intuition&practice=1&tutorialPerf=1 。不含 qaReplay，不加载人工修改的0AP局面。原玩家对局未刷新或操作。若再出现只部署结束，保留该页面即可读取前两份输入。
+
+## 回退方式
 
 仅撤销 RED-234 局部提交，保留 RED-232、RED-233；无数据迁移。不合并或发布。真实玩家体验由负责人验收。

@@ -17,7 +17,7 @@ class Element {
   remove() { this.removed = true }
 }
 
-function fixture({ practiceOnly = false, owner = 'human', phase = 'action', deployment = undefined } = {}) {
+function fixture({ practiceOnly = false, owner = 'human', phase = 'action', deployment = undefined, captureAiReplay = false } = {}) {
   let current = {
     turn: { phase, turnNumber: 1, currentPlayerId: owner },
     owner,
@@ -53,6 +53,7 @@ function fixture({ practiceOnly = false, owner = 'human', phase = 'action', depl
   }
   const hooks = {
     practiceOnly,
+    captureAiReplay,
     getState: () => current,
     engine: async () => engine,
     search: vi.fn(async ({ state: searchState, playerId, rootSeed, continuation, actionsTakenThisTurn }) =>
@@ -193,6 +194,117 @@ describe('RED-230 tactical tutorial runtime', () => {
       expect(details.continuation).not.toBe(f.engine.planTutorialAiAction.mock.results[0].value.continuation)
       trace[0].candidateId = 'mutated'
       expect(details.trace[0].candidateId).toBe('root-end')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('captures the decision input before a zero-action end turn when opted in', async () => {
+    vi.useFakeTimers()
+    try {
+      const f = fixture({ practiceOnly: true, owner: 'opponent', captureAiReplay: true })
+      const outputContinuation = { turnKey: 'opponent:1:opponent', nodes: 9, elapsedMs: 18 }
+      f.engine.planTutorialAiAction.mockReturnValue({
+        nextAction: { action: { type: 'endTurn', playerId: 'opponent' } },
+        continuation: outputContinuation,
+        nodes: 2, considered: 3, elapsedMs: 5, stopReason: 'selected',
+      })
+      const before = f.state()
+      f.click('开始实战')
+      await vi.advanceTimersByTimeAsync(3000)
+      const details = f.hooks.onAiDecisionResult.mock.calls[0][0]
+      expect(details.replayInput).toMatchObject({
+        rootSeed: 18707,
+        playerId: 'opponent',
+        actionsTakenThisTurn: 0,
+        continuation: null,
+        state: before,
+      })
+      expect(details.replayInput.continuation).not.toBe(outputContinuation)
+      expect(details.replayResult).toMatchObject({ action: { type: 'endTurn', playerId: 'opponent' } })
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('copies the incoming continuation before capturing the end-turn result', async () => {
+    vi.useFakeTimers()
+    try {
+      const f = fixture({ practiceOnly: true, owner: 'opponent', captureAiReplay: true })
+      const firstContinuation = { turnKey: 'opponent:1:opponent', nodes: 4, elapsedMs: 8 }
+      const outputContinuation = { turnKey: 'opponent:1:opponent', nodes: 9, elapsedMs: 18 }
+      f.engine.planTutorialAiAction
+        .mockReturnValueOnce({
+          nextAction: { action: { type: 'deployReservePiece', playerId: 'opponent', pieceId: 'enemy' } },
+          continuation: firstContinuation,
+          nodes: 2, considered: 3, elapsedMs: 5, stopReason: 'selected',
+        })
+        .mockReturnValueOnce({
+          nextAction: { action: { type: 'endTurn', playerId: 'opponent' } },
+          continuation: outputContinuation,
+          nodes: 1, considered: 1, elapsedMs: 3, stopReason: 'selected',
+        })
+      f.click('开始实战')
+      await vi.advanceTimersByTimeAsync(6000)
+      const details = f.hooks.onAiDecisionResult.mock.calls[1][0]
+      expect(details.replayInput.continuation).toEqual(firstContinuation)
+      expect(details.replayInput.continuation).not.toBe(firstContinuation)
+      expect(details.replayInput.continuation).not.toEqual(outputContinuation)
+      firstContinuation.nodes = 99
+      expect(details.replayInput.continuation.nodes).toBe(4)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('does not attach replay input to ordinary actions or an end turn after an accepted action', async () => {
+    vi.useFakeTimers()
+    try {
+      const f = fixture({ practiceOnly: true, owner: 'opponent', captureAiReplay: true })
+      f.engine.planTutorialAiAction
+        .mockReturnValueOnce({
+          nextAction: { action: { type: 'move', playerId: 'opponent', pieceId: 'enemy', toX: 4, toY: 1 } },
+          continuation: { turnKey: 'opponent:1:opponent', nodes: 2, elapsedMs: 4 },
+          nodes: 2, considered: 3, elapsedMs: 4, stopReason: 'selected',
+        })
+        .mockReturnValueOnce({
+          nextAction: { action: { type: 'endTurn', playerId: 'opponent' } },
+          continuation: { turnKey: 'opponent:1:opponent', nodes: 3, elapsedMs: 8 },
+          nodes: 1, considered: 1, elapsedMs: 4, stopReason: 'selected',
+        })
+      f.click('开始实战')
+      await vi.advanceTimersByTimeAsync(6000)
+      expect(f.hooks.onAiDecisionResult.mock.calls[0][0].replayInput).toBeUndefined()
+      expect(f.hooks.onAiDecisionResult.mock.calls[1][0].replayInput).toBeUndefined()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('captures a budget exhausted end turn with remaining AP after prior actions', async () => {
+    vi.useFakeTimers()
+    try {
+      const f = fixture({ practiceOnly: true, owner: 'opponent', captureAiReplay: true })
+      f.setState({
+        ...f.state(),
+        players: f.state().players.map(player => player.playerId === 'opponent'
+          ? { ...player, actionPoints: 1 }
+          : player),
+      })
+      f.engine.planTutorialAiAction
+        .mockReturnValueOnce({
+          nextAction: { action: { type: 'move', playerId: 'opponent', pieceId: 'enemy', toX: 4, toY: 1 } },
+          continuation: { turnKey: 'opponent:1:opponent', nodes: 2, elapsedMs: 4 },
+          nodes: 2, considered: 3, elapsedMs: 4, stopReason: 'selected',
+        })
+        .mockReturnValueOnce({
+          nextAction: { action: { type: 'endTurn', playerId: 'opponent' } },
+          continuation: { turnKey: 'opponent:1:opponent', nodes: 3, elapsedMs: 9 },
+          nodes: 0, considered: 10, elapsedMs: 5, stopReason: 'time-budget', overTurnBudget: true,
+        })
+      f.click('开始实战')
+      await vi.advanceTimersByTimeAsync(6000)
+      expect(f.hooks.onAiDecisionResult.mock.calls[1][0].replayInput).toMatchObject({ actionsTakenThisTurn: 1 })
     } finally {
       vi.useRealTimers()
     }
