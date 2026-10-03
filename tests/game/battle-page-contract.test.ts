@@ -909,7 +909,7 @@ new Script([
     const battlePage = readPage('battle.html')
 
     expect(battlePage).toContain(
-      "const iconPath = t.iconPath || t.assetPath || meta.assetPath || 'images/effect-icons/fallback.svg'",
+      "const iconPath = meta.assetPath || 'images/effect-icons/fallback.svg'",
     )
     expect(battlePage).toContain('class="pi-status-icon-image" src="${escHtml(iconPath)}"')
     expect(battlePage).toContain("const description = t.description || meta.description || ''")

@@ -128,7 +128,7 @@ describe('battle piece health and negative-status summary', () => {
     expect(details).toHaveLength(5)
     expect(details[0]).toMatchObject({
       id: 'amaterasu-1',
-      label: 'Amaterasu',
+      label: '天照',
       stacks: 3,
       duration: 2,
       description: '',
