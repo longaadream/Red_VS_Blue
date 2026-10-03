@@ -53,7 +53,7 @@ type RendererApi = {
   setTutorialCue(cue: { blockedCells?: Array<{x:number;y:number}>; cells?: Array<{ x: number; y: number }>; path?: Array<{ x: number; y: number }> }): void
   clearTutorialCue(): void
   screenToCell(clientX: number, clientY: number): { x: number; y: number } | null
-  showPresentationAreaFlash(cells: Array<{ x: number; y: number }>): void
+  showPresentationAreaFlash(cells: Array<{ x: number; y: number }>, options?: { transient?: boolean }): void
   clearPresentationAreaFlash(): void
   showPresentationPath(path: { source?: { x: number; y: number }; end?: { x: number; y: number }; selected?: { x: number; y: number } }): void
   showPresentationPaths(paths: Array<{ source: { x: number; y: number }; end: { x: number; y: number } }>): void
@@ -140,6 +140,8 @@ type RuntimePieceFixture = {
 
 type RuntimeModelFixture = {
   board: {
+    width: number
+    height: number
     [key: string]: unknown
     tiles: Array<{ props: { [key: string]: unknown; type: string } }>
   }
@@ -804,7 +806,7 @@ describe('RED-68 BattleRenderer3D runtime', () => {
     harness.renderer.dispose()
   })
 
-  it('flashes area cells with board-aligned overlays without breaking instanced terrain', () => {
+  it('keeps area flashes as ink-only overlays without pulsing the board fill', () => {
     const harness = createHarness(1280, 720, false)
     const model = runtimeModel()
     const authorityBefore = JSON.stringify(model)
@@ -815,21 +817,48 @@ describe('RED-68 BattleRenderer3D runtime', () => {
     const terrainBatches = scene.children.filter(child => child.isInstancedMesh)
     const originalTerrainMaterials = terrainBatches.map(batch => batch.material)
 
+    const assertInkOnlyArea = (expectedCount: number) => {
+      const flashes = scene.children.filter(child => child.userData.presentationAreaFlash === true)
+      expect(flashes).toHaveLength(expectedCount)
+      flashes.forEach((flash) => {
+        expect(flash.material!.emissive.getHex()).toBe(0xd09a52)
+        expect(flash.material!.opacity).toBe(0)
+        expect(flash.material!.emissiveIntensity).toBe(0)
+        expect(flash.children).toHaveLength(1)
+        expect(flash.children[0].type).toBe('LineSegments')
+        expect(flash.children[0].material!.opacity).toBe(0.85)
+      })
+      expect(harness.renderer.getMotionDiagnostics().activeAnimations).not.toContain('presentation:area:intensity')
+      return flashes
+    }
+
     harness.renderer.showPresentationAreaFlash([
       { x: 2, y: 2 }, { x: 2, y: 3 }, { x: 2, y: 4 }, { x: 2, y: 3 },
     ])
-    for (let index = 0; index < 4; index += 1) harness.frame(40)
     expect(harness.renderer.getMotionDiagnostics().presentationAreaCellCount).toBe(3)
-    const flashes = scene.children.filter(child => child.userData.presentationAreaFlash === true)
-    expect(flashes).toHaveLength(3)
-    flashes.forEach((flash) => {
-      expect(flash.material!.emissive.getHex()).toBe(0xd09a52)
-      expect(flash.material!.emissiveIntensity).toBeGreaterThan(0)
-      expect(flash.children).toHaveLength(1)
-    })
+    let flashes = assertInkOnlyArea(3)
     expect(flashes.map(flash => flash.userData.presentationAreaCell)).toEqual([
       { x: 2, y: 2 }, { x: 2, y: 3 }, { x: 2, y: 4 },
     ])
+    for (let index = 0; index < 4; index += 1) {
+      harness.frame(40)
+      assertInkOnlyArea(3)
+    }
+
+    const fullMap = Array.from({ length: model.board.width * model.board.height }, (_, index) => ({
+      x: index % model.board.width,
+      y: Math.floor(index / model.board.width),
+    }))
+    harness.renderer.showPresentationAreaFlash(fullMap)
+    expect(harness.renderer.getMotionDiagnostics().presentationAreaCellCount).toBe(fullMap.length)
+    flashes = assertInkOnlyArea(fullMap.length)
+    for (let index = 0; index < 4; index += 1) {
+      harness.frame(40)
+      assertInkOnlyArea(fullMap.length)
+    }
+    harness.renderer.showPresentationAreaFlash([{ x: 0, y: 0 }], { transient: true })
+    expect(harness.renderer.getMotionDiagnostics().presentationAreaCellCount).toBe(fullMap.length)
+    expect(scene.children.filter(child => child.userData.presentationAreaFlash === true)).toHaveLength(fullMap.length)
     terrainBatches.forEach((batch, index) => expect(batch.material).toBe(originalTerrainMaterials[index]))
     expect(JSON.stringify(model)).toBe(authorityBefore)
 
@@ -837,6 +866,37 @@ describe('RED-68 BattleRenderer3D runtime', () => {
     expect(harness.renderer.getMotionDiagnostics().presentationAreaCellCount).toBe(0)
     flashes.forEach(flash => expect(scene.children).not.toContain(flash))
     harness.renderer.dispose()
+  })
+
+  it('keeps reduced-motion area feedback ink-only and expires standalone transient flashes', () => {
+    vi.useFakeTimers()
+    try {
+      const harness = createHarness(1280, 720, false, true)
+      const model = runtimeModel()
+      harness.renderer.init({ container: harness.container })
+      harness.renderer.update(model)
+      harness.frame(16)
+      const scene = harness.renderers[0].scene!
+
+      harness.renderer.showPresentationAreaFlash([{ x: 2, y: 2 }], { transient: true })
+      const flash = scene.children.find(child => child.userData.presentationAreaFlash === true)!
+      expect(flash.material!.opacity).toBe(0)
+      expect(flash.material!.emissiveIntensity).toBe(0)
+      expect(flash.children).toHaveLength(1)
+      expect(flash.children[0].type).toBe('LineSegments')
+      expect(harness.renderer.getMotionDiagnostics().activeAnimations).not.toContain('presentation:area:intensity')
+
+      vi.advanceTimersByTime(649)
+      expect(harness.renderer.getMotionDiagnostics().presentationAreaCellCount).toBe(1)
+      vi.advanceTimersByTime(1)
+      expect(harness.renderer.getMotionDiagnostics().presentationAreaCellCount).toBe(0)
+      expect(scene.children).not.toContain(flash)
+      harness.frame()
+      harness.renderer.dispose()
+      expect(vi.getTimerCount()).toBe(0)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('draws action-history points and paths in the Three.js world parallel to the board plane', () => {

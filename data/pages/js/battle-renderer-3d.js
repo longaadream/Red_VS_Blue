@@ -1355,10 +1355,10 @@
         color: 0xd09a52,
         emissive: 0xd09a52,
         transparent: true,
-        opacity: 0.56,
+        opacity: 0,
         depthWrite: false,
       })
-      flashMaterial.emissiveIntensity = _reducedMotion ? 0.72 : 0
+      flashMaterial.emissiveIntensity = 0
       const mesh = new THREE.Mesh(_hlPlaneGeom, flashMaterial)
       mesh.rotation.x = -Math.PI / 2
       mesh.position.set(cell.x, _tileSurfaceHeightAt(cell.x, cell.z) + 0.016, cell.z)
@@ -1391,21 +1391,6 @@
     }
     if (options && options.transient) _skillFlashTimer = setTimeout(_clearPresentationAreaFlash, 650)
     _invalidate()
-    if (_reducedMotion) return
-    _startAnimation('presentation:area:intensity', {
-      duration: MOTION_SECONDS.result,
-      easing: EASE.out,
-      update: function (progress, raw) {
-        const timeline = Number.isFinite(raw) ? raw : progress
-        const intensity = timeline <= 0.42
-          ? 1.15 * EASE.out(timeline / 0.42)
-          : 1.15 - 0.77 * EASE.in((timeline - 0.42) / 0.58)
-        entries.forEach(function (entry) { entry.flashMaterial.emissiveIntensity = intensity })
-      },
-      complete: function () {
-        entries.forEach(function (entry) { entry.flashMaterial.emissiveIntensity = 0.38 })
-      },
-    })
   }
 
   function _disposePresentationObject(object) {
