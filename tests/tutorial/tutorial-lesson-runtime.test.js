@@ -29,7 +29,10 @@ function fixture(lessonOverrides = {}) {
     player: { playerId: 'human' }, ...lessonOverrides }
   const engine = { getCurrentInputOwnerPlayerId: () => 'human', getBattleRootSeed: () => lesson.rootSeed,
     hashBattleState: value => JSON.stringify(value), planTutorialAiAction: vi.fn(), planBotActions: vi.fn() }
-  const hooks = { getState: () => state, engine: async () => engine, render() {}, setCue() {}, exit: vi.fn(), restart() {}, next() {} }
+  const hooks = { getState: () => state, engine: async () => engine,
+    search: vi.fn(async ({ state: searchState, playerId, rootSeed, continuation, actionsTakenThisTurn }) =>
+      engine.planTutorialAiAction(searchState, playerId, rootSeed, { continuation, actionsTakenThisTurn })),
+    render() {}, setCue() {}, exit: vi.fn(), restart() {}, next() {} }
   const runtime = sandbox.RvBTutorialLessonRuntime.create(lesson, hooks)
   const root = body.children[0]
   function click(label) { root.children[3].children.find(item => item.textContent === label).listeners.click() }

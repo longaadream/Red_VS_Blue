@@ -55,6 +55,8 @@ function fixture({ practiceOnly = false, owner = 'human', phase = 'action', depl
     practiceOnly,
     getState: () => current,
     engine: async () => engine,
+    search: vi.fn(async ({ state: searchState, playerId, rootSeed, continuation, actionsTakenThisTurn }) =>
+      engine.planTutorialAiAction(searchState, playerId, rootSeed, { continuation, actionsTakenThisTurn })),
     commit: vi.fn(async action => {
       if (action.type === 'endTurn') current = { ...current, owner: 'human' }
       if (action.type === 'beginPhase') current = { ...current, owner: 'human', turn: { ...current.turn, phase: 'action' } }

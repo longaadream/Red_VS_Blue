@@ -552,28 +552,57 @@
       resetTutorialAiBudgetIfNeeded(state)
       const expectedState = state
       const expectedOwner = owner
-      const decisionStarted = tutorialClock()
       const expectedToken = authorityStateToken(engine, state)
       const rootSeed = resolveTutorialRootSeed(engine, state)
-      if (typeof engine.planTutorialAiAction !== 'function') throw new Error('教程 AI 规划器不可用')
-      const decision = engine.planTutorialAiAction(state, owner, rootSeed, {
-        continuation: tutorialAiContinuation,
-        actionsTakenThisTurn: tutorialAiActionsTaken,
-        now: tutorialClock,
-      })
+      if (typeof hooks.search !== 'function') throw new Error('教程 AI 搜索客户端不可用')
+      if (hooks.onAiDecisionStart) {
+        hooks.onAiDecisionStart({
+          state: expectedState,
+          owner: expectedOwner,
+          rootSeed: rootSeed,
+          continuation: tutorialAiContinuation,
+          actionsTakenThisTurn: tutorialAiActionsTaken,
+        })
+      }
+      const decisionStarted = tutorialClock()
+      let decision
+      try {
+        decision = await hooks.search({
+          state: expectedState,
+          playerId: expectedOwner,
+          rootSeed: rootSeed,
+          continuation: tutorialAiContinuation,
+          actionsTakenThisTurn: tutorialAiActionsTaken,
+        })
+      } catch (error) {
+        const reason = error && error.code ? ' [' + error.code + ']' : ''
+        throw new Error('教程 AI 搜索失败' + reason + '：' + (error && error.message || String(error)))
+      }
+      const measuredDecisionElapsed = Math.max(0, tutorialClock() - decisionStarted)
       if (!decision || !decision.nextAction || !decision.nextAction.action) {
         const reason = decision && decision.stopReason ? '（' + decision.stopReason + '）' : ''
         throw new Error('教程 AI 未找到可执行指令' + reason)
       }
       if (!decision.continuation) throw new Error('教程 AI 未返回可继续的搜索预算')
       const decisionElapsed = Number.isFinite(decision.elapsedMs) ? decision.elapsedMs : 0
-      const measuredDecisionElapsed = Math.max(0, tutorialClock() - decisionStarted)
       // Preserve the search continuation before pacing. A stale authority
       // snapshot still consumed search work and must not silently reset it.
       tutorialAiContinuation = decision.continuation
       const action = decision.nextAction.action
       if (action.playerId !== undefined && !samePlayer(action.playerId, expectedOwner)) {
         throw new Error('教程 AI 选择了错误行动方的指令')
+      }
+      if (hooks.onAiDecisionResult) {
+        hooks.onAiDecisionResult({
+          action: action,
+          owner: expectedOwner,
+          turn: expectedState.turn,
+          requestMs: measuredDecisionElapsed,
+          decisionMs: decisionElapsed,
+          nodes: decision.nodes,
+          considered: decision.considered,
+          stopReason: decision.stopReason,
+        })
       }
       const opponentAction = !samePlayer(owner, lesson.player.playerId)
       const phaseOnly = action.type === 'beginPhase'
@@ -593,6 +622,7 @@
         || latestToken !== expectedToken) {
         const submissionElapsed = Math.max(0, tutorialClock() - submissionStarted)
         includeTutorialAiSubmissionTime(decision, submissionElapsed + Math.max(0, measuredDecisionElapsed - decisionElapsed))
+        if (hooks.onAiDecisionSettled) hooks.onAiDecisionSettled({ action: action, stale: true })
         clearOpponentPresentation()
         return 'stale'
       }
@@ -609,6 +639,14 @@
       includeTutorialAiSubmissionTime(decision, submissionElapsed + Math.max(0, measuredDecisionElapsed - decisionElapsed))
       if (ordinaryTutorialAiActions.has(action.type) && action.playerId !== undefined
         && samePlayer(action.playerId, expectedOwner)) tutorialAiActionsTaken += 1
+      if (hooks.onAiDecisionCommitted) {
+        hooks.onAiDecisionCommitted({
+          action: action,
+          owner: expectedOwner,
+          turn: expectedState.turn,
+          actionsTakenThisTurn: tutorialAiActionsTaken,
+        })
+      }
       if (opponentAction) {
         opponentNote = description + describeResult(before, hooks.getState())
         render()
@@ -617,6 +655,7 @@
         clearOpponentPresentation()
       }
       observe(action, before)
+      if (hooks.onAiDecisionSettled) hooks.onAiDecisionSettled({ action: action, stale: false })
       return 'accepted'
     }
     async function pumpLegacyAction(engine, state, owner) {
@@ -688,9 +727,12 @@
       observe({ type: 'beginPhase' }, before)
       return 'accepted'
     }
-    async function pump() {
+    async function pump(options) {
       if (busy || disposed || !started || failure) return
-      busy = true; render()
+      const suppressIdleRender = !!(options && options.suppressIdleRender)
+      let progressed = false
+      busy = true
+      if (!suppressIdleRender) render()
       try {
         const engine = await hooks.engine()
         if (disposed) return
@@ -718,10 +760,12 @@
               ? await pumpTacticalStructuralPhase(engine, state, owner)
               : humanOwner ? 'waiting' : await pumpTutorialSearchAction(engine, state, owner)
           if (result === 'disposed' || result === 'waiting') return
-          if (result === 'stale') continue
+          if (result === 'stale') { progressed = true; continue }
+          if (result === 'accepted') progressed = true
         }
         throw new Error('人机行动超过本次安全上限')
       } catch (error) {
+        if (hooks.onAiDecisionError) hooks.onAiDecisionError(error)
         failure = '练习暂时中断：' + (error && error.message || String(error))
       } finally {
         busy = false
@@ -729,7 +773,13 @@
         if (!disposed && !failure && openingStep === 'watch' && !hooks.getState().terminalResult) {
           teach('review', '又轮到你了，行动点已补充。继续用刚学会的操作作战。', '观察新回合，再继续练习')
         }
-        if (!disposed) { hooks.setCue(teachingCue); hooks.render(); showResult(); render() }
+        if (!disposed) {
+          hooks.setCue(teachingCue)
+          const terminal = !!hooks.getState().terminalResult
+          if (!suppressIdleRender || progressed || failure || terminal) hooks.render()
+          showResult()
+          render()
+        }
       }
     }
     function dispose() { disposed = true; setTeachingCue(null); root.remove(); bubble.remove() }
@@ -741,7 +791,11 @@
         if (!openingAllows(action)) return { allowed: false, message: openingObjective || '先跟随引导完成这一项操作。' }
         return { allowed: true }
       },
-      afterAcceptedAction: async function (action, before) { observe(action, before); showResult(); await pump() },
+      afterAcceptedAction: async function (action, before) {
+        observe(action, before)
+        showResult()
+        await pump({ suppressIdleRender: true })
+      },
       afterIntent: function (intent) {
         if (!started || busy || disposed || hooks.getState().terminalResult) return
         if (openingStep === 'terrain' && intent.type === 'activate-cell' && intent.x === opening.moveTo.x && intent.y === opening.moveTo.y) {

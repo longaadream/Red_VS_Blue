@@ -153,6 +153,60 @@ describe('short-search bounded planning', () => {
     expect(planShortSearchAction(newTurn, 'player-red', 1, { ...options, continuation: first.continuation }).nodes).toBe(2)
   })
 
+  it('keeps opt-in root coverage bounded by an inherited turn budget', () => {
+    let clock = 0
+    const f = graph({ delay: () => { clock += 100 } })
+    const options = {
+      ...f,
+      now: () => clock,
+      config: { ...deterministic, minimumRootCoverage: 4, turnTimeMs: 200 },
+    }
+    const first = planShortSearchAction(f.state, 'player-red', 1, options)
+    expect(first.continuation.elapsedMs).toBe(200)
+
+    const second = planShortSearchAction(f.state, 'player-red', 1, {
+      ...options,
+      continuation: first.continuation,
+    })
+    expect(second.nodes).toBe(0)
+    expect(second.nextAction?.kind).toBe('end-turn')
+    expect(second.stopReason).toBe('time-budget')
+  })
+
+  it('covers stop, skill, card, and movement roots before a soft cutoff', () => {
+    const f = graph()
+    const baseList = f.environment.listLegalActions
+    const baseSimulate = f.environment.simulate
+    f.environment.listLegalActions = (s, p) => Number(s.extensions?.stage ?? 0) === 0
+      ? [candidate('end', 'end-turn'), candidate('zero-skill-a'), candidate('zero-skill-b'),
+        candidate('card', 'card'), candidate('step', 'move')]
+      : baseList(s, p)
+    f.environment.simulate = (s, input, context) => {
+      const result = baseSimulate(s, input, context)
+      if (result.accepted) {
+        const id = (input as CandidateAction).id
+        result.state.extensions!.stage = id === 'step' ? 3 : id === 'card' ? 4
+          : id === 'zero-skill-a' ? 5 : id === 'zero-skill-b' ? 6 : 7
+        if (id === 'step') result.state.pieces[1].currentHp = 0
+      }
+      return result
+    }
+
+    let reads = 0
+    const decision = planShortSearchAction(f.state, 'player-red', 1, {
+      ...f,
+      now: () => ++reads <= 2 ? 0 : 150,
+      config: { ...deterministic, minimumRootCoverage: 4, turnTimeMs: 1_000, decisionTimeMs: 100 },
+    })
+    const evaluated = decision.trace.filter(row => row.depth === 0 && row.reason === 'evaluated').map(row => row.candidateId)
+
+    expect(evaluated).toEqual(expect.arrayContaining(['end', 'zero-skill-a', 'card', 'step']))
+    expect(decision.nextAction?.id).toBe('step')
+    expect(decision.nodes).toBe(4)
+    expect(decision.elapsedMs).toBe(150)
+    expect(decision.overDecisionBudget).toBe(true)
+  })
+
   it('reports indivisible simulation overruns instead of claiming a hard deadline', () => {
     let clock = 0
     const f = graph({ delay: () => { clock += 300 } })

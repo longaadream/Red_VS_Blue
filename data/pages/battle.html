@@ -49,6 +49,7 @@
   <script src="js/battle-ui/battle-floater-layout.js"></script>
   <script src="js/battle-renderer-3d.js"></script>
   <script src="js/battle-ui/battle-presentation.js"></script>
+  <script src="js/tutorial/tutorial-search-client.js"></script>
   <script src="js/tutorial/tutorial-scenario.js"></script>
   <script src="js/tutorial/tutorial-controller.js"></script>
   <script src="js/tutorial/tutorial-runtime.js"></script>
@@ -2017,6 +2018,264 @@
     let trainingSetupConfig = null
     let tutorialDefinition = null
     let tutorialRuntime = null
+    let tutorialSearchClient = null
+    let tutorialSearchClientPromise = null
+    let tutorialSearchClientGeneration = null
+    let tutorialSearchClientCancelled = false
+
+    // RED-232 QA timing is opt-in and hidden from the product surface. Keep the
+    // last twenty action records so a CUA read can distinguish rule execution,
+    // presentation, and tutorial pacing without adding a second app state store.
+    const tutorialPerfEnabled = params.get('tutorialPerf') === '1'
+    const tutorialPerfRecords = []
+    let tutorialPerfElement = null
+    let tutorialPerfActive = null
+    let tutorialPerfRafHandle = null
+    let tutorialPerfRafTimer = null
+    if (tutorialPerfEnabled) {
+      tutorialPerfElement = document.createElement('div')
+      tutorialPerfElement.id = 'tutorialPerfData'
+      tutorialPerfElement.hidden = true
+      tutorialPerfElement.setAttribute('aria-hidden', 'true')
+      tutorialPerfElement.setAttribute('data-tutorial-perf', '1')
+      tutorialPerfElement.setAttribute('data-json', '[]')
+      document.body.appendChild(tutorialPerfElement)
+    }
+    function tutorialPerfNow() {
+      return typeof performance !== 'undefined' && typeof performance.now === 'function'
+        ? performance.now() : Date.now()
+    }
+    function tutorialPerfSync() {
+      if (tutorialPerfElement) tutorialPerfElement.setAttribute('data-json', JSON.stringify(tutorialPerfRecords))
+    }
+    function tutorialPerfScheduleFrame(callback) {
+      if (typeof requestAnimationFrame === 'function') return requestAnimationFrame(callback)
+      return setTimeout(function () { callback(tutorialPerfNow()) }, 16)
+    }
+    function tutorialPerfCancelFrame(handle) {
+      if (typeof cancelAnimationFrame === 'function' && tutorialPerfRafHandle === handle) cancelAnimationFrame(handle)
+      else if (tutorialPerfRafTimer === handle) clearTimeout(handle)
+    }
+    function tutorialPerfStopFrameCounter(record) {
+      if (!record) return
+      if (tutorialPerfRafHandle !== null) tutorialPerfCancelFrame(tutorialPerfRafHandle)
+      if (tutorialPerfRafTimer !== null) tutorialPerfCancelFrame(tutorialPerfRafTimer)
+      tutorialPerfRafHandle = null
+      tutorialPerfRafTimer = null
+      record.requestRafFrames = record._requestRafFrames
+      record.rafFrames = record._rafFrames
+    }
+    function tutorialPerfFinishNow(record) {
+      if (!record || tutorialPerfActive !== record) return
+      tutorialPerfStopFrameCounter(record)
+      record.durationMs = Math.max(0, tutorialPerfNow() - record._startedAt)
+      delete record._startedAt
+      delete record._rafFrames
+      delete record._requestRafFrames
+      delete record._searchActive
+      tutorialPerfRecords.push(record)
+      while (tutorialPerfRecords.length > 20) tutorialPerfRecords.shift()
+      tutorialPerfActive = null
+      tutorialPerfSync()
+    }
+    function tutorialPerfFinishAfterNextRaf(targetRecord) {
+      const record = targetRecord || tutorialPerfActive
+      if (!record || record._finishing) return
+      record._finishing = true
+      const started = tutorialPerfNow()
+      const finish = function () {
+        if (tutorialPerfActive !== record) return
+        record.nextRAFMs = Math.max(0, tutorialPerfNow() - started)
+        record.stages.nextRAFMs = record.nextRAFMs
+        delete record._finishing
+        tutorialPerfFinishNow(record)
+      }
+      tutorialPerfScheduleFrame(finish)
+    }
+    function tutorialPerfAddStageTo(record, stage, duration) {
+      if (!record || !Number.isFinite(duration)) return
+      const value = Math.max(0, duration)
+      record.stages[stage] = (record.stages[stage] || 0) + value
+      record[stage] = record.stages[stage]
+    }
+    function tutorialPerfAddStage(stage, duration) {
+      tutorialPerfAddStageTo(tutorialPerfActive, stage, duration)
+    }
+    function tutorialPerfBegin(action, kind, details) {
+      if (!tutorialPerfEnabled) return null
+      if (tutorialPerfActive) tutorialPerfFinishNow(tutorialPerfActive)
+      const state = G
+      const turn = state && state.turn || {}
+      const record = {
+        kind: kind || 'action',
+        action: action && action.type || 'tutorial-plan',
+        triggerAction: action && action.type || null,
+        actionId: action && action.clientActionId || null,
+        turn: Number.isFinite(turn.turnNumber) ? turn.turnNumber : null,
+        owner: turn.currentPlayerId || null,
+        seed: tutorialDefinition && tutorialDefinition.rootSeed,
+        counters: {
+          actionsTakenThisTurn: details && Number.isSafeInteger(details.actionsTakenThisTurn) ? details.actionsTakenThisTurn : 0,
+          aiActionsTaken: 0,
+          aiNodes: null,
+          aiConsidered: null,
+        },
+        stages: {
+          authorityMs: 0,
+          presentationMs: 0,
+          renderMs: 0,
+          afterAcceptedActionMs: 0,
+          nextRAFMs: null,
+        },
+        authorityMs: 0,
+        presentationMs: 0,
+        renderMs: 0,
+        afterAcceptedActionMs: 0,
+        nextRAFMs: null,
+        searchMs: null,
+        decisionMs: null,
+        chosen: null,
+        requestRafFrames: 0,
+        rafFrames: 0,
+        stopReason: null,
+        nodes: null,
+        considered: null,
+        _startedAt: tutorialPerfNow(),
+        _rafFrames: 0,
+        _requestRafFrames: 0,
+        _searchActive: kind === 'ai-search',
+      }
+      tutorialPerfActive = record
+      const tick = function () {
+        if (tutorialPerfActive !== record) return
+        record._rafFrames += 1
+        if (record._searchActive) record._requestRafFrames += 1
+        const next = tutorialPerfScheduleFrame(tick)
+        if (typeof requestAnimationFrame === 'function') tutorialPerfRafHandle = next
+        else tutorialPerfRafTimer = next
+      }
+      const first = tutorialPerfScheduleFrame(tick)
+      if (typeof requestAnimationFrame === 'function') tutorialPerfRafHandle = first
+      else tutorialPerfRafTimer = first
+      return record
+    }
+    function tutorialPerfAiDecisionStarted(details) {
+      if (!tutorialPerfEnabled) return
+      const current = tutorialPerfActive
+      if (current && current.kind === 'human') {
+        current.kind = 'human-ai'
+        current._searchActive = true
+        current._requestRafFrames = 0
+        current.aiStartedAt = tutorialPerfNow()
+        return
+      }
+      tutorialPerfBegin(null, 'ai-search', details)
+    }
+    function tutorialPerfAiDecisionResult(details) {
+      const record = tutorialPerfActive
+      if (!record || (record.kind !== 'ai-search' && record.kind !== 'human-ai')) return
+      record._searchActive = false
+      record.searchMs = Number.isFinite(details && details.requestMs) ? Math.max(0, details.requestMs) : null
+      record.decisionMs = Number.isFinite(details && details.decisionMs) ? Math.max(0, details.decisionMs) : null
+      record.nodes = Number.isFinite(details && details.nodes) ? details.nodes : null
+      record.considered = Number.isFinite(details && details.considered) ? details.considered : null
+      record.stopReason = details && details.stopReason || null
+      record.counters.aiNodes = record.nodes
+      record.counters.aiConsidered = record.considered
+      record.aiAction = details && details.action && details.action.type || record.aiAction || null
+      record.chosen = record.aiAction
+      record.aiActionId = details && details.action && details.action.clientActionId || null
+    }
+    function tutorialPerfAiDecisionCommitted(details) {
+      const record = tutorialPerfActive
+      if (!record || (record.kind !== 'ai-search' && record.kind !== 'human-ai')) return
+      record.aiAction = details && details.action && details.action.type || record.aiAction || null
+      record.counters.aiActionsTaken = Number.isSafeInteger(details && details.actionsTakenThisTurn)
+        ? details.actionsTakenThisTurn : record.counters.aiActionsTaken
+      if (details && details.turn) record.turn = details.turn.turnNumber
+      if (details && details.owner) record.owner = details.owner
+    }
+    function tutorialPerfAiDecisionSettled(details) {
+      const record = tutorialPerfActive
+      if (!record || (record.kind !== 'ai-search' && record.kind !== 'human-ai')) return
+      record._searchActive = false
+      if (record.kind === 'ai-search') tutorialPerfFinishAfterNextRaf(record)
+    }
+    function tutorialPerfAiDecisionError(error) {
+      const record = tutorialPerfActive
+      if (!record || (record.kind !== 'ai-search' && record.kind !== 'human-ai')) return
+      record.error = error && error.message || String(error)
+      record._searchActive = false
+      if (record.kind === 'ai-search') tutorialPerfFinishAfterNextRaf(record)
+    }
+    function tutorialPerfRenderStart() {
+      const record = tutorialPerfActive
+      return record ? { record: record, started: tutorialPerfNow() } : null
+    }
+    function tutorialPerfRenderEnd(marker) {
+      if (!marker || tutorialPerfActive !== marker.record) return
+      tutorialPerfAddStage('renderMs', tutorialPerfNow() - marker.started)
+    }
+    function disposeTutorialSearchClient(message) {
+      tutorialSearchClientCancelled = true
+      tutorialSearchClientGeneration = null
+      const pending = tutorialSearchClientPromise
+      const client = tutorialSearchClient
+      tutorialSearchClient = null
+      if (client && typeof client.dispose === 'function') client.dispose(message || '教程已退出')
+      if (pending) pending.then(function (eventualClient) {
+        if (eventualClient && typeof eventualClient.dispose === 'function') eventualClient.dispose(message || '教程已退出')
+      }, function () {})
+    }
+    function startTutorialSearchClient() {
+      disposeTutorialSearchClient('教程重新初始化')
+      tutorialSearchClientCancelled = false
+      const generation = {}
+      tutorialSearchClientGeneration = generation
+      if (!window.RvBPracticeClient || typeof window.RvBPracticeClient.create !== 'function'
+        || !window.RvBTutorialSearchClient || typeof window.RvBTutorialSearchClient.fromPractice !== 'function') {
+        throw new Error('教程 AI 搜索客户端不可用')
+      }
+      const pending = window.RvBPracticeClient.create().then(function (practice) {
+        return window.RvBTutorialSearchClient.fromPractice(practice)
+      })
+      tutorialSearchClientPromise = pending
+      pending.then(function (client) {
+        if (tutorialSearchClientGeneration !== generation || tutorialSearchClientCancelled) {
+          if (client && typeof client.dispose === 'function') client.dispose('教程已退出')
+          return client
+        }
+        tutorialSearchClient = client
+        return client
+      }, function () {})
+      return pending
+    }
+    function tutorialQaReplayEnabled() {
+      return TUTORIAL_MODE && params.has('lesson') && params.get('tutorialPerf') === '1'
+        && params.get('qaReplay') === '1'
+        && (location.hostname === '127.0.0.1' || location.hostname === 'localhost')
+    }
+    async function loadTutorialQaReplayState() {
+      const response = await withTimeout(
+        fetch('./__tutorial-qa-replay.json', { cache: 'no-store' }),
+        15000,
+        '教程 QA 回放状态',
+      )
+      if (!response.ok) throw new Error('教程 QA 回放状态 HTTP ' + response.status)
+      const state = await response.json()
+      if (!state || typeof state !== 'object' || Array.isArray(state)
+        || !state.turn || !Array.isArray(state.pieces)) {
+        throw new Error('教程 QA 回放状态格式无效')
+      }
+      return state
+    }
+    function disposeTutorialPage() {
+      if (tutorialRuntime) {
+        tutorialRuntime.dispose()
+        tutorialRuntime = null
+      }
+      if (TUTORIAL_MODE && params.has('lesson')) disposeTutorialSearchClient('教程页面已离开')
+    }
     function getTemplateFactionForBattleFaction(faction) {
       return faction === 'red' ? 'evil' : faction === 'blue' ? 'good' : faction
     }
@@ -2204,10 +2463,15 @@
       }
       if (method === 'PUT') {
         if (!body || !body.action || !body.battleState) throw new Error('Missing action or battleState')
-        const cloned = Engine.safeCloneBattleState(body.battleState)
-        const next = Engine.recordBattlePresentation(cloned, () => tutorialActive && tutorialDefinition
-          ? Engine.runBattleAction(cloned, body.action, { rootSeed: tutorialDefinition.rootSeed }).state
-          : Engine.applyBattleAction(cloned, body.action), state => state)
+        // The canonical tutorial runner already owns its replay-aware clone.
+        // Keep the outer clone for the ordinary training path, where the page
+        // still protects its input before calling the legacy authority helper.
+        const authorityInput = tutorialActive && tutorialDefinition
+          ? body.battleState
+          : Engine.safeCloneBattleState(body.battleState)
+        const next = Engine.recordBattlePresentation(authorityInput, () => tutorialActive && tutorialDefinition
+          ? Engine.runBattleAction(authorityInput, body.action, { rootSeed: tutorialDefinition.rootSeed }).state
+          : Engine.applyBattleAction(authorityInput, body.action), state => state)
         // runBattleAction deliberately strips the presentation-only skill cache
         // from its authoritative result; the browser needs it again for the
         // next target preview and for rendering skill details.
@@ -4728,7 +4992,12 @@
       const Engine = await window.RvBGameEngine.ensure()
       const action = withClientActionId(rawAction)
       const oldG = G
+      const perfNow = typeof tutorialPerfNow === 'function' ? tutorialPerfNow : function () { return Date.now() }
+      const perfAddStage = typeof tutorialPerfAddStage === 'function' ? tutorialPerfAddStage : function () {}
+      const authorityStarted = perfNow()
       const newG = await trainingApiFetch('PUT', { action: action, battleState: G })
+      perfAddStage('authorityMs', perfNow() - authorityStarted)
+      const presentationStarted = perfNow()
       appendTrainingPresentationEvents(Engine, action, oldG, newG)
       if (_use3d && battlePresentation && !(options && options.quiet)) {
         battlePresentation.animateAction(
@@ -4737,6 +5006,7 @@
           createBattlePresentationModel(newG),
         )
       }
+      perfAddStage('presentationMs', perfNow() - presentationStarted)
       G = newG
       spawnStateFloaters(oldG, G)
       flushActionLog(oldG, G)
@@ -4823,13 +5093,25 @@
             guide.hidden = false
           },
           engine: function () { return window.RvBGameEngine.ensure() },
+          search: function (payload) {
+            if (!tutorialSearchClient) throw new Error('教程 AI 搜索客户端不可用')
+            return tutorialSearchClient.request('tutorial-plan', payload)
+          },
+          onAiDecisionStart: tutorialPerfAiDecisionStarted,
+          onAiDecisionResult: tutorialPerfAiDecisionResult,
+          onAiDecisionCommitted: tutorialPerfAiDecisionCommitted,
+          onAiDecisionSettled: tutorialPerfAiDecisionSettled,
+          onAiDecisionError: tutorialPerfAiDecisionError,
           practiceOnly: tutorialDefinition.tactical === true && params.get('practice') === '1',
           commit: async function (action) { await commitTutorialScriptAction(action); render() },
           render: render,
           setCue: setLessonVisualCue,
-          exit: function () { window.location.href = 'tutorial.html' },
-          restart: function () { window.location.reload() },
-          next: function () { window.location.href = 'battle.html?mode=tutorial&lesson=' + encodeURIComponent(window.RvBTutorialLessons.all[tutorialDefinition.number].id) },
+          exit: function () { disposeTutorialSearchClient('教程已退出'); window.location.href = 'tutorial.html' },
+          restart: function () { disposeTutorialSearchClient('教程重新开始'); window.location.reload() },
+          next: function () {
+            disposeTutorialSearchClient('教程进入下一局')
+            window.location.href = 'battle.html?mode=tutorial&lesson=' + encodeURIComponent(window.RvBTutorialLessons.all[tutorialDefinition.number].id)
+          },
         })
         window.__RVB_TUTORIAL__ = { scenarioId: tutorialDefinition.id, snapshot: tutorialRuntime.snapshot }
         return
@@ -4863,7 +5145,22 @@
         trainingSetupConfig = config
         trainingBattlePresentationChains = []
         latestBattlePresentationEvents = []
-        G = await trainingApiFetch('POST', Object.assign({ mapId: mapId || undefined }, config))
+        const tutorialSearchReady = TUTORIAL_MODE && params.has('lesson')
+          ? startTutorialSearchClient() : null
+        if (tutorialQaReplayEnabled()) {
+          // The replay fixture is already an authoritative turn-16 state. Keep
+          // its replay/RNG metadata intact, but still initialize the same engine
+          // and presentation skill cache needed by the normal training entry.
+          G = await loadTutorialQaReplayState()
+          await window.RvBGameEngine.ensure()
+          G.skillsById = Object.assign({}, skillsById || {}, G.skillsById || {})
+        } else {
+          G = await trainingApiFetch('POST', Object.assign({ mapId: mapId || undefined }, config))
+        }
+        if (tutorialSearchReady) {
+          tutorialSearchClient = await tutorialSearchReady
+          if (!tutorialSearchClient || tutorialSearchClientCancelled) throw new Error('教程 AI 搜索客户端不可用')
+        }
         myPlayerId = TUTORIAL_MODE ? tutorialDefinition.player.playerId : G.turn.currentPlayerId
         if (TUTORIAL_MODE && !params.has('lesson')) await runTutorialOpening()
         // Auto-advance past start phase so training enters action phase immediately
@@ -4893,6 +5190,7 @@
         if (btn) btn.textContent = '切换视角 ' + trainingPlayerLabel(myPlayerId)
         if (TUTORIAL_MODE) mountTutorialRuntime()
       } catch (e) {
+        if (TUTORIAL_MODE && params.has('lesson')) disposeTutorialSearchClient('教程初始化失败')
         console.error('[training] initialization failed', e)
         showMsg('初始化失败：' + e.message, 'err')
         document.getElementById('loadingMsg').style.color = '#f87171'
@@ -6723,7 +7021,11 @@
     }
 
     function render(options) {
-      if (!G) return
+      const tutorialPerfMarker = typeof tutorialPerfRenderStart === 'function' ? tutorialPerfRenderStart() : null
+      if (!G) {
+        if (typeof tutorialPerfRenderEnd === 'function') tutorialPerfRenderEnd(tutorialPerfMarker)
+        return
+      }
       const input = options || {}
       syncAuthoritativePendingPresentation()
       if (input.board === false) renderBattleHud(input.presentationModel, input.beforeBoardUpdate)
@@ -6735,6 +7037,7 @@
       updateRed43QaEvidence()
       refreshLessonVisualCue()
       refreshHandResourceCost()
+      if (typeof tutorialPerfRenderEnd === 'function') tutorialPerfRenderEnd(tutorialPerfMarker)
     }
 
     function prepareCurrentBattlePresentationModel(preparedModel) {
@@ -6751,13 +7054,14 @@
     }
 
     function renderBoard(preparedModel, beforeBoardUpdate) {
-      clearSkillPreview()
+      clearSkillPreview({ preserveReplay: true })
       if (!G || !G.map) return
       currentBattleViewModel = prepareCurrentBattlePresentationModel(preparedModel)
       if (!currentBattleViewModel) return
       if (typeof beforeBoardUpdate === 'function') beforeBoardUpdate(currentBattleViewModel)
       if (battlePresentation) battlePresentation.update(currentBattleViewModel)
       recalcCellSize()
+      scheduleSkillPreviewReplayAfterRedraw()
 
       // ── Compute highlights (shared between 3D and HTML paths) ───────────────
       const tiles = currentBattleViewModel.board.tiles
@@ -7655,9 +7959,83 @@
     let skillPreviewController = null
     let skillDragController = null
     let hoverSkillPreviewReplayScheduled = false
+    let skillPreviewReplayScheduled = false
+    let skillPreviewReplayContext = null
+    let skillPreviewReplayGeneration = 0
     const skillPreviewDisplayTimings = []
-    function clearSkillPreview() {
+    function invalidateSkillPreviewReplay() {
+      skillPreviewReplayContext = null
+      skillPreviewReplayGeneration += 1
+    }
+
+    function clearSkillPreview(options) {
+      if (!options || options.preserveReplay !== true) invalidateSkillPreviewReplay()
+      else if (skillPreviewReplayContext) skillPreviewReplayContext.redrawPending = true
       if (skillPreviewController) skillPreviewController.clear()
+    }
+
+    function skillPreviewAuthorityRevision(snapshot) {
+      const revision = Number(snapshot && snapshot.targetingRevision)
+      return Number.isSafeInteger(revision) && revision >= 0 ? revision : 0
+    }
+
+    function skillPreviewPendingStateRevision(skill) {
+      const baseAction = skill && skill.baseAction
+      if (baseAction && baseAction.stateRevision !== undefined) return baseAction.stateRevision
+      if (skill && skill.rootAction && skill.rootAction.stateRevision !== undefined) return skill.rootAction.stateRevision
+      if (skill && skill.preparation && skill.preparation.stateRevision !== undefined) return skill.preparation.stateRevision
+      if (skill && skill.rootStateRevision !== undefined) return skill.rootStateRevision
+      return undefined
+    }
+
+    function skillPreviewHistoryViewActive() {
+      return typeof document !== 'undefined'
+        && document.body
+        && document.body.classList
+        && typeof document.body.classList.contains === 'function'
+        && document.body.classList.contains('is-viewing-history')
+    }
+
+    function skillPreviewReplayIsCurrent(context, generation) {
+      const skill = pendingSkill
+      const baseAction = skill && skill.baseAction
+      return !!context
+        && context.redrawPending === true
+        && !battlePageDisposed
+        && context === skillPreviewReplayContext
+        && generation === skillPreviewReplayGeneration
+        && !skillPreviewHistoryViewActive()
+        && context.snapshot === G
+        && context.authorityRevision === skillPreviewAuthorityRevision(G)
+        && context.pendingSkill === skill
+        && context.selectedPieceId === selectedPieceId
+        && context.viewerId === myPlayerId
+        && context.skillId === (skill && skill.skillId)
+        && context.pieceId === (baseAction && baseAction.pieceId)
+        && context.previewOnly === !!(skill && skill.previewOnly)
+        && context.previewOrigin === (skill && skill.previewOrigin)
+        && context.stateRevision === skillPreviewPendingStateRevision(skill)
+    }
+
+    function scheduleSkillPreviewReplayAfterRedraw() {
+      const context = skillPreviewReplayContext
+      if (!context || context.redrawPending !== true || skillPreviewReplayScheduled) return
+      const generation = skillPreviewReplayGeneration
+      skillPreviewReplayScheduled = true
+      const replay = function () {
+        skillPreviewReplayScheduled = false
+        if (!skillPreviewReplayIsCurrent(context, generation)) {
+          if (skillPreviewReplayContext === context) invalidateSkillPreviewReplay()
+          if (skillPreviewReplayContext && skillPreviewReplayContext.redrawPending === true) {
+            scheduleSkillPreviewReplayAfterRedraw()
+          }
+          return
+        }
+        context.redrawPending = false
+        previewSkillTarget(context.targetX, context.targetY)
+      }
+      if (typeof requestAnimationFrame === 'function') requestAnimationFrame(replay)
+      else setTimeout(replay, 0)
     }
 
     function replayHoverSkillPreviewAfterViewport() {
@@ -7684,6 +8062,7 @@
       if (!_use3d || !renderer || !pendingSkill || !pendingSkill.baseAction || !pendingSkill.skillId ||
           pendingSkill.turnTargetActionType || pendingSkill.preparation && pendingSkill.preparation.selectionMode === 'multi' ||
           targetSubmissionPending || waitingForOtherPending() ||
+          skillPreviewHistoryViewActive() ||
           previewOnly && pendingSkill.previewEligible !== true ||
           !previewOnly && !hasEligibleTarget ||
           typeof GameEngine === 'undefined' || !GameEngine.previewBattleAction) {
@@ -7788,6 +8167,22 @@
       }
       skillPreviewController.request({ snapshot: G, action, viewerId: myPlayerId,
         key: JSON.stringify(action), revision: action.stateRevision })
+      skillPreviewReplayContext = {
+        snapshot: G,
+        authorityRevision: skillPreviewAuthorityRevision(G),
+        pendingSkill: pendingSkill,
+        selectedPieceId: selectedPieceId,
+        viewerId: myPlayerId,
+        skillId: pendingSkill.skillId,
+        pieceId: action.pieceId,
+        previewOnly: previewOnly,
+        previewOrigin: pendingSkill.previewOrigin,
+        stateRevision: skillPreviewPendingStateRevision(pendingSkill),
+        targetX: x,
+        targetY: y,
+        redrawPending: false,
+      }
+      skillPreviewReplayGeneration += 1
     }
 
     function endSkillCardPreview(skId) {
@@ -8458,13 +8853,23 @@
     async function trainingDoAction(action) {
       if (!G) return
       const tutorialActive = typeof TUTORIAL_MODE !== 'undefined' && TUTORIAL_MODE
+      const perfNow = typeof tutorialPerfNow === 'function' ? tutorialPerfNow : function () { return Date.now() }
+      const perfAddStageTo = typeof tutorialPerfAddStageTo === 'function' ? tutorialPerfAddStageTo : function () {}
+      const perfBegin = typeof tutorialPerfBegin === 'function' ? tutorialPerfBegin : function () { return null }
+      const perfFinishAfterNextRaf = typeof tutorialPerfFinishAfterNextRaf === 'function' ? tutorialPerfFinishAfterNextRaf : function () {}
+      let tutorialPerfRecord = null
       try {
         const Engine = await window.RvBGameEngine.ensure()
         const wasTargetSubmission = !!targetSubmissionPending
         document.getElementById('btnEnd').disabled = true
         setMoveButtonDisabled(true)
         const oldG = G
+        tutorialPerfRecord = tutorialActive
+          ? perfBegin(action, 'human', { actionsTakenThisTurn: 0 }) : null
+        let authorityStarted = perfNow()
         const newG = await trainingApiFetch('PUT', { action, battleState: G })
+        perfAddStageTo(tutorialPerfRecord, 'authorityMs', perfNow() - authorityStarted)
+        let presentationStarted = perfNow()
         appendTrainingPresentationEvents(Engine, action, oldG, newG)
         if (_use3d && battlePresentation) {
           battlePresentation.animateAction(
@@ -8473,6 +8878,7 @@
             createBattlePresentationModel(newG)
           )
         }
+        perfAddStageTo(tutorialPerfRecord, 'presentationMs', perfNow() - presentationStarted)
         G = newG
         spawnStateFloaters(oldG, G)
         flushActionLog(oldG, G)
@@ -8484,16 +8890,24 @@
         ) {
           const beforeBegin = G
           const beginAction = withClientActionId({ type: 'beginPhase' })
+          authorityStarted = perfNow()
           G = await trainingApiFetch('PUT', { action: beginAction, battleState: G })
+          perfAddStageTo(tutorialPerfRecord, 'authorityMs', perfNow() - authorityStarted)
+          presentationStarted = perfNow()
           appendTrainingPresentationEvents(Engine, beginAction, beforeBegin, G)
+          perfAddStageTo(tutorialPerfRecord, 'presentationMs', perfNow() - presentationStarted)
         }
         if (action.type === 'endTurn') {
           if (G.turn && G.turn.phase === 'end') {
             try {
               const beforeBegin = G
               const beginAction = withClientActionId({ type: 'beginPhase', playerId: G.turn.currentPlayerId })
+              authorityStarted = perfNow()
               G = await trainingApiFetch('PUT', { action: beginAction, battleState: G })
+              perfAddStageTo(tutorialPerfRecord, 'authorityMs', perfNow() - authorityStarted)
+              presentationStarted = perfNow()
               appendTrainingPresentationEvents(Engine, beginAction, beforeBegin, G)
+              perfAddStageTo(tutorialPerfRecord, 'presentationMs', perfNow() - presentationStarted)
             } catch (error) {
               console.error('[training] failed to advance the next action phase', error)
             }
@@ -8521,9 +8935,19 @@
         render(); if (G.terminalResult) handleGameOver()
         if (interactionFeedback) setStatusMsg(interactionFeedback)
         if (tutorialActive && tutorialRuntime) {
-          await tutorialRuntime.afterAcceptedAction(action, oldG)
+          const afterStarted = perfNow()
+          try {
+            await tutorialRuntime.afterAcceptedAction(action, oldG)
+          } finally {
+            perfAddStageTo(tutorialPerfRecord, 'afterAcceptedActionMs', perfNow() - afterStarted)
+          }
         }
+        if (tutorialPerfRecord) perfFinishAfterNextRaf(tutorialPerfRecord)
       } catch (e) {
+        if (typeof tutorialPerfActive !== 'undefined' && tutorialPerfActive && tutorialPerfActive === tutorialPerfRecord) {
+          tutorialPerfActive.error = e && e.message || String(e)
+          perfFinishAfterNextRaf(tutorialPerfRecord)
+        }
         let rejectionFeedback = ''
         if (e.needsTargetSelection) {
           clearPendingActionFeedback('authoritative-target-step')
@@ -9319,6 +9743,7 @@
       } catch (error) { showBattleBootError(error) }
     })
     function disposeBattlePage() {
+      disposeTutorialPage()
       legacyFloaterTimers.forEach(timer => clearTimeout(timer))
       legacyFloaterTimers.clear()
       if (legacyFloaterLayout) legacyFloaterLayout.clear()
@@ -9340,6 +9765,7 @@
       if (battleFeedbackAudio) { battleFeedbackAudio.dispose(); battleFeedbackAudio = null }
     }
     window.addEventListener('pagehide', disposeBattlePage)
+    window.addEventListener('beforeunload', disposeBattlePage)
     window.addEventListener('unload', disposeBattlePage)
     window.addEventListener('blur', clearSkillPreview)
 
