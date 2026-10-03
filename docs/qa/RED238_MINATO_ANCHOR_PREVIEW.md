@@ -13,3 +13,5 @@
 回退：仅revert本任务与对应生成bundle；无数据迁移。现有玩家对局不操作/刷新。
 
 隔离验证：对相同预演源码的独立副本只加锚点白名单与字段拷贝，九项全通过（包含PracticeSession.human正式提交）。正式集成到RED237接口依赖提交0da1d67cf后，同样先复现五项失败，再修复并跑五个相关suite共59项全通过。普通练习session/worker两个suite11项通过。两个engine重建成功；practice bundle无实质变化。typecheck首次发现新测试缺少union narrowing，补充needs-input检查后通过；ESLint、编码、diff和main-baseline均通过。独立审查另跑anchor/privacy/progressive/sequence四个suite46项通过，无阻断性sanitizer问题；源码可见性过滤先于白名单复制。独立将practice Worker源码内存重建，结果与checked-in bundle逐字节一致；没有lib/ai、lib/practice或tutorial源差异。UI最终整合与人工界面验收仍待完成；未宣称人工验收通过。
+
+最终同步RED237 PR226候选5f89eaccb后，anchor/privacy/完整页面契约三个suite75项通过，main-baseline通过且与UI分支diff仅本任务四文件。最终直接node next typegen及node typescript tsc --noEmit均退出0（共享环境.bin shim缺失，npm脚本启动next失败单独记录，未混作通过）；encoding/diff通过。共享ESLint加载缺@babel/core，最终候选该检查待完整依赖环境补跑。正常practice烟测在新端口进行，用户原对局未刷新。
