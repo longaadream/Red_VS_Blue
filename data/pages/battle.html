@@ -2070,6 +2070,8 @@
     // presentation, and tutorial pacing without adding a second app state store.
     const tutorialPerfEnabled = params.get('tutorialPerf') === '1'
     const tutorialPerfRecords = []
+    const tutorialPerfReplayLimit = 2
+    let tutorialPerfReplayCount = 0
     let tutorialPerfElement = null
     let tutorialPerfActive = null
     let tutorialPerfRafHandle = null
@@ -2116,7 +2118,11 @@
       delete record._requestRafFrames
       delete record._searchActive
       tutorialPerfRecords.push(record)
-      while (tutorialPerfRecords.length > 20) tutorialPerfRecords.shift()
+      while (tutorialPerfRecords.length > 20) {
+        const removable = tutorialPerfRecords.findIndex(function (item) { return !item || !item.aiReplay })
+        if (removable < 0) tutorialPerfRecords.shift()
+        else tutorialPerfRecords.splice(removable, 1)
+      }
       tutorialPerfActive = null
       tutorialPerfSync()
     }
@@ -2234,6 +2240,36 @@
       record.aiAction = details && details.action && details.action.type || record.aiAction || null
       record.chosen = record.aiAction
       record.aiActionId = details && details.action && details.action.clientActionId || null
+      const replayLimit = typeof tutorialPerfReplayLimit === 'number' ? tutorialPerfReplayLimit : 2
+      const replayCaptureEnabled = typeof tutorialAiReplayCaptureEnabled !== 'function'
+        || tutorialAiReplayCaptureEnabled()
+      if (details && details.replayInput
+        && replayCaptureEnabled
+        && !record.aiReplay
+        && (typeof tutorialPerfReplayCount !== 'number' || tutorialPerfReplayCount < replayLimit)) {
+        try {
+          const copy = function (value) {
+            return JSON.parse(JSON.stringify(value, function (key, nested) {
+              return key === 'skillsById' ? undefined : nested
+            }))
+          }
+          record.aiReplay = {
+            input: copy(details.replayInput),
+            result: copy(details.replayResult || details.result || {
+              action: details.action ? Object.assign({}, details.action) : null,
+              score: details.score,
+              nodes: details.nodes,
+              considered: details.considered,
+              stopReason: details.stopReason,
+              continuation: details.continuation,
+            }),
+          }
+          if (typeof tutorialPerfReplayCount !== 'number') tutorialPerfReplayCount = 0
+          tutorialPerfReplayCount += 1
+        } catch (error) {
+          record.aiReplayError = error && error.message || String(error)
+        }
+      }
     }
     function tutorialPerfAiDecisionCommitted(details) {
       const record = tutorialPerfActive
@@ -2303,6 +2339,13 @@
       return TUTORIAL_MODE && params.has('lesson') && params.get('tutorialPerf') === '1'
         && params.get('qaReplay') === '1'
         && (location.hostname === '127.0.0.1' || location.hostname === 'localhost')
+    }
+    function tutorialAiReplayCaptureEnabled() {
+      const hostname = typeof location !== 'undefined' ? location.hostname : ''
+      return typeof TUTORIAL_MODE !== 'undefined' && TUTORIAL_MODE
+        && typeof params !== 'undefined' && typeof params.has === 'function'
+        && params.has('lesson') && params.get('tutorialPerf') === '1'
+        && (hostname === '127.0.0.1' || hostname === 'localhost')
     }
     async function loadTutorialQaReplayState() {
       const response = await withTimeout(
@@ -5154,6 +5197,7 @@
           },
           onAiDecisionStart: tutorialPerfAiDecisionStarted,
           onAiDecisionResult: tutorialPerfAiDecisionResult,
+          captureAiReplay: tutorialAiReplayCaptureEnabled(),
           onAiDecisionCommitted: tutorialPerfAiDecisionCommitted,
           onAiDecisionSettled: tutorialPerfAiDecisionSettled,
           onAiDecisionError: tutorialPerfAiDecisionError,
@@ -8286,6 +8330,10 @@
       const availability = resolveSkillAvailability(sp, skId)
       if (!availability.available) return false
       if (pendingSkill && pendingSkill.skillId === skId) return true
+
+      // Only another transient hover may replace a hover preview. Pointer
+      // travel across the menu must not cancel an activated target draft.
+      if (pendingSkill && pendingSkill.previewOrigin !== 'hover') return false
 
       // Let the public preparation surface classify the root. Hover may show
       // a ready no-input action, but a target/option prompt stays dormant

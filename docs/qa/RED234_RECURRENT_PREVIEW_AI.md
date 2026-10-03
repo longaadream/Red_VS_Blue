@@ -36,6 +36,45 @@ AI 探索对照：真实 seed 18707、红方首次部署 training-red-1 到 (1,1
 - 独立开局复现还比较默认测量时钟与无时间截止的深度3搜索：二者均部署黑百合并选择正收益致命毒素。结束基线约141701.08，选定技能约145847.49，移动最高约144764.07。后续普通动作耗尽累计时间才出现零节点结束，未复现部署后立即空过。临时诊断脚本已清理，未提交探索副产物。
 - 下次在候选 http://127.0.0.1:38678/battle.html?mode=tutorial&lesson=tactical-intuition&practice=1&tutorialPerf=1 出现相同空过时，保留页面即可读取受控根候选/累计预算记录；不要以重新切技能或刷新作为验收步骤。
 
-## 回退
+## 艾露恩守护与部署空过专项检查（2026-10-03）
+
+本轮再次 fetch，origin/main 仍为 9d1b0c30801cd733ec4cede37ce1ef0889a2313a；基线检查 Behind=0。未调整 AI 评分、规则或预算。
+
+- 敌方守护开启/关闭、目标12血/6血、固定时钟/正式默认预算共8个最小对照，均选择火球术。正式隔离模拟保持输入不变。6血守护目标第一击恢复到11血、玩家守护标签移除，第二枚棋子继续火球术到5血。消耗守护的实际静态收益约359716分；非致命第一击两种守护状态的收益均约140745分。因此这些场景不支持“守护使所有行动无收益”。
+- 原探索脚本的 default 时钟仍覆盖了零时间截止配置，不能称为默认预算验证。根代理另存 root-bounded-check.ts，固定时钟使用确定性配置，default 使用教程实际默认配置，并完成上述8例。初始蓝方 lesson 脚本返回 other-player，不能算开局验证，未纳入结论。
+- 独立浏览器38679、seed18707，玩家依次部署安度因、吉安娜、泰兰德、猎空；蓝方第2/4/6/8回合分别有3/2/3/4次普通行动。第6回合在敌方守护存在时部署后攻击、移动、眼棱，实际消耗守护，普通行动后 AP=0 正常结束。所有已观察回合没有部署后零普通行动；不能代表原玩家局面。
+- 已验证预算机制：合法动作生成和单次模拟均同步，预算检查不能抢占它们；同回合还累计请求及提交开销。控制真实局面模拟或动作生成耗时2600ms后，下次规划零节点、time-budget、endTurn。这证明可能的预算饥饿路径，人工注入的延迟不是原玩家浏览器复现。
+- 根代理本轮定向检查：tutorial-ai、venom-resource-update 共17通过；short-search、tutorial-tactical-runtime、tutorial-lesson-runtime 共44通过。独立预算检查5套56通过及浏览器引擎2通过；套件重叠，不合计为独立总数。
+- 本地证据位于 output/RED234/elune-check/：root-bounded-check.ts、root-bounded-results.json、summary.json、browser-decisions.json、browser-guard-consumed.png。原玩家tab8没有刷新或执行游戏操作；诊断使用独立tab9。
+
+结论：守护消耗的模拟与评分在上述对照正常；累计预算可导致未比较普通行动便结束。原玩家部署后立即空过仍未精确复现，验收第3项仍未完成。本轮为专项调查，不宣称修复。不通过强制动作、重置累计预算或增大时间上限掩盖问题。
+
+## 默认计时查证与异常输入保存（2026-10-03）
+
+- 四种合法玩家部署路线、seed18707、至第12回合，共24个AI回合，均至少执行两个普通动作；未复现开局只部署就结束。
+- 独立默认计时回放第8回合：AI已执行两个普通动作，剩2AP，搜索返回 endTurn、time-budget、overTurnBudget=true、nodes=0。逐一正式模拟全部合法根候选，13个普通动作收益高于正式结束回合基线；同一状态取消时间截止后选择 useBasicSkill、93节点。该局面的 SHA-256 为 47345BBCD94043B2339EFC79FB488ED6BCC11C360F77F15C21452972EB74FF34。完整局面及比较结果保存在 output/RED234/focus-turn-8-beforestate.json 和 focus-end-comparisons.json。耗时受运行环境影响，不能把动作数或时间作为跨机器确定性断言。
+- 此证据确认累计预算可造成有益动作未比较即结束，不等同于用户零普通动作案例，验收第3项仍未完整验证。艾露恩守护并非上述案例的已证实原因。
+- 新候选只增加有界本地取证。显式开启 tutorialPerf=1 的 loopback 教程页面，保存前两次零普通动作结束，或累计时间耗尽且剩AP的结束输入。input continuation 在覆盖返回 continuation 前复制；页面同步深拷贝局面并删除 skillsById 展示缓存。原20条性能记录滚动保留快照，不上传数据、不更改AI策略。
+- 浏览器受控验收使用蓝方0AP、无手牌且无免费移动的局面，合法动作仅 endTurn；这是正确结束的取证功能测试，不是用户Bug复现。正式Worker结果保存决策前第2回合状态、输入普通动作数0、input continuation=null，返回 continuation 为1节点，随后进入玩家第3回合。
+- 保存的浏览器 JSON 经 Node 中正式 planTutorialAiAction 重放，仍选择 endTurn、selected、1节点；正式隔离规则模拟接受操作并进入 end 阶段。证据为 output/RED234/browser-capture-records.json、browser-capture-replay-result.json、browser-capture-smoke.png。
+- 取证相关教程测试28通过，独立审查两套19通过（与前者重叠）；typecheck、定向 ESLint、check:encoding、diff检查通过。typecheck 首次被忽略目录中调查脚本的两处隐式any阻挡，补充脚本类型后通过；没有修改产品类型来掩盖错误。
+- 正常诊断入口：http://127.0.0.1:38680/battle.html?mode=tutorial&lesson=tactical-intuition&practice=1&tutorialPerf=1 。不含 qaReplay，不加载人工修改的0AP局面。原玩家对局未刷新或操作。若再出现只部署结束，保留该页面即可读取前两份输入。
+
+## 玩家仅使用灵魂残片案例（2026-10-03）
+
+- 读取38680原玩家页面，未刷新或提交操作。第8回合顺序为部署、灵魂残片、结束；第9回合开始时蓝方仍有4AP。结束决策 nodes=12，10 evaluated、2 rejected、105 candidate-limit，overTurnBudget=false，累计 elapsedMs≈1536.7ms。此案例是单次软截止下的有限比较，不能沿用累计预算耗尽的结论。DOM记录和截图保存在 output/RED234/user-latest-records.json、user-turn9-ap4.png。
+- 取证触发遗漏了这种已行动、未耗尽累计预算的 time-budget 结束；已扩为所有 time-budget 且AP>0的结束，维持显式门禁与最多两份。回归覆盖1普通行动、4AP、overTurnBudget=false。
+- 冻结对照修正：另一个保存的第8回合状态并不是本次玩家状态。对其添加一回合敌方freeze，正式结束只增加400 status分，moveRange、机动与未来攻击评分未增加；不能声称冻结导致几十万级评分跳变。完整对照见 output/RED234/end-component-probe.json。该另存状态有143候选，致命打击比结束高约486796分、眼棱高89186分，但不能当作本次遗漏候选一定有益的证据。
+- 教程局部修复采用有限的结束前检查，不增大累计时间/节点/动作上限、不修改评价器权重、卡牌或规则。普通练习默认关闭。用户当前精确局面仍缺完整输入，后续候选自动取证覆盖单次截止，最终体验待人工验证。
+
+## 本轮回退
 
 仅撤销 RED-234 局部提交，保留 RED-232、RED-233；无数据迁移。不合并或发布。真实玩家体验由负责人验收。
+
+## 2026-10-03 target draft / end-turn coverage candidate
+
+- Root regression reproduced three failures before the UI fix: another skill card hover cleared an explicitly activated click, drag, or legacy target draft. `previewSkillCard` now only replaces transient hover drafts; explicit selection/cancel and authoritative state invalidation retain their existing paths.
+- Controlled Uther fixture (seed 18707, positions adjusted for visibility, not the user's original replay): blessed-hammer selected an adjacent enemy and reduced Obito HP 13 to 10; shield-of-light then selected Uther and added divine shield. Both entered cooldown. Screenshot: `output/RED234/uther-both-skills.png`. This verifies submission, not every intermittent hover path or preview result.
+- Final targeted run: 8 files / 98 tests passed, including hard cumulative time cutoff, conditional root coverage, action-then-end comparison, worker, capture, and skill selection/preview tests. Typecheck, targeted ESLint, encoding, and diff checks passed.
+- Candidate normal URL: http://127.0.0.1:38681/battle.html?mode=tutorial&lesson=tactical-intuition&practice=1&tutorialPerf=1 . No qaReplay flag, hence no staged fixture. Existing user tab at 38680 was preserved.
+- The separate saved canonical state already selected a useful skill in both control and new search; it is adjacent regression evidence, not an exact replay of the user's latest partial-action end turn. AC3 remains open pending longer real games and renewed evidence captures.

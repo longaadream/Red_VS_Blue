@@ -27,6 +27,8 @@ export const TUTORIAL_AI_DEFAULTS: Readonly<ShortSearchConfig> = Object.freeze({
   decisionTimeMs: 250,
   deploymentTimeMs: 500,
   minimumRootCoverage: 12,
+  endTurnRootCoverage: 48,
+  endTurnComparisons: 3,
 })
 
 export interface TutorialAiOptions {

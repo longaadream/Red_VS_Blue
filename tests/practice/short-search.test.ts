@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- synthetic authority graphs test search independently of rules. */
 import { describe, expect, it } from 'vitest'
-import { planShortSearchAction, selectShortSearchCandidates } from '@/lib/game/ai-short-search'
+import { planShortSearchAction, selectShortSearchCandidates, SHORT_SEARCH_DEFAULTS } from '@/lib/game/ai-short-search'
 import type { AIEnvironment, AIObservation, CandidateAction } from '@/lib/game/ai-types'
 import { makePiece, makeState } from '../helpers/minimal-state'
 
@@ -51,6 +51,11 @@ function graph(options: { rejected?: boolean; blocked?: boolean; foreign?: boole
 const deterministic = { turnTimeMs: 0, decisionTimeMs: 0, deploymentTimeMs: 0 }
 
 describe('short-search bounded planning', () => {
+  it('keeps end-turn coverage disabled for ordinary short-search defaults', () => {
+    expect(SHORT_SEARCH_DEFAULTS.endTurnRootCoverage).toBe(0)
+    expect(SHORT_SEARCH_DEFAULTS.endTurnComparisons).toBe(0)
+  })
+
   it('scores public deployment alternatives beyond the ordinary root shortlist', () => {
     const f = graph()
     const legal = Array.from({ length: 48 }, (_, i) => ({
@@ -205,6 +210,160 @@ describe('short-search bounded planning', () => {
     expect(decision.nodes).toBe(4)
     expect(decision.elapsedMs).toBe(150)
     expect(decision.overDecisionBudget).toBe(true)
+  })
+
+  it('continues tutorial root coverage past the soft cutoff to find the thirteenth ordinary action', () => {
+    const f = graph()
+    const roots = Array.from({ length: 13 }, (_, index) => candidate(`ordinary-${String(index).padStart(2, '0')}`))
+    let clock = 0
+    f.environment.listLegalActions = s => Number(s.extensions?.stage ?? 0) === 0
+      ? [candidate('end', 'end-turn'), ...roots]
+      : [candidate('end', 'end-turn')]
+    f.environment.simulate = (s, input) => {
+      clock += 250
+      const next = structuredClone(s)
+      const id = (input as CandidateAction).id
+      if (id === 'end') next.turn.phase = 'end'
+      else {
+        const index = Number(id.slice('ordinary-'.length))
+        next.extensions!.stage = index + 1
+        next.pieces[1].currentHp = index === 12 ? 0 : 101
+      }
+      return { protocolVersion: 1, accepted: true, state: next,
+        stateHash: '', transitionHash: '', trace: { actionLog: [], stateChanges: [] } }
+    }
+    const decision = planShortSearchAction(f.state, 'player-red', 1, {
+      ...f,
+      now: () => clock,
+      config: { ...deterministic, rootCandidates: 2, endTurnRootCoverage: 48, endTurnComparisons: 0, decisionTimeMs: 100 },
+    })
+
+    expect(decision.nextAction?.id).toBe('ordinary-12')
+    expect(decision.trace.filter(row => row.depth === 0 && row.reason === 'evaluated'))
+      .toHaveLength(14)
+    expect(decision.overDecisionBudget).toBe(true)
+  })
+
+  it('compares a completed end phase after a lower-scoring ordinary root', () => {
+    const f = graph()
+    let clock = 0
+    f.environment.listLegalActions = s => Number(s.extensions?.stage ?? 0) === 0
+      ? [candidate('end', 'end-turn'), candidate('ordinary', 'move')]
+      : [candidate('end', 'end-turn')]
+    f.environment.simulate = (s, input) => {
+      clock += 250
+      const next = structuredClone(s)
+      const id = (input as CandidateAction).id
+      if (id === 'ordinary') {
+        next.extensions!.stage = 1
+        next.pieces[1].currentHp = 100
+      } else if (Number(s.extensions?.stage ?? 0) === 1) {
+        next.extensions!.stage = 2
+        next.turn.phase = 'end'
+        next.pieces[1].currentHp = 0
+      } else {
+        next.turn.phase = 'end'
+        next.pieces[1].currentHp = 1
+      }
+      return { protocolVersion: 1, accepted: true, state: next,
+        stateHash: '', transitionHash: '', trace: { actionLog: [], stateChanges: [] } }
+    }
+    const decision = planShortSearchAction(f.state, 'player-red', 1, {
+      ...f,
+      now: () => clock,
+      config: { ...deterministic, depth: 1, rootCandidates: 1, endTurnRootCoverage: 2, endTurnComparisons: 1,
+        decisionTimeMs: 100 },
+    })
+
+    expect(decision.nextAction?.id).toBe('ordinary')
+    expect(decision.sequence.map(action => action.id)).toEqual(['ordinary', 'end'])
+    expect(decision.trace).toContainEqual(expect.objectContaining({
+      depth: 1, rootId: 'ordinary', candidateId: 'end', reason: 'evaluated',
+    }))
+  })
+
+  it('does not spend an end-turn comparison beyond the hard node budget', () => {
+    const f = graph()
+    f.environment.listLegalActions = s => Number(s.extensions?.stage ?? 0) === 0
+      ? [candidate('end', 'end-turn'), candidate('ordinary', 'move')]
+      : [candidate('end', 'end-turn')]
+    f.environment.simulate = (s, input) => {
+      const next = structuredClone(s)
+      if ((input as CandidateAction).id === 'ordinary') next.extensions!.stage = 1
+      else next.turn.phase = 'end'
+      return { protocolVersion: 1, accepted: true, state: next,
+        stateHash: '', transitionHash: '', trace: { actionLog: [], stateChanges: [] } }
+    }
+    const decision = planShortSearchAction(f.state, 'player-red', 1, {
+      ...f,
+      config: { ...deterministic, depth: 1, rootCandidates: 1, endTurnRootCoverage: 2, endTurnComparisons: 1,
+        nodesPerDecision: 2, nodesPerTurn: 2 },
+    })
+
+    expect(decision.nodes).toBe(2)
+    expect(decision.stopReason).toBe('node-budget')
+    expect(decision.trace.some(row => row.depth === 1)).toBe(false)
+  })
+
+  it('does not score an end comparison that leaves pending input unresolved', () => {
+    const f = graph()
+    f.environment.listLegalActions = s => Number(s.extensions?.stage ?? 0) === 0
+      ? [candidate('end', 'end-turn'), candidate('ordinary', 'move')]
+      : [candidate('end', 'end-turn')]
+    f.environment.simulate = (s, input) => {
+      const next = structuredClone(s)
+      if ((input as CandidateAction).id === 'ordinary') {
+        next.extensions!.stage = 1
+        ;(next as any).pendingTargetSelection = { playerId: 'player-red' }
+      } else if (Number(s.extensions?.stage ?? 0) === 0) {
+        next.turn.phase = 'end'
+      }
+      return { protocolVersion: 1, accepted: true, state: next,
+        stateHash: '', transitionHash: '', trace: { actionLog: [], stateChanges: [] } }
+    }
+    const decision = planShortSearchAction(f.state, 'player-red', 1, {
+      ...f,
+      config: { ...deterministic, depth: 1, rootCandidates: 1, endTurnRootCoverage: 2, endTurnComparisons: 1 },
+    })
+    const comparison = decision.trace.find(row => row.depth === 1 && row.rootId === 'ordinary')
+
+    expect(decision.nextAction?.id).toBe('end')
+    expect(comparison).toMatchObject({ candidateId: 'end', reason: 'blocked' })
+    expect(comparison).not.toHaveProperty('score')
+  })
+
+  it('stops end comparisons at the cumulative time boundary despite the soft overrun option', () => {
+    const f = graph()
+    let clock = 0
+    let simulated = 0
+    const simulate = f.environment.simulate
+    f.environment.simulate = (state, input, context) => {
+      simulated++
+      clock += 100
+      return simulate(state, input, context)
+    }
+    f.environment.listLegalActions = () => [candidate('end', 'end-turn'), candidate('setup', 'move')]
+    const decision = planShortSearchAction(f.state, 'player-red', 1, { ...f, now: () => clock,
+      config: { depth: 1, rootCandidates: 2, endTurnRootCoverage: 2, endTurnComparisons: 3,
+        decisionTimeMs: 50, turnTimeMs: 200 } })
+    expect(simulated).toBe(2)
+    expect(decision.nodes).toBe(2)
+    expect(decision.stopReason).toBe('time-budget')
+    expect(decision.nextAction?.id).toBe('end')
+    expect(decision.trace.some(row => row.depth === 1)).toBe(false)
+  })
+
+  it('validates end-turn coverage and comparison bounds', () => {
+    const f = graph()
+    expect(() => planShortSearchAction(f.state, 'player-red', 1, {
+      ...f, config: { ...deterministic, endTurnRootCoverage: 49 },
+    })).toThrow()
+    expect(() => planShortSearchAction(f.state, 'player-red', 1, {
+      ...f, config: { ...deterministic, endTurnComparisons: 4 },
+    })).toThrow()
+    expect(() => planShortSearchAction(f.state, 'player-red', 1, {
+      ...f, config: { ...deterministic, endTurnRootCoverage: -1 },
+    })).toThrow()
   })
 
   it('reports indivisible simulation overruns instead of claiming a hard deadline', () => {

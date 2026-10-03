@@ -597,6 +597,11 @@
       resetTutorialAiBudgetIfNeeded(state)
       const expectedState = state
       const expectedOwner = owner
+      // Keep the exact input continuation/counter before the worker can return
+      // the next continuation. Replay evidence must explain this decision,
+      // rather than the state produced by the decision itself.
+      const inputContinuation = copyTutorialAiContinuation(tutorialAiContinuation)
+      const inputActionsTaken = tutorialAiActionsTaken
       const expectedToken = authorityStateToken(engine, state)
       const rootSeed = resolveTutorialRootSeed(engine, state)
       if (typeof hooks.search !== 'function') throw new Error('教程 AI 搜索客户端不可用')
@@ -639,7 +644,7 @@
       }
       if (hooks.onAiDecisionResult) {
         const traceDiagnostics = tutorialAiTraceDiagnostics(decision.trace)
-        hooks.onAiDecisionResult({
+        const details = {
           action: action,
           owner: expectedOwner,
           turn: expectedState.turn,
@@ -653,9 +658,38 @@
           overTurnBudget: decision.overTurnBudget === true,
           overDecisionBudget: decision.overDecisionBudget === true,
           continuation: copyTutorialAiContinuation(decision.continuation),
-          actionsTakenThisTurn: tutorialAiActionsTaken,
+          actionsTakenThisTurn: inputActionsTaken,
           stopReason: decision.stopReason,
+        }
+        const actingPlayer = (expectedState.players || []).find(function (player) {
+          return player && samePlayer(player.playerId, expectedOwner)
         })
+        const captureReplay = hooks.captureAiReplay === true
+          && action.type === 'endTurn'
+          && (inputActionsTaken === 0
+            || (decision.stopReason === 'time-budget'
+              && Number(actingPlayer && actingPlayer.actionPoints) > 0))
+        if (captureReplay) {
+          details.replayInput = {
+            state: expectedState,
+            rootSeed: rootSeed,
+            playerId: expectedOwner,
+            continuation: inputContinuation,
+            actionsTakenThisTurn: inputActionsTaken,
+          }
+          details.replayResult = {
+            action: Object.assign({}, action),
+            score: Number.isFinite(decision.score) ? decision.score : undefined,
+            nodes: decision.nodes,
+            considered: decision.considered,
+            elapsedMs: decisionElapsed,
+            overTurnBudget: decision.overTurnBudget === true,
+            overDecisionBudget: decision.overDecisionBudget === true,
+            stopReason: decision.stopReason,
+            continuation: copyTutorialAiContinuation(decision.continuation),
+          }
+        }
+        hooks.onAiDecisionResult(details)
       }
       const opponentAction = !samePlayer(owner, lesson.player.playerId)
       const phaseOnly = action.type === 'beginPhase'
