@@ -35,6 +35,7 @@ export {
 } from './battle-presentation-events'
 export { getEffectiveChargeCost } from './skills'
 export { planBotActions, prepareLegalBotAction } from './ai'
+export { planTutorialAiAction, TUTORIAL_AI_DEFAULTS } from './tutorial-ai'
 export { getCurrentInputOwnerPlayerId } from './turn-timer'
 export { parseGameProfileIdentityV1 } from '../content-pipeline/runtime/profile-game-identity'
 export {

@@ -30,7 +30,9 @@ async function fixture(id) {
   let selected = null
   const revealPieceSkills = vi.fn()
   const setCue = vi.fn()
-  const engine = { getCurrentInputOwnerPlayerId, planBotActions, prepareLegalBotAction }
+  const engine = { getCurrentInputOwnerPlayerId, planBotActions, prepareLegalBotAction,
+    planTutorialAiAction: vi.fn(), getBattleRootSeed: state => state.extensions?.tutorialLesson?.rootSeed,
+    hashBattleState: state => JSON.stringify(state) }
   function commit(action) {
     const skills = state.skillsById
     state = runBattleAction(state, action, { rootSeed: lesson.rootSeed }).state
