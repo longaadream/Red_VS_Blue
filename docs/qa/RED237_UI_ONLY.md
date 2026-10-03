@@ -65,4 +65,12 @@ passed before each local commit
 
 - 本候选不包含教程 AI 搜索优化、Worker 调度、Minato 飞雷神锚点规则或 Blizzard 全图目标数据；这些改动由其他任务独立处理。
 - 自动测试使用 DOM/Three.js 模拟环境，不能替代真实 WebGL 下的亮度和字号视觉验收。
-- 回退顺序为移除 `6d6de5c38`、`0da1d67cf`；无需数据迁移。
+- 回退本PR整体（含公开预演依赖及对应生成bundle），无需数据迁移。
+## 最终独立验证与真实页面证据
+
+- 独立审查最终状态反馈与页面契约五个suite86/86通过，包含完整battle-page-contract49项。此前9项失败来自公开预演依赖增加后旧VM测试缺少辅助函数/旧文本断言；适配保留非法指令拒绝、同步期间不盖章/不发送、取消归属断言。未更新快照。
+- 独立内存write:false重建practice Worker，与checked-in生成产物逐字节一致；AI、practice Worker、教程源码与main无差异。
+- 全站motion接线337423116已撤销；最终其它页面无差异，本任务仅battle消费共享motion。原RED224/225/227/231/233 QA记录仅为依赖的历史参考，本节与上方本次运行才是本候选证据。
+- 新端口38682真实普通practice烟测：配置八人棋组、部署图拉扬、征讨号令选圣光充能正式提交（AP1→0）、下一轮部署维伦、圣光充能及圣铸进军友军/地格两阶段响应完成（AP2→1）。可见“本回合首次移动免费”“强化”的中文名与独立SVG；大黄色提示居中略高。未使用tutorial夹具或修改页面内部状态；未刷新现有玩家对局。
+- 截图位于独立集成候选树的output/RED237/practice-opening.png、status-details.png、buff-status-details.png。静态截图不替代人工对连续动画及各设备尺寸的体验判断；没有声称真实施放全部可见状态。
+- 类型、编码、diff、最新main-baseline通过。最终ESLint尝试未能启动：共享依赖环境eslint-plugin-react-hooks加载报Cannot find module '@babel/core'，退出1；没有禁用规则或修改项目依赖，需在完整标准依赖环境补跑。不能将该项报告为通过。
