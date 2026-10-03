@@ -137,11 +137,32 @@ function removeHiddenInventory(holder: JsonRecord): void {
  * contract.
  */
 function hasUnprovenExecutableState(state: BattleState, allowTerminal = false): boolean {
-  if (state.deployment && state.deployment.status !== 'complete') return true
+  if (state.deployment
+    && state.deployment.status !== 'complete'
+    && !isPreviewSafeProgressiveTurnReady(state)) return true
   if (state.customCards && Object.keys(state.customCards).length > 0) return true
   if (!allowTerminal && state.terminalResult) return true
 
   return false
+}
+
+/**
+ * A progressive reserve offer is still an interactive deployment transaction.
+ * Once that transaction has settled, the public state keeps only its phase and
+ * reserve counts. Ordinary action commands are then executable without any
+ * deployment input, so the isolated preview may safely discard the metadata.
+ */
+function isPreviewSafeProgressiveTurnReady(state: BattleState): boolean {
+  const deployment = state.deployment
+  if (!deployment) return false
+  if (deployment.mode !== 'progressive-reserve-v1' || deployment.status !== 'turn-ready') return false
+  if (state.turn.phase !== 'action') return false
+  const emptyList = (value: unknown): boolean => value === undefined || (Array.isArray(value) && value.length === 0)
+  return deployment.activePlayerId === undefined
+    && deployment.offerTurnNumber === undefined
+    && emptyList(deployment.offerPieceIds)
+    && emptyList(deployment.offerPieces)
+    && emptyList(deployment.legalPositions)
 }
 
 const PUBLIC_EXTENSION_KEYS = new Set(['contentMode', 'removedPieces', 'skillPresentation', 'tileEffects'])
@@ -152,7 +173,7 @@ const PRIVATE_EXTENSION_KEYS = new Set([
 
 function sanitizePreviewState(state: BattleState): boolean {
   if (state.deployment) {
-    if (state.deployment.status !== 'complete') return false
+    if (state.deployment.status !== 'complete' && !isPreviewSafeProgressiveTurnReady(state)) return false
     delete state.deployment
   }
   delete state.terminalResult
