@@ -6,7 +6,7 @@
 - `base_branch: main`
 - `base_sha: 9d1b0c30801cd733ec4cede37ce1ef0889a2313a`（刷新后的 `origin/main`）。
 - 实现分支：`codex/RED-237-ui-only`。
-- 本地提交：`0da1d67cf`（预演基础）、`6d6de5c38`（状态与亮度反馈）、`337423116`（页面 motion 接入）。
+- 本地有效提交：`0da1d67cf`（预演基础）、`6d6de5c38`（状态与亮度反馈）。
 
 ## 交付内容
 
@@ -26,7 +26,7 @@
 ### 亮度与页面 motion
 
 - 移除全屏遮光蒙版和范围地格的发光强度脉冲；范围边框与斜线仍然保留。
-- 共享 cursor、触控、减少动态效果和 teardown 运行时已接入 UI 合同覆盖的页面。
+- `battle.html` 加载共享 cursor、触控、减少动态效果和 teardown 运行时；其它页面保持原有资源边界。
 
 ## 自动验证
 
@@ -42,11 +42,8 @@ node node_modules/vitest/vitest.mjs run tests/ui/battle-effect-icons.test.ts tes
 node node_modules/vitest/vitest.mjs run tests/ui/battle-action-vignette.test.ts tests/ui/battle-renderer-3d-runtime.test.ts --maxWorkers=1
 2 files / 88 tests passed
 
-node node_modules/vitest/vitest.mjs run tests/ui/ui-motion-pages.test.ts --maxWorkers=1
-1 file / 24 tests passed
-
 npm.cmd run typecheck
-passed
+direct `node node_modules/next/dist/bin/next typegen && node node_modules/typescript/bin/tsc --noEmit` passed
 
 git diff --cached --check
 passed before each local commit
@@ -62,10 +59,10 @@ passed before each local commit
 2. 触发一次非法操作或等待状态提示，确认黄色文字在棋盘中部水平居中、字号可读，并且目标选择模式的目标提示没有被覆盖。
 3. 触发带多个目标的增益或范围技能，确认战场底色不再连续变亮/变暗，地格边框与斜线仍可见，逐目标浮字仍出现。
 4. 点击技能并移动鼠标到目标，确认预演可见；发生普通棋盘重绘后，预演与当前目标选择仍保留。切换到历史查看后，确认历史视图不会恢复旧预演。
-5. 在任意页面确认共享 cursor；开启系统“减少动态效果”后刷新页面，确认 motion runtime 不抛异常并停止过渡动画。
+5. 在战斗页面确认共享 cursor；开启系统“减少动态效果”后刷新页面，确认 motion runtime 不抛异常并停止过渡动画。
 
 ## 已知边界与回退
 
 - 本候选不包含教程 AI 搜索优化、Worker 调度、Minato 飞雷神锚点规则或 Blizzard 全图目标数据；这些改动由其他任务独立处理。
 - 自动测试使用 DOM/Three.js 模拟环境，不能替代真实 WebGL 下的亮度和字号视觉验收。
-- 回退顺序为移除 `337423116`、`6d6de5c38`、`0da1d67cf`；无需数据迁移。
+- 回退顺序为移除 `6d6de5c38`、`0da1d67cf`；无需数据迁移。
