@@ -143,6 +143,28 @@ describe('isolated public ordinary move preview', () => {
     expect(JSON.stringify(state)).toBe(before)
   })
 
+  it('counts each entered Amaterasu cell once and includes the destination once', () => {
+    const state = enemyAmaterasuMoveState()
+    state.extensions!.amaterasuCells = [
+      { x: 0, y: 1, ownerPlayerId: 'player-blue', sourcePieceId: 'opponent' },
+      { x: 1, y: 1, ownerPlayerId: 'player-blue', sourcePieceId: 'opponent' },
+    ]
+    state.extensions!.tileEffects = [
+      { id: 'amaterasu-1', x: 0, y: 1, tileType: 'amaterasu' },
+      { id: 'amaterasu-2', x: 1, y: 1, tileType: 'amaterasu' },
+    ]
+    const action = moveAction([{ x: 0, y: 1 }, { x: 1, y: 1 }])
+    const actual = applyBattleAction(state, action)
+    const result = previewBattleAction(state, action, 'player-red')
+
+    expect(actual.pieces.find(piece => piece.instanceId === 'mover')?.statusTags)
+      .toEqual(expect.arrayContaining([expect.objectContaining({ type: 'amaterasu-burn', stacks: 2, intensity: 2 })]))
+    expect(result.status).toBe('ready')
+    if (result.status !== 'ready') return
+    expect(result.snapshot.pieces.find(piece => piece.instanceId === 'mover')?.statusTags)
+      .toEqual(expect.arrayContaining([expect.objectContaining({ type: 'amaterasu-burn', stacks: 2, intensity: 2 })]))
+  })
+
   it('previews enemy Itachi terrain whose canonical cells only contain coordinates', () => {
     const state = enemyAmaterasuMoveState()
     state.extensions!.amaterasuCells = [{ x: 0, y: 1 }]

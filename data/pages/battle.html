@@ -2878,7 +2878,25 @@
       if (renderer && renderer.clearPreviewBoard) renderer.clearPreviewBoard()
     }
 
-    function showMoveBoardPreview(snapshot) {
+    function showMovePreviewFloaters(events, predicted, authority, renderer) {
+      ;(events || []).forEach(function (event) {
+        if (event.kind !== 'damage' && event.kind !== 'heal') return
+        const value = event.result || {}
+        const amount = Math.abs(Number(value.amount) || 0)
+        if (!amount) return
+        const ids = event.targetPieceIds || (event.sourcePieceId ? [event.sourcePieceId] : [])
+        ids.forEach(function (id) {
+          const piece = predicted.pieces.find(function (candidate) { return candidate.id === id })
+            || authority.pieces.find(function (candidate) { return candidate.id === id })
+          if (!piece) return
+          const text = (event.kind === 'heal' ? '+' : '−') + amount
+          const color = event.kind === 'heal' ? '#4ade80' : '#f87171'
+          renderer.spawnFloater(piece.x, piece.y, text, color, false, { kind: event.kind, preview: true })
+        })
+      })
+    }
+
+    function showMoveBoardPreview(snapshot, events) {
       const renderer = _use3d && window.BattleRenderer3D
       if (!moveDraft || !renderer || !renderer.showPreviewBoard || !currentBattleViewModel) return
       const predicted = createBattlePresentationModel(snapshot)
@@ -2897,6 +2915,7 @@
       predicted.interactionPieces = authority.pieces
       renderer.showPreviewBoard(predicted, authority)
       movePreviewVisible = true
+      if (events) showMovePreviewFloaters(events, predicted, authority, renderer)
     }
 
     function refreshMoveDraftCandidates() {
@@ -2907,6 +2926,7 @@
       }) : []
       moveDraft.previewText = ''
       moveDraft.previewSnapshot = null
+      moveDraft.previewEvents = []
       moveDraft.remaining = null
       if (!moveDraft.valid || !moveDraft.path.length) {
         if (movePreviewCoordinator) movePreviewCoordinator.clear()
@@ -2921,6 +2941,7 @@
         if (result.status !== 'ready') draft.previewText = '沿途效果暂无法预演'
         else {
           draft.previewSnapshot = result.snapshot
+          draft.previewEvents = Array.isArray(result.events) ? result.events : []
           draft.continuationCells = BattleLegalActions.getNormalMoveContinuationTargets({ snapshot: G, engine: GameEngine,
             pieceId: draft.pieceId, path: draft.path, previewSnapshot: result.snapshot })
           const after = result.snapshot.pieces.find(function (piece) { return piece.instanceId === draft.pieceId })
@@ -2928,7 +2949,7 @@
           draft.previewText = ''
         }
         renderMoveDraftFeedback()
-        if (result.status === 'ready') showMoveBoardPreview(result.snapshot)
+        if (result.status === 'ready') showMoveBoardPreview(result.snapshot, draft.previewEvents)
       })
     }
 

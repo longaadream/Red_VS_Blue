@@ -23,7 +23,7 @@ function harness(terrain: 'amaterasu' | 'toxin' = 'amaterasu') {
     state.players[1].statusTags = [{ id: 'toxin', type: 'lethal-toxin', intensity: 4, value: 1, extraValue: 1, sourceId: 'enemy', currentDuration: -1 }]
     state.extensions = { tileEffects: [{ id: 'toxin', sourceId: 'toxin', tileType: 'lethal-toxin', x: 1, y: 1, ownerPlayerId: 'player-blue' }] }
   }
-  const renderer = { showPreviewBoard: vi.fn(), clearPreviewBoard: vi.fn() }
+  const renderer = { showPreviewBoard: vi.fn(), clearPreviewBoard: vi.fn(), spawnFloater: vi.fn() }
   const model = (snapshot: typeof state) => ({ pieces: snapshot.pieces.map(piece => ({ id: piece.instanceId,
     x: piece.x, y: piece.y, health: { current: piece.currentHp }, statusSummary: piece.statusTags })), interaction: {}, legal: {} })
   const ctx: any = createContext({
@@ -63,8 +63,18 @@ describe('drag path through public terrain uses the real rule preview', () => {
     const [predicted, authority] = renderer.showPreviewBoard.mock.calls[0]
     expect(predicted.pieces.find((piece: { id: string }) => piece.id === 'mover').health.current).toBe(96)
     expect(authority.pieces.find((piece: { id: string }) => piece.id === 'mover').health.current).toBe(100)
+    expect(renderer.spawnFloater).toHaveBeenCalledWith(1, 1, '−4', '#f87171', false, { kind: 'damage', preview: true })
     expect(ctx.moveDraft.previewSnapshot.extensions?.tileEffects ?? []).toHaveLength(0)
     expect(JSON.stringify(state)).toBe(before)
+    ctx.showMoveBoardPreview(ctx.moveDraft.previewSnapshot)
+    expect(renderer.showPreviewBoard).toHaveBeenCalledTimes(2)
+    expect(renderer.spawnFloater).toHaveBeenCalledTimes(1)
+    ctx.updateMoveDrag('mover', [{ x: 1, y: 1 }])
+    vi.advanceTimersByTime(100)
+    expect(renderer.spawnFloater).toHaveBeenCalledTimes(1)
+    ctx.updateMoveDrag('mover', [{ x: 0, y: 0 }])
+    expect(renderer.clearPreviewBoard).toHaveBeenCalledOnce()
+    expect(renderer.spawnFloater).toHaveBeenCalledTimes(1)
   })
   it('shows enemy terrain status after the pause and restores the authoritative board on backtracking', () => {
     vi.useFakeTimers()
@@ -85,5 +95,28 @@ describe('drag path through public terrain uses the real rule preview', () => {
     expect(renderer.clearPreviewBoard).toHaveBeenCalledOnce()
     vi.advanceTimersByTime(100)
     expect(renderer.showPreviewBoard).toHaveBeenCalledOnce()
+    expect(renderer.spawnFloater).not.toHaveBeenCalled()
+  })
+
+  it('shows positive healing from a movement preview as a green floater', () => {
+    vi.useFakeTimers()
+    const { ctx, state, renderer } = harness()
+    const snapshot = structuredClone(state)
+    snapshot.pieces[0].x = 1
+    snapshot.pieces[0].y = 1
+    ctx.GameEngine.previewBattleAction = () => ({
+      status: 'ready',
+      snapshot,
+      events: [
+        { kind: 'heal', targetPieceIds: ['mover'], result: { amount: 7, value: 107 } },
+        { kind: 'damage', targetPieceIds: ['mover'], result: { amount: 0, value: 100 } },
+      ],
+    })
+
+    ctx.updateMoveDrag('mover', [{ x: 0, y: 1 }, { x: 1, y: 1 }])
+    vi.advanceTimersByTime(90)
+
+    expect(renderer.spawnFloater).toHaveBeenCalledWith(1, 1, '+7', '#4ade80', false, { kind: 'heal', preview: true })
+    expect(renderer.spawnFloater).toHaveBeenCalledTimes(1)
   })
 })

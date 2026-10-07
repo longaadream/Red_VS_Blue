@@ -966,7 +966,11 @@
     const uses = Number(values.uses)
     const duration = Number(values.duration)
     const intensity = Number(values.intensity)
-    if (Number.isFinite(stacks) && stacks > 1) return String(stacks)
+    // A layered effect can carry a separate intensity value (for example,
+    // Amaterasu deals 2 damage per stack).  Once stacks is present, it is the
+    // count the board badge must show, including the first stack; falling
+    // through to intensity made a single Amaterasu contact look like 2 layers.
+    if (Number.isFinite(stacks) && stacks > 0) return String(stacks)
     if (Number.isFinite(uses) && uses > 0) return String(uses)
     if (Number.isFinite(duration) && duration > 0) return String(duration)
     if (Number.isFinite(intensity) && intensity > 1) return String(intensity)

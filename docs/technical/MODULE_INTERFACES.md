@@ -699,3 +699,7 @@ RED-186 正式接入：battle.html 直接加载 tabletop-battle 样式与角色�
 路径粗线、地格手绘数字和剩余步数采用轻量更新。规则预演在跨格停留 90ms 后执行，同格输入不重复规则查询；完整预测快照仅在有效结果返回时显示。连续同方向路径合并为动画子段，队列以完整路径时间等待，倍速变更沿剩余路线继续，不能将本方单效果移动瞬间定位终点。
 
 移动悬停路线经 updateMoveHoverPath 去重并通过 updateMoveDraft 轻量更新，禁止用整页 render 响应每次合法格 hover：renderBoard 的尺寸同步可能强制重发同格 hover。路线必须先写入再触发表现，确保回退渲染重入也终止。
+
+移动预演同时使用规则输出的 snapshot 与 events：snapshot 展示假设棋盘，damage/heal events 通过 spawnFloater 的 preview 标记显示实际预测数值；取消或替换路线清理预演浮字，正式浮字不受影响。同一草稿刷新棋盘不重复播放伤害提示。状态图标有正数 stacks 时优先显示该层数（包括一层），不能用 intensity 替代层数。
+
+公开预演的过滤项及尚未支持的执行场景见 docs/qa/RED-240-public-terrain-preview.md。它调用正式规则执行器，但输入经过隐私投影；未知扩展及额外选择反应存在明确限制，不能解释为完整权威结局。

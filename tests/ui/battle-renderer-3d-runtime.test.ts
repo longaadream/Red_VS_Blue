@@ -127,6 +127,8 @@ type RuntimeStatusFixture = {
   type?: string
   label?: string
   name?: string
+  stacks?: number
+  intensity?: number
   duration?: number
   uses?: number
   iconPath?: string
@@ -2029,6 +2031,33 @@ describe('RED-68 BattleRenderer3D runtime', () => {
     expect(overflow.attributes['aria-expanded']).toBe('true')
     overflow.dispatch('click', {})
     expect(statuses.dataset.open).toBe('false')
+    harness.renderer.dispose()
+  })
+
+  it('shows Amaterasu stacks instead of its per-stack intensity on the board badge', () => {
+    const harness = createHarness(844, 390, false)
+    const model = runtimeModel()
+    const pieceId = model.pieces[0].id
+    model.pieces[0].statusSummary = [{
+      id: 'amaterasu-burn-mover',
+      type: 'amaterasu-burn',
+      label: '天照',
+      stacks: 1,
+      intensity: 2,
+      iconPath: 'images/tile-effects/amaterasu.svg',
+    }]
+
+    harness.renderer.init({ container: harness.container })
+    harness.renderer.update(model)
+    harness.frame(16)
+
+    const hpLayer = harness.container.children.find((child) => child.id === 'hpBarLayer3d')!
+    const summary = hpLayer.children.find((child) => child.dataset.pieceId === pieceId)!
+    const badge = summary.querySelector('.piece-board-status-badge')!
+    expect(badge.textContent).toBe('1')
+    model.pieces[0].statusSummary[0].stacks = 2
+    harness.renderer.update(model)
+    expect(summary.querySelector('.piece-board-status-badge')?.textContent).toBe('2')
     harness.renderer.dispose()
   })
 
