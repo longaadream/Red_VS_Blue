@@ -169,7 +169,7 @@
       playbackModel = null
       playbackRoot = null
       if (mounted && !historicalRoot && currentModel && !updating) {
-        if (renderer.settlePresentation) renderer.settlePresentation(currentModel)
+        if (renderer.settlePresentation) renderer.settlePresentation(currentModel, { preserveFloaters: true })
         else renderer.update(currentModel)
         if (!settlingSelection && typeof input.onPlaybackIdle === 'function') input.onPlaybackIdle()
       }

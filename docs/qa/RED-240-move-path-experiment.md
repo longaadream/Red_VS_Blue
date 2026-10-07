@@ -1,5 +1,7 @@
 # RED-240：普通移动路径实验与动画衔接
 
+最新继承审计、恢复项和未带入项见 [RED-240-inheritance-audit.md](RED-240-inheritance-audit.md)。此前“完整 UI”描述不能替代该逐项核对结果。
+
 用户要求试做可选路径的普通移动，并加快动画衔接。随后明确 PVE 暂不处理，等待独立重做。
 
 - base_branch: main

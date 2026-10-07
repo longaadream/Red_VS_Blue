@@ -65,16 +65,17 @@ describe('RED-69 battle motion contract', () => {
     expect(renderer).toContain('const lungeDuration = MOTION_SECONDS.attack')
     expect(renderer).toContain('function _singleEffectPresentation(previousModel, nextModel)')
     expect(renderer).toContain('function _ownPresentationAction(action, model)')
-    expect(renderer).toContain('}, instant ? MOTION_TOKENS.instant : MOTION_TOKENS.action)')
+    expect(renderer).toContain('const requestedDuration = instant ? MOTION_TOKENS.instant')
+    expect(renderer).toContain('item.action.motionDurationMs')
   })
 
-  it('keeps target and status feedback short, simultaneous, and reduced-motion safe', () => {
+  it('keeps target and status feedback simultaneous, readable, and reduced-motion safe', () => {
     const css = readPage('css/battle-tactical-table.css')
     const renderer = readPage('js/battle-renderer-3d.js')
 
     expect(css).toContain('.piece-board-status-dot.is-entering')
     expect(css).toContain('.piece-board-status-dot.is-exiting')
-    expect(css).toMatch(/\.dmg-float[\s\S]*?--floater-duration:\s*600ms/)
+    expect(css).toMatch(/\.dmg-float[\s\S]*?--floater-duration:\s*2000ms/)
     expect(css).toContain('.dmg-float.is-heal')
     expect(css).toContain('@media (prefers-reduced-motion: reduce)')
     expect(css).not.toContain('animation:targetPulse')
@@ -106,8 +107,8 @@ describe('RED-69 battle motion contract', () => {
   it('uses authoritative piece coordinates while selecting a target', () => {
     const renderer = readPage('js/battle-renderer-3d.js')
     expect(renderer).toContain("const targetMode = !!(_currentModel.selection && _currentModel.selection.mode === 'target')")
-    expect(renderer).toContain('const x = targetMode ? piece.x : (obj ? obj.group.position.x : piece.x)')
-    expect(renderer).toContain('const y = targetMode ? piece.y : (obj ? obj.group.position.z : piece.y)')
+    expect(renderer).toContain('const x = targetMode || previewActive ? piece.x : (obj ? obj.group.position.x : piece.x)')
+    expect(renderer).toContain('const y = targetMode || previewActive ? piece.y : (obj ? obj.group.position.z : piece.y)')
   })
 
   it('exposes queued action count for animation diagnostics', () => {
@@ -135,6 +136,11 @@ describe('RED-69 battle motion contract', () => {
     expect(battlePage).toContain('你现在还不能行动。')
     expect(battlePage).toContain('function showDmFeedback(msg)')
     expect(battlePage).toContain('id="dmBubble"')
+    expect(battlePage).toContain('function ensureBattleFeedbackAudio()')
+    expect(battlePage).toMatch(/const key = line\s+if \(lastDmFeedback\.key === key/)
+    expect(battlePage).toContain("feedbackAudio.play('invalid')")
+    expect(battlePage).not.toContain('speechSynthesis')
+    expect(battlePage).toMatch(/function disposeBattlePage\(\)[\s\S]*?battleFeedbackAudio\.dispose\(\)/)
   })
 
   it('keeps the prominent corner timer wired to authoritative visibility', () => {
@@ -264,6 +270,6 @@ new Script("beginPendingActionFeedback({ type: 'move', pieceId: 'piece-a', clien
   it('blocks piece switching while a RED-69 command remains pending', () => {
     const battlePage = readPage('battle.html')
     const selectPiece = readNamedFunction(battlePage, 'selectPiece')
-    expect(selectPiece).toMatch(/if \(pendingActionFeedback\)[\s\S]*?暂不能切换棋子[\s\S]*?return/)
+    expect(selectPiece).toMatch(/if \(typeof pendingActionFeedback !== 'undefined' && pendingActionFeedback\)[\s\S]*?暂不能切换棋子[\s\S]*?return/)
   })
 })

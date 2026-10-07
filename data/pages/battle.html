@@ -8001,6 +8001,13 @@
     let skillPreviewReplayGeneration = 0
     const skillPreviewDisplayTimings = []
 
+    function skillPreviewViewportCell(intent) {
+      if (!intent || !Object.prototype.hasOwnProperty.call(intent, 'hoveredCell')) return null
+      const intentCell = intent.hoveredCell
+      if (!intentCell || !Number.isInteger(intentCell.x) || !Number.isInteger(intentCell.y)) return null
+      return { x: intentCell.x, y: intentCell.y }
+    }
+
     function invalidateSkillPreviewReplay() {
       skillPreviewReplayContext = null
       skillPreviewReplayGeneration += 1
@@ -8303,8 +8310,24 @@
         return
       }
       if (intent.type === 'viewport-change') {
-        clearSkillPreview()
-        replayHoverSkillPreviewAfterViewport()
+        let replayContext = skillPreviewReplayContext
+        if (replayContext && replayContext.previewOnly !== true) {
+          const pointerCell = skillPreviewViewportCell(intent)
+          if (pointerCell === null) {
+            clearSkillPreview()
+            replayContext = null
+          } else if (pointerCell) {
+            replayContext.targetX = pointerCell.x
+            replayContext.targetY = pointerCell.y
+          }
+        }
+        if (replayContext) {
+          clearSkillPreview({ preserveReplay: true })
+          scheduleSkillPreviewReplayAfterRedraw()
+        } else {
+          clearSkillPreview()
+          replayHoverSkillPreviewAfterViewport()
+        }
         schedulePieceContextMenuPosition()
         return
       }

@@ -596,6 +596,10 @@ function visiblePresentationMarkers(snapshot: BattleState, viewerId: string): Js
 }
 
 function publicPredictedState(state: BattleState, viewerId: string, skillId: string | undefined, baselineMarkers: JsonRecord[]): BattleState {
+  // Hypothetical victories have no authoritative replay archive. Remove only
+  // the terminal envelope from a copy, retaining the normal privacy projection.
+  state = { ...state }
+  delete state.terminalResult
   const projected = publicViewerExecutionSnapshot(state, viewerId) as unknown as JsonRecord
   // Return only presentation data from the already viewer-projected state.
   // Never carry executable/private extension stores into the hypothetical board.

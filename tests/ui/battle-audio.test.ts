@@ -6,18 +6,20 @@ import { describe, it, expect, vi } from 'vitest'
 function setup() {
   const listeners = new Map<string, () => void>()
   const sources: any[] = []
-  let saved: string | null = null
+  const gains: any[] = []
+  let saved: string | null = null, currentTime = 1
   const parameter = () => ({setValueAtTime:vi.fn(),linearRampToValueAtTime:vi.fn(),exponentialRampToValueAtTime:vi.fn()})
   class Audio {
-    state = 'running'; currentTime = 1; destination = {}; close = vi.fn(async()=>{}); resume = vi.fn(async()=>{})
-    createGain() {return {gain:parameter(),connect:vi.fn(),disconnect:vi.fn()}}
+    state = 'running'; destination = {}; close = vi.fn(async()=>{}); resume = vi.fn(async()=>{})
+    get currentTime() { return currentTime }
+    createGain() {const gain={gain:parameter(),connect:vi.fn(),disconnect:vi.fn()};gains.push(gain);return gain}
     createOscillator() {const s={frequency:parameter(),connect:vi.fn(),disconnect:vi.fn(),start:vi.fn(),stop:vi.fn()};sources.push(s);return s}
   }
   const w:any={AudioContext:Audio,localStorage:{getItem:()=>saved,setItem:(_:string,v:string)=>{saved=v}},document:{hidden:false,addEventListener:(type:string,fn:() => void)=>listeners.set(type,fn),removeEventListener:vi.fn()}}
   const context=createContext({window:w,console})
   new Script(readFileSync('data/pages/js/battle-ui/battle-effect-icons.js','utf8')).runInContext(context)
   new Script(readFileSync('data/pages/js/battle-audio.js','utf8')).runInContext(context)
-  return {w,listeners,sources,setVolume:(value:string)=>{saved=value}}
+  return {w,listeners,sources,gains,setVolume:(value:string)=>{saved=value},advance:(seconds:number)=>{currentTime+=seconds}}
 }
 describe('battle audio feedback',()=>{
   it('grades committed magnitudes and takes the strongest area target rather than summing damage',()=>{
@@ -38,6 +40,43 @@ describe('battle audio feedback',()=>{
     expect(heavy.frequency.setValueAtTime.mock.calls[0][0]).toBeLessThan(light.frequency.setValueAtTime.mock.calls[0][0])
     expect(heavy.stop.mock.calls[0][0]).toBeGreaterThan(light.stop.mock.calls[0][0])
     expect(huge.stop.mock.calls).toEqual(heavy.stop.mock.calls)
+  })
+  it('plays invalid as one short soft voice at normal master volume',()=>{
+    const {w,listeners,sources,gains}=setup(),audio=w.BattleAudio.create()
+    listeners.get('pointerdown')!()
+    expect(audio.play('invalid','非法目标')).toBe(true)
+    expect(sources).toHaveLength(1)
+    expect(sources[0].frequency.setValueAtTime).toHaveBeenCalledWith(260,1)
+    expect(sources[0].frequency.exponentialRampToValueAtTime).toHaveBeenCalledWith(190,expect.closeTo(1.1,10))
+    expect(gains[0].gain.setValueAtTime).toHaveBeenLastCalledWith(0.225,1)
+    expect(gains[1].gain.linearRampToValueAtTime).toHaveBeenCalledWith(0.08,expect.closeTo(1.008,10))
+    expect(sources[0].stop).toHaveBeenCalledWith(expect.closeTo(1.11,10))
+  })
+  it('throttles invalid per kind across messages and resumes after 500ms even after other sounds',()=>{
+    const {w,listeners,advance}=setup(),audio=w.BattleAudio.create()
+    listeners.get('pointerdown')!()
+    expect(audio.play('warning')).toBe(true)
+    expect(audio.play('invalid','first error')).toBe(true)
+    expect(audio.play('invalid','second error')).toBe(false)
+    advance(0.49)
+    expect(audio.play('invalid','third error')).toBe(false)
+    expect(audio.play('notice')).toBe(true)
+    advance(0.01)
+    expect(audio.play('invalid','fourth error')).toBe(true)
+  })
+  it('keeps invalid silent before unlock, while muted or hidden, and after disposal',()=>{
+    const {w,listeners,sources,setVolume}=setup(),audio=w.BattleAudio.create()
+    expect(audio.play('invalid','before unlock')).toBe(false)
+    listeners.get('pointerdown')!()
+    setVolume('0')
+    expect(audio.play('invalid','muted')).toBe(false)
+    setVolume('1')
+    w.document.hidden=true
+    expect(audio.play('invalid','hidden')).toBe(false)
+    w.document.hidden=false
+    audio.dispose()
+    expect(audio.play('invalid','disposed')).toBe(false)
+    expect(sources).toHaveLength(0)
   })
   it('keeps strengthening and weakening effects silent',()=>{
     const {w}=setup()

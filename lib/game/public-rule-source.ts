@@ -70,14 +70,28 @@ function ruleIsDeclaredByVisibleStatus(battle: unknown, ruleId: string): boolean
       && status.relatedRules.some(id => String(id) === ruleId)))
 }
 
+function ruleSourceIsOwnedByViewer(battle: unknown, metadata: unknown, viewerId: string): boolean {
+  if (!record(battle) || !record(metadata) || typeof metadata.sourceId !== 'string') return false
+  const holders = [
+    ...(Array.isArray(battle.pieces) ? battle.pieces : []),
+    ...(Array.isArray(battle.players) ? battle.players : []),
+  ]
+  return holders.some(holder => record(holder)
+    && String(holder.ownerPlayerId ?? holder.playerId ?? '').trim().toLowerCase() === viewerId
+    && String(holder.instanceId ?? holder.playerId ?? '') === metadata.sourceId)
+}
+
 export function createPublicRuleSource(
   state: BattleState,
   viewerId: string,
 ): PublicRuleSourceController {
   const publicRuleIds = collectRuleIds(state, viewerId)
   let unsupported = false
-  const ruleResolver: RuleExecutionContext['ruleResolver'] = (battle, ruleId) => {
-    if (!publicRuleIds.has(ruleId) && !ruleIsDeclaredByVisibleStatus(battle, ruleId)) {
+  const ruleResolver: RuleExecutionContext['ruleResolver'] = (battle, ruleId, metadata) => {
+    // Canonical skills can attach new rules to the viewer in the isolated
+    // battle. Resolve those owned sources from canonical resources only.
+    if (!publicRuleIds.has(ruleId) && !ruleIsDeclaredByVisibleStatus(battle, ruleId)
+      && !ruleSourceIsOwnedByViewer(battle, metadata, viewerId)) {
       unsupported = true
       return null
     }

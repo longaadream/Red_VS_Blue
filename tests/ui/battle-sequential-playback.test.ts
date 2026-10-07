@@ -42,6 +42,16 @@ beforeEach(() => vi.useFakeTimers())
 afterEach(() => vi.useRealTimers())
 
 describe('sequential board playback', () => {
+  it('preserves visible result floaters when the action queue becomes idle', () => {
+    const { presentation, renderer } = setup()
+    presentation.update(model())
+    presentation.update(model(14, events()))
+    vi.runAllTimers()
+    expect(renderer.spawnFloater).toHaveBeenCalled()
+    expect(renderer.settlePresentation).toHaveBeenLastCalledWith(expect.anything(), { preserveFloaters: true })
+    presentation.dispose()
+  })
+
   it('holds a three-leg move until its whole route finishes before applying aftermath', () => {
     const { presentation, renderer } = setup()
     presentation.update(model())
