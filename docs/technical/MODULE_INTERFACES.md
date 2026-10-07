@@ -30,12 +30,19 @@ RED-179 补充：动作小剧场的 1× / 2× 速度仍由 `battle-action-vignet
 ### 1.1 共享空间规则（RED-30）
 
 - 入口：`lib/game/spatial.ts`。
-- 职责：提供曼哈顿距离/范围、方形范围、横纵直线格序列、存活棋子占位查询和普通移动合法集合。
+- 职责：提供曼哈顿距离/范围、方形范围、横纵直线格序列、存活棋子占位查询、普通移动路径解析和合法集合。
 - 输入：只读地图、棋子和坐标；不访问窗口、存储、时间或随机源。
-- 输出：确定性的坐标/占位结果，或包含拒绝代码、位置与消息的普通移动失败结果。
+- 输出：确定性的坐标/占位结果，`getNormalMovePath()` 的最短基数路径（可带有序 waypoints，无法满足时为 `null`），
+  或包含拒绝代码、位置与消息的普通移动失败结果。
 - 调用方：`turn.ts` 的权威移动验证、`ai.ts` 的候选动作、`engine-browser-entry.ts` 导出的 UI 高亮接口，以及默认距离调用点。
-- 普通移动边界：仅横向/纵向且不超过 `moveRange`；不可行走地形与路径上的任意存活棋子阻挡；死亡/墓地棋子不阻挡；掩体是否可进入由地图的 `walkable` 属性决定。
+- 普通移动边界：路径每一步仅横向/纵向相邻且总长度不超过 `moveRange`；默认解析按公开可行走地形与存活棋子占位寻找最短路；
+  waypoints 必须按顺序经过且路径不得重复；不可行走地形与路径上的任意存活棋子阻挡；死亡/墓地棋子不阻挡；掩体是否可进入由地图的 `walkable` 属性决定。
+- 显式路径：`BattleAction.move.path` 排除起点、包含终点；`getNormalMoveRejection(..., path)` 和提交器的
+  `PositionChangeOptions.normalPath` 逐格复核并保持原路径，不会在触发器改写目标后静默改路。未提供 `normalPath` 的
+  数据/技能 `walk` 仍使用横纵直线兼容语义。
 - 排除：技能位移、推拉、传送不会隐式调用普通移动验证器，必须由技能实现明确选择空间工具。
+- 测试：`tests/game/normal-move-path.test.ts`、`spatial.test.ts`、`turn.test.ts`、`movement-contract.test.ts` 与
+  `position-contact.test.ts` 覆盖默认/waypoint 路径、显式路径拒绝、浏览器导出、AP 与接触事实。
 
 ### 1.2 确定性弹道事实（RED-32）
 

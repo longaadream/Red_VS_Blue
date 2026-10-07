@@ -29,8 +29,8 @@
     dash: 145,
     teleport: 80,
     attack: 130,
-    action: 200,
-    result: 200,
+    action: 140,
+    result: 140,
     reject: 120,
     hit: 100,
     heal: 120,
@@ -135,6 +135,10 @@
   const _anims = new Map()             // one controller per owner/property
   const _actionAnimationQueue = []
   let _actionAnimationTimer = null
+  let _actionAnimationTimerStartedAt = 0
+  let _actionAnimationTimerLogicalMs = 0
+  let _actionAnimationTimerTotalMs = 0
+  let _actionAnimationTimerSpeed = 1
   const _playedEventKeys = new Set()
   const _playedEventOrder = []
   const _pendingAppearanceCues = new Map()
@@ -148,6 +152,7 @@
   let _pressedPiece = null
   let _pressedHighlight = null
   let _reducedMotion = false
+  let _animationSpeed = 1
   let _motionQuery = null
   let _currentModel = null
   let _clock = { prev: 0 }
@@ -1157,6 +1162,7 @@
     _hoverMoveTargets = new Set((hl.move || []).map(_normalizeHighlightItem).filter(Boolean).map(cell => cell.key))
     _hoverSelectedId = hl.selected || null
     _clearHoverPath()
+    _drawHoverPath()
     const candidateKeys = new Set((hl.skill || []).map(_normalizeHighlightItem).filter(Boolean).map(cell => cell.key))
     _syncHighlightGroup('range', (hl.range || []).filter(function (cell) {
       const normalized = _normalizeHighlightItem(cell)
@@ -1431,6 +1437,17 @@
     return cell
   }
 
+  function _normalizePresentationPath(value) {
+    const result = []
+    ;(Array.isArray(value) ? value : []).forEach(function (point) {
+      if (!point || point.x == null || (point.y === undefined && point.z == null)) return
+      const cell = _normalizePresentationPoint(point)
+      if (!cell) return
+      result.push(cell)
+    })
+    return result
+  }
+
   function _createComicArrow(source, end, elevation, color, depthTest) {
     const dx = end.x - source.x
     const dz = end.z - source.z
@@ -1469,6 +1486,27 @@
     return mesh
   }
 
+  function _createPresentationPathPolyline(cells) {
+    if (!Array.isArray(cells) || cells.length < 2) return null
+    const points = cells.map(function (cell) {
+      return new THREE.Vector3(cell.x, _tileSurfaceHeightAt(cell.x, cell.z) + 0.034, cell.z)
+    })
+    const geometry = new THREE.BufferGeometry().setFromPoints(points)
+    const line = new THREE.Line(geometry, new THREE.LineDashedMaterial({
+      color: 0xe3bc73,
+      dashSize: 0.16,
+      gapSize: 0.10,
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+    }))
+    line.computeLineDistances()
+    line.renderOrder = 22
+    line.userData.presentationPathRole = 'trajectory'
+    line.userData.pathCells = cells.map(function (cell) { return { x: cell.x, y: cell.z } })
+    return line
+  }
+
   function _createPresentationAimMarker(selected) {
     if (!selected) return null
     const positions = []
@@ -1503,15 +1541,21 @@
     const source = _normalizePresentationPoint(input && input.source)
     const end = _normalizePresentationPoint(input && input.end)
     const selected = _normalizePresentationPoint(input && input.selected)
-    const hasTrajectory = !!(source && end && (source.x !== end.x || source.z !== end.z))
+    const suppliedPath = _normalizePresentationPath(input && input.path)
+    const route = suppliedPath.length
+      ? (source && suppliedPath[0].key !== source.key ? [source].concat(suppliedPath) : suppliedPath.slice())
+      : []
+    if (end && route.length && route[route.length - 1].key !== end.key) route.push(end)
+    const hasPolyline = route.length > 1
+    const hasTrajectory = hasPolyline || !!(source && end && (source.x !== end.x || source.z !== end.z))
     if (!hasTrajectory && !selected) {
       _clearPresentationPath()
       return
     }
-    const signature = [source && source.key || '', end && end.key || '', selected && selected.key || ''].join('|')
+    const signature = [source && source.key || '', end && end.key || '', selected && selected.key || '', route.map(function (cell) { return cell.key }).join('>')].join('|')
     if (_presentationPath && _presentationPath.signature === signature) return
     _clearPresentationPath()
-    const trajectory = hasTrajectory ? _createPresentationPathRibbon(source, end) : null
+    const trajectory = hasPolyline ? _createPresentationPathPolyline(route) : (hasTrajectory ? _createPresentationPathRibbon(source, end) : null)
     const aim = _createPresentationAimMarker(selected)
     if (!trajectory && !aim) return
     const group = new THREE.Group()
@@ -1528,6 +1572,7 @@
       source: source ? { x: source.x, y: source.z } : null,
       end: end ? { x: end.x, y: end.z } : null,
       selected: selected ? { x: selected.x, y: selected.z } : null,
+      path: route.map(function (cell) { return { x: cell.x, y: cell.z } }),
     }
     const targetOpacities = materials.map(function () { return 0.96 })
     if (_reducedMotion) {
@@ -1994,7 +2039,8 @@
         return
       }
       if (previousPiece.x !== nextPiece.x || previousPiece.y !== nextPiece.y) {
-        _animateMove(obj, nextPiece.x, nextPiece.y, action && action.movementKinds && action.movementKinds[nextPiece.id], instant)
+        _animateMove(obj, nextPiece.x, nextPiece.y, action && action.movementKinds && action.movementKinds[nextPiece.id], instant,
+          action && action.movementPaths && action.movementPaths[nextPiece.id])
       }
       const healthDelta = _pieceHealth(nextPiece) - _pieceHealth(previousPiece)
       if (healthDelta < 0) {
@@ -2035,10 +2081,57 @@
     const instant = _singleEffectPresentation(item.previousModel, item.nextModel)
       && _ownPresentationAction(item.action, item.nextModel)
     _animateActionNow(item.action, item.previousModel, item.nextModel)
+    const baseDuration = instant ? MOTION_TOKENS.instant : Number.isFinite(Number(item.action && item.action.motionDurationMs))
+      ? Number(item.action.motionDurationMs)
+      : MOTION_TOKENS.action
+    _actionAnimationTimerStartedAt = Date.now()
+    _actionAnimationTimerLogicalMs = 0
+    _actionAnimationTimerTotalMs = baseDuration
+    _actionAnimationTimerSpeed = _animationSpeed
     _actionAnimationTimer = setTimeout(function () {
       _actionAnimationTimer = null
+      _actionAnimationTimerStartedAt = 0
+      _actionAnimationTimerLogicalMs = 0
+      _actionAnimationTimerTotalMs = 0
+      _actionAnimationTimerSpeed = 1
       _drainActionAnimationQueue()
-    }, instant ? MOTION_TOKENS.instant : MOTION_TOKENS.action)
+    }, baseDuration / _animationSpeed)
+  }
+
+  function setAnimationSpeed(nextSpeed) {
+    const next = Number(nextSpeed) === 2 ? 2 : 1
+    if (next === _animationSpeed) return
+    const previousSpeed = _animationSpeed
+    if (_actionAnimationTimer != null) {
+      const elapsed = Math.max(0, Date.now() - _actionAnimationTimerStartedAt)
+      const logical = Math.min(_actionAnimationTimerTotalMs,
+        _actionAnimationTimerLogicalMs + elapsed * _actionAnimationTimerSpeed)
+      const remaining = Math.max(0, (_actionAnimationTimerTotalMs - logical) / next)
+      clearTimeout(_actionAnimationTimer)
+      _actionAnimationTimerStartedAt = Date.now()
+      _actionAnimationTimerLogicalMs = logical
+      _actionAnimationTimerSpeed = next
+      _actionAnimationTimer = setTimeout(function () {
+        _actionAnimationTimer = null
+        _actionAnimationTimerStartedAt = 0
+        _actionAnimationTimerLogicalMs = 0
+        _actionAnimationTimerTotalMs = 0
+        _actionAnimationTimerSpeed = 1
+        _drainActionAnimationQueue()
+      }, remaining)
+    }
+    _animationSpeed = next
+    _pieceObjects.forEach(function (obj) {
+      const key = obj.motionId + ':position'
+      if (!_anims.has(key) || !obj.motionTarget) return
+      const controller = _anims.get(key)
+      const remainingDuration = controller
+        ? Math.max(0.001, (controller.duration - controller.elapsed) * previousSpeed / next)
+        : null
+      const remainingPath = (obj.motionRoute || []).slice(Math.max(0, Number(obj.motionRouteIndex) || 0))
+      _cancelAnimation(key)
+      _animateMove(obj, obj.motionTarget.x, obj.motionTarget.z, obj.motionKind, false, remainingPath, remainingDuration)
+    })
   }
 
   function _clearActionAnimationQueue() {
@@ -2047,17 +2140,50 @@
       clearTimeout(_actionAnimationTimer)
       _actionAnimationTimer = null
     }
+    _actionAnimationTimerStartedAt = 0
+    _actionAnimationTimerLogicalMs = 0
+    _actionAnimationTimerTotalMs = 0
+    _actionAnimationTimerSpeed = 1
   }
 
-  function _animateMove(obj, targetX, targetZ, movementKind, instant) {
+  function _animateMove(obj, targetX, targetZ, movementKind, instant, movementPath, durationOverride) {
     const targetY = _tileSurfaceHeightAt(targetX, targetZ)
     const from = { x: obj.group.position.x, y: obj.group.position.y, z: obj.group.position.z }
     const fromBaseY = Number.isFinite(obj.motionBaseY) ? obj.motionBaseY : obj.baseY
     const visibleArc = Math.max(0, Math.min(0.08, from.y - fromBaseY))
-    const distance = Math.hypot(targetX - from.x, targetZ - from.z)
-    const travelDuration = movementKind === 'dash'
-      ? MOTION_SECONDS.dash
-      : Math.min(0.16, MOTION_SECONDS.move + Math.max(0, distance - 1) * 0.012)
+    const route = []
+    const seenRoute = new Set()
+    function addRoutePoint(x, z, y) {
+      if (x == null || z == null || !Number.isFinite(Number(x)) || !Number.isFinite(Number(z))) return
+      const key = Number(x) + ',' + Number(z)
+      if (seenRoute.has(key)) return
+      seenRoute.add(key)
+      route.push({ x: Number(x), z: Number(z), y: Number.isFinite(Number(y)) ? Number(y) : _tileSurfaceHeightAt(Number(x), Number(z)) })
+    }
+    addRoutePoint(from.x, from.z, fromBaseY)
+    ;(Array.isArray(movementPath) ? movementPath : []).forEach(function (cell) {
+      if (!cell || cell.x == null || (cell.y === undefined && cell.z == null)) return
+      addRoutePoint(cell.x, cell.y !== undefined ? cell.y : cell.z)
+    })
+    addRoutePoint(targetX, targetZ, targetY)
+    let distance = 0
+    const routeDistances = [0]
+    for (let index = 1; index < route.length; index += 1) {
+      distance += Math.hypot(route[index].x - route[index - 1].x, route[index].z - route[index - 1].z)
+      routeDistances.push(distance)
+    }
+    obj.motionTarget = { x: targetX, z: targetZ }
+    obj.motionKind = movementKind
+    // Keep restart metadata in grid coordinates.  The public path parser
+    // treats `y` as the board row; storing the sampled world height here would
+    // turn a speed change into a bogus route.
+    obj.motionRoute = route.slice(1).map(function (cell) { return { x: cell.x, y: cell.z } })
+    obj.motionRouteIndex = 0
+    const travelDuration = Number.isFinite(Number(durationOverride)) && Number(durationOverride) > 0
+      ? Number(durationOverride)
+      : (movementKind === 'dash'
+      ? Math.min(MOTION_SECONDS.action, MOTION_SECONDS.dash)
+      : Math.min(MOTION_SECONDS.action, MOTION_SECONDS.move + Math.max(0, distance - 1) * 0.012)) / _animationSpeed
     obj.baseX = targetX
     obj.baseY = targetY
     obj.baseZ = targetZ
@@ -2065,6 +2191,9 @@
       _cancelAnimation(obj.motionId + ':position')
       obj.motionBaseY = targetY
       obj.group.position.set(targetX, targetY, targetZ)
+      obj.motionTarget = null
+      obj.motionRoute = []
+      obj.motionRouteIndex = 0
       return
     }
     // Teleport and swap have no traversed board cells: snap, then mark arrival.
@@ -2072,6 +2201,9 @@
       _cancelAnimation(obj.motionId + ':position')
       obj.motionBaseY = targetY
       obj.group.position.set(targetX, targetY, targetZ)
+      obj.motionTarget = null
+      obj.motionRoute = []
+      obj.motionRouteIndex = 0
       _flashOutline(obj, movementKind === 'swap' ? 0x22d3ee : 0xa78bfa, MOTION_SECONDS.teleport)
       _animateLanding(obj)
       return
@@ -2080,6 +2212,9 @@
     if (_reducedMotion) {
       obj.motionBaseY = targetY
       obj.group.position.set(targetX, targetY, targetZ)
+      obj.motionTarget = null
+      obj.motionRoute = []
+      obj.motionRouteIndex = 0
       _flashOutline(obj, 0xf59e0b, MOTION_SECONDS.press)
       return
     }
@@ -2087,19 +2222,33 @@
       duration: travelDuration,
       easing: EASE.inOut,
       update: function (progress, raw) {
-        const pathBaseY = fromBaseY + (targetY - fromBaseY) * progress
+        const routeDistance = distance * progress
+        let segment = 1
+        while (segment < routeDistances.length && routeDistances[segment] < routeDistance) segment += 1
+        const previous = route[Math.max(0, segment - 1)] || route[0]
+        const next = route[Math.min(route.length - 1, segment)] || previous
+        const segmentStart = routeDistances[Math.max(0, segment - 1)] || 0
+        const segmentLength = Math.max(0.0001, (routeDistances[Math.min(routeDistances.length - 1, segment)] || segmentStart) - segmentStart)
+        const segmentProgress = Math.max(0, Math.min(1, (routeDistance - segmentStart) / segmentLength))
+        const routeX = previous.x + (next.x - previous.x) * segmentProgress
+        const routeZ = previous.z + (next.z - previous.z) * segmentProgress
+        const pathBaseY = previous.y + (next.y - previous.y) * segmentProgress
+        obj.motionRouteIndex = Math.max(0, segment - 1)
         const desiredArc = Math.sin(Math.PI * raw) * 0.08
         const arc = visibleArc + (desiredArc - visibleArc) * progress
         obj.motionBaseY = pathBaseY
         obj.group.position.set(
-          from.x + (targetX - from.x) * progress,
+          routeX,
           pathBaseY + Math.max(0, Math.min(0.08, arc)),
-          from.z + (targetZ - from.z) * progress,
+          routeZ,
         )
       },
       complete: function () {
         obj.motionBaseY = targetY
         obj.group.position.set(targetX, targetY, targetZ)
+        obj.motionTarget = null
+        obj.motionRoute = []
+        obj.motionRouteIndex = 0
         _animateLanding(obj)
       },
     })
@@ -2440,11 +2589,11 @@
       pendingPieceIds: Array.from(_pieceObjects.values()).filter(function (obj) { return obj.pending }).map(function (obj) { return obj.id }).sort(),
       pendingAppearanceCues: Array.from(_pendingAppearanceCues.entries()).map(function (entry) { return entry[0] + ':' + entry[1] }).sort(),
       presentationAreaCellCount: _presentationAreaFlash ? _presentationAreaFlash.cellCount : 0,
-      presentationPath: _presentationPath ? {
+      presentationPath: _presentationPath ? Object.assign({
         source: _presentationPath.source,
         end: _presentationPath.end,
         selected: _presentationPath.selected,
-      } : null,
+      }, _presentationPath.path && _presentationPath.path.length ? { path: _presentationPath.path } : {}) : null,
       tutorialCueCellCount: _tutorialCueCellCount,
       tutorialCuePathCount: _tutorialCuePathCount,
       highlightCounts: {
@@ -2818,6 +2967,7 @@
   let _hoveredCellRing = null
   let _hoverPath = null
   let _hoverKey = null
+  let _hoveredCell = null
   let _hoverMoveTargets = new Set()
   let _hoverSelectedId = null
 
@@ -2831,22 +2981,58 @@
     _invalidate()
   }
 
+  function _drawHoverPath() {
+    if (!_scene || !_currentModel) return
+    const source = _pieceObjects.get(_hoverSelectedId)
+    if (!source) return
+    const interaction = _currentModel.interaction || {}
+    const draftPath = Array.isArray(interaction.movePath) ? interaction.movePath : []
+    const previewPath = Array.isArray(interaction.hoverMovePath) ? interaction.hoverMovePath : []
+    const path = draftPath.length ? draftPath : previewPath
+    if (!path.length) return
+    if (!draftPath.length && _hoveredCell && !_hoverMoveTargets.has(_hoveredCell.x + ',' + _hoveredCell.y)) return
+    const authoritativePiece = (_currentModel.pieces || []).find(function (piece) { return piece && piece.id === source.id })
+    const originX = authoritativePiece && authoritativePiece.x != null ? authoritativePiece.x
+      : (source.baseX != null ? source.baseX : source.targetX)
+    const originZ = authoritativePiece && authoritativePiece.y != null ? authoritativePiece.y
+      : (source.baseZ != null ? source.baseZ : source.targetZ)
+    const cells = [{ x: originX, y: originZ }].concat(path)
+    const seen = new Set()
+    const points = cells.flatMap(function (cell) {
+      if (!cell || cell.x == null || (cell.y === undefined && cell.z == null)) return []
+      const x = Number(cell.x)
+      const z = Number(cell.y !== undefined ? cell.y : cell.z)
+      const key = x + ',' + z
+      if (!Number.isFinite(x) || !Number.isFinite(z) || seen.has(key)) return []
+      seen.add(key)
+      return [new THREE.Vector3(x, _tileSurfaceHeightAt(x, z) + 0.06, z)]
+    })
+    if (points.length < 2) return
+    const geometry = new THREE.BufferGeometry().setFromPoints(points)
+    _hoverPath = new THREE.Line(geometry, new THREE.LineDashedMaterial({
+      color: 0xf5d38b,
+      dashSize: 0.14,
+      gapSize: 0.10,
+      transparent: true,
+      opacity: 0.92,
+      depthTest: false,
+      depthWrite: false,
+    }))
+    _hoverPath.computeLineDistances()
+    _hoverPath.userData.movePath = true
+    _hoverPath.renderOrder = 26
+    _scene.add(_hoverPath)
+    _invalidate()
+  }
+
   function _showHoveredCell(cell) {
     if (!_scene) return
     const key = cell ? cell.x + ',' + cell.y : null
     if (key !== _hoverKey) {
       _clearHoverPath()
       _hoverKey = key
-      const source = _pieceObjects.get(_hoverSelectedId)
-      if (cell && source && _hoverMoveTargets.has(key)) {
-        const height = Math.max(source.baseY, _tileSurfaceHeightAt(cell.x, cell.y)) + 0.06
-        const geometry = new THREE.BufferGeometry().setFromPoints([
-          new THREE.Vector3(source.targetX, height, source.targetZ), new THREE.Vector3(cell.x, height, cell.y),
-        ])
-        _hoverPath = new THREE.Line(geometry, new THREE.LineDashedMaterial({ color: 0xf5d38b, dashSize: 0.14, gapSize: 0.10, depthWrite: false }))
-        _hoverPath.computeLineDistances()
-        _scene.add(_hoverPath)
-      }
+      _hoveredCell = cell
+      _drawHoverPath()
       if (_onIntent) _onIntent({ type: 'hover-cell', x: cell ? cell.x : null, y: cell ? cell.y : null })
     }
     if (!cell) {
@@ -3041,6 +3227,7 @@
     _boardDecorationsHistorical = false
     _updatePieces(model.pieces || [])
     _updateTileEffects(model.effects || [])
+    _currentModel = model
     setHighlights({
       move: model.legal && model.legal.moveCells,
       skill: model.legal && model.legal.targetCells,
@@ -3050,7 +3237,6 @@
     })
     _boardDecorationsHistorical = false
     if (_boardDecorations) _boardDecorations.visible = true
-    _currentModel = model
     _syncPendingFeedback(model.interaction || {})
     _summaryPositionsDirty = true
     _invalidate()
@@ -3172,6 +3358,8 @@
       materials.forEach(function (material) { if (material.dispose) material.dispose() })
     }
     _hoveredCellRing = null
+    _hoveredCell = null
+    _animationSpeed = 1
     _texCache.forEach(function (entry) { if (entry && entry.texture && entry.texture.dispose) entry.texture.dispose() })
     if (_toonRamp) _toonRamp.dispose()
     _toonRamp = null
@@ -3231,6 +3419,7 @@
     _onIntent = null
     _hitPlane = null
     _currentModel = null
+    _animationSpeed = 1
     _renderedMapKey = null
     _tileContentKey = null
     _mapW = 0
@@ -3266,6 +3455,7 @@
     update,
     showHistoricalBoard,
     animateAction,
+    setAnimationSpeed,
     settlePresentation,
     spawnFloater,
     resize,

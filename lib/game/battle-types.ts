@@ -8,6 +8,7 @@ import type { SkillDefinition } from "./skills"
 import type { PendingTargetSelectionSession, TargetSelectionCredential } from "./targeting"
 import type { TerminalResult } from "./terminal"
 import type { TurnTimerState } from "./turn-timer"
+import type { GridPosition } from './spatial'
 
 export type TurnPhase = "start" | "action" | "end"
 
@@ -257,6 +258,8 @@ export type BattleAction =
       pieceId: string
       toX: number
       toY: number
+      /** Optional authoritative route, excluding the origin and including the destination. */
+      path?: GridPosition[]
     }
   | ({
       type: "useBasicSkill"

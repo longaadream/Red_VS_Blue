@@ -2,7 +2,8 @@
   'use strict'
 
   const SINGLE_EFFECT_DURATION_MS = 24
-  const COMPOSITE_STEP_DURATION_MS = 200
+  const COMPOSITE_STEP_DURATION_MS = 140
+  const LIGHTWEIGHT_STEP_DURATION_MS = 100
   const NORMAL_DURATION_MS = COMPOSITE_STEP_DURATION_MS
   const CARD_DURATION_MS = COMPOSITE_STEP_DURATION_MS
   const REDUCED_DURATION_MS = 120
@@ -22,7 +23,11 @@
     // Every event gets its own readable post-action beat. The event queue
     // below deliberately keeps adjacent results separate, so a multi-hit or
     // triggered chain cannot collapse into one burst.
-    return COMPOSITE_STEP_DURATION_MS
+    const group = arguments[0]
+    const kind = group && group.root && group.root.kind
+    return ['statusAdded', 'statusRemoved', 'resourceChanged', 'resourceSpent', 'actionPoints', 'cardDiscarded', 'cardChanged'].includes(kind)
+      ? LIGHTWEIGHT_STEP_DURATION_MS
+      : COMPOSITE_STEP_DURATION_MS
   }
 
   function hideBannerForModel(event, model) {
@@ -401,6 +406,7 @@
     let showPath = null
     let clearPath = null
     let projectCell = null
+    let setAnimationSpeed = null
     let model = null
     let currentPhase = null
     let currentGroup = null
@@ -513,7 +519,7 @@
       } else {
         if (clearAreaFlash) clearAreaFlash()
         if (travelVisible && showPath) {
-          showPath({ source: cells.source, end: cells.end || cells.targets[0], selected: cells.selected })
+          showPath({ source: cells.source, end: cells.end || cells.targets[0], selected: cells.selected, path: cells.path })
         } else if (clearPath) clearPath()
       }
       layer.dataset.phase = currentPhase
@@ -615,6 +621,7 @@
     function setSpeed(nextSpeed) {
       speed = Number(nextSpeed) === 2 ? 2 : 1
       queue.setSpeed(speed)
+      if (setAnimationSpeed) setAnimationSpeed(speed)
       syncSpeedControl()
       if (currentGroup) render()
     }
@@ -646,6 +653,7 @@
       showPath = typeof mountInput.showPath === 'function' ? mountInput.showPath : null
       clearPath = typeof mountInput.clearPath === 'function' ? mountInput.clearPath : null
       projectCell = typeof mountInput.projectCell === 'function' ? mountInput.projectCell : null
+      setAnimationSpeed = typeof mountInput.setAnimationSpeed === 'function' ? mountInput.setAnimationSpeed : null
       if (!doc || !doc.createElement || !floatLayer || !floatLayer.appendChild) return
       layer = doc.createElement('div')
       layer.className = 'battle-vignette-layer'
@@ -702,6 +710,7 @@
       showPath = null
       clearPath = null
       projectCell = null
+      setAnimationSpeed = null
       model = null
       currentPhase = null
       currentGroup = null
@@ -736,6 +745,7 @@
     constants: Object.freeze({
       singleEffectDurationMs: SINGLE_EFFECT_DURATION_MS,
       compositeStepDurationMs: COMPOSITE_STEP_DURATION_MS,
+      lightweightStepDurationMs: LIGHTWEIGHT_STEP_DURATION_MS,
       normalDurationMs: NORMAL_DURATION_MS,
       cardDurationMs: CARD_DURATION_MS,
       reducedDurationMs: REDUCED_DURATION_MS,

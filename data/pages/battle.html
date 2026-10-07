@@ -1179,6 +1179,24 @@
       color: #cbd5e1; text-align: center; text-shadow: 0 1px 4px rgba(0,0,0,.9);
       font-size: 12px; font-weight: 700; pointer-events: none; backdrop-filter: none;
     }
+    #moveDraftPanel {
+      position: fixed; left: 50%; bottom: 98px; z-index: 86; transform: translateX(-50%);
+      width: min(560px, calc(100vw - 28px)); padding: 9px 11px;
+      border: 1px solid rgba(245, 211, 139, .6); border-radius: 10px;
+      background: rgba(10, 16, 30, .94); color: #f8fafc;
+      box-shadow: 0 10px 28px rgba(0,0,0,.42), inset 0 0 0 1px rgba(255,255,255,.04);
+      backdrop-filter: blur(10px); pointer-events: auto;
+    }
+    #moveDraftPanel[hidden] { display: none; }
+    .move-draft-summary { display:flex; justify-content:space-between; gap:10px; align-items:baseline; font-size:12px; font-weight:800; color:#fde68a; }
+    .move-draft-path { margin-top:4px; color:#94a3b8; font-size:10px; line-height:1.3; max-height:28px; overflow:hidden; overflow-wrap:anywhere; }
+    .move-draft-controls { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+    .move-draft-controls button { border:1px solid #475569; border-radius:6px; background:#172033; color:#e2e8f0; padding:5px 9px; font-size:11px; font-weight:700; cursor:pointer; }
+    .move-draft-controls button.primary { border-color:#4ade80; background:#14532d; color:#dcfce7; }
+    .move-draft-controls button.cancel { border-color:#64748b; background:transparent; color:#cbd5e1; }
+    .move-draft-controls button[disabled] { opacity:.45; cursor:not-allowed; }
+    .cell.move-draft-path-cell::after { content:'›'; position:absolute; inset:0; display:flex; align-items:center; justify-content:center; color:#fde68a; font-size:18px; font-weight:900; text-shadow:0 1px 4px #111827; pointer-events:none; }
+    @media (max-width: 760px) { #moveDraftPanel { bottom: 84px; } }
     #dmBubble {
       position: fixed; left: 16px; bottom: 124px; z-index: 84; max-width: min(440px, calc(100vw - 32px));
       padding: 18px 24px; border: 3px solid #e5c27c; border-radius: 22px 22px 22px 7px;
@@ -1600,6 +1618,16 @@
   </div>
 
   <div id="statusMsg" role="status" aria-live="polite">选择棋子开始行动</div>
+  <aside id="moveDraftPanel" hidden aria-live="polite" aria-label="移动路线草稿">
+    <div class="move-draft-summary"><span id="moveDraftSummary">移动路线</span><span id="moveDraftMode"></span></div>
+    <div class="move-draft-path" id="moveDraftPath"></div>
+    <div class="move-draft-controls">
+      <button type="button" class="primary" id="moveDraftConfirm" onclick="dispatchBattleIntent({type:'confirm-move'})">确认路线</button>
+      <button type="button" id="moveDraftWaypoint" onclick="dispatchBattleIntent({type:'add-move-waypoint'})">添加途经点</button>
+      <button type="button" id="moveDraftReset" onclick="dispatchBattleIntent({type:'reset-move'})">重置路线</button>
+      <button type="button" class="cancel" id="moveDraftCancel" onclick="dispatchBattleIntent({type:'cancel-move'})">取消</button>
+    </div>
+  </aside>
   <div id="dmBubble" role="status" aria-live="assertive" aria-hidden="true"></div>
   <div id="turnClockCorner" hidden aria-label="回合计时" aria-live="off"><span class="clock-label">回合计时</span><span class="clock-value">--:--</span></div>
 
@@ -2349,6 +2377,8 @@
     let keywordGlossaryByName = {}
     let selectedPieceId = null
     let pendingMove = false
+    let moveDraft = null // { pieceId, target, path, waypoints, editMode }
+    let hoverMovePath = []
     let pendingSkill = null    // { skillId, skillType, range }
     let pendingCardAction = null  // { type:'playCard', playerId, cardInstanceId } awaiting target
     let validMoves = new Set()   // reachable cells for current move (wall-aware)
@@ -2562,12 +2592,180 @@
       pendingCardAction = null
       targetSubmissionPending = null
       pendingBoardTargetSelection = { selectionId: null, selectedPieceIds: [] }
+      clearMoveDraft(reason || 'target-cleared')
       if (input.keepMove !== true) pendingMove = false
       if (hadTarget) recordTargetClear(reason)
       document.body.classList.remove('target-mode-active')
       if (input.deferRender !== true) renderTargetOverlay()
       if (input.message) setStatusMsg(input.message)
       return hadTarget
+    }
+
+    function clearMoveDraft(reason) {
+      moveDraft = null
+      hoverMovePath = []
+      return reason || 'cleared'
+    }
+
+    function normalMovePathForTarget(pieceId, x, y, waypoints) {
+      if (!window.BattleLegalActions || typeof BattleLegalActions.getNormalMovePath !== 'function') return null
+      return BattleLegalActions.getNormalMovePath({
+        snapshot: G,
+        engine: typeof GameEngine === 'undefined' ? null : GameEngine,
+        pieceId: pieceId,
+        target: { x: x, y: y },
+        waypoints: waypoints || [],
+      })
+    }
+
+    function normalMoveRejectionForDraft(draft) {
+      if (!window.BattleLegalActions || typeof BattleLegalActions.getNormalMoveRejection !== 'function') {
+        return { code: 'cannot-route', reason: 'move-path-unavailable' }
+      }
+      return BattleLegalActions.getNormalMoveRejection({
+        snapshot: G,
+        engine: typeof GameEngine === 'undefined' ? null : GameEngine,
+        pieceId: draft.pieceId,
+        target: draft.target,
+        path: draft.path,
+      })
+    }
+
+    function moveRouteErrorMessage(rejection) {
+      const code = String(rejection && (rejection.code || rejection.reason || rejection.message) || '')
+      return /blocked|walk|route|path|unavailable|cannot|illegal|occupied|range|超出|阻挡|合法|行走/i.test(code)
+        ? '无法规划到该位置的路线'
+        : '无法规划移动路线'
+    }
+
+    function renderMoveDraftPanel() {
+      const panel = document.getElementById('moveDraftPanel')
+      if (!panel) return
+      panel.hidden = !moveDraft
+      if (!moveDraft) return
+      const source = G && G.pieces && G.pieces.find(function (piece) { return piece.instanceId === moveDraft.pieceId })
+      const summary = document.getElementById('moveDraftSummary')
+      const mode = document.getElementById('moveDraftMode')
+      const path = document.getElementById('moveDraftPath')
+      const confirm = document.getElementById('moveDraftConfirm')
+      const waypoint = document.getElementById('moveDraftWaypoint')
+      const reset = document.getElementById('moveDraftReset')
+      const target = moveDraft.target
+      const selectedModelPiece = currentBattleViewModel && currentBattleViewModel.pieces
+        ? currentBattleViewModel.pieces.find(function (piece) { return piece.id === moveDraft.pieceId })
+        : null
+      const moveRange = (selectedModelPiece && selectedModelPiece.displayStats && selectedModelPiece.displayStats.moveRange)
+        || (source && source.stats && source.stats.moveRange)
+        || '?'
+      const firstMoveFree = !!(source && source.statusTags && source.statusTags.some(function (tag) {
+        return tag.type === 'deployment-first-move-free' && tag.currentUses === 1
+          && G && G.turn && tag.grantedTurnNumber === G.turn.turnNumber
+      }))
+      const steps = (moveDraft.path || []).length
+      if (summary) summary.textContent = (source && (source.name || source.instanceId) || '棋子') + ' · ' + steps + ' / ' + moveRange + ' 格 · 消耗' + (firstMoveFree ? '0 AP（首移）' : '1 AP')
+      if (mode) mode.textContent = moveDraft.editMode ? '点击棋盘添加途经点' : '待确认'
+      if (path) {
+        const points = moveDraft.path || []
+        path.textContent = '路径：' + ([source && { x: source.x, y: source.y }].concat(points)).filter(Boolean)
+          .map(function (cell) { return '(' + cell.x + ',' + cell.y + ')' }).join(' → ')
+      }
+      const isMyTurn = !!(G && G.turn && String(G.turn.currentPlayerId || '').toLowerCase() === String(myPlayerId || '').toLowerCase())
+      const canConfirm = !!(moveDraft.path && moveDraft.path.length && pendingMove && selectedPieceId === moveDraft.pieceId
+        && isMyTurn && !pendingActionFeedback && !targetSubmissionPending && !waitingForOtherPending())
+      if (confirm) confirm.disabled = !canConfirm
+      if (waypoint) waypoint.textContent = moveDraft.editMode ? '完成加点' : '添加途经点'
+      if (reset) reset.disabled = !moveDraft.waypoints || !moveDraft.waypoints.length
+    }
+
+    function draftMoveToCell(pieceId, x, y) {
+      const path = normalMovePathForTarget(pieceId, x, y, [])
+      if (!path || !path.length || path[path.length - 1].x !== x || path[path.length - 1].y !== y) {
+        setStatusMsg('无法规划到该位置的路线')
+        return false
+      }
+      moveDraft = { pieceId: pieceId, target: { x: x, y: y }, path: path, waypoints: [], editMode: false }
+      hoverMovePath = []
+      dismissedPieceContextId = null
+      closePieceContextMenu()
+      render()
+      return true
+    }
+
+    function addMoveWaypoint(x, y) {
+      if (!moveDraft) return false
+      const key = x + ',' + y
+      if ((moveDraft.waypoints || []).some(function (cell) { return cell.x + ',' + cell.y === key })) return true
+      if (moveDraft.target.x === x && moveDraft.target.y === y) return true
+      const waypoints = (moveDraft.waypoints || []).concat([{ x: x, y: y }])
+      const path = normalMovePathForTarget(moveDraft.pieceId, moveDraft.target.x, moveDraft.target.y, waypoints)
+      if (!path || !path.length || path[path.length - 1].x !== moveDraft.target.x || path[path.length - 1].y !== moveDraft.target.y) {
+        setStatusMsg('无法规划经过该途经点的路线')
+        return false
+      }
+      moveDraft = Object.assign({}, moveDraft, { waypoints: waypoints, path: path, editMode: true })
+      hoverMovePath = []
+      render()
+      return true
+    }
+
+    function toggleMoveWaypointMode() {
+      if (!moveDraft) return false
+      moveDraft = Object.assign({}, moveDraft, { editMode: !moveDraft.editMode })
+      hoverMovePath = []
+      render()
+      return true
+    }
+
+    function resetMoveDraft() {
+      if (!moveDraft) return false
+      const path = normalMovePathForTarget(moveDraft.pieceId, moveDraft.target.x, moveDraft.target.y, [])
+      if (!path || !path.length) {
+        setStatusMsg('无法重置移动路线')
+        return false
+      }
+      moveDraft = Object.assign({}, moveDraft, { path: path, waypoints: [], editMode: false })
+      hoverMovePath = []
+      render()
+      return true
+    }
+
+    function cancelMoveDraft(reason) {
+      const hadDraft = !!moveDraft
+      clearMoveDraft(reason || 'cancelled')
+      pendingMove = false
+      validMoves = new Set()
+      if (hadDraft) render()
+      return hadDraft
+    }
+
+    function confirmMoveDraft() {
+      if (!moveDraft || !G || pendingActionFeedback || targetSubmissionPending) return false
+      refreshBattleLegalActions()
+      if (!pendingMove || selectedPieceId !== moveDraft.pieceId || waitingForOtherPending()
+        || !validMoves.has(moveDraft.target.x + ',' + moveDraft.target.y)) {
+        setStatusMsg('当前状态已变化，请重新规划移动路线')
+        clearMoveDraft('confirm-context-changed')
+        render()
+        return false
+      }
+      const rejection = normalMoveRejectionForDraft(moveDraft)
+      if (rejection) {
+        setStatusMsg(moveRouteErrorMessage(rejection))
+        return false
+      }
+      const action = {
+        type: 'move', playerId: myPlayerId, pieceId: moveDraft.pieceId,
+        toX: moveDraft.target.x, toY: moveDraft.target.y,
+        path: moveDraft.path.map(function (cell) { return { x: cell.x, y: cell.y } }),
+      }
+      clearMoveDraft('confirmed')
+      pendingMove = false
+      validMoves = new Set()
+      dismissedPieceContextId = null
+      closePieceContextMenu()
+      void doAction(action)
+      render()
+      return true
     }
 
     function currentTargetSourceName() {
@@ -4570,6 +4768,7 @@
           createBattlePresentationModel(newG),
         )
       }
+      clearMoveDraft('authoritative-state-change')
       G = newG
       spawnStateFloaters(oldG, G)
       flushActionLog(oldG, G)
@@ -4986,6 +5185,7 @@
       syncAuthorityClock(serverNow, turnTimer, pendingTimer)
 
       const oldG = G
+      if (oldG) clearMoveDraft('authoritative-state-change')
       G = state
       reconcileDeploymentPieceInfo()
       if (!G.deployment || G.deployment.status === 'complete') {
@@ -5664,6 +5864,7 @@
       }
     }
     function cancelTargetSelection() {
+      if (moveDraft || pendingMove) return cancelMoveDraft('user-cancelled')
       if (targetSubmissionPending) {
         setStatusMsg('目标指令已提交，正在等待权威确认')
         return
@@ -5872,6 +6073,8 @@
           pendingCommandId: isCurrentSnapshot && pendingActionFeedback ? pendingActionFeedback.clientActionId : null,
           selectedTargetPieceIds: isCurrentSnapshot ? pendingBoardTargetSelection.selectedPieceIds : [],
           selectedTargetCells: isCurrentSnapshot ? pendingBoardTargetSelection.selectedCells || [] : [],
+          movePath: isCurrentSnapshot && moveDraft && moveDraft.pieceId === selectedPieceId ? moveDraft.path : [],
+          hoverMovePath: isCurrentSnapshot ? hoverMovePath : [],
         },
         legal: {
           moveCells: isCurrentSnapshot ? validMoves : new Set(),
@@ -6081,6 +6284,7 @@
       else renderBoard(input.presentationModel, input.beforeBoardUpdate)
       renderPanels()
       renderActionBar()
+      renderMoveDraftPanel()
       renderHand()
       renderTargetOverlay()
       updateRed43QaEvidence()
@@ -6118,6 +6322,7 @@
       const hlMoveKeys = new Set(currentBattleViewModel.legal.moveCells.map(toKey))
       const hlSkillKeys = new Set(currentBattleViewModel.legal.targetCells.map(toKey))
       const hlPlaceKeys = new Set(currentBattleViewModel.legal.placementCells.map(toKey))
+      const movePathKeys = new Set((currentBattleViewModel.interaction.movePath || []).map(toKey))
 
       // ── 3D path ─────────────────────────────────────────────────────────────
       if (_use3d) return
@@ -6143,6 +6348,7 @@
           else if (hlMoveKeys.has(key)) cls += ' hl-move'
           else if (hlSkillKeys.has(key)) cls += ' hl-skill'
           else if (hlPlaceKeys.has(key)) cls += ' hl-place'
+          if (movePathKeys.has(key)) cls += ' move-draft-path-cell'
 
           const tileEfxList = currentBattleViewModel.effects.filter(te => te.x === x && te.y === y)
           let tileEfxHtml = ''
@@ -6893,6 +7099,7 @@
         }
         setMoveButtonDisabled(true)
         pendingMove = false
+        clearMoveDraft('deployment-pending')
         pendingSkill = null
         setMoveButtonClass(false)
         setStatusMsg('')
@@ -6907,6 +7114,7 @@
         }
         setMoveButtonDisabled(true)
         pendingMove = false
+        clearMoveDraft('deployment-step')
         if (!G.pendingOptionSelection && !G.pendingTargetSelection) {
           pendingSkill = null
           pendingCardAction = null
@@ -6935,6 +7143,7 @@
       if (_waitingForOther) {
         setStatusMsg('等待对方操作')
         pendingMove = false
+        clearMoveDraft('waiting-for-other')
         pendingSkill = null
         pendingCardAction = null
         setMoveButtonClass(false)
@@ -6959,6 +7168,7 @@
       } else if (!isMyTurn) {
         setStatusMsg('等待对方操作 [' + (PHASE_LABELS[phase] || phase) + ']')
         pendingMove = false
+        clearMoveDraft('turn-changed')
         pendingSkill = null
         setMoveButtonClass(false)
         renderPieceContextMenu(_selPiece || null)
@@ -6968,6 +7178,8 @@
         setStatusMsg('开始阶段处理中...')
       } else if (pendingCardAction) {
         setStatusMsg(_targetPromptText() || '选择卡牌目标')
+      } else if (moveDraft) {
+        setStatusMsg(moveDraft.editMode ? '已规划路线 · 点击棋盘添加途经点，完成后确认' : '已规划路线 · 请确认后提交移动')
       } else if (pendingMove) {
         setStatusMsg(pieceHasVisibleStatusTag(_selPiece, 'deployment-first-move-free')
           ? '拖动棋子到高亮格，或点击高亮格移动 · 本回合首移 0 AP'
@@ -6989,18 +7201,21 @@
     function handleBattleIntent(intent) {
       if (!intent) return
       if (intent.type === 'hover-cell') {
-        if (!pendingMove || !validMoves.has(intent.x + ',' + intent.y) || waitingForOtherPending()) return
-        if (typeof GameEngine === 'undefined' || !GameEngine.applyBattleAction) return
-        try {
-          const preview = GameEngine.safeCloneBattleState ? GameEngine.safeCloneBattleState(G) : JSON.parse(JSON.stringify(G))
-          const before = preview.players.find(player => clientOwns(player.playerId))
-          if (!before) return
-          const points = before.actionPoints
-          const result = GameEngine.applyBattleAction(preview, { type: 'move', playerId: myPlayerId, pieceId: selectedPieceId, toX: intent.x, toY: intent.y }) || preview
-          const after = result.players.find(player => player.playerId === before.playerId)
-          if (result.pendingOptionSelection || result.pendingTargetSelection) setStatusMsg('移动 · 需要选择')
-          else if (after) setStatusMsg('移动 · 消耗 ' + Math.max(0, points - after.actionPoints) + ' 行动点')
-        } catch { /* A hidden state may prevent local prediction; do not invent a cost. */ }
+        if (intent.x == null || intent.y == null || !pendingMove || !selectedPieceId || waitingForOtherPending()) {
+          if (hoverMovePath.length) { hoverMovePath = []; render() }
+          return
+        }
+        if (!validMoves.has(intent.x + ',' + intent.y)) {
+          if (hoverMovePath.length) { hoverMovePath = []; render() }
+          return
+        }
+        const previewPath = normalMovePathForTarget(selectedPieceId, intent.x, intent.y, [])
+        if (!previewPath || !previewPath.length) {
+          if (hoverMovePath.length) { hoverMovePath = []; render() }
+          return
+        }
+        hoverMovePath = previewPath
+        render()
         return
       }
       if (intent.type === 'viewport-change') {
@@ -7012,7 +7227,10 @@
         if (TUTORIAL_MODE && tutorialRuntime) tutorialRuntime.afterIntent(intent)
         return result
       }
-      if (intent.type === 'inspect-piece') return showPieceInfo(intent.pieceId)
+      if (intent.type === 'inspect-piece') {
+        if (moveDraft || pendingMove) return cancelMoveDraft('right-click')
+        return showPieceInfo(intent.pieceId)
+      }
       if (intent.type === 'select-piece') {
         const result = selectPiece(intent.pieceId)
         if (TUTORIAL_MODE && tutorialRuntime) tutorialRuntime.afterIntent(intent)
@@ -7021,6 +7239,10 @@
       if (intent.type === 'clear-selection') return clearPieceSelection()
       if (intent.type === 'select-skill') return selectSkillCard(intent.skillId)
       if (intent.type === 'cancel-target') return cancelTargetSelection()
+      if (intent.type === 'cancel-move') return cancelMoveDraft('user-cancelled')
+      if (intent.type === 'confirm-move') return confirmMoveDraft()
+      if (intent.type === 'add-move-waypoint') return toggleMoveWaypointMode()
+      if (intent.type === 'reset-move') return resetMoveDraft()
       if (intent.type === 'confirm-target-selection') return confirmPendingBoardTargetSelection()
       if (intent.type === 'drop-piece') return moveSelectedPieceToCell(intent.pieceId, intent.x, intent.y)
     }
@@ -7036,10 +7258,20 @@
       const hasCell = Number.isInteger(x) && Number.isInteger(y)
       const key = hasCell ? x + ',' + y : ''
       const source = G.pieces.find(function(piece) { return piece.instanceId === pieceId && piece.currentHp > 0 })
+      if (typeof moveDraft !== 'undefined' && moveDraft && moveDraft.editMode) {
+        if (!source || !hasCell) {
+          setStatusMsg('请选择棋盘上的途经点')
+          return false
+        }
+        return addMoveWaypoint(x, y)
+      }
       if (!source || !validMoves.has(key)) {
         setStatusMsg('无法移动到该位置')
         return false
       }
+      if (typeof draftMoveToCell === 'function') return draftMoveToCell(pieceId, x, y)
+      // Compatibility for the isolated legacy helper contract test, whose
+      // slice intentionally omits the page-level draft helpers.
       pendingMove = false
       validMoves = new Set()
       dismissedPieceContextId = null
@@ -7199,6 +7431,11 @@
       }
 
       if (pendingMove && selectedPieceId) {
+        if (moveDraft && moveDraft.editMode) {
+          if (piece) { setStatusMsg('途经点必须选择空闲地格'); return }
+          addMoveWaypoint(x, y)
+          return
+        }
         if (piece) {
           selectPiece(piece.instanceId)
           return
@@ -7492,6 +7729,7 @@
             createBattlePresentationModel(newG)
           )
         }
+        clearMoveDraft('authoritative-state-change')
         G = newG
         spawnStateFloaters(oldG, G)
         flushActionLog(oldG, G)
@@ -8256,6 +8494,7 @@
     function disposeBattlePage() {
       if (ADVENTURE_MODE) disposeAdventureBattle()
       if (PRACTICE_MODE) disposePracticeBattle()
+      clearMoveDraft('shutdown')
       battlePageDisposed = true
       cardDisplayMetadataRequests.clear()
       if (pollTimer) clearInterval(pollTimer)
@@ -8273,6 +8512,11 @@
     // Escape closes the existing tile details panel.
     document.addEventListener('keydown', e => {
       if (e.key === 'Escape') {
+        if (moveDraft || pendingMove) {
+          e.preventDefault()
+          cancelMoveDraft('escape')
+          return
+        }
         const tilePanel = document.getElementById('tileStatusPanel')
         if (tilePanel && tilePanel.style.display !== 'none') {
           e.preventDefault()

@@ -111,7 +111,7 @@ function child(index: number, childIndex: number, overrides: Record<string, unkn
 describe('RED-167 action vignette queue', () => {
   it('keeps a single-effect banner under the instant feedback budget', () => {
     expect(loadModule().constants.singleEffectDurationMs).toBeLessThan(50)
-    expect(loadModule().constants.compositeStepDurationMs).toBe(200)
+    expect(loadModule().constants.compositeStepDurationMs).toBe(140)
   })
   it('hides friendly active banners and all ordinary movement banners', () => {
     const ui = loadModule()
@@ -377,7 +377,7 @@ describe('RED-167 action vignette queue', () => {
     queue.update({ presentationEvents: [], turn: { isViewerTurn: false } })
     queue.update({ presentationEvents: [root(1)], turn: { isViewerTurn: false } })
     queue.update({ presentationEvents: [root(2)], turn: { isViewerTurn: false } })
-    vi.advanceTimersByTime(200)
+    vi.advanceTimersByTime(20)
 
     expect(queue.skip()).toBe(true)
     expect(phases.at(-1)).toBe('action-1:0:settle')
@@ -438,10 +438,10 @@ describe('RED-167 action vignette queue', () => {
     const queue = vignetteModule.createQueue({ now: () => Date.now() })
     queue.update({ presentationEvents: [], turn: { isViewerTurn: false } })
     queue.update({ presentationEvents: [root(1)], turn: { isViewerTurn: false } })
-    vi.advanceTimersByTime(100)
+    vi.advanceTimersByTime(vignetteModule.constants.normalDurationMs / 2)
 
     queue.setSpeed(2)
-    vi.advanceTimersByTime(499)
+    vi.advanceTimersByTime(vignetteModule.constants.normalDurationMs / 4 - 1)
     expect(queue.getDiagnostics().activeRootId).toBe('action-1:0')
     vi.advanceTimersByTime(1)
     expect(queue.getDiagnostics().activeRootId).toBeNull()
@@ -453,10 +453,10 @@ describe('RED-167 action vignette queue', () => {
     queue.update({ presentationEvents: [], turn: { isViewerTurn: true } })
     queue.update({ presentationEvents: [root(1, { kind: 'card', cardId: 'coin' }),
       root(2, { kind: 'card', cardId: 'heal' }), child(2, 1, { kind: 'passive', skillId: 'reaction', sourcePieceId: 'other', result: { pending: true } })], turn: { isViewerTurn: true } })
-    vi.advanceTimersByTime(1000)
+    vi.advanceTimersByTime(vignetteModule.constants.cardDurationMs / 2)
     expect(queue.getDiagnostics().activeRootId).toBe('action-1:0')
     queue.setSpeed(2)
-    vi.advanceTimersByTime(399)
+    vi.advanceTimersByTime(vignetteModule.constants.cardDurationMs / 4 - 1)
     expect(queue.getDiagnostics().activeRootId).toBe('action-1:0')
     vi.advanceTimersByTime(1)
     expect(queue.getDiagnostics().activeRootId).toBe('action-2:0')
@@ -500,11 +500,11 @@ describe('RED-167 action vignette queue', () => {
     vignette.update(model)
     vignette.update({ ...model, presentationEvents: [root(1, { kind: 'card', cardId: 'late' })] })
     expect(floatLayer.children[0].innerHTML).toContain('资料暂不可用')
-    vi.advanceTimersByTime(900)
+    vi.advanceTimersByTime(70)
     deliver({ name: '迟到卡牌', description: '真实描述', actionPointCost: 2 })
     await Promise.resolve()
     expect(floatLayer.children[0].innerHTML).toContain('真实描述')
-    expect(floatLayer.children[0].innerHTML).toContain('--banner-elapsed:-900ms')
+    expect(floatLayer.children[0].innerHTML).toContain('--banner-elapsed:-70ms')
     vi.advanceTimersByTime(vignetteModule.constants.cardDurationMs)
     vignette.update({ ...model, presentationEvents: [root(2, { kind: 'card', cardId: 'later' })] })
     vignette.settleAll()
@@ -662,11 +662,12 @@ describe('RED-167 action vignette queue', () => {
 
     const layer = floatLayer.children[0]
     expect(layer.hidden).toBe(false)
-    vi.advanceTimersByTime(120)
+    vi.advanceTimersByTime(30)
     expect(showPath).toHaveBeenCalledWith({
       source: { x: 0, y: 0 },
       end: { x: 4, y: 0 },
       selected: { x: 1, y: 0 },
+      path: [{ x: 1, y: 0 }, { x: 2, y: 0 }, { x: 3, y: 0 }, { x: 4, y: 0 }],
     })
     expect(layer.innerHTML).not.toContain('battle-vignette-path-segment')
     expect(layer.innerHTML).not.toContain('battle-vignette-point')
@@ -676,7 +677,7 @@ describe('RED-167 action vignette queue', () => {
     expect(layer.innerHTML).toContain('寒冰坚忍')
     expect(layer.innerHTML).not.toContain('使用技能')
     expect(layer.innerHTML).not.toContain('images/effect-icons/action-skill.svg')
-    vi.advanceTimersByTime(300)
+    vi.advanceTimersByTime(30)
     expect(layer.innerHTML).not.toContain('battle-vignette-result')
     expect(layer.innerHTML).not.toContain('>4<')
 
@@ -803,8 +804,8 @@ describe('RED-167 action vignette queue', () => {
 
   it.each([
     ['focus', 0],
-    ['path', 120],
-    ['result', 420],
+    ['path', 30],
+    ['result', 60],
   ] as const)('allows battlefield input during %s without changing commands, logs, payloads, or hash', (phase, elapsedMs) => {
     const vignetteModule = loadModule()
     const floatLayer = new FakeElement()

@@ -13,11 +13,13 @@ type ThreeMaterial = {
   color?: { getHex(): number }
   emissive: { getHex(): number }
   emissiveIntensity: number
+  transparent?: boolean
   opacity?: number
   dispose(): void
 }
 type ThreeNode = {
   name?: string
+  renderOrder?: number
   rotation: {x:number;y:number;z:number}
   type: string
   isInstancedMesh?: boolean
@@ -38,6 +40,7 @@ type RendererApi = {
   update(model: unknown): void
   showHistoricalBoard(model: unknown): void
   animateAction(action: unknown, previousModel: unknown, nextModel: unknown): void
+  setAnimationSpeed(speed: number): void
   resize(): void
   spawnFloater(x: number, y: number, text: string, color: string, big: boolean, options: unknown): void
   resetView(): void
@@ -51,7 +54,7 @@ type RendererApi = {
   screenToCell(clientX: number, clientY: number): { x: number; y: number } | null
   showPresentationAreaFlash(cells: Array<{ x: number; y: number }>): void
   clearPresentationAreaFlash(): void
-  showPresentationPath(path: { source?: { x: number; y: number }; end?: { x: number; y: number }; selected?: { x: number; y: number } }): void
+  showPresentationPath(path: { source?: { x: number; y: number }; end?: { x: number; y: number }; selected?: { x: number; y: number }; path?: Array<{ x: number; y: number }> }): void
   clearPresentationPath(): void
   getMotionDiagnostics(): {
     activeAnimations: string[]
@@ -64,6 +67,7 @@ type RendererApi = {
       source: { x: number; y: number } | null
       end: { x: number; y: number } | null
       selected: { x: number; y: number } | null
+      path?: Array<{ x: number; y: number }>
     } | null
     tutorialCueCellCount: number
     tutorialCuePathCount: number
@@ -145,7 +149,12 @@ type RuntimeModelFixture = {
     placementCells: Array<{ x: number; y: number }>
   }
   selection: { pieceId: string | null; mode?: string }
-  interaction: { pendingPieceId: string | null; pendingCommandId: string | null }
+  interaction: {
+    pendingPieceId: string | null
+    pendingCommandId: string | null
+    movePath?: Array<{ x: number; y: number }>
+    hoverMovePath?: Array<{ x: number; y: number }>
+  }
 }
 
 class FakeElement {
@@ -675,6 +684,31 @@ describe('RED-68 BattleRenderer3D runtime', () => {
     harness.renderer.dispose()
   })
 
+  it('renders an ordered turn route as a polyline instead of a straight endpoint arrow', () => {
+    const harness = createHarness(1280, 720, false)
+    const model = runtimeModel()
+    harness.renderer.init({ container: harness.container })
+    harness.renderer.update(model)
+    harness.frame(16)
+    harness.renderer.showPresentationPath({
+      source: { x: 1, y: 1 },
+      end: { x: 4, y: 3 },
+      path: [{ x: 2, y: 1 }, { x: 2, y: 2 }, { x: 3, y: 2 }, { x: 3, y: 3 }, { x: 4, y: 3 }],
+    })
+    const group = harness.renderers[0].scene!.children.find(child => child.userData.presentationPath === true)!
+    const trajectory = group.children.find(child => child.userData.presentationPathRole === 'trajectory')!
+    expect(trajectory.userData.pathCells).toEqual([
+      { x: 1, y: 1 }, { x: 2, y: 1 }, { x: 2, y: 2 }, { x: 3, y: 2 }, { x: 3, y: 3 }, { x: 4, y: 3 },
+    ])
+    const positions = Array.from(trajectory.geometry!.getAttribute('position').array)
+    expect(positions.filter((_, index) => index % 3 === 0)).toEqual([1, 2, 2, 3, 3, 4])
+    expect(positions.filter((_, index) => index % 3 === 2)).toEqual([1, 1, 2, 2, 3, 3])
+    expect(harness.renderer.getMotionDiagnostics().presentationPath?.path).toEqual([
+      { x: 1, y: 1 }, { x: 2, y: 1 }, { x: 2, y: 2 }, { x: 3, y: 2 }, { x: 3, y: 3 }, { x: 4, y: 3 },
+    ])
+    harness.renderer.dispose()
+  })
+
   it('draws action-history points and paths in the Three.js world parallel to the board plane', () => {
     const harness = createHarness(1280, 720, false)
     const model = runtimeModel()
@@ -1166,6 +1200,92 @@ describe('RED-68 BattleRenderer3D runtime', () => {
     for (let index = 0; index < 20; index += 1) harness.frame(16)
     expect(group.position.x).toBeCloseTo(secondTarget.pieces[0].x, 3)
     expect(harness.renderer.getMotionDiagnostics().playedEventCount).toBe(2)
+    harness.renderer.dispose()
+  })
+
+  it('anchors a second hover route at the latest authoritative piece cell', () => {
+    const harness = createHarness(844, 390, false)
+    const model = runtimeModel()
+    const piece = model.pieces[0]
+    model.selection = { pieceId: piece.id, mode: 'move' }
+    model.interaction = {
+      pendingPieceId: null,
+      pendingCommandId: null,
+      movePath: [{ x: piece.x + 1, y: piece.y }],
+    }
+    harness.renderer.init({ container: harness.container })
+    harness.renderer.update(model)
+    harness.frame(16)
+
+    const firstLine = harness.renderers[0].scene!.children.find(child => child.userData.movePath === true)!
+    const firstPositions = Array.from(firstLine.geometry!.getAttribute('position').array)
+    expect(firstPositions[0]).toBeCloseTo(piece.x, 6)
+    expect(firstPositions[2]).toBeCloseTo(piece.y, 6)
+
+    const secondModel = structuredClone(model)
+    secondModel.pieces[0].x = piece.x + 1
+    secondModel.interaction.movePath = [{ x: piece.x + 2, y: piece.y }]
+    harness.renderer.update(secondModel)
+
+    const secondLine = harness.renderers[0].scene!.children.find(child => child.userData.movePath === true)!
+    const secondPositions = Array.from(secondLine.geometry!.getAttribute('position').array)
+    expect(secondPositions[0]).toBeCloseTo(piece.x + 1, 6)
+    expect(secondPositions[2]).toBeCloseTo(piece.y, 6)
+    expect(secondLine.renderOrder).toBeGreaterThan(22)
+    expect(secondLine.material!.transparent).toBe(true)
+    harness.renderer.dispose()
+  })
+
+  it('retimes a bent movement route when speed changes without jumping off the route', () => {
+    const harness = createHarness(844, 390, false)
+    const model = runtimeModel()
+    const pieceId = model.pieces[0].id
+    const piece = model.pieces[0]
+    const nextModel = structuredClone(model)
+    nextModel.pieces[0].x = piece.x + 3
+    nextModel.pieces[0].y = piece.y + 2
+    const path = [
+      { x: piece.x + 1, y: piece.y },
+      { x: piece.x + 1, y: piece.y + 1 },
+      { x: piece.x + 2, y: piece.y + 1 },
+      { x: piece.x + 2, y: piece.y + 2 },
+      { x: piece.x + 3, y: piece.y + 2 },
+    ]
+    const routePoints = [{ x: piece.x, y: piece.y }, ...path]
+    const isOnRoute = (x: number, z: number) => routePoints.some((from, index) => {
+      const to = routePoints[index + 1]
+      if (!to) return Math.hypot(x - from.x, z - from.y) < 0.001
+      const dx = to.x - from.x
+      const dz = to.y - from.y
+      const lengthSquared = dx * dx + dz * dz
+      const progress = ((x - from.x) * dx + (z - from.y) * dz) / lengthSquared
+      if (progress < -0.001 || progress > 1.001) return false
+      return Math.hypot(x - (from.x + dx * progress), z - (from.y + dz * progress)) < 0.001
+    })
+    harness.renderer.init({ container: harness.container })
+    harness.renderer.update(model)
+    harness.frame(16)
+    const group = harness.renderers[0].scene!.children.find(child => child.userData.pieceId === pieceId)!
+    harness.renderer.animateAction({ type: 'move', pieceId, motionEventKey: 'speed-route', movementPaths: { [pieceId]: path } }, model, nextModel)
+    harness.renderer.update(nextModel)
+    // The first demand-driven frame advances by one 60 Hz tick; the next
+    // frame supplies the rest of the intended 28 ms pre-toggle interval.
+    ;[16, 12].forEach((step) => {
+      harness.frame(step)
+      expect(isOnRoute(group.position.x, group.position.z)).toBe(true)
+    })
+    expect(group.position.x).toBeGreaterThan(piece.x)
+    expect(group.position.z).toBeCloseTo(piece.y, 1)
+    harness.renderer.setAnimationSpeed(2)
+    // The 140 ms action has about 112 ms of logical travel remaining at 2x,
+    // so the bent route must finish within about 56 ms. Sample at <=16 ms
+    // so a restart from the origin cannot pass this check by timing alone.
+    ;[16, 16, 16, 8].forEach((step) => {
+      harness.frame(step)
+      expect(isOnRoute(group.position.x, group.position.z)).toBe(true)
+    })
+    expect(group.position.x).toBeCloseTo(nextModel.pieces[0].x, 3)
+    expect(group.position.z).toBeCloseTo(nextModel.pieces[0].y, 3)
     harness.renderer.dispose()
   })
 

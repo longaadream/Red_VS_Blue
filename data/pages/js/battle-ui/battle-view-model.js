@@ -49,6 +49,33 @@
     return cells
   }
 
+  // Grid paths are ordered facts.  Keep their travel order instead of using
+  // normalizeCells, whose row-major ordering is correct for highlight sets
+  // but would turn a cardinal-turn route into a different route.
+  function normalizePathCells(value) {
+    const cells = []
+    const entries = Array.isArray(value)
+      ? value
+      : (value && typeof value.forEach === 'function' ? Array.from(value) : [])
+    entries.forEach(function (entry) {
+      let x
+      let y
+      if (typeof entry === 'string') {
+        const parts = entry.split(',')
+        if (parts.length < 2 || parts[0].trim() === '' || parts[1].trim() === '') return
+        x = Number(parts[0])
+        y = Number(parts[1])
+      } else if (entry && typeof entry === 'object') {
+        if (entry.x == null || (entry.y === undefined && entry.z == null)) return
+        x = Number(entry.x)
+        y = Number(entry.y !== undefined ? entry.y : entry.z)
+      }
+      if (!Number.isSafeInteger(x) || !Number.isSafeInteger(y)) return
+      cells.push({ x: x, y: y })
+    })
+    return cells
+  }
+
   function statusLabel(status) {
     if (typeof status === 'string') return status
     return String(status.name || status.type || status.id || '?')
@@ -137,7 +164,11 @@
       alive: piece.currentHp > 0,
       statuses: statuses,
       statusSummary: statuses,
-      displayStats: {attack: display.attack, defense: display.defense, moveRange: display.moveRange},
+      displayStats: {
+        attack: display.attack != null ? display.attack : piece.attack,
+        defense: display.defense != null ? display.defense : piece.defense,
+        moveRange: display.moveRange != null ? display.moveRange : (piece.moveRange != null ? piece.moveRange : piece.stats && piece.stats.moveRange),
+      },
       displaySkills: display.skills,
     }
   }
@@ -421,6 +452,8 @@
           }
         })(),
         selectedTargetCells: normalizeCells(interaction.selectedTargetCells),
+        movePath: normalizePathCells(interaction.movePath),
+        hoverMovePath: normalizePathCells(interaction.hoverMovePath),
         pendingPieceId: interaction.pendingPieceId || null,
         pendingCommandId: interaction.pendingCommandId || null,
         selectedTargetPieceIds: Array.isArray(interaction.selectedTargetPieceIds)
@@ -439,6 +472,7 @@
   root.BattleViewModel = {
     create: create,
     normalizeCells: normalizeCells,
+    normalizePathCells: normalizePathCells,
     normalizeSkillSummaries: normalizeSkillSummaries,
     normalizePresentationEvents: normalizePresentationEvents,
     normalizeStatuses: normalizeStatuses,

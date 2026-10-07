@@ -48,6 +48,7 @@ export {
   getLegalNormalMoveTargetsForPlayer,
   getLivingOccupantAt,
   getManhattanArea,
+  getNormalMovePath,
   getNormalMoveRejection,
   getOrthogonalLineCells,
   getSquareArea,

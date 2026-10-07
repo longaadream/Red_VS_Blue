@@ -153,6 +153,76 @@
     return result
   }
 
+  function pathCells(value) {
+    const result = []
+    ;(Array.isArray(value) ? value : []).forEach(function (cell) {
+      if (!cell || cell.x == null || (cell.y === undefined && cell.z == null)) return
+      const x = Number(cell && cell.x)
+      const y = Number(cell && (cell.y !== undefined ? cell.y : cell.z))
+      if (!Number.isSafeInteger(x) || !Number.isSafeInteger(y)) return
+      result.push({ x: x, y: y })
+    })
+    return result
+  }
+
+  function validGridTarget(target) {
+    if (!target || target.x == null || target.y == null) return false
+    const x = Number(target.x)
+    const y = Number(target.y)
+    return Number.isSafeInteger(x) && Number.isSafeInteger(y)
+  }
+
+  // The UI asks the engine for route facts; it must not reconstruct a route
+  // from the move highlight set because that loses turn order and blockers.
+  function getNormalMovePath(options) {
+    const input = options || {}
+    if (!input.snapshot || !input.pieceId || !input.engine || typeof input.engine.getNormalMovePath !== 'function') return null
+    const state = cloneState(input.snapshot, input.engine)
+    const piece = (state.pieces || []).find(function (candidate) {
+      return String(candidate.instanceId || candidate.id) === String(input.pieceId)
+    })
+    if (!piece) return null
+    const target = input.target || { x: input.toX, y: input.toY }
+    if (!validGridTarget(target)) return null
+    try {
+      const path = input.engine.getNormalMovePath(
+        state,
+        piece,
+        { x: Number(target.x), y: Number(target.y) },
+        Array.isArray(input.waypoints) ? input.waypoints : [],
+      )
+      return path == null ? null : pathCells(path)
+    } catch {
+      return null
+    }
+  }
+
+  function getNormalMoveRejection(options) {
+    const input = options || {}
+    if (!input.snapshot || !input.pieceId || !input.engine || typeof input.engine.getNormalMoveRejection !== 'function') {
+      return { code: 'cannot-route', reason: 'move-path-unavailable' }
+    }
+    const state = cloneState(input.snapshot, input.engine)
+    const piece = (state.pieces || []).find(function (candidate) {
+      return String(candidate.instanceId || candidate.id) === String(input.pieceId)
+    })
+    if (!piece) return { code: 'cannot-route', reason: 'piece-missing' }
+    const target = input.target || { x: input.toX, y: input.toY }
+    if (!validGridTarget(target)) {
+      return { code: 'cannot-route', reason: 'target-missing' }
+    }
+    try {
+      return input.engine.getNormalMoveRejection(
+        state,
+        piece,
+        { x: Number(target.x), y: Number(target.y) },
+        pathCells(input.path),
+      ) || null
+    } catch (error) {
+      return { code: String(error && (error.code || error.reason) || 'cannot-route'), reason: String(error && error.message || 'move-rejected') }
+    }
+  }
+
   function probeSkillTarget(options) {
     const input = options || {}
     if (!input.snapshot || !input.pieceId || !input.skillId || !input.engine) return null
@@ -250,6 +320,8 @@
     appendTarget: appendTarget,
     probeSkillTarget: probeSkillTarget,
     queryMoveCells: queryMoveCells,
+    getNormalMovePath: getNormalMovePath,
+    getNormalMoveRejection: getNormalMoveRejection,
     queryActionTargetCells: queryActionTargetCells,
     queryPendingTargetCells: queryPendingTargetCells,
     querySkillTargetCells: querySkillTargetCells,

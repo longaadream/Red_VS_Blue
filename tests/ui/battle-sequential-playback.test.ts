@@ -42,7 +42,7 @@ beforeEach(() => vi.useFakeTimers())
 afterEach(() => vi.useRealTimers())
 
 describe('sequential board playback', () => {
-  it.each(['statusAdded', 'statusRemoved', 'tileEffectAdded', 'tileEffectRemoved'])('renders every member of an explicit %s batch in the same update', kind => {
+  it.each(['statusAdded', 'statusRemoved', 'tileEffectAdded', 'tileEffectRemoved'])('renders every member of an explicit %s batch in authority order', kind => {
     const { presentation, frames, queue } = setup()
     const isTile = kind.startsWith('tile')
     const removing = kind.endsWith('Removed')
@@ -61,9 +61,12 @@ describe('sequential board playback', () => {
     presentation.update(final)
     const count = (frame: any) => isTile ? frame.effects.length : frame.pieces[0].statuses.length
     expect(frames.every(frame => count(frame) === (removing ? 3 : 0))).toBe(true)
-    vi.advanceTimersByTime(1520)
+    // Existing playback emits a separate beat for each authoritative member.
+    // Status beats are 100ms, tile beats 140ms; sample the third result before damage.
+    vi.advanceTimersByTime(isTile ? 480 : 400)
     expect(count(frames.at(-1))).toBe(removing ? 0 : 3)
-    expect(frames.every(frame => [0,3].includes(count(frame)))).toBe(true)
+    const observedCounts = [...new Set(frames.map(count))]
+    expect(observedCounts).toEqual(removing ? [3, 2, 1, 0] : [0, 1, 2, 3])
     expect(frames.at(-1).pieces[0].health.current).toBe(20)
     queue.settleAll()
     expect(frames.at(-1).pieces[0].health.current).toBe(17)
@@ -82,11 +85,11 @@ describe('sequential board playback', () => {
     // Tile batches intentionally use the short presentation lane. Verify the
     // add batch is visible before the remove batch settles instead of relying
     // on the old long-action timing.
-    vi.advanceTimersByTime(1220)
+    vi.advanceTimersByTime(340)
     expect(frames.at(-1).effects).toHaveLength(2)
-    vi.advanceTimersByTime(400)
+    vi.advanceTimersByTime(280)
     expect(frames.at(-1).effects).toHaveLength(0)
-    expect(frames.every(frame=>[0,2].includes(frame.effects.length))).toBe(true)
+    expect([...new Set(frames.map(frame => frame.effects.length))]).toEqual([0, 1, 2])
     presentation.dispose()
   })
 
@@ -101,11 +104,11 @@ describe('sequential board playback', () => {
     }))
     presentation.update(model(14, [...first, ...second], controlReturn))
     expect(frames.every(frame => frame.pieces[0].health.current === 20)).toBe(true)
-    vi.advanceTimersByTime(1520)
+    vi.advanceTimersByTime(200)
     expect(frames.at(-1).pieces[0].health.current).toBe(17)
-    vi.advanceTimersByTime(680)
+    vi.advanceTimersByTime(200)
     expect(frames.at(-1).pieces[0].health.current).toBe(17)
-    vi.advanceTimersByTime(1520)
+    vi.advanceTimersByTime(80)
     expect(frames.at(-1).pieces[0].health.current).toBe(14)
     presentation.dispose()
   })
@@ -115,10 +118,10 @@ describe('sequential board playback', () => {
     const final = model(14, events(), controlReturn)
     presentation.update(final)
     expect(frames.every(frame => frame.pieces[0].health.current === 20)).toBe(true)
-    vi.advanceTimersByTime(1100 + 420)
+    vi.advanceTimersByTime(200)
     expect(frames.at(-1).pieces[0].health.current).toBe(17)
     expect(renderer.spawnFloater.mock.calls.map(call => call[2])).toEqual(['−3'])
-    vi.advanceTimersByTime(1100)
+    vi.advanceTimersByTime(140)
     expect(frames.at(-1).pieces[0].health.current).toBe(14)
     expect(renderer.spawnFloater.mock.calls.map(call => call[2])).toEqual(['−3', '−3'])
     vi.runAllTimers()
@@ -152,10 +155,10 @@ describe('sequential board playback', () => {
     final.pieces[0].statuses = ['a', 'b'].map(id => ({ id, type: id }))
     final.pieces[0].statusSummary = final.pieces[0].statuses
     presentation.update(final)
-    vi.advanceTimersByTime(1520)
+    vi.advanceTimersByTime(300)
     expect(frames.at(-1).pieces[0].statuses.map((s: any) => s.id)).toEqual(['a', 'b'])
     expect(frames.at(-1).pieces[0].statusSummary).toEqual(frames.at(-1).pieces[0].statuses)
-    vi.advanceTimersByTime(1100)
+    vi.advanceTimersByTime(140)
     expect(frames.at(-1).pieces[0].statuses.map((s: any) => s.id)).toEqual(['a', 'b'])
     presentation.dispose()
   })
@@ -167,7 +170,7 @@ describe('sequential board playback', () => {
       batchId: 'summon-1', targetPieceIds: ['new'], pieceSnapshot: { id: 'new', templateId: 'new', name: 'New', faction: 'red', ownerPlayerId: 'red', x: 3, y: 2, hp: 10, maxHp: 10 } }])
     expect(sequence[1].batchId).toBe('summon-1')
     presentation.update(model(20, sequence))
-    vi.advanceTimersByTime(1520)
+    vi.advanceTimersByTime(200)
     expect(frames.at(-1).pieces.find((p: any) => p.id === 'new')).toMatchObject({ x: 3, y: 2, health: { current: 10 } })
     presentation.dispose()
   })

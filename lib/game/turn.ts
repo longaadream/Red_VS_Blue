@@ -84,7 +84,8 @@ import {
   type SuspendableInteractionInput,
   type SuspendableInteractionPrompt,
 } from './suspendable-action-transaction'
-import { getNormalMoveRejection, manhattanDistance } from "./spatial"
+import { getNormalMovePath, getNormalMoveRejection, getOrthogonalLineCells, manhattanDistance,
+  type GridPosition, type NormalMovePath } from "./spatial"
 import {
   PROGRESSIVE_DEPLOYMENT_MODE,
   getEmptyWalkableDeploymentPositions,
@@ -547,6 +548,8 @@ export type BattleAction =
       pieceId: string
       toX: number
       toY: number
+      /** Optional authoritative route, excluding the origin and including the destination. */
+      path?: GridPosition[]
     }
   | ({
       type: "useBasicSkill"
@@ -934,16 +937,22 @@ function isSamePlayer(playerId1: PlayerId, playerId2: PlayerId): boolean {
 }
 
 /**
- * 普通移动统一使用 spatial.ts 的纯规则：直线、moveRange、地形与存活棋子阻挡。
+ * 普通移动统一使用 spatial.ts 的纯规则：基数路径、moveRange、地形与存活棋子阻挡。
  */
 function validateMove(
   state: BattleState,
   piece: PieceInstance,
   toX: number,
   toY: number,
+  path?: NormalMovePath | null,
 ): void {
-  const rejection = getNormalMoveRejection(state, piece, { x: toX, y: toY })
+  const rejection = getNormalMoveRejection(state, piece, { x: toX, y: toY }, path)
   if (rejection) throw new BattleRuleError(rejection.message)
+}
+
+function sameNormalMovePath(left: readonly GridPosition[] | null | undefined, right: readonly GridPosition[] | null | undefined): boolean {
+  if (!left || !right || left.length !== right.length) return false
+  return left.every((cell, index) => cell.x === right[index]?.x && cell.y === right[index]?.y)
 }
 
 function getSkillDefinitionOrThrow(
@@ -2598,9 +2607,25 @@ function applyBattleActionInternal(
         )
       }
 
+      // Adventure enemy plans predate selectable routes. Keep their published
+      // route authoritative so the new normal-move resolver cannot turn a
+      // zero-AP scripted action into a different detour.
+      const adventureProgramPath: GridPosition[] | null | undefined = programMove
+        ? (() => {
+            const planned = adventureBoundary(next)?.plans?.[0]?.cells
+            if (Array.isArray(planned)) return planned.map(cell => ({ x: cell.x, y: cell.y }))
+            if (piece.x == null || piece.y == null) return null
+            return getOrthogonalLineCells({ x: piece.x, y: piece.y }, { x: action.toX, y: action.toY })
+          })()
+        : undefined
+      if (programMove && action.path !== undefined
+        && !sameNormalMovePath(action.path, adventureProgramPath)) {
+        throw new BattleRuleError('预告移动路径已改变')
+      }
+
       // 触发即将移动前的规则（检查冰冻等状态）
       // 使用可修改的上下文对象，触发器可以修改 targetX/targetY 来改变移动目标
-      validateMove(next, piece, action.toX, action.toY)
+      validateMove(next, piece, action.toX, action.toY, programMove ? adventureProgramPath : action.path)
 
       const moveContext = {
         type: "beforeMove" as const,
@@ -2649,7 +2674,22 @@ function applyBattleActionInternal(
 
       if (programMove && !isAdventureProgramMove(next, {...action,toX:finalToX,toY:finalToY})) throw new BattleRuleError('预告移动已改变')
 
-      validateMove(next, piece, finalToX, finalToY)
+      let normalPath: NormalMovePath | null
+      if (programMove) {
+        normalPath = adventureProgramPath ?? null
+      } else if (action.path !== undefined) {
+        normalPath = action.path
+      } else {
+        const resolved = getNormalMovePath(next, piece, { x: finalToX, y: finalToY })
+        if (!resolved) {
+          // Keep the normal rejection code/message for an unreachable default
+          // destination instead of treating it as a malformed explicit route.
+          validateMove(next, piece, finalToX, finalToY)
+          throw new BattleRuleError('普通移动路径已失效')
+        }
+        normalPath = resolved
+      }
+      validateMove(next, piece, finalToX, finalToY, normalPath)
 
       let deploymentFirstMoveFree = false
       const playerMeta = getPlayerMeta(next, action.playerId)
@@ -2660,6 +2700,7 @@ function applyBattleActionInternal(
 
       // 执行移动（使用触发器可能修改后的目标位置）
       const positionResult = changePiecePositions(next, [{ pieceId: piece.instanceId, x: finalToX, y: finalToY }], 'walk', {
+        normalPath,
         deferContacts: true,
         commitAction: () => {
           deploymentFirstMoveFree = !!piece.statusTags?.some(tag => tag.type === DEPLOYMENT_FIRST_MOVE_FREE_STATUS

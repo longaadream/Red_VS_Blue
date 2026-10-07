@@ -9,10 +9,15 @@
     'inspect-piece',
     'confirm-target-selection',
     'cancel-target',
+    'confirm-move',
+    'add-move-waypoint',
+    'reset-move',
+    'cancel-move',
     'drop-piece',
     'viewport-change',
     'hover-cell',
   ])
+  const LIGHTWEIGHT_MOTION_KINDS = new Set(['statusAdded', 'statusRemoved', 'resourceChanged', 'resourceSpent'])
 
   function create(options) {
     const input = options || {}
@@ -53,7 +58,9 @@
         renderer.update(playbackModel)
       }
       const movement = group.root.kind === 'move' || group.root.kind === 'forceMove'
-      if (!(phase === 'static' || phase === 'settle' || phase === (movement ? 'path' : 'result'))) return
+      // Movement starts at focus so the exact route gets the whole action
+      // window. Other effects retain their result phase and remain FIFO.
+      if (!(phase === 'static' || phase === 'settle' || phase === (movement ? 'path' : 'result') || (movement && phase === 'focus'))) return
       if (appliedBeats.has(group.rootEventId)) {
         if (phase === 'settle' && renderer.update && playbackModel) renderer.update(playbackModel)
         return
@@ -66,6 +73,7 @@
       if (phase !== 'settle' && !skillRecovering && !recoveryBaselinePending && skillAudio && skillAudio.playEvents) skillAudio.playEvents(events)
       if (phase !== 'settle' && !skillRecovering && !recoveryBaselinePending && impact) impact.playEvents(events)
       const movementKinds = {}
+      const movementPaths = {}
       const buffTargets = new Set()
       events.forEach(function (event) {
         const result = event.result || {}
@@ -74,7 +82,7 @@
           if (event.kind === 'tileEffectAdded') after.effects.push({ id: result.effectId, type: result.effectType,
             icon: result.icon || '', x: event.targetCell.x, y: event.targetCell.y })
         }
-        const ids = event.targetPieceIds || (event.kind === 'move' ? [event.sourcePieceId] : [])
+        const ids = event.targetPieceIds || ((event.kind === 'move' || event.kind === 'forceMove') ? [event.sourcePieceId] : [])
         ids.forEach(function (id) {
           let piece = after.pieces.find(function (p) { return p.id === id })
           const finalPiece = ((frames && frames.after || currentModel).pieces || []).find(function (p) { return p.id === id })
@@ -86,6 +94,15 @@
           if (!piece) return
           if ((event.kind === 'move' || event.kind === 'forceMove') && result.toX != null && result.toY != null) {
             movementKinds[id] = result.movementKind || (event.kind === 'move' ? 'walk' : '')
+            const pathCells = event.presentation && Array.isArray(event.presentation.pathCells)
+              ? event.presentation.pathCells
+              : []
+            if (pathCells.length) movementPaths[id] = pathCells.map(function (cell) {
+              return { x: Number(cell.x), y: Number(cell.y) }
+            })
+            if (pathCells.length && event.sourcePieceId) movementPaths[event.sourcePieceId] = pathCells.map(function (cell) {
+              return { x: Number(cell.x), y: Number(cell.y) }
+            })
             piece.x = result.toX; piece.y = result.toY
           } else if (event.kind === 'damage' || event.kind === 'heal') {
             const hp = piece.health ? piece.health.current : piece.hp || 0
@@ -129,7 +146,8 @@
       playbackModel = after
       if (phase === 'settle' && renderer.update) renderer.update(after)
       else if (renderer.animateAction) renderer.animateAction({ motionEventKey: 'beat:' + group.rootEventId,
-        movementKinds: movementKinds, sourcePieceId: group.root.sourcePieceId, targetPieceId: (group.root.targetPieceIds || [])[0],
+        movementKinds: movementKinds, movementPaths: movementPaths, sourcePieceId: group.root.sourcePieceId, targetPieceId: (group.root.targetPieceIds || [])[0],
+        motionDurationMs: LIGHTWEIGHT_MOTION_KINDS.has(group.root.kind) ? 100 : 140,
         isAutomatic: !!group.root.parentEventId }, before, after)
       renderer.update(after)
     }
@@ -263,6 +281,9 @@
           boardContainer: mountInput.boardContainer,
           floatLayer: mountInput.floatLayer || null,
           projectCell: function (x, y, elevation) { return renderer.projectCell(x, y, elevation) },
+          setAnimationSpeed: function (speed) {
+            if (renderer.setAnimationSpeed) renderer.setAnimationSpeed(speed)
+          },
           showAreaFlash: function (cells) {
             if (!historicalRoot && renderer.showPresentationAreaFlash) renderer.showPresentationAreaFlash(cells)
           },
