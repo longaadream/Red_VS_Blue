@@ -417,6 +417,7 @@
       <summary style="cursor:pointer;padding:8px">音效设置</summary>
       <label style="display:flex;align-items:center;gap:12px;padding:12px">音效音量 <input data-sound-volume type="range" min="0" max="100" step="1" aria-label="音效音量" style="min-width:0;width:130px"><output data-sound-label></output></label>
       <label style="display:flex;align-items:center;gap:12px;padding:12px"><input data-screen-shake type="checkbox">重伤害画面震动</label>
+      <label data-window-fullscreen-setting style="display:flex;align-items:center;gap:12px;padding:12px"><input data-window-fullscreen type="checkbox" aria-label="桌面全屏"><span>桌面全屏</span><output data-window-fullscreen-label></output></label>
     </details>
     <main class="menu-workspace">
       <nav class="mode-nav" aria-label="主要游戏模式">
@@ -1508,6 +1509,51 @@
       } catch {}
     }
 
+    function renderWindowFullscreenSetting(fullscreen) {
+      const input = document.querySelector('[data-window-fullscreen]')
+      const label = document.querySelector('[data-window-fullscreen-label]')
+      if (!input || typeof fullscreen !== 'boolean') return
+      input.checked = fullscreen
+      if (label) label.textContent = fullscreen ? '已开启' : '窗口模式'
+    }
+
+    async function initWindowFullscreenSetting() {
+      const setting = document.querySelector('[data-window-fullscreen-setting]')
+      const input = document.querySelector('[data-window-fullscreen]')
+      const api = window.electronAPI
+      if (!setting || !input) return
+      if (!api || typeof api.getWindowFullscreen !== 'function' || typeof api.setWindowFullscreen !== 'function') {
+        setting.hidden = true
+        return
+      }
+
+      input.disabled = true
+      try {
+        renderWindowFullscreenSetting(await api.getWindowFullscreen())
+        if (typeof api.onWindowFullscreenChanged === 'function') {
+          api.onWindowFullscreenChanged(renderWindowFullscreenSetting)
+        }
+      } catch (error) {
+        console.error('[client] fullscreen preference unavailable:', error)
+        setting.hidden = true
+        return
+      }
+
+      input.disabled = false
+      input.addEventListener('change', async () => {
+        const desired = input.checked
+        input.disabled = true
+        try {
+          renderWindowFullscreenSetting(await api.setWindowFullscreen(desired))
+        } catch (error) {
+          console.error('[client] fullscreen preference update failed:', error)
+          try { renderWindowFullscreenSetting(await api.getWindowFullscreen()) } catch {}
+        } finally {
+          input.disabled = false
+        }
+      })
+    }
+
     window.addEventListener('load', () => { if (new URLSearchParams(location.search).get('lan') === 'join') showJoinSheet() })
     // ── Service Worker ────────────────────────────────────────────────────────
     // 版本标识，方便确认运行的是最新构建
@@ -1557,6 +1603,7 @@
         }
       }
       updateTutorialEntry()
+      void initWindowFullscreenSetting()
       // Show connected server in server section if saved
       const saved = getSavedUrl()
       if (saved) {
