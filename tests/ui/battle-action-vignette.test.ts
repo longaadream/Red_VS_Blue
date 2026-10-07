@@ -79,6 +79,7 @@ function loadModule(): VignetteModule {
   const source = readFileSync(resolve(process.cwd(), 'data/pages/js/battle-ui/battle-action-vignette.js'), 'utf8')
   new Script(identitySource, { filename: 'battle-action-identity.js' }).runInContext(context)
   new Script(source, { filename: 'battle-action-vignette.js' }).runInContext(context)
+  new Script(readFileSync(resolve(process.cwd(), 'data/pages/js/battle-ui/battle-move-timeline.js'), 'utf8')).runInContext(context)
   return windowObject.BattleActionVignette as VignetteModule
 }
 
@@ -111,7 +112,7 @@ function child(index: number, childIndex: number, overrides: Record<string, unkn
 describe('RED-167 action vignette queue', () => {
   it('keeps a single-effect banner under the instant feedback budget', () => {
     expect(loadModule().constants.singleEffectDurationMs).toBeLessThan(50)
-    expect(loadModule().constants.compositeStepDurationMs).toBe(140)
+    expect(loadModule().constants.compositeStepDurationMs).toBe(200)
   })
   it('hides friendly active banners and all ordinary movement banners', () => {
     const ui = loadModule()
@@ -662,7 +663,7 @@ describe('RED-167 action vignette queue', () => {
 
     const layer = floatLayer.children[0]
     expect(layer.hidden).toBe(false)
-    vi.advanceTimersByTime(30)
+    vi.advanceTimersByTime(40)
     expect(showPath).toHaveBeenCalledWith({
       source: { x: 0, y: 0 },
       end: { x: 4, y: 0 },
@@ -677,7 +678,7 @@ describe('RED-167 action vignette queue', () => {
     expect(layer.innerHTML).toContain('寒冰坚忍')
     expect(layer.innerHTML).not.toContain('使用技能')
     expect(layer.innerHTML).not.toContain('images/effect-icons/action-skill.svg')
-    vi.advanceTimersByTime(30)
+    vi.advanceTimersByTime(50)
     expect(layer.innerHTML).not.toContain('battle-vignette-result')
     expect(layer.innerHTML).not.toContain('>4<')
 
@@ -804,8 +805,8 @@ describe('RED-167 action vignette queue', () => {
 
   it.each([
     ['focus', 0],
-    ['path', 30],
-    ['result', 60],
+    ['path', 40],
+    ['result', 90],
   ] as const)('allows battlefield input during %s without changing commands, logs, payloads, or hash', (phase, elapsedMs) => {
     const vignetteModule = loadModule()
     const floatLayer = new FakeElement()

@@ -38,6 +38,7 @@ type ThreeCamera = { updateMatrixWorld(force: boolean): void }
 type RendererApi = {
   init(options: unknown): void
   update(model: unknown): void
+  updateMoveDraft(interaction: unknown, moveCells: unknown[]): void
   showHistoricalBoard(model: unknown): void
   animateAction(action: unknown, previousModel: unknown, nextModel: unknown): void
   setAnimationSpeed(speed: number): void
@@ -75,6 +76,10 @@ type RendererApi = {
   }
   getPerformanceDiagnostics(): {
     renderCount: number
+    fullModelUpdateCount: number
+    moveDraftUpdateCount: number
+    terrainHitTestCount: number
+    dragGridSampleCount: number
     lastDrawCalls: number
     frameScheduled: boolean
     activeAnimationCount: number
@@ -89,8 +94,8 @@ type WindowHarness = {
   devicePixelRatio: number
   BattleRenderer3D?: RendererApi
   matchMedia(query: string): { matches: boolean }
-  addEventListener(): void
-  removeEventListener(): void
+  addEventListener(type: string, handler: (event: Record<string, unknown>) => void): void
+  removeEventListener(type: string, handler: (event: Record<string, unknown>) => void): void
 }
 
 type FakeRendererRecord = {
@@ -136,6 +141,7 @@ type RuntimePieceFixture = {
 }
 
 type RuntimeModelFixture = {
+  viewer?: { id: string }
   board: {
     [key: string]: unknown
     tiles: Array<{ props: { [key: string]: unknown; type: string } }>
@@ -154,6 +160,9 @@ type RuntimeModelFixture = {
     pendingCommandId: string | null
     movePath?: Array<{ x: number; y: number }>
     hoverMovePath?: Array<{ x: number; y: number }>
+    moveDraftActive?: boolean
+    moveRemaining?: number
+    movePreviewText?: string
   }
 }
 
@@ -267,6 +276,7 @@ function createHarness(width = 390, height = 844, coarsePointer = true, reducedM
     createElementNS(_namespace: string, tagName: string) { return new FakeElement(tagName) },
     getElementById() { return null },
   }
+  const windowEvents = new FakeElement('window')
   const windowObject: WindowHarness = {
     devicePixelRatio: 1,
     matchMedia(query: string) {
@@ -275,8 +285,9 @@ function createHarness(width = 390, height = 844, coarsePointer = true, reducedM
           || (reducedMotion && query.includes('prefers-reduced-motion: reduce')),
       }
     },
-    addEventListener() {},
-    removeEventListener() {},
+    addEventListener(type, handler) { windowEvents.addEventListener(type, handler) },
+    removeEventListener(type, handler) { windowEvents.removeEventListener(type, handler) },
+    dispatch: (type: string, event: Record<string, unknown>) => windowEvents.dispatch(type, event),
   }
   const sandbox: Record<string, unknown> = {
     window: windowObject,
@@ -356,6 +367,7 @@ function createHarness(width = 390, height = 844, coarsePointer = true, reducedM
   new Script(readFileSync(resolve(pagesDir, 'js/battle-ui/battle-effect-icons.js'), 'utf8'), { filename: 'battle-effect-icons.js' }).runInContext(context)
   new Script(readFileSync(resolve(pagesDir, 'js/battle-ui/battle-status-presentation.js'), 'utf8'), { filename: 'battle-status-presentation.js' }).runInContext(context)
   new Script(readFileSync(resolve(pagesDir, 'js/battle-ui/battle-tactical-geometry.js'), 'utf8'), { filename: 'battle-tactical-geometry.js' }).runInContext(context)
+  new Script(readFileSync(resolve(pagesDir, 'js/battle-ui/battle-move-timeline.js'), 'utf8')).runInContext(context)
   new Script(readFileSync(resolve(pagesDir, 'js/battle-renderer-3d.js'), 'utf8'), { filename: 'battle-renderer-3d.js' }).runInContext(context)
 
   function frame(step = 100) {
@@ -1103,26 +1115,98 @@ describe('RED-68 BattleRenderer3D runtime', () => {
     const canvas = harness.renderers[0].domElement
 
     canvas.dispatch('pointerdown', { pointerId: 61, pointerType: 'mouse', button: 0, clientX: sourcePoint.clientX, clientY: sourcePoint.clientY })
+    const terrainHitsBeforeDrag = harness.renderer.getPerformanceDiagnostics().terrainHitTestCount
     canvas.dispatch('pointermove', { pointerId: 61, pointerType: 'mouse', clientX: targetPoint.clientX, clientY: targetPoint.clientY })
     expect(group.position.x).not.toBe(piece.x)
     canvas.dispatch('pointerup', { pointerId: 61, pointerType: 'mouse', clientX: targetPoint.clientX, clientY: targetPoint.clientY })
+    expect(harness.renderer.getPerformanceDiagnostics().terrainHitTestCount).toBe(terrainHitsBeforeDrag)
+    expect(harness.renderer.getPerformanceDiagnostics().dragGridSampleCount).toBeGreaterThan(0)
 
-    expect(intents).toContainEqual({ type: 'drop-piece', pieceId: piece.id, x: target.x, y: target.y })
+    expect(intents).toContainEqual({ type: 'start-move-drag', pieceId: piece.id })
+    expect(intents).toContainEqual({ type: 'end-move-drag', pieceId: piece.id, cancelled: false, x: target.x, y: target.y })
     expect(intents).not.toContainEqual({ type: 'activate-cell', x: target.x, y: target.y })
     expect(distance(cameraReference, harness.renderer.projectCell(10, 8))).toBeLessThan(0.5)
     expect(group.position.x).toBe(piece.x)
     expect(group.position.z).toBe(piece.y)
     expect(canvas.capturedPointers.size).toBe(0)
 
-    const submissionsBeforeCancel = intents.filter((intent) => intent.type === 'drop-piece').length
+    const submissionsBeforeCancel = intents.filter((intent) => intent.type === 'end-move-drag' && !intent.cancelled).length
     canvas.dispatch('pointerdown', { pointerId: 62, pointerType: 'touch', button: 0, clientX: sourcePoint.clientX, clientY: sourcePoint.clientY })
     canvas.dispatch('pointermove', { pointerId: 62, pointerType: 'touch', clientX: targetPoint.clientX, clientY: targetPoint.clientY })
     canvas.dispatch('pointercancel', { pointerId: 62, pointerType: 'touch', clientX: targetPoint.clientX, clientY: targetPoint.clientY })
-    expect(intents.filter((intent) => intent.type === 'drop-piece')).toHaveLength(submissionsBeforeCancel)
+    expect(intents.filter((intent) => intent.type === 'end-move-drag' && !intent.cancelled)).toHaveLength(submissionsBeforeCancel)
+    expect(intents).toContainEqual({ type: 'end-move-drag', pieceId: piece.id, cancelled: true, x: null, y: null })
     expect(group.position.x).toBe(piece.x)
     expect(group.position.z).toBe(piece.y)
     expect(canvas.capturedPointers.size).toBe(0)
+    const countBeforeEscape = intents.length
+    canvas.dispatch('pointerdown', { pointerId: 63, pointerType: 'mouse', button: 0, clientX: sourcePoint.clientX, clientY: sourcePoint.clientY })
+    canvas.dispatch('pointermove', { pointerId: 63, pointerType: 'mouse', clientX: targetPoint.clientX, clientY: targetPoint.clientY })
+    ;(harness.windowObject.dispatch as (type: string, event: Record<string, unknown>) => void)('keydown', { key: 'Escape' })
+    canvas.dispatch('pointerup', { pointerId: 63, pointerType: 'mouse', clientX: targetPoint.clientX, clientY: targetPoint.clientY })
+    expect(intents.slice(countBeforeEscape).filter(intent => intent.type === 'select-cell' || intent.type === 'activate-cell'
+      || (intent.type === 'end-move-drag' && !intent.cancelled))).toEqual([])
     harness.renderer.dispose()
+  })
+
+  it('renders numbered route cells, remaining steps, and short preview text while drafting', () => {
+    const harness = createHarness(844, 390, false)
+    const model = runtimeModel()
+    const piece = model.pieces[0]
+    model.selection = { pieceId: piece.id, mode: 'move' }
+    model.interaction = {
+      pendingPieceId: null,
+      pendingCommandId: null,
+      moveDraftActive: true,
+      moveRemaining: 2,
+      movePreviewText: '路径可行 · 触点 +1',
+      movePath: [
+        { x: piece.x + 1, y: piece.y },
+        { x: piece.x + 1, y: piece.y + 1 },
+        { x: piece.x, y: piece.y + 1 },
+      ],
+    }
+    harness.renderer.init({ container: harness.container })
+    harness.renderer.update(model)
+    harness.frame(16)
+
+    const layer = harness.container.children.find((child) => child.id === 'hpBarLayer3d')!
+    const routeLayer = layer.children.find((child) => child.id === 'moveRouteLayer3d')!
+    const labels = routeLayer.children.filter((child) => child.className === 'move-route-step')
+    const badge = routeLayer.children.find((child) => child.className === 'move-route-remaining')!
+    const preview = routeLayer.children.find((child) => child.className === 'move-route-preview')!
+    expect(labels).toHaveLength(3)
+    expect(labels.map((label) => label.textContent)).toEqual(['1', '2', '3'])
+    expect(labels.every(label => String(label.style.cssText).includes('BattleComic') && String(label.style.cssText).includes('background:transparent'))).toBe(true)
+    expect(labels.every(label => String(label.style.transform).startsWith('matrix('))).toBe(true)
+    expect(labels.every((label) => String(label.style.cssText).includes('pointer-events:none'))).toBe(true)
+    expect(badge.textContent).toBe('2')
+    expect(badge.style.display).toBe('')
+    expect(preview.textContent).toBe('路径可行 · 触点 +1')
+    expect(preview.style.display).toBe('')
+    const fullUpdatesBefore = harness.renderer.getPerformanceDiagnostics().fullModelUpdateCount
+    harness.renderer.updateMoveDraft({ ...model.interaction, moveRemaining: 1 }, [{ x: piece.x + 2, y: piece.y + 1 }])
+    harness.frame(16)
+    expect(badge.textContent).toBe('1')
+    expect(harness.renderer.getPerformanceDiagnostics().fullModelUpdateCount).toBe(fullUpdatesBefore)
+    expect(harness.renderer.getPerformanceDiagnostics().moveDraftUpdateCount).toBe(1)
+
+    const initialBadgeLeft = Number.parseFloat(String(badge.style.left))
+    const group = harness.renderers[0].scene!.children.find((child) => child.userData.pieceId === piece.id)!
+    group.position.x += 0.5
+    harness.renderer.resize()
+    harness.frame(16)
+    expect(Number.parseFloat(String(badge.style.left))).not.toBe(initialBadgeLeft)
+
+    model.interaction.moveDraftActive = false
+    model.interaction.movePreviewText = ''
+    harness.renderer.update(model)
+    harness.frame(16)
+    expect(labels.every((label) => label.style.display === 'none')).toBe(true)
+    expect(badge.style.display).toBe('none')
+    expect(preview.style.display).toBe('none')
+    harness.renderer.dispose()
+    expect(harness.container.children.find((child) => child.id === 'hpBarLayer3d')).toBeUndefined()
   })
 
   it('brightens the complete target token without adding a token ring and restores it after selection', () => {
@@ -1236,6 +1320,37 @@ describe('RED-68 BattleRenderer3D runtime', () => {
     harness.renderer.dispose()
   })
 
+  it.each(['movementPaths', 'path'])('animates an owned U-turn through each leg using %s', (pathField) => {
+    const harness = createHarness(844, 390, false)
+    const model = runtimeModel()
+    const piece = model.pieces[0]
+    model.viewer = { id: piece.ownerPlayerId }
+    const path = [{ x: piece.x + 1, y: piece.y }, { x: piece.x + 1, y: piece.y + 1 }, { x: piece.x, y: piece.y + 1 }]
+    const nextModel = structuredClone(model)
+    Object.assign(nextModel.pieces[0], path[2])
+    harness.renderer.init({ container: harness.container })
+    harness.renderer.update(model)
+    harness.frame(16)
+    const group = harness.renderers[0].scene!.children.find(child => child.userData.pieceId === piece.id)!
+    harness.renderer.animateAction({ type: 'move', pieceId: piece.id,
+      [pathField]: pathField === 'path' ? path : { [piece.id]: path } }, model, nextModel)
+    harness.renderer.update(nextModel)
+    expect(group.position.z).toBeCloseTo(piece.y)
+    const visited = [false, false, false]
+    for (let index = 0; index < 30; index += 1) {
+      harness.frame(16)
+      const x = group.position.x - piece.x
+      const z = group.position.z - piece.y
+      if (x > 0.05 && x < 0.95 && Math.abs(z) < 0.001) visited[0] = true
+      if (Math.abs(x - 1) < 0.001 && z > 0.05 && z < 0.95) visited[1] = true
+      if (x > 0.05 && x < 0.95 && Math.abs(z - 1) < 0.001) visited[2] = true
+    }
+    expect(visited).toEqual([true, true, true])
+    expect(group.position.x).toBeCloseTo(piece.x)
+    expect(group.position.z).toBeCloseTo(piece.y + 1)
+    harness.renderer.dispose()
+  })
+
   it('retimes a bent movement route when speed changes without jumping off the route', () => {
     const harness = createHarness(844, 390, false)
     const model = runtimeModel()
@@ -1277,10 +1392,10 @@ describe('RED-68 BattleRenderer3D runtime', () => {
     expect(group.position.x).toBeGreaterThan(piece.x)
     expect(group.position.z).toBeCloseTo(piece.y, 1)
     harness.renderer.setAnimationSpeed(2)
-    // The 140 ms action has about 112 ms of logical travel remaining at 2x,
-    // so the bent route must finish within about 56 ms. Sample at <=16 ms
+    // Five directional legs take 600 ms; the remaining time halves at 2x.
+    // Sample at <=16 ms
     // so a restart from the origin cannot pass this check by timing alone.
-    ;[16, 16, 16, 8].forEach((step) => {
+    ;Array.from({ length: 19 }, () => 16).forEach((step) => {
       harness.frame(step)
       expect(isOnRoute(group.position.x, group.position.z)).toBe(true)
     })

@@ -14,6 +14,9 @@
     'reset-move',
     'cancel-move',
     'drop-piece',
+    'start-move-drag',
+    'update-move-drag',
+    'end-move-drag',
     'viewport-change',
     'hover-cell',
   ])
@@ -304,6 +307,16 @@
       }
     }
 
+    function updateMoveDraft(interaction, moveCells) {
+      if (!mounted || !currentModel || !renderer.updateMoveDraft) return false
+      currentModel = Object.assign({}, currentModel, {
+        interaction: Object.assign({}, currentModel.interaction, interaction),
+        legal: Object.assign({}, currentModel.legal, { moveCells: moveCells }),
+      })
+      renderer.updateMoveDraft(interaction, moveCells)
+      return true
+    }
+
     function update(model) {
       if (!mounted || !model) return
       const previousViewer = currentModel && currentModel.viewer && currentModel.viewer.id
@@ -425,6 +438,7 @@
     return {
       mount: mount,
       update: update,
+      updateMoveDraft: updateMoveDraft,
       animateAction: animateAction,
       settleForSelection: settleForSelection,
       spawnFloater: spawnFloater,

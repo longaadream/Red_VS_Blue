@@ -177,7 +177,7 @@
   function getNormalMovePath(options) {
     const input = options || {}
     if (!input.snapshot || !input.pieceId || !input.engine || typeof input.engine.getNormalMovePath !== 'function') return null
-    const state = cloneState(input.snapshot, input.engine)
+    const state = input.snapshot
     const piece = (state.pieces || []).find(function (candidate) {
       return String(candidate.instanceId || candidate.id) === String(input.pieceId)
     })
@@ -202,7 +202,7 @@
     if (!input.snapshot || !input.pieceId || !input.engine || typeof input.engine.getNormalMoveRejection !== 'function') {
       return { code: 'cannot-route', reason: 'move-path-unavailable' }
     }
-    const state = cloneState(input.snapshot, input.engine)
+    const state = input.snapshot
     const piece = (state.pieces || []).find(function (candidate) {
       return String(candidate.instanceId || candidate.id) === String(input.pieceId)
     })
@@ -221,6 +221,20 @@
     } catch (error) {
       return { code: String(error && (error.code || error.reason) || 'cannot-route'), reason: String(error && error.message || 'move-rejected') }
     }
+  }
+
+  function getNormalMoveContinuationTargets(options) {
+    const input = options || {}
+    if (!input.snapshot || !input.engine || typeof input.engine.getNormalMoveContinuationTargets !== 'function') return []
+    const piece = (input.snapshot.pieces || []).find(function (candidate) { return candidate.instanceId === input.pieceId })
+    if (!piece) return []
+    if (input.previewSnapshot && typeof input.engine.getNormalMovePreviewContinuationTargets === 'function') {
+      const predicted = (input.previewSnapshot.pieces || []).find(function (candidate) { return candidate.instanceId === input.pieceId })
+      if (!predicted || predicted.currentHp <= 0) return []
+      return input.engine.getNormalMovePreviewContinuationTargets(input.previewSnapshot, predicted, pathCells(input.path).length,
+        [{ x: piece.x, y: piece.y }].concat(pathCells(input.path)))
+    }
+    return input.engine.getNormalMoveContinuationTargets(input.snapshot, piece, pathCells(input.path))
   }
 
   function probeSkillTarget(options) {
@@ -322,6 +336,7 @@
     queryMoveCells: queryMoveCells,
     getNormalMovePath: getNormalMovePath,
     getNormalMoveRejection: getNormalMoveRejection,
+    getNormalMoveContinuationTargets: getNormalMoveContinuationTargets,
     queryActionTargetCells: queryActionTargetCells,
     queryPendingTargetCells: queryPendingTargetCells,
     querySkillTargetCells: querySkillTargetCells,

@@ -720,6 +720,84 @@ export function getLegalNormalMoveTargets(
   return targets
 }
 
+/**
+ * Return legal destinations reachable after an already drawn normal-move
+ * prefix. The prefix is validated exactly as an explicit route, then the
+ * remaining range is searched from its endpoint without revisiting the origin
+ * or any prefix cell.
+ */
+export function getNormalMoveContinuationTargets(
+  state: SpatialBattleState,
+  piece: SpatialPiece,
+  path: NormalMovePath,
+  excludedCells: NormalMovePath = [],
+): GridPosition[] {
+  if (!Array.isArray(path)) return []
+  if (path.length === 0 && excludedCells.length === 0) return getLegalNormalMoveTargets(state, piece)
+  if (getPositionChangeRejection(piece, 'walk')) return []
+  if (piece.x == null || piece.y == null || !isSafeGridPosition({ x: piece.x, y: piece.y })) return []
+
+  const maxRange = normalMoveRange(piece)
+  if (maxRange === undefined || path.length > maxRange) return []
+
+  const origin = { x: piece.x, y: piece.y }
+  if (!isInsideBounds(origin, state.map)) return []
+
+  const context = createNormalMoveSearchContext(state, piece)
+  const visited = new Set<string>([gridPositionKey(origin)])
+  let previous = origin
+  for (const cell of path) {
+    if (!isSafeGridPosition(cell) || !isInsideBounds(cell, state.map)) return []
+    const key = gridPositionKey(cell)
+    if (visited.has(key)
+      || manhattanDistance(previous, cell) !== 1
+      || !isNormalMoveCellOpen(state, cell, context)) return []
+    visited.add(key)
+    previous = { ...cell }
+  }
+
+  const remaining = maxRange - path.length
+  if (remaining <= 0) return []
+  for (const cell of excludedCells) {
+    if (isSafeGridPosition(cell)) visited.add(gridPositionKey(cell))
+  }
+
+  const queue: Array<{ position: GridPosition; distance: number }> = [{ position: { ...previous }, distance: 0 }]
+  const targets: GridPosition[] = []
+  for (let index = 0; index < queue.length; index += 1) {
+    const current = queue[index]
+    if (current.distance >= remaining) continue
+    for (const direction of ORTHOGONAL_DIRECTIONS) {
+      const target = {
+        x: current.position.x + direction.x,
+        y: current.position.y + direction.y,
+      }
+      const targetKey = gridPositionKey(target)
+      if (visited.has(targetKey) || !isNormalMoveCellOpen(state, target, context)) continue
+      visited.add(targetKey)
+      const distance = current.distance + 1
+      queue.push({ position: target, distance })
+      if (isLegalSkillLanding(state, target, { movingPieceIds: piece.instanceId ? [piece.instanceId] : [] })) {
+        targets.push({ ...target })
+      }
+    }
+  }
+  return targets
+}
+
+/** Continuations after publicly simulated contacts; never mutates the predicted state. */
+export function getNormalMovePreviewContinuationTargets(
+  state: SpatialBattleState,
+  piece: SpatialPiece,
+  usedSteps: number,
+  visitedCells: NormalMovePath,
+): GridPosition[] {
+  if (!Number.isSafeInteger(usedSteps) || usedSteps < 0) return []
+  const range = normalMoveRange(piece)
+  if (range === undefined) return []
+  return getNormalMoveContinuationTargets(state, { ...piece, moveRange: Math.max(0, range - usedSteps) }, [], visitedCells)
+}
+
 /** 完整普通移动动作上下文的 UI/服务端候选集合（阶段、回合、所有权和 AP 均有效）。 */
 export function getLegalNormalMoveTargetsForPlayer(
   state: NormalMoveActionState,

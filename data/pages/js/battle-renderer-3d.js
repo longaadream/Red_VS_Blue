@@ -29,8 +29,8 @@
     dash: 145,
     teleport: 80,
     attack: 130,
-    action: 140,
-    result: 140,
+    action: 200,
+    result: 200,
     reject: 120,
     hit: 100,
     heal: 120,
@@ -102,6 +102,10 @@
   let _cameraTarget = null
   let _container = null
   let _hpLayer = null
+  let _moveRouteLayer = null
+  let _moveRouteLabels = []
+  let _moveRemainingBadge = null
+  let _movePreviewText = null
   let _floatLayer = null
   let _onIntent = null
   function _notifyViewportChange() {
@@ -158,6 +162,10 @@
   let _clock = { prev: 0 }
   let _summaryPositionsDirty = true
   let _renderCount = 0
+  let _fullModelUpdateCount = 0
+  let _moveDraftUpdateCount = 0
+  let _terrainHitTestCount = 0
+  let _dragGridSampleCount = 0
   let _lastDrawCalls = 0
 
   // ── Geometry / Material cache (shared across all tiles/pieces) ────────────────
@@ -376,6 +384,20 @@
     _hpLayer.className = 'piece-summary-layer-3d'
     _hpLayer.style.cssText = 'position:absolute;inset:0;pointer-events:none;overflow:hidden'
     _container.appendChild(_hpLayer)
+    _moveRouteLayer = document.createElement('div')
+    _moveRouteLayer.id = 'moveRouteLayer3d'
+    _moveRouteLayer.style.cssText = 'position:absolute;inset:0;pointer-events:none;overflow:visible;z-index:42'
+    _hpLayer.appendChild(_moveRouteLayer)
+    _moveRemainingBadge = document.createElement('span')
+    _moveRemainingBadge.className = 'move-route-remaining'
+    _moveRemainingBadge.setAttribute('aria-hidden', 'true')
+    _moveRemainingBadge.style.cssText = 'position:absolute;display:none;pointer-events:none;transform:translate(-50%,-50%);background:transparent;border:0;color:#fff0bf;font:26px/30px BattleComic,TabletopComic,cursive;text-align:center;-webkit-text-stroke:1px #382b20;text-shadow:1px 2px 0 #382b20;white-space:nowrap'
+    _moveRouteLayer.appendChild(_moveRemainingBadge)
+    _movePreviewText = document.createElement('span')
+    _movePreviewText.className = 'move-route-preview'
+    _movePreviewText.setAttribute('aria-hidden', 'true')
+    _movePreviewText.style.cssText = 'position:absolute;display:none;pointer-events:none;transform:translate(-50%,-100%);max-width:300px;white-space:normal;text-align:center;background:transparent;border:0;color:#fff0bf;font:16px/20px BattleComic,TabletopComic,cursive;text-shadow:1px 1px 1px #382b20,-1px -1px 1px #382b20,1px -1px 1px #382b20,-1px 1px 1px #382b20'
+    _moveRouteLayer.appendChild(_movePreviewText)
 
     // Fixed tactical perspective camera. It stays centered on the board's X axis,
     // so depth converges into trapezoids without introducing any horizontal yaw.
@@ -1155,6 +1177,110 @@
       obj.summaryEl.style.top = (projected.top - Math.max(20, cellSpan * 0.48)) + 'px'
       obj.summaryEl.style.display = ''
     })
+    _updateMoveRouteOverlays()
+  }
+
+  function _hideMoveRouteOverlays() {
+    _moveRouteLabels.forEach(function (label) { label.style.display = 'none' })
+    if (_moveRemainingBadge) _moveRemainingBadge.style.display = 'none'
+    if (_movePreviewText) _movePreviewText.style.display = 'none'
+  }
+
+  function _moveRouteLabelAt(index) {
+    if (!_moveRouteLayer) return null
+    let label = _moveRouteLabels[index]
+    if (label) return label
+    label = document.createElement('span')
+    label.className = 'move-route-step'
+    label.setAttribute('aria-hidden', 'true')
+    label.style.cssText = 'position:absolute;display:none;pointer-events:none;transform-origin:0 0;width:64px;height:64px;background:transparent;border:0;color:#fff0bf;font:64px/64px BattleComic,TabletopComic,cursive;text-align:center;-webkit-text-stroke:2px #382b20;text-shadow:1px 2px 0 #382b20'
+    _moveRouteLayer.insertBefore(label, _moveRemainingBadge || null)
+    _moveRouteLabels[index] = label
+    return label
+  }
+
+  function _updateMoveRouteOverlays() {
+    if (!_moveRouteLayer || !_currentModel || _boardDecorationsHistorical) {
+      _hideMoveRouteOverlays()
+      return
+    }
+    const interaction = _currentModel.interaction || {}
+    const active = interaction.moveDraftActive === true
+    const path = Array.isArray(interaction.movePath) ? interaction.movePath : []
+    if (!active) {
+      _hideMoveRouteOverlays()
+      return
+    }
+
+    const visibleLabels = new Set()
+    path.forEach(function (cell, index) {
+      const x = Number(cell && cell.x)
+      const y = Number(cell && (cell.y !== undefined ? cell.y : cell.z))
+      if (!Number.isSafeInteger(x) || !Number.isSafeInteger(y)) return
+      const projected = projectCell(x, y, _tileSurfaceHeightAt(x, y) + 0.12)
+      if (!projected) return
+      const label = _moveRouteLabelAt(index)
+      if (!label) return
+      const elevation = _tileSurfaceHeightAt(x, y) + 0.12
+      const right = projectCell(x + 0.5, y, elevation)
+      const bottom = projectCell(x, y + 0.5, elevation)
+      if (!right || !bottom) return
+      const a = (right.left - projected.left) / 32
+      const b = (right.top - projected.top) / 32
+      const c = (bottom.left - projected.left) / 32
+      const d = (bottom.top - projected.top) / 32
+      label.textContent = String(index + 1)
+      label.style.left = projected.left + 'px'
+      label.style.top = projected.top + 'px'
+      label.style.transform = 'matrix(' + [a, b, c, d, -(a + c) * 32, -(b + d) * 32].join(',') + ')'
+      label.style.display = ''
+      visibleLabels.add(label)
+    })
+    _moveRouteLabels.forEach(function (label) {
+      if (!visibleLabels.has(label)) label.style.display = 'none'
+    })
+
+    const selectedId = _currentModel.selection && _currentModel.selection.pieceId
+    const selected = selectedId ? _pieceObjects.get(selectedId) : null
+    const remaining = Number(interaction.moveRemaining)
+    if (!selected || !selected.group.visible) {
+      if (_moveRemainingBadge) _moveRemainingBadge.style.display = 'none'
+      if (_movePreviewText) _movePreviewText.style.display = 'none'
+      return
+    }
+    const projected = projectCell(
+      selected.group.position.x,
+      selected.group.position.z,
+      selected.group.position.y + PIECE_H + 0.14,
+    )
+    if (!projected) {
+      _moveRemainingBadge.style.display = 'none'
+      _movePreviewText.style.display = 'none'
+      return
+    }
+    const span = _projectedCellSpan(selected.group.position.x, selected.group.position.z)
+    const badgeLeft = projected.left + span * 0.42
+    const badgeTop = projected.top - span * 0.42
+    if (Number.isFinite(remaining) && remaining >= 0) {
+      _moveRemainingBadge.textContent = String(Math.max(0, Math.floor(remaining)))
+      _moveRemainingBadge.title = '剩余 ' + Math.max(0, Math.floor(remaining)) + ' 格'
+      _moveRemainingBadge.style.left = badgeLeft + 'px'
+      _moveRemainingBadge.style.top = badgeTop + 'px'
+      _moveRemainingBadge.style.display = ''
+    } else {
+      _moveRemainingBadge.style.display = 'none'
+    }
+    const preview = typeof interaction.movePreviewText === 'string'
+      ? interaction.movePreviewText.slice(0, 240)
+      : ''
+    if (preview) {
+      _movePreviewText.textContent = preview
+      _movePreviewText.style.left = badgeLeft + 'px'
+      _movePreviewText.style.top = (badgeTop - 12) + 'px'
+      _movePreviewText.style.display = ''
+    } else {
+      _movePreviewText.style.display = 'none'
+    }
   }
 
   // ── Highlights ────────────────────────────────────────────────────────────────
@@ -2039,8 +2165,9 @@
         return
       }
       if (previousPiece.x !== nextPiece.x || previousPiece.y !== nextPiece.y) {
-        _animateMove(obj, nextPiece.x, nextPiece.y, action && action.movementKinds && action.movementKinds[nextPiece.id], instant,
-          action && action.movementPaths && action.movementPaths[nextPiece.id])
+        _animateMove(obj, nextPiece.x, nextPiece.y, action && action.movementKinds && action.movementKinds[nextPiece.id], false,
+          action && action.movementPaths && action.movementPaths[nextPiece.id]
+            || (action && action.type === 'move' && action.pieceId === nextPiece.id ? action.path : null))
       }
       const healthDelta = _pieceHealth(nextPiece) - _pieceHealth(previousPiece)
       if (healthDelta < 0) {
@@ -2081,9 +2208,14 @@
     const instant = _singleEffectPresentation(item.previousModel, item.nextModel)
       && _ownPresentationAction(item.action, item.nextModel)
     _animateActionNow(item.action, item.previousModel, item.nextModel)
-    const baseDuration = instant ? MOTION_TOKENS.instant : Number.isFinite(Number(item.action && item.action.motionDurationMs))
+    const requestedDuration = instant ? MOTION_TOKENS.instant : Number.isFinite(Number(item.action && item.action.motionDurationMs))
       ? Number(item.action.motionDurationMs)
       : MOTION_TOKENS.action
+    let baseDuration = requestedDuration
+    _pieceObjects.forEach(function (obj) {
+      const controller = _anims.get(obj.motionId + ':position')
+      if (controller) baseDuration = Math.max(baseDuration, (controller.duration - controller.elapsed) * _animationSpeed * 1000)
+    })
     _actionAnimationTimerStartedAt = Date.now()
     _actionAnimationTimerLogicalMs = 0
     _actionAnimationTimerTotalMs = baseDuration
@@ -2179,9 +2311,11 @@
     // turn a speed change into a bogus route.
     obj.motionRoute = route.slice(1).map(function (cell) { return { x: cell.x, y: cell.z } })
     obj.motionRouteIndex = 0
+    const timeline = window.BattleMoveTimeline && movementKind !== 'dash'
+      ? window.BattleMoveTimeline.build(route.map(function (cell) { return { x: cell.x, y: cell.z } })) : null
     const travelDuration = Number.isFinite(Number(durationOverride)) && Number(durationOverride) > 0
       ? Number(durationOverride)
-      : (movementKind === 'dash'
+      : (timeline && timeline.durationMs ? timeline.durationMs / 1000 : movementKind === 'dash'
       ? Math.min(MOTION_SECONDS.action, MOTION_SECONDS.dash)
       : Math.min(MOTION_SECONDS.action, MOTION_SECONDS.move + Math.max(0, distance - 1) * 0.012)) / _animationSpeed
     obj.baseX = targetX
@@ -2222,7 +2356,13 @@
       duration: travelDuration,
       easing: EASE.inOut,
       update: function (progress, raw) {
-        const routeDistance = distance * progress
+        let routeDistance = distance * progress
+        if (timeline && timeline.legs.length) {
+          const elapsed = raw * timeline.durationMs
+          const leg = timeline.legs.find(function (entry) { return elapsed < entry.startMs + entry.durationMs }) || timeline.legs[timeline.legs.length - 1]
+          const local = Math.max(0, Math.min(1, (elapsed - leg.startMs) / leg.durationMs))
+          routeDistance = leg.startDistance + leg.length * EASE.inOut(local)
+        }
         let segment = 1
         while (segment < routeDistances.length && routeDistances[segment] < routeDistance) segment += 1
         const previous = route[Math.max(0, segment - 1)] || route[0]
@@ -2611,6 +2751,10 @@
   function getPerformanceDiagnostics() {
     return {
       renderCount: _renderCount,
+      fullModelUpdateCount: _fullModelUpdateCount,
+      moveDraftUpdateCount: _moveDraftUpdateCount,
+      terrainHitTestCount: _terrainHitTestCount,
+      dragGridSampleCount: _dragGridSampleCount,
       lastDrawCalls: _lastDrawCalls,
       frameScheduled: _animFrameId != null,
       activeAnimationCount: _anims.size,
@@ -2686,7 +2830,7 @@
     _notifyViewportChange()
   }
 
-  function _groundPointFromClient(clientX, clientY) {
+  function _groundPointFromClient(clientX, clientY, height) {
     const canvas = _renderer.domElement
     const rect = canvas.getBoundingClientRect()
     if (!rect.width || !rect.height) return null
@@ -2695,7 +2839,7 @@
     _raycaster.setFromCamera({ x: ndcX, y: ndcY }, _camera)
     const vertical = _raycaster.ray.direction.y
     if (Math.abs(vertical) < 0.000001) return null
-    const distance = -_raycaster.ray.origin.y / vertical
+    const distance = ((height || 0) - _raycaster.ray.origin.y) / vertical
     if (distance < 0) return null
     return _raycaster.ray.origin.clone().add(_raycaster.ray.direction.clone().multiplyScalar(distance))
   }
@@ -2716,6 +2860,8 @@
       obj: obj,
       originX: clientX,
       originY: clientY,
+      lastX: clientX,
+      lastY: clientY,
       active: false,
     }
   }
@@ -2733,9 +2879,14 @@
     _invalidate()
   }
 
-  function _cancelPieceDrag() {
+  function _cancelPieceDrag(notify) {
+    const cancelled = _pieceDrag
+    if (cancelled && cancelled.active) _panMoved = true
     _restorePieceDragVisual()
     _pieceDrag = null
+    if (notify !== false && cancelled && cancelled.active && _onIntent) {
+      _onIntent({ type: 'end-move-drag', pieceId: cancelled.pieceId, cancelled: true })
+    }
   }
 
   function _movePieceDrag(e) {
@@ -2744,8 +2895,22 @@
     if (!_pieceDrag.active && distance >= PAN_ACTIVATION_PX) {
       _pieceDrag.active = true
       _releasePressedFeedback(e.pointerId)
+      if (_onIntent) _onIntent({ type: 'start-move-drag', pieceId: _pieceDrag.pieceId })
     }
-    if (!_pieceDrag.active) return true
+    if (!_pieceDrag || !_pieceDrag.active) return true
+    const drag = _pieceDrag
+    const samples = []
+    const sampleCount = Math.max(1, Math.ceil(Math.hypot(e.clientX - drag.lastX, e.clientY - drag.lastY) / 4))
+    for (let index = 1; index <= sampleCount; index += 1) {
+      const ratio = index / sampleCount
+      const cell = _dragCellAt(drag.lastX + (e.clientX - drag.lastX) * ratio, drag.lastY + (e.clientY - drag.lastY) * ratio)
+      const previous = samples[samples.length - 1]
+      if (!previous || !cell || previous.x !== cell.x || previous.y !== cell.y) samples.push(cell)
+    }
+    drag.lastX = e.clientX
+    drag.lastY = e.clientY
+    if (_onIntent) _onIntent({ type: 'update-move-drag', pieceId: drag.pieceId, cells: samples })
+    if (_pieceDrag !== drag) return true
     const point = _groundPointFromClient(e.clientX, e.clientY)
     if (!point) return true
     const x = Math.max(0, Math.min(_mapW - 1, point.x))
@@ -2757,6 +2922,20 @@
     _summaryPositionsDirty = true
     _invalidate()
     return true
+  }
+
+  function _dragCellAt(x, y) {
+    _dragGridSampleCount += 1
+    const rect = _renderer.domElement.getBoundingClientRect()
+    if (x < rect.left || y < rect.top || x >= rect.left + rect.width || y >= rect.top + rect.height) return null
+    // Drag sampling needs the grid plane, not a raycast through every terrain
+    // instance for each four-pixel sample. Rule queries still reject blockers.
+    const point = _groundPointFromClient(x, y, TILE_H + 0.01)
+    if (!point) return null
+    const cellX = Math.round(point.x)
+    const cellY = Math.round(point.z)
+    return cellX >= 0 && cellY >= 0 && cellX < _mapW && cellY < _mapH
+      ? { x: cellX || 0, y: cellY || 0 } : null
   }
 
   function _initControls() {
@@ -2835,12 +3014,13 @@
     }, { passive: false })
 
     const endPointer = (e, allowClick) => {
+      if (allowClick && _pieceDrag && _pieceDrag.pointerId === e.pointerId) _movePieceDrag(e)
       const completedPieceDrag = _pieceDrag && _pieceDrag.pointerId === e.pointerId && _pieceDrag.active
-        ? { pieceId: _pieceDrag.pieceId, cell: allowClick ? screenToCell(e.clientX, e.clientY) : null }
+        ? { pieceId: _pieceDrag.pieceId, cell: allowClick ? _dragCellAt(e.clientX, e.clientY) : null }
         : null
       const wasClick = !_panMoved && _pointers.size === 1
       _releasePressedFeedback(e.pointerId)
-      if (_pieceDrag && _pieceDrag.pointerId === e.pointerId) _cancelPieceDrag()
+      if (_pieceDrag && _pieceDrag.pointerId === e.pointerId) _cancelPieceDrag(false)
       if (canvas.hasPointerCapture && canvas.hasPointerCapture(e.pointerId)) canvas.releasePointerCapture(e.pointerId)
       _pointers.delete(e.pointerId)
       if (_pointers.size < 2) { _pinchDist = 0; _pinchCenter = null }
@@ -2852,10 +3032,11 @@
         _panStart = null
       }
       if (completedPieceDrag) {
-        if (allowClick && _onIntent) {
+        if (_onIntent) {
           _onIntent({
-            type: 'drop-piece',
+            type: 'end-move-drag',
             pieceId: completedPieceDrag.pieceId,
+            cancelled: !allowClick,
             x: completedPieceDrag.cell ? completedPieceDrag.cell.x : null,
             y: completedPieceDrag.cell ? completedPieceDrag.cell.y : null,
           })
@@ -2866,6 +3047,7 @@
     }
     _listen(canvas, 'pointerup', e => endPointer(e, true))
     _listen(canvas, 'pointercancel', e => endPointer(e, false))
+    _listen(window, 'keydown', e => { if (e.key === 'Escape') _cancelPieceDrag() })
 
     _listen(canvas, 'wheel', e => {
       _applyZoom(_camera.zoom * (e.deltaY < 0 ? 1.12 : 0.89))
@@ -3063,6 +3245,7 @@
     const ndcX = ((clientX - rect.left) / rect.width) * 2 - 1
     const ndcY = -((clientY - rect.top) / rect.height) * 2 + 1
     _raycaster.setFromCamera({ x: ndcX, y: ndcY }, _camera)
+    _terrainHitTestCount += 1
     const tileHits = _raycaster.intersectObjects(Array.from(_tileBatches.values()), false)
     if (tileHits.length) {
       const hit = tileHits[0]
@@ -3212,8 +3395,30 @@
   }
 
   // ── update — one-way presentation model input ─────────────────────────────────
+  function updateMoveDraft(interaction, moveCells) {
+    if (!_mounted || !_currentModel || _boardDecorationsHistorical) return
+    _moveDraftUpdateCount += 1
+    const previousPath = _currentModel.interaction && _currentModel.interaction.movePath
+    const previousCells = _currentModel.legal && _currentModel.legal.moveCells
+    _currentModel = Object.assign({}, _currentModel, {
+      interaction: Object.assign({}, _currentModel.interaction, interaction),
+      legal: Object.assign({}, _currentModel.legal, { moveCells: moveCells }),
+    })
+    if (previousCells !== moveCells) {
+      _hoverMoveTargets = new Set((moveCells || []).map(_normalizeHighlightItem).filter(Boolean).map(cell => cell.key))
+      _syncHighlightGroup('move', moveCells || [])
+    }
+    if (previousPath !== interaction.movePath) {
+      _clearHoverPath()
+      _drawHoverPath()
+    }
+    _summaryPositionsDirty = true
+    _invalidate()
+  }
+
   function update(model) {
     if (!model || !model.board || !_mounted) return
+    _fullModelUpdateCount += 1
 
     const mapKey = model.board.id + ':' + model.board.width + 'x' + model.board.height
     const tileContentKey = _tileContentSignature(model.board)
@@ -3278,6 +3483,7 @@
     _currentModel = model
     update(model)
     _boardDecorationsHistorical = true
+    _hideMoveRouteOverlays()
     _pieceObjects.forEach(function (obj) {
       const warning = obj.summaryEl?.querySelector('.piece-board-lethal')
       if (warning) warning.hidden = true
@@ -3338,6 +3544,13 @@
     clearBoardDecorations()
     _boardDecorationsHistorical = false
     clearTutorialCue()
+    _hideMoveRouteOverlays()
+    _moveRouteLabels.forEach(function (label) { label.remove() })
+    _moveRouteLabels = []
+    if (_moveRouteLayer) _moveRouteLayer.remove()
+    _moveRouteLayer = null
+    _moveRemainingBadge = null
+    _movePreviewText = null
     if (_hpLayer && _hpLayer.parentNode) _hpLayer.remove()
     if (_scene) {
       const geometries = new Set()
@@ -3437,6 +3650,10 @@
     _clock.prev = 0
     _summaryPositionsDirty = true
     _renderCount = 0
+    _fullModelUpdateCount = 0
+    _moveDraftUpdateCount = 0
+    _terrainHitTestCount = 0
+    _dragGridSampleCount = 0
     _lastDrawCalls = 0
     _panStart = null
     _panMoved = false
@@ -3453,6 +3670,7 @@
   window.BattleRenderer3D = {
     init,
     update,
+    updateMoveDraft,
     showHistoricalBoard,
     animateAction,
     setAnimationSpeed,

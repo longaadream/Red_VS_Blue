@@ -46,6 +46,8 @@ describe('RED-240 ordered normal-move paths', () => {
 
     expect(path).toEqual([{ x: 2, y: 0 }, { x: 2, y: 1 }, { x: 3, y: 1 }, { x: 3, y: 2 }])
     expect(legal.getNormalMoveRejection({ snapshot, engine, pieceId: 'piece', target: { x: 3, y: 2 }, path })).toBeNull()
-    expect(engine.safeCloneBattleState).toHaveBeenCalledTimes(2)
+    expect(engine.safeCloneBattleState).not.toHaveBeenCalled()
+    expect(engine.getNormalMovePath.mock.calls[0][0]).toBe(snapshot)
+    expect(snapshot).toEqual({ pieces: [{ instanceId: 'piece', x: 1, y: 0, currentHp: 10 }] })
   })
 })

@@ -2,8 +2,8 @@
   'use strict'
 
   const SINGLE_EFFECT_DURATION_MS = 24
-  const COMPOSITE_STEP_DURATION_MS = 140
-  const LIGHTWEIGHT_STEP_DURATION_MS = 100
+  const COMPOSITE_STEP_DURATION_MS = 200
+  const LIGHTWEIGHT_STEP_DURATION_MS = 200
   const NORMAL_DURATION_MS = COMPOSITE_STEP_DURATION_MS
   const CARD_DURATION_MS = COMPOSITE_STEP_DURATION_MS
   const REDUCED_DURATION_MS = 120
@@ -25,6 +25,8 @@
     // triggered chain cannot collapse into one burst.
     const group = arguments[0]
     const kind = group && group.root && group.root.kind
+    const moveDuration = root.BattleMoveTimeline && root.BattleMoveTimeline.eventDuration(group && group.root)
+    if (moveDuration) return Math.max(COMPOSITE_STEP_DURATION_MS, moveDuration)
     return ['statusAdded', 'statusRemoved', 'resourceChanged', 'resourceSpent', 'actionPoints', 'cardDiscarded', 'cardChanged'].includes(kind)
       ? LIGHTWEIGHT_STEP_DURATION_MS
       : COMPOSITE_STEP_DURATION_MS
