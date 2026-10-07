@@ -324,6 +324,131 @@ function applyPublicDisplayBindings(projected: BattleState, viewerId: string): v
   }
 }
 
+const PUBLIC_TERRAIN_RULES = {
+  amaterasu: 'rule-sasuke-amaterasu-move',
+  'lethal-toxin': 'rule-blackwidow-toxin-player',
+} as const
+
+type PublicTerrainProof = {
+  ruleIds: Set<string>
+  statusTags: JsonRecord[]
+}
+
+type PublicTerrainProofCollection = {
+  proofs: Map<string, PublicTerrainProof>
+  incomplete: boolean
+}
+
+function addPublicTerrainProof(
+  proofs: Map<string, PublicTerrainProof>,
+  playerId: string,
+  ruleId: string,
+  status?: JsonRecord,
+): void {
+  const proof = proofs.get(playerId) ?? { ruleIds: new Set<string>(), statusTags: [] }
+  proof.ruleIds.add(ruleId)
+  if (status && typeof status.id === 'string'
+    && !proof.statusTags.some(candidate => candidate.id === status.id)) {
+    proof.statusTags.push(status)
+  }
+  proofs.set(playerId, proof)
+}
+
+function publicToxinStatus(status: JsonRecord): JsonRecord {
+  // The canonical toxin rule reads only this public, tile-linked subset. Do
+  // not carry an opponent's unrelated status metadata into the executor.
+  const result: JsonRecord = {}
+  for (const key of ['id', 'type', 'intensity', 'value', 'extraValue', 'sourceId', 'currentDuration']) {
+    if (status[key] !== undefined) result[key] = cloneJson(status[key])
+  }
+  return result
+}
+
+function collectPublicTerrainProofs(state: BattleState, viewerId: string): PublicTerrainProofCollection {
+  const proofs = new Map<string, PublicTerrainProof>()
+  const extensions = state.extensions as JsonRecord | undefined
+  if (!extensions) return { proofs, incomplete: false }
+  let incomplete = false
+  const effects = Array.isArray(extensions.tileEffects)
+    ? extensions.tileEffects.filter(isRecord).filter(effect => effect.visible !== false)
+    : []
+  const players = state.players as unknown as JsonRecord[]
+  const playerFor = (playerId: string): JsonRecord | undefined => players.find(player => (
+    isRecord(player) && normalized(player.playerId) === playerId
+  ))
+
+  const amaterasuCells = Array.isArray(extensions.amaterasuCells)
+    ? extensions.amaterasuCells.filter(isRecord).filter(cell => cell.visible !== false)
+    : []
+  const amaterasuOwner = normalized(extensions.amaterasuOwnerPlayerId)
+  for (const effect of effects) {
+    if (effect.tileType !== 'amaterasu') continue
+    const cell = amaterasuCells.find(candidate => candidate.x === effect.x && candidate.y === effect.y)
+    const effectOwner = normalized(effect.ownerPlayerId)
+    if (!cell) {
+      // A generic presentation marker without a source/owner is not enough
+      // to infer an executable opponent rule. Once a canonical owner or
+      // source marker is present, however, a missing public cell proof must
+      // fail closed instead of silently dropping a known terrain effect.
+      const knownOwner = amaterasuOwner || effectOwner
+      if (knownOwner !== viewerId && (knownOwner || effect.sourceId !== undefined)) incomplete = true
+      continue
+    }
+    const cellOwner = normalized(cell.ownerPlayerId)
+    // The canonical Itachi skill can rewrite the global owner while retaining
+    // older cells with a previous owner. Prefer the authoritative public
+    // extension owner, then fall back to per-cell/tile metadata for older
+    // snapshots that do not have it.
+    const owner = amaterasuOwner || cellOwner || effectOwner
+    if (!owner || (!amaterasuOwner && cellOwner && effectOwner && cellOwner !== effectOwner)) {
+      incomplete = true
+      continue
+    }
+    if (owner === viewerId) continue
+    if (!playerFor(owner)) {
+      incomplete = true
+      continue
+    }
+    // The cell and owner are the public proof. The source piece may be dead or
+    // already in the graveyard while the permanent terrain remains active, and
+    // older canonical Amaterasu cells do not carry sourcePieceId.
+    addPublicTerrainProof(proofs, owner, PUBLIC_TERRAIN_RULES.amaterasu)
+  }
+
+  for (const effect of effects) {
+    if (effect.tileType !== 'lethal-toxin') continue
+    const owner = normalized(effect.ownerPlayerId)
+    const sourceId = typeof effect.sourceId === 'string' ? effect.sourceId : ''
+    if (!owner) {
+      incomplete = true
+      continue
+    }
+    if (owner === viewerId) continue
+    const player = playerFor(owner)
+    if (!player || !sourceId) {
+      incomplete = true
+      continue
+    }
+    const statuses = Array.isArray(player.statusTags) ? player.statusTags.filter(isRecord) : []
+    const status = statuses.find(candidate => candidate.visible !== false
+      && candidate.type === 'lethal-toxin'
+      && candidate.id === sourceId
+      && typeof candidate.sourceId === 'string'
+      && candidate.sourceId.length > 0
+      && candidate.value === effect.x
+      && candidate.extraValue === effect.y)
+    if (!status) {
+      // A visible toxin tile without its matching public status is an
+      // incomplete network projection. Never invent its coordinates/damage or
+      // silently present a result that omits a known public effect.
+      incomplete = true
+      continue
+    }
+    addPublicTerrainProof(proofs, owner, PUBLIC_TERRAIN_RULES['lethal-toxin'], publicToxinStatus(status))
+  }
+  return { proofs, incomplete }
+}
+
 /**
  * Always project before checking executable content. This prevents the
  * presence of an opponent's hidden status/rule from changing the result.
@@ -352,6 +477,11 @@ function publicViewerExecutionSnapshot(snapshot: BattleState, viewerId: string):
   }
   applyPublicDisplayBindings(projected, viewerId)
   if (projected.extensions) delete projected.extensions.skillPresentation
+  const terrainProofCollection = collectPublicTerrainProofs(projected, viewerId)
+  if (terrainProofCollection.incomplete) {
+    throw new Error('Public terrain proof is incomplete')
+  }
+  const terrainProofs = terrainProofCollection.proofs
   for (const piece of projected.pieces) {
     const holder = piece as unknown as JsonRecord
     if (normalized(piece.ownerPlayerId) !== viewerId) {
@@ -387,7 +517,19 @@ function publicViewerExecutionSnapshot(snapshot: BattleState, viewerId: string):
     if (normalized(player.playerId) !== viewerId && Array.isArray(player.rules)) {
       player.rules = player.rules.filter(rule => isPublicRuleForViewer(rule, holder, viewerId))
     }
-    if (normalized(player.playerId) !== viewerId) delete player.statusTags
+    if (normalized(player.playerId) !== viewerId) {
+      const proof = terrainProofs.get(normalized(player.playerId))
+      if (proof) {
+        const rules = Array.isArray(player.rules) ? player.rules : []
+        for (const ruleId of proof.ruleIds) {
+          if (!rules.some(rule => isRecord(rule) && rule.id === ruleId)) rules.push({ id: ruleId, public: true })
+        }
+        player.rules = rules
+        player.statusTags = proof.statusTags
+      } else {
+        player.statusTags = []
+      }
+    }
     removeHiddenInventory(holder)
   }
   removeHiddenInventory(projected as unknown as JsonRecord)
