@@ -192,13 +192,18 @@
     }
   }
 
-  function normalizePlayer(player, pieces, currentPlayerId) {
+  function normalizePlayer(player, pieces, currentPlayerId, names, index, training) {
     const id = String(player.playerId || player.id || '')
     const ownedPiece = pieces.find(function (piece) { return piece.ownerPlayerId.toLowerCase() === id.toLowerCase() })
+    const nameKey = Object.keys(names || {}).find(function (key) { return key.toLowerCase() === id.toLowerCase() })
+    const faction = player.teamId || (ownedPiece ? ownedPiece.faction : (index === 1 ? 'blue' : 'red'))
+    const publicName = String(nameKey ? names[nameKey] || '' : '').trim()
+    const snapshotName = String(player.name || '').trim()
+    const fallback = faction === 'blue' ? '蓝方玩家' : '红方玩家'
     return {
       id: id,
-      name: String(player.name || id),
-      faction: player.teamId || (ownedPiece ? ownedPiece.faction : 'red'),
+      name: training ? (faction === 'blue' ? '蓝方' : '红方') : (publicName && publicName.toLowerCase() !== id.toLowerCase() ? publicName : '') || (snapshotName && snapshotName.toLowerCase() !== id.toLowerCase() ? snapshotName : fallback),
+      faction: faction,
       isCurrent: id.toLowerCase() === String(currentPlayerId || '').toLowerCase(),
       resources: {
         action: numberOr(player.actionPoints, 0),
@@ -415,8 +420,8 @@
       ? pieces.find(function (piece) { return piece.id === selectedPieceId }) || null
       : null
     const legal = input.legal || {}
-    const players = (snapshot.players || []).map(function (player) {
-      return normalizePlayer(player, pieces, turn.currentPlayerId)
+    const players = (snapshot.players || []).map(function (player, index) {
+      return normalizePlayer(player, pieces, turn.currentPlayerId, input.playerNames, index, input.training === true)
     })
     const viewer = players.find(function (player) { return player.id.toLowerCase() === viewerId.toLowerCase() }) || null
 
@@ -437,6 +442,8 @@
       presentationEvents: normalizePresentationEvents(input.presentationEvents, input.pieceTemplates),
       players: players,
       viewer: viewer,
+      training: input.training === true,
+      spectating: input.spectating === true,
       turn: {
         currentPlayerId: String(turn.currentPlayerId || ''),
         number: numberOr(turn.turnNumber, 1),

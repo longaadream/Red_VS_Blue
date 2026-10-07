@@ -1,0 +1,22 @@
+.battle-social{position:fixed;left:18px;top:154px;z-index:160;font-family:inherit;color:#392b20}
+.social-arrival-note{position:absolute;top:0;left:85px;width:260px;padding:8px 12px;background:#e8d9ba;border:1px solid #997f58;box-shadow:2px 3px #241b1466;font-size:13px;white-space:pre-wrap;overflow-wrap:anywhere;pointer-events:none}
+.social-arrival-note[hidden]{display:none}
+.social-toggle{background:#e8d7b2;color:#493522;border:1px solid #927854;border-radius:3px;box-shadow:2px 3px 0 #30221966;padding:8px 14px;cursor:pointer;transform:rotate(2deg)}
+.social-toggle.has-note{outline:2px solid #b78045}
+.social-panel{box-sizing:border-box;margin-top:9px;width:280px;padding:12px;background:#e8ddc5;border:1px solid #8c785b;box-shadow:4px 5px 12px #0005;border-radius:3px;max-height:max(96px,calc(100dvh - 520px));overflow:auto;overscroll-behavior:contain}
+body.deployment-active .social-arrival-note{display:none}
+.social-panel[hidden]{display:none}
+.social-notes{list-style:none;margin:0 0 8px;padding:0;max-height:180px;overflow:auto;overscroll-behavior:contain}
+.social-notes li{padding:6px 0;border-bottom:1px dashed #a99a7c;overflow-wrap:anywhere;white-space:pre-wrap}
+.social-notes strong{display:block;font-size:11px;color:#6a5037}
+.social-notes span{font-size:13px}
+.social-presets{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px}
+.social-panel button{font:inherit;font-size:12px;background:#f3e9d2;color:#483623;border:1px solid #aa9572;border-radius:3px;padding:4px 7px;cursor:pointer}
+.social-panel button:disabled{opacity:.45;cursor:default}
+.social-panel label{display:block;font-size:12px}
+.social-panel textarea{box-sizing:border-box;width:100%;resize:none;background:#f4ead4;color:#382b22;border:1px solid #ac9877;border-radius:2px;font:inherit;font-size:13px;padding:6px;margin:4px 0}
+.social-status{min-height:16px;margin:7px 0 0;font-size:11px;color:#786044}
+@media(max-height:750px){.social-notes{max-height:110px}}
+@media(max-width:1100px){.social-panel{width:240px}.social-arrival-note{width:220px}}
+@media(max-height:600px){.battle-social{top:calc(var(--battle-hud-offset,60px) + 16px)}.social-panel{max-height:max(80px,calc(100dvh - var(--battle-hand-height,90px) - var(--battle-hud-offset,60px) - 64px))}}
+

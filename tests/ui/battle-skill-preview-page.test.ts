@@ -42,6 +42,7 @@ function createHarness(
   const bodyClasses = new Set<string>()
   const document = {
     badges,
+    getElementById: vi.fn(() => null),
     createElement: vi.fn(() => {
       const badge = {
         className: '',
@@ -151,6 +152,8 @@ function createHarness(
     'var myPlayerId = "player-a"',
     'var currentBattleViewModel = null',
     'var battlePageDisposed = false',
+    'var deploymentHoverCell = null',
+    'var updateDeploymentGhost = function () {}',
     'var skillPreviewController = null',
     'var hoverSkillPreviewReplayScheduled = false',
     'var skillPreviewReplayScheduled = false',
@@ -169,6 +172,7 @@ function createHarness(
     readNamedFunction(html, '_appendTargetToAction'),
     readNamedFunction(html, 'invalidateSkillPreviewReplay'),
     readNamedFunction(html, 'clearSkillPreview'),
+    readNamedFunction(html, 'renderResourcePreview'),
     readNamedFunction(html, 'clearMoveBoardPreview'),
     readNamedFunction(html, 'skillPreviewViewportCell'),
     readNamedFunction(html, 'skillPreviewAuthorityRevision'),
@@ -216,6 +220,73 @@ function createHarness(
 function preview(harness: PreviewHarness, x: number | null, y: number | null) {
   return new Script(`previewSkillTarget(${x === null ? 'null' : x}, ${y === null ? 'null' : y})`)
     .runInContext(harness.context as any)
+}
+
+type DeploymentGhostHarness = {
+  context: Record<string, any>
+  candidate: Record<string, any>
+  images: any[]
+  appendChild: ReturnType<typeof vi.fn>
+  projectCell: ReturnType<typeof vi.fn>
+}
+
+function createDeploymentGhostHarness(): DeploymentGhostHarness {
+  const candidate = {
+    instanceId: 'reserve-1',
+    templateId: 'hero-template',
+    name: 'Hero',
+    x: null,
+    y: null,
+  }
+  const images: any[] = []
+  const appendChild = vi.fn()
+  const projectCell = vi.fn(() => ({ clientX: 128, clientY: 256 }))
+  const document = {
+    createElement: vi.fn((tagName: string) => {
+      const attributes = new Map<string, string>()
+      const image = {
+        tagName,
+        className: '',
+        alt: '',
+        hidden: true,
+        src: '',
+        style: { left: '', top: '' },
+        onerror: null as null | (() => void),
+        setAttribute(name: string, value: string) { attributes.set(name, value) },
+        getAttribute(name: string) { return attributes.get(name) ?? null },
+      }
+      images.push(image)
+      return image
+    }),
+    body: { appendChild },
+  }
+  const context = createContext({
+    document,
+    console,
+    G: {
+      deployment: {
+        mode: 'progressive-reserve-v1',
+        status: 'awaiting-reserve-deploy',
+        activePlayerId: 'PLAYER-RED',
+        offerPieces: [candidate],
+        legalPositions: [{ x: 4, y: 2 }],
+      },
+    },
+    myPlayerId: 'player-red',
+    SPECTATE_MODE: false,
+    pendingActionFeedback: null,
+    localDeploymentChoiceId: 'reserve-1',
+    PIECES_BY_ID: { 'hero-template': { image: 'hero.png' } },
+    battlePresentation: { projectCell },
+  }) as unknown as Record<string, any>
+  const script = [
+    'var deploymentHoverCell = null',
+    'var deploymentGhost = null',
+    'var presentedDeployment = function () { return G && G.deployment }',
+    readNamedFunction(readPage(), 'updateDeploymentGhost'),
+  ].join('\n')
+  new Script(script, { filename: 'battle.html:updateDeploymentGhost' }).runInContext(context as any)
+  return { context, candidate, images, appendChild, projectCell }
 }
 
 describe('RED-224 battle page skill preview binding', () => {
@@ -578,5 +649,56 @@ describe('RED-224 battle page skill preview binding', () => {
     expect(h.document.badges[0].hidden).toBe(false)
     expect(h.document.badges[0].textContent).toBe('此效果暂不预演')
     expect(h.renderer.showPreviewBoard).not.toHaveBeenCalled()
+  })
+})
+
+describe('RED-241 deployment placement ghost binding', () => {
+  it('renders the selected private candidate on an authoritative legal cell without writing coordinates', () => {
+    const h = createDeploymentGhostHarness()
+    const before = structuredClone(h.candidate)
+
+    new Script('updateDeploymentGhost(4, 2)').runInContext(h.context as any)
+
+    expect(h.appendChild).toHaveBeenCalledOnce()
+    expect(h.images).toHaveLength(1)
+    expect(h.images[0]).toMatchObject({
+      className: 'deployment-placement-ghost',
+      alt: '',
+      hidden: false,
+      src: 'images/hero.png',
+      style: { left: '128px', top: '256px' },
+    })
+    expect(h.images[0].getAttribute('aria-hidden')).toBe('true')
+    expect(h.projectCell).toHaveBeenCalledWith(4, 2, 0.15)
+    expect(h.candidate).toEqual(before)
+  })
+
+  it('keeps the ghost private to the active owner and hides it for an opponent or spectator', () => {
+    const h = createDeploymentGhostHarness()
+
+    new Script('updateDeploymentGhost(4, 2)').runInContext(h.context as any)
+    expect(h.images[0].hidden).toBe(false)
+
+    h.context.myPlayerId = 'player-blue'
+    new Script('updateDeploymentGhost(4, 2)').runInContext(h.context as any)
+    expect(h.images[0].hidden).toBe(true)
+
+    h.context.myPlayerId = 'player-red'
+    h.context.SPECTATE_MODE = true
+    new Script('updateDeploymentGhost(4, 2)').runInContext(h.context as any)
+    expect(h.images[0].hidden).toBe(true)
+    expect(h.projectCell).toHaveBeenCalledOnce()
+  })
+
+  it('hides an existing ghost when the pointer leaves the board without changing the candidate', () => {
+    const h = createDeploymentGhostHarness()
+    const before = structuredClone(h.candidate)
+
+    new Script('updateDeploymentGhost(4, 2)').runInContext(h.context as any)
+    new Script('updateDeploymentGhost(null, null)').runInContext(h.context as any)
+
+    expect(h.images[0].hidden).toBe(true)
+    expect(h.projectCell).toHaveBeenCalledOnce()
+    expect(h.candidate).toEqual(before)
   })
 })

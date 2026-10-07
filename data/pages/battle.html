@@ -1600,48 +1600,9 @@
 <link rel="stylesheet" href="css/battle-landscape.css">
 <link rel="stylesheet" href="css/ui-motion.css">
 <script src="js/ui-motion.js" defer></script>
-<style id="red236-yellow-feedback">
-  /* RED-236: keep the action hint and invalid-action feedback readable over the
-     usable battlefield without changing target instructions or result floaters. */
-  body:not(.target-mode-active) #statusMsg,
-  body:not(.target-mode-active) #dmBubble {
-    left: 50% !important;
-    top: 42% !important;
-    right: auto !important;
-    bottom: auto !important;
-    width: min(760px, calc(100vw - 32px)) !important;
-    max-width: min(760px, calc(100vw - 32px)) !important;
-    min-height: 0 !important;
-    padding: 0 16px !important;
-    border: 0 !important;
-    border-radius: 0 !important;
-    background: transparent !important;
-    box-shadow: none !important;
-    color: #ffe08a !important;
-    font-size: clamp(24px, 3vw, 36px) !important;
-    font-weight: 900 !important;
-    line-height: 1.25 !important;
-    text-align: center !important;
-    text-shadow: 0 3px 10px rgba(0, 0, 0, .95) !important;
-    -webkit-text-stroke: 1px #16110d;
-    paint-order: stroke fill;
-    white-space: normal !important;
-    overflow: visible !important;
-    transform: translate(-50%, -50%) scale(.96) !important;
-  }
-  body:not(.target-mode-active) #dmBubble {
-    opacity: 0;
-    transition: opacity 120ms ease-out, transform 180ms cubic-bezier(.22, 1, .36, 1);
-  }
-  body:not(.target-mode-active) #dmBubble.is-visible {
-    opacity: 1;
-    transform: translate(-50%, -50%) scale(1) !important;
-  }
-  body:not(.target-mode-active):has(#dmBubble.is-visible) #statusMsg {
-    visibility: hidden !important;
-  }
-  body:not(.target-mode-active) #dmBubble::after { display: none !important; }
-</style>
+<link rel="stylesheet" href="css/battle-tabletop-ui.css">
+<link rel="stylesheet" href="css/battle-social.css">
+<script src="js/battle-social.js"></script>
 </head>
 <body>
 
@@ -1654,8 +1615,6 @@
     </div>
   </div>
 
-  <!-- Fullscreen map exit button -->
-  <div id="fullMapExitBtn" onclick="toggleFullMap()">退出全图</div>
 
   <!-- Turn announcement -->
   <div id="turnAnnounce"></div>
@@ -1669,7 +1628,10 @@
 
   <div id="statusMsg" role="status" aria-live="polite" data-floater-obstacle>选择棋子开始行动</div>
   <div id="dmBubble" role="status" aria-live="assertive" aria-hidden="true" data-floater-obstacle></div>
-  <div id="turnClockCorner" hidden aria-label="回合计时" aria-live="off"><span class="clock-label">回合计时</span><span class="clock-value">--:--</span></div>
+  <div id="turnClockCorner" hidden aria-label="回合计时" aria-live="off">
+    <svg class="table-hourglass" viewBox="0 0 48 64" aria-hidden="true"><path class="hourglass-frame" d="M9 4h30M9 60h30M12 6v8c0 9 7 12 12 18-5 6-12 9-12 18v8m24-52v8c0 9-7 12-12 18 5 6 12 9 12 18v8"/><path class="hourglass-sand top-sand" d="M16 15h16l-8 13z"/><path class="hourglass-sand bottom-sand" d="M14 53l10-15 10 15z"/><path class="hourglass-stream" d="M24 29v12"/></svg>
+    <span class="clock-copy"><span class="clock-label">回合计时</span><span class="clock-value">--:--</span></span>
+  </div>
 
   <aside id="red43QaPanel" aria-live="polite">
     <div class="red43-qa-title">RED-43 · OWNER TARGET QA</div>
@@ -1814,7 +1776,6 @@
     <button id="spectatorInvite" class="back-btn" hidden onclick="copySpectatorInvite()">复制房间邀请码</button>
     <button id="btnSwitchPov" aria-label="切换视角" style="display:none;background:#1e1b4b;border:1px solid #4f46e5;border-radius:8px;color:#a5b4fc;padding:5px 9px;font-size:12px;font-weight:700;cursor:pointer" onclick="switchPerspective()">切换视角 红方</button>
     <button id="btnResetCD" aria-label="重置冷却" style="display:none;background:#3b0764;border:1px solid #7c3aed;border-radius:8px;color:#d8b4fe;padding:5px 9px;font-size:12px;cursor:pointer" onclick="resetCooldowns()">冷却</button>
-    <button class="btn-fullmap" id="btnFullMap" aria-label="切换全屏地图" onclick="toggleFullMap()" title="全屏地图">全图</button>
     <div id="opponentHandStack" class="opponent-hand-stack" role="img" aria-label="对方没有手牌" title="对方手牌"><strong class="opponent-hand-count" aria-hidden="true">0</strong></div>
     <button class="btn-fullmap" id="btnDebugBattleLog" hidden aria-label="打开调试战斗日志" onclick="openLog()" title="调试战斗日志">调试日志</button>
   </div>
@@ -1857,9 +1818,6 @@
       </div>
 
       <div class="board-wrap" id="boardWrap">
-        <div class="board-camera-controls" aria-label="棋盘视图控制">
-          <button class="board-view-button" id="btnResetBoardView" type="button" onclick="resetBoardView()" title="显示完整棋盘" aria-label="显示完整棋盘">⌖ <span>全图</span></button>
-        </div>
         <div class="board-shell board-shell-3d">
           <div class="board-stage" id="boardStage3d" data-battle-layer="three-battlefield">
             <div id="floatLayer" style="position:absolute;inset:0;pointer-events:none;overflow:visible;z-index:12"></div>
@@ -1912,6 +1870,7 @@
             <span class="deployment-status-label" id="deploymentLabel">部署确认</span>
             <strong class="deployment-countdown" id="deploymentCountdown">00:45</strong>
             <span class="deployment-status-state" id="deploymentState" role="status" aria-live="polite">等待双方确认</span>
+            <button type="button" id="deploymentChangeChoice" class="deployment-change-choice" hidden onclick="toggleDeploymentCandidates()">更换棋子</button>
             <div class="deployment-choice-strip" id="deploymentChoices" role="radiogroup" aria-label="选择本回合上场棋子" hidden></div>
             <div class="deployment-status-footer" id="deploymentFooter" hidden>
               <span id="deploymentReserveCount"></span>
@@ -1984,11 +1943,11 @@
       <aside id="handResources" aria-label="我的行动点和充能点" hidden>
         <div id="tutorialResourceGuide" hidden aria-label="每次自己的新回合，行动点上限加一并补满，最多十点"><span>自己的新回合</span><b>ϟ 1 → 2 → 3 → … → 10</b><span>上限 +1 · 补满</span></div>
         <div id="resApDisplay" class="hand-resource hand-resource-ap" title="行动点：移动、使用技能和卡牌时消耗">
-          <span class="hand-resource-symbol" aria-hidden="true">ϟ</span><strong id="resApVal">0</strong><span>行动点</span>
+          <span class="resource-dial" aria-hidden="true"><i class="resource-dial-pointer"></i><i class="resource-dial-pin"></i></span><strong id="resApVal">0</strong><span class="resource-dial-label">行动点</span><small id="resApPreview" class="resource-dial-preview" hidden></small>
           <span id="resApTrack" class="hand-resource-track" aria-hidden="true"></span>
         </div>
         <div id="resCpDisplay" class="hand-resource hand-resource-cp" title="充能点：用于充能技能">
-          <span class="hand-resource-symbol" aria-hidden="true">◆</span><strong id="resCpVal">0</strong><span>充能点</span>
+          <span class="resource-dial" aria-hidden="true"><i class="resource-dial-pointer"></i><i class="resource-dial-pin"></i></span><strong id="resCpVal">0</strong><span class="resource-dial-label">充能点</span><small id="resCpPreview" class="resource-dial-preview" hidden></small>
         </div>
         <small id="handResourceCost" hidden></small>
       </aside>
@@ -2872,6 +2831,7 @@
     }
 
     function clearMoveBoardPreview() {
+      renderResourcePreview(null)
       if (!movePreviewVisible) return
       movePreviewVisible = false
       const renderer = _use3d && window.BattleRenderer3D
@@ -2914,6 +2874,7 @@
       predicted.legal = authority.legal
       predicted.interactionPieces = authority.pieces
       renderer.showPreviewBoard(predicted, authority)
+      renderResourcePreview(snapshot)
       movePreviewVisible = true
       if (events) showMovePreviewFloaters(events, predicted, authority, renderer)
     }
@@ -4525,6 +4486,7 @@
         .filter(function(effect) { return effect.x === x && effect.y === y })
         .slice()
         .sort(function(left, right) { return tileEffectSortKey(left).localeCompare(tileEffectSortKey(right)) })
+      if (terrainType === 'floor' && !effects.length) { closeTileStatus(); return }
       const panel = document.getElementById('tileStatusPanel')
       const coords = document.getElementById('tileStatusCoords')
       const terrain = document.getElementById('tileStatusTerrain')
@@ -4545,7 +4507,7 @@
       panel.dataset.tileKey = tileKey
 
       coords.textContent = '坐标 (' + x + ', ' + y + ')'
-      terrain.textContent = (TILE_TYPE_LABELS[terrainType] || '未知地形') + ' · ' + terrainType
+      terrain.textContent = TILE_TYPE_LABELS[terrainType] || '未知地形'
       count.textContent = '持续地格效果 · ' + effects.length
       content.innerHTML = effects.length
         ? effects.map(function(effect) {
@@ -5681,8 +5643,10 @@
     }
 
     // Connect the Colyseus client for the selected authority origin.
+    let battleSocial = null
     function connectBattleColyseus() {
       if (typeof RvBColyseus === 'undefined') return
+      if (window.BattleSocial) battleSocial = window.BattleSocial.mount({ spectating: SPECTATE_MODE, send: message => RvBColyseus.send(message) })
       RvBColyseus.on('error', function(error) {
         const reason = error && error.message ? error.message : String(error)
         const message = (SPECTATE_MODE ? '观战连接失败：' : '对局连接失败：') + reason
@@ -5698,6 +5662,7 @@
       })
 
       RvBColyseus.on('disconnect', function(event) {
+        if (battleSocial) battleSocial.setConnected(false)
         deferredSelectionPresentation = null
         if (battlePresentation) battlePresentation.beginSkillRecovery()
 
@@ -5760,10 +5725,12 @@
 
       RvBColyseus.on('message', function(msg) {
         if (msg.to && String(msg.to).toLowerCase() !== myPlayerId) return
+        if (/^social(Ready|Ack|Event)$/.test(msg.type)) { if (battleSocial) battleSocial.receive(msg); return }
         if (msg.type === 'spectatorClosed') {
           setStatusMsg(msg.reason || '观战已关闭，请返回大厅')
           showMsg(msg.reason || '观战已关闭，请返回大厅', 'err')
         } else if (msg.type === 'subscribed') {
+          if (battleSocial) battleSocial.setConnected(true)
           if (battlePresentation) battlePresentation.beginSkillRecovery()
           colyseusRole = msg.role || 'guest'
           addLog('[Colyseus] 角色：' + colyseusRole, 'info')
@@ -6840,6 +6807,9 @@
         presentationScope: roomId,
         presentationEvents: isCurrentSnapshot ? latestBattlePresentationEvents : [],
         viewerId: myPlayerId,
+        playerNames: playerNames,
+        training: TRAINING_MODE,
+        spectating: SPECTATE_MODE,
         selectedPieceId: selectedPieceId,
         skillsById: skillsById,
         pieceTemplates: PIECES_BY_ID,
@@ -7074,6 +7044,18 @@
     function prepareCurrentBattlePresentationModel(preparedModel) {
       refreshBattleLegalActions()
       return preparedModel || createBattlePresentationModel(G)
+    }
+
+    function renderResourcePreview(snapshot) {
+      const actual = G && G.players && G.players.find(function(player) { return String(player.playerId || player.id).toLowerCase() === myPlayerId })
+      const predicted = snapshot && snapshot.players && snapshot.players.find(function(player) { return String(player.playerId || player.id).toLowerCase() === myPlayerId })
+      ;[['resApPreview', 'actionPoints'], ['resCpPreview', 'chargePoints']].forEach(function(entry) {
+        const element = document.getElementById(entry[0])
+        if (!element) return
+        const changed = !!actual && !!predicted && Number.isFinite(Number(predicted[entry[1]])) && predicted[entry[1]] !== actual[entry[1]]
+        element.hidden = !changed
+        element.textContent = changed ? '→ ' + predicted[entry[1]] : ''
+      })
     }
 
     function renderBattleHud(preparedModel, beforeBoardUpdate) {
@@ -7740,10 +7722,11 @@
         const cornerValue = corner.querySelector('.clock-value')
         const cornerLabel = corner.querySelector('.clock-label')
         corner.hidden = !view.visible
+        corner.style.setProperty('--sand-remaining', String(view.sandRemaining))
         corner.classList.toggle('burning', view.visible && view.burning)
         corner.classList.toggle('fast', view.visible && view.fast)
         if (cornerValue) cornerValue.textContent = authoritativePendingTimer ? '响应 ' + view.clockText : view.clockText
-        if (cornerLabel) cornerLabel.textContent = authoritativePendingTimer ? '响应计时' : '回合计时'
+        if (cornerLabel) cornerLabel.textContent = authoritativePendingTimer ? '响应计时' : view.fast ? '快速烧绳' : view.burning ? '烧绳阶段' : '回合计时'
         corner.title = view.label
         corner.setAttribute('aria-label', view.visible ? view.label + '，剩余 ' + view.remainingSeconds + ' 秒' : '回合计时不可用')
       }
@@ -7800,6 +7783,7 @@
         setStatusMsg('该棋子不在当前权威候选中')
         return
       }
+      deploymentChoicesExpanded = false
       localDeploymentChoiceId = pieceId
       const legalPositions = Array.isArray(deployment.legalPositions) ? deployment.legalPositions : []
       if (!legalPositions.length) {
@@ -7816,6 +7800,35 @@
       setStatusMsg('请选择高亮格部署棋子')
     }
 
+    let deploymentChoicesExpanded = false
+    function toggleDeploymentCandidates() {
+      deploymentChoicesExpanded = !deploymentChoicesExpanded
+      renderDeploymentStatus()
+    }
+    let deploymentHoverCell = null
+    let deploymentGhost = null
+    function updateDeploymentGhost(x, y) {
+      deploymentHoverCell = x == null || y == null ? null : { x, y }
+      const deployment = presentedDeployment()
+      const legal = deployment && deployment.mode === 'progressive-reserve-v1'
+        && String(deployment.activePlayerId).toLowerCase() === String(myPlayerId).toLowerCase()
+        && !SPECTATE_MODE && !pendingActionFeedback && localDeploymentChoiceId
+        && deploymentHoverCell && (deployment.legalPositions || []).some(cell => cell.x === x && cell.y === y)
+      const piece = legal && (deployment.offerPieces || []).find(candidate => candidate.instanceId === localDeploymentChoiceId)
+      const point = piece && battlePresentation && battlePresentation.projectCell && battlePresentation.projectCell(x, y, 0.15)
+      if (!point) { if (deploymentGhost) deploymentGhost.hidden = true; return }
+      if (!deploymentGhost) {
+        deploymentGhost = document.createElement('img')
+        deploymentGhost.className = 'deployment-placement-ghost'; deploymentGhost.alt = ''; deploymentGhost.setAttribute('aria-hidden', 'true')
+        deploymentGhost.onerror = function() { this.onerror = null; this.src = 'images/tabletop/avatar-placeholder.svg' }
+        document.body.appendChild(deploymentGhost)
+      }
+      const template = PIECES_BY_ID[piece.templateId || piece.id]
+      const image = template && template.image
+      const src = image && /^[a-zA-Z0-9_.-]+\.(png|jpe?g|webp)$/i.test(image) ? 'images/' + image : 'images/tabletop/avatar-placeholder.svg'
+      if (deploymentGhost.getAttribute('src') !== src) deploymentGhost.src = src
+      deploymentGhost.hidden = false; deploymentGhost.style.left = point.clientX + 'px'; deploymentGhost.style.top = point.clientY + 'px'
+    }
     function renderDeploymentStatus() {
       const panel = document.getElementById('deploymentStatus')
       if (!panel || typeof RvBDeploymentStatus === 'undefined') return
@@ -7833,18 +7846,27 @@
       panel.hidden = !view.visible
       panel.classList.toggle('urgent', view.visible && view.urgent)
       panel.classList.toggle('progressive', view.mode === 'progressive-reserve-v1')
+      panel.classList.toggle('placing', !!selected && !deploymentChoicesExpanded)
+      document.body.classList.toggle('deployment-candidates-active', view.visible && !!view.showCandidates)
+      document.body.classList.toggle('deployment-active', view.visible)
+      updateDeploymentGhost(deploymentHoverCell && deploymentHoverCell.x, deploymentHoverCell && deploymentHoverCell.y)
       if (!view.visible) return
       const label = document.getElementById('deploymentLabel')
       const clock = document.getElementById('deploymentCountdown')
       const state = document.getElementById('deploymentState')
       const choices = document.getElementById('deploymentChoices')
+      const changeChoice = document.getElementById('deploymentChangeChoice')
+      if (changeChoice) { changeChoice.hidden = !view.showCandidates || !selected; changeChoice.textContent = deploymentChoicesExpanded ? '收起候选' : '更换棋子'; changeChoice.setAttribute('aria-expanded', String(deploymentChoicesExpanded)) }
       const footer = document.getElementById('deploymentFooter')
       const reserveCount = document.getElementById('deploymentReserveCount')
-      if (label) label.textContent = view.mode === 'progressive-reserve-v1' ? '本回合上场' : '部署确认'
+      if (label) label.textContent = view.mode === 'progressive-reserve-v1'
+        ? (view.ownsStep ? (selected && view.legalPositions.length ? '② 选择落点' : '① 选择上场棋子') : '等待上场')
+        : '部署确认'
       if (clock) clock.textContent = view.clockText
-      if (state) state.textContent = view.stateText
+      if (state) state.textContent = pendingActionFeedback && pendingActionFeedback.type === 'deployReservePiece' ? '正在上场 · 等待确认' : view.stateText
       if (choices) {
         choices.hidden = !view.showCandidates
+        if (selected && !deploymentChoicesExpanded) choices.hidden = true
         const candidateModels = view.showCandidates
           ? view.offerPieces.map(function(piece) {
               const selected = piece.instanceId === localDeploymentChoiceId
@@ -7853,14 +7875,17 @@
               const summary = stats
                 ? 'HP ' + stats.maxHp + ' · 攻击 ' + stats.attack + ' · 防御 ' + stats.defense + ' · 移动 ' + stats.moveRange
                 : '资料同步中'
-              return { piece: piece, selected: selected, summary: summary }
+              const template = PIECES_BY_ID[piece.templateId]
+              const image = template && template.image && /^[a-zA-Z0-9_.-]+\.(?:png|jpe?g|webp)$/i.test(template.image) ? 'images/' + template.image : 'images/tabletop/avatar-placeholder.svg'
+              const attributes = stats ? [['生命', stats.maxHp], ['攻击', stats.attack], ['防御', stats.defense], ['移动', stats.moveRange]] : []
+              return { piece: piece, selected: selected, summary: summary, image: image, attributes: attributes }
             })
           : []
         const nextChoicesKey = JSON.stringify([
           view.mode,
           G && G.deployment && G.deployment.revision,
           localDeploymentChoiceId,
-          candidateModels.map(function(model) { return [model.piece.instanceId, model.piece.name, model.summary] }),
+          candidateModels.map(function(model) { return [model.piece.instanceId, model.piece.name, model.summary, model.image] }),
         ])
         if (nextChoicesKey !== deploymentChoicesRenderKey) {
           choices.innerHTML = view.showCandidates
@@ -7869,8 +7894,10 @@
               return '<div class="deployment-candidate"><button type="button" class="deployment-choice" role="radio" aria-checked="' + model.selected
                  + '" data-piece-id="' + escHtml(piece.instanceId)
                  + '" onclick="selectReserveDeploymentPiece(this.dataset.pieceId)">'
-                 + '<span class="deployment-choice-name">' + escHtml(piece.name) + '</span>'
-                 + '<span class="deployment-choice-stats" aria-label="HP / 攻击 / 防御 / 移动">' + escHtml(model.summary) + '</span></button>'
+                 + '<img class="deployment-choice-portrait" src="' + escHtml(model.image) + '" alt="" onerror="this.onerror=null;this.src=\'images/tabletop/avatar-placeholder.svg\'">'
+                 + '<span class="deployment-choice-copy"><span class="deployment-choice-name">' + escHtml(piece.name) + '</span>'
+                 + '<span class="deployment-choice-stats" aria-label="HP / 攻击 / 防御 / 移动：' + escHtml(model.summary) + '">' + (model.attributes.length ? model.attributes.map(function(attribute) { return '<span><small>' + attribute[0] + '</small><b>' + escHtml(attribute[1]) + '</b></span>' }).join('') : '资料同步中') + '</span></span>'
+                 + (model.selected ? '<span class="deployment-choice-check" aria-hidden="true">✓</span>' : '') + '</button>'
                  + '<button type="button" class="deployment-choice-info" aria-label="查看候选棋子的属性与技能" data-piece-id="' + escHtml(piece.instanceId)
                  + '" onclick="event.stopPropagation();showDeploymentPieceInfo(this.dataset.pieceId,this)">属性与技能</button></div>'
               }).join('')
@@ -8143,7 +8170,7 @@
         document.body.appendChild(badge)
         skillPreviewController = BattleSkillPreview.create({
           compute: request => GameEngine.previewBattleAction(request.snapshot, request.action, request.viewerId),
-          restore: () => { renderer.clearPreviewBoard(); badge.hidden = true },
+          restore: () => { renderer.clearPreviewBoard(); renderResourcePreview(null); badge.hidden = true },
           notice: result => {
             badge.hidden = false
             badge.textContent = result.status === 'needs-input' ? '还需选择 · 暂不预演' : '此效果暂不预演'
@@ -8161,6 +8188,7 @@
             predicted.legal = authority.legal
             predicted.interactionPieces = authority.pieces
             renderer.showPreviewBoard(predicted, authority)
+            renderResourcePreview(result.snapshot)
             badge.hidden = false
             badge.textContent = '公开效果预演 · 点击或松手释放'
             badge.title = '只显示已知的确定性效果；实际结算可能受到隐藏效果影响'
@@ -8312,6 +8340,7 @@
       if (intent.type === 'update-move-drag') return updateMoveDrag(intent.pieceId, intent.cells)
       if (intent.type === 'end-move-drag') return endMoveDrag(intent)
       if (intent.type === 'hover-cell') {
+        updateDeploymentGhost(intent.x, intent.y)
         if (moveDraft) return
         if (pendingSkill || intent.x == null) previewSkillTarget(intent.x, intent.y)
         if (intent.x == null || intent.y == null || !pendingMove || !selectedPieceId || waitingForOtherPending()) {
@@ -8331,6 +8360,7 @@
         return
       }
       if (intent.type === 'viewport-change') {
+        updateDeploymentGhost(deploymentHoverCell && deploymentHoverCell.x, deploymentHoverCell && deploymentHoverCell.y)
         let replayContext = skillPreviewReplayContext
         if (replayContext && replayContext.previewOnly !== true) {
           const pointerCell = skillPreviewViewportCell(intent)
@@ -9608,13 +9638,6 @@
     window.addEventListener('resize', recalcCellSize)
 
     // ── Fullscreen map mode ───────────────────────────────────────────────────
-    let fullMapMode = false
-    function toggleFullMap() {
-      fullMapMode = !fullMapMode
-      document.body.classList.toggle('full-map', fullMapMode)
-      document.getElementById('btnFullMap').textContent = fullMapMode ? '退出全图' : '全图'
-      setTimeout(recalcCellSize, 50)
-    }
 
 
     function showBattleBootError(error) {
@@ -9818,6 +9841,8 @@
       if (PRACTICE_MODE) disposePracticeBattle()
       clearMoveDraft('shutdown')
       battlePageDisposed = true
+      if (deploymentGhost) { deploymentGhost.remove(); deploymentGhost = null }
+      if (battleSocial) { battleSocial.dispose(); battleSocial = null }
       if (skillPreviewController) skillPreviewController.dispose()
       if (skillDragController) skillDragController.dispose()
       cardDisplayMetadataRequests.clear()
@@ -9901,6 +9926,9 @@
 <h2 id="battleSettingsTitle">对局设置</h2>
 <label>音效音量 <input data-sound-volume type="range" min="0" max="100" step="1" aria-label="音效音量"><output data-sound-label></output></label>
 <label><input data-screen-shake type="checkbox">重伤害画面震动</label>
+<div class="battle-camera-settings"><button id="btnResetBoardView" type="button" onclick="resetBoardView()">镜头复位</button><span>演出速度</span><span data-speed-setting></span></div>
+<label data-window-fullscreen-row hidden><input data-window-fullscreen type="checkbox">窗口全屏 <small>F11</small></label>
+<p data-window-fullscreen-error role="status"></p>
 <p>设置自动保存。打开菜单不会暂停对局或回合计时。</p>
 <button type="button" data-close-settings autofocus>返回对局</button>
 </dialog>
