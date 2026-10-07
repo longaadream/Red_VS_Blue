@@ -19,4 +19,3 @@ body.deployment-active .social-arrival-note{display:none}
 @media(max-height:750px){.social-notes{max-height:110px}}
 @media(max-width:1100px){.social-panel{width:240px}.social-arrival-note{width:220px}}
 @media(max-height:600px){.battle-social{top:calc(var(--battle-hud-offset,60px) + 16px)}.social-panel{max-height:max(80px,calc(100dvh - var(--battle-hand-height,90px) - var(--battle-hud-offset,60px) - 64px))}}
-
