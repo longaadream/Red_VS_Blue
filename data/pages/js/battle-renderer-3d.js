@@ -3500,6 +3500,7 @@
   function updateMoveDraft(interaction, moveCells) {
     if (!_mounted || !_currentModel || _boardDecorationsHistorical) return
     _moveDraftUpdateCount += 1
+    const previousHoverPath = _currentModel.interaction && _currentModel.interaction.hoverMovePath
     const previousPath = _currentModel.interaction && _currentModel.interaction.movePath
     const previousCells = _currentModel.legal && _currentModel.legal.moveCells
     _currentModel = Object.assign({}, _currentModel, {
@@ -3510,7 +3511,7 @@
       _hoverMoveTargets = new Set((moveCells || []).map(_normalizeHighlightItem).filter(Boolean).map(cell => cell.key))
       _syncHighlightGroup('move', moveCells || [])
     }
-    if (previousPath !== interaction.movePath) {
+    if (previousPath !== interaction.movePath || previousHoverPath !== interaction.hoverMovePath) {
       _clearHoverPath()
       _drawHoverPath()
     }

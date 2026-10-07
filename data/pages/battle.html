@@ -2749,6 +2749,20 @@
       return reason || 'cleared'
     }
 
+    function updateMoveHoverPath(path) {
+      if (hoverMovePath.length === path.length && hoverMovePath.every(function (cell, index) {
+        return cell.x === path[index].x && cell.y === path[index].y
+      })) return
+      // Commit before any rendering: viewport callbacks can repeat this hover.
+      hoverMovePath = path
+      if (_use3d && battlePresentation && currentBattleViewModel) {
+        const interaction = Object.assign({}, currentBattleViewModel.interaction, { hoverMovePath: path })
+        currentBattleViewModel = Object.assign({}, currentBattleViewModel, { interaction: interaction })
+        if (battlePresentation.updateMoveDraft(interaction, currentBattleViewModel.legal.moveCells)) return
+      }
+      render()
+    }
+
     function normalMovePathForTarget(pieceId, x, y, waypoints) {
       if (!window.BattleLegalActions || typeof BattleLegalActions.getNormalMovePath !== 'function') return null
       return BattleLegalActions.getNormalMovePath({
@@ -8273,20 +8287,19 @@
         if (moveDraft) return
         if (pendingSkill || intent.x == null) previewSkillTarget(intent.x, intent.y)
         if (intent.x == null || intent.y == null || !pendingMove || !selectedPieceId || waitingForOtherPending()) {
-          if (hoverMovePath.length) { hoverMovePath = []; render() }
+          updateMoveHoverPath([])
           return
         }
         if (!validMoves.has(intent.x + ',' + intent.y)) {
-          if (hoverMovePath.length) { hoverMovePath = []; render() }
+          updateMoveHoverPath([])
           return
         }
         const previewPath = normalMovePathForTarget(selectedPieceId, intent.x, intent.y, [])
         if (!previewPath || !previewPath.length) {
-          if (hoverMovePath.length) { hoverMovePath = []; render() }
+          updateMoveHoverPath([])
           return
         }
-        hoverMovePath = previewPath
-        render()
+        updateMoveHoverPath(previewPath)
         return
       }
       if (intent.type === 'viewport-change') {

@@ -80,3 +80,13 @@
 浏览器受控场景使用真实规则生成的 U 形路线和生产 WebGL renderer，确认预测落点出现天照状态、粗路线从真实起点出发、取消后状态和位置恢复。证据 output/RED-240/integrated-board-preview.jpg。统一 38682 服务已切到整合工作树；已打开的旧页面需重新载入脚本。浏览器工具未完成多拐点手势全过程的主观流畅度验收，不能以静态截图替代动画体验验收。
 
 预演仍在主线程停留 90ms 后执行，复杂规则耗时风险保留。回退本次整合 merge commit 的第一父分支可回到 af8fcfdea；不迁移存档，不合并或发布远端 PR。
+
+## 移动后鼠标卡死修复（2026-10-08）
+
+复现：训练营选中棋子、移动后鼠标进入下一合法地格。旧 hover-cell 分支无条件 render，renderBoard/recalcCellSize 调用 renderer.resize，viewport-change 再强制发送相同 hover，形成同步递归。并非资源加载或 AI 卡住。新增 battle-move-hover 回归在修复前两项均因递归失败。
+
+修复：相同路线不刷新；路线先写入，再经已有 updateMoveDraft 轻量更新；renderer 同时识别 hoverMovePath 的变化与清除。回退渲染也由相同路线判断终止重入。没有更改规则结算、PVE/AI 或动画速度。
+
+5 文件 92 项通过（hover、drag-route、renderer、sequential-playback、skill-preview-page）；独立审查另跑 3 文件 60 项通过，无实质发现。相关 ESLint、内联脚本语法检查通过。真实浏览器新训练页完成拖动第一步、鼠标点击第二步，行动点10→9→8，再打开角色技能面板，页面持续响应、无控制台错误。截图 output/RED-240/move-hover-fixed.jpg。旧卡死标签页仍持有旧脚本，需要重新打开训练页；验收新页为 localhost:38682，同一整合服务。
+
+回退本次局部修复提交会恢复该悬停递归风险。其余未验收平台及复杂预演性能限制沿用上述记录。
