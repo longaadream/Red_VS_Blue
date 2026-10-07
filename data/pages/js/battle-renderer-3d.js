@@ -108,10 +108,21 @@
   let _movePreviewText = null
   let _floatLayer = null
   let _onIntent = null
+  let _hoverPointer = null
   function _notifyViewportChange() {
     _summaryPositionsDirty = true
     _invalidate()
-    if (_onIntent) _onIntent({ type: 'viewport-change' })
+    let hoveredCell = null
+    if (_hoverPointer) {
+      if (_camera && typeof _camera.updateMatrixWorld === 'function') _camera.updateMatrixWorld(true)
+      hoveredCell = screenToCell(_hoverPointer.clientX, _hoverPointer.clientY)
+    }
+    if (_onIntent) {
+      const intent = { type: 'viewport-change' }
+      if (_hoverPointer) intent.hoveredCell = hoveredCell ? { x: hoveredCell.x, y: hoveredCell.y } : null
+      _onIntent(intent)
+    }
+    if (_hoverPointer) _showHoveredCell(hoveredCell, true)
   }
   let _resizeObserver = null
   let _hitPlane = null
@@ -153,6 +164,9 @@
   let _textureLoadGeneration = 0
   const _floaters = new Set()
   const _floaterTimers = new Set()
+  let _floaterLayout = null
+  const _previewFloaterTimers = new Map()
+  let _previewAuthorityModel = null
   let _pressedPiece = null
   let _pressedHighlight = null
   let _reducedMotion = false
@@ -443,6 +457,7 @@
     _updateCameraProjection(w, h)
     if (_mapW && _camera && _cameraInOverview) _resetCamera()
     _notifyViewportChange()
+    if (_floaterLayout) _floaterLayout.resize()
   }
 
   function _withCameraZoomOne(callback) {
@@ -1248,6 +1263,21 @@
       if (_movePreviewText) _movePreviewText.style.display = 'none'
       return
     }
+    // During a board preview the selected mesh may have moved to the route
+    // endpoint while the numbered route labels still describe the authority
+    // path. Keep that endpoint label out of the portrait's DOM stacking area;
+    // the remaining route numbers remain useful for the preview.
+    if (_previewAuthorityModel && path.length) {
+      const endpoint = path[path.length - 1]
+      const endpointX = Number(endpoint && endpoint.x)
+      const endpointZ = Number(endpoint && (endpoint.y !== undefined ? endpoint.y : endpoint.z))
+      const endpointLabel = _moveRouteLabels[path.length - 1]
+      if (endpointLabel && Number.isFinite(endpointX) && Number.isFinite(endpointZ)
+        && Math.abs(selected.group.position.x - endpointX) < 0.45
+        && Math.abs(selected.group.position.z - endpointZ) < 0.45) {
+        endpointLabel.style.display = 'none'
+      }
+    }
     const projected = projectCell(
       selected.group.position.x,
       selected.group.position.z,
@@ -1483,10 +1513,10 @@
         color: 0xd09a52,
         emissive: 0xd09a52,
         transparent: true,
-        opacity: 0.56,
+        opacity: 0,
         depthWrite: false,
       })
-      flashMaterial.emissiveIntensity = _reducedMotion ? 0.72 : 0
+      flashMaterial.emissiveIntensity = 0
       const mesh = new THREE.Mesh(_hlPlaneGeom, flashMaterial)
       mesh.rotation.x = -Math.PI / 2
       mesh.position.set(cell.x, _tileSurfaceHeightAt(cell.x, cell.z) + 0.016, cell.z)
@@ -1519,21 +1549,6 @@
     }
     if (options && options.transient) _skillFlashTimer = setTimeout(_clearPresentationAreaFlash, 650)
     _invalidate()
-    if (_reducedMotion) return
-    _startAnimation('presentation:area:intensity', {
-      duration: MOTION_SECONDS.result,
-      easing: EASE.out,
-      update: function (progress, raw) {
-        const timeline = Number.isFinite(raw) ? raw : progress
-        const intensity = timeline <= 0.42
-          ? 1.15 * EASE.out(timeline / 0.42)
-          : 1.15 - 0.77 * EASE.in((timeline - 0.42) / 0.58)
-        entries.forEach(function (entry) { entry.flashMaterial.emissiveIntensity = intensity })
-      },
-      complete: function () {
-        entries.forEach(function (entry) { entry.flashMaterial.emissiveIntensity = 0.38 })
-      },
-    })
   }
 
   function _disposePresentationObject(object) {
@@ -1602,9 +1617,9 @@
     return mesh
   }
 
-  function _createPresentationPathRibbon(source, end) {
+  function _createPresentationPathRibbon(source, end, elevation) {
     // All vertices stay parallel to the board; raised terrain occludes naturally.
-    const mesh = _createComicArrow(source, end, TILE_H + 0.028, 0xe3bc73, true)
+    const mesh = _createComicArrow(source, end, elevation == null ? TILE_H + 0.028 : elevation, 0xe3bc73, true)
     if (!mesh) return null
     mesh.userData.presentationPathRole = 'trajectory'
     mesh.userData.sourceCell = { x: source.x, y: source.z }
@@ -1663,31 +1678,44 @@
   }
 
   function showPresentationPath(input) {
+    return showPresentationPaths([input])
+  }
+
+  function showPresentationPaths(inputs) {
     if (!_mounted || !_scene) return
-    const source = _normalizePresentationPoint(input && input.source)
-    const end = _normalizePresentationPoint(input && input.end)
-    const selected = _normalizePresentationPoint(input && input.selected)
-    const suppliedPath = _normalizePresentationPath(input && input.path)
-    const route = suppliedPath.length
-      ? (source && suppliedPath[0].key !== source.key ? [source].concat(suppliedPath) : suppliedPath.slice())
-      : []
-    if (end && route.length && route[route.length - 1].key !== end.key) route.push(end)
-    const hasPolyline = route.length > 1
-    const hasTrajectory = hasPolyline || !!(source && end && (source.x !== end.x || source.z !== end.z))
-    if (!hasTrajectory && !selected) {
+    const paths = (Array.isArray(inputs) ? inputs : []).map(function (input) {
+      const source = _normalizePresentationPoint(input && input.source)
+      const end = _normalizePresentationPoint(input && input.end)
+      const selected = _normalizePresentationPoint(input && input.selected)
+      const suppliedPath = _normalizePresentationPath(input && input.path)
+      const route = suppliedPath.length
+        ? (source && suppliedPath[0].key !== source.key ? [source].concat(suppliedPath) : suppliedPath.slice())
+        : []
+      if (end && route.length && route[route.length - 1].key !== end.key) route.push(end)
+      const hasPolyline = route.length > 1
+      const hasTrajectory = hasPolyline || !!(source && end && (source.x !== end.x || source.z !== end.z))
+      return { source: source, end: end, selected: selected, route: route, hasPolyline: hasPolyline, hasTrajectory: hasTrajectory }
+    }).filter(function (path) { return path.hasTrajectory || path.selected })
+    if (!paths.length) {
       _clearPresentationPath()
       return
     }
-    const signature = [source && source.key || '', end && end.key || '', selected && selected.key || '', route.map(function (cell) { return cell.key }).join('>')].join('|')
+    const signature = paths.map(function (path) {
+      return [path.source && path.source.key || '', path.end && path.end.key || '', path.selected && path.selected.key || '', path.route.map(function (cell) { return cell.key }).join('>')].join('|')
+    }).join(';')
     if (_presentationPath && _presentationPath.signature === signature) return
     _clearPresentationPath()
-    const trajectory = hasPolyline ? _createPresentationPathPolyline(route) : (hasTrajectory ? _createPresentationPathRibbon(source, end) : null)
-    const aim = _createPresentationAimMarker(selected)
-    if (!trajectory && !aim) return
     const group = new THREE.Group()
     group.userData.presentationPath = true
-    if (trajectory) group.add(trajectory)
-    if (aim) group.add(aim)
+    paths.forEach(function (path) {
+      const trajectory = path.hasPolyline
+        ? _createPresentationPathPolyline(path.route)
+        : (path.hasTrajectory ? _createPresentationPathRibbon(path.source, path.end) : null)
+      const aim = _createPresentationAimMarker(path.selected)
+      if (trajectory) group.add(trajectory)
+      if (aim) group.add(aim)
+    })
+    if (!group.children.length) return
     _scene.add(group)
     _invalidate()
     const materials = []
@@ -1695,10 +1723,12 @@
     _presentationPath = {
       signature: signature,
       group: group,
-      source: source ? { x: source.x, y: source.z } : null,
-      end: end ? { x: end.x, y: end.z } : null,
-      selected: selected ? { x: selected.x, y: selected.z } : null,
-      path: route.map(function (cell) { return { x: cell.x, y: cell.z } }),
+      pathCount: paths.filter(function (path) { return path.hasTrajectory }).length,
+      // Preserve the single-path diagnostics for existing callers.
+      source: paths[0].source ? { x: paths[0].source.x, y: paths[0].source.z } : null,
+      end: paths[0].end ? { x: paths[0].end.x, y: paths[0].end.z } : null,
+      selected: paths[0].selected ? { x: paths[0].selected.x, y: paths[0].selected.z } : null,
+      path: paths[0].route.map(function (cell) { return { x: cell.x, y: cell.z } }),
     }
     const targetOpacities = materials.map(function () { return 0.96 })
     if (_reducedMotion) {
@@ -2483,6 +2513,13 @@
     })
   }
 
+  // Acknowledge submission without rebuilding the board or predicting its result.
+  function setPendingFeedback(pieceId) {
+    if (!_currentModel) return
+    _syncPendingFeedback(Object.assign({}, _currentModel.interaction || {}, { pendingPieceId: pieceId || null }))
+    _invalidate()
+  }
+
   function _pressFeedbackAt(pointerId, clientX, clientY) {
     _releasePressedFeedback()
     const piece = _findPieceFromPointer(clientX, clientY)
@@ -2759,6 +2796,9 @@
       frameScheduled: _animFrameId != null,
       activeAnimationCount: _anims.size,
       terrainBatchCount: _tileBatches.size,
+      tileEffectCellCount: _tileEffectObjects.size,
+      previewBoardActive: _previewAuthorityModel != null,
+      presentationPathCount: _presentationPath ? _presentationPath.pathCount : 0,
       terrainInstanceCount: Array.from(_tileBatches.values()).reduce(function (total, batch) {
         return total + Number(batch.count || 0)
       }, 0),
@@ -2852,6 +2892,14 @@
     if (!piece || piece.id !== selection.pieceId) return null
     const obj = _pieceObjects.get(piece.id)
     if (!obj || obj.pending) return null
+    const authorityModel = _previewAuthorityModel || _currentModel
+    const authorityPieces = Array.isArray(authorityModel && authorityModel.interactionPieces)
+      ? authorityModel.interactionPieces
+      : authorityModel && authorityModel.pieces
+    const authorityPiece = authorityPieces
+      && authorityPieces.find(function (entry) { return entry && entry.id === piece.id })
+    const authorityX = authorityPiece && Number.isFinite(Number(authorityPiece.x)) ? Number(authorityPiece.x) : obj.baseX
+    const authorityZ = authorityPiece && Number.isFinite(Number(authorityPiece.y)) ? Number(authorityPiece.y) : obj.baseZ
     // Spatial motion is presentation-only. The drag is accepted immediately;
     // the queued travel animation remains responsible for its visual sequence.
     return {
@@ -2863,16 +2911,19 @@
       lastX: clientX,
       lastY: clientY,
       active: false,
+      authorityPosition: { x: authorityX, y: _tileSurfaceHeightAt(authorityX, authorityZ), z: authorityZ },
+      visualPosition: { x: obj.group.position.x, y: obj.group.position.y, z: obj.group.position.z },
     }
   }
 
   function _restorePieceDragVisual() {
     if (!_pieceDrag || !_pieceDrag.obj) return
     const obj = _pieceDrag.obj
+    const authority = _pieceDrag.authorityPosition
     obj.group.position.set(
-      obj.baseX,
-      obj.baseY + (obj.pending && !_reducedMotion ? 0.04 : 0),
-      obj.baseZ,
+      authority ? authority.x : obj.baseX,
+      (authority ? authority.y : obj.baseY) + (obj.pending && !_reducedMotion ? 0.04 : 0),
+      authority ? authority.z : obj.baseZ,
     )
     _updateSelectedRingPosition()
     _summaryPositionsDirty = true
@@ -2917,8 +2968,12 @@
     const z = Math.max(0, Math.min(_mapH - 1, point.z))
     const tileX = Math.max(0, Math.min(_mapW - 1, Math.round(x)))
     const tileZ = Math.max(0, Math.min(_mapH - 1, Math.round(z)))
-    _pieceDrag.obj.group.position.set(x, _tileSurfaceHeightAt(tileX, tileZ) + 0.08, z)
-    _updateSelectedRingPosition()
+    const visualY = _tileSurfaceHeightAt(tileX, tileZ) + 0.08
+    drag.visualPosition = { x, y: visualY, z }
+    if (drag.obj) {
+      drag.obj.group.position.set(x, visualY, z)
+      _updateSelectedRingPosition()
+    }
     _summaryPositionsDirty = true
     _invalidate()
     return true
@@ -2968,10 +3023,19 @@
       e.preventDefault()
     }, { passive: false })
 
-    _listen(canvas, 'pointerleave', () => _showHoveredCell(null))
-    _listen(canvas, 'pointerdown', () => _showHoveredCell(null))
+    _listen(canvas, 'pointerleave', () => {
+      _hoverPointer = null
+      _showHoveredCell(null)
+    })
+    _listen(canvas, 'pointerdown', () => {
+      _hoverPointer = null
+      _showHoveredCell(null)
+    })
     _listen(canvas, 'pointermove', e => {
-      if (e.pointerType === 'mouse' && !_pointers.size) _showHoveredCell(screenToCell(e.clientX, e.clientY))
+      if (e.pointerType === 'mouse' && !_pointers.size) {
+        _hoverPointer = { clientX: e.clientX, clientY: e.clientY }
+        _showHoveredCell(screenToCell(e.clientX, e.clientY))
+      }
       if (!_pointers.has(e.pointerId)) return
       _pointers.set(e.pointerId, { x: e.clientX, y: e.clientY })
 
@@ -3046,7 +3110,10 @@
       if (allowClick && wasClick) _handleClick(e)
     }
     _listen(canvas, 'pointerup', e => endPointer(e, true))
-    _listen(canvas, 'pointercancel', e => endPointer(e, false))
+    _listen(canvas, 'pointercancel', e => {
+      _hoverPointer = null
+      endPointer(e, false)
+    })
     _listen(window, 'keydown', e => { if (e.key === 'Escape') _cancelPieceDrag() })
 
     _listen(canvas, 'wheel', e => {
@@ -3152,13 +3219,24 @@
   let _hoveredCell = null
   let _hoverMoveTargets = new Set()
   let _hoverSelectedId = null
+  let _hoverIntentKey = null
 
   function _clearHoverPath() {
     _hoverKey = null
     if (!_hoverPath) return
     _scene.remove(_hoverPath)
-    _hoverPath.geometry.dispose()
-    _hoverPath.material.dispose()
+    const geometries = new Set()
+    const materials = new Set()
+    _hoverPath.traverse(function (object) {
+      if (object.geometry) geometries.add(object.geometry)
+      if (object.material) {
+        ;(Array.isArray(object.material) ? object.material : [object.material]).forEach(function (material) {
+          if (material) materials.add(material)
+        })
+      }
+    })
+    geometries.forEach(function (geometry) { if (geometry.dispose) geometry.dispose() })
+    materials.forEach(function (material) { if (material.dispose) material.dispose() })
     _hoverPath = null
     _invalidate()
   }
@@ -3173,7 +3251,10 @@
     const path = draftPath.length ? draftPath : previewPath
     if (!path.length) return
     if (!draftPath.length && _hoveredCell && !_hoverMoveTargets.has(_hoveredCell.x + ',' + _hoveredCell.y)) return
-    const authoritativePiece = (_currentModel.pieces || []).find(function (piece) { return piece && piece.id === source.id })
+    const interactionPieces = Array.isArray(_currentModel.interactionPieces)
+      ? _currentModel.interactionPieces
+      : (_currentModel.pieces || [])
+    const authoritativePiece = interactionPieces.find(function (piece) { return piece && piece.id === source.id })
     const originX = authoritativePiece && authoritativePiece.x != null ? authoritativePiece.x
       : (source.baseX != null ? source.baseX : source.targetX)
     const originZ = authoritativePiece && authoritativePiece.y != null ? authoritativePiece.y
@@ -3190,24 +3271,39 @@
       return [new THREE.Vector3(x, _tileSurfaceHeightAt(x, z) + 0.06, z)]
     })
     if (points.length < 2) return
-    const geometry = new THREE.BufferGeometry().setFromPoints(points)
-    _hoverPath = new THREE.Line(geometry, new THREE.LineDashedMaterial({
-      color: 0xf5d38b,
-      dashSize: 0.14,
-      gapSize: 0.10,
-      transparent: true,
-      opacity: 0.92,
-      depthTest: false,
-      depthWrite: false,
-    }))
-    _hoverPath.computeLineDistances()
-    _hoverPath.userData.movePath = true
-    _hoverPath.renderOrder = 26
+    const route = new THREE.Group()
+    route.userData.movePath = true
+    route.userData.pathCells = points.map(function (point) { return { x: point.x, y: point.z } })
+    for (let index = 1; index < points.length; index += 1) {
+      const previous = points[index - 1]
+      const next = points[index]
+      const ribbon = _createPresentationPathRibbon(
+        { x: previous.x, z: previous.z },
+        { x: next.x, z: next.z },
+        Math.max(previous.y, next.y) + 0.06,
+      )
+      if (!ribbon) continue
+      ribbon.userData.movePathSegment = true
+      ribbon.traverse(function (object) {
+        if (!object.material) return
+        const materials = Array.isArray(object.material) ? object.material : [object.material]
+        materials.forEach(function (material) {
+          material.transparent = true
+          material.opacity = 0.92
+          material.depthTest = false
+          material.depthWrite = false
+        })
+      })
+      route.add(ribbon)
+    }
+    if (!route.children.length) return
+    route.renderOrder = 26
+    _hoverPath = route
     _scene.add(_hoverPath)
     _invalidate()
   }
 
-  function _showHoveredCell(cell) {
+  function _showHoveredCell(cell, forceIntent) {
     if (!_scene) return
     const key = cell ? cell.x + ',' + cell.y : null
     if (key !== _hoverKey) {
@@ -3215,6 +3311,11 @@
       _hoverKey = key
       _hoveredCell = cell
       _drawHoverPath()
+    }
+    // Visual updates may rebuild the hover path; they must not erase the
+    // pointer's last notified cell (otherwise pointerleave can be lost).
+    if (forceIntent || key !== _hoverIntentKey) {
+      _hoverIntentKey = key
       if (_onIntent) _onIntent({ type: 'hover-cell', x: cell ? cell.x : null, y: cell ? cell.y : null })
     }
     if (!cell) {
@@ -3295,6 +3396,7 @@
     let closest = null
     let closestDistance = Infinity
     const targetMode = !!(_currentModel.selection && _currentModel.selection.mode === 'target')
+    const previewActive = _previewAuthorityModel != null
 
     ;(_currentModel.interactionPieces || _currentModel.pieces || []).forEach(piece => {
       if (piece.visible === false) return
@@ -3305,8 +3407,8 @@
       // Targeting follows the authoritative snapshot, not the presentation
       // position. A piece can therefore be selected at its new legal cell while
       // its travel animation is still catching up visually.
-      const x = targetMode ? piece.x : (obj ? obj.group.position.x : piece.x)
-      const y = targetMode ? piece.y : (obj ? obj.group.position.z : piece.y)
+      const x = targetMode || previewActive ? piece.x : (obj ? obj.group.position.x : piece.x)
+      const y = targetMode || previewActive ? piece.y : (obj ? obj.group.position.z : piece.y)
       const point = projectCell(x, y, (obj ? obj.group.position.y : _tileSurfaceHeightAt(x, y)) + PIECE_H + 0.014)
       if (!point) return
       const dx = clientX - point.clientX
@@ -3448,29 +3550,71 @@
   }
 
   // Replace only the rendered board, preserving the user's camera and authority model.
-  function settlePresentation(model) {
+  function settlePresentation(model, options) {
     if (!_mounted) return
     _clearActionAnimationQueue()
     Array.from(_anims.keys()).forEach(_cancelAnimation)
     _pieceObjects.forEach(function (obj) { _restorePieceVisual(obj); obj.group.scale.set(1, 1, 1) })
-    _floaterTimers.forEach(function (timer) { clearTimeout(timer) })
-    _floaterTimers.clear()
-    _floaters.forEach(function (element) { element.remove() })
-    _floaters.clear()
+    if (!(options && options.preserveFloaters)) {
+      _previewFloaterTimers.clear()
+      _previewAuthorityModel = null
+      _floaterTimers.forEach(function (timer) { clearTimeout(timer) })
+      _floaterTimers.clear()
+      _floaters.forEach(function (element) { element.remove() })
+      _floaters.clear()
+      if (_floaterLayout) _floaterLayout.clear()
+    }
     update(model)
   }
 
-  function showHistoricalBoard(model) {
+  function _replaceDisplayedBoard(model, options) {
     if (!_mounted || !model || !model.board) return
     _clearActionAnimationQueue()
-    _cancelPieceDrag()
+    if (!(options && options.preview)) _cancelPieceDrag()
+    const drag = options && options.preview ? _pieceDrag : null
+    const dragPosition = drag && drag.obj && drag.obj.group
+      ? { x: drag.obj.group.position.x, y: drag.obj.group.position.y, z: drag.obj.group.position.z }
+      : drag && drag.visualPosition || null
+    if (drag && dragPosition) drag.visualPosition = dragPosition
     Array.from(_anims.keys()).forEach(_cancelAnimation)
     _clearPresentationAreaFlash()
     _clearPresentationPath()
-    _floaterTimers.forEach(function (timer) { clearTimeout(timer) })
-    _floaterTimers.clear()
-    _floaters.forEach(function (element) { element.remove() })
-    _floaters.clear()
+    if (options && options.preview) {
+      // Reuse meshes and unchanged terrain. Hover must not repeatedly tear
+      // down the entire battlefield or reload portrait textures.
+      update(model)
+      if (!options.restore) _pieceObjects.forEach(function (obj) {
+        const warning = obj.summaryEl?.querySelector('.piece-board-lethal')
+        if (warning) warning.hidden = true
+      })
+      if (drag && _pieceDrag === drag) {
+        // A hypothetical snapshot may remove the dragged piece (for example,
+        // while an effect preview includes a lethal result). Rebind to the
+        // live mesh after the incremental update so clearing the preview can
+        // restore and continue the same gesture.
+        drag.obj = _pieceObjects.get(drag.pieceId) || null
+      }
+      if (drag && _pieceDrag === drag && drag.obj && dragPosition) {
+        if (drag.authorityPosition) {
+          drag.obj.baseX = drag.authorityPosition.x
+          drag.obj.baseY = drag.authorityPosition.y
+          drag.obj.baseZ = drag.authorityPosition.z
+        }
+        drag.obj.group.position.set(dragPosition.x, dragPosition.y, dragPosition.z)
+        _updateSelectedRingPosition()
+        _summaryPositionsDirty = true
+      }
+      return
+    }
+    if (!(options && options.preview)) {
+      _floaterTimers.forEach(function (timer) { clearTimeout(timer) })
+      _floaterTimers.clear()
+      _floaters.forEach(function (element) { element.remove() })
+      _floaters.clear()
+      if (_floaterLayout) _floaterLayout.clear()
+      _previewFloaterTimers.clear()
+      _previewAuthorityModel = null
+    }
     _pieceObjects.forEach(function (obj) { _scene.remove(obj.group); _disposePieceObject(obj) })
     _pieceObjects.clear()
     const camera = { x: _cameraTarget.x, y: _cameraTarget.y, z: _cameraTarget.z, zoom: _camera.zoom, overview: _cameraInOverview }
@@ -3482,13 +3626,47 @@
     _camera.updateProjectionMatrix()
     _currentModel = model
     update(model)
-    _boardDecorationsHistorical = true
-    _hideMoveRouteOverlays()
-    _pieceObjects.forEach(function (obj) {
+    _boardDecorationsHistorical = !(options && options.preview)
+    if (!(options && options.restore)) _pieceObjects.forEach(function (obj) {
       const warning = obj.summaryEl?.querySelector('.piece-board-lethal')
       if (warning) warning.hidden = true
     })
-    if (_boardDecorations) _boardDecorations.visible = false
+    if (_boardDecorationsHistorical) _hideMoveRouteOverlays()
+    if (_boardDecorations) _boardDecorations.visible = !_boardDecorationsHistorical
+  }
+
+  function showHistoricalBoard(model) {
+    _replaceDisplayedBoard(model)
+  }
+
+  function clearPreviewFloaters() {
+    _previewFloaterTimers.forEach(function (timer, element) {
+      clearTimeout(timer)
+      _floaterTimers.delete(timer)
+      _floaters.delete(element)
+      if (_floaterLayout) _floaterLayout.remove(element)
+      element.remove()
+    })
+    _previewFloaterTimers.clear()
+  }
+
+  function showPreviewBoard(model, authoritativeModel) {
+    if (!_mounted || !model || !authoritativeModel) return
+    clearPreviewFloaters()
+    _replaceDisplayedBoard(model, { preview: true })
+    // The board is hypothetical; all hit testing continues to use authority.
+    _previewAuthorityModel = authoritativeModel
+    _currentModel = authoritativeModel
+    _updateMoveRouteOverlays()
+  }
+
+  function clearPreviewBoard() {
+    clearPreviewFloaters()
+    if (!_previewAuthorityModel) return
+    const authoritativeModel = _previewAuthorityModel
+    _previewAuthorityModel = null
+    _replaceDisplayedBoard(authoritativeModel, { preview: true, restore: true })
+    setHistoryHighlight([])
   }
 
   // ── spawnFloater ─────────────────────────────────────────────────────────────
@@ -3509,8 +3687,8 @@
 
     const el = document.createElement('div')
     const kind = ['heal', 'death', 'statusAdded'].includes(options.kind) ? options.kind : 'damage'
-    const requestedDuration = Number(options.durationMs) || (kind === 'heal' ? 550 : 600)
-    const durationMs = _reducedMotion ? Math.min(140, requestedDuration) : Math.max(kind === 'statusAdded' ? 200 : 480, Math.min(650, requestedDuration))
+    const requestedDuration = Number(options.durationMs) || 2000
+    const durationMs = Math.max(2000, Math.min(3000, requestedDuration))
     el.className = 'dmg-float is-' + kind + (big ? ' big' : '')
     el.style.color = color
     el.style.left  = left + 'px'
@@ -3518,17 +3696,27 @@
     el.style.setProperty('--floater-duration', durationMs + 'ms')
     el.textContent = text
     layer.appendChild(el)
+    if (!_floaterLayout) _floaterLayout = window.BattleFloaterLayout.create(layer)
+    _floaterLayout.add(el, left, top)
     _floaters.add(el)
     const timer = setTimeout(function () {
       el.remove()
       _floaters.delete(el)
+      _floaterLayout.remove(el)
+      _previewFloaterTimers.delete(el)
       _floaterTimers.delete(timer)
     }, durationMs + 80)
     _floaterTimers.add(timer)
+    if (options.preview) {
+      el.dataset.preview = 'true'
+      _previewFloaterTimers.set(el, timer)
+    }
   }
 
   // ── Dispose ───────────────────────────────────────────────────────────────────
   function dispose() {
+    _hoverPointer = null
+    _hoverIntentKey = null
     _clearHoverPath()
     _hoverMoveTargets.clear()
     _hoverSelectedId = null
@@ -3621,6 +3809,10 @@
     _floaterTimers.clear()
     _floaters.forEach(function (element) { element.remove() })
     _floaters.clear()
+    if (_floaterLayout) _floaterLayout.clear()
+    _floaterLayout = null
+    _previewFloaterTimers.clear()
+    _previewAuthorityModel = null
     _texCache.clear()
     _pointers.clear()
     _renderer = null
@@ -3672,8 +3864,11 @@
     update,
     updateMoveDraft,
     showHistoricalBoard,
+    showPreviewBoard,
+    clearPreviewBoard,
     animateAction,
     setAnimationSpeed,
+    setPendingFeedback,
     settlePresentation,
     spawnFloater,
     resize,
@@ -3689,6 +3884,7 @@
     showPresentationAreaFlash,
     clearPresentationAreaFlash: _clearPresentationAreaFlash,
     showPresentationPath,
+    showPresentationPaths,
     clearPresentationPath: _clearPresentationPath,
     dispose,
     getMotionDiagnostics,

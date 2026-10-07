@@ -14,7 +14,7 @@ function harness() {
     refreshBattleLegalActions() {}, waitingForOtherPending: () => false,
     closePieceContextMenu() {}, dismissedPieceContextId: null,
     BattleLegalActions: { getNormalMoveContinuationTargets: () => [] }, GameEngine: {},
-    _use3d: false, battlePresentation: null,
+    _use3d: false, battlePresentation: null, movePreviewVisible: false, window: {},
     normalMoveRejectionForDraft: vi.fn((draft: any) => {
       const last = draft.path.length > 1 ? draft.path[draft.path.length - 2] : draft.origin
       return Math.abs(last.x - draft.target.x) + Math.abs(last.y - draft.target.y) === 1 ? null : { code: 'non-adjacent' }
@@ -63,6 +63,12 @@ describe('drag route editing and release', () => {
   })
   it('uses the predicted status state for candidate highlights and ignores a replaced route result', () => {
     const ctx = harness()
+    ctx._use3d = true
+    const authorityPieces = [{ id: 'p', x: 1, y: 1, health: { current: 10 } }]
+    ctx.currentBattleViewModel = { pieces: authorityPieces, selection: { pieceId: 'p' }, interaction: {}, legal: {} }
+    ctx.createBattlePresentationModel = vi.fn((state) => ({ pieces: state.pieces.map((piece: any) => ({ id: piece.instanceId,
+      x: piece.x, y: piece.y, health: { current: piece.currentHp }, statusSummary: piece.statusTags })) }))
+    ctx.window.BattleRenderer3D = { showPreviewBoard: vi.fn(), clearPreviewBoard: vi.fn() }
     const request = vi.fn()
     ctx.GameEngine.previewBattleAction = vi.fn()
     ctx.BattleMovePreview = { create: () => ({ request, clear() {} }) }
@@ -70,15 +76,21 @@ describe('drag route editing and release', () => {
     ctx.BattleLegalActions.getNormalMoveContinuationTargets = vi.fn(() => [])
     ctx.updateMoveDrag('p', [{ x: 2, y: 1 }])
     const firstAccept = request.mock.calls[0][3]
-    const predicted = { pieces: [{ instanceId: 'p', currentHp: 8, moveRange: 3,
+    const predicted = { pieces: [{ instanceId: 'p', x: 2, y: 1, currentHp: 8, moveRange: 3,
       statusTags: [{ id: 'root', type: 'root', remainingDuration: 1 }] }] }
     firstAccept({ status: 'ready', snapshot: predicted, events: [] })
-    expect(ctx.moveDraft.previewText).toContain('生命 10 → 8')
-    expect(ctx.moveDraft.previewText).toContain('定身')
+    expect(ctx.moveDraft.previewText).toBe('')
+    const [shown, authority] = ctx.window.BattleRenderer3D.showPreviewBoard.mock.calls[0]
+    expect(shown.pieces[0]).toMatchObject({ x: 2, y: 1, health: { current: 8 }, statusSummary: [{ type: 'root' }] })
+    expect(shown.interactionPieces).toBe(authorityPieces)
+    expect(authority.pieces).toBe(authorityPieces)
+    expect(authority.interaction.movePath).toEqual([{ x: 2, y: 1 }])
     expect(ctx.BattleLegalActions.getNormalMoveContinuationTargets).toHaveBeenLastCalledWith(expect.objectContaining({ previewSnapshot: predicted }))
     ctx.updateMoveDrag('p', [{ x: 2, y: 2 }])
+    expect(ctx.window.BattleRenderer3D.clearPreviewBoard).toHaveBeenCalledOnce()
     firstAccept({ status: 'ready', snapshot: predicted, events: [] })
     expect(ctx.moveDraft.previewText).toBe('')
+    expect(ctx.window.BattleRenderer3D.showPreviewBoard).toHaveBeenCalledOnce()
   })
   it.each(['outside', 'origin', 'stale', 'cancel'])('cancels %s without executing a valid earlier prefix', reason => {
     const ctx = harness()

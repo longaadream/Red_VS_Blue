@@ -1,6 +1,7 @@
 import { assertContentAvailable, battleContentMode, type ModeScopedContent } from './content-availability'
 import { writePiecePosition, withPositionWriteGuard } from './position-write-guard'
 import { areMatchAllies } from './match-teams'
+import { applySkillChoiceSequence, type SkillChoiceInput } from './skill-choice-sequence'
 import { adventureBoundary, adventureDeploymentCells, refreshAdventureActionPoints, isAdventureProgramMove } from './adventure-boundary'
 // 当序列化格式出现不兼容变化时递增此值（旧状态会被 applyBattleAction 拒绝）
 export const BATTLE_STATE_VERSION = 1
@@ -558,6 +559,8 @@ export type BattleAction =
       skillId: string
       /** 用户通过选项选择器选择的值 */
       selectedOption?: any
+      /** Locally collected public continuation choices; validated by authority. */
+      skillChoices?: SkillChoiceInput[]
     } & TargetedActionFields)
   | ({
       type: "useChargeSkill"
@@ -566,6 +569,7 @@ export type BattleAction =
       skillId: string
       /** 用户通过选项选择器选择的值 */
       selectedOption?: any
+      skillChoices?: SkillChoiceInput[]
     } & TargetedActionFields)
   | {
       type: "endTurn"
@@ -4366,6 +4370,9 @@ export function applyBattleAction(
   action: BattleAction,
 ): BattleState {
   assertBattleNotTerminal(state)
+  if (Object.hasOwn(action, 'skillChoices')) {
+    return applySkillChoiceSequence(state, action as BattleAction & { skillChoices: SkillChoiceInput[] }, applyBattleAction)
+  }
   const activeEffectChain = getActiveEffectChain(state)
   if (!activeEffectChain) {
     const detachedEffectChain = createDetachedApplyEffectChain(state, action)

@@ -133,7 +133,11 @@
               const meta = root.BattleEffectIcons && root.BattleEffectIcons.resolveStatusType(event.statusType)
               if (meta && meta.category === 'buff' && !buffTargets.has(id) && renderer.spawnFloater && phase !== 'settle') {
                 buffTargets.add(id)
-                renderer.spawnFloater(piece.x, piece.y, '获得增益', '#ffe69b', false, { kind: 'statusAdded', durationMs: 250 })
+                const label = normalized[0] && normalized[0].label
+                  || (root.BattleEffectIcons && root.BattleEffectIcons.labelForStatus
+                    ? root.BattleEffectIcons.labelForStatus(status) : '')
+                  || '获得效果'
+                renderer.spawnFloater(piece.x, piece.y, label, '#ffe69b', false, { kind: 'statusAdded', durationMs: 250 })
               }
             }
             piece.statusSummary = piece.statuses

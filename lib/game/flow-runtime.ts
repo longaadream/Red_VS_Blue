@@ -144,6 +144,7 @@ export function createFlowRuntime(battle: BattleState, context: any, surface: Fl
       },
     },
     effects: {
+
       damage: (source: any, targetId: string, amount: number, type: 'physical' | 'magical' | 'true', skillId = effectId()) =>
         call('dealDamage', resolveSource(source), piece(targetId), Math.max(0, numeric(amount)), type, battle, skillId),
       heal: (source: any, targetId: string, amount: number, skillId = effectId()) =>

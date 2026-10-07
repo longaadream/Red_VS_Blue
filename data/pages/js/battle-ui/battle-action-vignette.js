@@ -2,10 +2,20 @@
   'use strict'
 
   const SINGLE_EFFECT_DURATION_MS = 24
+  const DECLARATION_DURATION_MS = 0
   const COMPOSITE_STEP_DURATION_MS = 200
   const LIGHTWEIGHT_STEP_DURATION_MS = 200
-  const NORMAL_DURATION_MS = COMPOSITE_STEP_DURATION_MS
-  const CARD_DURATION_MS = COMPOSITE_STEP_DURATION_MS
+  // Keep a movement beat alive until the renderer's longest normal walk can
+  // finish.  The renderer uses 120ms for a one-cell walk, up to 160ms for a
+  // long walk, and 145ms for dash; these values are presentation contracts,
+  // not rules timings.
+  const MOVEMENT_BASE_DURATION_MS = 120
+  const MOVEMENT_MAX_DURATION_MS = 160
+  const MOVEMENT_DISTANCE_STEP_MS = 12
+  const DASH_DURATION_MS = 145
+  const TELEPORT_DURATION_MS = 80
+  const NORMAL_DURATION_MS = 3000
+  const CARD_DURATION_MS = NORMAL_DURATION_MS
   const REDUCED_DURATION_MS = 120
   const SKIP_SETTLE_MS = 60
   const MAX_PLAYED_ROOTS = 256
@@ -19,17 +29,69 @@
     return !!(group && group.root && group.root.parentEventId)
   }
 
-  function actionDuration() {
-    // Every event gets its own readable post-action beat. The event queue
-    // below deliberately keeps adjacent results separate, so a multi-hit or
-    // triggered chain cannot collapse into one burst.
-    const group = arguments[0]
-    const kind = group && group.root && group.root.kind
-    const moveDuration = root.BattleMoveTimeline && root.BattleMoveTimeline.eventDuration(group && group.root)
-    if (moveDuration) return Math.max(COMPOSITE_STEP_DURATION_MS, moveDuration)
-    return ['statusAdded', 'statusRemoved', 'resourceChanged', 'resourceSpent', 'actionPoints', 'cardDiscarded', 'cardChanged'].includes(kind)
-      ? LIGHTWEIGHT_STEP_DURATION_MS
-      : COMPOSITE_STEP_DURATION_MS
+  function hasBattleFact(event) {
+    if (!event) return false
+    const result = event.result || {}
+    const presentation = event.presentation || {}
+    const declaration = ['skill', 'chargeSkill', 'card', 'choiceResolved'].includes(event.kind)
+    return (!declaration && (Array.isArray(event.targetPieceIds) && event.targetPieceIds.length > 0))
+      || (!declaration && !!event.targetCell)
+      || event.kind === 'move'
+      || event.kind === 'forceMove'
+      || event.kind === 'damage'
+      || event.kind === 'heal'
+      || event.kind === 'death'
+      || event.kind === 'eliminated'
+      || event.kind === 'statusAdded'
+      || event.kind === 'statusRemoved'
+      || event.kind === 'statChanged'
+      || result.amount != null
+      || result.value != null
+      || result.toX != null
+      || result.toY != null
+      || (Array.isArray(presentation.pathCells) && presentation.pathCells.length > 0)
+      || (Array.isArray(presentation.areaCells) && presentation.areaCells.length > 0)
+  }
+
+  function movementDuration(group) {
+    const event = group && group.root
+    if (!event || !['move', 'forceMove'].includes(event.kind)) return 0
+    const routeDuration = root.BattleMoveTimeline && root.BattleMoveTimeline.eventDuration(event)
+    if (routeDuration) return routeDuration
+    const result = event.result || {}
+    const movementKind = result.movementKind
+    if (movementKind === 'dash') return DASH_DURATION_MS
+    if (movementKind === 'teleport' || movementKind === 'swap') return TELEPORT_DURATION_MS
+    const fromX = Number(result.fromX)
+    const fromY = Number(result.fromY)
+    const toX = Number(result.toX)
+    const toY = Number(result.toY)
+    const path = event.presentation && Array.isArray(event.presentation.pathCells)
+      ? event.presentation.pathCells : []
+    const distance = Number.isFinite(fromX) && Number.isFinite(fromY)
+      && Number.isFinite(toX) && Number.isFinite(toY)
+      ? Math.hypot(toX - fromX, toY - fromY)
+      : Math.max(1, path.length - 1)
+    return Math.min(MOVEMENT_MAX_DURATION_MS,
+      MOVEMENT_BASE_DURATION_MS + Math.max(0, distance - 1) * MOVEMENT_DISTANCE_STEP_MS)
+  }
+
+  function actionDuration(group, reducedMotion, playbackSpeed) {
+    // The banner has its own reading lifetime.  Effect beats must stay short so
+    // damage, movement and status feedback are committed without waiting for
+    // that lifetime or for a preceding action name to disappear.
+    if (group && showsBanner(group.root) && group.root.kind !== 'move' && !hasBattleFact(group.root)) {
+      return DECLARATION_DURATION_MS
+    }
+    const base = reducedMotion ? REDUCED_DURATION_MS : COMPOSITE_STEP_DURATION_MS
+    if (reducedMotion) return base
+    const speed = Number(playbackSpeed) > 0 ? Number(playbackSpeed) : 1
+    const hasRouteTimeline = root.BattleMoveTimeline && root.BattleMoveTimeline.eventDuration(group && group.root)
+    return Math.max(base, movementDuration(group) * (hasRouteTimeline ? 1 : speed))
+  }
+
+  function bannerDuration(group) {
+    return group && showsBanner(group.root) ? NORMAL_DURATION_MS : 0
   }
 
   function hideBannerForModel(event, model) {
@@ -44,8 +106,10 @@
     return own && ['skill', 'chargeSkill', 'card'].includes(event.kind)
   }
 
-  function phaseTime(phase, group) {
-    const duration = actionDuration(group)
+  function phaseTime(phase, group, playbackSpeed, durationOverride) {
+    const duration = durationOverride == null
+      ? actionDuration(group, false, playbackSpeed)
+      : durationOverride
     return phase === 'settle'
       ? Math.max(32, duration - 40)
       : ({ path: Math.min(40, duration * 0.18), result: Math.min(120, duration * 0.42) }[phase] || 0)
@@ -109,6 +173,7 @@
     const cancel = input.clearTimeout || root.clearTimeout
     const now = typeof input.now === 'function' ? input.now : Date.now
     const onPhase = typeof input.onPhase === 'function' ? input.onPhase : function () {}
+    const onBanner = typeof input.onBanner === 'function' ? input.onBanner : function () {}
     const onIdle = typeof input.onIdle === 'function' ? input.onIdle : function () {}
     const reducedMotion = input.reducedMotion === true
     const forcePlayback = input.forcePlayback === true
@@ -123,11 +188,16 @@
     let lastIsViewerTurn = null
     let activeProgressMs = 0
     let activeTimelineStartedAt = 0
+    let activeWallElapsedMs = 0
     let skipSettling = false
     let holdingResponse = false
     let responseOrigin = null
     let responseForViewer = false
     let responseSelectionId = null
+    let banner = null
+    let bannerTimer = null
+    let bannerElapsedMs = 0
+    let bannerStartedAt = 0
 
     function remember(rootId) {
       if (playedRoots.has(rootId)) return false
@@ -141,6 +211,21 @@
       timers.splice(0).forEach(function (timer) { if (cancel) cancel(timer) })
     }
 
+    function clearBannerTimer() {
+      if (bannerTimer != null && cancel) cancel(bannerTimer)
+      bannerTimer = null
+    }
+
+    function pauseBannerTimer() {
+      if (!banner) return
+      if (bannerStartedAt) {
+        bannerElapsedMs += Math.max(0, now() - bannerStartedAt) * speed
+        bannerElapsedMs = Math.min(bannerDuration(banner), bannerElapsedMs)
+      }
+      clearBannerTimer()
+      bannerStartedAt = 0
+    }
+
     function later(callback, delay) {
       if (!schedule) return null
       const timer = schedule(function () {
@@ -151,11 +236,45 @@
       return timer
     }
 
+    function hideBanner() {
+      if (!banner) return
+      const previous = banner
+      banner = null
+      bannerElapsedMs = 0
+      bannerStartedAt = 0
+      clearBannerTimer()
+      onBanner('hide', previous)
+    }
+
+    function scheduleBannerTimer() {
+      clearBannerTimer()
+      if (!banner || !schedule) return
+      const remaining = Math.max(0, bannerDuration(banner) - bannerElapsedMs)
+      bannerStartedAt = now()
+      bannerTimer = schedule(function () {
+        bannerTimer = null
+        if (!banner) return
+        bannerElapsedMs = bannerDuration(banner)
+        hideBanner()
+      }, remaining / speed)
+    }
+
+    function showBanner(group) {
+      if (!group || !bannerDuration(group)) return
+      if (banner && banner.rootEventId === group.rootEventId) return
+      hideBanner()
+      banner = group
+      bannerElapsedMs = 0
+      onBanner('show', group)
+      scheduleBannerTimer()
+    }
+
     function completeActive() {
       clearTimers()
       active = null
       activeProgressMs = 0
       activeTimelineStartedAt = 0
+      activeWallElapsedMs = 0
       skipSettling = false
       startNext()
     }
@@ -164,18 +283,35 @@
       if (!active) return
       clearTimers()
       activeTimelineStartedAt = now()
-      const duration = reducedMotion ? REDUCED_DURATION_MS : actionDuration(active)
+      const duration = actionDuration(active, reducedMotion, speed)
+      if (duration <= 0) {
+        // A declaration-only beat has no board fact to animate.  Complete it
+        // in the same turn so the first real child beat can begin immediately.
+        completeActive()
+        return
+      }
+      const wallElapsedMs = activeWallElapsedMs + Math.max(0, now() - activeTimelineStartedAt)
+      const hasRouteTimeline = root.BattleMoveTimeline && root.BattleMoveTimeline.eventDuration(active.root)
+      const movementFloorMs = !reducedMotion && !hasRouteTimeline ? movementDuration(active) : 0
+      const logicalRemainingMs = Math.max(0, duration - activeProgressMs)
+      const movementRemainingMs = Math.max(0, movementFloorMs - wallElapsedMs)
+      const completionDelayMs = movementFloorMs
+        ? Math.max(logicalRemainingMs / speed, movementRemainingMs)
+        : logicalRemainingMs / speed
+      const phaseDuration = movementFloorMs
+        ? activeProgressMs + completionDelayMs * speed
+        : duration
       if (!reducedMotion) {
         ;[
-          { at: phaseTime('path', active), phase: 'path' },
-          { at: phaseTime('result', active), phase: 'result' },
-          { at: phaseTime('settle', active), phase: 'settle' },
+          { at: phaseTime('path', active, speed, phaseDuration), phase: 'path' },
+          { at: phaseTime('result', active, speed, phaseDuration), phase: 'result' },
+          { at: phaseTime('settle', active, speed, phaseDuration), phase: 'settle' },
         ].forEach(function (entry) {
           if (entry.at <= activeProgressMs) return
           later(function () { if (active) onPhase(entry.phase, active) }, (entry.at - activeProgressMs) / speed)
         })
       }
-      later(completeActive, Math.max(0, duration - activeProgressMs) / speed)
+      later(completeActive, completionDelayMs)
     }
 
     function startNext() {
@@ -185,6 +321,12 @@
         if (responseForViewer && responseOrigin) {
           active = responseOrigin
           holdingResponse = true
+          // A response can be reached from the initial snapshot or after a
+          // long chain, by which time the ordinary banner timer may have
+          // already ended.  Reattach the response banner before pausing it so
+          // the pending context remains visible until the response resolves.
+          showBanner(responseOrigin)
+          pauseBannerTimer()
           onPhase('hold', active)
         }
         onIdle()
@@ -192,6 +334,8 @@
       }
       activeProgressMs = 0
       activeTimelineStartedAt = now()
+      activeWallElapsedMs = 0
+      showBanner(active)
       if (reducedMotion) {
         onPhase('static', active)
         activeProgressMs = 0
@@ -206,10 +350,12 @@
     function settleAll() {
       if (active && !holdingResponse) onPhase('settle', active)
       clearTimers()
+      hideBanner()
       holdingResponse = false
       active = null
       activeProgressMs = 0
       activeTimelineStartedAt = 0
+      activeWallElapsedMs = 0
       skipSettling = false
       pending = []
       onIdle()
@@ -257,7 +403,7 @@
       const manualIncoming = incoming.some(function (group) { return !isAutomaticGroup(group) })
       if (active && !holdingResponse && isAutomaticGroup(active) && manualIncoming) {
         const elapsed = activeProgressMs + Math.max(0, now() - activeTimelineStartedAt) * speed
-        if (elapsed >= phaseTime('result', active)) {
+        if (elapsed >= phaseTime('result', active, speed)) {
           // The automatic result is already visible; its remaining post-action
           // tail must not hold up a newly submitted action.
           clearTimers()
@@ -265,6 +411,7 @@
           active = null
           activeProgressMs = 0
           activeTimelineStartedAt = 0
+          activeWallElapsedMs = 0
           skipSettling = false
         }
       }
@@ -273,12 +420,19 @@
     }
 
     function skip() {
-      if (disposed || !active || holdingResponse) return false
+      if (disposed || holdingResponse) return false
+      if (!active) {
+        if (!banner) return false
+        hideBanner()
+        onIdle()
+        return true
+      }
       if (skipSettling) {
         completeActive()
         if (!active) return true
       }
       clearTimers()
+      hideBanner()
       skipSettling = true
       onPhase('settle', active)
       later(completeActive, SKIP_SETTLE_MS)
@@ -290,11 +444,20 @@
       if (normalized === speed) return
       if (holdingResponse) { speed = normalized; return }
       if (active) {
-        activeProgressMs += Math.max(0, now() - activeTimelineStartedAt) * speed
-        activeProgressMs = Math.min(reducedMotion ? REDUCED_DURATION_MS : actionDuration(active), activeProgressMs)
+        const elapsedMs = Math.max(0, now() - activeTimelineStartedAt)
+        activeWallElapsedMs += elapsedMs
+        activeProgressMs += elapsedMs * speed
+        activeProgressMs = Math.min(actionDuration(active, reducedMotion, speed), activeProgressMs)
+      }
+      if (banner) {
+        if (bannerStartedAt) {
+          bannerElapsedMs += Math.max(0, now() - bannerStartedAt) * speed
+          bannerElapsedMs = Math.min(bannerDuration(banner), bannerElapsedMs)
+        }
       }
       speed = normalized
       if (active) scheduleActiveTimeline()
+      if (banner) scheduleBannerTimer()
     }
 
     function dispose() {
@@ -303,9 +466,11 @@
       responseOrigin = null
       responseSelectionId = null
       clearTimers()
+      hideBanner()
       active = null
       activeProgressMs = 0
       activeTimelineStartedAt = 0
+      activeWallElapsedMs = 0
       skipSettling = false
       pending = []
       playedRoots.clear()
@@ -334,8 +499,10 @@
           speed: speed,
           playedRootCount: playedRoots.size,
           timerCount: timers.length,
+          bannerRootId: banner ? banner.rootEventId : null,
+          bannerProgressMs: banner ? Math.min(bannerDuration(banner), bannerElapsedMs + (bannerStartedAt ? Math.max(0, now() - bannerStartedAt) * speed : 0)) : 0,
           holdingResponse: holdingResponse,
-          activeProgressMs: active && !holdingResponse ? Math.min(actionDuration(active), activeProgressMs + Math.max(0, now() - activeTimelineStartedAt) * speed) : 0,
+          activeProgressMs: active && !holdingResponse ? Math.min(actionDuration(active, reducedMotion, speed), activeProgressMs + Math.max(0, now() - activeTimelineStartedAt) * speed) : 0,
         }
       },
     }
@@ -412,6 +579,7 @@
     let model = null
     let currentPhase = null
     let currentGroup = null
+    let bannerGroup = null
     let suppressClickUntil = 0
     let speed = 1
     let displayedCard = null
@@ -431,17 +599,53 @@
         if (playbackPhase) playbackPhase(phase, group)
         render()
       },
+      onBanner: function (phase, group) {
+        if (phase === 'show') {
+          bannerGroup = hideBannerForModel(group.root, model) ? null : group
+          if (!currentGroup) {
+            currentGroup = group
+            currentPhase = 'banner'
+          }
+          render()
+          return
+        }
+        const hidingCurrentBanner = currentPhase === 'banner'
+          && currentGroup && (!group || currentGroup.rootEventId === group.rootEventId)
+        if (bannerGroup && (!group || bannerGroup.rootEventId === group.rootEventId)) bannerGroup = null
+        if (hidingCurrentBanner) {
+          currentPhase = null
+          currentGroup = null
+          displayedCard = null
+          if (clearAreaFlash) clearAreaFlash()
+          if (clearPath) clearPath()
+          if (layer) layer.hidden = true
+          return
+        }
+        if (!currentGroup) {
+          currentPhase = null
+          if (clearAreaFlash) clearAreaFlash()
+          if (clearPath) clearPath()
+          if (layer) layer.hidden = true
+        } else render()
+      },
       onIdle: function () {
         if (currentPhase === 'hold' && queue.getDiagnostics().holdingResponse) {
           if (playbackIdle) playbackIdle()
           return
         }
-        currentPhase = null
-        currentGroup = null
-        displayedCard = null
         if (clearAreaFlash) clearAreaFlash()
         if (clearPath) clearPath()
-        if (layer) layer.hidden = true
+        if (bannerGroup) {
+          currentPhase = 'banner'
+          currentGroup = bannerGroup
+          if (layer) layer.hidden = false
+          render()
+        } else {
+          currentPhase = null
+          currentGroup = null
+          displayedCard = null
+          if (layer) layer.hidden = true
+        }
         if (playbackIdle) playbackIdle()
       },
     })
@@ -503,16 +707,19 @@
     }
 
     function render() {
-      if (!layer || !currentGroup || !model) return
-      const rootEvent = currentGroup.root
+      const effectGroup = currentGroup || bannerGroup
+      if (!layer || !effectGroup || !model) return
+      const rootEvent = (bannerGroup || effectGroup).root
       const meta = resolveIcon(rootEvent)
       const identity = resolveIdentity(rootEvent)
       const card = cardDisplay(rootEvent)
-      const cells = eventCells(currentGroup, getPlaybackModel ? getPlaybackModel() : model)
-      const cue = rootEvent.presentation && rootEvent.presentation.cue || 'directional'
+      const cells = eventCells(effectGroup, getPlaybackModel ? getPlaybackModel() : model)
+      const cue = effectGroup.root.presentation && effectGroup.root.presentation.cue || 'directional'
       const actionLabel = identity.isSkill ? identity.skillName : (meta.label || '战场动作')
-      const resultVisible = currentPhase === 'result' || currentPhase === 'settle' || currentPhase === 'static'
-      const pathVisible = currentPhase === 'path' || currentPhase === 'hold' || resultVisible
+      const bannerVisible = !!bannerGroup && showsBanner(rootEvent) && !hideBannerForModel(rootEvent, model)
+      const hasEffectPhase = !!currentGroup && currentPhase !== 'banner'
+      const resultVisible = hasEffectPhase && (currentPhase === 'result' || currentPhase === 'settle' || currentPhase === 'static')
+      const pathVisible = hasEffectPhase && (currentPhase === 'path' || currentPhase === 'hold' || resultVisible)
       const travelVisible = pathVisible && cue !== 'area'
       const areaCells = cells.area.length ? cells.area : cells.targets
       if (cue === 'area' && pathVisible) {
@@ -525,22 +732,23 @@
         } else if (clearPath) clearPath()
       }
       layer.dataset.phase = currentPhase
-      layer.dataset.rootId = currentGroup.rootEventId
-      if (!showsBanner(rootEvent) || hideBannerForModel(rootEvent, model)) {
+      layer.dataset.rootId = effectGroup.rootEventId
+      if (!bannerVisible) {
         layer.hidden = false
         layer.className = 'battle-vignette-layer is-phase-' + currentPhase
-        layer.innerHTML = hideBannerForModel(rootEvent, model) ? '' : renderComicBeat(resultVisible)
+        layer.innerHTML = hideBannerForModel(rootEvent, model) ? '' : renderComicBeat(resultVisible, effectGroup)
         return
       }
       layer.hidden = false
       layer.className = 'battle-vignette-layer is-phase-' + currentPhase + ' is-cue-' + cue
         + (card ? ' is-card-reveal' : identity.isSkill ? ' is-skill-banner' : ' is-action-banner')
       layer.dataset.phase = currentPhase
-      layer.dataset.rootId = currentGroup.rootEventId
-      layer.innerHTML = '<div class="battle-vignette-veil" aria-hidden="true"></div>'
-        + '<div class="battle-vignette-status" data-action="' + escapeHtml(rootEvent.kind) + '" data-faction="' + escapeHtml(identity.faction) + '" role="status" aria-live="polite"'
-        + ' style="--banner-duration:' + (actionDuration(currentGroup) / speed) + 'ms;--banner-elapsed:-'
-        + (Math.max(phaseTime(currentPhase, currentGroup), queue.getDiagnostics().activeProgressMs) / speed) + 'ms">'
+      layer.dataset.rootId = effectGroup.rootEventId
+      const bannerElapsedMs = queue.getDiagnostics().bannerProgressMs
+      const bannerDurationMs = bannerDuration(bannerGroup)
+      layer.innerHTML = '<div class="battle-vignette-status" data-action="' + escapeHtml(rootEvent.kind) + '" data-faction="' + escapeHtml(identity.faction) + '" role="status" aria-live="polite"'
+        + ' style="--banner-duration:' + (bannerDurationMs / speed) + 'ms;--banner-elapsed:-'
+        + (bannerElapsedMs / speed) + 'ms">'
         + (card ? renderCard(rootEvent, card) : '<span class="battle-vignette-label">'
         + (identity.isSkill ? renderPortrait(identity) : '<span class="battle-vignette-action-icon" aria-hidden="true"><img src="' + escapeHtml(meta.assetPath) + '" alt=""></span>')
         + '<span class="battle-vignette-copy">'
@@ -550,15 +758,16 @@
         + '<span class="battle-vignette-action-name" title="' + escapeHtml(actionLabel) + '">'
         + escapeHtml(actionLabel) + '</span></span></span>')
         + '<span class="battle-vignette-skip-hint">' + (currentPhase === 'hold' ? '等待你响应 · 可打开行动记录查看' : '右键 / 空格跳过动画') + '</span></div>'
-        + renderComicBeat(resultVisible)
+        + renderComicBeat(resultVisible, effectGroup)
     }
 
     // One accent per root, derived only from a visible atomic result. Never
     // infer damage/critical hits from a skill name or a hidden outcome.
-    function renderComicBeat(resultVisible) {
+    function renderComicBeat(resultVisible, effectGroup) {
       if (!resultVisible || currentPhase === 'settle' || !projectCell) return ''
       const labels = { death: '退场!', summon: '登场!', move: '嗖!' }
-      const events = (currentGroup.children || []).concat([currentGroup.root])
+      const group = effectGroup || currentGroup
+      const events = (group.children || []).concat([group.root])
       const event = events.find(function (entry) {
         return entry && labels[entry.kind] && entry.visibility !== 'actorOnly'
           && (entry.targetCell || (entry.targetPieceIds || []).length)
@@ -716,6 +925,7 @@
       model = null
       currentPhase = null
       currentGroup = null
+      bannerGroup = null
       displayedCard = null
       playbackPhase = null
       playbackIdle = null
@@ -750,6 +960,10 @@
       lightweightStepDurationMs: LIGHTWEIGHT_STEP_DURATION_MS,
       normalDurationMs: NORMAL_DURATION_MS,
       cardDurationMs: CARD_DURATION_MS,
+      movementMaxDurationMs: MOVEMENT_MAX_DURATION_MS,
+      dashDurationMs: DASH_DURATION_MS,
+      bannerDurationMs: NORMAL_DURATION_MS,
+      declarationDurationMs: DECLARATION_DURATION_MS,
       reducedDurationMs: REDUCED_DURATION_MS,
       skipSettleMs: SKIP_SETTLE_MS,
     }),

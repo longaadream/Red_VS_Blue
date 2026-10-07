@@ -62,6 +62,31 @@ describe('sequential board playback', () => {
     expect(renderer.spawnFloater.mock.calls[0][2]).toBe('−3')
     presentation.dispose()
   })
+
+  it('retimes the shared three-leg movement timeline at 2x before applying aftermath', () => {
+    const { presentation, queue, renderer } = setup()
+    presentation.update(model())
+    const route = [{ x: 2, y: 1 }, { x: 2, y: 2 }, { x: 1, y: 2 }]
+    const sequence = [
+      { eventId: 'walk:0', rootEventId: 'walk:0', kind: 'move', sourcePieceId: 'target', sequence: 0,
+        result: { fromX: 1, fromY: 1, toX: 1, toY: 2, movementKind: 'walk' }, presentation: { pathCells: route } },
+      { eventId: 'walk:1', rootEventId: 'walk:0', parentEventId: 'walk:0', kind: 'damage', targetPieceIds: ['target'], sequence: 1,
+        result: { amount: 3, value: 17 } },
+    ]
+    const final = model(17, sequence)
+    final.pieces[0].y = 2
+    presentation.update(final)
+    queue.setSpeed(2)
+    expect(renderer.animateAction.mock.calls[0][0].movementPaths.target).toEqual(route)
+    // Three 120ms legs take 180ms at 2x; the aftermath result follows 42ms
+    // into its own 200ms beat at the same speed.
+    vi.advanceTimersByTime(221)
+    expect(renderer.spawnFloater).not.toHaveBeenCalled()
+    vi.advanceTimersByTime(1)
+    expect(renderer.spawnFloater.mock.calls[0][2]).toBe('−3')
+    presentation.dispose()
+  })
+
   it.each(['statusAdded', 'statusRemoved', 'tileEffectAdded', 'tileEffectRemoved'])('renders every member of an explicit %s batch in authority order', kind => {
     const { presentation, frames, queue } = setup()
     const isTile = kind.startsWith('tile')
@@ -83,7 +108,9 @@ describe('sequential board playback', () => {
     expect(frames.every(frame => count(frame) === (removing ? 3 : 0))).toBe(true)
     // Existing playback emits a separate beat for each authoritative member.
     // All original beats are 200ms; sample the third result before damage.
-    vi.advanceTimersByTime(700)
+    // The declaration beat is instantaneous; three real effect beats finish at
+    // 600ms. Sample before the following damage beat reaches its result phase.
+    vi.advanceTimersByTime(650)
     expect(count(frames.at(-1))).toBe(removing ? 0 : 3)
     const observedCounts = [...new Set(frames.map(count))]
     expect(observedCounts).toEqual(removing ? [3, 2, 1, 0] : [0, 1, 2, 3])
@@ -105,7 +132,7 @@ describe('sequential board playback', () => {
     // Tile batches intentionally use the short presentation lane. Verify the
     // add batch is visible before the remove batch settles instead of relying
     // on the old long-action timing.
-    vi.advanceTimersByTime(500)
+    vi.advanceTimersByTime(450)
     expect(frames.at(-1).effects).toHaveLength(2)
     vi.advanceTimersByTime(400)
     expect(frames.at(-1).effects).toHaveLength(0)
@@ -124,11 +151,11 @@ describe('sequential board playback', () => {
     }))
     presentation.update(model(14, [...first, ...second], controlReturn))
     expect(frames.every(frame => frame.pieces[0].health.current === 20)).toBe(true)
-    vi.advanceTimersByTime(300)
+    vi.advanceTimersByTime(100)
     expect(frames.at(-1).pieces[0].health.current).toBe(17)
-    vi.advanceTimersByTime(200)
+    vi.advanceTimersByTime(100)
     expect(frames.at(-1).pieces[0].health.current).toBe(17)
-    vi.advanceTimersByTime(200)
+    vi.advanceTimersByTime(100)
     expect(frames.at(-1).pieces[0].health.current).toBe(14)
     presentation.dispose()
   })
@@ -138,7 +165,7 @@ describe('sequential board playback', () => {
     const final = model(14, events(), controlReturn)
     presentation.update(final)
     expect(frames.every(frame => frame.pieces[0].health.current === 20)).toBe(true)
-    vi.advanceTimersByTime(300)
+    vi.advanceTimersByTime(100)
     expect(frames.at(-1).pieces[0].health.current).toBe(17)
     expect(renderer.spawnFloater.mock.calls.map(call => call[2])).toEqual(['−3'])
     vi.advanceTimersByTime(200)
@@ -151,11 +178,13 @@ describe('sequential board playback', () => {
     expect(vi.getTimerCount()).toBe(0)
   })
 
-  it('consumes skip per beat and settles the board to authority when the queue is cancelled', () => {
+  it('consumes skip on a real beat and settles the board to authority when the queue is cancelled', () => {
     const { presentation, queue, frames } = setup()
     presentation.update(model())
     presentation.update(model(14, events()))
-    queue.skip(); vi.advanceTimersByTime(60)
+    // The declaration root completes synchronously; skip the first real
+    // effect after its result phase, then cancel the remaining queue.
+    vi.advanceTimersByTime(84)
     queue.skip()
     expect(frames.at(-1).pieces[0].health.current).toBe(17)
     queue.settleAll()
@@ -190,7 +219,7 @@ describe('sequential board playback', () => {
       batchId: 'summon-1', targetPieceIds: ['new'], pieceSnapshot: { id: 'new', templateId: 'new', name: 'New', faction: 'red', ownerPlayerId: 'red', x: 3, y: 2, hp: 10, maxHp: 10 } }])
     expect(sequence[1].batchId).toBe('summon-1')
     presentation.update(model(20, sequence))
-    vi.advanceTimersByTime(300)
+    vi.advanceTimersByTime(100)
     expect(frames.at(-1).pieces.find((p: any) => p.id === 'new')).toMatchObject({ x: 3, y: 2, health: { current: 10 } })
     presentation.dispose()
   })
