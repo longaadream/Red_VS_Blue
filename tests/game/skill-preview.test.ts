@@ -3,7 +3,7 @@ import { createRequire } from 'node:module'
 import { resolve } from 'node:path'
 import { createContext, Script } from 'node:vm'
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import { previewBattleAction } from '@/lib/game/skill-preview'
 import { applyBattleAction, type BattleAction, type BattleState } from '@/lib/game/turn'
@@ -508,5 +508,25 @@ describe('RED-224 isolated public skill preview', () => {
     expect(result.snapshot.pieces.find(piece => piece.instanceId === 'uther')?.currentHp)
       .toBe(4)
     expect(result.snapshot.pendingTargetSelection).toBeUndefined()
+  })
+
+  it('keeps preview output stable and reports zero diagnostics without performance.now', () => {
+    const state = publicFixture()
+    const action = targetedAction(state)
+    const withPerformance = previewBattleAction(state, action, 'player-red')
+    const originalPerformance = globalThis.performance
+    let dateReads = 0
+    const dateSpy = vi.spyOn(Date, 'now').mockImplementation(() => 10_000 + dateReads++ * 10)
+
+    try {
+      vi.stubGlobal('performance', undefined)
+      const withoutPerformance = previewBattleAction(state, action, 'player-red')
+      expect(withoutPerformance.durationMs).toBe(0)
+      expect(withoutDuration(withoutPerformance)).toEqual(withoutDuration(withPerformance))
+      expect(dateReads).toBe(0)
+    } finally {
+      dateSpy.mockRestore()
+      vi.stubGlobal('performance', originalPerformance)
+    }
   })
 })
