@@ -120,7 +120,11 @@ describe('RED-227 skill preview selection switching', () => {
     h.context.battlePageDisposed = false
     h.context.requestAnimationFrame = vi.fn((callback: () => void) => frames.push(callback))
     h.context.previewSkillTarget = vi.fn()
-    new Script(readFunction('replayHoverSkillPreviewAfterViewport')).runInContext(h.context)
+    new Script([
+      readFunction('cardNeedsTarget'),
+      readFunction('activeBattlePreviewDraft'),
+      readFunction('replayHoverSkillPreviewAfterViewport'),
+    ].join('\n')).runInContext(h.context)
 
     new Script('replayHoverSkillPreviewAfterViewport(); replayHoverSkillPreviewAfterViewport()').runInContext(h.context)
     expect(frames).toHaveLength(1)

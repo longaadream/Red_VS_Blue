@@ -44,18 +44,25 @@
 
     function updateHud(model) {
       const turnBadge = byId('turnBadge')
+      const currentPlayer = model.players.find(function (player) { return player.isCurrent })
+      const turnText = model.training || model.spectating
+        ? (currentPlayer ? currentPlayer.name + '行动' : '等待行动')
+        : model.turn.isViewerTurn ? '轮到你行动' : '对方正在行动'
       if (turnBadge) {
-        turnBadge.textContent = model.turn.isViewerTurn ? '我方回合' : '对方回合'
+        turnBadge.textContent = turnText
         turnBadge.className = 'turn-badge ' + (model.turn.isViewerTurn ? 'my-turn' : 'opp-turn')
       }
       if (model.turn.currentPlayerId && model.turn.currentPlayerId !== previousTurnPlayerId) {
         previousTurnPlayerId = model.turn.currentPlayerId
-        announce(model.turn.isViewerTurn ? '你的回合' : '对方回合', model.turn.isViewerTurn ? '#4ade80' : '#f87171')
+        announce(turnText, model.turn.isViewerTurn ? '#4ade80' : '#f87171')
       }
       const roundLabel = byId('roundLabel')
       if (roundLabel) roundLabel.textContent = '第 ' + model.turn.number + ' 回合'
       const phaseLabel = byId('phaseLabel')
-      if (phaseLabel) phaseLabel.textContent = PHASE_LABELS[model.turn.phase] || model.turn.phase
+      const response = model.interaction && model.interaction.pendingResponse
+      if (phaseLabel) phaseLabel.textContent = response
+        ? (response.isForViewer ? '等待你响应' : '等待对方响应')
+        : (PHASE_LABELS[model.turn.phase] || model.turn.phase)
       const turnClock = byId('turnClock')
       if (turnClock) {
         turnClock.textContent = formatTimer(model.turn.remainingSeconds)
@@ -82,6 +89,13 @@
       const cpDisplay = byId('resCpDisplay')
       if (apDisplay && viewer) apDisplay.style.display = ''
       if (cpDisplay && viewer) cpDisplay.style.display = ''
+      ;[[apDisplay, 'action', 'maxAction'], [cpDisplay, 'charge', 'maxCharge']].forEach(function (entry) {
+        const element = entry[0]
+        if (!element || !viewer) return
+        const value = Math.max(0, Number(viewer.resources[entry[1]]) || 0)
+        const max = Math.max(1, Number(viewer.resources[entry[2]]) || 0, value)
+        if (element.style && element.style.setProperty) element.style.setProperty('--dial-angle', (value / max * 240 - 120) + 'deg')
+      })
       const values = {
         resApVal: viewer && viewer.resources.action,
         resApMax: viewer && viewer.resources.maxAction,
@@ -124,16 +138,16 @@
         }).join('')
         const localLabel = isLocal ? '，你' : ''
         return { key: String(player.id || index), html: '<div class="player-state-chip ' + player.faction + (player.isCurrent ? ' active' : '') + (isLocal ? ' is-local-player' : '')
-          + '" data-player-id="' + escapeHtml(player.id || index) + '" role="group" aria-label="' + escapeHtml(player.name + '，' + sideName + localLabel + currentLabel) + '" title="' + escapeHtml(player.id) + '">'
+          + '" data-player-id="' + escapeHtml(player.id || index) + '" role="group" aria-label="' + escapeHtml(player.name + '，' + sideName + localLabel + currentLabel) + '" title="' + escapeHtml(player.name + ' · ' + sideName) + '">'
           + '<span class="player-avatar" aria-hidden="true">' + escapeHtml(playerInitial(player)) + '</span>'
           + (isLocal ? '<span class="local-player-mark" aria-hidden="true">你</span>' : '')
           + '<span class="player-state-copy"><span class="player-display-name">' + escapeHtml(player.name) + '</span>'
           + '<span class="player-side-name">' + sideName + '</span></span>'
           + '<span class="player-state-resources">'
-          + '<span class="resource-orb action" title="行动点"><span class="resource-glyph action"></span>' + player.resources.action + '</span>'
-          + '<span class="resource-orb charge" title="充能点"><span class="resource-glyph charge"></span>' + player.resources.charge + '</span>'
+          + '<span class="resource-orb action" title="行动点"><span class="resource-name">行动</span> ' + player.resources.action + '</span>'
+          + '<span class="resource-orb charge" title="充能点"><span class="resource-name">充能</span> ' + player.resources.charge + '</span>'
           + '</span>'
-          + (player.isCurrent ? '<span class="current-player-marker" aria-hidden="true">◆</span>' : '')
+          + (player.isCurrent ? '<span class="current-player-marker" aria-hidden="true">行动中</span>' : '')
           + '<div class="player-state-tags">' + tags + '</div>' + '</div>' }
       })
       if (root.BattleDomPatch) root.BattleDomPatch.patchKeyed(players, playerEntries, { datasetKey: 'playerId' })

@@ -3,8 +3,10 @@ import { describe, expect, it } from 'vitest'
 import { readFileSync, readdirSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { applyBattleAction, BattleRuleError } from '@/lib/game/turn'
+import { runBattleAction } from '@/lib/game/battle-runner'
 import { buildInitialPiecesForPlayers } from '@/lib/game/battle-setup'
 import { dealDamage, executeSkillFunction, loadRuleById } from '@/lib/game/skills'
+import { RuleRuntime, withRuleRuntime } from '@/lib/game/rule-runtime'
 import { prepareAction } from '@/lib/game/targeting'
 import { makePiece, makeState } from '../helpers/minimal-state'
 
@@ -116,9 +118,9 @@ describe('Sonic roster mechanics', () => {
     })
     const state = makeState({ pieces: [sonic, enemy], width: 6, height: 4 })
 
-    const result = executeSkillFunction(definition, {
+    const result = withRuleRuntime(new RuleRuntime({ rootSeed: 3 }), () => executeSkillFunction(definition, {
       piece: sonic, target: enemy, targetPosition: null, targets: [{ info: enemy, pos: null }], skill: definition, battle: state,
-    }, state)
+    }, state))
 
     expect(result).toMatchObject({ success: true, message: '追踪攻击造成2点伤害' })
     expect(sonic).toMatchObject({ x: 4, y: 0 })
@@ -142,9 +144,9 @@ describe('Sonic roster mechanics', () => {
     })
     const state = makeState({ pieces: [sonic, enemy], width: 6, height: 4 })
 
-    const result = executeSkillFunction(definition, {
+    const result = withRuleRuntime(new RuleRuntime({ rootSeed: 3 }), () => executeSkillFunction(definition, {
       piece: sonic, target: enemy, targetPosition: null, targets: [{ info: enemy, pos: null }], skill: definition, battle: state,
-    }, state)
+    }, state))
 
     expect(result).toMatchObject({ success: true, message: `追踪攻击造成${expectedDamage}点伤害` })
     expect(enemy.currentHp).toBe(20 - expectedDamage)
@@ -222,33 +224,46 @@ describe('Sonic roster mechanics', () => {
   })
 
   it('lets afterSkillUsed consume the pre-teleport momentum after Homing Attack', () => {
-    const definition = JSON.parse(readFileSync(resolve(process.cwd(), 'data/skills/sonic-homing-attack.json'), 'utf8'))
-    const sonic = makePiece({
-      instanceId: 'sonic', templateId: 'sonic', ownerPlayerId: 'player-red', x: 0, y: 0, attack: 5,
-      skills: [{ skillId: definition.id, currentCooldown: 0, usesRemaining: -1 }],
-      statusTags: [{ type: 'momentum-core', stacks: 8, skillIds: [definition.id] }],
-    })
-    sonic.momentum = 8
-    attachRule(sonic, 'rule-momentum-consume')
-    const enemy = makePiece({ instanceId: 'enemy', ownerPlayerId: 'player-blue', x: 3, y: 0, currentHp: 20, maxHp: 20 })
-    const state = makeState({ pieces: [sonic, enemy], width: 6, height: 4 })
-    state.skillsById[definition.id] = definition
-    state.players[0].actionPoints = 1
+    const execute = () => {
+      const definition = JSON.parse(readFileSync(resolve(process.cwd(), 'data/skills/sonic-homing-attack.json'), 'utf8'))
+      const sonic = makePiece({
+        instanceId: 'sonic', templateId: 'sonic', ownerPlayerId: 'player-red', x: 0, y: 0, attack: 5,
+        skills: [{ skillId: definition.id, currentCooldown: 0, usesRemaining: -1 }],
+        statusTags: [{ type: 'momentum-core', stacks: 8, skillIds: [definition.id] }],
+      })
+      sonic.momentum = 8
+      attachRule(sonic, 'rule-momentum-consume')
+      const enemy = makePiece({ instanceId: 'enemy', ownerPlayerId: 'player-blue', x: 3, y: 0, currentHp: 20, maxHp: 20 })
+      const state = makeState({ pieces: [sonic, enemy], width: 6, height: 4 })
+      state.skillsById[definition.id] = definition
+      state.players[0].actionPoints = 1
 
-    const prepared = prepareAction(state, {
-      type: 'useBasicSkill', playerId: 'player-red', pieceId: sonic.instanceId, skillId: definition.id,
-    })
-    expect(prepared.kind).toBe('needTarget')
-    if (prepared.kind !== 'needTarget') return
-    const resolved = applyBattleAction(state, {
-      type: 'useBasicSkill', playerId: 'player-red', pieceId: sonic.instanceId, skillId: definition.id,
-      targetPieceId: enemy.instanceId, selectionId: prepared.selectionId, stateRevision: prepared.stateRevision,
-    })
-    const nextSonic = resolved.pieces.find(piece => piece.instanceId === sonic.instanceId)
-    const nextEnemy = resolved.pieces.find(piece => piece.instanceId === enemy.instanceId)
+      const prepared = prepareAction(state, {
+        type: 'useBasicSkill', playerId: 'player-red', pieceId: sonic.instanceId, skillId: definition.id,
+      })
+      expect(prepared.kind).toBe('needTarget')
+      if (prepared.kind !== 'needTarget') return null
+      const resolved = runBattleAction(state, {
+        type: 'useBasicSkill', playerId: 'player-red', pieceId: sonic.instanceId, skillId: definition.id,
+        targetPieceId: enemy.instanceId, selectionId: prepared.selectionId, stateRevision: prepared.stateRevision,
+      }, { rootSeed: 227 }).state
+      return {
+        sonic: resolved.pieces.find(piece => piece.instanceId === sonic.instanceId),
+        enemy: resolved.pieces.find(piece => piece.instanceId === enemy.instanceId),
+      }
+    }
+
+    const resolved = execute()
+    const repeated = execute()
+    if (!resolved || !repeated) return
+    const nextSonic = resolved.sonic
+    const nextEnemy = resolved.enemy
+    const repeatedSonic = repeated.sonic
 
     expect(nextEnemy?.currentHp).toBe(16)
-    expect(nextSonic).toMatchObject({ x: 4, y: 0, momentum: 0 })
+    expect(nextSonic).toMatchObject({ momentum: 0 })
+    expect(Math.abs((nextSonic?.x ?? 0) - (nextEnemy?.x ?? 0)) + Math.abs((nextSonic?.y ?? 0) - (nextEnemy?.y ?? 0))).toBe(1)
+    expect({ x: nextSonic?.x, y: nextSonic?.y }).toEqual({ x: repeatedSonic?.x, y: repeatedSonic?.y })
     expect(nextSonic?.statusTags).toEqual(expect.arrayContaining([
       expect.objectContaining({ type: 'momentum-core', stacks: 0 }),
     ]))
@@ -639,7 +654,7 @@ describe('Sonic roster mechanics', () => {
   it.each([
     ['left', 4, 1, 9, 0],
     ['right', 6, 9, 1, 10],
-  ])('fires ride sweep up to four cells along the %s perpendicular ray', (side, selectionY, targetY, oppositeY, beyondY) => {
+  ])('fires ride sweep to the board edge along the %s perpendicular ray', (side, selectionY, targetY, oppositeY, beyondY) => {
     const definition = JSON.parse(readFileSync(resolve(process.cwd(), 'data/skills/shadow-ride-sweep.json'), 'utf8'))
     const shadow = makePiece({
       instanceId: 'shadow', templateId: 'shadow', ownerPlayerId: 'player-red', x: 1, y: 5, attack: 9,
@@ -683,7 +698,7 @@ describe('Sonic roster mechanics', () => {
     expect(result.actions?.some((action) => String(action.payload?.message || '').includes(`垂直射击${side === 'left' ? '左侧' : '右侧'}命中`))).toBe(true)
     expect(result.pieces.find(piece => piece.instanceId === 'side-enemy')?.currentHp).toBe(15)
     expect(result.pieces.find(piece => piece.instanceId === 'opposite-enemy')?.currentHp).toBe(20)
-    expect(result.pieces.find(piece => piece.instanceId === 'beyond-enemy')?.currentHp).toBe(20)
+    expect(result.pieces.find(piece => piece.instanceId === 'beyond-enemy')?.currentHp).toBe(15)
     expect(result.pieces.find(piece => piece.instanceId === 'path-enemy')?.currentHp).toBe(11)
   })
 

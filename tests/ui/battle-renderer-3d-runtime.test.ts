@@ -64,6 +64,7 @@ type RendererApi = {
   clearPresentationPath(): void
   getMotionDiagnostics(): {
     activeAnimations: string[]
+    queuedActionCount: number
     playedEventCount: number
     floaterCount: number
     pendingPieceIds: string[]
@@ -94,6 +95,21 @@ type RendererApi = {
     previewBoardActive: boolean
   }
   dispose(): void
+}
+
+type PresentationQueue = {
+  dispose(): void
+  [key: string]: unknown
+}
+
+type ProductionWindow = WindowHarness & {
+  BattleViewModel: { normalizePresentationEvents(value: unknown[]): Array<Record<string, unknown>> }
+  BattleActionVignette: { createQueue(options: Record<string, unknown>): PresentationQueue }
+  BattlePresentation: { create(options: Record<string, unknown>): {
+    mount(options: Record<string, unknown>): void
+    update(model: unknown): void
+    dispose(): void
+  } }
 }
 
 type WindowHarness = {
@@ -176,6 +192,8 @@ type RuntimeModelFixture = {
     moveRemaining?: number
     movePreviewText?: string
   }
+  presentationEvents?: Array<Record<string, unknown>>
+  turn?: { isViewerTurn: boolean }
 }
 
 class FakeElement {
@@ -272,7 +290,7 @@ class FakeElement {
   releasePointerCapture(pointerId: number) { this.capturedPointers.delete(pointerId) }
 }
 
-function createHarness(width = 390, height = 844, coarsePointer = true, reducedMotion = false, webglFailures = 0, resizeObserver = true) {
+function createHarness(width = 390, height = 844, coarsePointer = true, reducedMotion = false, webglFailures = 0, resizeObserver = true, withPresentation = false) {
   const container = new FakeElement('div')
   container.rect = { left: 0, top: 0, width, height }
   const renderers: FakeRendererRecord[] = []
@@ -382,6 +400,11 @@ function createHarness(width = 390, height = 844, coarsePointer = true, reducedM
   new Script(readFileSync(resolve(pagesDir, 'js/battle-ui/battle-move-timeline.js'), 'utf8'), { filename: 'battle-move-timeline.js' }).runInContext(context)
   new Script(readFileSync(resolve(pagesDir, 'js/battle-ui/battle-floater-layout.js'), 'utf8'), { filename: 'battle-floater-layout.js' }).runInContext(context)
   new Script(readFileSync(resolve(pagesDir, 'js/battle-renderer-3d.js'), 'utf8'), { filename: 'battle-renderer-3d.js' }).runInContext(context)
+  if (withPresentation) {
+    new Script(readFileSync(resolve(pagesDir, 'js/battle-ui/battle-view-model.js'), 'utf8'), { filename: 'battle-view-model.js' }).runInContext(context)
+    new Script(readFileSync(resolve(pagesDir, 'js/battle-ui/battle-action-vignette.js'), 'utf8'), { filename: 'battle-action-vignette.js' }).runInContext(context)
+    new Script(readFileSync(resolve(pagesDir, 'js/battle-ui/battle-presentation.js'), 'utf8'), { filename: 'battle-presentation.js' }).runInContext(context)
+  }
 
   function frame(step = 100) {
     now += step
@@ -1460,6 +1483,203 @@ describe('RED-68 BattleRenderer3D runtime', () => {
     harness.renderer.dispose()
   })
 
+  it.each(['owned', 'opponent'])('records a sampled drag route and plays it after preview release (%s)', (viewer) => {
+    const harness = createHarness(844, 390, false)
+    const intents: Array<Record<string, unknown>> = []
+    const model = runtimeModel()
+    const piece = model.pieces[0]
+    model.viewer = { id: viewer === 'owned' ? piece.ownerPlayerId : 'other-player' }
+    model.selection = { pieceId: piece.id, mode: 'move' }
+    const route = [
+      { x: piece.x + 1, y: piece.y },
+      { x: piece.x + 1, y: piece.y + 1 },
+      { x: piece.x, y: piece.y + 1 },
+    ]
+    model.legal.moveCells = route
+    const authority = structuredClone(model)
+    const sampledPath: Array<{ x: number; y: number }> = []
+    let previewPath: Array<{ x: number; y: number }> | null = null
+    let action: Record<string, unknown> | null = null
+
+    const sameCell = (left: { x: number; y: number }, right: { x: number; y: number }) =>
+      left.x === right.x && left.y === right.y
+    const applyDraft = () => {
+      authority.interaction = {
+        pendingPieceId: null,
+        pendingCommandId: null,
+        moveDraftActive: true,
+        movePath: sampledPath.slice(),
+        hoverMovePath: [],
+        moveRemaining: Math.max(0, route.length - sampledPath.length),
+      }
+      authority.legal.moveCells = sampledPath.slice()
+      harness.renderer.updateMoveDraft(authority.interaction, authority.legal.moveCells)
+    }
+
+    harness.renderer.init({
+      container: harness.container,
+      onIntent: (intent: Record<string, unknown>) => {
+        intents.push(intent)
+        if (intent.type === 'start-move-drag') {
+          sampledPath.length = 0
+          return
+        }
+        if (intent.type === 'update-move-drag') {
+          const cells = Array.isArray(intent.cells) ? intent.cells as Array<{ x: number; y: number }> : []
+          cells.forEach((cell) => {
+            const expected = route[sampledPath.length]
+            if (expected && sameCell(cell, expected)) sampledPath.push({ x: cell.x, y: cell.y })
+          })
+          applyDraft()
+          if (sampledPath.length === route.length && !previewPath) {
+            const predicted = structuredClone(authority)
+            Object.assign(predicted.pieces[0], route[route.length - 1])
+            predicted.interactionPieces = authority.pieces
+            harness.renderer.showPreviewBoard(predicted, authority)
+            const routeOverlay = harness.renderers[0].scene!.children.find(child => child.userData.movePath === true)
+            previewPath = (routeOverlay?.userData.pathCells as Array<{ x: number; y: number }> | undefined) || null
+          }
+          return
+        }
+        if (intent.type === 'end-move-drag') {
+          const next = structuredClone(authority)
+          Object.assign(next.pieces[0], route[route.length - 1])
+          next.interaction = { pendingPieceId: null, pendingCommandId: null, movePath: [], hoverMovePath: [] }
+          action = {
+            type: 'move',
+            pieceId: piece.id,
+            motionEventKey: 'pointer-drag-route-' + viewer,
+          }
+          if (viewer === 'owned') action.path = sampledPath.slice()
+          else action.movementPaths = { [piece.id]: sampledPath.slice() }
+          harness.renderer.clearPreviewBoard()
+          harness.renderer.animateAction(action, authority, next)
+          harness.renderer.update(next)
+        }
+      },
+    })
+    try {
+      harness.renderer.update(model)
+      harness.frame(16)
+      const group = harness.renderers[0].scene!.children.find(child => child.userData.pieceId === piece.id)!
+      const canvas = harness.renderers[0].domElement
+      const sourcePoint = harness.renderer.projectCell(piece.x, piece.y, group.position.y + 0.12)
+      const targetPoints = route.map(cell => harness.renderer.projectCell(cell.x, cell.y, 0.12))
+
+      canvas.dispatch('pointerdown', { pointerId: 81, pointerType: 'mouse', button: 0, clientX: sourcePoint.clientX, clientY: sourcePoint.clientY })
+      targetPoints.forEach((point) => {
+        canvas.dispatch('pointermove', { pointerId: 81, pointerType: 'mouse', clientX: point.clientX, clientY: point.clientY })
+      })
+      canvas.dispatch('pointerup', { pointerId: 81, pointerType: 'mouse', clientX: targetPoints[2].clientX, clientY: targetPoints[2].clientY })
+
+      expect(sampledPath).toEqual(route)
+      expect(previewPath).toEqual([{ x: piece.x, y: piece.y }, ...route])
+      expect(action).toMatchObject({ type: 'move', pieceId: piece.id })
+      expect(intents).toContainEqual({ type: 'start-move-drag', pieceId: piece.id })
+      expect(intents).toContainEqual({ type: 'end-move-drag', pieceId: piece.id, cancelled: false,
+        x: route[route.length - 1].x, y: route[route.length - 1].y })
+      expect(harness.renderer.getMotionDiagnostics().activeAnimations).toContain('piece:' + piece.id + ':position')
+
+      const visited = [false, false, false]
+      for (let index = 0; index < 30; index += 1) {
+        harness.frame(16)
+        const x = group.position.x - piece.x
+        const z = group.position.z - piece.y
+        if (x > 0.05 && x < 0.95 && Math.abs(z) < 0.001) visited[0] = true
+        if (Math.abs(x - 1) < 0.001 && z > 0.05 && z < 0.95) visited[1] = true
+        if (x > 0.05 && x < 0.95 && Math.abs(z - 1) < 0.001) visited[2] = true
+      }
+      expect(visited).toEqual([true, true, true])
+      expect(group.position.x).toBeCloseTo(route[route.length - 1].x, 3)
+      expect(group.position.z).toBeCloseTo(route[route.length - 1].y, 3)
+    } finally {
+      harness.renderer.dispose()
+    }
+  })
+
+  it.each(['owned', 'opponent'])('plays a production-normalized drag route through the presentation adapter (%s)', (viewer) => {
+    const harness = createHarness(844, 390, false, false, 0, true, true)
+    const production = harness.windowObject as unknown as ProductionWindow
+    const callbacks: {
+      onPlaybackPhase?: (phase: string, group: unknown) => void
+      onPlaybackIdle?: () => void
+    } = {}
+    const queue = production.BattleActionVignette.createQueue({
+      setTimeout,
+      clearTimeout,
+      onPhase: (phase: string, group: unknown) => callbacks.onPlaybackPhase?.(phase, group),
+      onIdle: () => callbacks.onPlaybackIdle?.(),
+    })
+    const vignetteUi = Object.assign(queue, {
+      sequencesBoard: true,
+      mount(input: Record<string, unknown>) {
+        callbacks.onPlaybackPhase = input.onPlaybackPhase as (phase: string, group: unknown) => void
+        callbacks.onPlaybackIdle = input.onPlaybackIdle as () => void
+      },
+    })
+    const presentation = production.BattlePresentation.create({
+      renderer: harness.renderer,
+      domUi: { update() {}, dispose() {} },
+      vignetteUi,
+    })
+    const model = runtimeModel()
+    const piece = model.pieces[0]
+    model.viewer = { id: viewer === 'owned' ? piece.ownerPlayerId : 'other-player' }
+    model.turn = { isViewerTurn: viewer === 'owned' }
+    const route = [
+      { x: piece.x + 1, y: piece.y },
+      { x: piece.x + 1, y: piece.y + 1 },
+      { x: piece.x, y: piece.y + 1 },
+      { x: piece.x, y: piece.y + 2 },
+    ]
+    const authority = structuredClone(model)
+    const normalized = production.BattleViewModel.normalizePresentationEvents([{
+      eventId: 'production-drag:0', rootEventId: 'production-drag:0', kind: 'move',
+      sourcePieceId: piece.id, sequence: 0,
+      result: { fromX: piece.x, fromY: piece.y, toX: route[route.length - 1].x, toY: route[route.length - 1].y, movementKind: 'walk' },
+      presentation: { cue: 'displacement', pathCells: route, endPoint: route[route.length - 1], endReason: 'resolved' },
+    }])
+    expect(normalized[0].targetPieceIds).toEqual([])
+    const final = structuredClone(authority)
+    Object.assign(final.pieces[0], route[route.length - 1])
+    final.presentationEvents = normalized
+
+    const floatLayer = new FakeElement('div')
+    floatLayer.rect = { left: 0, top: 0, width: 844, height: 390 }
+    presentation.mount({ boardContainer: harness.container, floatLayer })
+    try {
+      presentation.update(authority)
+      harness.frame(16)
+      presentation.update(final)
+      const group = harness.renderers[0].scene!.children.find(child => child.userData.pieceId === piece.id)!
+      expect(harness.renderer.getMotionDiagnostics().activeAnimations).toContain('piece:' + piece.id + ':position')
+
+      const visited = [false, false, false, false]
+      const isOnLeg = (x: number, z: number, from: { x: number; y: number }, to: { x: number; y: number }, interiorOnly = false) => {
+        const dx = to.x - from.x
+        const dz = to.y - from.y
+        const lengthSquared = dx * dx + dz * dz
+        const progress = ((x - from.x) * dx + (z - from.y) * dz) / lengthSquared
+        if (progress < -0.001 || progress > 1.001) return false
+        if (interiorOnly && (progress <= 0.05 || progress >= 0.95)) return false
+        return Math.hypot(x - (from.x + dx * progress), z - (from.y + dz * progress)) < 0.001
+      }
+      const routeWithSource = [{ x: piece.x, y: piece.y }, ...route]
+      for (let index = 0; index < 40; index += 1) {
+        harness.frame(16)
+        expect(route.some((_, leg) => isOnLeg(group.position.x, group.position.z, routeWithSource[leg], routeWithSource[leg + 1]))).toBe(true)
+        for (let leg = 0; leg < route.length; leg += 1) {
+          if (isOnLeg(group.position.x, group.position.z, routeWithSource[leg], routeWithSource[leg + 1], true)) visited[leg] = true
+        }
+      }
+      expect(visited).toEqual([true, true, true, true])
+      expect(group.position.x).toBeCloseTo(route[route.length - 1].x, 3)
+      expect(group.position.z).toBeCloseTo(route[route.length - 1].y, 3)
+    } finally {
+      presentation.dispose()
+    }
+  })
+
   it('renders numbered route cells, remaining steps, and short preview text while drafting', () => {
     const harness = createHarness(844, 390, false)
     const model = runtimeModel()
@@ -1702,6 +1922,258 @@ describe('RED-68 BattleRenderer3D runtime', () => {
         { x: piece.x, y: piece.y },
         { x: piece.x + 1, y: piece.y },
       ])
+    } finally {
+      harness.renderer.dispose()
+    }
+  })
+
+  it.each(['owned', 'opponent'])('keeps an in-flight routed move alive when a drag preview is shown and cleared (%s)', (viewer) => {
+    const harness = createHarness(844, 390, false)
+    const model = runtimeModel()
+    const piece = model.pieces[0]
+    model.viewer = { id: viewer === 'owned' ? piece.ownerPlayerId : 'other-player' }
+    const path = [
+      { x: piece.x + 1, y: piece.y },
+      { x: piece.x + 1, y: piece.y + 1 },
+      { x: piece.x, y: piece.y + 1 },
+    ]
+    // This is the authority model that the page passes as the second
+    // showPreviewBoard argument. Keeping the draft route there mirrors
+    // showMoveBoardPreview's interaction projection, so the overlay assertion
+    // exercises the same release-time model rather than a hypothetical-only
+    // interaction field.
+    model.selection = { pieceId: piece.id, mode: 'move' }
+    model.interaction = {
+      pendingPieceId: null,
+      pendingCommandId: null,
+      moveDraftActive: true,
+      movePath: path,
+      hoverMovePath: [],
+      moveRemaining: 1,
+    }
+    model.legal.moveCells = path
+    const nextModel = structuredClone(model)
+    Object.assign(nextModel.pieces[0], path[path.length - 1])
+
+    harness.renderer.init({ container: harness.container })
+    harness.renderer.update(model)
+    harness.frame(16)
+    const group = harness.renderers[0].scene!.children.find(child => child.userData.pieceId === piece.id)!
+
+    const action: Record<string, unknown> = {
+      type: 'move',
+      pieceId: piece.id,
+      motionEventKey: 'drag-preview-playback-' + viewer,
+    }
+    // The submitted move reports a direct action.path. Opponent snapshots use
+    // the server's per-piece movementPaths projection; both must survive a
+    // preview refresh without losing any turn in the route.
+    if (viewer === 'owned') action.path = path
+    else action.movementPaths = { [piece.id]: path }
+    const predicted = structuredClone(model)
+    Object.assign(predicted.pieces[0], path[path.length - 1])
+    predicted.interaction = {
+      pendingPieceId: null,
+      pendingCommandId: null,
+      moveDraftActive: true,
+      movePath: path,
+      hoverMovePath: [],
+      moveRemaining: 1,
+    }
+    predicted.interactionPieces = model.pieces
+    harness.renderer.showPreviewBoard(predicted, model)
+    const previewRoute = harness.renderers[0].scene!.children.find(child => child.userData.movePath === true)
+    expect(previewRoute?.userData.pathCells).toEqual([
+      { x: piece.x, y: piece.y }, ...path,
+    ])
+    expect(previewRoute?.children).toHaveLength(path.length)
+    // This is the order used by an authoritative state update: the
+    // presentation adapter starts the move before applyServerState clears the
+    // stale drag preview.
+    harness.renderer.animateAction(action, model, nextModel)
+    harness.renderer.clearPreviewBoard()
+    const settledModel = structuredClone(nextModel)
+    settledModel.interaction = { pendingPieceId: null, pendingCommandId: null, movePath: [], hoverMovePath: [] }
+    harness.renderer.update(settledModel)
+
+    expect(harness.renderer.getMotionDiagnostics().activeAnimations).toContain('piece:' + piece.id + ':position')
+    const visited = [false, false, false]
+    for (let index = 0; index < 30; index += 1) {
+      harness.frame(16)
+      const x = group.position.x - piece.x
+      const z = group.position.z - piece.y
+      if (x > 0.05 && x < 0.95 && Math.abs(z) < 0.001) visited[0] = true
+      if (Math.abs(x - 1) < 0.001 && z > 0.05 && z < 0.95) visited[1] = true
+      if (x > 0.05 && x < 0.95 && Math.abs(z - 1) < 0.001) visited[2] = true
+    }
+    expect(visited).toEqual([true, true, true])
+    expect(group.position.x).toBeCloseTo(path[path.length - 1].x, 3)
+    expect(group.position.z).toBeCloseTo(path[path.length - 1].y, 3)
+    expect(harness.renderers[0].scene!.children.some(child => child.userData.movePath === true)).toBe(false)
+    const endpoint = path[path.length - 1]
+    const endpointScreen = harness.renderer.projectCell(endpoint.x, endpoint.y)
+    expect(harness.renderer.screenToCell(endpointScreen.clientX, endpointScreen.clientY)).toEqual(endpoint)
+    harness.renderer.dispose()
+  })
+
+  it('keeps a queued follow-up route after a late preview snapshot and drains both paths', () => {
+    vi.useFakeTimers()
+    const harness = createHarness(844, 390, false)
+    try {
+      const model = runtimeModel()
+      const piece = model.pieces[0]
+      model.viewer = { id: 'other-player' }
+      const firstPath = [
+        { x: piece.x + 1, y: piece.y },
+        { x: piece.x + 1, y: piece.y + 1 },
+        { x: piece.x, y: piece.y + 1 },
+      ]
+      const secondPath = [
+        { x: piece.x + 1, y: piece.y + 1 },
+        { x: piece.x + 1, y: piece.y + 2 },
+      ]
+      const firstModel = structuredClone(model)
+      Object.assign(firstModel.pieces[0], firstPath[firstPath.length - 1])
+      const secondModel = structuredClone(firstModel)
+      Object.assign(secondModel.pieces[0], secondPath[secondPath.length - 1])
+
+      harness.renderer.init({ container: harness.container })
+      harness.renderer.update(model)
+      harness.frame(16)
+      const group = harness.renderers[0].scene!.children.find(child => child.userData.pieceId === piece.id)!
+      harness.renderer.animateAction({ type: 'move', pieceId: piece.id, motionEventKey: 'queued-route-1',
+        movementPaths: { [piece.id]: firstPath }, isAutomatic: true }, model, firstModel)
+      harness.renderer.update(firstModel)
+      harness.renderer.animateAction({ type: 'move', pieceId: piece.id, motionEventKey: 'queued-route-2',
+        movementPaths: { [piece.id]: secondPath }, isAutomatic: true }, firstModel, secondModel)
+
+      // Keep the preview's interaction model realistic while making its
+      // authority snapshot stale. A late drag projection can outlive the
+      // first authoritative move, so the queued follow-up must use its own
+      // previousModel when it starts.
+      const previewAuthority = structuredClone(model)
+      previewAuthority.selection = { pieceId: piece.id, mode: 'move' }
+      previewAuthority.interaction = {
+        pendingPieceId: null,
+        pendingCommandId: null,
+        moveDraftActive: true,
+        movePath: secondPath,
+        hoverMovePath: [],
+        moveRemaining: 1,
+      }
+      previewAuthority.legal.moveCells = secondPath
+      const predicted = structuredClone(previewAuthority)
+      Object.assign(predicted.pieces[0], secondPath[secondPath.length - 1])
+      predicted.interactionPieces = previewAuthority.pieces
+      harness.renderer.showPreviewBoard(predicted, previewAuthority)
+      expect(harness.renderer.getMotionDiagnostics().activeAnimations).toContain('piece:' + piece.id + ':position')
+      expect(harness.renderer.getMotionDiagnostics().queuedActionCount).toBeGreaterThan(0)
+
+      const firstVisited = [false, false, false]
+      for (let index = 0; index < 30; index += 1) {
+        harness.frame(16)
+        const x = group.position.x - piece.x
+        const z = group.position.z - piece.y
+        if (x > 0.05 && x < 0.95 && Math.abs(z) < 0.001) firstVisited[0] = true
+        if (Math.abs(x - 1) < 0.001 && z > 0.05 && z < 0.95) firstVisited[1] = true
+        if (x > 0.05 && x < 0.95 && Math.abs(z - 1) < 0.001) firstVisited[2] = true
+      }
+      expect(firstVisited).toEqual([true, true, true])
+
+      // The automatic lane is timer-backed. Keep the stale preview alive while
+      // the queue gate drains so the newer follow-up action has to restore its
+      // own previous endpoint before building the second route.
+      vi.advanceTimersByTime(1000)
+      harness.renderer.clearPreviewBoard()
+      harness.renderer.update(secondModel)
+      const secondVisited = [false, false]
+      for (let index = 0; index < 30; index += 1) {
+        harness.frame(16)
+        const x = group.position.x - piece.x
+        const z = group.position.z - piece.y
+        if (x > 0.05 && x < 0.95 && Math.abs(z - 1) < 0.001) secondVisited[0] = true
+        if (Math.abs(x - 1) < 0.001 && z > 1.05 && z < 1.95) secondVisited[1] = true
+      }
+      expect(secondVisited).toEqual([true, true])
+      expect(group.position.x).toBeCloseTo(secondPath[secondPath.length - 1].x, 3)
+      expect(group.position.z).toBeCloseTo(secondPath[secondPath.length - 1].y, 3)
+    } finally {
+      harness.renderer.dispose()
+      vi.useRealTimers()
+    }
+  })
+
+  it('restores authoritative status and departed meshes without cancelling an unrelated route', () => {
+    const harness = createHarness(844, 390, false)
+    const model = runtimeModel()
+    const source = model.pieces[0]
+    const departed = model.pieces[1]
+    const route = [
+      { x: source.x + 1, y: source.y },
+      { x: source.x + 1, y: source.y + 1 },
+      { x: source.x, y: source.y + 1 },
+    ]
+    const moved = structuredClone(model)
+    Object.assign(moved.pieces[0], route[route.length - 1])
+    const authoritativeStatus = { id: 'authoritative-status', label: '权威状态' }
+    moved.pieces[1].statuses = [authoritativeStatus]
+    moved.pieces[1].statusSummary = [authoritativeStatus]
+    harness.renderer.init({ container: harness.container })
+    try {
+      const findSummary = (): FakeElement | null => {
+        let result: FakeElement | null = null
+        const visit = (node: FakeElement) => {
+          if (node.className.split(/\s+/).includes('piece-board-summary')
+            && node.dataset.pieceId === departed.id) result = node
+          node.children.forEach(visit)
+        }
+        visit(harness.container)
+        return result
+      }
+      harness.renderer.update(model)
+      harness.frame(16)
+      const sourceGroup = harness.renderers[0].scene!.children.find(child => child.userData.pieceId === source.id)!
+      harness.renderer.animateAction({ type: 'move', pieceId: source.id, motionEventKey: 'preview-status-route',
+        movementPaths: { [source.id]: route } }, model, moved)
+      harness.renderer.update(moved)
+      // The status animation is intentionally started by a real authoritative
+      // state transition before the hypothetical snapshots arrive.
+      const statusChange = structuredClone(moved)
+      statusChange.pieces[1].statuses = [{ id: 'preview-status', label: '预演状态' }]
+      statusChange.pieces[1].statusSummary = [{ id: 'preview-status', label: '预演状态' }]
+      harness.renderer.animateAction({ type: 'stateUpdate', motionEventKey: 'preview-status-change-2' }, moved, statusChange)
+      harness.renderer.update(statusChange)
+      expect(harness.renderer.getMotionDiagnostics().activeAnimations).toContain('piece:' + source.id + ':position')
+      expect(harness.renderer.getMotionDiagnostics().activeAnimations).toContain('piece:' + departed.id + ':outline')
+
+      const statusPreview = structuredClone(statusChange)
+      statusPreview.pieces[1].statusSummary = [{ id: 'hypothetical-status', label: '假设状态' }]
+      statusPreview.pieces[1].statuses = [{ id: 'hypothetical-status', label: '假设状态' }]
+      harness.renderer.showPreviewBoard(statusPreview, moved)
+      const statusSummary = findSummary()
+      if (!statusSummary) throw new Error('departed status summary missing during preview')
+      expect(statusSummary.dataset.statusIds).toBe('hypothetical-status')
+      harness.renderer.clearPreviewBoard()
+      const restoredStatusSummary = findSummary()
+      if (!restoredStatusSummary) throw new Error('departed status summary missing after preview restore')
+      expect(restoredStatusSummary.dataset.statusIds).toBe('authoritative-status')
+      expect(harness.renderer.getMotionDiagnostics().activeAnimations).toContain('piece:' + source.id + ':position')
+
+      const departedPreview = structuredClone(moved)
+      departedPreview.pieces = departedPreview.pieces.filter(piece => piece.id !== departed.id)
+      harness.renderer.showPreviewBoard(departedPreview, moved)
+      expect(harness.renderers[0].scene!.children.find(child => child.userData.pieceId === departed.id)).toBeUndefined()
+      harness.renderer.clearPreviewBoard()
+      const restored = harness.renderers[0].scene!.children.find(child => child.userData.pieceId === departed.id)
+      expect(restored).toBeTruthy()
+      const restoredDepartedSummary = findSummary()
+      if (!restoredDepartedSummary) throw new Error('departed status summary missing after mesh restore')
+      expect(restoredDepartedSummary.dataset.statusIds).toBe('authoritative-status')
+      expect(harness.renderer.getMotionDiagnostics().activeAnimations).not.toContain('piece:' + departed.id + ':outline')
+
+      for (let index = 0; index < 30; index += 1) harness.frame(16)
+      expect(sourceGroup.position.x).toBeCloseTo(route[route.length - 1].x, 3)
+      expect(sourceGroup.position.z).toBeCloseTo(route[route.length - 1].y, 3)
     } finally {
       harness.renderer.dispose()
     }

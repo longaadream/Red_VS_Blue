@@ -73,6 +73,65 @@ describe('sequential board playback', () => {
     presentation.dispose()
   })
 
+  it.each([
+    { label: 'the viewer piece', ownerPlayerId: 'blue' },
+    { label: 'an opponent piece', ownerPlayerId: 'red' },
+  ])('plays the full normalized move route for $label', ({ ownerPlayerId }) => {
+    const { presentation, renderer, normalize } = setup()
+    const route = [{ x: 2, y: 1 }, { x: 2, y: 2 }, { x: 1, y: 2 }, { x: 1, y: 3 }]
+    const rawSequence = [{
+      eventId: 'drag:0', rootEventId: 'drag:0', kind: 'move', sourcePieceId: 'target', sequence: 0,
+      result: { fromX: 1, fromY: 1, toX: 1, toY: 3, movementKind: 'walk' },
+      presentation: { cue: 'displacement', pathCells: route, endPoint: { x: 1, y: 3 }, endReason: 'resolved' },
+    }]
+    const sequence = normalize(rawSequence)
+    // Production normalization adds an empty target list to a root move.
+    // This is the input that previously bypassed the source fallback.
+    expect(sequence[0].targetPieceIds).toEqual([])
+
+    const before: any = model()
+    before.pieces[0].ownerPlayerId = ownerPlayerId
+    presentation.update(before)
+    const final: any = model(20, sequence)
+    final.pieces[0].ownerPlayerId = ownerPlayerId
+    final.pieces[0].y = 3
+    presentation.update(final)
+
+    const [action, previous, next] = renderer.animateAction.mock.calls[0]
+    expect(action.movementPaths).toMatchObject({ target: route })
+    expect(previous.pieces[0]).toMatchObject({ x: 1, y: 1 })
+    expect(next.pieces[0]).toMatchObject({ x: 1, y: 3 })
+    presentation.dispose()
+  })
+
+  it('animates a normalized forceMove target without assigning the route to its source', () => {
+    const { presentation, renderer, normalize } = setup()
+    const route = [{ x: 3, y: 2 }, { x: 3, y: 3 }, { x: 2, y: 3 }]
+    const sequence = normalize([{
+      eventId: 'push:0', rootEventId: 'push:0', kind: 'forceMove', sourcePieceId: 'caster',
+      targetPieceIds: ['victim'], sequence: 0,
+      result: { fromX: 3, fromY: 1, toX: 2, toY: 3, movementKind: 'push' },
+      presentation: { cue: 'displacement', pathCells: route, endPoint: { x: 2, y: 3 }, endReason: 'resolved' },
+    }])
+    const before: any = model()
+    before.pieces = [
+      { id: 'caster', x: 1, y: 1, visible: true, health: { current: 20, max: 20 }, statuses: [], statusSummary: [] },
+      { id: 'victim', x: 3, y: 1, visible: true, health: { current: 20, max: 20 }, statuses: [], statusSummary: [] },
+    ]
+    presentation.update(before)
+    const final: any = model(20, sequence)
+    final.pieces = JSON.parse(JSON.stringify(before.pieces))
+    final.pieces[1].x = 2
+    final.pieces[1].y = 3
+    presentation.update(final)
+
+    const [action, , next] = renderer.animateAction.mock.calls[0]
+    expect(action.movementPaths).toEqual({ victim: route })
+    expect(next.pieces.find((piece: any) => piece.id === 'victim')).toMatchObject({ x: 2, y: 3 })
+    expect(next.pieces.find((piece: any) => piece.id === 'caster')).toMatchObject({ x: 1, y: 1 })
+    presentation.dispose()
+  })
+
   it('retimes the shared three-leg movement timeline at 2x before applying aftermath', () => {
     const { presentation, queue, renderer } = setup()
     presentation.update(model())

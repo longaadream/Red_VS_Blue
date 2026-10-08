@@ -14,7 +14,7 @@ function harness() {
     refreshBattleLegalActions() {}, waitingForOtherPending: () => false,
     closePieceContextMenu() {}, dismissedPieceContextId: null,
     BattleLegalActions: { getNormalMoveContinuationTargets: () => [] }, GameEngine: {},
-    _use3d: false, battlePresentation: null, movePreviewVisible: false, window: {},
+    _use3d: false, battlePresentation: null, movePreviewVisible: false, window: {}, renderResourcePreview: vi.fn(),
     normalMoveRejectionForDraft: vi.fn((draft: any) => {
       const last = draft.path.length > 1 ? draft.path[draft.path.length - 2] : draft.origin
       return Math.abs(last.x - draft.target.x) + Math.abs(last.y - draft.target.y) === 1 ? null : { code: 'non-adjacent' }

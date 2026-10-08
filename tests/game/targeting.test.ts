@@ -603,8 +603,12 @@ describe('Demo targeting admission fixture', () => {
     }
 
     const fixtureHash = createHash('sha256').update(JSON.stringify(fixture)).digest('hex')
-    // RED-239: approved full-map Blizzard candidates replace the fallback range of five.
-    expect(fixtureHash).toBe('d1a6089556d1da07a5fc2c5ccfbf7614b34dc22aa3a25fa772c8fe3a752f1991')
+    // RED-241: approved historical restoration adds four Akaza skills and Colt Big Stride.
+    // Keep the prior roster's hash as an inheritance guard, including full-map Blizzard.
+    const priorRoster = fixture.filter(entry => !String(entry[0]).startsWith('akaza-') && entry[0] !== 'colt-big-stride')
+    expect(createHash('sha256').update(JSON.stringify(priorRoster)).digest('hex'))
+      .toBe('d1a6089556d1da07a5fc2c5ccfbf7614b34dc22aa3a25fa772c8fe3a752f1991')
+    expect(fixtureHash).toBe('641b8def8f2791461ea9ea4e630558a53442c0aaa90a9d0fcbc7f50ff092dee3')
   })
 })
 

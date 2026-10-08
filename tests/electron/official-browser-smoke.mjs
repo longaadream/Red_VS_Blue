@@ -141,7 +141,12 @@ try {
     if (geometry.board.top < 58 || geometry.board.bottom > height - 88 || geometry.board.height < 180) throw Error('Battle overlaps phone HUD: ' + JSON.stringify(geometry))
     for (const p of geometry.points) if (p.clientX < geometry.board.left || p.clientX > geometry.board.right || p.clientY < geometry.board.top || p.clientY > geometry.board.bottom) throw Error('Phone board is cropped: ' + JSON.stringify(geometry))
     if (geometry.buttons.some(b => b.width < 44 || b.height < 44)) throw Error('Phone camera control is too small')
-    if (geometry.buttons.length !== 1) throw Error('Phone camera should only show full-board reset; zoom uses gestures')
+    if (geometry.buttons.length !== 0) throw Error('Camera reset should be inside settings; zoom uses gestures')
+    const cameraSettings = await pages[0].evaluate(`(() => {
+      const button = document.getElementById('btnResetBoardView');
+      return {inSettings: !!button && !!button.closest('#battleSettings'), fullMap: !!document.getElementById('btnFullMap')};
+    })()`)
+    if (!cameraSettings.inSettings || cameraSettings.fullMap) throw Error('Camera settings contract failed: ' + JSON.stringify(cameraSettings))
     const shot = await pages[0].call('Page.captureScreenshot', {format: 'png'})
     fs.writeFileSync(path.join(output, `red199-battle-${width}x${height}.png`), Buffer.from(shot.data, 'base64'))
   }

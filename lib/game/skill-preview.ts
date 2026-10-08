@@ -136,11 +136,20 @@ function removeHiddenInventory(holder: JsonRecord): void {
  * depend on hidden or terminal state that is not represented in the preview
  * contract.
  */
+function customCardRegistryChanged(state: BattleState, baseline: JsonRecord | undefined): boolean {
+  const current = state.customCards
+  const currentRecord = isRecord(current) ? current : undefined
+  const currentKeys = currentRecord ? Object.keys(currentRecord) : []
+  const baselineKeys = baseline ? Object.keys(baseline) : []
+  if (currentKeys.length === 0 && baselineKeys.length === 0) return false
+  if (!currentRecord || !baseline) return true
+  return JSON.stringify(currentRecord) !== JSON.stringify(baseline)
+}
+
 function hasUnprovenExecutableState(state: BattleState, allowTerminal = false): boolean {
   if (state.deployment
     && state.deployment.status !== 'complete'
     && !isPreviewSafeProgressiveTurnReady(state)) return true
-  if (state.customCards && Object.keys(state.customCards).length > 0) return true
   if (!allowTerminal && state.terminalResult) return true
 
   return false
@@ -539,7 +548,7 @@ function publicViewerExecutionSnapshot(snapshot: BattleState, viewerId: string):
 function actionFields(action: BattleAction): BattleAction {
   const source = action as unknown as JsonRecord
   const result: JsonRecord = {}
-  for (const key of ['type', 'playerId', 'pieceId', 'skillId', 'toX', 'toY']) {
+  for (const key of ['type', 'playerId', 'pieceId', 'skillId', 'cardInstanceId', 'toX', 'toY']) {
     if (Object.prototype.hasOwnProperty.call(source, key) && source[key] !== undefined) result[key] = source[key]
   }
   for (const key of [
@@ -807,7 +816,7 @@ function safeEvents(events: readonly BattlePresentationEvent[]): BattlePresentat
 
 function actionId(action: BattleAction): string {
   const record = action as unknown as JsonRecord
-  return `preview:${String(record.type)}:${String(record.pieceId)}:${String(record.skillId)}`
+  return `preview:${String(record.type)}:${String(record.pieceId)}:${String(record.skillId)}:${String(record.cardInstanceId)}`
 }
 
 /**
@@ -835,29 +844,58 @@ function runPublicSkillAction(
     if (!isPureJson(safeAction)) return unavailable(started)
     const actionRecord = action as unknown as JsonRecord
     const isMove = actionRecord.type === 'move'
-    if (!isMove && actionRecord.type !== 'useBasicSkill' && actionRecord.type !== 'useChargeSkill') return unavailable(started)
+    const isCard = actionRecord.type === 'playCard'
+    const isSkill = actionRecord.type === 'useBasicSkill' || actionRecord.type === 'useChargeSkill'
+    if (!isMove && !isSkill && !isCard) return unavailable(started)
     const baselineMarkers = visiblePresentationMarkers(snapshot, viewer)
     const publicSnapshot = publicViewerExecutionSnapshot(snapshot, viewer)
     if (!isPureJson(publicSnapshot)) return unavailable(started)
     if (stateHasPendingInteraction(publicSnapshot)) return needsInput(started)
     if (normalized(actionRecord.playerId) !== viewer) return unavailable(started)
-    if (!isMove && !collectOwnedChoices && Array.isArray(actionRecord.extraTargets) && actionRecord.extraTargets.length > 0) return needsInput(started)
-    const source = publicSnapshot.pieces.find(piece => piece.instanceId === actionRecord.pieceId)
-    if (!source || normalized(source.ownerPlayerId) !== viewer) return unavailable(started)
+    if (!isMove && !isCard && !collectOwnedChoices && Array.isArray(actionRecord.extraTargets) && actionRecord.extraTargets.length > 0) return needsInput(started)
+    const source = !isCard
+      ? publicSnapshot.pieces.find(piece => piece.instanceId === actionRecord.pieceId)
+      : undefined
+    if (!isCard && (!source || normalized(source.ownerPlayerId) !== viewer)) return unavailable(started)
+    const owner = isCard
+      ? publicSnapshot.players.find(player => normalized(player.playerId) === viewer)
+      : undefined
+    const card = isCard
+      ? owner?.hand.find(entry => entry.instanceId === actionRecord.cardInstanceId)
+      : undefined
+    if (isCard && (!owner || !card || normalized(card.ownerPlayerId) !== viewer)) return unavailable(started)
     if (normalized(publicSnapshot.turn?.currentPlayerId) !== viewer || publicSnapshot.turn.phase !== 'action') return unavailable(started)
     if (hasUnprovenExecutableState(publicSnapshot)) return unavailable(started)
     const skillId = typeof actionRecord.skillId === 'string' ? actionRecord.skillId : undefined
+    const cardId = isCard && typeof card?.cardId === 'string' ? card.cardId : undefined
     let skill: JsonRecord | undefined
-    if (!isMove) {
-      if (!skillId || !source.skills?.some(skillEntry => skillEntry.skillId === skillId)) return unavailable(started)
+    let cardDefinition: JsonRecord | undefined
+    if (isSkill) {
+      if (!skillId || !source?.skills?.some(skillEntry => skillEntry.skillId === skillId)) return unavailable(started)
       skill = publicSkillDefinition(publicSnapshot, skillId, collectOwnedChoices)
       if (!skill) return unavailable(started)
       if (!collectOwnedChoices && selectionNeedsInput(skill, safeAction)) return needsInput(started)
+    } else if (isCard && cardId && card) {
+      const cardSource = createPublicRuleSource(publicSnapshot, viewer)
+      const resolved = cardSource.cardResolver?.(
+        publicSnapshot,
+        cardId,
+        publicSnapshot.customCards?.[cardId],
+        { sourceId: card.instanceId, skillId: cardId },
+      )
+      if (!resolved || cardSource.hasUnsupportedAccess()) return unavailable(started)
+      cardDefinition = resolved as unknown as JsonRecord
     }
 
     // Use JSON-only state plus the selected public skill.  Never hydrate from
     // the server content registry in this surface.
     const safeState = cloneJson(publicSnapshot)
+    if (isCard && cardId && cardDefinition && isRecord(safeState.customCards)) {
+      // Targeting preflight reads the snapshot registry directly. Replace the
+      // selected entry with the already verified canonical/generated copy so
+      // forged metadata cannot influence a preparation response.
+      safeState.customCards[cardId] = cloneJson(cardDefinition)
+    }
     if (!sanitizePreviewState(safeState)) return unavailable(started)
     if (skillId && skill) {
       const safeSkill = cloneJson(skill)
@@ -875,6 +913,7 @@ function runPublicSkillAction(
       const context: RuleExecutionContext = createRuleExecutionContext(isolatedTriggerSystem, {
         ruleResolver: publicRuleSource.ruleResolver,
         skillResolver: publicRuleSource.skillResolver,
+        cardResolver: publicRuleSource.cardResolver,
         previewReactionPolicy: {
           shouldSkipConsumer: (kind, consumerId, sourceId, eventType) => skippedReactions.has(
             previewReactionKey(kind, consumerId, sourceId, eventType),
@@ -891,7 +930,7 @@ function runPublicSkillAction(
         },
       })
       try {
-        if (collectOwnedChoices) {
+        if (collectOwnedChoices || isCard) {
           const preparation = withRuleRuntime(runtimeScope.runtime, () => withRuleExecutionContext(
             context, () => prepareAction(attemptState, safeAction),
           ))
@@ -899,7 +938,11 @@ function runPublicSkillAction(
           if (preparation.kind === 'invalid') return unavailable(started)
           if (preparation.kind !== 'ready') {
             const publicPreparation: JsonRecord = { kind: preparation.kind, continuation: false,
-              source: { type: 'skill', id: skillId, pieceId: source.instanceId } }
+              source: {
+                type: isCard ? 'card' : 'skill',
+                id: isCard ? cardId : skillId,
+                ...(source?.instanceId ? { pieceId: source.instanceId } : {}),
+              } }
             const record = preparation as unknown as JsonRecord
             for (const key of ['title', 'selectionId', 'stateRevision', 'targetType', 'range', 'filter', 'rangeCells',
               'candidates', 'options', 'selectionMode', 'minSelections', 'maxSelections', 'canCancel', 'min', 'max', 'step']) {
@@ -911,7 +954,9 @@ function runPublicSkillAction(
           // outside the supported preview executor. Never execute those
           // effects merely because their root choices have been completed.
           if (skill?.statusTag || skill?.summonCapability || skill?.deathParasitism
-            || /\bMath\s*\.\s*random\s*\(/.test(String(skill?.code ?? ''))) return unavailable(started)
+            || cardDefinition?.statusTag || cardDefinition?.summonCapability || cardDefinition?.deathParasitism
+            || /\bMath\s*\.\s*random\s*\(/.test(String(skill?.code ?? ''))
+            || /\bMath\s*\.\s*random\s*\(/.test(String(cardDefinition?.code ?? ''))) return unavailable(started)
         }
         predicted = recordBattlePresentation(
           attemptState,
@@ -937,6 +982,7 @@ function runPublicSkillAction(
     }
 
     if (!predicted || randomAccessed) return unavailable(started)
+    if (customCardRegistryChanged(predicted, isRecord(safeState.customCards) ? safeState.customCards : undefined)) return unavailable(started)
     if (stateHasPendingInteraction(predicted)) {
       return needsInput(started, collectOwnedChoices ? publicNextSkillChoice(predicted, viewer) : undefined)
     }

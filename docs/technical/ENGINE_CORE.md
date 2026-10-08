@@ -89,6 +89,12 @@ pending 信号、契约错误仍交给权威事务，不吞成普通取消。
 复杂的有序 waypoints 搜索使用有限棋盘格数和确定性节点预算；预算耗尽时返回 `null`，不返回部分路径，也不丢弃
 waypoint。普通无 waypoint 的默认最短路仍使用一次有界 BFS。
 
+流程运行时的 `flow.query.normalMoveTargets(pieceId)` 只查询当前棋子可到达的普通走格落点；
+`flow.effects.freeMove(pieceId, destination)` 免除行动点消耗，但仍重新执行普通移动的落点、路径、
+`beforeMove/afterMove` 反应和路径接触校验。它必须把解析后的完整普通路径交给统一提交器，不能绕过规则
+直接提交坐标；成功后的 `positionChanged.payload.path` 和 `afterMove` 上下文 `pathCells` 是预览与远端播放
+使用的权威路径事实。
+
 ## 6. 技能、卡牌和触发器
 
 `lib/game/skills.ts` 加载并执行数据驱动技能/卡牌；`lib/game/triggers.ts` 管理事件消费者。

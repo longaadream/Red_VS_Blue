@@ -7,7 +7,18 @@ import { applyBattleAction } from '@/lib/game/turn'
 import { asPieceInstance, makePiece, makeState } from '../helpers/minimal-state'
 
 const page = readFileSync('data/pages/battle.html', 'utf8')
-const controller = page.slice(page.indexOf('    function startMoveDrag('), page.indexOf('    function currentTargetSourceName('))
+function readNamedFunction(html: string, name: string) {
+  const marker = `function ${name}(`
+  const start = html.indexOf(marker)
+  if (start === -1) throw new Error(`Missing ${name} in battle.html`)
+  const nextFunction = html.indexOf('\n    function ', start + marker.length)
+  if (nextFunction === -1) throw new Error(`Could not isolate ${name} in battle.html`)
+  return html.slice(start, nextFunction)
+}
+const controller = [
+  page.slice(page.indexOf('    function startMoveDrag('), page.indexOf('    function currentTargetSourceName(')),
+  readNamedFunction(page, 'renderResourcePreview'),
+].join('\n')
 
 function harness(terrain: 'amaterasu' | 'toxin' = 'amaterasu') {
   const mover = asPieceInstance(makePiece({ instanceId: 'mover', x: 0, y: 0, moveRange: 4 }))
@@ -32,6 +43,7 @@ function harness(terrain: 'amaterasu' | 'toxin' = 'amaterasu') {
     moveDraft: null, movePreviewCoordinator: null, movePreviewVisible: false, hoverMovePath: [], myPlayerId: 'player-red',
     currentBattleViewModel: model(state), createBattlePresentationModel: model,
     window: { BattleRenderer3D: renderer }, setTimeout, clearTimeout,
+    document: { getElementById: () => null },
     refreshBattleLegalActions() {}, waitingForOtherPending: () => false,
     closePieceContextMenu() {}, render() {},
     normalMoveRejectionForDraft: () => null,

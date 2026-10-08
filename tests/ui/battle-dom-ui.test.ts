@@ -27,6 +27,12 @@ class FakeElement {
   hidden = false
   textContent = ''
   innerHTML = ''
+  readonly style = {
+    display: '',
+    cssText: '',
+    properties: {} as Record<string, string>,
+    setProperty: (name: string, value: string) => { this.style.properties[name] = String(value) },
+  }
 
   constructor(ownerDocument: FakeDocument, tagName: string) {
     this.ownerDocument = ownerDocument
@@ -118,10 +124,10 @@ function loadUi(document: FakeDocument) {
   return (windowObject.BattleDomUI as { create: (options: { document: FakeDocument }) => { update: (model: unknown) => void } }).create({ document })
 }
 
-function player(id: string, name: string, faction: string, action: number, charge: number, isCurrent: boolean) {
+function player(id: string, name: string, faction: string, action: number, charge: number, isCurrent: boolean, maxAction = 3, maxCharge = 4) {
   return {
     id, name, faction, isCurrent,
-    resources: { action, maxAction: 3, charge, maxCharge: 4 },
+    resources: { action, maxAction, charge, maxCharge },
     statusSummary: [], buffSummary: [], ruleSummary: [],
   }
 }
@@ -167,5 +173,76 @@ describe('battle HUD DOM integration', () => {
     expect(firstBobCard.dataset.playerId).toBe('bob')
     expect(firstAliceCard.dataset.playerId).toBe('alice')
     expect(firstAliceCard.innerHTML).toContain('Alice Renamed')
+    expect(firstAliceCard.getAttribute('title')).toBe('Alice Renamed · 红方 · 先手')
+    expect(firstAliceCard.getAttribute('title')).not.toContain('alice')
+  })
+
+  it('keeps exact large resource values visible and caps the decorative AP track', () => {
+    const document = new FakeDocument()
+    const apDisplay = new FakeElement(document, 'div')
+    const cpDisplay = new FakeElement(document, 'div')
+    const apValue = new FakeElement(document, 'span')
+    const apMax = new FakeElement(document, 'span')
+    const cpValue = new FakeElement(document, 'span')
+    const cpMax = new FakeElement(document, 'span')
+    const handResources = new FakeElement(document, 'div')
+    const track = new FakeElement(document, 'span')
+    const players = new FakeElement(document, 'div')
+    document.elements.set('resApDisplay', apDisplay)
+    document.elements.set('resCpDisplay', cpDisplay)
+    document.elements.set('resApVal', apValue)
+    document.elements.set('resApMax', apMax)
+    document.elements.set('resCpVal', cpValue)
+    document.elements.set('resCpMax', cpMax)
+    document.elements.set('handResources', handResources)
+    document.elements.set('resApTrack', track)
+    document.elements.set('playerResCards', players)
+    const ui = loadUi(document)
+    const alice = player('alice', 'Alice', 'red', 1234, 5678, true, 9999, 8888)
+
+    ui.update(model(alice, [alice]))
+
+    expect(apValue.textContent).toBe('1234')
+    expect(apMax.textContent).toBe('9999')
+    expect(cpValue.textContent).toBe('5678')
+    expect(cpMax.textContent).toBe('8888')
+    expect(handResources.getAttribute('aria-label')).toBe('Alice：行动点 1234，充能点 5678')
+    expect(track.children).toHaveLength(10)
+    expect(Number(apDisplay.style.properties['--dial-angle'].replace('deg', ''))).toBeCloseTo(1234 / 9999 * 240 - 120, 8)
+    expect(Number(cpDisplay.style.properties['--dial-angle'].replace('deg', ''))).toBeCloseTo(5678 / 8888 * 240 - 120, 8)
+  })
+
+  it('uses the named current player for training and spectator turn banners', () => {
+    const document = new FakeDocument()
+    const turnBadge = new FakeElement(document, 'span')
+    const players = new FakeElement(document, 'div')
+    document.elements.set('turnBadge', turnBadge)
+    document.elements.set('playerResCards', players)
+    const ui = loadUi(document)
+    const alice = player('alice', '红方', 'red', 2, 1, false)
+    const bob = player('bob', '蓝方', 'blue', 1, 0, true)
+
+    ui.update({
+      ...model(alice, [alice, bob]),
+      training: true,
+      spectating: true,
+      turn: { currentPlayerId: 'bob', isViewerTurn: false, number: 1, phase: 'action', remainingSeconds: 20 },
+    })
+
+    expect(turnBadge.textContent).toBe('蓝方行动')
+    expect(players.children[1].innerHTML).toContain('行动中')
+    expect(players.children[1].innerHTML).toContain('行动</span> 1')
+    expect(players.children[1].innerHTML).toContain('充能</span> 0')
+
+    ui.update({
+      ...model(alice, [alice, bob]),
+      turn: { currentPlayerId: 'alice', isViewerTurn: true, number: 1, phase: 'action', remainingSeconds: 20 },
+    })
+    expect(turnBadge.textContent).toBe('轮到你行动')
+    ui.update({
+      ...model(alice, [alice, bob]),
+      turn: { currentPlayerId: 'bob', isViewerTurn: false, number: 1, phase: 'action', remainingSeconds: 20 },
+    })
+    expect(turnBadge.textContent).toBe('对方正在行动')
   })
 })

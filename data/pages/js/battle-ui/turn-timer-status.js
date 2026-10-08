@@ -24,6 +24,7 @@
         burning: false,
         fast: false,
         label: '回合计时',
+        sandRemaining: 0,
       }
     }
 
@@ -46,6 +47,7 @@
       burning,
       fast,
       label,
+      sandRemaining: Math.min(1, Math.max(0, remainingMs / Math.max(1, Number(activeTimer.durationMs) || remainingMs || 1))),
     }
   }
 
