@@ -165,4 +165,3 @@ export function applySkillChoiceSequence(
     throw error
   }
 }
-

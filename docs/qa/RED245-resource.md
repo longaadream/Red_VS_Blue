@@ -77,4 +77,3 @@ canonical delta 证据在 `output/RED245/resource-delta/evidence/RED-245/`：bui
 ## COS 差量准备门禁
 
 `prepare-cos-update-source.mjs` 支持完整 snapshot 清单中的可选 canonical `patch` 字段，并会把经校验的 `content-patch.rvbpack` 复制到 `resource/<version>/` 和 `resource/latest.json` 的资产列表。该路径仍要求完整 snapshot 的签名、校验和、客户端 full fallback 及真实公开资源 receipt；receipt 必须逐字节匹配 patch 的摘要和大小。当前资源仍是本地 draft，COS 草稿 staging 在 `output/RED245/resource-delta/cos-draft/`，没有真实 receipt，因此本轮没有上传、公开发布或生成 `public-verification.json`。
-

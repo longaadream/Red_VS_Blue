@@ -138,4 +138,3 @@ describe('Colt big stride before end-turn shooting', () => {
     expect(read('data/rules/manifest.json')).toContain('rule-colt-big-stride')
   })
 })
-

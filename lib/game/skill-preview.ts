@@ -1058,4 +1058,3 @@ export function previewBattleAction(snapshot: BattleState, action: BattleAction,
     || (action as unknown as JsonRecord)?.selectedOption !== undefined
     || (Array.isArray((action as unknown as JsonRecord)?.extraTargets) && ((action as unknown as JsonRecord).extraTargets as unknown[]).length > 0))
 }
-
