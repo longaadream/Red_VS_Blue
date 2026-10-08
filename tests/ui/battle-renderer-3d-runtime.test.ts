@@ -97,6 +97,21 @@ type RendererApi = {
   dispose(): void
 }
 
+type PresentationQueue = {
+  dispose(): void
+  [key: string]: unknown
+}
+
+type ProductionWindow = WindowHarness & {
+  BattleViewModel: { normalizePresentationEvents(value: unknown[]): Array<Record<string, unknown>> }
+  BattleActionVignette: { createQueue(options: Record<string, unknown>): PresentationQueue }
+  BattlePresentation: { create(options: Record<string, unknown>): {
+    mount(options: Record<string, unknown>): void
+    update(model: unknown): void
+    dispose(): void
+  } }
+}
+
 type WindowHarness = {
   [key: string]: unknown
   devicePixelRatio: number
@@ -177,6 +192,8 @@ type RuntimeModelFixture = {
     moveRemaining?: number
     movePreviewText?: string
   }
+  presentationEvents?: Array<Record<string, unknown>>
+  turn?: { isViewerTurn: boolean }
 }
 
 class FakeElement {
@@ -273,7 +290,7 @@ class FakeElement {
   releasePointerCapture(pointerId: number) { this.capturedPointers.delete(pointerId) }
 }
 
-function createHarness(width = 390, height = 844, coarsePointer = true, reducedMotion = false, webglFailures = 0, resizeObserver = true) {
+function createHarness(width = 390, height = 844, coarsePointer = true, reducedMotion = false, webglFailures = 0, resizeObserver = true, withPresentation = false) {
   const container = new FakeElement('div')
   container.rect = { left: 0, top: 0, width, height }
   const renderers: FakeRendererRecord[] = []
@@ -383,6 +400,11 @@ function createHarness(width = 390, height = 844, coarsePointer = true, reducedM
   new Script(readFileSync(resolve(pagesDir, 'js/battle-ui/battle-move-timeline.js'), 'utf8'), { filename: 'battle-move-timeline.js' }).runInContext(context)
   new Script(readFileSync(resolve(pagesDir, 'js/battle-ui/battle-floater-layout.js'), 'utf8'), { filename: 'battle-floater-layout.js' }).runInContext(context)
   new Script(readFileSync(resolve(pagesDir, 'js/battle-renderer-3d.js'), 'utf8'), { filename: 'battle-renderer-3d.js' }).runInContext(context)
+  if (withPresentation) {
+    new Script(readFileSync(resolve(pagesDir, 'js/battle-ui/battle-view-model.js'), 'utf8'), { filename: 'battle-view-model.js' }).runInContext(context)
+    new Script(readFileSync(resolve(pagesDir, 'js/battle-ui/battle-action-vignette.js'), 'utf8'), { filename: 'battle-action-vignette.js' }).runInContext(context)
+    new Script(readFileSync(resolve(pagesDir, 'js/battle-ui/battle-presentation.js'), 'utf8'), { filename: 'battle-presentation.js' }).runInContext(context)
+  }
 
   function frame(step = 100) {
     now += step
@@ -1572,6 +1594,89 @@ describe('RED-68 BattleRenderer3D runtime', () => {
       expect(group.position.z).toBeCloseTo(route[route.length - 1].y, 3)
     } finally {
       harness.renderer.dispose()
+    }
+  })
+
+  it.each(['owned', 'opponent'])('plays a production-normalized drag route through the presentation adapter (%s)', (viewer) => {
+    const harness = createHarness(844, 390, false, false, 0, true, true)
+    const production = harness.windowObject as unknown as ProductionWindow
+    const callbacks: {
+      onPlaybackPhase?: (phase: string, group: unknown) => void
+      onPlaybackIdle?: () => void
+    } = {}
+    const queue = production.BattleActionVignette.createQueue({
+      setTimeout,
+      clearTimeout,
+      onPhase: (phase: string, group: unknown) => callbacks.onPlaybackPhase?.(phase, group),
+      onIdle: () => callbacks.onPlaybackIdle?.(),
+    })
+    const vignetteUi = Object.assign(queue, {
+      sequencesBoard: true,
+      mount(input: Record<string, unknown>) {
+        callbacks.onPlaybackPhase = input.onPlaybackPhase as (phase: string, group: unknown) => void
+        callbacks.onPlaybackIdle = input.onPlaybackIdle as () => void
+      },
+    })
+    const presentation = production.BattlePresentation.create({
+      renderer: harness.renderer,
+      domUi: { update() {}, dispose() {} },
+      vignetteUi,
+    })
+    const model = runtimeModel()
+    const piece = model.pieces[0]
+    model.viewer = { id: viewer === 'owned' ? piece.ownerPlayerId : 'other-player' }
+    model.turn = { isViewerTurn: viewer === 'owned' }
+    const route = [
+      { x: piece.x + 1, y: piece.y },
+      { x: piece.x + 1, y: piece.y + 1 },
+      { x: piece.x, y: piece.y + 1 },
+      { x: piece.x, y: piece.y + 2 },
+    ]
+    const authority = structuredClone(model)
+    const normalized = production.BattleViewModel.normalizePresentationEvents([{
+      eventId: 'production-drag:0', rootEventId: 'production-drag:0', kind: 'move',
+      sourcePieceId: piece.id, sequence: 0,
+      result: { fromX: piece.x, fromY: piece.y, toX: route[route.length - 1].x, toY: route[route.length - 1].y, movementKind: 'walk' },
+      presentation: { cue: 'displacement', pathCells: route, endPoint: route[route.length - 1], endReason: 'resolved' },
+    }])
+    expect(normalized[0].targetPieceIds).toEqual([])
+    const final = structuredClone(authority)
+    Object.assign(final.pieces[0], route[route.length - 1])
+    final.presentationEvents = normalized
+
+    const floatLayer = new FakeElement('div')
+    floatLayer.rect = { left: 0, top: 0, width: 844, height: 390 }
+    presentation.mount({ boardContainer: harness.container, floatLayer })
+    try {
+      presentation.update(authority)
+      harness.frame(16)
+      presentation.update(final)
+      const group = harness.renderers[0].scene!.children.find(child => child.userData.pieceId === piece.id)!
+      expect(harness.renderer.getMotionDiagnostics().activeAnimations).toContain('piece:' + piece.id + ':position')
+
+      const visited = [false, false, false, false]
+      const isOnLeg = (x: number, z: number, from: { x: number; y: number }, to: { x: number; y: number }, interiorOnly = false) => {
+        const dx = to.x - from.x
+        const dz = to.y - from.y
+        const lengthSquared = dx * dx + dz * dz
+        const progress = ((x - from.x) * dx + (z - from.y) * dz) / lengthSquared
+        if (progress < -0.001 || progress > 1.001) return false
+        if (interiorOnly && (progress <= 0.05 || progress >= 0.95)) return false
+        return Math.hypot(x - (from.x + dx * progress), z - (from.y + dz * progress)) < 0.001
+      }
+      const routeWithSource = [{ x: piece.x, y: piece.y }, ...route]
+      for (let index = 0; index < 40; index += 1) {
+        harness.frame(16)
+        expect(route.some((_, leg) => isOnLeg(group.position.x, group.position.z, routeWithSource[leg], routeWithSource[leg + 1]))).toBe(true)
+        for (let leg = 0; leg < route.length; leg += 1) {
+          if (isOnLeg(group.position.x, group.position.z, routeWithSource[leg], routeWithSource[leg + 1], true)) visited[leg] = true
+        }
+      }
+      expect(visited).toEqual([true, true, true, true])
+      expect(group.position.x).toBeCloseTo(route[route.length - 1].x, 3)
+      expect(group.position.z).toBeCloseTo(route[route.length - 1].y, 3)
+    } finally {
+      presentation.dispose()
     }
   })
 

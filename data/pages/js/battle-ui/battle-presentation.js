@@ -85,7 +85,10 @@
           if (event.kind === 'tileEffectAdded') after.effects.push({ id: result.effectId, type: result.effectType,
             icon: result.icon || '', x: event.targetCell.x, y: event.targetCell.y })
         }
-        const ids = event.targetPieceIds || ((event.kind === 'move' || event.kind === 'forceMove') ? [event.sourcePieceId] : [])
+        const targetIds = Array.isArray(event.targetPieceIds) ? event.targetPieceIds.filter(Boolean) : []
+        const ids = targetIds.length
+          ? targetIds
+          : ((event.kind === 'move' || event.kind === 'forceMove') && event.sourcePieceId ? [event.sourcePieceId] : [])
         ids.forEach(function (id) {
           let piece = after.pieces.find(function (p) { return p.id === id })
           const finalPiece = ((frames && frames.after || currentModel).pieces || []).find(function (p) { return p.id === id })
@@ -101,9 +104,6 @@
               ? event.presentation.pathCells
               : []
             if (pathCells.length) movementPaths[id] = pathCells.map(function (cell) {
-              return { x: Number(cell.x), y: Number(cell.y) }
-            })
-            if (pathCells.length && event.sourcePieceId) movementPaths[event.sourcePieceId] = pathCells.map(function (cell) {
               return { x: Number(cell.x), y: Number(cell.y) }
             })
             piece.x = result.toX; piece.y = result.toY
