@@ -21,6 +21,7 @@ import { adventureCards, initializeAdventureCards, hasAdventureCardChoice } from
 import { supplyEncounter, cleanupAdventureCards, offerAdventureRewards, chooseAdventureSupply, withAdventureSupplyRuntime } from './supplies'
 import { campaignAct } from './campaign'
 import { initializeRoaming, planRoamingEnemies, tryStartRoamingEncounter, getRoamingEncounter } from './roaming'
+import type { BoardMap } from '../../game/map'
 
 function adventureTemplates() { return enemyTemplates }
 
@@ -30,7 +31,7 @@ export interface WorldProgress { coins: number; cleared: string[]; claimed: stri
 const allowed = new Set(['move', 'useBasicSkill', 'useChargeSkill', 'playCard', 'endTurn', 'beginPhase',
   'pendingOptionSelect', 'pendingTargetSelect', 'cancelPendingSelection', 'surrender', 'deployReservePiece'])
 const copy = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T
-export async function createAdventureState(profile: GameProfileIdentityV1, content = adventureContent) {
+export async function createAdventureState(profile: GameProfileIdentityV1, content = adventureContent, mapOverride?: BoardMap) {
   const { enemyLineup, startingPositions } = content
   const templates = adventureTemplates()
   const roster = (playerId: string, ids: string[], faction: 'red' | 'blue') => ({ playerId, faction,
@@ -38,7 +39,7 @@ export async function createAdventureState(profile: GameProfileIdentityV1, conte
   const state = await createInitialBattleForPlayers([HUMAN, ENEMY], [], [
     roster(HUMAN, content.party.pieceIds, 'red'), roster(ENEMY, enemyLineup.map(p => p.templateId), 'blue'),
   ], undefined, { firstPlayerId: HUMAN, rootSeed: content.party.seed, profileIdentity: profile,
-    adventureWorld: { map: createAdventureMap(content), humanId: HUMAN, captainId: `${HUMAN}-1`, positions: startingPositions,
+    adventureWorld: { map: mapOverride ?? createAdventureMap(content), humanId: HUMAN, captainId: `${HUMAN}-1`, positions: startingPositions,
       coreIds:[...content.party.pieceIds.map((_,i)=>`${HUMAN}-${i+1}`),...enemyLineup.filter(p => p.core && !content.zones.find(z=>z.id===p.zone)?.optional).map(p => p.id)], skills:enemySkills } })
   if (!state) throw new Error('无法创建冒险')
   strengthenEliteGuards(state,content)

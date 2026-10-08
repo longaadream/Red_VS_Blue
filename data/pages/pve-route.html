@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>固定路线 · RED vs BLUE</title>
+  <link rel="stylesheet" href="css/pve-route.css">
+</head>
+<body>
+  <main id="routeShell" class="route-shell">
+    <header class="route-header">
+      <a class="route-back" href="index.html" aria-label="返回主页">← 主页</a>
+      <div class="route-heading">
+        <span class="eyebrow">单人固定路线</span>
+        <h1>三幕闯关</h1>
+      </div>
+      <div class="route-wallet" aria-label="当前金币">
+        <span class="wallet-icon" aria-hidden="true">◆</span>
+        <span id="coinsValue">—</span>
+      </div>
+    </header>
+
+    <section id="routeContent" class="route-content" aria-live="polite">
+    <div id="progressOverlay" class="progress-overlay">
+    <section id="progressPanel" class="route-progress-panel" aria-labelledby="progressTitle" aria-hidden="true" inert>
+      <div class="section-kicker"><span id="progressTitle">路线进度</span><span class="route-notice">刷新或离开后，本次进度不保留。</span><span id="chapterLabel">准备中</span></div>
+      <div id="routeProgress" class="route-progress" role="list" aria-label="章节节点"></div>
+    </section>
+    <button id="progressToggle" class="progress-toggle" type="button" aria-label="展开路线进度" aria-expanded="false" aria-controls="progressPanel"><span aria-hidden="true">⌄</span></button>
+    </div>
+      <article class="node-panel" aria-labelledby="nodeTitle">
+        <div id="nodeBadge" class="node-badge">节点</div>
+        <p id="nodeType" class="node-type">正在准备</p>
+        <h2 id="nodeTitle">固定路线</h2>
+        <p id="nodeDescription" class="node-description">正在加载本地战斗资源…</p>
+        <div id="nodeAction" class="node-action"></div>
+      </article>
+
+      <aside class="party-panel" aria-labelledby="partyTitle">
+        <div class="panel-title-row"><h2 id="partyTitle">队伍</h2><span id="partyCount">0 人</span></div>
+        <div id="partyCards" class="party-cards"></div>
+      </aside>
+
+      <aside class="backpack-panel" aria-labelledby="backpackTitle">
+        <div class="panel-title-row"><h2 id="backpackTitle">背包</h2><button id="backpackButton" class="icon-button" type="button" aria-expanded="false" aria-controls="backpackDetails">打开</button></div>
+        <div id="backpackSummary" class="backpack-summary">卡牌 0 · 遗物 0</div>
+        <div id="backpackDetails" class="backpack-details" hidden></div>
+      </aside>
+    </section>
+
+    <p id="routeStatus" class="route-status" role="status" aria-live="polite">准备固定路线…</p>
+    <section id="loadingPanel" class="message-panel" aria-live="polite">
+      <div class="spinner" aria-hidden="true"></div>
+      <p id="loadingMessage">正在加载资源与路线引擎…</p>
+      <button id="retryButton" class="primary-button" type="button" hidden>重试</button>
+    </section>
+  </main>
+
+  <section id="battleView" class="battle-view" hidden aria-label="战斗">
+    <iframe id="battleFrame" title="固定路线战斗" src="about:blank"></iframe>
+  </section>
+
+  <dialog id="detailDialog" class="detail-dialog">
+    <form method="dialog">
+      <button class="dialog-close" value="cancel" aria-label="关闭">×</button>
+    </form>
+    <div id="detailContent"></div>
+  </dialog>
+
+  <script src="js/pve-route/client.js"></script>
+  <script src="js/pve-route/page.js"></script>
+</body>
+</html>
