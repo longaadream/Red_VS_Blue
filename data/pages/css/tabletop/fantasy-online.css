@@ -1,0 +1,868 @@
+/* RED-243: shared fantasy online atlas skin.
+ * This layer is deliberately scoped to the three online pages so the battle
+ * pages keep their established tabletop treatment and behavior. */
+
+body.fantasy-online {
+  --fantasy-ink: #2d2520;
+  --fantasy-muted: #6d5943;
+  --fantasy-paper: #f1e2c7;
+  --fantasy-paper-bright: #fbf3e3;
+  --fantasy-paper-shadow: #1d1712a8;
+  --fantasy-red: #a83e3b;
+  --fantasy-red-dark: #742d2b;
+  --fantasy-teal: #2e6e73;
+  --fantasy-teal-dark: #205158;
+  --fantasy-gold: #bf8c45;
+  --fantasy-line: #a9875b;
+  min-height: 100svh;
+  overflow: hidden;
+  color: var(--fantasy-ink) !important;
+  color-scheme: light;
+  background:
+    url('../../images/tabletop/fantasy-lobby-table.png') center / cover fixed #24352d !important;
+  font-family: 'Microsoft YaHei', 'Segoe UI', sans-serif;
+}
+
+body.fantasy-online .game-shell {
+  width: 100%;
+  height: 100dvh;
+  min-height: 0;
+  grid-template-columns: minmax(158px, 13vw) minmax(0, 1fr);
+  grid-template-rows: 84px minmax(0, 1fr) 54px;
+  background: transparent;
+}
+
+body.fantasy-online .game-header {
+  gap: clamp(14px, 2vw, 30px);
+  padding-inline: clamp(18px, 3vw, 48px);
+  background-color: #17130fe6;
+  background-image: url('../../images/tabletop/fantasy-lobby-table.png');
+  background-position: center top;
+  background-size: cover;
+  background-blend-mode: multiply;
+  border-bottom: 1px solid #c29b65;
+  box-shadow: 0 4px 16px #07060565;
+}
+
+body.fantasy-online .game-header h1 {
+  margin: 0;
+  color: #f3dfb8;
+  font: 27px/1.1 var(--table-heading);
+  letter-spacing: .08em;
+}
+
+body.fantasy-online .game-brand {
+  gap: 8px;
+  color: #f3dfb8;
+  font: 37px/1 var(--table-heading);
+  letter-spacing: .04em;
+  text-shadow: 2px 3px 0 #100e0b;
+}
+
+body.fantasy-online .game-brand span:first-child { color: #d86958; }
+body.fantasy-online .game-brand span:last-child { color: #8fb8bd; }
+body.fantasy-online .game-brand small { color: #e8c88d; font-size: 16px; }
+body.fantasy-online .header-divider { background: #c29b65; }
+body.fantasy-online .header-end { color: #e5cda2; font-size: 13px; }
+
+body.fantasy-online .game-header .back-link {
+  padding: 7px 14px;
+  color: var(--fantasy-ink) !important;
+  background: var(--fantasy-paper) !important;
+  border: 1px solid #c19a63 !important;
+  box-shadow: 0 2px 0 #120f0b !important;
+}
+
+body.fantasy-online .game-nav {
+  gap: 8px;
+  padding: 22px 12px;
+  background: #17130fe5;
+  border-right: 1px solid #bd935b;
+  box-shadow: 5px 0 18px #0c0b0960;
+}
+
+body.fantasy-online .game-nav > a {
+  min-height: 55px;
+  padding: 13px 11px;
+  color: var(--fantasy-ink);
+  background-color: #f0dec0ef;
+  background-image: url('../../images/tabletop/fantasy-ledger-paper.png');
+  background-position: center;
+  background-size: cover;
+  background-blend-mode: lighten;
+  border: 1px solid #b28a58;
+  border-radius: 9px 5px 11px 6px;
+  box-shadow: 3px 4px 0 #160f0a;
+  font: 20px/1.2 var(--table-heading);
+  transition: background-color .16s ease, color .16s ease, translate .16s ease;
+}
+
+body.fantasy-online .game-nav > a img {
+  width: 23px;
+  height: 23px;
+  opacity: .85;
+  filter: brightness(.34) sepia(.2) saturate(1.15);
+}
+
+body.fantasy-online .game-nav > a:hover {
+  color: var(--fantasy-red-dark);
+  background: #fff8e9;
+  translate: 2px 0;
+}
+
+body.fantasy-online .game-nav > a.selected {
+  color: var(--fantasy-red-dark);
+  background-color: #f2dfbd;
+  background-image: url('../../images/tabletop/fantasy-ledger-paper.png');
+  background-position: center;
+  background-size: cover;
+  background-blend-mode: lighten;
+  border-color: #cc914e;
+  box-shadow: inset 5px 0 var(--fantasy-red), 3px 4px 0 #160f0a;
+}
+
+body.fantasy-online .game-nav > a.selected img { opacity: 1; }
+
+body.fantasy-online .nav-note {
+  margin: 8px 2px 0;
+  padding: 14px 11px;
+  color: #3e3025;
+  background-color: #ead5b0ed;
+  background-image: url('../../images/tabletop/fantasy-ledger-paper.png');
+  background-position: center;
+  background-size: cover;
+  background-blend-mode: lighten;
+  border: 1px solid #9e7749;
+  border-radius: 7px 4px 10px 5px;
+  box-shadow: 3px 4px 0 #160f0a;
+  font: 18px/1.65 var(--table-heading);
+}
+
+body.fantasy-online .nav-note small {
+  color: #6d5840;
+  font: 11px/1.7 'Microsoft YaHei', sans-serif;
+}
+
+body.fantasy-online .game-main {
+  min-width: 0;
+  min-height: 0;
+  padding: clamp(22px, 3vw, 48px) clamp(20px, 3vw, 52px);
+  color: var(--fantasy-ink);
+  overflow: auto;
+  scrollbar-color: #b9905b #33291f44;
+}
+
+body.fantasy-online .view-heading {
+  gap: 20px;
+  margin-bottom: clamp(17px, 2vw, 26px);
+}
+
+body.fantasy-online .view-heading h2 {
+  margin: 0;
+  color: var(--fantasy-ink) !important;
+  font: clamp(30px, 3vw, 46px)/1.15 var(--table-heading) !important;
+  letter-spacing: .03em;
+  text-shadow: 1px 2px 0 #fff7e74f;
+}
+
+body.fantasy-online .kicker {
+  color: var(--fantasy-red) !important;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .2em;
+}
+
+body.fantasy-online .toolbar { gap: 10px; }
+
+body.fantasy-online :is(button, .back-link, input, select, textarea):focus-visible {
+  outline: 3px solid #f3c66e !important;
+  outline-offset: 3px !important;
+}
+
+body.fantasy-online :is(input:not([type=checkbox]):not([type=range]):not([type=radio]), select, textarea) {
+  min-height: 40px;
+  color: var(--fantasy-ink) !important;
+  background: #fff8e9 !important;
+  border: 1px solid #ad8756 !important;
+  border-radius: 8px 5px 10px 6px !important;
+  box-shadow: inset 0 1px 2px #8e693426, 0 1px 0 #fffaf080 !important;
+  color-scheme: light;
+}
+
+body.fantasy-online input::placeholder,
+body.fantasy-online textarea::placeholder { color: #8a7257 !important; }
+
+body.fantasy-online :is(button, .back-link) {
+  min-height: 40px;
+  color: var(--fantasy-ink) !important;
+  background: #e7d1aa !important;
+  border: 1px solid #9d784c !important;
+  border-radius: 8px 5px 11px 6px !important;
+  box-shadow: 0 2px 0 #3a281b !important;
+  font-family: var(--table-heading) !important;
+  transition: background-color .16s ease, box-shadow .16s ease, translate .16s ease;
+}
+
+body.fantasy-online :is(button, .back-link):not(:disabled):not([aria-disabled=true]):hover {
+  box-shadow: 0 0 0 2px #e2b76c, 0 3px 0 #3a281b !important;
+  translate: 0 -1px;
+}
+
+body.fantasy-online :is(button:disabled, [aria-disabled=true]) {
+  opacity: .56;
+  box-shadow: none !important;
+}
+
+body.fantasy-online :is(.button.primary, .btn-primary, .btn-create, .button.primary) {
+  color: #fff4de !important;
+  background: var(--fantasy-teal) !important;
+  border-color: var(--fantasy-teal-dark) !important;
+}
+
+body.fantasy-online :is(.button.primary, .btn-primary, .btn-create, .button.primary):not(:disabled):hover {
+  background: #3d8588 !important;
+}
+
+body.fantasy-online[data-art-page="multiplayer"] .view-heading .button.primary,
+body.fantasy-online[data-art-page="multiplayer"] #hostDialog #publish {
+  color: #fff3df !important;
+  background: var(--fantasy-red) !important;
+  border-color: var(--fantasy-red-dark) !important;
+}
+
+body.fantasy-online[data-art-page="multiplayer"] .view-heading .button.primary:hover,
+body.fantasy-online[data-art-page="multiplayer"] #hostDialog #publish:hover {
+  background: #bc4e45 !important;
+}
+
+body.fantasy-online[data-art-page="multiplayer"] .host button,
+body.fantasy-online[data-art-page="multiplayer"] #joinInvite {
+  color: #fff5e2 !important;
+  background: var(--fantasy-teal) !important;
+  border-color: var(--fantasy-teal-dark) !important;
+}
+
+body.fantasy-online :is(.room-browser, .room-preview, .rank-arena, .rank-side, .rank-data, .panel) {
+  color: var(--fantasy-ink) !important;
+  background-color: var(--fantasy-paper) !important;
+  background-image: url('../../images/tabletop/fantasy-ledger-paper.png') !important;
+  background-position: center !important;
+  background-repeat: no-repeat !important;
+  background-size: cover !important;
+  border: 1px solid #aa8455 !important;
+  border-radius: 17px 10px 21px 12px !important;
+  box-shadow: 0 10px 22px var(--fantasy-paper-shadow), 0 1px 0 #fff9e8b8 inset !important;
+}
+
+body.fantasy-online .game-dialog {
+  color: var(--fantasy-ink) !important;
+  background-color: var(--fantasy-paper) !important;
+  background-image: url('../../images/tabletop/fantasy-ledger-paper.png') !important;
+  background-position: center !important;
+  background-repeat: no-repeat !important;
+  background-size: cover !important;
+  border: 1px solid #aa8455 !important;
+  box-shadow: 0 14px 30px #1d1712b8 !important;
+}
+
+body.fantasy-online .game-dialog :is(h2, p, label, summary, [role=status], [role=alert]) {
+  color: var(--fantasy-ink);
+}
+
+body.fantasy-online .game-dialog :is(p, label, summary) { color: var(--fantasy-muted); }
+
+body.fantasy-online :is(.room-browser, .room-preview, .rank-arena, .rank-side, .rank-data, .panel) :is(h2, h3, p, label, summary, small, span, strong, td, th) {
+  color: inherit;
+}
+
+body.fantasy-online .game-footer {
+  padding-inline: clamp(18px, 3vw, 48px);
+  color: #ddc196;
+  background: #171410ed;
+  border-top: 1px solid #bb8d57;
+  box-shadow: 0 -4px 14px #0c0a0860;
+}
+
+body.fantasy-online .game-footer a { color: #f0cb8a; }
+
+/* The room directory is the large open atlas sheet. */
+body.fantasy-online[data-art-page="multiplayer"] .browser-layout {
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 31%);
+  gap: clamp(18px, 2.2vw, 34px);
+  min-height: 0;
+  align-items: start;
+  flex: 0 0 auto;
+}
+
+body.fantasy-online[data-art-page="official"] .game-main > .view-heading,
+body.fantasy-online[data-art-page="community"] .game-main > .view-heading {
+  padding: 19px 24px;
+  background-color: var(--fantasy-paper) !important;
+  background-image: url('../../images/tabletop/fantasy-ledger-paper.png') !important;
+  background-position: center !important;
+  background-repeat: no-repeat !important;
+  background-size: cover !important;
+  border: 1px solid #aa8455;
+  border-radius: 15px 9px 18px 10px;
+  box-shadow: 0 6px 15px #1d171285;
+}
+
+body.fantasy-online[data-art-page="multiplayer"] .atlas-sheet {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: min(640px, calc(100dvh - 180px));
+  max-height: calc(100dvh - 112px);
+  overflow: hidden;
+  color: var(--fantasy-ink);
+  background-color: var(--fantasy-paper) !important;
+  background-image: url('../../images/tabletop/fantasy-ledger-paper.png') !important;
+  background-position: center !important;
+  background-repeat: no-repeat !important;
+  background-size: cover !important;
+  border: 1px solid #aa8455 !important;
+  border-radius: 19px 11px 23px 13px !important;
+  box-shadow: 0 10px 22px var(--fantasy-paper-shadow), 0 1px 0 #fff9e8b8 inset !important;
+}
+
+body.fantasy-online[data-art-page="multiplayer"] .room-browser {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+body.fantasy-online[data-art-page="multiplayer"] .atlas-sheet > .view-heading {
+  flex: 0 0 auto;
+  margin: 0;
+  padding: clamp(23px, 2.5vw, 36px) clamp(22px, 2.7vw, 42px) 19px;
+  border-bottom: 1px solid #a9875b8c;
+}
+
+body.fantasy-online[data-art-page="multiplayer"] .server-settings-row {
+  gap: 10px;
+  padding: 15px 17px;
+  background: #ead4b355;
+  border-bottom: 1px solid #b390605f;
+}
+
+body.fantasy-online[data-art-page="multiplayer"] .server-settings-row label,
+body.fantasy-online[data-art-page="multiplayer"] .browser-filters label {
+  color: var(--fantasy-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+body.fantasy-online[data-art-page="multiplayer"] .server-settings-row select { min-width: 150px; }
+body.fantasy-online[data-art-page="multiplayer"] .server-settings-row #refresh { margin-left: auto; }
+
+body.fantasy-online[data-art-page="multiplayer"] #customSettings {
+  padding: 11px 17px;
+  color: var(--fantasy-muted);
+  border-bottom: 1px dashed #a9875b99;
+}
+
+body.fantasy-online[data-art-page="multiplayer"] #customSettings summary {
+  cursor: pointer;
+  color: var(--fantasy-ink);
+  font: 17px var(--table-heading);
+}
+
+body.fantasy-online[data-art-page="multiplayer"] .browser-filters {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 13px 17px;
+  background: #f8ebd48a;
+  border-bottom: 1px solid #b390605f;
+}
+
+body.fantasy-online[data-art-page="multiplayer"] .browser-filters select {
+  min-width: 145px;
+  font-size: 13px;
+}
+
+body.fantasy-online[data-art-page="multiplayer"] .room-columns {
+  min-height: 44px;
+  padding: 12px 18px;
+  color: var(--fantasy-muted);
+  background: #e4c89a66 !important;
+  border-bottom: 1px solid #a9875b9c;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .08em;
+}
+
+body.fantasy-online[data-art-page="multiplayer"] .room-scroll {
+  min-height: 0;
+  overflow: auto;
+}
+
+body.fantasy-online[data-art-page="multiplayer"] .server-list .host {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-height: 78px;
+  padding: 15px 18px;
+  color: var(--fantasy-ink);
+  border-bottom: 1px solid #aa845557;
+  transition: background-color .16s ease, padding-left .16s ease;
+}
+
+body.fantasy-online[data-art-page="multiplayer"] .server-list .host:hover {
+  padding-left: 22px;
+  background: #fff6e57a;
+}
+
+body.fantasy-online[data-art-page="multiplayer"] .server-list .host span {
+  min-width: 0;
+  color: var(--fantasy-ink);
+  font: 20px/1.3 var(--table-heading);
+  overflow-wrap: anywhere;
+}
+
+body.fantasy-online[data-art-page="multiplayer"] .server-list .host button {
+  flex: 0 0 auto;
+  min-width: 96px;
+  font-size: 17px;
+}
+
+body.fantasy-online[data-art-page="multiplayer"] .browser-empty {
+  height: auto !important;
+  flex: 1 1 auto;
+  min-height: 180px;
+  padding: 36px 28px;
+  color: var(--fantasy-muted);
+  font-size: 14px;
+  line-height: 2;
+}
+
+body.fantasy-online[data-art-page="multiplayer"] .room-preview {
+  position: relative;
+  align-self: start;
+  min-height: 360px;
+  padding: clamp(22px, 2vw, 30px);
+  overflow: visible;
+}
+
+body.fantasy-online[data-art-page="multiplayer"] .room-preview::after {
+  position: absolute;
+  right: -17px;
+  top: 18px;
+  width: 135px;
+  height: 120px;
+  content: '';
+  background: url('../../images/tabletop/desk-emblem.svg') center / contain no-repeat;
+  opacity: .13;
+  pointer-events: none;
+}
+
+body.fantasy-online[data-art-page="multiplayer"] .room-preview > * { position: relative; z-index: 1; }
+body.fantasy-online[data-art-page="multiplayer"] .room-preview h3 {
+  margin-bottom: 10px !important;
+  color: var(--fantasy-ink) !important;
+  font: 30px/1.25 var(--table-heading) !important;
+}
+
+body.fantasy-online[data-art-page="multiplayer"] .room-preview p {
+  color: var(--fantasy-muted) !important;
+  font-size: 13px;
+  line-height: 1.8;
+}
+
+body.fantasy-online[data-art-page="multiplayer"] .room-preview label {
+  display: block;
+  margin: 15px 0 5px;
+  color: var(--fantasy-muted) !important;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+body.fantasy-online[data-art-page="multiplayer"] .room-preview input,
+body.fantasy-online[data-art-page="multiplayer"] .room-preview select,
+body.fantasy-online[data-art-page="multiplayer"] .room-preview #joinInvite { width: 100%; }
+
+body.fantasy-online[data-art-page="multiplayer"] .room-preview #invite {
+  color: var(--fantasy-red-dark) !important;
+  font: 22px/1.1 Consolas, monospace !important;
+  letter-spacing: .14em;
+  text-align: center;
+}
+
+body.fantasy-online[data-art-page="multiplayer"] .room-preview #joinInvite {
+  margin-top: 13px;
+  min-height: 48px;
+  font-size: 21px;
+}
+
+body.fantasy-online[data-art-page="multiplayer"] .preview-label {
+  color: var(--fantasy-red) !important;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .16em;
+}
+
+body.fantasy-online[data-art-page="multiplayer"] .preview-note {
+  margin-top: 20px;
+  padding-top: 16px;
+  color: var(--fantasy-muted);
+  border-top: 1px dashed #a9875b;
+  font-size: 11px;
+  line-height: 1.7;
+}
+
+body.fantasy-online[data-art-page="multiplayer"] .community-link {
+  display: grid;
+  grid-template-columns: 22px 1fr;
+  align-items: center;
+  gap: 2px 8px;
+  margin-top: 20px;
+  padding: 10px 12px;
+  color: var(--fantasy-red-dark) !important;
+  background: #d6b87955;
+  border-top: 1px solid #b38b58;
+  text-decoration: none;
+  font: 17px/1.2 var(--table-heading);
+}
+
+body.fantasy-online[data-art-page="multiplayer"] .community-link:hover { background: #d6b8798c; }
+body.fantasy-online[data-art-page="multiplayer"] .community-link img { width: 22px; height: 22px; grid-row: span 2; }
+body.fantasy-online[data-art-page="multiplayer"] .community-link span { color: var(--fantasy-muted); font: 10px/1.4 'Microsoft YaHei', sans-serif; }
+
+body.fantasy-online[data-art-page="multiplayer"] .server-guide {
+  flex: 0 0 auto;
+  margin: 0 clamp(22px, 2.7vw, 42px);
+  padding: 11px 0 16px;
+  color: var(--fantasy-muted);
+  border-top: 1px solid #a9875b8c;
+  font-size: 12px;
+}
+
+body.fantasy-online[data-art-page="multiplayer"] .server-guide .button {
+  min-height: 32px;
+  margin-left: 8px;
+  padding: 4px 10px;
+  font-size: 13px;
+}
+
+body.fantasy-online[data-art-page="multiplayer"] .connection-error {
+  flex: 0 0 auto;
+  min-height: 20px;
+  margin-top: 14px;
+  padding: 10px 16px;
+  background: #fff1df;
+  color: #8b2f26;
+  border: 1px solid #a83e3b;
+}
+
+body.fantasy-online[data-art-page="multiplayer"] .connection-error:empty { display: none; }
+
+body.fantasy-online[data-art-page="multiplayer"] #publicationControls:not([hidden]) {
+  flex: 0 0 auto;
+  margin-top: 14px;
+  padding: 14px;
+  background: var(--fantasy-paper);
+  color: var(--fantasy-ink);
+  overflow-wrap: anywhere;
+}
+
+/* Official ranked play keeps its existing stages and controls, but moves them
+ * onto the same readable atlas paper as the directory. */
+body.fantasy-online[data-art-page="official"] .rank-tabs {
+  gap: 28px;
+  border-bottom: 1px solid #b390605f;
+}
+
+body.fantasy-online[data-art-page="official"] .rank-tabs button {
+  color: var(--fantasy-muted) !important;
+  border-bottom-color: transparent !important;
+}
+
+body.fantasy-online[data-art-page="official"] .rank-tabs button[aria-selected="true"] {
+  color: var(--fantasy-red-dark) !important;
+  border-bottom-color: var(--fantasy-red) !important;
+}
+
+body.fantasy-online[data-art-page="official"] .rank-arena {
+  min-height: 330px;
+  padding: clamp(20px, 2.5vw, 34px);
+}
+
+body.fantasy-online[data-art-page="official"] .arena-heading h3,
+body.fantasy-online[data-art-page="official"] .rank-side h3 {
+  color: var(--fantasy-ink) !important;
+}
+
+body.fantasy-online[data-art-page="official"] .arena-heading p,
+body.fantasy-online[data-art-page="official"] .rank-side p,
+body.fantasy-online[data-art-page="official"] .rank-rule {
+  color: var(--fantasy-muted) !important;
+}
+
+body.fantasy-online[data-art-page="official"] .match-tag {
+  color: var(--fantasy-red-dark);
+  border-color: #af8858;
+  background: #e8c98d66;
+}
+
+body.fantasy-online[data-art-page="official"] .arena-art {
+  filter: drop-shadow(0 9px 8px #7251304a);
+}
+
+body.fantasy-online[data-art-page="official"] .arena-seats > div {
+  color: var(--fantasy-ink);
+  background: #4381842b;
+  border-top: 2px solid var(--fantasy-teal);
+}
+
+body.fantasy-online[data-art-page="official"] .arena-seats > div:last-child {
+  background: #a83e3b22;
+  border-color: var(--fantasy-red);
+}
+
+body.fantasy-online[data-art-page="official"] .arena-seats strong { color: var(--fantasy-ink); }
+body.fantasy-online[data-art-page="official"] .arena-seats small { color: var(--fantasy-muted); }
+body.fantasy-online[data-art-page="official"] .arena-seats > span { color: var(--fantasy-red-dark); }
+
+body.fantasy-online[data-art-page="official"] .rank-side {
+  padding: clamp(20px, 2vw, 30px);
+}
+
+body.fantasy-online[data-art-page="official"] .rank-score { color: var(--fantasy-teal-dark); }
+body.fantasy-online[data-art-page="official"] .rank-record,
+body.fantasy-online[data-art-page="official"] .rank-side #season { color: var(--fantasy-muted); }
+
+body.fantasy-online[data-art-page="official"] .rank-dock {
+  background: #f1e2c7;
+  border-top: 1px solid #b390605f;
+}
+
+body.fantasy-online[data-art-page="official"] .rank-dock strong { color: var(--fantasy-ink); }
+body.fantasy-online[data-art-page="official"] .rank-dock p,
+body.fantasy-online[data-art-page="official"] .rank-dock .rank-message { color: var(--fantasy-muted); }
+
+body.fantasy-online[data-art-page="official"] .rank-data {
+  color: var(--fantasy-ink);
+}
+
+body.fantasy-online[data-art-page="official"] .rank-data :is(td, th) {
+  color: var(--fantasy-ink);
+  border-bottom-color: #a9875b66;
+}
+
+/* Community uses the same ink and paper system while retaining every form and
+ * server-driven list. */
+body.fantasy-online[data-art-page="community"] .community-account-menu { gap: 9px; }
+body.fantasy-online[data-art-page="community"] .community-connection { color: #e6cc9c; }
+
+body.fantasy-online[data-art-page="community"] .community-auth,
+body.fantasy-online[data-art-page="community"] .community-panel {
+  padding: clamp(18px, 2vw, 28px);
+}
+
+body.fantasy-online[data-art-page="community"] .community-auth-copy h2,
+body.fantasy-online[data-art-page="community"] .community-panel h2 {
+  color: var(--fantasy-ink) !important;
+}
+
+body.fantasy-online[data-art-page="community"] .community-auth-copy p:not(.kicker),
+body.fantasy-online[data-art-page="community"] .community-status,
+body.fantasy-online[data-art-page="community"] .community-search-form label,
+body.fantasy-online[data-art-page="community"] .post-form label {
+  color: var(--fantasy-muted) !important;
+}
+
+body.fantasy-online[data-art-page="community"] .community-login-form input { width: 100%; }
+
+body.fantasy-online[data-art-page="community"] .panel-heading {
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #a9875b66;
+}
+
+body.fantasy-online[data-art-page="community"] .friend-group {
+  border-top-color: #a9875b99;
+}
+
+body.fantasy-online[data-art-page="community"] .friend-row,
+body.fantasy-online[data-art-page="community"] .reply-row {
+  background: #fff8e966;
+  border: 0;
+  border-bottom: 1px solid #b38c5e8c;
+  box-shadow: none;
+}
+
+body.fantasy-online[data-art-page="community"] .friend-row-name,
+body.fantasy-online[data-art-page="community"] .reply-body,
+body.fantasy-online[data-art-page="community"] .board-post-body {
+  color: var(--fantasy-ink) !important;
+}
+
+body.fantasy-online[data-art-page="community"] .friend-row-meta,
+body.fantasy-online[data-art-page="community"] .friend-offline,
+body.fantasy-online[data-art-page="community"] .reply-meta,
+body.fantasy-online[data-art-page="community"] .board-post-meta {
+  color: var(--fantasy-muted) !important;
+}
+
+body.fantasy-online[data-art-page="community"] .friend-online { color: #2e714d !important; }
+
+body.fantasy-online[data-art-page="community"] .official-announcement,
+body.fantasy-online[data-art-page="community"] .post-composer,
+body.fantasy-online[data-art-page="community"] .post-form,
+body.fantasy-online[data-art-page="community"] .board-post {
+  background: #fff7e6b8;
+  border: 0;
+  border-bottom: 1px solid #ae8756;
+  box-shadow: none;
+}
+
+body.fantasy-online[data-art-page="community"] .official-announcement h3,
+body.fantasy-online[data-art-page="community"] .post-form h3,
+body.fantasy-online[data-art-page="community"] .board-post h3,
+body.fantasy-online[data-art-page="community"] .post-composer summary {
+  color: var(--fantasy-ink) !important;
+}
+
+body.fantasy-online[data-art-page="community"] .official-announcement p:last-child,
+body.fantasy-online[data-art-page="community"] .post-form small {
+  color: var(--fantasy-muted) !important;
+}
+
+body.fantasy-online[data-art-page="community"] .board-post-tools {
+  border-top-color: #a9875b99;
+}
+
+body.fantasy-online[data-art-page="community"] .room-code {
+  color: var(--fantasy-teal-dark) !important;
+  background: #c4d9d344;
+  border-color: #6f969088;
+}
+
+body.fantasy-online[data-art-page="community"] .board-more { width: 100%; }
+
+/* A narrow screen becomes one continuous atlas. Content stays reachable by
+ * document scrolling and the invitation slip follows the room list. */
+@media (max-width: 1100px) {
+  body.fantasy-online .game-shell { grid-template-columns: 148px minmax(0, 1fr); }
+  body.fantasy-online .game-nav > a { font-size: 18px; padding-inline: 9px; }
+  body.fantasy-online .game-main { padding-inline: 24px; }
+  body.fantasy-online[data-art-page="multiplayer"] .browser-layout { grid-template-columns: minmax(0, 1fr) minmax(235px, 32%); }
+}
+
+@media (max-width: 900px) {
+  body.fantasy-online {
+    min-height: 100svh;
+    overflow: auto !important;
+  }
+
+  body.fantasy-online .game-shell {
+    display: flex !important;
+    flex-direction: column;
+    height: auto !important;
+    min-height: 100svh;
+  }
+
+  body.fantasy-online .game-header {
+    flex: 0 0 auto;
+    min-height: 68px;
+    padding: 10px 14px;
+    flex-wrap: wrap;
+  }
+
+  body.fantasy-online .game-header h1,
+  body.fantasy-online .header-divider { display: none; }
+  body.fantasy-online .game-brand { font-size: 28px; }
+  body.fantasy-online .header-end { margin-left: auto; font-size: 11px; }
+  body.fantasy-online .game-header .back-link { padding: 6px 10px; font-size: 12px; }
+
+  body.fantasy-online .game-nav {
+    flex: 0 0 auto;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 8px 10px;
+    border-right: 0;
+    border-bottom: 1px solid #bb8d57;
+  }
+
+  body.fantasy-online .game-nav > a {
+    flex: 1 1 30%;
+    justify-content: center;
+    min-height: 44px;
+    padding: 8px 5px;
+    font-size: 17px;
+  }
+
+  body.fantasy-online .game-nav > a img,
+  body.fantasy-online .nav-note { display: none; }
+  body.fantasy-online .game-main { flex: 1 0 auto; padding: 22px 14px 28px; overflow: visible; }
+  body.fantasy-online .view-heading { align-items: flex-start; flex-wrap: wrap; }
+  body.fantasy-online .view-heading h2 { font-size: 32px; }
+  body.fantasy-online .game-footer { flex: 0 0 auto; min-height: 52px; padding: 10px 14px; flex-wrap: wrap; }
+
+  body.fantasy-online[data-art-page="multiplayer"] .browser-layout {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  body.fantasy-online[data-art-page="multiplayer"] .room-browser {
+    min-height: 0;
+    overflow: visible;
+  }
+
+  body.fantasy-online[data-art-page="multiplayer"] .atlas-sheet {
+    min-height: 0;
+    max-height: none;
+    overflow: visible;
+  }
+
+  body.fantasy-online[data-art-page="multiplayer"] .room-scroll {
+    height: auto;
+    max-height: none;
+    overflow: visible;
+  }
+
+  body.fantasy-online[data-art-page="multiplayer"] .room-preview {
+    min-height: 0;
+    margin-top: 0;
+  }
+
+  body.fantasy-online[data-art-page="multiplayer"] .server-settings-row { flex-wrap: wrap; }
+  body.fantasy-online[data-art-page="multiplayer"] .server-settings-row label { width: 100%; }
+  body.fantasy-online[data-art-page="multiplayer"] .server-settings-row #refresh { margin-left: 0; }
+
+  body.fantasy-online[data-art-page="official"] .rank-stage,
+  body.fantasy-online[data-art-page="community"] .community-layout {
+    grid-template-columns: 1fr;
+  }
+
+  body.fantasy-online[data-art-page="official"] .rank-arena { min-height: 330px; }
+  body.fantasy-online[data-art-page="official"] .rank-dock { flex-wrap: wrap; }
+  body.fantasy-online[data-art-page="official"] .rank-dock .dock-copy { flex-basis: 100%; }
+  body.fantasy-online[data-art-page="official"] .rank-dock .primary { min-width: 145px; }
+  body.fantasy-online[data-art-page="community"] .community-auth { grid-template-columns: 1fr; }
+  body.fantasy-online[data-art-page="community"] .community-auth,
+  body.fantasy-online[data-art-page="community"] .community-panel { padding: 18px; }
+}
+
+@media (max-width: 520px) {
+  body.fantasy-online .game-header { gap: 7px; }
+  body.fantasy-online .game-brand { font-size: 25px; }
+  body.fantasy-online .header-end { order: 3; width: 100%; margin-left: 0; }
+  body.fantasy-online .game-header .back-link { margin-left: auto; }
+  body.fantasy-online .view-heading h2 { font-size: 29px; }
+  body.fantasy-online[data-art-page="multiplayer"] .room-preview h3 { font-size: 27px !important; }
+  body.fantasy-online[data-art-page="community"] .community-login-form { grid-template-columns: 1fr; }
+  body.fantasy-online[data-art-page="community"] .community-login-form :is(label, #communityServer, #communityLoginSubmit) { grid-column: 1; }
+  body.fantasy-online[data-art-page="community"] .post-fields { grid-template-columns: 1fr; }
+  body.fantasy-online[data-art-page="community"] .reply-form { flex-direction: column; align-items: stretch; }
+  body.fantasy-online[data-art-page="community"] .reply-form .button { width: 100%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body.fantasy-online * { transition: none !important; scroll-behavior: auto !important; }
+}
