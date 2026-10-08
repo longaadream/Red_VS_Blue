@@ -14,6 +14,13 @@
 
   function node(id) { return $(id) }
   function setText(id, value) { var element = node(id); if (element) element.textContent = value }
+  function renderHomeIdentity(saved, fallback) {
+    var element = node('userName')
+    var account = saved && saved.account
+    if (element && account && account.id && window.RvBPlayerProfile && typeof window.RvBPlayerProfile.renderIdentity === 'function') {
+      window.RvBPlayerProfile.renderIdentity(element, account, 'rvb-home-avatar', fallback)
+    } else if (element) element.textContent = fallback || '登录账号'
+  }
   function setHidden(id, value) { var element = node(id); if (element) element.hidden = value }
   function signal() { return typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function' ? AbortSignal.timeout(20000) : undefined }
 
@@ -97,7 +104,7 @@
     var origin = savedBase()
     var saved = sessionFor(origin)
     var name = saved && saved.account && saved.account.name ? saved.account.name : '登录账号'
-    setText('userName', name)
+    renderHomeIdentity(saved, name)
     var dot = node('userDot')
     if (dot) dot.style.background = saved ? '#22c55e' : '#a58d68'
     setText('communityStatus', saved

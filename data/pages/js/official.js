@@ -2,6 +2,7 @@
   'use strict'
   var $ = function (id) { return document.getElementById(id) }
   var current = null, activeMatch = null, busy = false, polling = false
+  var selectedRankTab = 'prepare', officialHistorySnapshot = '', officialHistoryDirty = true
   var announcedMatch = null, matchAudio = window.BattleAudio ? window.BattleAudio.create() : null
   if (matchAudio) window.addEventListener('pagehide', function () { matchAudio.dispose() }, { once: true })
   var nativeApp = location.protocol === 'rvb-client:' || !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform())
@@ -18,19 +19,63 @@
     return url.href.replace(/\/+$/, '')
   }
   function message(text) { $('message').textContent = text; $('authMessage').textContent = text; $('connectionMessage').textContent = text }
+  function renderAccountIdentity(element, account, avatarClass, fallback) {
+    if (!element) return
+    if (account && account.id && window.RvBPlayerProfile && typeof window.RvBPlayerProfile.renderIdentity === 'function') {
+      window.RvBPlayerProfile.renderIdentity(element, account, avatarClass, fallback)
+    } else element.textContent = fallback || '登录账号'
+  }
   function accountState(signedIn) {
     $('loginPrompt').hidden = signedIn; $('logout').hidden = !signedIn; $('guestSummary').hidden = signedIn
-    $('accountButton').textContent = signedIn ? current.account.name : '登录账号'
-    $('seatName').textContent = signedIn ? current.account.name : '你的席位'
+    renderAccountIdentity($('accountButton'), signedIn ? current.account : null, 'rvb-account-avatar', signedIn ? current.account.name : '登录账号')
+    renderAccountIdentity($('seatName'), signedIn ? current.account : null, 'rvb-seat-avatar', signedIn ? current.account.name : '你的席位')
     $('seatHint').textContent = signedIn ? '先禁图，再选择阵营与阵容' : '登录后准备匹配'
     if (!signedIn) { $('matchReady').hidden = true; announcedMatch = null; $('join').hidden = true; $('cancel').hidden = true; $('enter').hidden = true; $('queueStatus').textContent = '登录后即可参加排位' }
   }
-  function selectRankTab(name) {
-    document.querySelectorAll('[data-rank-tab]').forEach(function (tab) { var selected = tab.dataset.rankTab === name; tab.setAttribute('aria-selected', String(selected)); $('rank-' + tab.dataset.rankTab).hidden = !selected })
+  function ensureStatsTab() {
+    var tabs = document.querySelector('.rank-tabs')
+    var board = $('rank-board')
+    if (!tabs || !board || typeof document.createElement !== 'function' || $('rank-stats')) return
+    var tab = document.createElement('button')
+    tab.type = 'button'; tab.setAttribute('role', 'tab'); tab.setAttribute('aria-selected', 'false'); tab.setAttribute('data-rank-tab', 'stats'); tab.textContent = '棋子统计'
+    tabs.appendChild(tab)
+    var panel = document.createElement('section')
+    panel.className = 'rank-data'; panel.id = 'rank-stats'; panel.hidden = true; panel.setAttribute('role', 'tabpanel'); panel.setAttribute('aria-label', '当前资源棋子统计')
+    var heading = document.createElement('h3'); heading.textContent = '当前资源棋子统计'; panel.appendChild(heading)
+    var target = document.createElement('div'); target.setAttribute('data-profile-stats', ''); target.textContent = '选择「棋子统计」读取已结算样本。'; panel.appendChild(target)
+    if (board.parentNode && typeof board.parentNode.insertBefore === 'function') board.parentNode.insertBefore(panel, board.nextSibling)
   }
+  function selectRankTab(name) {
+    selectedRankTab = name
+    document.querySelectorAll('[data-rank-tab]').forEach(function (tab) {
+      var selected = tab.dataset.rankTab === name
+      tab.setAttribute('aria-selected', String(selected))
+      var panel = $('rank-' + tab.dataset.rankTab)
+      if (panel) panel.hidden = !selected
+    })
+    if (name === 'stats' && window.RvBPlayerProfile && typeof window.RvBPlayerProfile.loadCharacterStats === 'function') {
+      var statsPanel = $('rank-stats')
+      var statsTarget = statsPanel && typeof statsPanel.querySelector === 'function' ? statsPanel.querySelector('[data-profile-stats]') : statsPanel
+      void window.RvBPlayerProfile.loadCharacterStats(statsTarget)
+    }
+    if (name === 'history') {
+      var historyTarget = $('history')
+      if (current && current.account && current.account.id && window.RvBPlayerProfile && typeof window.RvBPlayerProfile.loadHistoryInto === 'function') {
+        var historyView = historyTarget && historyTarget.__rvbProfileHistoryView
+        var force = officialHistoryDirty || !historyView || !historyView.loaded
+        officialHistoryDirty = false
+        void window.RvBPlayerProfile.loadHistoryInto(historyTarget, current.account.id, { force: force })
+      } else if (historyTarget) historyTarget.textContent = current ? '暂无可用的对局历史。' : '登录后查看你的近期比赛。'
+    }
+  }
+  ensureStatsTab()
   document.querySelectorAll('[data-rank-tab]').forEach(function (tab) { tab.onclick = function () { selectRankTab(tab.dataset.rankTab) } })
   $('loginPrompt').onclick = function () { $('accountDialog').showModal() }
-  $('accountButton').onclick = function () { if (current) selectRankTab('history'); else $('accountDialog').showModal() }
+  $('accountButton').onclick = function () {
+    if (current && window.RvBPlayerProfile && current.account && current.account.id) void window.RvBPlayerProfile.open(current.account.id)
+    else if (current) selectRankTab('history')
+    else $('accountDialog').showModal()
+  }
   $('connectionButton').onclick = function () { $('connection').showModal() }
   async function api(path, body) {
     var origin = base(), saved = session(), headers = { 'Content-Type': 'application/json' }
@@ -70,17 +115,39 @@
           if (matchAudio) matchAudio.play('notice')
         }
         if (!activeMatch) announcedMatch = null
-        $('history').replaceChildren()
-        current.history.forEach(function (match) {
-          var item = document.createElement('article'), result = match.result, mine = result && result.first ? (result.first.id === current.account.id ? result.first : result.second) : null
-          item.textContent = new Date(match.created_at).toLocaleString() + ' · ' + match.season_id + '\n' + (mine ? (result.winnerId ? result.winnerId === current.account.id ? '胜利' : '失败' : '和局') + ' · ' + (mine.delta >= 0 ? '+' : '') + mine.delta + ' → ' + mine.after : match.status === 'void' ? '已作废 · ' + result.reason : '比赛进行中／等待结算')
-          $('history').appendChild(item)
-        })
-        if (!current.history.length) $('history').textContent = '还没有对战记录，开始你的第一场排位吧。'
+        var historySnapshot = JSON.stringify(current.history || [])
+        var historyChanged = historySnapshot !== officialHistorySnapshot
+        officialHistorySnapshot = historySnapshot
+        if (historyChanged) officialHistoryDirty = true
+        var historyTarget = $('history')
+        if (window.RvBPlayerProfile && typeof window.RvBPlayerProfile.loadHistoryInto === 'function') {
+          var historyView = historyTarget && historyTarget.__rvbProfileHistoryView
+          if (selectedRankTab === 'history' && (historyChanged || officialHistoryDirty || !historyView || !historyView.loaded)) {
+            var forceHistory = historyChanged || officialHistoryDirty
+            officialHistoryDirty = false
+            void window.RvBPlayerProfile.loadHistoryInto(historyTarget, current.account.id, { force: forceHistory })
+          }
+        } else {
+          $('history').replaceChildren()
+          current.history.forEach(function (match) {
+            var item = document.createElement('article'), result = match.result, mine = result && result.first ? (result.first.id === current.account.id ? result.first : result.second) : null
+            item.textContent = new Date(match.created_at).toLocaleString() + ' · ' + match.season_id + '\n' + (mine ? (result.winnerId ? result.winnerId === current.account.id ? '胜利' : '失败' : '和局') + ' · ' + (mine.delta >= 0 ? '+' : '') + mine.delta + ' → ' + mine.after : match.status === 'void' ? '已作废 · ' + result.reason : '比赛进行中／等待结算')
+            $('history').appendChild(item)
+          })
+          if (!current.history.length) $('history').textContent = '还没有对战记录，开始你的第一场排位吧。'
+        }
       }
-      else { current = null; activeMatch = null; $('profile').hidden = true; $('auth').hidden = false; $('history').textContent = '登录后查看你的近期比赛。'; accountState(false) }
+      else { current = null; activeMatch = null; officialHistorySnapshot = ''; officialHistoryDirty = true; $('profile').hidden = true; $('auth').hidden = false; $('history').textContent = '登录后查看你的近期比赛。'; accountState(false) }
       var board = await api('/official/leaderboard'); $('leaderboard').replaceChildren()
-      board.players.forEach(function (player) { var row = document.createElement('tr'); cell(row, player.name); cell(row, player.rating); cell(row, player.games); $('leaderboard').appendChild(row) })
+      board.players.forEach(function (player) {
+        var row = document.createElement('tr')
+        var playerCell = document.createElement('td')
+        var playerName = document.createElement('span')
+        playerName.textContent = player.name || player.id || '未知玩家'
+        if (window.RvBPlayerProfile && player.id) window.RvBPlayerProfile.decoratePlayer(playerName, { id: player.id, name: player.name })
+        playerCell.appendChild(playerName); row.appendChild(playerCell)
+        cell(row, player.rating); cell(row, player.games); $('leaderboard').appendChild(row)
+      })
     } catch (error) { message(error.message) } finally { polling = false }
   }
   async function connect() {
@@ -144,8 +211,9 @@
   if (nativeApp && savedServer.replace(/\/+$/, '') === location.origin) savedServer = ''
   $('server').value = savedServer || 'https://play.redvsblue.top'
   $('authAction').onchange()
-  if (new URLSearchParams(location.search).get('account') === '1') $('accountDialog').showModal()
-  if ($('server').value) void connect().catch(function (error) { message(error.message) })
+  var initialQuery = new URLSearchParams(location.search)
+  if (initialQuery.get('account') === '1') $('accountDialog').showModal()
+  if ($('server').value) void connect().then(function () { if (initialQuery.get('tab') === 'history') selectRankTab('history') }).catch(function (error) { message(error.message) })
   else message('请先设置官方服务器地址，再登录并匹配')
   setInterval(refresh, 4000)
 })()

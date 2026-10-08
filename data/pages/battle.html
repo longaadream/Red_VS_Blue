@@ -13,6 +13,8 @@
   <link rel="stylesheet" href="css/tabletop/related-hand-cards.css" />
   <script src="js/server-utils.js"></script><script src="js/lan-address.js"></script>
   <script src="js/developer-tools/match-trace.js"></script>
+  <link rel="stylesheet" href="css/tabletop/player-profile.css" />
+  <script src="js/player-profile.js" defer></script>
   <script src="js/crypto-lib.js"></script>
   <script src="js/identity.js"></script>
   <script src="js/game-engine-runtime.js"></script>
@@ -2400,6 +2402,7 @@
     let completedMatchTraceRecord = null
     let pressTimer = null      // long-press timer
     let playerNames = {}       // playerId → display name, loaded from room
+    const playerAccountIds = Object.create(null)
     let playerAlignments = {}  // playerId → authoritative light/dark content alignment
     const initialAlignment = params.get('alignment')
     if (myPlayerId && (initialAlignment === 'light' || initialAlignment === 'dark')) {
@@ -5898,6 +5901,7 @@
             ;(msg.room.players || []).forEach(function(p) {
               var pid = (p.id || '').toLowerCase()
               if (pid && p.name) playerNames[pid] = p.name
+              if (pid && typeof p.accountId === 'string') playerAccountIds[pid] = p.accountId
               if (pid) teamConnectionStatus[pid] = p.connectionStatus || 'online'
               if (pid && (p.alignment === 'light' || p.alignment === 'dark')) playerAlignments[pid] = p.alignment
             })
@@ -7298,6 +7302,17 @@
       if (!currentBattleViewModel) return
       if (typeof beforeBoardUpdate === 'function') beforeBoardUpdate(currentBattleViewModel)
       if (battleDomUi) battleDomUi.update(currentBattleViewModel)
+      bindBattlePlayerAvatars()
+    }
+
+    function bindBattlePlayerAvatars() {
+      if (!window.RvBPlayerProfile || !window.RvBPlayerProfile.bindAvatar || !Object.keys(playerAccountIds).length) return
+      document.querySelectorAll('.player-state-chip[data-player-id], .action-history-entity.is-player[data-player-id]').forEach(function(element) {
+        const pid = String(element.dataset.playerId || '').toLowerCase()
+        const accountId = playerAccountIds[pid]
+        const avatar = element.querySelector('.player-avatar, .is-player-avatar')
+        if (accountId && avatar) window.RvBPlayerProfile.bindAvatar(avatar, { id: accountId, name: playerNames[pid] || '玩家' })
+      })
     }
 
     function renderBoard(preparedModel, beforeBoardUpdate) {
@@ -7308,6 +7323,7 @@
       if (!currentBattleViewModel) return
       if (typeof beforeBoardUpdate === 'function') beforeBoardUpdate(currentBattleViewModel)
       if (battlePresentation) battlePresentation.update(currentBattleViewModel)
+      bindBattlePlayerAvatars()
       recalcCellSize()
       scheduleSkillPreviewReplayAfterRedraw()
 
