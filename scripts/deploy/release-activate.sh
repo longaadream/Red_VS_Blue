@@ -525,7 +525,8 @@ inspect_profile() {
 }
 
 atomic_link_update() {
-  local link=$1 target=$2 temporary="${link}.red245-tmp-$$"
+  local link=$1 target=$2
+  local temporary="${link}.red245-tmp-$$"
   [[ ! -e "$temporary" && ! -L "$temporary" ]] || die "temporary link already exists: $temporary"
   ln -s "$target" "$temporary" || die "cannot stage link $link"
   mv -Tf "$temporary" "$link" || die "cannot atomically update $link"

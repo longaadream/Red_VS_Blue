@@ -14,7 +14,10 @@ const PROFILE = path.join(ROOT, 'scripts/deploy/release-profile.mjs')
 const PACKAGE_HASH = '25b673f202e1b9eeace0fce32398439c3178c7b128b23a32b3710e5c7e6d2346'
 const NEW_PROFILE = '56211560292d9088c7ec0d1a97e0af86725fb63cd5ed2b16b4a1fd38bd24e3dd'
 const NEW_AUTHORITY = 'a46408509276fbb3a96d58bc2a8b6a0b0792775040f8f7ee63375f022c658fd2'
-const shell = fs.readFileSync(ACTIVATE, 'utf8')
+// Keep the source-file LF policy separate from the isolated fixture input:
+// Windows checkouts may present the tracked shell as CRLF, while the fixture
+// extracts shell functions by LF-delimited markers.
+const shell = fs.readFileSync(ACTIVATE, 'utf8').replace(/\r\n?/g, '\n')
 
 function indexOfOrFail(source, text) {
   const index = source.indexOf(text)
@@ -172,7 +175,10 @@ test('bundled profile helper performs signed install, idempotent install, activa
 
 function writeExecutable(file, source) {
   fs.mkdirSync(path.dirname(file), { recursive: true })
-  fs.writeFileSync(file, `#!/usr/bin/env node\n${source}\n`)
+  // The fixture prepends its own command directory to PATH. Use the test
+  // process's absolute Node path so command stubs do not depend on a host
+  // `node` lookup through that modified PATH.
+  fs.writeFileSync(file, `#!${process.execPath}\n${source}\n`)
   fs.chmodSync(file, 0o755)
 }
 
@@ -267,7 +273,15 @@ else process.exit(1)
 `)
   writeExecutable(path.join(bin, 'psql'), `const query = process.argv.join(' '); process.stdout.write((query.includes('battle_room_authority') ? '0' : process.env.MOCK_DB_RESULT) + '\\n')`)
   writeExecutable(path.join(bin, 'pg_dump'), '')
-  writeExecutable(path.join(bin, 'stat'), `process.stdout.write('rvb:rvb\\n')`)
+  writeExecutable(path.join(bin, 'stat'), `
+const fs = require('node:fs')
+const args = process.argv.slice(2)
+const format = args[args.indexOf('-c') + 1]
+const target = args.at(-1)
+if (format === '%U:%G') process.stdout.write('rvb:rvb\\n')
+else if (format === '%a') process.stdout.write((fs.statSync(target).isDirectory() ? '755' : '644') + '\\n')
+else process.exit(2)
+`)
   writeExecutable(path.join(bin, 'sleep'), '')
   writeExecutable(path.join(bin, 'sudo'), '')
   const panelStub = [
@@ -300,7 +314,7 @@ else process.exit(1)
   return {
     activate, bin, stateFile, eventsFile, maintenanceFile, gameLink, officialLink,
     oldRoot, candidateRoot, gameState, officialState, oldId, candidateId, commit,
-    oldProfile, newProfile, oldAuthority, newAuthority, dbResult,
+    oldProfile, newProfile, oldAuthority, newAuthority, dbResult, failOfficial,
   }
 }
 
@@ -343,7 +357,7 @@ test('mock command fixture executes post-start rollback and pre-stop preservatio
     const postEvents = fs.readFileSync(postStart.eventsFile, 'utf8').trim().split(/\r?\n/)
     assert.ok(postEvents.indexOf('systemctl:stop') < postEvents.lastIndexOf('systemctl:start'))
     assert.ok(postEvents.lastIndexOf('systemctl:stop') < postEvents.indexOf('rollback:game'))
-    assert.ok(postEvents.indexOf('rollback:game') < postEvents.indexOf('systemctl:start'))
+    assert.ok(postEvents.indexOf('rollback:game') < postEvents.lastIndexOf('systemctl:start'))
     assert.equal(fs.realpathSync(postStart.gameLink), postStart.oldRoot)
     assert.equal(fs.realpathSync(postStart.officialLink), postStart.oldRoot)
     assert.equal(fs.existsSync(path.join(postStart.gameState, 'resource-pack', '.fixture-new')), false)
@@ -366,6 +380,7 @@ test('mock command fixture executes post-start rollback and pre-stop preservatio
     assert.ok(partialEvents.includes('install:game'))
     assert.ok(partialEvents.includes('install-failed:official'))
     assert.ok(partialEvents.indexOf('systemctl:stop') < partialEvents.indexOf('rollback:game'))
+    assert.ok(partialEvents.indexOf('rollback:game') < partialEvents.lastIndexOf('systemctl:start'))
     assert.equal(fs.existsSync(path.join(partial.gameState, 'resource-pack', '.fixture-new')), false)
     assert.equal(fs.realpathSync(partial.gameLink), partial.oldRoot)
   } finally {

@@ -54,6 +54,10 @@ git diff --check -- scripts/deploy/release-activate.sh scripts/deploy/release-pr
 
 `server-release-deploy.test.mjs` 包含静态门禁顺序断言、真实 esbuild bundle 后的 signed install/idempotent/activation-guard/rollback fixture，以及 POSIX 隔离 mock command fixture。该 fixture 覆盖 post-start failure、official partial install failure 和停服前 DB gate failure；Windows 开发机上最后一项因没有可用 POSIX bash 会 skip，Linux 发布主机应运行它，确认 stop-before-rollback 顺序和停服前失败不停止服务。
 
+POSIX fixture 只在读取 shell source 供隔离执行时归一化 CRLF，正式脚本仍按仓库的 LF 门禁检查；命令 mock 使用测试进程的绝对 Node 路径，并分别模拟 `%U:%G`、目录 `%a=755` 和文件 `%a=644`。Linux 验证应看到三项通过；若只在 Windows 运行，应明确记录一项 POSIX fixture skip，不能将其记为通过。
+
+独立 Linux 验证曾复现 `atomic_link_update` 在同一 `local` 声明中读取尚未绑定的 `link`，导致 `set -u` 中止回退。已将 `temporary` 初始化拆到下一条声明。修复后，官方机器新建的 `/tmp/rvb-red245-shell-qa-dda817a776ad43e8b4f5243285f81dd0` 内真实 Bash fixture 为 1/1 PASS（post-start rollback、pre-stop refusal、partial-install rollback）；上传脚本 SHA-256 与本机完全一致：`af28ca88641136427df5df67ae1299963f1902cc89d979fd7f4ba176382edaf8`。测试副本只移除未被该 name-filter 执行的静态 `esbuild` import，没有改动 fixture 行为。另从实际脚本提取函数，在 `set -Eeuo pipefail` 下更新临时 symlink，`atomic_link_update_ok` 且 exit=0。全部 mock 状态位于新建 `/tmp` 下，未调用真实生产服务、DB 或 `/opt`/`/var` 写入；Windows 另外两项测试通过。
+
 ## 回退
 
 回退只通过同一 trusted helper 的 `rollback` 和旧 release link 原子恢复完成；禁止复制或编辑 `resource-pack/active.json`，禁止恢复数据库。生产执行前应保存 stdout/stderr、panel snapshot、service 状态、old/new identity、DB idle 查询、backup 路径及 rollback 证据。
