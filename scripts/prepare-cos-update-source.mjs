@@ -8,6 +8,7 @@ import { verifyBundle } from './synchronized-release.mjs'
 export const COS_ORIGIN = 'https://updates.redvsblue.top'
 const repository = 'https://github.com/longaadream/Red_VS_Blue'
 const sha = bytes => createHash('sha256').update(bytes).digest('hex')
+const hashPattern = /^[a-f0-9]{64}$/
 const read = file => JSON.parse(fs.readFileSync(file, 'utf8'))
 
 // Preparation only: consume previously verified public release receipts, never sign,
@@ -22,11 +23,24 @@ export function prepareCosUpdateSource({ clientDirectory, resourceDirectory, out
   const receipt = read(path.join(resourceDirectory, 'public-verification.json'))
   const verification = read(path.join(resourceDirectory, 'verification.json'))
   const tag = `content-test-${index.contentHash}`
-  if (index.schema !== 'rvb-content-release/v1' || index.channel !== 'test' || !/^\d+\.\d+\.\d+$/.test(index.version) || !/^[a-f0-9]{64}$/.test(index.contentHash) || index.archive !== 'content.rvbpack' || index.patch || index.identity?.signature !== 'signed') throw Error('Unsupported resource release; expected a signed full snapshot')
+  if (index.schema !== 'rvb-content-release/v1' || index.channel !== 'test' || !/^\d+\.\d+\.\d+$/.test(index.version) || !hashPattern.test(index.contentHash) || index.archive !== 'content.rvbpack' || index.identity?.signature !== 'signed') throw Error('Unsupported resource release; expected a signed full snapshot')
   if (receipt.ok !== true || receipt.publicAssetsByteMatched !== true || receipt.publicDiscovery !== true || receipt.tag !== tag || receipt.url !== `${repository}/releases/tag/${tag}` || receipt.version !== index.version || !Number.isFinite(Date.parse(receipt.publishedAt)) || verification.ok !== true || verification.signatureVerified !== true) throw Error('Verified public resource release receipts required')
   const pack = fs.readFileSync(path.join(resourceDirectory, index.archive))
   if (sha(pack) !== index.archiveSha256) throw Error('Resource archive checksum mismatch')
+  let patch
+  if (index.patch !== undefined) {
+    const value = index.patch
+    const allowedKeys = new Set(['archive', 'sha256', 'parentProfileHash', 'resolvedProfileHash', 'size'])
+    if (!value || typeof value !== 'object' || Array.isArray(value) || Object.keys(value).some(key => !allowedKeys.has(key)) || value.archive !== 'content-patch.rvbpack' || !hashPattern.test(value.sha256) || !hashPattern.test(value.parentProfileHash) || !hashPattern.test(value.resolvedProfileHash) || (value.size !== undefined && (!Number.isSafeInteger(value.size) || value.size <= 0))) {
+      throw Error('Unsupported resource release; invalid canonical patch metadata')
+    }
+    patch = fs.readFileSync(path.join(resourceDirectory, value.archive))
+    if (value.size !== undefined && value.size !== patch.length) throw Error('Resource patch size mismatch')
+    if (sha(patch) !== value.sha256) throw Error('Resource patch checksum mismatch')
+    if (patch.length >= pack.length) throw Error('Resource patch must be smaller than the full archive')
+  }
   const resourceAssets = new Map([['content-update.json', indexBytes], ['content.rvbpack', pack]])
+  if (patch) resourceAssets.set('content-patch.rvbpack', patch)
   const assets = [...resourceAssets].map(([name, bytes]) => {
     const matching = receipt.assets?.filter(asset => asset.name === name)
     if (matching?.length !== 1 || matching[0].size !== bytes.length || matching[0].digest !== `sha256:${sha(bytes)}`) throw Error('Resource public asset receipt mismatch: ' + name)

@@ -16,7 +16,7 @@ const options = { encoding: 'utf8', windowsHide: true, stdio: 'pipe' }
 let base, target, patch
 before(() => {
   const directory = 'android/app/src/uiAcceptance/java/com/redvsblue/client/'
-  execFileSync(executable('javac'), ['-d', out, directory+'ApkDelta.java', directory+'ApkUpdateTransfer.java', 'tests/build/ApkDeltaHarness.java'], { ...options, cwd: root })
+  execFileSync(executable('javac'), ['-encoding', 'UTF-8', '-d', out, directory+'ApkDelta.java', directory+'ApkUpdateTransfer.java', 'tests/build/ApkDeltaHarness.java'], { ...options, cwd: root })
   // Incompressible unchanged bytes + insertion/edits model signed APK offsets moving.
   base = crypto.randomBytes(4 * 1024 * 1024)
   target = Buffer.concat([base.subarray(0, 17000), crypto.randomBytes(111), base.subarray(17000, 700000), crypto.randomBytes(5000), base.subarray(705000)])
