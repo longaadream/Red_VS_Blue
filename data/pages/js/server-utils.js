@@ -42,10 +42,15 @@
   function saveOfficialSession(value) {
     if (!value || !value.url || !value.token || !value.account) return false
     var normalized = normalizeServerUrl(value.url)
+    var previous = readOfficialSession(normalized)
     var session = Object.assign({}, value, { url: normalized })
     try {
       localStorage.setItem(officialSessionKey(normalized), JSON.stringify(session))
       sessionStorage.setItem('rvb_official_session', JSON.stringify(session))
+      var canonical = normalizeOfficialOrigin(localStorage.getItem('rvb_official_url') || '')
+      if ((!previous || previous.token !== session.token) && canonical === normalized && typeof startOfficialPresence === 'function') {
+        Promise.resolve().then(function () { return startOfficialPresence(normalized, session.token) }).catch(function () {})
+      }
       return true
     } catch { return false }
   }
@@ -57,6 +62,182 @@
       var active = JSON.parse(sessionStorage.getItem('rvb_official_session') || 'null')
       if (!normalized || (active && normalizeServerUrl(active.url) === normalized)) sessionStorage.removeItem('rvb_official_session')
     } catch {}
+    if (typeof officialPresence !== 'undefined' && (!normalized || officialPresence.origin === normalized) && typeof stopOfficialPresence === 'function') stopOfficialPresence()
+  }
+
+  var OFFICIAL_PRESENCE_INTERVAL_MS = 20000
+  var OFFICIAL_PRESENCE_ROUTE = '/official/community/heartbeat'
+  var officialPresence = {
+    timer: null,
+    inFlight: false,
+    origin: '',
+    token: '',
+    generation: 0,
+    disabledOrigin: '',
+    firstPromise: null,
+  }
+
+  function isLoopbackHostname(hostname) {
+    return /^(localhost|127(?:\.\d{1,3}){3}|\[::1\])$/i.test(String(hostname || ''))
+  }
+
+  function normalizeOfficialOrigin(raw) {
+    var value = String(raw || '').trim()
+    if (!value) return ''
+    try {
+      var url = new URL(value)
+      if (url.username || url.password || url.search || url.hash) return ''
+      if (url.protocol !== 'https:' && !(url.protocol === 'http:' && isLoopbackHostname(url.hostname))) return ''
+      return url.href.replace(/\/+$/, '')
+    } catch { return '' }
+  }
+
+  function officialPresenceSession(preferredOrigin, preferredToken) {
+    var hasPreferredOrigin = preferredOrigin !== undefined && preferredOrigin !== null
+    var origin = normalizeOfficialOrigin(hasPreferredOrigin ? preferredOrigin : (localStorage.getItem('rvb_official_url') || ''))
+    if (!origin) return null
+    var session = readOfficialSession(origin)
+    var token = preferredToken || (session && session.token)
+    if (!session || !session.token || !token || session.token !== token) return null
+    return { origin: origin, token: token }
+  }
+
+  function presenceSessionMatches(origin, token) {
+    var session = readOfficialSession(origin)
+    return !!(session && session.token === token)
+  }
+
+  function emitOfficialPresence(status, origin, token) {
+    if (typeof window === 'undefined' || typeof window.dispatchEvent !== 'function') return
+    var detail = { status: status, origin: origin, token: token }
+    try {
+      if (typeof CustomEvent === 'function') window.dispatchEvent(new CustomEvent('rvb-official-presence', { detail: detail }))
+      else if (typeof document !== 'undefined' && document.createEvent) {
+        var event = document.createEvent('CustomEvent')
+        event.initCustomEvent('rvb-official-presence', false, false, detail)
+        window.dispatchEvent(event)
+      }
+    } catch {}
+  }
+
+  function stopOfficialPresence() {
+    if (officialPresence.timer !== null && typeof clearInterval === 'function') clearInterval(officialPresence.timer)
+    officialPresence.timer = null
+    officialPresence.inFlight = false
+    officialPresence.origin = ''
+    officialPresence.token = ''
+    officialPresence.generation += 1
+    officialPresence.firstPromise = null
+  }
+
+  async function officialPresenceRequest(origin, token) {
+    var options = {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: '{}',
+      cache: 'no-store',
+    }
+    var controller = typeof AbortController === 'function' ? new AbortController() : null
+    var timer = null
+    if (controller) {
+      options.signal = controller.signal
+      timer = setTimeout(function () { controller.abort() }, 20000)
+    } else if (typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function') {
+      options.signal = AbortSignal.timeout(20000)
+    }
+    try { return await fetch(origin + OFFICIAL_PRESENCE_ROUTE, options) }
+    finally { if (timer !== null) clearTimeout(timer) }
+  }
+
+  function presenceResult(response) {
+    if (response && response.ok) return true
+    return false
+  }
+
+  function heartbeatOfficialPresence(origin, token, generation) {
+    if (generation !== officialPresence.generation || officialPresence.inFlight) return officialPresence.firstPromise || Promise.resolve(false)
+    officialPresence.inFlight = true
+    var operation = officialPresenceRequest(origin, token).then(function (response) {
+      if (generation !== officialPresence.generation) return false
+      if (response && response.status === 401) {
+        if (presenceSessionMatches(origin, token)) {
+          emitOfficialPresence('unauthorized', origin, token)
+          clearOfficialSession(origin)
+          stopOfficialPresence()
+        }
+        return false
+      }
+      if (response && response.status === 404) {
+        if (!presenceSessionMatches(origin, token)) return false
+        officialPresence.disabledOrigin = origin
+        emitOfficialPresence('unsupported', origin, token)
+        stopOfficialPresence()
+        return false
+      }
+      if (!presenceResult(response)) {
+        if (generation === officialPresence.generation && presenceSessionMatches(origin, token)) {
+          emitOfficialPresence('failure', origin, token)
+          if (officialPresence.timer !== null && typeof clearInterval === 'function') clearInterval(officialPresence.timer)
+          officialPresence.timer = null
+        }
+        return false
+      }
+      if (!presenceSessionMatches(origin, token)) return false
+      emitOfficialPresence('connected', origin, token)
+      return true
+    }).catch(function () {
+      if (generation === officialPresence.generation && presenceSessionMatches(origin, token)) {
+        emitOfficialPresence('failure', origin, token)
+        if (officialPresence.timer !== null && typeof clearInterval === 'function') clearInterval(officialPresence.timer)
+        officialPresence.timer = null
+      }
+      return false
+    }).finally(function () {
+      if (generation === officialPresence.generation) officialPresence.inFlight = false
+    })
+    officialPresence.firstPromise = operation
+    return operation
+  }
+
+  function startOfficialPresence(preferredOrigin, preferredToken) {
+    var current = officialPresenceSession(preferredOrigin, preferredToken)
+    if (!current) return Promise.resolve(false)
+    if (officialPresence.disabledOrigin === current.origin) return Promise.resolve(false)
+    if (officialPresence.disabledOrigin && officialPresence.disabledOrigin !== current.origin) officialPresence.disabledOrigin = ''
+    if (officialPresence.origin === current.origin && officialPresence.token === current.token && officialPresence.timer !== null) {
+      return officialPresence.firstPromise || Promise.resolve(true)
+    }
+    stopOfficialPresence()
+    officialPresence.origin = current.origin
+    officialPresence.token = current.token
+    var generation = officialPresence.generation
+    var first = heartbeatOfficialPresence(current.origin, current.token, generation)
+    officialPresence.timer = typeof setInterval === 'function'
+      ? setInterval(function () {
+        if (generation !== officialPresence.generation || officialPresence.inFlight) return
+        var latest = officialPresenceSession(current.origin)
+        if (!latest) { stopOfficialPresence(); return }
+        if (latest.origin !== current.origin || latest.token !== current.token) {
+          stopOfficialPresence()
+          void startOfficialPresence(current.origin, latest.token)
+          return
+        }
+        void heartbeatOfficialPresence(current.origin, current.token, generation)
+      }, OFFICIAL_PRESENCE_INTERVAL_MS)
+      : null
+    return first
+  }
+
+  function realPresenceDocument() {
+    return typeof document !== 'undefined' && document && typeof document.addEventListener === 'function' && (document.nodeType === 9 || document.documentElement)
+  }
+
+  function bindOfficialPresenceLifecycle() {
+    if (!realPresenceDocument()) return
+    var start = function () { void startOfficialPresence() }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start, { once: true })
+    else start()
+    if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') window.addEventListener('pagehide', stopOfficialPresence, { once: true })
   }
 
   function getServerUrl() {
@@ -744,5 +925,9 @@
     readOfficialSession: readOfficialSession,
     saveOfficialSession: saveOfficialSession,
     clearOfficialSession: clearOfficialSession,
+    normalizeOfficialOrigin: normalizeOfficialOrigin,
+    startOfficialPresence: startOfficialPresence,
+    stopOfficialPresence: stopOfficialPresence,
   }
+  bindOfficialPresenceLifecycle()
 })()

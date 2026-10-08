@@ -6,10 +6,11 @@ import { matchMaker } from 'colyseus'
 import { OfficialError } from './accounts'
 import type { Ranked } from './ranked'
 import type { createSmtpMailer } from './mail'
+import type { Community } from './community'
 
 type Mail = Pick<ReturnType<typeof createSmtpMailer>, 'status' | 'verify'>
 export type PanelOperations = { read(): Promise<unknown>; execute(action: string, input: Record<string, unknown>): Promise<void> }
-export async function startControlPanel(options: { ranked: Ranked; mail: Mail; assetsRoot: string; pagesRoot: string; playerPort: number; shutdown: () => Promise<void>; operations?: PanelOperations }) {
+export async function startControlPanel(options: { ranked: Ranked; mail: Mail; assetsRoot: string; pagesRoot: string; playerPort: number; shutdown: () => Promise<void>; operations?: PanelOperations; community?: Community }) {
   const token = randomBytes(32).toString('base64url'), startedAt = Date.now()
   const assets = new Map<string, { body: Buffer; type: string }>()
   for (const [url, file, type] of [
@@ -20,6 +21,7 @@ export async function startControlPanel(options: { ranked: Ranked; mail: Mail; a
     ['/font.ttf', path.join(options.pagesRoot, 'images/tabletop/ZCOOLKuaiLe-Regular.ttf'), 'font/ttf'],
   ]) assets.set(url, { body: readFileSync(file), type })
   let origin = '', mutating = false, closing = false, lastMailCheck = 0
+  const community = () => options.community ?? (options.ranked as Ranked & { community?: Community }).community
   const json = (res: ServerResponse, status: number, value: unknown) => { res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' }); res.end(JSON.stringify(value)) }
   async function body(req: IncomingMessage) {
     if (req.headers['content-type'] !== 'application/json') throw new OfficialError('需要JSON请求', 415)
@@ -66,6 +68,10 @@ export async function startControlPanel(options: { ranked: Ranked; mail: Mail; a
           ORDER BY a.created_at DESC,a.id LIMIT 31 OFFSET $2`, [q, offset])).rows
         json(res, 200, { rows: rows.slice(0, 30), more: rows.length > 30 }); return
       }
+      if (req.method === 'GET' && url.pathname === '/api/community') {
+        const service = community(); if (!service) throw new OfficialError('请使用新版Windows启动器打开完整社区审核功能', 503)
+        json(res, 200, await service.moderation(Number(url.searchParams.get('offset') ?? 0))); return
+      }
       if (req.method === 'GET' && url.pathname === '/api/matches') {
         const filter = url.searchParams.get('status') || 'assigned'
         if (!['assigned', 'settled', 'void'].includes(filter)) throw new OfficialError('对局筛选无效')
@@ -100,6 +106,10 @@ export async function startControlPanel(options: { ranked: Ranked; mail: Mail; a
             const stop = () => { if (scheduled) return; scheduled = true; setImmediate(() => { void options.shutdown().catch(() => console.error('[official-panel] SHUTDOWN_FAILED')) }) }
             res.once('finish', stop); res.once('close', stop)
             if (res.destroyed) stop()
+          } else if (['community-hide', 'community-hide-post', 'community-hide-reply'].includes(action)) {
+            const service = community(); if (!service) throw new OfficialError('请使用新版Windows启动器打开完整社区审核功能', 503)
+            if (!reason.trim() || reason.length > 300) throw new OfficialError('请填写1–300字的操作原因')
+            await service.administer(action, value, reason)
           } else if (['maintenance', 'ban', 'unban', 'season', 'kick', 'rank-disable', 'rank-enable', 'cooldown-clear', 'queue-clear', 'capacity', 'announcement', 'map-pool', 'void-match'].includes(action)) await options.ranked.administer(action, value, reason)
           else throw new OfficialError('未知管理操作')
           json(res, 200, { ok: true }); return

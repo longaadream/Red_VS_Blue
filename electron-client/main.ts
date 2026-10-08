@@ -59,6 +59,8 @@ const LOCAL_AUTHORITY_AUTO_RECOVERY_DELAYS_MS = [250, 750, 1_500] as const
 const LOCAL_AUTHORITY_READY_TIMEOUT_MS = 900_000
 const PROFILE_ARCHIVE_MAX_BYTES = 32 * 1024 * 1024
 const PROFILE_ADMIN_KEY = randomBytes(32).toString('hex')
+// Public launch marker: stable through page navigation, renewed on process restart.
+const communityLaunchId = randomBytes(16).toString('hex')
 let allowAppExit = false
 let appExitPromise: Promise<void> | null = null
 let officialUpdateApplying = false
@@ -2100,6 +2102,7 @@ function createGameWindow(): BrowserWindow {
     autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
+      additionalArguments: [`--rvb-community-launch=${communityLaunchId}`],
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,

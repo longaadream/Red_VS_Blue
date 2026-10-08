@@ -69,10 +69,12 @@ it('routes bare lobby navigation to the public directory, preserving explicit en
     expect(replace).toHaveBeenCalledTimes(search.includes('create=') || search.includes('joinRoom=') ? 0 : 1)
   }
 })
-it('has only room lobby and ranked navigation', () => {
+it('keeps room and ranked routes reachable and exposes community on online entry pages', () => {
   for (const page of ['multiplayer','lobby','official']) {
     const nav=readFileSync('data/pages/'+page+'.html','utf8').split('<nav')[1].split('</nav>')[0]
-    expect(nav.match(/<a /g)).toHaveLength(2)
+    expect(nav).toContain('href="multiplayer.html"')
+    expect(nav).toContain('href="official.html"')
+    if (page !== 'lobby') expect(nav).toContain('href="community.html"')
     expect(nav).not.toContain('>服务器</a>')
   }
 })
