@@ -391,7 +391,7 @@
       const player = ((model && model.players) || []).find(function (entry) {
         return String(entry.id || '').toLowerCase() === String(playerId || '').toLowerCase()
       })
-      return player ? '<span class="action-history-entity is-player" title="' + escapeHtml(player.name || player.id) + '">'
+      return player ? '<span class="action-history-entity is-player" data-player-id="' + escapeHtml(player.id) + '" title="' + escapeHtml(player.name || player.id) + '">'
         + '<i class="action-history-avatar is-player-avatar" data-faction="' + escapeHtml(player.faction) + '" role="img" aria-label="玩家 ' + escapeHtml(player.name || player.id) + '">'
         + escapeHtml(String(player.name || player.id).slice(0, 1)) + '</i>'
         + (compact ? '' : '<span>' + escapeHtml(player.name || player.id) + '</span>') + '</span>' : ''

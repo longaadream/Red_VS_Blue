@@ -126,6 +126,8 @@
 - [`ADR-0027-colyseus-single-session-match-lifecycle.md`](./ADR-0027-colyseus-single-session-match-lifecycle.md)：Colyseus 原生单会话重连、Room clock、精确 receipt 查询和本机 authority 失败边界（RED-170，已接受）。
 - [`ADR-0028-contested-charge-crystals.md`](./ADR-0028-contested-charge-crystals.md)：正式棋子死亡生成公共永久结晶，仅普通移动可为任一方拾取并转化为队伍 CP（RED-185，已接受）。
 
+- [`ADR-0037-player-profiles-and-terminal-replay.md`](./ADR-0037-player-profiles-and-terminal-replay.md)：玩家档案、已结算阵容统计、受限官方回放与好友房间邀请（RED-244，已批准方案，实施候选）。
+
 以下内容目前作为项目基础方向，后续可根据最新代码分别建立正式 ADR：
 
 - GitHub 作为代码、PR、构建和发布记录的主要平台。

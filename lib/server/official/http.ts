@@ -4,8 +4,12 @@ import { Ranked } from './ranked'
 import type { PostgresBattleReportReader } from '../postgres/authority-types'
 import { rankedMapCatalog, validateRankedMapPool } from './pregame'
 import type { Community } from './community'
+import type { PlayerProfilesApi } from './player-profiles'
+import type { OfficialReplayService } from './player-replay'
+import type { RoomInvitations } from './room-invitations'
 
-export function mountOfficialApi(app: Express, accounts: Accounts, ranked: Ranked, reports: PostgresBattleReportReader, injectedCommunity?: Community) {
+export function mountOfficialApi(app: Express, accounts: Accounts, ranked: Ranked, reports: PostgresBattleReportReader, injectedCommunity?: Community,
+  playerServices?: { profiles: PlayerProfilesApi; replay: OfficialReplayService; invitations: RoomInvitations }) {
   app.use('/official', express.json({ limit: '8kb', strict: true }))
   const community = injectedCommunity ?? (ranked as Ranked & { community?: Community }).community
   const token = (request: Request) => String(request.headers.authorization ?? '').replace(/^Bearer /, '')
@@ -17,6 +21,10 @@ export function mountOfficialApi(app: Express, accounts: Accounts, ranked: Ranke
     const account = await accounts.authenticate(token(request))
     if (write) await accounts.limit(`community-write:${account.id}`, 120, 60)
     return account
+  }
+  const players = () => {
+    if (!playerServices) throw new OfficialError('玩家资料服务暂不可用，请稍后重试', 503)
+    return playerServices
   }
   function endpoint(path: string, handler: (request: Request) => Promise<unknown>, post = false) {
     const route = async (request: Request, response: Response) => {
@@ -47,6 +55,49 @@ export function mountOfficialApi(app: Express, accounts: Accounts, ranked: Ranke
   endpoint('/official/queue/join', async request => { const account = await accounts.authenticate(token(request)); await ranked.enqueue(account.id, request.body?.profileIdentity); return { ok: true } }, true)
   endpoint('/official/queue/cancel', async request => { const account = await accounts.authenticate(token(request)); await ranked.cancel(account.id); return { ok: true } }, true)
   endpoint('/official/leaderboard', async () => ({ players: await ranked.leaderboard() }))
+  endpoint('/official/players/catalog', async request => {
+    await communityAccount(request)
+    return players().profiles.catalog()
+  })
+  endpoint('/official/players/cards', async request => {
+    await communityAccount(request)
+    return players().profiles.cards(request.query.ids)
+  })
+  endpoint('/official/players/me', async request => {
+    const account = await communityAccount(request, true)
+    await accounts.limit(`profile-edit:${account.id}`, 10, 60)
+    return players().profiles.updateProfile(account.id, request.body)
+  }, true)
+  endpoint('/official/players/:accountId/history', async request => {
+    const account = await communityAccount(request)
+    return players().profiles.history(account.id, String(request.params.accountId), request.query.cursor)
+  })
+  endpoint('/official/players/:accountId', async request => {
+    const account = await communityAccount(request)
+    return players().profiles.getProfile(account.id, String(request.params.accountId))
+  })
+  endpoint('/official/character-stats', async request => {
+    const account = await communityAccount(request)
+    await accounts.limit(`character-stats:${account.id}`, 12, 60)
+    return players().profiles.characterStats()
+  })
+  endpoint('/official/matches/:matchId/replay', async request => {
+    const account = await communityAccount(request)
+    await accounts.limit(`replay-export:${account.id}`, 12, 60)
+    return { trace: await players().replay.read(account.id, String(request.params.matchId)) }
+  })
+  endpoint('/official/community/invitations', async request => {
+    const account = await communityAccount(request)
+    return players().invitations.list(account.id)
+  })
+  endpoint('/official/community/invitations', async request => {
+    const account = await communityAccount(request, true)
+    return players().invitations.send(account.id, request.body)
+  }, true)
+  for (const action of ['accept', 'decline'] as const) endpoint(`/official/community/invitations/:invitationId/${action}`, async request => {
+    const account = await communityAccount(request, true)
+    return players().invitations.respond(account.id, request.params.invitationId, action === 'accept')
+  }, true)
   endpoint('/official/maps', async () => ({ maps: rankedMapCatalog(validateRankedMapPool((await ranked.pool.query('SELECT ranked_maps FROM official_settings')).rows[0].ranked_maps)) }))
   endpoint('/official/pregame/:matchId', async request => {
     const account = await accounts.authenticate(token(request))

@@ -3,8 +3,10 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { randomUUID } from 'node:crypto'
+import { Script, createContext } from 'node:vm'
 import { matchMaker } from 'colyseus'
 import { Client, type Room } from '@colyseus/sdk'
+import { Pool } from 'pg'
 import { EmbeddedPostgresController } from '../../electron-client/embedded-postgres'
 import { findFreePort } from '../../electron-client/local-port'
 import { createOfficialServer } from '@/lib/server/official/server'
@@ -20,11 +22,24 @@ import { BATTLE_AUTHORITY_BUILD_ID, BATTLE_AUTHORITY_PROTOCOL_VERSION } from '@/
 
 describe.skipIf(process.platform !== 'win32')('Windows embedded PostgreSQL official integration', () => {
 let databaseUrl: string
-let app: Awaited<ReturnType<typeof createOfficialServer>>, pg: EmbeddedPostgresController, root: string, url: string
+let app: Awaited<ReturnType<typeof createOfficialServer>>, pg: EmbeddedPostgresController | undefined, basePool: Pool | undefined, root: string, url: string
+let externalSchema: string | undefined
 const mail = new Map<string, string>(), clients: Room[] = []
 const profileIdentity = getServerGameProfileIdentityV1()
 type User = { token: string; account: { id: string; name: string; email: string } }
+type BrowserTraceTools = { assertTraceRecord: (value: unknown) => unknown }
 beforeAll(async () => {
+  const externalDatabaseUrl = String(process.env.RVB_TEST_POSTGRES_URL || '').trim()
+  if (externalDatabaseUrl) {
+    externalSchema = `red244_ranked_${process.pid}_${Date.now()}_${randomUUID().slice(0, 8)}`
+    basePool = new Pool({ connectionString: externalDatabaseUrl, max: 4 })
+    await basePool.query(`CREATE SCHEMA ${quoteIdentifier(externalSchema)}`)
+    databaseUrl = withSearchPath(externalDatabaseUrl, externalSchema)
+    app = await createOfficialServer({ databaseUrl, mail: async (to: string, purpose: string, code: string) => { mail.set(`${to}:${purpose}`, code) }, maxMatches: 2, reconnectGraceMs: 5000, adminToken: 'a'.repeat(43) })
+    const port = await findFreePort(38932); url = `http://127.0.0.1:${port}`
+    await app.start(port)
+    return
+  }
   root = fs.mkdtempSync(path.join(os.tmpdir(), 'rvb-official-test-'))
   pg = new EmbeddedPostgresController({ runtimeRoot: path.resolve('_client-postgres/pgsql'), stateRoot: root, findFreePort, portHint: 38931,
     protectSecret: value => Buffer.from(value), unprotectSecret: value => value.toString(),
@@ -37,12 +52,40 @@ beforeAll(async () => {
 }, 90000)
 afterAll(async () => {
   for (const client of clients) if (client.connection.isOpen) await client.leave()
-  await app?.close(); await pg?.stop()
-  // Keep the uniquely named evidence database for failure diagnosis; never delete a user's database.
+  let closeFailed = false
+  try { await app?.close() } catch { closeFailed = true }
+  await pg?.stop()
+  if (basePool) {
+    const keepSchema = closeFailed || process.env.RVB_KEEP_OFFICIAL_RANKED_SCHEMA === '1'
+    if (!keepSchema && externalSchema) await basePool.query(`DROP SCHEMA IF EXISTS ${quoteIdentifier(externalSchema)} CASCADE`).catch(() => {})
+    await basePool.end().catch(() => {})
+  }
 }, 30000)
 async function http(route: string, body?: unknown, token?: string) {
   const response = await fetch(url + route, { method: body === undefined ? 'GET' : 'POST', headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) }, body: body === undefined ? undefined : JSON.stringify(body) })
   return { status: response.status, body: await response.json() }
+}
+function loadBrowserTraceTools(): BrowserTraceTools {
+  const source = fs.readFileSync(path.resolve(process.cwd(), 'data/pages/js/developer-tools/match-trace.js'), 'utf8')
+  const context = createContext({
+    window: {},
+    localStorage: { getItem: () => null, setItem: () => undefined, removeItem: () => undefined },
+    Blob,
+    URL: { createObjectURL: () => 'blob:trace', revokeObjectURL: () => undefined },
+    document: { createElement: () => ({ click: () => undefined, remove: () => undefined }), body: { appendChild: () => undefined } },
+    setTimeout: (callback: () => void) => callback(),
+  })
+  new Script(source, { filename: 'match-trace.js' }).runInContext(context)
+  const browserWindow = context as unknown as { window: { RvBDeveloperTools: BrowserTraceTools } }
+  return browserWindow.window.RvBDeveloperTools
+}
+function quoteIdentifier(identifier: string): string {
+  return `"${identifier.replaceAll('"', '""')}"`
+}
+function withSearchPath(connectionString: string, schema: string): string {
+  const scoped = new URL(connectionString)
+  scoped.searchParams.set('options', `-c search_path=${schema},public`)
+  return scoped.toString()
 }
 async function user(): Promise<User> {
   const email = `${randomUUID()}@example.test`, password = 'A-test-password-123!'
@@ -130,6 +173,25 @@ it('uses only server assignments; arbitrary-Elo players finish a real Colyseus b
   expect(await app.ranked.settle('p2p-untrusted-result')).toBe(false)
   expect((await http('/battle-reports/' + id, undefined, outsider.token)).status).toBe(403)
   expect((await http('/battle-reports/' + id, undefined, first.token)).status).toBe(200)
+  const outsiderReplay = await http('/official/matches/' + id + '/replay', undefined, outsider.token)
+  expect(outsiderReplay.status).toBe(403)
+  const officialReplay = await http('/official/matches/' + id + '/replay', undefined, first.token)
+  expect(officialReplay.status, JSON.stringify(officialReplay.body)).toBe(200)
+  const trace = (officialReplay.body as { trace?: unknown }).trace
+  expect(trace).toBeTruthy()
+  loadBrowserTraceTools().assertTraceRecord(trace)
+  const traceRecord = trace as {
+    format: string
+    roomId: string
+    frames: unknown[]
+    final: { reason?: string }
+    content?: { pieces?: Array<{ templateId?: string; imageId?: string | null }> }
+  }
+  expect(traceRecord).toMatchObject({ format: 'rvb-match-trace/v2', roomId: id, final: { reason: 'surrender' } })
+  expect(traceRecord.frames.length).toBeGreaterThan(0)
+  expect(traceRecord.content?.pieces?.find(piece => piece.templateId === 'ana')?.imageId).toBe(getPieceById('ana')?.image)
+  expect(JSON.stringify(trace)).not.toContain('receipts')
+  expect(JSON.stringify(trace)).not.toContain('signature')
   await a.leave(); await b.leave()
 }, 45000)
 

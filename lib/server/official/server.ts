@@ -9,6 +9,9 @@ import { ACCOUNT_SCHEMA, Accounts, type MailSender } from './accounts'
 import { Ranked } from './ranked'
 import { mountOfficialApi } from './http'
 import { Community } from './community'
+import { PlayerProfiles } from './player-profiles'
+import { OfficialReplayService } from './player-replay'
+import { RoomInvitations } from './room-invitations'
 
 export async function createOfficialServer(options: { databaseUrl: string; mail: MailSender; maxMatches?: number; pagesRoot?: string; reconnectGraceMs?: number; adminToken?: string }) {
   const pool = new Pool({ connectionString: options.databaseUrl, max: 8, connectionTimeoutMillis: 10000 })
@@ -21,6 +24,9 @@ export async function createOfficialServer(options: { databaseUrl: string; mail:
     await ranked.initialize()
     const community = new Community(pool)
     await community.initialize()
+    const profiles = new PlayerProfiles(pool), replay = new OfficialReplayService(pool, repository), invitations = new RoomInvitations(pool)
+    await profiles.initialize()
+    await invitations.initialize()
     // Existing launcher signatures only pass Ranked to the local panel.  Keep
     // the service discoverable there while still allowing direct injection in
     // tests and newer callers.
@@ -28,7 +34,7 @@ export async function createOfficialServer(options: { databaseUrl: string; mail:
     const authority = createColyseusBattleServer({ repository, requireIdentityProof: true, reconnectGraceMs: options.reconnectGraceMs,
       official: ranked, healthIdentity: { runtime: 'official-colyseus-postgresql', database: 'postgresql' },
       configureExpress: app => {
-        mountOfficialApi(app, accounts, ranked, repository, community)
+        mountOfficialApi(app, accounts, ranked, repository, community, { profiles, replay, invitations })
         if (options.adminToken) app.post('/official/admin', async (request, response) => {
           const provided = String(request.headers.authorization ?? '').replace(/^Bearer /, '')
           const expected = options.adminToken!
@@ -85,6 +91,6 @@ export async function createOfficialServer(options: { databaseUrl: string; mail:
       }
       if (failures.length) throw new AggregateError(failures, '官方服务已执行清理，但落盘或关闭失败；请保留数据库与日志')
     }
-    return { ...authority, pool, accounts, ranked, community, start, close }
+    return { ...authority, pool, accounts, ranked, community, profiles, replay, invitations, start, close }
   } catch (error) { await pool.end(); throw error }
 }

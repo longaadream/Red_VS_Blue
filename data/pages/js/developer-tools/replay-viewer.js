@@ -10,6 +10,8 @@
   var pieceTemplates = {}
   var skillsById = {}
   var materializedStates = []
+  var turnStops = []
+  var officialMatchId = null
 
   var workspace = document.getElementById('replayWorkspace')
   var errorBox = document.getElementById('replayError')
@@ -23,6 +25,10 @@
   var inspectorToggle = document.getElementById('replayInspectorToggle')
   var inspectorClose = document.getElementById('replayInspectorClose')
   var inspectorTabs = document.getElementById('replayInspectorTabs')
+  var turnSelect = document.getElementById('replayTurnSelect')
+  var previousTurnButton = document.getElementById('replayPreviousTurnButton')
+  var nextTurnButton = document.getElementById('replayNextTurnButton')
+  var downloadButton = document.getElementById('replayDownloadButton')
 
   function showError(message) {
     stopPlayback()
@@ -60,7 +66,7 @@
       if (!piece || !piece.templateId) return
       pieceTemplates[piece.templateId] = {
         name: piece.name || piece.templateId,
-        image: piece.imageId || piece.templateId,
+        image: piece.imageId || 'effect-icons/fallback.svg',
         stats: piece.stats || {},
       }
     })
@@ -75,6 +81,171 @@
 
   function frameAt(index) {
     return index > 0 ? trace.frames[index - 1] : null
+  }
+
+  function stateTurn(state, fallback) {
+    var value = state && state.turn && Number(state.turn.turnNumber)
+    return Number.isFinite(value) ? value : fallback
+  }
+
+  function buildTurnStops() {
+    turnStops = []
+    for (var index = 0; index <= trace.frames.length; index += 1) {
+      var frame = frameAt(index)
+      var turn = stateTurn(stateAt(index), frame && frame.turnAfter || 1)
+      if (!turnStops.length || turnStops[turnStops.length - 1].turn !== turn) {
+        turnStops.push({ turn: turn, index: index })
+      }
+    }
+    clearNode(turnSelect)
+    turnStops.forEach(function (stop, stopIndex) {
+      var option = createElement('option', '', '第 ' + stop.turn + ' 回合 · 第 ' + stop.index + ' 帧')
+      option.value = String(stopIndex)
+      turnSelect.appendChild(option)
+    })
+  }
+
+  function updateTurnControls() {
+    if (!turnSelect || !turnStops.length) return
+    var selected = 0
+    turnStops.forEach(function (stop, index) {
+      if (stop.index <= currentIndex) selected = index
+    })
+    turnSelect.value = String(selected)
+    previousTurnButton.disabled = selected === 0
+    nextTurnButton.disabled = selected === turnStops.length - 1
+  }
+
+  function jumpTurn(delta) {
+    if (!turnStops.length) return
+    var selected = 0
+    turnStops.forEach(function (stop, index) {
+      if (stop.index <= currentIndex) selected = index
+    })
+    var next = Math.max(0, Math.min(turnStops.length - 1, selected + delta))
+    stopPlayback()
+    setFrame(turnStops[next].index, false)
+  }
+
+  function renderMatchMetadata() {
+    var source = trace.source && typeof trace.source === 'object' ? trace.source : {}
+    var map = source.map && typeof source.map === 'object' ? source.map : {}
+    var mapLabel = map.name || map.id || trace.final.mapId || '未知地图'
+    var players = Array.isArray(source.players) && source.players.length
+      ? source.players
+      : (Array.isArray(trace.players) ? trace.players : [])
+    var playerLabel = players.map(function (player) {
+      if (!player) return ''
+      var name = player.name || player.playerId || '未知玩家'
+      var faction = alignmentLabel(player.alignment || player.faction)
+      return faction ? name + ' · ' + faction : name
+    }).filter(Boolean).join('  vs  ')
+
+    document.getElementById('replayMatchTitle').textContent = source.kind === 'official-match'
+      ? '官方对局回放'
+      : '本地对局回放'
+    document.getElementById('replayMatchPlayers').textContent = playerLabel || '玩家信息未记录'
+    document.getElementById('replayMatchMap').textContent = mapLabel
+    document.getElementById('replayMatchResult').textContent = resultLabel(trace.final.reason)
+    document.getElementById('replayHeaderMeta').textContent =
+      (source.kind === 'official-match' ? '官方对局' : '本地对局') + ' · 地图：' + mapLabel + ' · ' + trace.frames.length + ' 个命令帧'
+  }
+
+  function alignmentLabel(value) {
+    var labels = { light: '光方', dark: '暗方', red: '红方', blue: '蓝方' }
+    return labels[String(value || '').toLowerCase()] || String(value || '')
+  }
+
+  function resultLabel(value) {
+    var labels = {
+      surrender: '投降',
+      timeout: '超时',
+      elimination: '淘汰',
+      draw: '平局',
+      finished: '结束',
+    }
+    return labels[String(value || '').toLowerCase()] || '已结算'
+  }
+
+  function readOfficialMatchId() {
+    try {
+      var params = new URLSearchParams(window.location.search || '')
+      return params.get('matchId') || params.get('officialMatchId') || ''
+    } catch {
+      return ''
+    }
+  }
+
+  function officialSessionStorageValue(origin) {
+    try {
+      return localStorage.getItem('rvb_official_session:' + encodeURIComponent(origin))
+    } catch {
+      return undefined
+    }
+  }
+
+  function captureOfficialRequestContext(origin, session) {
+    return {
+      origin: origin,
+      token: String(session.token),
+      accountId: session.account && session.account.id ? String(session.account.id) : '',
+      sessionStorageValue: officialSessionStorageValue(origin),
+    }
+  }
+
+  function assertOfficialRequestContext(utils, context) {
+    var currentOrigin = utils.normalizeOfficialOrigin(localStorage.getItem('rvb_official_url') || '')
+    var current = currentOrigin ? utils.readOfficialSession(currentOrigin) : null
+    var currentAccountId = current && current.account && current.account.id ? String(current.account.id) : ''
+    var currentStorageValue = context.origin === currentOrigin
+      ? officialSessionStorageValue(currentOrigin)
+      : undefined
+    if (
+      currentOrigin !== context.origin
+      || !current
+      || String(current.token || '') !== context.token
+      || currentAccountId !== context.accountId
+      || (
+        context.sessionStorageValue !== undefined
+        && currentStorageValue !== context.sessionStorageValue
+      )
+    ) {
+      throw new Error('官方会话已变化，请返回战绩页重新打开回放')
+    }
+  }
+
+  async function readOfficialTrace(matchId) {
+    var utils = window.RvBUtils
+    if (!utils || typeof utils.readOfficialSession !== 'function' || typeof utils.normalizeOfficialOrigin !== 'function') {
+      throw new Error('官方会话工具不可用，请返回战绩页重新登录')
+    }
+    var origin = utils.normalizeOfficialOrigin(localStorage.getItem('rvb_official_url') || '')
+    var session = origin ? utils.readOfficialSession(origin) : null
+    if (!origin || !session || !session.token || !session.account || !session.account.id) {
+      throw new Error('请先登录官方账号，再打开这场回放')
+    }
+    var requestContext = captureOfficialRequestContext(origin, session)
+
+    var controller = typeof AbortController === 'function' ? new AbortController() : null
+    var timer = controller ? window.setTimeout(function () { controller.abort() }, 15000) : null
+    try {
+      var response = await fetch(origin + '/official/matches/' + encodeURIComponent(matchId) + '/replay', {
+        method: 'GET',
+        headers: { Authorization: 'Bearer ' + session.token, Accept: 'application/json' },
+        cache: 'no-store',
+        signal: controller ? controller.signal : undefined,
+      })
+      assertOfficialRequestContext(utils, requestContext)
+      var payload = await response.json()
+      assertOfficialRequestContext(utils, requestContext)
+      if (!response.ok) throw new Error(payload && (payload.error || payload.message) || '官方回放暂不可用')
+      var record = payload && payload.trace
+      if (!record) throw new Error('官方回放响应缺少 Trace')
+      RvBDeveloperTools.assertTraceRecord(record)
+      return record
+    } finally {
+      if (timer !== null) window.clearTimeout(timer)
+    }
   }
 
   function resolveViewerId(snapshot) {
@@ -125,6 +296,7 @@
     document.getElementById('replayTimelinePosition').textContent = currentIndex + ' / ' + trace.frames.length
     previousButton.disabled = currentIndex === 0
     nextButton.disabled = currentIndex === trace.frames.length
+    updateTurnControls()
     if (currentIndex === trace.frames.length && playing) stopPlayback()
   }
 
@@ -529,6 +701,19 @@
       stopPlayback()
       setFrame(Number(timeline.value), false)
     })
+    previousTurnButton.addEventListener('click', function () { jumpTurn(-1) })
+    nextTurnButton.addEventListener('click', function () { jumpTurn(1) })
+    turnSelect.addEventListener('change', function () {
+      var selected = Number(turnSelect.value)
+      if (!turnStops[selected]) return
+      stopPlayback()
+      setFrame(turnStops[selected].index, false)
+    })
+    downloadButton.addEventListener('click', function () {
+      if (!trace) return
+      try { RvBDeveloperTools.downloadTrace(trace) }
+      catch (error) { showError('无法下载回放：' + ((error && error.message) || error)) }
+    })
     perspectiveSelect.addEventListener('change', function () {
       setFrame(currentIndex, false)
     })
@@ -548,14 +733,16 @@
     }
 
     try {
-      trace = await RvBDeveloperTools.readStoredTrace()
+      officialMatchId = readOfficialMatchId()
+      trace = officialMatchId
+        ? await readOfficialTrace(officialMatchId)
+        : await RvBDeveloperTools.readStoredTrace()
       if (!trace) throw new Error('没有可回放的 Trace v2。请返回开发者中心导入一份合法文件。')
       RvBDeveloperTools.assertTraceRecord(trace)
       materializedStates = RvBDeveloperTools.materializeTraceStates(trace)
       buildContentLookup(trace)
-
-      document.getElementById('replayHeaderMeta').textContent =
-        (trace.roomId || '本地对局') + ' · ' + (trace.final.mapId || '未知地图') + ' · ' + trace.frames.length + ' 个命令帧'
+      buildTurnStops()
+      renderMatchMetadata()
       timeline.max = String(trace.frames.length)
       timeline.value = '0'
       workspace.hidden = false

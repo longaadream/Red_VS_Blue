@@ -158,7 +158,7 @@
     if (auth) auth.hidden = loggedIn
     if (content) content.hidden = !loggedIn
     if (logout) logout.hidden = !loggedIn
-    if (accountButton) accountButton.textContent = loggedIn ? ((state.account && state.account.name) || (session.account && session.account.name) || '已登录') : '登录账号'
+    if (accountButton) renderAccountIdentity(accountButton, loggedIn ? (state.account || session.account) : null, loggedIn ? ((state.account && state.account.name) || (session.account && session.account.name) || '已登录') : '登录账号')
     if (loggedIn) {
       if (state.account == null) state.account = session.account
       setStatus('communityAuthStatus', '')
@@ -172,6 +172,12 @@
     return '未知玩家'
   }
   function displayId(value) { return value && typeof value.id === 'string' ? value.id : '' }
+  function renderAccountIdentity(element, account, fallback) {
+    if (!element) return
+    if (account && account.id && window.RvBPlayerProfile && typeof window.RvBPlayerProfile.renderIdentity === 'function') {
+      window.RvBPlayerProfile.renderIdentity(element, account, 'rvb-community-avatar', fallback)
+    } else element.textContent = fallback || '登录账号'
+  }
   function dateText(value) {
     var date = value ? new Date(value) : null
     return date && !Number.isNaN(date.getTime()) ? date.toLocaleString() : ''
@@ -182,6 +188,8 @@
     var row = make('li', 'friend-row')
     var copy = make('span', 'friend-row-copy')
     copy.appendChild(make('span', 'friend-row-name', displayName(value)))
+    var playerName = copy.lastChild || (copy.children && copy.children[copy.children.length - 1])
+    if (window.RvBPlayerProfile && displayId(value)) window.RvBPlayerProfile.decoratePlayer(playerName, { id: displayId(value), name: displayName(value), avatar: value && value.avatar })
     if (displayId(value)) copy.appendChild(make('span', 'friend-row-meta', displayId(value)))
     row.appendChild(copy)
     var actions = make('span', 'friend-row-actions')
@@ -284,7 +292,9 @@
   function makeReply(post, reply) {
     var row = make('li', 'reply-row')
     var meta = make('div', 'reply-meta')
-    meta.appendChild(make('span', '', displayName(reply.author)))
+    var replyAuthor = make('span', '', displayName(reply.author))
+    meta.appendChild(replyAuthor)
+    if (window.RvBPlayerProfile && displayId(reply.author)) window.RvBPlayerProfile.decoratePlayer(replyAuthor, { id: displayId(reply.author), name: displayName(reply.author), avatar: reply.author && reply.author.avatar })
     meta.appendChild(make('span', '', dateText(reply.createdAt)))
     row.appendChild(meta)
     row.appendChild(make('p', 'reply-body', reply.body || ''))
@@ -303,7 +313,12 @@
     heading.appendChild(make('span', 'board-post-kind', post.kind === 'meetup' ? '约桌' : '讨论'))
     heading.appendChild(make('h3', '', post.title || '无标题'))
     header.appendChild(heading)
-    header.appendChild(make('span', 'board-post-meta', displayName(post.author) + (dateText(post.createdAt) ? ' · ' + dateText(post.createdAt) : '')))
+    var author = make('span', 'board-post-meta')
+    var authorName = make('span', 'board-post-author', displayName(post.author))
+    author.appendChild(authorName)
+    if (window.RvBPlayerProfile && displayId(post.author)) window.RvBPlayerProfile.decoratePlayer(authorName, { id: displayId(post.author), name: displayName(post.author), avatar: post.author && post.author.avatar })
+    if (dateText(post.createdAt)) author.appendChild(make('span', 'board-post-date', ' · ' + dateText(post.createdAt)))
+    header.appendChild(author)
     article.appendChild(header)
     article.appendChild(make('p', 'board-post-body', post.body || ''))
     var tools = make('div', 'board-post-tools')
@@ -548,7 +563,8 @@
     node('friendSearchForm').addEventListener('submit', function (event) { event.preventDefault(); void searchAccounts() })
     node('postForm').addEventListener('submit', function (event) { event.preventDefault(); void submitPost() })
     node('communityAccountButton').addEventListener('click', function () {
-      if (!state.token) { node('communityEmail').focus(); node('communityAuth').scrollIntoView({ block: 'center', behavior: 'smooth' }) }
+      if (state.token && state.account && state.account.id && window.RvBPlayerProfile) void window.RvBPlayerProfile.open(state.account.id)
+      else if (!state.token) { node('communityEmail').focus(); node('communityAuth').scrollIntoView({ block: 'center', behavior: 'smooth' }) }
     })
     node('communityServer').addEventListener('change', function () {
       try { state.origin = normalizeOrigin(node('communityServer').value); state.token = ''; state.account = null; state.connected = false; state.epoch += 1; stopHeartbeat(); resetCommunityData(); renderAuth(); setStatus('communityAuthStatus', '服务器已更改，请重新登录') }
