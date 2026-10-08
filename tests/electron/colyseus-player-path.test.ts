@@ -81,7 +81,7 @@ describe('RED-161 default player transport', () => {
     const main = await readFile(path.join(ROOT, 'electron-client', 'main.ts'), 'utf8')
 
     expect(packageJson.scripts.dev).toBe('next dev')
-    expect(packageJson.scripts.start).toBe('next start')
+    expect(packageJson.scripts.start).toBe('node scripts/start-web.mjs')
     await expect(readFile(path.join(ROOT, 'instrumentation.ts'), 'utf8')).rejects.toThrow()
     expect(main).not.toContain('DISABLE_WS')
   })

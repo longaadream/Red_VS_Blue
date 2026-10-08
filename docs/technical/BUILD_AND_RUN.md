@@ -1,26 +1,81 @@
 # Windows 构建与运行
 
-更新：2026-09-03（RED-158 Phase F 主线同步）
+更新：2026-10-09（RED-247 源码构建）
 
 ## 环境
 
 - Windows 10/11 x64
-- Node.js 22 或更高版本（Colyseus 引擎要求）；RED-197 文档验证使用 24.13.1，依赖遵循 lockfile
+- Node.js 24.13.1、npm 11.8.0 为当前验证环境；Colyseus 至少要求 Node.js 22。CI 固定 Node.js 24.13.1。
 - Git
-- 完整依赖通过 `npm.cmd ci --legacy-peer-deps` 安装；当前 Colyseus 的可选 Zod 4 peer 与项目 Zod 3 冲突，普通 `npm ci` 会遇到 `ERESOLVE`。该选项只用于安装既有依赖，依赖兼容问题仍需专项处理。
+- 完整依赖通过 `npm.cmd ci` 安装。仓库 `.npmrc` 固化现有 lockfile 使用的 `legacy-peer-deps=true`，无需临时追加参数。当前 Colyseus 可选 Zod 4 peer 与项目 Zod 3 的兼容性欠账仍在；这不是依赖升级或兼容性修复，不要使用 `npm audit fix --force` 代替构建修复。
 
 不要手工复制另一个 worktree 的 `node_modules`、构建目录或数据库目录。任务分支每天首次继续、提交 PR
 和请求验收前都运行 `npm.cmd run check:main-baseline`。
 
-## 安装与基础验证
+## 从 GitHub 源码构建
+
+在新的目录中执行（Windows PowerShell 使用 `npm.cmd`；其他终端可使用 `npm`）：
 
 ```powershell
-npm.cmd ci --legacy-peer-deps
+git clone https://github.com/longaadream/Red_VS_Blue.git
+cd Red_VS_Blue
+npm.cmd ci
+npm.cmd run build
+npm.cmd start
+```
+
+默认访问 `http://localhost:3000`。这是 Next 服务/API 状态页；完整游戏客户端使用下文的
+Electron 入口，`npm run build` 本身不生成安装包、Android APK、资源发行包或启动 PostgreSQL。
+源码 Web 构建不需要数据库、签名密钥或个人 `.env`。
+
+`build` 依次生成练习/PVE worker、编译 CSS、运行 Next 生产编译与 TypeScript 检查、
+验证 standalone 入口并复制静态资源。任一步失败都会停止并返回非零退出码。
+成功产物包含 `.next/standalone/server.js`、`.next/standalone/.next/static/` 和
+`.next/standalone/public/`。构建根目录固定为当前仓库，不依赖父目录或其他工作区的依赖。
+
+`npm start` 使用构建出的 standalone 服务，并提供源码数据根目录；保留整个源码检出用于此启动方式。
+可设置 `HOSTNAME`、`PORT`、`APP_ROOT_DIR`、`USER_DATA_DIR` 覆盖默认值；后两个分别指向只读应用资源和
+可写运行数据目录。默认运行数据位于当前仓库。不要将个人数据库或运行数据提交到 Git。
+分发完整桌面产物仍使用专门的打包入口，而非直接复制源码 Web 构建目录。
+
+```powershell
+$env:HOSTNAME = '127.0.0.1'
+$env:PORT = '3100'
+npm.cmd start
+```
+
+自动验证实际产物（临时端口、临时运行数据目录，完成后关闭服务）：
+
+```powershell
+npm.cmd test -- tests/build/web-build.test.ts --maxWorkers=1
+node scripts/smoke-web-build.mjs
+```
+
+冒烟检查主页、ping API、页面引用的 Next 静态资源、public 文件以及 pieces/maps/skills 数据 API。
+GitHub Actions `Source build` 在 Windows 和 Linux 的全新检出上执行安装、回归测试、构建和该冒烟。
+
+### 常见构建问题
+
+- `ERESOLVE`：确认在包含 `.npmrc` 和 `package-lock.json` 的仓库根目录运行 `npm ci`。
+  不要复制另一工作区的 `node_modules`，也不要删除 lockfile 重新选版本。
+- 找不到 Next/esbuild：安装必须成功，并包含 devDependencies；不要使用 `npm ci --omit=dev` 构建。
+- 找不到 standalone 入口：先执行 `npm run build`，查看首个失败步骤；不接受仅有旧 `.next` 目录作为构建成功证据。
+- TypeScript 报错：构建现已执行类型检查，应修复报告的文件；不要启用 `ignoreBuildErrors`。
+- `EADDRINUSE`：停止占用该端口的自有服务或设置其他 `PORT`。
+- 内存不足：关闭其他构建进程；可设置已有的 `RVB_BUILD_LOW_MEMORY=1` 降低并发。
+- 安装的弃用/peer 兼容风险不等同于构建失败；关注命令退出码与首个错误。依赖升级另立专项任务。
+
+## 开发分支基础验证
+
+```powershell
+npm.cmd ci
 npm.cmd run check:main-baseline
 npm.cmd run check:windows-cutover
 npm.cmd run typecheck
 npm.cmd test
 ```
+
+`check:main-baseline` 面向包含 RED 编号的开发分支，刚克隆的 `main` 无需运行此协作门禁才能构建。
 
 `check:windows-cutover` 是 Windows 迁移的静态门禁：它核对已退役路径不存在、包清单没有被禁用的直接
 依赖、玩家生产源码只包含当前 Colyseus/PostgreSQL 接线。

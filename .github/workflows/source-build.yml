@@ -1,0 +1,39 @@
+name: Source build
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: source-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Source build (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.13.1'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Build pipeline regression tests
+        run: npm test -- tests/build/web-build.test.ts --maxWorkers=1
+      - name: Build from source with type checking
+        run: npm run build
+      - name: Verify production HTTP and static assets
+        run: node scripts/smoke-web-build.mjs
