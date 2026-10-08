@@ -3017,6 +3017,107 @@
       return next
     }
 
+    function cardNeedsTarget(card) {
+      return !!(card && card.type === 'playCard'
+        && card.preparation
+        && (card.preparation.kind === 'needTarget'
+          || (card.preparation.targetType && Array.isArray(card.preparation.candidates))))
+    }
+
+    function cardPreviewAction(card) {
+      const source = card && (card.baseAction || card.rootAction) ? (card.baseAction || card.rootAction) : card
+      const action = cloneLocalSkillValue(source || {})
+      // These fields only describe the local presentation draft. They must
+      // never reach either the isolated preview executor or the authority.
+      ;[
+        'cardId', 'baseAction', 'previewOnly', 'previewOrigin', 'previewEligible',
+        'validTargets', 'preparation', 'pendingTargetIndex', 'pendingTargetType',
+        'pendingTargetFilter',
+      ].forEach(key => { delete action[key] })
+      return action
+    }
+
+    function isLocalCardDraft(card) {
+      return !!(card && card.localCardDraft === true && card.rootAction)
+    }
+
+    function cardRootAction(card) {
+      const source = card && (card.rootAction || card.baseAction) ? (card.rootAction || card.baseAction) : card
+      const action = cloneLocalSkillValue(source || {})
+      ;[
+        'cardId', 'baseAction', 'rootAction', 'localCardDraft', 'previewOnly', 'previewOrigin', 'previewEligible',
+        'validTargets', 'preparation', 'pendingTargetIndex', 'pendingTargetType', 'pendingTargetFilter',
+      ].forEach(key => { delete action[key] })
+      return action
+    }
+
+    function normalizeLocalCardPreparation(result) {
+      if (!result || typeof result !== 'object') return null
+      const status = result.status || (
+        result.kind === 'needTarget' || result.kind === 'target' || result.kind === 'needOption' || result.kind === 'option'
+          ? 'needs-input' : '')
+      if (status !== 'needs-input') return { status: status || 'unavailable', result }
+      const raw = result.preparation || result
+      if (!raw || typeof raw !== 'object') return { status: 'needs-input', preparation: null, result }
+      const preparation = cloneLocalSkillValue(raw)
+      if (preparation.kind === 'target') preparation.kind = 'needTarget'
+      if (preparation.kind === 'option') preparation.kind = 'needOption'
+      if (preparation.kind !== 'needTarget' && preparation.kind !== 'needOption') {
+        return { status: 'needs-input', preparation: null, result }
+      }
+      if (preparation.kind === 'needTarget' && preparation.targetType === 'grid') preparation.targetType = 'cell'
+      if (preparation.kind === 'needTarget' && preparation.targetType === 'tile') preparation.targetType = 'cell'
+      if (preparation.selectionMode === 'multi') {
+        if (!Number.isInteger(preparation.minSelections) && Number.isInteger(preparation.min)) preparation.minSelections = preparation.min
+        if (!Number.isInteger(preparation.maxSelections) && Number.isInteger(preparation.max)) preparation.maxSelections = preparation.max
+      }
+      return { status: 'needs-input', preparation, result }
+    }
+
+    function installLocalCardDraft(rootAction, card, preparation) {
+      const root = cardRootAction(Object.assign({}, card || {}, { rootAction: rootAction }))
+      if (root.selectionId === undefined && preparation && preparation.selectionId !== undefined) root.selectionId = preparation.selectionId
+      if (root.stateRevision === undefined && preparation && preparation.stateRevision !== undefined) root.stateRevision = preparation.stateRevision
+      const next = Object.assign({}, card || {}, {
+        type: 'playCard',
+        playerId: rootAction && rootAction.playerId || myPlayerId,
+        cardInstanceId: rootAction && rootAction.cardInstanceId || card && card.cardInstanceId,
+        rootAction: root,
+        localCardDraft: true,
+        preparation: cloneLocalSkillValue(preparation),
+        previewOnly: false,
+        previewEligible: false,
+      })
+      next.cardId = next.cardId || card && card.cardId
+      if (next.selectionId === undefined && preparation && preparation.selectionId !== undefined) next.selectionId = preparation.selectionId
+      if (next.stateRevision === undefined && preparation && preparation.stateRevision !== undefined) next.stateRevision = preparation.stateRevision
+      next.pendingTargetIndex = preparation && preparation.step
+      next.pendingTargetType = preparation && preparation.targetType
+      next.pendingTargetFilter = preparation && preparation.filter
+      next.validTargets = preparation && preparation.kind === 'needTarget' ? cardCandidateSet(next) : new Set()
+      return next
+    }
+
+    function renderLocalCardPreparation(card) {
+      if (!isLocalCardDraft(card)) return false
+      renderBoard(); renderActionBar(); renderTargetOverlay()
+      return true
+    }
+
+    function cardCandidateSet(card) {
+      if (!card || !card.preparation || !Array.isArray(card.preparation.candidates)) return new Set()
+      const cells = new Set()
+      card.preparation.candidates.forEach(ref => {
+        if (!ref) return
+        if (ref.type === 'cell') cells.add(ref.x + ',' + ref.y)
+        if (ref.type === 'piece') {
+          const piece = G && G.pieces && G.pieces.find(p => p.instanceId === ref.pieceId && p.currentHp > 0)
+          if (piece && piece.x != null && piece.y != null) cells.add(piece.x + ',' + piece.y)
+        }
+      })
+      return cells
+    }
+
     function prepareCardTargetRetry(action, targetIndex, targetType, filter, preparation) {
       const idx = Number(targetIndex)
       const next = idx === 0 ? clearCardPrimaryTarget(action) : Object.assign({}, action || {})
@@ -3029,6 +3130,13 @@
       if (next.preparation) {
         next.selectionId = next.preparation.selectionId
         next.stateRevision = next.preparation.stateRevision
+      }
+      if (!next.cardId && G && Array.isArray(G.players)) {
+        const owner = G.players.find(player => String(player.playerId || '').toLowerCase() === String(next.playerId || myPlayerId).toLowerCase())
+        const card = owner && Array.isArray(owner.hand)
+          ? owner.hand.find(entry => entry.instanceId === next.cardInstanceId)
+          : null
+        if (card) next.cardId = card.cardId
       }
       return next
     }
@@ -6068,6 +6176,90 @@
       }
     }
 
+    // Cards use the same public preparation surface as skills. Keep the
+    // result opaque to the page: only the stable preparation metadata is
+    // copied into the local card draft, while the authority still owns the
+    // final action validation.
+    function prepareLocalCardAction(action) {
+      const engine = typeof GameEngine !== 'undefined' ? GameEngine : null
+      if (!engine || typeof engine.preparePublicSkillAction !== 'function') return null
+      try {
+        return normalizeLocalCardPreparation(engine.preparePublicSkillAction(G, action, myPlayerId))
+      } catch (error) {
+        return { status: 'unavailable', error }
+      }
+    }
+
+    function commitLocalCardAction(rootAction, card) {
+      const draft = Object.assign({}, card || {}, { rootAction: rootAction })
+      const action = cardPreviewAction(draft)
+      const targetLabel = currentTargetSourceName()
+      rememberTargetInteraction()
+      pendingCardAction = null
+      clearSkillPreview()
+      renderHand(); renderBoard(); renderActionBar(); renderTargetOverlay()
+      return submitTargetAction(action, targetLabel)
+    }
+
+    function continueLocalCardPreparation(rootAction, card, prepared, commitReady) {
+      if (!prepared || prepared.status === 'unavailable') {
+        if (commitReady) return commitLocalCardAction(rootAction, card)
+        setStatusMsg('此卡牌的后续选择暂无法预演')
+        return false
+      }
+      if (prepared.status === 'needs-input' && prepared.preparation) {
+        // The current card set only exposes target continuations. If a
+        // future/dynamic card asks for an option here, let the authority
+        // enter its existing option flow instead of leaving an inert card
+        // draft that would discard the targets already selected.
+        if (prepared.preparation.kind !== 'needTarget') {
+          if (commitReady) return commitLocalCardAction(rootAction, card)
+          setStatusMsg('此卡牌的后续选择暂无法预演')
+          return false
+        }
+        pendingCardAction = installLocalCardDraft(rootAction, card, prepared.preparation)
+        pendingCardAction.previewOrigin = card && card.previewOrigin || 'click'
+        renderLocalCardPreparation(pendingCardAction)
+        setStatusMsg(targetStepPrefix(prepared.preparation.step) + targetTypeText(prepared.preparation.targetType, prepared.preparation.filter))
+        return false
+      }
+      if (prepared.status !== 'ready') {
+        setStatusMsg('此卡牌的后续选择暂无法预演')
+        return false
+      }
+      if (commitReady) return commitLocalCardAction(rootAction, card)
+      pendingCardAction = Object.assign({}, card || {}, {
+        rootAction: cardRootAction(Object.assign({}, card || {}, { rootAction: rootAction })),
+        localCardDraft: true,
+        preparation: null,
+        validTargets: new Set(),
+        previewOnly: true,
+        previewEligible: true,
+        previewOrigin: card && card.previewOrigin || 'click',
+      })
+      renderHand(); renderBoard(); renderActionBar(); renderTargetOverlay()
+      previewSkillTarget(null, null)
+      setStatusMsg('再次点击释放，点其他地方取消')
+      return true
+    }
+
+    function advanceLocalCardTarget(piece, x, y) {
+      if (!isLocalCardDraft(pendingCardAction) || !cardNeedsTarget(pendingCardAction)) return false
+      const root = cardRootAction(pendingCardAction)
+      const targetType = pendingCardAction.preparation && pendingCardAction.preparation.targetType
+      const firstTarget = !_actionHasFirstTarget(root)
+      _appendTargetToAction(root, piece, x, y, targetType)
+      // Preserve the coordinates included by the legacy card submission path
+      // alongside a piece id. Later targets stay in extraTargets, whose cell
+      // payload already carries coordinates.
+      if (firstTarget && targetType === 'piece' && piece) {
+        root.targetX = x
+        root.targetY = y
+      }
+      const prepared = prepareLocalCardAction(root)
+      return continueLocalCardPreparation(root, pendingCardAction, prepared, true)
+    }
+
     function localSkillInitialOptionPreparation(action, skillData) {
       // Initial option prompts must come from the same public preparation
       // surface as target prompts. Reading authored targeting steps here would
@@ -6469,7 +6661,7 @@
       return Number.isFinite(idx) && idx > 0 ? '第' + (idx + 1) + '步：' : ''
     }
     function _targetPromptText() {
-      if (pendingCardAction) {
+      if (cardNeedsTarget(pendingCardAction)) {
         return targetStepPrefix(pendingCardAction.pendingTargetIndex) +
           targetTypeText(pendingCardAction.pendingTargetType, pendingCardAction.pendingTargetFilter)
       }
@@ -6548,7 +6740,10 @@
       if (!el) return
       // A no-target preview is a local display state, not target selection.
       // Keep the prompt and controls reserved for real target/card sessions.
-      const active = !!(pendingCardAction || targetSubmissionPending || (pendingSkill && !pendingSkill.previewOnly))
+      const submissionDraft = targetSubmissionPending && targetSubmissionPending.draft
+      const targetSubmissionNeedsOverlay = !!(targetSubmissionPending
+        && !(submissionDraft && submissionDraft.card && !cardNeedsTarget(submissionDraft.card)))
+      const active = !!(cardNeedsTarget(pendingCardAction) || targetSubmissionNeedsOverlay || (pendingSkill && !pendingSkill.previewOnly))
       document.body.classList.toggle('target-mode-active', active)
       const controls = document.getElementById('targetSelectionControls')
       if (controls) controls.classList.toggle('show', active)
@@ -6729,11 +6924,21 @@
       return currentCandidates !== authoritativeCandidates
     }
 
+    function serverPendingCardTargetChanged(currentCard, authoritativePending) {
+      if (!currentCard || !cardNeedsTarget(currentCard) || !authoritativePending) return true
+      const preparation = currentCard.preparation || {}
+      if (preparation.selectionId !== authoritativePending.selectionId
+        || preparation.stateRevision !== authoritativePending.stateRevision
+        || Number(preparation.step) !== Number(authoritativePending.step || 0)
+        || preparation.targetType !== (authoritativePending.targetType === 'piece' ? 'piece' : 'cell')) return true
+      return JSON.stringify(preparation.candidates || []) !== JSON.stringify(authoritativePending.candidates || [])
+    }
+
     function battleInteractionMode() {
       if (ADVENTURE_MODE && adventureDeployPieceId) return 'place'
       if (progressiveDeploymentOwned(G) && localDeploymentChoiceId) return 'place'
       if (TRAINING_MODE && placingMode) return 'place'
-      if (pendingSkill || (pendingCardAction && pendingCardAction.type) || targetSubmissionPending) return 'target'
+      if (pendingSkill || cardNeedsTarget(pendingCardAction) || targetSubmissionPending) return 'target'
       if (pendingMove) return 'move'
       return 'inspect'
     }
@@ -6781,19 +6986,9 @@
         validMoves = new Set()
       }
       if (pendingSkill) _updatePendingSkillTargets()
-      if (pendingCardAction && pendingCardAction.type) {
+      if (cardNeedsTarget(pendingCardAction)) {
         const preparation = pendingCardAction.preparation
-        const cells = new Set()
-        if (preparation && Array.isArray(preparation.candidates)) {
-          preparation.candidates.forEach(ref => {
-            if (ref.type === 'cell') cells.add(ref.x + ',' + ref.y)
-            if (ref.type === 'piece') {
-              const piece = G.pieces.find(p => p.instanceId === ref.pieceId && p.currentHp > 0)
-              if (piece && piece.x != null && piece.y != null) cells.add(piece.x + ',' + piece.y)
-            }
-          })
-        }
-        pendingCardAction.validTargets = cells
+        pendingCardAction.validTargets = cardCandidateSet(pendingCardAction)
       }
     }
 
@@ -6802,7 +6997,7 @@
       const isCurrentSnapshot = snapshot === G
       const targetCells = isCurrentSnapshot && pendingSkill
         ? (pendingSkill.validTargets || new Set())
-        : (isCurrentSnapshot && pendingCardAction && pendingCardAction.type
+        : (isCurrentSnapshot && cardNeedsTarget(pendingCardAction)
             ? (pendingCardAction.validTargets || new Set())
             : new Set())
       const progressiveDeployment = isCurrentSnapshot && progressiveDeploymentOwned(snapshot)
@@ -6839,7 +7034,7 @@
         legal: {
           moveCells: isCurrentSnapshot ? (moveDraft ? moveDraft.continuationCells || [] : validMoves) : new Set(),
           targetCells: targetCells,
-          rangeCells: isCurrentSnapshot ? ((pendingSkill || pendingCardAction || {}).preparation?.rangeCells || []) : [],
+          rangeCells: isCurrentSnapshot ? ((pendingSkill || (cardNeedsTarget(pendingCardAction) ? pendingCardAction : null) || {}).preparation?.rangeCells || []) : [],
           placementCells: isCurrentSnapshot && ADVENTURE_MODE && adventureDeployPieceId
             ? authorityCellSet(adventureSnapshot?.deployment?.cells)
             : progressivePlacementCells.size
@@ -6895,7 +7090,34 @@
       if (pendingTargetSelectionForMe()) {
         syncPendingBoardTargetSelection(pbt)
         const actionType = 'pendingTargetSelect'
-        if (serverPendingTargetChanged(pendingSkill, pbt)) {
+        const pendingCardSource = pbt && pbt.source && pbt.source.type === 'card'
+        if (pendingCardSource && pendingCardAction) {
+          if (serverPendingCardTargetChanged(pendingCardAction, pbt)) {
+            const preparation = {
+              kind: 'needTarget',
+              selectionId: pbt.selectionId,
+              stateRevision: pbt.stateRevision,
+              step: Number(pbt.step) || 0,
+              targetType: pbt.targetType === 'piece' ? 'piece' : 'cell',
+              filter: pbt.filter || 'all',
+              range: pbt.range,
+              rangeCells: pbt.rangeCells,
+              candidates: Array.isArray(pbt.candidates) ? pbt.candidates : [],
+              selectionMode: pbt.selectionMode,
+              minSelections: pbt.minSelections,
+              maxSelections: pbt.maxSelections,
+            }
+            pendingCardAction = prepareCardTargetRetry(
+              pendingCardAction,
+              preparation.step,
+              preparation.targetType,
+              preparation.filter,
+              preparation,
+            )
+            pendingCardAction.validTargets = cardCandidateSet(pendingCardAction)
+            setStatusMsg(pbt.title || _targetPromptText() || '请选择目标')
+          }
+        } else if (serverPendingTargetChanged(pendingSkill, pbt)) {
           pendingSkill = {
             targetType: pbt.targetType,
             hint: pbt.title,
@@ -7685,8 +7907,34 @@
         return
       }
 
+      const samePendingCard = pendingCardAction && pendingCardAction.cardInstanceId === cardInstanceId
+      if (samePendingCard && cardNeedsTarget(pendingCardAction)) {
+        // A targeted card commits from the board target itself. Clicking its
+        // hand entry again must not send the un-targeted root action.
+        setStatusMsg(_targetPromptText() || '请选择卡牌目标')
+        return
+      }
+
+      if (samePendingCard && pendingCardAction.previewOnly === true) {
+        const action = cardPreviewAction(pendingCardAction)
+        const targetLabel = currentTargetSourceName()
+        rememberTargetInteraction()
+        pendingCardAction = null
+        clearSkillPreview()
+        renderHand(); renderBoard(); renderTargetOverlay()
+        submitTargetAction(action, targetLabel)
+        return
+      }
+
+      if (pendingCardAction && !samePendingCard) {
+        clearSkillPreview()
+        pendingCardAction = null
+        renderHand(); renderBoard(); renderTargetOverlay()
+      }
+
       // Cancel any pending skill/move
       pendingMove = false
+      if (pendingSkill) clearSkillPreview()
       pendingSkill = null
       setMoveButtonClass(false)
       renderPieceContextMenu(G && selectedPieceId ? G.pieces.find(p => p.instanceId === selectedPieceId) : null)
@@ -7699,9 +7947,32 @@
         return
       }
 
-      // First click: select/preview the card
-      pendingCardAction = { cardInstanceId, cardId }
+      const prepared = prepareLocalCardAction(tutorialCardAction)
+      if (prepared && prepared.status === 'needs-input'
+        && prepared.preparation && prepared.preparation.kind === 'needTarget') {
+        pendingCardAction = installLocalCardDraft(
+          tutorialCardAction,
+          Object.assign({}, tutorialCardAction, { cardId: cardId }),
+          prepared.preparation,
+        )
+        pendingCardAction.previewOrigin = 'click'
+        renderLocalCardPreparation(pendingCardAction)
+        setStatusMsg(targetStepPrefix(prepared.preparation.step) + targetTypeText(prepared.preparation.targetType, prepared.preparation.filter))
+        return
+      }
+
+      // First click selects the card. A ready public root also gets the same
+      // hypothetical board/resource presentation as a skill preview; its
+      // draft remains local until the second click confirms it.
+      pendingCardAction = Object.assign({}, tutorialCardAction, {
+        cardId: cardId,
+        previewOnly: !!(prepared && prepared.status === 'ready'),
+        previewEligible: !!(prepared && prepared.status === 'ready'),
+        previewOrigin: 'click',
+      })
       renderHand()
+      renderBoard(); renderActionBar(); renderTargetOverlay()
+      if (pendingCardAction.previewOnly) previewSkillTarget(null, null)
       setStatusMsg('再次点击释放，点其他地方取消')
     }
 
@@ -8072,6 +8343,21 @@
     let skillPreviewReplayGeneration = 0
     const skillPreviewDisplayTimings = []
 
+    function activeBattlePreviewDraft() {
+      if (pendingSkill) return { kind: 'skill', draft: pendingSkill }
+      if (pendingCardAction && (pendingCardAction.previewOnly === true || cardNeedsTarget(pendingCardAction))) {
+        return { kind: 'card', draft: pendingCardAction }
+      }
+      return null
+    }
+
+    function battlePreviewDraftAction(active) {
+      if (!active || !active.draft) return null
+      return active.kind === 'card'
+        ? cardPreviewAction(active.draft)
+        : (active.draft.baseAction || null)
+    }
+
     function skillPreviewViewportCell(intent) {
       if (!intent || !Object.prototype.hasOwnProperty.call(intent, 'hoveredCell')) return null
       const intentCell = intent.hoveredCell
@@ -8113,8 +8399,10 @@
     }
 
     function skillPreviewReplayIsCurrent(context, generation) {
-      const skill = pendingSkill
-      const baseAction = skill && skill.baseAction
+      const active = activeBattlePreviewDraft()
+      const skill = active && active.kind === 'skill' ? active.draft : null
+      const card = active && active.kind === 'card' ? active.draft : null
+      const baseAction = battlePreviewDraftAction(active)
       return !!context
         && context.redrawPending === true
         && !battlePageDisposed
@@ -8123,14 +8411,16 @@
         && !skillPreviewHistoryViewActive()
         && context.snapshot === G
         && context.authorityRevision === skillPreviewAuthorityRevision(G)
-        && context.pendingSkill === skill
+        && (context.kind === 'card' ? context.pendingCardAction === card : context.pendingSkill === skill)
         && context.selectedPieceId === selectedPieceId
         && context.viewerId === myPlayerId
-        && context.skillId === (skill && skill.skillId)
+        && (context.kind === 'card' ? active && active.kind === 'card' : active && active.kind === 'skill')
+        && context.skillId === (skill ? skill.skillId : undefined)
+        && context.cardInstanceId === (card ? card.cardInstanceId : undefined)
         && context.pieceId === (baseAction && baseAction.pieceId)
-        && context.previewOnly === !!(skill && skill.previewOnly)
-        && context.previewOrigin === (skill && skill.previewOrigin)
-        && context.stateRevision === skillPreviewPendingStateRevision(skill)
+        && context.previewOnly === !!(active && active.draft && active.draft.previewOnly)
+        && context.previewOrigin === (active && active.draft && active.draft.previewOrigin)
+        && context.stateRevision === (skill ? skillPreviewPendingStateRevision(skill) : baseAction && baseAction.stateRevision)
     }
 
     function scheduleSkillPreviewReplayAfterRedraw() {
@@ -8155,16 +8445,18 @@
     }
 
     function replayHoverSkillPreviewAfterViewport() {
+      const active = activeBattlePreviewDraft()
       if (hoverSkillPreviewReplayScheduled
-        || !pendingSkill
-        || pendingSkill.previewOnly !== true
-        || pendingSkill.previewOrigin !== 'hover') return
+        || !active
+        || active.draft.previewOnly !== true
+        || active.draft.previewOrigin !== 'hover') return
       hoverSkillPreviewReplayScheduled = true
       const replay = function() {
         hoverSkillPreviewReplayScheduled = false
-        if (battlePageDisposed || !pendingSkill
-          || pendingSkill.previewOnly !== true
-          || pendingSkill.previewOrigin !== 'hover') return
+        const current = activeBattlePreviewDraft()
+        if (battlePageDisposed || !current
+          || current.draft.previewOnly !== true
+          || current.draft.previewOrigin !== 'hover') return
         previewSkillTarget(null, null)
       }
       if (typeof requestAnimationFrame === 'function') requestAnimationFrame(replay)
@@ -8173,13 +8465,19 @@
 
     function previewSkillTarget(x, y) {
       const renderer = window.BattleRenderer3D
-      const previewOnly = !!(pendingSkill && pendingSkill.previewOnly)
-      const hasEligibleTarget = !!(pendingSkill && pendingSkill.validTargets && pendingSkill.validTargets.has(x + ',' + y))
-      if (!_use3d || !renderer || !pendingSkill || !pendingSkill.baseAction || !pendingSkill.skillId ||
-          pendingSkill.turnTargetActionType || pendingSkill.preparation && pendingSkill.preparation.selectionMode === 'multi' ||
+      const active = activeBattlePreviewDraft()
+      const draft = active && active.draft
+      const isCard = !!(active && active.kind === 'card')
+      const previewOnly = !!(draft && draft.previewOnly)
+      const hasEligibleTarget = !!(draft && draft.validTargets && draft.validTargets.has(x + ',' + y))
+      const targetPreparation = draft && draft.preparation
+      if (!_use3d || !renderer || !active || !draft || !battlePreviewDraftAction(active) ||
+          isCard && !draft.cardInstanceId || !isCard && !draft.skillId ||
+          !isCard && (draft.turnTargetActionType || targetPreparation && targetPreparation.selectionMode === 'multi') ||
+          isCard && targetPreparation && targetPreparation.selectionMode === 'multi' ||
           targetSubmissionPending || waitingForOtherPending() ||
           skillPreviewHistoryViewActive() ||
-          previewOnly && pendingSkill.previewEligible !== true ||
+          previewOnly && draft.previewEligible !== true ||
           !previewOnly && !hasEligibleTarget ||
           typeof GameEngine === 'undefined' || !GameEngine.previewBattleAction) {
         clearSkillPreview()
@@ -8270,7 +8568,10 @@
       let action
       if (!previewOnly) {
         const piece = G.pieces.find(p => p.x === x && p.y === y && p.currentHp > 0)
-        if (pendingSkill.localChoiceDraft === true) {
+        if (isCard) {
+          action = cardPreviewAction(draft)
+          _appendTargetToAction(action, piece, x, y, targetPreparation && targetPreparation.targetType)
+        } else if (pendingSkill.localChoiceDraft === true) {
           const root = localSkillRootAction(pendingSkill)
           const choices = localSkillChoices(pendingSkill)
           const choice = localSkillTargetChoice(pendingSkill, piece, x, y, pendingSkill.preparation)
@@ -8283,9 +8584,11 @@
           _appendTargetToAction(action, piece, x, y, pendingSkill.preparation && pendingSkill.preparation.targetType)
         }
       } else {
-        action = pendingSkill.localChoiceDraft === true
-          ? localSkillBatchAction(pendingSkill)
-          : Object.assign({}, pendingSkill.baseAction)
+        action = isCard
+          ? cardPreviewAction(draft)
+          : pendingSkill.localChoiceDraft === true
+            ? localSkillBatchAction(pendingSkill)
+            : Object.assign({}, pendingSkill.baseAction)
       }
       skillPreviewController.request({ snapshot: G, action, viewerId: myPlayerId,
         key: JSON.stringify(action), revision: action.stateRevision })
@@ -8293,13 +8596,16 @@
         snapshot: G,
         authorityRevision: skillPreviewAuthorityRevision(G),
         pendingSkill: pendingSkill,
+        pendingCardAction: isCard ? pendingCardAction : null,
+        kind: isCard ? 'card' : 'skill',
         selectedPieceId: selectedPieceId,
         viewerId: myPlayerId,
-        skillId: pendingSkill.skillId,
+        skillId: isCard ? undefined : pendingSkill.skillId,
+        cardInstanceId: isCard ? pendingCardAction.cardInstanceId : undefined,
         pieceId: action.pieceId,
         previewOnly: previewOnly,
-        previewOrigin: pendingSkill.previewOrigin,
-        stateRevision: skillPreviewPendingStateRevision(pendingSkill),
+        previewOrigin: draft.previewOrigin,
+        stateRevision: isCard ? action.stateRevision : skillPreviewPendingStateRevision(pendingSkill),
         targetX: x,
         targetY: y,
         redrawPending: false,
@@ -8365,7 +8671,7 @@
       if (intent.type === 'hover-cell') {
         updateDeploymentGhost(intent.x, intent.y)
         if (moveDraft) return
-        if (pendingSkill || intent.x == null) previewSkillTarget(intent.x, intent.y)
+        if (activeBattlePreviewDraft() || intent.x == null) previewSkillTarget(intent.x, intent.y)
         if (intent.x == null || intent.y == null || !pendingMove || !selectedPieceId || waitingForOtherPending()) {
           updateMoveHoverPath([])
           return
@@ -8513,16 +8819,20 @@
         return
       }
 
-      // A first card click is only a preview; a board click cancels it instead of serializing it as an action.
-      if (pendingCardAction && pendingCardAction.type !== 'playCard') {
+      // A first no-target card click is only a local preview; a board click
+      // cancels it instead of serializing hovered coordinates as an action.
+      if (pendingCardAction && !cardNeedsTarget(pendingCardAction)) {
+        clearSkillPreview()
         pendingCardAction = null
         renderHand()
+        renderBoard()
         renderTargetOverlay()
         setStatusMsg('已取消卡牌预览')
+        return
       }
 
       // Pending card target selection
-      if (pendingCardAction) {
+      if (cardNeedsTarget(pendingCardAction)) {
         const cardPreparation = pendingCardAction.preparation
         if (cardPreparation && Array.isArray(cardPreparation.candidates)) {
           const allowed = cardPreparation.candidates.some(ref =>
@@ -8533,6 +8843,10 @@
             setStatusMsg('目标不在权威候选集合内')
             return
           }
+        }
+        if (isLocalCardDraft(pendingCardAction)) {
+          advanceLocalCardTarget(piece, x, y)
+          return
         }
         let action
         const cardTargetType = cardPreparation && cardPreparation.targetType
@@ -8549,8 +8863,15 @@
         }
         delete action.clientActionId
         delete action.requestId
+        delete action.cardId
+        delete action.previewOnly
+        delete action.previewOrigin
+        delete action.previewEligible
         delete action.preparation
         delete action.validTargets
+        delete action.pendingTargetIndex
+        delete action.pendingTargetType
+        delete action.pendingTargetFilter
         const targetLabel = currentTargetSourceName()
         rememberTargetInteraction()
         pendingCardAction = null
@@ -9817,6 +10138,7 @@
       // Click outside the hand and battlefield to cancel card targeting.
       document.addEventListener('click', function(e) {
         if (!shouldCancelPendingCardTarget(pendingCardAction, e.target)) return
+        clearSkillPreview()
         pendingCardAction = null
         renderHand()
         renderBoard()

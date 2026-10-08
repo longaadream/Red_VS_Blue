@@ -1,12 +1,29 @@
 import type { BattleState } from './turn'
 import type { RuleExecutionContext } from './rule-runtime'
-import { loadRuleById, loadSkillById } from './skills'
+import {
+  assertCardDefinition,
+  executeSkillFunction,
+  loadCardById,
+  loadRuleById,
+  loadSkillById,
+  type CardDefinition,
+  type SkillExecutionContext,
+  type SkillExecutionResult,
+} from './skills'
+import {
+  createRuleExecutionContext,
+  RuleRuntime,
+  withRuleExecutionContext,
+  withRuleRuntime,
+} from './rule-runtime'
+import { TriggerSystem } from './triggers'
 
 type JsonRecord = Record<string, unknown>
 
 export interface PublicRuleSourceController {
   readonly ruleResolver: RuleExecutionContext['ruleResolver']
   readonly skillResolver: RuleExecutionContext['skillResolver']
+  readonly cardResolver: RuleExecutionContext['cardResolver']
   hasUnsupportedAccess(): boolean
 }
 
@@ -14,6 +31,156 @@ export class PublicRuleSourceError extends Error {}
 
 function record(value: unknown): value is JsonRecord {
   return !!value && typeof value === 'object' && !Array.isArray(value)
+}
+
+function normalized(value: unknown): string {
+  return typeof value === 'string' ? value.trim().toLowerCase() : ''
+}
+
+const ARMOR_SKILL_ID = 'tails-armor-assembly'
+const ARMOR_MODULES = ['attack', 'defense', 'heal', 'speed'] as const
+const ARMOR_GENERATOR_SEED = 0x41524d52
+
+type ArmorModule = typeof ARMOR_MODULES[number]
+
+function cloneJson<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value)) as T
+}
+
+function stableJson(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(stableJson)
+  if (!record(value)) return value
+  return Object.fromEntries(
+    Object.keys(value).sort().map(key => [key, stableJson(value[key])]),
+  )
+}
+
+function armorModulesForCardId(cardId: string): [ArmorModule, ArmorModule] | undefined {
+  if (!cardId.startsWith('armor-')) return undefined
+  const values = cardId.slice('armor-'.length).split('-')
+  if (values.length !== 2 || values[0] === values[1]) return undefined
+  if (!values.every(value => (ARMOR_MODULES as readonly string[]).includes(value))) return undefined
+  const modules = [...values].sort() as [ArmorModule, ArmorModule]
+  return `armor-${modules.join('-')}` === cardId ? modules : undefined
+}
+
+function makeArmorGeneratorState(state: BattleState, viewerId: string): {
+  battle: BattleState
+  piece: SkillExecutionContext['piece']
+} {
+  const battle = cloneJson(state)
+  const source = {
+    instanceId: 'preview-armor-generator-source',
+    templateId: 'tails',
+    name: 'Tails',
+    ownerPlayerId: viewerId,
+    faction: 'red',
+    x: 0,
+    y: 0,
+    currentHp: 1,
+    maxHp: 1,
+    attack: 1,
+    defense: 1,
+    moveRange: 1,
+    statusTags: [],
+    debuffs: [],
+    buffs: [],
+    skills: [],
+    rules: [],
+  } as unknown as SkillExecutionContext['piece']
+  const owner = battle.players.find(player => normalized(player.playerId) === normalized(viewerId))
+  battle.players = [
+    {
+      ...(owner ?? {
+        playerId: viewerId,
+        name: viewerId,
+        chargePoints: 0,
+        actionPoints: 0,
+        maxActionPoints: 0,
+        discardPile: [],
+        hand: [],
+      }),
+      playerId: viewerId,
+      hand: [],
+      discardPile: [],
+      rules: [],
+      statusTags: [],
+      skills: [],
+    },
+  ] as BattleState['players']
+  battle.pieces = [source as BattleState['pieces'][number]]
+  battle.graveyard = []
+  battle.customCards = {}
+  battle.actions = []
+  battle.extensions = {}
+  battle.turn = {
+    ...battle.turn,
+    currentPlayerId: viewerId,
+    phase: 'action',
+  }
+  return { battle, piece: source }
+}
+
+/**
+ * Re-run the canonical Armor Assembly skill in a fresh trusted scope. The
+ * generated code is the authority's source of truth; this helper only admits
+ * a snapshot definition after a full structural comparison with that output.
+ */
+function generatedArmorCard(
+  state: BattleState,
+  viewerId: string,
+  cardId: string,
+): CardDefinition | undefined {
+  const selectedOption = armorModulesForCardId(cardId)
+  if (!selectedOption) return undefined
+  const isolated = makeArmorGeneratorState(state, viewerId)
+  const executionContext = createRuleExecutionContext(new TriggerSystem())
+  let result: SkillExecutionResult | undefined
+  try {
+    result = withRuleExecutionContext(executionContext, () => {
+      const skill = loadSkillById(ARMOR_SKILL_ID, true)
+      if (!skill) return undefined
+      const context: SkillExecutionContext = {
+        piece: isolated.piece,
+        target: null,
+        targetPosition: null,
+        selectedOption,
+        battle: isolated.battle,
+        skill: {
+          id: skill.id,
+          name: skill.name,
+          type: skill.type,
+          powerMultiplier: skill.powerMultiplier,
+          targeting: skill.targeting,
+        },
+      }
+      return withRuleRuntime(
+        new RuleRuntime({ rootSeed: ARMOR_GENERATOR_SEED, tick: 0 }),
+        () => executeSkillFunction(skill, context, isolated.battle),
+      )
+    })
+  } catch {
+    return undefined
+  }
+  if (!result?.success) return undefined
+  const generated = isolated.battle.customCards?.[cardId]
+  if (!generated) return undefined
+  let expected: CardDefinition
+  try {
+    expected = assertCardDefinition(cardId, generated)
+  } catch {
+    return undefined
+  }
+  return expected
+}
+
+function sameCardDefinition(candidate: unknown, expected: CardDefinition): candidate is CardDefinition {
+  try {
+    const asserted = assertCardDefinition(expected.id, candidate)
+    return JSON.stringify(stableJson(asserted)) === JSON.stringify(stableJson(expected))
+  } catch {
+    return false
+  }
 }
 
 /**
@@ -86,6 +253,13 @@ export function createPublicRuleSource(
   viewerId: string,
 ): PublicRuleSourceController {
   const publicRuleIds = collectRuleIds(state, viewerId)
+  const visibleCardIds = new Set(
+    state.players
+      .filter(player => normalized(player.playerId) === normalized(viewerId))
+      .flatMap(player => (player.hand || []).flatMap(card => (
+        typeof card?.cardId === 'string' && card.cardId.trim() ? [card.cardId] : []
+      ))),
+  )
   let unsupported = false
   const ruleResolver: RuleExecutionContext['ruleResolver'] = (battle, ruleId, metadata) => {
     // Canonical skills can attach new rules to the viewer in the isolated
@@ -125,9 +299,41 @@ export function createPublicRuleSource(
     return null
   }
 
+  const cardResolver: RuleExecutionContext['cardResolver'] = (_battle, cardId, candidate) => {
+    // Opponent hands are intentionally represented by stable hidden sentinels
+    // in the public projection. Their definitions are unavailable by design;
+    // the existing trigger path already skips them when no executable source
+    // is present, so they must not poison an otherwise public preview.
+    if (cardId === 'hidden') return null
+    if (typeof cardId !== 'string' || !visibleCardIds.has(cardId)) {
+      unsupported = true
+      return null
+    }
+
+    try {
+      // Static cards are always loaded from the canonical content root. A
+      // same-ID snapshot replacement can never override their executable
+      // source.
+      const canonical = loadCardById(cardId, false, true)
+      if (canonical) return canonical
+    } catch {
+      // Dynamic cards below are admitted only through a verified generator.
+    }
+
+    const expected = generatedArmorCard(state, viewerId, cardId)
+    if (expected && sameCardDefinition(candidate, expected)) return expected
+
+    // A custom registry entry is data from the snapshot, not an authority
+    // source. Unknown IDs, forged definitions, and altered Armor code all
+    // remain unavailable without evaluating their code.
+    unsupported = true
+    return null
+  }
+
   return {
     ruleResolver,
     skillResolver,
+    cardResolver,
     hasUnsupportedAccess: () => unsupported,
   }
 }

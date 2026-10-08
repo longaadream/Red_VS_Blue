@@ -645,6 +645,42 @@ export function loadCardForBattle(
     metadata?: EffectDispatchMetadata
   } = {},
 ): CardDefinition | null {
+  const scopedResolver = getActiveRuleExecutionContext()?.cardResolver
+  if (scopedResolver) {
+    let definitionError: unknown
+    try {
+      const resolved = scopedResolver(
+        battle,
+        cardId,
+        battle.customCards?.[cardId] as unknown,
+        options.metadata,
+      )
+      if (resolved) {
+        assertContentAvailable(resolved as CardDefinition, battleContentMode(battle))
+        return assertCardDefinition(cardId, resolved, {
+          requireReactiveTrigger: options.requireReactiveTrigger,
+        })
+      }
+    } catch (error) {
+      definitionError = error
+    }
+
+    if (definitionError instanceof ContentUnavailableError) throw definitionError
+    const error = definitionError === undefined
+      ? new Error(`Card definition ${cardId || '<empty>'} is unavailable`)
+      : definitionError
+    rethrowAttachedEffectContentError(
+      battle,
+      error,
+      `Card definition ${cardId || '<empty>'} could not load during an EffectChain`,
+      {
+        ...options.metadata,
+        skillId: options.metadata?.skillId ?? cardId,
+      },
+    )
+    return null
+  }
+
   let staticCard: CardDefinition | null = null
   let definitionError: unknown
   try {
