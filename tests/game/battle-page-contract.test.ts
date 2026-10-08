@@ -296,7 +296,7 @@ describe('battle page route contract', () => {
     expect(responsiveCss).toMatch(/\.hand-scroll\s*\{[\s\S]*?scrollbar-width:\s*none/)
     expect(contextCss).toMatch(/\.training-popover\s*\{[\s\S]*?transform-origin:\s*bottom left/)
     expect(battlePage).toMatch(/function setTrainingToolsOpen\(open[\s\S]*?aria-expanded[\s\S]*?aria-hidden/)
-    expect(battlePage).toMatch(/const active = !!\(pendingCardAction \|\| targetSubmissionPending \|\| \(pendingSkill && !pendingSkill\.previewOnly\)\)[\s\S]*?if \(active\) \{[\s\S]*?closePieceContextMenu\(\)/)
+    expect(battlePage).toMatch(/const targetSubmissionNeedsOverlay = !!\(targetSubmissionPending[\s\S]*?const active = !!\(cardNeedsTarget\(pendingCardAction\) \|\| targetSubmissionNeedsOverlay \|\| \(pendingSkill && !pendingSkill\.previewOnly\)\)[\s\S]*?if \(active\) \{[\s\S]*?closePieceContextMenu\(\)/)
     expect(battlePage).toMatch(/function setTrainingToolsOpen\(open[\s\S]*?if \(next\) closePieceContextMenu\(\)/)
     expect(battlePage).toMatch(/const draftAction[^\n]+[\s\S]*?tutorialActionAllowed\(draftAction\)[\s\S]*?closePieceContextMenu\(\)/)
     expect(battlePage).not.toContain('tutorialSelfTarget')
@@ -333,7 +333,10 @@ describe('battle page route contract', () => {
     const moveEnd = battlePage.indexOf('function onCellClick(x, y)', moveStart)
     const moveHandler = battlePage.slice(moveStart, moveEnd)
 
-    expect(moveHandler).toMatch(/dismissedPieceContextId = null[\s\S]*?doAction\(\{ type: 'move'/)
+    expect(moveHandler).toContain('return submitMoveRoute(')
+    const submitHandler = readNamedFunction(battlePage, 'submitMoveRoute')
+    expect(submitHandler).toContain("type: 'move'")
+    expect(submitHandler).toMatch(/dismissedPieceContextId = null[\s\S]*?doAction\(action\)/)
     expect(battlePage).toMatch(/function restoreSelectedPieceMenu\(options\)[\s\S]*?input\.reopen[\s\S]*?dismissedPieceContextId = null/)
     expect(battlePage).toMatch(/restoreSelectedPieceMenu\(\{ reopen: action\.type === 'move' \}\)/)
   })
@@ -595,7 +598,7 @@ describe('battle page route contract', () => {
       addLog: () => undefined,
       PIECES_BY_ID: { ana: { id: 'ana', name: 'Ana' } },
     })
-    new Script(readNamedFunction(battlePage, 'onCellClick')).runInContext(context)
+    new Script([readNamedFunction(battlePage, 'cardNeedsTarget'), readNamedFunction(battlePage, 'onCellClick')].join('\n')).runInContext(context)
 
     expect(() => new Script('onCellClick(2, 3)').runInContext(context)).not.toThrow()
     expect(JSON.parse(JSON.stringify(patches))).toEqual([
@@ -623,15 +626,18 @@ describe('battle page route contract', () => {
       pendingOptionSelectionForOther: () => false,
       refreshBattleLegalActions: () => undefined,
       submitTargetAction: (action: unknown) => submittedActions.push(action),
+      clearSkillPreview: () => undefined,
+      rememberTargetInteraction: () => undefined,
       setStatusMsg: (message: string) => statusMessages.push(message),
       currentTargetSourceName: () => '恶魔召唤（1）',
       renderHand: () => undefined,
+      renderBoard: () => undefined,
       renderTargetOverlay: () => undefined,
       document: {
         getElementById: () => ({ style: { display: '' } }),
       },
     })
-    new Script(readNamedFunction(battlePage, 'onCellClick')).runInContext(context)
+    new Script([readNamedFunction(battlePage, 'cardNeedsTarget'), readNamedFunction(battlePage, 'onCellClick')].join('\n')).runInContext(context)
 
     new Script('onCellClick(4, 3)').runInContext(context)
 
@@ -681,7 +687,7 @@ describe('battle page route contract', () => {
       renderHand: () => undefined,
       doAction: (action: unknown) => submittedActions.push(action),
     })
-    new Script(readNamedFunction(battlePage, 'onCardClick')).runInContext(context)
+    new Script([readNamedFunction(battlePage, 'cardNeedsTarget'), readNamedFunction(battlePage, 'onCardClick')].join('\n')).runInContext(context)
 
     new Script("onCardClick('discounted-charge', 'holy-charge')").runInContext(context)
 
@@ -1107,6 +1113,7 @@ new Script([
       selectedPieceId: null,
       locallyCancelledSelectionId: null,
     })
+    Object.assign(context, { moveDraft: null, pendingMove: false })
     new Script(readNamedFunction(battlePage, 'cancelTargetSelection')).runInContext(context)
 
     new Script('cancelTargetSelection()').runInContext(context)
@@ -1146,6 +1153,7 @@ new Script([
       setStatusMsg: (message: string) => { statusMessages.push(message) },
       selectedPieceId: null,
     })
+    Object.assign(context, { moveDraft: null, pendingMove: false })
     new Script(readNamedFunction(battlePage, 'cancelTargetSelection')).runInContext(context)
 
     new Script('cancelTargetSelection()').runInContext(context)
@@ -1186,6 +1194,7 @@ new Script([
       setStatusMsg: (message: string) => { statusMessages.push(message) },
       selectedPieceId: null,
     })
+    Object.assign(context, { moveDraft: null, pendingMove: false })
     new Script(readNamedFunction(battlePage, 'cancelTargetSelection')).runInContext(context)
 
     expect(() => new Script('cancelTargetSelection()').runInContext(context)).not.toThrow()

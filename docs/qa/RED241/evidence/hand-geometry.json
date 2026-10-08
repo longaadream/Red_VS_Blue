@@ -1,0 +1,96 @@
+{
+  "baseline": [
+    {
+      "card": {
+        "height": 240,
+        "width": 190
+      },
+      "hand": {
+        "height": 290,
+        "top": 430,
+        "width": 1280
+      },
+      "viewport": {
+        "height": 720,
+        "width": 1280
+      }
+    },
+    {
+      "card": {
+        "height": 240,
+        "width": 190
+      },
+      "hand": {
+        "height": 290,
+        "top": 610,
+        "width": 1440
+      },
+      "viewport": {
+        "height": 900,
+        "width": 1440
+      }
+    },
+    {
+      "card": {
+        "height": 195,
+        "width": 164
+      },
+      "hand": {
+        "height": 90,
+        "top": 486,
+        "width": 1024
+      },
+      "viewport": {
+        "height": 576,
+        "width": 1024
+      }
+    }
+  ],
+  "candidate": [
+    {
+      "card": {
+        "height": 240,
+        "width": 190
+      },
+      "hand": {
+        "height": 290,
+        "top": 430,
+        "width": 1280
+      },
+      "viewport": {
+        "height": 720,
+        "width": 1280
+      }
+    },
+    {
+      "card": {
+        "height": 240,
+        "width": 190
+      },
+      "hand": {
+        "height": 290,
+        "top": 610,
+        "width": 1440
+      },
+      "viewport": {
+        "height": 900,
+        "width": 1440
+      }
+    },
+    {
+      "card": {
+        "height": 195,
+        "width": 164
+      },
+      "hand": {
+        "height": 90,
+        "top": 486,
+        "width": 1024
+      },
+      "viewport": {
+        "height": 576,
+        "width": 1024
+      }
+    }
+  ]
+}

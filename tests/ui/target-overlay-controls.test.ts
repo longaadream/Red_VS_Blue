@@ -185,12 +185,32 @@ function renderScenario(input: OverlayScenario = {}) {
     pendingBoardMultiLimits: () => ({ min: 1, max: 1 }),
     pendingBoardMultiSummary: () => '',
   })
-  new Script(source('_targetPromptText') + '\n' + source('renderTargetOverlay')).runInContext(context)
+  new Script(source('cardNeedsTarget') + '\n' + source('_targetPromptText') + '\n' + source('renderTargetOverlay')).runInContext(context)
   new Script('renderTargetOverlay()').runInContext(context)
   return { context, body, overlay, prompt, cancel, controls }
 }
 
 describe('target prompt and controls separation', () => {
+  it('keeps a no-target card preview and its pending submission outside target controls', () => {
+    const result = renderScenario({
+      pendingSkill: null,
+      pendingCardAction: {
+        type: 'playCard', cardInstanceId: 'card-1', previewOnly: true,
+      },
+    })
+
+    expect(result.overlay.classList.contains('show')).toBe(false)
+    expect(result.controls.classList.contains('show')).toBe(false)
+
+    result.context.targetSubmissionPending = {
+      type: 'playCard',
+      draft: { card: { type: 'playCard', cardInstanceId: 'card-1', previewOnly: true } },
+    }
+    new Script('renderTargetOverlay()').runInContext(result.context)
+    expect(result.overlay.classList.contains('show')).toBe(false)
+    expect(result.controls.classList.contains('show')).toBe(false)
+  })
+
   it('presents a skill-specific hint as the public prompt while keeping cancel separate', () => {
     const result = renderScenario({
       pendingSkill: {
@@ -391,7 +411,7 @@ describe('target prompt and controls separation', () => {
       pendingBoardMultiLimits: () => ({ min: 1, max: 1 }),
       pendingBoardMultiSummary: () => '',
     })
-    new Script(source('_targetPromptText') + '\n' + source('renderTargetOverlay')).runInContext(context)
+    new Script(source('cardNeedsTarget') + '\n' + source('_targetPromptText') + '\n' + source('renderTargetOverlay')).runInContext(context)
     new Script('renderTargetOverlay()').runInContext(context)
     expect(cancel.hidden).toBe(false)
 

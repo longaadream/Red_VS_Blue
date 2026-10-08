@@ -9,6 +9,19 @@ export function recordedPositionKind(state: BattleState, pieceId: string, fromX:
   }
   return {}
 }
+/** Only committed position facts can supply a route; never infer one from an aim. */
+export function recordedPositionMotion(state: BattleState, pieceId: string, fromX: number, fromY: number, toX: number, toY: number, firstActionIndex = 0): BattlePresentationEvent['presentation'] {
+  for (let i = (state.actions?.length ?? 0) - 1; i >= firstActionIndex; i--) {
+    const action = state.actions![i]
+    const p = action.payload
+    if (action.type !== 'positionChanged' || p?.pieceId !== pieceId || p.fromX !== fromX || p.fromY !== fromY || p.toX !== toX || p.toY !== toY) continue
+    if (!Array.isArray(p.path)) return undefined
+    const pathCells = p.path.filter((cell: { x?: unknown; y?: unknown }) => cell && Number.isSafeInteger(cell.x) && Number.isSafeInteger(cell.y))
+      .map((cell: { x: number; y: number }) => ({ x: cell.x, y: cell.y }))
+    return { cue: 'displacement', pathCells, endPoint: { x: toX, y: toY }, endReason: 'resolved' }
+  }
+  return undefined
+}
 import type { SkillDefinition } from './skills'
 import type { BattlePresentationEvent } from './battle-presentation-events'
 import { snapshotBattlePresentationStatuses, diffBattlePresentationStatuses, snapshotBattlePresentationTileEffects, diffBattlePresentationTileEffects } from './battle-presentation-events'
@@ -232,6 +245,7 @@ export function checkpointBattlePresentation(state: BattleState, batch?: { kind:
     }
     if ((old.x !== p.x || old.y !== p.y) && old.x != null && old.y != null && p.x != null && p.y != null) {
       active.events.push({ ...active.source, kind: 'forceMove', iconId: 'action-force-move', targetPieceIds: [p.id],
+        presentation: recordedPositionMotion(state, p.id, old.x, old.y, p.x, p.y),
         targetCell: { x: p.x, y: p.y }, result: { fromX: old.x, fromY: old.y, toX: p.x, toY: p.y,
           ...recordedPositionKind(state, p.id, old.x, old.y, p.x, p.y) }, priority: 75, skippable: true })
     }

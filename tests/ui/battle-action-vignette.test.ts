@@ -79,6 +79,7 @@ function loadModule(): VignetteModule {
   const source = readFileSync(resolve(process.cwd(), 'data/pages/js/battle-ui/battle-action-vignette.js'), 'utf8')
   new Script(identitySource, { filename: 'battle-action-identity.js' }).runInContext(context)
   new Script(source, { filename: 'battle-action-vignette.js' }).runInContext(context)
+  new Script(readFileSync(resolve(process.cwd(), 'data/pages/js/battle-ui/battle-move-timeline.js'), 'utf8')).runInContext(context)
   return windowObject.BattleActionVignette as VignetteModule
 }
 
@@ -585,11 +586,11 @@ describe('RED-167 action vignette queue', () => {
     vignette.update(model)
     vignette.update({ ...model, presentationEvents: [root(1, { kind: 'card', cardId: 'late' })] })
     expect(floatLayer.children[0].innerHTML).toContain('资料暂不可用')
-    vi.advanceTimersByTime(900)
+    vi.advanceTimersByTime(70)
     deliver({ name: '迟到卡牌', description: '真实描述', actionPointCost: 2 })
     await Promise.resolve()
     expect(floatLayer.children[0].innerHTML).toContain('真实描述')
-    expect(floatLayer.children[0].innerHTML).toContain('--banner-elapsed:-900ms')
+    expect(floatLayer.children[0].innerHTML).toContain('--banner-elapsed:-70ms')
     vi.advanceTimersByTime(vignetteModule.constants.cardDurationMs)
     vignette.update({ ...model, presentationEvents: [root(2, { kind: 'card', cardId: 'later' })] })
     vignette.settleAll()
@@ -748,11 +749,12 @@ describe('RED-167 action vignette queue', () => {
 
     const layer = floatLayer.children[0]
     expect(layer.hidden).toBe(false)
-    vi.advanceTimersByTime(120)
+    vi.advanceTimersByTime(40)
     expect(showPath).toHaveBeenCalledWith({
       source: { x: 0, y: 0 },
       end: { x: 4, y: 0 },
       selected: { x: 1, y: 0 },
+      path: [{ x: 1, y: 0 }, { x: 2, y: 0 }, { x: 3, y: 0 }, { x: 4, y: 0 }],
     })
     expect(layer.innerHTML).not.toContain('battle-vignette-path-segment')
     expect(layer.innerHTML).not.toContain('battle-vignette-point')
@@ -762,9 +764,10 @@ describe('RED-167 action vignette queue', () => {
     expect(layer.innerHTML).toContain('寒冰坚忍')
     expect(layer.innerHTML).not.toContain('使用技能')
     expect(layer.innerHTML).not.toContain('images/effect-icons/action-skill.svg')
-    // The path beat is now short; keep the assertion in its result phase while
+    // The root has a 200ms effect beat; its result phase begins at 42% (84ms).
+    // Advance from the 40ms path checkpoint to that exact phase boundary while
     // the independent action banner remains readable.
-    vi.advanceTimersByTime(20)
+    vi.advanceTimersByTime(44)
     expect(layer.innerHTML).not.toContain('battle-vignette-result')
     expect(layer.innerHTML).not.toContain('>4<')
 

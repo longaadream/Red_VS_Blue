@@ -247,6 +247,8 @@ export interface RuleExecutionContext {
   readonly ruleResolver?: (battle: unknown, ruleId: string, metadata?: unknown) => unknown | null
   /** Public preview counterpart for skills triggered by a scoped rule. */
   readonly skillResolver?: (battle: unknown, skillId: string, candidate?: unknown, metadata?: unknown) => unknown | null
+  /** Public preview counterpart for cards loaded from a battle snapshot. */
+  readonly cardResolver?: (battle: unknown, cardId: string, candidate?: unknown, metadata?: unknown) => unknown | null
   /** Preview-only policy for reactions that cannot be completed without input. */
   readonly previewReactionPolicy?: PreviewReactionPolicy
 }
@@ -307,6 +309,7 @@ export function isPreviewReactionPendingError(error: unknown): error is PreviewR
 export interface RuleExecutionContextOptions {
   ruleResolver?: RuleExecutionContext['ruleResolver']
   skillResolver?: RuleExecutionContext['skillResolver']
+  cardResolver?: RuleExecutionContext['cardResolver']
   previewReactionPolicy?: RuleExecutionContext['previewReactionPolicy']
 }
 
@@ -319,6 +322,7 @@ export function createRuleExecutionContext(
     cache: new Map(),
     ...(options.ruleResolver ? { ruleResolver: options.ruleResolver } : {}),
     ...(options.skillResolver ? { skillResolver: options.skillResolver } : {}),
+    ...(options.cardResolver ? { cardResolver: options.cardResolver } : {}),
     ...(options.previewReactionPolicy ? { previewReactionPolicy: options.previewReactionPolicy } : {}),
   }
 }

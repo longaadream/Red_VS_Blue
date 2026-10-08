@@ -10,6 +10,7 @@ type TurnTimerStatusApi = {
       status: string
       deadlineAt: number
       burnStartsAt: number
+      durationMs?: number
       remainingMs?: number
       paused?: boolean
       burning?: boolean
@@ -18,6 +19,7 @@ type TurnTimerStatusApi = {
     pendingTimer?: {
       status: string
       deadlineAt: number
+      durationMs?: number
     }
     now?: number
   }): {
@@ -28,6 +30,7 @@ type TurnTimerStatusApi = {
     burning: boolean
     fast: boolean
     label: string
+    sandRemaining: number
   }
 }
 
@@ -50,6 +53,7 @@ describe('RED-36 turn timer status view', () => {
       status: 'running',
       deadlineAt: 46_000,
       burnStartsAt: 31_000,
+      durationMs: 45_000,
     }
 
     expect(api.create({ timer, now: 1_000 })).toMatchObject({
@@ -58,6 +62,7 @@ describe('RED-36 turn timer status view', () => {
       clockText: '00:45',
       burning: false,
       fast: false,
+      sandRemaining: 1,
     })
     expect(api.create({ timer, now: 31_001 })).toMatchObject({
       remainingSeconds: 15,
@@ -65,7 +70,8 @@ describe('RED-36 turn timer status view', () => {
       burning: true,
       label: '烧绳阶段',
     })
-    expect(timer).toEqual({ status: 'running', deadlineAt: 46_000, burnStartsAt: 31_000 })
+    expect(api.create({ timer, now: 31_001 }).sandRemaining).toBeCloseTo(14_999 / 45_000, 8)
+    expect(timer).toEqual({ status: 'running', deadlineAt: 46_000, burnStartsAt: 31_000, durationMs: 45_000 })
   })
 
   it('distinguishes a player-local fast turn and hides stopped timers', () => {
@@ -74,6 +80,7 @@ describe('RED-36 turn timer status view', () => {
       status: 'running',
       deadlineAt: 21_000,
       burnStartsAt: 6_000,
+      durationMs: 20_000,
       fast: true,
     }
 
@@ -85,6 +92,7 @@ describe('RED-36 turn timer status view', () => {
     expect(api.create({ timer: { ...fast, status: 'stopped' }, now: 1_000 })).toMatchObject({
       visible: false,
       clockText: '--:--',
+      sandRemaining: 0,
     })
   })
 
@@ -96,12 +104,14 @@ describe('RED-36 turn timer status view', () => {
         status: 'running',
         deadlineAt: 46_000,
         burnStartsAt: 31_000,
+        durationMs: 45_000,
         remainingMs: 34_000,
         paused: true,
       },
       pendingTimer: {
         status: 'running',
         deadlineAt: 20_000,
+        durationMs: 15_000,
       },
       now: 8_000,
     })).toMatchObject({
@@ -112,6 +122,7 @@ describe('RED-36 turn timer status view', () => {
       burning: false,
       fast: false,
       label: '响应计时（回合计时已冻结 00:34）',
+      sandRemaining: 0.8,
     })
   })
 })

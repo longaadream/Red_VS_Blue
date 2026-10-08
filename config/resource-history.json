@@ -7,7 +7,11 @@
     "current-main: retain position API and concise descriptions",
     "RED-211: retain 1.0.5 history; shorten Aizen and Grimmjow names; remove gran-rey-cero from Grimmjow skill list per 1010 balance plan; preserve stats and rules",
     "RED-211 role fixes: preserve the damage-multiplier language standard and register the new character rules",
-    "RED-214: RED-213 adds rule-el-primo-meteor-belt to rule manifest; preserve all existing rule IDs. df3a91c74 already shortened Ulquiorra description to 造成或受到伤害后，回复1。; healing remains 1 and executable behavior unchanged."
+    "RED-214: RED-213 adds rule-el-primo-meteor-belt to rule manifest; preserve all existing rule IDs. df3a91c74 already shortened Ulquiorra description to 造成或受到伤害后，回复1。; healing remains 1 and executable behavior unchanged.",
+    "RED-216: retain the existing Muzan resources and manifest IDs from 3c11224f8; this candidate does not rewrite their behavior.",
+    "RED-217: restore Akaza resource files and manifest IDs from 4cd7617d8; source-scoped damage marks, target validation, and flow-based movement remain covered by the Akaza behavior tests.",
+    "RED-227: restore confirmed character resource fields from 28e5e1fdf and 48e24c0a6: Edgar two 0.5 physical hits with per-hit actual-damage healing, Sonic/Kenshin seeded random legal adjacent landings through flow.query.random and flow.effects.move, and Itachi Amaterasu intensity 1. Direct regressions live in tests/game/red227-skill-content.test.ts and tests/game/ichigo-itachi.test.ts; current Edgar pogo content remains unchanged.",
+    "RED-218/219 integration provenance: preserve the resource and manifest decisions from 1416b1209. Colt registers the passive colt-big-stride and rule-colt-big-stride; the end-turn rule offers one cancellable flow.effects.freeMove before Colt shooting zones. Colt revolver zones use the first hostile flow.query.path hit and stop at allies or blocking terrain, while storm zones retain area coverage and wall destruction. Shadow momentum side shots record damage on the status and resolve board-edge flow.query.path hits through rule-momentum-consume while retaining momentum reset/preserve behavior. Alfonso Kick and Ichigo Black Getsuga stop projectile traversal at allied pieces. Existing IDs remain in the manifests; only these RED-218 role/free-move resources are protected here. Behavior evidence is in tests/game/red218-colt-stride.test.ts, tests/game/red218-projectile-blocking.test.ts, and tests/game/red218-shadow-sweep.test.ts; AI, tutorial, and PVE resources are excluded."
   ],
   "files": [
     {
@@ -20,7 +24,7 @@
     },
     {
       "path": "data/rules/manifest.json",
-      "sha256": "a7e7efd5a8b5c33474aabee10fe900bd3d3ab7d14e9079f7cc86b0a34ba6ee58"
+      "sha256": "28ab1aa7f6cd47510f4a7360c1fdb310a8d5d932746b6856914a9a3c46f797c9"
     },
     {
       "path": "data/rules/rule-grimmjow-destruction-instinct.json",
@@ -57,6 +61,90 @@
     {
       "path": "data/skills/ulquiorra-high-speed-regeneration.json",
       "sha256": "def49d0a069c6cce5ec0be239d5a18dd3208d0ea4c427774a6fd26c00eea7c6e"
+    },
+    {
+      "path": "data/pieces/dark-akaza.json",
+      "sha256": "3a9e1e8f71b76f5889ffc9751065bdc0a279269f7de75224e496ec679632bb04"
+    },
+    {
+      "path": "data/pieces/manifest.json",
+      "sha256": "7b428d15f4c5fd9ced8873192bac5d35547949b47bedade8f7c4130a1ed7b051"
+    },
+    {
+      "path": "data/rules/rule-akaza-damage-mark.json",
+      "sha256": "161ac1b50e54ce1f333cf06080a330c2e8fe1443c7dbefec1b33efbe26abd22c"
+    },
+    {
+      "path": "data/rules/rule-akaza-fighting-spirit.json",
+      "sha256": "da4d7304c0cae7243519a26d8441a102a2987e708d078f1075cb08bed63d7733"
+    },
+    {
+      "path": "data/skills/akaza-annihilation.json",
+      "sha256": "1be9df8425ef5edf7df0baf0c063e9fc549738bf81f81bdd4b8d59ea44251a84"
+    },
+    {
+      "path": "data/skills/akaza-disorder.json",
+      "sha256": "c9037a4a74af864f78b461f900e4397cf315a839f6836928836fb0741814051e"
+    },
+    {
+      "path": "data/skills/akaza-fighting-spirit.json",
+      "sha256": "d70e25fbab30a0190fdc8ac5ccf115b538fbe414869e88dcc902769c8bc9d7d0"
+    },
+    {
+      "path": "data/skills/akaza-flash-step.json",
+      "sha256": "d5cfe873ff1da0c7f8e68774d1591d26d257e376678aef3fda71eb9d25e6dc7f"
+    },
+    {
+      "path": "data/skills/edgar-fisticuffs.json",
+      "sha256": "523db6dd0e228c767783aa7cf416def3d1ed6e930ee3195c3be7c99f4c19ac52"
+    },
+    {
+      "path": "data/skills/itachi-amaterasu.json",
+      "sha256": "67bc7575c7bc85c44d1d8c39cb0d692b8816bee429de4d76a5a21d96326d7518"
+    },
+    {
+      "path": "data/skills/kenshin-amakakeru.json",
+      "sha256": "707b7175500128f70aad7b46fbcdc19f075495c9e147ec72859814a15694c760"
+    },
+    {
+      "path": "data/skills/manifest.json",
+      "sha256": "428bce52958136196a336984059b5a075f1ea14c5558f3cc2a1c8d106a88c436"
+    },
+    {
+      "path": "data/skills/sonic-homing-attack.json",
+      "sha256": "f40395956c61416687fb8069efeaf728623776de0113a97f360e7c4bd1d13e37"
+    },
+    {
+      "path": "data/pieces/colt.json",
+      "sha256": "a8776fcb52b62616bf84e1cf3dbc401edaf077f7cf8dfa31ab92a3596415931f"
+    },
+    {
+      "path": "data/rules/rule-colt-big-stride.json",
+      "sha256": "17bfc43c0363f0527e86be0109526ff56a7278c041faf9939365a95d9bd03002"
+    },
+    {
+      "path": "data/rules/rule-colt-zone-endturn.json",
+      "sha256": "9fcfcedcc387938581123954d92dd7d31b1a6ec8829b274d886dfd4cd726a5c7"
+    },
+    {
+      "path": "data/rules/rule-momentum-consume.json",
+      "sha256": "72801f3668cdbe0d6eecc1610d3b09c54f880e0388c21747e71868eb27f7b7ae"
+    },
+    {
+      "path": "data/skills/alfonso-kick.json",
+      "sha256": "d5128ea9b11f3edf8a4e13ec3669254b2c728d74a6d7cc73aee8869e45cdd550"
+    },
+    {
+      "path": "data/skills/colt-big-stride.json",
+      "sha256": "b9abfcc6e27f2d6d95ccc1aa07c580e5daf7ff84dcf2aedb53cf5a2700a02a36"
+    },
+    {
+      "path": "data/skills/ichigo-black-getsuga-tensho.json",
+      "sha256": "fa9708408ec25305247f0e51e181a45ff489cc8bbc4e84a14338e977b4344d32"
+    },
+    {
+      "path": "data/skills/shadow-ride-sweep.json",
+      "sha256": "57f6fa0c7ca08f8f027bf32d387e4a809c248390bd3dd337b8e7a345cc81cef3"
     }
   ]
 }

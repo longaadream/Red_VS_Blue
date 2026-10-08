@@ -102,6 +102,10 @@
   let _cameraTarget = null
   let _container = null
   let _hpLayer = null
+  let _moveRouteLayer = null
+  let _moveRouteLabels = []
+  let _moveRemainingBadge = null
+  let _movePreviewText = null
   let _floatLayer = null
   let _onIntent = null
   let _hoverPointer = null
@@ -146,6 +150,10 @@
   const _anims = new Map()             // one controller per owner/property
   const _actionAnimationQueue = []
   let _actionAnimationTimer = null
+  let _actionAnimationTimerStartedAt = 0
+  let _actionAnimationTimerLogicalMs = 0
+  let _actionAnimationTimerTotalMs = 0
+  let _actionAnimationTimerSpeed = 1
   const _playedEventKeys = new Set()
   const _playedEventOrder = []
   const _pendingAppearanceCues = new Map()
@@ -162,11 +170,16 @@
   let _pressedPiece = null
   let _pressedHighlight = null
   let _reducedMotion = false
+  let _animationSpeed = 1
   let _motionQuery = null
   let _currentModel = null
   let _clock = { prev: 0 }
   let _summaryPositionsDirty = true
   let _renderCount = 0
+  let _fullModelUpdateCount = 0
+  let _moveDraftUpdateCount = 0
+  let _terrainHitTestCount = 0
+  let _dragGridSampleCount = 0
   let _lastDrawCalls = 0
 
   // ── Geometry / Material cache (shared across all tiles/pieces) ────────────────
@@ -385,6 +398,20 @@
     _hpLayer.className = 'piece-summary-layer-3d'
     _hpLayer.style.cssText = 'position:absolute;inset:0;pointer-events:none;overflow:hidden'
     _container.appendChild(_hpLayer)
+    _moveRouteLayer = document.createElement('div')
+    _moveRouteLayer.id = 'moveRouteLayer3d'
+    _moveRouteLayer.style.cssText = 'position:absolute;inset:0;pointer-events:none;overflow:visible;z-index:42'
+    _hpLayer.appendChild(_moveRouteLayer)
+    _moveRemainingBadge = document.createElement('span')
+    _moveRemainingBadge.className = 'move-route-remaining'
+    _moveRemainingBadge.setAttribute('aria-hidden', 'true')
+    _moveRemainingBadge.style.cssText = 'position:absolute;display:none;pointer-events:none;transform:translate(-50%,-50%);background:transparent;border:0;color:#fff0bf;font:26px/30px BattleComic,TabletopComic,cursive;text-align:center;-webkit-text-stroke:1px #382b20;text-shadow:1px 2px 0 #382b20;white-space:nowrap'
+    _moveRouteLayer.appendChild(_moveRemainingBadge)
+    _movePreviewText = document.createElement('span')
+    _movePreviewText.className = 'move-route-preview'
+    _movePreviewText.setAttribute('aria-hidden', 'true')
+    _movePreviewText.style.cssText = 'position:absolute;display:none;pointer-events:none;transform:translate(-50%,-100%);max-width:300px;white-space:normal;text-align:center;background:transparent;border:0;color:#fff0bf;font:16px/20px BattleComic,TabletopComic,cursive;text-shadow:1px 1px 1px #382b20,-1px -1px 1px #382b20,1px -1px 1px #382b20,-1px 1px 1px #382b20'
+    _moveRouteLayer.appendChild(_movePreviewText)
 
     // Fixed tactical perspective camera. It stays centered on the board's X axis,
     // so depth converges into trapezoids without introducing any horizontal yaw.
@@ -939,7 +966,11 @@
     const uses = Number(values.uses)
     const duration = Number(values.duration)
     const intensity = Number(values.intensity)
-    if (Number.isFinite(stacks) && stacks > 1) return String(stacks)
+    // A layered effect can carry a separate intensity value (for example,
+    // Amaterasu deals 2 damage per stack).  Once stacks is present, it is the
+    // count the board badge must show, including the first stack; falling
+    // through to intensity made a single Amaterasu contact look like 2 layers.
+    if (Number.isFinite(stacks) && stacks > 0) return String(stacks)
     if (Number.isFinite(uses) && uses > 0) return String(uses)
     if (Number.isFinite(duration) && duration > 0) return String(duration)
     if (Number.isFinite(intensity) && intensity > 1) return String(intensity)
@@ -1165,6 +1196,125 @@
       obj.summaryEl.style.top = (projected.top - Math.max(20, cellSpan * 0.48)) + 'px'
       obj.summaryEl.style.display = ''
     })
+    _updateMoveRouteOverlays()
+  }
+
+  function _hideMoveRouteOverlays() {
+    _moveRouteLabels.forEach(function (label) { label.style.display = 'none' })
+    if (_moveRemainingBadge) _moveRemainingBadge.style.display = 'none'
+    if (_movePreviewText) _movePreviewText.style.display = 'none'
+  }
+
+  function _moveRouteLabelAt(index) {
+    if (!_moveRouteLayer) return null
+    let label = _moveRouteLabels[index]
+    if (label) return label
+    label = document.createElement('span')
+    label.className = 'move-route-step'
+    label.setAttribute('aria-hidden', 'true')
+    label.style.cssText = 'position:absolute;display:none;pointer-events:none;transform-origin:0 0;width:64px;height:64px;background:transparent;border:0;color:#fff0bf;font:64px/64px BattleComic,TabletopComic,cursive;text-align:center;-webkit-text-stroke:2px #382b20;text-shadow:1px 2px 0 #382b20'
+    _moveRouteLayer.insertBefore(label, _moveRemainingBadge || null)
+    _moveRouteLabels[index] = label
+    return label
+  }
+
+  function _updateMoveRouteOverlays() {
+    if (!_moveRouteLayer || !_currentModel || _boardDecorationsHistorical) {
+      _hideMoveRouteOverlays()
+      return
+    }
+    const interaction = _currentModel.interaction || {}
+    const active = interaction.moveDraftActive === true
+    const path = Array.isArray(interaction.movePath) ? interaction.movePath : []
+    if (!active) {
+      _hideMoveRouteOverlays()
+      return
+    }
+
+    const visibleLabels = new Set()
+    path.forEach(function (cell, index) {
+      const x = Number(cell && cell.x)
+      const y = Number(cell && (cell.y !== undefined ? cell.y : cell.z))
+      if (!Number.isSafeInteger(x) || !Number.isSafeInteger(y)) return
+      const projected = projectCell(x, y, _tileSurfaceHeightAt(x, y) + 0.12)
+      if (!projected) return
+      const label = _moveRouteLabelAt(index)
+      if (!label) return
+      const elevation = _tileSurfaceHeightAt(x, y) + 0.12
+      const right = projectCell(x + 0.5, y, elevation)
+      const bottom = projectCell(x, y + 0.5, elevation)
+      if (!right || !bottom) return
+      const a = (right.left - projected.left) / 32
+      const b = (right.top - projected.top) / 32
+      const c = (bottom.left - projected.left) / 32
+      const d = (bottom.top - projected.top) / 32
+      label.textContent = String(index + 1)
+      label.style.left = projected.left + 'px'
+      label.style.top = projected.top + 'px'
+      label.style.transform = 'matrix(' + [a, b, c, d, -(a + c) * 32, -(b + d) * 32].join(',') + ')'
+      label.style.display = ''
+      visibleLabels.add(label)
+    })
+    _moveRouteLabels.forEach(function (label) {
+      if (!visibleLabels.has(label)) label.style.display = 'none'
+    })
+
+    const selectedId = _currentModel.selection && _currentModel.selection.pieceId
+    const selected = selectedId ? _pieceObjects.get(selectedId) : null
+    const remaining = Number(interaction.moveRemaining)
+    if (!selected || !selected.group.visible) {
+      if (_moveRemainingBadge) _moveRemainingBadge.style.display = 'none'
+      if (_movePreviewText) _movePreviewText.style.display = 'none'
+      return
+    }
+    // During a board preview the selected mesh may have moved to the route
+    // endpoint while the numbered route labels still describe the authority
+    // path. Keep that endpoint label out of the portrait's DOM stacking area;
+    // the remaining route numbers remain useful for the preview.
+    if (_previewAuthorityModel && path.length) {
+      const endpoint = path[path.length - 1]
+      const endpointX = Number(endpoint && endpoint.x)
+      const endpointZ = Number(endpoint && (endpoint.y !== undefined ? endpoint.y : endpoint.z))
+      const endpointLabel = _moveRouteLabels[path.length - 1]
+      if (endpointLabel && Number.isFinite(endpointX) && Number.isFinite(endpointZ)
+        && Math.abs(selected.group.position.x - endpointX) < 0.45
+        && Math.abs(selected.group.position.z - endpointZ) < 0.45) {
+        endpointLabel.style.display = 'none'
+      }
+    }
+    const projected = projectCell(
+      selected.group.position.x,
+      selected.group.position.z,
+      selected.group.position.y + PIECE_H + 0.14,
+    )
+    if (!projected) {
+      _moveRemainingBadge.style.display = 'none'
+      _movePreviewText.style.display = 'none'
+      return
+    }
+    const span = _projectedCellSpan(selected.group.position.x, selected.group.position.z)
+    const badgeLeft = projected.left + span * 0.42
+    const badgeTop = projected.top - span * 0.42
+    if (Number.isFinite(remaining) && remaining >= 0) {
+      _moveRemainingBadge.textContent = String(Math.max(0, Math.floor(remaining)))
+      _moveRemainingBadge.title = '剩余 ' + Math.max(0, Math.floor(remaining)) + ' 格'
+      _moveRemainingBadge.style.left = badgeLeft + 'px'
+      _moveRemainingBadge.style.top = badgeTop + 'px'
+      _moveRemainingBadge.style.display = ''
+    } else {
+      _moveRemainingBadge.style.display = 'none'
+    }
+    const preview = typeof interaction.movePreviewText === 'string'
+      ? interaction.movePreviewText.slice(0, 240)
+      : ''
+    if (preview) {
+      _movePreviewText.textContent = preview
+      _movePreviewText.style.left = badgeLeft + 'px'
+      _movePreviewText.style.top = (badgeTop - 12) + 'px'
+      _movePreviewText.style.display = ''
+    } else {
+      _movePreviewText.style.display = 'none'
+    }
   }
 
   // ── Highlights ────────────────────────────────────────────────────────────────
@@ -1172,6 +1322,7 @@
     _hoverMoveTargets = new Set((hl.move || []).map(_normalizeHighlightItem).filter(Boolean).map(cell => cell.key))
     _hoverSelectedId = hl.selected || null
     _clearHoverPath()
+    _drawHoverPath()
     const candidateKeys = new Set((hl.skill || []).map(_normalizeHighlightItem).filter(Boolean).map(cell => cell.key))
     _syncHighlightGroup('range', (hl.range || []).filter(function (cell) {
       const normalized = _normalizeHighlightItem(cell)
@@ -1431,6 +1582,17 @@
     return cell
   }
 
+  function _normalizePresentationPath(value) {
+    const result = []
+    ;(Array.isArray(value) ? value : []).forEach(function (point) {
+      if (!point || point.x == null || (point.y === undefined && point.z == null)) return
+      const cell = _normalizePresentationPoint(point)
+      if (!cell) return
+      result.push(cell)
+    })
+    return result
+  }
+
   function _createComicArrow(source, end, elevation, color, depthTest) {
     const dx = end.x - source.x
     const dz = end.z - source.z
@@ -1459,14 +1621,35 @@
     return mesh
   }
 
-  function _createPresentationPathRibbon(source, end) {
+  function _createPresentationPathRibbon(source, end, elevation) {
     // All vertices stay parallel to the board; raised terrain occludes naturally.
-    const mesh = _createComicArrow(source, end, TILE_H + 0.028, 0xe3bc73, true)
+    const mesh = _createComicArrow(source, end, elevation == null ? TILE_H + 0.028 : elevation, 0xe3bc73, true)
     if (!mesh) return null
     mesh.userData.presentationPathRole = 'trajectory'
     mesh.userData.sourceCell = { x: source.x, y: source.z }
     mesh.userData.endCell = { x: end.x, y: end.z }
     return mesh
+  }
+
+  function _createPresentationPathPolyline(cells) {
+    if (!Array.isArray(cells) || cells.length < 2) return null
+    const points = cells.map(function (cell) {
+      return new THREE.Vector3(cell.x, _tileSurfaceHeightAt(cell.x, cell.z) + 0.034, cell.z)
+    })
+    const geometry = new THREE.BufferGeometry().setFromPoints(points)
+    const line = new THREE.Line(geometry, new THREE.LineDashedMaterial({
+      color: 0xe3bc73,
+      dashSize: 0.16,
+      gapSize: 0.10,
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+    }))
+    line.computeLineDistances()
+    line.renderOrder = 22
+    line.userData.presentationPathRole = 'trajectory'
+    line.userData.pathCells = cells.map(function (cell) { return { x: cell.x, y: cell.z } })
+    return line
   }
 
   function _createPresentationAimMarker(selected) {
@@ -1508,22 +1691,30 @@
       const source = _normalizePresentationPoint(input && input.source)
       const end = _normalizePresentationPoint(input && input.end)
       const selected = _normalizePresentationPoint(input && input.selected)
-      const hasTrajectory = !!(source && end && (source.x !== end.x || source.z !== end.z))
-      return { source: source, end: end, selected: selected, hasTrajectory: hasTrajectory }
+      const suppliedPath = _normalizePresentationPath(input && input.path)
+      const route = suppliedPath.length
+        ? (source && suppliedPath[0].key !== source.key ? [source].concat(suppliedPath) : suppliedPath.slice())
+        : []
+      if (end && route.length && route[route.length - 1].key !== end.key) route.push(end)
+      const hasPolyline = route.length > 1
+      const hasTrajectory = hasPolyline || !!(source && end && (source.x !== end.x || source.z !== end.z))
+      return { source: source, end: end, selected: selected, route: route, hasPolyline: hasPolyline, hasTrajectory: hasTrajectory }
     }).filter(function (path) { return path.hasTrajectory || path.selected })
     if (!paths.length) {
       _clearPresentationPath()
       return
     }
     const signature = paths.map(function (path) {
-      return [path.source && path.source.key || '', path.end && path.end.key || '', path.selected && path.selected.key || ''].join('|')
+      return [path.source && path.source.key || '', path.end && path.end.key || '', path.selected && path.selected.key || '', path.route.map(function (cell) { return cell.key }).join('>')].join('|')
     }).join(';')
     if (_presentationPath && _presentationPath.signature === signature) return
     _clearPresentationPath()
     const group = new THREE.Group()
     group.userData.presentationPath = true
     paths.forEach(function (path) {
-      const trajectory = path.hasTrajectory ? _createPresentationPathRibbon(path.source, path.end) : null
+      const trajectory = path.hasPolyline
+        ? _createPresentationPathPolyline(path.route)
+        : (path.hasTrajectory ? _createPresentationPathRibbon(path.source, path.end) : null)
       const aim = _createPresentationAimMarker(path.selected)
       if (trajectory) group.add(trajectory)
       if (aim) group.add(aim)
@@ -1541,6 +1732,7 @@
       source: paths[0].source ? { x: paths[0].source.x, y: paths[0].source.z } : null,
       end: paths[0].end ? { x: paths[0].end.x, y: paths[0].end.z } : null,
       selected: paths[0].selected ? { x: paths[0].selected.x, y: paths[0].selected.z } : null,
+      path: paths[0].route.map(function (cell) { return { x: cell.x, y: cell.z } }),
     }
     const targetOpacities = materials.map(function () { return 0.96 })
     if (_reducedMotion) {
@@ -2007,7 +2199,29 @@
         return
       }
       if (previousPiece.x !== nextPiece.x || previousPiece.y !== nextPiece.y) {
-        _animateMove(obj, nextPiece.x, nextPiece.y, action && action.movementKinds && action.movementKinds[nextPiece.id], instant)
+        // A state update can start authoritative playback before the page has
+        // cleared a late drag projection.  The preview mesh may therefore be
+        // sitting on its hypothetical endpoint when this action begins.  If
+        // no real movement is already in flight, restore this piece to the
+        // authoritative previous cell before building the route.  Use the
+        // action's previous snapshot rather than the preview's authority
+        // pointer: queued actions can be newer than a stale preview snapshot.
+        // Existing motion owns its current position and must continue
+        // uninterrupted.
+        if (_previewAuthorityModel && !_anims.has(obj.motionId + ':position')) {
+          const authorityPiece = previousPiece
+          if (authorityPiece && authorityPiece.x != null && authorityPiece.y != null) {
+            const authorityY = _tileSurfaceHeightAt(authorityPiece.x, authorityPiece.y)
+            obj.baseX = authorityPiece.x
+            obj.baseY = authorityY
+            obj.baseZ = authorityPiece.y
+            obj.motionBaseY = authorityY
+            obj.group.position.set(authorityPiece.x, authorityY, authorityPiece.y)
+          }
+        }
+        _animateMove(obj, nextPiece.x, nextPiece.y, action && action.movementKinds && action.movementKinds[nextPiece.id], false,
+          action && action.movementPaths && action.movementPaths[nextPiece.id]
+            || (action && action.type === 'move' && action.pieceId === nextPiece.id ? action.path : null))
       }
       const healthDelta = _pieceHealth(nextPiece) - _pieceHealth(previousPiece)
       if (healthDelta < 0) {
@@ -2048,10 +2262,62 @@
     const instant = _singleEffectPresentation(item.previousModel, item.nextModel)
       && _ownPresentationAction(item.action, item.nextModel)
     _animateActionNow(item.action, item.previousModel, item.nextModel)
+    const requestedDuration = instant ? MOTION_TOKENS.instant : Number.isFinite(Number(item.action && item.action.motionDurationMs))
+      ? Number(item.action.motionDurationMs)
+      : MOTION_TOKENS.action
+    let baseDuration = requestedDuration
+    _pieceObjects.forEach(function (obj) {
+      const controller = _anims.get(obj.motionId + ':position')
+      if (controller) baseDuration = Math.max(baseDuration, (controller.duration - controller.elapsed) * _animationSpeed * 1000)
+    })
+    _actionAnimationTimerStartedAt = Date.now()
+    _actionAnimationTimerLogicalMs = 0
+    _actionAnimationTimerTotalMs = baseDuration
+    _actionAnimationTimerSpeed = _animationSpeed
     _actionAnimationTimer = setTimeout(function () {
       _actionAnimationTimer = null
+      _actionAnimationTimerStartedAt = 0
+      _actionAnimationTimerLogicalMs = 0
+      _actionAnimationTimerTotalMs = 0
+      _actionAnimationTimerSpeed = 1
       _drainActionAnimationQueue()
-    }, instant ? MOTION_TOKENS.instant : MOTION_TOKENS.action)
+    }, baseDuration / _animationSpeed)
+  }
+
+  function setAnimationSpeed(nextSpeed) {
+    const next = Number(nextSpeed) === 2 ? 2 : 1
+    if (next === _animationSpeed) return
+    const previousSpeed = _animationSpeed
+    if (_actionAnimationTimer != null) {
+      const elapsed = Math.max(0, Date.now() - _actionAnimationTimerStartedAt)
+      const logical = Math.min(_actionAnimationTimerTotalMs,
+        _actionAnimationTimerLogicalMs + elapsed * _actionAnimationTimerSpeed)
+      const remaining = Math.max(0, (_actionAnimationTimerTotalMs - logical) / next)
+      clearTimeout(_actionAnimationTimer)
+      _actionAnimationTimerStartedAt = Date.now()
+      _actionAnimationTimerLogicalMs = logical
+      _actionAnimationTimerSpeed = next
+      _actionAnimationTimer = setTimeout(function () {
+        _actionAnimationTimer = null
+        _actionAnimationTimerStartedAt = 0
+        _actionAnimationTimerLogicalMs = 0
+        _actionAnimationTimerTotalMs = 0
+        _actionAnimationTimerSpeed = 1
+        _drainActionAnimationQueue()
+      }, remaining)
+    }
+    _animationSpeed = next
+    _pieceObjects.forEach(function (obj) {
+      const key = obj.motionId + ':position'
+      if (!_anims.has(key) || !obj.motionTarget) return
+      const controller = _anims.get(key)
+      const remainingDuration = controller
+        ? Math.max(0.001, (controller.duration - controller.elapsed) * previousSpeed / next)
+        : null
+      const remainingPath = (obj.motionRoute || []).slice(Math.max(0, Number(obj.motionRouteIndex) || 0))
+      _cancelAnimation(key)
+      _animateMove(obj, obj.motionTarget.x, obj.motionTarget.z, obj.motionKind, false, remainingPath, remainingDuration)
+    })
   }
 
   function _clearActionAnimationQueue() {
@@ -2060,17 +2326,52 @@
       clearTimeout(_actionAnimationTimer)
       _actionAnimationTimer = null
     }
+    _actionAnimationTimerStartedAt = 0
+    _actionAnimationTimerLogicalMs = 0
+    _actionAnimationTimerTotalMs = 0
+    _actionAnimationTimerSpeed = 1
   }
 
-  function _animateMove(obj, targetX, targetZ, movementKind, instant) {
+  function _animateMove(obj, targetX, targetZ, movementKind, instant, movementPath, durationOverride) {
     const targetY = _tileSurfaceHeightAt(targetX, targetZ)
     const from = { x: obj.group.position.x, y: obj.group.position.y, z: obj.group.position.z }
     const fromBaseY = Number.isFinite(obj.motionBaseY) ? obj.motionBaseY : obj.baseY
     const visibleArc = Math.max(0, Math.min(0.08, from.y - fromBaseY))
-    const distance = Math.hypot(targetX - from.x, targetZ - from.z)
-    const travelDuration = movementKind === 'dash'
-      ? MOTION_SECONDS.dash
-      : Math.min(0.16, MOTION_SECONDS.move + Math.max(0, distance - 1) * 0.012)
+    const route = []
+    const seenRoute = new Set()
+    function addRoutePoint(x, z, y) {
+      if (x == null || z == null || !Number.isFinite(Number(x)) || !Number.isFinite(Number(z))) return
+      const key = Number(x) + ',' + Number(z)
+      if (seenRoute.has(key)) return
+      seenRoute.add(key)
+      route.push({ x: Number(x), z: Number(z), y: Number.isFinite(Number(y)) ? Number(y) : _tileSurfaceHeightAt(Number(x), Number(z)) })
+    }
+    addRoutePoint(from.x, from.z, fromBaseY)
+    ;(Array.isArray(movementPath) ? movementPath : []).forEach(function (cell) {
+      if (!cell || cell.x == null || (cell.y === undefined && cell.z == null)) return
+      addRoutePoint(cell.x, cell.y !== undefined ? cell.y : cell.z)
+    })
+    addRoutePoint(targetX, targetZ, targetY)
+    let distance = 0
+    const routeDistances = [0]
+    for (let index = 1; index < route.length; index += 1) {
+      distance += Math.hypot(route[index].x - route[index - 1].x, route[index].z - route[index - 1].z)
+      routeDistances.push(distance)
+    }
+    obj.motionTarget = { x: targetX, z: targetZ }
+    obj.motionKind = movementKind
+    // Keep restart metadata in grid coordinates.  The public path parser
+    // treats `y` as the board row; storing the sampled world height here would
+    // turn a speed change into a bogus route.
+    obj.motionRoute = route.slice(1).map(function (cell) { return { x: cell.x, y: cell.z } })
+    obj.motionRouteIndex = 0
+    const timeline = window.BattleMoveTimeline && movementKind !== 'dash'
+      ? window.BattleMoveTimeline.build(route.map(function (cell) { return { x: cell.x, y: cell.z } })) : null
+    const travelDuration = Number.isFinite(Number(durationOverride)) && Number(durationOverride) > 0
+      ? Number(durationOverride)
+      : (timeline && timeline.durationMs ? timeline.durationMs / 1000 : movementKind === 'dash'
+      ? Math.min(MOTION_SECONDS.action, MOTION_SECONDS.dash)
+      : Math.min(MOTION_SECONDS.action, MOTION_SECONDS.move + Math.max(0, distance - 1) * 0.012)) / _animationSpeed
     obj.baseX = targetX
     obj.baseY = targetY
     obj.baseZ = targetZ
@@ -2078,6 +2379,9 @@
       _cancelAnimation(obj.motionId + ':position')
       obj.motionBaseY = targetY
       obj.group.position.set(targetX, targetY, targetZ)
+      obj.motionTarget = null
+      obj.motionRoute = []
+      obj.motionRouteIndex = 0
       return
     }
     // Teleport and swap have no traversed board cells: snap, then mark arrival.
@@ -2085,6 +2389,9 @@
       _cancelAnimation(obj.motionId + ':position')
       obj.motionBaseY = targetY
       obj.group.position.set(targetX, targetY, targetZ)
+      obj.motionTarget = null
+      obj.motionRoute = []
+      obj.motionRouteIndex = 0
       _flashOutline(obj, movementKind === 'swap' ? 0x22d3ee : 0xa78bfa, MOTION_SECONDS.teleport)
       _animateLanding(obj)
       return
@@ -2093,6 +2400,9 @@
     if (_reducedMotion) {
       obj.motionBaseY = targetY
       obj.group.position.set(targetX, targetY, targetZ)
+      obj.motionTarget = null
+      obj.motionRoute = []
+      obj.motionRouteIndex = 0
       _flashOutline(obj, 0xf59e0b, MOTION_SECONDS.press)
       return
     }
@@ -2100,19 +2410,39 @@
       duration: travelDuration,
       easing: EASE.inOut,
       update: function (progress, raw) {
-        const pathBaseY = fromBaseY + (targetY - fromBaseY) * progress
+        let routeDistance = distance * progress
+        if (timeline && timeline.legs.length) {
+          const elapsed = raw * timeline.durationMs
+          const leg = timeline.legs.find(function (entry) { return elapsed < entry.startMs + entry.durationMs }) || timeline.legs[timeline.legs.length - 1]
+          const local = Math.max(0, Math.min(1, (elapsed - leg.startMs) / leg.durationMs))
+          routeDistance = leg.startDistance + leg.length * EASE.inOut(local)
+        }
+        let segment = 1
+        while (segment < routeDistances.length && routeDistances[segment] < routeDistance) segment += 1
+        const previous = route[Math.max(0, segment - 1)] || route[0]
+        const next = route[Math.min(route.length - 1, segment)] || previous
+        const segmentStart = routeDistances[Math.max(0, segment - 1)] || 0
+        const segmentLength = Math.max(0.0001, (routeDistances[Math.min(routeDistances.length - 1, segment)] || segmentStart) - segmentStart)
+        const segmentProgress = Math.max(0, Math.min(1, (routeDistance - segmentStart) / segmentLength))
+        const routeX = previous.x + (next.x - previous.x) * segmentProgress
+        const routeZ = previous.z + (next.z - previous.z) * segmentProgress
+        const pathBaseY = previous.y + (next.y - previous.y) * segmentProgress
+        obj.motionRouteIndex = Math.max(0, segment - 1)
         const desiredArc = Math.sin(Math.PI * raw) * 0.08
         const arc = visibleArc + (desiredArc - visibleArc) * progress
         obj.motionBaseY = pathBaseY
         obj.group.position.set(
-          from.x + (targetX - from.x) * progress,
+          routeX,
           pathBaseY + Math.max(0, Math.min(0.08, arc)),
-          from.z + (targetZ - from.z) * progress,
+          routeZ,
         )
       },
       complete: function () {
         obj.motionBaseY = targetY
         obj.group.position.set(targetX, targetY, targetZ)
+        obj.motionTarget = null
+        obj.motionRoute = []
+        obj.motionRouteIndex = 0
         _animateLanding(obj)
       },
     })
@@ -2460,11 +2790,11 @@
       pendingPieceIds: Array.from(_pieceObjects.values()).filter(function (obj) { return obj.pending }).map(function (obj) { return obj.id }).sort(),
       pendingAppearanceCues: Array.from(_pendingAppearanceCues.entries()).map(function (entry) { return entry[0] + ':' + entry[1] }).sort(),
       presentationAreaCellCount: _presentationAreaFlash ? _presentationAreaFlash.cellCount : 0,
-      presentationPath: _presentationPath ? {
+      presentationPath: _presentationPath ? Object.assign({
         source: _presentationPath.source,
         end: _presentationPath.end,
         selected: _presentationPath.selected,
-      } : null,
+      }, _presentationPath.path && _presentationPath.path.length ? { path: _presentationPath.path } : {}) : null,
       tutorialCueCellCount: _tutorialCueCellCount,
       tutorialCuePathCount: _tutorialCuePathCount,
       highlightCounts: {
@@ -2482,6 +2812,10 @@
   function getPerformanceDiagnostics() {
     return {
       renderCount: _renderCount,
+      fullModelUpdateCount: _fullModelUpdateCount,
+      moveDraftUpdateCount: _moveDraftUpdateCount,
+      terrainHitTestCount: _terrainHitTestCount,
+      dragGridSampleCount: _dragGridSampleCount,
       lastDrawCalls: _lastDrawCalls,
       frameScheduled: _animFrameId != null,
       activeAnimationCount: _anims.size,
@@ -2560,7 +2894,7 @@
     _notifyViewportChange()
   }
 
-  function _groundPointFromClient(clientX, clientY) {
+  function _groundPointFromClient(clientX, clientY, height) {
     const canvas = _renderer.domElement
     const rect = canvas.getBoundingClientRect()
     if (!rect.width || !rect.height) return null
@@ -2569,7 +2903,7 @@
     _raycaster.setFromCamera({ x: ndcX, y: ndcY }, _camera)
     const vertical = _raycaster.ray.direction.y
     if (Math.abs(vertical) < 0.000001) return null
-    const distance = -_raycaster.ray.origin.y / vertical
+    const distance = ((height || 0) - _raycaster.ray.origin.y) / vertical
     if (distance < 0) return null
     return _raycaster.ray.origin.clone().add(_raycaster.ray.direction.clone().multiplyScalar(distance))
   }
@@ -2582,6 +2916,14 @@
     if (!piece || piece.id !== selection.pieceId) return null
     const obj = _pieceObjects.get(piece.id)
     if (!obj || obj.pending) return null
+    const authorityModel = _previewAuthorityModel || _currentModel
+    const authorityPieces = Array.isArray(authorityModel && authorityModel.interactionPieces)
+      ? authorityModel.interactionPieces
+      : authorityModel && authorityModel.pieces
+    const authorityPiece = authorityPieces
+      && authorityPieces.find(function (entry) { return entry && entry.id === piece.id })
+    const authorityX = authorityPiece && Number.isFinite(Number(authorityPiece.x)) ? Number(authorityPiece.x) : obj.baseX
+    const authorityZ = authorityPiece && Number.isFinite(Number(authorityPiece.y)) ? Number(authorityPiece.y) : obj.baseZ
     // Spatial motion is presentation-only. The drag is accepted immediately;
     // the queued travel animation remains responsible for its visual sequence.
     return {
@@ -2590,26 +2932,36 @@
       obj: obj,
       originX: clientX,
       originY: clientY,
+      lastX: clientX,
+      lastY: clientY,
       active: false,
+      authorityPosition: { x: authorityX, y: _tileSurfaceHeightAt(authorityX, authorityZ), z: authorityZ },
+      visualPosition: { x: obj.group.position.x, y: obj.group.position.y, z: obj.group.position.z },
     }
   }
 
   function _restorePieceDragVisual() {
     if (!_pieceDrag || !_pieceDrag.obj) return
     const obj = _pieceDrag.obj
+    const authority = _pieceDrag.authorityPosition
     obj.group.position.set(
-      obj.baseX,
-      obj.baseY + (obj.pending && !_reducedMotion ? 0.04 : 0),
-      obj.baseZ,
+      authority ? authority.x : obj.baseX,
+      (authority ? authority.y : obj.baseY) + (obj.pending && !_reducedMotion ? 0.04 : 0),
+      authority ? authority.z : obj.baseZ,
     )
     _updateSelectedRingPosition()
     _summaryPositionsDirty = true
     _invalidate()
   }
 
-  function _cancelPieceDrag() {
+  function _cancelPieceDrag(notify) {
+    const cancelled = _pieceDrag
+    if (cancelled && cancelled.active) _panMoved = true
     _restorePieceDragVisual()
     _pieceDrag = null
+    if (notify !== false && cancelled && cancelled.active && _onIntent) {
+      _onIntent({ type: 'end-move-drag', pieceId: cancelled.pieceId, cancelled: true })
+    }
   }
 
   function _movePieceDrag(e) {
@@ -2618,19 +2970,51 @@
     if (!_pieceDrag.active && distance >= PAN_ACTIVATION_PX) {
       _pieceDrag.active = true
       _releasePressedFeedback(e.pointerId)
+      if (_onIntent) _onIntent({ type: 'start-move-drag', pieceId: _pieceDrag.pieceId })
     }
-    if (!_pieceDrag.active) return true
+    if (!_pieceDrag || !_pieceDrag.active) return true
+    const drag = _pieceDrag
+    const samples = []
+    const sampleCount = Math.max(1, Math.ceil(Math.hypot(e.clientX - drag.lastX, e.clientY - drag.lastY) / 4))
+    for (let index = 1; index <= sampleCount; index += 1) {
+      const ratio = index / sampleCount
+      const cell = _dragCellAt(drag.lastX + (e.clientX - drag.lastX) * ratio, drag.lastY + (e.clientY - drag.lastY) * ratio)
+      const previous = samples[samples.length - 1]
+      if (!previous || !cell || previous.x !== cell.x || previous.y !== cell.y) samples.push(cell)
+    }
+    drag.lastX = e.clientX
+    drag.lastY = e.clientY
+    if (_onIntent) _onIntent({ type: 'update-move-drag', pieceId: drag.pieceId, cells: samples })
+    if (_pieceDrag !== drag) return true
     const point = _groundPointFromClient(e.clientX, e.clientY)
     if (!point) return true
     const x = Math.max(0, Math.min(_mapW - 1, point.x))
     const z = Math.max(0, Math.min(_mapH - 1, point.z))
     const tileX = Math.max(0, Math.min(_mapW - 1, Math.round(x)))
     const tileZ = Math.max(0, Math.min(_mapH - 1, Math.round(z)))
-    _pieceDrag.obj.group.position.set(x, _tileSurfaceHeightAt(tileX, tileZ) + 0.08, z)
-    _updateSelectedRingPosition()
+    const visualY = _tileSurfaceHeightAt(tileX, tileZ) + 0.08
+    drag.visualPosition = { x, y: visualY, z }
+    if (drag.obj) {
+      drag.obj.group.position.set(x, visualY, z)
+      _updateSelectedRingPosition()
+    }
     _summaryPositionsDirty = true
     _invalidate()
     return true
+  }
+
+  function _dragCellAt(x, y) {
+    _dragGridSampleCount += 1
+    const rect = _renderer.domElement.getBoundingClientRect()
+    if (x < rect.left || y < rect.top || x >= rect.left + rect.width || y >= rect.top + rect.height) return null
+    // Drag sampling needs the grid plane, not a raycast through every terrain
+    // instance for each four-pixel sample. Rule queries still reject blockers.
+    const point = _groundPointFromClient(x, y, TILE_H + 0.01)
+    if (!point) return null
+    const cellX = Math.round(point.x)
+    const cellY = Math.round(point.z)
+    return cellX >= 0 && cellY >= 0 && cellX < _mapW && cellY < _mapH
+      ? { x: cellX || 0, y: cellY || 0 } : null
   }
 
   function _initControls() {
@@ -2718,12 +3102,13 @@
     }, { passive: false })
 
     const endPointer = (e, allowClick) => {
+      if (allowClick && _pieceDrag && _pieceDrag.pointerId === e.pointerId) _movePieceDrag(e)
       const completedPieceDrag = _pieceDrag && _pieceDrag.pointerId === e.pointerId && _pieceDrag.active
-        ? { pieceId: _pieceDrag.pieceId, cell: allowClick ? screenToCell(e.clientX, e.clientY) : null }
+        ? { pieceId: _pieceDrag.pieceId, cell: allowClick ? _dragCellAt(e.clientX, e.clientY) : null }
         : null
       const wasClick = !_panMoved && _pointers.size === 1
       _releasePressedFeedback(e.pointerId)
-      if (_pieceDrag && _pieceDrag.pointerId === e.pointerId) _cancelPieceDrag()
+      if (_pieceDrag && _pieceDrag.pointerId === e.pointerId) _cancelPieceDrag(false)
       if (canvas.hasPointerCapture && canvas.hasPointerCapture(e.pointerId)) canvas.releasePointerCapture(e.pointerId)
       _pointers.delete(e.pointerId)
       if (_pointers.size < 2) { _pinchDist = 0; _pinchCenter = null }
@@ -2735,10 +3120,11 @@
         _panStart = null
       }
       if (completedPieceDrag) {
-        if (allowClick && _onIntent) {
+        if (_onIntent) {
           _onIntent({
-            type: 'drop-piece',
+            type: 'end-move-drag',
             pieceId: completedPieceDrag.pieceId,
+            cancelled: !allowClick,
             x: completedPieceDrag.cell ? completedPieceDrag.cell.x : null,
             y: completedPieceDrag.cell ? completedPieceDrag.cell.y : null,
           })
@@ -2752,6 +3138,7 @@
       _hoverPointer = null
       endPointer(e, false)
     })
+    _listen(window, 'keydown', e => { if (e.key === 'Escape') _cancelPieceDrag() })
 
     _listen(canvas, 'wheel', e => {
       _applyZoom(_camera.zoom * (e.deltaY < 0 ? 1.12 : 0.89))
@@ -2853,6 +3240,7 @@
   let _hoveredCellRing = null
   let _hoverPath = null
   let _hoverKey = null
+  let _hoveredCell = null
   let _hoverMoveTargets = new Set()
   let _hoverSelectedId = null
   let _hoverIntentKey = null
@@ -2861,9 +3249,81 @@
     _hoverKey = null
     if (!_hoverPath) return
     _scene.remove(_hoverPath)
-    _hoverPath.geometry.dispose()
-    _hoverPath.material.dispose()
+    const geometries = new Set()
+    const materials = new Set()
+    _hoverPath.traverse(function (object) {
+      if (object.geometry) geometries.add(object.geometry)
+      if (object.material) {
+        ;(Array.isArray(object.material) ? object.material : [object.material]).forEach(function (material) {
+          if (material) materials.add(material)
+        })
+      }
+    })
+    geometries.forEach(function (geometry) { if (geometry.dispose) geometry.dispose() })
+    materials.forEach(function (material) { if (material.dispose) material.dispose() })
     _hoverPath = null
+    _invalidate()
+  }
+
+  function _drawHoverPath() {
+    if (!_scene || !_currentModel) return
+    const source = _pieceObjects.get(_hoverSelectedId)
+    if (!source) return
+    const interaction = _currentModel.interaction || {}
+    const draftPath = Array.isArray(interaction.movePath) ? interaction.movePath : []
+    const previewPath = Array.isArray(interaction.hoverMovePath) ? interaction.hoverMovePath : []
+    const path = draftPath.length ? draftPath : previewPath
+    if (!path.length) return
+    if (!draftPath.length && _hoveredCell && !_hoverMoveTargets.has(_hoveredCell.x + ',' + _hoveredCell.y)) return
+    const interactionPieces = Array.isArray(_currentModel.interactionPieces)
+      ? _currentModel.interactionPieces
+      : (_currentModel.pieces || [])
+    const authoritativePiece = interactionPieces.find(function (piece) { return piece && piece.id === source.id })
+    const originX = authoritativePiece && authoritativePiece.x != null ? authoritativePiece.x
+      : (source.baseX != null ? source.baseX : source.targetX)
+    const originZ = authoritativePiece && authoritativePiece.y != null ? authoritativePiece.y
+      : (source.baseZ != null ? source.baseZ : source.targetZ)
+    const cells = [{ x: originX, y: originZ }].concat(path)
+    const seen = new Set()
+    const points = cells.flatMap(function (cell) {
+      if (!cell || cell.x == null || (cell.y === undefined && cell.z == null)) return []
+      const x = Number(cell.x)
+      const z = Number(cell.y !== undefined ? cell.y : cell.z)
+      const key = x + ',' + z
+      if (!Number.isFinite(x) || !Number.isFinite(z) || seen.has(key)) return []
+      seen.add(key)
+      return [new THREE.Vector3(x, _tileSurfaceHeightAt(x, z) + 0.06, z)]
+    })
+    if (points.length < 2) return
+    const route = new THREE.Group()
+    route.userData.movePath = true
+    route.userData.pathCells = points.map(function (point) { return { x: point.x, y: point.z } })
+    for (let index = 1; index < points.length; index += 1) {
+      const previous = points[index - 1]
+      const next = points[index]
+      const ribbon = _createPresentationPathRibbon(
+        { x: previous.x, z: previous.z },
+        { x: next.x, z: next.z },
+        Math.max(previous.y, next.y) + 0.06,
+      )
+      if (!ribbon) continue
+      ribbon.userData.movePathSegment = true
+      ribbon.traverse(function (object) {
+        if (!object.material) return
+        const materials = Array.isArray(object.material) ? object.material : [object.material]
+        materials.forEach(function (material) {
+          material.transparent = true
+          material.opacity = 0.92
+          material.depthTest = false
+          material.depthWrite = false
+        })
+      })
+      route.add(ribbon)
+    }
+    if (!route.children.length) return
+    route.renderOrder = 26
+    _hoverPath = route
+    _scene.add(_hoverPath)
     _invalidate()
   }
 
@@ -2873,16 +3333,8 @@
     if (key !== _hoverKey) {
       _clearHoverPath()
       _hoverKey = key
-      const source = _pieceObjects.get(_hoverSelectedId)
-      if (cell && source && _hoverMoveTargets.has(key)) {
-        const height = Math.max(source.baseY, _tileSurfaceHeightAt(cell.x, cell.y)) + 0.06
-        const geometry = new THREE.BufferGeometry().setFromPoints([
-          new THREE.Vector3(source.targetX, height, source.targetZ), new THREE.Vector3(cell.x, height, cell.y),
-        ])
-        _hoverPath = new THREE.Line(geometry, new THREE.LineDashedMaterial({ color: 0xf5d38b, dashSize: 0.14, gapSize: 0.10, depthWrite: false }))
-        _hoverPath.computeLineDistances()
-        _scene.add(_hoverPath)
-      }
+      _hoveredCell = cell
+      _drawHoverPath()
     }
     // Visual updates may rebuild the hover path; they must not erase the
     // pointer's last notified cell (otherwise pointerleave can be lost).
@@ -2918,6 +3370,7 @@
     const ndcX = ((clientX - rect.left) / rect.width) * 2 - 1
     const ndcY = -((clientY - rect.top) / rect.height) * 2 + 1
     _raycaster.setFromCamera({ x: ndcX, y: ndcY }, _camera)
+    _terrainHitTestCount += 1
     const tileHits = _raycaster.intersectObjects(Array.from(_tileBatches.values()), false)
     if (tileHits.length) {
       const hit = tileHits[0]
@@ -2967,6 +3420,7 @@
     let closest = null
     let closestDistance = Infinity
     const targetMode = !!(_currentModel.selection && _currentModel.selection.mode === 'target')
+    const previewActive = _previewAuthorityModel != null
 
     ;(_currentModel.interactionPieces || _currentModel.pieces || []).forEach(piece => {
       if (piece.visible === false) return
@@ -2977,8 +3431,8 @@
       // Targeting follows the authoritative snapshot, not the presentation
       // position. A piece can therefore be selected at its new legal cell while
       // its travel animation is still catching up visually.
-      const x = targetMode ? piece.x : (obj ? obj.group.position.x : piece.x)
-      const y = targetMode ? piece.y : (obj ? obj.group.position.z : piece.y)
+      const x = targetMode || previewActive ? piece.x : (obj ? obj.group.position.x : piece.x)
+      const y = targetMode || previewActive ? piece.y : (obj ? obj.group.position.z : piece.y)
       const point = projectCell(x, y, (obj ? obj.group.position.y : _tileSurfaceHeightAt(x, y)) + PIECE_H + 0.014)
       if (!point) return
       const dx = clientX - point.clientX
@@ -3067,8 +3521,31 @@
   }
 
   // ── update — one-way presentation model input ─────────────────────────────────
+  function updateMoveDraft(interaction, moveCells) {
+    if (!_mounted || !_currentModel || _boardDecorationsHistorical) return
+    _moveDraftUpdateCount += 1
+    const previousHoverPath = _currentModel.interaction && _currentModel.interaction.hoverMovePath
+    const previousPath = _currentModel.interaction && _currentModel.interaction.movePath
+    const previousCells = _currentModel.legal && _currentModel.legal.moveCells
+    _currentModel = Object.assign({}, _currentModel, {
+      interaction: Object.assign({}, _currentModel.interaction, interaction),
+      legal: Object.assign({}, _currentModel.legal, { moveCells: moveCells }),
+    })
+    if (previousCells !== moveCells) {
+      _hoverMoveTargets = new Set((moveCells || []).map(_normalizeHighlightItem).filter(Boolean).map(cell => cell.key))
+      _syncHighlightGroup('move', moveCells || [])
+    }
+    if (previousPath !== interaction.movePath || previousHoverPath !== interaction.hoverMovePath) {
+      _clearHoverPath()
+      _drawHoverPath()
+    }
+    _summaryPositionsDirty = true
+    _invalidate()
+  }
+
   function update(model) {
     if (!model || !model.board || !_mounted) return
+    _fullModelUpdateCount += 1
 
     const mapKey = model.board.id + ':' + model.board.width + 'x' + model.board.height
     const tileContentKey = _tileContentSignature(model.board)
@@ -3082,6 +3559,7 @@
     _boardDecorationsHistorical = false
     _updatePieces(model.pieces || [])
     _updateTileEffects(model.effects || [])
+    _currentModel = model
     setHighlights({
       move: model.legal && model.legal.moveCells,
       skill: model.legal && model.legal.targetCells,
@@ -3091,7 +3569,6 @@
     })
     _boardDecorationsHistorical = false
     if (_boardDecorations) _boardDecorations.visible = true
-    _currentModel = model
     _syncPendingFeedback(model.interaction || {})
     _summaryPositionsDirty = true
     _invalidate()
@@ -3117,12 +3594,25 @@
 
   function _replaceDisplayedBoard(model, options) {
     if (!_mounted || !model || !model.board) return
-    _clearActionAnimationQueue()
-    if (!(options && options.preview)) _cancelPieceDrag()
-    Array.from(_anims.keys()).forEach(_cancelAnimation)
-    _clearPresentationAreaFlash()
-    _clearPresentationPath()
-    if (options && options.preview) {
+    const preview = !!(options && options.preview)
+    // A move preview is a transient projection over the live board. It can
+    // arrive while an authoritative action is already playing (and a late
+    // authority response can clear it after playback has started), so it must
+    // not tear down the action queue or its property animations. Full board
+    // replacements still own the presentation lifecycle and cancel them.
+    if (!preview) _clearActionAnimationQueue()
+    if (!preview) _cancelPieceDrag()
+    const drag = preview ? _pieceDrag : null
+    const dragPosition = drag && drag.obj && drag.obj.group
+      ? { x: drag.obj.group.position.x, y: drag.obj.group.position.y, z: drag.obj.group.position.z }
+      : drag && drag.visualPosition || null
+    if (drag && dragPosition) drag.visualPosition = dragPosition
+    if (!preview) {
+      Array.from(_anims.keys()).forEach(_cancelAnimation)
+      _clearPresentationAreaFlash()
+      _clearPresentationPath()
+    }
+    if (preview) {
       // Reuse meshes and unchanged terrain. Hover must not repeatedly tear
       // down the entire battlefield or reload portrait textures.
       update(model)
@@ -3130,6 +3620,23 @@
         const warning = obj.summaryEl?.querySelector('.piece-board-lethal')
         if (warning) warning.hidden = true
       })
+      if (drag && _pieceDrag === drag) {
+        // A hypothetical snapshot may remove the dragged piece (for example,
+        // while an effect preview includes a lethal result). Rebind to the
+        // live mesh after the incremental update so clearing the preview can
+        // restore and continue the same gesture.
+        drag.obj = _pieceObjects.get(drag.pieceId) || null
+      }
+      if (drag && _pieceDrag === drag && drag.obj && dragPosition) {
+        if (drag.authorityPosition) {
+          drag.obj.baseX = drag.authorityPosition.x
+          drag.obj.baseY = drag.authorityPosition.y
+          drag.obj.baseZ = drag.authorityPosition.z
+        }
+        drag.obj.group.position.set(dragPosition.x, dragPosition.y, dragPosition.z)
+        _updateSelectedRingPosition()
+        _summaryPositionsDirty = true
+      }
       return
     }
     if (!(options && options.preview)) {
@@ -3157,6 +3664,7 @@
       const warning = obj.summaryEl?.querySelector('.piece-board-lethal')
       if (warning) warning.hidden = true
     })
+    if (_boardDecorationsHistorical) _hideMoveRouteOverlays()
     if (_boardDecorations) _boardDecorations.visible = !_boardDecorationsHistorical
   }
 
@@ -3182,6 +3690,7 @@
     // The board is hypothetical; all hit testing continues to use authority.
     _previewAuthorityModel = authoritativeModel
     _currentModel = authoritativeModel
+    _updateMoveRouteOverlays()
   }
 
   function clearPreviewBoard() {
@@ -3256,6 +3765,13 @@
     clearBoardDecorations()
     _boardDecorationsHistorical = false
     clearTutorialCue()
+    _hideMoveRouteOverlays()
+    _moveRouteLabels.forEach(function (label) { label.remove() })
+    _moveRouteLabels = []
+    if (_moveRouteLayer) _moveRouteLayer.remove()
+    _moveRouteLayer = null
+    _moveRemainingBadge = null
+    _movePreviewText = null
     if (_hpLayer && _hpLayer.parentNode) _hpLayer.remove()
     if (_scene) {
       const geometries = new Set()
@@ -3276,6 +3792,8 @@
       materials.forEach(function (material) { if (material.dispose) material.dispose() })
     }
     _hoveredCellRing = null
+    _hoveredCell = null
+    _animationSpeed = 1
     _texCache.forEach(function (entry) { if (entry && entry.texture && entry.texture.dispose) entry.texture.dispose() })
     if (_toonRamp) _toonRamp.dispose()
     _toonRamp = null
@@ -3339,6 +3857,7 @@
     _onIntent = null
     _hitPlane = null
     _currentModel = null
+    _animationSpeed = 1
     _renderedMapKey = null
     _tileContentKey = null
     _mapW = 0
@@ -3356,6 +3875,10 @@
     _clock.prev = 0
     _summaryPositionsDirty = true
     _renderCount = 0
+    _fullModelUpdateCount = 0
+    _moveDraftUpdateCount = 0
+    _terrainHitTestCount = 0
+    _dragGridSampleCount = 0
     _lastDrawCalls = 0
     _panStart = null
     _panMoved = false
@@ -3372,10 +3895,12 @@
   window.BattleRenderer3D = {
     init,
     update,
+    updateMoveDraft,
     showHistoricalBoard,
     showPreviewBoard,
     clearPreviewBoard,
     animateAction,
+    setAnimationSpeed,
     setPendingFeedback,
     settlePresentation,
     spawnFloater,

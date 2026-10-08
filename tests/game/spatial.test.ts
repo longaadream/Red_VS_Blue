@@ -99,8 +99,25 @@ describe('occupancy and normal movement tools', () => {
     expect(getLivingOccupantAt([dead, summon], { x: 2, y: 0 })?.instanceId).toBe('summon')
   })
 
+  it('普通移动合法集合包含可在 moveRange 内转弯抵达的目标', () => {
+    const mover = makePiece({ instanceId: 'mover', x: 0, y: 0, moveRange: 3 })
+    const state = { map: makeMap(6, 5), pieces: [mover] }
+    const legal = new Set(getLegalNormalMoveTargets(state, mover).map(key))
+
+    expect(legal.has('1,1')).toBe(true)
+  })
+
+  it('普通移动合法集合尊重定身和禁锢限制', () => {
+    for (const statusTags of [
+      [{ id: 'root', type: 'root' }],
+      [{ id: 'imprisoned', type: 'imprisoned' }],
+    ]) {
+      const mover = makePiece({ instanceId: 'mover', x: 0, y: 0, moveRange: 3, statusTags })
+      expect(getLegalNormalMoveTargets({ map: makeMap(3, 2), pieces: [mover] }, mover)).toEqual([])
+    }
+  })
+
   it.each([
-    ['斜线', { x: 1, y: 1 }, []],
     ['超距', { x: 4, y: 0 }, []],
     ['路径棋子阻挡', { x: 3, y: 0 }, [makePiece({ instanceId: 'blocker', x: 1, y: 0 })]],
   ])('%s目标不在普通移动合法集合中', (_label, target, blockers) => {

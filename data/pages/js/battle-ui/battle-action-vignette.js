@@ -4,6 +4,7 @@
   const SINGLE_EFFECT_DURATION_MS = 24
   const DECLARATION_DURATION_MS = 0
   const COMPOSITE_STEP_DURATION_MS = 200
+  const LIGHTWEIGHT_STEP_DURATION_MS = 200
   // Keep a movement beat alive until the renderer's longest normal walk can
   // finish.  The renderer uses 120ms for a one-cell walk, up to 160ms for a
   // long walk, and 145ms for dash; these values are presentation contracts,
@@ -55,6 +56,8 @@
   function movementDuration(group) {
     const event = group && group.root
     if (!event || !['move', 'forceMove'].includes(event.kind)) return 0
+    const routeDuration = root.BattleMoveTimeline && root.BattleMoveTimeline.eventDuration(event)
+    if (routeDuration) return routeDuration
     const result = event.result || {}
     const movementKind = result.movementKind
     if (movementKind === 'dash') return DASH_DURATION_MS
@@ -83,7 +86,8 @@
     const base = reducedMotion ? REDUCED_DURATION_MS : COMPOSITE_STEP_DURATION_MS
     if (reducedMotion) return base
     const speed = Number(playbackSpeed) > 0 ? Number(playbackSpeed) : 1
-    return Math.max(base, movementDuration(group) * speed)
+    const hasRouteTimeline = root.BattleMoveTimeline && root.BattleMoveTimeline.eventDuration(group && group.root)
+    return Math.max(base, movementDuration(group) * (hasRouteTimeline ? 1 : speed))
   }
 
   function bannerDuration(group) {
@@ -287,7 +291,8 @@
         return
       }
       const wallElapsedMs = activeWallElapsedMs + Math.max(0, now() - activeTimelineStartedAt)
-      const movementFloorMs = !reducedMotion ? movementDuration(active) : 0
+      const hasRouteTimeline = root.BattleMoveTimeline && root.BattleMoveTimeline.eventDuration(active.root)
+      const movementFloorMs = !reducedMotion && !hasRouteTimeline ? movementDuration(active) : 0
       const logicalRemainingMs = Math.max(0, duration - activeProgressMs)
       const movementRemainingMs = Math.max(0, movementFloorMs - wallElapsedMs)
       const completionDelayMs = movementFloorMs
@@ -570,6 +575,7 @@
     let showPath = null
     let clearPath = null
     let projectCell = null
+    let setAnimationSpeed = null
     let model = null
     let currentPhase = null
     let currentGroup = null
@@ -722,7 +728,7 @@
       } else {
         if (clearAreaFlash) clearAreaFlash()
         if (travelVisible && showPath) {
-          showPath({ source: cells.source, end: cells.end || cells.targets[0], selected: cells.selected })
+          showPath({ source: cells.source, end: cells.end || cells.targets[0], selected: cells.selected, path: cells.path })
         } else if (clearPath) clearPath()
       }
       layer.dataset.phase = currentPhase
@@ -826,6 +832,7 @@
     function setSpeed(nextSpeed) {
       speed = Number(nextSpeed) === 2 ? 2 : 1
       queue.setSpeed(speed)
+      if (setAnimationSpeed) setAnimationSpeed(speed)
       syncSpeedControl()
       if (currentGroup) render()
     }
@@ -857,6 +864,7 @@
       showPath = typeof mountInput.showPath === 'function' ? mountInput.showPath : null
       clearPath = typeof mountInput.clearPath === 'function' ? mountInput.clearPath : null
       projectCell = typeof mountInput.projectCell === 'function' ? mountInput.projectCell : null
+      setAnimationSpeed = typeof mountInput.setAnimationSpeed === 'function' ? mountInput.setAnimationSpeed : null
       if (!doc || !doc.createElement || !floatLayer || !floatLayer.appendChild) return
       layer = doc.createElement('div')
       layer.className = 'battle-vignette-layer'
@@ -913,6 +921,7 @@
       showPath = null
       clearPath = null
       projectCell = null
+      setAnimationSpeed = null
       model = null
       currentPhase = null
       currentGroup = null
@@ -948,6 +957,7 @@
     constants: Object.freeze({
       singleEffectDurationMs: SINGLE_EFFECT_DURATION_MS,
       compositeStepDurationMs: COMPOSITE_STEP_DURATION_MS,
+      lightweightStepDurationMs: LIGHTWEIGHT_STEP_DURATION_MS,
       normalDurationMs: NORMAL_DURATION_MS,
       cardDurationMs: CARD_DURATION_MS,
       movementMaxDurationMs: MOVEMENT_MAX_DURATION_MS,

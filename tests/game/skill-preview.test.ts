@@ -1,4 +1,7 @@
 import { readFileSync } from 'node:fs'
+import { createRequire } from 'node:module'
+import { resolve } from 'node:path'
+import { createContext, Script } from 'node:vm'
 
 import { describe, expect, it } from 'vitest'
 
@@ -45,6 +48,48 @@ function publicFixture(): BattleState {
   return state
 }
 
+function browserArmorFixture(): { state: BattleState; action: BattleAction } {
+  const armor = skill('tails-armor-assembly')
+  const source = asPieceInstance(makePiece({
+    instanceId: 'tails', templateId: 'tails', name: 'Tails', ownerPlayerId: 'player-red', faction: 'red',
+    x: 0, y: 0, attack: 3,
+    skills: [{ skillId: armor.id, currentCooldown: 0, usesRemaining: -1 }],
+  }))
+  const ally = asPieceInstance(makePiece({
+    instanceId: 'ally', templateId: 'test-ally', name: 'Ally', ownerPlayerId: 'player-red', faction: 'red',
+    x: 1, y: 0, attack: 4, defense: 1, currentHp: 8, maxHp: 16,
+  }))
+  const state = makeState({ pieces: [source, ally] })
+  state.pieces = [source, ally]
+  state.skillsById = { [armor.id]: armor }
+  state.players[0].actionPoints = 10
+  state.players[0].chargePoints = 2
+
+  const selecting = applyBattleAction(state, {
+    type: 'useChargeSkill', playerId: 'player-red', pieceId: 'tails', skillId: armor.id,
+  })
+  const pending = selecting.pendingOptionSelection
+  if (!pending) throw new Error('Armor Assembly did not request module selection')
+  const resolved = applyBattleAction(selecting, {
+    type: 'pendingOptionSelect', playerId: 'player-red', selectedOption: ['attack', 'defense'],
+    selectionId: pending.selectionId, stateRevision: pending.stateRevision,
+  })
+  const card = resolved.players[0].hand.find(entry => entry.cardId === 'armor-attack-defense')
+  if (!card) throw new Error('Armor Assembly did not create the expected card')
+  const draft = { type: 'playCard' as const, playerId: 'player-red', cardInstanceId: card.instanceId }
+  const preparation = prepareAction(resolved, draft)
+  if (preparation.kind !== 'needTarget') throw new Error(`expected Armor target prompt, got ${preparation.kind}`)
+  return {
+    state: resolved,
+    action: {
+      ...draft,
+      targetPieceId: 'ally',
+      selectionId: preparation.selectionId,
+      stateRevision: preparation.stateRevision,
+    },
+  }
+}
+
 function targetedAction(state: BattleState): BattleAction {
   const draft = {
     type: 'useBasicSkill' as const,
@@ -76,6 +121,100 @@ function withoutDuration<T>(value: T): T {
 }
 
 describe('RED-224 isolated public skill preview', () => {
+  it('previews a deterministic last-core kill without settling the live battle', () => {
+    const state = publicFixture()
+    state.pieces.forEach(piece => { piece.isCore = true })
+    state.pieces.find(piece => piece.instanceId === 'uther')!.currentHp = 1
+    const action = targetedAction(state)
+    const before = JSON.stringify(state)
+    const actual = applyBattleAction(structuredClone(state), action)
+    expect(actual.terminalResult?.reason).toBe('core-eliminated')
+    const result = previewBattleAction(state, action, 'player-red')
+    expect(result.status).toBe('ready')
+    if (result.status !== 'ready') return
+    expect(result.snapshot.pieces.some(piece => piece.instanceId === 'uther')).toBe(false)
+    expect(result.events.some(event => event.kind === 'damage')).toBe(true)
+    expect(result.snapshot.terminalResult).toBeUndefined()
+    expect(JSON.stringify(result.snapshot)).not.toContain('terminalReplay')
+    expect(previewBattleAction(actual, action, 'player-red').status).toBe('unavailable')
+    expect(JSON.stringify(state)).toBe(before)
+  })
+
+  it('ships last-core preview support in the training browser engine bundle', () => {
+    const context = createContext({ require: createRequire(resolve('package.json')), process, console, TextEncoder, TextDecoder, window: {} })
+    new Script(readFileSync('data/pages/js/game-engine.js', 'utf8')).runInContext(context)
+    const browserPreview = (context.GameEngine as { previewBattleAction: typeof previewBattleAction }).previewBattleAction
+    const state = publicFixture()
+    state.pieces.forEach(piece => { piece.isCore = true })
+    state.pieces.find(piece => piece.instanceId === 'uther')!.currentHp = 1
+    const before = JSON.stringify(state)
+    const result = browserPreview(state, targetedAction(state), 'player-red')
+    expect(result.status).toBe('ready')
+    if (result.status !== 'ready') return
+    expect(result.snapshot.pieces.some(piece => piece.instanceId === 'uther')).toBe(false)
+    expect(result.snapshot.terminalResult).toBeUndefined()
+    expect(JSON.stringify(state)).toBe(before)
+  })
+
+  it('previews canonical card damage and generated Armor cards in the real browser bundle', () => {
+    const context = createContext({
+      require: createRequire(resolve('package.json')), process,
+      console: { error: () => undefined, log: () => undefined, warn: () => undefined },
+      TextEncoder, TextDecoder, window: {},
+    })
+    new Script(readFileSync('data/pages/js/game-engine.js', 'utf8')).runInContext(context)
+    const browserPreview = (context.GameEngine as { previewBattleAction: typeof previewBattleAction }).previewBattleAction
+
+    const damageState = publicFixture()
+    damageState.players[0].hand = [{ cardId: 'holy-smite', instanceId: 'browser-smite', ownerPlayerId: 'player-red' }]
+    const damageAction = { type: 'playCard', playerId: 'player-red', cardInstanceId: 'browser-smite' } as BattleAction
+    const damageBefore = JSON.stringify(damageState)
+    const damage = browserPreview(damageState, damageAction, 'player-red')
+    expect(damage.status).toBe('ready')
+    if (damage.status === 'ready') {
+      expect(damage.snapshot.pieces.find(piece => piece.instanceId === 'uther')?.currentHp).toBe(5)
+      expect(damage.snapshot.players[0].hand).toEqual([])
+      expect(damage.snapshot.customCards).toBeUndefined()
+    }
+    expect(JSON.stringify(damageState)).toBe(damageBefore)
+
+    const armor = browserArmorFixture()
+    const armorBefore = JSON.stringify(armor.state)
+    const armorPreview = browserPreview(armor.state, armor.action, 'player-red')
+    expect(armorPreview.status).toBe('ready')
+    if (armorPreview.status === 'ready') {
+      const ally = armorPreview.snapshot.pieces.find(piece => piece.instanceId === 'ally')!
+      expect(ally.attack).toBe(7)
+      expect(ally.defense).toBe(2)
+      expect(armorPreview.snapshot.customCards).toBeUndefined()
+    }
+    expect(JSON.stringify(armor.state)).toBe(armorBefore)
+
+    const anchor = asPieceInstance(makePiece({ instanceId: 'demon-anchor', templateId: 'red-anchor', name: 'Sacrifice', ownerPlayerId: 'player-red', faction: 'red', x: 0, y: 0, currentHp: 20, maxHp: 20, attack: 3 }))
+    const summonState = makeState({ pieces: [anchor], width: 4, height: 4 })
+    summonState.pieces = [anchor]
+    summonState.players[0].actionPoints = 10
+    summonState.players[0].hand = [{ cardId: 'demon-summon-5', instanceId: 'browser-summon', ownerPlayerId: 'player-red' }]
+    summonState.extensions = { kiljaedanPiecesByPlayerId: {
+      'player-red': { ...summonState.pieces[0], instanceId: 'stored-kiljaedan', templateId: 'kiljaedan', maxHp: 99, currentHp: 99, attack: 44 },
+    } }
+    const summonBefore = JSON.stringify(summonState)
+    const summonRoot = { type: 'playCard', playerId: 'player-red', cardInstanceId: 'browser-summon' } as BattleAction
+    expect(browserPreview(summonState, summonRoot, 'player-red').status).toBe('needs-input')
+    const summonPreparation = prepareAction(summonState, summonRoot)
+    if (summonPreparation.kind !== 'needTarget') throw new Error('expected summon target prompt')
+    const summonAction = {
+      ...summonRoot, targetPieceId: anchor.instanceId, targetX: 0, targetY: 0, extraTargets: [{ x: 2, y: 2 }],
+      selectionId: summonPreparation.selectionId, stateRevision: summonPreparation.stateRevision,
+    } as BattleAction
+    expect(prepareAction(summonState, summonAction).kind).toBe('ready')
+    expect(applyBattleAction(structuredClone(summonState), summonAction).pieces.some(piece => piece.instanceId === 'stored-kiljaedan')).toBe(true)
+    const summonResult = browserPreview(summonState, summonAction, 'player-red')
+    expect(summonResult.status).toBe('unavailable')
+    expect(JSON.stringify(summonResult)).not.toContain('stored-kiljaedan')
+    expect(JSON.stringify(summonState)).toBe(summonBefore)
+  })
+
   it('previews a public single target skill and matches applyBattleAction', () => {
     const state = publicFixture()
     const action = targetedAction(state)

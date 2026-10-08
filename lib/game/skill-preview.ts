@@ -136,11 +136,20 @@ function removeHiddenInventory(holder: JsonRecord): void {
  * depend on hidden or terminal state that is not represented in the preview
  * contract.
  */
+function customCardRegistryChanged(state: BattleState, baseline: JsonRecord | undefined): boolean {
+  const current = state.customCards
+  const currentRecord = isRecord(current) ? current : undefined
+  const currentKeys = currentRecord ? Object.keys(currentRecord) : []
+  const baselineKeys = baseline ? Object.keys(baseline) : []
+  if (currentKeys.length === 0 && baselineKeys.length === 0) return false
+  if (!currentRecord || !baseline) return true
+  return JSON.stringify(currentRecord) !== JSON.stringify(baseline)
+}
+
 function hasUnprovenExecutableState(state: BattleState, allowTerminal = false): boolean {
   if (state.deployment
     && state.deployment.status !== 'complete'
     && !isPreviewSafeProgressiveTurnReady(state)) return true
-  if (state.customCards && Object.keys(state.customCards).length > 0) return true
   if (!allowTerminal && state.terminalResult) return true
 
   return false
@@ -191,18 +200,33 @@ function sanitizePreviewState(state: BattleState): boolean {
       // change availability and reveal hidden state.
       if (!PUBLIC_EXTENSION_KEYS.has(key)) continue
       if (key === 'minatoAnchors') {
-        // Owner-only records were filtered by the public projection. Keep only
-        // the visible geometry required by authoritative anchor targeting.
+        // Retain only viewer-projected geometry needed for anchor targeting.
         sanitized[key] = Array.isArray(value) ? value.filter(entry =>
           isRecord(entry) && Number.isSafeInteger(entry.x) && Number.isSafeInteger(entry.y)
           && typeof entry.sourceId === 'string',
-        ).map(entry => ({
-          x: entry.x, y: entry.y, sourceId: entry.sourceId,
+        ).map(entry => ({ x: entry.x, y: entry.y, sourceId: entry.sourceId,
           ...(typeof entry.ownerPlayerId === 'string' ? { ownerPlayerId: entry.ownerPlayerId } : {}),
         })) : []
         continue
       }
       sanitized[key] = value
+    }
+    if (Array.isArray(sanitized.tileEffects)) {
+      const visibleTileEffects = sanitized.tileEffects.filter(effect => !isRecord(effect) || effect.visible !== false)
+      if (visibleTileEffects.length > 0) sanitized.tileEffects = visibleTileEffects
+      else delete sanitized.tileEffects
+      // Canonical Amaterasu contact rules read a parallel cell store. Retain
+      // only entries proved by the public board effect, never hidden cells.
+      const visibleAmaterasu = visibleTileEffects.filter(effect => isRecord(effect) && effect.tileType === 'amaterasu')
+      if (visibleAmaterasu.length && Array.isArray(state.extensions.amaterasuCells)) {
+        const cells = state.extensions.amaterasuCells.filter(cell => isRecord(cell) && cell.visible !== false
+          && visibleAmaterasu.some(effect => isRecord(effect) && effect.x === cell.x && effect.y === cell.y))
+        if (cells.length) {
+          sanitized.amaterasuCells = cells
+          const owner = state.extensions.amaterasuOwnerPlayerId
+          if (typeof owner === 'string' && state.players.some(player => player.playerId === owner)) sanitized.amaterasuOwnerPlayerId = owner
+        }
+      }
     }
     state.extensions = sanitized
   }
@@ -309,6 +333,131 @@ function applyPublicDisplayBindings(projected: BattleState, viewerId: string): v
   }
 }
 
+const PUBLIC_TERRAIN_RULES = {
+  amaterasu: 'rule-sasuke-amaterasu-move',
+  'lethal-toxin': 'rule-blackwidow-toxin-player',
+} as const
+
+type PublicTerrainProof = {
+  ruleIds: Set<string>
+  statusTags: JsonRecord[]
+}
+
+type PublicTerrainProofCollection = {
+  proofs: Map<string, PublicTerrainProof>
+  incomplete: boolean
+}
+
+function addPublicTerrainProof(
+  proofs: Map<string, PublicTerrainProof>,
+  playerId: string,
+  ruleId: string,
+  status?: JsonRecord,
+): void {
+  const proof = proofs.get(playerId) ?? { ruleIds: new Set<string>(), statusTags: [] }
+  proof.ruleIds.add(ruleId)
+  if (status && typeof status.id === 'string'
+    && !proof.statusTags.some(candidate => candidate.id === status.id)) {
+    proof.statusTags.push(status)
+  }
+  proofs.set(playerId, proof)
+}
+
+function publicToxinStatus(status: JsonRecord): JsonRecord {
+  // The canonical toxin rule reads only this public, tile-linked subset. Do
+  // not carry an opponent's unrelated status metadata into the executor.
+  const result: JsonRecord = {}
+  for (const key of ['id', 'type', 'intensity', 'value', 'extraValue', 'sourceId', 'currentDuration']) {
+    if (status[key] !== undefined) result[key] = cloneJson(status[key])
+  }
+  return result
+}
+
+function collectPublicTerrainProofs(state: BattleState, viewerId: string): PublicTerrainProofCollection {
+  const proofs = new Map<string, PublicTerrainProof>()
+  const extensions = state.extensions as JsonRecord | undefined
+  if (!extensions) return { proofs, incomplete: false }
+  let incomplete = false
+  const effects = Array.isArray(extensions.tileEffects)
+    ? extensions.tileEffects.filter(isRecord).filter(effect => effect.visible !== false)
+    : []
+  const players = state.players as unknown as JsonRecord[]
+  const playerFor = (playerId: string): JsonRecord | undefined => players.find(player => (
+    isRecord(player) && normalized(player.playerId) === playerId
+  ))
+
+  const amaterasuCells = Array.isArray(extensions.amaterasuCells)
+    ? extensions.amaterasuCells.filter(isRecord).filter(cell => cell.visible !== false)
+    : []
+  const amaterasuOwner = normalized(extensions.amaterasuOwnerPlayerId)
+  for (const effect of effects) {
+    if (effect.tileType !== 'amaterasu') continue
+    const cell = amaterasuCells.find(candidate => candidate.x === effect.x && candidate.y === effect.y)
+    const effectOwner = normalized(effect.ownerPlayerId)
+    if (!cell) {
+      // A generic presentation marker without a source/owner is not enough
+      // to infer an executable opponent rule. Once a canonical owner or
+      // source marker is present, however, a missing public cell proof must
+      // fail closed instead of silently dropping a known terrain effect.
+      const knownOwner = amaterasuOwner || effectOwner
+      if (knownOwner !== viewerId && (knownOwner || effect.sourceId !== undefined)) incomplete = true
+      continue
+    }
+    const cellOwner = normalized(cell.ownerPlayerId)
+    // The canonical Itachi skill can rewrite the global owner while retaining
+    // older cells with a previous owner. Prefer the authoritative public
+    // extension owner, then fall back to per-cell/tile metadata for older
+    // snapshots that do not have it.
+    const owner = amaterasuOwner || cellOwner || effectOwner
+    if (!owner || (!amaterasuOwner && cellOwner && effectOwner && cellOwner !== effectOwner)) {
+      incomplete = true
+      continue
+    }
+    if (owner === viewerId) continue
+    if (!playerFor(owner)) {
+      incomplete = true
+      continue
+    }
+    // The cell and owner are the public proof. The source piece may be dead or
+    // already in the graveyard while the permanent terrain remains active, and
+    // older canonical Amaterasu cells do not carry sourcePieceId.
+    addPublicTerrainProof(proofs, owner, PUBLIC_TERRAIN_RULES.amaterasu)
+  }
+
+  for (const effect of effects) {
+    if (effect.tileType !== 'lethal-toxin') continue
+    const owner = normalized(effect.ownerPlayerId)
+    const sourceId = typeof effect.sourceId === 'string' ? effect.sourceId : ''
+    if (!owner) {
+      incomplete = true
+      continue
+    }
+    if (owner === viewerId) continue
+    const player = playerFor(owner)
+    if (!player || !sourceId) {
+      incomplete = true
+      continue
+    }
+    const statuses = Array.isArray(player.statusTags) ? player.statusTags.filter(isRecord) : []
+    const status = statuses.find(candidate => candidate.visible !== false
+      && candidate.type === 'lethal-toxin'
+      && candidate.id === sourceId
+      && typeof candidate.sourceId === 'string'
+      && candidate.sourceId.length > 0
+      && candidate.value === effect.x
+      && candidate.extraValue === effect.y)
+    if (!status) {
+      // A visible toxin tile without its matching public status is an
+      // incomplete network projection. Never invent its coordinates/damage or
+      // silently present a result that omits a known public effect.
+      incomplete = true
+      continue
+    }
+    addPublicTerrainProof(proofs, owner, PUBLIC_TERRAIN_RULES['lethal-toxin'], publicToxinStatus(status))
+  }
+  return { proofs, incomplete }
+}
+
 /**
  * Always project before checking executable content. This prevents the
  * presence of an opponent's hidden status/rule from changing the result.
@@ -337,6 +486,11 @@ function publicViewerExecutionSnapshot(snapshot: BattleState, viewerId: string):
   }
   applyPublicDisplayBindings(projected, viewerId)
   if (projected.extensions) delete projected.extensions.skillPresentation
+  const terrainProofCollection = collectPublicTerrainProofs(projected, viewerId)
+  if (terrainProofCollection.incomplete) {
+    throw new Error('Public terrain proof is incomplete')
+  }
+  const terrainProofs = terrainProofCollection.proofs
   for (const piece of projected.pieces) {
     const holder = piece as unknown as JsonRecord
     if (normalized(piece.ownerPlayerId) !== viewerId) {
@@ -372,7 +526,19 @@ function publicViewerExecutionSnapshot(snapshot: BattleState, viewerId: string):
     if (normalized(player.playerId) !== viewerId && Array.isArray(player.rules)) {
       player.rules = player.rules.filter(rule => isPublicRuleForViewer(rule, holder, viewerId))
     }
-    if (normalized(player.playerId) !== viewerId) delete player.statusTags
+    if (normalized(player.playerId) !== viewerId) {
+      const proof = terrainProofs.get(normalized(player.playerId))
+      if (proof) {
+        const rules = Array.isArray(player.rules) ? player.rules : []
+        for (const ruleId of proof.ruleIds) {
+          if (!rules.some(rule => isRecord(rule) && rule.id === ruleId)) rules.push({ id: ruleId, public: true })
+        }
+        player.rules = rules
+        player.statusTags = proof.statusTags
+      } else {
+        player.statusTags = []
+      }
+    }
     removeHiddenInventory(holder)
   }
   removeHiddenInventory(projected as unknown as JsonRecord)
@@ -381,13 +547,12 @@ function publicViewerExecutionSnapshot(snapshot: BattleState, viewerId: string):
 
 function actionFields(action: BattleAction): BattleAction {
   const source = action as unknown as JsonRecord
-  const result: JsonRecord = {
-    type: source.type,
-    playerId: source.playerId,
-    pieceId: source.pieceId,
-    skillId: source.skillId,
+  const result: JsonRecord = {}
+  for (const key of ['type', 'playerId', 'pieceId', 'skillId', 'cardInstanceId', 'toX', 'toY']) {
+    if (Object.prototype.hasOwnProperty.call(source, key) && source[key] !== undefined) result[key] = source[key]
   }
   for (const key of [
+    'path',
     'selectedOption',
     'targetX',
     'targetY',
@@ -560,7 +725,7 @@ function redactActionLog(value: unknown): unknown {
   if (isRecord(value.payload)) {
     const payload: JsonRecord = {}
     for (const key of [
-      'pieceId', 'pieceTemplateId', 'skillId', 'fromX', 'fromY', 'toX', 'toY',
+      'pieceId', 'pieceTemplateId', 'skillId', 'fromX', 'fromY', 'toX', 'toY', 'path',
       'amount', 'value', 'movementKind', 'targetPieceId', 'targetCell',
     ]) if (value.payload[key] !== undefined) payload[key] = value.payload[key]
     if (Object.keys(payload).length > 0) result.payload = payload
@@ -581,7 +746,11 @@ function visiblePresentationMarkers(snapshot: BattleState, viewerId: string): Js
   }) : []
 }
 
-function publicPredictedState(state: BattleState, viewerId: string, skillId: string, baselineMarkers: JsonRecord[]): BattleState {
+function publicPredictedState(state: BattleState, viewerId: string, skillId: string | undefined, baselineMarkers: JsonRecord[]): BattleState {
+  // Hypothetical victories have no authoritative replay archive. Remove only
+  // the terminal envelope from a copy, retaining the normal privacy projection.
+  state = { ...state }
+  delete state.terminalResult
   const projected = publicViewerExecutionSnapshot(state, viewerId) as unknown as JsonRecord
   // Return only presentation data from the already viewer-projected state.
   // Never carry executable/private extension stores into the hypothetical board.
@@ -610,9 +779,10 @@ function publicPredictedState(state: BattleState, viewerId: string, skillId: str
   delete projected.pendingTargetSelection
   delete projected.actions
   removeHiddenInventory(projected)
-  projected.skillsById = {
+  if (skillId) projected.skillsById = {
     [skillId]: redactSkill(state.skillsById?.[skillId]),
   }
+  else delete projected.skillsById
   if (Array.isArray(projected.pieces)) projected.pieces = projected.pieces.map(redactPiece).filter(Boolean)
   if (Array.isArray(projected.graveyard)) projected.graveyard = projected.graveyard.map(redactPiece).filter(Boolean)
   if (Array.isArray(projected.players)) {
@@ -646,7 +816,7 @@ function safeEvents(events: readonly BattlePresentationEvent[]): BattlePresentat
 
 function actionId(action: BattleAction): string {
   const record = action as unknown as JsonRecord
-  return `preview:${String(record.type)}:${String(record.pieceId)}:${String(record.skillId)}`
+  return `preview:${String(record.type)}:${String(record.pieceId)}:${String(record.skillId)}:${String(record.cardInstanceId)}`
 }
 
 /**
@@ -673,30 +843,64 @@ function runPublicSkillAction(
     const safeAction = actionFields(action)
     if (!isPureJson(safeAction)) return unavailable(started)
     const actionRecord = action as unknown as JsonRecord
-    if (actionRecord.type !== 'useBasicSkill' && actionRecord.type !== 'useChargeSkill') return unavailable(started)
+    const isMove = actionRecord.type === 'move'
+    const isCard = actionRecord.type === 'playCard'
+    const isSkill = actionRecord.type === 'useBasicSkill' || actionRecord.type === 'useChargeSkill'
+    if (!isMove && !isSkill && !isCard) return unavailable(started)
     const baselineMarkers = visiblePresentationMarkers(snapshot, viewer)
     const publicSnapshot = publicViewerExecutionSnapshot(snapshot, viewer)
     if (!isPureJson(publicSnapshot)) return unavailable(started)
     if (stateHasPendingInteraction(publicSnapshot)) return needsInput(started)
     if (normalized(actionRecord.playerId) !== viewer) return unavailable(started)
-    if (!collectOwnedChoices && Array.isArray(actionRecord.extraTargets) && actionRecord.extraTargets.length > 0) return needsInput(started)
-    const source = publicSnapshot.pieces.find(piece => piece.instanceId === actionRecord.pieceId)
-    if (!source || normalized(source.ownerPlayerId) !== viewer) return unavailable(started)
+    if (!isMove && !isCard && !collectOwnedChoices && Array.isArray(actionRecord.extraTargets) && actionRecord.extraTargets.length > 0) return needsInput(started)
+    const source = !isCard
+      ? publicSnapshot.pieces.find(piece => piece.instanceId === actionRecord.pieceId)
+      : undefined
+    if (!isCard && (!source || normalized(source.ownerPlayerId) !== viewer)) return unavailable(started)
+    const owner = isCard
+      ? publicSnapshot.players.find(player => normalized(player.playerId) === viewer)
+      : undefined
+    const card = isCard
+      ? owner?.hand.find(entry => entry.instanceId === actionRecord.cardInstanceId)
+      : undefined
+    if (isCard && (!owner || !card || normalized(card.ownerPlayerId) !== viewer)) return unavailable(started)
     if (normalized(publicSnapshot.turn?.currentPlayerId) !== viewer || publicSnapshot.turn.phase !== 'action') return unavailable(started)
     if (hasUnprovenExecutableState(publicSnapshot)) return unavailable(started)
-    if (!source.skills?.some(skill => skill.skillId === actionRecord.skillId)) return unavailable(started)
-
-    const skillId = typeof actionRecord.skillId === 'string' ? actionRecord.skillId : ''
-    const skill = publicSkillDefinition(publicSnapshot, skillId, collectOwnedChoices)
-    if (!skill) return unavailable(started)
-    if (!collectOwnedChoices && selectionNeedsInput(skill, safeAction)) return needsInput(started)
+    const skillId = typeof actionRecord.skillId === 'string' ? actionRecord.skillId : undefined
+    const cardId = isCard && typeof card?.cardId === 'string' ? card.cardId : undefined
+    let skill: JsonRecord | undefined
+    let cardDefinition: JsonRecord | undefined
+    if (isSkill) {
+      if (!skillId || !source?.skills?.some(skillEntry => skillEntry.skillId === skillId)) return unavailable(started)
+      skill = publicSkillDefinition(publicSnapshot, skillId, collectOwnedChoices)
+      if (!skill) return unavailable(started)
+      if (!collectOwnedChoices && selectionNeedsInput(skill, safeAction)) return needsInput(started)
+    } else if (isCard && cardId && card) {
+      const cardSource = createPublicRuleSource(publicSnapshot, viewer)
+      const resolved = cardSource.cardResolver?.(
+        publicSnapshot,
+        cardId,
+        publicSnapshot.customCards?.[cardId],
+        { sourceId: card.instanceId, skillId: cardId },
+      )
+      if (!resolved || cardSource.hasUnsupportedAccess()) return unavailable(started)
+      cardDefinition = resolved as unknown as JsonRecord
+    }
 
     // Use JSON-only state plus the selected public skill.  Never hydrate from
     // the server content registry in this surface.
     const safeState = cloneJson(publicSnapshot)
+    if (isCard && cardId && cardDefinition && isRecord(safeState.customCards)) {
+      // Targeting preflight reads the snapshot registry directly. Replace the
+      // selected entry with the already verified canonical/generated copy so
+      // forged metadata cannot influence a preparation response.
+      safeState.customCards[cardId] = cloneJson(cardDefinition)
+    }
     if (!sanitizePreviewState(safeState)) return unavailable(started)
-    const safeSkill = cloneJson(skill)
-    safeState.skillsById = { [skillId]: safeSkill as unknown as BattleState['skillsById'][string] }
+    if (skillId && skill) {
+      const safeSkill = cloneJson(skill)
+      safeState.skillsById = { [skillId]: safeSkill as unknown as BattleState['skillsById'][string] }
+    }
     const skippedReactions = new Set<string>()
     let randomAccessed = false
     let predicted: BattleState | undefined
@@ -709,6 +913,7 @@ function runPublicSkillAction(
       const context: RuleExecutionContext = createRuleExecutionContext(isolatedTriggerSystem, {
         ruleResolver: publicRuleSource.ruleResolver,
         skillResolver: publicRuleSource.skillResolver,
+        cardResolver: publicRuleSource.cardResolver,
         previewReactionPolicy: {
           shouldSkipConsumer: (kind, consumerId, sourceId, eventType) => skippedReactions.has(
             previewReactionKey(kind, consumerId, sourceId, eventType),
@@ -725,7 +930,7 @@ function runPublicSkillAction(
         },
       })
       try {
-        if (collectOwnedChoices) {
+        if (collectOwnedChoices || isCard) {
           const preparation = withRuleRuntime(runtimeScope.runtime, () => withRuleExecutionContext(
             context, () => prepareAction(attemptState, safeAction),
           ))
@@ -733,7 +938,11 @@ function runPublicSkillAction(
           if (preparation.kind === 'invalid') return unavailable(started)
           if (preparation.kind !== 'ready') {
             const publicPreparation: JsonRecord = { kind: preparation.kind, continuation: false,
-              source: { type: 'skill', id: skillId, pieceId: source.instanceId } }
+              source: {
+                type: isCard ? 'card' : 'skill',
+                id: isCard ? cardId : skillId,
+                ...(source?.instanceId ? { pieceId: source.instanceId } : {}),
+              } }
             const record = preparation as unknown as JsonRecord
             for (const key of ['title', 'selectionId', 'stateRevision', 'targetType', 'range', 'filter', 'rangeCells',
               'candidates', 'options', 'selectionMode', 'minSelections', 'maxSelections', 'canCancel', 'min', 'max', 'step']) {
@@ -744,8 +953,10 @@ function runPublicSkillAction(
           // Public input metadata can be prepared even for effects that are
           // outside the supported preview executor. Never execute those
           // effects merely because their root choices have been completed.
-          if (skill.statusTag || skill.summonCapability || skill.deathParasitism
-            || /\bMath\s*\.\s*random\s*\(/.test(String(skill.code))) return unavailable(started)
+          if (skill?.statusTag || skill?.summonCapability || skill?.deathParasitism
+            || cardDefinition?.statusTag || cardDefinition?.summonCapability || cardDefinition?.deathParasitism
+            || /\bMath\s*\.\s*random\s*\(/.test(String(skill?.code ?? ''))
+            || /\bMath\s*\.\s*random\s*\(/.test(String(cardDefinition?.code ?? ''))) return unavailable(started)
         }
         predicted = recordBattlePresentation(
           attemptState,
@@ -759,6 +970,7 @@ function runPublicSkillAction(
       } catch (error) {
         randomAccessed ||= runtimeScope.randomAccessed()
         if (isPreviewReactionPendingError(error) && pendingReactionKey) {
+          if (isMove) return needsInput(started)
           skippedReactions.add(pendingReactionKey)
           continue
         }
@@ -770,6 +982,7 @@ function runPublicSkillAction(
     }
 
     if (!predicted || randomAccessed) return unavailable(started)
+    if (customCardRegistryChanged(predicted, isRecord(safeState.customCards) ? safeState.customCards : undefined)) return unavailable(started)
     if (stateHasPendingInteraction(predicted)) {
       return needsInput(started, collectOwnedChoices ? publicNextSkillChoice(predicted, viewer) : undefined)
     }
@@ -845,3 +1058,4 @@ export function previewBattleAction(snapshot: BattleState, action: BattleAction,
     || (action as unknown as JsonRecord)?.selectedOption !== undefined
     || (Array.isArray((action as unknown as JsonRecord)?.extraTargets) && ((action as unknown as JsonRecord).extraTargets as unknown[]).length > 0))
 }
+

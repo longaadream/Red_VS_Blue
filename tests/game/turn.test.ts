@@ -27,6 +27,7 @@ import { finalizePendingTargetSession, prepareAction } from '@/lib/game/targetin
 import { makeState, makePiece, makeTile } from '../helpers/minimal-state'
 import { globalTriggerSystem, type TriggerContext } from '@/lib/game/triggers'
 import { projectBattlePresentationEvents, projectBattlePresentationEventsForViewer } from '@/lib/game/battle-presentation-events'
+import { changePiecePositions } from '@/lib/game/position-change'
 
 function withTargetCredentials(state: BattleState, action: Extract<BattleAction, { type: 'useBasicSkill' | 'useChargeSkill' | 'playCard' }>): BattleAction {
   const draft = { ...action }
@@ -131,6 +132,62 @@ describe('move action', () => {
     expect(moved?.y).toBe(0)
   })
 
+  it('普通移动允许横纵转弯，并按提交路径记录接触事实', () => {
+    const piece = makePiece({ instanceId: 'turning-mover', ownerPlayerId: 'player-red', x: 0, y: 0, moveRange: 3 })
+    const state = makeState({ pieces: [piece], currentPlayerId: 'player-red', phase: 'action' })
+
+    const next = applyBattleAction(state, {
+      type: 'move',
+      playerId: 'player-red',
+      pieceId: 'turning-mover',
+      toX: 1,
+      toY: 1,
+      path: [{ x: 1, y: 0 }, { x: 1, y: 1 }],
+    })
+
+    expect(next.pieces.find(p => p.instanceId === 'turning-mover')).toMatchObject({ x: 1, y: 1 })
+    expect(next.players.find(p => p.playerId === 'player-red')?.actionPoints).toBe(1)
+    expect(next.actions).toContainEqual(expect.objectContaining({
+      type: 'positionChanged',
+      payload: expect.objectContaining({
+        pieceId: 'turning-mover',
+        path: [{ x: 1, y: 0 }, { x: 1, y: 1 }],
+      }),
+    }))
+  })
+
+  it('legacy skill-authored walk keeps straight-line semantics for diagonal targets', () => {
+    const piece = makePiece({ instanceId: 'legacy-walk', ownerPlayerId: 'player-red', x: 0, y: 0, moveRange: 3 })
+    const state = makeState({ pieces: [piece], currentPlayerId: 'player-red', phase: 'action' })
+
+    expect(changePiecePositions(state, [{ pieceId: piece.instanceId, x: 1, y: 1 }], 'walk'))
+      .toMatchObject({ success: false })
+    expect(piece).toMatchObject({ x: 0, y: 0 })
+  })
+
+  it('rejects an explicit route when beforeMove redirects its destination', () => {
+    const piece = makePiece({ instanceId: 'redirected-route', ownerPlayerId: 'player-red', x: 0, y: 0, moveRange: 3 })
+    const state = makeState({ pieces: [piece], currentPlayerId: 'player-red', phase: 'action' })
+    vi.mocked(globalTriggerSystem.checkTriggers).mockImplementation((_, context: TriggerContext) => {
+      if (context.type === 'beforeMove') {
+        context.targetX = 2
+        context.targetY = 0
+      }
+      return TRIGGER_OK as any
+    })
+    const before = JSON.stringify(state)
+
+    try {
+      expect(() => applyBattleAction(state, {
+        type: 'move', playerId: 'player-red', pieceId: piece.instanceId, toX: 1, toY: 1,
+        path: [{ x: 1, y: 0 }, { x: 1, y: 1 }],
+      })).toThrow(/path|destination|终点/i)
+      expect(JSON.stringify(state)).toBe(before)
+    } finally {
+      vi.mocked(globalTriggerSystem.checkTriggers).mockImplementation(() => TRIGGER_OK)
+    }
+  })
+
   it('移动超过 moveRange 应抛出错误', () => {
     const piece = makePiece({ instanceId: 'p1', ownerPlayerId: 'player-red', x: 0, y: 0, moveRange: 2 })
     const state = makeState({ pieces: [piece], currentPlayerId: 'player-red', phase: 'action' })
@@ -190,12 +247,6 @@ describe('move action', () => {
 
   it.each([
     {
-      label: '斜线',
-      target: { x: 1, y: 1 },
-      prepare: () => {},
-      error: /straight line/i,
-    },
-    {
       label: '超出 moveRange',
       target: { x: 4, y: 0 },
       prepare: () => {},
@@ -247,6 +298,55 @@ describe('move action', () => {
 
     expect(JSON.stringify(state)).toBe(before)
     expect(state.players.find(p => p.playerId === 'player-red')?.actionPoints).toBe(2)
+    expect(state.actions).toEqual([])
+  })
+
+  it.each([
+    {
+      label: '格式错误',
+      target: { x: 2, y: 0 },
+      path: [{ x: 1.5, y: 0 }, { x: 2, y: 0 }],
+      error: /path|integer/i,
+    },
+    {
+      label: '非相邻',
+      target: { x: 2, y: 0 },
+      path: [{ x: 2, y: 0 }],
+      error: /adjacent|相邻|path/i,
+    },
+    {
+      label: '重复格',
+      target: { x: 2, y: 0 },
+      path: [{ x: 1, y: 0 }, { x: 1, y: 0 }, { x: 2, y: 0 }],
+      error: /revisit|重复|path/i,
+    },
+    {
+      label: '超出路径范围',
+      target: { x: 3, y: 0 },
+      path: [{ x: 1, y: 0 }, { x: 2, y: 0 }, { x: 3, y: 0 }],
+      error: /moveRange|range|超距/i,
+      moveRange: 2,
+    },
+    {
+      label: '路径棋子阻挡',
+      target: { x: 2, y: 0 },
+      path: [{ x: 1, y: 0 }, { x: 2, y: 0 }],
+      error: /blocked|occupied/i,
+      blocker: true,
+    },
+  ] as const)('显式路径$label被拒绝且不污染输入状态', ({ target, path, error, moveRange, blocker }) => {
+    const mover = makePiece({ instanceId: 'mover', ownerPlayerId: 'player-red', x: 0, y: 0, moveRange: moveRange ?? 3 })
+    const pieces = [mover]
+    if (blocker) pieces.push(makePiece({ instanceId: 'path-blocker', ownerPlayerId: 'player-blue', x: 1, y: 0 }))
+    const state = makeState({ pieces, currentPlayerId: 'player-red', phase: 'action' })
+    const before = JSON.stringify(state)
+
+    expect(() => applyBattleAction(state, {
+      type: 'move', playerId: 'player-red', pieceId: 'mover', toX: target.x, toY: target.y,
+      path: path as any,
+    })).toThrow(error)
+    expect(JSON.stringify(state)).toBe(before)
+    expect(state.players.find(player => player.playerId === 'player-red')?.actionPoints).toBe(2)
     expect(state.actions).toEqual([])
   })
 

@@ -4,8 +4,8 @@ import type { BattleState } from './turn'
 import { BattleRuleError } from './battle-types'
 import { globalTriggerSystem, type TriggerContext } from './triggers'
 import { getRuleExecutionTriggerSystem } from './rule-runtime'
-import { getNormalMoveRejection, getPositionChangeRejection, isLegalSkillLanding, traceMovementPath,
-  type GridPosition, type MovementTraceOptions, type PositionChangeKind } from './spatial'
+import { getNormalMoveRejection, getOrthogonalLineCells, getPositionChangeRejection, isLegalSkillLanding, traceMovementPath,
+  type GridPosition, type MovementTraceOptions, type NormalMovePath, type PositionChangeKind } from './spatial'
 import { submitPositionContacts } from './tile-contact'
 
 export interface PiecePositionChange { pieceId: string; x: number; y: number }
@@ -15,6 +15,8 @@ export interface PositionChangeFact {
 export interface PositionChangeOptions {
   reservedCells?: readonly GridPosition[]
   path?: Omit<MovementTraceOptions, 'excludePieceId' | 'maxDistance'>
+  /** Authoritative normal-walk route; unlike skill traces it is validated exactly and never rerouted. */
+  normalPath?: NormalMovePath | null
   /** Engine-only action boundary: AP/log commit precedes contact. */
   deferContacts?: boolean
   /** Host-only fee commit, never exposed through the author facade. No trigger dispatch. */
@@ -168,8 +170,18 @@ export function changePiecePositions(battle: BattleState, changes: readonly Piec
     cells.add(key)
     if (entry.from.x === entry.to.x && entry.from.y === entry.to.y) continue
     if (kind === 'walk') {
-      const rejection = getNormalMoveRejection(battle, piece, entry.to)
+      // A normal turn supplies `normalPath`; legacy skill/data-authored walk
+      // effects intentionally retain their old straight trace semantics.
+      const resolvedPath = options.normalPath !== undefined
+        ? options.normalPath
+        : getOrthogonalLineCells(entry.from, entry.to)
+      if (!resolvedPath) return cancel(options.normalPath === undefined
+        ? '位移路径必须沿同一行或同一列'
+        : '普通移动路径已失效')
+      const rejection = getNormalMoveRejection(battle, piece, entry.to, resolvedPath)
       if (rejection) return cancel(rejection.message)
+      entry.path = resolvedPath.map(cell => ({ ...cell }))
+      continue
     }
     if (kind !== 'teleport' && kind !== 'swap') {
       const dx = entry.to.x - entry.from.x, dy = entry.to.y - entry.from.y

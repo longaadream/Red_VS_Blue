@@ -266,6 +266,7 @@ describe('RED-227 local skill choice sequence', () => {
       myPlayerId: 'player-red',
       validMoves: new Set(),
       clearSkillPreview: () => undefined,
+      clearMoveDraft: () => undefined,
       recordTargetClear: (reason: string) => clearEvents.push(reason),
       renderTargetOverlay: () => undefined,
       setStatusMsg: () => undefined,

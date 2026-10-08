@@ -86,12 +86,26 @@ describe('UI/server normal movement contract', () => {
 
     const engine = context.GameEngine as {
       manhattanDistance?: (from: { x: number; y: number }, to: { x: number; y: number }) => number
+      getNormalMovePath?: (
+        state: ReturnType<typeof makeState>,
+        piece: ReturnType<typeof makePiece>,
+        target: { x: number; y: number },
+        waypoints?: Array<{ x: number; y: number }>,
+      ) => Array<{ x: number; y: number }> | null
+      getNormalMoveRejection?: (
+        state: ReturnType<typeof makeState>,
+        piece: ReturnType<typeof makePiece>,
+        target: { x: number; y: number },
+        path?: Array<{ x: number; y: number }> | null,
+      ) => { code: string } | null
       getLegalNormalMoveTargetsForPlayer?: (
         state: ReturnType<typeof makeState>, playerId: string, pieceId: string,
       ) => Array<{ x: number; y: number }>
       applyBattleAction?: (state: ReturnType<typeof makeState>, action: Record<string, unknown>) => ReturnType<typeof makeState>
     }
     expect(engine.manhattanDistance).toBeTypeOf('function')
+    expect(engine.getNormalMovePath).toBeTypeOf('function')
+    expect(engine.getNormalMoveRejection).toBeTypeOf('function')
     expect(engine.getLegalNormalMoveTargetsForPlayer).toBeTypeOf('function')
     expect(engine.applyBattleAction).toBeTypeOf('function')
 
@@ -101,8 +115,20 @@ describe('UI/server normal movement contract', () => {
 
     expect(engine.manhattanDistance!({ x: 2, y: 2 }, { x: 3, y: 3 })).toBe(2)
     expect(engine.getLegalNormalMoveTargetsForPlayer!(state, 'player-red', 'mover').map(key).sort()).toEqual([
-      '0,2', '1,2', '2,0', '2,1', '2,3', '2,4',
+      '0,1', '0,2', '0,3', '1,0', '1,1', '1,2', '1,3', '1,4',
+      '2,0', '2,1', '2,3', '2,4', '3,0', '3,1', '3,3', '3,4', '4,1', '4,3',
     ])
+
+    const bentMover = makePiece({ instanceId: 'browser-bent', ownerPlayerId: 'player-red', x: 0, y: 0, moveRange: 3 })
+    const bentState = makeState({ pieces: [bentMover], currentPlayerId: 'player-red', phase: 'action', width: 3, height: 3 })
+    const browserPath = engine.getNormalMovePath!(bentState, bentMover, { x: 1, y: 1 })
+    expect(browserPath).toEqual([{ x: 1, y: 0 }, { x: 1, y: 1 }])
+    expect(engine.getNormalMoveRejection!(bentState, bentMover, { x: 1, y: 1 }, [{ x: 1, y: 1 }]))
+      .toMatchObject({ code: 'nonadjacent-path' })
+    const browserBentMoved = engine.applyBattleAction!(bentState, {
+      type: 'move', playerId: 'player-red', pieceId: 'browser-bent', toX: 1, toY: 1, path: browserPath,
+    })
+    expect(browserBentMoved.pieces.find(piece => piece.instanceId === 'browser-bent')).toMatchObject({ x: 1, y: 1 })
 
     const taggedMover = makePiece({
       instanceId: 'browser-tagged',
