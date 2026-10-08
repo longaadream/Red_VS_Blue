@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>社区 · RED vs BLUE</title>
+  <link rel="stylesheet" href="css/tabletop/tabletop.css">
+  <link rel="stylesheet" href="css/tabletop/online.css">
+  <link rel="stylesheet" href="css/tabletop/community.css">
+  <link rel="stylesheet" href="css/tabletop/fantasy-online.css">
+  <link rel="stylesheet" href="css/tabletop/player-profile.css">
+  <script src="js/server-utils.js"></script>
+  <script src="js/developer-tools/match-trace.js"></script>
+  <script defer src="js/player-profile.js"></script>
+  <script defer src="js/community.js"></script>
+</head>
+<body class="fantasy-online" data-art-page="community">
+  <div class="game-shell">
+    <header class="game-header">
+      <a class="game-brand" href="index.html"><span>RED</span><small>vs</small><span>BLUE</span></a>
+      <span class="header-divider"></span>
+      <h1>玩家社区</h1>
+      <div class="header-end community-account-menu">
+        <span id="communityConnection" class="community-connection" role="status">未连接</span>
+        <button class="button" id="communityAccountButton" type="button">登录账号</button>
+        <button class="button" id="communityLogout" type="button" hidden>退出</button>
+      </div>
+      <a class="back-link" href="index.html">主菜单</a>
+    </header>
+
+    <nav class="game-nav" aria-label="联机导航">
+      <a href="multiplayer.html"><img src="images/tabletop/ui-map.svg" alt="">房间大厅</a>
+      <a href="official.html"><img src="images/tabletop/ui-confirm.svg" alt="">排位对战</a>
+      <a class="selected" href="community.html"><img src="images/tabletop/ui-tools.svg" alt="">社区</a>
+      <div class="nav-note">好友与公告板<br>约桌 · 讨论<small>登录后连接官方社区服务</small></div>
+    </nav>
+
+    <main class="game-main">
+      <div class="view-heading">
+        <div><p class="kicker">COMMUNITY TABLE</p><h2>好友与公告板</h2></div>
+        <div class="toolbar"><button class="button" id="communityRefresh" type="button">刷新</button></div>
+      </div>
+
+      <section class="community-auth panel" id="communityAuth" aria-labelledby="communityAuthTitle">
+        <div class="community-auth-copy"><p class="kicker">OFFICIAL ACCOUNT</p><h2 id="communityAuthTitle">登录社区</h2><p>使用已有官方账号连接好友和公告板。关闭登录区域仍可返回离线游戏。</p></div>
+        <form id="communityLoginForm" class="community-login-form">
+          <label for="communityServer">服务器地址</label>
+          <input id="communityServer" type="url" autocomplete="url" value="https://play.redvsblue.top" required>
+          <label for="communityEmail">邮箱</label>
+          <input id="communityEmail" type="email" autocomplete="username" maxlength="254" required>
+          <label for="communityPassword">密码</label>
+          <input id="communityPassword" type="password" autocomplete="current-password" maxlength="128" required>
+          <button class="button primary" id="communityLoginSubmit" type="submit">登录并连接</button>
+        </form>
+        <p id="communityAuthStatus" class="community-status" role="status"></p>
+      </section>
+
+      <div class="community-layout" id="communityContent" hidden>
+        <section class="community-panel panel" aria-labelledby="friendsTitle">
+          <div class="panel-heading"><div><p class="kicker">FRIENDS</p><h2 id="friendsTitle">好友</h2></div><button class="button" id="friendsRefresh" type="button">刷新</button></div>
+          <form id="friendSearchForm" class="community-search-form">
+            <label for="friendSearch">查找玩家</label>
+            <div class="inline-controls"><input id="friendSearch" type="search" minlength="2" maxlength="80" autocomplete="off" placeholder="输入至少两个字符或 UID"><button class="button" type="submit">搜索</button></div>
+          </form>
+          <p id="friendStatus" class="community-status" role="status"></p>
+          <section class="friend-group" aria-labelledby="searchResultsTitle"><h3 id="searchResultsTitle">搜索结果</h3><ul id="searchResults" class="friend-list"></ul></section>
+          <section class="friend-group" aria-labelledby="friendsListTitle"><h3 id="friendsListTitle">我的好友</h3><ul id="friendsList" class="friend-list"></ul></section>
+          <section class="friend-group" aria-labelledby="incomingTitle"><h3 id="incomingTitle">收到的申请</h3><ul id="incomingList" class="friend-list"></ul></section>
+          <section class="friend-group" aria-labelledby="outgoingTitle"><h3 id="outgoingTitle">发出的申请</h3><ul id="outgoingList" class="friend-list"></ul></section>
+          <section class="friend-group" aria-labelledby="blockedTitle"><h3 id="blockedTitle">已屏蔽</h3><ul id="blockedList" class="friend-list"></ul></section>
+        </section>
+
+        <section class="community-panel panel board-panel" aria-labelledby="boardTitle">
+          <div class="panel-heading"><div><p class="kicker">COMMUNITY BOARD</p><h2 id="boardTitle">公告板</h2></div><button class="button" id="boardRefresh" type="button">重新加载</button></div>
+          <article class="official-announcement" id="officialAnnouncement" aria-labelledby="announcementTitle"><p class="kicker">PINNED</p><h3 id="announcementTitle">官方公告</h3><p id="announcementBody">正在读取公告…</p></article>
+          <details class="post-composer">
+            <summary>发布约桌 / 交流帖</summary>
+            <form id="postForm" class="post-form">
+              <div class="post-form-heading"><h3>发布新帖</h3><span>纯文本交流</span></div>
+              <div class="post-fields"><label for="postKind">类型<select id="postKind"><option value="meetup">约桌</option><option value="discussion">讨论</option></select></label><label for="postTitle">标题<input id="postTitle" maxlength="80" required></label></div>
+              <label for="postBody">内容<textarea id="postBody" maxlength="2000" rows="4" required></textarea></label>
+              <label for="postRoomCode">已有房间码（可选）<input id="postRoomCode" maxlength="80" autocomplete="off"><small>只复制房间码；进入房间仍按正常联机流程完成。</small></label>
+              <button class="button primary" id="postSubmit" type="submit">发布</button>
+            </form>
+          </details>
+          <p id="boardStatus" class="community-status" role="status"></p>
+          <div id="boardPosts" class="board-posts"></div>
+          <button class="button board-more" id="boardMore" type="button" hidden>加载更多帖子</button>
+        </section>
+      </div>
+    </main>
+
+    <footer class="game-footer"><span id="communityFooterStatus">官方社区 · 未连接</span><a href="official.html?account=1">账号设置</a></footer>
+  </div>
+  <script src="js/room-invitations.js" defer></script>
+</body>
+</html>

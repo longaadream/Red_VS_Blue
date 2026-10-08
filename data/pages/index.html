@@ -395,6 +395,7 @@
 </style>
   <link rel="stylesheet" href="css/tabletop/tabletop.css" />
   <link rel="stylesheet" href="css/tabletop/menu.css" />
+  <link rel="stylesheet" href="css/tabletop/player-profile.css" />
   <script src="js/battle-audio.js" defer></script>
   <script src="js/battle-impact.js" defer></script>
 </head>
@@ -417,6 +418,7 @@
       <summary style="cursor:pointer;padding:8px">音效设置</summary>
       <label style="display:flex;align-items:center;gap:12px;padding:12px">音效音量 <input data-sound-volume type="range" min="0" max="100" step="1" aria-label="音效音量" style="min-width:0;width:130px"><output data-sound-label></output></label>
       <label style="display:flex;align-items:center;gap:12px;padding:12px"><input data-screen-shake type="checkbox">重伤害画面震动</label>
+      <label data-window-fullscreen-setting style="display:flex;align-items:center;gap:12px;padding:12px"><input data-window-fullscreen type="checkbox" aria-label="桌面全屏"><span>桌面全屏</span><output data-window-fullscreen-label></output></label>
     </details>
     <main class="menu-workspace">
       <nav class="mode-nav" aria-label="主要游戏模式">
@@ -456,6 +458,14 @@
               <h2 class="panel-title">联机对战</h2>
               <p class="panel-description">局域网可离线游玩；互联网房间和排位需要登录所选服务器。</p>
             </header>
+            <section class="community-callout" aria-labelledby="communityEntryTitle">
+              <button class="action-button action-feature" id="communityEntry" type="button" onclick="loadPage('community.html')">
+                <span class="action-code" aria-hidden="true">社区</span>
+                <span class="action-copy"><span class="action-title" id="communityEntryTitle">进入在线社区</span><span class="action-description">好友 · 公告板 · 约桌</span></span>
+                <span class="action-arrow" aria-hidden="true">›</span>
+              </button>
+              <p id="communityStatus" class="community-status" role="status">未连接 · 可继续离线游玩</p>
+            </section>
             <div class="connection-groups">
               <section class="connection-group" aria-labelledby="lanGroupTitle">
                 <h3 class="connection-group__title" id="lanGroupTitle">局域网联机</h3>
@@ -649,12 +659,13 @@
         <button type="submit" id="homeLoginSubmit">登录</button>
         <button type="button" id="homeAccountManage">注册 / 找回密码</button>
       </div>
+      <button type="button" id="homeCommunityRetry" hidden>重新连接社区</button>
       <button type="button" id="homeLogout" hidden>退出登录</button>
     </form>
     <hr>
     <label>离线 / LAN 昵称<input id="homeGuestName" maxlength="20" style="display:block;width:100%;box-sizing:border-box;margin:8px 0;padding:10px"></label>
     <button type="button" id="homeGuestSave">保存昵称</button>
-    <p>教程、单人和 LAN 可离线游玩；互联网联机须登录服务器账号。</p>
+    <p>教程、单人和 LAN 可离线游玩；登录后可连接好友和公告板，也可以随时关闭继续离线游玩。</p>
     <button type="button" id="homeAccountClose">返回游戏</button>
   </dialog>
 
@@ -1508,6 +1519,51 @@
       } catch {}
     }
 
+    function renderWindowFullscreenSetting(fullscreen) {
+      const input = document.querySelector('[data-window-fullscreen]')
+      const label = document.querySelector('[data-window-fullscreen-label]')
+      if (!input || typeof fullscreen !== 'boolean') return
+      input.checked = fullscreen
+      if (label) label.textContent = fullscreen ? '已开启' : '窗口模式'
+    }
+
+    async function initWindowFullscreenSetting() {
+      const setting = document.querySelector('[data-window-fullscreen-setting]')
+      const input = document.querySelector('[data-window-fullscreen]')
+      const api = window.electronAPI
+      if (!setting || !input) return
+      if (!api || typeof api.getWindowFullscreen !== 'function' || typeof api.setWindowFullscreen !== 'function') {
+        setting.hidden = true
+        return
+      }
+
+      input.disabled = true
+      try {
+        renderWindowFullscreenSetting(await api.getWindowFullscreen())
+        if (typeof api.onWindowFullscreenChanged === 'function') {
+          api.onWindowFullscreenChanged(renderWindowFullscreenSetting)
+        }
+      } catch (error) {
+        console.error('[client] fullscreen preference unavailable:', error)
+        setting.hidden = true
+        return
+      }
+
+      input.disabled = false
+      input.addEventListener('change', async () => {
+        const desired = input.checked
+        input.disabled = true
+        try {
+          renderWindowFullscreenSetting(await api.setWindowFullscreen(desired))
+        } catch (error) {
+          console.error('[client] fullscreen preference update failed:', error)
+          try { renderWindowFullscreenSetting(await api.getWindowFullscreen()) } catch {}
+        } finally {
+          input.disabled = false
+        }
+      })
+    }
+
     window.addEventListener('load', () => { if (new URLSearchParams(location.search).get('lan') === 'join') showJoinSheet() })
     // ── Service Worker ────────────────────────────────────────────────────────
     // 版本标识，方便确认运行的是最新构建
@@ -1557,6 +1613,7 @@
         }
       }
       updateTutorialEntry()
+      void initWindowFullscreenSetting()
       // Show connected server in server section if saved
       const saved = getSavedUrl()
       if (saved) {
@@ -1569,7 +1626,9 @@
     })
   </script>
 <script src="js/official-updates.js"></script>
+<script src="js/developer-tools/match-trace.js"></script>
+<script src="js/player-profile.js"></script>
 <script src="js/home-account.js"></script>
-<script src="js/button-audio.js" defer></script>
+<script src="js/button-audio.js" defer></script><script src="js/room-invitations.js" defer></script>
 </body>
 </html>

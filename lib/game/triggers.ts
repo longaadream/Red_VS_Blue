@@ -8,7 +8,12 @@ import {
   getActiveSuspendableActionRuntime,
   type SuspendableInteractionInput,
 } from './suspendable-action-transaction'
-import { getRuleExecutionTriggerSystem } from './rule-runtime'
+import {
+  getActiveRuleExecutionContext,
+  getRuleExecutionTriggerSystem,
+  isPreviewReactionPendingError,
+  PreviewReactionPendingError,
+} from './rule-runtime'
 import {
   EffectChainFatalError,
   getActiveEffectChain,
@@ -613,6 +618,7 @@ export class TriggerSystem {
     }
     const rethrowTriggerError = (error: unknown, consumerKind: string, consumerId: string): never => {
       restoreRuleLimits()
+      if (isPreviewReactionPendingError(error)) throw error
       if (isEffectChainPendingSignal(error) || isFatalEffectChainError(error)) {
         throwAttachedTriggerBoundaryFailure(
           battle,
@@ -737,6 +743,8 @@ export class TriggerSystem {
 
     const rejectedEvent = this.prepareEventContext(battle, context)
     if (rejectedEvent) return rejectedEvent
+
+    const previewReactionPolicy = getActiveRuleExecutionContext()?.previewReactionPolicy
 
     // 从 context 中读取恢复状态（用于从 pendingTargetSelect/pendingOptionSelect 恢复执行）
     const ctxPendingRuleId = context.pendingRuleId as string | undefined
@@ -908,6 +916,7 @@ export class TriggerSystem {
     for (let i = startIdx; i < allRuleItems.length; i++) {
       if (blocked) break
       const item = allRuleItems[i]
+      if (previewReactionPolicy?.shouldSkipConsumer?.('rule', item.ruleId, item.sourceId, context.type)) continue
       writeLog('[checkTriggers] Executing rule: ' + item.ruleId + ' sourceId: ' + (item.sourceId || 'none'))
 
       if (!ensureRuleEffect(item.rule)) {
@@ -945,6 +954,9 @@ export class TriggerSystem {
           }, () => item.rule.effect!(battle, ruleCtx))
           writeBackMutableTriggerContext(ruleCtx, context, mutableBeforeEffect)
           if (!result?.needsOptionSelection && !result?.needsTargetSelection) break
+          if (previewReactionPolicy?.onPendingConsumer?.('rule', item.ruleId, item.sourceId, context.type)) {
+            throw new PreviewReactionPendingError('rule', item.ruleId, item.sourceId, context.type)
+          }
           if (!transactionRuntime || !interactionKey) break
           const nextInput = transactionRuntime.takeAnswer(interactionKey)
           if (nextInput) {
@@ -1058,6 +1070,7 @@ export class TriggerSystem {
     if (!deferredReactiveCards) {
       for (const cardRef of pendingReactiveCards) {
         if (blocked) break
+        if (previewReactionPolicy?.shouldSkipConsumer?.('reactiveCard', cardRef.cardId, cardRef.cardInstanceId, context.type)) continue
         const player = battle.players?.find(candidate => candidate.playerId === cardRef.playerId)
         const cardInstance = player?.hand?.find(card => card.instanceId === cardRef.cardInstanceId)
         if (!player || !cardInstance || cardInstance.cardId !== cardRef.cardId) continue
@@ -1099,6 +1112,9 @@ export class TriggerSystem {
             result = executeCardFunction(cardDef, player.playerId, battle, cardContext) as any
             writeBackMutableTriggerContext(cardContext, context, mutableBeforeEffect)
             if (!result?.needsOptionSelection && !result?.needsTargetSelection) break
+            if (previewReactionPolicy?.onPendingConsumer?.('reactiveCard', cardRef.cardId, cardRef.cardInstanceId, context.type)) {
+              throw new PreviewReactionPendingError('reactiveCard', cardRef.cardId, cardRef.cardInstanceId, context.type)
+            }
             if (!transactionRuntime || !interactionKey) {
               throw new Error(`Reactive card ${cardRef.cardId} requested unsupported interaction during ${context.type}`)
             }

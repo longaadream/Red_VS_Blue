@@ -116,12 +116,18 @@ export type NormalMoveRejectionCode =
   | 'terrain-blocked'
   | 'piece-blocked'
   | 'target-occupied'
+  | 'malformed-path'
+  | 'nonadjacent-path'
+  | 'repeated-path'
+  | 'path-blocked'
 
 export interface NormalMoveRejection {
   code: NormalMoveRejectionCode
   message: string
   at?: GridPosition
 }
+
+export type NormalMovePath = readonly GridPosition[]
 
 const ORTHOGONAL_DIRECTIONS: readonly GridPosition[] = [
   { x: 1, y: 0 },
@@ -366,55 +372,317 @@ function isProjectileTerrainBlocked(tile: SpatialTile): boolean {
   return typeof explicitPassable === 'boolean' ? !explicitPassable : tile.props?.type === 'wall' || tile.props?.type === 'cover'
 }
 
-export function getNormalMoveRejection(
+interface NormalMoveSearchContext {
+  walkable: Set<string>
+  occupied: Set<string>
+}
+
+function isSafeGridPosition(value: unknown): value is GridPosition {
+  if (!value || typeof value !== 'object') return false
+  const position = value as NullableGridPosition
+  return Number.isSafeInteger(position.x) && Number.isSafeInteger(position.y)
+}
+
+function normalMoveRange(piece: SpatialPiece): number | undefined {
+  if (typeof piece.moveRange !== 'number' || !Number.isFinite(piece.moveRange) || piece.moveRange < 0) return undefined
+  return Math.floor(piece.moveRange)
+}
+
+function createNormalMoveSearchContext(
+  state: SpatialBattleState,
+  piece: SpatialPiece,
+): NormalMoveSearchContext {
+  const walkable = new Set(state.map.tiles
+    .filter(tile => tile.props?.walkable === true)
+    .map(gridPositionKey))
+  const occupied = new Set(state.pieces
+    .filter(candidate => candidate.currentHp > 0 && candidate.instanceId !== piece.instanceId
+      && isSafeGridPosition({ x: candidate.x, y: candidate.y }))
+    .map(candidate => gridPositionKey({ x: candidate.x!, y: candidate.y! })))
+  return { walkable, occupied }
+}
+
+function isNormalMoveCellOpen(
+  state: SpatialBattleState,
+  position: GridPosition,
+  context: NormalMoveSearchContext,
+): boolean {
+  return isInsideBounds(position, state.map)
+    && context.walkable.has(gridPositionKey(position))
+    && !context.occupied.has(gridPositionKey(position))
+}
+
+/** Find a shortest cardinal segment while excluding already committed route cells. */
+function findNormalMoveSegment(
+  state: SpatialBattleState,
+  from: GridPosition,
+  target: GridPosition,
+  maxDistance: number,
+  context: NormalMoveSearchContext,
+  excluded: ReadonlySet<string>,
+): GridPosition[] | null {
+  if (from.x === target.x && from.y === target.y) return []
+  if (maxDistance <= 0 || excluded.has(gridPositionKey(target))
+    || !isNormalMoveCellOpen(state, target, context)) return null
+
+  const queue: Array<{ position: GridPosition; path: GridPosition[] }> = [{ position: { ...from }, path: [] }]
+  const visited = new Set(excluded)
+  visited.add(gridPositionKey(from))
+  for (let index = 0; index < queue.length; index += 1) {
+    const current = queue[index]
+    if (current.path.length >= maxDistance) continue
+    for (const direction of ORTHOGONAL_DIRECTIONS) {
+      const next = {
+        x: current.position.x + direction.x,
+        y: current.position.y + direction.y,
+      }
+      const key = gridPositionKey(next)
+      if (visited.has(key) || !isNormalMoveCellOpen(state, next, context)) continue
+      const path = [...current.path, next]
+      if (next.x === target.x && next.y === target.y) return path
+      visited.add(key)
+      queue.push({ position: next, path })
+    }
+  }
+  return null
+}
+
+function sameGridPosition(left: GridPosition, right: GridPosition): boolean {
+  return left.x === right.x && left.y === right.y
+}
+
+/** Manhattan distance is an admissible lower bound for an ordered checkpoint route. */
+function normalMoveWaypointLowerBound(
+  current: GridPosition,
+  destinations: readonly GridPosition[],
+  nextDestinationIndex: number,
+): number {
+  let lowerBound = 0
+  let cursor = current
+  for (let index = nextDestinationIndex; index < destinations.length; index += 1) {
+    lowerBound += manhattanDistance(cursor, destinations[index])
+    cursor = destinations[index]
+  }
+  return lowerBound
+}
+
+/**
+ * Search all bounded simple routes through ordered waypoints.  A greedy
+ * shortest segment can consume the only corridor needed by a later segment,
+ * so waypoint routes use deterministic iterative-deepening backtracking.
+ * A shared node budget keeps malformed or hostile inputs bounded across all
+ * depth iterations; an exhausted search returns null rather than silently
+ * dropping a waypoint.
+ */
+function findNormalMoveWaypointPath(
+  state: SpatialBattleState,
+  origin: GridPosition,
+  destinations: readonly GridPosition[],
+  maxDistance: number,
+  context: NormalMoveSearchContext,
+): GridPosition[] | null {
+  const lowerBound = normalMoveWaypointLowerBound(origin, destinations, 0)
+  const availableCells = [...context.walkable].filter(key => !context.occupied.has(key)).length
+  // A simple route cannot consume the origin twice. This also makes a huge
+  // edited moveRange harmless on a finite board before iterative deepening.
+  const boundedMaxDistance = Math.min(maxDistance, Math.max(0, availableCells - 1))
+  if (lowerBound > boundedMaxDistance) return null
+
+  const boardArea = Math.max(1, state.map.width * state.map.height)
+  const nodeBudget = Math.min(100_000, Math.max(20_000, boardArea * 16))
+  let exploredNodes = 0
+  for (let depthLimit = lowerBound; depthLimit <= boundedMaxDistance; depthLimit += 1) {
+    const used = new Set<string>([gridPositionKey(origin)])
+    const route: GridPosition[] = []
+
+    const search = (
+      current: GridPosition,
+      nextDestinationIndex: number,
+      remaining: number,
+    ): boolean => {
+      exploredNodes += 1
+      if (exploredNodes > nodeBudget) return false
+
+      while (nextDestinationIndex < destinations.length
+        && sameGridPosition(current, destinations[nextDestinationIndex])) {
+        nextDestinationIndex += 1
+      }
+      if (nextDestinationIndex >= destinations.length) return true
+      if (remaining <= 0
+        || normalMoveWaypointLowerBound(current, destinations, nextDestinationIndex) > remaining) return false
+
+      for (const direction of ORTHOGONAL_DIRECTIONS) {
+        const next = { x: current.x + direction.x, y: current.y + direction.y }
+        const nextKey = gridPositionKey(next)
+        if (used.has(nextKey) || !isNormalMoveCellOpen(state, next, context)) continue
+
+        // A later checkpoint cannot be crossed before the current one: it
+        // would be marked used and could never be visited in order afterward.
+        if (destinations.slice(nextDestinationIndex + 1).some(destination => sameGridPosition(destination, next))) continue
+
+        used.add(nextKey)
+        route.push({ ...next })
+        if (search(next, nextDestinationIndex, remaining - 1)) return true
+        route.pop()
+        used.delete(nextKey)
+        if (exploredNodes > nodeBudget) return false
+      }
+      return false
+    }
+
+    if (search(origin, 0, depthLimit)) return route.map(cell => ({ ...cell }))
+    if (exploredNodes > nodeBudget) return null
+  }
+  return null
+}
+
+/**
+ * Resolve the shortest legal normal route. Waypoints are mandatory ordered
+ * checkpoints; each segment is searched with the cells already used by the
+ * route excluded, so the returned route never revisits its origin or a prior
+ * route cell.
+ */
+export function getNormalMovePath(
   state: SpatialBattleState,
   piece: SpatialPiece,
   target: GridPosition,
+  waypoints: readonly GridPosition[] = [],
+): GridPosition[] | null {
+  if (!Array.isArray(waypoints) || !isSafeGridPosition(target)
+    || piece.x == null || piece.y == null
+    || !isSafeGridPosition({ x: piece.x, y: piece.y })) return null
+  if (getPositionChangeRejection(piece, 'walk')) return null
+  const range = normalMoveRange(piece)
+  if (range === undefined || !isInsideBounds(target, state.map)) return null
+  const origin = { x: piece.x, y: piece.y }
+  if (!isInsideBounds(origin, state.map)) return null
+  const destinations = [...waypoints, target]
+  // A waypoint equal to the final target is already satisfied by landing on
+  // that target; avoid treating this harmless duplicate as a revisit.
+  if (destinations.length > 1
+    && sameGridPosition(destinations[destinations.length - 2], target)) destinations.pop()
+  const destinationKeys = new Set<string>()
+  for (const destination of destinations) {
+    if (!isSafeGridPosition(destination) || !isInsideBounds(destination, state.map)) return null
+    const destinationKey = gridPositionKey(destination)
+    if (sameGridPosition(destination, origin) || destinationKeys.has(destinationKey)) return null
+    destinationKeys.add(destinationKey)
+  }
+  const context = createNormalMoveSearchContext(state, piece)
+  if (destinations.some(destination => !isNormalMoveCellOpen(state, destination, context))) return null
+  if (destinations.length === 1) {
+    const segment = findNormalMoveSegment(state, origin, destinations[0], range, context, new Set([gridPositionKey(origin)]))
+    return segment?.map(cell => ({ ...cell })) ?? null
+  }
+  return findNormalMoveWaypointPath(state, origin, destinations, range, context)
+}
+
+function validateExplicitNormalMovePath(
+  state: SpatialBattleState,
+  piece: SpatialPiece,
+  target: GridPosition,
+  path: unknown,
+  maxRange: number,
+  context: NormalMoveSearchContext,
 ): NormalMoveRejection | null {
-  const restriction = getPositionChangeRejection(piece, 'walk')
-  if (restriction) return { code: 'movement-restricted', message: restriction }
-  if (piece.x == null || piece.y == null) {
-    return { code: 'piece-not-on-board', message: 'Piece is not on the board' }
+  if (!Array.isArray(path) || path.length === 0) {
+    return { code: 'malformed-path', message: 'Normal move path must contain the destination', at: target }
   }
-  if (!isInsideBounds(target, state.map)) {
-    return { code: 'target-outside-board', message: 'Target position is outside of the board', at: target }
-  }
-
-  const from = { x: piece.x, y: piece.y }
-  const line = getOrthogonalLineCells(from, target)
-  if (line === null) {
-    return { code: 'not-orthogonal', message: 'Move must be in a straight line (rook-style)', at: target }
-  }
-  if (line.length === 0) {
-    return { code: 'same-position', message: 'Move must change the piece position', at: target }
+  const last = path[path.length - 1]
+  if (!isSafeGridPosition(last) || last.x !== target.x || last.y !== target.y) {
+    return { code: 'malformed-path', message: 'Normal move path must end at the requested destination', at: target }
   }
 
-  const maxRange = piece.moveRange
-  if (typeof maxRange !== 'number' || !Number.isFinite(maxRange) || maxRange < 0) {
-    return { code: 'invalid-move-range', message: 'Piece has an invalid moveRange' }
-  }
-  if (manhattanDistance(from, target) > Math.floor(maxRange)) {
-    return { code: 'out-of-range', message: 'Move distance exceeds piece moveRange', at: target }
-  }
-
-  for (let index = 0; index < line.length; index++) {
-    const cell = line[index]
-    const tile = state.map.tiles.find(candidate => candidate.x === cell.x && candidate.y === cell.y)
-    if (!tile?.props?.walkable) {
+  const origin = { x: piece.x!, y: piece.y! }
+  let previous = origin
+  const seen = new Set<string>([gridPositionKey(origin)])
+  for (let index = 0; index < path.length; index += 1) {
+    const cell = path[index]
+    if (!isSafeGridPosition(cell)) {
+      return { code: 'malformed-path', message: 'Normal move path cells must use safe integer coordinates' }
+    }
+    if (!isInsideBounds(cell, state.map)) {
+      return { code: 'malformed-path', message: 'Normal move path leaves the board', at: cell }
+    }
+    const key = gridPositionKey(cell)
+    if (seen.has(key)) {
+      return { code: 'repeated-path', message: 'Normal move path cannot revisit a cell', at: cell }
+    }
+    if (manhattanDistance(previous, cell) !== 1) {
+      return { code: 'nonadjacent-path', message: 'Normal move path must use adjacent cardinal cells', at: cell }
+    }
+    if (index + 1 > maxRange) {
+      return { code: 'out-of-range', message: 'Normal move path exceeds piece moveRange', at: cell }
+    }
+    if (!context.walkable.has(key)) {
       return { code: 'terrain-blocked', message: 'Path is blocked by unwalkable terrain', at: cell }
     }
-
-    const occupant = getLivingOccupantAt(state.pieces, cell, piece.instanceId)
-    if (occupant) {
-      const isTarget = index === line.length - 1
+    if (context.occupied.has(key)) {
+      const isTarget = index === path.length - 1
       return {
         code: isTarget ? 'target-occupied' : 'piece-blocked',
         message: isTarget ? 'Target tile is already occupied' : 'Path is blocked by a living piece',
         at: cell,
       }
     }
+    seen.add(key)
+    previous = cell
+  }
+  return null
+}
+
+export function getNormalMoveRejection(
+  state: SpatialBattleState,
+  piece: SpatialPiece,
+  target: GridPosition,
+  path?: NormalMovePath | null,
+): NormalMoveRejection | null {
+  const restriction = getPositionChangeRejection(piece, 'walk')
+  if (restriction) return { code: 'movement-restricted', message: restriction }
+  if (piece.x == null || piece.y == null || !isSafeGridPosition({ x: piece.x, y: piece.y })) {
+    return { code: 'piece-not-on-board', message: 'Piece is not on the board' }
+  }
+  if (!isSafeGridPosition(target) || !isInsideBounds(target, state.map)) {
+    return { code: 'target-outside-board', message: 'Target position is outside of the board', at: target }
   }
 
+  const from = { x: piece.x, y: piece.y }
+  if (from.x === target.x && from.y === target.y) {
+    return { code: 'same-position', message: 'Move must change the piece position', at: target }
+  }
+
+  const maxRange = normalMoveRange(piece)
+  if (maxRange === undefined) {
+    return { code: 'invalid-move-range', message: 'Piece has an invalid moveRange' }
+  }
+  const context = createNormalMoveSearchContext(state, piece)
+  if (path !== undefined) {
+    return validateExplicitNormalMovePath(state, piece, target, path, maxRange, context)
+  }
+
+  if (manhattanDistance(from, target) > maxRange) {
+    return { code: 'out-of-range', message: 'Move distance exceeds piece moveRange', at: target }
+  }
+  if (!context.walkable.has(gridPositionKey(target))) {
+    return { code: 'terrain-blocked', message: 'Path is blocked by unwalkable terrain', at: target }
+  }
+  if (context.occupied.has(gridPositionKey(target))) {
+    return { code: 'target-occupied', message: 'Target tile is already occupied', at: target }
+  }
+  if (!getNormalMovePath(state, piece, target)) {
+    const line = getOrthogonalLineCells(from, target)
+    if (line) {
+      for (const cell of line) {
+        if (!context.walkable.has(gridPositionKey(cell))) {
+          return { code: 'terrain-blocked', message: 'Path is blocked by unwalkable terrain', at: cell }
+        }
+        if (context.occupied.has(gridPositionKey(cell))) {
+          return { code: 'piece-blocked', message: 'Path is blocked by a living piece', at: cell }
+        }
+      }
+    }
+    return { code: 'path-blocked', message: 'No legal cardinal path reaches the requested destination; path is blocked', at: target }
+  }
   return null
 }
 
@@ -422,24 +690,112 @@ export function getLegalNormalMoveTargets(
   state: SpatialBattleState,
   piece: SpatialPiece,
 ): GridPosition[] {
-  if (piece.x == null || piece.y == null) return []
-  const maxRange = piece.moveRange
-  if (typeof maxRange !== 'number' || !Number.isFinite(maxRange) || maxRange <= 0) return []
-
+  if (getPositionChangeRejection(piece, 'walk')) return []
+  if (piece.x == null || piece.y == null || !isSafeGridPosition({ x: piece.x, y: piece.y })) return []
+  const maxRange = normalMoveRange(piece)
+  if (maxRange === undefined || maxRange <= 0) return []
+  const origin = { x: piece.x, y: piece.y }
+  const context = createNormalMoveSearchContext(state, piece)
+  const visited = new Set<string>([gridPositionKey(origin)])
+  const queue: Array<{ position: GridPosition; distance: number }> = [{ position: origin, distance: 0 }]
   const targets: GridPosition[] = []
-  for (const direction of ORTHOGONAL_DIRECTIONS) {
-    for (let distance = 1; distance <= Math.floor(maxRange); distance++) {
+  for (let index = 0; index < queue.length; index += 1) {
+    const current = queue[index]
+    if (current.distance >= maxRange) continue
+    for (const direction of ORTHOGONAL_DIRECTIONS) {
       const target = {
-        x: piece.x + direction.x * distance,
-        y: piece.y + direction.y * distance,
+        x: current.position.x + direction.x,
+        y: current.position.y + direction.y,
       }
-      if (!isInsideBounds(target, state.map)) break
-      if (getNormalMoveRejection(state, piece, target)) break
-      if (!isLegalSkillLanding(state, target, { movingPieceIds: piece.instanceId ? [piece.instanceId] : [] })) continue
-      targets.push(target)
+      const targetKey = gridPositionKey(target)
+      if (visited.has(targetKey) || !isNormalMoveCellOpen(state, target, context)) continue
+      visited.add(targetKey)
+      const distance = current.distance + 1
+      queue.push({ position: target, distance })
+      if (isLegalSkillLanding(state, target, { movingPieceIds: piece.instanceId ? [piece.instanceId] : [] })) {
+        targets.push(target)
+      }
     }
   }
   return targets
+}
+
+/**
+ * Return legal destinations reachable after an already drawn normal-move
+ * prefix. The prefix is validated exactly as an explicit route, then the
+ * remaining range is searched from its endpoint without revisiting the origin
+ * or any prefix cell.
+ */
+export function getNormalMoveContinuationTargets(
+  state: SpatialBattleState,
+  piece: SpatialPiece,
+  path: NormalMovePath,
+  excludedCells: NormalMovePath = [],
+): GridPosition[] {
+  if (!Array.isArray(path)) return []
+  if (path.length === 0 && excludedCells.length === 0) return getLegalNormalMoveTargets(state, piece)
+  if (getPositionChangeRejection(piece, 'walk')) return []
+  if (piece.x == null || piece.y == null || !isSafeGridPosition({ x: piece.x, y: piece.y })) return []
+
+  const maxRange = normalMoveRange(piece)
+  if (maxRange === undefined || path.length > maxRange) return []
+
+  const origin = { x: piece.x, y: piece.y }
+  if (!isInsideBounds(origin, state.map)) return []
+
+  const context = createNormalMoveSearchContext(state, piece)
+  const visited = new Set<string>([gridPositionKey(origin)])
+  let previous = origin
+  for (const cell of path) {
+    if (!isSafeGridPosition(cell) || !isInsideBounds(cell, state.map)) return []
+    const key = gridPositionKey(cell)
+    if (visited.has(key)
+      || manhattanDistance(previous, cell) !== 1
+      || !isNormalMoveCellOpen(state, cell, context)) return []
+    visited.add(key)
+    previous = { ...cell }
+  }
+
+  const remaining = maxRange - path.length
+  if (remaining <= 0) return []
+  for (const cell of excludedCells) {
+    if (isSafeGridPosition(cell)) visited.add(gridPositionKey(cell))
+  }
+
+  const queue: Array<{ position: GridPosition; distance: number }> = [{ position: { ...previous }, distance: 0 }]
+  const targets: GridPosition[] = []
+  for (let index = 0; index < queue.length; index += 1) {
+    const current = queue[index]
+    if (current.distance >= remaining) continue
+    for (const direction of ORTHOGONAL_DIRECTIONS) {
+      const target = {
+        x: current.position.x + direction.x,
+        y: current.position.y + direction.y,
+      }
+      const targetKey = gridPositionKey(target)
+      if (visited.has(targetKey) || !isNormalMoveCellOpen(state, target, context)) continue
+      visited.add(targetKey)
+      const distance = current.distance + 1
+      queue.push({ position: target, distance })
+      if (isLegalSkillLanding(state, target, { movingPieceIds: piece.instanceId ? [piece.instanceId] : [] })) {
+        targets.push({ ...target })
+      }
+    }
+  }
+  return targets
+}
+
+/** Continuations after publicly simulated contacts; never mutates the predicted state. */
+export function getNormalMovePreviewContinuationTargets(
+  state: SpatialBattleState,
+  piece: SpatialPiece,
+  usedSteps: number,
+  visitedCells: NormalMovePath,
+): GridPosition[] {
+  if (!Number.isSafeInteger(usedSteps) || usedSteps < 0) return []
+  const range = normalMoveRange(piece)
+  if (range === undefined) return []
+  return getNormalMoveContinuationTargets(state, { ...piece, moveRange: Math.max(0, range - usedSteps) }, [], visitedCells)
 }
 
 /** 完整普通移动动作上下文的 UI/服务端候选集合（阶段、回合、所有权和 AP 均有效）。 */

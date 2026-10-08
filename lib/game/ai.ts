@@ -12,8 +12,22 @@ import { getEffectiveChargeCost } from './skills'
 function getValidMoves(
   state: BattleState,
   piece: any,
+  remainingActionPoints?: number,
 ): Array<{ x: number; y: number }> {
-  return getLegalNormalMoveTargetsForPlayer(state, piece.ownerPlayerId, piece.instanceId)
+  if (remainingActionPoints === undefined) {
+    return getLegalNormalMoveTargetsForPlayer(state, piece.ownerPlayerId, piece.instanceId)
+  }
+
+  // The legacy generator keeps a local AP budget while building a batch. Query
+  // the canonical movement rules through a shallow immutable budget view so a
+  // later piece cannot reuse the turn-start AP from the authority snapshot.
+  const budgetState = {
+    ...state,
+    players: state.players.map(player => player.playerId.toLowerCase() === piece.ownerPlayerId.toLowerCase()
+      ? { ...player, actionPoints: remainingActionPoints }
+      : player),
+  }
+  return getLegalNormalMoveTargetsForPlayer(budgetState, piece.ownerPlayerId, piece.instanceId)
 }
 
 function appendTargetRef(action: any, ref: TargetRef): any {
@@ -134,7 +148,7 @@ export function generateBotActions(state: BattleState, botPlayerId: string): any
 
     // ── 2. Move toward nearest enemy if no skill was fired ─────────────────
     if (!actedThisPiece) {
-      const validMoves = getValidMoves(state, piece)
+      const validMoves = getValidMoves(state, piece, ap)
       const liveEnemies = enemies.filter(e => e.x != null && e.y != null)
       if (validMoves.length > 0 && liveEnemies.length > 0) {
         const nearestEnemy = liveEnemies.reduce((best, e) => {

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 
 // triggers 内部动态 require 了依赖文件系统的模块，测试环境里 mock 掉
-const TRIGGER_OK = { success: true, messages: [], blocked: false }
+const TRIGGER_OK: TriggerResult = { success: true, messages: [], blocked: false }
 vi.mock('@/lib/game/triggers', () => ({
   globalTriggerSystem: {
     checkTriggers:   vi.fn(() => TRIGGER_OK),
@@ -21,12 +21,15 @@ vi.mock('@/lib/game/skill-repository', () => ({
 }))
 import { applyBattleAction, BATTLE_STATE_VERSION, summonPiece } from '@/lib/game/turn'
 import { runBattleAction } from '@/lib/game/battle-runner'
-import type { BattleAction, BattleState } from '@/lib/game/turn'
+import type { BattleAction, BattleActionLog, BattleState } from '@/lib/game/turn'
+import type { CardInstance } from '@/lib/game/battle-types'
 import type { PieceInstance } from '@/lib/game/piece'
+import type { SkillDefinition } from '@/lib/game/skills'
 import { finalizePendingTargetSession, prepareAction } from '@/lib/game/targeting'
 import { makeState, makePiece, makeTile } from '../helpers/minimal-state'
-import { globalTriggerSystem, type TriggerContext } from '@/lib/game/triggers'
+import { globalTriggerSystem, type TriggerContext, type TriggerResult } from '@/lib/game/triggers'
 import { projectBattlePresentationEvents, projectBattlePresentationEventsForViewer } from '@/lib/game/battle-presentation-events'
+import { changePiecePositions } from '@/lib/game/position-change'
 
 function withTargetCredentials(state: BattleState, action: Extract<BattleAction, { type: 'useBasicSkill' | 'useChargeSkill' | 'playCard' }>): BattleAction {
   const draft = { ...action }
@@ -34,7 +37,7 @@ function withTargetCredentials(state: BattleState, action: Extract<BattleAction,
   delete draft.targetX
   delete draft.targetY
   delete draft.extraTargets
-  const prepared = prepareAction(state, draft as any)
+  const prepared = prepareAction(state, draft)
   if (prepared.kind !== 'needTarget') throw new Error(`Expected target preparation, received ${prepared.kind}`)
   return { ...action, selectionId: prepared.selectionId, stateRevision: prepared.stateRevision }
 }
@@ -85,12 +88,12 @@ describe('move action', () => {
     vi.mocked(globalTriggerSystem.checkTriggers).mockImplementation((_, context: TriggerContext) =>
       context.type === 'beforeMove'
         ? { success: true, messages: ['blocked'], blocked: true }
-        : { success: true, messages: [], blocked: false } as any,
+        : { success: true, messages: [], blocked: false },
     )
 
-    const next = applyBattleAction(state as any, {
+    const next = applyBattleAction(state, {
       type: 'move', playerId: 'player-red', pieceId: 'blocked-move', toX: 1, toY: 0,
-    }) as any
+    })
 
     expect(next.pieces[0].x).toBe(0)
     expect(vi.mocked(globalTriggerSystem.checkTriggers).mock.calls.map(([, context]) => context.type)).toEqual(['beforeMove'])
@@ -99,7 +102,7 @@ describe('move action', () => {
 
   it('rolls back the action when a before trigger throws', () => {
     const piece = makePiece({ instanceId: 'throwing-move', ownerPlayerId: 'player-red', x: 0, y: 0, moveRange: 3 })
-    const state = makeState({ pieces: [piece], currentPlayerId: 'player-red', phase: 'action' }) as any
+    const state = makeState({ pieces: [piece], currentPlayerId: 'player-red', phase: 'action' })
     const before = JSON.stringify(state)
     vi.mocked(globalTriggerSystem.checkTriggers).mockClear()
     vi.mocked(globalTriggerSystem.checkTriggers).mockImplementationOnce((battle: BattleState) => {
@@ -109,7 +112,7 @@ describe('move action', () => {
 
     expect(() => applyBattleAction(state, {
       type: 'move', playerId: 'player-red', pieceId: 'throwing-move', toX: 1, toY: 0,
-    } as any)).toThrow('trigger exploded')
+    })).toThrow('trigger exploded')
     expect(JSON.stringify(state)).toBe(before)
     expect(vi.mocked(globalTriggerSystem.checkTriggers)).toHaveBeenCalledTimes(1)
     vi.mocked(globalTriggerSystem.checkTriggers).mockImplementation(() => TRIGGER_OK)
@@ -118,7 +121,7 @@ describe('move action', () => {
     const piece = makePiece({ instanceId: 'p1', ownerPlayerId: 'player-red', x: 0, y: 0, moveRange: 3 })
     const state = makeState({ pieces: [piece], currentPlayerId: 'player-red', phase: 'action' })
 
-    const next = applyBattleAction(state as any, {
+    const next = applyBattleAction(state, {
       type: 'move',
       playerId: 'player-red',
       pieceId: 'p1',
@@ -131,12 +134,68 @@ describe('move action', () => {
     expect(moved?.y).toBe(0)
   })
 
+  it('普通移动允许横纵转弯，并按提交路径记录接触事实', () => {
+    const piece = makePiece({ instanceId: 'turning-mover', ownerPlayerId: 'player-red', x: 0, y: 0, moveRange: 3 })
+    const state = makeState({ pieces: [piece], currentPlayerId: 'player-red', phase: 'action' })
+
+    const next = applyBattleAction(state, {
+      type: 'move',
+      playerId: 'player-red',
+      pieceId: 'turning-mover',
+      toX: 1,
+      toY: 1,
+      path: [{ x: 1, y: 0 }, { x: 1, y: 1 }],
+    })
+
+    expect(next.pieces.find(p => p.instanceId === 'turning-mover')).toMatchObject({ x: 1, y: 1 })
+    expect(next.players.find(p => p.playerId === 'player-red')?.actionPoints).toBe(1)
+    expect(next.actions).toContainEqual(expect.objectContaining({
+      type: 'positionChanged',
+      payload: expect.objectContaining({
+        pieceId: 'turning-mover',
+        path: [{ x: 1, y: 0 }, { x: 1, y: 1 }],
+      }),
+    }))
+  })
+
+  it('legacy skill-authored walk keeps straight-line semantics for diagonal targets', () => {
+    const piece = makePiece({ instanceId: 'legacy-walk', ownerPlayerId: 'player-red', x: 0, y: 0, moveRange: 3 })
+    const state = makeState({ pieces: [piece], currentPlayerId: 'player-red', phase: 'action' })
+
+    expect(changePiecePositions(state, [{ pieceId: piece.instanceId, x: 1, y: 1 }], 'walk'))
+      .toMatchObject({ success: false })
+    expect(piece).toMatchObject({ x: 0, y: 0 })
+  })
+
+  it('rejects an explicit route when beforeMove redirects its destination', () => {
+    const piece = makePiece({ instanceId: 'redirected-route', ownerPlayerId: 'player-red', x: 0, y: 0, moveRange: 3 })
+    const state = makeState({ pieces: [piece], currentPlayerId: 'player-red', phase: 'action' })
+    vi.mocked(globalTriggerSystem.checkTriggers).mockImplementation((_, context: TriggerContext) => {
+      if (context.type === 'beforeMove') {
+        context.targetX = 2
+        context.targetY = 0
+      }
+      return TRIGGER_OK
+    })
+    const before = JSON.stringify(state)
+
+    try {
+      expect(() => applyBattleAction(state, {
+        type: 'move', playerId: 'player-red', pieceId: piece.instanceId, toX: 1, toY: 1,
+        path: [{ x: 1, y: 0 }, { x: 1, y: 1 }],
+      })).toThrow(/path|destination|终点/i)
+      expect(JSON.stringify(state)).toBe(before)
+    } finally {
+      vi.mocked(globalTriggerSystem.checkTriggers).mockImplementation(() => TRIGGER_OK)
+    }
+  })
+
   it('移动超过 moveRange 应抛出错误', () => {
     const piece = makePiece({ instanceId: 'p1', ownerPlayerId: 'player-red', x: 0, y: 0, moveRange: 2 })
     const state = makeState({ pieces: [piece], currentPlayerId: 'player-red', phase: 'action' })
 
     expect(() =>
-      applyBattleAction(state as any, {
+      applyBattleAction(state, {
         type: 'move',
         playerId: 'player-red',
         pieceId: 'p1',
@@ -151,7 +210,7 @@ describe('move action', () => {
     const state = makeState({ pieces: [piece], currentPlayerId: 'player-red', phase: 'action' })
     const initialAP = state.players.find(p => p.playerId === 'player-red')?.actionPoints ?? 2
 
-    const next = applyBattleAction(state as any, {
+    const next = applyBattleAction(state, {
       type: 'move',
       playerId: 'player-red',
       pieceId: 'p1',
@@ -189,12 +248,6 @@ describe('move action', () => {
   })
 
   it.each([
-    {
-      label: '斜线',
-      target: { x: 1, y: 1 },
-      prepare: () => {},
-      error: /straight line/i,
-    },
     {
       label: '超出 moveRange',
       target: { x: 4, y: 0 },
@@ -247,6 +300,55 @@ describe('move action', () => {
 
     expect(JSON.stringify(state)).toBe(before)
     expect(state.players.find(p => p.playerId === 'player-red')?.actionPoints).toBe(2)
+    expect(state.actions).toEqual([])
+  })
+
+  it.each([
+    {
+      label: '格式错误',
+      target: { x: 2, y: 0 },
+      path: [{ x: 1.5, y: 0 }, { x: 2, y: 0 }],
+      error: /path|integer/i,
+    },
+    {
+      label: '非相邻',
+      target: { x: 2, y: 0 },
+      path: [{ x: 2, y: 0 }],
+      error: /adjacent|相邻|path/i,
+    },
+    {
+      label: '重复格',
+      target: { x: 2, y: 0 },
+      path: [{ x: 1, y: 0 }, { x: 1, y: 0 }, { x: 2, y: 0 }],
+      error: /revisit|重复|path/i,
+    },
+    {
+      label: '超出路径范围',
+      target: { x: 3, y: 0 },
+      path: [{ x: 1, y: 0 }, { x: 2, y: 0 }, { x: 3, y: 0 }],
+      error: /moveRange|range|超距/i,
+      moveRange: 2,
+    },
+    {
+      label: '路径棋子阻挡',
+      target: { x: 2, y: 0 },
+      path: [{ x: 1, y: 0 }, { x: 2, y: 0 }],
+      error: /blocked|occupied/i,
+      blocker: true,
+    },
+  ])('显式路径$label被拒绝且不污染输入状态', ({ target, path, error, moveRange, blocker }) => {
+    const mover = makePiece({ instanceId: 'mover', ownerPlayerId: 'player-red', x: 0, y: 0, moveRange: moveRange ?? 3 })
+    const pieces = [mover]
+    if (blocker) pieces.push(makePiece({ instanceId: 'path-blocker', ownerPlayerId: 'player-blue', x: 1, y: 0 }))
+    const state = makeState({ pieces, currentPlayerId: 'player-red', phase: 'action' })
+    const before = JSON.stringify(state)
+
+    expect(() => applyBattleAction(state, {
+      type: 'move', playerId: 'player-red', pieceId: 'mover', toX: target.x, toY: target.y,
+      path,
+    })).toThrow(error)
+    expect(JSON.stringify(state)).toBe(before)
+    expect(state.players.find(player => player.playerId === 'player-red')?.actionPoints).toBe(2)
     expect(state.actions).toEqual([])
   })
 
@@ -307,7 +409,7 @@ describe('endTurn / beginPhase', () => {
   it('endTurn 后当前玩家切换', () => {
     const state = makeState({ currentPlayerId: 'player-red', phase: 'action' })
 
-    const afterEnd = applyBattleAction(state as any, {
+    const afterEnd = applyBattleAction(state, {
       type: 'endTurn',
       playerId: 'player-red',
     })
@@ -321,7 +423,7 @@ describe('endTurn / beginPhase', () => {
   it('红蓝各走一回合后轮回到红方，回合数递增', () => {
     let state = makeState({ currentPlayerId: 'player-red', phase: 'action', turnNumber: 1 })
 
-    state = applyBattleAction(state as any, { type: 'endTurn', playerId: 'player-red' })
+    state = applyBattleAction(state, { type: 'endTurn', playerId: 'player-red' })
     state = applyBattleAction(state, { type: 'beginPhase' })
     // 此时应轮到蓝方
     expect(state.turn.currentPlayerId).toBe('player-blue')
@@ -339,18 +441,18 @@ describe('endTurn / beginPhase', () => {
 describe('BattleState version', () => {
   it('_v 在 applyBattleAction 后被写入', () => {
     const state = makeState({ currentPlayerId: 'player-red', phase: 'action' })
-    delete (state as any)._v   // 模拟无版本的旧状态
+    delete state._v   // 模拟无版本的旧状态
 
-    const next = applyBattleAction(state as any, { type: 'beginPhase' })
+    const next = applyBattleAction(state, { type: 'beginPhase' })
     expect(next._v).toBe(BATTLE_STATE_VERSION)
   })
 
   it('版本不匹配时抛出错误', () => {
     const state = makeState({ currentPlayerId: 'player-red', phase: 'action' })
-    ;(state as any)._v = 9999  // 伪造一个未来版本
+    state._v = 9999  // 伪造一个未来版本
 
     expect(() =>
-      applyBattleAction(state as any, { type: 'beginPhase' })
+      applyBattleAction(state, { type: 'beginPhase' })
     ).toThrow(/version mismatch/)
   })
 })
@@ -363,7 +465,7 @@ describe('state immutability', () => {
     const state = makeState({ pieces: [piece], currentPlayerId: 'player-red', phase: 'action' })
     const originalX = state.pieces[0].x
 
-    applyBattleAction(state as any, {
+    applyBattleAction(state, {
       type: 'move',
       playerId: 'player-red',
       pieceId: 'p1',
@@ -380,9 +482,9 @@ describe('projectile target validation', () => {
     'rejects diagonal %s targets before beforeSkillUse triggers',
     (skillId) => {
       const caster = makePiece({ instanceId: 'caster', ownerPlayerId: 'player-red', x: 0, y: 0 })
-      ;(caster as any).skills = [{ skillId, currentCooldown: 0, usesRemaining: -1 }]
+      caster.skills = [{ skillId, currentCooldown: 0, usesRemaining: -1 }]
       const minato = makePiece({ instanceId: 'minato', ownerPlayerId: 'player-blue', x: 1, y: 1, faction: 'blue' })
-      const state = makeState({ pieces: [caster, minato], currentPlayerId: 'player-red', phase: 'action' }) as any
+      const state = makeState({ pieces: [caster, minato], currentPlayerId: 'player-red', phase: 'action' })
       state.skillsById[skillId] = {
         id: skillId,
         name: skillId,
@@ -405,8 +507,8 @@ describe('projectile target validation', () => {
             excludeSourceCell: true,
           }],
         },
-        code: 'function executeSkill(context) { return { success: true } }',
-      }
+       code: 'function executeSkill(context) { return { success: true } }',
+      } as unknown as SkillDefinition
       vi.mocked(globalTriggerSystem.checkTriggers).mockClear()
 
       expect(() => applyBattleAction(state, withTargetCredentials(state, {
@@ -416,7 +518,7 @@ describe('projectile target validation', () => {
         skillId,
         targetX: 1,
         targetY: 1,
-      }) as any)).toThrow(/same row or column/)
+      }))).toThrow(/same row or column/)
 
       expect(globalTriggerSystem.checkTriggers).not.toHaveBeenCalled()
     },
@@ -424,9 +526,9 @@ describe('projectile target validation', () => {
 
   it('rejects script-level invalid targets before beforeSkillUse triggers', () => {
     const caster = makePiece({ instanceId: 'caster', ownerPlayerId: 'player-red', x: 0, y: 0 })
-    ;(caster as any).skills = [{ skillId: 'ally-only-test', currentCooldown: 0, usesRemaining: -1 }]
+    caster.skills = [{ skillId: 'ally-only-test', currentCooldown: 0, usesRemaining: -1 }]
     const minato = makePiece({ instanceId: 'minato', ownerPlayerId: 'player-blue', x: 1, y: 0, faction: 'blue' })
-    const state = makeState({ pieces: [caster, minato], currentPlayerId: 'player-red', phase: 'action' }) as any
+    const state = makeState({ pieces: [caster, minato], currentPlayerId: 'player-red', phase: 'action' })
     state.skillsById['ally-only-test'] = {
       id: 'ally-only-test',
       name: 'Ally Only Test',
@@ -449,10 +551,10 @@ describe('projectile target validation', () => {
       pieceId: 'caster',
       skillId: 'ally-only-test',
       targetPieceId: 'minato',
-    }) as any)).toThrow()
+    }))).toThrow()
 
     expect(globalTriggerSystem.checkTriggers).not.toHaveBeenCalled()
-    expect(state.extensions.executed).toBeUndefined()
+    expect(state.extensions!.executed).toBeUndefined()
   })
 })
 
@@ -488,8 +590,8 @@ describe('interrupted skill release', () => {
     const caster = makePiece({ instanceId: 'rewrite-caster', ownerPlayerId: 'player-red', x: 0, y: 0 })
     const original = makePiece({ instanceId: 'rewrite-original', ownerPlayerId: 'player-blue', x: 1, y: 0, faction: 'blue' })
     const replacement = makePiece({ instanceId: 'rewrite-replacement', ownerPlayerId: 'player-blue', x: 0, y: 1, faction: 'blue' })
-    ;(caster as any).skills = [{ skillId: 'rewrite-test', currentCooldown: 0, usesRemaining: -1 }]
-    const state = makeState({ pieces: [caster, original, replacement], currentPlayerId: 'player-red', phase: 'action' }) as any
+    caster.skills = [{ skillId: 'rewrite-test', currentCooldown: 0, usesRemaining: -1 }]
+    const state = makeState({ pieces: [caster, original, replacement], currentPlayerId: 'player-red', phase: 'action' })
     state.skillsById['rewrite-test'] = {
       id: 'rewrite-test', name: 'Rewrite Test', description: '', kind: 'active', type: 'normal',
       cooldownTurns: 2, maxCharges: 0, powerMultiplier: 1, actionPointCost: 1,
@@ -501,38 +603,38 @@ describe('interrupted skill release', () => {
       context.type === 'beforeSkillUse'
         ? { success: true, messages: [], blocked: false, targetReplacementPieceId: replacement.instanceId }
         : TRIGGER_OK
-    ) as any)
+    ))
 
     const next = applyBattleAction(state, withTargetCredentials(state, {
       type: 'useBasicSkill', playerId: 'player-red', pieceId: caster.instanceId,
       skillId: 'rewrite-test', targetPieceId: original.instanceId,
-    }) as any) as any
+    }))
 
     expect(next.extensions).toMatchObject({ hitTarget: replacement.instanceId, releases: 1 })
     expect(next.players[0].actionPoints).toBe(1)
-    expect(next.pieces.find((piece: any) => piece.instanceId === caster.instanceId).skills[0].currentCooldown).toBe(2)
+    expect(next.pieces.find(piece => piece.instanceId === caster.instanceId)!.skills[0].currentCooldown).toBe(2)
     vi.mocked(globalTriggerSystem.checkTriggers).mockImplementation(() => TRIGGER_OK)
   })
 
   it('resumes a pending skill trigger without replaying before consumers', () => {
     const caster = makePiece({ instanceId: 'pending-caster', ownerPlayerId: 'player-red', x: 0, y: 0 })
-    const state = makeState({ pieces: [caster], currentPlayerId: 'player-red', phase: 'action' }) as any
+    const state = makeState({ pieces: [caster], currentPlayerId: 'player-red', phase: 'action' })
     state.skillsById['pending-skill'] = {
       id: 'pending-skill', name: 'Pending Skill', description: '', kind: 'active', type: 'normal',
       cooldownTurns: 0, maxCharges: 0, powerMultiplier: 1, actionPointCost: 1, range: 'self', requiresTarget: false,
       code: "function executeSkill(context) { context.battle.extensions.skillOption = context.selectedOption; return { success: true, message: 'ok' }; }",
     }
-    const beforeCalls: any[] = []
+    const beforeCalls: TriggerContext[] = []
     vi.mocked(globalTriggerSystem.checkTriggers).mockClear()
     vi.mocked(globalTriggerSystem.checkTriggers).mockImplementation((battle: BattleState, context: TriggerContext) => {
       if (context.type === 'beforeSkillUse') {
         beforeCalls.push(context)
-        if (context.selectedOption === undefined) return { success: false, messages: [], blocked: false, needsOptionSelection: true, options: ['yes'], title: 'Choose', pendingRuleId: 'pending-rule', pendingRuleSourceId: 'pending-caster' } as any
+        if (context.selectedOption === undefined) return { success: false, messages: [], blocked: false, needsOptionSelection: true, options: ['yes'], title: 'Choose', pendingRuleId: 'pending-rule', pendingRuleSourceId: 'pending-caster' }
       }
-      return { success: true, messages: [], blocked: false } as any
+      return { success: true, messages: [], blocked: false }
     })
 
-    const pending = applyBattleAction(state, { type: 'useBasicSkill', playerId: 'player-red', pieceId: 'pending-caster', skillId: 'pending-skill' } as any) as any
+    const pending = applyBattleAction(state, { type: 'useBasicSkill', playerId: 'player-red', pieceId: 'pending-caster', skillId: 'pending-skill' })
     expect(pending.pendingOptionSelection).toBeDefined()
     expect(pending.players[0].actionPoints).toBe(2)
 
@@ -540,21 +642,21 @@ describe('interrupted skill release', () => {
       type: 'pendingOptionSelect',
       playerId: 'player-red',
       selectedOption: 'yes',
-      selectionId: pending.pendingOptionSelection.selectionId,
-      stateRevision: pending.pendingOptionSelection.stateRevision,
-    } as any) as any
+      selectionId: pending.pendingOptionSelection!.selectionId,
+      stateRevision: pending.pendingOptionSelection!.stateRevision,
+    })
     expect(resumed.pendingOptionSelection).toBeUndefined()
-    expect(resumed.extensions.skillOption).toBe('yes')
+    expect(resumed.extensions!.skillOption).toBe('yes')
     expect(resumed.players[0].actionPoints).toBe(1)
     expect(beforeCalls).toHaveLength(2)
     expect(vi.mocked(globalTriggerSystem.checkTriggers).mock.calls.filter(([, context]) => context.type === 'afterSkillUsed')).toHaveLength(1)
-    expect(resumed.actions.some((entry: any) => entry.type === 'useBasicSkill')).toBe(true)
+    expect(resumed.actions!.some((entry: BattleActionLog) => entry.type === 'useBasicSkill')).toBe(true)
     vi.mocked(globalTriggerSystem.checkTriggers).mockImplementation(() => TRIGGER_OK)
   })
 
   it('does not pay or execute a skill when the resumed trigger blocks', () => {
     const caster = makePiece({ instanceId: 'blocked-pending-caster', ownerPlayerId: 'player-red', x: 0, y: 0 })
-    const state = makeState({ pieces: [caster], currentPlayerId: 'player-red', phase: 'action' }) as any
+    const state = makeState({ pieces: [caster], currentPlayerId: 'player-red', phase: 'action' })
     state.skillsById['blocked-pending-skill'] = {
       id: 'blocked-pending-skill', name: 'Blocked Pending Skill', description: '', kind: 'active', type: 'normal',
       cooldownTurns: 0, maxCharges: 0, powerMultiplier: 1, actionPointCost: 1, range: 'self', requiresTarget: false,
@@ -563,28 +665,28 @@ describe('interrupted skill release', () => {
     vi.mocked(globalTriggerSystem.checkTriggers).mockImplementationOnce(() => ({
       success: false, messages: [], blocked: false, needsOptionSelection: true, options: ['yes'],
       title: 'Choose', pendingRuleId: 'blocked-rule', pendingRuleSourceId: 'blocked-pending-caster',
-    } as any)).mockImplementationOnce(() => ({ success: true, messages: ['blocked'], blocked: true } as any))
+    })).mockImplementationOnce(() => ({ success: true, messages: ['blocked'], blocked: true }))
 
     const pending = applyBattleAction(state, {
       type: 'useBasicSkill', playerId: 'player-red', pieceId: 'blocked-pending-caster', skillId: 'blocked-pending-skill',
-    } as any) as any
+    })
     const resumed = applyBattleAction(pending, {
       type: 'pendingOptionSelect', playerId: 'player-red', selectedOption: 'yes',
-      selectionId: pending.pendingOptionSelection.selectionId,
-      stateRevision: pending.pendingOptionSelection.stateRevision,
-    } as any) as any
+      selectionId: pending.pendingOptionSelection!.selectionId,
+      stateRevision: pending.pendingOptionSelection!.stateRevision,
+    })
 
     expect(resumed.players[0].actionPoints).toBe(2)
-    expect(resumed.extensions.executed).toBeUndefined()
-    expect(resumed.actions.some((entry: any) => entry.type === 'useBasicSkill')).toBe(false)
+    expect(resumed.extensions!.executed).toBeUndefined()
+    expect(resumed.actions!.some((entry: BattleActionLog) => entry.type === 'useBasicSkill')).toBe(false)
     vi.mocked(globalTriggerSystem.checkTriggers).mockImplementation(() => TRIGGER_OK)
   })
 
   it('pays AP, cooldown, and uses when the caster dies during beforeSkillUse', () => {
     const caster = makePiece({ instanceId: 'caster', ownerPlayerId: 'player-red', x: 0, y: 0 })
-    ;(caster as any).skills = [{ skillId: 'paid-fizzle', currentCooldown: 0, usesRemaining: 1 }]
-    const state = makeState({ pieces: [caster], currentPlayerId: 'player-red', phase: 'action' }) as any
-    state.players.find((p: BattleState['players'][number]) => p.playerId === 'player-red').actionPoints = 2
+    caster.skills = [{ skillId: 'paid-fizzle', currentCooldown: 0, usesRemaining: 1 }]
+    const state = makeState({ pieces: [caster], currentPlayerId: 'player-red', phase: 'action' })
+    state.players.find((p: BattleState['players'][number]) => p.playerId === 'player-red')!.actionPoints = 2
     state.skillsById['paid-fizzle'] = {
       id: 'paid-fizzle',
       name: 'Paid Fizzle',
@@ -611,14 +713,14 @@ describe('interrupted skill release', () => {
       playerId: 'player-red',
       pieceId: 'caster',
       skillId: 'paid-fizzle',
-    } as any) as any
+    })
 
-    expect(next.players.find((p: BattleState['players'][number]) => p.playerId === 'player-red').actionPoints).toBe(1)
-    expect(next.pieces.find((p: PieceInstance) => p.instanceId === 'caster').currentHp).toBe(0)
-    expect(next.pieces.find((p: PieceInstance) => p.instanceId === 'caster').skills[0].currentCooldown).toBe(2)
-    expect(next.pieces.find((p: PieceInstance) => p.instanceId === 'caster').skills[0].usesRemaining).toBe(0)
-    expect(next.extensions.executed).toBeUndefined()
-    expect(next.actions.some((a: any) => a.type === 'useBasicSkill' && a.payload?.interrupted)).toBe(true)
+    expect(next.players.find((p: BattleState['players'][number]) => p.playerId === 'player-red')!.actionPoints).toBe(1)
+    expect(next.pieces.find((p: PieceInstance) => p.instanceId === 'caster')!.currentHp).toBe(0)
+    expect(next.pieces.find((p: PieceInstance) => p.instanceId === 'caster')!.skills[0].currentCooldown).toBe(2)
+    expect(next.pieces.find((p: PieceInstance) => p.instanceId === 'caster')!.skills[0].usesRemaining).toBe(0)
+    expect(next.extensions!.executed).toBeUndefined()
+    expect(next.actions!.some((a: BattleActionLog) => a.type === 'useBasicSkill' && a.payload?.interrupted)).toBe(true)
   })
 })
 
@@ -626,9 +728,9 @@ describe('card preflight and interrupted release', () => {
   it('rejects invalid card effects before beforeCardPlay triggers', () => {
     const caster = makePiece({ instanceId: 'caster', ownerPlayerId: 'player-red', x: 0, y: 0 })
     const target = makePiece({ instanceId: 'target', ownerPlayerId: 'player-blue', x: 1, y: 1, faction: 'blue' })
-    const state = makeState({ pieces: [caster, target], currentPlayerId: 'player-red', phase: 'action' }) as any
-    const red = state.players.find((p: BattleState['players'][number]) => p.playerId === 'player-red')
-    red.hand = [{ cardId: 'line-card', instanceId: 'card-1', actionPointCost: 1 }]
+    const state = makeState({ pieces: [caster, target], currentPlayerId: 'player-red', phase: 'action' })
+    const red = state.players.find((p: BattleState['players'][number]) => p.playerId === 'player-red')!
+    red.hand = [{ cardId: 'line-card', instanceId: 'card-1', actionPointCost: 1 } as unknown as CardInstance]
     red.actionPoints = 2
     state.customCards = {
       'line-card': {
@@ -651,16 +753,16 @@ describe('card preflight and interrupted release', () => {
       targetPieceId: 'target',
       targetX: 1,
       targetY: 1,
-    }) as any)).toThrow(/ally/)
+    }))).toThrow(/ally/)
 
     expect(globalTriggerSystem.checkTriggers).not.toHaveBeenCalled()
   })
 
   it('pays AP and discards when the card target dies during beforeCardPlay', () => {
     const target = makePiece({ instanceId: 'target', ownerPlayerId: 'player-blue', x: 1, y: 0, faction: 'blue' })
-    const state = makeState({ pieces: [target], currentPlayerId: 'player-red', phase: 'action' }) as any
-    const red = state.players.find((p: BattleState['players'][number]) => p.playerId === 'player-red')
-    red.hand = [{ cardId: 'paid-card', instanceId: 'card-1', actionPointCost: 1 }]
+    const state = makeState({ pieces: [target], currentPlayerId: 'player-red', phase: 'action' })
+    const red = state.players.find((p: BattleState['players'][number]) => p.playerId === 'player-red')!
+    red.hand = [{ cardId: 'paid-card', instanceId: 'card-1', actionPointCost: 1 } as unknown as CardInstance]
     red.discardPile = []
     red.actionPoints = 2
     state.customCards = {
@@ -689,22 +791,22 @@ describe('card preflight and interrupted release', () => {
       targetPieceId: 'target',
       targetX: 1,
       targetY: 0,
-    }) as any) as any
+    }))
 
     const nextRed = next.players.find((p: BattleState['players'][number]) => p.playerId === 'player-red')
-    expect(nextRed.actionPoints).toBe(1)
-    expect(nextRed.hand).toEqual([])
-    expect(nextRed.discardPile).toEqual(['paid-card'])
-    expect(next.pieces.find((p: PieceInstance) => p.instanceId === 'target').currentHp).toBe(0)
-    expect(next.extensions.executed).toBeUndefined()
-    expect(next.actions.some((a: any) => a.type === 'playCard' && a.payload?.interrupted)).toBe(true)
+    expect(nextRed!.actionPoints).toBe(1)
+    expect(nextRed!.hand).toEqual([])
+    expect(nextRed!.discardPile).toEqual(['paid-card'])
+    expect(next.pieces.find((p: PieceInstance) => p.instanceId === 'target')!.currentHp).toBe(0)
+    expect(next.extensions!.executed).toBeUndefined()
+    expect(next.actions!.some((a: BattleActionLog) => a.type === 'playCard' && a.payload?.interrupted)).toBe(true)
   })
 
   it('resolves multi-target cards with a piece target followed by a grid target', () => {
     const anchor = makePiece({ instanceId: 'anchor', ownerPlayerId: 'player-red', x: 0, y: 0, currentHp: 20, maxHp: 20, attack: 3 })
-    const state = makeState({ pieces: [anchor], currentPlayerId: 'player-red', phase: 'action' }) as any
-    const red = state.players.find((p: BattleState['players'][number]) => p.playerId === 'player-red')
-    red.hand = [{ cardId: 'relocate-test', instanceId: 'card-1', actionPointCost: 1 }]
+    const state = makeState({ pieces: [anchor], currentPlayerId: 'player-red', phase: 'action' })
+    const red = state.players.find((p: BattleState['players'][number]) => p.playerId === 'player-red')!
+    red.hand = [{ cardId: 'relocate-test', instanceId: 'card-1', actionPointCost: 1 } as unknown as CardInstance]
     red.discardPile = []
     red.actionPoints = 3
     state.customCards = {
@@ -717,7 +819,7 @@ describe('card preflight and interrupted release', () => {
         code: "function executeCard(context) { var anchor = selectTarget({ type: 'piece', filter: 'ally', range: 99 }); if (!anchor || anchor.needsTargetSelection) return anchor; var pos = selectTarget({ type: 'grid', range: 99, filter: 'all' }); if (!pos || pos.needsTargetSelection) return pos; flow.effects.move([{pieceId:anchor.instanceId,x:pos.x,y:pos.y}], 'teleport'); return { success: true, message: 'relocated' }; }",
       },
     }
-    vi.mocked(globalTriggerSystem.checkTriggers).mockReturnValue({ success: true, messages: [], blocked: false } as any)
+    vi.mocked(globalTriggerSystem.checkTriggers).mockReturnValue({ success: true, messages: [], blocked: false })
 
     const next = applyBattleAction(state, withTargetCredentials(state, {
       type: 'playCard',
@@ -727,23 +829,23 @@ describe('card preflight and interrupted release', () => {
       targetX: 0,
       targetY: 0,
       extraTargets: [{ x: 2, y: 2 }],
-    }) as any) as any
+    }))
 
     const moved = next.pieces.find((p: PieceInstance) => p.instanceId === 'anchor')
     expect(moved?.x).toBe(2)
     expect(moved?.y).toBe(2)
     expect(moved?.currentHp).toBe(20)
-    expect(next.players.find((p: BattleState['players'][number]) => p.playerId === 'player-red').discardPile).toEqual(['relocate-test'])
+    expect(next.players.find((p: BattleState['players'][number]) => p.playerId === 'player-red')!.discardPile).toEqual(['relocate-test'])
   })
 
   it('resolves demon-summon-1 exactly once and deterministically after an allied piece target', () => {
     const ally = makePiece({ instanceId: 'ally-piece', ownerPlayerId: 'player-red', x: 1, y: 1, currentHp: 18, maxHp: 18, attack: 3, faction: 'red' })
-    const state = makeState({ pieces: [ally], currentPlayerId: 'player-red', phase: 'action' }) as any
-    const red = state.players.find((p: BattleState['players'][number]) => p.playerId === 'player-red')
-    red.hand = [{ cardId: 'demon-summon-1', instanceId: 'card-1', actionPointCost: 1 }]
+    const state = makeState({ pieces: [ally], currentPlayerId: 'player-red', phase: 'action' })
+    const red = state.players.find((p: BattleState['players'][number]) => p.playerId === 'player-red')!
+    red.hand = [{ cardId: 'demon-summon-1', instanceId: 'card-1', actionPointCost: 1 } as unknown as CardInstance]
     red.discardPile = []
     red.actionPoints = 1
-    vi.mocked(globalTriggerSystem.checkTriggers).mockReturnValue({ success: true, messages: [], blocked: false } as any)
+    vi.mocked(globalTriggerSystem.checkTriggers).mockReturnValue({ success: true, messages: [], blocked: false })
 
     const draft = {
       type: 'playCard' as const,
@@ -765,18 +867,18 @@ describe('card preflight and interrupted release', () => {
     }
     const peerState = structuredClone(state)
 
-    const authority = runBattleAction(state, action as any, { rootSeed: 2173765951 })
-    const peer = runBattleAction(peerState, action as any, { rootSeed: 2173765951 })
-    const next = authority.state as any
-    const nextRed = next.players.find((p: BattleState['players'][number]) => p.playerId === 'player-red')
-    const nextAlly = next.pieces.find((p: PieceInstance) => p.instanceId === 'ally-piece')
+    const authority = runBattleAction(state, action, { rootSeed: 2173765951 })
+    const peer = runBattleAction(peerState, action, { rootSeed: 2173765951 })
+    const next = authority.state
+    const nextRed = next.players.find((p: BattleState['players'][number]) => p.playerId === 'player-red')!
+    const nextAlly = next.pieces.find((p: PieceInstance) => p.instanceId === 'ally-piece')!
 
     expect(authority.stateHash).toBe(peer.stateHash)
     expect(next.pendingTargetSelection).toBeUndefined()
     expect(nextRed.actionPoints).toBe(0)
     expect(nextAlly.currentHp).toBe(16)
     expect(nextAlly.attack).toBe(4)
-    expect(nextRed.hand.map((card: any) => card.cardId)).toEqual(['demon-summon-2'])
+    expect(nextRed.hand.map((card: CardInstance) => card.cardId)).toEqual(['demon-summon-2'])
     expect(nextRed.discardPile).toEqual(['demon-summon-1'])
     expect(red.actionPoints).toBe(1)
     expect(ally.currentHp).toBe(18)
@@ -784,17 +886,17 @@ describe('card preflight and interrupted release', () => {
 
   it('resolves the real demon-summon-5 card with an ally target followed by a grid target', () => {
     const anchor = makePiece({ instanceId: 'anchor', ownerPlayerId: 'player-red', x: 0, y: 0, currentHp: 20, maxHp: 20, attack: 3, faction: 'red' })
-    const state = makeState({ pieces: [anchor], currentPlayerId: 'player-red', phase: 'action' }) as any
-    const red = state.players.find((p: BattleState['players'][number]) => p.playerId === 'player-red')
-    red.hand = [{ cardId: 'demon-summon-5', instanceId: 'card-5', actionPointCost: 3 }]
+    const state = makeState({ pieces: [anchor], currentPlayerId: 'player-red', phase: 'action' })
+    const red = state.players.find((p: BattleState['players'][number]) => p.playerId === 'player-red')!
+    red.hand = [{ cardId: 'demon-summon-5', instanceId: 'card-5', actionPointCost: 3 } as unknown as CardInstance]
     red.discardPile = []
     red.actionPoints = 3
     state.deployment = {
       mode: 'progressive-reserve-v1',
       status: 'turn-ready',
       activePlayerId: 'player-red',
-    }
-    state.extensions.kiljaedanPiece = {
+    } as unknown as NonNullable<BattleState['deployment']>
+    state.extensions!.kiljaedanPiece = {
       instanceId: 'kiljaedan-hidden',
       templateId: 'kiljaedan',
       name: 'Kiljaedan',
@@ -812,7 +914,7 @@ describe('card preflight and interrupted release', () => {
       rules: [],
       statusTags: [],
     }
-    vi.mocked(globalTriggerSystem.checkTriggers).mockReturnValue({ success: true, messages: [], blocked: false } as any)
+    vi.mocked(globalTriggerSystem.checkTriggers).mockReturnValue({ success: true, messages: [], blocked: false })
 
     const next = applyBattleAction(state, withTargetCredentials(state, {
       type: 'playCard',
@@ -822,9 +924,9 @@ describe('card preflight and interrupted release', () => {
       targetX: 0,
       targetY: 0,
       extraTargets: [{ x: 2, y: 2 }],
-    }) as any) as any
+    }))
 
-    expect(next.extensions.kiljaedanPiece).toBeUndefined()
+    expect(next.extensions!.kiljaedanPiece).toBeUndefined()
     const summoned = next.pieces.find((p: PieceInstance) => p.instanceId === 'kiljaedan-hidden')
     expect(summoned?.x).toBe(2)
     expect(summoned?.y).toBe(2)
@@ -845,13 +947,13 @@ describe('card preflight and interrupted release', () => {
         sourcePiece: expect.objectContaining({ instanceId: 'kiljaedan-hidden' }),
       }),
     )
-    expect(next.players.find((p: BattleState['players'][number]) => p.playerId === 'player-red').discardPile).toEqual(['demon-summon-5'])
+    expect(next.players.find((p: BattleState['players'][number]) => p.playerId === 'player-red')!.discardPile).toEqual(['demon-summon-5'])
   })
 })
 
 describe('generic pending target selection', () => {
   it('pendingTargetSelect clears selector and applies effectCode', () => {
-    const state = makeState({ currentPlayerId: 'player-blue', phase: 'action' }) as any
+    const state = makeState({ currentPlayerId: 'player-blue', phase: 'action' })
     state.pendingTargetSelection = finalizePendingTargetSession(state, {
       playerId: 'player-blue',
       title: '选择测试格',
@@ -868,15 +970,15 @@ describe('generic pending target selection', () => {
       targetY: 1,
       selectionId: state.pendingTargetSelection.selectionId,
       stateRevision: state.pendingTargetSelection.stateRevision,
-    } as any) as any
+    })
 
     expect(next.pendingTargetSelection).toBeUndefined()
-    expect(next.extensions.tileEffects).toEqual([{ x: 1, y: 1, tileType: 'test-anchor' }])
-    expect(next.actions.at(-1)?.payload?.message).toBe('ok')
+    expect(next.extensions!.tileEffects).toEqual([{ x: 1, y: 1, tileType: 'test-anchor' }])
+    expect(next.actions!.at(-1)?.payload?.message).toBe('ok')
   })
 
   it('preserves the first target across a two-step pending session and executes only at completion', () => {
-    const state = makeState({ currentPlayerId: 'player-blue', phase: 'action' }) as any
+    const state = makeState({ currentPlayerId: 'player-blue', phase: 'action' })
     state.pendingTargetSelection = finalizePendingTargetSession(state, {
       playerId: 'player-blue',
       title: 'two targets',
@@ -893,22 +995,22 @@ describe('generic pending target selection', () => {
       type: 'pendingTargetSelect', playerId: 'player-blue', targetX: 1, targetY: 1,
       selectionId: state.pendingTargetSelection.selectionId,
       stateRevision: state.pendingTargetSelection.stateRevision,
-    } as any) as any
+    })
 
     expect(afterFirst.pendingTargetSelection).toMatchObject({ step: 1, selectedTargets: [{ type: 'cell', x: 1, y: 1 }] })
-    expect(afterFirst.extensions.completedTargets).toBeUndefined()
+    expect(afterFirst.extensions!.completedTargets).toBeUndefined()
 
     const completed = applyBattleAction(afterFirst, {
       type: 'pendingTargetSelect', playerId: 'player-blue', targetX: 2, targetY: 2,
-      selectionId: afterFirst.pendingTargetSelection.selectionId,
-      stateRevision: afterFirst.pendingTargetSelection.stateRevision,
-    } as any) as any
+      selectionId: afterFirst.pendingTargetSelection!.selectionId,
+      stateRevision: afterFirst.pendingTargetSelection!.stateRevision,
+    })
 
     expect(completed.pendingTargetSelection).toBeUndefined()
-    expect(completed.extensions.completedTargets).toEqual([
+    expect(completed.extensions!.completedTargets).toEqual([
       { type: 'cell', x: 1, y: 1 },
       { type: 'cell', x: 2, y: 2 },
     ])
-    expect(completed.actions.at(-1)?.payload?.message).toBe('complete')
+    expect(completed.actions!.at(-1)?.payload?.message).toBe('complete')
   })
 })

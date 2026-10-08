@@ -239,10 +239,92 @@ export class RuleRuntime {
 export interface RuleExecutionContext {
   readonly triggerSystem: TriggerSystem
   readonly cache: Map<symbol, unknown>
+  /**
+   * Optional scoped content hydration.  Authority rooms leave this unset and
+   * retain the normal server loader.  Public preview installs a resolver so
+   * rule IDs can only resolve from its JSON-only public source map.
+   */
+  readonly ruleResolver?: (battle: unknown, ruleId: string, metadata?: unknown) => unknown | null
+  /** Public preview counterpart for skills triggered by a scoped rule. */
+  readonly skillResolver?: (battle: unknown, skillId: string, candidate?: unknown, metadata?: unknown) => unknown | null
+  /** Public preview counterpart for cards loaded from a battle snapshot. */
+  readonly cardResolver?: (battle: unknown, cardId: string, candidate?: unknown, metadata?: unknown) => unknown | null
+  /** Preview-only policy for reactions that cannot be completed without input. */
+  readonly previewReactionPolicy?: PreviewReactionPolicy
 }
 
-export function createRuleExecutionContext(triggerSystem: TriggerSystem): RuleExecutionContext {
-  return { triggerSystem, cache: new Map() }
+export type PreviewReactionConsumerKind = 'rule' | 'reactiveCard'
+
+export interface PreviewReactionPolicy {
+  shouldSkipConsumer?: (
+    kind: PreviewReactionConsumerKind,
+    consumerId: string,
+    sourceId: string | undefined,
+    eventType: string,
+  ) => boolean
+  /** Return true to abort this isolated attempt and retry after skipping it. */
+  onPendingConsumer?: (
+    kind: PreviewReactionConsumerKind,
+    consumerId: string,
+    sourceId: string | undefined,
+    eventType: string,
+  ) => boolean
+}
+
+const previewReactionPendingErrors = new WeakSet<object>()
+
+export class PreviewReactionPendingError extends Error {
+  readonly consumerKind: PreviewReactionConsumerKind
+  readonly consumerId: string
+  readonly sourceId?: string
+  readonly eventType: string
+
+  constructor(
+    consumerKind: PreviewReactionConsumerKind,
+    consumerId: string,
+    sourceId: string | undefined,
+    eventType: string,
+  ) {
+    super(`Preview reaction ${consumerKind}:${consumerId} requested input`)
+    this.name = 'PreviewReactionPendingError'
+    this.consumerKind = consumerKind
+    this.consumerId = consumerId
+    this.sourceId = sourceId
+    this.eventType = eventType
+    previewReactionPendingErrors.add(this)
+  }
+}
+
+/**
+ * Checks the preview marker without touching properties or the prototype of an
+ * arbitrary thrown value.  Rule code may throw a hostile Proxy; `instanceof`
+ * would invoke that Proxy's prototype trap while the authority path is
+ * constructing its fatal diagnostic.
+ */
+export function isPreviewReactionPendingError(error: unknown): error is PreviewReactionPendingError {
+  if ((typeof error !== 'object' || error === null) && typeof error !== 'function') return false
+  return previewReactionPendingErrors.has(error as object)
+}
+
+export interface RuleExecutionContextOptions {
+  ruleResolver?: RuleExecutionContext['ruleResolver']
+  skillResolver?: RuleExecutionContext['skillResolver']
+  cardResolver?: RuleExecutionContext['cardResolver']
+  previewReactionPolicy?: RuleExecutionContext['previewReactionPolicy']
+}
+
+export function createRuleExecutionContext(
+  triggerSystem: TriggerSystem,
+  options: RuleExecutionContextOptions = {},
+): RuleExecutionContext {
+  return {
+    triggerSystem,
+    cache: new Map(),
+    ...(options.ruleResolver ? { ruleResolver: options.ruleResolver } : {}),
+    ...(options.skillResolver ? { skillResolver: options.skillResolver } : {}),
+    ...(options.cardResolver ? { cardResolver: options.cardResolver } : {}),
+    ...(options.previewReactionPolicy ? { previewReactionPolicy: options.previewReactionPolicy } : {}),
+  }
 }
 
 let activeRuleExecutionContext: RuleExecutionContext | undefined

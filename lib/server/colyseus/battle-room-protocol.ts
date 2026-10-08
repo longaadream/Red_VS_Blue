@@ -1,4 +1,30 @@
 import type { DispatchRoomBattleActionResult } from '@/lib/game/room-battle-actions'
+import {
+  SOCIAL_COOLDOWN_MS,
+  SOCIAL_KINDS,
+  SOCIAL_MAX_TEXT_GRAPHEMES,
+  SOCIAL_MAX_TEXT_LINES,
+  SOCIAL_MAX_TEXT_UTF8_BYTES,
+  SOCIAL_PRESET_ALLOWLIST,
+  SOCIAL_PROTOCOL_VERSION,
+  SOCIAL_STAMP_ALLOWLIST,
+  type SocialEvent,
+} from './battle-social'
+
+export {
+  SOCIAL_COOLDOWN_MS,
+  SOCIAL_KINDS,
+  SOCIAL_MAX_REQUEST_CACHE,
+  SOCIAL_MAX_REQUEST_ID_LENGTH,
+  SOCIAL_MAX_PLAYER_TRACKING,
+  SOCIAL_MAX_TEXT_GRAPHEMES,
+  SOCIAL_MAX_TEXT_LINES,
+  SOCIAL_MAX_TEXT_UTF8_BYTES,
+  SOCIAL_PRESET_ALLOWLIST,
+  SOCIAL_PROTOCOL_VERSION,
+  SOCIAL_STAMP_ALLOWLIST,
+  type SocialKind,
+} from './battle-social'
 
 export const BATTLE_ROOM_TYPE = 'battle'
 export const BATTLE_COMMAND_MESSAGE = 'battleCommand'
@@ -11,6 +37,21 @@ export const BATTLE_RESYNC_MESSAGE = 'battleResync'
 export const PRODUCT_ROOM_RPC_MESSAGE = 'roomRpc'
 export const PRODUCT_ROOM_RPC_RESULT_MESSAGE = 'roomRpcResult'
 export const PRODUCT_ROOM_UPDATE_MESSAGE = 'roomUpdate'
+export const SOCIAL_HELLO_MESSAGE = 'socialHello'
+export const SOCIAL_READY_MESSAGE = 'socialReady'
+export const SOCIAL_SEND_MESSAGE = 'socialSend'
+export const SOCIAL_ACK_MESSAGE = 'socialAck'
+export const SOCIAL_EVENT_MESSAGE = 'socialEvent'
+
+// Explicit aliases keep the battle-room prefix available to callers that
+// group protocol constants by feature, while the wire names remain short and
+// independent from battle command/receipt messages.
+export const BATTLE_SOCIAL_HELLO_MESSAGE = SOCIAL_HELLO_MESSAGE
+export const BATTLE_SOCIAL_READY_MESSAGE = SOCIAL_READY_MESSAGE
+export const BATTLE_SOCIAL_SEND_MESSAGE = SOCIAL_SEND_MESSAGE
+export const BATTLE_SOCIAL_ACK_MESSAGE = SOCIAL_ACK_MESSAGE
+export const BATTLE_SOCIAL_EVENT_MESSAGE = SOCIAL_EVENT_MESSAGE
+export const SOCIAL_CAPABILITY_MESSAGE = SOCIAL_READY_MESSAGE
 
 export function createColyseusAppliedReceipt(result: DispatchRoomBattleActionResult) {
   const transition = result.transition
@@ -75,5 +116,60 @@ export function createColyseusRejectedReceipt(input: ColyseusRejectedReceiptInpu
     targetIndex: failure.targetIndex,
     title: failure.title,
     options: failure.options,
+  }
+}
+
+export function createSocialReadyMessage(requestId?: string) {
+  return {
+    type: SOCIAL_READY_MESSAGE,
+    supported: true as const,
+    protocolVersion: SOCIAL_PROTOCOL_VERSION,
+    cooldownMs: SOCIAL_COOLDOWN_MS,
+    kinds: [...SOCIAL_KINDS],
+    limits: {
+      text: {
+        maxGraphemes: SOCIAL_MAX_TEXT_GRAPHEMES,
+        maxLines: SOCIAL_MAX_TEXT_LINES,
+        maxUtf8Bytes: SOCIAL_MAX_TEXT_UTF8_BYTES,
+      },
+    },
+    presetIds: [...SOCIAL_PRESET_ALLOWLIST],
+    stampIds: [...SOCIAL_STAMP_ALLOWLIST],
+    ...(requestId ? { requestId } : {}),
+  }
+}
+
+export interface SocialAckInput {
+  requestId: string
+  ok: boolean
+  code?: string
+  message?: string
+  retryAfterMs?: number
+  retryAt?: number
+  event?: SocialEvent
+}
+
+export function createSocialAckMessage(input: SocialAckInput) {
+  return {
+    type: SOCIAL_ACK_MESSAGE,
+    requestId: input.requestId,
+    ok: input.ok,
+    ...(input.code ? { code: input.code } : {}),
+    ...(input.message ? { message: input.message } : {}),
+    ...(input.retryAfterMs !== undefined ? { retryAfterMs: input.retryAfterMs } : {}),
+    ...(input.retryAt !== undefined ? { retryAt: input.retryAt } : {}),
+    ...(input.event ? { event: input.event } : {}),
+  }
+}
+
+export function createSocialEventMessage(event: SocialEvent) {
+  return {
+    type: SOCIAL_EVENT_MESSAGE,
+    messageId: event.messageId,
+    playerId: event.playerId,
+    displayName: event.displayName,
+    kind: event.kind,
+    payload: event.payload,
+    sentAt: event.sentAt,
   }
 }

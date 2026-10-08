@@ -38,6 +38,7 @@ import {
   reconcileProfileRendererCommit,
   resolveActiveResourcePackRoot,
 } from './resource-pack-store'
+import { readWindowPreferences, writeWindowPreferences } from './window-preferences'
 
 // ─── 常量 ─────────────────────────────────────────────────────────────────────
 
@@ -58,6 +59,8 @@ const LOCAL_AUTHORITY_AUTO_RECOVERY_DELAYS_MS = [250, 750, 1_500] as const
 const LOCAL_AUTHORITY_READY_TIMEOUT_MS = 900_000
 const PROFILE_ARCHIVE_MAX_BYTES = 32 * 1024 * 1024
 const PROFILE_ADMIN_KEY = randomBytes(32).toString('hex')
+// Public launch marker: stable through page navigation, renewed on process restart.
+const communityLaunchId = randomBytes(16).toString('hex')
 let allowAppExit = false
 let appExitPromise: Promise<void> | null = null
 let officialUpdateApplying = false
@@ -2022,6 +2025,29 @@ handleTrusted('pack-list', ['game'], async () => {
 
 let mainWin: BrowserWindow | null = null
 
+function getMainWindowFullscreen(): boolean {
+  if (mainWin && !mainWin.isDestroyed()) return mainWin.isFullScreen()
+  return readWindowPreferences(getUserData()).fullscreen
+}
+
+function notifyWindowFullscreenChanged(win: BrowserWindow): void {
+  if (win.isDestroyed() || win.webContents.isDestroyed?.()) return
+  win.webContents.send('window-fullscreen-changed', win.isFullScreen())
+}
+
+function setMainWindowFullscreen(fullscreen: boolean): boolean {
+  if (typeof fullscreen !== 'boolean') throw new Error('全屏设置必须是布尔值')
+  const win = mainWin
+  if (!win || win.isDestroyed()) throw new Error('游戏窗口不可用')
+
+  win.setFullScreen(fullscreen)
+  // Only this explicit setter persists. Native enter/leave events below only
+  // report the real state and never create an implicit preference.
+  writeWindowPreferences(getUserData(), fullscreen)
+  notifyWindowFullscreenChanged(win)
+  return win.isFullScreen()
+}
+
 function startupPageUrl(): string {
   return pathToFileURL(path.join(__dirname, '..', 'startup', 'index.html')).href
 }
@@ -2070,11 +2096,13 @@ function createGameWindow(): BrowserWindow {
   const win = new BrowserWindow({
     width: 1280,
     height: 800,
+    fullscreen: readWindowPreferences(getUserData()).fullscreen,
     title: 'RED vs BLUE',
     icon: getApplicationIconPath(),
     autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
+      additionalArguments: [`--rvb-community-launch=${communityLaunchId}`],
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
@@ -2084,6 +2112,9 @@ function createGameWindow(): BrowserWindow {
       allowRunningInsecureContent: true,
     },
   })
+
+  win.on('enter-full-screen', () => notifyWindowFullscreenChanged(win))
+  win.on('leave-full-screen', () => notifyWindowFullscreenChanged(win))
 
   restrictWindowNavigation(win, url => isGameClientUrl(url) || (startupInProgress && url === startupPageUrl()))
   win.webContents.on('will-navigate', (event, url) => {
@@ -2103,7 +2134,17 @@ function createGameWindow(): BrowserWindow {
   })
   win.setMenuBarVisibility(false)
 
-  win.webContents.on('before-input-event', (_event, input) => {
+  win.webContents.on('before-input-event', (event, input) => {
+    if (input.key === 'F11') {
+      event.preventDefault()
+      if (input.type !== 'keyDown' || input.isAutoRepeat) return
+      try {
+        setMainWindowFullscreen(!win.isFullScreen())
+      } catch (error) {
+        console.error('[client] F11 fullscreen toggle failed:', error)
+      }
+      return
+    }
     if (input.key === 'F12') win.webContents.openDevTools()
   })
 
@@ -2398,6 +2439,13 @@ function abortLocalMatchToMainMenu(message: string): void {
 }
 
 // ─── IPC ─────────────────────────────────────────────────────────────────────
+
+handleTrusted('get-window-fullscreen', ['game'], () => getMainWindowFullscreen())
+
+handleTrusted('set-window-fullscreen', ['game'], (_event, fullscreen: unknown) => {
+  if (typeof fullscreen !== 'boolean') throw new Error('全屏设置必须是布尔值')
+  return setMainWindowFullscreen(fullscreen)
+})
 
 // 读取已保存的远程服务器地址（UI 初始化时调用）
 handleTrusted('get-remote-url', ['connect'], () => getOnlineServerUrl())

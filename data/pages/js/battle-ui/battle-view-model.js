@@ -49,9 +49,44 @@
     return cells
   }
 
+  // Grid paths are ordered facts.  Keep their travel order instead of using
+  // normalizeCells, whose row-major ordering is correct for highlight sets
+  // but would turn a cardinal-turn route into a different route.
+  function normalizePathCells(value) {
+    const cells = []
+    const entries = Array.isArray(value)
+      ? value
+      : (value && typeof value.forEach === 'function' ? Array.from(value) : [])
+    entries.forEach(function (entry) {
+      let x
+      let y
+      if (typeof entry === 'string') {
+        const parts = entry.split(',')
+        if (parts.length < 2 || parts[0].trim() === '' || parts[1].trim() === '') return
+        x = Number(parts[0])
+        y = Number(parts[1])
+      } else if (entry && typeof entry === 'object') {
+        if (entry.x == null || (entry.y === undefined && entry.z == null)) return
+        x = Number(entry.x)
+        y = Number(entry.y !== undefined ? entry.y : entry.z)
+      }
+      if (!Number.isSafeInteger(x) || !Number.isSafeInteger(y)) return
+      cells.push({ x: x, y: y })
+    })
+    return cells
+  }
+
   function statusLabel(status) {
     if (typeof status === 'string') return status
     return String(status.name || status.type || status.id || '?')
+  }
+
+  function displayStatusLabel(status, meta, iconRegistry) {
+    if (iconRegistry && typeof iconRegistry.labelForStatus === 'function') {
+      return String(iconRegistry.labelForStatus(status) || '未知状态')
+    }
+    const explicit = status && typeof status === 'object' ? (status.name || status.label) : ''
+    return String(explicit || (meta && meta.label) || statusLabel(status) || '未知状态')
   }
 
   function normalizeStatuses(piece, visibleTags) {
@@ -74,7 +109,7 @@
       statuses.push({
         id: id,
         type: type,
-        label: String(item.name || item.label || (meta && meta.label) || statusLabel(item)),
+        label: displayStatusLabel(item, meta, iconRegistry),
         description: String(item.description || item.message || ''),
         iconId: meta ? meta.iconId : 'fallback',
         iconPath: meta ? meta.assetPath : 'images/effect-icons/fallback.svg',
@@ -137,7 +172,11 @@
       alive: piece.currentHp > 0,
       statuses: statuses,
       statusSummary: statuses,
-      displayStats: {attack: display.attack, defense: display.defense, moveRange: display.moveRange},
+      displayStats: {
+        attack: display.attack != null ? display.attack : piece.attack,
+        defense: display.defense != null ? display.defense : piece.defense,
+        moveRange: display.moveRange != null ? display.moveRange : (piece.moveRange != null ? piece.moveRange : piece.stats && piece.stats.moveRange),
+      },
       displaySkills: display.skills,
     }
   }
@@ -153,13 +192,18 @@
     }
   }
 
-  function normalizePlayer(player, pieces, currentPlayerId) {
+  function normalizePlayer(player, pieces, currentPlayerId, names, index, training) {
     const id = String(player.playerId || player.id || '')
     const ownedPiece = pieces.find(function (piece) { return piece.ownerPlayerId.toLowerCase() === id.toLowerCase() })
+    const nameKey = Object.keys(names || {}).find(function (key) { return key.toLowerCase() === id.toLowerCase() })
+    const faction = player.teamId || (ownedPiece ? ownedPiece.faction : (index === 1 ? 'blue' : 'red'))
+    const publicName = String(nameKey ? names[nameKey] || '' : '').trim()
+    const snapshotName = String(player.name || '').trim()
+    const fallback = faction === 'blue' ? '蓝方玩家' : '红方玩家'
     return {
       id: id,
-      name: String(player.name || id),
-      faction: player.teamId || (ownedPiece ? ownedPiece.faction : 'red'),
+      name: training ? (faction === 'blue' ? '蓝方' : '红方') : (publicName && publicName.toLowerCase() !== id.toLowerCase() ? publicName : '') || (snapshotName && snapshotName.toLowerCase() !== id.toLowerCase() ? snapshotName : fallback),
+      faction: faction,
       isCurrent: id.toLowerCase() === String(currentPlayerId || '').toLowerCase(),
       resources: {
         action: numberOr(player.actionPoints, 0),
@@ -376,8 +420,8 @@
       ? pieces.find(function (piece) { return piece.id === selectedPieceId }) || null
       : null
     const legal = input.legal || {}
-    const players = (snapshot.players || []).map(function (player) {
-      return normalizePlayer(player, pieces, turn.currentPlayerId)
+    const players = (snapshot.players || []).map(function (player, index) {
+      return normalizePlayer(player, pieces, turn.currentPlayerId, input.playerNames, index, input.training === true)
     })
     const viewer = players.find(function (player) { return player.id.toLowerCase() === viewerId.toLowerCase() }) || null
 
@@ -398,6 +442,8 @@
       presentationEvents: normalizePresentationEvents(input.presentationEvents, input.pieceTemplates),
       players: players,
       viewer: viewer,
+      training: input.training === true,
+      spectating: input.spectating === true,
       turn: {
         currentPlayerId: String(turn.currentPlayerId || ''),
         number: numberOr(turn.turnNumber, 1),
@@ -421,6 +467,11 @@
           }
         })(),
         selectedTargetCells: normalizeCells(interaction.selectedTargetCells),
+        movePath: normalizePathCells(interaction.movePath),
+        moveDraftActive: interaction.moveDraftActive === true,
+        movePreviewText: typeof interaction.movePreviewText === 'string' ? interaction.movePreviewText.slice(0, 240) : '',
+        moveRemaining: Number.isSafeInteger(interaction.moveRemaining) ? Math.max(0, interaction.moveRemaining) : null,
+        hoverMovePath: normalizePathCells(interaction.hoverMovePath),
         pendingPieceId: interaction.pendingPieceId || null,
         pendingCommandId: interaction.pendingCommandId || null,
         selectedTargetPieceIds: Array.isArray(interaction.selectedTargetPieceIds)
@@ -439,6 +490,7 @@
   root.BattleViewModel = {
     create: create,
     normalizeCells: normalizeCells,
+    normalizePathCells: normalizePathCells,
     normalizeSkillSummaries: normalizeSkillSummaries,
     normalizePresentationEvents: normalizePresentationEvents,
     normalizeStatuses: normalizeStatuses,

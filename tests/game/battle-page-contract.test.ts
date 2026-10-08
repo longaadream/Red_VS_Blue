@@ -296,7 +296,7 @@ describe('battle page route contract', () => {
     expect(responsiveCss).toMatch(/\.hand-scroll\s*\{[\s\S]*?scrollbar-width:\s*none/)
     expect(contextCss).toMatch(/\.training-popover\s*\{[\s\S]*?transform-origin:\s*bottom left/)
     expect(battlePage).toMatch(/function setTrainingToolsOpen\(open[\s\S]*?aria-expanded[\s\S]*?aria-hidden/)
-    expect(battlePage).toMatch(/const active = !targetSubmissionPending && !!\(pendingSkill \|\| pendingCardAction\)[\s\S]*?if \(active\) \{\s*closePieceContextMenu\(\)/)
+    expect(battlePage).toMatch(/const targetSubmissionNeedsOverlay = !!\(targetSubmissionPending[\s\S]*?const active = !!\(cardNeedsTarget\(pendingCardAction\) \|\| targetSubmissionNeedsOverlay \|\| \(pendingSkill && !pendingSkill\.previewOnly\)\)[\s\S]*?if \(active\) \{[\s\S]*?closePieceContextMenu\(\)/)
     expect(battlePage).toMatch(/function setTrainingToolsOpen\(open[\s\S]*?if \(next\) closePieceContextMenu\(\)/)
     expect(battlePage).toMatch(/const draftAction[^\n]+[\s\S]*?tutorialActionAllowed\(draftAction\)[\s\S]*?closePieceContextMenu\(\)/)
     expect(battlePage).not.toContain('tutorialSelfTarget')
@@ -333,7 +333,10 @@ describe('battle page route contract', () => {
     const moveEnd = battlePage.indexOf('function onCellClick(x, y)', moveStart)
     const moveHandler = battlePage.slice(moveStart, moveEnd)
 
-    expect(moveHandler).toMatch(/dismissedPieceContextId = null[\s\S]*?doAction\(\{ type: 'move'/)
+    expect(moveHandler).toContain('return submitMoveRoute(')
+    const submitHandler = readNamedFunction(battlePage, 'submitMoveRoute')
+    expect(submitHandler).toContain("type: 'move'")
+    expect(submitHandler).toMatch(/dismissedPieceContextId = null[\s\S]*?doAction\(action\)/)
     expect(battlePage).toMatch(/function restoreSelectedPieceMenu\(options\)[\s\S]*?input\.reopen[\s\S]*?dismissedPieceContextId = null/)
     expect(battlePage).toMatch(/restoreSelectedPieceMenu\(\{ reopen: action\.type === 'move' \}\)/)
   })
@@ -358,6 +361,10 @@ describe('battle page route contract', () => {
       targetSubmissionPending: null,
       skillDefOf: () => ({ type: 'normal' }),
       skillUsesCharge: () => false,
+      prepareLocalSkillAction: () => null,
+      normalizeLocalSkillPreparation: (result: unknown) => result,
+      installLocalSkillDraft: () => false,
+      localSkillInitialOptionPreparation: () => null,
       pendingSkill: null,
       clearTargetInteraction: () => undefined,
       pendingMove: false,
@@ -591,7 +598,7 @@ describe('battle page route contract', () => {
       addLog: () => undefined,
       PIECES_BY_ID: { ana: { id: 'ana', name: 'Ana' } },
     })
-    new Script(readNamedFunction(battlePage, 'onCellClick')).runInContext(context)
+    new Script([readNamedFunction(battlePage, 'cardNeedsTarget'), readNamedFunction(battlePage, 'onCellClick')].join('\n')).runInContext(context)
 
     expect(() => new Script('onCellClick(2, 3)').runInContext(context)).not.toThrow()
     expect(JSON.parse(JSON.stringify(patches))).toEqual([
@@ -619,15 +626,18 @@ describe('battle page route contract', () => {
       pendingOptionSelectionForOther: () => false,
       refreshBattleLegalActions: () => undefined,
       submitTargetAction: (action: unknown) => submittedActions.push(action),
+      clearSkillPreview: () => undefined,
+      rememberTargetInteraction: () => undefined,
       setStatusMsg: (message: string) => statusMessages.push(message),
       currentTargetSourceName: () => '恶魔召唤（1）',
       renderHand: () => undefined,
+      renderBoard: () => undefined,
       renderTargetOverlay: () => undefined,
       document: {
         getElementById: () => ({ style: { display: '' } }),
       },
     })
-    new Script(readNamedFunction(battlePage, 'onCellClick')).runInContext(context)
+    new Script([readNamedFunction(battlePage, 'cardNeedsTarget'), readNamedFunction(battlePage, 'onCellClick')].join('\n')).runInContext(context)
 
     new Script('onCellClick(4, 3)').runInContext(context)
 
@@ -677,7 +687,7 @@ describe('battle page route contract', () => {
       renderHand: () => undefined,
       doAction: (action: unknown) => submittedActions.push(action),
     })
-    new Script(readNamedFunction(battlePage, 'onCardClick')).runInContext(context)
+    new Script([readNamedFunction(battlePage, 'cardNeedsTarget'), readNamedFunction(battlePage, 'onCardClick')].join('\n')).runInContext(context)
 
     new Script("onCardClick('discounted-charge', 'holy-charge')").runInContext(context)
 
@@ -699,6 +709,7 @@ describe('battle page route contract', () => {
       red50Evidence: { targetCommands: [], rejections: [] },
       addLog: (message: string) => logs.push(message),
       setStatusMsg: (message: string) => statusMessages.push(message),
+      clearSkillPreview: () => undefined,
       doAction: (action: unknown) => sentActions.push(action),
     })
     new Script(readNamedFunction(battlePage, 'submitTargetAction')).runInContext(context)
@@ -741,6 +752,8 @@ describe('battle page route contract', () => {
       latestAuthorityStateHash: 'hash-7',
       colyseusConnected: true,
       waitingForOtherPending: () => false,
+      targetSubmissionPending: null,
+      rejectUnsentTargetSubmission: () => undefined,
       RvBColyseus: {
         isConnected: () => true,
         send: (message: unknown) => sentMessages.push(message),
@@ -809,6 +822,8 @@ new Script([
         stamped = true
         return { type: 'move', clientActionId: 'should-not-exist' }
       },
+      targetSubmissionPending: null,
+      rejectUnsentTargetSubmission: (_reason: string, message: string) => statusMessages.push(message),
       setStatusMsg: (message: string) => statusMessages.push(message),
     })
     new Script(readNamedAsyncFunction(battlePage, 'doAction')).runInContext(context)
@@ -817,7 +832,7 @@ new Script([
 
     expect(stamped).toBe(false)
     expect(sent).toBe(false)
-    expect(statusMessages.at(-1)).toBe('正在同步服务端状态，请等待完成后重新操作')
+    expect(statusMessages.at(-1)).toBe('正在同步服务端状态；指令未发送，选择已保留')
   })
 
   it.each([false, true])('routes adventure commands locally while preserving spectator read-only=%s', async (spectating) => {
@@ -840,7 +855,7 @@ new Script([
 
     expect(battlePage).toContain('function submitTargetAction(action, label)')
     expect(battlePage).toMatch(
-      /function submitTargetAction\(action, label\) \{\s*if \(targetSubmissionPending\)/,
+      /function submitTargetAction\(action, label\) \{\s*clearSkillPreview\(\)\s*if \(targetSubmissionPending\)/,
     )
     expect(battlePage).toContain('目标指令已提交，正在等待权威确认')
     expect(battlePage).toContain("clearTargetInteraction('user-cancelled')")
@@ -899,7 +914,7 @@ new Script([
     const battlePage = readPage('battle.html')
 
     expect(battlePage).toContain(
-      "const iconPath = t.iconPath || t.assetPath || meta.assetPath || 'images/effect-icons/fallback.svg'",
+      "const iconPath = meta.assetPath || 'images/effect-icons/fallback.svg'",
     )
     expect(battlePage).toContain('class="pi-status-icon-image" src="${escHtml(iconPath)}"')
     expect(battlePage).toContain("const description = t.description || meta.description || ''")
@@ -910,10 +925,10 @@ new Script([
   it('exposes accessible target feedback and a mobile target mode that removes obstructing detail UI', () => {
     const battlePage = readPage('battle.html')
 
-    expect(battlePage).toContain('<div id="statusMsg" role="status" aria-live="polite">')
+    expect(battlePage).toContain('<div id="statusMsg" role="status" aria-live="polite" data-floater-obstacle>')
     expect(battlePage).toContain('<div id="targetOverlay" role="status" aria-live="polite">')
     expect(battlePage).toContain('border: 0; border-radius: 0; background: transparent;')
-    expect(battlePage).toContain('id="targetSourceName"')
+    expect(battlePage).toContain('id="targetPromptText"')
     expect(battlePage).toContain('id="targetCancelButton"')
     expect(battlePage).toMatch(/function renderTargetOverlay\(\)[\s\S]*?closePieceContextMenu\(\)/)
     expect(battlePage).toContain('body.target-mode-active #trainingTools')
@@ -1082,6 +1097,9 @@ new Script([
       },
       myPlayerId: 'training-blue',
       targetSubmissionPending: false,
+      isLocalSkillDraft: () => false,
+      pendingSkill: null,
+      pendingOptionAction: null,
       pendingTargetSelectionForMe: () => true,
       pendingOptionSelectionForMe: () => false,
       doAction: (action: unknown) => { submittedActions.push(action); return Promise.resolve() },
@@ -1095,6 +1113,7 @@ new Script([
       selectedPieceId: null,
       locallyCancelledSelectionId: null,
     })
+    Object.assign(context, { moveDraft: null, pendingMove: false })
     new Script(readNamedFunction(battlePage, 'cancelTargetSelection')).runInContext(context)
 
     new Script('cancelTargetSelection()').runInContext(context)
@@ -1134,6 +1153,7 @@ new Script([
       setStatusMsg: (message: string) => { statusMessages.push(message) },
       selectedPieceId: null,
     })
+    Object.assign(context, { moveDraft: null, pendingMove: false })
     new Script(readNamedFunction(battlePage, 'cancelTargetSelection')).runInContext(context)
 
     new Script('cancelTargetSelection()').runInContext(context)
@@ -1159,6 +1179,9 @@ new Script([
       },
       myPlayerId: 'training-red',
       targetSubmissionPending: false,
+      isLocalSkillDraft: () => false,
+      pendingSkill: null,
+      pendingOptionAction: null,
       pendingTargetSelectionForMe: () => false,
       pendingOptionSelectionForMe: () => true,
       doAction: (action: unknown) => { submittedActions.push(action); return Promise.resolve() },
@@ -1171,6 +1194,7 @@ new Script([
       setStatusMsg: (message: string) => { statusMessages.push(message) },
       selectedPieceId: null,
     })
+    Object.assign(context, { moveDraft: null, pendingMove: false })
     new Script(readNamedFunction(battlePage, 'cancelTargetSelection')).runInContext(context)
 
     expect(() => new Script('cancelTargetSelection()').runInContext(context)).not.toThrow()

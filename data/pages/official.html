@@ -1,7 +1,7 @@
-<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>排位对战 · RED vs BLUE</title><link rel="stylesheet" href="css/tabletop/tabletop.css"><link rel="stylesheet" href="css/tabletop/online.css"><link rel="stylesheet" href="css/tabletop/ranked-match.css"><script src="js/server-utils.js"></script><script src="js/battle-audio.js"></script><script defer src="js/official.js"></script></head>
-<body data-art-page="official"><div class="game-shell">
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>排位对战 · RED vs BLUE</title><link rel="stylesheet" href="css/tabletop/tabletop.css"><link rel="stylesheet" href="css/tabletop/online.css"><link rel="stylesheet" href="css/tabletop/ranked-match.css"><link rel="stylesheet" href="css/tabletop/fantasy-online.css"><link rel="stylesheet" href="css/tabletop/player-profile.css"><script src="js/server-utils.js"></script><script src="js/developer-tools/match-trace.js"></script><script defer src="js/player-profile.js"></script><script src="js/battle-audio.js"></script><script defer src="js/official.js"></script></head>
+<body class="fantasy-online" data-art-page="official"><div class="game-shell">
 <header class="game-header"><a class="game-brand" href="index.html"><span>RED</span><small>vs</small><span>BLUE</span></a><span class="header-divider"></span><h1>联机大厅</h1><div class="header-end account-menu"><button class="button" id="accountButton">登录账号</button><button class="button" id="logout" hidden>退出</button></div><a class="back-link" href="index.html">主菜单</a></header>
-<nav class="game-nav" aria-label="联机导航"><a href="multiplayer.html"><img src="images/tabletop/ui-map.svg" alt="">房间大厅</a><a class="selected" href="official.html"><img src="images/tabletop/ui-confirm.svg" alt="">排位对战</a><div class="nav-note">测试赛季<br>1v1 · Elo<small>接受任意积分的真人对手</small></div></nav>
+<nav class="game-nav" aria-label="联机导航"><a href="multiplayer.html"><img src="images/tabletop/ui-map.svg" alt="">房间大厅</a><a class="selected" href="official.html"><img src="images/tabletop/ui-confirm.svg" alt="">排位对战</a><a href="community.html"><img src="images/tabletop/ui-tools.svg" alt="">社区</a><div class="nav-note">测试赛季<br>1v1 · Elo<small>接受任意积分的真人对手</small></div></nav>
 <main class="game-main"><div class="view-heading"><div><p class="kicker">RANKED MATCH</p><h2>排位对战</h2></div><span class="match-tag">1v1</span></div>
 <p id="server-announcement" class="rank-message" hidden></p>
 <section id="matchReady" class="ranked-match-ready" aria-labelledby="matchReadyTitle" hidden><div role="status" aria-live="assertive"><p>对手已找到</p><h2 id="matchReadyTitle">匹配成功</h2><p>赛前倒计时已经开始，请立即进入比赛。</p></div><button class="button primary" id="enter" hidden>进入比赛 →</button></section>
@@ -22,5 +22,5 @@
         </form>
 <p>开放注册 · 验证邮箱后即可参加排位</p></section><p id="authMessage" role="status"></p></dialog>
 <dialog class="game-dialog" id="connection"><form method="dialog"><button class="dialog-close" aria-label="关闭连接设置">×</button></form><h2>官方服务器</h2><label for="server">服务器地址</label><input id="server" type="url" placeholder="http://127.0.0.1:2568"><p>填写组织者提供的 HTTPS 地址。本机试运行可使用 HTTP。</p><button class="button primary" id="connect">连接服务器</button><p id="connectionMessage" role="status"></p></dialog>
-<script src="js/button-audio.js" defer></script>
+<script src="js/button-audio.js" defer></script><script src="js/room-invitations.js" defer></script>
 </body></html>

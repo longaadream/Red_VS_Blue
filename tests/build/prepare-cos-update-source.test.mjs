@@ -29,6 +29,31 @@ function fixture(t, version = '0.1.3') {
   return { clientDirectory, resourceDirectory, outputDirectory, index, pack, exe, name }
 }
 
+function addResourcePatch(f, options = {}) {
+  const archive = options.archive ?? 'content-patch.rvbpack'
+  const patch = options.bytes ?? Buffer.from('verified resource patch')
+  const indexPath = path.join(f.resourceDirectory, 'content-update.json')
+  const receiptPath = path.join(f.resourceDirectory, 'public-verification.json')
+  const patchIndex = JSON.parse(fs.readFileSync(indexPath, 'utf8'))
+  patchIndex.patch = {
+    archive,
+    sha256: options.sha256 ?? hash(patch),
+    parentProfileHash: options.parentProfileHash ?? 'd'.repeat(64),
+    resolvedProfileHash: options.resolvedProfileHash ?? 'e'.repeat(64),
+    ...(options.includeSize === false ? {} : { size: options.size ?? patch.length }),
+  }
+  fs.writeFileSync(path.join(f.resourceDirectory, archive), patch)
+  const indexBytes = Buffer.from(JSON.stringify(patchIndex))
+  fs.writeFileSync(indexPath, indexBytes)
+  const receipt = JSON.parse(fs.readFileSync(receiptPath, 'utf8'))
+  const indexAsset = receipt.assets.find(asset => asset.name === 'content-update.json')
+  Object.assign(indexAsset, { size: indexBytes.length, digest: 'sha256:' + hash(indexBytes) })
+  receipt.assets = receipt.assets.filter(asset => asset.name !== 'content-patch.rvbpack')
+  if (options.receiptPatch !== false) receipt.assets.push({ name: 'content-patch.rvbpack', size: patch.length, digest: 'sha256:' + hash(patch) })
+  fs.writeFileSync(receiptPath, JSON.stringify(receipt))
+  return { archive, patch, indexBytes, patchIndex }
+}
+
 test('prepares separate immutable assets and last-published manifests with Android feed', t => {
   const f = fixture(t), receipt = prepareCosUpdateSource(f)
   assert.deepEqual(receipt.publishLast, ['resource/latest.json', 'android-latest.json', 'latest.yml'])
@@ -45,6 +70,87 @@ test('prepares separate immutable assets and last-published manifests with Andro
   assert.deepEqual(fs.readFileSync(path.join(f.outputDirectory, 'android-latest.json')), fs.readFileSync(path.join(f.clientDirectory, 'android-latest.json')))
   assert.deepEqual(fs.readFileSync(path.join(f.outputDirectory, '0.1.3/RED-vs-BLUE-0.1.3-Android.apk')), fs.readFileSync(path.join(f.clientDirectory, 'RED-vs-BLUE-0.1.3-Android.apk')))
   assert.throws(() => prepareCosUpdateSource(f), /already exists/)
+})
+
+test('copies a verified canonical resource patch into the version and latest asset lists', t => {
+  const f = fixture(t), delta = addResourcePatch(f)
+  const result = prepareCosUpdateSource(f)
+  assert.deepEqual(fs.readFileSync(path.join(f.outputDirectory, 'resource/0.0.123/content-patch.rvbpack')), delta.patch)
+  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(f.outputDirectory, 'resource/0.0.123/content-update.json'))).patch, delta.patchIndex.patch)
+  const [release] = JSON.parse(fs.readFileSync(path.join(f.outputDirectory, 'resource/latest.json')))
+  assert.deepEqual(release.assets.find(asset => asset.name === 'content-patch.rvbpack'), {
+    name: 'content-patch.rvbpack',
+    size: delta.patch.length,
+    digest: 'sha256:' + hash(delta.patch),
+    state: 'uploaded',
+    browser_download_url: 'https://github.com/longaadream/Red_VS_Blue/releases/download/content-test-' + 'c'.repeat(64) + '/content-patch.rvbpack',
+  })
+  assert.deepEqual(result.files.find(file => file.name === 'resource/0.0.123/content-patch.rvbpack'), {
+    name: 'resource/0.0.123/content-patch.rvbpack',
+    size: delta.patch.length,
+    sha256: hash(delta.patch),
+  })
+})
+
+test('rejects a canonical resource patch without a receipt asset', t => {
+  const f = fixture(t)
+  addResourcePatch(f, { receiptPatch: false })
+  assert.throws(() => prepareCosUpdateSource(f), /Resource public asset receipt mismatch: content-patch\.rvbpack/)
+  assert.equal(fs.existsSync(f.outputDirectory), false)
+})
+
+test('rejects a canonical resource patch with a mismatched receipt digest', t => {
+  const f = fixture(t)
+  addResourcePatch(f)
+  const receiptPath = path.join(f.resourceDirectory, 'public-verification.json')
+  const receipt = JSON.parse(fs.readFileSync(receiptPath, 'utf8'))
+  receipt.assets.find(asset => asset.name === 'content-patch.rvbpack').digest = 'sha256:' + '0'.repeat(64)
+  fs.writeFileSync(receiptPath, JSON.stringify(receipt))
+  assert.throws(() => prepareCosUpdateSource(f), /Resource public asset receipt mismatch: content-patch\.rvbpack/)
+  assert.equal(fs.existsSync(f.outputDirectory), false)
+})
+
+test('rejects a tampered canonical resource patch before creating output', t => {
+  const f = fixture(t), delta = addResourcePatch(f)
+  fs.writeFileSync(path.join(f.resourceDirectory, delta.archive), Buffer.alloc(delta.patch.length, 0x78))
+  assert.throws(() => prepareCosUpdateSource(f), /Resource patch checksum mismatch/)
+  assert.equal(fs.existsSync(f.outputDirectory), false)
+})
+
+test('rejects a canonical resource patch with an unsafe archive path', t => {
+  const f = fixture(t)
+  addResourcePatch(f)
+  const indexPath = path.join(f.resourceDirectory, 'content-update.json')
+  const index = JSON.parse(fs.readFileSync(indexPath, 'utf8'))
+  index.patch.archive = '../content-patch.rvbpack'
+  const indexBytes = Buffer.from(JSON.stringify(index))
+  fs.writeFileSync(indexPath, indexBytes)
+  const receiptPath = path.join(f.resourceDirectory, 'public-verification.json')
+  const receipt = JSON.parse(fs.readFileSync(receiptPath, 'utf8'))
+  Object.assign(receipt.assets.find(asset => asset.name === 'content-update.json'), { size: indexBytes.length, digest: 'sha256:' + hash(indexBytes) })
+  fs.writeFileSync(receiptPath, JSON.stringify(receipt))
+  assert.throws(() => prepareCosUpdateSource(f), /invalid canonical patch metadata/)
+  assert.equal(fs.existsSync(f.outputDirectory), false)
+})
+
+test('rejects a canonical resource patch with a mismatched declared size', t => {
+  const f = fixture(t), delta = addResourcePatch(f, { size: 1 })
+  const indexPath = path.join(f.resourceDirectory, 'content-update.json')
+  const indexBytes = fs.readFileSync(indexPath)
+  const receiptPath = path.join(f.resourceDirectory, 'public-verification.json')
+  const receipt = JSON.parse(fs.readFileSync(receiptPath, 'utf8'))
+  Object.assign(receipt.assets.find(asset => asset.name === 'content-update.json'), { size: indexBytes.length, digest: 'sha256:' + hash(indexBytes) })
+  fs.writeFileSync(receiptPath, JSON.stringify(receipt))
+  assert.equal(delta.patch.length > 1, true)
+  assert.throws(() => prepareCosUpdateSource(f), /Resource patch size mismatch/)
+  assert.equal(fs.existsSync(f.outputDirectory), false)
+})
+
+test('rejects a canonical resource patch that is not smaller than the full archive', t => {
+  const f = fixture(t)
+  addResourcePatch(f, { bytes: Buffer.alloc(f.pack.length, 0x70) })
+  assert.throws(() => prepareCosUpdateSource(f), /Resource patch must be smaller than the full archive/)
+  assert.equal(fs.existsSync(f.outputDirectory), false)
 })
 
 test('copies verified previous blockmap into its version directory', t => {

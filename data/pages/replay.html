@@ -3,20 +3,22 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
-  <title>Trace 回放器 · RED vs BLUE</title>
+  <title>对局回放 · RED vs BLUE</title>
   <link rel="stylesheet" href="css/battle-tactical-table.css" />
   <link rel="stylesheet" href="css/developer-tools/replay.css" />
   <link rel="stylesheet" href="css/tabletop/tabletop.css" />
 </head>
 <body data-art-page="replay">
   <header class="replay-topbar">
-    <a class="back-link" href="developer-tools.html">← 开发者中心</a>
+    <a class="back-link" href="official.html?tab=history">← 官方战绩</a>
+    <a class="back-link secondary-link" href="developer-tools.html">开发者中心</a>
     <div class="replay-heading">
-      <div class="replay-title">Trace 回放器</div>
-      <div id="replayHeaderMeta" class="replay-subtitle">正在读取本地 Trace v2…</div>
+      <div class="replay-title">对局回放</div>
+      <div id="replayHeaderMeta" class="replay-subtitle">正在读取对局回放…</div>
     </div>
     <div class="topbar-actions">
       <div class="readonly-badge">只读 · 无房间连接</div>
+      <button id="replayDownloadButton" class="control-button" type="button">下载回放</button>
       <button id="replayInspectorToggle" class="control-button inspector-toggle" type="button" aria-expanded="true" aria-controls="replayInspector">检查器</button>
     </div>
   </header>
@@ -26,6 +28,15 @@
 
     <div id="replayWorkspace" class="replay-workspace" hidden>
       <section class="stage-column" aria-label="对局回放棋盘">
+        <section class="replay-summary" aria-label="对局概要">
+          <div class="frame-kicker">对局概要</div>
+          <div id="replayMatchTitle" class="summary-title">对局回放</div>
+          <div class="summary-grid">
+            <div><span>玩家</span><strong id="replayMatchPlayers">—</strong></div>
+            <div><span>地图</span><strong id="replayMatchMap">—</strong></div>
+            <div><span>结果</span><strong id="replayMatchResult">—</strong></div>
+          </div>
+        </section>
         <div class="board-frame">
           <div id="replayBoardStage" class="replay-board-stage" data-battle-layer="three-battlefield">
             <div id="replayFloatLayer" class="board-float-layer"></div>
@@ -35,7 +46,7 @@
 
         <div class="frame-strip">
           <div class="frame-primary">
-            <div class="frame-kicker">AUTHORITY FRAME</div>
+            <div class="frame-kicker">权威帧</div>
             <div id="replayFrameTitle" class="frame-title">初始状态</div>
           </div>
           <div id="replayFrameMeta" class="frame-meta">第 0 帧</div>
@@ -46,6 +57,12 @@
             <button id="replayPreviousButton" class="control-button" type="button">← 上一命令</button>
             <button id="replayPlayButton" class="control-button primary" type="button">播放</button>
             <button id="replayNextButton" class="control-button" type="button">下一命令 →</button>
+            <button id="replayPreviousTurnButton" class="control-button" type="button">上一回合</button>
+            <button id="replayNextTurnButton" class="control-button" type="button">下一回合</button>
+            <label class="select-control turn-control">
+              <span>回合</span>
+              <select id="replayTurnSelect" class="control-select" aria-label="选择回合"></select>
+            </label>
             <span class="control-spacer"></span>
             <label class="select-control">
               <span>倍速</span>
@@ -118,6 +135,7 @@
     </div>
   </main>
 
+  <script src="js/server-utils.js"></script>
   <script src="js/developer-tools/match-trace.js"></script>
   <script src="js/three.min.js"></script>
   <script src="js/battle-ui/battle-view-model.js"></script>

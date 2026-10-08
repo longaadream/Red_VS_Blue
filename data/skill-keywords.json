@@ -75,8 +75,8 @@
     "id": "projectile",
     "name": "弹射物",
     "category": "mechanic",
-    "shortDescription": "弹射物无法穿过掩体和墙壁。",
-    "longDescription": "弹射物在飞行路径上遇到掩体或墙壁时会停止，无法穿透。",
+    "shortDescription": "弹射物无法穿过棋子、掩体和墙壁，除非技能明确说明可穿透。",
+    "longDescription": "弹射物在飞行路径上遇到棋子、掩体或墙壁时会停止，除非技能说明允许穿透；明确说明的友军或敌军穿透例外按技能说明结算。",
     "highlight": false
   },
   {

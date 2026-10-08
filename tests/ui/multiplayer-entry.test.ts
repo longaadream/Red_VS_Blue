@@ -3,20 +3,36 @@ import { createContext, Script } from 'node:vm'
 import { expect, it, vi } from 'vitest'
 const script = readFileSync('data/pages/js/multiplayer.js', 'utf8')
 type MockNode = { value:string; hidden:boolean; disabled:boolean; checked:boolean; textContent:string; children:MockNode[]; onclick:()=>void; onchange:()=>void; append(...items:MockNode[]):void; replaceChildren():void }
-function setup() {
+function setup(search = '') {
   const nodes = new Map<string, ReturnType<typeof node>>()
   function node(): MockNode { return { value: '', hidden: false, disabled: false, checked: true, textContent: '', children: [] as ReturnType<typeof node>[], onclick: () => {}, onchange: () => {}, append(...items: ReturnType<typeof node>[]) { this.children.push(...items) }, replaceChildren() { this.children = [] } } }
   const get = (id: string) => { if (!nodes.has(id)) nodes.set(id, node()); return nodes.get(id)! }
   get('serverKind').value = 'official'; get('gameMode').value = 'pve'
   const profile = { schemaVersion: 1, engineAbi: 'a', runnerRevision: 'b', resolvedProfileHash: 'c', authorityContentHash: 'd' }
-  const location = { href: '', search: '' }, storage = { getItem: () => null, setItem: vi.fn() }
+  const location = { href: '', search }, storage = { getItem: () => null, setItem: vi.fn() }
   const host = { ensureLocalAuthority: vi.fn(async () => ({ ok: true })), getMode: async () => ({ localUrl: 'http://127.0.0.1:2567', profileIdentity: profile, localAuthorityProfileIdentity: profile }), relayControl: vi.fn(async () => ({ ok: true, published: { url: 'https://play.redvsblue.top/hosts/ab', inviteCode: '12345678' } })), startHostBroadcast: vi.fn(async () => ({})) }
   const fetch = vi.fn(async (url: string) => ({ ok: true, json: async () => url.includes('/invites/') ? { url: 'https://play.redvsblue.top/hosts/ab' } : url.endsWith('/hosts') ? { hosts: [{ url: 'https://play.redvsblue.top/hosts/ab', name: 'A' }] } : url.endsWith('/rooms?mode=pve') ? { rooms: [{ id: 'pv', name: '旅途', players: 2, maxPlayers: 4, joinable: true }] } : url.endsWith('/rooms') ? { rooms: [{ id: 'full', mode: '1v1', players: [{}, {}], maxPlayers: 2, status: 'waiting' }] } : { ok: true, protocol: 'rvb-colyseus' } }))
   const utils = { readOfficialSession: () => ({ token: 'test', account: { id: 'test' } }), saveServerConfig: vi.fn(), appendServerParams: (p: URLSearchParams) => p }
-  const context = createContext({ URL, URLSearchParams, AbortSignal, console, location, fetch, localStorage: storage, setInterval: () => {}, window: { RvBHost: host, RvBUtils: utils }, navigator: {}, document: { getElementById: get, createElement: node, querySelectorAll: (selector: string) => selector === '.modalError' ? [] : [...nodes.values()] }, RvBIdentity: { getIdentity: () => ({ displayName: '测试' }), ensureIdentity: async () => ({}) }, RvBColyseus: { requestCatalogIdentityAt: async () => ({ profileIdentity: profile }) }, RvBUtils: utils })
+  const listeners: Record<string, () => void> = {}
+  const accepted = { takeIntent: vi.fn(async () => ({ origin:'https://play.redvsblue.top',hostId:'ab',roomId:'invited-room' })) }
+  const catalog = vi.fn(async () => ({ profileIdentity: profile }))
+  const context = createContext({ URL, URLSearchParams, AbortSignal, console, location, fetch, localStorage: storage, setInterval: () => {}, window: { RvBHost: host, RvBUtils: utils, RvBRoomInvitations:accepted, addEventListener:(name:string,fn:()=>void)=>{listeners[name]=fn} }, navigator: {}, document: { getElementById: get, createElement: node, querySelectorAll: (selector: string) => selector === '.modalError' ? [] : [...nodes.values()] }, RvBIdentity: { getIdentity: () => ({ displayName: '测试' }), ensureIdentity: async () => ({}) }, RvBColyseus: { requestCatalogIdentityAt: catalog }, RvBUtils: utils })
   new Script(script).runInContext(context)
-  return { get, location, host, fetch }
+  return { get, location, host, fetch, listeners, accepted, catalog }
 }
+it('accepts a social room invitation through the existing version check and faction-join route',async()=>{
+  const test=setup('?acceptedInvite=1');test.listeners.DOMContentLoaded();await finished()
+  expect(test.accepted.takeIntent).toHaveBeenCalledTimes(1)
+  expect(test.catalog).toHaveBeenCalledWith('https://play.redvsblue.top/hosts/ab','remote-server')
+  expect(test.location.href).toBe('lobby.html?server=remote&lobbyContext=public&joinRoom=invited-room')
+})
+it('rejects resource mismatch before entering an invited room',async()=>{
+  const test=setup('?acceptedInvite=1')
+  test.catalog.mockResolvedValue({profileIdentity:{schemaVersion:1,engineAbi:'different',runnerRevision:'b',resolvedProfileHash:'c',authorityContentHash:'d'}})
+  test.listeners.DOMContentLoaded();await finished()
+  expect(test.location.href).toBe('')
+  expect(test.get('error').textContent).toContain('资源版本不同')
+})
 async function finished() { await new Promise(resolve => setTimeout(resolve, 0)) }
 it('publishes a player host then opens the local PVE preparation', async () => {
   const { get, location, host } = setup(); get('publish').onclick(); await finished()
@@ -69,10 +85,12 @@ it('routes bare lobby navigation to the public directory, preserving explicit en
     expect(replace).toHaveBeenCalledTimes(search.includes('create=') || search.includes('joinRoom=') ? 0 : 1)
   }
 })
-it('has only room lobby and ranked navigation', () => {
+it('keeps room and ranked routes reachable and exposes community on online entry pages', () => {
   for (const page of ['multiplayer','lobby','official']) {
     const nav=readFileSync('data/pages/'+page+'.html','utf8').split('<nav')[1].split('</nav>')[0]
-    expect(nav.match(/<a /g)).toHaveLength(2)
+    expect(nav).toContain('href="multiplayer.html"')
+    expect(nav).toContain('href="official.html"')
+    if (page !== 'lobby') expect(nav).toContain('href="community.html"')
     expect(nav).not.toContain('>服务器</a>')
   }
 })

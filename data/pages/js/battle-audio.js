@@ -80,7 +80,8 @@
     function play(kind, value) {
       if (disposed || !context || context.state !== 'running' || !volume() || (doc && doc.hidden) || voices.size >= 12) return false
       const now = context.currentTime
-      if (last.has(kind) && now - last.get(kind) < 0.09) return false
+      const throttle = kind === 'invalid' ? 0.5 : 0.09
+      if (last.has(kind) && now - last.get(kind) < throttle) return false
       last.set(kind, now)
       master.gain.setValueAtTime(volume() * 0.5, now)
       const tier=tierFor(kind,value)
@@ -88,6 +89,7 @@
       else if (kind === 'move') { tone(310+tier*40,105,0,0.1+tier*0.045,'triangle',0.28+tier*0.03); tone(900,350,0.015,0.055+tier*0.025,'sine',0.07) }
       else if (kind === 'heal' || kind === 'success') { [523,659,784].forEach(function(f,i){tone(f,f*1.015,i*(0.025+tier*0.015),0.23+tier*0.09,'sine',0.08+tier*0.015)}) }
       else if (kind === 'warning') { tone(330,130,0,0.24,'triangle',0.16); tone(349,145,0.025,0.22,'sine',0.065) }
+      else if (kind === 'invalid') tone(260,190,0,0.1,'sine',0.08)
       else if (kind === 'teleport') { tone(240,1100,0,0.13,'sine',0.12); tone(1100,440,0.13,0.17,'sine',0.1) }
       else if (kind === 'click') { tone(820,420,0,0.055,'triangle',0.28); tone(1400,700,0,0.025,'sine',0.06) }
       else if (kind === 'notice') tone(440,440,0,0.15,'sine',0.1)
