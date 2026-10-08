@@ -167,52 +167,66 @@ body #battleSettings [hidden] { display: none !important; }
   body #handResources .resource-dial-pointer, body #dmBubble { transition: none !important; }
 }
 
-/* Illustrated materials. Keep deployment cards and hand geometry untouched. */
+/* Material belongs to the scenery; controls stay flat and hand-inked.
+   Deployment cards and hand geometry are deliberately unchanged. */
 body .topbar {
+  left: auto !important;
+  bottom: auto !important;
   width: max-content !important;
   max-width: var(--battle-tools-width, min(304px, 40vw)) !important;
   justify-content: flex-start !important;
+  padding: 0 4px 4px 0 !important;
+  scrollbar-color: #8c795d #392d25;
 }
 body .topbar > [hidden], body .topbar > #spectatorStatus:empty { display: none !important; }
 body .topbar #spectatorStatus:not(:empty) { color: #f1dfbd; white-space: nowrap; text-shadow: 0 1px 2px #211a16; }
 body .phase-bar .turn-summary,
 body:not(.target-mode-active) #statusMsg,
 body:not(.target-mode-active) #dmBubble {
-  background: transparent url('../images/tabletop/paper-slip-v2.webp') center / 100% 100% no-repeat !important;
-  border-color: transparent !important;
-  box-shadow: none !important;
+  background: #cbbb9b !important;
+  border: 2px solid #392d25 !important;
+  border-image: none !important;
+  border-radius: 12px 7px 15px 8px !important;
+  box-shadow: 2px 3px 0 #211a1666 !important;
 }
 body .phase-bar .turn-summary::after { display: none !important; }
 body #actionHistoryDock {
-  background: transparent !important;
-  border-image: url('../images/tabletop/paper-slip-v2.webp') 70 fill / 8px / 0 stretch !important;
+  background: #cbbb9b !important;
+  border-image: none !important;
   color: #493322 !important;
-  box-shadow: 2px 3px 5px #211a16aa, inset 0 0 0 2px #e9d7b080 !important;
+  box-shadow: 2px 3px 0 #211a1666 !important;
 }
 body #actionHistoryDock .action-history-empty { color: #634b32 !important; text-shadow: none !important; }
 body #handResources .hand-resource {
   position: relative;
-  background: transparent !important;
-  border: 0 !important; box-shadow: none !important; border-radius: 0 !important;
-  border-image: url('../images/tabletop/counter-v2.webp') 0 30 0 175 fill / 0 10px 0 46px / 0 stretch !important;
-  padding: 10px 13px 3px 46px !important;
+  background: #cbbb9b !important;
+  border: 2px solid #392d25 !important; box-shadow: 2px 3px 0 #211a1666 !important;
+  border-radius: 22px 9px 13px 21px !important; border-image: none !important;
+  padding: 3px 10px 3px 4px !important;
   min-width: 138px; gap: 5px;
 }
-body #handResources .resource-dial { display: none; }
+body #handResources .resource-dial { display: block; box-shadow: none; border-color: #493a2d; }
 body #handResources strong { font-size: 25px !important; }
 body #handResources .resource-dial-label { font-size: 12px; }
 body #turnClockCorner {
-  background: transparent url('../images/tabletop/paper-slip-v2.webp') center / 100% 100% no-repeat !important;
-  box-shadow: none !important; border-color: transparent !important;
+  background: #cbbb9b !important;
+  border-image: none !important; border-color: #392d25 !important;
+  border-radius: 12px 7px 15px 8px !important;
+  box-shadow: 2px 3px 0 #211a1666 !important;
 }
 body .table-hourglass {
-  background: url('../images/tabletop/hourglass-v2.webp') center / contain no-repeat;
+  background: none;
   width: 34px; height: 50px;
 }
-body .hourglass-frame { stroke: transparent; }
+body .hourglass-frame { stroke: #493a2d; }
 body .hourglass-sand { fill: #b68d52; opacity: .9; }
 body .topbar button:not([hidden]), body .battle-turn-control .btn-end {
-  background: transparent !important;
-  border-image: url('../images/tabletop/paper-slip-v2.webp') 70 fill / 8px / 0 stretch !important;
-  box-shadow: none !important;
+  background: #cbbb9b !important;
+  border: 2px solid #392d25 !important;
+  border-image: none !important;
+  border-radius: 14px 10px 16px 9px !important;
+  box-shadow: 2px 3px 0 #211a1666 !important;
 }
+body .topbar button:not([hidden]) { border-radius: 43% 36% 41% 35% !important; }
+body .topbar button:hover:not(:disabled), body .battle-turn-control .btn-end:hover:not(:disabled) { background: #dfd0af !important; }
+body .topbar button:focus-visible { outline: 2px solid #e9dcae; outline-offset: 3px; }

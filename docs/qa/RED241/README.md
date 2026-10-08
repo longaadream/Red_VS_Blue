@@ -2,7 +2,7 @@
 
 状态：实现候选，等待独立复核与人工体验验收；未合并、未发布。
 
-最新人工视觉反馈后的返工见 [材质与聊天入口 v2](MATERIAL_V2.md)。下方原截图保留为历史记录，不代表最新美术。
+最新人工视觉反馈后的返工见 [扁平控件与聊天避让](FLAT_CONTROLS.md)，本轮 47 项相关回归通过。[材质与聊天入口 v2](MATERIAL_V2.md) 和下方原截图保留为历史记录，不代表最新控件美术。
 
 - 合同：[RED-241](https://linear.app/redvsblue/issue/RED-241)
 - 新鲜 main：`9d1b0c30801cd733ec4cede37ce1ef0889a2313a`，2026-10-08 fetch；check:main-baseline behind=0。

@@ -7,9 +7,13 @@
   const offline=options.offline===true
   const offlineNotice=String(options.offlineNotice||'当前模式没有真人对手，聊天不可发送')
   const root=document.createElement('aside');root.className=offline?'battle-social is-offline':'battle-social';root.setAttribute('aria-label','聊天')
-  root.innerHTML='<button type="button" class="social-toggle" aria-expanded="false">聊天</button><section class="social-panel" hidden><ol class="social-notes" aria-live="polite"></ol><div class="social-presets"></div><form><label>发送聊天消息<textarea rows="2" maxlength="120" placeholder="最多60字，Enter发送"></textarea></label><button type="submit">发送</button></form><p class="social-status" role="status"></p></section>'
+  root.innerHTML='<section class="social-panel" hidden><ol class="social-notes" aria-live="polite"></ol><div class="social-presets"></div><form><label>发送聊天消息<textarea rows="2" maxlength="120" placeholder="最多60字，Enter发送"></textarea></label><button type="submit">发送</button></form><p class="social-status" role="status"></p></section>'
   document.body.appendChild(root)
-  const panel=root.querySelector('section'),toggle=root.querySelector('.social-toggle'),input=root.querySelector('textarea'),form=root.querySelector('form'),status=root.querySelector('.social-status'),notes=root.querySelector('ol'),choices=root.querySelector('.social-presets')
+  const panel=root.querySelector('section'),input=root.querySelector('textarea'),form=root.querySelector('form'),status=root.querySelector('.social-status'),notes=root.querySelector('ol'),choices=root.querySelector('.social-presets')
+  const toggle=document.createElement('button');toggle.type='button';toggle.className=offline?'social-toggle is-offline':'social-toggle';toggle.textContent='聊天';toggle.setAttribute('aria-expanded','false')
+  const toolbar=document.querySelector('.topbar')
+  if(toolbar) toolbar.appendChild(toggle)
+  else root.insertBefore(toggle,panel)
   let connected=false,ready=false,composing=false,pending=null,cooldownUntil=0,helloTimeout=null,ackTimeout=null,sequence=0,disposed=false,lastCooldown=false
   const seen=new Set(),toast=document.createElement('div');toast.className='social-arrival-note';toast.hidden=true;root.appendChild(toast)
   let toastTimeout=null,muted=false
@@ -41,8 +45,10 @@
    ackTimeout=setTimeout(()=>{pending=null;status.textContent='没有收到确认，请检查连接后再试';refresh()},5000)
    return true
   }
-  toggle.addEventListener('click',()=>{panel.hidden=!panel.hidden;toggle.setAttribute('aria-expanded',String(!panel.hidden));if(!panel.hidden&&!options.spectating)input.focus()})
-  root.addEventListener('keydown',event=>{event.stopPropagation();if(event.key==='Escape'&&!event.isComposing&&!composing){panel.hidden=true;toggle.setAttribute('aria-expanded','false');toggle.focus()}});root.addEventListener('keyup',event=>event.stopPropagation())
+  toggle.addEventListener('click',()=>{panel.hidden=!panel.hidden;toggle.setAttribute('aria-expanded',String(!panel.hidden));if(!panel.hidden&&!offline&&!options.spectating)input.focus()})
+  function closeOnEscape(event){event.stopPropagation();if(event.key==='Escape'&&!event.isComposing&&!composing){panel.hidden=true;toggle.setAttribute('aria-expanded','false');toggle.focus()}}
+  toggle.addEventListener('keydown',closeOnEscape);toggle.addEventListener('keyup',event=>event.stopPropagation())
+  root.addEventListener('keydown',closeOnEscape);root.addEventListener('keyup',event=>event.stopPropagation())
   input.addEventListener('compositionstart',()=>{composing=true});input.addEventListener('compositionend',()=>{composing=false})
   input.addEventListener('keydown',event=>{if(event.key==='Enter'&&!event.shiftKey&&!event.isComposing&&!composing){event.preventDefault();send('text',input.value)}})
   form.addEventListener('submit',event=>{event.preventDefault();if(!composing)send('text',input.value)})
@@ -76,7 +82,7 @@
   }
   refresh()
   const tick=setInterval(refresh,100)
-  return {setConnected,receive,dispose(){disposed=true;clearInterval(tick);clearTimeout(helloTimeout);clearTimeout(ackTimeout);clearTimeout(toastTimeout);root.remove()}}
+  return {setConnected,receive,dispose(){disposed=true;clearInterval(tick);clearTimeout(helloTimeout);clearTimeout(ackTimeout);clearTimeout(toastTimeout);if(toggle.parentNode&&toggle.parentNode!==root)toggle.remove();root.remove()}}
  }
  window.BattleSocial={mount}
 })()

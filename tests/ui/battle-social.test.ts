@@ -37,8 +37,6 @@ class FakeElement {
     this._innerHTML = String(value)
     if (this.tagName !== 'ASIDE') return
 
-    const toggle = new FakeElement('button')
-    toggle.textContent = '聊天'
     const panel = new FakeElement('section')
     panel.hidden = true
     const notes = new FakeElement('ol')
@@ -54,9 +52,7 @@ class FakeElement {
     panel.appendChild(choices)
     panel.appendChild(form)
     panel.appendChild(status)
-    this.appendChild(toggle)
     this.appendChild(panel)
-    this.namedChildren.set('.social-toggle', toggle)
     this.namedChildren.set('section', panel)
     this.namedChildren.set('.social-panel', panel)
     this.namedChildren.set('.social-notes', notes)
@@ -86,6 +82,16 @@ class FakeElement {
     const index = this.children.indexOf(child)
     if (index >= 0) this.children.splice(index, 1)
     child.parentNode = null
+    return child
+  }
+
+  insertBefore(child: FakeElement, reference: FakeElement | null) {
+    if (child.parentNode) child.parentNode.removeChild(child)
+    const index = reference ? this.children.indexOf(reference) : -1
+    child.parentNode = this
+    if (index < 0) this.children.push(child)
+    else this.children.splice(index, 0, child)
+    child.className.split(/\s+/).filter(Boolean).forEach(name => this.namedChildren.set('.' + name, child))
     return child
   }
 
@@ -123,7 +129,9 @@ class FakeElement {
 
   getAttribute(name: string) { return this.attributes.get(name) || null }
 
-  focus() {}
+  focused = false
+
+  focus() { this.focused = true }
 
   addEventListener(type: string, listener: Listener) {
     this.listeners.set(type, [...(this.listeners.get(type) || []), listener])
@@ -142,11 +150,17 @@ type SocialApi = {
   }
 }
 
-function loadSocial() {
+function loadSocial({ withToolbar = false } = {}) {
   const body = new FakeElement('body')
+  const toolbar = withToolbar ? new FakeElement('div') : null
+  if (toolbar) {
+    toolbar.className = 'topbar'
+    body.appendChild(toolbar)
+  }
   const document = {
     body,
     createElement: (tagName: string) => new FakeElement(tagName),
+    querySelector: (selector: string) => selector === '.topbar' ? toolbar : null,
   }
   const windowObject: Record<string, unknown> = {}
   const context = createContext({
@@ -163,7 +177,7 @@ function loadSocial() {
     clearInterval,
   })
   new Script(readFileSync('data/pages/js/battle-social.js', 'utf8'), { filename: 'battle-social.js' }).runInContext(context)
-  return { api: windowObject.BattleSocial as SocialApi, body }
+  return { api: windowObject.BattleSocial as SocialApi, body, toolbar }
 }
 
 function readyWidget(spectating = false) {
@@ -366,6 +380,45 @@ describe('RED-241 battle social widget', () => {
     root.dispatchEvent('keydown', { key: 'Escape', isComposing: true, stopPropagation: vi.fn() })
     expect(panel.hidden).toBe(false)
     widget.dispose()
+  })
+
+  it('mounts the toggle in the toolbar, keeps Escape focus, and removes it on dispose', () => {
+    vi.useFakeTimers()
+    const { api, body, toolbar } = loadSocial({ withToolbar: true })
+    const send = vi.fn((message: unknown): boolean => { void message; return true })
+    const widget = api.mount({ send })
+    const root = body.children[1]
+    const toggle = toolbar!.querySelector('.social-toggle')!
+    const panel = root.querySelector('section')!
+
+    expect(toggle.textContent).toBe('聊天')
+    expect(root.querySelector('.social-toggle')).toBeNull()
+    toggle.dispatchEvent('click')
+    expect(panel.hidden).toBe(false)
+    toggle.dispatchEvent('keydown', { key: 'Escape', isComposing: false, stopPropagation: vi.fn() })
+    expect(panel.hidden).toBe(true)
+    expect(toggle.focused).toBe(true)
+    toggle.dispatchEvent('click')
+    root.dispatchEvent('keydown', { key: 'Escape', isComposing: false, stopPropagation: vi.fn() })
+    expect(panel.hidden).toBe(true)
+    expect(toggle.getAttribute('aria-expanded')).toBe('false')
+    expect(toggle.focused).toBe(true)
+
+    widget.dispose()
+    expect(toolbar!.children).toHaveLength(0)
+    expect(body.children).toHaveLength(1)
+  })
+
+  it('falls back to a root toggle when no toolbar exists and removes the root on dispose', () => {
+    vi.useFakeTimers()
+    const { api, body } = loadSocial()
+    const send = vi.fn((message: unknown): boolean => { void message; return true })
+    const widget = api.mount({ send })
+    const root = body.children[0]
+
+    expect(root.querySelector('.social-toggle')?.textContent).toBe('聊天')
+    widget.dispose()
+    expect(body.children).toHaveLength(0)
   })
 
   it('shows the unsupported status and keeps the old server from accepting sends', () => {
