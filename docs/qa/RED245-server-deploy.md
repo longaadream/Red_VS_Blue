@@ -41,6 +41,8 @@
 
 ## 生产前置证据缺口
 
+2026-10-09 更新：用户重新授权部署并确认强制更新，已通过独立候选验证及本次专用临时入口冻结、双库/PVE/事务证据完成实际切换。通用发布脚本仍保留下面的缺证据固定拒绝，不修改已公开资产；具体执行、备份、回退和验收见 [官方部署记录](RED245-production-deployment.md)。下面描述的是本次专用运维方案获批准前的缺口。
+
 当前只读生产检查已得到：两个 HTTP healthz 正常，normal/PVE listing 为空，assigned/recent queue 为 0；但 `/rooms` listing 不能证明 hidden/private/finished room 已终止。生产 DB 还需要在不打印凭据的情况下分别核对 `rvb` 与 `rvb_official` 的 authority 持久化房间 `terminal=false` 计数均为 0，并取得可用的 PVE durable lease 终止证据；还需要维护窗口冻结普通 game ingress 的既有审计证据。缺少这些证据时，工具应保持 automatic activation 阻断，不以空 listing 宣称全量 idle。
 
 ## 本地验证
