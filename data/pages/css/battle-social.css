@@ -2,7 +2,9 @@
 .social-arrival-note{position:absolute;top:0;left:85px;width:260px;padding:8px 12px;background:#e8d9ba;border:1px solid #997f58;box-shadow:2px 3px #241b1466;font-size:13px;white-space:pre-wrap;overflow-wrap:anywhere;pointer-events:none}
 .social-arrival-note[hidden]{display:none}
 .social-toggle{background:#e8d7b2;color:#493522;border:1px solid #927854;border-radius:3px;box-shadow:2px 3px 0 #30221966;padding:8px 14px;cursor:pointer;transform:rotate(2deg)}
+.battle-social.is-offline .social-toggle{background:#ded4bd;color:#756852;border-color:#a99b7d}
 .social-toggle.has-note{outline:2px solid #b78045}
+.battle-social :is(.social-toggle,.social-panel,.social-arrival-note){background:transparent;border-image:url('../images/tabletop/paper-slip-v2.webp') 70 fill / 8px / 0 stretch;box-shadow:2px 3px 5px #241b1455}
 .social-panel{box-sizing:border-box;margin-top:9px;width:280px;padding:12px;background:#e8ddc5;border:1px solid #8c785b;box-shadow:4px 5px 12px #0005;border-radius:3px;max-height:max(96px,calc(100dvh - 520px));overflow:auto;overscroll-behavior:contain}
 body.deployment-active .social-arrival-note{display:none}
 .social-panel[hidden]{display:none}

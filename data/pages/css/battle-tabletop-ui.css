@@ -2,8 +2,7 @@
    the existing hand layout; decoration must fit its original resource slot. */
 :root { --tabletop-paper: #dfcca5; --tabletop-dark-ink: #382b21; --tabletop-accent: #416b70; }
 body .board-shell-3d .board-stage {
-  background: url('../images/tabletop/theatre-edges.svg') center / 100% 100% no-repeat,
-    url('../images/tabletop/table-wood.svg') center / 960px 720px #342a22 !important;
+  background: #342a22 url('../images/tabletop/paper-theatre-v2.webp') center / cover no-repeat !important;
 }
 body .turn-summary {
   background: #e5d3ad !important; border-image: none !important;
@@ -166,4 +165,54 @@ body #battleSettings [hidden] { display: none !important; }
 @media (max-height: 600px) { body #deploymentStatus { top: 80px; max-height: 135px; } }
 @media (prefers-reduced-motion: reduce) {
   body #handResources .resource-dial-pointer, body #dmBubble { transition: none !important; }
+}
+
+/* Illustrated materials. Keep deployment cards and hand geometry untouched. */
+body .topbar {
+  width: max-content !important;
+  max-width: var(--battle-tools-width, min(304px, 40vw)) !important;
+  justify-content: flex-start !important;
+}
+body .topbar > [hidden], body .topbar > #spectatorStatus:empty { display: none !important; }
+body .topbar #spectatorStatus:not(:empty) { color: #f1dfbd; white-space: nowrap; text-shadow: 0 1px 2px #211a16; }
+body .phase-bar .turn-summary,
+body:not(.target-mode-active) #statusMsg,
+body:not(.target-mode-active) #dmBubble {
+  background: transparent url('../images/tabletop/paper-slip-v2.webp') center / 100% 100% no-repeat !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+}
+body .phase-bar .turn-summary::after { display: none !important; }
+body #actionHistoryDock {
+  background: transparent !important;
+  border-image: url('../images/tabletop/paper-slip-v2.webp') 70 fill / 8px / 0 stretch !important;
+  color: #493322 !important;
+  box-shadow: 2px 3px 5px #211a16aa, inset 0 0 0 2px #e9d7b080 !important;
+}
+body #actionHistoryDock .action-history-empty { color: #634b32 !important; text-shadow: none !important; }
+body #handResources .hand-resource {
+  position: relative;
+  background: transparent !important;
+  border: 0 !important; box-shadow: none !important; border-radius: 0 !important;
+  border-image: url('../images/tabletop/counter-v2.webp') 0 30 0 175 fill / 0 10px 0 46px / 0 stretch !important;
+  padding: 10px 13px 3px 46px !important;
+  min-width: 138px; gap: 5px;
+}
+body #handResources .resource-dial { display: none; }
+body #handResources strong { font-size: 25px !important; }
+body #handResources .resource-dial-label { font-size: 12px; }
+body #turnClockCorner {
+  background: transparent url('../images/tabletop/paper-slip-v2.webp') center / 100% 100% no-repeat !important;
+  box-shadow: none !important; border-color: transparent !important;
+}
+body .table-hourglass {
+  background: url('../images/tabletop/hourglass-v2.webp') center / contain no-repeat;
+  width: 34px; height: 50px;
+}
+body .hourglass-frame { stroke: transparent; }
+body .hourglass-sand { fill: #b68d52; opacity: .9; }
+body .topbar button:not([hidden]), body .battle-turn-control .btn-end {
+  background: transparent !important;
+  border-image: url('../images/tabletop/paper-slip-v2.webp') 70 fill / 8px / 0 stretch !important;
+  box-shadow: none !important;
 }

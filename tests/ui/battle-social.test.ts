@@ -38,6 +38,7 @@ class FakeElement {
     if (this.tagName !== 'ASIDE') return
 
     const toggle = new FakeElement('button')
+    toggle.textContent = '聊天'
     const panel = new FakeElement('section')
     panel.hidden = true
     const notes = new FakeElement('ol')
@@ -134,7 +135,7 @@ class FakeElement {
 }
 
 type SocialApi = {
-  mount(options: { send: (message: unknown) => boolean; spectating?: boolean }): {
+  mount(options: { send: (message: unknown) => boolean; spectating?: boolean; offline?: boolean; offlineNotice?: string }): {
     setConnected(value: boolean): void
     receive(message: any): void
     dispose(): void
@@ -298,6 +299,33 @@ describe('RED-241 battle social widget', () => {
     widget.dispose()
   })
 
+  it('shows a clear offline chat entry without sending or faking replies', () => {
+    vi.useFakeTimers()
+    const { api, body } = loadSocial()
+    const send = vi.fn((message: unknown): boolean => { void message; return true })
+    const widget = api.mount({ send, offline: true, offlineNotice: '练习模式：当前没有真人对手，聊天不可发送' })
+    const root = body.children[0]
+    const toggle = root.querySelector('.social-toggle')!
+    const input = root.querySelector('textarea')!
+    const status = root.querySelector('.social-status')!
+    const notes = root.querySelector('.social-notes')!
+
+    expect(toggle.textContent).toBe('聊天')
+    expect(root.className).toContain('is-offline')
+    expect(input.disabled).toBe(true)
+    expect(status.textContent).toBe('练习模式：当前没有真人对手，聊天不可发送')
+
+    widget.setConnected(true)
+    input.value = '不会发送给真人'
+    input.dispatchEvent('keydown', enterEvent())
+    widget.receive({ type: 'socialEvent', messageId: 'fake-ai', kind: 'text', displayName: 'AI', payload: '伪造回复' })
+
+    expect(send).not.toHaveBeenCalled()
+    expect(notes.children).toHaveLength(0)
+    expect(status.textContent).toBe('练习模式：当前没有真人对手，聊天不可发送')
+    widget.dispose()
+  })
+
   it('deduplicates repeated remote events by messageId while updating the arrival toast safely', () => {
     vi.useFakeTimers()
     const { widget, root } = readyWidget()
@@ -418,5 +446,14 @@ describe('RED-241 battle social widget', () => {
     expect(choices.children).toHaveLength(0)
     expect(send).not.toHaveBeenCalled()
     widget.dispose()
+  })
+
+  it('mounts offline chat for practice and training while leaving PvP on Colyseus', () => {
+    const page = readFileSync('data/pages/battle.html', 'utf8').replace(/\r\n/g, '\n')
+    expect(page).toContain('function mountOfflineBattleSocial()')
+    expect(page).toContain('if (PRACTICE_MODE) { mountOfflineBattleSocial(); await initPracticeBattle(); return }')
+    expect(page).toContain('if (TRAINING_MODE) {\n        mountOfflineBattleSocial()')
+    expect(page).toContain('battleSocial = window.BattleSocial.mount({ spectating: SPECTATE_MODE, send: message => RvBColyseus.send(message) })')
+    expect(page).toContain("offlineNotice: modeLabel + '：当前没有真人对手，聊天不可发送'")
   })
 })

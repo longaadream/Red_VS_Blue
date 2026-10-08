@@ -4911,13 +4911,14 @@
     // ── Init ──
     async function init() {
       if (ADVENTURE_MODE) { await initAdventureBattle(); return }
-      if (PRACTICE_MODE) { await initPracticeBattle(); return }
+      if (PRACTICE_MODE) { mountOfflineBattleSocial(); await initPracticeBattle(); return }
       const requestedLesson = TUTORIAL_MODE && params.has('lesson') && window.RvBTutorialLessons.get(params.get('lesson'))
       if (requestedLesson && requestedLesson.enabled === false) {
         window.location.replace('tutorial.html')
         return
       }
       if (TRAINING_MODE) {
+        mountOfflineBattleSocial()
         document.getElementById('btnSurrender').style.display = 'none'
         document.getElementById('btnSwitchPov').style.display = TUTORIAL_MODE ? 'none' : ''
         document.getElementById('btnResetCD').style.display = TUTORIAL_MODE ? 'none' : ''
@@ -5644,6 +5645,15 @@
 
     // Connect the Colyseus client for the selected authority origin.
     let battleSocial = null
+    function mountOfflineBattleSocial() {
+      if (battleSocial || !window.BattleSocial) return
+      const modeLabel = PRACTICE_MODE ? '练习模式' : TUTORIAL_MODE ? '教学模式' : '训练模式'
+      battleSocial = window.BattleSocial.mount({
+        offline: true,
+        offlineNotice: modeLabel + '：当前没有真人对手，聊天不可发送',
+        send: () => false,
+      })
+    }
     function connectBattleColyseus() {
       if (typeof RvBColyseus === 'undefined') return
       if (window.BattleSocial) battleSocial = window.BattleSocial.mount({ spectating: SPECTATE_MODE, send: message => RvBColyseus.send(message) })

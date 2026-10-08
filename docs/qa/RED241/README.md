@@ -2,6 +2,8 @@
 
 状态：实现候选，等待独立复核与人工体验验收；未合并、未发布。
 
+最新人工视觉反馈后的返工见 [材质与聊天入口 v2](MATERIAL_V2.md)。下方原截图保留为历史记录，不代表最新美术。
+
 - 合同：[RED-241](https://linear.app/redvsblue/issue/RED-241)
 - 新鲜 main：`9d1b0c30801cd733ec4cede37ce1ef0889a2313a`，2026-10-08 fetch；check:main-baseline behind=0。
 - 继承候选：`cb882cadc3a5f5249b1403ddf61e190f3aa9f909`；PR #226/#227 的预演、状态、路径和卡牌修复保留。

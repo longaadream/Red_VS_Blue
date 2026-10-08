@@ -1,0 +1,62 @@
+[
+  {
+    "buttons": 4,
+    "expected": 192,
+    "handHeight": 290,
+    "handTop": 430,
+    "hiddenWidths": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "socialBottom": 381,
+    "toolbarWidth": 192,
+    "viewport": [
+      1280,
+      720
+    ]
+  },
+  {
+    "buttons": 4,
+    "expected": 185,
+    "handHeight": 90,
+    "handTop": 486,
+    "hiddenWidths": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "socialBottom": 317,
+    "toolbarWidth": 189,
+    "viewport": [
+      1024,
+      576
+    ]
+  },
+  {
+    "buttons": 4,
+    "expected": 185,
+    "handHeight": 90,
+    "handTop": 270,
+    "hiddenWidths": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "socialBottom": 263,
+    "toolbarWidth": 189,
+    "viewport": [
+      740,
+      360
+    ]
+  }
+]
