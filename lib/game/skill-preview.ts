@@ -165,7 +165,7 @@ function isPreviewSafeProgressiveTurnReady(state: BattleState): boolean {
     && emptyList(deployment.legalPositions)
 }
 
-const PUBLIC_EXTENSION_KEYS = new Set(['contentMode', 'removedPieces', 'skillPresentation', 'tileEffects'])
+const PUBLIC_EXTENSION_KEYS = new Set(['contentMode', 'removedPieces', 'skillPresentation', 'tileEffects', 'minatoAnchors'])
 const PRIVATE_EXTENSION_KEYS = new Set([
   'debugBattle', 'battleProfile', 'flowState', 'recallData', '__dryRunSkillPreflight',
   'adventureWorld', 'adventureCards',
@@ -190,6 +190,18 @@ function sanitizePreviewState(state: BattleState): boolean {
       // feature. Drop it from the isolated input so its mere presence cannot
       // change availability and reveal hidden state.
       if (!PUBLIC_EXTENSION_KEYS.has(key)) continue
+      if (key === 'minatoAnchors') {
+        // Owner-only records were filtered by the public projection. Keep only
+        // the visible geometry required by authoritative anchor targeting.
+        sanitized[key] = Array.isArray(value) ? value.filter(entry =>
+          isRecord(entry) && Number.isSafeInteger(entry.x) && Number.isSafeInteger(entry.y)
+          && typeof entry.sourceId === 'string',
+        ).map(entry => ({
+          x: entry.x, y: entry.y, sourceId: entry.sourceId,
+          ...(typeof entry.ownerPlayerId === 'string' ? { ownerPlayerId: entry.ownerPlayerId } : {}),
+        })) : []
+        continue
+      }
       sanitized[key] = value
     }
     state.extensions = sanitized
