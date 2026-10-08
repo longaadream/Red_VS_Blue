@@ -457,6 +457,14 @@
               <h2 class="panel-title">联机对战</h2>
               <p class="panel-description">局域网可离线游玩；互联网房间和排位需要登录所选服务器。</p>
             </header>
+            <section class="community-callout" aria-labelledby="communityEntryTitle">
+              <button class="action-button action-feature" id="communityEntry" type="button" onclick="loadPage('community.html')">
+                <span class="action-code" aria-hidden="true">社区</span>
+                <span class="action-copy"><span class="action-title" id="communityEntryTitle">进入在线社区</span><span class="action-description">好友 · 公告板 · 约桌</span></span>
+                <span class="action-arrow" aria-hidden="true">›</span>
+              </button>
+              <p id="communityStatus" class="community-status" role="status">未连接 · 可继续离线游玩</p>
+            </section>
             <div class="connection-groups">
               <section class="connection-group" aria-labelledby="lanGroupTitle">
                 <h3 class="connection-group__title" id="lanGroupTitle">局域网联机</h3>
@@ -650,12 +658,13 @@
         <button type="submit" id="homeLoginSubmit">登录</button>
         <button type="button" id="homeAccountManage">注册 / 找回密码</button>
       </div>
+      <button type="button" id="homeCommunityRetry" hidden>重新连接社区</button>
       <button type="button" id="homeLogout" hidden>退出登录</button>
     </form>
     <hr>
     <label>离线 / LAN 昵称<input id="homeGuestName" maxlength="20" style="display:block;width:100%;box-sizing:border-box;margin:8px 0;padding:10px"></label>
     <button type="button" id="homeGuestSave">保存昵称</button>
-    <p>教程、单人和 LAN 可离线游玩；互联网联机须登录服务器账号。</p>
+    <p>教程、单人和 LAN 可离线游玩；登录后可连接好友和公告板，也可以随时关闭继续离线游玩。</p>
     <button type="button" id="homeAccountClose">返回游戏</button>
   </dialog>
 

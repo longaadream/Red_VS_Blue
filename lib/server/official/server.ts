@@ -8,6 +8,7 @@ import { PostgresAuthorityRepository } from '../postgres/postgres-authority-repo
 import { ACCOUNT_SCHEMA, Accounts, type MailSender } from './accounts'
 import { Ranked } from './ranked'
 import { mountOfficialApi } from './http'
+import { Community } from './community'
 
 export async function createOfficialServer(options: { databaseUrl: string; mail: MailSender; maxMatches?: number; pagesRoot?: string; reconnectGraceMs?: number; adminToken?: string }) {
   const pool = new Pool({ connectionString: options.databaseUrl, max: 8, connectionTimeoutMillis: 10000 })
@@ -18,15 +19,26 @@ export async function createOfficialServer(options: { databaseUrl: string; mail:
     await pool.query(ACCOUNT_SCHEMA)
     const accounts = new Accounts(pool, options.mail), ranked = new Ranked(pool, accounts, options.maxMatches)
     await ranked.initialize()
+    const community = new Community(pool)
+    await community.initialize()
+    // Existing launcher signatures only pass Ranked to the local panel.  Keep
+    // the service discoverable there while still allowing direct injection in
+    // tests and newer callers.
+    ;(ranked as Ranked & { community?: Community }).community = community
     const authority = createColyseusBattleServer({ repository, requireIdentityProof: true, reconnectGraceMs: options.reconnectGraceMs,
       official: ranked, healthIdentity: { runtime: 'official-colyseus-postgresql', database: 'postgresql' },
       configureExpress: app => {
-        mountOfficialApi(app, accounts, ranked, repository)
+        mountOfficialApi(app, accounts, ranked, repository, community)
         if (options.adminToken) app.post('/official/admin', async (request, response) => {
           const provided = String(request.headers.authorization ?? '').replace(/^Bearer /, '')
           const expected = options.adminToken!
           if (!['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(request.socket.remoteAddress ?? '') || !equalToken(provided, expected)) { response.status(403).json({ error: '仅允许本机管理员操作' }); return }
-          try { await ranked.administer(String(request.body?.action), String(request.body?.value)); response.json({ ok: true }) }
+          try {
+            const action = String(request.body?.action), value = String(request.body?.value), reason = String(request.body?.reason ?? '')
+            if (action === 'community-hide' || action === 'community-hide-post' || action === 'community-hide-reply') await community.administer(action, value, reason)
+            else await ranked.administer(action, value, reason)
+            response.json({ ok: true })
+          }
           catch (error) { response.status(400).json({ error: error instanceof Error ? error.message : '管理操作失败' }) }
         })
         if (options.pagesRoot) {
@@ -73,6 +85,6 @@ export async function createOfficialServer(options: { databaseUrl: string; mail:
       }
       if (failures.length) throw new AggregateError(failures, '官方服务已执行清理，但落盘或关闭失败；请保留数据库与日志')
     }
-    return { ...authority, pool, accounts, ranked, start, close }
+    return { ...authority, pool, accounts, ranked, community, start, close }
   } catch (error) { await pool.end(); throw error }
 }

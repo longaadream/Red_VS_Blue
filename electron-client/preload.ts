@@ -1,6 +1,8 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
 
 contextBridge.exposeInMainWorld('electronAPI', {
+  // Read-only marker, not an authentication credential or persistent preference.
+  getCommunityLaunchId: () => process.argv.find(argument => /^--rvb-community-launch=[a-f0-9]{32}$/.test(argument))?.split('=')[1] ?? null,
   getOfficialUpdateStatus: () => ipcRenderer.invoke('official-update-status'),
   checkOfficialUpdates: () => ipcRenderer.invoke('official-update-check'),
   enterAfterUpdateCheck: () => ipcRenderer.invoke('official-update-enter'),

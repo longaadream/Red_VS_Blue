@@ -3,10 +3,21 @@ import { Accounts, OfficialError } from './accounts'
 import { Ranked } from './ranked'
 import type { PostgresBattleReportReader } from '../postgres/authority-types'
 import { rankedMapCatalog, validateRankedMapPool } from './pregame'
+import type { Community } from './community'
 
-export function mountOfficialApi(app: Express, accounts: Accounts, ranked: Ranked, reports: PostgresBattleReportReader) {
+export function mountOfficialApi(app: Express, accounts: Accounts, ranked: Ranked, reports: PostgresBattleReportReader, injectedCommunity?: Community) {
   app.use('/official', express.json({ limit: '8kb', strict: true }))
+  const community = injectedCommunity ?? (ranked as Ranked & { community?: Community }).community
   const token = (request: Request) => String(request.headers.authorization ?? '').replace(/^Bearer /, '')
+  const communityService = () => {
+    if (!community) throw new OfficialError('社区服务暂不可用，请稍后重试', 503)
+    return community
+  }
+  const communityAccount = async (request: Request, write = false) => {
+    const account = await accounts.authenticate(token(request))
+    if (write) await accounts.limit(`community-write:${account.id}`, 120, 60)
+    return account
+  }
   function endpoint(path: string, handler: (request: Request) => Promise<unknown>, post = false) {
     const route = async (request: Request, response: Response) => {
       response.setHeader('Cache-Control', 'no-store')
@@ -55,4 +66,68 @@ export function mountOfficialApi(app: Express, accounts: Accounts, ranked: Ranke
     if (!report || !report.room.players.some(p => p.id === account.id)) throw new OfficialError('没有该战报的读取权限', 403)
     return report
   })
+
+  // Community reads are authenticated as well as writes.  Account identity
+  // always comes from the session; request bodies only carry the target and
+  // content values.
+  endpoint('/official/community/accounts', async request => {
+    const account = await communityAccount(request)
+    return { accounts: await communityService().search(account.id, request.query.q) }
+  })
+  endpoint('/official/community/friends', async request => {
+    const account = await communityAccount(request)
+    return communityService().friends(account.id)
+  })
+  endpoint('/official/community/heartbeat', async request => {
+    const account = await communityAccount(request, true)
+    await communityService().heartbeat(account.id)
+    return { ok: true }
+  }, true)
+  for (const action of ['request', 'accept', 'reject', 'withdraw', 'remove', 'block', 'unblock'] as const) {
+    endpoint(`/official/community/friends/${action}`, async request => {
+      const account = await communityAccount(request, true)
+      const service = communityService(), target = request.body?.targetAccountId
+      if (action === 'request') await service.request(account.id, target)
+      else if (action === 'accept') await service.accept(account.id, target)
+      else if (action === 'reject') await service.reject(account.id, target)
+      else if (action === 'withdraw') await service.withdraw(account.id, target)
+      else if (action === 'remove') await service.remove(account.id, target)
+      else if (action === 'block') await service.block(account.id, target)
+      else await service.unblock(account.id, target)
+      return { ok: true }
+    }, true)
+  }
+  endpoint('/official/community/board', async request => {
+    const account = await communityAccount(request)
+    return communityService().board(account.id, request.query.cursor, request.query.limit)
+  })
+  endpoint('/official/community/posts', async request => {
+    const account = await communityAccount(request, true)
+    return { id: await communityService().createPost(account.id, request.body ?? {}) }
+  }, true)
+  endpoint('/official/community/posts/:postId/replies', async request => {
+    const account = await communityAccount(request)
+    return communityService().replies(account.id, request.params.postId, request.query.cursor, request.query.limit)
+  })
+  endpoint('/official/community/posts/:postId/replies', async request => {
+    const account = await communityAccount(request, true)
+    return { id: await communityService().createReply(account.id, request.params.postId, request.body?.body) }
+  }, true)
+  endpoint('/official/community/posts/:postId/delete', async request => {
+    const account = await communityAccount(request, true)
+    await communityService().deletePost(account.id, request.params.postId)
+    return { ok: true }
+  }, true)
+  // Keep the short reply deletion path from the API contract, and retain the
+  // nested form used by the first client implementation.
+  endpoint('/official/community/replies/:replyId/delete', async request => {
+    const account = await communityAccount(request, true)
+    await communityService().deleteReply(account.id, request.params.replyId)
+    return { ok: true }
+  }, true)
+  endpoint('/official/community/posts/:postId/replies/:replyId/delete', async request => {
+    const account = await communityAccount(request, true)
+    await communityService().deleteReply(account.id, request.params.postId, request.params.replyId)
+    return { ok: true }
+  }, true)
 }
