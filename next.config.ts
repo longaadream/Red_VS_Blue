@@ -3,9 +3,9 @@ import path from 'path'
 
 const nextConfig: NextConfig = {
   output: 'standalone',
-  // Widen filesystem root to cover the node_modules junction target (points to ../red181/node_modules in worktree)
+  // Keep build and tracing paths inside this checkout so standalone output is flat.
   turbopack: {
-    root: path.resolve(__dirname, '..'),
+    root: path.resolve(__dirname),
   },
   // Resource-pack imports are streamed through the local Next server. Keep
   // its proxy limit aligned with PROFILE_ARCHIVE_LIMITS_V1 (32 MiB), otherwise
@@ -17,15 +17,8 @@ const nextConfig: NextConfig = {
       webpackMemoryOptimizations: true,
     } : {}),
   },
-  // Must match turbopack.root — Next.js enforces equality. stage-client-resources.js handles nested standalone output.
-  outputFileTracingRoot: path.resolve(__dirname, '..'),
-  // Exclude staging/build output dirs so their stale files don't appear in .nft.json traces.
-  outputFileTracingExcludes: {
-    '**': ['release-018-build/_client-stage/**', 'release-018-build/_client-node/**', 'release-018-build/_client-colyseus/**'],
-  },
-  typescript: {
-    ignoreBuildErrors: true,
-  },
+  // Must match turbopack.root — Next.js enforces equality.
+  outputFileTracingRoot: path.resolve(__dirname),
   serverExternalPackages: ['adm-zip', 'ws'],
 }
 

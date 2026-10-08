@@ -68,10 +68,22 @@ Red VS Blue 是一款正在开发中的桌游风格策略游戏。你从同一�
 ```powershell
 git clone https://github.com/longaadream/Red_VS_Blue.git
 cd Red_VS_Blue
-npm.cmd ci --legacy-peer-deps
+npm.cmd ci
 ```
 
-当前依赖树中 Colyseus 的可选 Zod 4 peer 与项目 Zod 3 存在冲突，普通 `npm ci` 可能报 `ERESOLVE`。上面的兼容选项用于安装现有锁定依赖，不会升级依赖；该兼容问题仍待专项处理。
+仓库 `.npmrc` 已固化现有 lockfile 所需的 `legacy-peer-deps` 安装设置，无需手工添加参数。Colyseus 可选 Zod 4 peer 与项目 Zod 3 的兼容问题仍待专项处理；此设置不升级依赖。
+
+只构建和检查源码 Web 服务时：
+
+```powershell
+npm.cmd run build
+node scripts/smoke-web-build.mjs
+npm.cmd start
+```
+
+`build` 包含 TypeScript 检查，并生成 `.next/standalone/server.js` 及配套静态资源。
+`start` 在默认端口 3000 打开 Next 服务/API 状态页；完整游戏通过下面的 Electron 入口启动。
+失败定位、端口配置和 Windows/Linux CI 说明见 [构建与运行](docs/technical/BUILD_AND_RUN.md)。
 
 ### 启动桌面游戏
 
