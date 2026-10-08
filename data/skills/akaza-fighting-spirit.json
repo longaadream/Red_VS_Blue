@@ -1,0 +1,18 @@
+{
+  "id": "akaza-fighting-spirit",
+  "name": "先手斗气",
+  "description": "对满生命值的敌军造成的伤害提高50%。",
+  "keywords": [],
+  "targetText": "被动",
+  "effectTags": ["伤害"],
+  "icon": "👊",
+  "kind": "passive",
+  "type": "normal",
+  "cooldownTurns": 0,
+  "maxCharges": 0,
+  "powerMultiplier": 1,
+  "actionPointCost": 0,
+  "range": "self",
+  "targeting": { "steps": [] },
+  "code": "function executeSkill() { return { success: false, message: '这是被动技能，自动触发，无法手动使用' }; }"
+}

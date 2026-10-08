@@ -1,0 +1,167 @@
+[
+  {
+    "path": "data/pieces/dark-aizen.json",
+    "activeBattleData": true,
+    "matchesSource": true
+  },
+  {
+    "path": "data/pieces/dark-grimmjow.json",
+    "activeBattleData": true,
+    "matchesSource": true
+  },
+  {
+    "path": "data/rules/manifest.json",
+    "activeBattleData": true,
+    "matchesSource": true
+  },
+  {
+    "path": "data/rules/rule-grimmjow-destruction-instinct.json",
+    "activeBattleData": true,
+    "matchesSource": true
+  },
+  {
+    "path": "data/rules/rule-grimmjow-hunt-after-move.json",
+    "activeBattleData": true,
+    "matchesSource": true
+  },
+  {
+    "path": "data/rules/rule-grimmjow-hunt-after-skill.json",
+    "activeBattleData": true,
+    "matchesSource": true
+  },
+  {
+    "path": "data/rules/rule-ulquiorra-damage-dealt.json",
+    "activeBattleData": true,
+    "matchesSource": true
+  },
+  {
+    "path": "data/rules/rule-ulquiorra-damage-taken.json",
+    "activeBattleData": true,
+    "matchesSource": true
+  },
+  {
+    "path": "data/skills/grimmjow-destruction-instinct.json",
+    "activeBattleData": true,
+    "matchesSource": true
+  },
+  {
+    "path": "data/skills/grimmjow-gran-rey-cero.json",
+    "activeBattleData": false,
+    "matchesSource": true
+  },
+  {
+    "path": "data/skills/grimmjow-panther-claw.json",
+    "activeBattleData": true,
+    "matchesSource": true
+  },
+  {
+    "path": "data/skills/ulquiorra-high-speed-regeneration.json",
+    "activeBattleData": true,
+    "matchesSource": true
+  },
+  {
+    "path": "data/pieces/dark-akaza.json",
+    "activeBattleData": true,
+    "matchesSource": true
+  },
+  {
+    "path": "data/pieces/manifest.json",
+    "activeBattleData": true,
+    "matchesSource": true
+  },
+  {
+    "path": "data/rules/rule-akaza-damage-mark.json",
+    "activeBattleData": true,
+    "matchesSource": true
+  },
+  {
+    "path": "data/rules/rule-akaza-fighting-spirit.json",
+    "activeBattleData": true,
+    "matchesSource": true
+  },
+  {
+    "path": "data/skills/akaza-annihilation.json",
+    "activeBattleData": true,
+    "matchesSource": true
+  },
+  {
+    "path": "data/skills/akaza-disorder.json",
+    "activeBattleData": true,
+    "matchesSource": true
+  },
+  {
+    "path": "data/skills/akaza-fighting-spirit.json",
+    "activeBattleData": true,
+    "matchesSource": true
+  },
+  {
+    "path": "data/skills/akaza-flash-step.json",
+    "activeBattleData": true,
+    "matchesSource": true
+  },
+  {
+    "path": "data/skills/edgar-fisticuffs.json",
+    "activeBattleData": true,
+    "matchesSource": true
+  },
+  {
+    "path": "data/skills/itachi-amaterasu.json",
+    "activeBattleData": true,
+    "matchesSource": true
+  },
+  {
+    "path": "data/skills/kenshin-amakakeru.json",
+    "activeBattleData": true,
+    "matchesSource": true
+  },
+  {
+    "path": "data/skills/manifest.json",
+    "activeBattleData": true,
+    "matchesSource": true
+  },
+  {
+    "path": "data/skills/sonic-homing-attack.json",
+    "activeBattleData": true,
+    "matchesSource": true
+  },
+  {
+    "path": "data/pieces/colt.json",
+    "activeBattleData": true,
+    "matchesSource": true
+  },
+  {
+    "path": "data/rules/rule-colt-big-stride.json",
+    "activeBattleData": true,
+    "matchesSource": true
+  },
+  {
+    "path": "data/rules/rule-colt-zone-endturn.json",
+    "activeBattleData": true,
+    "matchesSource": true
+  },
+  {
+    "path": "data/rules/rule-momentum-consume.json",
+    "activeBattleData": true,
+    "matchesSource": true
+  },
+  {
+    "path": "data/skills/alfonso-kick.json",
+    "activeBattleData": true,
+    "matchesSource": true
+  },
+  {
+    "path": "data/skills/colt-big-stride.json",
+    "activeBattleData": true,
+    "matchesSource": true
+  },
+  {
+    "path": "data/skills/ichigo-black-getsuga-tensho.json",
+    "activeBattleData": true,
+    "matchesSource": true
+  },
+  {
+    "path": "data/skills/shadow-ride-sweep.json",
+    "activeBattleData": true,
+    "matchesSource": true
+  }
+]

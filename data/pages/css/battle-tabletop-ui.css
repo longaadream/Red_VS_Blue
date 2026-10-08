@@ -140,8 +140,28 @@ body #deploymentStatus .deployment-choice-stats { display: grid; grid-template-c
 .deployment-choice-stats b { font: 15px/1.2 'Segoe UI', sans-serif; }
 .deployment-choice-check { position: absolute; top: -6px; right: 4px; color: #eff0d5; background: #466e6b; border-radius: 50%; padding: 1px 4px; font-size: 15px; }
 body #deploymentStatus .deployment-choice-info { width: 100%; min-height: 22px; border: 0 !important; border-top: 1px solid #80674455 !important; background: transparent !important; border-radius: 0 !important; color: #55402c !important; font-size: 11px; padding: 2px 6px; box-shadow: none !important; }
-body #deploymentStatus .deployment-status-footer { position: absolute; top: 7px; right: 8px; border: 0; padding: 0; color: #d6c49f; font-size: 11px; }
+body #deploymentStatus .deployment-status-footer {
+  position: absolute; top: 7px; right: 8px; display: flex; align-items: center;
+  min-height: 28px; padding: 4px 11px; color: #30261d; background: #d8c39a;
+  border: 2px solid #4d3b29; border-radius: 7px 4px 8px 5px;
+  box-shadow: 1px 2px 0 #241b14; font: 700 14px/1.1 var(--comic-font, BattleComic, sans-serif);
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+body #deploymentStatus .deployment-status-footer[hidden] { display: none !important; }
 body #deploymentStatus:has(.deployment-status-state:not(:empty)) .deployment-status-footer { position: static; grid-column: 1 / -1; justify-self: end; }
+body #deploymentStatus.progressive {
+  grid-template-columns: auto minmax(0, 1fr) auto auto !important;
+}
+body #deploymentStatus.progressive .deployment-status-state {
+  grid-column: 2; grid-row: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+body #deploymentStatus.progressive .deployment-change-choice:not([hidden]) {
+  grid-column: 4; grid-row: 1;
+}
+body #deploymentStatus.progressive .deployment-status-footer:not([hidden]) {
+  position: static; grid-column: 3; grid-row: 1; justify-self: end; display: flex !important;
+}
+body #deploymentStatus.progressive .deployment-choice-strip { grid-column: 1 / -1; grid-row: 2; }
 /* Move the existing speed widget into the settings, preserving its listeners. */
 .deployment-placement-ghost { position: fixed; z-index: 90; width: 42px; height: 42px; object-fit: cover; border-radius: 50%; border: 2px dashed #e6d4a3; opacity: .55; transform: translate(-50%, -70%); pointer-events: none; }
 .deployment-placement-ghost[hidden] { display: none; }
@@ -159,7 +179,7 @@ body #battleSettings [hidden] { display: none !important; }
   body #deploymentStatus .deployment-choice-name { font-size: 15px; }
   body #deploymentStatus .deployment-status-state { font-size: 12px; }
   body #deploymentStatus .deployment-status-label { font-size: 15px !important; padding: 3px 9px; }
-  body #deploymentStatus .deployment-status-footer { display: none; }
+  body #deploymentStatus .deployment-status-footer { min-height: 24px; padding: 3px 8px; font-size: 13px; }
   body:not(.target-mode-active) #statusMsg, body:not(.target-mode-active) #dmBubble { font-size: 15px !important; padding: 5px 12px !important; }
 }
 @media (max-height: 600px) { body #deploymentStatus { top: 80px; max-height: 135px; } }

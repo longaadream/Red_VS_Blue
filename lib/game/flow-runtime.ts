@@ -2,7 +2,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- Legacy SkillCode contexts have distinct dynamic surfaces. */
 import type { BattleState } from './turn'
 import { changePiecePositions, type PositionChangeOptions } from './position-change'
-import { traceProjectile, manhattanDistance, traceMovementPath, getLegalSkillLandingCells, type MovementTraceOptions, type GridPosition } from './spatial'
+import { executeFreeMove } from './free-move-effect'
+import { traceProjectile, manhattanDistance, traceMovementPath, getLegalSkillLandingCells, getLegalNormalMoveTargets, type MovementTraceOptions, type GridPosition } from './spatial'
 import { getRuleMath } from './rule-runtime'
 import { areMatchAllies } from './match-teams'
 import { createSkillPresentation } from './skill-presentation'
@@ -103,6 +104,7 @@ export function createFlowRuntime(battle: BattleState, context: any, surface: Fl
       distance: (a: string, b: string) => manhattanDistance(piece(a) as any, piece(b) as any),
       random: <T>(items: readonly T[]): T | null => items.length ? items[Math.floor(getRuleMath().random() * items.length)] : null,
       path: (origin: { x: number; y: number }, direction: { x: number; y: number }, options?: { maxDistance?: number; excludePieceId?: string }) => observeProjectilePath(origin, direction, options, traceProjectile(battle, origin, direction, options)),
+      normalMoveTargets: (pieceId: string) => getLegalNormalMoveTargets(battle, piece(pieceId)),
       tracePath: (origin: GridPosition, direction: GridPosition, options: MovementTraceOptions) => traceMovementPath(battle, origin, direction, options),
       landingCells: (candidates: GridPosition[], movingPieceIds: string[] = []) => getLegalSkillLandingCells(battle, candidates, {
         movingPieceIds, reservedCells: surface === 'skill' ? [] : context.reservedCells ?? [],
@@ -144,7 +146,8 @@ export function createFlowRuntime(battle: BattleState, context: any, surface: Fl
       },
     },
     effects: {
-
+      freeMove: (pieceId: string, destination: GridPosition) => executeFreeMove(battle, pieceId, destination,
+        surface === 'skill' ? [] : context.reservedCells ?? []),
       damage: (source: any, targetId: string, amount: number, type: 'physical' | 'magical' | 'true', skillId = effectId()) =>
         call('dealDamage', resolveSource(source), piece(targetId), Math.max(0, numeric(amount)), type, battle, skillId),
       heal: (source: any, targetId: string, amount: number, skillId = effectId()) =>

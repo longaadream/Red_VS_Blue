@@ -1871,10 +1871,10 @@
             <strong class="deployment-countdown" id="deploymentCountdown">00:45</strong>
             <span class="deployment-status-state" id="deploymentState" role="status" aria-live="polite">等待双方确认</span>
             <button type="button" id="deploymentChangeChoice" class="deployment-change-choice" hidden onclick="toggleDeploymentCandidates()">更换棋子</button>
-            <div class="deployment-choice-strip" id="deploymentChoices" role="radiogroup" aria-label="选择本回合上场棋子" hidden></div>
             <div class="deployment-status-footer" id="deploymentFooter" hidden>
-              <span id="deploymentReserveCount"></span>
+              <span class="deployment-reserve-count" id="deploymentReserveCount" aria-live="polite"></span>
             </div>
+            <div class="deployment-choice-strip" id="deploymentChoices" role="radiogroup" aria-label="选择本回合上场棋子" hidden></div>
           </div>
           <button class="btn-end" id="btnEnd" onclick="doTurnControl()" disabled>结束回合 →</button>
         </div>
@@ -3094,6 +3094,7 @@
     let colyseusConnected = false     // Colyseus live
     let colyseusRole = 'guest'        // 'host' | 'guest' from subscribed message
     let localDeploymentChoiceId = null
+    let deploymentOpportunityKey = ''
     let deploymentChoicesRenderKey = ''
     let _use3d = false           // Three.js renderer active
     let battlePresentation = null
@@ -7842,12 +7843,24 @@
     function renderDeploymentStatus() {
       const panel = document.getElementById('deploymentStatus')
       if (!panel || typeof RvBDeploymentStatus === 'undefined') return
-      const selected = G && G.deployment && localDeploymentChoiceId
-        ? (presentedDeployment().offerPieces || []).find(function(piece) { return piece.instanceId === localDeploymentChoiceId })
+      const deployment = presentedDeployment()
+      const nextDeploymentOpportunityKey = deployment
+        && deployment.mode === 'progressive-reserve-v1'
+        && deployment.status === 'awaiting-reserve-deploy'
+        ? String(deployment.revision) + ':' + String(deployment.activePlayerId || '').toLowerCase()
+        : ''
+      if (nextDeploymentOpportunityKey !== deploymentOpportunityKey) {
+        deploymentOpportunityKey = nextDeploymentOpportunityKey
+        deploymentChoicesExpanded = !!nextDeploymentOpportunityKey
+        localDeploymentChoiceId = null
+        deploymentChoicesRenderKey = ''
+      }
+      const selected = G && deployment && localDeploymentChoiceId
+        ? (deployment.offerPieces || []).find(function(piece) { return piece.instanceId === localDeploymentChoiceId })
           || G.pieces.find(function(piece) { return piece.instanceId === localDeploymentChoiceId })
         : null
       const view = RvBDeploymentStatus.create({
-        deployment: presentedDeployment(),
+        deployment: deployment,
         playerId: myPlayerId,
         selectedPieceName: selected ? (selected.name || pieceName(selected)) : '',
         spectating: SPECTATE_MODE,

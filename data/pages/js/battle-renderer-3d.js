@@ -2199,6 +2199,26 @@
         return
       }
       if (previousPiece.x !== nextPiece.x || previousPiece.y !== nextPiece.y) {
+        // A state update can start authoritative playback before the page has
+        // cleared a late drag projection.  The preview mesh may therefore be
+        // sitting on its hypothetical endpoint when this action begins.  If
+        // no real movement is already in flight, restore this piece to the
+        // authoritative previous cell before building the route.  Use the
+        // action's previous snapshot rather than the preview's authority
+        // pointer: queued actions can be newer than a stale preview snapshot.
+        // Existing motion owns its current position and must continue
+        // uninterrupted.
+        if (_previewAuthorityModel && !_anims.has(obj.motionId + ':position')) {
+          const authorityPiece = previousPiece
+          if (authorityPiece && authorityPiece.x != null && authorityPiece.y != null) {
+            const authorityY = _tileSurfaceHeightAt(authorityPiece.x, authorityPiece.y)
+            obj.baseX = authorityPiece.x
+            obj.baseY = authorityY
+            obj.baseZ = authorityPiece.y
+            obj.motionBaseY = authorityY
+            obj.group.position.set(authorityPiece.x, authorityY, authorityPiece.y)
+          }
+        }
         _animateMove(obj, nextPiece.x, nextPiece.y, action && action.movementKinds && action.movementKinds[nextPiece.id], false,
           action && action.movementPaths && action.movementPaths[nextPiece.id]
             || (action && action.type === 'move' && action.pieceId === nextPiece.id ? action.path : null))
@@ -3574,17 +3594,25 @@
 
   function _replaceDisplayedBoard(model, options) {
     if (!_mounted || !model || !model.board) return
-    _clearActionAnimationQueue()
-    if (!(options && options.preview)) _cancelPieceDrag()
-    const drag = options && options.preview ? _pieceDrag : null
+    const preview = !!(options && options.preview)
+    // A move preview is a transient projection over the live board. It can
+    // arrive while an authoritative action is already playing (and a late
+    // authority response can clear it after playback has started), so it must
+    // not tear down the action queue or its property animations. Full board
+    // replacements still own the presentation lifecycle and cancel them.
+    if (!preview) _clearActionAnimationQueue()
+    if (!preview) _cancelPieceDrag()
+    const drag = preview ? _pieceDrag : null
     const dragPosition = drag && drag.obj && drag.obj.group
       ? { x: drag.obj.group.position.x, y: drag.obj.group.position.y, z: drag.obj.group.position.z }
       : drag && drag.visualPosition || null
     if (drag && dragPosition) drag.visualPosition = dragPosition
-    Array.from(_anims.keys()).forEach(_cancelAnimation)
-    _clearPresentationAreaFlash()
-    _clearPresentationPath()
-    if (options && options.preview) {
+    if (!preview) {
+      Array.from(_anims.keys()).forEach(_cancelAnimation)
+      _clearPresentationAreaFlash()
+      _clearPresentationPath()
+    }
+    if (preview) {
       // Reuse meshes and unchanged terrain. Hover must not repeatedly tear
       // down the entire battlefield or reload portrait textures.
       update(model)

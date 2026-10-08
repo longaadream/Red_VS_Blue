@@ -156,6 +156,7 @@ function createHarness(): DeploymentHarness {
   context.RvBDeploymentStatus = windowObject.RvBDeploymentStatus
   const script = [
     'let deploymentChoicesExpanded = false',
+    'let deploymentOpportunityKey = ""',
     'let deploymentChoicesRenderKey = ""',
     'let deploymentHoverCell = null',
     'let deploymentGhost = null',
@@ -193,6 +194,46 @@ describe('RED-241 deployment candidate presentation', () => {
     expect(h.elements.deploymentChoices.hidden).toBe(false)
     expect(h.elements.deploymentChangeChoice.textContent).toBe('收起候选')
     expect(h.elements.deploymentChangeChoice.getAttribute('aria-expanded')).toBe('true')
+  })
+
+  it('reopens and clears the local choice when a new deployment opportunity arrives', async () => {
+    const h = createHarness()
+    new Script('renderDeploymentStatus()').runInContext(h.context as any)
+    await new Script('selectReserveDeploymentPiece("reserve-1")').runInContext(h.context as any)
+    new Script('renderDeploymentStatus()').runInContext(h.context as any)
+    expect(new Script('deploymentChoicesExpanded').runInContext(h.context as any)).toBe(false)
+
+    h.deployment.revision = 18
+    h.deployment.offerPieces = [h.deployment.offerPieces[1]]
+    new Script('renderDeploymentStatus()').runInContext(h.context as any)
+
+    expect(new Script('localDeploymentChoiceId').runInContext(h.context as any)).toBeNull()
+    expect(new Script('deploymentChoicesExpanded').runInContext(h.context as any)).toBe(true)
+    expect(h.elements.deploymentChoices.hidden).toBe(false)
+  })
+
+  it('renders the reserve remainder from the visible deployment projection', () => {
+    const h = createHarness()
+    h.deployment.reserveCounts = { 'PLAYER-RED': 99, 'PLAYER-BLUE': 8 }
+    h.context.presentedDeployment = () => ({
+      ...h.deployment,
+      reserveCounts: { 'PLAYER-RED': 4 },
+    })
+
+    new Script('renderDeploymentStatus()').runInContext(h.context as any)
+
+    expect(h.elements.deploymentFooter.hidden).toBe(false)
+    expect(h.elements.deploymentReserveCount.textContent).toBe('预备区剩余 4')
+  })
+
+  it('keeps candidates and the reserve remainder hidden from the opponent view', () => {
+    const h = createHarness()
+    h.context.myPlayerId = 'player-blue'
+
+    new Script('renderDeploymentStatus()').runInContext(h.context as any)
+
+    expect(h.elements.deploymentChoices.hidden).toBe(true)
+    expect(h.elements.deploymentFooter.hidden).toBe(true)
   })
 
   it('opens candidate details without selecting or submitting a deployment', () => {

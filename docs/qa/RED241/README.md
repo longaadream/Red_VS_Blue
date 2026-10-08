@@ -2,6 +2,8 @@
 
 状态：实现候选，等待独立复核与人工体验验收；未合并、未发布。
 
+最新拖动路径、部署与历史角色继承修复见 [ROUTE_INHERITANCE](ROUTE_INHERITANCE.md)。角色恢复后的候选服务与当前资源已逐项对照。
+
 最新人工视觉反馈后的返工见 [扁平控件与聊天避让](FLAT_CONTROLS.md)，本轮 47 项相关回归通过。[材质与聊天入口 v2](MATERIAL_V2.md) 和下方原截图保留为历史记录，不代表最新控件美术。
 
 - 合同：[RED-241](https://linear.app/redvsblue/issue/RED-241)

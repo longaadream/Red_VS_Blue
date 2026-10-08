@@ -511,7 +511,9 @@ export type SelectionStepDefinition =
       forbiddenColumns?: number[]
       forbiddenTargetStatuses?: string[]
       requiredTargetStatuses?: string[]
+      requiredTargetStatusFromSource?: string
       requireOpenCardinalLanding?: boolean
+      excludeSourceLanding?: boolean
       requireTraversableFirstStep?: boolean
       requireExtensionCell?: ExtensionCellRequirementDefinition
       ignoreOccupantSelectedTargetIndex?: number
