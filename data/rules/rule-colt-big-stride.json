@@ -1,0 +1,9 @@
+{
+  "id": "rule-colt-big-stride",
+  "name": "大步流星",
+  "description": "对方回合结束时允许免费普通移动一次；在射击区域规则前装配，选择完成或放弃后继续结算。",
+  "trigger": {
+    "type": "endTurn"
+  },
+  "skillCode": "var c=context.rulePiece;var eventPlayer=flow.refs.eventPlayer();if(!c||c.currentHp<=0||c.x==null||c.y==null||!eventPlayer||arePlayersAllied(battle,c.ownerPlayerId,eventPlayer)||context.cancelled)return{success:false,message:''};var selected=Array.isArray(context.selectedTargets)?context.selectedTargets:[];if(selected.length){var cell=selected[0];if(!cell||cell.type!=='cell')return{success:false,message:'移动目标已失效'};return flow.effects.freeMove(c.instanceId,{x:cell.x,y:cell.y});}var cells=flow.query.normalMoveTargets(c.instanceId).map(function(cell){return{type:'cell',x:cell.x,y:cell.y};});if(!cells.length)return{success:false,message:''};return{success:false,needsTargetSelection:true,playerId:c.ownerPlayerId,title:'大步流星：选择移动落点，或放弃移动',targetType:'cell',targetCandidates:cells,canCancel:true,resumeOnCancel:true};"
+}

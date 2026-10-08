@@ -9,7 +9,7 @@ function setup() {
   // are replaced. Timers drive the production queue and presentation together.
   const window: Record<string, any> = { setTimeout, clearTimeout }
   const context = createContext({ window, globalThis: window, setTimeout, clearTimeout, console, Date })
-  for (const file of ['battle-view-model', 'battle-action-vignette', 'battle-presentation']) {
+  for (const file of ['battle-move-timeline', 'battle-view-model', 'battle-action-vignette', 'battle-presentation']) {
     new Script(readFileSync(resolve('data/pages/js/battle-ui/' + file + '.js'), 'utf8')).runInContext(context)
   }
   let callbacks: Record<string, any> = {}
@@ -42,7 +42,121 @@ beforeEach(() => vi.useFakeTimers())
 afterEach(() => vi.useRealTimers())
 
 describe('sequential board playback', () => {
-  it.each(['statusAdded', 'statusRemoved', 'tileEffectAdded', 'tileEffectRemoved'])('renders every member of an explicit %s batch in the same update', kind => {
+  it('preserves visible result floaters when the action queue becomes idle', () => {
+    const { presentation, renderer } = setup()
+    presentation.update(model())
+    presentation.update(model(14, events()))
+    vi.runAllTimers()
+    expect(renderer.spawnFloater).toHaveBeenCalled()
+    expect(renderer.settlePresentation).toHaveBeenLastCalledWith(expect.anything(), { preserveFloaters: true })
+    presentation.dispose()
+  })
+
+  it('holds a three-leg move until its whole route finishes before applying aftermath', () => {
+    const { presentation, renderer } = setup()
+    presentation.update(model())
+    const route = [{ x: 2, y: 1 }, { x: 2, y: 2 }, { x: 1, y: 2 }]
+    const sequence = [
+      { eventId: 'walk:0', rootEventId: 'walk:0', kind: 'move', sourcePieceId: 'target', sequence: 0,
+        result: { fromX: 1, fromY: 1, toX: 1, toY: 2, movementKind: 'walk' }, presentation: { pathCells: route } },
+      { eventId: 'walk:1', rootEventId: 'walk:0', parentEventId: 'walk:0', kind: 'damage', targetPieceIds: ['target'], sequence: 1,
+        result: { amount: 3, value: 17 } },
+    ]
+    const final = model(17, sequence)
+    final.pieces[0].y = 2
+    presentation.update(final)
+    expect(renderer.animateAction.mock.calls[0][0].movementPaths.target).toEqual(route)
+    vi.advanceTimersByTime(350)
+    expect(renderer.spawnFloater).not.toHaveBeenCalled()
+    vi.advanceTimersByTime(100)
+    expect(renderer.spawnFloater.mock.calls[0][2]).toBe('−3')
+    presentation.dispose()
+  })
+
+  it.each([
+    { label: 'the viewer piece', ownerPlayerId: 'blue' },
+    { label: 'an opponent piece', ownerPlayerId: 'red' },
+  ])('plays the full normalized move route for $label', ({ ownerPlayerId }) => {
+    const { presentation, renderer, normalize } = setup()
+    const route = [{ x: 2, y: 1 }, { x: 2, y: 2 }, { x: 1, y: 2 }, { x: 1, y: 3 }]
+    const rawSequence = [{
+      eventId: 'drag:0', rootEventId: 'drag:0', kind: 'move', sourcePieceId: 'target', sequence: 0,
+      result: { fromX: 1, fromY: 1, toX: 1, toY: 3, movementKind: 'walk' },
+      presentation: { cue: 'displacement', pathCells: route, endPoint: { x: 1, y: 3 }, endReason: 'resolved' },
+    }]
+    const sequence = normalize(rawSequence)
+    // Production normalization adds an empty target list to a root move.
+    // This is the input that previously bypassed the source fallback.
+    expect(sequence[0].targetPieceIds).toEqual([])
+
+    const before: any = model()
+    before.pieces[0].ownerPlayerId = ownerPlayerId
+    presentation.update(before)
+    const final: any = model(20, sequence)
+    final.pieces[0].ownerPlayerId = ownerPlayerId
+    final.pieces[0].y = 3
+    presentation.update(final)
+
+    const [action, previous, next] = renderer.animateAction.mock.calls[0]
+    expect(action.movementPaths).toMatchObject({ target: route })
+    expect(previous.pieces[0]).toMatchObject({ x: 1, y: 1 })
+    expect(next.pieces[0]).toMatchObject({ x: 1, y: 3 })
+    presentation.dispose()
+  })
+
+  it('animates a normalized forceMove target without assigning the route to its source', () => {
+    const { presentation, renderer, normalize } = setup()
+    const route = [{ x: 3, y: 2 }, { x: 3, y: 3 }, { x: 2, y: 3 }]
+    const sequence = normalize([{
+      eventId: 'push:0', rootEventId: 'push:0', kind: 'forceMove', sourcePieceId: 'caster',
+      targetPieceIds: ['victim'], sequence: 0,
+      result: { fromX: 3, fromY: 1, toX: 2, toY: 3, movementKind: 'push' },
+      presentation: { cue: 'displacement', pathCells: route, endPoint: { x: 2, y: 3 }, endReason: 'resolved' },
+    }])
+    const before: any = model()
+    before.pieces = [
+      { id: 'caster', x: 1, y: 1, visible: true, health: { current: 20, max: 20 }, statuses: [], statusSummary: [] },
+      { id: 'victim', x: 3, y: 1, visible: true, health: { current: 20, max: 20 }, statuses: [], statusSummary: [] },
+    ]
+    presentation.update(before)
+    const final: any = model(20, sequence)
+    final.pieces = JSON.parse(JSON.stringify(before.pieces))
+    final.pieces[1].x = 2
+    final.pieces[1].y = 3
+    presentation.update(final)
+
+    const [action, , next] = renderer.animateAction.mock.calls[0]
+    expect(action.movementPaths).toEqual({ victim: route })
+    expect(next.pieces.find((piece: any) => piece.id === 'victim')).toMatchObject({ x: 2, y: 3 })
+    expect(next.pieces.find((piece: any) => piece.id === 'caster')).toMatchObject({ x: 1, y: 1 })
+    presentation.dispose()
+  })
+
+  it('retimes the shared three-leg movement timeline at 2x before applying aftermath', () => {
+    const { presentation, queue, renderer } = setup()
+    presentation.update(model())
+    const route = [{ x: 2, y: 1 }, { x: 2, y: 2 }, { x: 1, y: 2 }]
+    const sequence = [
+      { eventId: 'walk:0', rootEventId: 'walk:0', kind: 'move', sourcePieceId: 'target', sequence: 0,
+        result: { fromX: 1, fromY: 1, toX: 1, toY: 2, movementKind: 'walk' }, presentation: { pathCells: route } },
+      { eventId: 'walk:1', rootEventId: 'walk:0', parentEventId: 'walk:0', kind: 'damage', targetPieceIds: ['target'], sequence: 1,
+        result: { amount: 3, value: 17 } },
+    ]
+    const final = model(17, sequence)
+    final.pieces[0].y = 2
+    presentation.update(final)
+    queue.setSpeed(2)
+    expect(renderer.animateAction.mock.calls[0][0].movementPaths.target).toEqual(route)
+    // Three 120ms legs take 180ms at 2x; the aftermath result follows 42ms
+    // into its own 200ms beat at the same speed.
+    vi.advanceTimersByTime(221)
+    expect(renderer.spawnFloater).not.toHaveBeenCalled()
+    vi.advanceTimersByTime(1)
+    expect(renderer.spawnFloater.mock.calls[0][2]).toBe('−3')
+    presentation.dispose()
+  })
+
+  it.each(['statusAdded', 'statusRemoved', 'tileEffectAdded', 'tileEffectRemoved'])('renders every member of an explicit %s batch in authority order', kind => {
     const { presentation, frames, queue } = setup()
     const isTile = kind.startsWith('tile')
     const removing = kind.endsWith('Removed')
@@ -61,9 +175,14 @@ describe('sequential board playback', () => {
     presentation.update(final)
     const count = (frame: any) => isTile ? frame.effects.length : frame.pieces[0].statuses.length
     expect(frames.every(frame => count(frame) === (removing ? 3 : 0))).toBe(true)
-    vi.advanceTimersByTime(1520)
+    // Existing playback emits a separate beat for each authoritative member.
+    // All original beats are 200ms; sample the third result before damage.
+    // The declaration beat is instantaneous; three real effect beats finish at
+    // 600ms. Sample before the following damage beat reaches its result phase.
+    vi.advanceTimersByTime(650)
     expect(count(frames.at(-1))).toBe(removing ? 0 : 3)
-    expect(frames.every(frame => [0,3].includes(count(frame)))).toBe(true)
+    const observedCounts = [...new Set(frames.map(count))]
+    expect(observedCounts).toEqual(removing ? [3, 2, 1, 0] : [0, 1, 2, 3])
     expect(frames.at(-1).pieces[0].health.current).toBe(20)
     queue.settleAll()
     expect(frames.at(-1).pieces[0].health.current).toBe(17)
@@ -82,11 +201,11 @@ describe('sequential board playback', () => {
     // Tile batches intentionally use the short presentation lane. Verify the
     // add batch is visible before the remove batch settles instead of relying
     // on the old long-action timing.
-    vi.advanceTimersByTime(1220)
+    vi.advanceTimersByTime(450)
     expect(frames.at(-1).effects).toHaveLength(2)
     vi.advanceTimersByTime(400)
     expect(frames.at(-1).effects).toHaveLength(0)
-    expect(frames.every(frame=>[0,2].includes(frame.effects.length))).toBe(true)
+    expect([...new Set(frames.map(frame => frame.effects.length))]).toEqual([0, 1, 2])
     presentation.dispose()
   })
 
@@ -101,11 +220,11 @@ describe('sequential board playback', () => {
     }))
     presentation.update(model(14, [...first, ...second], controlReturn))
     expect(frames.every(frame => frame.pieces[0].health.current === 20)).toBe(true)
-    vi.advanceTimersByTime(1520)
+    vi.advanceTimersByTime(100)
     expect(frames.at(-1).pieces[0].health.current).toBe(17)
-    vi.advanceTimersByTime(680)
+    vi.advanceTimersByTime(100)
     expect(frames.at(-1).pieces[0].health.current).toBe(17)
-    vi.advanceTimersByTime(1520)
+    vi.advanceTimersByTime(100)
     expect(frames.at(-1).pieces[0].health.current).toBe(14)
     presentation.dispose()
   })
@@ -115,10 +234,10 @@ describe('sequential board playback', () => {
     const final = model(14, events(), controlReturn)
     presentation.update(final)
     expect(frames.every(frame => frame.pieces[0].health.current === 20)).toBe(true)
-    vi.advanceTimersByTime(1100 + 420)
+    vi.advanceTimersByTime(100)
     expect(frames.at(-1).pieces[0].health.current).toBe(17)
     expect(renderer.spawnFloater.mock.calls.map(call => call[2])).toEqual(['−3'])
-    vi.advanceTimersByTime(1100)
+    vi.advanceTimersByTime(200)
     expect(frames.at(-1).pieces[0].health.current).toBe(14)
     expect(renderer.spawnFloater.mock.calls.map(call => call[2])).toEqual(['−3', '−3'])
     vi.runAllTimers()
@@ -128,11 +247,13 @@ describe('sequential board playback', () => {
     expect(vi.getTimerCount()).toBe(0)
   })
 
-  it('consumes skip per beat and settles the board to authority when the queue is cancelled', () => {
+  it('consumes skip on a real beat and settles the board to authority when the queue is cancelled', () => {
     const { presentation, queue, frames } = setup()
     presentation.update(model())
     presentation.update(model(14, events()))
-    queue.skip(); vi.advanceTimersByTime(60)
+    // The declaration root completes synchronously; skip the first real
+    // effect after its result phase, then cancel the remaining queue.
+    vi.advanceTimersByTime(84)
     queue.skip()
     expect(frames.at(-1).pieces[0].health.current).toBe(17)
     queue.settleAll()
@@ -152,10 +273,10 @@ describe('sequential board playback', () => {
     final.pieces[0].statuses = ['a', 'b'].map(id => ({ id, type: id }))
     final.pieces[0].statusSummary = final.pieces[0].statuses
     presentation.update(final)
-    vi.advanceTimersByTime(1520)
+    vi.advanceTimersByTime(500)
     expect(frames.at(-1).pieces[0].statuses.map((s: any) => s.id)).toEqual(['a', 'b'])
     expect(frames.at(-1).pieces[0].statusSummary).toEqual(frames.at(-1).pieces[0].statuses)
-    vi.advanceTimersByTime(1100)
+    vi.advanceTimersByTime(200)
     expect(frames.at(-1).pieces[0].statuses.map((s: any) => s.id)).toEqual(['a', 'b'])
     presentation.dispose()
   })
@@ -167,7 +288,7 @@ describe('sequential board playback', () => {
       batchId: 'summon-1', targetPieceIds: ['new'], pieceSnapshot: { id: 'new', templateId: 'new', name: 'New', faction: 'red', ownerPlayerId: 'red', x: 3, y: 2, hp: 10, maxHp: 10 } }])
     expect(sequence[1].batchId).toBe('summon-1')
     presentation.update(model(20, sequence))
-    vi.advanceTimersByTime(1520)
+    vi.advanceTimersByTime(100)
     expect(frames.at(-1).pieces.find((p: any) => p.id === 'new')).toMatchObject({ x: 3, y: 2, health: { current: 10 } })
     presentation.dispose()
   })

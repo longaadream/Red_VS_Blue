@@ -14,6 +14,10 @@ describe('hand resource cost preview', () => {
       G: { pieces: [{ instanceId: 'caster' }] }, selectedPieceId: 'caster',
       pendingSkill: { skillId: 'skill' } as Record<string, unknown> | null,
       resolveSkillAvailability: cost,
+      skillDefOf: () => ({ id: 'skill' }),
+      skillUsesCharge: () => true,
+      skillChargeCostLabel: () => '1',
+      skillHasDynamicChargeCost: () => false,
     }
     runInNewContext(script + '\nrefreshHandResourceCost()', context)
     expect(label.hidden).toBe(false)

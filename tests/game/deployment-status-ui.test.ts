@@ -164,4 +164,31 @@ describe('RED-138 progressive reserve deployment view', () => {
       playerId: 'alice',
     })).toMatchObject({ visible: false })
   })
+
+  it('keeps progressive candidates private from spectators while exposing owner selection feedback', () => {
+    const api = loadDeploymentStatusApi()
+
+    expect(api.create({
+      deployment: progressiveDeployment,
+      playerId: 'spectator',
+      spectating: true,
+    })).toMatchObject({
+      visible: true,
+      ownsStep: false,
+      showCandidates: false,
+      stateText: '观战 · 等待当前玩家完成部署',
+      offerPieces: [],
+    })
+
+    expect(api.create({
+      deployment: progressiveDeployment,
+      playerId: 'ALICE',
+      selectedPieceName: '',
+    })).toMatchObject({
+      ownsStep: true,
+      showCandidates: true,
+      stateText: '选择一名预备棋子，再选择高亮落点',
+      offerPieces: progressiveDeployment.offerPieces,
+    })
+  })
 })

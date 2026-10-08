@@ -144,6 +144,8 @@
     .btn-ready:disabled { opacity: .5; cursor: not-allowed; }
   </style>
   <link rel="stylesheet" href="css/tabletop/tabletop.css" />
+  <link rel="stylesheet" href="css/tabletop/player-profile.css" />
+  <script src="js/player-profile.js" defer></script>
 </head>
 <body data-art-page="room">
 
@@ -169,6 +171,7 @@
       <div class="room-info-row" id="inviteRow" style="display:none">
         <span class="room-info-label">邀请码</span>
         <span class="room-info-value invite-code" id="inviteCodeLabel" onclick="copyInviteCode()">—</span>
+        <button type="button" class="back-btn" id="inviteFriendButton" onclick="RvBRoomInvitations.inviteCurrentRoom()">邀请好友</button>
       </div>
       <div class="room-info-row">
         <span class="room-info-label">人数</span>
@@ -334,7 +337,7 @@
         + '<div class="slot-body">'
           + '<div class="player-faction-badge ' + factionCls + '">' + alignmentIcon(p.alignment) + '</div>'
           + '<div class="player-name">'
-            + '<div class="player-name-text">' + escHtml(p.name || p.id) + '<span class="name-tag">#' + escHtml((p.id || '').slice(0, 6).toUpperCase()) + '</span></div>'
+            + '<div class="player-name-text" data-account-id="' + escHtml(p.accountId || '') + '">' + escHtml(p.name || p.id) + '<span class="name-tag">#' + escHtml((p.id || '').slice(0, 6).toUpperCase()) + '</span></div>'
             + '<div class="player-name-sub">' + alignBadge + (orderBadge ? ' · ' + orderBadge : '') + '</div>'
           + '</div>'
           + '<div class="player-ready-badge ' + (ready ? 'yes' : 'no') + '">' + (ready ? '✓ 已准备' : '准备中…') + '</div>'
@@ -377,6 +380,9 @@
     }
 
     async function renderRoom(room) {
+      const inviteFriendButton = document.getElementById('inviteFriendButton')
+      inviteFriendButton.hidden = !!room.officialRanked
+      inviteFriendButton.disabled = room.status !== 'waiting' || (room.players || []).length >= (room.maxPlayers || 2)
       document.getElementById('spectatorCount').textContent = '观众 ' + (room.spectatorCount || 0) + ' / 8'
       document.getElementById('spectatingControl').hidden = room.officialRanked || room.hostId !== playerId
       document.getElementById('spectatingEnabled').checked = room.spectatingEnabled !== false
@@ -405,6 +411,12 @@
             return renderSlot(label + (isMe ? ' · 自己' : seated && me && seated.seat === me.seat ? ' · 队友' : ''), seated, playerId, hostId, isMe)
           }).join('')
         : renderSlot('自己', me, playerId, hostId, true) + renderSlot('对手', opp, playerId, hostId, false)
+
+      if (window.RvBPlayerProfile) document.querySelectorAll('.player-name-text[data-account-id]').forEach(function(element) {
+        const accountId = element.dataset.accountId
+        const player = players.find(p => p.accountId === accountId)
+        if (accountId && player) window.RvBPlayerProfile.decoratePlayer(element, { id: accountId, name: player.name || '玩家' })
+      })
 
       // 解散按钮：仅主机在 waiting 状态可见
       const dissolveBtn = document.getElementById('dissolveBtn')
@@ -561,6 +573,7 @@
       })
     })
   </script>
+<script src="js/room-invitations.js" defer></script>
 <script src="js/battle-audio.js" defer></script><script src="js/button-audio.js" defer></script>
 </body>
 </html>

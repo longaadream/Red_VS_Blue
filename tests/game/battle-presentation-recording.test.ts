@@ -16,6 +16,18 @@ function run(state: BattleState, action: BattleAction) {
 }
 
 describe('ordered committed presentation recording', () => {
+  it('projects the exact committed bent route instead of a straight visual shortcut', () => {
+    const before = makeState({ pieces: [makePiece({ instanceId: 'mover', x: 0, y: 0 })] })
+    const after = structuredClone(before)
+    after.pieces[0].x = 1
+    after.pieces[0].y = 1
+    const path = [{ x: 0, y: 1 }, { x: 1, y: 1 }]
+    after.actions!.push({ type: 'positionChanged', playerId: 'player-red', turn: 1,
+      payload: { pieceId: 'mover', fromX: 0, fromY: 0, toX: 1, toY: 1, movementKind: 'walk', path } })
+    const events = projectBattlePresentationEvents({ actionId: 'bent',
+      command: { type: 'move', playerId: 'player-red', pieceId: 'mover', toX: 1, toY: 1 }, beforeState: before, afterState: after })
+    expect(events[0].presentation).toMatchObject({ cue: 'displacement', pathCells: path, endPoint: { x: 1, y: 1 } })
+  })
   it.each(['teleport', 'swap', 'dash'] as const)('records authoritative %s semantics for playback', kind => {
     const state = makeState({ pieces: [makePiece({ instanceId: 'mover', x: 0, y: 0 })] })
     recordBattlePresentation(state, () => {

@@ -1,0 +1,548 @@
+{
+  "matchId": "ranked-7a83afd7-7591-43e4-95e4-56a060f6cd66",
+  "profiles": [
+    {
+      "profile": {
+        "id": "a87d2df4-3555-4ddf-9764-be7e6d325507",
+        "name": "纸桌旅人",
+        "avatar": null,
+        "totalGames": 1,
+        "wins": 0,
+        "draws": 0,
+        "season": {
+          "id": "test-1",
+          "name": "首次测试赛季",
+          "rating": 984,
+          "games": 1,
+          "wins": 0
+        },
+        "favoriteRosters": {
+          "light": {
+            "pieces": [
+              {
+                "id": "ana",
+                "name": "安娜",
+                "image": "ana.jpg"
+              },
+              {
+                "id": "anduin",
+                "name": "安度因",
+                "image": "anduin.jpg"
+              },
+              {
+                "id": "blue-ichigo",
+                "name": "黑崎一护",
+                "image": "ichigo.jpg"
+              },
+              {
+                "id": "blue-kenshin",
+                "name": "绯村剑心",
+                "image": "kenshin.jpg"
+              },
+              {
+                "id": "blue-minato",
+                "name": "波风水门",
+                "image": "minato.jpg"
+              },
+              {
+                "id": "blue-naruto",
+                "name": "漩涡鸣人",
+                "image": "naruto.jpg"
+              },
+              {
+                "id": "blue-tirion-fordring",
+                "name": "提里奥弗丁",
+                "image": "tirion-fordring.jpg"
+              },
+              {
+                "id": "blue-watcher",
+                "name": "观者",
+                "image": "watcher.jpg"
+              }
+            ],
+            "games": 1,
+            "wins": 0
+          },
+          "dark": null
+        },
+        "recentMatches": [
+          {
+            "id": "ranked-7a83afd7-7591-43e4-95e4-56a060f6cd66",
+            "createdAt": "2026-10-08T15:48:39.497Z",
+            "finishedAt": "2026-10-08T15:48:41.516Z",
+            "status": "settled",
+            "map": {
+              "id": "winding-pass",
+              "name": "回风曲径"
+            },
+            "players": [
+              {
+                "id": "a87d2df4-3555-4ddf-9764-be7e6d325507",
+                "name": "纸桌旅人",
+                "avatar": null,
+                "alignment": "light",
+                "pieces": [
+                  {
+                    "id": "ana",
+                    "name": "安娜",
+                    "image": "ana.jpg"
+                  },
+                  {
+                    "id": "anduin",
+                    "name": "安度因",
+                    "image": "anduin.jpg"
+                  },
+                  {
+                    "id": "blue-ichigo",
+                    "name": "黑崎一护",
+                    "image": "ichigo.jpg"
+                  },
+                  {
+                    "id": "blue-kenshin",
+                    "name": "绯村剑心",
+                    "image": "kenshin.jpg"
+                  },
+                  {
+                    "id": "blue-minato",
+                    "name": "波风水门",
+                    "image": "minato.jpg"
+                  },
+                  {
+                    "id": "blue-naruto",
+                    "name": "漩涡鸣人",
+                    "image": "naruto.jpg"
+                  },
+                  {
+                    "id": "blue-tirion-fordring",
+                    "name": "提里奥弗丁",
+                    "image": "tirion-fordring.jpg"
+                  },
+                  {
+                    "id": "blue-watcher",
+                    "name": "观者",
+                    "image": "watcher.jpg"
+                  }
+                ],
+                "ratingBefore": 1000,
+                "ratingAfter": 984,
+                "delta": -16
+              },
+              {
+                "id": "f57d1703-ab06-46f8-92bb-84d0629cfca7",
+                "name": "星灯同伴",
+                "avatar": null,
+                "alignment": "dark",
+                "pieces": [
+                  {
+                    "id": "arthas",
+                    "name": "阿尔萨斯",
+                    "image": "arthas.jpg"
+                  },
+                  {
+                    "id": "dark-aizen",
+                    "name": "蓝染",
+                    "image": "aizen.jpg"
+                  },
+                  {
+                    "id": "dark-grimmjow",
+                    "name": "格里姆乔",
+                    "image": "grimmjow.jpg"
+                  },
+                  {
+                    "id": "dark-muzan",
+                    "name": "鬼舞辻无惨",
+                    "image": "muzan.png"
+                  },
+                  {
+                    "id": "dark-ulquiorra",
+                    "name": "乌尔奇奥拉",
+                    "image": "ulquiorra.jpg"
+                  },
+                  {
+                    "id": "guldan",
+                    "name": "古尔丹",
+                    "image": "guldan.jpg"
+                  },
+                  {
+                    "id": "kiljaedan",
+                    "name": "基尔加丹",
+                    "image": "kiljaedan.jpg"
+                  },
+                  {
+                    "id": "reaper",
+                    "name": "死神",
+                    "image": "reaper.jpg"
+                  }
+                ],
+                "ratingBefore": 1000,
+                "ratingAfter": 1016,
+                "delta": 16
+              }
+            ],
+            "winnerId": "f57d1703-ab06-46f8-92bb-84d0629cfca7",
+            "reason": "surrender",
+            "replayAvailable": true
+          }
+        ]
+      }
+    },
+    {
+      "profile": {
+        "id": "f57d1703-ab06-46f8-92bb-84d0629cfca7",
+        "name": "星灯同伴",
+        "avatar": null,
+        "totalGames": 1,
+        "wins": 1,
+        "draws": 0,
+        "season": {
+          "id": "test-1",
+          "name": "首次测试赛季",
+          "rating": 1016,
+          "games": 1,
+          "wins": 1
+        },
+        "favoriteRosters": {
+          "light": null,
+          "dark": {
+            "pieces": [
+              {
+                "id": "arthas",
+                "name": "阿尔萨斯",
+                "image": "arthas.jpg"
+              },
+              {
+                "id": "dark-aizen",
+                "name": "蓝染",
+                "image": "aizen.jpg"
+              },
+              {
+                "id": "dark-grimmjow",
+                "name": "格里姆乔",
+                "image": "grimmjow.jpg"
+              },
+              {
+                "id": "dark-muzan",
+                "name": "鬼舞辻无惨",
+                "image": "muzan.png"
+              },
+              {
+                "id": "dark-ulquiorra",
+                "name": "乌尔奇奥拉",
+                "image": "ulquiorra.jpg"
+              },
+              {
+                "id": "guldan",
+                "name": "古尔丹",
+                "image": "guldan.jpg"
+              },
+              {
+                "id": "kiljaedan",
+                "name": "基尔加丹",
+                "image": "kiljaedan.jpg"
+              },
+              {
+                "id": "reaper",
+                "name": "死神",
+                "image": "reaper.jpg"
+              }
+            ],
+            "games": 1,
+            "wins": 1
+          }
+        },
+        "recentMatches": [
+          {
+            "id": "ranked-7a83afd7-7591-43e4-95e4-56a060f6cd66",
+            "createdAt": "2026-10-08T15:48:39.497Z",
+            "finishedAt": "2026-10-08T15:48:41.516Z",
+            "status": "settled",
+            "map": {
+              "id": "winding-pass",
+              "name": "回风曲径"
+            },
+            "players": [
+              {
+                "id": "a87d2df4-3555-4ddf-9764-be7e6d325507",
+                "name": "纸桌旅人",
+                "avatar": null,
+                "alignment": "light",
+                "pieces": [
+                  {
+                    "id": "ana",
+                    "name": "安娜",
+                    "image": "ana.jpg"
+                  },
+                  {
+                    "id": "anduin",
+                    "name": "安度因",
+                    "image": "anduin.jpg"
+                  },
+                  {
+                    "id": "blue-ichigo",
+                    "name": "黑崎一护",
+                    "image": "ichigo.jpg"
+                  },
+                  {
+                    "id": "blue-kenshin",
+                    "name": "绯村剑心",
+                    "image": "kenshin.jpg"
+                  },
+                  {
+                    "id": "blue-minato",
+                    "name": "波风水门",
+                    "image": "minato.jpg"
+                  },
+                  {
+                    "id": "blue-naruto",
+                    "name": "漩涡鸣人",
+                    "image": "naruto.jpg"
+                  },
+                  {
+                    "id": "blue-tirion-fordring",
+                    "name": "提里奥弗丁",
+                    "image": "tirion-fordring.jpg"
+                  },
+                  {
+                    "id": "blue-watcher",
+                    "name": "观者",
+                    "image": "watcher.jpg"
+                  }
+                ],
+                "ratingBefore": 1000,
+                "ratingAfter": 984,
+                "delta": -16
+              },
+              {
+                "id": "f57d1703-ab06-46f8-92bb-84d0629cfca7",
+                "name": "星灯同伴",
+                "avatar": null,
+                "alignment": "dark",
+                "pieces": [
+                  {
+                    "id": "arthas",
+                    "name": "阿尔萨斯",
+                    "image": "arthas.jpg"
+                  },
+                  {
+                    "id": "dark-aizen",
+                    "name": "蓝染",
+                    "image": "aizen.jpg"
+                  },
+                  {
+                    "id": "dark-grimmjow",
+                    "name": "格里姆乔",
+                    "image": "grimmjow.jpg"
+                  },
+                  {
+                    "id": "dark-muzan",
+                    "name": "鬼舞辻无惨",
+                    "image": "muzan.png"
+                  },
+                  {
+                    "id": "dark-ulquiorra",
+                    "name": "乌尔奇奥拉",
+                    "image": "ulquiorra.jpg"
+                  },
+                  {
+                    "id": "guldan",
+                    "name": "古尔丹",
+                    "image": "guldan.jpg"
+                  },
+                  {
+                    "id": "kiljaedan",
+                    "name": "基尔加丹",
+                    "image": "kiljaedan.jpg"
+                  },
+                  {
+                    "id": "reaper",
+                    "name": "死神",
+                    "image": "reaper.jpg"
+                  }
+                ],
+                "ratingBefore": 1000,
+                "ratingAfter": 1016,
+                "delta": 16
+              }
+            ],
+            "winnerId": "f57d1703-ab06-46f8-92bb-84d0629cfca7",
+            "reason": "surrender",
+            "replayAvailable": true
+          }
+        ]
+      }
+    }
+  ],
+  "stats": {
+    "resourceIdentity": {
+      "schemaVersion": "rvb-game-profile-identity/v1",
+      "engineAbi": "rvb-engine/v1",
+      "runnerRevision": "rvb-battle-runner/v2",
+      "resolvedProfileHash": "c9c071274dc934a55f43c30cec31f5f731b3d83d38009a9b8cc451ec4fe85e7b",
+      "authorityContentHash": "62fc7d9595fc4680c1c4f0d68017db76e278a4ef3d025c5b34a3ce42ae082378"
+    },
+    "matches": 1,
+    "playerGames": 2,
+    "characters": [
+      {
+        "id": "ana",
+        "name": "安娜",
+        "image": "ana.jpg",
+        "games": 1,
+        "wins": 0,
+        "draws": 0,
+        "selectionRate": 0.5,
+        "winRate": 0
+      },
+      {
+        "id": "anduin",
+        "name": "安度因",
+        "image": "anduin.jpg",
+        "games": 1,
+        "wins": 0,
+        "draws": 0,
+        "selectionRate": 0.5,
+        "winRate": 0
+      },
+      {
+        "id": "arthas",
+        "name": "阿尔萨斯",
+        "image": "arthas.jpg",
+        "games": 1,
+        "wins": 1,
+        "draws": 0,
+        "selectionRate": 0.5,
+        "winRate": 1
+      },
+      {
+        "id": "blue-ichigo",
+        "name": "黑崎一护",
+        "image": "ichigo.jpg",
+        "games": 1,
+        "wins": 0,
+        "draws": 0,
+        "selectionRate": 0.5,
+        "winRate": 0
+      },
+      {
+        "id": "blue-kenshin",
+        "name": "绯村剑心",
+        "image": "kenshin.jpg",
+        "games": 1,
+        "wins": 0,
+        "draws": 0,
+        "selectionRate": 0.5,
+        "winRate": 0
+      },
+      {
+        "id": "blue-minato",
+        "name": "波风水门",
+        "image": "minato.jpg",
+        "games": 1,
+        "wins": 0,
+        "draws": 0,
+        "selectionRate": 0.5,
+        "winRate": 0
+      },
+      {
+        "id": "blue-naruto",
+        "name": "漩涡鸣人",
+        "image": "naruto.jpg",
+        "games": 1,
+        "wins": 0,
+        "draws": 0,
+        "selectionRate": 0.5,
+        "winRate": 0
+      },
+      {
+        "id": "blue-tirion-fordring",
+        "name": "提里奥弗丁",
+        "image": "tirion-fordring.jpg",
+        "games": 1,
+        "wins": 0,
+        "draws": 0,
+        "selectionRate": 0.5,
+        "winRate": 0
+      },
+      {
+        "id": "blue-watcher",
+        "name": "观者",
+        "image": "watcher.jpg",
+        "games": 1,
+        "wins": 0,
+        "draws": 0,
+        "selectionRate": 0.5,
+        "winRate": 0
+      },
+      {
+        "id": "dark-aizen",
+        "name": "蓝染",
+        "image": "aizen.jpg",
+        "games": 1,
+        "wins": 1,
+        "draws": 0,
+        "selectionRate": 0.5,
+        "winRate": 1
+      },
+      {
+        "id": "dark-grimmjow",
+        "name": "格里姆乔",
+        "image": "grimmjow.jpg",
+        "games": 1,
+        "wins": 1,
+        "draws": 0,
+        "selectionRate": 0.5,
+        "winRate": 1
+      },
+      {
+        "id": "dark-muzan",
+        "name": "鬼舞辻无惨",
+        "image": "muzan.png",
+        "games": 1,
+        "wins": 1,
+        "draws": 0,
+        "selectionRate": 0.5,
+        "winRate": 1
+      },
+      {
+        "id": "dark-ulquiorra",
+        "name": "乌尔奇奥拉",
+        "image": "ulquiorra.jpg",
+        "games": 1,
+        "wins": 1,
+        "draws": 0,
+        "selectionRate": 0.5,
+        "winRate": 1
+      },
+      {
+        "id": "guldan",
+        "name": "古尔丹",
+        "image": "guldan.jpg",
+        "games": 1,
+        "wins": 1,
+        "draws": 0,
+        "selectionRate": 0.5,
+        "winRate": 1
+      },
+      {
+        "id": "kiljaedan",
+        "name": "基尔加丹",
+        "image": "kiljaedan.jpg",
+        "games": 1,
+        "wins": 1,
+        "draws": 0,
+        "selectionRate": 0.5,
+        "winRate": 1
+      },
+      {
+        "id": "reaper",
+        "name": "死神",
+        "image": "reaper.jpg",
+        "games": 1,
+        "wins": 1,
+        "draws": 0,
+        "selectionRate": 0.5,
+        "winRate": 1
+      }
+    ]
+  }
+}

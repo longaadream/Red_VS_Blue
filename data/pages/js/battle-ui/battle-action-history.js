@@ -391,7 +391,7 @@
       const player = ((model && model.players) || []).find(function (entry) {
         return String(entry.id || '').toLowerCase() === String(playerId || '').toLowerCase()
       })
-      return player ? '<span class="action-history-entity is-player" title="' + escapeHtml(player.name || player.id) + '">'
+      return player ? '<span class="action-history-entity is-player" data-player-id="' + escapeHtml(player.id) + '" title="' + escapeHtml(player.name || player.id) + '">'
         + '<i class="action-history-avatar is-player-avatar" data-faction="' + escapeHtml(player.faction) + '" role="img" aria-label="玩家 ' + escapeHtml(player.name || player.id) + '">'
         + escapeHtml(String(player.name || player.id).slice(0, 1)) + '</i>'
         + (compact ? '' : '<span>' + escapeHtml(player.name || player.id) + '</span>') + '</span>' : ''
@@ -470,8 +470,10 @@
       if (complement.kind === 'status' || complement.kind === 'tileEffect') {
         const meta = resolveIcon({ statusType: complement.type, iconId: event.iconId })
         const explicitLabel = typeof complement.label === 'string' ? complement.label.trim() : ''
-        const registeredLabel = typeof meta.label === 'string' ? meta.label.trim() : ''
-        const displayName = explicitLabel || registeredLabel || (complement.kind === 'tileEffect' ? '未知地格效果' : '未知状态')
+        const registeredLabel = meta.iconId !== 'fallback' && typeof meta.label === 'string' ? meta.label.trim() : ''
+        const displayName = complement.kind === 'status' && icons && typeof icons.labelForStatus === 'function'
+          ? icons.labelForStatus({ type: complement.type, name: explicitLabel })
+          : explicitLabel || registeredLabel || (complement.kind === 'tileEffect' ? '未知地格效果' : '未知状态')
         if ((explicitLabel || registeredLabel) && displayName === predicateLabel) return ''
         if (!explicitLabel && !registeredLabel) {
           const diagnosticKey = String(event.eventId || '') + ':' + String(complement.kind || '') + ':' + String(complement.type || '')

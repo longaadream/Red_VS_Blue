@@ -15,6 +15,20 @@ entry failures report surface, content ID, version, and phase. Action reducers
 execute on candidate state, so a failed pending continuation cannot commit a
 partial authority state.
 
+Public battle previews install optional scoped `ruleResolver`, `skillResolver`,
+and `cardResolver` capabilities in `RuleExecutionContext`. Authoritative rooms
+leave these unset and retain their normal content loader. Card previews resolve
+static definitions from canonical resources; generated Armor Assembly cards are
+admitted only after re-running the canonical generator in a fresh isolated
+context and comparing the entire resulting definition, including code. A card
+ID or display name alone is not proof of executable provenance. Unknown nested
+reactive card access fails closed without executing snapshot code.
+
+An existing custom-card registry does not by itself disable move or skill
+previews. Unsupported registry creation or mutation still makes that hypothetical
+result unavailable; returned preview boards omit executable card definitions.
+See `docs/qa/RED241/HAND_CARD_PREVIEW.md` for regression and candidate evidence.
+
 Run `node scripts/benchmark-skillcode-runtime.mjs` to record a reproducible
 compiler-cost sample. Keep raw Node/browser evidence with the PR; do not infer a
 cross-device percentage target from this microbenchmark.

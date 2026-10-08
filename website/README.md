@@ -6,16 +6,16 @@
 
 ## 构建与预览
 
-在仓库根目录运行：
+在仓库根目录运行，并明确指定本次已验收的资源快照和新的输出目录：
 
 ```powershell
-node scripts/build-official-site.mjs
-node scripts/preview-official-site.mjs
+node scripts/build-official-site.mjs --source output/RED245/resource/source-1.0.12-safe --output output/RED245/official-site
+py -m http.server 4188 --directory output/RED245/official-site
 ```
 
-输出为 `output/official-site-preview`，预览地址 `http://127.0.0.1:4188/`。构建需要已验收的 `output/release-019-content/source` 快照，缺失时明确失败，不回退到旧数据。图鉴展示该快照的资源 1.0.4，明确标为候选；公开下载仍沿用 `website/release.json` 中的客户端 0.1.7 / 资源 1.0.2。正式发布新的资源时须同时更新构建快照、图鉴标签、发布清单、HTML 兜底链接和资源发布页链接。
+输出为命令指定的目录，预览地址 `http://127.0.0.1:4188/`。`--source` 和 `--output` 都是必填项；资源快照缺失、输出目录已存在或图鉴资料不完整时构建失败，不会静默回退到旧资源或覆盖已有输出。当前官网同步客户端 0.1.13、资源 1.0.12，最低客户端为 0.1.13。正式发布新的资源时须同时更新构建快照、图鉴标签、发布清单、HTML 兜底链接和资源发布页链接。
 
-游戏内 `pieces.html` 与官网生成器共用 `data/pages/js/gallery-content.js`：排除 PVE 专用模式及旧版 pve- 模板，保留兼容 PVP/PVE 的普通角色。本次 36 位。官网从同一资源快照读取基础技能、可解锁技能与解锁来源、关键词的短/长解释、相关卡牌的图像/消耗/效果，不导出规则代码。搜索同时覆盖关键词和关联卡牌；生成遇到缺失定义直接报错。
+游戏内 `pieces.html` 与官网生成器共用 `data/pages/js/gallery-content.js`：排除 PVE 专用模式及旧版 pve- 模板，保留兼容 PVP/PVE 的普通角色。官网从同一资源快照读取棋子图像、描述、基础技能、可解锁技能与解锁来源、关键词的短/长解释、相关卡牌的图像/消耗/效果，不导出规则代码。搜索同时覆盖棋子描述、技能文本、关键词和关联卡牌；未列入快照关键词词典的通用效果标签仍保留在技能描述中。生成遇到缺失棋子、技能或卡牌定义，或公共棋子缺图时直接报错。
 
 资源手动下载导向已核验的 GitHub 资源发布页，避免 COS 对象当前的 text/plain 响应头导致浏览器打开二进制文本。Windows / Android COS 地址保持不变。
 

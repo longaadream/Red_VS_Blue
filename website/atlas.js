@@ -32,7 +32,7 @@ function render() {
   const q = search.value.trim().toLocaleLowerCase();
   const list = pieces.filter(p => {
     const content = [...p.skills, ...(p.transformedSkills || []), ...(p.relatedCards || []), ...(p.keywords || [])];
-    const text = [p.name, p.role, ...content.map(s => [s.name, s.description, s.shortDescription, s.longDescription].join(' '))].join(' ').toLocaleLowerCase();
+    const text = [p.name, p.description, p.role, ...content.map(s => [s.name, s.description, s.shortDescription, s.longDescription].join(' '))].join(' ').toLocaleLowerCase();
     return (faction.value === 'all' || p.faction === faction.value) && text.includes(q);
   });
   roster.replaceChildren();
@@ -43,6 +43,7 @@ function render() {
     if (p.image) head.append(image(p.image, p.name));
     const title = el('div'); title.append(el('h3', p.name), el('div', p.role, 'role')); head.append(title);
     card.append(head, el('p', ({good:'光方', evil:'暗方', neutral:'中立'})[p.faction] || p.faction, 'note'));
+    if (p.description) card.append(el('p', p.description, 'piece-description'));
     const s = p.stats;
     card.append(el('div', '生命 ' + s.maxHp + ' · 攻击 ' + s.attack + ' · 防御 ' + s.defense + ' · 移动 ' + s.moveRange, 'stats'));
     const details = el('details');

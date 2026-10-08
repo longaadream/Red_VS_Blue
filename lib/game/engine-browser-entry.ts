@@ -18,6 +18,18 @@ export { applyBattleAction, safeCloneBattleState, validateSkillActionByDryRun } 
 export { getBattleRootSeed, hashBattleState, hashStable, runBattleAction } from './battle-runner'
 export { recordBattlePresentation, createBattlePresentationQueue } from './battle-presentation-recording'
 export {
+  previewBattleAction,
+  preparePublicSkillAction,
+  PREVIEW_NEEDS_INPUT_REASON,
+  PREVIEW_UNAVAILABLE_REASON,
+} from './skill-preview'
+export type {
+  BattleActionPreview,
+  NeedsInputBattleActionPreview,
+  ReadyBattleActionPreview,
+  UnavailableBattleActionPreview,
+} from './skill-preview'
+export {
   projectBattlePresentationEvents,
   projectBattlePresentationEventsForViewer,
 } from './battle-presentation-events'
@@ -48,6 +60,9 @@ export {
   getLegalNormalMoveTargetsForPlayer,
   getLivingOccupantAt,
   getManhattanArea,
+  getNormalMovePath,
+  getNormalMoveContinuationTargets,
+  getNormalMovePreviewContinuationTargets,
   getNormalMoveRejection,
   getOrthogonalLineCells,
   getSquareArea,

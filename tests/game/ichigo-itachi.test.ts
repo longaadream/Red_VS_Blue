@@ -422,16 +422,19 @@ describe('RED-120 Ichigo combat behavior', () => {
       ichigo.skills = [{ skillId: 'ichigo-black-getsuga-tensho', currentCooldown: 0, usesRemaining: -1 }]
       attachRule(ichigo, 'rule-ichigo-black-getsuga-teleport')
       const first = namedPiece({ instanceId: 'first', ownerPlayerId: 'player-blue', x: 2, y: 1, currentHp: 40, maxHp: 40 })
-      const pathBlocker = namedPiece({ instanceId: 'path-ally', ownerPlayerId: 'player-red', x: 1, y: 1 })
       const rightBlocker = namedPiece({ instanceId: 'right-ally', ownerPlayerId: 'player-red', x: 3, y: 1 })
       const downBlocker = namedPiece({ instanceId: 'down-ally', ownerPlayerId: 'player-red', x: 2, y: 2 })
       let state = makeState({
-        pieces: [ichigo, first, pathBlocker, rightBlocker, downBlocker],
+        // Keep (1,1) unavailable as a landing candidate without placing a
+        // friendly piece in the projectile lane: RED-218 projectiles stop at
+        // the first allied piece, while this test targets teleport contact.
+        pieces: [ichigo, first, rightBlocker, downBlocker],
         width: 5,
         height: 3,
       })
       state.extensions = state.extensions || {}
       state.extensions.amaterasuCells = amaterasuCells
+      state.extensions.tileEffects = [{ type: 'landing-blocker', blocksLanding: true, x: 1, y: 1 }]
       state.players[0].rules = [loadRuleById('rule-sasuke-amaterasu-move', true)!]
       state = runBattleAction(state, selectedAction(state, {
         type: 'useBasicSkill', playerId: 'player-red', pieceId: 'ichigo', skillId: 'ichigo-black-getsuga-tensho',
@@ -535,7 +538,7 @@ describe('RED-120 Itachi combat behavior', () => {
 
     expect(state.extensions?.amaterasuCells).toEqual([{ x: 3, y: 0 }])
     expect(state.extensions?.tileEffects).toContainEqual(expect.objectContaining({ x: 3, y: 0, tileType: 'amaterasu' }))
-    expect(target.statusTags).toContainEqual(expect.objectContaining({ type: 'amaterasu-burn', stacks: 1 }))
+    expect(target.statusTags).toContainEqual(expect.objectContaining({ type: 'amaterasu-burn', stacks: 1, intensity: 1 }))
     expect(state.players[0].rules?.map(rule => rule.id)).toEqual(expect.arrayContaining([
       'rule-sasuke-amaterasu-move', 'rule-sasuke-amaterasu-stack', 'rule-sasuke-amaterasu-damage',
     ]))
@@ -543,6 +546,20 @@ describe('RED-120 Itachi combat behavior', () => {
     executeDirect(loadSkill('sasuke-kagutsuchi'), state, itachi, target)
     expect(state.extensions?.amaterasuCells).toEqual([])
     expect(target.statusTags.find((tag: any) => tag.type === 'amaterasu-burn')?.stacks).toBe(4)
+  })
+
+  it('adds exactly one layer to an existing Amaterasu status without duplicating it', () => {
+    const itachi = namedPiece({ instanceId: 'itachi', ownerPlayerId: 'player-red', x: 0, y: 0 })
+    const target = namedPiece({ instanceId: 'target', ownerPlayerId: 'player-blue', x: 3, y: 0 })
+    target.statusTags.push({ id: 'existing-burn', type: 'amaterasu-burn', stacks: 3, intensity: 1 })
+    const state = makeState({ pieces: [itachi, target], width: 6, height: 2 })
+
+    executeDirect(loadSkill('itachi-amaterasu'), state, itachi, target)
+
+    expect(target.statusTags.filter((tag: any) => tag.type === 'amaterasu-burn')).toEqual([
+      expect.objectContaining({ id: 'existing-burn', stacks: 4, intensity: 1 }),
+    ])
+    expect(state.extensions?.amaterasuCells).toEqual([{ x: 3, y: 0 }])
   })
 
   it('pays for Totsuka Blade and keeps active skills unavailable throughout the next enemy turn', () => {

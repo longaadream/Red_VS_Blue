@@ -56,9 +56,25 @@ import {
   PRODUCT_ROOM_RPC_MESSAGE,
   PRODUCT_ROOM_RPC_RESULT_MESSAGE,
   PRODUCT_ROOM_UPDATE_MESSAGE,
+  SOCIAL_ACK_MESSAGE,
+  SOCIAL_EVENT_MESSAGE,
+  SOCIAL_HELLO_MESSAGE,
+  SOCIAL_READY_MESSAGE,
+  SOCIAL_SEND_MESSAGE,
   createColyseusAppliedReceipt,
   createColyseusRejectedReceipt,
+  createSocialAckMessage,
+  createSocialEventMessage,
+  createSocialReadyMessage,
 } from './battle-room-protocol'
+import {
+  SOCIAL_MAX_REQUEST_ID_LENGTH,
+  SOCIAL_MAX_PLAYER_TRACKING,
+  BoundedSocialRequestCache,
+  admitSocialMessage,
+  extractSocialRequestId,
+  normalizeSocialRequest,
+} from './battle-social'
 import { BattleRoomState } from './battle-room-state'
 import { ProductBattleStore } from './product-battle-store'
 import type { RankedRoomHooks } from '../official/ranked'
@@ -104,6 +120,7 @@ export interface BattleRoomDependencies {
   fixtureFactory: BattleRoomFixtureFactory
   claimProductCreation(creationKey: string, roomId: string): string | undefined
   releaseProductCreation(creationKey: string, roomId: string): void
+  now?: () => number
 }
 
 type RpcCacheRecord = {
@@ -111,6 +128,8 @@ type RpcCacheRecord = {
   response?: Record<string, unknown>
   waiters: number
 }
+
+type SocialAck = ReturnType<typeof createSocialAckMessage>
 
 export function createBattleRoomClass(dependencies: BattleRoomDependencies) {
   return class BattleRoom extends Room<{ state: BattleRoomState }> {
@@ -134,6 +153,8 @@ export function createBattleRoomClass(dependencies: BattleRoomDependencies) {
     private readonly officialTokens = new Map<string, string>()
     private readonly playerReconnections = new Map<string, () => void>()
     private readonly reportedDrops = new Set<string>()
+    private readonly socialLastSuccessfulAt = new Map<string, number>()
+    private readonly socialRequestCache = new BoundedSocialRequestCache<SocialAck>()
 
     async onCreate(options: BattleRoomCreateOptions): Promise<void> {
       if (dependencies.official && !options.restore && options.officialCapability !== dependencies.official.capability) throw new Error('官方排位只能通过系统匹配创建')
@@ -150,6 +171,8 @@ export function createBattleRoomClass(dependencies: BattleRoomDependencies) {
       this.onMessage(BATTLE_RESYNC_MESSAGE, client => this.sendBattleSnapshot(client))
       this.onMessage(PRODUCT_ROOM_RPC_MESSAGE, (client, message) => this.handleProductRpc(client, message))
       this.onMessage(BATTLE_RECEIPT_REQUEST_MESSAGE, (client, message) => this.handleBattleReceiptRequest(client, message))
+      this.onMessage(SOCIAL_HELLO_MESSAGE, (client, message) => this.handleSocialHello(client, message))
+      this.onMessage(SOCIAL_SEND_MESSAGE, (client, message) => this.handleSocialSend(client, message))
 
       if (options?.restore === true) {
         this.productMode = true
@@ -365,6 +388,8 @@ export function createBattleRoomClass(dependencies: BattleRoomDependencies) {
       this.spectators.clear()
       clearRoomBattleTimeout(this.roomId)
       this.unsubscribeDurable?.()
+      this.socialLastSuccessfulAt.clear()
+      this.socialRequestCache.clear()
       if (this.authorityStore) await this.authorityStore.drainBattleAuthorityPersistence(this.roomId)
     }
 
@@ -644,6 +669,219 @@ export function createBattleRoomClass(dependencies: BattleRoomDependencies) {
       await this.broadcastProductRoom()
       await this.broadcastBattleSnapshot(createPublicBattleSnapshot(result.room))
       await this.scheduleAuthorityTimeout()
+    }
+
+    private async handleSocialHello(client: Client, message: unknown): Promise<void> {
+      const requestId = extractSocialRequestId(message).slice(0, SOCIAL_MAX_REQUEST_ID_LENGTH)
+      if (!await this.isSocialViewer(client)) {
+        client.send(SOCIAL_READY_MESSAGE, {
+          type: SOCIAL_READY_MESSAGE,
+          supported: false,
+          protocolVersion: 0,
+          code: 'SOCIAL_NOT_AUTHENTICATED',
+          ...(requestId ? { requestId } : {}),
+        })
+        return
+      }
+      client.send(SOCIAL_READY_MESSAGE, createSocialReadyMessage(requestId))
+    }
+
+    private async handleSocialSend(client: Client, message: unknown): Promise<void> {
+      const requestId = extractSocialRequestId(message)
+      if (!requestId) {
+        client.send(SOCIAL_ACK_MESSAGE, createSocialAckMessage({
+          requestId: '',
+          ok: false,
+          code: 'SOCIAL_REQUEST_ID_REQUIRED',
+          message: 'requestId is required',
+        }))
+        return
+      }
+      if (requestId.length > SOCIAL_MAX_REQUEST_ID_LENGTH) {
+        client.send(SOCIAL_ACK_MESSAGE, createSocialAckMessage({
+          requestId: requestId.slice(0, SOCIAL_MAX_REQUEST_ID_LENGTH),
+          ok: false,
+          code: 'SOCIAL_REQUEST_ID_TOO_LONG',
+          message: `requestId must be at most ${SOCIAL_MAX_REQUEST_ID_LENGTH} characters`,
+        }))
+        return
+      }
+
+      const spectator = this.spectators.get(client.sessionId)
+      if (spectator) {
+        client.send(SOCIAL_ACK_MESSAGE, createSocialAckMessage({
+          requestId,
+          ok: false,
+          code: 'SOCIAL_SPECTATOR_FORBIDDEN',
+          message: 'Spectators cannot send social messages',
+        }))
+        return
+      }
+
+      const playerId = this.playerBySession.get(client.sessionId)
+      if (!playerId || !await this.officialSessionValid(client)) {
+        client.send(SOCIAL_ACK_MESSAGE, createSocialAckMessage({
+          requestId,
+          ok: false,
+          code: 'SOCIAL_NOT_AUTHENTICATED',
+          message: 'Session is not an authenticated room player',
+        }))
+        return
+      }
+
+      const normalized = normalizeSocialRequest(message)
+      const fingerprint = socialRequestFingerprint(message, normalized)
+      const cacheKey = `${playerId}\u0000${requestId}`
+      const cached = this.socialRequestCache.get(cacheKey)
+      if (cached) {
+        if (cached.fingerprint !== fingerprint) {
+          client.send(SOCIAL_ACK_MESSAGE, createSocialAckMessage({
+            requestId,
+            ok: false,
+            code: 'SOCIAL_REQUEST_ID_CONFLICT',
+            message: 'requestId was reused with a different payload',
+          }))
+          return
+        }
+        const response = cached.response ?? await cached.pending
+        if (response) client.send(SOCIAL_ACK_MESSAGE, response)
+        return
+      }
+
+      if (!this.socialRequestCache.reserve(cacheKey, fingerprint)) {
+        client.send(SOCIAL_ACK_MESSAGE, createSocialAckMessage({
+          requestId,
+          ok: false,
+          code: 'SOCIAL_REQUEST_CACHE_FULL',
+          message: 'Social channel is busy; retry with a new requestId',
+        }))
+        return
+      }
+
+      const process = this.processSocialSend(client, playerId, requestId, normalized).catch(error => createSocialAckMessage({
+        requestId,
+        ok: false,
+        code: 'SOCIAL_INTERNAL_ERROR',
+        message: error instanceof Error ? error.message : 'Social message failed',
+      }))
+      this.socialRequestCache.setPending(cacheKey, process)
+      let response: SocialAck
+      try {
+        response = await process
+      } catch (error) {
+        response = createSocialAckMessage({
+          requestId,
+          ok: false,
+          code: 'SOCIAL_INTERNAL_ERROR',
+          message: error instanceof Error ? error.message : 'Social message failed',
+        })
+      }
+      this.socialRequestCache.setResponse(cacheKey, response)
+      client.send(SOCIAL_ACK_MESSAGE, response)
+    }
+
+    private async processSocialSend(
+      client: Client,
+      playerId: string,
+      requestId: string,
+      normalized: ReturnType<typeof normalizeSocialRequest>,
+    ): Promise<SocialAck> {
+      if (!normalized.ok) {
+        return createSocialAckMessage({
+          requestId,
+          ok: false,
+          code: normalized.code,
+          message: normalized.message,
+        })
+      }
+
+      const displayName = await this.socialDisplayName(playerId)
+      // Room lookup is asynchronous.  Re-check the live session after it
+      // returns so a disconnect or official revocation during that read cannot
+      // consume a cooldown or publish an event for a stale identity.
+      if (this.playerBySession.get(client.sessionId) !== playerId || !await this.officialSessionValid(client)) {
+        return createSocialAckMessage({
+          requestId,
+          ok: false,
+          code: 'SOCIAL_NOT_AUTHENTICATED',
+          message: 'Session is no longer an authenticated room player',
+        })
+      }
+      const decision = admitSocialMessage(
+        { playerId, displayName, request: normalized.request },
+        this.socialNow(),
+        this.socialLastSuccessfulAt.get(playerId),
+      )
+      if (!decision.ok) {
+        return createSocialAckMessage({
+          requestId,
+          ok: false,
+          code: decision.code,
+          message: decision.message,
+          retryAfterMs: decision.retryAfterMs,
+          retryAt: decision.retryAt,
+        })
+      }
+      if (this.disposed) {
+        return createSocialAckMessage({
+          requestId,
+          ok: false,
+          code: 'SOCIAL_ROOM_CLOSED',
+          message: 'Room is closing',
+        })
+      }
+
+      // Commit the per-player timestamp before broadcasting.  A duplicate
+      // request retained in the bounded cache can therefore never create a
+      // second cooldown window or event, even if a recipient disconnects while
+      // the event is being delivered.
+      this.rememberSocialTimestamp(playerId, decision.nextLastSuccessfulAt)
+      await this.broadcastSocialEvent(decision.event)
+      return createSocialAckMessage({
+        requestId,
+        ok: true,
+        event: decision.event,
+      })
+    }
+
+    private async isSocialViewer(client: Client): Promise<boolean> {
+      if (!this.playerBySession.has(client.sessionId) && !this.spectators.has(client.sessionId)) return false
+      return this.officialSessionValid(client)
+    }
+
+    private async socialDisplayName(playerId: string): Promise<string> {
+      const room = this.productMode ? await this.requireProductRoom() : await this.requireGameRoom()
+      const player = room.players.find(candidate => candidate.id.toLowerCase() === playerId.toLowerCase())
+      return normalizePlayerName(player?.name, playerId)
+    }
+
+    private async broadcastSocialEvent(event: Parameters<typeof createSocialEventMessage>[0]): Promise<void> {
+      const payload = createSocialEventMessage(event)
+      for (const recipient of this.clients) {
+        if (!this.playerBySession.has(recipient.sessionId) && !this.spectators.has(recipient.sessionId)) continue
+        if (!await this.officialSessionValid(recipient)) continue
+        try { recipient.send(SOCIAL_EVENT_MESSAGE, payload) } catch (error) {
+          console.error('[social-broadcast]', {
+            roomId: this.roomId,
+            playerId: event.playerId,
+            kind: event.kind,
+            message: error instanceof Error ? error.message : String(error),
+          })
+        }
+      }
+    }
+
+    private rememberSocialTimestamp(playerId: string, at: number): void {
+      if (!this.socialLastSuccessfulAt.has(playerId) && this.socialLastSuccessfulAt.size >= SOCIAL_MAX_PLAYER_TRACKING) {
+        const oldest = [...this.socialLastSuccessfulAt.entries()]
+          .sort(([, left], [, right]) => left - right)[0]
+        if (oldest) this.socialLastSuccessfulAt.delete(oldest[0])
+      }
+      this.socialLastSuccessfulAt.set(playerId, at)
+    }
+
+    private socialNow(): number {
+      return dependencies.now?.() ?? Date.now()
     }
 
     private async handleBattleCommand(client: Client, message: unknown): Promise<void> {
@@ -1096,4 +1334,27 @@ function normalizePlayerName(value: unknown, playerId: string): string {
 function normalizeRoomName(value: unknown, roomId: string): string {
   const normalized = typeof value === 'string' ? value.trim() : ''
   return normalized || `Room ${roomId}`
+}
+
+function socialRequestFingerprint(
+  message: unknown,
+  normalized: ReturnType<typeof normalizeSocialRequest>,
+): string {
+  if (normalized.ok) return JSON.stringify([normalized.request.kind, normalized.request.payload])
+  if (!message || typeof message !== 'object' || Array.isArray(message)) return typeof message
+  try {
+    const record = message as Record<string, unknown>
+    return JSON.stringify([
+      typeof record.kind === 'string' ? record.kind.slice(0, 64) : typeof record.kind,
+      boundedFingerprintValue(record.payload ?? record.text ?? record.presetId ?? record.stampId ?? record.id ?? record.value),
+    ])
+  } catch {
+    return '[unserializable-social-request]'
+  }
+}
+
+function boundedFingerprintValue(value: unknown): unknown {
+  if (typeof value === 'string') return { type: 'string', length: value.length, prefix: value.slice(0, 2_048) }
+  if (value === null || typeof value === 'number' || typeof value === 'boolean' || value === undefined) return value
+  return Array.isArray(value) ? { type: 'array' } : { type: 'object' }
 }

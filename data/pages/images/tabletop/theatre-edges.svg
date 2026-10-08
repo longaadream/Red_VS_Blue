@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1000" preserveAspectRatio="none">
+ <defs><linearGradient id="fold"><stop stop-color="#504030"/><stop offset=".6" stop-color="#70604b"/><stop offset="1" stop-color="#382d23"/></linearGradient></defs>
+ <!-- Folded scenic boards at the desk edges; the centre and hand remain empty. -->
+ <g opacity=".46" stroke="#211b16" stroke-width="3" stroke-linejoin="round">
+  <path d="M0 160l54 31 26 223-23 97L0 470z" fill="url(#fold)"/><path d="M54 191l-9 282 12 38M4 243l29-17 18 10M6 282l29-18 16 12" fill="none"/>
+  <path d="M1600 180l-49 22-28 221 30 80 47-25z" fill="url(#fold)"/><path d="M1551 202l16 247-14 54M1588 241l-30-17M1588 281l-29-17" fill="none"/>
+  <path d="M0 698l44-84 8-60 29 12 9 84 30 65-17 21H0z" fill="#76654e"/><path d="M27 681l29-14 43 45M53 568l9 84M90 650l-28 2" fill="none"/>
+  <path d="M1600 705l-36-59-4-81-27 13-9 75-31 58 10 18h97z" fill="#73624c"/><path d="M1577 691l-39-22-32 45M1559 578l-20 91" fill="none"/>
+ </g>
+</svg>

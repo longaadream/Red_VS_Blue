@@ -34,4 +34,29 @@ describe('RED-186 checked-in art bundle', () => {
       expect(existsSync(resolve(pages, meta.assetPath))).toBe(true)
     }
   })
+
+  it('keeps native skin labels available to the shared status label resolver', () => {
+    const window = {} as {
+      BattleEffectIcons: {
+        labelForStatus(status: unknown): string
+        resolveStatusType(type: string): { assetPath: string }
+      }
+    }
+    const context = createContext({
+      window,
+      globalThis: window,
+      console,
+      document: { getElementById: () => null, querySelectorAll: () => [] },
+    })
+    new Script(readFileSync(resolve(pages, 'js/battle-ui/battle-effect-icons.js'), 'utf8')).runInContext(context)
+    new Script(readFileSync(resolve(pages, 'tabletop-battle/refinements.js'), 'utf8')).runInContext(context)
+
+    expect(window.BattleEffectIcons.labelForStatus({ type: 'inoperable', name: 'inoperable' })).toBe('不可操作')
+    expect(window.BattleEffectIcons.labelForStatus({
+      type: 'ulquiorra-resurreccion-progress',
+      name: 'ulquiorra-resurreccion-progress',
+    })).toBe('归刃进度')
+    expect(window.BattleEffectIcons.resolveStatusType('ulquiorra-resurreccion-progress').assetPath)
+      .toBe('tabletop-battle/assets/ink-icons/ulquiorra-resurreccion-progress.svg')
+  })
 })

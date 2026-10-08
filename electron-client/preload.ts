@@ -1,6 +1,8 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
 
 contextBridge.exposeInMainWorld('electronAPI', {
+  // Read-only marker, not an authentication credential or persistent preference.
+  getCommunityLaunchId: () => process.argv.find(argument => /^--rvb-community-launch=[a-f0-9]{32}$/.test(argument))?.split('=')[1] ?? null,
   getOfficialUpdateStatus: () => ipcRenderer.invoke('official-update-status'),
   checkOfficialUpdates: () => ipcRenderer.invoke('official-update-check'),
   enterAfterUpdateCheck: () => ipcRenderer.invoke('official-update-enter'),
@@ -25,6 +27,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
   openLocalGame: () => ipcRenderer.invoke('open-local-game'),
   ensureLocalAuthority: () => ipcRenderer.invoke('ensure-local-authority'),
   relayControl: (options: { action: 'status' | 'publish' | 'stop'; relayUrl?: string; name?: string; visible?: boolean; turnTimerEnabled?: boolean; publishKey?: string }) => ipcRenderer.invoke('relay-control', options),
+  getWindowFullscreen: (): Promise<boolean> => ipcRenderer.invoke('get-window-fullscreen'),
+  setWindowFullscreen: (fullscreen: boolean): Promise<boolean> => ipcRenderer.invoke('set-window-fullscreen', fullscreen),
+  onWindowFullscreenChanged: (callback: (fullscreen: boolean) => void) => {
+    const listener = (_event: unknown, fullscreen: unknown) => {
+      if (typeof fullscreen === 'boolean') callback(fullscreen)
+    }
+    ipcRenderer.on('window-fullscreen-changed', listener)
+    return () => ipcRenderer.removeListener('window-fullscreen-changed', listener)
+  },
   // 查询当前模式
   getMode: () => ipcRenderer.invoke('get-mode'),
   // 重启本地服务器

@@ -1,4 +1,4 @@
-// Download links stay tied to the reviewed public release, independently of the candidate atlas.
+// Download links stay tied to the reviewed public release and its matching atlas snapshot.
 fetch('./release.json', {cache:'no-cache'}).then(r=>{if(!r.ok)throw Error('manifest');return r.json()}).then(data=>{
   if(!/^\d+\.\d+\.\d+$/.test(data.version))return;
   for(const el of document.querySelectorAll('[data-download]')){

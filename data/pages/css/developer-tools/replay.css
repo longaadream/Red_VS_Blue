@@ -19,6 +19,8 @@ button:focus-visible, select:focus-visible, input:focus-visible { outline: 3px s
   backdrop-filter: blur(18px) saturate(135%);
 }
 .back-link { flex: none; color: #cbd5e1; text-decoration: none; border: 1px solid #303b4d; border-radius: 9px; padding: 7px 11px; background: rgba(15,23,42,.72); }
+.back-link:hover { border-color: #64748b; background: #1e293b; }
+.secondary-link { color: #94a3b8; }
 .replay-heading { min-width: 0; }
 .replay-title { font-size: 14px; font-weight: 800; }
 .replay-subtitle { margin-top: 2px; color: #8391a5; font-size: 11px; overflow-wrap: anywhere; }
@@ -55,6 +57,16 @@ button:focus-visible, select:focus-visible, input:focus-visible { outline: 3px s
 .frame-title { margin-top: 3px; font-weight: 800; overflow-wrap: anywhere; }
 .frame-meta { color: #93a2b8; font-size: 12px; text-align: right; }
 
+.replay-summary {
+  position: fixed; z-index: 12; top: 144px; left: 16px; width: min(390px, calc(100vw - 32px));
+  padding: 10px 13px; border: 1px solid rgba(71,85,105,.62); border-radius: 12px;
+  background: rgba(7,12,20,.78); box-shadow: 0 16px 45px rgba(0,0,0,.24); backdrop-filter: blur(18px);
+}
+.summary-title { margin-top: 3px; color: #dbeafe; font-weight: 800; }
+.summary-grid { display: grid; grid-template-columns: 1.5fr 1fr .8fr; gap: 8px; margin-top: 9px; }
+.summary-grid span { display: block; color: #64748b; font-size: 10px; }
+.summary-grid strong { display: block; margin-top: 2px; color: #cbd5e1; font-size: 11px; overflow-wrap: anywhere; }
+
 .controls {
   position: fixed; z-index: 30; left: 50%; bottom: 14px; width: min(980px, calc(100vw - 28px)); transform: translateX(-50%);
   padding: 10px 12px; border: 1px solid rgba(71,85,105,.7); border-radius: 14px;
@@ -70,6 +82,7 @@ button:focus-visible, select:focus-visible, input:focus-visible { outline: 3px s
 .control-button:disabled { opacity: .4; cursor: not-allowed; }
 .control-spacer { flex: 1; }
 .select-control { display: flex; align-items: center; gap: 6px; color: #73839a; font-size: 10px; }
+.turn-control { min-width: 180px; }
 .timeline-row { display: grid; grid-template-columns: auto minmax(0,1fr) auto; align-items: center; gap: 10px; margin-top: 8px; }
 .timeline-row label, .timeline-position { color: #8a98ad; font-size: 11px; }
 #replayTimeline { width: 100%; accent-color: #3b82f6; }
@@ -112,12 +125,16 @@ button:focus-visible, select:focus-visible, input:focus-visible { outline: 3px s
 @media (max-width: 760px) {
   .replay-topbar { top: 7px; left: 7px; right: 7px; }
   .replay-heading { display: none; }
+  .secondary-link { display: none; }
   .readonly-badge { display: none; }
   .frame-strip { top: 68px; left: 8px; width: calc(100vw - 16px); }
+  .replay-summary { top: 132px; left: 8px; width: calc(100vw - 16px); }
+  .summary-grid { grid-template-columns: 1.4fr 1fr .8fr; }
   .board-hint { display: none; }
   .controls { bottom: 7px; width: calc(100vw - 14px); }
   .control-spacer, .select-control span { display: none; }
   .control-button, .control-select { min-height: 34px; padding: 6px 8px; font-size: 11px; }
+  .turn-control { min-width: 0; }
   .inspector {
     top: auto; left: 7px; right: 7px; bottom: 106px; width: auto; max-height: min(62vh, 600px);
     transform: translateY(0);

@@ -25,6 +25,7 @@ import {
   getRuleExecutionTriggerSystem,
   getRuleDate,
   getRuleMath,
+  isPreviewReactionPendingError,
 } from './rule-runtime'
 
 const getActiveTriggerSystem = () => getRuleExecutionTriggerSystem(globalTriggerSystem)
@@ -510,7 +511,9 @@ export type SelectionStepDefinition =
       forbiddenColumns?: number[]
       forbiddenTargetStatuses?: string[]
       requiredTargetStatuses?: string[]
+      requiredTargetStatusFromSource?: string
       requireOpenCardinalLanding?: boolean
+      excludeSourceLanding?: boolean
       requireTraversableFirstStep?: boolean
       requireExtensionCell?: ExtensionCellRequirementDefinition
       ignoreOccupantSelectedTargetIndex?: number
@@ -642,6 +645,42 @@ export function loadCardForBattle(
     metadata?: EffectDispatchMetadata
   } = {},
 ): CardDefinition | null {
+  const scopedResolver = getActiveRuleExecutionContext()?.cardResolver
+  if (scopedResolver) {
+    let definitionError: unknown
+    try {
+      const resolved = scopedResolver(
+        battle,
+        cardId,
+        battle.customCards?.[cardId] as unknown,
+        options.metadata,
+      )
+      if (resolved) {
+        assertContentAvailable(resolved as CardDefinition, battleContentMode(battle))
+        return assertCardDefinition(cardId, resolved, {
+          requireReactiveTrigger: options.requireReactiveTrigger,
+        })
+      }
+    } catch (error) {
+      definitionError = error
+    }
+
+    if (definitionError instanceof ContentUnavailableError) throw definitionError
+    const error = definitionError === undefined
+      ? new Error(`Card definition ${cardId || '<empty>'} is unavailable`)
+      : definitionError
+    rethrowAttachedEffectContentError(
+      battle,
+      error,
+      `Card definition ${cardId || '<empty>'} could not load during an EffectChain`,
+      {
+        ...options.metadata,
+        skillId: options.metadata?.skillId ?? cardId,
+      },
+    )
+    return null
+  }
+
   let staticCard: CardDefinition | null = null
   let definitionError: unknown
   try {
@@ -1138,9 +1177,17 @@ export function loadSkillForBattle(
   let definition: SkillDefinition | null = null
   let definitionError: unknown
   try {
-    definition = candidate === undefined
-      ? loadSkillById(skillId, strict)
-      : assertSkillDefinition(skillId, candidate)
+    const scopedResolver = getActiveRuleExecutionContext()?.skillResolver
+    if (scopedResolver) {
+      const resolved = scopedResolver(battle, skillId, candidate, options.metadata)
+      definition = resolved === null || resolved === undefined
+        ? null
+        : assertSkillDefinition(skillId, resolved)
+    } else {
+      definition = candidate === undefined
+        ? loadSkillById(skillId, strict)
+        : assertSkillDefinition(skillId, candidate)
+    }
     if (definition) {
       assertContentAvailable(definition, battleContentMode(battle))
       return assertSkillDefinition(skillId, definition, {
@@ -1959,7 +2006,15 @@ export function loadRuleForBattle(
   let rule: TriggerRule | null = null
   let definitionError: unknown
   try {
-    rule = loadRuleById(ruleId, FORCE_RULE_RELOAD, strict)
+    const scopedResolver = getActiveRuleExecutionContext()?.ruleResolver
+    if (scopedResolver) {
+      const resolved = scopedResolver(battle, ruleId, metadata)
+      rule = resolved === null || resolved === undefined
+        ? null
+        : assertCompiledRuleDefinition(ruleId, resolved)
+    } else {
+      rule = loadRuleById(ruleId, FORCE_RULE_RELOAD, strict)
+    }
   } catch (error) {
     definitionError = error
   }
@@ -5993,6 +6048,7 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
       } catch (error) {
         if (isEffectChainPendingSignal(error)) throw error
         if (isEffectChainFatalError(error)) throw error
+        if (isPreviewReactionPendingError(error)) throw error
         let isInteractionSignal = false
         try {
           isInteractionSignal = Boolean(
@@ -6022,7 +6078,7 @@ export function executeSkillFunction(skillDef: SkillDefinition, context: SkillEx
     throw new Error('技能没有有效的执行代码');
     
   } catch (error) {
-    console.error('Error executing skill:', error)
+    if (!isPreviewReactionPendingError(error)) console.error('Error executing skill:', error)
     throw error;
   } finally {
     sealedContent.cleanup?.()

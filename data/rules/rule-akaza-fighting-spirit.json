@@ -1,0 +1,9 @@
+{
+  "id": "rule-akaza-fighting-spirit",
+  "name": "先手斗气",
+  "description": "对满生命值的敌军造成的伤害提高50%。",
+  "trigger": {
+    "type": "beforeDamageTaken"
+  },
+  "skillCode": "var holder = context.rulePiece; var victim = context.sourcePiece; var attacker = context.targetPiece; if (!holder || !attacker || attacker.instanceId !== holder.instanceId || !victim || victim.currentHp <= 0 || victim.currentHp !== victim.maxHp || flow.query.pieces({ originId: holder.instanceId, relation: \"enemy\" }).indexOf(victim.instanceId) === -1) return { success: false, message: '' }; var damage = Number(context.damage || 0); if (!(damage > 0)) return { success: false, message: '' }; flow.event.modify('damage', damage * 1.5); return { success: true, message: holder.name + '触发先手斗气，伤害提高50%' };"
+}

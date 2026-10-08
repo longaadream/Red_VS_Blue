@@ -1,6 +1,6 @@
 import type { BattleAction, BattleActionLog, BattleState } from './turn'
 import { traceProjectile } from './spatial'
-import { recordedBattlePresentation, recordedSkillPresentation, recordedPositionKind } from './battle-presentation-recording'
+import { recordedBattlePresentation, recordedSkillPresentation, recordedPositionKind, recordedPositionMotion } from './battle-presentation-recording'
 
 export type BattlePresentationEventKind =
   | 'move'
@@ -806,6 +806,7 @@ function pieceDrafts(command: Record<string, unknown>, beforeState: BattleState,
         kind: 'forceMove', iconId: 'action-force-move', actorPlayerId: text(command.playerId),
         ...(text(command.pieceId) ? { sourcePieceId: text(command.pieceId) } : {}),
         targetPieceIds: [piece.instanceId], targetCell: { x: finite(piece.x)!, y: finite(piece.y)! },
+        presentation: recordedPositionMotion(afterState, piece.instanceId, finite(previous.x)!, finite(previous.y)!, finite(piece.x)!, finite(piece.y)!),
         result: {
           ...(finite(previous.x) !== undefined ? { fromX: finite(previous.x)! } : {}),
           ...(finite(previous.y) !== undefined ? { fromY: finite(previous.y)! } : {}),
@@ -982,10 +983,16 @@ export function projectBattlePresentationEvents(
     skippable: true,
   } : undefined)
   if (!root) return []
+  if (root.kind === 'move' && root.sourcePieceId && root.result) {
+    const motion = recordedPositionMotion(input.afterState, root.sourcePieceId,
+      Number(root.result.fromX), Number(root.result.fromY), Number(root.result.toX), Number(root.result.toY), input.beforeState.actions?.length ?? 0)
+    if (motion) root.presentation = motion
+  }
   if (recorded && root.kind === 'move') {
     const index = children.findIndex(event => event.kind === 'forceMove' && event.targetPieceIds?.[0] === root.sourcePieceId)
     if (index >= 0) {
       root.result = children[index].result
+      if (children[index].presentation) root.presentation = children[index].presentation
       root.targetCell = children[index].targetCell
       children.splice(index, 1)
     } else {

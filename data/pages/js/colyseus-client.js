@@ -197,6 +197,9 @@
   }
 
   function registerRoomHandlers(room, generation) {
+    ;['socialReady','socialAck','socialEvent'].forEach(function(type){
+      room.onMessage(type,function(message){if(generation===_generation)emitRoomMessage(type,message)})
+    })
     room.onMessage('officialSessionExpired', function () {
       _shouldReconnect = false
       clearReconnectToken()
@@ -392,7 +395,9 @@
     }
     if (!_subscribed || !_room) return false
     try {
-      if (message && message.type === 'action') {
+      if(message && (message.type==='socialHello'||message.type==='socialSend')){
+        _room.send(message.type,message)
+      } else if (message && message.type === 'action') {
         _room.send('battleCommand', message)
       } else if (message && message.type === 'requestBattleSnapshot') {
         _room.send('battleResync', {})

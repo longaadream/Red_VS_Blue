@@ -14,10 +14,10 @@ function page(protocol: string, android = false, available = true) {
   const calls: { url: string; options?: RequestInit }[] = []
   vm.runInNewContext(source, {
     window: { Capacitor: android ? { isNativePlatform: () => true } : undefined, RvBUtils: { readOfficialSession: () => null } },
-    location: { protocol, origin: protocol === 'rvb-client:' ? 'rvb-client://app' : 'https://localhost' },
+    location: { protocol, origin: protocol === 'rvb-client:' ? 'rvb-client://app' : 'https://localhost', search: '' },
     document: { hidden: true, getElementById: node, querySelector: node, querySelectorAll: () => [] },
-    localStorage: { getItem: (key: string) => values.get(key), setItem: (key: string, value: string) => values.set(key, value) },
-    sessionStorage: { getItem: () => null }, URL, AbortSignal, setInterval() {},
+    localStorage: { getItem: (key: string) => values.get(key), setItem: (key: string, value: string) => values.set(key, value), removeItem: (key: string) => values.delete(key) },
+    sessionStorage: { getItem: () => null }, URL, URLSearchParams, AbortSignal, setInterval() {},
     fetch: async (url: string, options?: RequestInit) => {
       calls.push({ url, options })
       return { ok: url !== '__tutorial-profile.json' || available, headers: { get: () => 'application/json' }, json: async () => url === '__tutorial-profile.json' ? fresh : { kind: 'rvb-official-v1' } }

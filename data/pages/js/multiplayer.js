@@ -172,6 +172,16 @@
     byId('copyDiagnosis').hidden = false
   }) }
   byId('copyDiagnosis').onclick = function () { run(function () { return navigator.clipboard.writeText(lastDiagnosis) }) }
+  if (new URLSearchParams(location.search).get('acceptedInvite') === '1') {
+    window.addEventListener('DOMContentLoaded', function () { run(async function () {
+      if (!window.RvBRoomInvitations) throw new Error('邀请组件未加载，请从社区重新打开邀请')
+      var invite = await window.RvBRoomInvitations.takeIntent()
+      byId('serverKind').value = invite.origin === officialUrl ? 'official' : 'custom'
+      byId('relayUrl').value = invite.origin
+      byId('serverKind').onchange()
+      await enter(publishedAddress({ url: invite.origin + '/hosts/' + invite.hostId }), false, 'pvp', invite.roomId)
+    }) }, { once: true })
+  }
   if ((window.RvBHost || window.electronAPI) && (window.RvBHost || window.electronAPI).relayControl) {
     (window.RvBHost || window.electronAPI).relayControl({ action: 'status' }).then(function (result) { if (result.ok) showPublication(result.published) }).catch(function (error) { byId('error').textContent = error.message })
     setInterval(function () { if (!busy) (window.RvBHost || window.electronAPI).relayControl({ action: 'status' }).then(function (result) { if (result.ok) showPublication(result.published); else showPublication(null) }).catch(function () { showPublication(null) }) }, 5000)
