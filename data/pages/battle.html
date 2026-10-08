@@ -1995,6 +1995,7 @@
     const TIMER_PREVIEW_STARTED_AT = Date.now()
     const TIMER_PREVIEW_TIMER = TIMER_PREVIEW_MODE ? {
       status: 'running',
+      durationMs: 45_000,
       deadlineAt: TIMER_PREVIEW_STARTED_AT + 45_000,
       burnStartsAt: TIMER_PREVIEW_STARTED_AT + 15_000,
       burning: false,
@@ -8032,6 +8033,9 @@
         deadlines.push(Number(activeTurnTimer.deadlineAt))
         if (activeTurnTimer === authoritativeTurnTimer) deadlines.push(Number(authoritativeTurnTimer.burnStartsAt))
       }
+      if (TIMER_PREVIEW_MODE && !authoritativeTurnTimer && !authoritativePendingTimer) {
+        deadlines.push(Number(TIMER_PREVIEW_TIMER.deadlineAt), Number(TIMER_PREVIEW_TIMER.burnStartsAt))
+      }
 
       const delays = deadlines.filter(Number.isFinite).map(function(deadlineAt) {
         const remainingMs = deadlineAt - now
@@ -8043,7 +8047,8 @@
 
       deadlineStatusTimer = setTimeout(function() {
         deadlineStatusTimer = null
-        renderDeploymentStatus()
+        if (battlePageDisposed) return
+        if (G && G.deployment && G.deployment.status === 'awaiting-locks') renderDeploymentStatus()
         renderTurnTimerStatus()
         scheduleDeadlineStatusRefresh()
       }, Math.min.apply(Math, delays))
@@ -9777,9 +9782,6 @@
       }, 3000)
       const feedbackAudio = ensureBattleFeedbackAudio()
       if (feedbackAudio) feedbackAudio.play('invalid')
-      if (TIMER_PREVIEW_MODE && !authoritativeTurnTimer && !authoritativePendingTimer) {
-        deadlines.push(Number(TIMER_PREVIEW_TIMER.deadlineAt), Number(TIMER_PREVIEW_TIMER.burnStartsAt))
-      }
     }
     function setStatusMsg(msg) {
       const el = document.getElementById('statusMsg')
