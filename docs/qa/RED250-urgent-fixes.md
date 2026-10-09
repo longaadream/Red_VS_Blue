@@ -51,6 +51,20 @@
 npm.cmd test -- tests/game/red250-turalyon-holy-hand.test.ts tests/game/holy-hand-system.test.ts tests/game/holy-hand-performance.test.ts tests/game/red250-ulquiorra-cero.test.ts tests/game/red250-ichigo-choice.test.ts tests/game/red227-local-skill-sequence.test.ts tests/game/skill-preview-privacy.test.ts tests/game/pending-interaction.test.ts tests/game/effect-chain-transaction.test.ts tests/game/deterministic-runtime.test.ts tests/ui/red250-holy-card-continuation.test.ts tests/ui/red250-pending-cancel.test.ts tests/ui/target-overlay-controls.test.ts tests/ui/red227-local-skill-sequence.test.ts tests/ui/battle-skill-preview-page.test.ts tests/ui/battle-skill-preview.test.ts tests/electron/red250-exit.test.ts tests/electron/ipc-trust.test.ts tests/electron/client-startup.test.ts tests/electron/local-game-lifecycle.test.ts
 ```
 
+## 镜花水月：范围攻击被误判为单体
+
+用户追加反馈替代目标似乎只能选择正方向敌人。依据 RED-163 与 ADR-0026，镜花水月仅响应单体技能，替代目标是蓝染曼哈顿距离三格内的存活敌人，可以斜向，也可以是原施法者。数据与页面候选均没有行列限制。
+
+固定种子 250 的真实复现：蓝染 `(1,1)`、秘密友军 `(2,1)`、敌方施法者 `(5,1)`，替代敌人 `(2,2)` 或 `(3,2)`。王虚的闪光声明 `range: "area"`，但原 `isSinglePieceTargetAction()` 只统计一个棋子选择步骤，将其误判为单体；镜花 pending 包含斜向候选，提交后王虚自己的行列检查拒绝。相同局面用火球触发则可成功转移。原始选择一个路径端点不代表技能只影响一个单位。
+
+修复仅在通用单体判定中排除明确声明 `range: "area"` 的技能，保留缺少范围声明的旧技能兼容。王虚按原路径伤害结算，不打开错误的镜花选择，也不消耗秘密标记；真正单体技能继续支持斜向和原施法者替代。没有修改蓝染范围、王虚路径校验或任一角色数据。
+
+修改前的正确期望回归为 3 项中 2 项失败（两个范围攻击场景错误打开镜花 pending）；修改后扩展为 7 项并全部通过。
+
+最终在前述 20 文件验证集上增加 `tests/game/red250-aizen-targets.test.ts`、`tests/game/targeting.test.ts`、`tests/game/targeting-range-overlay.test.ts`、`tests/game/grimmjow-destruction-history.test.ts`，合计 **24 文件、399 项通过**。typecheck、定向 ESLint、编码（1521 文件）、main-baseline 通过，三个浏览器引擎重建。独立审查无阻塞，另外验证声明 single / 缺 range / area 的判定分别为 true / true / false。
+
+边界：用户现场触发技能尚未确认；本轮明确修复上述已复现缺陷，不声称已复现所有“只能正方向”的现场。未执行本轮完整原生战局鼠标验收。人工复核：王虚不触发镜花且正常路径伤害；火球对秘密友军施放后，可选择蓝染三格内非同行列敌人，原友军无伤、替代者受伤、成本一次；超出三格的候选仍不可选。回退本轮追加提交及对应引擎即可。
+
 ## 验证记录
 
 - 虚闪定向回归：修复前失败，修复后通过。

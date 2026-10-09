@@ -668,6 +668,10 @@ RED-186 正式接入：battle.html 直接加载 tabletop-battle 样式与角色�
 
 ## RED-227 技能切换与公开预演补充（候选）
 
+### 单体目标改写的技能分类（RED-250）
+
+`isSinglePieceTargetAction()` 同时区分技能的效果范围与选择步骤。显式声明 `range: "area"` 的技能，即使只有一个棋子目标选择步骤，也不属于单体技能，不触发镜花水月的单体目标改写。未声明范围的旧技能继续使用原有单棋子选择步骤判定。真正单体技能的替代候选仍由响应规则确定，镜花水月为蓝染曼哈顿距离三格内的存活敌人，包含斜向及原施法者。
+
 ### 本地多步选择与一次权威提交
 
 `preparePublicSkillAction(publicSnapshot, rootAction, viewerId)` 在隔离的公开状态中准备技能。根动作声明的未完成输入返回 `needs-input` / `preparation.continuation:false`；角色代码或公开规则执行中产生的自身续选返回 `continuation:true` 和不透明 `promptKey`。UI 只展示候选并收集答案，不自行计算规则，也不修改真实战局。完成最后一个输入后 `previewBattleAction` 可展示完整公开假设。
