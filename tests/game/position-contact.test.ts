@@ -8,6 +8,7 @@ import { traceMovementPath } from '@/lib/game/spatial'
 import type { PieceInstance } from '@/lib/game/piece'
 import { beginCompoundPositionContacts } from '@/lib/game/tile-contact'
 import { runBattleAction } from '@/lib/game/battle-runner'
+import { loadRuleById } from '@/lib/game/skills'
 import { makePiece, makeState } from '../helpers/minimal-state'
 
 beforeEach(() => globalTriggerSystem.clearRules())
@@ -39,6 +40,17 @@ describe('RED-209 position and contact contract', () => {
     expect(state.players[0].chargePoints).toBe(1)
     expect(state.extensions?.tileEffects).toHaveLength(2)
   })
+  it('does not accumulate momentum from a teleport', () => {
+    const mover = makePiece({ instanceId: 'teleport-momentum', x: 0, y: 0,
+      statusTags: [{ type: 'momentum-core', stacks: 0 }], rules: [loadRuleById('rule-momentum-gain')!] })
+    const state = makeState({ pieces: [mover], width: 5, height: 2 })
+
+    expect(changePiecePositions(state, [{ pieceId: mover.instanceId, x: 3, y: 0 }], 'teleport')).toMatchObject({ success: true })
+    expect((state.pieces[0] as { momentum?: number }).momentum).toBeUndefined()
+    expect(state.pieces[0].statusTags).toEqual([expect.objectContaining({ type: 'momentum-core', stacks: 0 })])
+    expect(state.actions?.some(action => action.type === 'move')).toBe(false)
+  })
+
   it('swaps the complete group and credits each moved owner', () => {
     const a = makePiece({ instanceId: 'a', x: 0, y: 0 })
     const b = makePiece({ instanceId: 'b', ownerPlayerId: 'player-blue', x: 2, y: 0 })
@@ -78,6 +90,31 @@ describe('RED-209 position and contact contract', () => {
     expect(next.players[0].actionPoints).toBe(state.players[0].actionPoints)
     expect(next.pieces[0].x).toBe(0)
     expect(next.actions?.some(a => a.type === 'move' || a.type === 'positionChanged')).toBe(false)
+  })
+
+  it('keeps the original move path when a contact reaction teleports the mover', () => {
+    const mover = makePiece({ instanceId: 'path-mover', x: 0, y: 0, moveRange: 4,
+      statusTags: [{ type: 'momentum-core', stacks: 0 }], rules: [loadRuleById('rule-momentum-gain')!] })
+    const blocker = makePiece({ instanceId: 'path-blocker', ownerPlayerId: 'player-blue', x: 1, y: 0 })
+    const state = makeState({ pieces: [mover, blocker], currentPlayerId: 'player-red', phase: 'action', width: 6, height: 3 })
+    const path = [{ x: 0, y: 1 }, { x: 1, y: 1 }, { x: 2, y: 1 }, { x: 2, y: 0 }]
+    globalTriggerSystem.addRule({ id: 'contact-teleport', name: 'contact-teleport', description: '', trigger: { type: 'afterPiecePathContact' },
+      effect: (battle, context) => {
+        if (context.sourcePiece?.instanceId !== mover.instanceId || context.movementKind !== 'walk') return { success: false }
+        return changePiecePositions(battle, [{ pieceId: mover.instanceId, x: 4, y: 2 }], 'teleport')
+      } })
+
+    const next = applyBattleAction(state, {
+      type: 'move', playerId: 'player-red', pieceId: mover.instanceId, toX: 2, toY: 0, path,
+    })
+    const moved = next.pieces.find(piece => piece.instanceId === mover.instanceId)
+    const moveLog = next.actions?.find(action => action.type === 'move')
+
+    expect(moved).toMatchObject({ x: 4, y: 2, momentum: path.length })
+    expect(moveLog?.payload?.path).toEqual(path)
+    expect(next.actions?.filter(action => action.type === 'positionChanged').at(-1)?.payload).toMatchObject({
+      movementKind: 'teleport', toX: 4, toY: 2,
+    })
   })
 
   it('traces passable allies and blockers while excluding explicit landing blockers', () => {

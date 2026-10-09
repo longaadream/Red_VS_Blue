@@ -42,6 +42,9 @@ RED-221 公共选择反馈：非法目标不能被路由为切换棋子；目标
 - 显式路径：`BattleAction.move.path` 排除起点、包含终点；`getNormalMoveRejection(..., path)` 和提交器的
   `PositionChangeOptions.normalPath` 逐格复核并保持原路径，不会在触发器改写目标后静默改路。未提供 `normalPath` 的
   数据/技能 `walk` 仍使用横纵直线兼容语义。
+- RED-257：付费和免费普通移动的 `move.payload.path` 复制成功位置提交返回的实际路径，动能按该路径长度积累；
+  不使用起终点距离或未执行的计划路线。获得动能的旋转冲刺、骑射横扫也读取成功位移返回的 `changes.path`，
+  前置反应改变落点后只计实际经过格。传送仍不积累；缺失/空路径不增加动能。
 - 排除：技能位移、推拉、传送不会隐式调用普通移动验证器，必须由技能实现明确选择空间工具。
 - 测试：`tests/game/normal-move-path.test.ts`、`spatial.test.ts`、`turn.test.ts`、`movement-contract.test.ts` 与
   `position-contact.test.ts` 覆盖默认/waypoint 路径、显式路径拒绝、浏览器导出、AP 与接触事实。

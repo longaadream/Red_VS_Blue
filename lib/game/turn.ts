@@ -2729,6 +2729,7 @@ function applyBattleActionInternal(
       // 记录移动信息到战斗日志
       const pieceName = piece.name || piece.templateId;
       const moveMessage = `${pieceName}从(${fromX}, ${fromY})移动到(${finalToX}, ${finalToY})`;
+      const movementPath = positionResult.changes.find(change => change.pieceId === piece.instanceId)?.path ?? []
 
       next.actions.push({
         type: "move",
@@ -2741,6 +2742,7 @@ function applyBattleActionInternal(
           fromY,
           toX: finalToX,
           toY: finalToY,
+          path: movementPath.map(cell => ({ ...cell })),
           deploymentFirstMoveFree,
         }
       })
