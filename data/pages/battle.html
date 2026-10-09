@@ -6776,30 +6776,9 @@
         const cancelButton = document.getElementById('targetCancelButton')
         if (cancelButton) {
           const authoritativeSelection = G && (G.pendingTargetSelection || G.pendingOptionSelection)
-          const currentSkillId = pendingSkill && (pendingSkill.skillId || pendingSkill.baseAction && pendingSkill.baseAction.skillId)
-            || targetSubmissionPending && targetSubmissionPending.draft && targetSubmissionPending.draft.skill && targetSubmissionPending.draft.skill.skillId
-          let currentSkillButton = false
-          const pieceInfoModal = document.getElementById('pieceInfoModal')
-          const skillSheetVisible = pieceInfoModal
-            && pieceInfoModal.classList.contains('character-dock')
-            && pieceInfoModal.style.display !== 'none'
-            && document.body.classList.contains('character-dock-open')
-            && typeof currentPieceInfoSource !== 'undefined'
-            && currentPieceInfoSource === 'board'
-          if (currentSkillId && skillSheetVisible && typeof document.querySelectorAll === 'function') {
-            const skillButtons = document.querySelectorAll('#pieceInfoContent .character-cast')
-            for (let i = 0; i < skillButtons.length; i += 1) {
-              if (skillButtons[i].dataset
-                && skillButtons[i].dataset.targetMode
-                && String(skillButtons[i].dataset.skillId || '') === String(currentSkillId)) {
-                currentSkillButton = true
-                break
-              }
-            }
-          }
-          // A current skill owns its second-click cancel affordance. Keep the
-          // shared button only for cards, rules and rows that are unavailable.
-          cancelButton.hidden = currentSkillButton || !!(authoritativeSelection && authoritativeSelection.canCancel === false)
+          // Every cancellable pending session keeps a shared explicit entry,
+          // including an active skill row with its own second-click affordance.
+          cancelButton.hidden = !!(authoritativeSelection && authoritativeSelection.canCancel === false)
           cancelButton.disabled = !!targetSubmissionPending
           cancelButton.textContent = targetSubmissionPending ? '等待确认…' : '取消目标选择'
         }
@@ -10293,6 +10272,8 @@
 <label data-window-fullscreen-row hidden><input data-window-fullscreen type="checkbox">窗口全屏 <small>F11</small></label>
 <p data-window-fullscreen-error role="status"></p>
 <p>设置自动保存。打开菜单不会暂停对局或回合计时。</p>
+<button type="button" data-application-exit hidden>退出程序</button>
+<p data-application-exit-error role="alert" hidden></p>
 <button type="button" data-close-settings autofocus>返回对局</button>
 </dialog>
 <script src="js/battle-settings.js" defer></script>

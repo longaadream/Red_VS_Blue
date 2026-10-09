@@ -10,6 +10,8 @@ export interface SuspendableInteractionKey {
   sourceId?: string
   eventType?: string
   consumerOrdinal: number
+  /** Stable occurrence for this consumer identity; omitted by legacy transactions. */
+  consumerOccurrence?: number
 }
 
 export interface SuspendableInteractionInput {
@@ -105,13 +107,22 @@ function sameKey(left: SuspendableInteractionKey, right: SuspendableInteractionK
 export class SuspendableActionRuntime {
   private answerCursor = 0
   private consumerOrdinal = 0
+  private readonly consumerOccurrences = new Map<string, number>()
 
   constructor(private readonly answers: readonly SuspendableInteractionAnswer[]) {}
 
   enterConsumer(
-    input: Omit<SuspendableInteractionKey, 'consumerOrdinal'>,
+    input: Omit<SuspendableInteractionKey, 'consumerOrdinal' | 'consumerOccurrence'>,
   ): SuspendableInteractionKey {
-    const key = { ...input, consumerOrdinal: this.consumerOrdinal }
+    const occurrenceKey = JSON.stringify([
+      input.consumerKind,
+      input.consumerId,
+      input.sourceId,
+      input.eventType,
+    ])
+    const consumerOccurrence = this.consumerOccurrences.get(occurrenceKey) ?? 0
+    this.consumerOccurrences.set(occurrenceKey, consumerOccurrence + 1)
+    const key = { ...input, consumerOrdinal: this.consumerOrdinal, consumerOccurrence }
     this.consumerOrdinal += 1
     return key
   }

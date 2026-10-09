@@ -268,7 +268,7 @@ describe('target prompt and controls separation', () => {
     expect(page).toMatch(/draft\.skill && targetSubmissionPending\.draft\.skill\.skillId/)
     expect(page).toMatch(/resolve: button => button\.dataset\.targetMode \? null/)
     expect(page).toMatch(/window\.refreshTargetSkillButtonState\(\)/)
-    expect(page).toMatch(/cancelButton\.hidden = currentSkillButton \|\|/)
+    expect(page).toMatch(/cancelButton\.hidden = !!\(authoritativeSelection && authoritativeSelection\.canCancel === false\)/)
     expect(page).toMatch(/event\.key === 'Escape' && \(pendingSkill \|\| pendingCardAction \|\| targetSubmissionPending\)/)
     expect(tacticalCss).toMatch(/body #targetOverlay #targetPromptText[\s\S]*color: #ffe08a !important/)
     expect(tacticalCss).toMatch(/character-cast\.is-cancel-mode[\s\S]*font-size: 16px[\s\S]*font-weight: 900/)
@@ -369,7 +369,7 @@ describe('target prompt and controls separation', () => {
     expect(button.click).toHaveBeenCalledTimes(2)
   })
 
-  it('keeps the fallback cancel control when a matching skill row is closed', () => {
+  it('keeps the shared cancel control visible when a matching skill row is open', () => {
     const overlay = element()
     const prompt = element()
     const multiSummary = element()
@@ -418,7 +418,7 @@ describe('target prompt and controls separation', () => {
     modal.style.display = 'flex'
     body.classList.add('character-dock-open')
     new Script('renderTargetOverlay()').runInContext(context)
-    expect(cancel.hidden).toBe(true)
+    expect(cancel.hidden).toBe(false)
   })
 
   it('mounts the existing controls beside the matching skill title and before its description', () => {
