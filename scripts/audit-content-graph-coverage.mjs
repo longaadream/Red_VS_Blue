@@ -1387,6 +1387,23 @@ function migrationArtifact(definition, validator) {
     if (codeFields.includes(field)) fieldOverrides[field] = { status, graphArtifact, reason }
   }
 
+  if (hasOwn(definition, 'gameplayModules')) {
+    try {
+      if (!validator?.documentAvailable) throw new Error('Document compiler is unavailable')
+      validator.assertContentGraphDocument(definition)
+      const moduleFields = Object.keys(definition.gameplayModules.entries)
+      const primary = definition.contentGraphField
+      for (const field of codeFields) {
+        if (moduleFields.includes(field)) setField(field, 'graph-validated', 'semantic-module-validated', 'The registered module compiler validated this entry and its generated source.')
+        else if ((hasPrimaryGraph && field === primary) || entryFields.includes(field)) setField(field, 'graph-validated', 'validated', 'The document compiler validated this compatibility graph entry.')
+      }
+      const complete = codeFields.length > 0 && codeFields.every(field => fieldOverrides[field]?.status === 'graph-validated')
+      return migrationResult({ sourceKind, codeFields, status: complete ? 'graph-validated' : 'graph-partial', graphArtifact: 'validated', reason: 'Document contains registered gameplay-module entries; semantic coverage is reported separately from compatibility graphs.', fieldOverrides })
+    } catch (error) {
+      return migrationResult({ sourceKind, codeFields, status: 'graph-unverified', graphArtifact: 'document-rejected', reason: `Gameplay module document assertion failed: ${error.message}`, fieldOverrides })
+    }
+  }
+
   if (hasEntries && !entries) {
     return migrationResult({
       sourceKind,
@@ -1996,6 +2013,20 @@ function hasRafaamPrefixFilterExpression(value) {
 function inspectRootGraphSource(entry, field) {
   const graph = graphForField(entry?.definition, field)
   const migration = entry?.migration?.fields?.[field]
+  if (entry?.definition?.gameplayModules?.entries?.[field] && migration?.graphArtifact === 'semantic-module-validated') {
+    try {
+      const validator = loadContentGraphValidator(SCRIPT_ROOT)
+      if (!validator.documentAvailable) throw new Error('Module document compiler unavailable')
+      validator.assertContentGraphDocument(entry.definition)
+      return {
+        status: 'graph-source-validated', id: entry.id, field,
+        sourceSha256: sha256(entry.definition[field]), graphArtifactStatus: migration.status,
+        inspection: { authoringKind: 'registered-gameplay-modules', rawExecutableSourceLiterals: [], unresolvedSinkPaths: [] },
+      }
+    } catch (error) {
+      return { status: 'graph-source-unverified', id: entry.id, field, reason: `Module source validation failed: ${error.message}` }
+    }
+  }
   if (!entry || !graph || migration?.status !== 'graph-validated') {
     return {
       status: 'graph-source-unverified',
@@ -2518,14 +2549,17 @@ function makeReport(root) {
   const ordinaryFieldEntries = fieldEntries.filter(field => ordinaryEntries.some(entry => entry.nodeKey === field.nodeKey))
   const fieldMigrationCounts = Object.fromEntries(FIELD_MIGRATION_STATUSES.map(status => [status, fieldEntries.filter(field => field.status === status).length]))
   const ordinaryFieldMigrationCounts = Object.fromEntries(FIELD_MIGRATION_STATUSES.map(status => [status, ordinaryFieldEntries.filter(field => field.status === status).length]))
+  const semanticFields = ordinaryFieldEntries.filter(field => field.graphArtifact === 'semantic-module-validated')
   return {
     schemaVersion: 1,
     reportKind: 'content-graph-coverage',
     assessmentScope: 'compiler-ir-and-behavior-compatibility',
     semanticModuleCoverage: {
-      status: 'not-assessed',
+      status: semanticFields.length ? 'partial' : 'not-assessed',
       complete: false,
-      reason: 'Validated v1 compiler graphs do not prove registered semantic-module composition. Domain-module dependencies, typed ports and absence of author-level code escape hatches require a separate audit.',
+      validatedInlineFields: semanticFields.length,
+      fields: semanticFields.map(field => `${field.nodeKey}:${field.field}`).sort(compareCodePoints),
+      reason: 'Only registered gameplay-module entries count here. Compatibility graphs, declarative content and generated/pending child content do not establish complete semantic-module coverage.',
     },
     baseBranch: BASE_BRANCH,
     baseSha: BASE_SHA,

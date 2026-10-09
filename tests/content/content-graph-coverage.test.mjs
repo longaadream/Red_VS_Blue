@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { createRequire } from 'node:module'
 import {
   BASE_SHA,
   CONTENT_GRAPH_VERSION,
@@ -21,6 +22,17 @@ import {
 } from '../../scripts/audit-content-graph-coverage.mjs'
 
 const root = path.resolve(fileURLToPath(new URL('../..', import.meta.url)))
+const moduleCore = createRequire(import.meta.url)('../../electron-editor/gameplay-module-core.cjs')
+
+test('module coverage requires a valid registered graph and matching generated source', () => {
+  const validator = loadContentGraphArtifactValidator(root)
+  const document = moduleCore.applyGameplayModuleGraph({ id: 'semantic-probe' }, moduleCore.createGameplayModuleGraph('skill'))
+  const valid = classifyMigration(document, { validator })
+  assert.equal(valid.fields.code.graphArtifact, 'semantic-module-validated')
+  assert.equal(valid.fields.code.status, 'graph-validated')
+  const tampered = classifyMigration({ ...document, code: 'function executeSkill(){}' }, { validator })
+  assert.equal(tampered.status, 'graph-unverified')
+})
 
 function dynamicByFrom(report, from) {
   const reference = report.dynamicReferences.find(candidate => candidate.from === from)
@@ -40,7 +52,8 @@ test('coverage inventory is deterministic and exposes the dynamic evidence exten
   // Even a fully validated compiler-IR corpus cannot satisfy the author's
   // stronger requirement that every feature expand to registered modules.
   assert.equal(first.assessmentScope, 'compiler-ir-and-behavior-compatibility')
-  assert.equal(first.semanticModuleCoverage.status, 'not-assessed')
+  assert.equal(first.semanticModuleCoverage.status, 'partial')
+  assert.equal(first.semanticModuleCoverage.validatedInlineFields, 5)
   assert.equal(first.semanticModuleCoverage.complete, false)
   assert.equal(first.compilerValidator.available, true)
   assert.equal(first.compilerValidator.documentAvailable, true)
@@ -580,6 +593,11 @@ test('source proof is rooted at executable sinks and Rafaam copy proof rejects c
     ordinaryCurseIds: ['rafaam-curse-sample'],
   }
   assert.equal(inspectRafaamCopySource(amplify, amplifyMigration, copyOptions).status, 'graph-source-validated')
+  const tamperedModuleSource = structuredClone(sampleEntry)
+  tamperedModuleSource.definition.code = 'function executeCard(){return {success:true}}'
+  assert.equal(inspectRafaamCopySource(amplify, amplifyMigration, {
+    ...copyOptions, staticSourceEntry: tamperedModuleSource,
+  }).status, 'graph-source-unverified', 'copy provenance must revalidate semantic source bytes, not trust a cached classification')
 
   const graphMetadataMutation = structuredClone(ward)
   graphMetadataMutation.contentGraph.metadata = {

@@ -10,12 +10,14 @@
 <script src="skill-graph-editor.js"></script>
 <script src="content-graph-core.js"></script>
 <script src="content-graph-editor.js"></script>
+<script src="gameplay-module-editor.js"></script>
 <script src="source-flow.js"></script>
 <script src="code-ide.js"></script>
 <link rel="stylesheet" href="code-ide.css">
 <link rel="stylesheet" href="source-flow.css">
 <link rel="stylesheet" href="skill-graph.css">
 <link rel="stylesheet" href="content-graph.css">
+<link rel="stylesheet" href="gameplay-module-editor.css">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{--bg:#0d0f12;--rail:#101318;--surface:#15191f;--surface-2:#1b2028;--border:#2a3039;--border-soft:#20252d;--muted:#7f8997;--text:#eef1f5;--text-dim:#b3bac4;--accent:#f05252;--accent-h:#ff6b6b;--blue:#5b8def;--green:#35b97f;--red:#f06464;--yellow:#e8ad4d;--mono:'Cascadia Code','SFMono-Regular',Consolas,monospace}
@@ -466,6 +468,7 @@ function renderDocumentEditor({ subdir, item, data, dataMap, items, listControll
   const detailEl = document.getElementById(`${subdir}-detail`)
   detailEl.codeIDE?.destroy()
   detailEl.contentGraphEditor?.destroy()
+  detailEl.gameplayModuleEditor?.destroy()
   let saved = clone(data)
   let draft = clone(data)
   let pendingCreate = isNew
@@ -500,6 +503,14 @@ function renderDocumentEditor({ subdir, item, data, dataMap, items, listControll
     category: subdir, field: config.codeField, getDraft: () => draft, onChange: syncDraft,
   }) : null
   detailEl.contentGraphEditor = contentGraphEditor
+  const moduleContainer = document.createElement('div')
+  moduleContainer.dataset.gameplayModules = ''
+  const graphPane = detailEl.querySelector('[data-editor-pane="graph"]')
+  if (graphPane) graphPane.prepend(moduleContainer)
+  const gameplayModuleEditor = graphPane ? window.GameplayModuleEditor.mount(moduleContainer, {
+    category: subdir, field: config.codeField, getDraft: () => draft, onChange: syncDraft,
+  }) : null
+  detailEl.gameplayModuleEditor = gameplayModuleEditor
   const graphEditor = subdir === 'skills' ? window.ContentSkillGraph.mount(detailEl.querySelector('[data-skill-graph]'), { getDraft: () => draft, onChange: syncDraft }) : null
   if (draft.skillGraph) detailEl.querySelector('[data-typed-graph]').open = true
   const sourceFlow = ['skills','rules'].includes(subdir) ? window.ContentSourceFlow.mount(detailEl.querySelector('[data-source-flow]'), {
@@ -542,8 +553,11 @@ function renderDocumentEditor({ subdir, item, data, dataMap, items, listControll
     if (!result.error && result.value.skillGraph !== undefined) {
       try { window.SkillGraphCore.assertSkillGraphArtifact(result.value) } catch (error) { result.graphError = error.message }
     }
-    if (!result.error && result.value.contentGraph !== undefined) {
-      try { window.ContentGraphCore.assertContentGraphArtifact(result.value) } catch (error) { result.graphError = error.message }
+    if (!result.error && (result.value.contentGraph !== undefined || result.value.gameplayModules !== undefined || saved.gameplayModules !== undefined)) {
+      try {
+        window.ContentGraphCore.assertContentGraphArtifact(result.value)
+        window.ContentGraphCore.assertGameplayModuleTransition(saved, result.value)
+      } catch (error) { result.graphError = error.message }
     }
     errorEl.textContent = result.error || result.graphError || ''
     jsonEl.classList.toggle('invalid', Boolean(result.error))
@@ -557,6 +571,10 @@ function renderDocumentEditor({ subdir, item, data, dataMap, items, listControll
     serialized = JSON.stringify(draft, null, 2)
     jsonEl.value = serialized
     detailEl.querySelector('[data-document-title]').textContent = draft.name || item.id
+    for (const selector of ['[data-content-graph]', '[data-source-flow]', '[data-typed-graph]']) {
+      const section = detailEl.querySelector(selector)
+      if (section) section.hidden = Boolean(draft.gameplayModules)
+    }
     validateSource()
   }
 
@@ -574,6 +592,7 @@ function renderDocumentEditor({ subdir, item, data, dataMap, items, listControll
       visualEditor?.refresh()
       graphEditor?.refresh()
       contentGraphEditor?.refresh()
+      gameplayModuleEditor?.refresh()
       sourceFlow?.refresh()
     }
     detailEl.querySelectorAll('.editor-mode').forEach(candidate => candidate.classList.toggle('active', candidate === button))
@@ -618,6 +637,10 @@ function renderDocumentEditor({ subdir, item, data, dataMap, items, listControll
       listController.select(item.id); setStatus('已保存', 'valid'); toast(`${item.name} 已保存`)
     } catch (error) { toast('保存失败：' + error.message, 'error'); setStatus('保存失败', 'invalid') }
     finally { delete detailEl.dataset.saving; controls.forEach(([node, disabled]) => { node.disabled = disabled }); codeIDE?.setLocked(false); saveButton.disabled = false; saveButton.textContent = pendingCreate ? '创建文件' : '保存 JSON'; if (!pendingCreate) detailEl.querySelector('[data-open-external]').disabled = false }
+  }
+  for (const selector of ['[data-content-graph]', '[data-source-flow]', '[data-typed-graph]']) {
+    const section = detailEl.querySelector(selector)
+    if (section) section.hidden = Boolean(draft.gameplayModules)
   }
   validateSource()
   if (isNew) detailEl.querySelector('[data-editor-mode="json"]').click()

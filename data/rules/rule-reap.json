@@ -5,350 +5,455 @@
   "trigger": {
     "type": "afterDamageDealt"
   },
-  "skillCode": "var __rvb_lexical_0_healAmount; var _pc = \"n11\"; for (var _step = 0; _step <= 11; _step++) { switch (_pc) { case \"n11\": _pc = (! (! ((! (context)[\"sourcePiece\"]) || (! (context)[\"rulePiece\"])))) ? \"n10\" : \"n9\"; break; case \"n9\": _pc = (! (! (((context)[\"sourcePiece\"])[\"instanceId\"] !== ((context)[\"rulePiece\"])[\"instanceId\"]))) ? \"n8\" : \"n7\"; break; case \"n7\": _pc = (! (! ((! (context)[\"damage\"]) || ((context)[\"damage\"] <= 0)))) ? \"n6\" : \"n5\"; break; case \"n5\": __rvb_lexical_0_healAmount = Math.floor(((context)[\"damage\"] * 0.5)); _pc = \"n4\"; break; case \"n4\": _pc = (! (! (__rvb_lexical_0_healAmount <= 0))) ? \"n3\" : \"n2\"; break; case \"n2\": context.healQueue.push({healer: (context)[\"rulePiece\"], target: (context)[\"rulePiece\"], heal: __rvb_lexical_0_healAmount, skillId: \"reap\"}); _pc = \"n1\"; break; case \"n1\": return {success: true, message: (((context)[\"rulePiece\"])[\"name\"] + \"触发了收割\")}; case \"n3\": return {success: false}; case \"n6\": return {success: false}; case \"n8\": return {success: false}; case \"n10\": return {success: false}; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\");",
-  "contentGraph": {
-    "version": "rvb-content-graph/v1",
-    "surface": "rule",
-    "entry": "n11",
-    "nodes": [
-      {
-        "id": "n1",
-        "kind": "return",
-        "value": {
-          "kind": "object",
-          "entries": [
+  "skillCode": "var __gameplayInvalid = {}; var _module0 = (flow.refs.source()); if ((((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0) === __gameplayInvalid) || (((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0) === undefined) || (((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0)))) { _module1 = __gameplayInvalid; } else { var _module1 = (flow.query.hasPiece(((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0)) ? flow.query.piece(((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0)).instanceId : null); } var _module2 = (flow.refs.holder()); if ((((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"piece\")) ? _module2[\"piece\"] : _module2) === __gameplayInvalid) || (((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"piece\")) ? _module2[\"piece\"] : _module2) === undefined) || (((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"piece\")) ? _module2[\"piece\"] : _module2) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"piece\")) ? _module2[\"piece\"] : _module2)))) { _module3 = __gameplayInvalid; } else { var _module3 = (flow.query.hasPiece(((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"piece\")) ? _module2[\"piece\"] : _module2)) ? flow.query.piece(((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"piece\")) ? _module2[\"piece\"] : _module2)).instanceId : null); } if ((((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === __gameplayInvalid) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === undefined) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === null) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1))) || (((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"piece\")) ? _module3[\"piece\"] : _module3) === __gameplayInvalid) || (((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"piece\")) ? _module3[\"piece\"] : _module3) === undefined) || (((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"piece\")) ? _module3[\"piece\"] : _module3) === null) || (((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"piece\")) ? _module3[\"piece\"] : _module3) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"piece\")) ? _module3[\"piece\"] : _module3)))) { _module4 = __gameplayInvalid; } else { var _module4 = ((((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === ((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"piece\")) ? _module3[\"piece\"] : _module3))); } var _condition21 = ((_module4 !== null && typeof _module4 === \"object\" && Object.prototype.hasOwnProperty.call(_module4, \"value\")) ? _module4[\"value\"] : _module4); if (_condition21 !== __gameplayInvalid && _condition21) { var _module5 = ((flow.event.read())[\"damage\"]); if ((((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"value\")) ? _module5[\"value\"] : _module5) === __gameplayInvalid) || (((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"value\")) ? _module5[\"value\"] : _module5) === undefined)) { _module6 = __gameplayInvalid; } else { var _module6 = (Math.max(0, ((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"value\")) ? _module5[\"value\"] : _module5) ?? 0)); } if ((((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"value\")) ? _module6[\"value\"] : _module6) === __gameplayInvalid) || (((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"value\")) ? _module6[\"value\"] : _module6) === undefined) || (((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"value\")) ? _module6[\"value\"] : _module6) === null) || (0 === __gameplayInvalid) || (0 === undefined) || (0 === null)) { _module7 = __gameplayInvalid; } else { var _module7 = ((((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"value\")) ? _module6[\"value\"] : _module6) > 0)); } var _condition20 = ((_module7 !== null && typeof _module7 === \"object\" && Object.prototype.hasOwnProperty.call(_module7, \"value\")) ? _module7[\"value\"] : _module7); if (_condition20 !== __gameplayInvalid && _condition20) { var _composite8 = __gameplayInvalid; if ((((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"value\")) ? _module6[\"value\"] : _module6) === __gameplayInvalid) || (((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"value\")) ? _module6[\"value\"] : _module6) === undefined) || (((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"value\")) ? _module6[\"value\"] : _module6) === null)) { _composite8 = __gameplayInvalid; } else { _done9: { if ((((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"value\")) ? _module6[\"value\"] : _module6) === __gameplayInvalid) || (((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"value\")) ? _module6[\"value\"] : _module6) === undefined) || (((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"value\")) ? _module6[\"value\"] : _module6) === null) || (0.5 === __gameplayInvalid) || (0.5 === undefined) || (0.5 === null)) { _module10 = __gameplayInvalid; } else { var _module10 = ((((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"value\")) ? _module6[\"value\"] : _module6) * 0.5)); } if ((((_module10 !== null && typeof _module10 === \"object\" && Object.prototype.hasOwnProperty.call(_module10, \"value\")) ? _module10[\"value\"] : _module10) === __gameplayInvalid) || (((_module10 !== null && typeof _module10 === \"object\" && Object.prototype.hasOwnProperty.call(_module10, \"value\")) ? _module10[\"value\"] : _module10) === undefined) || (((_module10 !== null && typeof _module10 === \"object\" && Object.prototype.hasOwnProperty.call(_module10, \"value\")) ? _module10[\"value\"] : _module10) === null)) { _module11 = __gameplayInvalid; } else { var _module11 = (Math.floor(((_module10 !== null && typeof _module10 === \"object\" && Object.prototype.hasOwnProperty.call(_module10, \"value\")) ? _module10[\"value\"] : _module10))); } if (!((((_module11 !== null && typeof _module11 === \"object\" && Object.prototype.hasOwnProperty.call(_module11, \"value\")) ? _module11[\"value\"] : _module11) === __gameplayInvalid))) { _composite8 = { \"amount\": ((_module11 !== null && typeof _module11 === \"object\" && Object.prototype.hasOwnProperty.call(_module11, \"value\")) ? _module11[\"value\"] : _module11) }; break _done9; } } } if ((((_composite8 !== null && typeof _composite8 === \"object\" && Object.prototype.hasOwnProperty.call(_composite8, \"amount\")) ? _composite8[\"amount\"] : _composite8) === __gameplayInvalid) || (((_composite8 !== null && typeof _composite8 === \"object\" && Object.prototype.hasOwnProperty.call(_composite8, \"amount\")) ? _composite8[\"amount\"] : _composite8) === undefined) || (((_composite8 !== null && typeof _composite8 === \"object\" && Object.prototype.hasOwnProperty.call(_composite8, \"amount\")) ? _composite8[\"amount\"] : _composite8) === null) || (0 === __gameplayInvalid) || (0 === undefined) || (0 === null)) { _module12 = __gameplayInvalid; } else { var _module12 = ((((_composite8 !== null && typeof _composite8 === \"object\" && Object.prototype.hasOwnProperty.call(_composite8, \"amount\")) ? _composite8[\"amount\"] : _composite8) > 0)); } var _condition19 = ((_module12 !== null && typeof _module12 === \"object\" && Object.prototype.hasOwnProperty.call(_module12, \"value\")) ? _module12[\"value\"] : _module12); if (_condition19 !== __gameplayInvalid && _condition19) { if ((((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"piece\")) ? _module3[\"piece\"] : _module3) === __gameplayInvalid) || (((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"piece\")) ? _module3[\"piece\"] : _module3) === undefined) || (((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"piece\")) ? _module3[\"piece\"] : _module3) === null) || (((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"piece\")) ? _module3[\"piece\"] : _module3) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"piece\")) ? _module3[\"piece\"] : _module3))) || (((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"piece\")) ? _module3[\"piece\"] : _module3) === __gameplayInvalid) || (((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"piece\")) ? _module3[\"piece\"] : _module3) === undefined) || (((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"piece\")) ? _module3[\"piece\"] : _module3) === null) || (((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"piece\")) ? _module3[\"piece\"] : _module3) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"piece\")) ? _module3[\"piece\"] : _module3))) || (((_composite8 !== null && typeof _composite8 === \"object\" && Object.prototype.hasOwnProperty.call(_composite8, \"amount\")) ? _composite8[\"amount\"] : _composite8) === __gameplayInvalid) || (((_composite8 !== null && typeof _composite8 === \"object\" && Object.prototype.hasOwnProperty.call(_composite8, \"amount\")) ? _composite8[\"amount\"] : _composite8) === undefined) || (((_composite8 !== null && typeof _composite8 === \"object\" && Object.prototype.hasOwnProperty.call(_composite8, \"amount\")) ? _composite8[\"amount\"] : _composite8) === null)) { _module13 = __gameplayInvalid; } else { var _module13 = (context.healQueue.push({healer: flow.query.piece(((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"piece\")) ? _module3[\"piece\"] : _module3)), target: flow.query.piece(((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"piece\")) ? _module3[\"piece\"] : _module3)), heal: ((_composite8 !== null && typeof _composite8 === \"object\" && Object.prototype.hasOwnProperty.call(_composite8, \"amount\")) ? _composite8[\"amount\"] : _composite8), skillId: \"reap\"})); } if ((((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"piece\")) ? _module3[\"piece\"] : _module3) === __gameplayInvalid) || (((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"piece\")) ? _module3[\"piece\"] : _module3) === undefined) || (((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"piece\")) ? _module3[\"piece\"] : _module3) === null) || (((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"piece\")) ? _module3[\"piece\"] : _module3) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"piece\")) ? _module3[\"piece\"] : _module3)))) { _module14 = __gameplayInvalid; } else { var _module14 = (String(flow.query.piece(((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"piece\")) ? _module3[\"piece\"] : _module3))[\"name\"])); } if ((((_module14 !== null && typeof _module14 === \"object\" && Object.prototype.hasOwnProperty.call(_module14, \"text\")) ? _module14[\"text\"] : _module14) === __gameplayInvalid) || (((_module14 !== null && typeof _module14 === \"object\" && Object.prototype.hasOwnProperty.call(_module14, \"text\")) ? _module14[\"text\"] : _module14) === undefined) || (((_module14 !== null && typeof _module14 === \"object\" && Object.prototype.hasOwnProperty.call(_module14, \"text\")) ? _module14[\"text\"] : _module14) === null) || (\"触发了收割\" === __gameplayInvalid) || (\"触发了收割\" === undefined) || (\"触发了收割\" === null)) { _module15 = __gameplayInvalid; } else { var _module15 = ((((_module14 !== null && typeof _module14 === \"object\" && Object.prototype.hasOwnProperty.call(_module14, \"text\")) ? _module14[\"text\"] : _module14) + \"触发了收割\")); } var _composite16 = { \"success\": __gameplayInvalid, \"message\": __gameplayInvalid }; if ((((_module15 !== null && typeof _module15 === \"object\" && Object.prototype.hasOwnProperty.call(_module15, \"text\")) ? _module15[\"text\"] : _module15) === __gameplayInvalid) || (((_module15 !== null && typeof _module15 === \"object\" && Object.prototype.hasOwnProperty.call(_module15, \"text\")) ? _module15[\"text\"] : _module15) === undefined) || (((_module15 !== null && typeof _module15 === \"object\" && Object.prototype.hasOwnProperty.call(_module15, \"text\")) ? _module15[\"text\"] : _module15) === null)) { _composite16 = { \"success\": __gameplayInvalid, \"message\": __gameplayInvalid }; } else { _done17: { if ((((_module15 !== null && typeof _module15 === \"object\" && Object.prototype.hasOwnProperty.call(_module15, \"text\")) ? _module15[\"text\"] : _module15) === __gameplayInvalid) || (((_module15 !== null && typeof _module15 === \"object\" && Object.prototype.hasOwnProperty.call(_module15, \"text\")) ? _module15[\"text\"] : _module15) === undefined) || (((_module15 !== null && typeof _module15 === \"object\" && Object.prototype.hasOwnProperty.call(_module15, \"text\")) ? _module15[\"text\"] : _module15) === null)) { _module18 = { \"success\": __gameplayInvalid, \"message\": __gameplayInvalid }; } else { var _module18 = ({success: true, message: ((_module15 !== null && typeof _module15 === \"object\" && Object.prototype.hasOwnProperty.call(_module15, \"text\")) ? _module15[\"text\"] : _module15)}); } if (!(((_module18[\"success\"]) === __gameplayInvalid) || ((_module18[\"message\"]) === __gameplayInvalid))) { _composite16 = { \"success\": (_module18[\"success\"]), \"message\": (_module18[\"message\"]) }; break _done17; } } } if (!(((_composite16[\"success\"]) === __gameplayInvalid) || ((_composite16[\"message\"]) === __gameplayInvalid))) { return { \"success\": (_composite16[\"success\"]), \"message\": (_composite16[\"message\"]) }; } } else if (_condition19 !== __gameplayInvalid) { if (!((false === __gameplayInvalid))) { return { \"success\": false }; } } } else if (_condition20 !== __gameplayInvalid) { if (!((false === __gameplayInvalid))) { return { \"success\": false }; } } } else if (_condition21 !== __gameplayInvalid) { if (!((false === __gameplayInvalid))) { return { \"success\": false }; } }",
+  "gameplayModules": {
+    "version": "rvb-gameplay-module-document/v1",
+    "entries": {
+      "skillCode": {
+        "graph": {
+          "version": "rvb-gameplay-modules/v1",
+          "surface": "rule",
+          "outputs": [
             {
-              "key": "success",
-              "value": {
-                "kind": "literal",
-                "value": true
-              }
+              "name": "success",
+              "type": "boolean"
             },
             {
-              "key": "message",
-              "value": {
-                "kind": "binary",
-                "op": "+",
-                "left": {
-                  "kind": "get",
-                  "object": {
-                    "kind": "get",
-                    "object": {
-                      "kind": "ref",
-                      "name": "context"
+              "name": "message",
+              "type": "string",
+              "optional": true
+            }
+          ],
+          "composites": [
+            {
+              "id": "shared.result-message",
+              "version": "1",
+              "label": "成功消息",
+              "description": "将一段已计算文本转换为统一的成功消息结果。",
+              "inputs": [
+                {
+                  "name": "message",
+                  "type": "string"
+                }
+              ],
+              "outputs": [
+                {
+                  "name": "success",
+                  "type": "boolean"
+                },
+                {
+                  "name": "message",
+                  "type": "string"
+                }
+              ],
+              "allowedSurfaces": [
+                "skill",
+                "card",
+                "rule",
+                "triggerSkill",
+                "pending"
+              ],
+              "body": [
+                {
+                  "kind": "call",
+                  "id": "result-message",
+                  "module": "result.message",
+                  "version": "1",
+                  "inputs": {
+                    "message": {
+                      "kind": "input",
+                      "name": "message"
+                    }
+                  },
+                  "parameters": {}
+                },
+                {
+                  "kind": "return",
+                  "id": "return-result-message",
+                  "values": {
+                    "success": {
+                      "kind": "output",
+                      "node": "result-message",
+                      "port": "success"
                     },
-                    "key": "rulePiece"
+                    "message": {
+                      "kind": "output",
+                      "node": "result-message",
+                      "port": "message"
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "id": "shared.half-damage",
+              "version": "1",
+              "label": "伤害一半",
+              "description": "按当前事件伤害向下取整的一半，供规则效果继续处理。",
+              "inputs": [
+                {
+                  "name": "damage",
+                  "type": "number"
+                }
+              ],
+              "outputs": [
+                {
+                  "name": "amount",
+                  "type": "number"
+                }
+              ],
+              "allowedSurfaces": [
+                "skill",
+                "card",
+                "rule",
+                "triggerSkill",
+                "pending"
+              ],
+              "body": [
+                {
+                  "kind": "call",
+                  "id": "half",
+                  "module": "math.multiply",
+                  "version": "1",
+                  "inputs": {
+                    "left": {
+                      "kind": "input",
+                      "name": "damage"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": 0.5
+                    }
                   },
-                  "key": "name"
+                  "parameters": {}
                 },
-                "right": {
-                  "kind": "literal",
-                  "value": "触发了收割"
-                }
-              }
-            }
-          ]
-        }
-      },
-      {
-        "id": "n2",
-        "kind": "call",
-        "capability": "queue.heal",
-        "args": [
-          {
-            "kind": "object",
-            "entries": [
-              {
-                "key": "healer",
-                "value": {
-                  "kind": "get",
-                  "object": {
-                    "kind": "ref",
-                    "name": "context"
+                {
+                  "kind": "call",
+                  "id": "amount",
+                  "module": "math.floor",
+                  "version": "1",
+                  "inputs": {
+                    "value": {
+                      "kind": "output",
+                      "node": "half",
+                      "port": "value"
+                    }
                   },
-                  "key": "rulePiece"
-                }
-              },
-              {
-                "key": "target",
-                "value": {
-                  "kind": "get",
-                  "object": {
-                    "kind": "ref",
-                    "name": "context"
-                  },
-                  "key": "rulePiece"
-                }
-              },
-              {
-                "key": "heal",
-                "value": {
-                  "kind": "ref",
-                  "name": "__rvb_lexical_0_healAmount"
-                }
-              },
-              {
-                "key": "skillId",
-                "value": {
-                  "kind": "literal",
-                  "value": "reap"
-                }
-              }
-            ]
-          }
-        ],
-        "next": "n1"
-      },
-      {
-        "id": "n3",
-        "kind": "return",
-        "value": {
-          "kind": "object",
-          "entries": [
-            {
-              "key": "success",
-              "value": {
-                "kind": "literal",
-                "value": false
-              }
-            }
-          ]
-        }
-      },
-      {
-        "id": "n4",
-        "kind": "branch",
-        "condition": {
-          "kind": "unary",
-          "op": "!",
-          "argument": {
-            "kind": "unary",
-            "op": "!",
-            "argument": {
-              "kind": "binary",
-              "op": "<=",
-              "left": {
-                "kind": "ref",
-                "name": "__rvb_lexical_0_healAmount"
-              },
-              "right": {
-                "kind": "literal",
-                "value": 0
-              }
-            }
-          }
-        },
-        "yes": "n3",
-        "no": "n2"
-      },
-      {
-        "id": "n5",
-        "kind": "bind",
-        "name": "__rvb_lexical_0_healAmount",
-        "expr": {
-          "kind": "call",
-          "callee": "Math.floor",
-          "args": [
-            {
-              "kind": "binary",
-              "op": "*",
-              "left": {
-                "kind": "get",
-                "object": {
-                  "kind": "ref",
-                  "name": "context"
+                  "parameters": {}
                 },
-                "key": "damage"
-              },
-              "right": {
-                "kind": "literal",
-                "value": 0.5
-              }
+                {
+                  "kind": "return",
+                  "id": "return",
+                  "values": {
+                    "amount": {
+                      "kind": "output",
+                      "node": "amount",
+                      "port": "value"
+                    }
+                  }
+                }
+              ]
             }
-          ]
-        },
-        "next": "n4"
-      },
-      {
-        "id": "n6",
-        "kind": "return",
-        "value": {
-          "kind": "object",
-          "entries": [
+          ],
+          "body": [
             {
-              "key": "success",
-              "value": {
-                "kind": "literal",
-                "value": false
-              }
-            }
-          ]
-        }
-      },
-      {
-        "id": "n7",
-        "kind": "branch",
-        "condition": {
-          "kind": "unary",
-          "op": "!",
-          "argument": {
-            "kind": "unary",
-            "op": "!",
-            "argument": {
-              "kind": "binary",
-              "op": "||",
-              "left": {
-                "kind": "unary",
-                "op": "!",
-                "argument": {
-                  "kind": "get",
-                  "object": {
-                    "kind": "ref",
-                    "name": "context"
-                  },
-                  "key": "damage"
+              "kind": "call",
+              "id": "source-ref",
+              "module": "ref.source",
+              "version": "1",
+              "inputs": {},
+              "parameters": {}
+            },
+            {
+              "kind": "call",
+              "id": "source",
+              "module": "query.piece",
+              "version": "1",
+              "inputs": {
+                "pieceId": {
+                  "kind": "output",
+                  "node": "source-ref",
+                  "port": "piece"
                 }
               },
-              "right": {
-                "kind": "binary",
-                "op": "<=",
+              "parameters": {}
+            },
+            {
+              "kind": "call",
+              "id": "holder-ref",
+              "module": "ref.holder",
+              "version": "1",
+              "inputs": {},
+              "parameters": {}
+            },
+            {
+              "kind": "call",
+              "id": "holder",
+              "module": "query.piece",
+              "version": "1",
+              "inputs": {
+                "pieceId": {
+                  "kind": "output",
+                  "node": "holder-ref",
+                  "port": "piece"
+                }
+              },
+              "parameters": {}
+            },
+            {
+              "kind": "call",
+              "id": "same-holder",
+              "module": "compare.equal-piece",
+              "version": "1",
+              "inputs": {
                 "left": {
-                  "kind": "get",
-                  "object": {
-                    "kind": "ref",
-                    "name": "context"
-                  },
-                  "key": "damage"
+                  "kind": "output",
+                  "node": "source",
+                  "port": "piece"
                 },
                 "right": {
-                  "kind": "literal",
-                  "value": 0
-                }
-              }
-            }
-          }
-        },
-        "yes": "n6",
-        "no": "n5"
-      },
-      {
-        "id": "n8",
-        "kind": "return",
-        "value": {
-          "kind": "object",
-          "entries": [
-            {
-              "key": "success",
-              "value": {
-                "kind": "literal",
-                "value": false
-              }
-            }
-          ]
-        }
-      },
-      {
-        "id": "n9",
-        "kind": "branch",
-        "condition": {
-          "kind": "unary",
-          "op": "!",
-          "argument": {
-            "kind": "unary",
-            "op": "!",
-            "argument": {
-              "kind": "binary",
-              "op": "!==",
-              "left": {
-                "kind": "get",
-                "object": {
-                  "kind": "get",
-                  "object": {
-                    "kind": "ref",
-                    "name": "context"
-                  },
-                  "key": "sourcePiece"
-                },
-                "key": "instanceId"
-              },
-              "right": {
-                "kind": "get",
-                "object": {
-                  "kind": "get",
-                  "object": {
-                    "kind": "ref",
-                    "name": "context"
-                  },
-                  "key": "rulePiece"
-                },
-                "key": "instanceId"
-              }
-            }
-          }
-        },
-        "yes": "n8",
-        "no": "n7"
-      },
-      {
-        "id": "n10",
-        "kind": "return",
-        "value": {
-          "kind": "object",
-          "entries": [
-            {
-              "key": "success",
-              "value": {
-                "kind": "literal",
-                "value": false
-              }
-            }
-          ]
-        }
-      },
-      {
-        "id": "n11",
-        "kind": "branch",
-        "condition": {
-          "kind": "unary",
-          "op": "!",
-          "argument": {
-            "kind": "unary",
-            "op": "!",
-            "argument": {
-              "kind": "binary",
-              "op": "||",
-              "left": {
-                "kind": "unary",
-                "op": "!",
-                "argument": {
-                  "kind": "get",
-                  "object": {
-                    "kind": "ref",
-                    "name": "context"
-                  },
-                  "key": "sourcePiece"
+                  "kind": "output",
+                  "node": "holder",
+                  "port": "piece"
                 }
               },
-              "right": {
-                "kind": "unary",
-                "op": "!",
-                "argument": {
-                  "kind": "get",
-                  "object": {
-                    "kind": "ref",
-                    "name": "context"
+              "parameters": {}
+            },
+            {
+              "kind": "if",
+              "id": "holder-guard",
+              "condition": {
+                "kind": "output",
+                "node": "same-holder",
+                "port": "value"
+              },
+              "then": [
+                {
+                  "kind": "call",
+                  "id": "damage",
+                  "module": "event.damage",
+                  "version": "1",
+                  "inputs": {},
+                  "parameters": {}
+                },
+                {
+                  "kind": "call",
+                  "id": "damage-value",
+                  "module": "value.number-or-zero",
+                  "version": "1",
+                  "inputs": {
+                    "value": {
+                      "kind": "output",
+                      "node": "damage",
+                      "port": "value"
+                    }
                   },
-                  "key": "rulePiece"
+                  "parameters": {}
+                },
+                {
+                  "kind": "call",
+                  "id": "positive-damage",
+                  "module": "compare.greater-than",
+                  "version": "1",
+                  "inputs": {
+                    "left": {
+                      "kind": "output",
+                      "node": "damage-value",
+                      "port": "value"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": 0
+                    }
+                  },
+                  "parameters": {}
+                },
+                {
+                  "kind": "if",
+                  "id": "damage-guard",
+                  "condition": {
+                    "kind": "output",
+                    "node": "positive-damage",
+                    "port": "value"
+                  },
+                  "then": [
+                    {
+                      "kind": "call",
+                      "id": "heal-amount",
+                      "module": "shared.half-damage",
+                      "version": "1",
+                      "inputs": {
+                        "damage": {
+                          "kind": "output",
+                          "node": "damage-value",
+                          "port": "value"
+                        }
+                      },
+                      "parameters": {}
+                    },
+                    {
+                      "kind": "call",
+                      "id": "positive-heal",
+                      "module": "compare.greater-than",
+                      "version": "1",
+                      "inputs": {
+                        "left": {
+                          "kind": "output",
+                          "node": "heal-amount",
+                          "port": "amount"
+                        },
+                        "right": {
+                          "kind": "literal",
+                          "value": 0
+                        }
+                      },
+                      "parameters": {}
+                    },
+                    {
+                      "kind": "if",
+                      "id": "heal-guard",
+                      "condition": {
+                        "kind": "output",
+                        "node": "positive-heal",
+                        "port": "value"
+                      },
+                      "then": [
+                        {
+                          "kind": "call",
+                          "id": "queue-heal",
+                          "module": "effect.queue-heal",
+                          "version": "1",
+                          "inputs": {
+                            "healer": {
+                              "kind": "output",
+                              "node": "holder",
+                              "port": "piece"
+                            },
+                            "target": {
+                              "kind": "output",
+                              "node": "holder",
+                              "port": "piece"
+                            },
+                            "amount": {
+                              "kind": "output",
+                              "node": "heal-amount",
+                              "port": "amount"
+                            }
+                          },
+                          "parameters": {
+                            "skillId": "reap"
+                          }
+                        },
+                        {
+                          "kind": "call",
+                          "id": "name",
+                          "module": "attribute.text",
+                          "version": "1",
+                          "inputs": {
+                            "piece": {
+                              "kind": "output",
+                              "node": "holder",
+                              "port": "piece"
+                            }
+                          },
+                          "parameters": {
+                            "attribute": "name"
+                          }
+                        },
+                        {
+                          "kind": "call",
+                          "id": "message-text",
+                          "module": "text.concat",
+                          "version": "1",
+                          "inputs": {
+                            "left": {
+                              "kind": "output",
+                              "node": "name",
+                              "port": "text"
+                            },
+                            "right": {
+                              "kind": "literal",
+                              "value": "触发了收割"
+                            }
+                          },
+                          "parameters": {}
+                        },
+                        {
+                          "kind": "call",
+                          "id": "result",
+                          "module": "shared.result-message",
+                          "version": "1",
+                          "inputs": {
+                            "message": {
+                              "kind": "output",
+                              "node": "message-text",
+                              "port": "text"
+                            }
+                          },
+                          "parameters": {}
+                        },
+                        {
+                          "kind": "return",
+                          "id": "return-success",
+                          "values": {
+                            "success": {
+                              "kind": "output",
+                              "node": "result",
+                              "port": "success"
+                            },
+                            "message": {
+                              "kind": "output",
+                              "node": "result",
+                              "port": "message"
+                            }
+                          }
+                        }
+                      ],
+                      "else": [
+                        {
+                          "kind": "return",
+                          "id": "return-no-damage-at-heal-guard",
+                          "values": {
+                            "success": {
+                              "kind": "literal",
+                              "value": false
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  ],
+                  "else": [
+                    {
+                      "kind": "return",
+                      "id": "return-no-damage-at-damage-guard",
+                      "values": {
+                        "success": {
+                          "kind": "literal",
+                          "value": false
+                        }
+                      }
+                    }
+                  ]
                 }
-              }
+              ],
+              "else": [
+                {
+                  "kind": "return",
+                  "id": "return-no-holder",
+                  "values": {
+                    "success": {
+                      "kind": "literal",
+                      "value": false
+                    }
+                  }
+                }
+              ]
             }
-          }
+          ]
         },
-        "yes": "n10",
-        "no": "n9"
+        "compilerVersion": "rvb-gameplay-module-compiler/v1"
       }
-    ]
-  },
-  "contentGraphField": "skillCode",
-  "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1"
+    }
+  }
 }

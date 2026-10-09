@@ -8,6 +8,7 @@ import { areMatchAllies } from './match-teams'
 import { addPieceStatus, removePieceStatus, expireHolderStatuses, type StatusHolder } from './status-lifecycle'
 import { checkpointBattlePresentation, recordBattlePresentationBlock, createBattlePresentationQueue } from './battle-presentation-recording'
 import { createFlowRuntime, clearRemovedPieceFlowState } from './flow-runtime'
+import { assertGameplayModuleDocument } from '../skill-graph/module-document'
 import { changePiecePositions, type PiecePositionChange } from './position-change'
 import { makeDeathParasitismCandidate, resolveDeathParasitism } from './death-parasitism'
 import type { PositionChangeKind } from './spatial'
@@ -561,6 +562,7 @@ export function assertCardDefinition(
     throw new Error(`Card definition ${cardId} must be an object`)
   }
   const card = value as Record<string, unknown>
+  assertGameplayModuleDocument(card)
   if (!isNonEmptyString(cardId) || card.id !== cardId) {
     throw new Error(`Card definition ${cardId || '<empty>'} has a mismatched or empty id`)
   }
@@ -1105,6 +1107,7 @@ export function assertSkillDefinition(
     throw new Error(`Skill definition ${skillId} must be an object`)
   }
   const skill = value as Record<string, unknown>
+  assertGameplayModuleDocument(skill)
   if (!isNonEmptyString(skillId) || skill.id !== skillId) {
     throw new Error(`Skill definition ${skillId || '<empty>'} has a mismatched or empty id`)
   }
@@ -1364,6 +1367,7 @@ function assertRawRuleDefinition(ruleId: string, value: unknown): Record<string,
     throw new Error(`Rule definition ${ruleId} must be an object`)
   }
   const rule = value as Record<string, any>
+  assertGameplayModuleDocument(rule)
   if (!isNonEmptyString(ruleId) || rule.id !== ruleId) {
     throw new Error(`Rule definition ${ruleId || '<empty>'} has a mismatched or empty id`)
   }

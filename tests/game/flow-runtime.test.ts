@@ -17,6 +17,17 @@ function fixture() {
   return makeState({ pieces: [makePiece({ instanceId: 'self' }), makePiece({ instanceId: 'enemy', ownerPlayerId: 'player-blue', x: 3, currentHp: 20 })] })
 }
 describe('trusted code-node runtime facade', () => {
+  it('probes missing dependencies while preserving references during death settlement', () => {
+    const battle = fixture(), flow = createSkillCodeFlow(battle, { piece: battle.pieces[0] }, 'skill')
+    expect(flow.query.hasPiece('self')).toBe(true)
+    expect(flow.query.hasPlayer('player-red')).toBe(true)
+    expect(flow.query.hasPiece(null)).toBe(false)
+    expect(flow.query.hasPlayer('missing')).toBe(false)
+    battle.pieces[1].currentHp = 0
+    expect(flow.query.hasPiece('enemy')).toBe(true)
+    battle.pieces.splice(0, 1)
+    expect(flow.query.hasPiece('self')).toBe(false)
+  })
   it('uses team relations in four seats while ownerId alone remains exact ownership', () => {
     const ids = ['blue1', 'red1', 'red2', 'blue2']
     const battle = makeState({ pieces: ids.map(id => makePiece({ instanceId: id, ownerPlayerId: id })) })

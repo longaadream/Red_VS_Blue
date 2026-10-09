@@ -91,7 +91,7 @@ function graphCandidate(
   if (typeof definition[field] !== 'string' || definition[field].length === 0) return undefined
   const group = surface === 'card' ? 'cards' : 'rules'
   const production = JSON.parse(readFileSync(resolve(process.cwd(), 'data', group, `${definition.id}.json`), 'utf8'))
-  if (production.contentGraphField === field) {
+  if (production.contentGraphField === field || production.gameplayModules?.entries?.[field]) {
     assertContentGraphArtifact(production)
     return production
   }

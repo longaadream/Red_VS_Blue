@@ -10,6 +10,7 @@ import { applyBattleAction, type BattleAction, type BattleState } from '@/lib/ga
 import { prepareAction } from '@/lib/game/targeting'
 import type { SkillDefinition } from '@/lib/game/skills'
 import { asPieceInstance, makePiece, makeState } from '../helpers/minimal-state'
+import { applyGameplayModuleGraph, createGameplayModuleGraph } from '../../lib/skill-graph/module-document'
 
 function venomClaw(): SkillDefinition {
   return JSON.parse(readFileSync('data/skills/venom-claw-rend.json', 'utf8')) as SkillDefinition
@@ -217,6 +218,10 @@ describe('RED-224 isolated public skill preview', () => {
 
   it('previews a public single target skill and matches applyBattleAction', () => {
     const state = publicFixture()
+    state.skillsById['module-probe'] = applyGameplayModuleGraph({
+      id: 'module-probe', name: '模块探针', kind: 'active', type: 'normal',
+      actionPointCost: 0, cooldownTurns: 0, maxCharges: 0, powerMultiplier: 1,
+    }, createGameplayModuleGraph('skill')) as unknown as SkillDefinition
     const action = targetedAction(state)
     const before = JSON.stringify(state)
     const actual = applyBattleAction(structuredClone(state), action)
@@ -231,6 +236,7 @@ describe('RED-224 isolated public skill preview', () => {
     expect(result.events.some(event => event.kind === 'damage')).toBe(true)
     expect(JSON.stringify(result)).not.toContain('previewCode')
     expect(JSON.stringify(result)).not.toContain('contentGraph')
+    expect(JSON.stringify(result)).not.toContain('gameplayModules')
     expect(JSON.stringify(result)).not.toContain('venom-claw-rend-random')
     expect(JSON.stringify(state)).toBe(before)
   })

@@ -12,7 +12,7 @@ const candidates:Array<{id:string;legacy:SkillDefinition;graph:SkillDefinition}>
 for (const [key, definition] of Object.entries(baseline.entries)) {
   if (!key.startsWith('skills/') || typeof definition.code !== 'string') continue
   const production = JSON.parse(readFileSync(`data/${key}.json`, 'utf8'))
-  if (production.contentGraphField === 'code') {
+  if (production.contentGraphField === 'code' || production.gameplayModules?.entries?.code) {
     assertContentGraphArtifact(production)
     candidates.push({id:String(definition.id),legacy:definition as unknown as SkillDefinition,graph:production})
     continue

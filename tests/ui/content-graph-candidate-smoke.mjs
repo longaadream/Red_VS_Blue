@@ -270,6 +270,12 @@ if (process.versions.electron) {
       if (JSON.stringify(expected) !== JSON.stringify(loaded)) throw new Error(`QA resource payload is stale for ${id}; restart scripts/qa/practice-server.mjs`)
       resourceProof.push({ id, sha256: createHash('sha256').update(JSON.stringify(loaded)).digest('hex') })
     }
+    const coin = JSON.parse(readFileSync(path.join(root, 'data/cards/lucky-coin.json'), 'utf8'))
+    const coinFields = ['code', 'description', 'gameplayModules']
+    const expectedCoin = Object.fromEntries(coinFields.map(key => [key, coin[key]]))
+    const loadedCoin = await evaluate(`Object.fromEntries(${JSON.stringify(coinFields)}.map(key => [key, cardsById['lucky-coin'][key]]))`)
+    if (JSON.stringify(expectedCoin) !== JSON.stringify(loadedCoin)) throw new Error('QA lucky-coin module payload is stale; restart the QA server')
+    resourceProof.push({ id: 'cards/lucky-coin', sha256: createHash('sha256').update(JSON.stringify(loadedCoin)).digest('hex') })
 
     // Establish the roster through the page's own training initializer. The
     // setup sheet is intentionally bypassed as a deterministic QA fixture;

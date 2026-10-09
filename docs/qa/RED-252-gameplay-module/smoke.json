@@ -1,0 +1,16 @@
+{
+  "ok": true,
+  "startedAt": "2026-10-09T16:47:35.977Z",
+  "completedAt": "2026-10-09T16:47:37.814Z",
+  "checks": [
+    "real Electron mount",
+    "registered palette",
+    "typed literal parameters",
+    "typed prior-output reference",
+    "composite navigation and persistence",
+    "module document save and reload",
+    "unknown fields preserved",
+    "controls fit detail pane"
+  ],
+  "screenshot": "gameplay-module-editor.png"
+}

@@ -1,14 +1,30 @@
 # RED-252 验证记录
 
-状态修订：v1 编译图迁移与兼容性候选验证已完成；用户随后明确要求所有复杂功能也由注册模块组合。该要求尚未实现，任务退回开发中，PR 为草案。下方旧候选数据保留为兼容性证据，不能证明语义模块化完成。新的边界见 [统一玩法模块说明书](../technical/GAMEPLAY_MODULE_CONTRACT.md)。全套游戏测试仍有 39 项已确认的基线失败。
+当前状态：已实现语义模块引擎底座及首批五个生产入口；完整普通对局迁移仍未完成，RED-252 保持开发中、PR #240 保持草案。下方 v1 历史数据只证明兼容性。边界见 [统一玩法模块说明书](../technical/GAMEPLAY_MODULE_CONTRACT.md)。
 
-## 模块标准修订
+## 2026-10-10：语义模块引擎与首批生产迁移
+
+实现 78 个注册原子模块、类型端口/入口权限校验、递归组合展开、条件/集合子流程及失效引用传播。普通效果不能绕过实体存在检查；存在性谓词仅通过可信注册项 `inspectReferences` 检查失效引用，内容节点不能自行声明该权限。模块生成字段在保存、技能/卡牌/规则加载时校验一致性，编辑器禁止解绑已持有的模块字段。
+
+实际迁移 `skills/reap`、`skills/hidan-undying`、`cards/rafaam-curse-sample`、`cards/lucky-coin`、`rules/rule-reap`。共享成功消息组合跨入口复用；伤害折半公式通过组合模块展开，治疗仍提交原权威队列。保留冻结原文、日志及字段。双尾飞行、动态生成与 pending 等复杂流程还未完成语义迁移；覆盖报告明确为 `partial`，只有 5 个字段计入新模块，不能将原 360 个兼容图字段全部算入。
+
+- 完整游戏回归 `semantic-full-game-final.json`：**2464 项，2423 通过、41 失败**；旧候选为 2452 项/39 失败，原 39 项失败名称保持一致。新增两项在 AI pending 枚举和双房间 100 次转换场景中超过既有 5 秒/20 秒限制（6207ms/23920ms）。为诊断单独执行这两个文件，**31/31 通过**，对应耗时 4489ms/17962ms，未修改代码或超时阈值；全量结果仍非绿色，性能波动根因尚未证实。不得把单独通过替代全量结果。[精确比较](RED-252-gameplay-module/full-game-comparison.json)。
+- 最新定向集 `output/red-252/semantic-suite-final.json`：**1093/1093 通过**，覆盖编译器、注册表、生产字段保留、技能/卡牌/规则差分、生成内容、预览、存储和效果链。
+- `node --test tests/content/content-graph-coverage.test.mjs`：**12/12 通过**。包含语义来源重新编译、篡改拒绝及拉法姆复制来源验证；报告重建后 unknown references 为 0。
+- 根 TypeScript、编辑器 TypeScript、共享编辑器 bundle 和浏览器游戏引擎构建通过。
+- 真实 Electron 新模块编辑器验证：结构化输入、前序输出引用、组合模块独立端口、进入/返回、组合调用、子流程复制、保存重开和窄面板布局通过。旧编辑器的 17 项兼容检查仍通过。[编辑器证据](RED-252-gameplay-module/smoke.json)、[截图](RED-252-gameplay-module/gameplay-module-editor.png)。
+- 最新候选战斗 UI 冒烟于上海时间 00:48 完成，种子 594。实际载入的新模块幸运币代码/图/文案与磁盘匹配，真实手牌点击、AP/日志、动画结束及既有双尾飞行交互均通过。[候选报告](RED-252-gameplay-module/battle-smoke.json)。
+- 独立审查最终无未解决实质性发现，另行运行 44/44 测试通过。审查不代表用户体验人工验收。
+
+回退：将本批五个内容定义与模块编译器、运行时桥接、编辑器及生成 bundle 成组回退到 `a35c5194b6`；不改存档或正在进行的对局，不覆盖独立用户资源项目。人工可在独立项目中新建模块图，建立一个带输入/输出的组合模块并调用、保存重开，再使用幸运币及收割技能核对原文、日志与效果。
+
+## 历史：模块标准修订
 
 已核查当前编译器的字段读取/赋值、函数调用和源码生成入口，以及双尾飞行、塔尔斯护甲、拉法姆生成/复制、水门与图拉扬续接。它们目前仍依赖编程语义。新说明书规定作者层只能引用有类型端口和明确副作用契约的注册模块，组合模块须可递归展开，原子能力适配现有权威引擎。此轮未修改运行时或内容行为；新增覆盖报告范围声明，明确编译图通过不等于模块化完成。
 
 本轮 `node --test tests/content/content-graph-coverage.test.mjs` 为 11/11，通过已包含范围声明的断言；覆盖报告已重建。定向 ESLint、编码及差异空白检查通过。独立审查未发现规格、兼容边界或状态声明的实质性问题；不代替后续模块实现的审查。本轮没有重新运行全量游戏/界面测试，下方均是旧候选证据。
 
-## 最新候选验证
+## 历史：v1 候选验证
 
 - 实际普通对局数据：276 个代码主入口、84 个预览入口已转为图。45 个棋子与 26 个原有声明式定义保留数据和引用，不伪称代码迁移。
 - `npx.cmd vitest run tests/skill-graph tests/content/content-graph-production.test.ts tests/game/content-graph-corpus.test.ts tests/game/content-graph-card-rule-corpus.test.ts tests/game/content-graph-targeting.test.ts tests/game/content-graph-preview.test.ts tests/game/content-graph-generated-cards.test.ts tests/game/content-graph-migration.test.ts --maxWorkers=1 --reporter=json --outputFile=output/red-252/final-content-suite.json`：1013/1013 通过。

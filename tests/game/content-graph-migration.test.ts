@@ -17,6 +17,7 @@ import {
   type ContentGraphSurface,
 } from '@/electron-editor/content-graph'
 import { importContentGraph } from '@/electron-editor/content-graph-import'
+import { assertGameplayModuleDocument } from '@/lib/skill-graph/module-document'
 import {
   loadCardById,
   loadRuleById,
@@ -192,6 +193,11 @@ function assertProductionArtifact(
   surface: ContentGraphSurface,
   field: string,
 ): void {
+  if (production.gameplayModules) {
+    assertGameplayModuleDocument(production)
+    expect(canonicalDefinition(production)).toEqual(canonicalDefinition(legacy))
+    return
+  }
   const expected = migrateDefinition(legacy, surface, field).graph
   expect(production[field], `${surface}:${String(legacy.id)} generated source`).toBe(expected[field])
   expect(production.contentGraph, `${surface}:${String(legacy.id)} content graph`).toEqual(expected.contentGraph)
@@ -391,7 +397,7 @@ function gridAction(
   }
 }
 
-const generatedDefinitionFields = new Set(['code', 'skillCode', 'previewCode', 'contentGraph', 'contentGraphField', 'contentGraphCompilerVersion', 'contentGraphEntries'])
+const generatedDefinitionFields = new Set(['code', 'skillCode', 'previewCode', 'contentGraph', 'contentGraphField', 'contentGraphCompilerVersion', 'contentGraphEntries', 'gameplayModules'])
 
 function canonicalDefinition(value: unknown): unknown {
   if (!record(value)) return value

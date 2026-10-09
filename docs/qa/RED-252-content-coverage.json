@@ -3,9 +3,17 @@
   "reportKind": "content-graph-coverage",
   "assessmentScope": "compiler-ir-and-behavior-compatibility",
   "semanticModuleCoverage": {
-    "status": "not-assessed",
+    "status": "partial",
     "complete": false,
-    "reason": "Validated v1 compiler graphs do not prove registered semantic-module composition. Domain-module dependencies, typed ports and absence of author-level code escape hatches require a separate audit."
+    "validatedInlineFields": 5,
+    "fields": [
+      "cards/lucky-coin:code",
+      "cards/rafaam-curse-sample:code",
+      "rules/rule-reap:skillCode",
+      "skills/hidan-undying:code",
+      "skills/reap:code"
+    ],
+    "reason": "Only registered gameplay-module entries count here. Compatibility graphs, declarative content and generated/pending child content do not establish complete semantic-module coverage."
   },
   "baseBranch": "main",
   "baseSha": "00df31f8bd35b34200d507fd83853bf5ac99ba94",
@@ -1321,8 +1329,8 @@
       "hashes": {
         "textSha256": "118926d3b522e4a652991e5861f81c34aed7dedc25daacc09eac1a3ac6b959d2",
         "targetingSha256": "7c1c7407aad0ea7895fea4cdb01d792b479806dae9ecad5171172e1f21df3b0c",
-        "codeSha256": "a5823980b3886f8df9e93ea0d5954998cec8416782bbe18242e46d7799b75831",
-        "metadataSha256": "28bee1fc3d87327b6268c54e64344915ef8e3f36c4490a315dda4de5f78977bc"
+        "codeSha256": "be1e6ca5d625f205400ab78d9a3fea309eaa6e9e617983cec68adefa58372c86",
+        "metadataSha256": "6e3e4177a0eff5d40f9f27b818c86059934ec7e5366175afb2c098994c6c8a44"
       },
       "migration": {
         "sourceKind": "inline-fields",
@@ -1331,12 +1339,12 @@
         ],
         "status": "graph-validated",
         "graphArtifact": "validated",
-        "reason": "The repository compiler assertion accepted the explicit graph artifact for inline field \"code\".",
+        "reason": "Document contains registered gameplay-module entries; semantic coverage is reported separately from compatibility graphs.",
         "fields": {
           "code": {
             "status": "graph-validated",
-            "graphArtifact": "validated",
-            "reason": "The repository compiler assertion accepted the explicit graph artifact for inline field \"code\"."
+            "graphArtifact": "semantic-module-validated",
+            "reason": "The registered module compiler validated this entry and its generated source."
           }
         }
       },
@@ -3431,8 +3439,8 @@
       "hashes": {
         "textSha256": "5ad9582e8d657d0ab6340d1d1e821221120460451652c3f67a1560290544a04d",
         "targetingSha256": "7c1c7407aad0ea7895fea4cdb01d792b479806dae9ecad5171172e1f21df3b0c",
-        "codeSha256": "b6f8f741cb682767893ffcab46bca5630d0e95ddd115e482afe5d95c42d6dabc",
-        "metadataSha256": "20292ca6021a7e709304ee48c5a35871e6c0efc0381bcd9634ccb7d4ce68f6f8"
+        "codeSha256": "a312495eb68d0c2da1ab1155d4a4e3deb1d6af38c3c36b0c9d776c4233281691",
+        "metadataSha256": "c2b32dbeb45ce3efcd506850e910daaa155b62a72fab570a1d55ff94a0e0baa6"
       },
       "migration": {
         "sourceKind": "inline-fields",
@@ -3441,12 +3449,12 @@
         ],
         "status": "graph-validated",
         "graphArtifact": "validated",
-        "reason": "The repository compiler assertion accepted the explicit graph artifact for inline field \"code\".",
+        "reason": "Document contains registered gameplay-module entries; semantic coverage is reported separately from compatibility graphs.",
         "fields": {
           "code": {
             "status": "graph-validated",
-            "graphArtifact": "validated",
-            "reason": "The repository compiler assertion accepted the explicit graph artifact for inline field \"code\"."
+            "graphArtifact": "semantic-module-validated",
+            "reason": "The registered module compiler validated this entry and its generated source."
           }
         }
       },
@@ -11483,8 +11491,8 @@
       "hashes": {
         "textSha256": "01ecdcaf230e76849330e675c1a8e284b116b646f9ed9d9c7dcd980e1cae80c8",
         "targetingSha256": "7c1c7407aad0ea7895fea4cdb01d792b479806dae9ecad5171172e1f21df3b0c",
-        "codeSha256": "96b4accd2b3d1b6ba92ecf5576db1676dcd25c2deca3725d85371c54e73b17d5",
-        "metadataSha256": "99387f3da4fd85a7656b795a5de92f18ba6bd8ef9d56719e83813bed73101483"
+        "codeSha256": "006e1088020e88820ecf0113e2a300eabf89d288f6b164a85e78548d29cd971d",
+        "metadataSha256": "9f4f4ce47243a062a72556a8d8ecfab9bbab01d435962d9498a342503f39c2a6"
       },
       "migration": {
         "sourceKind": "inline-fields",
@@ -11493,12 +11501,12 @@
         ],
         "status": "graph-validated",
         "graphArtifact": "validated",
-        "reason": "The repository compiler assertion accepted the explicit graph artifact for inline field \"skillCode\".",
+        "reason": "Document contains registered gameplay-module entries; semantic coverage is reported separately from compatibility graphs.",
         "fields": {
           "skillCode": {
             "status": "graph-validated",
-            "graphArtifact": "validated",
-            "reason": "The repository compiler assertion accepted the explicit graph artifact for inline field \"skillCode\"."
+            "graphArtifact": "semantic-module-validated",
+            "reason": "The registered module compiler validated this entry and its generated source."
           }
         }
       },
@@ -11508,7 +11516,7 @@
           "toGroup": "skills",
           "toId": "reap",
           "relation": "skill-reference",
-          "fieldPath": "contentGraph.nodes.1.args.0.entries.3.value.value",
+          "fieldPath": "gameplayModules.entries.skillCode.graph.body.5.then.3.then.2.then.0.parameters.skillId",
           "evidenceKind": "data-literal"
         },
         {
@@ -17773,8 +17781,8 @@
       "hashes": {
         "textSha256": "81b249454b07720521e9d1304f3756c555699dc53aef2d4aa54d96c8b9938341",
         "targetingSha256": "7c1c7407aad0ea7895fea4cdb01d792b479806dae9ecad5171172e1f21df3b0c",
-        "codeSha256": "20edf719733ab217b3ba82d713577c63de259d3618d45d83d0d626ba084c63aa",
-        "metadataSha256": "9689838f567caffa24aa703151f4ec69f505448ae12e8de1050bbef5c87d64f3"
+        "codeSha256": "88d97269010d555c896e814aa4a121d2ca792f4c761ede10b75da57bf9a6dffa",
+        "metadataSha256": "234036aaeb948db38b57a6e56bd60128633771c3070c688325196cd663a51759"
       },
       "migration": {
         "sourceKind": "inline-fields",
@@ -17783,12 +17791,12 @@
         ],
         "status": "graph-validated",
         "graphArtifact": "validated",
-        "reason": "The repository compiler assertion accepted the explicit graph artifact for inline field \"code\".",
+        "reason": "Document contains registered gameplay-module entries; semantic coverage is reported separately from compatibility graphs.",
         "fields": {
           "code": {
             "status": "graph-validated",
-            "graphArtifact": "validated",
-            "reason": "The repository compiler assertion accepted the explicit graph artifact for inline field \"code\"."
+            "graphArtifact": "semantic-module-validated",
+            "reason": "The registered module compiler validated this entry and its generated source."
           }
         }
       },
@@ -21476,8 +21484,8 @@
       "hashes": {
         "textSha256": "8bea3bfc232448fecd3089b43f63e8a14f87fbd324a4ff4154773347401e2235",
         "targetingSha256": "3feeb822c0e94a33c3ca346cb2a0b0dc594dfbed83aef8170a4443fc4aa7954c",
-        "codeSha256": "6f3f5212f7b55417d70218fa3269f306c2661b801009c2c1e8d3cab42cbdab7b",
-        "metadataSha256": "90c00d940c466ba2d4dca4458845987c3429e4fb44ccdb3c952bfe28dedf7db1"
+        "codeSha256": "26cb86d1c022c1ed497c26bc7f0e39a6f2420de1b1e2c73090574e12670a0e0f",
+        "metadataSha256": "256bc2dd1b38313af4ea88d0c36be19ac336b82c83b7c019cbd7d93d6f4f7f08"
       },
       "migration": {
         "sourceKind": "inline-fields",
@@ -21486,12 +21494,12 @@
         ],
         "status": "graph-validated",
         "graphArtifact": "validated",
-        "reason": "The repository compiler assertion accepted the explicit graph artifact for inline field \"code\".",
+        "reason": "Document contains registered gameplay-module entries; semantic coverage is reported separately from compatibility graphs.",
         "fields": {
           "code": {
             "status": "graph-validated",
-            "graphArtifact": "validated",
-            "reason": "The repository compiler assertion accepted the explicit graph artifact for inline field \"code\"."
+            "graphArtifact": "semantic-module-validated",
+            "reason": "The registered module compiler validated this entry and its generated source."
           }
         }
       },
@@ -29986,7 +29994,7 @@
       "toGroup": "skills",
       "toId": "reap",
       "relation": "skill-reference",
-      "fieldPath": "contentGraph.nodes.1.args.0.entries.3.value.value",
+      "fieldPath": "gameplayModules.entries.skillCode.graph.body.5.then.3.then.2.then.0.parameters.skillId",
       "evidenceKind": "data-literal"
     },
     {
@@ -29999,7 +30007,7 @@
       "fieldPath": "skillCode",
       "evidenceKind": "code-literal",
       "line": 1,
-      "column": 778
+      "column": 13031
     },
     {
       "from": "rules/rule-recall-endturn",
@@ -35868,16 +35876,12 @@
                     "status": "graph-source-validated",
                     "id": "rafaam-curse-sample",
                     "field": "code",
-                    "sourceSha256": "5c9de9b5a97948b6393f6da2de00c6a7b25927b7920ef5f48cb01b2bd65b20a8",
+                    "sourceSha256": "cb14e667123cd0fc41d1139d84516384e601f2cfd5c032104bd111ffa4d0b6ed",
                     "graphArtifactStatus": "graph-validated",
                     "inspection": {
-                      "sourceExpressionCount": 0,
-                      "materializeSourceCount": 0,
-                      "sourceExpressionPaths": [],
-                      "materializeSourcePaths": [],
+                      "authoringKind": "registered-gameplay-modules",
                       "rawExecutableSourceLiterals": [],
-                      "unresolvedSinkPaths": [],
-                      "typedSourceCount": 0
+                      "unresolvedSinkPaths": []
                     }
                   },
                   {
@@ -36167,16 +36171,12 @@
               "status": "graph-source-validated",
               "id": "rafaam-curse-sample",
               "field": "code",
-              "sourceSha256": "5c9de9b5a97948b6393f6da2de00c6a7b25927b7920ef5f48cb01b2bd65b20a8",
+              "sourceSha256": "cb14e667123cd0fc41d1139d84516384e601f2cfd5c032104bd111ffa4d0b6ed",
               "graphArtifactStatus": "graph-validated",
               "inspection": {
-                "sourceExpressionCount": 0,
-                "materializeSourceCount": 0,
-                "sourceExpressionPaths": [],
-                "materializeSourcePaths": [],
+                "authoringKind": "registered-gameplay-modules",
                 "rawExecutableSourceLiterals": [],
-                "unresolvedSinkPaths": [],
-                "typedSourceCount": 0
+                "unresolvedSinkPaths": []
               }
             },
             {

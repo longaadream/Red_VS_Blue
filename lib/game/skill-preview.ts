@@ -717,6 +717,7 @@ function redactSkill(skill: unknown): unknown {
   delete result.contentGraphField
   delete result.contentGraphCompilerVersion
   delete result.contentGraphEntries
+    delete result.gameplayModules
   delete result.statusTag
   delete result.summonCapability
   delete result.deathParasitism

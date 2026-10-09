@@ -8,7 +8,7 @@ import { preparePublicationIdentity } from './publication-identity'
 import { openTrainingPreview, closeTrainingPreviews } from './training-preview'
 import type { TrainingSnapshot } from './training-resources'
 import { readCodeImport } from './code-import'
-import { assertContentGraphArtifact } from './content-graph-document'
+import { assertContentGraphArtifact, assertGameplayModuleTransition } from './content-graph-document'
 import { assertSkillGraphArtifact } from './skill-graph'
 import { assertContentProjectRoot, createContentProject, openContentProject, readDocumentSnapshot, writeDocumentSnapshot } from './content-project'
 import {
@@ -328,6 +328,7 @@ handleTrusted('write-file', (_e, subdir: string, filename: string, data: unknown
   assertSkillGraphArtifact(data)
   assertContentGraphArtifact(data)
   const file = safePath(subdir, filename, 'write')
+  if (fs.existsSync(file)) assertGameplayModuleTransition(JSON.parse(fs.readFileSync(file, 'utf-8')), data)
   fs.writeFileSync(file, JSON.stringify(data, null, 2) + '\n', 'utf-8')
   return { ok: true }
 })
