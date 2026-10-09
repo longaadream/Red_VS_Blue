@@ -70,7 +70,7 @@ body {
   min-height: 0;
   max-width: 306px !important;
   padding: 0 !important;
-  flex-wrap: nowrap !important;
+  flex-wrap: wrap !important;
 }
 
 .turn-summary {
@@ -957,11 +957,10 @@ body #targetOverlay #targetSelectionControls { z-index: auto; }
     inset: 52px 8px auto 8px !important;
     width: auto !important;
     max-width: none !important;
-    height: 44px !important;
+    height: auto !important;
     min-height: 0 !important;
-    flex-wrap: nowrap !important;
-    overflow-x: auto !important;
-    overflow-y: hidden !important;
+    flex-wrap: wrap !important;
+    overflow: visible !important;
     pointer-events: none !important;
   }
   body:not(.full-map) .topbar > * { pointer-events: auto !important; flex-shrink: 0; }

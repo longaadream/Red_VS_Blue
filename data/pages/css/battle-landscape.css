@@ -135,8 +135,8 @@
     max-width: 236px !important;
     padding: 2px !important;
     gap: 3px !important;
-    flex-wrap: nowrap !important;
-    overflow-x: auto !important;
+    flex-wrap: wrap !important;
+    overflow: visible !important;
   }
   body .topbar button { width: 44px !important; min-width: 44px !important; height: 44px !important; min-height: 44px !important; }
 
@@ -456,26 +456,39 @@
   body #handCards .card-item { -webkit-touch-callout: none; user-select: none; touch-action: pan-x; }
 }
 
-/* Toolbar width is shared by every landscape breakpoint, including desktop
-   windows shorter than 601px. Keep the first (leave) button reachable. */
+/* All tools stay visible: wrap into rows rather than a scrolling strip. */
 @media (orientation: landscape) {
   body { --battle-tools-width: min(304px, 40vw); }
   body .topbar {
     width: var(--battle-tools-width) !important;
     max-width: var(--battle-tools-width) !important;
     box-sizing: border-box !important;
-    flex-wrap: nowrap !important;
-    justify-content: flex-start !important;
-    overflow-x: auto !important;
-    overflow-y: hidden !important;
-    pointer-events: auto !important;
-    touch-action: pan-x;
-    scrollbar-width: thin;
+    flex-wrap: wrap !important;
+    justify-content: flex-end !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    pointer-events: none !important;
   }
-  body .topbar > * { flex-shrink: 0 !important; }
+  body .topbar > * { flex-shrink: 0 !important; pointer-events: auto; }
   body .phase-bar {
     right: calc(var(--battle-tools-width) + 28px) !important;
     max-width: calc(100vw - var(--battle-tools-width) - 40px) !important;
+  }
+}
+@media (max-width: 760px), (orientation: landscape) and (max-height: 600px) {
+  /* Waiting keeps the tools visible; reserve their expanded rows. */
+  body.pending-response-waiting #targetOverlay {
+    left: 8px !important;
+    right: auto !important;
+    max-width: calc(100vw - var(--battle-tools-width, min(304px, 40vw)) - 32px) !important;
+  }
+}
+@media (max-width: 760px) and (orientation: portrait) {
+  body:not(.full-map) .topbar {
+    left: auto !important;
+    width: min(304px, 40vw) !important;
+    max-width: min(304px, 40vw) !important;
   }
 }
 @media (orientation: landscape) and (min-height: 601px) {

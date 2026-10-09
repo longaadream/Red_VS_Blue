@@ -716,3 +716,5 @@ RED-250 将同一续选流程用于 `playCard`：原牌目标仍属于根动作�
 移动预演同时使用规则输出的 snapshot 与 events：snapshot 展示假设棋盘，damage/heal events 通过 spawnFloater 的 preview 标记显示实际预测数值；取消或替换路线清理预演浮字，正式浮字不受影响。同一草稿刷新棋盘不重复播放伤害提示。状态图标有正数 stacks 时优先显示该层数（包括一层），不能用 intensity 替代层数。
 
 公开预演的过滤项及尚未支持的执行场景见 docs/qa/RED-240-public-terrain-preview.md。它调用正式规则执行器，但输入经过隐私投影；未知扩展及额外选择反应存在明确限制，不能解释为完整权威结局。
+
+RED-250 工具栏补充：战局右上 `.topbar` 所有现有按钮在空间不足时平铺换行，由 `battle-landscape.css`、`battle-tactical-table.css` 与最终 `battle-tabletop-ui.css` 控制级联；不使用滚动条或隐藏按钮。容器空白不拦截棋盘输入，子控件沿用原操作。窄屏等待对手响应的提示为展开后的工具栏保留横向空间；本方目标选择原有 HUD 隐藏策略不变。
