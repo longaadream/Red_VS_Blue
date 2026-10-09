@@ -1281,3 +1281,19 @@ body.target-mode-active .battle-vignette-speed-control { top: calc(env(safe-area
 .history-response { display: grid; gap: 4px; margin-left: 14px; padding-left: 10px; border-left: 2px dashed #6b563b; }
 .history-response-title { font-weight: 700; display: flex; align-items: center; gap: 5px; }
 .history-own-effects { display: grid; gap: 4px; }
+
+/* Long release names and nested responses must leave result amounts readable. */
+.action-history-predicate.is-skill-release strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.history-response, .history-own-effects { min-width: 0; }
+.action-history-sentence { flex-wrap: wrap; max-width: 100%; }
+.history-response-title {
+  min-width: 0;
+  flex-wrap: wrap;
+  overflow-wrap: anywhere;
+}
+.action-history-complement.is-amount { flex: 0 0 auto; }

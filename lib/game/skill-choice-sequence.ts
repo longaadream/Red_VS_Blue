@@ -167,6 +167,12 @@ export function applySkillChoiceSequence(
       // not feed our answer to it or skip it; keep the authority pending flow.
       if (!skillChoiceMatchesPrompt(choice, next, action.playerId)) break
       const pending = next.pendingTargetSelection ?? next.pendingOptionSelection!
+      // Each choice resumes the transaction by replaying the root from its
+      // original prestate. Discard the preceding speculative recording before
+      // the next replay so the recorder's frame stays aligned with `next`.
+      // The final reduce below then leaves only the committed presentation
+      // facts; the same closure still restores the original frame on failure.
+      rollbackPresentation()
       const { kind, source: _source, promptKey: _promptKey, cancelled, ...input } = choice
       void _source
       void _promptKey

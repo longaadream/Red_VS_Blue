@@ -133,6 +133,18 @@ function removeHiddenInventory(holder: JsonRecord): void {
   for (const key of HIDDEN_INVENTORY_KEYS) delete holder[key]
 }
 
+const LIGHTFORGED_TURN_MARKERS = 'turalyonLightforgedTurns'
+
+function publicSourceTurnMarkerMap(value: unknown, state: BattleState): JsonRecord | undefined {
+  if (!isRecord(value)) return undefined
+  const sourceIds = new Set(state.pieces.map(piece => piece.instanceId))
+  const visibleMarkers: JsonRecord = {}
+  for (const [sourceId, marker] of Object.entries(value)) {
+    if (sourceIds.has(sourceId) && Number.isSafeInteger(marker)) visibleMarkers[sourceId] = marker
+  }
+  return visibleMarkers
+}
+
 /**
  * The projection below proves the public rule sources before this check runs.
  * These remaining surfaces are rejected because their replay semantics still
@@ -198,6 +210,16 @@ function sanitizePreviewState(state: BattleState): boolean {
     const sanitized: Record<string, unknown> = {}
     for (const [key, value] of Object.entries(state.extensions)) {
       if (PRIVATE_EXTENSION_KEYS.has(key)) continue
+      // The owner-scoped source marker is retained only after the public state
+      // projection has reduced it to known piece IDs. It is execution
+      // metadata, not a general extension allowlist or a display surface.
+      if (key === LIGHTFORGED_TURN_MARKERS) {
+        const sourceMarkers = publicSourceTurnMarkerMap(value, state)
+        if (sourceMarkers) {
+          sanitized[key] = sourceMarkers
+          continue
+        }
+      }
       // Unknown extension data may be private or an optional presentation
       // feature. Drop it from the isolated input so its mere presence cannot
       // change availability and reveal hidden state.

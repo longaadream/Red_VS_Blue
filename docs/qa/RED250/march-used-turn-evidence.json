@@ -1,0 +1,101 @@
+{
+  "capture": {
+    "kind": "RED-250 live training march failure",
+    "page": "rvb-client://app/battle.html?mode=training",
+    "worktreeHead": "f922766f70047c718607efae90c61442930c4aac",
+    "loadedResources": {
+      "battle.html": {
+        "sha256": "6dd6f888846bc4a01701ea46e5c7a63064be0fd96c334ad84ef8685164f2aa9e",
+        "normalizedUtf8Bytes": 521419
+      },
+      "js/game-engine.js": {
+        "sha256": "2b0a0c73c3524a97a7fd68406e46e9047b0a432d8bb268793d888c1985f6cc2e",
+        "normalizedUtf8Bytes": 650923
+      }
+    }
+  },
+  "live": {
+    "viewer": "training-blue",
+    "turn": {
+      "currentPlayerId": "training-blue",
+      "turnNumber": 2,
+      "phase": "action"
+    },
+    "targetingRevision": 9,
+    "pieces": [
+      { "id": "training-blue-1", "templateId": "sonic", "x": 12, "y": 4, "currentHp": 12 },
+      { "id": "training-blue-2", "templateId": "turalyon", "x": 3, "y": 1, "currentHp": 15 },
+      { "id": "training-red-2", "templateId": "dark-aizen", "x": 12, "y": 8, "currentHp": 4 }
+    ],
+    "turalyonLightforgedTurns": { "training-blue-2": 2 },
+    "pendingCardAction": {
+      "cardId": "holy-heal",
+      "localCardDraft": true,
+      "rootAction": {
+        "type": "playCard",
+        "playerId": "training-blue",
+        "cardInstanceId": "ci-holy-heal-575511391",
+        "stateRevision": 9,
+        "skillChoices": [
+          {
+            "kind": "target",
+            "source": { "type": "rule", "id": "rule-turalyon-lightforged-march", "pieceId": "training-blue-2" },
+            "promptKey": "public-choice-v1-c42f903f8531783c50ab98f6522752e3acd4734b8a9f79cfaa1b962ef73c088b",
+            "targetPieceId": "training-blue-1"
+          }
+        ]
+      },
+      "preparation": {
+        "kind": "needTarget",
+        "continuation": true,
+        "source": { "type": "rule", "id": "rule-turalyon-lightforged-march", "pieceId": "training-blue-2" },
+        "promptKey": "public-choice-v1-04a8f6e84b56491587644198d233970572791571c9b4f95707d44a7b35b989d8",
+        "targetType": "cell",
+        "candidates": [
+          { "type": "cell", "x": 12, "y": 4 },
+          { "type": "cell", "x": 11, "y": 4 }
+        ]
+      }
+    },
+    "evidence": {
+      "rejectionCode": "TARGET_SKILL_CHOICES_INVALID",
+      "rejectionMessage": "Invalid skill choice sequence",
+      "rejectionCount": 10,
+      "lastRejectionTimes": [1791533080201, 1791533080790, 1791533081000]
+    }
+  },
+  "reproduction": {
+    "previewRootNoChoices": {
+      "status": "needs-input",
+      "source": { "type": "rule", "id": "rule-turalyon-lightforged-march", "pieceId": "training-blue-2" },
+      "promptKey": "public-choice-v1-c42f903f8531783c50ab98f6522752e3acd4734b8a9f79cfaa1b962ef73c088b"
+    },
+    "previewAfterFirstChoice": {
+      "status": "needs-input",
+      "source": { "type": "rule", "id": "rule-turalyon-lightforged-march", "pieceId": "training-blue-2" },
+      "promptKey": "public-choice-v1-04a8f6e84b56491587644198d233970572791571c9b4f95707d44a7b35b989d8",
+      "candidates": [{ "x": 12, "y": 4 }, { "x": 11, "y": 4 }]
+    },
+    "authorityRootNoChoices": {
+      "ok": true,
+      "pendingSelection": false,
+      "targetingRevision": 10,
+      "blueActionPoints": 6,
+      "blueHand": ["lucky-coin"],
+      "blueDiscard": ["holy-smite", "holy-heal"]
+    },
+    "authorityFullChoices": {
+      "choices": ["targetPieceId=training-blue-1", "targetX=12,targetY=4 (or 11,4)"],
+      "errorCode": "TARGET_SKILL_CHOICES_INVALID",
+      "errorMessage": "Invalid skill choice sequence",
+      "preStateHash": "90b2acba7ba6bcefec3ce5d198c3b8f42d021334b5dcfa1200495fcdf87a8c9d",
+      "postStateHash": "90b2acba7ba6bcefec3ce5d198c3b8f42d021334b5dcfa1200495fcdf87a8c9d",
+      "liveStateUnchanged": true
+    }
+  },
+  "interpretation": {
+    "cause": "The public preview executor drops unknown extensions, including turalyonLightforgedTurns, before replay. It therefore predicts a fresh march prompt although authority state already records that Turalyon's turn-2 march was fired.",
+    "authorityGuard": "After replaying the root card with no choices, authority has no pending selection because the rule returns success:false when firedTurns[turalyon.instanceId] equals the current turn. The first submitted public choice then hits the no-pending guard.",
+    "sourceBranch": "lib/game/skill-choice-sequence.ts:165-166"
+  }
+}

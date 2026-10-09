@@ -98,6 +98,10 @@ describe('RED-183 versioned deck preset persistence', () => {
   it('uses concise tactical roles instead of biography copy', () => {
     const api = loadApi()
     expect(api.roleFor({ id: 'turalyon', description: 'very long biography' })).toBe('辅助 / 机动')
+    for (const [id, role] of [['dark-muzan', '输出 / 治疗'], ['dark-akaza', '输出 / 机动']]) {
+      const piece = JSON.parse(readFileSync(resolve(process.cwd(), `data/pieces/${id}.json`), 'utf8'))
+      expect(api.roleFor(piece)).toBe(role)
+    }
     expect(api.roleFor({ id: 'unknown', description: '控制敌人。后续人物介绍' })).toBe('控制敌人')
   })
 })

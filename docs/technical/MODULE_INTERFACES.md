@@ -718,3 +718,11 @@ RED-250 将同一续选流程用于 `playCard`：原牌目标仍属于根动作�
 公开预演的过滤项及尚未支持的执行场景见 docs/qa/RED-240-public-terrain-preview.md。它调用正式规则执行器，但输入经过隐私投影；未知扩展及额外选择反应存在明确限制，不能解释为完整权威结局。
 
 RED-250 工具栏补充：战局右上 `.topbar` 所有现有按钮在空间不足时平铺换行，由 `battle-landscape.css`、`battle-tactical-table.css` 与最终 `battle-tabletop-ui.css` 控制级联；不使用滚动条或隐藏按钮。容器空白不拦截棋盘输入，子控件沿用原操作。窄屏等待对手响应的提示为展开后的工具栏保留横向空间；本方目标选择原有 HUD 隐藏策略不变。
+
+### RED-250 同回合圣铸标记与续选表现记录
+
+公共投影只向棋子拥有者提供经验证的 `extensions.turalyonLightforgedTurns`（已知棋子ID→安全整数回合），对手/旁观者不获得别人的标记。预演仅保留该显式键，不泛化未知扩展；用于避免权威已触发而公开准备重复请求进军。
+
+`applySkillChoiceSequence` 续选重放前回退上次暂态表现记录，再执行真实规则；最终事件只包含实际结算。取消附加效果不生成HP恢复事件，真实治疗照常记录一次；非法输入原子回滚不变。
+
+双人地图白名单新增 twin-bridges、crossroads-plaza、island-courtyard、broad-ring；全部中立20×16既有地形，2v2/PVE目录不变。一护两个月牙 cooldownTurns=2 为用户明确的本轮平衡校正。定位标签和历史CSS仅影响显示。详细验证、既有测试失败边界与回退见 docs/qa/RED250-urgent-fixes.md 最终追加。

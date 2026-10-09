@@ -571,4 +571,60 @@ describe('RED-250 Turalyon holy-hand authority continuation', () => {
     expect(secondResolved.players[0]).toMatchObject({ actionPoints: 1, hand: [], discardPile: ['holy-heal', 'holy-charge'] })
     expect(secondResolved.actions.filter((entry: any) => entry.type === 'playCard')).toHaveLength(2)
   })
+
+  it('keeps a same-turn march marker in the owner public preparation without leaking source IDs', () => {
+    const authorityState = makeHolyHandState()
+    authorityState.turn.turnNumber = 2
+    authorityState.pieces[0].instanceId = 'training-blue-2'
+    authorityState.pieces.push(makePiece({
+      instanceId: 'training-red-1',
+      ownerPlayerId: 'player-blue',
+      faction: 'blue',
+      x: 5,
+      y: 5,
+    }) as any)
+    ;(authorityState.extensions as any).turalyonLightforgedTurns = {
+      'training-blue-2': 2,
+      'training-red-1': 2,
+      'unknown-source': 2,
+    }
+    const root = {
+      type: 'playCard',
+      playerId: 'player-red',
+      cardInstanceId: 'red250-holy-heal',
+    } as BattleAction
+
+    const ownerProjection = toPublicBattleState(authorityState, 'player-red')
+    const opponentProjection = toPublicBattleState(authorityState, 'player-blue')
+    const spectatorProjection = toPublicBattleState(authorityState)
+    expect((ownerProjection.extensions as any).turalyonLightforgedTurns)
+      .toEqual({ 'training-blue-2': 2 })
+    expect((opponentProjection.extensions as any).turalyonLightforgedTurns)
+      .toEqual({ 'training-red-1': 2 })
+    expect((spectatorProjection.extensions as any).turalyonLightforgedTurns)
+      .toEqual({})
+    const unknownOnly = {
+      ...authorityState,
+      extensions: { ...authorityState.extensions },
+    }
+    ;(unknownOnly.extensions as any).turalyonLightforgedTurns = { 'unknown-source': 2 }
+    expect((toPublicBattleState(unknownOnly, 'player-red').extensions as any).turalyonLightforgedTurns)
+      .toEqual({})
+
+    const ownerPreparation = preparePublicSkillAction(ownerProjection, root, 'player-red')
+    expect(ownerPreparation.status).toBe('ready')
+    const accepted = runBattleAction(authorityState, root, { rootSeed: 250 }).state as any
+    expect(accepted.pendingTargetSelection).toBeUndefined()
+    expect(accepted.players[0]).toMatchObject({ actionPoints: 1, hand: [], discardPile: ['holy-heal'] })
+
+    const nextTurn = makeHolyHandState()
+    nextTurn.turn.turnNumber = 3
+    nextTurn.pieces[0].instanceId = 'training-blue-2'
+    ;(nextTurn.extensions as any).turalyonLightforgedTurns = { 'training-blue-2': 2 }
+    expect(preparePublicSkillAction(
+      toPublicBattleState(nextTurn, 'player-red'),
+      root,
+      'player-red',
+    ).status).toBe('needs-input')
+  })
 })

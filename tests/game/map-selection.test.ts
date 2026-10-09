@@ -9,12 +9,13 @@ import {
 } from '@/lib/game/map-selection'
 
 describe('RED-119 authoritative map selection', () => {
-  it('exposes the four selectable maps in one stable order', () => {
+  it('exposes the selectable maps in one stable order', () => {
     expect(SELECTABLE_MAP_IDS).toEqual([
       'large-hole-arena',
       'open-expanse',
       'winding-pass',
       'narrow-corridors',
+      'twin-bridges', 'crossroads-plaza', 'island-courtyard', 'broad-ring',
     ])
     expect(getSelectableMapCatalog().map(map => map.id)).toEqual(SELECTABLE_MAP_IDS)
   })
