@@ -347,7 +347,7 @@ describe('RED-120 Ichigo combat behavior', () => {
     let state = makeState({ pieces: [ichigo, enemy], width: 6, height: 3 })
     state.players[0].actionPoints = 3
     state.players[0].maxActionPoints = 3
-    state.players[0].chargePoints = 1
+    state.players[0].chargePoints = 2
 
     state = runBattleAction(state, selectedAction(state, {
       type: 'useBasicSkill', playerId: 'player-red', pieceId: 'ichigo', skillId: 'ichigo-getsuga-tensho',
