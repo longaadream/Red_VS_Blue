@@ -2521,6 +2521,12 @@ function makeReport(root) {
   return {
     schemaVersion: 1,
     reportKind: 'content-graph-coverage',
+    assessmentScope: 'compiler-ir-and-behavior-compatibility',
+    semanticModuleCoverage: {
+      status: 'not-assessed',
+      complete: false,
+      reason: 'Validated v1 compiler graphs do not prove registered semantic-module composition. Domain-module dependencies, typed ports and absence of author-level code escape hatches require a separate audit.',
+    },
     baseBranch: BASE_BRANCH,
     baseSha: BASE_SHA,
     contentGraphVersion: CONTENT_GRAPH_VERSION,

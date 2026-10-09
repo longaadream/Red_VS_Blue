@@ -1,6 +1,12 @@
 {
   "schemaVersion": 1,
   "reportKind": "content-graph-coverage",
+  "assessmentScope": "compiler-ir-and-behavior-compatibility",
+  "semanticModuleCoverage": {
+    "status": "not-assessed",
+    "complete": false,
+    "reason": "Validated v1 compiler graphs do not prove registered semantic-module composition. Domain-module dependencies, typed ports and absence of author-level code escape hatches require a separate audit."
+  },
   "baseBranch": "main",
   "baseSha": "00df31f8bd35b34200d507fd83853bf5ac99ba94",
   "contentGraphVersion": "rvb-content-graph/v1",

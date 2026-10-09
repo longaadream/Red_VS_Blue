@@ -1,6 +1,6 @@
 # RED-252 内容流程图覆盖清单
 
-状态：普通对局可达的 276 个代码主入口、84 个预览入口均通过图校验；3 个生成卡族、2 个 pending 字段（3 个子源码）均有独立冻结图证明。行为验证见 [验证记录](../qa/RED-252-verification.md)，不代表人工验收。声明式内容、不可达内容和冒险内容分别计数。
+状态：以下统计仅为 v1 编译中间表示覆盖，不是语义模块覆盖。普通对局可达的 276 个代码主入口、84 个预览入口均通过编译图校验；3 个生成卡族、2 个 pending 字段（3 个子源码）均有独立冻结图证明。新的模块验收尚未完成，见 [统一玩法模块说明书](GAMEPLAY_MODULE_CONTRACT.md)。行为验证见 [验证记录](../qa/RED-252-verification.md)。声明式内容、不可达内容和冒险内容分别计数。
 
 基线：`main@00df31f8bd35b34200d507fd83853bf5ac99ba94`。
 
@@ -10,7 +10,7 @@
 node scripts/audit-content-graph-coverage.mjs --write
 ```
 
-该命令只读取 `data/{pieces,skills,rules,cards}` 的注册 manifest 及其 JSON 定义。生成结果不执行内容代码，也不把源码流程图、编辑器 AST 视图或任意脚本节点当作已迁移内容。
+该命令读取 `data/{pieces,skills,rules,cards}` 的注册 manifest、JSON 定义和冻结来源，调用图编译/产物校验但不执行战斗效果。它验证编译图与生成源码的关系；不能据此排除代码语法层表达或证明复杂功能已经全部由领域模块组合。报告显式声明 `assessmentScope: compiler-ir-and-behavior-compatibility` 和 `semanticModuleCoverage: { status: not-assessed, complete: false }`，后者不能从编译覆盖率推导。
 
 ## 分母与入口
 

@@ -37,6 +37,11 @@ test('coverage inventory is deterministic and exposes the dynamic evidence exten
   assert.equal(first.baseSha, BASE_SHA)
   assert.equal(first.contentGraphVersion, CONTENT_GRAPH_VERSION)
   assert.equal(first.graphCompilerVersion, GRAPH_COMPILER_VERSION)
+  // Even a fully validated compiler-IR corpus cannot satisfy the author's
+  // stronger requirement that every feature expand to registered modules.
+  assert.equal(first.assessmentScope, 'compiler-ir-and-behavior-compatibility')
+  assert.equal(first.semanticModuleCoverage.status, 'not-assessed')
+  assert.equal(first.semanticModuleCoverage.complete, false)
   assert.equal(first.compilerValidator.available, true)
   assert.equal(first.compilerValidator.documentAvailable, true)
   assert.ok(Array.isArray(first.generatedFamilies))
