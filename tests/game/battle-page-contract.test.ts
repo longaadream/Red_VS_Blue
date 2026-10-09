@@ -926,7 +926,9 @@ new Script([
     const battlePage = readPage('battle.html')
 
     expect(battlePage).toContain('<div id="statusMsg" role="status" aria-live="polite" data-floater-obstacle>')
-    expect(battlePage).toContain('<div id="targetOverlay" role="status" aria-live="polite">')
+    expect(battlePage).toContain('<div id="targetOverlay">')
+    expect(battlePage).toContain('id="targetPromptText" role="status" aria-live="polite"')
+    expect(battlePage).toContain('id="targetSelectionControls" role="group" aria-label="目标选择操作"')
     expect(battlePage).toContain('border: 0; border-radius: 0; background: transparent;')
     expect(battlePage).toContain('id="targetPromptText"')
     expect(battlePage).toContain('id="targetCancelButton"')

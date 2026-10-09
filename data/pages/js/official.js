@@ -6,9 +6,16 @@
   var announcedMatch = null, matchAudio = window.BattleAudio ? window.BattleAudio.create() : null
   if (matchAudio) window.addEventListener('pagehide', function () { matchAudio.dispose() }, { once: true })
   var nativeApp = location.protocol === 'rvb-client:' || !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform())
-  function session() { return window.RvBUtils.readOfficialSession(base()) }
-  function clearBattleReservations() {
-    var prefix = 'rvb_colyseus_reconnect:' + base() + ':'
+  function sessionFor(origin) {
+    try { return window.RvBUtils.readOfficialSession(origin) } catch { return null }
+  }
+  function session() { return sessionFor(base()) }
+  function sameSession(origin, token) {
+    var saved = sessionFor(origin)
+    return !!(saved && saved.token === token)
+  }
+  function clearBattleReservations(origin) {
+    var prefix = 'rvb_colyseus_reconnect:' + (origin || base()) + ':'
     Object.keys(sessionStorage).forEach(function (key) { if (key.startsWith(prefix)) sessionStorage.removeItem(key) })
   }
   function base() {
@@ -26,7 +33,7 @@
     } else element.textContent = fallback || '登录账号'
   }
   function accountState(signedIn) {
-    $('loginPrompt').hidden = signedIn; $('logout').hidden = !signedIn; $('guestSummary').hidden = signedIn
+    $('loginPrompt').hidden = signedIn; $('guestSummary').hidden = signedIn
     renderAccountIdentity($('accountButton'), signedIn ? current.account : null, 'rvb-account-avatar', signedIn ? current.account.name : '登录账号')
     renderAccountIdentity($('seatName'), signedIn ? current.account : null, 'rvb-seat-avatar', signedIn ? current.account.name : '你的席位')
     $('seatHint').textContent = signedIn ? '先禁图，再选择阵营与阵容' : '登录后准备匹配'
@@ -77,13 +84,15 @@
     else $('accountDialog').showModal()
   }
   $('connectionButton').onclick = function () { $('connection').showModal() }
-  async function api(path, body) {
-    var origin = base(), saved = session(), headers = { 'Content-Type': 'application/json' }
+  async function api(path, body, credentials) {
+    var origin = credentials && credentials.origin ? credentials.origin : base()
+    var saved = credentials ? { url: origin, token: credentials.token } : sessionFor(origin)
+    var headers = { 'Content-Type': 'application/json' }
     if (saved && saved.url === origin) headers.Authorization = 'Bearer ' + saved.token
     var response = await fetch(origin + path, { method: body === undefined ? 'GET' : 'POST', headers: headers, body: body === undefined ? undefined : JSON.stringify(body), signal: AbortSignal.timeout(20000), cache: 'no-store' })
     if (!(response.headers.get('content-type') || '').toLowerCase().includes('application/json')) throw new Error('此地址未返回排位服务数据，请检查服务器地址和端口')
     var result = await response.json()
-    if (!response.ok) { if (response.status === 401 && path === '/official/me') { window.RvBUtils.clearOfficialSession(origin); $('profile').hidden = true; $('auth').hidden = false; current = null; activeMatch = null; accountState(false) }; throw new Error(result.error || '请求失败') }
+    if (!response.ok) { if (response.status === 401 && path === '/official/me' && (!credentials || sameSession(origin, credentials.token))) { window.RvBUtils.clearOfficialSession(origin); $('profile').hidden = true; $('auth').hidden = false; current = null; activeMatch = null; accountState(false) }; throw new Error(result.error || '请求失败') }
     return result
   }
   function cell(row, text) { var td = document.createElement('td'); td.textContent = text; row.appendChild(td) }
@@ -163,7 +172,7 @@
     document.querySelector('#authForm button').disabled = busy
     $('join').disabled = busy || !!(current && (current.cooldownUntil || current.season.maintenance))
   }
-  function run(work) { return async function (event) { if (event) event.preventDefault(); if (busy) return; busy = true; busyControls(); try { await work() } catch (error) { message(error.message) } finally { busy = false; busyControls() } } }
+  function run(work) { return async function (event) { if (event) event.preventDefault(); if (busy) return false; busy = true; busyControls(); try { await work(); return true } catch (error) { message(error.message); return false } finally { busy = false; busyControls() } } }
   $('connect').onclick = run(connect)
   $('authAction').onchange = function () {
     var action = $('authAction').value
@@ -193,15 +202,30 @@
     await api('/official/queue/join', { profileIdentity: JSON.parse(identity) }); await refresh()
   })
   $('cancel').onclick = run(async function () { await api('/official/queue/cancel', {}); await refresh() })
-  $('logout').onclick = run(async function () {
-    var origin = base()
-    try { await api('/official/queue/cancel', {}); await api('/official/auth/logout', {}) }
-    finally {
-      clearBattleReservations(); window.RvBUtils.clearOfficialSession(origin); current = null
-      $('profile').hidden = true; $('auth').hidden = false; accountState(false)
+  async function logout() {
+    var origin = base(), saved = sessionFor(origin), token = saved && saved.token
+    var credentials = { origin: origin, token: token }
+    var logoutCompleted = false
+    try {
+      if (token) {
+        await api('/official/queue/cancel', {}, credentials)
+        await api('/official/auth/logout', {}, credentials)
+      }
     }
-    message('已退出账号。'); await refresh()
-  })
+    finally {
+      var currentSession = sessionFor(origin)
+      if (!token || !currentSession || currentSession.token === token) {
+        clearBattleReservations(origin); window.RvBUtils.clearOfficialSession(origin); current = null
+        $('profile').hidden = true; $('auth').hidden = false; accountState(false)
+        logoutCompleted = true
+      }
+    }
+    if (logoutCompleted) message('已退出账号。')
+    await refresh()
+  }
+  var logoutAction = run(logout)
+  window.RvBOfficial = { logout: function () { return logoutAction() } }
+  if (window.RvBPlayerProfile && typeof window.RvBPlayerProfile.setLogoutHandler === 'function') window.RvBPlayerProfile.setLogoutHandler(window.RvBOfficial.logout)
   $('enter').onclick = run(async function () {
     if (!activeMatch || !current) return
     window.RvBUtils.saveRemoteServerUrl(base()); window.RvBUtils.switchServerMode('remote')
