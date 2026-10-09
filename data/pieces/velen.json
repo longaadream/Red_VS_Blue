@@ -23,6 +23,10 @@
     {
       "skillId": "velen-thousand-futures-ultimate",
       "level": 1
+    },
+    {
+      "skillId": "turalyon-expedition-order",
+      "level": 1
     }
   ],
   "rules": [
