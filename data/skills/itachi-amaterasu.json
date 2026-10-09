@@ -28,6 +28,962 @@
       }
     ]
   },
-  "code": "function executeSkill(context) { var caster = context.piece; var target = selectTarget({ type: 'piece', range: 5, filter: 'enemy' }); if (!target || target.needsTargetSelection) return target; if (!battle.extensions) battle.extensions = {}; if (!battle.extensions.tileEffects) battle.extensions.tileEffects = []; if (!battle.extensions.amaterasuCells) battle.extensions.amaterasuCells = []; var x = target.x; var y = target.y; if (!battle.extensions.amaterasuCells.some(function(cell) { return cell.x === x && cell.y === y; })) battle.extensions.amaterasuCells.push({ x: x, y: y }); if (!battle.extensions.tileEffects.some(function(effect) { return effect.tileType === 'amaterasu' && effect.x === x && effect.y === y; })) battle.extensions.tileEffects.push({ x: x, y: y, sourceId: 'amaterasu', tileType: 'amaterasu', presentation: 'expand', presentationStep: 0, icon: '🌑', iconPosition: 'bottom-right' }); battle.extensions.amaterasuOwnerPlayerId = caster.ownerPlayerId; var tag = target.statusTags && target.statusTags.find(function(status) { return status.type === 'amaterasu-burn'; }); if (tag) tag.stacks = (tag.stacks || 1) + 1; else addStatusEffectById(target.instanceId, { id: 'amaterasu-burn-' + target.instanceId, name: '天照灼烧', type: 'amaterasu-burn', currentDuration: -1, currentUses: -1, intensity: 1, stacks: 1 }); addPlayerRuleById(caster.ownerPlayerId, 'rule-sasuke-amaterasu-move'); addPlayerRuleById(caster.ownerPlayerId, 'rule-sasuke-amaterasu-stack'); addPlayerRuleById(caster.ownerPlayerId, 'rule-sasuke-amaterasu-damage'); return { success: true, message: caster.name + '以天照点燃' + target.name + '所在格，并使其获得1层天照' }; }",
-  "previewCode": "function calculatePreview() { return { description: \"选择敌人（5），将其所在格化为天照地格。目标获得天照 x 1。\", expectedValues: { stacks: 1 } }; }"
+  "code": "function executeSkill(context) { var caster, tag, target, x, y; var _pc = \"n25\"; for (var _step = 0; _step <= 25; _step++) { switch (_pc) { case \"n25\": caster = (context)[\"piece\"]; _pc = \"n24\"; break; case \"n24\": target = selectTarget({type: \"piece\", range: 5, filter: \"enemy\"}); _pc = \"n23\"; break; case \"n23\": _pc = (! (! ((! target) || (target)[\"needsTargetSelection\"]))) ? \"n22\" : \"n21\"; break; case \"n21\": _pc = (! (! (! (battle)[\"extensions\"]))) ? \"n20\" : \"n19\"; break; case \"n20\": (battle)[\"extensions\"] = {}; _pc = \"n19\"; break; case \"n19\": _pc = (! (! (! ((battle)[\"extensions\"])[\"tileEffects\"]))) ? \"n18\" : \"n17\"; break; case \"n18\": ((battle)[\"extensions\"])[\"tileEffects\"] = []; _pc = \"n17\"; break; case \"n17\": _pc = (! (! (! ((battle)[\"extensions\"])[\"amaterasuCells\"]))) ? \"n16\" : \"n15\"; break; case \"n16\": ((battle)[\"extensions\"])[\"amaterasuCells\"] = []; _pc = \"n15\"; break; case \"n15\": x = (target)[\"x\"]; _pc = \"n14\"; break; case \"n14\": y = (target)[\"y\"]; _pc = \"n13\"; break; case \"n13\": _pc = (! (! (! (((battle)[\"extensions\"])[\"amaterasuCells\"])[\"some\"](function (cell) { return (((cell)[\"x\"] === x) && ((cell)[\"y\"] === y)); })))) ? \"n12\" : \"n11\"; break; case \"n12\": (((battle)[\"extensions\"])[\"amaterasuCells\"]).push({x: x, y: y}); _pc = \"n11\"; break; case \"n11\": _pc = (! (! (! (((battle)[\"extensions\"])[\"tileEffects\"])[\"some\"](function (effect) { return ((((effect)[\"tileType\"] === \"amaterasu\") && ((effect)[\"x\"] === x)) && ((effect)[\"y\"] === y)); })))) ? \"n10\" : \"n9\"; break; case \"n10\": (((battle)[\"extensions\"])[\"tileEffects\"]).push({x: x, y: y, sourceId: \"amaterasu\", tileType: \"amaterasu\", presentation: \"expand\", presentationStep: 0, icon: \"🌑\", iconPosition: \"bottom-right\"}); _pc = \"n9\"; break; case \"n9\": ((battle)[\"extensions\"])[\"amaterasuOwnerPlayerId\"] = (caster)[\"ownerPlayerId\"]; _pc = \"n8\"; break; case \"n8\": tag = ((target)[\"statusTags\"] && ((target)[\"statusTags\"])[\"find\"](function (status) { return ((status)[\"type\"] === \"amaterasu-burn\"); })); _pc = \"n7\"; break; case \"n7\": _pc = (! (! tag)) ? \"n5\" : \"n6\"; break; case \"n6\": addStatusEffectById((target)[\"instanceId\"], {id: (\"amaterasu-burn-\" + (target)[\"instanceId\"]), name: \"天照灼烧\", type: \"amaterasu-burn\", currentDuration: (- 1), currentUses: (- 1), intensity: 1, stacks: 1}); _pc = \"n4\"; break; case \"n5\": (tag)[\"stacks\"] = (((tag)[\"stacks\"] || 1) + 1); _pc = \"n4\"; break; case \"n4\": addPlayerRuleById((caster)[\"ownerPlayerId\"], \"rule-sasuke-amaterasu-move\"); _pc = \"n3\"; break; case \"n3\": addPlayerRuleById((caster)[\"ownerPlayerId\"], \"rule-sasuke-amaterasu-stack\"); _pc = \"n2\"; break; case \"n2\": addPlayerRuleById((caster)[\"ownerPlayerId\"], \"rule-sasuke-amaterasu-damage\"); _pc = \"n1\"; break; case \"n1\": return {success: true, message: ((((caster)[\"name\"] + \"以天照点燃\") + (target)[\"name\"]) + \"所在格，并使其获得1层天照\")}; case \"n22\": return target; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\"); }",
+  "previewCode": "function calculatePreview(piece, skillDef, currentCooldown) { var _pc = \"n1\"; for (var _step = 0; _step <= 1; _step++) { switch (_pc) { case \"n1\": return {description: \"选择敌人（5），将其所在格化为天照地格。目标获得天照 x 1。\", expectedValues: {stacks: 1}}; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\"); }",
+  "contentGraph": {
+    "version": "rvb-content-graph/v1",
+    "surface": "skill",
+    "entry": "n25",
+    "nodes": [
+      {
+        "id": "n1",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "binary",
+                  "op": "+",
+                  "left": {
+                    "kind": "binary",
+                    "op": "+",
+                    "left": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "caster"
+                      },
+                      "key": "name"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": "以天照点燃"
+                    }
+                  },
+                  "right": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "target"
+                    },
+                    "key": "name"
+                  }
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "所在格，并使其获得1层天照"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n2",
+        "kind": "call",
+        "capability": "addPlayerRuleById",
+        "args": [
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "caster"
+            },
+            "key": "ownerPlayerId"
+          },
+          {
+            "kind": "literal",
+            "value": "rule-sasuke-amaterasu-damage"
+          }
+        ],
+        "next": "n1"
+      },
+      {
+        "id": "n3",
+        "kind": "call",
+        "capability": "addPlayerRuleById",
+        "args": [
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "caster"
+            },
+            "key": "ownerPlayerId"
+          },
+          {
+            "kind": "literal",
+            "value": "rule-sasuke-amaterasu-stack"
+          }
+        ],
+        "next": "n2"
+      },
+      {
+        "id": "n4",
+        "kind": "call",
+        "capability": "addPlayerRuleById",
+        "args": [
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "caster"
+            },
+            "key": "ownerPlayerId"
+          },
+          {
+            "kind": "literal",
+            "value": "rule-sasuke-amaterasu-move"
+          }
+        ],
+        "next": "n3"
+      },
+      {
+        "id": "n5",
+        "kind": "set",
+        "target": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "tag"
+          },
+          "key": "stacks"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "binary",
+          "op": "+",
+          "left": {
+            "kind": "binary",
+            "op": "||",
+            "left": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "tag"
+              },
+              "key": "stacks"
+            },
+            "right": {
+              "kind": "literal",
+              "value": 1
+            }
+          },
+          "right": {
+            "kind": "literal",
+            "value": 1
+          }
+        },
+        "next": "n4"
+      },
+      {
+        "id": "n6",
+        "kind": "call",
+        "capability": "addStatusEffectById",
+        "args": [
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "target"
+            },
+            "key": "instanceId"
+          },
+          {
+            "kind": "object",
+            "entries": [
+              {
+                "key": "id",
+                "value": {
+                  "kind": "binary",
+                  "op": "+",
+                  "left": {
+                    "kind": "literal",
+                    "value": "amaterasu-burn-"
+                  },
+                  "right": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "target"
+                    },
+                    "key": "instanceId"
+                  }
+                }
+              },
+              {
+                "key": "name",
+                "value": {
+                  "kind": "literal",
+                  "value": "天照灼烧"
+                }
+              },
+              {
+                "key": "type",
+                "value": {
+                  "kind": "literal",
+                  "value": "amaterasu-burn"
+                }
+              },
+              {
+                "key": "currentDuration",
+                "value": {
+                  "kind": "unary",
+                  "op": "-",
+                  "argument": {
+                    "kind": "literal",
+                    "value": 1
+                  }
+                }
+              },
+              {
+                "key": "currentUses",
+                "value": {
+                  "kind": "unary",
+                  "op": "-",
+                  "argument": {
+                    "kind": "literal",
+                    "value": 1
+                  }
+                }
+              },
+              {
+                "key": "intensity",
+                "value": {
+                  "kind": "literal",
+                  "value": 1
+                }
+              },
+              {
+                "key": "stacks",
+                "value": {
+                  "kind": "literal",
+                  "value": 1
+                }
+              }
+            ]
+          }
+        ],
+        "next": "n4"
+      },
+      {
+        "id": "n7",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "ref",
+              "name": "tag"
+            }
+          }
+        },
+        "yes": "n5",
+        "no": "n6"
+      },
+      {
+        "id": "n8",
+        "kind": "bind",
+        "name": "tag",
+        "expr": {
+          "kind": "binary",
+          "op": "&&",
+          "left": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "target"
+            },
+            "key": "statusTags"
+          },
+          "right": {
+            "kind": "collection",
+            "object": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "target"
+              },
+              "key": "statusTags"
+            },
+            "method": "find",
+            "args": [
+              {
+                "kind": "lambda",
+                "parameters": [
+                  "status"
+                ],
+                "body": {
+                  "kind": "binary",
+                  "op": "===",
+                  "left": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "status"
+                    },
+                    "key": "type"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": "amaterasu-burn"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "next": "n7"
+      },
+      {
+        "id": "n9",
+        "kind": "set",
+        "target": {
+          "kind": "get",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "battle"
+            },
+            "key": "extensions"
+          },
+          "key": "amaterasuOwnerPlayerId"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "caster"
+          },
+          "key": "ownerPlayerId"
+        },
+        "next": "n8"
+      },
+      {
+        "id": "n10",
+        "kind": "call",
+        "capability": "array.push",
+        "args": [
+          {
+            "kind": "get",
+            "object": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "battle"
+              },
+              "key": "extensions"
+            },
+            "key": "tileEffects"
+          },
+          {
+            "kind": "object",
+            "entries": [
+              {
+                "key": "x",
+                "value": {
+                  "kind": "ref",
+                  "name": "x"
+                }
+              },
+              {
+                "key": "y",
+                "value": {
+                  "kind": "ref",
+                  "name": "y"
+                }
+              },
+              {
+                "key": "sourceId",
+                "value": {
+                  "kind": "literal",
+                  "value": "amaterasu"
+                }
+              },
+              {
+                "key": "tileType",
+                "value": {
+                  "kind": "literal",
+                  "value": "amaterasu"
+                }
+              },
+              {
+                "key": "presentation",
+                "value": {
+                  "kind": "literal",
+                  "value": "expand"
+                }
+              },
+              {
+                "key": "presentationStep",
+                "value": {
+                  "kind": "literal",
+                  "value": 0
+                }
+              },
+              {
+                "key": "icon",
+                "value": {
+                  "kind": "literal",
+                  "value": "🌑"
+                }
+              },
+              {
+                "key": "iconPosition",
+                "value": {
+                  "kind": "literal",
+                  "value": "bottom-right"
+                }
+              }
+            ]
+          }
+        ],
+        "next": "n9"
+      },
+      {
+        "id": "n11",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "unary",
+              "op": "!",
+              "argument": {
+                "kind": "collection",
+                "object": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "battle"
+                    },
+                    "key": "extensions"
+                  },
+                  "key": "tileEffects"
+                },
+                "method": "some",
+                "args": [
+                  {
+                    "kind": "lambda",
+                    "parameters": [
+                      "effect"
+                    ],
+                    "body": {
+                      "kind": "binary",
+                      "op": "&&",
+                      "left": {
+                        "kind": "binary",
+                        "op": "&&",
+                        "left": {
+                          "kind": "binary",
+                          "op": "===",
+                          "left": {
+                            "kind": "get",
+                            "object": {
+                              "kind": "ref",
+                              "name": "effect"
+                            },
+                            "key": "tileType"
+                          },
+                          "right": {
+                            "kind": "literal",
+                            "value": "amaterasu"
+                          }
+                        },
+                        "right": {
+                          "kind": "binary",
+                          "op": "===",
+                          "left": {
+                            "kind": "get",
+                            "object": {
+                              "kind": "ref",
+                              "name": "effect"
+                            },
+                            "key": "x"
+                          },
+                          "right": {
+                            "kind": "ref",
+                            "name": "x"
+                          }
+                        }
+                      },
+                      "right": {
+                        "kind": "binary",
+                        "op": "===",
+                        "left": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "effect"
+                          },
+                          "key": "y"
+                        },
+                        "right": {
+                          "kind": "ref",
+                          "name": "y"
+                        }
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "yes": "n10",
+        "no": "n9"
+      },
+      {
+        "id": "n12",
+        "kind": "call",
+        "capability": "array.push",
+        "args": [
+          {
+            "kind": "get",
+            "object": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "battle"
+              },
+              "key": "extensions"
+            },
+            "key": "amaterasuCells"
+          },
+          {
+            "kind": "object",
+            "entries": [
+              {
+                "key": "x",
+                "value": {
+                  "kind": "ref",
+                  "name": "x"
+                }
+              },
+              {
+                "key": "y",
+                "value": {
+                  "kind": "ref",
+                  "name": "y"
+                }
+              }
+            ]
+          }
+        ],
+        "next": "n11"
+      },
+      {
+        "id": "n13",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "unary",
+              "op": "!",
+              "argument": {
+                "kind": "collection",
+                "object": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "battle"
+                    },
+                    "key": "extensions"
+                  },
+                  "key": "amaterasuCells"
+                },
+                "method": "some",
+                "args": [
+                  {
+                    "kind": "lambda",
+                    "parameters": [
+                      "cell"
+                    ],
+                    "body": {
+                      "kind": "binary",
+                      "op": "&&",
+                      "left": {
+                        "kind": "binary",
+                        "op": "===",
+                        "left": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "cell"
+                          },
+                          "key": "x"
+                        },
+                        "right": {
+                          "kind": "ref",
+                          "name": "x"
+                        }
+                      },
+                      "right": {
+                        "kind": "binary",
+                        "op": "===",
+                        "left": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "cell"
+                          },
+                          "key": "y"
+                        },
+                        "right": {
+                          "kind": "ref",
+                          "name": "y"
+                        }
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "yes": "n12",
+        "no": "n11"
+      },
+      {
+        "id": "n14",
+        "kind": "bind",
+        "name": "y",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "target"
+          },
+          "key": "y"
+        },
+        "next": "n13"
+      },
+      {
+        "id": "n15",
+        "kind": "bind",
+        "name": "x",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "target"
+          },
+          "key": "x"
+        },
+        "next": "n14"
+      },
+      {
+        "id": "n16",
+        "kind": "set",
+        "target": {
+          "kind": "get",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "battle"
+            },
+            "key": "extensions"
+          },
+          "key": "amaterasuCells"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "array",
+          "items": []
+        },
+        "next": "n15"
+      },
+      {
+        "id": "n17",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "unary",
+              "op": "!",
+              "argument": {
+                "kind": "get",
+                "object": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "battle"
+                  },
+                  "key": "extensions"
+                },
+                "key": "amaterasuCells"
+              }
+            }
+          }
+        },
+        "yes": "n16",
+        "no": "n15"
+      },
+      {
+        "id": "n18",
+        "kind": "set",
+        "target": {
+          "kind": "get",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "battle"
+            },
+            "key": "extensions"
+          },
+          "key": "tileEffects"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "array",
+          "items": []
+        },
+        "next": "n17"
+      },
+      {
+        "id": "n19",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "unary",
+              "op": "!",
+              "argument": {
+                "kind": "get",
+                "object": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "battle"
+                  },
+                  "key": "extensions"
+                },
+                "key": "tileEffects"
+              }
+            }
+          }
+        },
+        "yes": "n18",
+        "no": "n17"
+      },
+      {
+        "id": "n20",
+        "kind": "set",
+        "target": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "battle"
+          },
+          "key": "extensions"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "object",
+          "entries": []
+        },
+        "next": "n19"
+      },
+      {
+        "id": "n21",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "unary",
+              "op": "!",
+              "argument": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "battle"
+                },
+                "key": "extensions"
+              }
+            }
+          }
+        },
+        "yes": "n20",
+        "no": "n19"
+      },
+      {
+        "id": "n22",
+        "kind": "return",
+        "value": {
+          "kind": "ref",
+          "name": "target"
+        }
+      },
+      {
+        "id": "n23",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "ref",
+                  "name": "target"
+                }
+              },
+              "right": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "target"
+                },
+                "key": "needsTargetSelection"
+              }
+            }
+          }
+        },
+        "yes": "n22",
+        "no": "n21"
+      },
+      {
+        "id": "n24",
+        "kind": "call",
+        "capability": "selectTarget",
+        "args": [
+          {
+            "kind": "object",
+            "entries": [
+              {
+                "key": "type",
+                "value": {
+                  "kind": "literal",
+                  "value": "piece"
+                }
+              },
+              {
+                "key": "range",
+                "value": {
+                  "kind": "literal",
+                  "value": 5
+                }
+              },
+              {
+                "key": "filter",
+                "value": {
+                  "kind": "literal",
+                  "value": "enemy"
+                }
+              }
+            ]
+          }
+        ],
+        "result": "target",
+        "next": "n23"
+      },
+      {
+        "id": "n25",
+        "kind": "bind",
+        "name": "caster",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "context"
+          },
+          "key": "piece"
+        },
+        "next": "n24"
+      }
+    ]
+  },
+  "contentGraphField": "code",
+  "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1",
+  "contentGraphEntries": {
+    "previewCode": {
+      "graph": {
+        "version": "rvb-content-graph/v1",
+        "surface": "preview",
+        "entry": "n1",
+        "nodes": [
+          {
+            "id": "n1",
+            "kind": "return",
+            "value": {
+              "kind": "object",
+              "entries": [
+                {
+                  "key": "description",
+                  "value": {
+                    "kind": "literal",
+                    "value": "选择敌人（5），将其所在格化为天照地格。目标获得天照 x 1。"
+                  }
+                },
+                {
+                  "key": "expectedValues",
+                  "value": {
+                    "kind": "object",
+                    "entries": [
+                      {
+                        "key": "stacks",
+                        "value": {
+                          "kind": "literal",
+                          "value": 1
+                        }
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "compilerVersion": "rvb-content-graph-compiler/v1"
+    }
+  }
 }

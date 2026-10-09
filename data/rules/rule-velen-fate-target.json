@@ -1,9 +1,316 @@
 {
   "id": "rule-velen-fate-target",
-  "name": "\u547d\u8fd0\u5e87\u62a4\u76ee\u6807",
-  "description": "\u547d\u8fd0\u5e87\u62a4\u7684\u76ee\u6807\u6b7b\u4ea1\u65f6\u79fb\u9664\u672a\u5b8c\u7684\u5e87\u62a4\u3002",
+  "name": "命运庇护目标",
+  "description": "命运庇护的目标死亡时移除未完的庇护。",
   "trigger": {
     "type": "onPieceDied"
   },
-  "skillCode": "var piece = context.rulePiece; var dead = context.sourcePiece;\nif (!piece || !dead || dead.instanceId !== piece.instanceId) return { success: false, message: '' };\nvar before = piece.statusTags ? piece.statusTags.length : 0; piece.statusTags = (piece.statusTags || []).filter(function(tag) { return tag.type !== 'velen-fate-shelter'; }); removeRuleById(piece.instanceId, 'rule-velen-fate-target');\nreturn { success: piece.statusTags.length !== before, message: piece.statusTags.length !== before ? piece.name + '\u6b7b\u4ea1\uff0c\u547d\u8fd0\u5e87\u62a4\u672a\u80fd\u5b8c\u6210' : '' };"
+  "skillCode": "var before, dead, piece; var _pc = \"n8\"; for (var _step = 0; _step <= 8; _step++) { switch (_pc) { case \"n8\": piece = (context)[\"rulePiece\"]; _pc = \"n7\"; break; case \"n7\": dead = (context)[\"sourcePiece\"]; _pc = \"n6\"; break; case \"n6\": _pc = (! (! (((! piece) || (! dead)) || ((dead)[\"instanceId\"] !== (piece)[\"instanceId\"])))) ? \"n5\" : \"n4\"; break; case \"n4\": before = ((piece)[\"statusTags\"] ? ((piece)[\"statusTags\"])[\"length\"] : 0); _pc = \"n3\"; break; case \"n3\": (piece)[\"statusTags\"] = (((piece)[\"statusTags\"] || []))[\"filter\"](function (tag) { return ((tag)[\"type\"] !== \"velen-fate-shelter\"); }); _pc = \"n2\"; break; case \"n2\": removeRuleById((piece)[\"instanceId\"], \"rule-velen-fate-target\"); _pc = \"n1\"; break; case \"n1\": return {success: (((piece)[\"statusTags\"])[\"length\"] !== before), message: ((((piece)[\"statusTags\"])[\"length\"] !== before) ? ((piece)[\"name\"] + \"死亡，命运庇护未能完成\") : \"\")}; case \"n5\": return {success: false, message: \"\"}; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\");",
+  "contentGraph": {
+    "version": "rvb-content-graph/v1",
+    "surface": "rule",
+    "entry": "n8",
+    "nodes": [
+      {
+        "id": "n1",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "binary",
+                "op": "!==",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "piece"
+                    },
+                    "key": "statusTags"
+                  },
+                  "key": "length"
+                },
+                "right": {
+                  "kind": "ref",
+                  "name": "before"
+                }
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "conditional",
+                "test": {
+                  "kind": "binary",
+                  "op": "!==",
+                  "left": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "piece"
+                      },
+                      "key": "statusTags"
+                    },
+                    "key": "length"
+                  },
+                  "right": {
+                    "kind": "ref",
+                    "name": "before"
+                  }
+                },
+                "consequent": {
+                  "kind": "binary",
+                  "op": "+",
+                  "left": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "piece"
+                    },
+                    "key": "name"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": "死亡，命运庇护未能完成"
+                  }
+                },
+                "alternate": {
+                  "kind": "literal",
+                  "value": ""
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n2",
+        "kind": "call",
+        "capability": "removeRuleById",
+        "args": [
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "piece"
+            },
+            "key": "instanceId"
+          },
+          {
+            "kind": "literal",
+            "value": "rule-velen-fate-target"
+          }
+        ],
+        "next": "n1"
+      },
+      {
+        "id": "n3",
+        "kind": "set",
+        "target": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "piece"
+          },
+          "key": "statusTags"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "collection",
+          "object": {
+            "kind": "binary",
+            "op": "||",
+            "left": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "piece"
+              },
+              "key": "statusTags"
+            },
+            "right": {
+              "kind": "array",
+              "items": []
+            }
+          },
+          "method": "filter",
+          "args": [
+            {
+              "kind": "lambda",
+              "parameters": [
+                "tag"
+              ],
+              "body": {
+                "kind": "binary",
+                "op": "!==",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "tag"
+                  },
+                  "key": "type"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "velen-fate-shelter"
+                }
+              }
+            }
+          ]
+        },
+        "next": "n2"
+      },
+      {
+        "id": "n4",
+        "kind": "bind",
+        "name": "before",
+        "expr": {
+          "kind": "conditional",
+          "test": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "piece"
+            },
+            "key": "statusTags"
+          },
+          "consequent": {
+            "kind": "get",
+            "object": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "piece"
+              },
+              "key": "statusTags"
+            },
+            "key": "length"
+          },
+          "alternate": {
+            "kind": "literal",
+            "value": 0
+          }
+        },
+        "next": "n3"
+      },
+      {
+        "id": "n5",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n6",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "binary",
+                "op": "||",
+                "left": {
+                  "kind": "unary",
+                  "op": "!",
+                  "argument": {
+                    "kind": "ref",
+                    "name": "piece"
+                  }
+                },
+                "right": {
+                  "kind": "unary",
+                  "op": "!",
+                  "argument": {
+                    "kind": "ref",
+                    "name": "dead"
+                  }
+                }
+              },
+              "right": {
+                "kind": "binary",
+                "op": "!==",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "dead"
+                  },
+                  "key": "instanceId"
+                },
+                "right": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "piece"
+                  },
+                  "key": "instanceId"
+                }
+              }
+            }
+          }
+        },
+        "yes": "n5",
+        "no": "n4"
+      },
+      {
+        "id": "n7",
+        "kind": "bind",
+        "name": "dead",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "context"
+          },
+          "key": "sourcePiece"
+        },
+        "next": "n6"
+      },
+      {
+        "id": "n8",
+        "kind": "bind",
+        "name": "piece",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "context"
+          },
+          "key": "rulePiece"
+        },
+        "next": "n7"
+      }
+    ]
+  },
+  "contentGraphField": "skillCode",
+  "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1"
 }

@@ -17,6 +17,390 @@
   "maxCharges": 0,
   "powerMultiplier": 1,
   "actionPointCost": 1,
-  "code": "function executeSkill(context) { var caster = context.piece; var battle = context.battle; var existingSageMode = caster.statusTags && caster.statusTags.find(function(t) { return t.type === 'sage-mode'; }); if (existingSageMode) return { success: false, message: caster.name + '已处于仙人模式中' }; addStatusEffectById(caster.instanceId, { id: 'sage-mode-' + caster.instanceId, name: '仙人模式', type: 'sage-mode', currentDuration: -1, currentUses: -1, intensity: 1, stacks: 6, relatedRules: ['rule-naruto-sage-immobile', 'rule-naruto-sage-block-skill', 'rule-naruto-sage-tick'] }); addRuleById(caster.instanceId, 'rule-naruto-sage-immobile'); addRuleById(caster.instanceId, 'rule-naruto-sage-block-skill'); addRuleById(caster.instanceId, 'rule-naruto-sage-tick'); return { success: true, message: caster.name + '进入仙人模式！你的回合开始时推进准备，完成后获得3行动点和1充能点' }; }",
-  "previewCode": "function calculatePreview() { return { description: \"进入打坐，准备进度6。你的回合开始时进度−1，每个存活友方影分身额外−1。归零时结束打坐，获得3点行动点和1点充能点。\", expectedValues: {} }; }"
+  "code": "function executeSkill(context) { var battle, caster, existingSageMode; var _pc = \"n10\"; for (var _step = 0; _step <= 10; _step++) { switch (_pc) { case \"n10\": caster = (context)[\"piece\"]; _pc = \"n9\"; break; case \"n9\": battle = (context)[\"battle\"]; _pc = \"n8\"; break; case \"n8\": existingSageMode = ((caster)[\"statusTags\"] && ((caster)[\"statusTags\"])[\"find\"](function (t) { return ((t)[\"type\"] === \"sage-mode\"); })); _pc = \"n7\"; break; case \"n7\": _pc = (! (! existingSageMode)) ? \"n6\" : \"n5\"; break; case \"n5\": addStatusEffectById((caster)[\"instanceId\"], {id: (\"sage-mode-\" + (caster)[\"instanceId\"]), name: \"仙人模式\", type: \"sage-mode\", currentDuration: (- 1), currentUses: (- 1), intensity: 1, stacks: 6, relatedRules: [\"rule-naruto-sage-immobile\", \"rule-naruto-sage-block-skill\", \"rule-naruto-sage-tick\"]}); _pc = \"n4\"; break; case \"n4\": addRuleById((caster)[\"instanceId\"], \"rule-naruto-sage-immobile\"); _pc = \"n3\"; break; case \"n3\": addRuleById((caster)[\"instanceId\"], \"rule-naruto-sage-block-skill\"); _pc = \"n2\"; break; case \"n2\": addRuleById((caster)[\"instanceId\"], \"rule-naruto-sage-tick\"); _pc = \"n1\"; break; case \"n1\": return {success: true, message: ((caster)[\"name\"] + \"进入仙人模式！你的回合开始时推进准备，完成后获得3行动点和1充能点\")}; case \"n6\": return {success: false, message: ((caster)[\"name\"] + \"已处于仙人模式中\")}; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\"); }",
+  "previewCode": "function calculatePreview(piece, skillDef, currentCooldown) { var _pc = \"n1\"; for (var _step = 0; _step <= 1; _step++) { switch (_pc) { case \"n1\": return {description: \"进入打坐，准备进度6。你的回合开始时进度−1，每个存活友方影分身额外−1。归零时结束打坐，获得3点行动点和1点充能点。\", expectedValues: {}}; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\"); }",
+  "contentGraph": {
+    "version": "rvb-content-graph/v1",
+    "surface": "skill",
+    "entry": "n10",
+    "nodes": [
+      {
+        "id": "n1",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "caster"
+                  },
+                  "key": "name"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "进入仙人模式！你的回合开始时推进准备，完成后获得3行动点和1充能点"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n2",
+        "kind": "call",
+        "capability": "addRuleById",
+        "args": [
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "caster"
+            },
+            "key": "instanceId"
+          },
+          {
+            "kind": "literal",
+            "value": "rule-naruto-sage-tick"
+          }
+        ],
+        "next": "n1"
+      },
+      {
+        "id": "n3",
+        "kind": "call",
+        "capability": "addRuleById",
+        "args": [
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "caster"
+            },
+            "key": "instanceId"
+          },
+          {
+            "kind": "literal",
+            "value": "rule-naruto-sage-block-skill"
+          }
+        ],
+        "next": "n2"
+      },
+      {
+        "id": "n4",
+        "kind": "call",
+        "capability": "addRuleById",
+        "args": [
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "caster"
+            },
+            "key": "instanceId"
+          },
+          {
+            "kind": "literal",
+            "value": "rule-naruto-sage-immobile"
+          }
+        ],
+        "next": "n3"
+      },
+      {
+        "id": "n5",
+        "kind": "call",
+        "capability": "addStatusEffectById",
+        "args": [
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "caster"
+            },
+            "key": "instanceId"
+          },
+          {
+            "kind": "object",
+            "entries": [
+              {
+                "key": "id",
+                "value": {
+                  "kind": "binary",
+                  "op": "+",
+                  "left": {
+                    "kind": "literal",
+                    "value": "sage-mode-"
+                  },
+                  "right": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "caster"
+                    },
+                    "key": "instanceId"
+                  }
+                }
+              },
+              {
+                "key": "name",
+                "value": {
+                  "kind": "literal",
+                  "value": "仙人模式"
+                }
+              },
+              {
+                "key": "type",
+                "value": {
+                  "kind": "literal",
+                  "value": "sage-mode"
+                }
+              },
+              {
+                "key": "currentDuration",
+                "value": {
+                  "kind": "unary",
+                  "op": "-",
+                  "argument": {
+                    "kind": "literal",
+                    "value": 1
+                  }
+                }
+              },
+              {
+                "key": "currentUses",
+                "value": {
+                  "kind": "unary",
+                  "op": "-",
+                  "argument": {
+                    "kind": "literal",
+                    "value": 1
+                  }
+                }
+              },
+              {
+                "key": "intensity",
+                "value": {
+                  "kind": "literal",
+                  "value": 1
+                }
+              },
+              {
+                "key": "stacks",
+                "value": {
+                  "kind": "literal",
+                  "value": 6
+                }
+              },
+              {
+                "key": "relatedRules",
+                "value": {
+                  "kind": "array",
+                  "items": [
+                    {
+                      "kind": "literal",
+                      "value": "rule-naruto-sage-immobile"
+                    },
+                    {
+                      "kind": "literal",
+                      "value": "rule-naruto-sage-block-skill"
+                    },
+                    {
+                      "kind": "literal",
+                      "value": "rule-naruto-sage-tick"
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ],
+        "next": "n4"
+      },
+      {
+        "id": "n6",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "caster"
+                  },
+                  "key": "name"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "已处于仙人模式中"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n7",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "ref",
+              "name": "existingSageMode"
+            }
+          }
+        },
+        "yes": "n6",
+        "no": "n5"
+      },
+      {
+        "id": "n8",
+        "kind": "bind",
+        "name": "existingSageMode",
+        "expr": {
+          "kind": "binary",
+          "op": "&&",
+          "left": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "caster"
+            },
+            "key": "statusTags"
+          },
+          "right": {
+            "kind": "collection",
+            "object": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "caster"
+              },
+              "key": "statusTags"
+            },
+            "method": "find",
+            "args": [
+              {
+                "kind": "lambda",
+                "parameters": [
+                  "t"
+                ],
+                "body": {
+                  "kind": "binary",
+                  "op": "===",
+                  "left": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "t"
+                    },
+                    "key": "type"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": "sage-mode"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "next": "n7"
+      },
+      {
+        "id": "n9",
+        "kind": "bind",
+        "name": "battle",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "context"
+          },
+          "key": "battle"
+        },
+        "next": "n8"
+      },
+      {
+        "id": "n10",
+        "kind": "bind",
+        "name": "caster",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "context"
+          },
+          "key": "piece"
+        },
+        "next": "n9"
+      }
+    ]
+  },
+  "contentGraphField": "code",
+  "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1",
+  "contentGraphEntries": {
+    "previewCode": {
+      "graph": {
+        "version": "rvb-content-graph/v1",
+        "surface": "preview",
+        "entry": "n1",
+        "nodes": [
+          {
+            "id": "n1",
+            "kind": "return",
+            "value": {
+              "kind": "object",
+              "entries": [
+                {
+                  "key": "description",
+                  "value": {
+                    "kind": "literal",
+                    "value": "进入打坐，准备进度6。你的回合开始时进度−1，每个存活友方影分身额外−1。归零时结束打坐，获得3点行动点和1点充能点。"
+                  }
+                },
+                {
+                  "key": "expectedValues",
+                  "value": {
+                    "kind": "object",
+                    "entries": []
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "compilerVersion": "rvb-content-graph-compiler/v1"
+    }
+  }
 }

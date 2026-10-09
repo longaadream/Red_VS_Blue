@@ -5,5 +5,1948 @@
   "trigger": {
     "type": "afterSkillUsed"
   },
-  "skillCode": "var piece=context.rulePiece;if(!piece||!context.sourcePiece||context.sourcePiece.instanceId!==piece.instanceId)return {success:false,message:''};var tag=(piece.statusTags||[]).find(function(t){return t.type==='momentum-core';});if(!tag||!Array.isArray(tag.skillIds)||tag.skillIds.indexOf(context.skillId)<0)return {success:false,message:''};var sideTag=(piece.statusTags||[]).find(function(t){return t.type==='shadow-ride-sweep-side';});var sideMessage='';if(context.skillId==='shadow-ride-sweep'&&sideTag){var candidates=[sideTag.left,sideTag.right].filter(function(cell){return cell&&battle.map.tiles.some(function(tile){return tile.x===cell.x&&tile.y===cell.y;});}).map(function(cell){return {type:'cell',x:cell.x,y:cell.y};});if(context.targetX===undefined||context.targetY===undefined){if(candidates.length)return {needsTargetSelection:true,playerId:piece.ownerPlayerId,title:'骑射横扫：选择冲刺方向左侧或右侧地格',targetType:'grid',filter:'all',targetCandidates:candidates,selectionMode:'single',minSelections:1,maxSelections:1,canCancel:true};piece.statusTags=piece.statusTags.filter(function(t){return t!==sideTag;});sideMessage='，侧射方向没有可选地格';}else{var side=context.targetX===sideTag.left.x&&context.targetY===sideTag.left.y?'left':context.targetX===sideTag.right.x&&context.targetY===sideTag.right.y?'right':null;if(!side)return {success:false,message:'骑射横扫必须选择冲刺终点左侧或右侧的相邻地格'};var sx=side==='left'?sideTag.dy:-sideTag.dy,sy=side==='left'?-sideTag.dx:sideTag.dx,hits=[],sideDamage=Number(sideTag.damage||5);(sideTag.pathCells||[]).forEach(function(origin){var events=flow.query.path(origin,{x:sx,y:sy});for(var index=0;index<events.length;index++){var event=events[index];if(event.type==='boundary')break;if(event.type==='piece'){var target=event.piece;if(target.currentHp>0&&!arePlayersAllied(battle,target.ownerPlayerId,piece.ownerPlayerId)){var result=dealDamage(piece,target,sideDamage,'physical',battle,'shadow-ride-sweep');hits.push(target.name+'(-'+result.damage+')');}}if(event.type==='terrain'&&event.blocksProjectile)break;}});piece.statusTags=piece.statusTags.filter(function(t){return t!==sideTag;});sideMessage='，按本次冲刺方向垂直射击'+(side==='left'?'左侧':'右侧')+(hits.length?'命中'+hits.join('、'):'未命中');}}if((piece.statusTags||[]).some(function(t){return t.type==='preserve-momentum';}))return {success:true,message:piece.name+'保留了动能'+sideMessage};var skill=battle.skillsById&&battle.skillsById[context.skillId];if(skill&&skill.momentumGainOnUse===true)return {success:true,message:piece.name+'获得了动能'+sideMessage};tag.stacks=0;piece.momentum=0;return {success:true,message:(sideMessage?sideMessage.slice(1)+'；':'')+piece.name+'的动能已重置'};"
+  "skillCode": "var __rvb_import_bound_method_0, candidates, hits, piece, side, sideDamage, sideMessage, sideTag, skill, sx, sy, tag; var _pc = \"n51\"; for (var _step = 0; _step <= 34; _step++) { switch (_pc) { case \"n51\": piece = (context)[\"rulePiece\"]; _pc = \"n50\"; break; case \"n50\": _pc = (! (! (((! piece) || (! (context)[\"sourcePiece\"])) || (((context)[\"sourcePiece\"])[\"instanceId\"] !== (piece)[\"instanceId\"])))) ? \"n49\" : \"n48\"; break; case \"n48\": tag = (((piece)[\"statusTags\"] || []))[\"find\"](function (t) { return ((t)[\"type\"] === \"momentum-core\"); }); _pc = \"n47\"; break; case \"n47\": _pc = (! (! (((! tag) || (! Array.isArray((tag)[\"skillIds\"]))) || (((tag)[\"skillIds\"])[\"indexOf\"]((context)[\"skillId\"]) < 0)))) ? \"n46\" : \"n45\"; break; case \"n45\": sideTag = (((piece)[\"statusTags\"] || []))[\"find\"](function (t) { return ((t)[\"type\"] === \"shadow-ride-sweep-side\"); }); _pc = \"n44\"; break; case \"n44\": sideMessage = \"\"; _pc = \"n43\"; break; case \"n43\": _pc = (! (! (((context)[\"skillId\"] === \"shadow-ride-sweep\") && sideTag))) ? \"n42\" : \"n8\"; break; case \"n42\": candidates = (([(sideTag)[\"left\"], (sideTag)[\"right\"]])[\"filter\"](function (cell) { return (cell && (((battle)[\"map\"])[\"tiles\"])[\"some\"](function (tile) { return (((tile)[\"x\"] === (cell)[\"x\"]) && ((tile)[\"y\"] === (cell)[\"y\"])); })); }))[\"map\"](function (cell) { return {type: \"cell\", x: (cell)[\"x\"], y: (cell)[\"y\"]}; }); _pc = \"n41\"; break; case \"n41\": _pc = (! (! (((context)[\"targetX\"] === (void 0)) || ((context)[\"targetY\"] === (void 0))))) ? \"n12\" : \"n40\"; break; case \"n40\": side = ((((context)[\"targetX\"] === ((sideTag)[\"left\"])[\"x\"]) && ((context)[\"targetY\"] === ((sideTag)[\"left\"])[\"y\"])) ? \"left\" : ((((context)[\"targetX\"] === ((sideTag)[\"right\"])[\"x\"]) && ((context)[\"targetY\"] === ((sideTag)[\"right\"])[\"y\"])) ? \"right\" : null)); _pc = \"n39\"; break; case \"n39\": _pc = (! (! (! side))) ? \"n38\" : \"n37\"; break; case \"n37\": sx = ((side === \"left\") ? (sideTag)[\"dy\"] : (- (sideTag)[\"dy\"])); _pc = \"n36\"; break; case \"n36\": sy = ((side === \"left\") ? (- (sideTag)[\"dx\"]) : (sideTag)[\"dx\"]); _pc = \"n35\"; break; case \"n35\": hits = []; _pc = \"n34\"; break; case \"n34\": sideDamage = Number(((sideTag)[\"damage\"] || 5)); _pc = \"n33\"; break; case \"n33\": __rvb_import_bound_method_0 = (function (receiver) { var capturedMethod = receiver[\"forEach\"]; return function () { return Reflect.apply(capturedMethod, receiver, arguments); }; })(((sideTag)[\"pathCells\"] || [])); _pc = \"n15\"; break; case \"n15\": (__rvb_import_bound_method_0)(function (origin) { var event, events, index, result, target; { var __rvb_content_graph_region_pc_0 = \"n32\"; while (__rvb_content_graph_region_pc_0 !== \"n16\") { switch (__rvb_content_graph_region_pc_0) { case \"n32\": events = flow.query.path(origin, {x: sx, y: sy}); __rvb_content_graph_region_pc_0 = \"n31\"; break; case \"n31\": index = 0; __rvb_content_graph_region_pc_0 = \"n30\"; break; case \"n30\": var __rvb_content_graph_loop_break_1 = false, __rvb_content_graph_loop_continue_2 = false; while ((! (! (index < (events)[\"length\"])))) { __rvb_content_graph_loop_continue_2 = false; { var __rvb_content_graph_region_pc_3 = \"n27\"; while (__rvb_content_graph_region_pc_3 !== \"n17\") { switch (__rvb_content_graph_region_pc_3) { case \"n27\": event = (events)[(function (key) { if (typeof key === \"string\" && key.split(\".\").some(function (part) { return [\"__proto__\",\"arguments\",\"callee\",\"caller\",\"constructor\",\"prototype\"].indexOf(part) !== -1; })) throw new Error(\"unsafe content graph index\"); return key; })(index)]; __rvb_content_graph_region_pc_3 = \"n26\"; break; case \"n26\": __rvb_content_graph_region_pc_3 = (! (! ((event)[\"type\"] === \"boundary\"))) ? \"n25\" : \"n24\"; break; case \"n24\": __rvb_content_graph_region_pc_3 = (! (! ((event)[\"type\"] === \"piece\"))) ? \"n23\" : \"n19\"; break; case \"n23\": target = (event)[\"piece\"]; __rvb_content_graph_region_pc_3 = \"n22\"; break; case \"n22\": __rvb_content_graph_region_pc_3 = (! (! (((target)[\"currentHp\"] > 0) && (! arePlayersAllied(battle, (target)[\"ownerPlayerId\"], (piece)[\"ownerPlayerId\"]))))) ? \"n21\" : \"n19\"; break; case \"n21\": result = dealDamage(piece, target, sideDamage, \"physical\", battle, \"shadow-ride-sweep\"); __rvb_content_graph_region_pc_3 = \"n20\"; break; case \"n20\": (hits).push(((((target)[\"name\"] + \"(-\") + (result)[\"damage\"]) + \")\")); __rvb_content_graph_region_pc_3 = \"n19\"; break; case \"n19\": __rvb_content_graph_region_pc_3 = (! (! (((event)[\"type\"] === \"terrain\") && (event)[\"blocksProjectile\"]))) ? \"n18\" : \"n17\"; break; case \"n17\": __rvb_content_graph_region_pc_3 = \"n17\"; break; case \"n18\": __rvb_content_graph_loop_break_1 = true; __rvb_content_graph_region_pc_3 = \"n17\"; break; case \"n25\": __rvb_content_graph_loop_break_1 = true; __rvb_content_graph_region_pc_3 = \"n17\"; break; default: throw new Error(\"invalid content graph region node\"); } } } if (__rvb_content_graph_loop_break_1) break; { var __rvb_content_graph_region_pc_4 = \"n29\"; while (__rvb_content_graph_region_pc_4 !== \"n28\") { switch (__rvb_content_graph_region_pc_4) { case \"n29\": index = ((+ index) + 1); __rvb_content_graph_region_pc_4 = \"n28\"; break; case \"n28\": __rvb_content_graph_region_pc_4 = \"n28\"; break; default: throw new Error(\"invalid content graph region node\"); } } } if (__rvb_content_graph_loop_break_1) break; if (__rvb_content_graph_loop_continue_2) { __rvb_content_graph_loop_continue_2 = false; continue; } } __rvb_content_graph_region_pc_0 = \"n16\"; break; case \"n16\": __rvb_content_graph_region_pc_0 = \"n16\"; break; default: throw new Error(\"invalid content graph region node\"); } } } }); _pc = \"n14\"; break; case \"n14\": (piece)[\"statusTags\"] = ((piece)[\"statusTags\"])[\"filter\"](function (t) { return (t !== sideTag); }); _pc = \"n13\"; break; case \"n13\": sideMessage = ((\"，按本次冲刺方向垂直射击\" + ((side === \"left\") ? \"左侧\" : \"右侧\")) + ((hits)[\"length\"] ? (\"命中\" + (hits)[\"join\"](\"、\")) : \"未命中\")); _pc = \"n8\"; break; case \"n38\": return {success: false, message: \"骑射横扫必须选择冲刺终点左侧或右侧的相邻地格\"}; case \"n12\": _pc = (! (! (candidates)[\"length\"])) ? \"n11\" : \"n10\"; break; case \"n10\": (piece)[\"statusTags\"] = ((piece)[\"statusTags\"])[\"filter\"](function (t) { return (t !== sideTag); }); _pc = \"n9\"; break; case \"n9\": sideMessage = \"，侧射方向没有可选地格\"; _pc = \"n8\"; break; case \"n8\": _pc = (! (! (((piece)[\"statusTags\"] || []))[\"some\"](function (t) { return ((t)[\"type\"] === \"preserve-momentum\"); }))) ? \"n7\" : \"n6\"; break; case \"n6\": skill = ((battle)[\"skillsById\"] && ((battle)[\"skillsById\"])[(function (key) { if (typeof key === \"string\" && key.split(\".\").some(function (part) { return [\"__proto__\",\"arguments\",\"callee\",\"caller\",\"constructor\",\"prototype\"].indexOf(part) !== -1; })) throw new Error(\"unsafe content graph index\"); return key; })((context)[\"skillId\"])]); _pc = \"n5\"; break; case \"n5\": _pc = (! (! (skill && ((skill)[\"momentumGainOnUse\"] === true)))) ? \"n4\" : \"n3\"; break; case \"n3\": (tag)[\"stacks\"] = 0; _pc = \"n2\"; break; case \"n2\": (piece)[\"momentum\"] = 0; _pc = \"n1\"; break; case \"n1\": return {success: true, message: (((sideMessage ? ((sideMessage)[\"slice\"](1) + \"；\") : \"\") + (piece)[\"name\"]) + \"的动能已重置\")}; case \"n4\": return {success: true, message: (((piece)[\"name\"] + \"获得了动能\") + sideMessage)}; case \"n7\": return {success: true, message: (((piece)[\"name\"] + \"保留了动能\") + sideMessage)}; case \"n11\": return {needsTargetSelection: true, playerId: (piece)[\"ownerPlayerId\"], title: \"骑射横扫：选择冲刺方向左侧或右侧地格\", targetType: \"grid\", filter: \"all\", targetCandidates: candidates, selectionMode: \"single\", minSelections: 1, maxSelections: 1, canCancel: true}; case \"n46\": return {success: false, message: \"\"}; case \"n49\": return {success: false, message: \"\"}; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\");",
+  "contentGraph": {
+    "version": "rvb-content-graph/v1",
+    "surface": "rule",
+    "entry": "n51",
+    "nodes": [
+      {
+        "id": "n1",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "binary",
+                  "op": "+",
+                  "left": {
+                    "kind": "conditional",
+                    "test": {
+                      "kind": "ref",
+                      "name": "sideMessage"
+                    },
+                    "consequent": {
+                      "kind": "binary",
+                      "op": "+",
+                      "left": {
+                        "kind": "collection",
+                        "object": {
+                          "kind": "ref",
+                          "name": "sideMessage"
+                        },
+                        "method": "slice",
+                        "args": [
+                          {
+                            "kind": "literal",
+                            "value": 1
+                          }
+                        ]
+                      },
+                      "right": {
+                        "kind": "literal",
+                        "value": "；"
+                      }
+                    },
+                    "alternate": {
+                      "kind": "literal",
+                      "value": ""
+                    }
+                  },
+                  "right": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "piece"
+                    },
+                    "key": "name"
+                  }
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "的动能已重置"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n2",
+        "kind": "set",
+        "target": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "piece"
+          },
+          "key": "momentum"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "literal",
+          "value": 0
+        },
+        "next": "n1"
+      },
+      {
+        "id": "n3",
+        "kind": "set",
+        "target": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "tag"
+          },
+          "key": "stacks"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "literal",
+          "value": 0
+        },
+        "next": "n2"
+      },
+      {
+        "id": "n4",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "binary",
+                  "op": "+",
+                  "left": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "piece"
+                    },
+                    "key": "name"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": "获得了动能"
+                  }
+                },
+                "right": {
+                  "kind": "ref",
+                  "name": "sideMessage"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n5",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "&&",
+              "left": {
+                "kind": "ref",
+                "name": "skill"
+              },
+              "right": {
+                "kind": "binary",
+                "op": "===",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "skill"
+                  },
+                  "key": "momentumGainOnUse"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": true
+                }
+              }
+            }
+          }
+        },
+        "yes": "n4",
+        "no": "n3"
+      },
+      {
+        "id": "n6",
+        "kind": "bind",
+        "name": "skill",
+        "expr": {
+          "kind": "binary",
+          "op": "&&",
+          "left": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "battle"
+            },
+            "key": "skillsById"
+          },
+          "right": {
+            "kind": "index",
+            "object": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "battle"
+              },
+              "key": "skillsById"
+            },
+            "index": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "context"
+              },
+              "key": "skillId"
+            }
+          }
+        },
+        "next": "n5"
+      },
+      {
+        "id": "n7",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "binary",
+                  "op": "+",
+                  "left": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "piece"
+                    },
+                    "key": "name"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": "保留了动能"
+                  }
+                },
+                "right": {
+                  "kind": "ref",
+                  "name": "sideMessage"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n8",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "collection",
+              "object": {
+                "kind": "binary",
+                "op": "||",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "piece"
+                  },
+                  "key": "statusTags"
+                },
+                "right": {
+                  "kind": "array",
+                  "items": []
+                }
+              },
+              "method": "some",
+              "args": [
+                {
+                  "kind": "lambda",
+                  "parameters": [
+                    "t"
+                  ],
+                  "body": {
+                    "kind": "binary",
+                    "op": "===",
+                    "left": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "t"
+                      },
+                      "key": "type"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": "preserve-momentum"
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "yes": "n7",
+        "no": "n6"
+      },
+      {
+        "id": "n9",
+        "kind": "set",
+        "target": {
+          "kind": "ref",
+          "name": "sideMessage"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "literal",
+          "value": "，侧射方向没有可选地格"
+        },
+        "next": "n8"
+      },
+      {
+        "id": "n10",
+        "kind": "set",
+        "target": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "piece"
+          },
+          "key": "statusTags"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "collection",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "piece"
+            },
+            "key": "statusTags"
+          },
+          "method": "filter",
+          "args": [
+            {
+              "kind": "lambda",
+              "parameters": [
+                "t"
+              ],
+              "body": {
+                "kind": "binary",
+                "op": "!==",
+                "left": {
+                  "kind": "ref",
+                  "name": "t"
+                },
+                "right": {
+                  "kind": "ref",
+                  "name": "sideTag"
+                }
+              }
+            }
+          ]
+        },
+        "next": "n9"
+      },
+      {
+        "id": "n11",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "needsTargetSelection",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "playerId",
+              "value": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "piece"
+                },
+                "key": "ownerPlayerId"
+              }
+            },
+            {
+              "key": "title",
+              "value": {
+                "kind": "literal",
+                "value": "骑射横扫：选择冲刺方向左侧或右侧地格"
+              }
+            },
+            {
+              "key": "targetType",
+              "value": {
+                "kind": "literal",
+                "value": "grid"
+              }
+            },
+            {
+              "key": "filter",
+              "value": {
+                "kind": "literal",
+                "value": "all"
+              }
+            },
+            {
+              "key": "targetCandidates",
+              "value": {
+                "kind": "ref",
+                "name": "candidates"
+              }
+            },
+            {
+              "key": "selectionMode",
+              "value": {
+                "kind": "literal",
+                "value": "single"
+              }
+            },
+            {
+              "key": "minSelections",
+              "value": {
+                "kind": "literal",
+                "value": 1
+              }
+            },
+            {
+              "key": "maxSelections",
+              "value": {
+                "kind": "literal",
+                "value": 1
+              }
+            },
+            {
+              "key": "canCancel",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n12",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "candidates"
+              },
+              "key": "length"
+            }
+          }
+        },
+        "yes": "n11",
+        "no": "n10"
+      },
+      {
+        "id": "n13",
+        "kind": "set",
+        "target": {
+          "kind": "ref",
+          "name": "sideMessage"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "binary",
+          "op": "+",
+          "left": {
+            "kind": "binary",
+            "op": "+",
+            "left": {
+              "kind": "literal",
+              "value": "，按本次冲刺方向垂直射击"
+            },
+            "right": {
+              "kind": "conditional",
+              "test": {
+                "kind": "binary",
+                "op": "===",
+                "left": {
+                  "kind": "ref",
+                  "name": "side"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "left"
+                }
+              },
+              "consequent": {
+                "kind": "literal",
+                "value": "左侧"
+              },
+              "alternate": {
+                "kind": "literal",
+                "value": "右侧"
+              }
+            }
+          },
+          "right": {
+            "kind": "conditional",
+            "test": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "hits"
+              },
+              "key": "length"
+            },
+            "consequent": {
+              "kind": "binary",
+              "op": "+",
+              "left": {
+                "kind": "literal",
+                "value": "命中"
+              },
+              "right": {
+                "kind": "collection",
+                "object": {
+                  "kind": "ref",
+                  "name": "hits"
+                },
+                "method": "join",
+                "args": [
+                  {
+                    "kind": "literal",
+                    "value": "、"
+                  }
+                ]
+              }
+            },
+            "alternate": {
+              "kind": "literal",
+              "value": "未命中"
+            }
+          }
+        },
+        "next": "n8"
+      },
+      {
+        "id": "n14",
+        "kind": "set",
+        "target": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "piece"
+          },
+          "key": "statusTags"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "collection",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "piece"
+            },
+            "key": "statusTags"
+          },
+          "method": "filter",
+          "args": [
+            {
+              "kind": "lambda",
+              "parameters": [
+                "t"
+              ],
+              "body": {
+                "kind": "binary",
+                "op": "!==",
+                "left": {
+                  "kind": "ref",
+                  "name": "t"
+                },
+                "right": {
+                  "kind": "ref",
+                  "name": "sideTag"
+                }
+              }
+            }
+          ]
+        },
+        "next": "n13"
+      },
+      {
+        "id": "n15",
+        "kind": "invoke",
+        "target": {
+          "kind": "function",
+          "value": {
+            "kind": "ref",
+            "name": "__rvb_import_bound_method_0"
+          }
+        },
+        "args": [
+          {
+            "kind": "function",
+            "parameters": [
+              "origin"
+            ],
+            "body": {
+              "entry": "n32",
+              "end": "n16",
+              "nodes": [
+                {
+                  "id": "n16",
+                  "kind": "regionEnd"
+                },
+                {
+                  "id": "n30",
+                  "kind": "loop",
+                  "loop": "for",
+                  "condition": {
+                    "kind": "unary",
+                    "op": "!",
+                    "argument": {
+                      "kind": "unary",
+                      "op": "!",
+                      "argument": {
+                        "kind": "binary",
+                        "op": "<",
+                        "left": {
+                          "kind": "ref",
+                          "name": "index"
+                        },
+                        "right": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "events"
+                          },
+                          "key": "length"
+                        }
+                      }
+                    }
+                  },
+                  "body": {
+                    "entry": "n27",
+                    "end": "n17",
+                    "nodes": [
+                      {
+                        "id": "n17",
+                        "kind": "regionEnd"
+                      },
+                      {
+                        "id": "n18",
+                        "kind": "break"
+                      },
+                      {
+                        "id": "n19",
+                        "kind": "branch",
+                        "condition": {
+                          "kind": "unary",
+                          "op": "!",
+                          "argument": {
+                            "kind": "unary",
+                            "op": "!",
+                            "argument": {
+                              "kind": "binary",
+                              "op": "&&",
+                              "left": {
+                                "kind": "binary",
+                                "op": "===",
+                                "left": {
+                                  "kind": "get",
+                                  "object": {
+                                    "kind": "ref",
+                                    "name": "event"
+                                  },
+                                  "key": "type"
+                                },
+                                "right": {
+                                  "kind": "literal",
+                                  "value": "terrain"
+                                }
+                              },
+                              "right": {
+                                "kind": "get",
+                                "object": {
+                                  "kind": "ref",
+                                  "name": "event"
+                                },
+                                "key": "blocksProjectile"
+                              }
+                            }
+                          }
+                        },
+                        "yes": "n18",
+                        "no": "n17"
+                      },
+                      {
+                        "id": "n20",
+                        "kind": "call",
+                        "capability": "array.push",
+                        "args": [
+                          {
+                            "kind": "ref",
+                            "name": "hits"
+                          },
+                          {
+                            "kind": "binary",
+                            "op": "+",
+                            "left": {
+                              "kind": "binary",
+                              "op": "+",
+                              "left": {
+                                "kind": "binary",
+                                "op": "+",
+                                "left": {
+                                  "kind": "get",
+                                  "object": {
+                                    "kind": "ref",
+                                    "name": "target"
+                                  },
+                                  "key": "name"
+                                },
+                                "right": {
+                                  "kind": "literal",
+                                  "value": "(-"
+                                }
+                              },
+                              "right": {
+                                "kind": "get",
+                                "object": {
+                                  "kind": "ref",
+                                  "name": "result"
+                                },
+                                "key": "damage"
+                              }
+                            },
+                            "right": {
+                              "kind": "literal",
+                              "value": ")"
+                            }
+                          }
+                        ],
+                        "next": "n19"
+                      },
+                      {
+                        "id": "n21",
+                        "kind": "call",
+                        "capability": "dealDamage",
+                        "args": [
+                          {
+                            "kind": "ref",
+                            "name": "piece"
+                          },
+                          {
+                            "kind": "ref",
+                            "name": "target"
+                          },
+                          {
+                            "kind": "ref",
+                            "name": "sideDamage"
+                          },
+                          {
+                            "kind": "literal",
+                            "value": "physical"
+                          },
+                          {
+                            "kind": "ref",
+                            "name": "battle"
+                          },
+                          {
+                            "kind": "literal",
+                            "value": "shadow-ride-sweep"
+                          }
+                        ],
+                        "result": "result",
+                        "next": "n20"
+                      },
+                      {
+                        "id": "n22",
+                        "kind": "branch",
+                        "condition": {
+                          "kind": "unary",
+                          "op": "!",
+                          "argument": {
+                            "kind": "unary",
+                            "op": "!",
+                            "argument": {
+                              "kind": "binary",
+                              "op": "&&",
+                              "left": {
+                                "kind": "binary",
+                                "op": ">",
+                                "left": {
+                                  "kind": "get",
+                                  "object": {
+                                    "kind": "ref",
+                                    "name": "target"
+                                  },
+                                  "key": "currentHp"
+                                },
+                                "right": {
+                                  "kind": "literal",
+                                  "value": 0
+                                }
+                              },
+                              "right": {
+                                "kind": "unary",
+                                "op": "!",
+                                "argument": {
+                                  "kind": "call",
+                                  "callee": "arePlayersAllied",
+                                  "args": [
+                                    {
+                                      "kind": "ref",
+                                      "name": "battle"
+                                    },
+                                    {
+                                      "kind": "get",
+                                      "object": {
+                                        "kind": "ref",
+                                        "name": "target"
+                                      },
+                                      "key": "ownerPlayerId"
+                                    },
+                                    {
+                                      "kind": "get",
+                                      "object": {
+                                        "kind": "ref",
+                                        "name": "piece"
+                                      },
+                                      "key": "ownerPlayerId"
+                                    }
+                                  ]
+                                }
+                              }
+                            }
+                          }
+                        },
+                        "yes": "n21",
+                        "no": "n19"
+                      },
+                      {
+                        "id": "n23",
+                        "kind": "bind",
+                        "name": "target",
+                        "expr": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "event"
+                          },
+                          "key": "piece"
+                        },
+                        "next": "n22"
+                      },
+                      {
+                        "id": "n24",
+                        "kind": "branch",
+                        "condition": {
+                          "kind": "unary",
+                          "op": "!",
+                          "argument": {
+                            "kind": "unary",
+                            "op": "!",
+                            "argument": {
+                              "kind": "binary",
+                              "op": "===",
+                              "left": {
+                                "kind": "get",
+                                "object": {
+                                  "kind": "ref",
+                                  "name": "event"
+                                },
+                                "key": "type"
+                              },
+                              "right": {
+                                "kind": "literal",
+                                "value": "piece"
+                              }
+                            }
+                          }
+                        },
+                        "yes": "n23",
+                        "no": "n19"
+                      },
+                      {
+                        "id": "n25",
+                        "kind": "break"
+                      },
+                      {
+                        "id": "n26",
+                        "kind": "branch",
+                        "condition": {
+                          "kind": "unary",
+                          "op": "!",
+                          "argument": {
+                            "kind": "unary",
+                            "op": "!",
+                            "argument": {
+                              "kind": "binary",
+                              "op": "===",
+                              "left": {
+                                "kind": "get",
+                                "object": {
+                                  "kind": "ref",
+                                  "name": "event"
+                                },
+                                "key": "type"
+                              },
+                              "right": {
+                                "kind": "literal",
+                                "value": "boundary"
+                              }
+                            }
+                          }
+                        },
+                        "yes": "n25",
+                        "no": "n24"
+                      },
+                      {
+                        "id": "n27",
+                        "kind": "bind",
+                        "name": "event",
+                        "expr": {
+                          "kind": "index",
+                          "object": {
+                            "kind": "ref",
+                            "name": "events"
+                          },
+                          "index": {
+                            "kind": "ref",
+                            "name": "index"
+                          }
+                        },
+                        "next": "n26"
+                      }
+                    ]
+                  },
+                  "update": {
+                    "entry": "n29",
+                    "end": "n28",
+                    "nodes": [
+                      {
+                        "id": "n28",
+                        "kind": "regionEnd"
+                      },
+                      {
+                        "id": "n29",
+                        "kind": "set",
+                        "target": {
+                          "kind": "ref",
+                          "name": "index"
+                        },
+                        "operator": "=",
+                        "value": {
+                          "kind": "binary",
+                          "op": "+",
+                          "left": {
+                            "kind": "unary",
+                            "op": "+",
+                            "argument": {
+                              "kind": "ref",
+                              "name": "index"
+                            }
+                          },
+                          "right": {
+                            "kind": "literal",
+                            "value": 1
+                          }
+                        },
+                        "next": "n28"
+                      }
+                    ]
+                  },
+                  "next": "n16"
+                },
+                {
+                  "id": "n31",
+                  "kind": "bind",
+                  "name": "index",
+                  "expr": {
+                    "kind": "literal",
+                    "value": 0
+                  },
+                  "next": "n30"
+                },
+                {
+                  "id": "n32",
+                  "kind": "call",
+                  "capability": "flow.query.path",
+                  "args": [
+                    {
+                      "kind": "ref",
+                      "name": "origin"
+                    },
+                    {
+                      "kind": "object",
+                      "entries": [
+                        {
+                          "key": "x",
+                          "value": {
+                            "kind": "ref",
+                            "name": "sx"
+                          }
+                        },
+                        {
+                          "key": "y",
+                          "value": {
+                            "kind": "ref",
+                            "name": "sy"
+                          }
+                        }
+                      ]
+                    }
+                  ],
+                  "result": "events",
+                  "next": "n31"
+                }
+              ]
+            }
+          }
+        ],
+        "next": "n14"
+      },
+      {
+        "id": "n33",
+        "kind": "bind",
+        "name": "__rvb_import_bound_method_0",
+        "expr": {
+          "kind": "boundMethod",
+          "object": {
+            "kind": "binary",
+            "op": "||",
+            "left": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "sideTag"
+              },
+              "key": "pathCells"
+            },
+            "right": {
+              "kind": "array",
+              "items": []
+            }
+          },
+          "method": "forEach"
+        },
+        "next": "n15"
+      },
+      {
+        "id": "n34",
+        "kind": "bind",
+        "name": "sideDamage",
+        "expr": {
+          "kind": "call",
+          "callee": "Number",
+          "args": [
+            {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "sideTag"
+                },
+                "key": "damage"
+              },
+              "right": {
+                "kind": "literal",
+                "value": 5
+              }
+            }
+          ]
+        },
+        "next": "n33"
+      },
+      {
+        "id": "n35",
+        "kind": "bind",
+        "name": "hits",
+        "expr": {
+          "kind": "array",
+          "items": []
+        },
+        "next": "n34"
+      },
+      {
+        "id": "n36",
+        "kind": "bind",
+        "name": "sy",
+        "expr": {
+          "kind": "conditional",
+          "test": {
+            "kind": "binary",
+            "op": "===",
+            "left": {
+              "kind": "ref",
+              "name": "side"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "left"
+            }
+          },
+          "consequent": {
+            "kind": "unary",
+            "op": "-",
+            "argument": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "sideTag"
+              },
+              "key": "dx"
+            }
+          },
+          "alternate": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "sideTag"
+            },
+            "key": "dx"
+          }
+        },
+        "next": "n35"
+      },
+      {
+        "id": "n37",
+        "kind": "bind",
+        "name": "sx",
+        "expr": {
+          "kind": "conditional",
+          "test": {
+            "kind": "binary",
+            "op": "===",
+            "left": {
+              "kind": "ref",
+              "name": "side"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "left"
+            }
+          },
+          "consequent": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "sideTag"
+            },
+            "key": "dy"
+          },
+          "alternate": {
+            "kind": "unary",
+            "op": "-",
+            "argument": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "sideTag"
+              },
+              "key": "dy"
+            }
+          }
+        },
+        "next": "n36"
+      },
+      {
+        "id": "n38",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": "骑射横扫必须选择冲刺终点左侧或右侧的相邻地格"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n39",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "unary",
+              "op": "!",
+              "argument": {
+                "kind": "ref",
+                "name": "side"
+              }
+            }
+          }
+        },
+        "yes": "n38",
+        "no": "n37"
+      },
+      {
+        "id": "n40",
+        "kind": "bind",
+        "name": "side",
+        "expr": {
+          "kind": "conditional",
+          "test": {
+            "kind": "binary",
+            "op": "&&",
+            "left": {
+              "kind": "binary",
+              "op": "===",
+              "left": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "context"
+                },
+                "key": "targetX"
+              },
+              "right": {
+                "kind": "get",
+                "object": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "sideTag"
+                  },
+                  "key": "left"
+                },
+                "key": "x"
+              }
+            },
+            "right": {
+              "kind": "binary",
+              "op": "===",
+              "left": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "context"
+                },
+                "key": "targetY"
+              },
+              "right": {
+                "kind": "get",
+                "object": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "sideTag"
+                  },
+                  "key": "left"
+                },
+                "key": "y"
+              }
+            }
+          },
+          "consequent": {
+            "kind": "literal",
+            "value": "left"
+          },
+          "alternate": {
+            "kind": "conditional",
+            "test": {
+              "kind": "binary",
+              "op": "&&",
+              "left": {
+                "kind": "binary",
+                "op": "===",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "context"
+                  },
+                  "key": "targetX"
+                },
+                "right": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "sideTag"
+                    },
+                    "key": "right"
+                  },
+                  "key": "x"
+                }
+              },
+              "right": {
+                "kind": "binary",
+                "op": "===",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "context"
+                  },
+                  "key": "targetY"
+                },
+                "right": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "sideTag"
+                    },
+                    "key": "right"
+                  },
+                  "key": "y"
+                }
+              }
+            },
+            "consequent": {
+              "kind": "literal",
+              "value": "right"
+            },
+            "alternate": {
+              "kind": "literal",
+              "value": null
+            }
+          }
+        },
+        "next": "n39"
+      },
+      {
+        "id": "n41",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "binary",
+                "op": "===",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "context"
+                  },
+                  "key": "targetX"
+                },
+                "right": {
+                  "kind": "undefined"
+                }
+              },
+              "right": {
+                "kind": "binary",
+                "op": "===",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "context"
+                  },
+                  "key": "targetY"
+                },
+                "right": {
+                  "kind": "undefined"
+                }
+              }
+            }
+          }
+        },
+        "yes": "n12",
+        "no": "n40"
+      },
+      {
+        "id": "n42",
+        "kind": "bind",
+        "name": "candidates",
+        "expr": {
+          "kind": "collection",
+          "object": {
+            "kind": "collection",
+            "object": {
+              "kind": "array",
+              "items": [
+                {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "sideTag"
+                  },
+                  "key": "left"
+                },
+                {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "sideTag"
+                  },
+                  "key": "right"
+                }
+              ]
+            },
+            "method": "filter",
+            "args": [
+              {
+                "kind": "lambda",
+                "parameters": [
+                  "cell"
+                ],
+                "body": {
+                  "kind": "binary",
+                  "op": "&&",
+                  "left": {
+                    "kind": "ref",
+                    "name": "cell"
+                  },
+                  "right": {
+                    "kind": "collection",
+                    "object": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "battle"
+                        },
+                        "key": "map"
+                      },
+                      "key": "tiles"
+                    },
+                    "method": "some",
+                    "args": [
+                      {
+                        "kind": "lambda",
+                        "parameters": [
+                          "tile"
+                        ],
+                        "body": {
+                          "kind": "binary",
+                          "op": "&&",
+                          "left": {
+                            "kind": "binary",
+                            "op": "===",
+                            "left": {
+                              "kind": "get",
+                              "object": {
+                                "kind": "ref",
+                                "name": "tile"
+                              },
+                              "key": "x"
+                            },
+                            "right": {
+                              "kind": "get",
+                              "object": {
+                                "kind": "ref",
+                                "name": "cell"
+                              },
+                              "key": "x"
+                            }
+                          },
+                          "right": {
+                            "kind": "binary",
+                            "op": "===",
+                            "left": {
+                              "kind": "get",
+                              "object": {
+                                "kind": "ref",
+                                "name": "tile"
+                              },
+                              "key": "y"
+                            },
+                            "right": {
+                              "kind": "get",
+                              "object": {
+                                "kind": "ref",
+                                "name": "cell"
+                              },
+                              "key": "y"
+                            }
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            ]
+          },
+          "method": "map",
+          "args": [
+            {
+              "kind": "lambda",
+              "parameters": [
+                "cell"
+              ],
+              "body": {
+                "kind": "object",
+                "entries": [
+                  {
+                    "key": "type",
+                    "value": {
+                      "kind": "literal",
+                      "value": "cell"
+                    }
+                  },
+                  {
+                    "key": "x",
+                    "value": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "cell"
+                      },
+                      "key": "x"
+                    }
+                  },
+                  {
+                    "key": "y",
+                    "value": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "cell"
+                      },
+                      "key": "y"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "next": "n41"
+      },
+      {
+        "id": "n43",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "&&",
+              "left": {
+                "kind": "binary",
+                "op": "===",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "context"
+                  },
+                  "key": "skillId"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "shadow-ride-sweep"
+                }
+              },
+              "right": {
+                "kind": "ref",
+                "name": "sideTag"
+              }
+            }
+          }
+        },
+        "yes": "n42",
+        "no": "n8"
+      },
+      {
+        "id": "n44",
+        "kind": "bind",
+        "name": "sideMessage",
+        "expr": {
+          "kind": "literal",
+          "value": ""
+        },
+        "next": "n43"
+      },
+      {
+        "id": "n45",
+        "kind": "bind",
+        "name": "sideTag",
+        "expr": {
+          "kind": "collection",
+          "object": {
+            "kind": "binary",
+            "op": "||",
+            "left": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "piece"
+              },
+              "key": "statusTags"
+            },
+            "right": {
+              "kind": "array",
+              "items": []
+            }
+          },
+          "method": "find",
+          "args": [
+            {
+              "kind": "lambda",
+              "parameters": [
+                "t"
+              ],
+              "body": {
+                "kind": "binary",
+                "op": "===",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "t"
+                  },
+                  "key": "type"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "shadow-ride-sweep-side"
+                }
+              }
+            }
+          ]
+        },
+        "next": "n44"
+      },
+      {
+        "id": "n46",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n47",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "binary",
+                "op": "||",
+                "left": {
+                  "kind": "unary",
+                  "op": "!",
+                  "argument": {
+                    "kind": "ref",
+                    "name": "tag"
+                  }
+                },
+                "right": {
+                  "kind": "unary",
+                  "op": "!",
+                  "argument": {
+                    "kind": "call",
+                    "callee": "Array.isArray",
+                    "args": [
+                      {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "tag"
+                        },
+                        "key": "skillIds"
+                      }
+                    ]
+                  }
+                }
+              },
+              "right": {
+                "kind": "binary",
+                "op": "<",
+                "left": {
+                  "kind": "collection",
+                  "object": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "tag"
+                    },
+                    "key": "skillIds"
+                  },
+                  "method": "indexOf",
+                  "args": [
+                    {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "context"
+                      },
+                      "key": "skillId"
+                    }
+                  ]
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": 0
+                }
+              }
+            }
+          }
+        },
+        "yes": "n46",
+        "no": "n45"
+      },
+      {
+        "id": "n48",
+        "kind": "bind",
+        "name": "tag",
+        "expr": {
+          "kind": "collection",
+          "object": {
+            "kind": "binary",
+            "op": "||",
+            "left": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "piece"
+              },
+              "key": "statusTags"
+            },
+            "right": {
+              "kind": "array",
+              "items": []
+            }
+          },
+          "method": "find",
+          "args": [
+            {
+              "kind": "lambda",
+              "parameters": [
+                "t"
+              ],
+              "body": {
+                "kind": "binary",
+                "op": "===",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "t"
+                  },
+                  "key": "type"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "momentum-core"
+                }
+              }
+            }
+          ]
+        },
+        "next": "n47"
+      },
+      {
+        "id": "n49",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n50",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "binary",
+                "op": "||",
+                "left": {
+                  "kind": "unary",
+                  "op": "!",
+                  "argument": {
+                    "kind": "ref",
+                    "name": "piece"
+                  }
+                },
+                "right": {
+                  "kind": "unary",
+                  "op": "!",
+                  "argument": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "context"
+                    },
+                    "key": "sourcePiece"
+                  }
+                }
+              },
+              "right": {
+                "kind": "binary",
+                "op": "!==",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "context"
+                    },
+                    "key": "sourcePiece"
+                  },
+                  "key": "instanceId"
+                },
+                "right": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "piece"
+                  },
+                  "key": "instanceId"
+                }
+              }
+            }
+          }
+        },
+        "yes": "n49",
+        "no": "n48"
+      },
+      {
+        "id": "n51",
+        "kind": "bind",
+        "name": "piece",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "context"
+          },
+          "key": "rulePiece"
+        },
+        "next": "n50"
+      }
+    ]
+  },
+  "contentGraphField": "skillCode",
+  "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1"
 }

@@ -38,5 +38,546 @@
       }
     ]
   },
-  "code": "function executeSkill(context) { var caster = context.piece; var target = selectTarget({ type: 'piece', range: 5, filter: 'enemy' }); if (!target || target.needsTargetSelection) return target; var damage = Math.floor(caster.attack * 1.5); var result = dealDamage(caster, target, damage, 'magical', battle, 'aizen-black-coffin'); var living = battle.pieces.find(function(piece) { return piece.instanceId === target.instanceId && piece.currentHp > 0; }); if (living) { addStatusEffectById(living.instanceId, { id: 'aizen-black-coffin-' + caster.instanceId + '-' + living.instanceId, type: 'aizen-black-coffin', name: '黑棺', visible: true, currentDuration: 1, currentUses: 1, stacks: 1, sourceId: caster.instanceId, delayedDamage: damage, relatedRules: ['rule-aizen-black-coffin-end'] }); addStatusEffectById(living.instanceId, { id: 'black-coffin-root-' + caster.instanceId + '-' + living.instanceId, type: 'root', name: '定身', currentDuration: 1 }); addRuleById(living.instanceId, 'rule-aizen-black-coffin-end'); } return { success: true, message: caster.name + '以黑棺造成' + (result.damage || 0) + '点魔法伤害' }; }"
+  "code": "function executeSkill(context) { var caster, damage, living, result, target; var _pc = \"n12\"; for (var _step = 0; _step <= 12; _step++) { switch (_pc) { case \"n12\": caster = (context)[\"piece\"]; _pc = \"n11\"; break; case \"n11\": target = selectTarget({type: \"piece\", range: 5, filter: \"enemy\"}); _pc = \"n10\"; break; case \"n10\": _pc = (! (! ((! target) || (target)[\"needsTargetSelection\"]))) ? \"n9\" : \"n8\"; break; case \"n8\": damage = Math.floor(((caster)[\"attack\"] * 1.5)); _pc = \"n7\"; break; case \"n7\": result = dealDamage(caster, target, damage, \"magical\", battle, \"aizen-black-coffin\"); _pc = \"n6\"; break; case \"n6\": living = ((battle)[\"pieces\"])[\"find\"](function (piece) { return (((piece)[\"instanceId\"] === (target)[\"instanceId\"]) && ((piece)[\"currentHp\"] > 0)); }); _pc = \"n5\"; break; case \"n5\": _pc = (! (! living)) ? \"n4\" : \"n1\"; break; case \"n4\": addStatusEffectById((living)[\"instanceId\"], {id: (((\"aizen-black-coffin-\" + (caster)[\"instanceId\"]) + \"-\") + (living)[\"instanceId\"]), type: \"aizen-black-coffin\", name: \"黑棺\", visible: true, currentDuration: 1, currentUses: 1, stacks: 1, sourceId: (caster)[\"instanceId\"], delayedDamage: damage, relatedRules: [\"rule-aizen-black-coffin-end\"]}); _pc = \"n3\"; break; case \"n3\": addStatusEffectById((living)[\"instanceId\"], {id: (((\"black-coffin-root-\" + (caster)[\"instanceId\"]) + \"-\") + (living)[\"instanceId\"]), type: \"root\", name: \"定身\", currentDuration: 1}); _pc = \"n2\"; break; case \"n2\": addRuleById((living)[\"instanceId\"], \"rule-aizen-black-coffin-end\"); _pc = \"n1\"; break; case \"n1\": return {success: true, message: ((((caster)[\"name\"] + \"以黑棺造成\") + ((result)[\"damage\"] || 0)) + \"点魔法伤害\")}; case \"n9\": return target; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\"); }",
+  "contentGraph": {
+    "version": "rvb-content-graph/v1",
+    "surface": "skill",
+    "entry": "n12",
+    "nodes": [
+      {
+        "id": "n1",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "binary",
+                  "op": "+",
+                  "left": {
+                    "kind": "binary",
+                    "op": "+",
+                    "left": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "caster"
+                      },
+                      "key": "name"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": "以黑棺造成"
+                    }
+                  },
+                  "right": {
+                    "kind": "binary",
+                    "op": "||",
+                    "left": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "result"
+                      },
+                      "key": "damage"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": 0
+                    }
+                  }
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "点魔法伤害"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n2",
+        "kind": "call",
+        "capability": "addRuleById",
+        "args": [
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "living"
+            },
+            "key": "instanceId"
+          },
+          {
+            "kind": "literal",
+            "value": "rule-aizen-black-coffin-end"
+          }
+        ],
+        "next": "n1"
+      },
+      {
+        "id": "n3",
+        "kind": "call",
+        "capability": "addStatusEffectById",
+        "args": [
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "living"
+            },
+            "key": "instanceId"
+          },
+          {
+            "kind": "object",
+            "entries": [
+              {
+                "key": "id",
+                "value": {
+                  "kind": "binary",
+                  "op": "+",
+                  "left": {
+                    "kind": "binary",
+                    "op": "+",
+                    "left": {
+                      "kind": "binary",
+                      "op": "+",
+                      "left": {
+                        "kind": "literal",
+                        "value": "black-coffin-root-"
+                      },
+                      "right": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "caster"
+                        },
+                        "key": "instanceId"
+                      }
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": "-"
+                    }
+                  },
+                  "right": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "living"
+                    },
+                    "key": "instanceId"
+                  }
+                }
+              },
+              {
+                "key": "type",
+                "value": {
+                  "kind": "literal",
+                  "value": "root"
+                }
+              },
+              {
+                "key": "name",
+                "value": {
+                  "kind": "literal",
+                  "value": "定身"
+                }
+              },
+              {
+                "key": "currentDuration",
+                "value": {
+                  "kind": "literal",
+                  "value": 1
+                }
+              }
+            ]
+          }
+        ],
+        "next": "n2"
+      },
+      {
+        "id": "n4",
+        "kind": "call",
+        "capability": "addStatusEffectById",
+        "args": [
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "living"
+            },
+            "key": "instanceId"
+          },
+          {
+            "kind": "object",
+            "entries": [
+              {
+                "key": "id",
+                "value": {
+                  "kind": "binary",
+                  "op": "+",
+                  "left": {
+                    "kind": "binary",
+                    "op": "+",
+                    "left": {
+                      "kind": "binary",
+                      "op": "+",
+                      "left": {
+                        "kind": "literal",
+                        "value": "aizen-black-coffin-"
+                      },
+                      "right": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "caster"
+                        },
+                        "key": "instanceId"
+                      }
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": "-"
+                    }
+                  },
+                  "right": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "living"
+                    },
+                    "key": "instanceId"
+                  }
+                }
+              },
+              {
+                "key": "type",
+                "value": {
+                  "kind": "literal",
+                  "value": "aizen-black-coffin"
+                }
+              },
+              {
+                "key": "name",
+                "value": {
+                  "kind": "literal",
+                  "value": "黑棺"
+                }
+              },
+              {
+                "key": "visible",
+                "value": {
+                  "kind": "literal",
+                  "value": true
+                }
+              },
+              {
+                "key": "currentDuration",
+                "value": {
+                  "kind": "literal",
+                  "value": 1
+                }
+              },
+              {
+                "key": "currentUses",
+                "value": {
+                  "kind": "literal",
+                  "value": 1
+                }
+              },
+              {
+                "key": "stacks",
+                "value": {
+                  "kind": "literal",
+                  "value": 1
+                }
+              },
+              {
+                "key": "sourceId",
+                "value": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "caster"
+                  },
+                  "key": "instanceId"
+                }
+              },
+              {
+                "key": "delayedDamage",
+                "value": {
+                  "kind": "ref",
+                  "name": "damage"
+                }
+              },
+              {
+                "key": "relatedRules",
+                "value": {
+                  "kind": "array",
+                  "items": [
+                    {
+                      "kind": "literal",
+                      "value": "rule-aizen-black-coffin-end"
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ],
+        "next": "n3"
+      },
+      {
+        "id": "n5",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "ref",
+              "name": "living"
+            }
+          }
+        },
+        "yes": "n4",
+        "no": "n1"
+      },
+      {
+        "id": "n6",
+        "kind": "bind",
+        "name": "living",
+        "expr": {
+          "kind": "collection",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "battle"
+            },
+            "key": "pieces"
+          },
+          "method": "find",
+          "args": [
+            {
+              "kind": "lambda",
+              "parameters": [
+                "piece"
+              ],
+              "body": {
+                "kind": "binary",
+                "op": "&&",
+                "left": {
+                  "kind": "binary",
+                  "op": "===",
+                  "left": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "piece"
+                    },
+                    "key": "instanceId"
+                  },
+                  "right": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "target"
+                    },
+                    "key": "instanceId"
+                  }
+                },
+                "right": {
+                  "kind": "binary",
+                  "op": ">",
+                  "left": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "piece"
+                    },
+                    "key": "currentHp"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": 0
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "next": "n5"
+      },
+      {
+        "id": "n7",
+        "kind": "call",
+        "capability": "dealDamage",
+        "args": [
+          {
+            "kind": "ref",
+            "name": "caster"
+          },
+          {
+            "kind": "ref",
+            "name": "target"
+          },
+          {
+            "kind": "ref",
+            "name": "damage"
+          },
+          {
+            "kind": "literal",
+            "value": "magical"
+          },
+          {
+            "kind": "ref",
+            "name": "battle"
+          },
+          {
+            "kind": "literal",
+            "value": "aizen-black-coffin"
+          }
+        ],
+        "result": "result",
+        "next": "n6"
+      },
+      {
+        "id": "n8",
+        "kind": "bind",
+        "name": "damage",
+        "expr": {
+          "kind": "call",
+          "callee": "Math.floor",
+          "args": [
+            {
+              "kind": "binary",
+              "op": "*",
+              "left": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "caster"
+                },
+                "key": "attack"
+              },
+              "right": {
+                "kind": "literal",
+                "value": 1.5
+              }
+            }
+          ]
+        },
+        "next": "n7"
+      },
+      {
+        "id": "n9",
+        "kind": "return",
+        "value": {
+          "kind": "ref",
+          "name": "target"
+        }
+      },
+      {
+        "id": "n10",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "ref",
+                  "name": "target"
+                }
+              },
+              "right": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "target"
+                },
+                "key": "needsTargetSelection"
+              }
+            }
+          }
+        },
+        "yes": "n9",
+        "no": "n8"
+      },
+      {
+        "id": "n11",
+        "kind": "call",
+        "capability": "selectTarget",
+        "args": [
+          {
+            "kind": "object",
+            "entries": [
+              {
+                "key": "type",
+                "value": {
+                  "kind": "literal",
+                  "value": "piece"
+                }
+              },
+              {
+                "key": "range",
+                "value": {
+                  "kind": "literal",
+                  "value": 5
+                }
+              },
+              {
+                "key": "filter",
+                "value": {
+                  "kind": "literal",
+                  "value": "enemy"
+                }
+              }
+            ]
+          }
+        ],
+        "result": "target",
+        "next": "n10"
+      },
+      {
+        "id": "n12",
+        "kind": "bind",
+        "name": "caster",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "context"
+          },
+          "key": "piece"
+        },
+        "next": "n11"
+      }
+    ]
+  },
+  "contentGraphField": "code",
+  "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1"
 }

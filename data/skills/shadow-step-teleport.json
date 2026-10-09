@@ -18,5 +18,1315 @@
   "actionPointCost": 0,
   "range": "self",
   "requiresTarget": false,
-  "code": "function executeSkill(context) { const sourcePiece = context.piece; if (!sourcePiece.statusTags) { return { message: '', success: false }; } const shadowStepStatus = sourcePiece.statusTags.find(tag => tag.type === 'shadow-step'); if (!shadowStepStatus) { return { message: '', success: false }; } if (shadowStepStatus.remainingDuration <= 0) { return { message: '', success: false }; } if (context.playerId !== sourcePiece.ownerPlayerId) { return { message: '', success: false }; } const targetX = shadowStepStatus.value; const targetY = shadowStepStatus.intensity; const shadowStepSourceId = 'shadow-step-' + sourcePiece.instanceId; const cleanupAndCancel = function(reason) { if (battle.extensions && battle.extensions.tileEffects) { battle.extensions.tileEffects = battle.extensions.tileEffects.filter(function(te) { return !(te.tileType === 'shadow-step' && te.sourceId === shadowStepSourceId); }); } const index = sourcePiece.statusTags.findIndex(tag => tag.type === 'shadow-step'); if (index !== -1) { sourcePiece.statusTags.splice(index, 1); } return { message: sourcePiece.name + '的暗影步' + reason + '，传送取消', success: true }; }; const targetTile = battle.map.tiles.find(t => t.x === targetX && t.y === targetY); if (!targetTile || !targetTile.props.walkable) { return cleanupAndCancel('目标位置不可行走'); } const pieceAtPos = battle.pieces.find(p => p.x === targetX && p.y === targetY && p.currentHp > 0); if (pieceAtPos) { return cleanupAndCancel('目标位置已被占用'); } if (battle.extensions && battle.extensions.tileEffects) { battle.extensions.tileEffects = battle.extensions.tileEffects.filter(function(te) { return !(te.tileType === 'shadow-step' && te.sourceId === shadowStepSourceId); }); } if (!flow.effects.displace([{pieceId:sourcePiece.instanceId,x:targetX,y:targetY}], 'teleport').success) return cleanupAndCancel('被阻挡'); const index = sourcePiece.statusTags.findIndex(tag => tag.type === 'shadow-step'); if (index !== -1) { sourcePiece.statusTags.splice(index, 1); } return { message: sourcePiece.name + '通过暗影步传送到了(' + targetX + ',' + targetY + ')', success: true }; }"
+  "code": "function executeSkill(context) { var __rvb_import_bound_method_0, __rvb_import_effect_1, __rvb_import_effect_3, __rvb_import_effect_4, __rvb_import_effect_6, __rvb_import_operand_2, __rvb_import_operand_5, __rvb_import_operand_7, __rvb_lexical_0_sourcePiece, __rvb_lexical_1_shadowStepStatus, __rvb_lexical_2_targetX, __rvb_lexical_3_targetY, __rvb_lexical_4_shadowStepSourceId, __rvb_lexical_5_cleanupAndCancel, __rvb_lexical_7_targetTile, __rvb_lexical_8_pieceAtPos, __rvb_lexical_9_index; var _pc = \"n44\"; for (var _step = 0; _step <= 36; _step++) { switch (_pc) { case \"n44\": __rvb_lexical_0_sourcePiece = (context)[\"piece\"]; _pc = \"n43\"; break; case \"n43\": _pc = (! (! (! (__rvb_lexical_0_sourcePiece)[\"statusTags\"]))) ? \"n42\" : \"n41\"; break; case \"n41\": __rvb_lexical_1_shadowStepStatus = ((__rvb_lexical_0_sourcePiece)[\"statusTags\"])[\"find\"](function (tag) { return ((tag)[\"type\"] === \"shadow-step\"); }); _pc = \"n40\"; break; case \"n40\": _pc = (! (! (! __rvb_lexical_1_shadowStepStatus))) ? \"n39\" : \"n38\"; break; case \"n38\": _pc = (! (! ((__rvb_lexical_1_shadowStepStatus)[\"remainingDuration\"] <= 0))) ? \"n37\" : \"n36\"; break; case \"n36\": _pc = (! (! ((context)[\"playerId\"] !== (__rvb_lexical_0_sourcePiece)[\"ownerPlayerId\"]))) ? \"n35\" : \"n34\"; break; case \"n34\": __rvb_lexical_2_targetX = (__rvb_lexical_1_shadowStepStatus)[\"value\"]; _pc = \"n33\"; break; case \"n33\": __rvb_lexical_3_targetY = (__rvb_lexical_1_shadowStepStatus)[\"intensity\"]; _pc = \"n32\"; break; case \"n32\": __rvb_lexical_4_shadowStepSourceId = (\"shadow-step-\" + (__rvb_lexical_0_sourcePiece)[\"instanceId\"]); _pc = \"n31\"; break; case \"n31\": __rvb_lexical_5_cleanupAndCancel = function (reason) { var __rvb_import_bound_method_8, __rvb_lexical_6_index; { var __rvb_content_graph_region_pc_0 = \"n30\"; while (__rvb_content_graph_region_pc_0 !== \"n23\") { switch (__rvb_content_graph_region_pc_0) { case \"n30\": __rvb_content_graph_region_pc_0 = (! (! ((battle)[\"extensions\"] && ((battle)[\"extensions\"])[\"tileEffects\"]))) ? \"n29\" : \"n28\"; break; case \"n29\": ((battle)[\"extensions\"])[\"tileEffects\"] = (((battle)[\"extensions\"])[\"tileEffects\"])[\"filter\"](function (te) { return (! (((te)[\"tileType\"] === \"shadow-step\") && ((te)[\"sourceId\"] === __rvb_lexical_4_shadowStepSourceId))); }); __rvb_content_graph_region_pc_0 = \"n28\"; break; case \"n28\": __rvb_import_bound_method_8 = (function (receiver) { var capturedMethod = receiver[\"findIndex\"]; return function () { return Reflect.apply(capturedMethod, receiver, arguments); }; })((__rvb_lexical_0_sourcePiece)[\"statusTags\"]); __rvb_content_graph_region_pc_0 = \"n27\"; break; case \"n27\": __rvb_lexical_6_index = (__rvb_import_bound_method_8)(function (tag) { return ((tag)[\"type\"] === \"shadow-step\"); }); __rvb_content_graph_region_pc_0 = \"n26\"; break; case \"n26\": __rvb_content_graph_region_pc_0 = (! (! (__rvb_lexical_6_index !== (- 1)))) ? \"n25\" : \"n24\"; break; case \"n25\": ((__rvb_lexical_0_sourcePiece)[\"statusTags\"]).splice(__rvb_lexical_6_index, 1); __rvb_content_graph_region_pc_0 = \"n24\"; break; case \"n24\": return {message: ((((__rvb_lexical_0_sourcePiece)[\"name\"] + \"的暗影步\") + reason) + \"，传送取消\"), success: true}; default: throw new Error(\"invalid content graph region node\"); } } } }; _pc = \"n22\"; break; case \"n22\": __rvb_lexical_7_targetTile = (((battle)[\"map\"])[\"tiles\"])[\"find\"](function (t) { return (((t)[\"x\"] === __rvb_lexical_2_targetX) && ((t)[\"y\"] === __rvb_lexical_3_targetY)); }); _pc = \"n21\"; break; case \"n21\": _pc = (! (! ((! __rvb_lexical_7_targetTile) || (! ((__rvb_lexical_7_targetTile)[\"props\"])[\"walkable\"])))) ? \"n20\" : \"n17\"; break; case \"n17\": __rvb_lexical_8_pieceAtPos = ((battle)[\"pieces\"])[\"find\"](function (p) { return ((((p)[\"x\"] === __rvb_lexical_2_targetX) && ((p)[\"y\"] === __rvb_lexical_3_targetY)) && ((p)[\"currentHp\"] > 0)); }); _pc = \"n16\"; break; case \"n16\": _pc = (! (! __rvb_lexical_8_pieceAtPos)) ? \"n15\" : \"n12\"; break; case \"n12\": _pc = (! (! ((battle)[\"extensions\"] && ((battle)[\"extensions\"])[\"tileEffects\"]))) ? \"n11\" : \"n10\"; break; case \"n11\": ((battle)[\"extensions\"])[\"tileEffects\"] = (((battle)[\"extensions\"])[\"tileEffects\"])[\"filter\"](function (te) { return (! (((te)[\"tileType\"] === \"shadow-step\") && ((te)[\"sourceId\"] === __rvb_lexical_4_shadowStepSourceId))); }); _pc = \"n10\"; break; case \"n10\": __rvb_import_effect_3 = flow.effects.displace([{pieceId: (__rvb_lexical_0_sourcePiece)[\"instanceId\"], x: __rvb_lexical_2_targetX, y: __rvb_lexical_3_targetY}], \"teleport\"); _pc = \"n9\"; break; case \"n9\": _pc = (! (! (! (__rvb_import_effect_3)[\"success\"]))) ? \"n8\" : \"n5\"; break; case \"n5\": __rvb_import_bound_method_0 = (function (receiver) { var capturedMethod = receiver[\"findIndex\"]; return function () { return Reflect.apply(capturedMethod, receiver, arguments); }; })((__rvb_lexical_0_sourcePiece)[\"statusTags\"]); _pc = \"n4\"; break; case \"n4\": __rvb_lexical_9_index = (__rvb_import_bound_method_0)(function (tag) { return ((tag)[\"type\"] === \"shadow-step\"); }); _pc = \"n3\"; break; case \"n3\": _pc = (! (! (__rvb_lexical_9_index !== (- 1)))) ? \"n2\" : \"n1\"; break; case \"n2\": ((__rvb_lexical_0_sourcePiece)[\"statusTags\"]).splice(__rvb_lexical_9_index, 1); _pc = \"n1\"; break; case \"n1\": return {message: ((((((__rvb_lexical_0_sourcePiece)[\"name\"] + \"通过暗影步传送到了(\") + __rvb_lexical_2_targetX) + \",\") + __rvb_lexical_3_targetY) + \")\"), success: true}; case \"n8\": __rvb_import_operand_2 = __rvb_lexical_5_cleanupAndCancel; _pc = \"n7\"; break; case \"n7\": __rvb_import_effect_1 = (__rvb_import_operand_2)(\"被阻挡\"); _pc = \"n6\"; break; case \"n6\": return __rvb_import_effect_1; case \"n15\": __rvb_import_operand_5 = __rvb_lexical_5_cleanupAndCancel; _pc = \"n14\"; break; case \"n14\": __rvb_import_effect_4 = (__rvb_import_operand_5)(\"目标位置已被占用\"); _pc = \"n13\"; break; case \"n13\": return __rvb_import_effect_4; case \"n20\": __rvb_import_operand_7 = __rvb_lexical_5_cleanupAndCancel; _pc = \"n19\"; break; case \"n19\": __rvb_import_effect_6 = (__rvb_import_operand_7)(\"目标位置不可行走\"); _pc = \"n18\"; break; case \"n18\": return __rvb_import_effect_6; case \"n35\": return {message: \"\", success: false}; case \"n37\": return {message: \"\", success: false}; case \"n39\": return {message: \"\", success: false}; case \"n42\": return {message: \"\", success: false}; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\"); }",
+  "contentGraph": {
+    "version": "rvb-content-graph/v1",
+    "surface": "triggerSkill",
+    "entry": "n44",
+    "nodes": [
+      {
+        "id": "n1",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "message",
+              "value": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "binary",
+                  "op": "+",
+                  "left": {
+                    "kind": "binary",
+                    "op": "+",
+                    "left": {
+                      "kind": "binary",
+                      "op": "+",
+                      "left": {
+                        "kind": "binary",
+                        "op": "+",
+                        "left": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "__rvb_lexical_0_sourcePiece"
+                          },
+                          "key": "name"
+                        },
+                        "right": {
+                          "kind": "literal",
+                          "value": "通过暗影步传送到了("
+                        }
+                      },
+                      "right": {
+                        "kind": "ref",
+                        "name": "__rvb_lexical_2_targetX"
+                      }
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": ","
+                    }
+                  },
+                  "right": {
+                    "kind": "ref",
+                    "name": "__rvb_lexical_3_targetY"
+                  }
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": ")"
+                }
+              }
+            },
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n2",
+        "kind": "call",
+        "capability": "array.splice",
+        "args": [
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "__rvb_lexical_0_sourcePiece"
+            },
+            "key": "statusTags"
+          },
+          {
+            "kind": "ref",
+            "name": "__rvb_lexical_9_index"
+          },
+          {
+            "kind": "literal",
+            "value": 1
+          }
+        ],
+        "next": "n1"
+      },
+      {
+        "id": "n3",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "!==",
+              "left": {
+                "kind": "ref",
+                "name": "__rvb_lexical_9_index"
+              },
+              "right": {
+                "kind": "unary",
+                "op": "-",
+                "argument": {
+                  "kind": "literal",
+                  "value": 1
+                }
+              }
+            }
+          }
+        },
+        "yes": "n2",
+        "no": "n1"
+      },
+      {
+        "id": "n4",
+        "kind": "invoke",
+        "target": {
+          "kind": "function",
+          "value": {
+            "kind": "ref",
+            "name": "__rvb_import_bound_method_0"
+          }
+        },
+        "args": [
+          {
+            "kind": "lambda",
+            "parameters": [
+              "tag"
+            ],
+            "body": {
+              "kind": "binary",
+              "op": "===",
+              "left": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "tag"
+                },
+                "key": "type"
+              },
+              "right": {
+                "kind": "literal",
+                "value": "shadow-step"
+              }
+            }
+          }
+        ],
+        "result": "__rvb_lexical_9_index",
+        "next": "n3"
+      },
+      {
+        "id": "n5",
+        "kind": "bind",
+        "name": "__rvb_import_bound_method_0",
+        "expr": {
+          "kind": "boundMethod",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "__rvb_lexical_0_sourcePiece"
+            },
+            "key": "statusTags"
+          },
+          "method": "findIndex"
+        },
+        "next": "n4"
+      },
+      {
+        "id": "n6",
+        "kind": "return",
+        "value": {
+          "kind": "ref",
+          "name": "__rvb_import_effect_1"
+        }
+      },
+      {
+        "id": "n7",
+        "kind": "invoke",
+        "target": {
+          "kind": "function",
+          "value": {
+            "kind": "ref",
+            "name": "__rvb_import_operand_2"
+          }
+        },
+        "args": [
+          {
+            "kind": "literal",
+            "value": "被阻挡"
+          }
+        ],
+        "result": "__rvb_import_effect_1",
+        "next": "n6"
+      },
+      {
+        "id": "n8",
+        "kind": "bind",
+        "name": "__rvb_import_operand_2",
+        "expr": {
+          "kind": "ref",
+          "name": "__rvb_lexical_5_cleanupAndCancel"
+        },
+        "next": "n7"
+      },
+      {
+        "id": "n9",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "unary",
+              "op": "!",
+              "argument": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "__rvb_import_effect_3"
+                },
+                "key": "success"
+              }
+            }
+          }
+        },
+        "yes": "n8",
+        "no": "n5"
+      },
+      {
+        "id": "n10",
+        "kind": "call",
+        "capability": "flow.effects.displace",
+        "args": [
+          {
+            "kind": "array",
+            "items": [
+              {
+                "kind": "object",
+                "entries": [
+                  {
+                    "key": "pieceId",
+                    "value": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "__rvb_lexical_0_sourcePiece"
+                      },
+                      "key": "instanceId"
+                    }
+                  },
+                  {
+                    "key": "x",
+                    "value": {
+                      "kind": "ref",
+                      "name": "__rvb_lexical_2_targetX"
+                    }
+                  },
+                  {
+                    "key": "y",
+                    "value": {
+                      "kind": "ref",
+                      "name": "__rvb_lexical_3_targetY"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "kind": "literal",
+            "value": "teleport"
+          }
+        ],
+        "result": "__rvb_import_effect_3",
+        "next": "n9"
+      },
+      {
+        "id": "n11",
+        "kind": "set",
+        "target": {
+          "kind": "get",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "battle"
+            },
+            "key": "extensions"
+          },
+          "key": "tileEffects"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "collection",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "battle"
+              },
+              "key": "extensions"
+            },
+            "key": "tileEffects"
+          },
+          "method": "filter",
+          "args": [
+            {
+              "kind": "lambda",
+              "parameters": [
+                "te"
+              ],
+              "body": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "binary",
+                  "op": "&&",
+                  "left": {
+                    "kind": "binary",
+                    "op": "===",
+                    "left": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "te"
+                      },
+                      "key": "tileType"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": "shadow-step"
+                    }
+                  },
+                  "right": {
+                    "kind": "binary",
+                    "op": "===",
+                    "left": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "te"
+                      },
+                      "key": "sourceId"
+                    },
+                    "right": {
+                      "kind": "ref",
+                      "name": "__rvb_lexical_4_shadowStepSourceId"
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "next": "n10"
+      },
+      {
+        "id": "n12",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "&&",
+              "left": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "battle"
+                },
+                "key": "extensions"
+              },
+              "right": {
+                "kind": "get",
+                "object": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "battle"
+                  },
+                  "key": "extensions"
+                },
+                "key": "tileEffects"
+              }
+            }
+          }
+        },
+        "yes": "n11",
+        "no": "n10"
+      },
+      {
+        "id": "n13",
+        "kind": "return",
+        "value": {
+          "kind": "ref",
+          "name": "__rvb_import_effect_4"
+        }
+      },
+      {
+        "id": "n14",
+        "kind": "invoke",
+        "target": {
+          "kind": "function",
+          "value": {
+            "kind": "ref",
+            "name": "__rvb_import_operand_5"
+          }
+        },
+        "args": [
+          {
+            "kind": "literal",
+            "value": "目标位置已被占用"
+          }
+        ],
+        "result": "__rvb_import_effect_4",
+        "next": "n13"
+      },
+      {
+        "id": "n15",
+        "kind": "bind",
+        "name": "__rvb_import_operand_5",
+        "expr": {
+          "kind": "ref",
+          "name": "__rvb_lexical_5_cleanupAndCancel"
+        },
+        "next": "n14"
+      },
+      {
+        "id": "n16",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "ref",
+              "name": "__rvb_lexical_8_pieceAtPos"
+            }
+          }
+        },
+        "yes": "n15",
+        "no": "n12"
+      },
+      {
+        "id": "n17",
+        "kind": "bind",
+        "name": "__rvb_lexical_8_pieceAtPos",
+        "expr": {
+          "kind": "collection",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "battle"
+            },
+            "key": "pieces"
+          },
+          "method": "find",
+          "args": [
+            {
+              "kind": "lambda",
+              "parameters": [
+                "p"
+              ],
+              "body": {
+                "kind": "binary",
+                "op": "&&",
+                "left": {
+                  "kind": "binary",
+                  "op": "&&",
+                  "left": {
+                    "kind": "binary",
+                    "op": "===",
+                    "left": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "p"
+                      },
+                      "key": "x"
+                    },
+                    "right": {
+                      "kind": "ref",
+                      "name": "__rvb_lexical_2_targetX"
+                    }
+                  },
+                  "right": {
+                    "kind": "binary",
+                    "op": "===",
+                    "left": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "p"
+                      },
+                      "key": "y"
+                    },
+                    "right": {
+                      "kind": "ref",
+                      "name": "__rvb_lexical_3_targetY"
+                    }
+                  }
+                },
+                "right": {
+                  "kind": "binary",
+                  "op": ">",
+                  "left": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "p"
+                    },
+                    "key": "currentHp"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": 0
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "next": "n16"
+      },
+      {
+        "id": "n18",
+        "kind": "return",
+        "value": {
+          "kind": "ref",
+          "name": "__rvb_import_effect_6"
+        }
+      },
+      {
+        "id": "n19",
+        "kind": "invoke",
+        "target": {
+          "kind": "function",
+          "value": {
+            "kind": "ref",
+            "name": "__rvb_import_operand_7"
+          }
+        },
+        "args": [
+          {
+            "kind": "literal",
+            "value": "目标位置不可行走"
+          }
+        ],
+        "result": "__rvb_import_effect_6",
+        "next": "n18"
+      },
+      {
+        "id": "n20",
+        "kind": "bind",
+        "name": "__rvb_import_operand_7",
+        "expr": {
+          "kind": "ref",
+          "name": "__rvb_lexical_5_cleanupAndCancel"
+        },
+        "next": "n19"
+      },
+      {
+        "id": "n21",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "ref",
+                  "name": "__rvb_lexical_7_targetTile"
+                }
+              },
+              "right": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "__rvb_lexical_7_targetTile"
+                    },
+                    "key": "props"
+                  },
+                  "key": "walkable"
+                }
+              }
+            }
+          }
+        },
+        "yes": "n20",
+        "no": "n17"
+      },
+      {
+        "id": "n22",
+        "kind": "bind",
+        "name": "__rvb_lexical_7_targetTile",
+        "expr": {
+          "kind": "collection",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "battle"
+              },
+              "key": "map"
+            },
+            "key": "tiles"
+          },
+          "method": "find",
+          "args": [
+            {
+              "kind": "lambda",
+              "parameters": [
+                "t"
+              ],
+              "body": {
+                "kind": "binary",
+                "op": "&&",
+                "left": {
+                  "kind": "binary",
+                  "op": "===",
+                  "left": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "t"
+                    },
+                    "key": "x"
+                  },
+                  "right": {
+                    "kind": "ref",
+                    "name": "__rvb_lexical_2_targetX"
+                  }
+                },
+                "right": {
+                  "kind": "binary",
+                  "op": "===",
+                  "left": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "t"
+                    },
+                    "key": "y"
+                  },
+                  "right": {
+                    "kind": "ref",
+                    "name": "__rvb_lexical_3_targetY"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "next": "n21"
+      },
+      {
+        "id": "n31",
+        "kind": "bind",
+        "name": "__rvb_lexical_5_cleanupAndCancel",
+        "expr": {
+          "kind": "function",
+          "parameters": [
+            "reason"
+          ],
+          "body": {
+            "entry": "n30",
+            "end": "n23",
+            "nodes": [
+              {
+                "id": "n24",
+                "kind": "return",
+                "value": {
+                  "kind": "object",
+                  "entries": [
+                    {
+                      "key": "message",
+                      "value": {
+                        "kind": "binary",
+                        "op": "+",
+                        "left": {
+                          "kind": "binary",
+                          "op": "+",
+                          "left": {
+                            "kind": "binary",
+                            "op": "+",
+                            "left": {
+                              "kind": "get",
+                              "object": {
+                                "kind": "ref",
+                                "name": "__rvb_lexical_0_sourcePiece"
+                              },
+                              "key": "name"
+                            },
+                            "right": {
+                              "kind": "literal",
+                              "value": "的暗影步"
+                            }
+                          },
+                          "right": {
+                            "kind": "ref",
+                            "name": "reason"
+                          }
+                        },
+                        "right": {
+                          "kind": "literal",
+                          "value": "，传送取消"
+                        }
+                      }
+                    },
+                    {
+                      "key": "success",
+                      "value": {
+                        "kind": "literal",
+                        "value": true
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "n25",
+                "kind": "call",
+                "capability": "array.splice",
+                "args": [
+                  {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "__rvb_lexical_0_sourcePiece"
+                    },
+                    "key": "statusTags"
+                  },
+                  {
+                    "kind": "ref",
+                    "name": "__rvb_lexical_6_index"
+                  },
+                  {
+                    "kind": "literal",
+                    "value": 1
+                  }
+                ],
+                "next": "n24"
+              },
+              {
+                "id": "n26",
+                "kind": "branch",
+                "condition": {
+                  "kind": "unary",
+                  "op": "!",
+                  "argument": {
+                    "kind": "unary",
+                    "op": "!",
+                    "argument": {
+                      "kind": "binary",
+                      "op": "!==",
+                      "left": {
+                        "kind": "ref",
+                        "name": "__rvb_lexical_6_index"
+                      },
+                      "right": {
+                        "kind": "unary",
+                        "op": "-",
+                        "argument": {
+                          "kind": "literal",
+                          "value": 1
+                        }
+                      }
+                    }
+                  }
+                },
+                "yes": "n25",
+                "no": "n24"
+              },
+              {
+                "id": "n27",
+                "kind": "invoke",
+                "target": {
+                  "kind": "function",
+                  "value": {
+                    "kind": "ref",
+                    "name": "__rvb_import_bound_method_8"
+                  }
+                },
+                "args": [
+                  {
+                    "kind": "lambda",
+                    "parameters": [
+                      "tag"
+                    ],
+                    "body": {
+                      "kind": "binary",
+                      "op": "===",
+                      "left": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "tag"
+                        },
+                        "key": "type"
+                      },
+                      "right": {
+                        "kind": "literal",
+                        "value": "shadow-step"
+                      }
+                    }
+                  }
+                ],
+                "result": "__rvb_lexical_6_index",
+                "next": "n26"
+              },
+              {
+                "id": "n28",
+                "kind": "bind",
+                "name": "__rvb_import_bound_method_8",
+                "expr": {
+                  "kind": "boundMethod",
+                  "object": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "__rvb_lexical_0_sourcePiece"
+                    },
+                    "key": "statusTags"
+                  },
+                  "method": "findIndex"
+                },
+                "next": "n27"
+              },
+              {
+                "id": "n29",
+                "kind": "set",
+                "target": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "battle"
+                    },
+                    "key": "extensions"
+                  },
+                  "key": "tileEffects"
+                },
+                "operator": "=",
+                "value": {
+                  "kind": "collection",
+                  "object": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "battle"
+                      },
+                      "key": "extensions"
+                    },
+                    "key": "tileEffects"
+                  },
+                  "method": "filter",
+                  "args": [
+                    {
+                      "kind": "lambda",
+                      "parameters": [
+                        "te"
+                      ],
+                      "body": {
+                        "kind": "unary",
+                        "op": "!",
+                        "argument": {
+                          "kind": "binary",
+                          "op": "&&",
+                          "left": {
+                            "kind": "binary",
+                            "op": "===",
+                            "left": {
+                              "kind": "get",
+                              "object": {
+                                "kind": "ref",
+                                "name": "te"
+                              },
+                              "key": "tileType"
+                            },
+                            "right": {
+                              "kind": "literal",
+                              "value": "shadow-step"
+                            }
+                          },
+                          "right": {
+                            "kind": "binary",
+                            "op": "===",
+                            "left": {
+                              "kind": "get",
+                              "object": {
+                                "kind": "ref",
+                                "name": "te"
+                              },
+                              "key": "sourceId"
+                            },
+                            "right": {
+                              "kind": "ref",
+                              "name": "__rvb_lexical_4_shadowStepSourceId"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                },
+                "next": "n28"
+              },
+              {
+                "id": "n30",
+                "kind": "branch",
+                "condition": {
+                  "kind": "unary",
+                  "op": "!",
+                  "argument": {
+                    "kind": "unary",
+                    "op": "!",
+                    "argument": {
+                      "kind": "binary",
+                      "op": "&&",
+                      "left": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "battle"
+                        },
+                        "key": "extensions"
+                      },
+                      "right": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "battle"
+                          },
+                          "key": "extensions"
+                        },
+                        "key": "tileEffects"
+                      }
+                    }
+                  }
+                },
+                "yes": "n29",
+                "no": "n28"
+              },
+              {
+                "id": "n23",
+                "kind": "regionEnd"
+              }
+            ]
+          }
+        },
+        "next": "n22"
+      },
+      {
+        "id": "n32",
+        "kind": "bind",
+        "name": "__rvb_lexical_4_shadowStepSourceId",
+        "expr": {
+          "kind": "binary",
+          "op": "+",
+          "left": {
+            "kind": "literal",
+            "value": "shadow-step-"
+          },
+          "right": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "__rvb_lexical_0_sourcePiece"
+            },
+            "key": "instanceId"
+          }
+        },
+        "next": "n31"
+      },
+      {
+        "id": "n33",
+        "kind": "bind",
+        "name": "__rvb_lexical_3_targetY",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "__rvb_lexical_1_shadowStepStatus"
+          },
+          "key": "intensity"
+        },
+        "next": "n32"
+      },
+      {
+        "id": "n34",
+        "kind": "bind",
+        "name": "__rvb_lexical_2_targetX",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "__rvb_lexical_1_shadowStepStatus"
+          },
+          "key": "value"
+        },
+        "next": "n33"
+      },
+      {
+        "id": "n35",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            },
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n36",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "!==",
+              "left": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "context"
+                },
+                "key": "playerId"
+              },
+              "right": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "__rvb_lexical_0_sourcePiece"
+                },
+                "key": "ownerPlayerId"
+              }
+            }
+          }
+        },
+        "yes": "n35",
+        "no": "n34"
+      },
+      {
+        "id": "n37",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            },
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n38",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "<=",
+              "left": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "__rvb_lexical_1_shadowStepStatus"
+                },
+                "key": "remainingDuration"
+              },
+              "right": {
+                "kind": "literal",
+                "value": 0
+              }
+            }
+          }
+        },
+        "yes": "n37",
+        "no": "n36"
+      },
+      {
+        "id": "n39",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            },
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n40",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "unary",
+              "op": "!",
+              "argument": {
+                "kind": "ref",
+                "name": "__rvb_lexical_1_shadowStepStatus"
+              }
+            }
+          }
+        },
+        "yes": "n39",
+        "no": "n38"
+      },
+      {
+        "id": "n41",
+        "kind": "bind",
+        "name": "__rvb_lexical_1_shadowStepStatus",
+        "expr": {
+          "kind": "collection",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "__rvb_lexical_0_sourcePiece"
+            },
+            "key": "statusTags"
+          },
+          "method": "find",
+          "args": [
+            {
+              "kind": "lambda",
+              "parameters": [
+                "tag"
+              ],
+              "body": {
+                "kind": "binary",
+                "op": "===",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "tag"
+                  },
+                  "key": "type"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "shadow-step"
+                }
+              }
+            }
+          ]
+        },
+        "next": "n40"
+      },
+      {
+        "id": "n42",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            },
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n43",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "unary",
+              "op": "!",
+              "argument": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "__rvb_lexical_0_sourcePiece"
+                },
+                "key": "statusTags"
+              }
+            }
+          }
+        },
+        "yes": "n42",
+        "no": "n41"
+      },
+      {
+        "id": "n44",
+        "kind": "bind",
+        "name": "__rvb_lexical_0_sourcePiece",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "context"
+          },
+          "key": "piece"
+        },
+        "next": "n43"
+      }
+    ]
+  },
+  "contentGraphField": "code",
+  "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1"
 }

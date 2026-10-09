@@ -2,6 +2,843 @@
   "id": "rule-elune-guidance",
   "name": "艾露恩的指引规则",
   "description": "当己方使用圣光手牌且泰兰德在场时，泰兰德获得月华层数",
-  "trigger": { "type": "afterCardPlay" },
-  "skillCode": "const cardId = context.cardId; if (!cardId || !cardId.startsWith('holy-')) return { success: false }; const playerId = context.playerId; const player = battle.players.find(function(p) { return p.playerId === playerId; }); if (!player) return { success: false }; const tyrande = battle.pieces.find(function(p) { return p.templateId === 'tyrande' && p.ownerPlayerId === playerId && p.currentHp > 0; }); if (!tyrande) return { success: false }; const moonGlow = tyrande.statusTags ? tyrande.statusTags.find(function(t) { return t.id === 'moon-glow'; }) : null; let currentStacks = moonGlow ? moonGlow.stacks : 0; currentStacks++; if (currentStacks >= 2) { const allies = battle.pieces.filter(function(p) { return arePlayersAllied(battle, p.ownerPlayerId, playerId) && p.currentHp > 0; }); if (allies.length > 0) { const target = allies.sort(function(a, b) { return a.currentHp - b.currentHp; })[0]; healDamage(tyrande, target, 5, battle, 'elune-guidance'); if (moonGlow) { removeStatusEffectById(tyrande.instanceId, 'moon-glow'); } return { success: true, message: '艾露恩的指引：月华满层，为' + target.name + '恢复5点生命' }; } } else { addStatusEffectById(tyrande.instanceId, { id: 'moon-glow', name: '月华', type: 'buff', currentDuration: -1, currentUses: -1, intensity: 1, stacks: currentStacks, maxStacks: 2 }); return { success: true, message: '艾露恩的指引：获得' + currentStacks + '层月华' }; } return { success: false };"
+  "trigger": {
+    "type": "afterCardPlay"
+  },
+  "skillCode": "var __rvb_import_effect_0, __rvb_lexical_0_cardId, __rvb_lexical_1_playerId, __rvb_lexical_2_player, __rvb_lexical_3_tyrande, __rvb_lexical_4_moonGlow, __rvb_lexical_5_currentStacks, __rvb_lexical_6_allies, __rvb_lexical_7_target; var _pc = \"n25\"; for (var _step = 0; _step <= 25; _step++) { switch (_pc) { case \"n25\": __rvb_lexical_0_cardId = (context)[\"cardId\"]; _pc = \"n24\"; break; case \"n24\": _pc = (! (! ((! __rvb_lexical_0_cardId) || (! (__rvb_lexical_0_cardId)[\"startsWith\"](\"holy-\"))))) ? \"n23\" : \"n22\"; break; case \"n22\": __rvb_lexical_1_playerId = (context)[\"playerId\"]; _pc = \"n21\"; break; case \"n21\": __rvb_lexical_2_player = ((battle)[\"players\"])[\"find\"](function (p) { return ((p)[\"playerId\"] === __rvb_lexical_1_playerId); }); _pc = \"n20\"; break; case \"n20\": _pc = (! (! (! __rvb_lexical_2_player))) ? \"n19\" : \"n18\"; break; case \"n18\": __rvb_lexical_3_tyrande = ((battle)[\"pieces\"])[\"find\"](function (p) { return ((((p)[\"templateId\"] === \"tyrande\") && ((p)[\"ownerPlayerId\"] === __rvb_lexical_1_playerId)) && ((p)[\"currentHp\"] > 0)); }); _pc = \"n17\"; break; case \"n17\": _pc = (! (! (! __rvb_lexical_3_tyrande))) ? \"n16\" : \"n15\"; break; case \"n15\": __rvb_lexical_4_moonGlow = ((__rvb_lexical_3_tyrande)[\"statusTags\"] ? ((__rvb_lexical_3_tyrande)[\"statusTags\"])[\"find\"](function (t) { return ((t)[\"id\"] === \"moon-glow\"); }) : null); _pc = \"n14\"; break; case \"n14\": __rvb_lexical_5_currentStacks = (__rvb_lexical_4_moonGlow ? (__rvb_lexical_4_moonGlow)[\"stacks\"] : 0); _pc = \"n13\"; break; case \"n13\": __rvb_lexical_5_currentStacks = ((+ __rvb_lexical_5_currentStacks) + 1); _pc = \"n12\"; break; case \"n12\": _pc = (! (! (__rvb_lexical_5_currentStacks >= 2))) ? \"n9\" : \"n11\"; break; case \"n11\": addStatusEffectById((__rvb_lexical_3_tyrande)[\"instanceId\"], {id: \"moon-glow\", name: \"月华\", type: \"buff\", currentDuration: (- 1), currentUses: (- 1), intensity: 1, stacks: __rvb_lexical_5_currentStacks, maxStacks: 2}); _pc = \"n10\"; break; case \"n10\": return {success: true, message: ((\"艾露恩的指引：获得\" + __rvb_lexical_5_currentStacks) + \"层月华\")}; case \"n9\": __rvb_lexical_6_allies = ((battle)[\"pieces\"])[\"filter\"](function (p) { return (arePlayersAllied(battle, (p)[\"ownerPlayerId\"], __rvb_lexical_1_playerId) && ((p)[\"currentHp\"] > 0)); }); _pc = \"n8\"; break; case \"n8\": _pc = (! (! ((__rvb_lexical_6_allies)[\"length\"] > 0))) ? \"n7\" : \"n1\"; break; case \"n1\": return {success: false}; case \"n7\": __rvb_import_effect_0 = (__rvb_lexical_6_allies).sort(function (a, b) { return ((a)[\"currentHp\"] - (b)[\"currentHp\"]); }); _pc = \"n6\"; break; case \"n6\": __rvb_lexical_7_target = (__rvb_import_effect_0)[0]; _pc = \"n5\"; break; case \"n5\": healDamage(__rvb_lexical_3_tyrande, __rvb_lexical_7_target, 5, battle, \"elune-guidance\"); _pc = \"n4\"; break; case \"n4\": _pc = (! (! __rvb_lexical_4_moonGlow)) ? \"n3\" : \"n2\"; break; case \"n3\": removeStatusEffectById((__rvb_lexical_3_tyrande)[\"instanceId\"], \"moon-glow\"); _pc = \"n2\"; break; case \"n2\": return {success: true, message: ((\"艾露恩的指引：月华满层，为\" + (__rvb_lexical_7_target)[\"name\"]) + \"恢复5点生命\")}; case \"n16\": return {success: false}; case \"n19\": return {success: false}; case \"n23\": return {success: false}; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\");",
+  "contentGraph": {
+    "version": "rvb-content-graph/v1",
+    "surface": "rule",
+    "entry": "n25",
+    "nodes": [
+      {
+        "id": "n1",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n2",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "binary",
+                  "op": "+",
+                  "left": {
+                    "kind": "literal",
+                    "value": "艾露恩的指引：月华满层，为"
+                  },
+                  "right": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "__rvb_lexical_7_target"
+                    },
+                    "key": "name"
+                  }
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "恢复5点生命"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n3",
+        "kind": "call",
+        "capability": "removeStatusEffectById",
+        "args": [
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "__rvb_lexical_3_tyrande"
+            },
+            "key": "instanceId"
+          },
+          {
+            "kind": "literal",
+            "value": "moon-glow"
+          }
+        ],
+        "next": "n2"
+      },
+      {
+        "id": "n4",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "ref",
+              "name": "__rvb_lexical_4_moonGlow"
+            }
+          }
+        },
+        "yes": "n3",
+        "no": "n2"
+      },
+      {
+        "id": "n5",
+        "kind": "call",
+        "capability": "healDamage",
+        "args": [
+          {
+            "kind": "ref",
+            "name": "__rvb_lexical_3_tyrande"
+          },
+          {
+            "kind": "ref",
+            "name": "__rvb_lexical_7_target"
+          },
+          {
+            "kind": "literal",
+            "value": 5
+          },
+          {
+            "kind": "ref",
+            "name": "battle"
+          },
+          {
+            "kind": "literal",
+            "value": "elune-guidance"
+          }
+        ],
+        "next": "n4"
+      },
+      {
+        "id": "n6",
+        "kind": "bind",
+        "name": "__rvb_lexical_7_target",
+        "expr": {
+          "kind": "index",
+          "object": {
+            "kind": "ref",
+            "name": "__rvb_import_effect_0"
+          },
+          "index": {
+            "kind": "literal",
+            "value": 0
+          }
+        },
+        "next": "n5"
+      },
+      {
+        "id": "n7",
+        "kind": "call",
+        "capability": "array.sort",
+        "args": [
+          {
+            "kind": "ref",
+            "name": "__rvb_lexical_6_allies"
+          },
+          {
+            "kind": "lambda",
+            "parameters": [
+              "a",
+              "b"
+            ],
+            "body": {
+              "kind": "binary",
+              "op": "-",
+              "left": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "a"
+                },
+                "key": "currentHp"
+              },
+              "right": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "b"
+                },
+                "key": "currentHp"
+              }
+            }
+          }
+        ],
+        "result": "__rvb_import_effect_0",
+        "next": "n6"
+      },
+      {
+        "id": "n8",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": ">",
+              "left": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "__rvb_lexical_6_allies"
+                },
+                "key": "length"
+              },
+              "right": {
+                "kind": "literal",
+                "value": 0
+              }
+            }
+          }
+        },
+        "yes": "n7",
+        "no": "n1"
+      },
+      {
+        "id": "n9",
+        "kind": "bind",
+        "name": "__rvb_lexical_6_allies",
+        "expr": {
+          "kind": "collection",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "battle"
+            },
+            "key": "pieces"
+          },
+          "method": "filter",
+          "args": [
+            {
+              "kind": "lambda",
+              "parameters": [
+                "p"
+              ],
+              "body": {
+                "kind": "binary",
+                "op": "&&",
+                "left": {
+                  "kind": "call",
+                  "callee": "arePlayersAllied",
+                  "args": [
+                    {
+                      "kind": "ref",
+                      "name": "battle"
+                    },
+                    {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "p"
+                      },
+                      "key": "ownerPlayerId"
+                    },
+                    {
+                      "kind": "ref",
+                      "name": "__rvb_lexical_1_playerId"
+                    }
+                  ]
+                },
+                "right": {
+                  "kind": "binary",
+                  "op": ">",
+                  "left": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "p"
+                    },
+                    "key": "currentHp"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": 0
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "next": "n8"
+      },
+      {
+        "id": "n10",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "binary",
+                  "op": "+",
+                  "left": {
+                    "kind": "literal",
+                    "value": "艾露恩的指引：获得"
+                  },
+                  "right": {
+                    "kind": "ref",
+                    "name": "__rvb_lexical_5_currentStacks"
+                  }
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "层月华"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n11",
+        "kind": "call",
+        "capability": "addStatusEffectById",
+        "args": [
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "__rvb_lexical_3_tyrande"
+            },
+            "key": "instanceId"
+          },
+          {
+            "kind": "object",
+            "entries": [
+              {
+                "key": "id",
+                "value": {
+                  "kind": "literal",
+                  "value": "moon-glow"
+                }
+              },
+              {
+                "key": "name",
+                "value": {
+                  "kind": "literal",
+                  "value": "月华"
+                }
+              },
+              {
+                "key": "type",
+                "value": {
+                  "kind": "literal",
+                  "value": "buff"
+                }
+              },
+              {
+                "key": "currentDuration",
+                "value": {
+                  "kind": "unary",
+                  "op": "-",
+                  "argument": {
+                    "kind": "literal",
+                    "value": 1
+                  }
+                }
+              },
+              {
+                "key": "currentUses",
+                "value": {
+                  "kind": "unary",
+                  "op": "-",
+                  "argument": {
+                    "kind": "literal",
+                    "value": 1
+                  }
+                }
+              },
+              {
+                "key": "intensity",
+                "value": {
+                  "kind": "literal",
+                  "value": 1
+                }
+              },
+              {
+                "key": "stacks",
+                "value": {
+                  "kind": "ref",
+                  "name": "__rvb_lexical_5_currentStacks"
+                }
+              },
+              {
+                "key": "maxStacks",
+                "value": {
+                  "kind": "literal",
+                  "value": 2
+                }
+              }
+            ]
+          }
+        ],
+        "next": "n10"
+      },
+      {
+        "id": "n12",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": ">=",
+              "left": {
+                "kind": "ref",
+                "name": "__rvb_lexical_5_currentStacks"
+              },
+              "right": {
+                "kind": "literal",
+                "value": 2
+              }
+            }
+          }
+        },
+        "yes": "n9",
+        "no": "n11"
+      },
+      {
+        "id": "n13",
+        "kind": "set",
+        "target": {
+          "kind": "ref",
+          "name": "__rvb_lexical_5_currentStacks"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "binary",
+          "op": "+",
+          "left": {
+            "kind": "unary",
+            "op": "+",
+            "argument": {
+              "kind": "ref",
+              "name": "__rvb_lexical_5_currentStacks"
+            }
+          },
+          "right": {
+            "kind": "literal",
+            "value": 1
+          }
+        },
+        "next": "n12"
+      },
+      {
+        "id": "n14",
+        "kind": "bind",
+        "name": "__rvb_lexical_5_currentStacks",
+        "expr": {
+          "kind": "conditional",
+          "test": {
+            "kind": "ref",
+            "name": "__rvb_lexical_4_moonGlow"
+          },
+          "consequent": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "__rvb_lexical_4_moonGlow"
+            },
+            "key": "stacks"
+          },
+          "alternate": {
+            "kind": "literal",
+            "value": 0
+          }
+        },
+        "next": "n13"
+      },
+      {
+        "id": "n15",
+        "kind": "bind",
+        "name": "__rvb_lexical_4_moonGlow",
+        "expr": {
+          "kind": "conditional",
+          "test": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "__rvb_lexical_3_tyrande"
+            },
+            "key": "statusTags"
+          },
+          "consequent": {
+            "kind": "collection",
+            "object": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "__rvb_lexical_3_tyrande"
+              },
+              "key": "statusTags"
+            },
+            "method": "find",
+            "args": [
+              {
+                "kind": "lambda",
+                "parameters": [
+                  "t"
+                ],
+                "body": {
+                  "kind": "binary",
+                  "op": "===",
+                  "left": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "t"
+                    },
+                    "key": "id"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": "moon-glow"
+                  }
+                }
+              }
+            ]
+          },
+          "alternate": {
+            "kind": "literal",
+            "value": null
+          }
+        },
+        "next": "n14"
+      },
+      {
+        "id": "n16",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n17",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "unary",
+              "op": "!",
+              "argument": {
+                "kind": "ref",
+                "name": "__rvb_lexical_3_tyrande"
+              }
+            }
+          }
+        },
+        "yes": "n16",
+        "no": "n15"
+      },
+      {
+        "id": "n18",
+        "kind": "bind",
+        "name": "__rvb_lexical_3_tyrande",
+        "expr": {
+          "kind": "collection",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "battle"
+            },
+            "key": "pieces"
+          },
+          "method": "find",
+          "args": [
+            {
+              "kind": "lambda",
+              "parameters": [
+                "p"
+              ],
+              "body": {
+                "kind": "binary",
+                "op": "&&",
+                "left": {
+                  "kind": "binary",
+                  "op": "&&",
+                  "left": {
+                    "kind": "binary",
+                    "op": "===",
+                    "left": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "p"
+                      },
+                      "key": "templateId"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": "tyrande"
+                    }
+                  },
+                  "right": {
+                    "kind": "binary",
+                    "op": "===",
+                    "left": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "p"
+                      },
+                      "key": "ownerPlayerId"
+                    },
+                    "right": {
+                      "kind": "ref",
+                      "name": "__rvb_lexical_1_playerId"
+                    }
+                  }
+                },
+                "right": {
+                  "kind": "binary",
+                  "op": ">",
+                  "left": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "p"
+                    },
+                    "key": "currentHp"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": 0
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "next": "n17"
+      },
+      {
+        "id": "n19",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n20",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "unary",
+              "op": "!",
+              "argument": {
+                "kind": "ref",
+                "name": "__rvb_lexical_2_player"
+              }
+            }
+          }
+        },
+        "yes": "n19",
+        "no": "n18"
+      },
+      {
+        "id": "n21",
+        "kind": "bind",
+        "name": "__rvb_lexical_2_player",
+        "expr": {
+          "kind": "collection",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "battle"
+            },
+            "key": "players"
+          },
+          "method": "find",
+          "args": [
+            {
+              "kind": "lambda",
+              "parameters": [
+                "p"
+              ],
+              "body": {
+                "kind": "binary",
+                "op": "===",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "p"
+                  },
+                  "key": "playerId"
+                },
+                "right": {
+                  "kind": "ref",
+                  "name": "__rvb_lexical_1_playerId"
+                }
+              }
+            }
+          ]
+        },
+        "next": "n20"
+      },
+      {
+        "id": "n22",
+        "kind": "bind",
+        "name": "__rvb_lexical_1_playerId",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "context"
+          },
+          "key": "playerId"
+        },
+        "next": "n21"
+      },
+      {
+        "id": "n23",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n24",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "ref",
+                  "name": "__rvb_lexical_0_cardId"
+                }
+              },
+              "right": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "collection",
+                  "object": {
+                    "kind": "ref",
+                    "name": "__rvb_lexical_0_cardId"
+                  },
+                  "method": "startsWith",
+                  "args": [
+                    {
+                      "kind": "literal",
+                      "value": "holy-"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "yes": "n23",
+        "no": "n22"
+      },
+      {
+        "id": "n25",
+        "kind": "bind",
+        "name": "__rvb_lexical_0_cardId",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "context"
+          },
+          "key": "cardId"
+        },
+        "next": "n24"
+      }
+    ]
+  },
+  "contentGraphField": "skillCode",
+  "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1"
 }

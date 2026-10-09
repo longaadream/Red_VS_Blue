@@ -26,6 +26,1079 @@
     ]
   },
   "icon": "Flame",
-  "code": "function executeCard(context) { var watcher = battle.pieces.find(function(p) { return p.ownerPlayerId === playerId && p.templateId === 'blue-watcher' && p.currentHp > 0; }); if (!watcher) return { success: false, message: '找不到观察者棋子' }; var target = selectTarget({ type: 'piece', filter: 'enemy', range: 3 }); if (!target || target.needsTargetSelection) return target; var targetPiece = battle.pieces.find(function(p) { return p.instanceId === target.instanceId && p.currentHp > 0; }); if (!targetPiece) return { success: false, message: '目标不存在或已阵亡' }; var dist = Math.abs(targetPiece.x - watcher.x) + Math.abs(targetPiece.y - watcher.y); if (dist > 3) return { success: false, message: '目标超出暴怒攻击范围（3格内）' }; var damage = Math.floor(watcher.attack * 1.0); var result = dealDamage(watcher, targetPiece, damage, 'physical', battle, 'watcher-rage'); var msg = watcher.name + '暴怒攻击' + targetPiece.name + '，造成' + (result.damage || 0) + '点伤害'; var calmStance = watcher.statusTags && watcher.statusTags.find(function(t) { return t.type === 'calm-stance'; }); if (calmStance) { removeStatusEffectById(watcher.instanceId, calmStance.id); var player = battle.players.find(function(p) { return p.playerId === playerId; }); if (player) { player.actionPoints = (player.actionPoints || 0) + 1; } msg += '（退出平静姿态，恢复1点行动力）'; } var rageStance = watcher.statusTags && watcher.statusTags.find(function(t) { return t.type === 'rage-stance'; }); if (!rageStance) { addStatusEffectById(watcher.instanceId, { id: 'rage-stance-' + watcher.instanceId, type: 'rage-stance', name: '暴怒姿态', currentDuration: -1, currentUses: -1, intensity: 1, stacks: 1 }); addRuleById(watcher.instanceId, 'rule-watcher-rage-taken'); addRuleById(watcher.instanceId, 'rule-watcher-rage-dealt'); msg += '，进入暴怒姿态'; } if (result.isKilled) msg += '，' + targetPiece.name + '被击败'; return { success: true, message: msg }; }",
-  "image": "watcher-rage.jpg"
+  "code": "function executeCard(context) { var calmStance, damage, dist, msg, player, rageStance, result, target, targetPiece, watcher; var _pc = \"n31\"; for (var _step = 0; _step <= 31; _step++) { switch (_pc) { case \"n31\": watcher = ((battle)[\"pieces\"])[\"find\"](function (p) { return ((((p)[\"ownerPlayerId\"] === playerId) && ((p)[\"templateId\"] === \"blue-watcher\")) && ((p)[\"currentHp\"] > 0)); }); _pc = \"n30\"; break; case \"n30\": _pc = (! (! (! watcher))) ? \"n29\" : \"n28\"; break; case \"n28\": target = selectTarget({type: \"piece\", filter: \"enemy\", range: 3}); _pc = \"n27\"; break; case \"n27\": _pc = (! (! ((! target) || (target)[\"needsTargetSelection\"]))) ? \"n26\" : \"n25\"; break; case \"n25\": targetPiece = ((battle)[\"pieces\"])[\"find\"](function (p) { return (((p)[\"instanceId\"] === (target)[\"instanceId\"]) && ((p)[\"currentHp\"] > 0)); }); _pc = \"n24\"; break; case \"n24\": _pc = (! (! (! targetPiece))) ? \"n23\" : \"n22\"; break; case \"n22\": dist = (Math.abs(((targetPiece)[\"x\"] - (watcher)[\"x\"])) + Math.abs(((targetPiece)[\"y\"] - (watcher)[\"y\"]))); _pc = \"n21\"; break; case \"n21\": _pc = (! (! (dist > 3))) ? \"n20\" : \"n19\"; break; case \"n19\": damage = Math.floor(((watcher)[\"attack\"] * 1)); _pc = \"n18\"; break; case \"n18\": result = dealDamage(watcher, targetPiece, damage, \"physical\", battle, \"watcher-rage\"); _pc = \"n17\"; break; case \"n17\": msg = ((((((watcher)[\"name\"] + \"暴怒攻击\") + (targetPiece)[\"name\"]) + \"，造成\") + ((result)[\"damage\"] || 0)) + \"点伤害\"); _pc = \"n16\"; break; case \"n16\": calmStance = ((watcher)[\"statusTags\"] && ((watcher)[\"statusTags\"])[\"find\"](function (t) { return ((t)[\"type\"] === \"calm-stance\"); })); _pc = \"n15\"; break; case \"n15\": _pc = (! (! calmStance)) ? \"n14\" : \"n9\"; break; case \"n14\": removeStatusEffectById((watcher)[\"instanceId\"], (calmStance)[\"id\"]); _pc = \"n13\"; break; case \"n13\": player = ((battle)[\"players\"])[\"find\"](function (p) { return ((p)[\"playerId\"] === playerId); }); _pc = \"n12\"; break; case \"n12\": _pc = (! (! player)) ? \"n11\" : \"n10\"; break; case \"n11\": (player)[\"actionPoints\"] = (((player)[\"actionPoints\"] || 0) + 1); _pc = \"n10\"; break; case \"n10\": msg += \"（退出平静姿态，恢复1点行动力）\"; _pc = \"n9\"; break; case \"n9\": rageStance = ((watcher)[\"statusTags\"] && ((watcher)[\"statusTags\"])[\"find\"](function (t) { return ((t)[\"type\"] === \"rage-stance\"); })); _pc = \"n8\"; break; case \"n8\": _pc = (! (! (! rageStance))) ? \"n7\" : \"n3\"; break; case \"n7\": addStatusEffectById((watcher)[\"instanceId\"], {id: (\"rage-stance-\" + (watcher)[\"instanceId\"]), type: \"rage-stance\", name: \"暴怒姿态\", currentDuration: (- 1), currentUses: (- 1), intensity: 1, stacks: 1}); _pc = \"n6\"; break; case \"n6\": addRuleById((watcher)[\"instanceId\"], \"rule-watcher-rage-taken\"); _pc = \"n5\"; break; case \"n5\": addRuleById((watcher)[\"instanceId\"], \"rule-watcher-rage-dealt\"); _pc = \"n4\"; break; case \"n4\": msg += \"，进入暴怒姿态\"; _pc = \"n3\"; break; case \"n3\": _pc = (! (! (result)[\"isKilled\"])) ? \"n2\" : \"n1\"; break; case \"n2\": msg += ((\"，\" + (targetPiece)[\"name\"]) + \"被击败\"); _pc = \"n1\"; break; case \"n1\": return {success: true, message: msg}; case \"n20\": return {success: false, message: \"目标超出暴怒攻击范围（3格内）\"}; case \"n23\": return {success: false, message: \"目标不存在或已阵亡\"}; case \"n26\": return target; case \"n29\": return {success: false, message: \"找不到观察者棋子\"}; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\"); }",
+  "image": "watcher-rage.jpg",
+  "contentGraph": {
+    "version": "rvb-content-graph/v1",
+    "surface": "card",
+    "entry": "n31",
+    "nodes": [
+      {
+        "id": "n1",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "ref",
+                "name": "msg"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n2",
+        "kind": "set",
+        "target": {
+          "kind": "ref",
+          "name": "msg"
+        },
+        "operator": "+=",
+        "value": {
+          "kind": "binary",
+          "op": "+",
+          "left": {
+            "kind": "binary",
+            "op": "+",
+            "left": {
+              "kind": "literal",
+              "value": "，"
+            },
+            "right": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "targetPiece"
+              },
+              "key": "name"
+            }
+          },
+          "right": {
+            "kind": "literal",
+            "value": "被击败"
+          }
+        },
+        "next": "n1"
+      },
+      {
+        "id": "n3",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "result"
+              },
+              "key": "isKilled"
+            }
+          }
+        },
+        "yes": "n2",
+        "no": "n1"
+      },
+      {
+        "id": "n4",
+        "kind": "set",
+        "target": {
+          "kind": "ref",
+          "name": "msg"
+        },
+        "operator": "+=",
+        "value": {
+          "kind": "literal",
+          "value": "，进入暴怒姿态"
+        },
+        "next": "n3"
+      },
+      {
+        "id": "n5",
+        "kind": "call",
+        "capability": "addRuleById",
+        "args": [
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "watcher"
+            },
+            "key": "instanceId"
+          },
+          {
+            "kind": "literal",
+            "value": "rule-watcher-rage-dealt"
+          }
+        ],
+        "next": "n4"
+      },
+      {
+        "id": "n6",
+        "kind": "call",
+        "capability": "addRuleById",
+        "args": [
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "watcher"
+            },
+            "key": "instanceId"
+          },
+          {
+            "kind": "literal",
+            "value": "rule-watcher-rage-taken"
+          }
+        ],
+        "next": "n5"
+      },
+      {
+        "id": "n7",
+        "kind": "call",
+        "capability": "addStatusEffectById",
+        "args": [
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "watcher"
+            },
+            "key": "instanceId"
+          },
+          {
+            "kind": "object",
+            "entries": [
+              {
+                "key": "id",
+                "value": {
+                  "kind": "binary",
+                  "op": "+",
+                  "left": {
+                    "kind": "literal",
+                    "value": "rage-stance-"
+                  },
+                  "right": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "watcher"
+                    },
+                    "key": "instanceId"
+                  }
+                }
+              },
+              {
+                "key": "type",
+                "value": {
+                  "kind": "literal",
+                  "value": "rage-stance"
+                }
+              },
+              {
+                "key": "name",
+                "value": {
+                  "kind": "literal",
+                  "value": "暴怒姿态"
+                }
+              },
+              {
+                "key": "currentDuration",
+                "value": {
+                  "kind": "unary",
+                  "op": "-",
+                  "argument": {
+                    "kind": "literal",
+                    "value": 1
+                  }
+                }
+              },
+              {
+                "key": "currentUses",
+                "value": {
+                  "kind": "unary",
+                  "op": "-",
+                  "argument": {
+                    "kind": "literal",
+                    "value": 1
+                  }
+                }
+              },
+              {
+                "key": "intensity",
+                "value": {
+                  "kind": "literal",
+                  "value": 1
+                }
+              },
+              {
+                "key": "stacks",
+                "value": {
+                  "kind": "literal",
+                  "value": 1
+                }
+              }
+            ]
+          }
+        ],
+        "next": "n6"
+      },
+      {
+        "id": "n8",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "unary",
+              "op": "!",
+              "argument": {
+                "kind": "ref",
+                "name": "rageStance"
+              }
+            }
+          }
+        },
+        "yes": "n7",
+        "no": "n3"
+      },
+      {
+        "id": "n9",
+        "kind": "bind",
+        "name": "rageStance",
+        "expr": {
+          "kind": "binary",
+          "op": "&&",
+          "left": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "watcher"
+            },
+            "key": "statusTags"
+          },
+          "right": {
+            "kind": "collection",
+            "object": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "watcher"
+              },
+              "key": "statusTags"
+            },
+            "method": "find",
+            "args": [
+              {
+                "kind": "lambda",
+                "parameters": [
+                  "t"
+                ],
+                "body": {
+                  "kind": "binary",
+                  "op": "===",
+                  "left": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "t"
+                    },
+                    "key": "type"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": "rage-stance"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "next": "n8"
+      },
+      {
+        "id": "n10",
+        "kind": "set",
+        "target": {
+          "kind": "ref",
+          "name": "msg"
+        },
+        "operator": "+=",
+        "value": {
+          "kind": "literal",
+          "value": "（退出平静姿态，恢复1点行动力）"
+        },
+        "next": "n9"
+      },
+      {
+        "id": "n11",
+        "kind": "set",
+        "target": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "player"
+          },
+          "key": "actionPoints"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "binary",
+          "op": "+",
+          "left": {
+            "kind": "binary",
+            "op": "||",
+            "left": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "player"
+              },
+              "key": "actionPoints"
+            },
+            "right": {
+              "kind": "literal",
+              "value": 0
+            }
+          },
+          "right": {
+            "kind": "literal",
+            "value": 1
+          }
+        },
+        "next": "n10"
+      },
+      {
+        "id": "n12",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "ref",
+              "name": "player"
+            }
+          }
+        },
+        "yes": "n11",
+        "no": "n10"
+      },
+      {
+        "id": "n13",
+        "kind": "bind",
+        "name": "player",
+        "expr": {
+          "kind": "collection",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "battle"
+            },
+            "key": "players"
+          },
+          "method": "find",
+          "args": [
+            {
+              "kind": "lambda",
+              "parameters": [
+                "p"
+              ],
+              "body": {
+                "kind": "binary",
+                "op": "===",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "p"
+                  },
+                  "key": "playerId"
+                },
+                "right": {
+                  "kind": "ref",
+                  "name": "playerId"
+                }
+              }
+            }
+          ]
+        },
+        "next": "n12"
+      },
+      {
+        "id": "n14",
+        "kind": "call",
+        "capability": "removeStatusEffectById",
+        "args": [
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "watcher"
+            },
+            "key": "instanceId"
+          },
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "calmStance"
+            },
+            "key": "id"
+          }
+        ],
+        "next": "n13"
+      },
+      {
+        "id": "n15",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "ref",
+              "name": "calmStance"
+            }
+          }
+        },
+        "yes": "n14",
+        "no": "n9"
+      },
+      {
+        "id": "n16",
+        "kind": "bind",
+        "name": "calmStance",
+        "expr": {
+          "kind": "binary",
+          "op": "&&",
+          "left": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "watcher"
+            },
+            "key": "statusTags"
+          },
+          "right": {
+            "kind": "collection",
+            "object": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "watcher"
+              },
+              "key": "statusTags"
+            },
+            "method": "find",
+            "args": [
+              {
+                "kind": "lambda",
+                "parameters": [
+                  "t"
+                ],
+                "body": {
+                  "kind": "binary",
+                  "op": "===",
+                  "left": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "t"
+                    },
+                    "key": "type"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": "calm-stance"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "next": "n15"
+      },
+      {
+        "id": "n17",
+        "kind": "bind",
+        "name": "msg",
+        "expr": {
+          "kind": "binary",
+          "op": "+",
+          "left": {
+            "kind": "binary",
+            "op": "+",
+            "left": {
+              "kind": "binary",
+              "op": "+",
+              "left": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "binary",
+                  "op": "+",
+                  "left": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "watcher"
+                    },
+                    "key": "name"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": "暴怒攻击"
+                  }
+                },
+                "right": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "targetPiece"
+                  },
+                  "key": "name"
+                }
+              },
+              "right": {
+                "kind": "literal",
+                "value": "，造成"
+              }
+            },
+            "right": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "result"
+                },
+                "key": "damage"
+              },
+              "right": {
+                "kind": "literal",
+                "value": 0
+              }
+            }
+          },
+          "right": {
+            "kind": "literal",
+            "value": "点伤害"
+          }
+        },
+        "next": "n16"
+      },
+      {
+        "id": "n18",
+        "kind": "call",
+        "capability": "dealDamage",
+        "args": [
+          {
+            "kind": "ref",
+            "name": "watcher"
+          },
+          {
+            "kind": "ref",
+            "name": "targetPiece"
+          },
+          {
+            "kind": "ref",
+            "name": "damage"
+          },
+          {
+            "kind": "literal",
+            "value": "physical"
+          },
+          {
+            "kind": "ref",
+            "name": "battle"
+          },
+          {
+            "kind": "literal",
+            "value": "watcher-rage"
+          }
+        ],
+        "result": "result",
+        "next": "n17"
+      },
+      {
+        "id": "n19",
+        "kind": "bind",
+        "name": "damage",
+        "expr": {
+          "kind": "call",
+          "callee": "Math.floor",
+          "args": [
+            {
+              "kind": "binary",
+              "op": "*",
+              "left": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "watcher"
+                },
+                "key": "attack"
+              },
+              "right": {
+                "kind": "literal",
+                "value": 1
+              }
+            }
+          ]
+        },
+        "next": "n18"
+      },
+      {
+        "id": "n20",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": "目标超出暴怒攻击范围（3格内）"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n21",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": ">",
+              "left": {
+                "kind": "ref",
+                "name": "dist"
+              },
+              "right": {
+                "kind": "literal",
+                "value": 3
+              }
+            }
+          }
+        },
+        "yes": "n20",
+        "no": "n19"
+      },
+      {
+        "id": "n22",
+        "kind": "bind",
+        "name": "dist",
+        "expr": {
+          "kind": "binary",
+          "op": "+",
+          "left": {
+            "kind": "call",
+            "callee": "Math.abs",
+            "args": [
+              {
+                "kind": "binary",
+                "op": "-",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "targetPiece"
+                  },
+                  "key": "x"
+                },
+                "right": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "watcher"
+                  },
+                  "key": "x"
+                }
+              }
+            ]
+          },
+          "right": {
+            "kind": "call",
+            "callee": "Math.abs",
+            "args": [
+              {
+                "kind": "binary",
+                "op": "-",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "targetPiece"
+                  },
+                  "key": "y"
+                },
+                "right": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "watcher"
+                  },
+                  "key": "y"
+                }
+              }
+            ]
+          }
+        },
+        "next": "n21"
+      },
+      {
+        "id": "n23",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": "目标不存在或已阵亡"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n24",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "unary",
+              "op": "!",
+              "argument": {
+                "kind": "ref",
+                "name": "targetPiece"
+              }
+            }
+          }
+        },
+        "yes": "n23",
+        "no": "n22"
+      },
+      {
+        "id": "n25",
+        "kind": "bind",
+        "name": "targetPiece",
+        "expr": {
+          "kind": "collection",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "battle"
+            },
+            "key": "pieces"
+          },
+          "method": "find",
+          "args": [
+            {
+              "kind": "lambda",
+              "parameters": [
+                "p"
+              ],
+              "body": {
+                "kind": "binary",
+                "op": "&&",
+                "left": {
+                  "kind": "binary",
+                  "op": "===",
+                  "left": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "p"
+                    },
+                    "key": "instanceId"
+                  },
+                  "right": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "target"
+                    },
+                    "key": "instanceId"
+                  }
+                },
+                "right": {
+                  "kind": "binary",
+                  "op": ">",
+                  "left": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "p"
+                    },
+                    "key": "currentHp"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": 0
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "next": "n24"
+      },
+      {
+        "id": "n26",
+        "kind": "return",
+        "value": {
+          "kind": "ref",
+          "name": "target"
+        }
+      },
+      {
+        "id": "n27",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "ref",
+                  "name": "target"
+                }
+              },
+              "right": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "target"
+                },
+                "key": "needsTargetSelection"
+              }
+            }
+          }
+        },
+        "yes": "n26",
+        "no": "n25"
+      },
+      {
+        "id": "n28",
+        "kind": "call",
+        "capability": "selectTarget",
+        "args": [
+          {
+            "kind": "object",
+            "entries": [
+              {
+                "key": "type",
+                "value": {
+                  "kind": "literal",
+                  "value": "piece"
+                }
+              },
+              {
+                "key": "filter",
+                "value": {
+                  "kind": "literal",
+                  "value": "enemy"
+                }
+              },
+              {
+                "key": "range",
+                "value": {
+                  "kind": "literal",
+                  "value": 3
+                }
+              }
+            ]
+          }
+        ],
+        "result": "target",
+        "next": "n27"
+      },
+      {
+        "id": "n29",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": "找不到观察者棋子"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n30",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "unary",
+              "op": "!",
+              "argument": {
+                "kind": "ref",
+                "name": "watcher"
+              }
+            }
+          }
+        },
+        "yes": "n29",
+        "no": "n28"
+      },
+      {
+        "id": "n31",
+        "kind": "bind",
+        "name": "watcher",
+        "expr": {
+          "kind": "collection",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "battle"
+            },
+            "key": "pieces"
+          },
+          "method": "find",
+          "args": [
+            {
+              "kind": "lambda",
+              "parameters": [
+                "p"
+              ],
+              "body": {
+                "kind": "binary",
+                "op": "&&",
+                "left": {
+                  "kind": "binary",
+                  "op": "&&",
+                  "left": {
+                    "kind": "binary",
+                    "op": "===",
+                    "left": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "p"
+                      },
+                      "key": "ownerPlayerId"
+                    },
+                    "right": {
+                      "kind": "ref",
+                      "name": "playerId"
+                    }
+                  },
+                  "right": {
+                    "kind": "binary",
+                    "op": "===",
+                    "left": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "p"
+                      },
+                      "key": "templateId"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": "blue-watcher"
+                    }
+                  }
+                },
+                "right": {
+                  "kind": "binary",
+                  "op": ">",
+                  "left": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "p"
+                    },
+                    "key": "currentHp"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": 0
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "next": "n30"
+      }
+    ]
+  },
+  "contentGraphField": "code",
+  "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1"
 }

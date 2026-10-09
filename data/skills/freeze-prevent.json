@@ -8,9 +8,445 @@
   "maxCharges": 0,
   "powerMultiplier": 1,
   "actionPointCost": 0,
-  "code": "function executeSkill(context) {\n  if (!context.piece) {\n    return { success: false };\n  }\n  // 检查statusTags中的冰冻状态\n  if (context.piece.statusTags) {\n    const hasFreezeTag = context.piece.statusTags.some(tag => {\n      if (typeof tag === 'string') {\n        return tag === 'freeze';\n      }\n      if (typeof tag === 'object' && tag !== null) {\n        return tag.type === 'freeze';\n      }\n      return false;\n    });\n    if (hasFreezeTag) {\n      // 根据触发类型确定行动类型\n      let actionType = '执行该操作';\n      if (context.type === 'beforeMove') {\n        actionType = '移动';\n    } else if (context.type === 'beforeSkillUse') {\n        actionType = '使用技能';\n      }\n      return { message: context.piece.name + '被冰冻，无法' + actionType, success: true, blocked: true };\n    }\n  }\n  return { success: true };\n}",
+  "code": "function executeSkill(context) { var __rvb_import_bound_method_0, __rvb_lexical_0_hasFreezeTag, __rvb_lexical_1_actionType; var _pc = \"n25\"; for (var _step = 0; _step <= 13; _step++) { switch (_pc) { case \"n25\": _pc = (! (! (! (context)[\"piece\"]))) ? \"n24\" : \"n23\"; break; case \"n23\": _pc = (! (! ((context)[\"piece\"])[\"statusTags\"])) ? \"n22\" : \"n1\"; break; case \"n22\": __rvb_import_bound_method_0 = (function (receiver) { var capturedMethod = receiver[\"some\"]; return function () { return Reflect.apply(capturedMethod, receiver, arguments); }; })(((context)[\"piece\"])[\"statusTags\"]); _pc = \"n15\"; break; case \"n15\": __rvb_lexical_0_hasFreezeTag = (__rvb_import_bound_method_0)(function (tag) { { var __rvb_content_graph_region_pc_0 = \"n21\"; while (__rvb_content_graph_region_pc_0 !== \"n16\") { switch (__rvb_content_graph_region_pc_0) { case \"n21\": __rvb_content_graph_region_pc_0 = (! (! ((typeof tag) === \"string\"))) ? \"n20\" : \"n19\"; break; case \"n19\": __rvb_content_graph_region_pc_0 = (! (! (((typeof tag) === \"object\") && (tag !== null)))) ? \"n18\" : \"n17\"; break; case \"n17\": return false; case \"n18\": return ((tag)[\"type\"] === \"freeze\"); case \"n20\": return (tag === \"freeze\"); default: throw new Error(\"invalid content graph region node\"); } } } }); _pc = \"n8\"; break; case \"n8\": _pc = (! (! __rvb_lexical_0_hasFreezeTag)) ? \"n7\" : \"n1\"; break; case \"n1\": return {success: true}; case \"n7\": __rvb_lexical_1_actionType = \"执行该操作\"; _pc = \"n6\"; break; case \"n6\": _pc = (! (! ((context)[\"type\"] === \"beforeMove\"))) ? \"n3\" : \"n5\"; break; case \"n5\": _pc = (! (! ((context)[\"type\"] === \"beforeSkillUse\"))) ? \"n4\" : \"n2\"; break; case \"n4\": __rvb_lexical_1_actionType = \"使用技能\"; _pc = \"n2\"; break; case \"n3\": __rvb_lexical_1_actionType = \"移动\"; _pc = \"n2\"; break; case \"n2\": return {message: ((((context)[\"piece\"])[\"name\"] + \"被冰冻，无法\") + __rvb_lexical_1_actionType), success: true, blocked: true}; case \"n24\": return {success: false}; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\"); }",
   "showInUI": false,
   "keywords": [
     "冰冻"
-  ]
+  ],
+  "contentGraph": {
+    "version": "rvb-content-graph/v1",
+    "surface": "triggerSkill",
+    "entry": "n25",
+    "nodes": [
+      {
+        "id": "n1",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n2",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "message",
+              "value": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "binary",
+                  "op": "+",
+                  "left": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "context"
+                      },
+                      "key": "piece"
+                    },
+                    "key": "name"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": "被冰冻，无法"
+                  }
+                },
+                "right": {
+                  "kind": "ref",
+                  "name": "__rvb_lexical_1_actionType"
+                }
+              }
+            },
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "blocked",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n3",
+        "kind": "set",
+        "target": {
+          "kind": "ref",
+          "name": "__rvb_lexical_1_actionType"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "literal",
+          "value": "移动"
+        },
+        "next": "n2"
+      },
+      {
+        "id": "n4",
+        "kind": "set",
+        "target": {
+          "kind": "ref",
+          "name": "__rvb_lexical_1_actionType"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "literal",
+          "value": "使用技能"
+        },
+        "next": "n2"
+      },
+      {
+        "id": "n5",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "===",
+              "left": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "context"
+                },
+                "key": "type"
+              },
+              "right": {
+                "kind": "literal",
+                "value": "beforeSkillUse"
+              }
+            }
+          }
+        },
+        "yes": "n4",
+        "no": "n2"
+      },
+      {
+        "id": "n6",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "===",
+              "left": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "context"
+                },
+                "key": "type"
+              },
+              "right": {
+                "kind": "literal",
+                "value": "beforeMove"
+              }
+            }
+          }
+        },
+        "yes": "n3",
+        "no": "n5"
+      },
+      {
+        "id": "n7",
+        "kind": "bind",
+        "name": "__rvb_lexical_1_actionType",
+        "expr": {
+          "kind": "literal",
+          "value": "执行该操作"
+        },
+        "next": "n6"
+      },
+      {
+        "id": "n8",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "ref",
+              "name": "__rvb_lexical_0_hasFreezeTag"
+            }
+          }
+        },
+        "yes": "n7",
+        "no": "n1"
+      },
+      {
+        "id": "n15",
+        "kind": "invoke",
+        "target": {
+          "kind": "function",
+          "value": {
+            "kind": "ref",
+            "name": "__rvb_import_bound_method_0"
+          }
+        },
+        "args": [
+          {
+            "kind": "function",
+            "parameters": [
+              "tag"
+            ],
+            "body": {
+              "entry": "n21",
+              "end": "n16",
+              "nodes": [
+                {
+                  "id": "n17",
+                  "kind": "return",
+                  "value": {
+                    "kind": "literal",
+                    "value": false
+                  }
+                },
+                {
+                  "id": "n18",
+                  "kind": "return",
+                  "value": {
+                    "kind": "binary",
+                    "op": "===",
+                    "left": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "tag"
+                      },
+                      "key": "type"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": "freeze"
+                    }
+                  }
+                },
+                {
+                  "id": "n19",
+                  "kind": "branch",
+                  "condition": {
+                    "kind": "unary",
+                    "op": "!",
+                    "argument": {
+                      "kind": "unary",
+                      "op": "!",
+                      "argument": {
+                        "kind": "binary",
+                        "op": "&&",
+                        "left": {
+                          "kind": "binary",
+                          "op": "===",
+                          "left": {
+                            "kind": "unary",
+                            "op": "typeof",
+                            "argument": {
+                              "kind": "ref",
+                              "name": "tag"
+                            }
+                          },
+                          "right": {
+                            "kind": "literal",
+                            "value": "object"
+                          }
+                        },
+                        "right": {
+                          "kind": "binary",
+                          "op": "!==",
+                          "left": {
+                            "kind": "ref",
+                            "name": "tag"
+                          },
+                          "right": {
+                            "kind": "literal",
+                            "value": null
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "yes": "n18",
+                  "no": "n17"
+                },
+                {
+                  "id": "n20",
+                  "kind": "return",
+                  "value": {
+                    "kind": "binary",
+                    "op": "===",
+                    "left": {
+                      "kind": "ref",
+                      "name": "tag"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": "freeze"
+                    }
+                  }
+                },
+                {
+                  "id": "n21",
+                  "kind": "branch",
+                  "condition": {
+                    "kind": "unary",
+                    "op": "!",
+                    "argument": {
+                      "kind": "unary",
+                      "op": "!",
+                      "argument": {
+                        "kind": "binary",
+                        "op": "===",
+                        "left": {
+                          "kind": "unary",
+                          "op": "typeof",
+                          "argument": {
+                            "kind": "ref",
+                            "name": "tag"
+                          }
+                        },
+                        "right": {
+                          "kind": "literal",
+                          "value": "string"
+                        }
+                      }
+                    }
+                  },
+                  "yes": "n20",
+                  "no": "n19"
+                },
+                {
+                  "id": "n16",
+                  "kind": "regionEnd"
+                }
+              ]
+            }
+          }
+        ],
+        "result": "__rvb_lexical_0_hasFreezeTag",
+        "next": "n8"
+      },
+      {
+        "id": "n22",
+        "kind": "bind",
+        "name": "__rvb_import_bound_method_0",
+        "expr": {
+          "kind": "boundMethod",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "context"
+              },
+              "key": "piece"
+            },
+            "key": "statusTags"
+          },
+          "method": "some"
+        },
+        "next": "n15"
+      },
+      {
+        "id": "n23",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "get",
+              "object": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "context"
+                },
+                "key": "piece"
+              },
+              "key": "statusTags"
+            }
+          }
+        },
+        "yes": "n22",
+        "no": "n1"
+      },
+      {
+        "id": "n24",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n25",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "unary",
+              "op": "!",
+              "argument": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "context"
+                },
+                "key": "piece"
+              }
+            }
+          }
+        },
+        "yes": "n24",
+        "no": "n23"
+      }
+    ]
+  },
+  "contentGraphField": "code",
+  "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1"
 }

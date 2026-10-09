@@ -15,5 +15,334 @@
   "maxCharges": 0,
   "powerMultiplier": 1,
   "actionPointCost": 0,
-  "code": "function executeSkill(context) { try { console.log('[grant-lucky-coin] context.playerId:', context.playerId); var player = battle.players.find(function(p) { return p.playerId.toLowerCase() === context.playerId.toLowerCase(); }); if (!player) { console.log('[grant-lucky-coin] Player not found'); return { success: false, message: 'Player not found' }; } console.log('[grant-lucky-coin] Found player:', player.playerId); var result = addCardToHand('lucky-coin', player.playerId); console.log('[grant-lucky-coin] addCardToHand result:', result); return { success: result, message: (player.name || player.playerId) + ' 获得了幸运币' }; } catch (e) { console.error('[grant-lucky-coin] Error:', e); return { success: false, message: 'Error: ' + e.message }; } }"
+  "code": "function executeSkill(context) { var player, result; var _pc = \"n14\"; for (var _step = 0; _step <= 2; _step++) { switch (_pc) { case \"n14\": try { var __rvb_content_graph_region_pc_0 = \"n10\"; while (__rvb_content_graph_region_pc_0 !== \"n1\") { switch (__rvb_content_graph_region_pc_0) { case \"n10\": console.log(\"[grant-lucky-coin] context.playerId:\", (context)[\"playerId\"]); __rvb_content_graph_region_pc_0 = \"n9\"; break; case \"n9\": player = ((battle)[\"players\"])[\"find\"](function (p) { return (((p)[\"playerId\"])[\"toLowerCase\"]() === ((context)[\"playerId\"])[\"toLowerCase\"]()); }); __rvb_content_graph_region_pc_0 = \"n8\"; break; case \"n8\": __rvb_content_graph_region_pc_0 = (! (! (! player))) ? \"n7\" : \"n5\"; break; case \"n5\": console.log(\"[grant-lucky-coin] Found player:\", (player)[\"playerId\"]); __rvb_content_graph_region_pc_0 = \"n4\"; break; case \"n4\": result = addCardToHand(\"lucky-coin\", (player)[\"playerId\"]); __rvb_content_graph_region_pc_0 = \"n3\"; break; case \"n3\": console.log(\"[grant-lucky-coin] addCardToHand result:\", result); __rvb_content_graph_region_pc_0 = \"n2\"; break; case \"n2\": return {success: result, message: (((player)[\"name\"] || (player)[\"playerId\"]) + \" 获得了幸运币\")}; case \"n7\": console.log(\"[grant-lucky-coin] Player not found\"); __rvb_content_graph_region_pc_0 = \"n6\"; break; case \"n6\": return {success: false, message: \"Player not found\"}; default: throw new Error(\"invalid content graph region node\"); } } } catch (e) { var __rvb_content_graph_region_pc_1 = \"n13\"; while (__rvb_content_graph_region_pc_1 !== \"n11\") { switch (__rvb_content_graph_region_pc_1) { case \"n13\": console.error(\"[grant-lucky-coin] Error:\", e); __rvb_content_graph_region_pc_1 = \"n12\"; break; case \"n12\": return {success: false, message: (\"Error: \" + (e)[\"message\"])}; default: throw new Error(\"invalid content graph region node\"); } } } _pc = \"n0\"; break; case \"n0\": return; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\"); }",
+  "contentGraph": {
+    "version": "rvb-content-graph/v1",
+    "surface": "triggerSkill",
+    "entry": "n14",
+    "nodes": [
+      {
+        "id": "n0",
+        "kind": "return"
+      },
+      {
+        "id": "n14",
+        "kind": "try",
+        "body": {
+          "entry": "n10",
+          "end": "n1",
+          "nodes": [
+            {
+              "id": "n2",
+              "kind": "return",
+              "value": {
+                "kind": "object",
+                "entries": [
+                  {
+                    "key": "success",
+                    "value": {
+                      "kind": "ref",
+                      "name": "result"
+                    }
+                  },
+                  {
+                    "key": "message",
+                    "value": {
+                      "kind": "binary",
+                      "op": "+",
+                      "left": {
+                        "kind": "binary",
+                        "op": "||",
+                        "left": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "player"
+                          },
+                          "key": "name"
+                        },
+                        "right": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "player"
+                          },
+                          "key": "playerId"
+                        }
+                      },
+                      "right": {
+                        "kind": "literal",
+                        "value": " 获得了幸运币"
+                      }
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "id": "n3",
+              "kind": "call",
+              "capability": "console.log",
+              "args": [
+                {
+                  "kind": "literal",
+                  "value": "[grant-lucky-coin] addCardToHand result:"
+                },
+                {
+                  "kind": "ref",
+                  "name": "result"
+                }
+              ],
+              "next": "n2"
+            },
+            {
+              "id": "n4",
+              "kind": "call",
+              "capability": "addCardToHand",
+              "args": [
+                {
+                  "kind": "literal",
+                  "value": "lucky-coin"
+                },
+                {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "player"
+                  },
+                  "key": "playerId"
+                }
+              ],
+              "result": "result",
+              "next": "n3"
+            },
+            {
+              "id": "n5",
+              "kind": "call",
+              "capability": "console.log",
+              "args": [
+                {
+                  "kind": "literal",
+                  "value": "[grant-lucky-coin] Found player:"
+                },
+                {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "player"
+                  },
+                  "key": "playerId"
+                }
+              ],
+              "next": "n4"
+            },
+            {
+              "id": "n6",
+              "kind": "return",
+              "value": {
+                "kind": "object",
+                "entries": [
+                  {
+                    "key": "success",
+                    "value": {
+                      "kind": "literal",
+                      "value": false
+                    }
+                  },
+                  {
+                    "key": "message",
+                    "value": {
+                      "kind": "literal",
+                      "value": "Player not found"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "id": "n7",
+              "kind": "call",
+              "capability": "console.log",
+              "args": [
+                {
+                  "kind": "literal",
+                  "value": "[grant-lucky-coin] Player not found"
+                }
+              ],
+              "next": "n6"
+            },
+            {
+              "id": "n8",
+              "kind": "branch",
+              "condition": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "unary",
+                  "op": "!",
+                  "argument": {
+                    "kind": "unary",
+                    "op": "!",
+                    "argument": {
+                      "kind": "ref",
+                      "name": "player"
+                    }
+                  }
+                }
+              },
+              "yes": "n7",
+              "no": "n5"
+            },
+            {
+              "id": "n9",
+              "kind": "bind",
+              "name": "player",
+              "expr": {
+                "kind": "collection",
+                "object": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "battle"
+                  },
+                  "key": "players"
+                },
+                "method": "find",
+                "args": [
+                  {
+                    "kind": "lambda",
+                    "parameters": [
+                      "p"
+                    ],
+                    "body": {
+                      "kind": "binary",
+                      "op": "===",
+                      "left": {
+                        "kind": "collection",
+                        "object": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "p"
+                          },
+                          "key": "playerId"
+                        },
+                        "method": "toLowerCase",
+                        "args": []
+                      },
+                      "right": {
+                        "kind": "collection",
+                        "object": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "context"
+                          },
+                          "key": "playerId"
+                        },
+                        "method": "toLowerCase",
+                        "args": []
+                      }
+                    }
+                  }
+                ]
+              },
+              "next": "n8"
+            },
+            {
+              "id": "n10",
+              "kind": "call",
+              "capability": "console.log",
+              "args": [
+                {
+                  "kind": "literal",
+                  "value": "[grant-lucky-coin] context.playerId:"
+                },
+                {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "context"
+                  },
+                  "key": "playerId"
+                }
+              ],
+              "next": "n9"
+            },
+            {
+              "id": "n1",
+              "kind": "regionEnd"
+            }
+          ]
+        },
+        "catch": {
+          "parameter": "e",
+          "body": {
+            "entry": "n13",
+            "end": "n11",
+            "nodes": [
+              {
+                "id": "n12",
+                "kind": "return",
+                "value": {
+                  "kind": "object",
+                  "entries": [
+                    {
+                      "key": "success",
+                      "value": {
+                        "kind": "literal",
+                        "value": false
+                      }
+                    },
+                    {
+                      "key": "message",
+                      "value": {
+                        "kind": "binary",
+                        "op": "+",
+                        "left": {
+                          "kind": "literal",
+                          "value": "Error: "
+                        },
+                        "right": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "e"
+                          },
+                          "key": "message"
+                        }
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "n13",
+                "kind": "call",
+                "capability": "console.error",
+                "args": [
+                  {
+                    "kind": "literal",
+                    "value": "[grant-lucky-coin] Error:"
+                  },
+                  {
+                    "kind": "ref",
+                    "name": "e"
+                  }
+                ],
+                "next": "n12"
+              },
+              {
+                "id": "n11",
+                "kind": "regionEnd"
+              }
+            ]
+          }
+        },
+        "next": "n0"
+      }
+    ]
+  },
+  "contentGraphField": "code",
+  "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1"
 }

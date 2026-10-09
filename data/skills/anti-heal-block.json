@@ -8,9 +8,450 @@
   "maxCharges": 0,
   "powerMultiplier": 1,
   "actionPointCost": 0,
-  "code": "function executeSkill(context) { if (!context.piece) { return { message: '没有目标', success: false }; } let isAntiHeal = false; if (context.piece.statusTags) { for (let i = 0; i < context.piece.statusTags.length; i++) { const tag = context.piece.statusTags[i]; if (typeof tag === 'object' && tag.type === 'anti-heal') { isAntiHeal = true; break; } if (typeof tag === 'string' && tag.includes('anti-heal')) { isAntiHeal = true; break; } } } if (isAntiHeal) { return { message: context.piece.name + '处于禁疗状态，无法受到治疗', success: false, blocked: true, showUIEffect: true }; } return { message: '目标未处于禁疗状态', success: true }; }",
+  "code": "function executeSkill(context) { var __rvb_lexical_0_isAntiHeal, __rvb_lexical_1_i, __rvb_lexical_2_tag; var _pc = \"n19\"; for (var _step = 0; _step <= 9; _step++) { switch (_pc) { case \"n19\": _pc = (! (! (! (context)[\"piece\"]))) ? \"n18\" : \"n17\"; break; case \"n17\": __rvb_lexical_0_isAntiHeal = false; _pc = \"n16\"; break; case \"n16\": _pc = (! (! ((context)[\"piece\"])[\"statusTags\"])) ? \"n15\" : \"n3\"; break; case \"n15\": __rvb_lexical_1_i = 0; _pc = \"n14\"; break; case \"n14\": var __rvb_content_graph_loop_break_0 = false, __rvb_content_graph_loop_continue_1 = false; while ((! (! (__rvb_lexical_1_i < (((context)[\"piece\"])[\"statusTags\"])[\"length\"])))) { __rvb_content_graph_loop_continue_1 = false; { var __rvb_content_graph_region_pc_2 = \"n11\"; while (__rvb_content_graph_region_pc_2 !== \"n4\") { switch (__rvb_content_graph_region_pc_2) { case \"n11\": __rvb_lexical_2_tag = (((context)[\"piece\"])[\"statusTags\"])[(function (key) { if (typeof key === \"string\" && key.split(\".\").some(function (part) { return [\"__proto__\",\"arguments\",\"callee\",\"caller\",\"constructor\",\"prototype\"].indexOf(part) !== -1; })) throw new Error(\"unsafe content graph index\"); return key; })(__rvb_lexical_1_i)]; __rvb_content_graph_region_pc_2 = \"n10\"; break; case \"n10\": __rvb_content_graph_region_pc_2 = (! (! (((typeof __rvb_lexical_2_tag) === \"object\") && ((__rvb_lexical_2_tag)[\"type\"] === \"anti-heal\")))) ? \"n9\" : \"n7\"; break; case \"n7\": __rvb_content_graph_region_pc_2 = (! (! (((typeof __rvb_lexical_2_tag) === \"string\") && (__rvb_lexical_2_tag)[\"includes\"](\"anti-heal\")))) ? \"n6\" : \"n4\"; break; case \"n4\": __rvb_content_graph_region_pc_2 = \"n4\"; break; case \"n6\": __rvb_lexical_0_isAntiHeal = true; __rvb_content_graph_region_pc_2 = \"n5\"; break; case \"n5\": __rvb_content_graph_loop_break_0 = true; __rvb_content_graph_region_pc_2 = \"n4\"; break; case \"n9\": __rvb_lexical_0_isAntiHeal = true; __rvb_content_graph_region_pc_2 = \"n8\"; break; case \"n8\": __rvb_content_graph_loop_break_0 = true; __rvb_content_graph_region_pc_2 = \"n4\"; break; default: throw new Error(\"invalid content graph region node\"); } } } if (__rvb_content_graph_loop_break_0) break; { var __rvb_content_graph_region_pc_3 = \"n13\"; while (__rvb_content_graph_region_pc_3 !== \"n12\") { switch (__rvb_content_graph_region_pc_3) { case \"n13\": __rvb_lexical_1_i = ((+ __rvb_lexical_1_i) + 1); __rvb_content_graph_region_pc_3 = \"n12\"; break; case \"n12\": __rvb_content_graph_region_pc_3 = \"n12\"; break; default: throw new Error(\"invalid content graph region node\"); } } } if (__rvb_content_graph_loop_break_0) break; if (__rvb_content_graph_loop_continue_1) { __rvb_content_graph_loop_continue_1 = false; continue; } } _pc = \"n3\"; break; case \"n3\": _pc = (! (! __rvb_lexical_0_isAntiHeal)) ? \"n2\" : \"n1\"; break; case \"n1\": return {message: \"目标未处于禁疗状态\", success: true}; case \"n2\": return {message: (((context)[\"piece\"])[\"name\"] + \"处于禁疗状态，无法受到治疗\"), success: false, blocked: true, showUIEffect: true}; case \"n18\": return {message: \"没有目标\", success: false}; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\"); }",
   "showInUI": false,
   "keywords": [
     "禁疗"
-  ]
+  ],
+  "contentGraph": {
+    "version": "rvb-content-graph/v1",
+    "surface": "triggerSkill",
+    "entry": "n19",
+    "nodes": [
+      {
+        "id": "n1",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": "目标未处于禁疗状态"
+              }
+            },
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n2",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "message",
+              "value": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "context"
+                    },
+                    "key": "piece"
+                  },
+                  "key": "name"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "处于禁疗状态，无法受到治疗"
+                }
+              }
+            },
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "blocked",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "showUIEffect",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n3",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "ref",
+              "name": "__rvb_lexical_0_isAntiHeal"
+            }
+          }
+        },
+        "yes": "n2",
+        "no": "n1"
+      },
+      {
+        "id": "n14",
+        "kind": "loop",
+        "loop": "for",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "<",
+              "left": {
+                "kind": "ref",
+                "name": "__rvb_lexical_1_i"
+              },
+              "right": {
+                "kind": "get",
+                "object": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "context"
+                    },
+                    "key": "piece"
+                  },
+                  "key": "statusTags"
+                },
+                "key": "length"
+              }
+            }
+          }
+        },
+        "body": {
+          "entry": "n11",
+          "end": "n4",
+          "nodes": [
+            {
+              "id": "n4",
+              "kind": "regionEnd"
+            },
+            {
+              "id": "n5",
+              "kind": "break"
+            },
+            {
+              "id": "n6",
+              "kind": "set",
+              "target": {
+                "kind": "ref",
+                "name": "__rvb_lexical_0_isAntiHeal"
+              },
+              "operator": "=",
+              "value": {
+                "kind": "literal",
+                "value": true
+              },
+              "next": "n5"
+            },
+            {
+              "id": "n7",
+              "kind": "branch",
+              "condition": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "unary",
+                  "op": "!",
+                  "argument": {
+                    "kind": "binary",
+                    "op": "&&",
+                    "left": {
+                      "kind": "binary",
+                      "op": "===",
+                      "left": {
+                        "kind": "unary",
+                        "op": "typeof",
+                        "argument": {
+                          "kind": "ref",
+                          "name": "__rvb_lexical_2_tag"
+                        }
+                      },
+                      "right": {
+                        "kind": "literal",
+                        "value": "string"
+                      }
+                    },
+                    "right": {
+                      "kind": "collection",
+                      "object": {
+                        "kind": "ref",
+                        "name": "__rvb_lexical_2_tag"
+                      },
+                      "method": "includes",
+                      "args": [
+                        {
+                          "kind": "literal",
+                          "value": "anti-heal"
+                        }
+                      ]
+                    }
+                  }
+                }
+              },
+              "yes": "n6",
+              "no": "n4"
+            },
+            {
+              "id": "n8",
+              "kind": "break"
+            },
+            {
+              "id": "n9",
+              "kind": "set",
+              "target": {
+                "kind": "ref",
+                "name": "__rvb_lexical_0_isAntiHeal"
+              },
+              "operator": "=",
+              "value": {
+                "kind": "literal",
+                "value": true
+              },
+              "next": "n8"
+            },
+            {
+              "id": "n10",
+              "kind": "branch",
+              "condition": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "unary",
+                  "op": "!",
+                  "argument": {
+                    "kind": "binary",
+                    "op": "&&",
+                    "left": {
+                      "kind": "binary",
+                      "op": "===",
+                      "left": {
+                        "kind": "unary",
+                        "op": "typeof",
+                        "argument": {
+                          "kind": "ref",
+                          "name": "__rvb_lexical_2_tag"
+                        }
+                      },
+                      "right": {
+                        "kind": "literal",
+                        "value": "object"
+                      }
+                    },
+                    "right": {
+                      "kind": "binary",
+                      "op": "===",
+                      "left": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "__rvb_lexical_2_tag"
+                        },
+                        "key": "type"
+                      },
+                      "right": {
+                        "kind": "literal",
+                        "value": "anti-heal"
+                      }
+                    }
+                  }
+                }
+              },
+              "yes": "n9",
+              "no": "n7"
+            },
+            {
+              "id": "n11",
+              "kind": "bind",
+              "name": "__rvb_lexical_2_tag",
+              "expr": {
+                "kind": "index",
+                "object": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "context"
+                    },
+                    "key": "piece"
+                  },
+                  "key": "statusTags"
+                },
+                "index": {
+                  "kind": "ref",
+                  "name": "__rvb_lexical_1_i"
+                }
+              },
+              "next": "n10"
+            }
+          ]
+        },
+        "update": {
+          "entry": "n13",
+          "end": "n12",
+          "nodes": [
+            {
+              "id": "n12",
+              "kind": "regionEnd"
+            },
+            {
+              "id": "n13",
+              "kind": "set",
+              "target": {
+                "kind": "ref",
+                "name": "__rvb_lexical_1_i"
+              },
+              "operator": "=",
+              "value": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "unary",
+                  "op": "+",
+                  "argument": {
+                    "kind": "ref",
+                    "name": "__rvb_lexical_1_i"
+                  }
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": 1
+                }
+              },
+              "next": "n12"
+            }
+          ]
+        },
+        "next": "n3"
+      },
+      {
+        "id": "n15",
+        "kind": "bind",
+        "name": "__rvb_lexical_1_i",
+        "expr": {
+          "kind": "literal",
+          "value": 0
+        },
+        "next": "n14"
+      },
+      {
+        "id": "n16",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "get",
+              "object": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "context"
+                },
+                "key": "piece"
+              },
+              "key": "statusTags"
+            }
+          }
+        },
+        "yes": "n15",
+        "no": "n3"
+      },
+      {
+        "id": "n17",
+        "kind": "bind",
+        "name": "__rvb_lexical_0_isAntiHeal",
+        "expr": {
+          "kind": "literal",
+          "value": false
+        },
+        "next": "n16"
+      },
+      {
+        "id": "n18",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": "没有目标"
+              }
+            },
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n19",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "unary",
+              "op": "!",
+              "argument": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "context"
+                },
+                "key": "piece"
+              }
+            }
+          }
+        },
+        "yes": "n18",
+        "no": "n17"
+      }
+    ]
+  },
+  "contentGraphField": "code",
+  "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1"
 }

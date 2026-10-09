@@ -5,5 +5,650 @@
   "trigger": {
     "type": "beforeDamageDealt"
   },
-  "skillCode": "var piece = context.rulePiece; if (!context.sourcePiece || context.sourcePiece.instanceId !== piece.instanceId) return { success: false, message: '' }; if (!context.targetPiece || context.targetPiece.instanceId === piece.instanceId) return { success: false, message: '' }; var target = battle.pieces.find(function(p) { return p.instanceId === context.targetPiece.instanceId; }); if (!target || target.currentHp <= 0) return { success: false, message: '' }; var damage = context.damage || 0; if (damage <= target.currentHp) return { success: false, message: '' }; var choice = selectOption({ title: '自燃·灭杀', canCancel: true, cancelValue: 'normal', options: [{ label: '立即出局', value: 'execute', description: '目标立即出局，不增加充能点' }, { label: '正常造成伤害', value: 'normal', description: '正常造成 ' + damage + ' 点伤害' }] }); if (choice && choice.needsOptionSelection) return choice; if (choice === 'execute') { target.currentHp = 0; return { success: true, blocked: true, message: piece.name + ' 自燃·灭杀：' + target.name + ' 立即出局！（不增加充能）' }; } return { success: false, message: '' };"
+  "skillCode": "var choice, damage, piece, target; var _pc = \"n18\"; for (var _step = 0; _step <= 18; _step++) { switch (_pc) { case \"n18\": piece = (context)[\"rulePiece\"]; _pc = \"n17\"; break; case \"n17\": _pc = (! (! ((! (context)[\"sourcePiece\"]) || (((context)[\"sourcePiece\"])[\"instanceId\"] !== (piece)[\"instanceId\"])))) ? \"n16\" : \"n15\"; break; case \"n15\": _pc = (! (! ((! (context)[\"targetPiece\"]) || (((context)[\"targetPiece\"])[\"instanceId\"] === (piece)[\"instanceId\"])))) ? \"n14\" : \"n13\"; break; case \"n13\": target = ((battle)[\"pieces\"])[\"find\"](function (p) { return ((p)[\"instanceId\"] === ((context)[\"targetPiece\"])[\"instanceId\"]); }); _pc = \"n12\"; break; case \"n12\": _pc = (! (! ((! target) || ((target)[\"currentHp\"] <= 0)))) ? \"n11\" : \"n10\"; break; case \"n10\": damage = ((context)[\"damage\"] || 0); _pc = \"n9\"; break; case \"n9\": _pc = (! (! (damage <= (target)[\"currentHp\"]))) ? \"n8\" : \"n7\"; break; case \"n7\": choice = selectOption({title: \"自燃·灭杀\", canCancel: true, cancelValue: \"normal\", options: [{label: \"立即出局\", value: \"execute\", description: \"目标立即出局，不增加充能点\"}, {label: \"正常造成伤害\", value: \"normal\", description: ((\"正常造成 \" + damage) + \" 点伤害\")}]}); _pc = \"n6\"; break; case \"n6\": _pc = (! (! (choice && (choice)[\"needsOptionSelection\"]))) ? \"n5\" : \"n4\"; break; case \"n4\": _pc = (! (! (choice === \"execute\"))) ? \"n3\" : \"n1\"; break; case \"n1\": return {success: false, message: \"\"}; case \"n3\": (target)[\"currentHp\"] = 0; _pc = \"n2\"; break; case \"n2\": return {success: true, blocked: true, message: ((((piece)[\"name\"] + \" 自燃·灭杀：\") + (target)[\"name\"]) + \" 立即出局！（不增加充能）\")}; case \"n5\": return choice; case \"n8\": return {success: false, message: \"\"}; case \"n11\": return {success: false, message: \"\"}; case \"n14\": return {success: false, message: \"\"}; case \"n16\": return {success: false, message: \"\"}; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\");",
+  "contentGraph": {
+    "version": "rvb-content-graph/v1",
+    "surface": "rule",
+    "entry": "n18",
+    "nodes": [
+      {
+        "id": "n1",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n2",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "blocked",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "binary",
+                  "op": "+",
+                  "left": {
+                    "kind": "binary",
+                    "op": "+",
+                    "left": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "piece"
+                      },
+                      "key": "name"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": " 自燃·灭杀："
+                    }
+                  },
+                  "right": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "target"
+                    },
+                    "key": "name"
+                  }
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": " 立即出局！（不增加充能）"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n3",
+        "kind": "set",
+        "target": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "target"
+          },
+          "key": "currentHp"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "literal",
+          "value": 0
+        },
+        "next": "n2"
+      },
+      {
+        "id": "n4",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "===",
+              "left": {
+                "kind": "ref",
+                "name": "choice"
+              },
+              "right": {
+                "kind": "literal",
+                "value": "execute"
+              }
+            }
+          }
+        },
+        "yes": "n3",
+        "no": "n1"
+      },
+      {
+        "id": "n5",
+        "kind": "return",
+        "value": {
+          "kind": "ref",
+          "name": "choice"
+        }
+      },
+      {
+        "id": "n6",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "&&",
+              "left": {
+                "kind": "ref",
+                "name": "choice"
+              },
+              "right": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "choice"
+                },
+                "key": "needsOptionSelection"
+              }
+            }
+          }
+        },
+        "yes": "n5",
+        "no": "n4"
+      },
+      {
+        "id": "n7",
+        "kind": "call",
+        "capability": "selectOption",
+        "args": [
+          {
+            "kind": "object",
+            "entries": [
+              {
+                "key": "title",
+                "value": {
+                  "kind": "literal",
+                  "value": "自燃·灭杀"
+                }
+              },
+              {
+                "key": "canCancel",
+                "value": {
+                  "kind": "literal",
+                  "value": true
+                }
+              },
+              {
+                "key": "cancelValue",
+                "value": {
+                  "kind": "literal",
+                  "value": "normal"
+                }
+              },
+              {
+                "key": "options",
+                "value": {
+                  "kind": "array",
+                  "items": [
+                    {
+                      "kind": "object",
+                      "entries": [
+                        {
+                          "key": "label",
+                          "value": {
+                            "kind": "literal",
+                            "value": "立即出局"
+                          }
+                        },
+                        {
+                          "key": "value",
+                          "value": {
+                            "kind": "literal",
+                            "value": "execute"
+                          }
+                        },
+                        {
+                          "key": "description",
+                          "value": {
+                            "kind": "literal",
+                            "value": "目标立即出局，不增加充能点"
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "kind": "object",
+                      "entries": [
+                        {
+                          "key": "label",
+                          "value": {
+                            "kind": "literal",
+                            "value": "正常造成伤害"
+                          }
+                        },
+                        {
+                          "key": "value",
+                          "value": {
+                            "kind": "literal",
+                            "value": "normal"
+                          }
+                        },
+                        {
+                          "key": "description",
+                          "value": {
+                            "kind": "binary",
+                            "op": "+",
+                            "left": {
+                              "kind": "binary",
+                              "op": "+",
+                              "left": {
+                                "kind": "literal",
+                                "value": "正常造成 "
+                              },
+                              "right": {
+                                "kind": "ref",
+                                "name": "damage"
+                              }
+                            },
+                            "right": {
+                              "kind": "literal",
+                              "value": " 点伤害"
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ],
+        "result": "choice",
+        "next": "n6"
+      },
+      {
+        "id": "n8",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n9",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "<=",
+              "left": {
+                "kind": "ref",
+                "name": "damage"
+              },
+              "right": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "target"
+                },
+                "key": "currentHp"
+              }
+            }
+          }
+        },
+        "yes": "n8",
+        "no": "n7"
+      },
+      {
+        "id": "n10",
+        "kind": "bind",
+        "name": "damage",
+        "expr": {
+          "kind": "binary",
+          "op": "||",
+          "left": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "context"
+            },
+            "key": "damage"
+          },
+          "right": {
+            "kind": "literal",
+            "value": 0
+          }
+        },
+        "next": "n9"
+      },
+      {
+        "id": "n11",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n12",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "ref",
+                  "name": "target"
+                }
+              },
+              "right": {
+                "kind": "binary",
+                "op": "<=",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "target"
+                  },
+                  "key": "currentHp"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": 0
+                }
+              }
+            }
+          }
+        },
+        "yes": "n11",
+        "no": "n10"
+      },
+      {
+        "id": "n13",
+        "kind": "bind",
+        "name": "target",
+        "expr": {
+          "kind": "collection",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "battle"
+            },
+            "key": "pieces"
+          },
+          "method": "find",
+          "args": [
+            {
+              "kind": "lambda",
+              "parameters": [
+                "p"
+              ],
+              "body": {
+                "kind": "binary",
+                "op": "===",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "p"
+                  },
+                  "key": "instanceId"
+                },
+                "right": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "context"
+                    },
+                    "key": "targetPiece"
+                  },
+                  "key": "instanceId"
+                }
+              }
+            }
+          ]
+        },
+        "next": "n12"
+      },
+      {
+        "id": "n14",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n15",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "context"
+                  },
+                  "key": "targetPiece"
+                }
+              },
+              "right": {
+                "kind": "binary",
+                "op": "===",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "context"
+                    },
+                    "key": "targetPiece"
+                  },
+                  "key": "instanceId"
+                },
+                "right": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "piece"
+                  },
+                  "key": "instanceId"
+                }
+              }
+            }
+          }
+        },
+        "yes": "n14",
+        "no": "n13"
+      },
+      {
+        "id": "n16",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n17",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "context"
+                  },
+                  "key": "sourcePiece"
+                }
+              },
+              "right": {
+                "kind": "binary",
+                "op": "!==",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "context"
+                    },
+                    "key": "sourcePiece"
+                  },
+                  "key": "instanceId"
+                },
+                "right": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "piece"
+                  },
+                  "key": "instanceId"
+                }
+              }
+            }
+          }
+        },
+        "yes": "n16",
+        "no": "n15"
+      },
+      {
+        "id": "n18",
+        "kind": "bind",
+        "name": "piece",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "context"
+          },
+          "key": "rulePiece"
+        },
+        "next": "n17"
+      }
+    ]
+  },
+  "contentGraphField": "skillCode",
+  "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1"
 }

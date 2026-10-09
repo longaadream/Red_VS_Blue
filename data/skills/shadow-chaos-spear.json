@@ -20,5 +20,543 @@
       }
     ]
   },
-  "code": "function executeSkill(context){var c=context.piece,t=selectTarget({type:'piece',range:4,filter:'enemy'});if(!t||t.needsTargetSelection)return t;var old=(c.statusTags||[]).find(function(tag){return tag.type==='chaos-spear-theft';});if(old)return {success:false,message:'混沌之矛的移速偷取尚未归还'};var r=dealDamage(c,t,Math.floor(c.attack*0.5),'physical',context.battle,context.skill.id);t.moveRange=(t.moveRange||0)-2;c.moveRange=(c.moveRange||0)+2;c.statusTags=c.statusTags||[];addStatusEffectById(c.instanceId, {id:'chaos-spear-theft-'+c.instanceId+'-'+t.instanceId,type:'chaos-spear-theft',name:'混沌之矛',targetId:t.instanceId,intensity:2,currentDuration:-1,relatedRules:['rule-shadow-chaos-spear-restore']});addRuleById(c.instanceId,'rule-shadow-chaos-spear-restore');return {success:true,message:'造成'+r.damage+'点伤害并偷取2点移动范围'};}"
+  "code": "function executeSkill(context) { var c, old, r, t; var _pc = \"n14\"; for (var _step = 0; _step <= 14; _step++) { switch (_pc) { case \"n14\": c = (context)[\"piece\"]; _pc = \"n13\"; break; case \"n13\": t = selectTarget({type: \"piece\", range: 4, filter: \"enemy\"}); _pc = \"n12\"; break; case \"n12\": _pc = (! (! ((! t) || (t)[\"needsTargetSelection\"]))) ? \"n11\" : \"n10\"; break; case \"n10\": old = (((c)[\"statusTags\"] || []))[\"find\"](function (tag) { return ((tag)[\"type\"] === \"chaos-spear-theft\"); }); _pc = \"n9\"; break; case \"n9\": _pc = (! (! old)) ? \"n8\" : \"n7\"; break; case \"n7\": r = dealDamage(c, t, Math.floor(((c)[\"attack\"] * 0.5)), \"physical\", (context)[\"battle\"], ((context)[\"skill\"])[\"id\"]); _pc = \"n6\"; break; case \"n6\": (t)[\"moveRange\"] = (((t)[\"moveRange\"] || 0) - 2); _pc = \"n5\"; break; case \"n5\": (c)[\"moveRange\"] = (((c)[\"moveRange\"] || 0) + 2); _pc = \"n4\"; break; case \"n4\": (c)[\"statusTags\"] = ((c)[\"statusTags\"] || []); _pc = \"n3\"; break; case \"n3\": addStatusEffectById((c)[\"instanceId\"], {id: (((\"chaos-spear-theft-\" + (c)[\"instanceId\"]) + \"-\") + (t)[\"instanceId\"]), type: \"chaos-spear-theft\", name: \"混沌之矛\", targetId: (t)[\"instanceId\"], intensity: 2, currentDuration: (- 1), relatedRules: [\"rule-shadow-chaos-spear-restore\"]}); _pc = \"n2\"; break; case \"n2\": addRuleById((c)[\"instanceId\"], \"rule-shadow-chaos-spear-restore\"); _pc = \"n1\"; break; case \"n1\": return {success: true, message: ((\"造成\" + (r)[\"damage\"]) + \"点伤害并偷取2点移动范围\")}; case \"n8\": return {success: false, message: \"混沌之矛的移速偷取尚未归还\"}; case \"n11\": return t; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\"); }",
+  "contentGraph": {
+    "version": "rvb-content-graph/v1",
+    "surface": "skill",
+    "entry": "n14",
+    "nodes": [
+      {
+        "id": "n1",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "binary",
+                  "op": "+",
+                  "left": {
+                    "kind": "literal",
+                    "value": "造成"
+                  },
+                  "right": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "r"
+                    },
+                    "key": "damage"
+                  }
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "点伤害并偷取2点移动范围"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n2",
+        "kind": "call",
+        "capability": "addRuleById",
+        "args": [
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "c"
+            },
+            "key": "instanceId"
+          },
+          {
+            "kind": "literal",
+            "value": "rule-shadow-chaos-spear-restore"
+          }
+        ],
+        "next": "n1"
+      },
+      {
+        "id": "n3",
+        "kind": "call",
+        "capability": "addStatusEffectById",
+        "args": [
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "c"
+            },
+            "key": "instanceId"
+          },
+          {
+            "kind": "object",
+            "entries": [
+              {
+                "key": "id",
+                "value": {
+                  "kind": "binary",
+                  "op": "+",
+                  "left": {
+                    "kind": "binary",
+                    "op": "+",
+                    "left": {
+                      "kind": "binary",
+                      "op": "+",
+                      "left": {
+                        "kind": "literal",
+                        "value": "chaos-spear-theft-"
+                      },
+                      "right": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "c"
+                        },
+                        "key": "instanceId"
+                      }
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": "-"
+                    }
+                  },
+                  "right": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "t"
+                    },
+                    "key": "instanceId"
+                  }
+                }
+              },
+              {
+                "key": "type",
+                "value": {
+                  "kind": "literal",
+                  "value": "chaos-spear-theft"
+                }
+              },
+              {
+                "key": "name",
+                "value": {
+                  "kind": "literal",
+                  "value": "混沌之矛"
+                }
+              },
+              {
+                "key": "targetId",
+                "value": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "t"
+                  },
+                  "key": "instanceId"
+                }
+              },
+              {
+                "key": "intensity",
+                "value": {
+                  "kind": "literal",
+                  "value": 2
+                }
+              },
+              {
+                "key": "currentDuration",
+                "value": {
+                  "kind": "unary",
+                  "op": "-",
+                  "argument": {
+                    "kind": "literal",
+                    "value": 1
+                  }
+                }
+              },
+              {
+                "key": "relatedRules",
+                "value": {
+                  "kind": "array",
+                  "items": [
+                    {
+                      "kind": "literal",
+                      "value": "rule-shadow-chaos-spear-restore"
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ],
+        "next": "n2"
+      },
+      {
+        "id": "n4",
+        "kind": "set",
+        "target": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "c"
+          },
+          "key": "statusTags"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "binary",
+          "op": "||",
+          "left": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "c"
+            },
+            "key": "statusTags"
+          },
+          "right": {
+            "kind": "array",
+            "items": []
+          }
+        },
+        "next": "n3"
+      },
+      {
+        "id": "n5",
+        "kind": "set",
+        "target": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "c"
+          },
+          "key": "moveRange"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "binary",
+          "op": "+",
+          "left": {
+            "kind": "binary",
+            "op": "||",
+            "left": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "c"
+              },
+              "key": "moveRange"
+            },
+            "right": {
+              "kind": "literal",
+              "value": 0
+            }
+          },
+          "right": {
+            "kind": "literal",
+            "value": 2
+          }
+        },
+        "next": "n4"
+      },
+      {
+        "id": "n6",
+        "kind": "set",
+        "target": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "t"
+          },
+          "key": "moveRange"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "binary",
+          "op": "-",
+          "left": {
+            "kind": "binary",
+            "op": "||",
+            "left": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "t"
+              },
+              "key": "moveRange"
+            },
+            "right": {
+              "kind": "literal",
+              "value": 0
+            }
+          },
+          "right": {
+            "kind": "literal",
+            "value": 2
+          }
+        },
+        "next": "n5"
+      },
+      {
+        "id": "n7",
+        "kind": "call",
+        "capability": "dealDamage",
+        "args": [
+          {
+            "kind": "ref",
+            "name": "c"
+          },
+          {
+            "kind": "ref",
+            "name": "t"
+          },
+          {
+            "kind": "call",
+            "callee": "Math.floor",
+            "args": [
+              {
+                "kind": "binary",
+                "op": "*",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "c"
+                  },
+                  "key": "attack"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": 0.5
+                }
+              }
+            ]
+          },
+          {
+            "kind": "literal",
+            "value": "physical"
+          },
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "context"
+            },
+            "key": "battle"
+          },
+          {
+            "kind": "get",
+            "object": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "context"
+              },
+              "key": "skill"
+            },
+            "key": "id"
+          }
+        ],
+        "result": "r",
+        "next": "n6"
+      },
+      {
+        "id": "n8",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": "混沌之矛的移速偷取尚未归还"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n9",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "ref",
+              "name": "old"
+            }
+          }
+        },
+        "yes": "n8",
+        "no": "n7"
+      },
+      {
+        "id": "n10",
+        "kind": "bind",
+        "name": "old",
+        "expr": {
+          "kind": "collection",
+          "object": {
+            "kind": "binary",
+            "op": "||",
+            "left": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "c"
+              },
+              "key": "statusTags"
+            },
+            "right": {
+              "kind": "array",
+              "items": []
+            }
+          },
+          "method": "find",
+          "args": [
+            {
+              "kind": "lambda",
+              "parameters": [
+                "tag"
+              ],
+              "body": {
+                "kind": "binary",
+                "op": "===",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "tag"
+                  },
+                  "key": "type"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "chaos-spear-theft"
+                }
+              }
+            }
+          ]
+        },
+        "next": "n9"
+      },
+      {
+        "id": "n11",
+        "kind": "return",
+        "value": {
+          "kind": "ref",
+          "name": "t"
+        }
+      },
+      {
+        "id": "n12",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "ref",
+                  "name": "t"
+                }
+              },
+              "right": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "t"
+                },
+                "key": "needsTargetSelection"
+              }
+            }
+          }
+        },
+        "yes": "n11",
+        "no": "n10"
+      },
+      {
+        "id": "n13",
+        "kind": "call",
+        "capability": "selectTarget",
+        "args": [
+          {
+            "kind": "object",
+            "entries": [
+              {
+                "key": "type",
+                "value": {
+                  "kind": "literal",
+                  "value": "piece"
+                }
+              },
+              {
+                "key": "range",
+                "value": {
+                  "kind": "literal",
+                  "value": 4
+                }
+              },
+              {
+                "key": "filter",
+                "value": {
+                  "kind": "literal",
+                  "value": "enemy"
+                }
+              }
+            ]
+          }
+        ],
+        "result": "t",
+        "next": "n12"
+      },
+      {
+        "id": "n14",
+        "kind": "bind",
+        "name": "c",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "context"
+          },
+          "key": "piece"
+        },
+        "next": "n13"
+      }
+    ]
+  },
+  "contentGraphField": "code",
+  "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1"
 }

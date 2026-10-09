@@ -5,5 +5,665 @@
   "trigger": {
     "type": "afterDamageTaken"
   },
-  "skillCode": "var piece = context.rulePiece; if (!piece || !context.sourcePiece || context.sourcePiece.instanceId !== piece.instanceId || !(context.damage > 0)) return { success: false, message: '' }; if (context.targetPiece && context.targetPiece.instanceId === piece.instanceId) return { success: false, message: '' }; var transformed = piece.statusTags && piece.statusTags.some(function(tag) { return tag.id === 'ulquiorra-resurreccion-' + piece.instanceId; }); if (!transformed) { var progress = piece.statusTags && piece.statusTags.find(function(tag) { return tag.type === 'ulquiorra-resurreccion-progress'; }); if (!progress) { progress = { id: 'ulquiorra-resurreccion-progress-' + piece.instanceId, type: 'ulquiorra-resurreccion-progress', name: '归刃进度', visible: true, currentDuration: -1, currentUses: -1, intensity: 0, stacks: 0 }; piece.statusTags.push(progress); } progress.intensity = Math.min(3, (progress.intensity || 0) + 1); progress.stacks = progress.intensity; } if (piece.currentHp > 0) context.healQueue.push({ healer: piece, target: piece, heal: 1, skillId: 'ulquiorra-high-speed-regeneration' }); return { success: true, message: piece.name + '触发超速再生' };"
+  "skillCode": "var piece, progress, transformed; var _pc = \"n16\"; for (var _step = 0; _step <= 16; _step++) { switch (_pc) { case \"n16\": piece = (context)[\"rulePiece\"]; _pc = \"n15\"; break; case \"n15\": _pc = (! (! ((((! piece) || (! (context)[\"sourcePiece\"])) || (((context)[\"sourcePiece\"])[\"instanceId\"] !== (piece)[\"instanceId\"])) || (! ((context)[\"damage\"] > 0))))) ? \"n14\" : \"n13\"; break; case \"n13\": _pc = (! (! ((context)[\"targetPiece\"] && (((context)[\"targetPiece\"])[\"instanceId\"] === (piece)[\"instanceId\"])))) ? \"n12\" : \"n11\"; break; case \"n11\": transformed = ((piece)[\"statusTags\"] && ((piece)[\"statusTags\"])[\"some\"](function (tag) { return ((tag)[\"id\"] === (\"ulquiorra-resurreccion-\" + (piece)[\"instanceId\"])); })); _pc = \"n10\"; break; case \"n10\": _pc = (! (! (! transformed))) ? \"n9\" : \"n3\"; break; case \"n9\": progress = ((piece)[\"statusTags\"] && ((piece)[\"statusTags\"])[\"find\"](function (tag) { return ((tag)[\"type\"] === \"ulquiorra-resurreccion-progress\"); })); _pc = \"n8\"; break; case \"n8\": _pc = (! (! (! progress))) ? \"n7\" : \"n5\"; break; case \"n7\": progress = {id: (\"ulquiorra-resurreccion-progress-\" + (piece)[\"instanceId\"]), type: \"ulquiorra-resurreccion-progress\", name: \"归刃进度\", visible: true, currentDuration: (- 1), currentUses: (- 1), intensity: 0, stacks: 0}; _pc = \"n6\"; break; case \"n6\": ((piece)[\"statusTags\"]).push(progress); _pc = \"n5\"; break; case \"n5\": (progress)[\"intensity\"] = Math.min(3, (((progress)[\"intensity\"] || 0) + 1)); _pc = \"n4\"; break; case \"n4\": (progress)[\"stacks\"] = (progress)[\"intensity\"]; _pc = \"n3\"; break; case \"n3\": _pc = (! (! ((piece)[\"currentHp\"] > 0))) ? \"n2\" : \"n1\"; break; case \"n2\": context.healQueue.push({healer: piece, target: piece, heal: 1, skillId: \"ulquiorra-high-speed-regeneration\"}); _pc = \"n1\"; break; case \"n1\": return {success: true, message: ((piece)[\"name\"] + \"触发超速再生\")}; case \"n12\": return {success: false, message: \"\"}; case \"n14\": return {success: false, message: \"\"}; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\");",
+  "contentGraph": {
+    "version": "rvb-content-graph/v1",
+    "surface": "rule",
+    "entry": "n16",
+    "nodes": [
+      {
+        "id": "n1",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "piece"
+                  },
+                  "key": "name"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "触发超速再生"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n2",
+        "kind": "call",
+        "capability": "queue.heal",
+        "args": [
+          {
+            "kind": "object",
+            "entries": [
+              {
+                "key": "healer",
+                "value": {
+                  "kind": "ref",
+                  "name": "piece"
+                }
+              },
+              {
+                "key": "target",
+                "value": {
+                  "kind": "ref",
+                  "name": "piece"
+                }
+              },
+              {
+                "key": "heal",
+                "value": {
+                  "kind": "literal",
+                  "value": 1
+                }
+              },
+              {
+                "key": "skillId",
+                "value": {
+                  "kind": "literal",
+                  "value": "ulquiorra-high-speed-regeneration"
+                }
+              }
+            ]
+          }
+        ],
+        "next": "n1"
+      },
+      {
+        "id": "n3",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": ">",
+              "left": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "piece"
+                },
+                "key": "currentHp"
+              },
+              "right": {
+                "kind": "literal",
+                "value": 0
+              }
+            }
+          }
+        },
+        "yes": "n2",
+        "no": "n1"
+      },
+      {
+        "id": "n4",
+        "kind": "set",
+        "target": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "progress"
+          },
+          "key": "stacks"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "progress"
+          },
+          "key": "intensity"
+        },
+        "next": "n3"
+      },
+      {
+        "id": "n5",
+        "kind": "set",
+        "target": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "progress"
+          },
+          "key": "intensity"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "call",
+          "callee": "Math.min",
+          "args": [
+            {
+              "kind": "literal",
+              "value": 3
+            },
+            {
+              "kind": "binary",
+              "op": "+",
+              "left": {
+                "kind": "binary",
+                "op": "||",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "progress"
+                  },
+                  "key": "intensity"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": 0
+                }
+              },
+              "right": {
+                "kind": "literal",
+                "value": 1
+              }
+            }
+          ]
+        },
+        "next": "n4"
+      },
+      {
+        "id": "n6",
+        "kind": "call",
+        "capability": "array.push",
+        "args": [
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "piece"
+            },
+            "key": "statusTags"
+          },
+          {
+            "kind": "ref",
+            "name": "progress"
+          }
+        ],
+        "next": "n5"
+      },
+      {
+        "id": "n7",
+        "kind": "set",
+        "target": {
+          "kind": "ref",
+          "name": "progress"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "id",
+              "value": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "literal",
+                  "value": "ulquiorra-resurreccion-progress-"
+                },
+                "right": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "piece"
+                  },
+                  "key": "instanceId"
+                }
+              }
+            },
+            {
+              "key": "type",
+              "value": {
+                "kind": "literal",
+                "value": "ulquiorra-resurreccion-progress"
+              }
+            },
+            {
+              "key": "name",
+              "value": {
+                "kind": "literal",
+                "value": "归刃进度"
+              }
+            },
+            {
+              "key": "visible",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "currentDuration",
+              "value": {
+                "kind": "unary",
+                "op": "-",
+                "argument": {
+                  "kind": "literal",
+                  "value": 1
+                }
+              }
+            },
+            {
+              "key": "currentUses",
+              "value": {
+                "kind": "unary",
+                "op": "-",
+                "argument": {
+                  "kind": "literal",
+                  "value": 1
+                }
+              }
+            },
+            {
+              "key": "intensity",
+              "value": {
+                "kind": "literal",
+                "value": 0
+              }
+            },
+            {
+              "key": "stacks",
+              "value": {
+                "kind": "literal",
+                "value": 0
+              }
+            }
+          ]
+        },
+        "next": "n6"
+      },
+      {
+        "id": "n8",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "unary",
+              "op": "!",
+              "argument": {
+                "kind": "ref",
+                "name": "progress"
+              }
+            }
+          }
+        },
+        "yes": "n7",
+        "no": "n5"
+      },
+      {
+        "id": "n9",
+        "kind": "bind",
+        "name": "progress",
+        "expr": {
+          "kind": "binary",
+          "op": "&&",
+          "left": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "piece"
+            },
+            "key": "statusTags"
+          },
+          "right": {
+            "kind": "collection",
+            "object": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "piece"
+              },
+              "key": "statusTags"
+            },
+            "method": "find",
+            "args": [
+              {
+                "kind": "lambda",
+                "parameters": [
+                  "tag"
+                ],
+                "body": {
+                  "kind": "binary",
+                  "op": "===",
+                  "left": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "tag"
+                    },
+                    "key": "type"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": "ulquiorra-resurreccion-progress"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "next": "n8"
+      },
+      {
+        "id": "n10",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "unary",
+              "op": "!",
+              "argument": {
+                "kind": "ref",
+                "name": "transformed"
+              }
+            }
+          }
+        },
+        "yes": "n9",
+        "no": "n3"
+      },
+      {
+        "id": "n11",
+        "kind": "bind",
+        "name": "transformed",
+        "expr": {
+          "kind": "binary",
+          "op": "&&",
+          "left": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "piece"
+            },
+            "key": "statusTags"
+          },
+          "right": {
+            "kind": "collection",
+            "object": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "piece"
+              },
+              "key": "statusTags"
+            },
+            "method": "some",
+            "args": [
+              {
+                "kind": "lambda",
+                "parameters": [
+                  "tag"
+                ],
+                "body": {
+                  "kind": "binary",
+                  "op": "===",
+                  "left": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "tag"
+                    },
+                    "key": "id"
+                  },
+                  "right": {
+                    "kind": "binary",
+                    "op": "+",
+                    "left": {
+                      "kind": "literal",
+                      "value": "ulquiorra-resurreccion-"
+                    },
+                    "right": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "piece"
+                      },
+                      "key": "instanceId"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "next": "n10"
+      },
+      {
+        "id": "n12",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n13",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "&&",
+              "left": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "context"
+                },
+                "key": "targetPiece"
+              },
+              "right": {
+                "kind": "binary",
+                "op": "===",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "context"
+                    },
+                    "key": "targetPiece"
+                  },
+                  "key": "instanceId"
+                },
+                "right": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "piece"
+                  },
+                  "key": "instanceId"
+                }
+              }
+            }
+          }
+        },
+        "yes": "n12",
+        "no": "n11"
+      },
+      {
+        "id": "n14",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n15",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "binary",
+                "op": "||",
+                "left": {
+                  "kind": "binary",
+                  "op": "||",
+                  "left": {
+                    "kind": "unary",
+                    "op": "!",
+                    "argument": {
+                      "kind": "ref",
+                      "name": "piece"
+                    }
+                  },
+                  "right": {
+                    "kind": "unary",
+                    "op": "!",
+                    "argument": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "context"
+                      },
+                      "key": "sourcePiece"
+                    }
+                  }
+                },
+                "right": {
+                  "kind": "binary",
+                  "op": "!==",
+                  "left": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "context"
+                      },
+                      "key": "sourcePiece"
+                    },
+                    "key": "instanceId"
+                  },
+                  "right": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "piece"
+                    },
+                    "key": "instanceId"
+                  }
+                }
+              },
+              "right": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "binary",
+                  "op": ">",
+                  "left": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "context"
+                    },
+                    "key": "damage"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": 0
+                  }
+                }
+              }
+            }
+          }
+        },
+        "yes": "n14",
+        "no": "n13"
+      },
+      {
+        "id": "n16",
+        "kind": "bind",
+        "name": "piece",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "context"
+          },
+          "key": "rulePiece"
+        },
+        "next": "n15"
+      }
+    ]
+  },
+  "contentGraphField": "skillCode",
+  "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1"
 }

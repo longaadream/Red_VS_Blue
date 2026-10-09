@@ -19,9 +19,1160 @@
   "maxCharges": 0,
   "powerMultiplier": 1,
   "actionPointCost": 1,
-  "code": "function executeSkill(context) { const sourcePiece = context.piece; const targetPosition = selectTarget({ type: 'grid', range: 4, filter: 'all' }); if (!targetPosition || targetPosition.needsTargetSelection) { return targetPosition; } const targetX = targetPosition.x; const targetY = targetPosition.y; const allies = []; const enemies = []; for (let dx = 0; dx < 2; dx++) { for (let dy = 0; dy < 2; dy++) { const p = select.getPieceAt(targetX + dx, targetY + dy); if (p && p.currentHp > 0) { if (arePlayersAllied(battle, p.ownerPlayerId, sourcePiece.ownerPlayerId)) { allies.push(p); } else { enemies.push(p); } } } } let messages = []; if (allies.length > 0) { const hlResult = healDamage(sourcePiece, allies, 4, context.battle, context.skill.id); allies.forEach(function(ally, i) { const r = hlResult.results && hlResult.results[i]; if (r && r.success) { messages.push(ally.name + '恢复' + r.heal + '点生命值'); } }); } if (enemies.length > 0) { const dmgResult = dealDamage(sourcePiece, enemies, 1, 'physical', context.battle, context.skill.id); enemies.forEach(function(enemy, i) { const r = dmgResult.results && dmgResult.results[i]; if (r && r.success) { const statusId = 'anti-heal-' + Date.now(); addStatusEffectById(enemy.instanceId, { id: statusId, type: 'anti-heal', currentDuration: 1, intensity: 1, relatedRules: ['rule-anti-heal-block'] }); addRuleById(enemy.instanceId, 'rule-anti-heal-block'); addSkillById(enemy.instanceId, 'anti-heal-block'); messages.push(enemy.name + '受到' + r.damage + '点伤害并被禁疗'); } }); } return { message: '生物手雷生效：' + messages.join('；'), success: true }; }",
-  "previewCode": "function calculatePreview(piece, skillDef) { return { description: \"选择地格（4），以该格为左上角影响2×2区域。回复区域内友军4点。对区域内敌人造成1点伤害，并施加禁疗[1]。\", expectedValues: { heal: 4, damage: 1 } }; }",
+  "code": "function executeSkill(context) { var __rvb_import_bound_method_2, __rvb_import_bound_method_3, __rvb_lexical_0_sourcePiece, __rvb_lexical_10_hlResult, __rvb_lexical_12_dmgResult, __rvb_lexical_1_targetPosition, __rvb_lexical_2_targetX, __rvb_lexical_3_targetY, __rvb_lexical_4_allies, __rvb_lexical_5_enemies, __rvb_lexical_6_dx, __rvb_lexical_7_dy, __rvb_lexical_8_p, __rvb_lexical_9_messages; var _pc = \"n47\"; for (var _step = 0; _step <= 20; _step++) { switch (_pc) { case \"n47\": __rvb_lexical_0_sourcePiece = (context)[\"piece\"]; _pc = \"n46\"; break; case \"n46\": __rvb_lexical_1_targetPosition = selectTarget({type: \"grid\", range: 4, filter: \"all\"}); _pc = \"n45\"; break; case \"n45\": _pc = (! (! ((! __rvb_lexical_1_targetPosition) || (__rvb_lexical_1_targetPosition)[\"needsTargetSelection\"]))) ? \"n44\" : \"n43\"; break; case \"n43\": __rvb_lexical_2_targetX = (__rvb_lexical_1_targetPosition)[\"x\"]; _pc = \"n42\"; break; case \"n42\": __rvb_lexical_3_targetY = (__rvb_lexical_1_targetPosition)[\"y\"]; _pc = \"n41\"; break; case \"n41\": __rvb_lexical_4_allies = []; _pc = \"n40\"; break; case \"n40\": __rvb_lexical_5_enemies = []; _pc = \"n39\"; break; case \"n39\": __rvb_lexical_6_dx = 0; _pc = \"n38\"; break; case \"n38\": var __rvb_content_graph_loop_break_0 = false, __rvb_content_graph_loop_continue_1 = false; while ((! (! (__rvb_lexical_6_dx < 2)))) { __rvb_content_graph_loop_continue_1 = false; { var __rvb_content_graph_region_pc_2 = \"n35\"; while (__rvb_content_graph_region_pc_2 !== \"n25\") { switch (__rvb_content_graph_region_pc_2) { case \"n35\": __rvb_lexical_7_dy = 0; __rvb_content_graph_region_pc_2 = \"n34\"; break; case \"n34\": var __rvb_content_graph_loop_break_3 = false, __rvb_content_graph_loop_continue_4 = false; while ((! (! (__rvb_lexical_7_dy < 2)))) { __rvb_content_graph_loop_continue_4 = false; { var __rvb_content_graph_region_pc_5 = \"n31\"; while (__rvb_content_graph_region_pc_5 !== \"n26\") { switch (__rvb_content_graph_region_pc_5) { case \"n31\": __rvb_lexical_8_p = select.getPieceAt((__rvb_lexical_2_targetX + __rvb_lexical_6_dx), (__rvb_lexical_3_targetY + __rvb_lexical_7_dy)); __rvb_content_graph_region_pc_5 = \"n30\"; break; case \"n30\": __rvb_content_graph_region_pc_5 = (! (! (__rvb_lexical_8_p && ((__rvb_lexical_8_p)[\"currentHp\"] > 0)))) ? \"n29\" : \"n26\"; break; case \"n29\": __rvb_content_graph_region_pc_5 = (! (! arePlayersAllied(battle, (__rvb_lexical_8_p)[\"ownerPlayerId\"], (__rvb_lexical_0_sourcePiece)[\"ownerPlayerId\"]))) ? \"n27\" : \"n28\"; break; case \"n28\": (__rvb_lexical_5_enemies).push(__rvb_lexical_8_p); __rvb_content_graph_region_pc_5 = \"n26\"; break; case \"n27\": (__rvb_lexical_4_allies).push(__rvb_lexical_8_p); __rvb_content_graph_region_pc_5 = \"n26\"; break; case \"n26\": __rvb_content_graph_region_pc_5 = \"n26\"; break; default: throw new Error(\"invalid content graph region node\"); } } } if (__rvb_content_graph_loop_break_3) break; { var __rvb_content_graph_region_pc_6 = \"n33\"; while (__rvb_content_graph_region_pc_6 !== \"n32\") { switch (__rvb_content_graph_region_pc_6) { case \"n33\": __rvb_lexical_7_dy = ((+ __rvb_lexical_7_dy) + 1); __rvb_content_graph_region_pc_6 = \"n32\"; break; case \"n32\": __rvb_content_graph_region_pc_6 = \"n32\"; break; default: throw new Error(\"invalid content graph region node\"); } } } if (__rvb_content_graph_loop_break_3) break; if (__rvb_content_graph_loop_continue_4) { __rvb_content_graph_loop_continue_4 = false; continue; } } __rvb_content_graph_region_pc_2 = \"n25\"; break; case \"n25\": __rvb_content_graph_region_pc_2 = \"n25\"; break; default: throw new Error(\"invalid content graph region node\"); } } } if (__rvb_content_graph_loop_break_0) break; { var __rvb_content_graph_region_pc_7 = \"n37\"; while (__rvb_content_graph_region_pc_7 !== \"n36\") { switch (__rvb_content_graph_region_pc_7) { case \"n37\": __rvb_lexical_6_dx = ((+ __rvb_lexical_6_dx) + 1); __rvb_content_graph_region_pc_7 = \"n36\"; break; case \"n36\": __rvb_content_graph_region_pc_7 = \"n36\"; break; default: throw new Error(\"invalid content graph region node\"); } } } if (__rvb_content_graph_loop_break_0) break; if (__rvb_content_graph_loop_continue_1) { __rvb_content_graph_loop_continue_1 = false; continue; } } _pc = \"n24\"; break; case \"n24\": __rvb_lexical_9_messages = []; _pc = \"n23\"; break; case \"n23\": _pc = (! (! ((__rvb_lexical_4_allies)[\"length\"] > 0))) ? \"n22\" : \"n15\"; break; case \"n22\": __rvb_lexical_10_hlResult = healDamage(__rvb_lexical_0_sourcePiece, __rvb_lexical_4_allies, 4, (context)[\"battle\"], ((context)[\"skill\"])[\"id\"]); _pc = \"n21\"; break; case \"n21\": __rvb_import_bound_method_3 = (function (receiver) { var capturedMethod = receiver[\"forEach\"]; return function () { return Reflect.apply(capturedMethod, receiver, arguments); }; })(__rvb_lexical_4_allies); _pc = \"n16\"; break; case \"n16\": (__rvb_import_bound_method_3)(function (ally, i) { var __rvb_lexical_11_r; { var __rvb_content_graph_region_pc_8 = \"n20\"; while (__rvb_content_graph_region_pc_8 !== \"n17\") { switch (__rvb_content_graph_region_pc_8) { case \"n20\": __rvb_lexical_11_r = ((__rvb_lexical_10_hlResult)[\"results\"] && ((__rvb_lexical_10_hlResult)[\"results\"])[(function (key) { if (typeof key === \"string\" && key.split(\".\").some(function (part) { return [\"__proto__\",\"arguments\",\"callee\",\"caller\",\"constructor\",\"prototype\"].indexOf(part) !== -1; })) throw new Error(\"unsafe content graph index\"); return key; })(i)]); __rvb_content_graph_region_pc_8 = \"n19\"; break; case \"n19\": __rvb_content_graph_region_pc_8 = (! (! (__rvb_lexical_11_r && (__rvb_lexical_11_r)[\"success\"]))) ? \"n18\" : \"n17\"; break; case \"n18\": (__rvb_lexical_9_messages).push(((((ally)[\"name\"] + \"恢复\") + (__rvb_lexical_11_r)[\"heal\"]) + \"点生命值\")); __rvb_content_graph_region_pc_8 = \"n17\"; break; case \"n17\": __rvb_content_graph_region_pc_8 = \"n17\"; break; default: throw new Error(\"invalid content graph region node\"); } } } }); _pc = \"n15\"; break; case \"n15\": _pc = (! (! ((__rvb_lexical_5_enemies)[\"length\"] > 0))) ? \"n14\" : \"n1\"; break; case \"n14\": __rvb_lexical_12_dmgResult = dealDamage(__rvb_lexical_0_sourcePiece, __rvb_lexical_5_enemies, 1, \"physical\", (context)[\"battle\"], ((context)[\"skill\"])[\"id\"]); _pc = \"n13\"; break; case \"n13\": __rvb_import_bound_method_2 = (function (receiver) { var capturedMethod = receiver[\"forEach\"]; return function () { return Reflect.apply(capturedMethod, receiver, arguments); }; })(__rvb_lexical_5_enemies); _pc = \"n2\"; break; case \"n2\": (__rvb_import_bound_method_2)(function (enemy, i) { var __rvb_import_effect_1, __rvb_import_operand_0, __rvb_lexical_13_r, __rvb_lexical_14_statusId; { var __rvb_content_graph_region_pc_9 = \"n12\"; while (__rvb_content_graph_region_pc_9 !== \"n3\") { switch (__rvb_content_graph_region_pc_9) { case \"n12\": __rvb_lexical_13_r = ((__rvb_lexical_12_dmgResult)[\"results\"] && ((__rvb_lexical_12_dmgResult)[\"results\"])[(function (key) { if (typeof key === \"string\" && key.split(\".\").some(function (part) { return [\"__proto__\",\"arguments\",\"callee\",\"caller\",\"constructor\",\"prototype\"].indexOf(part) !== -1; })) throw new Error(\"unsafe content graph index\"); return key; })(i)]); __rvb_content_graph_region_pc_9 = \"n11\"; break; case \"n11\": __rvb_content_graph_region_pc_9 = (! (! (__rvb_lexical_13_r && (__rvb_lexical_13_r)[\"success\"]))) ? \"n8\" : \"n3\"; break; case \"n8\": __rvb_import_operand_0 = \"anti-heal-\"; __rvb_content_graph_region_pc_9 = \"n10\"; break; case \"n10\": __rvb_import_effect_1 = Date.now(); __rvb_content_graph_region_pc_9 = \"n9\"; break; case \"n9\": __rvb_lexical_14_statusId = (__rvb_import_operand_0 + __rvb_import_effect_1); __rvb_content_graph_region_pc_9 = \"n7\"; break; case \"n7\": addStatusEffectById((enemy)[\"instanceId\"], {id: __rvb_lexical_14_statusId, type: \"anti-heal\", currentDuration: 1, intensity: 1, relatedRules: [\"rule-anti-heal-block\"]}); __rvb_content_graph_region_pc_9 = \"n6\"; break; case \"n6\": addRuleById((enemy)[\"instanceId\"], \"rule-anti-heal-block\"); __rvb_content_graph_region_pc_9 = \"n5\"; break; case \"n5\": addSkillById((enemy)[\"instanceId\"], \"anti-heal-block\"); __rvb_content_graph_region_pc_9 = \"n4\"; break; case \"n4\": (__rvb_lexical_9_messages).push(((((enemy)[\"name\"] + \"受到\") + (__rvb_lexical_13_r)[\"damage\"]) + \"点伤害并被禁疗\")); __rvb_content_graph_region_pc_9 = \"n3\"; break; case \"n3\": __rvb_content_graph_region_pc_9 = \"n3\"; break; default: throw new Error(\"invalid content graph region node\"); } } } }); _pc = \"n1\"; break; case \"n1\": return {message: (\"生物手雷生效：\" + (__rvb_lexical_9_messages)[\"join\"](\"；\")), success: true}; case \"n44\": return __rvb_lexical_1_targetPosition; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\"); }",
+  "previewCode": "function calculatePreview(piece, skillDef, currentCooldown) { var _pc = \"n1\"; for (var _step = 0; _step <= 1; _step++) { switch (_pc) { case \"n1\": return {description: \"选择地格（4），以该格为左上角影响2×2区域。回复区域内友军4点。对区域内敌人造成1点伤害，并施加禁疗[1]。\", expectedValues: {heal: 4, damage: 1}}; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\"); }",
   "range": "area",
   "areaSize": 2,
-  "requiresTarget": true
+  "requiresTarget": true,
+  "contentGraph": {
+    "version": "rvb-content-graph/v1",
+    "surface": "skill",
+    "entry": "n47",
+    "nodes": [
+      {
+        "id": "n1",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "message",
+              "value": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "literal",
+                  "value": "生物手雷生效："
+                },
+                "right": {
+                  "kind": "collection",
+                  "object": {
+                    "kind": "ref",
+                    "name": "__rvb_lexical_9_messages"
+                  },
+                  "method": "join",
+                  "args": [
+                    {
+                      "kind": "literal",
+                      "value": "；"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n2",
+        "kind": "invoke",
+        "target": {
+          "kind": "function",
+          "value": {
+            "kind": "ref",
+            "name": "__rvb_import_bound_method_2"
+          }
+        },
+        "args": [
+          {
+            "kind": "function",
+            "parameters": [
+              "enemy",
+              "i"
+            ],
+            "body": {
+              "entry": "n12",
+              "end": "n3",
+              "nodes": [
+                {
+                  "id": "n3",
+                  "kind": "regionEnd"
+                },
+                {
+                  "id": "n4",
+                  "kind": "call",
+                  "capability": "array.push",
+                  "args": [
+                    {
+                      "kind": "ref",
+                      "name": "__rvb_lexical_9_messages"
+                    },
+                    {
+                      "kind": "binary",
+                      "op": "+",
+                      "left": {
+                        "kind": "binary",
+                        "op": "+",
+                        "left": {
+                          "kind": "binary",
+                          "op": "+",
+                          "left": {
+                            "kind": "get",
+                            "object": {
+                              "kind": "ref",
+                              "name": "enemy"
+                            },
+                            "key": "name"
+                          },
+                          "right": {
+                            "kind": "literal",
+                            "value": "受到"
+                          }
+                        },
+                        "right": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "__rvb_lexical_13_r"
+                          },
+                          "key": "damage"
+                        }
+                      },
+                      "right": {
+                        "kind": "literal",
+                        "value": "点伤害并被禁疗"
+                      }
+                    }
+                  ],
+                  "next": "n3"
+                },
+                {
+                  "id": "n5",
+                  "kind": "call",
+                  "capability": "addSkillById",
+                  "args": [
+                    {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "enemy"
+                      },
+                      "key": "instanceId"
+                    },
+                    {
+                      "kind": "literal",
+                      "value": "anti-heal-block"
+                    }
+                  ],
+                  "next": "n4"
+                },
+                {
+                  "id": "n6",
+                  "kind": "call",
+                  "capability": "addRuleById",
+                  "args": [
+                    {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "enemy"
+                      },
+                      "key": "instanceId"
+                    },
+                    {
+                      "kind": "literal",
+                      "value": "rule-anti-heal-block"
+                    }
+                  ],
+                  "next": "n5"
+                },
+                {
+                  "id": "n7",
+                  "kind": "call",
+                  "capability": "addStatusEffectById",
+                  "args": [
+                    {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "enemy"
+                      },
+                      "key": "instanceId"
+                    },
+                    {
+                      "kind": "object",
+                      "entries": [
+                        {
+                          "key": "id",
+                          "value": {
+                            "kind": "ref",
+                            "name": "__rvb_lexical_14_statusId"
+                          }
+                        },
+                        {
+                          "key": "type",
+                          "value": {
+                            "kind": "literal",
+                            "value": "anti-heal"
+                          }
+                        },
+                        {
+                          "key": "currentDuration",
+                          "value": {
+                            "kind": "literal",
+                            "value": 1
+                          }
+                        },
+                        {
+                          "key": "intensity",
+                          "value": {
+                            "kind": "literal",
+                            "value": 1
+                          }
+                        },
+                        {
+                          "key": "relatedRules",
+                          "value": {
+                            "kind": "array",
+                            "items": [
+                              {
+                                "kind": "literal",
+                                "value": "rule-anti-heal-block"
+                              }
+                            ]
+                          }
+                        }
+                      ]
+                    }
+                  ],
+                  "next": "n6"
+                },
+                {
+                  "id": "n9",
+                  "kind": "bind",
+                  "name": "__rvb_lexical_14_statusId",
+                  "expr": {
+                    "kind": "binary",
+                    "op": "+",
+                    "left": {
+                      "kind": "ref",
+                      "name": "__rvb_import_operand_0"
+                    },
+                    "right": {
+                      "kind": "ref",
+                      "name": "__rvb_import_effect_1"
+                    }
+                  },
+                  "next": "n7"
+                },
+                {
+                  "id": "n10",
+                  "kind": "call",
+                  "capability": "Date.now",
+                  "args": [],
+                  "result": "__rvb_import_effect_1",
+                  "next": "n9"
+                },
+                {
+                  "id": "n8",
+                  "kind": "bind",
+                  "name": "__rvb_import_operand_0",
+                  "expr": {
+                    "kind": "literal",
+                    "value": "anti-heal-"
+                  },
+                  "next": "n10"
+                },
+                {
+                  "id": "n11",
+                  "kind": "branch",
+                  "condition": {
+                    "kind": "unary",
+                    "op": "!",
+                    "argument": {
+                      "kind": "unary",
+                      "op": "!",
+                      "argument": {
+                        "kind": "binary",
+                        "op": "&&",
+                        "left": {
+                          "kind": "ref",
+                          "name": "__rvb_lexical_13_r"
+                        },
+                        "right": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "__rvb_lexical_13_r"
+                          },
+                          "key": "success"
+                        }
+                      }
+                    }
+                  },
+                  "yes": "n8",
+                  "no": "n3"
+                },
+                {
+                  "id": "n12",
+                  "kind": "bind",
+                  "name": "__rvb_lexical_13_r",
+                  "expr": {
+                    "kind": "binary",
+                    "op": "&&",
+                    "left": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "__rvb_lexical_12_dmgResult"
+                      },
+                      "key": "results"
+                    },
+                    "right": {
+                      "kind": "index",
+                      "object": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "__rvb_lexical_12_dmgResult"
+                        },
+                        "key": "results"
+                      },
+                      "index": {
+                        "kind": "ref",
+                        "name": "i"
+                      }
+                    }
+                  },
+                  "next": "n11"
+                }
+              ]
+            }
+          }
+        ],
+        "next": "n1"
+      },
+      {
+        "id": "n13",
+        "kind": "bind",
+        "name": "__rvb_import_bound_method_2",
+        "expr": {
+          "kind": "boundMethod",
+          "object": {
+            "kind": "ref",
+            "name": "__rvb_lexical_5_enemies"
+          },
+          "method": "forEach"
+        },
+        "next": "n2"
+      },
+      {
+        "id": "n14",
+        "kind": "call",
+        "capability": "dealDamage",
+        "args": [
+          {
+            "kind": "ref",
+            "name": "__rvb_lexical_0_sourcePiece"
+          },
+          {
+            "kind": "ref",
+            "name": "__rvb_lexical_5_enemies"
+          },
+          {
+            "kind": "literal",
+            "value": 1
+          },
+          {
+            "kind": "literal",
+            "value": "physical"
+          },
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "context"
+            },
+            "key": "battle"
+          },
+          {
+            "kind": "get",
+            "object": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "context"
+              },
+              "key": "skill"
+            },
+            "key": "id"
+          }
+        ],
+        "result": "__rvb_lexical_12_dmgResult",
+        "next": "n13"
+      },
+      {
+        "id": "n15",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": ">",
+              "left": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "__rvb_lexical_5_enemies"
+                },
+                "key": "length"
+              },
+              "right": {
+                "kind": "literal",
+                "value": 0
+              }
+            }
+          }
+        },
+        "yes": "n14",
+        "no": "n1"
+      },
+      {
+        "id": "n16",
+        "kind": "invoke",
+        "target": {
+          "kind": "function",
+          "value": {
+            "kind": "ref",
+            "name": "__rvb_import_bound_method_3"
+          }
+        },
+        "args": [
+          {
+            "kind": "function",
+            "parameters": [
+              "ally",
+              "i"
+            ],
+            "body": {
+              "entry": "n20",
+              "end": "n17",
+              "nodes": [
+                {
+                  "id": "n17",
+                  "kind": "regionEnd"
+                },
+                {
+                  "id": "n18",
+                  "kind": "call",
+                  "capability": "array.push",
+                  "args": [
+                    {
+                      "kind": "ref",
+                      "name": "__rvb_lexical_9_messages"
+                    },
+                    {
+                      "kind": "binary",
+                      "op": "+",
+                      "left": {
+                        "kind": "binary",
+                        "op": "+",
+                        "left": {
+                          "kind": "binary",
+                          "op": "+",
+                          "left": {
+                            "kind": "get",
+                            "object": {
+                              "kind": "ref",
+                              "name": "ally"
+                            },
+                            "key": "name"
+                          },
+                          "right": {
+                            "kind": "literal",
+                            "value": "恢复"
+                          }
+                        },
+                        "right": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "__rvb_lexical_11_r"
+                          },
+                          "key": "heal"
+                        }
+                      },
+                      "right": {
+                        "kind": "literal",
+                        "value": "点生命值"
+                      }
+                    }
+                  ],
+                  "next": "n17"
+                },
+                {
+                  "id": "n19",
+                  "kind": "branch",
+                  "condition": {
+                    "kind": "unary",
+                    "op": "!",
+                    "argument": {
+                      "kind": "unary",
+                      "op": "!",
+                      "argument": {
+                        "kind": "binary",
+                        "op": "&&",
+                        "left": {
+                          "kind": "ref",
+                          "name": "__rvb_lexical_11_r"
+                        },
+                        "right": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "__rvb_lexical_11_r"
+                          },
+                          "key": "success"
+                        }
+                      }
+                    }
+                  },
+                  "yes": "n18",
+                  "no": "n17"
+                },
+                {
+                  "id": "n20",
+                  "kind": "bind",
+                  "name": "__rvb_lexical_11_r",
+                  "expr": {
+                    "kind": "binary",
+                    "op": "&&",
+                    "left": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "__rvb_lexical_10_hlResult"
+                      },
+                      "key": "results"
+                    },
+                    "right": {
+                      "kind": "index",
+                      "object": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "__rvb_lexical_10_hlResult"
+                        },
+                        "key": "results"
+                      },
+                      "index": {
+                        "kind": "ref",
+                        "name": "i"
+                      }
+                    }
+                  },
+                  "next": "n19"
+                }
+              ]
+            }
+          }
+        ],
+        "next": "n15"
+      },
+      {
+        "id": "n21",
+        "kind": "bind",
+        "name": "__rvb_import_bound_method_3",
+        "expr": {
+          "kind": "boundMethod",
+          "object": {
+            "kind": "ref",
+            "name": "__rvb_lexical_4_allies"
+          },
+          "method": "forEach"
+        },
+        "next": "n16"
+      },
+      {
+        "id": "n22",
+        "kind": "call",
+        "capability": "healDamage",
+        "args": [
+          {
+            "kind": "ref",
+            "name": "__rvb_lexical_0_sourcePiece"
+          },
+          {
+            "kind": "ref",
+            "name": "__rvb_lexical_4_allies"
+          },
+          {
+            "kind": "literal",
+            "value": 4
+          },
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "context"
+            },
+            "key": "battle"
+          },
+          {
+            "kind": "get",
+            "object": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "context"
+              },
+              "key": "skill"
+            },
+            "key": "id"
+          }
+        ],
+        "result": "__rvb_lexical_10_hlResult",
+        "next": "n21"
+      },
+      {
+        "id": "n23",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": ">",
+              "left": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "__rvb_lexical_4_allies"
+                },
+                "key": "length"
+              },
+              "right": {
+                "kind": "literal",
+                "value": 0
+              }
+            }
+          }
+        },
+        "yes": "n22",
+        "no": "n15"
+      },
+      {
+        "id": "n24",
+        "kind": "bind",
+        "name": "__rvb_lexical_9_messages",
+        "expr": {
+          "kind": "array",
+          "items": []
+        },
+        "next": "n23"
+      },
+      {
+        "id": "n38",
+        "kind": "loop",
+        "loop": "for",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "<",
+              "left": {
+                "kind": "ref",
+                "name": "__rvb_lexical_6_dx"
+              },
+              "right": {
+                "kind": "literal",
+                "value": 2
+              }
+            }
+          }
+        },
+        "body": {
+          "entry": "n35",
+          "end": "n25",
+          "nodes": [
+            {
+              "id": "n25",
+              "kind": "regionEnd"
+            },
+            {
+              "id": "n34",
+              "kind": "loop",
+              "loop": "for",
+              "condition": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "unary",
+                  "op": "!",
+                  "argument": {
+                    "kind": "binary",
+                    "op": "<",
+                    "left": {
+                      "kind": "ref",
+                      "name": "__rvb_lexical_7_dy"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": 2
+                    }
+                  }
+                }
+              },
+              "body": {
+                "entry": "n31",
+                "end": "n26",
+                "nodes": [
+                  {
+                    "id": "n26",
+                    "kind": "regionEnd"
+                  },
+                  {
+                    "id": "n27",
+                    "kind": "call",
+                    "capability": "array.push",
+                    "args": [
+                      {
+                        "kind": "ref",
+                        "name": "__rvb_lexical_4_allies"
+                      },
+                      {
+                        "kind": "ref",
+                        "name": "__rvb_lexical_8_p"
+                      }
+                    ],
+                    "next": "n26"
+                  },
+                  {
+                    "id": "n28",
+                    "kind": "call",
+                    "capability": "array.push",
+                    "args": [
+                      {
+                        "kind": "ref",
+                        "name": "__rvb_lexical_5_enemies"
+                      },
+                      {
+                        "kind": "ref",
+                        "name": "__rvb_lexical_8_p"
+                      }
+                    ],
+                    "next": "n26"
+                  },
+                  {
+                    "id": "n29",
+                    "kind": "branch",
+                    "condition": {
+                      "kind": "unary",
+                      "op": "!",
+                      "argument": {
+                        "kind": "unary",
+                        "op": "!",
+                        "argument": {
+                          "kind": "call",
+                          "callee": "arePlayersAllied",
+                          "args": [
+                            {
+                              "kind": "ref",
+                              "name": "battle"
+                            },
+                            {
+                              "kind": "get",
+                              "object": {
+                                "kind": "ref",
+                                "name": "__rvb_lexical_8_p"
+                              },
+                              "key": "ownerPlayerId"
+                            },
+                            {
+                              "kind": "get",
+                              "object": {
+                                "kind": "ref",
+                                "name": "__rvb_lexical_0_sourcePiece"
+                              },
+                              "key": "ownerPlayerId"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    "yes": "n27",
+                    "no": "n28"
+                  },
+                  {
+                    "id": "n30",
+                    "kind": "branch",
+                    "condition": {
+                      "kind": "unary",
+                      "op": "!",
+                      "argument": {
+                        "kind": "unary",
+                        "op": "!",
+                        "argument": {
+                          "kind": "binary",
+                          "op": "&&",
+                          "left": {
+                            "kind": "ref",
+                            "name": "__rvb_lexical_8_p"
+                          },
+                          "right": {
+                            "kind": "binary",
+                            "op": ">",
+                            "left": {
+                              "kind": "get",
+                              "object": {
+                                "kind": "ref",
+                                "name": "__rvb_lexical_8_p"
+                              },
+                              "key": "currentHp"
+                            },
+                            "right": {
+                              "kind": "literal",
+                              "value": 0
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "yes": "n29",
+                    "no": "n26"
+                  },
+                  {
+                    "id": "n31",
+                    "kind": "call",
+                    "capability": "select.getPieceAt",
+                    "args": [
+                      {
+                        "kind": "binary",
+                        "op": "+",
+                        "left": {
+                          "kind": "ref",
+                          "name": "__rvb_lexical_2_targetX"
+                        },
+                        "right": {
+                          "kind": "ref",
+                          "name": "__rvb_lexical_6_dx"
+                        }
+                      },
+                      {
+                        "kind": "binary",
+                        "op": "+",
+                        "left": {
+                          "kind": "ref",
+                          "name": "__rvb_lexical_3_targetY"
+                        },
+                        "right": {
+                          "kind": "ref",
+                          "name": "__rvb_lexical_7_dy"
+                        }
+                      }
+                    ],
+                    "result": "__rvb_lexical_8_p",
+                    "next": "n30"
+                  }
+                ]
+              },
+              "update": {
+                "entry": "n33",
+                "end": "n32",
+                "nodes": [
+                  {
+                    "id": "n32",
+                    "kind": "regionEnd"
+                  },
+                  {
+                    "id": "n33",
+                    "kind": "set",
+                    "target": {
+                      "kind": "ref",
+                      "name": "__rvb_lexical_7_dy"
+                    },
+                    "operator": "=",
+                    "value": {
+                      "kind": "binary",
+                      "op": "+",
+                      "left": {
+                        "kind": "unary",
+                        "op": "+",
+                        "argument": {
+                          "kind": "ref",
+                          "name": "__rvb_lexical_7_dy"
+                        }
+                      },
+                      "right": {
+                        "kind": "literal",
+                        "value": 1
+                      }
+                    },
+                    "next": "n32"
+                  }
+                ]
+              },
+              "next": "n25"
+            },
+            {
+              "id": "n35",
+              "kind": "bind",
+              "name": "__rvb_lexical_7_dy",
+              "expr": {
+                "kind": "literal",
+                "value": 0
+              },
+              "next": "n34"
+            }
+          ]
+        },
+        "update": {
+          "entry": "n37",
+          "end": "n36",
+          "nodes": [
+            {
+              "id": "n36",
+              "kind": "regionEnd"
+            },
+            {
+              "id": "n37",
+              "kind": "set",
+              "target": {
+                "kind": "ref",
+                "name": "__rvb_lexical_6_dx"
+              },
+              "operator": "=",
+              "value": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "unary",
+                  "op": "+",
+                  "argument": {
+                    "kind": "ref",
+                    "name": "__rvb_lexical_6_dx"
+                  }
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": 1
+                }
+              },
+              "next": "n36"
+            }
+          ]
+        },
+        "next": "n24"
+      },
+      {
+        "id": "n39",
+        "kind": "bind",
+        "name": "__rvb_lexical_6_dx",
+        "expr": {
+          "kind": "literal",
+          "value": 0
+        },
+        "next": "n38"
+      },
+      {
+        "id": "n40",
+        "kind": "bind",
+        "name": "__rvb_lexical_5_enemies",
+        "expr": {
+          "kind": "array",
+          "items": []
+        },
+        "next": "n39"
+      },
+      {
+        "id": "n41",
+        "kind": "bind",
+        "name": "__rvb_lexical_4_allies",
+        "expr": {
+          "kind": "array",
+          "items": []
+        },
+        "next": "n40"
+      },
+      {
+        "id": "n42",
+        "kind": "bind",
+        "name": "__rvb_lexical_3_targetY",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "__rvb_lexical_1_targetPosition"
+          },
+          "key": "y"
+        },
+        "next": "n41"
+      },
+      {
+        "id": "n43",
+        "kind": "bind",
+        "name": "__rvb_lexical_2_targetX",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "__rvb_lexical_1_targetPosition"
+          },
+          "key": "x"
+        },
+        "next": "n42"
+      },
+      {
+        "id": "n44",
+        "kind": "return",
+        "value": {
+          "kind": "ref",
+          "name": "__rvb_lexical_1_targetPosition"
+        }
+      },
+      {
+        "id": "n45",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "ref",
+                  "name": "__rvb_lexical_1_targetPosition"
+                }
+              },
+              "right": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "__rvb_lexical_1_targetPosition"
+                },
+                "key": "needsTargetSelection"
+              }
+            }
+          }
+        },
+        "yes": "n44",
+        "no": "n43"
+      },
+      {
+        "id": "n46",
+        "kind": "call",
+        "capability": "selectTarget",
+        "args": [
+          {
+            "kind": "object",
+            "entries": [
+              {
+                "key": "type",
+                "value": {
+                  "kind": "literal",
+                  "value": "grid"
+                }
+              },
+              {
+                "key": "range",
+                "value": {
+                  "kind": "literal",
+                  "value": 4
+                }
+              },
+              {
+                "key": "filter",
+                "value": {
+                  "kind": "literal",
+                  "value": "all"
+                }
+              }
+            ]
+          }
+        ],
+        "result": "__rvb_lexical_1_targetPosition",
+        "next": "n45"
+      },
+      {
+        "id": "n47",
+        "kind": "bind",
+        "name": "__rvb_lexical_0_sourcePiece",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "context"
+          },
+          "key": "piece"
+        },
+        "next": "n46"
+      }
+    ]
+  },
+  "contentGraphField": "code",
+  "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1",
+  "contentGraphEntries": {
+    "previewCode": {
+      "graph": {
+        "version": "rvb-content-graph/v1",
+        "surface": "preview",
+        "entry": "n1",
+        "nodes": [
+          {
+            "id": "n1",
+            "kind": "return",
+            "value": {
+              "kind": "object",
+              "entries": [
+                {
+                  "key": "description",
+                  "value": {
+                    "kind": "literal",
+                    "value": "选择地格（4），以该格为左上角影响2×2区域。回复区域内友军4点。对区域内敌人造成1点伤害，并施加禁疗[1]。"
+                  }
+                },
+                {
+                  "key": "expectedValues",
+                  "value": {
+                    "kind": "object",
+                    "entries": [
+                      {
+                        "key": "heal",
+                        "value": {
+                          "kind": "literal",
+                          "value": 4
+                        }
+                      },
+                      {
+                        "key": "damage",
+                        "value": {
+                          "kind": "literal",
+                          "value": 1
+                        }
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "compilerVersion": "rvb-content-graph-compiler/v1"
+    }
+  }
 }

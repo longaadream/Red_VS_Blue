@@ -5,5 +5,890 @@
   "trigger": {
     "type": "endTurn"
   },
-  "skillCode": "if (battle.extensions && battle.extensions.amaterasuOwnerPlayerId && context.playerId !== battle.extensions.amaterasuOwnerPlayerId) return { success: false, message: '' }; var currentPlayerId = battle.turn.currentPlayerId; var amaterasuOwnerPlayerId = (battle.extensions && battle.extensions.amaterasuOwnerPlayerId) || null; var msgs = []; battle.pieces.forEach(function(p) { if (p.currentHp <= 0 || p.ownerPlayerId !== currentPlayerId) return; var tag = p.statusTags && p.statusTags.find(function(t) { return t.type === 'amaterasu-burn'; }); if (!tag) return; var stacks = tag.stacks || 1; var dmg = 2 * stacks; var amaterasuAttacker = tag.sourcePieceId ? battle.pieces.concat(battle.graveyard || []).find(function(pc) { return pc.instanceId === tag.sourcePieceId; }) : amaterasuOwnerPlayerId ? battle.pieces.find(function(pc) { return pc.ownerPlayerId === amaterasuOwnerPlayerId && pc.currentHp > 0; }) : null; var result = dealDamage(amaterasuAttacker || p, p, dmg, 'true', battle, 'amaterasu-burn-tick'); var actualDmg = (result && result.damage != null) ? result.damage : 0; if (actualDmg > 0) { msgs.push(p.name + '受天照灼烧(' + stacks + '层)，失去' + actualDmg + '点生命值'); } else if (result && result.success === false && result.message && result.message !== '') { msgs.push(p.name + '天照灼烧被抵挡'); } }); if (msgs.length === 0) return { success: false, message: '' }; return { success: true, message: msgs.join('；') };"
+  "skillCode": "var __rvb_import_operand_0, amaterasuOwnerPlayerId, currentPlayerId, msgs; var _pc = \"n25\"; for (var _step = 0; _step <= 10; _step++) { switch (_pc) { case \"n25\": _pc = (! (! (((battle)[\"extensions\"] && ((battle)[\"extensions\"])[\"amaterasuOwnerPlayerId\"]) && ((context)[\"playerId\"] !== ((battle)[\"extensions\"])[\"amaterasuOwnerPlayerId\"])))) ? \"n24\" : \"n23\"; break; case \"n23\": currentPlayerId = ((battle)[\"turn\"])[\"currentPlayerId\"]; _pc = \"n22\"; break; case \"n22\": amaterasuOwnerPlayerId = (((battle)[\"extensions\"] && ((battle)[\"extensions\"])[\"amaterasuOwnerPlayerId\"]) || null); _pc = \"n21\"; break; case \"n21\": msgs = []; _pc = \"n20\"; break; case \"n20\": __rvb_import_operand_0 = (battle)[\"pieces\"]; _pc = \"n4\"; break; case \"n4\": (__rvb_import_operand_0)[\"forEach\"](function (p) { var actualDmg, amaterasuAttacker, dmg, result, stacks, tag; { var __rvb_content_graph_region_pc_0 = \"n19\"; while (__rvb_content_graph_region_pc_0 !== \"n5\") { switch (__rvb_content_graph_region_pc_0) { case \"n19\": __rvb_content_graph_region_pc_0 = (! (! (((p)[\"currentHp\"] <= 0) || ((p)[\"ownerPlayerId\"] !== currentPlayerId)))) ? \"n18\" : \"n17\"; break; case \"n17\": tag = ((p)[\"statusTags\"] && ((p)[\"statusTags\"])[\"find\"](function (t) { return ((t)[\"type\"] === \"amaterasu-burn\"); })); __rvb_content_graph_region_pc_0 = \"n16\"; break; case \"n16\": __rvb_content_graph_region_pc_0 = (! (! (! tag))) ? \"n15\" : \"n14\"; break; case \"n14\": stacks = ((tag)[\"stacks\"] || 1); __rvb_content_graph_region_pc_0 = \"n13\"; break; case \"n13\": dmg = (2 * stacks); __rvb_content_graph_region_pc_0 = \"n12\"; break; case \"n12\": amaterasuAttacker = ((tag)[\"sourcePieceId\"] ? (((battle)[\"pieces\"])[\"concat\"](((battle)[\"graveyard\"] || [])))[\"find\"](function (pc) { return ((pc)[\"instanceId\"] === (tag)[\"sourcePieceId\"]); }) : (amaterasuOwnerPlayerId ? ((battle)[\"pieces\"])[\"find\"](function (pc) { return (((pc)[\"ownerPlayerId\"] === amaterasuOwnerPlayerId) && ((pc)[\"currentHp\"] > 0)); }) : null)); __rvb_content_graph_region_pc_0 = \"n11\"; break; case \"n11\": result = dealDamage((amaterasuAttacker || p), p, dmg, \"true\", battle, \"amaterasu-burn-tick\"); __rvb_content_graph_region_pc_0 = \"n10\"; break; case \"n10\": actualDmg = ((result && ((result)[\"damage\"] != null)) ? (result)[\"damage\"] : 0); __rvb_content_graph_region_pc_0 = \"n9\"; break; case \"n9\": __rvb_content_graph_region_pc_0 = (! (! (actualDmg > 0))) ? \"n6\" : \"n8\"; break; case \"n8\": __rvb_content_graph_region_pc_0 = (! (! (((result && ((result)[\"success\"] === false)) && (result)[\"message\"]) && ((result)[\"message\"] !== \"\")))) ? \"n7\" : \"n5\"; break; case \"n7\": (msgs).push(((p)[\"name\"] + \"天照灼烧被抵挡\")); __rvb_content_graph_region_pc_0 = \"n5\"; break; case \"n6\": (msgs).push(((((((p)[\"name\"] + \"受天照灼烧(\") + stacks) + \"层)，失去\") + actualDmg) + \"点生命值\")); __rvb_content_graph_region_pc_0 = \"n5\"; break; case \"n5\": __rvb_content_graph_region_pc_0 = \"n5\"; break; case \"n15\": return; case \"n18\": return; default: throw new Error(\"invalid content graph region node\"); } } } }); _pc = \"n3\"; break; case \"n3\": _pc = (! (! ((msgs)[\"length\"] === 0))) ? \"n2\" : \"n1\"; break; case \"n1\": return {success: true, message: (msgs)[\"join\"](\"；\")}; case \"n2\": return {success: false, message: \"\"}; case \"n24\": return {success: false, message: \"\"}; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\");",
+  "contentGraph": {
+    "version": "rvb-content-graph/v1",
+    "surface": "rule",
+    "entry": "n25",
+    "nodes": [
+      {
+        "id": "n1",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "collection",
+                "object": {
+                  "kind": "ref",
+                  "name": "msgs"
+                },
+                "method": "join",
+                "args": [
+                  {
+                    "kind": "literal",
+                    "value": "；"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n2",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n3",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "===",
+              "left": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "msgs"
+                },
+                "key": "length"
+              },
+              "right": {
+                "kind": "literal",
+                "value": 0
+              }
+            }
+          }
+        },
+        "yes": "n2",
+        "no": "n1"
+      },
+      {
+        "id": "n4",
+        "kind": "invoke",
+        "target": {
+          "kind": "array",
+          "object": {
+            "kind": "ref",
+            "name": "__rvb_import_operand_0"
+          },
+          "method": "forEach"
+        },
+        "args": [
+          {
+            "kind": "function",
+            "parameters": [
+              "p"
+            ],
+            "body": {
+              "entry": "n19",
+              "end": "n5",
+              "nodes": [
+                {
+                  "id": "n5",
+                  "kind": "regionEnd"
+                },
+                {
+                  "id": "n6",
+                  "kind": "call",
+                  "capability": "array.push",
+                  "args": [
+                    {
+                      "kind": "ref",
+                      "name": "msgs"
+                    },
+                    {
+                      "kind": "binary",
+                      "op": "+",
+                      "left": {
+                        "kind": "binary",
+                        "op": "+",
+                        "left": {
+                          "kind": "binary",
+                          "op": "+",
+                          "left": {
+                            "kind": "binary",
+                            "op": "+",
+                            "left": {
+                              "kind": "binary",
+                              "op": "+",
+                              "left": {
+                                "kind": "get",
+                                "object": {
+                                  "kind": "ref",
+                                  "name": "p"
+                                },
+                                "key": "name"
+                              },
+                              "right": {
+                                "kind": "literal",
+                                "value": "受天照灼烧("
+                              }
+                            },
+                            "right": {
+                              "kind": "ref",
+                              "name": "stacks"
+                            }
+                          },
+                          "right": {
+                            "kind": "literal",
+                            "value": "层)，失去"
+                          }
+                        },
+                        "right": {
+                          "kind": "ref",
+                          "name": "actualDmg"
+                        }
+                      },
+                      "right": {
+                        "kind": "literal",
+                        "value": "点生命值"
+                      }
+                    }
+                  ],
+                  "next": "n5"
+                },
+                {
+                  "id": "n7",
+                  "kind": "call",
+                  "capability": "array.push",
+                  "args": [
+                    {
+                      "kind": "ref",
+                      "name": "msgs"
+                    },
+                    {
+                      "kind": "binary",
+                      "op": "+",
+                      "left": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "p"
+                        },
+                        "key": "name"
+                      },
+                      "right": {
+                        "kind": "literal",
+                        "value": "天照灼烧被抵挡"
+                      }
+                    }
+                  ],
+                  "next": "n5"
+                },
+                {
+                  "id": "n8",
+                  "kind": "branch",
+                  "condition": {
+                    "kind": "unary",
+                    "op": "!",
+                    "argument": {
+                      "kind": "unary",
+                      "op": "!",
+                      "argument": {
+                        "kind": "binary",
+                        "op": "&&",
+                        "left": {
+                          "kind": "binary",
+                          "op": "&&",
+                          "left": {
+                            "kind": "binary",
+                            "op": "&&",
+                            "left": {
+                              "kind": "ref",
+                              "name": "result"
+                            },
+                            "right": {
+                              "kind": "binary",
+                              "op": "===",
+                              "left": {
+                                "kind": "get",
+                                "object": {
+                                  "kind": "ref",
+                                  "name": "result"
+                                },
+                                "key": "success"
+                              },
+                              "right": {
+                                "kind": "literal",
+                                "value": false
+                              }
+                            }
+                          },
+                          "right": {
+                            "kind": "get",
+                            "object": {
+                              "kind": "ref",
+                              "name": "result"
+                            },
+                            "key": "message"
+                          }
+                        },
+                        "right": {
+                          "kind": "binary",
+                          "op": "!==",
+                          "left": {
+                            "kind": "get",
+                            "object": {
+                              "kind": "ref",
+                              "name": "result"
+                            },
+                            "key": "message"
+                          },
+                          "right": {
+                            "kind": "literal",
+                            "value": ""
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "yes": "n7",
+                  "no": "n5"
+                },
+                {
+                  "id": "n9",
+                  "kind": "branch",
+                  "condition": {
+                    "kind": "unary",
+                    "op": "!",
+                    "argument": {
+                      "kind": "unary",
+                      "op": "!",
+                      "argument": {
+                        "kind": "binary",
+                        "op": ">",
+                        "left": {
+                          "kind": "ref",
+                          "name": "actualDmg"
+                        },
+                        "right": {
+                          "kind": "literal",
+                          "value": 0
+                        }
+                      }
+                    }
+                  },
+                  "yes": "n6",
+                  "no": "n8"
+                },
+                {
+                  "id": "n10",
+                  "kind": "bind",
+                  "name": "actualDmg",
+                  "expr": {
+                    "kind": "conditional",
+                    "test": {
+                      "kind": "binary",
+                      "op": "&&",
+                      "left": {
+                        "kind": "ref",
+                        "name": "result"
+                      },
+                      "right": {
+                        "kind": "binary",
+                        "op": "!=",
+                        "left": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "result"
+                          },
+                          "key": "damage"
+                        },
+                        "right": {
+                          "kind": "literal",
+                          "value": null
+                        }
+                      }
+                    },
+                    "consequent": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "result"
+                      },
+                      "key": "damage"
+                    },
+                    "alternate": {
+                      "kind": "literal",
+                      "value": 0
+                    }
+                  },
+                  "next": "n9"
+                },
+                {
+                  "id": "n11",
+                  "kind": "call",
+                  "capability": "dealDamage",
+                  "args": [
+                    {
+                      "kind": "binary",
+                      "op": "||",
+                      "left": {
+                        "kind": "ref",
+                        "name": "amaterasuAttacker"
+                      },
+                      "right": {
+                        "kind": "ref",
+                        "name": "p"
+                      }
+                    },
+                    {
+                      "kind": "ref",
+                      "name": "p"
+                    },
+                    {
+                      "kind": "ref",
+                      "name": "dmg"
+                    },
+                    {
+                      "kind": "literal",
+                      "value": "true"
+                    },
+                    {
+                      "kind": "ref",
+                      "name": "battle"
+                    },
+                    {
+                      "kind": "literal",
+                      "value": "amaterasu-burn-tick"
+                    }
+                  ],
+                  "result": "result",
+                  "next": "n10"
+                },
+                {
+                  "id": "n12",
+                  "kind": "bind",
+                  "name": "amaterasuAttacker",
+                  "expr": {
+                    "kind": "conditional",
+                    "test": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "tag"
+                      },
+                      "key": "sourcePieceId"
+                    },
+                    "consequent": {
+                      "kind": "collection",
+                      "object": {
+                        "kind": "collection",
+                        "object": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "battle"
+                          },
+                          "key": "pieces"
+                        },
+                        "method": "concat",
+                        "args": [
+                          {
+                            "kind": "binary",
+                            "op": "||",
+                            "left": {
+                              "kind": "get",
+                              "object": {
+                                "kind": "ref",
+                                "name": "battle"
+                              },
+                              "key": "graveyard"
+                            },
+                            "right": {
+                              "kind": "array",
+                              "items": []
+                            }
+                          }
+                        ]
+                      },
+                      "method": "find",
+                      "args": [
+                        {
+                          "kind": "lambda",
+                          "parameters": [
+                            "pc"
+                          ],
+                          "body": {
+                            "kind": "binary",
+                            "op": "===",
+                            "left": {
+                              "kind": "get",
+                              "object": {
+                                "kind": "ref",
+                                "name": "pc"
+                              },
+                              "key": "instanceId"
+                            },
+                            "right": {
+                              "kind": "get",
+                              "object": {
+                                "kind": "ref",
+                                "name": "tag"
+                              },
+                              "key": "sourcePieceId"
+                            }
+                          }
+                        }
+                      ]
+                    },
+                    "alternate": {
+                      "kind": "conditional",
+                      "test": {
+                        "kind": "ref",
+                        "name": "amaterasuOwnerPlayerId"
+                      },
+                      "consequent": {
+                        "kind": "collection",
+                        "object": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "battle"
+                          },
+                          "key": "pieces"
+                        },
+                        "method": "find",
+                        "args": [
+                          {
+                            "kind": "lambda",
+                            "parameters": [
+                              "pc"
+                            ],
+                            "body": {
+                              "kind": "binary",
+                              "op": "&&",
+                              "left": {
+                                "kind": "binary",
+                                "op": "===",
+                                "left": {
+                                  "kind": "get",
+                                  "object": {
+                                    "kind": "ref",
+                                    "name": "pc"
+                                  },
+                                  "key": "ownerPlayerId"
+                                },
+                                "right": {
+                                  "kind": "ref",
+                                  "name": "amaterasuOwnerPlayerId"
+                                }
+                              },
+                              "right": {
+                                "kind": "binary",
+                                "op": ">",
+                                "left": {
+                                  "kind": "get",
+                                  "object": {
+                                    "kind": "ref",
+                                    "name": "pc"
+                                  },
+                                  "key": "currentHp"
+                                },
+                                "right": {
+                                  "kind": "literal",
+                                  "value": 0
+                                }
+                              }
+                            }
+                          }
+                        ]
+                      },
+                      "alternate": {
+                        "kind": "literal",
+                        "value": null
+                      }
+                    }
+                  },
+                  "next": "n11"
+                },
+                {
+                  "id": "n13",
+                  "kind": "bind",
+                  "name": "dmg",
+                  "expr": {
+                    "kind": "binary",
+                    "op": "*",
+                    "left": {
+                      "kind": "literal",
+                      "value": 2
+                    },
+                    "right": {
+                      "kind": "ref",
+                      "name": "stacks"
+                    }
+                  },
+                  "next": "n12"
+                },
+                {
+                  "id": "n14",
+                  "kind": "bind",
+                  "name": "stacks",
+                  "expr": {
+                    "kind": "binary",
+                    "op": "||",
+                    "left": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "tag"
+                      },
+                      "key": "stacks"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": 1
+                    }
+                  },
+                  "next": "n13"
+                },
+                {
+                  "id": "n15",
+                  "kind": "return"
+                },
+                {
+                  "id": "n16",
+                  "kind": "branch",
+                  "condition": {
+                    "kind": "unary",
+                    "op": "!",
+                    "argument": {
+                      "kind": "unary",
+                      "op": "!",
+                      "argument": {
+                        "kind": "unary",
+                        "op": "!",
+                        "argument": {
+                          "kind": "ref",
+                          "name": "tag"
+                        }
+                      }
+                    }
+                  },
+                  "yes": "n15",
+                  "no": "n14"
+                },
+                {
+                  "id": "n17",
+                  "kind": "bind",
+                  "name": "tag",
+                  "expr": {
+                    "kind": "binary",
+                    "op": "&&",
+                    "left": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "p"
+                      },
+                      "key": "statusTags"
+                    },
+                    "right": {
+                      "kind": "collection",
+                      "object": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "p"
+                        },
+                        "key": "statusTags"
+                      },
+                      "method": "find",
+                      "args": [
+                        {
+                          "kind": "lambda",
+                          "parameters": [
+                            "t"
+                          ],
+                          "body": {
+                            "kind": "binary",
+                            "op": "===",
+                            "left": {
+                              "kind": "get",
+                              "object": {
+                                "kind": "ref",
+                                "name": "t"
+                              },
+                              "key": "type"
+                            },
+                            "right": {
+                              "kind": "literal",
+                              "value": "amaterasu-burn"
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  },
+                  "next": "n16"
+                },
+                {
+                  "id": "n18",
+                  "kind": "return"
+                },
+                {
+                  "id": "n19",
+                  "kind": "branch",
+                  "condition": {
+                    "kind": "unary",
+                    "op": "!",
+                    "argument": {
+                      "kind": "unary",
+                      "op": "!",
+                      "argument": {
+                        "kind": "binary",
+                        "op": "||",
+                        "left": {
+                          "kind": "binary",
+                          "op": "<=",
+                          "left": {
+                            "kind": "get",
+                            "object": {
+                              "kind": "ref",
+                              "name": "p"
+                            },
+                            "key": "currentHp"
+                          },
+                          "right": {
+                            "kind": "literal",
+                            "value": 0
+                          }
+                        },
+                        "right": {
+                          "kind": "binary",
+                          "op": "!==",
+                          "left": {
+                            "kind": "get",
+                            "object": {
+                              "kind": "ref",
+                              "name": "p"
+                            },
+                            "key": "ownerPlayerId"
+                          },
+                          "right": {
+                            "kind": "ref",
+                            "name": "currentPlayerId"
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "yes": "n18",
+                  "no": "n17"
+                }
+              ]
+            }
+          }
+        ],
+        "next": "n3"
+      },
+      {
+        "id": "n20",
+        "kind": "bind",
+        "name": "__rvb_import_operand_0",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "battle"
+          },
+          "key": "pieces"
+        },
+        "next": "n4"
+      },
+      {
+        "id": "n21",
+        "kind": "bind",
+        "name": "msgs",
+        "expr": {
+          "kind": "array",
+          "items": []
+        },
+        "next": "n20"
+      },
+      {
+        "id": "n22",
+        "kind": "bind",
+        "name": "amaterasuOwnerPlayerId",
+        "expr": {
+          "kind": "binary",
+          "op": "||",
+          "left": {
+            "kind": "binary",
+            "op": "&&",
+            "left": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "battle"
+              },
+              "key": "extensions"
+            },
+            "right": {
+              "kind": "get",
+              "object": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "battle"
+                },
+                "key": "extensions"
+              },
+              "key": "amaterasuOwnerPlayerId"
+            }
+          },
+          "right": {
+            "kind": "literal",
+            "value": null
+          }
+        },
+        "next": "n21"
+      },
+      {
+        "id": "n23",
+        "kind": "bind",
+        "name": "currentPlayerId",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "battle"
+            },
+            "key": "turn"
+          },
+          "key": "currentPlayerId"
+        },
+        "next": "n22"
+      },
+      {
+        "id": "n24",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n25",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "&&",
+              "left": {
+                "kind": "binary",
+                "op": "&&",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "battle"
+                  },
+                  "key": "extensions"
+                },
+                "right": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "battle"
+                    },
+                    "key": "extensions"
+                  },
+                  "key": "amaterasuOwnerPlayerId"
+                }
+              },
+              "right": {
+                "kind": "binary",
+                "op": "!==",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "context"
+                  },
+                  "key": "playerId"
+                },
+                "right": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "battle"
+                    },
+                    "key": "extensions"
+                  },
+                  "key": "amaterasuOwnerPlayerId"
+                }
+              }
+            }
+          }
+        },
+        "yes": "n24",
+        "no": "n23"
+      }
+    ]
+  },
+  "contentGraphField": "skillCode",
+  "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1"
 }

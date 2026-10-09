@@ -2,7 +2,10 @@
   "id": "el-primo-elbow",
   "name": "飞身肘击",
   "description": "传送至地格（7）。对以自身为中心的3×3范围内：破墙，对敌人造成1倍伤害，然后移速+1。",
-  "keywords": ["传送", "破墙"],
+  "keywords": [
+    "传送",
+    "破墙"
+  ],
   "targetText": "地格（7）",
   "kind": "active",
   "type": "super",
@@ -13,11 +16,26 @@
   "powerMultiplier": 1,
   "range": "area",
   "targeting": {
-    "steps": [{ "kind": "target", "type": "grid", "filter": "all", "range": 7, "requireWalkable": true, "requireUnoccupied": true, "excludeSourceCell": true }]
+    "steps": [
+      {
+        "kind": "target",
+        "type": "grid",
+        "filter": "all",
+        "range": 7,
+        "requireWalkable": true,
+        "requireUnoccupied": true,
+        "excludeSourceCell": true
+      }
+    ]
   },
-  "effectTags": ["位移", "破墙", "伤害", "强化"],
+  "effectTags": [
+    "位移",
+    "破墙",
+    "伤害",
+    "强化"
+  ],
   "icon": "💪",
-  "code": "function executeSkill(context){var c=context.piece,p=selectTarget({type:'grid',range:7,filter:'all'});if(!p||p.needsTargetSelection)return p;var tile=battle.map.tiles.find(function(t){return t.x===p.x&&t.y===p.y;});if(!tile||!tile.props.walkable)return{success:false,message:'目标地格不可行走'};if(!flow.effects.displace([{pieceId:c.instanceId,x:p.x,y:p.y}],'teleport').success)return{success:true,message:'位移被阻挡，本次位移效果取消'};var cells=[];for(var dx=-1;dx<=1;dx++)for(var dy=-1;dy<=1;dy++)cells.push({x:c.x+dx,y:c.y+dy});flow.effects.destroyWalls(cells);var es=battle.pieces.filter(function(x){return x.currentHp>0&&!arePlayersAllied(battle,x.ownerPlayerId,c.ownerPlayerId)&&Math.abs(x.x-c.x)<=1&&Math.abs(x.y-c.y)<=1});if(es.length)dealDamage(c,es,c.attack,'physical',battle,context.skill.id);c.moveRange=(c.moveRange||0)+1;return{success:true,message:c.name+'飞身肘击并破墙'};}",
+  "code": "function executeSkill(context) { var __rvb_import_effect_0, c, cells, dx, dy, es, p, tile; var _pc = \"n28\"; for (var _step = 0; _step <= 19; _step++) { switch (_pc) { case \"n28\": c = (context)[\"piece\"]; _pc = \"n27\"; break; case \"n27\": p = selectTarget({type: \"grid\", range: 7, filter: \"all\"}); _pc = \"n26\"; break; case \"n26\": _pc = (! (! ((! p) || (p)[\"needsTargetSelection\"]))) ? \"n25\" : \"n24\"; break; case \"n24\": tile = (((battle)[\"map\"])[\"tiles\"])[\"find\"](function (t) { return (((t)[\"x\"] === (p)[\"x\"]) && ((t)[\"y\"] === (p)[\"y\"])); }); _pc = \"n23\"; break; case \"n23\": _pc = (! (! ((! tile) || (! ((tile)[\"props\"])[\"walkable\"])))) ? \"n22\" : \"n21\"; break; case \"n21\": __rvb_import_effect_0 = flow.effects.displace([{pieceId: (c)[\"instanceId\"], x: (p)[\"x\"], y: (p)[\"y\"]}], \"teleport\"); _pc = \"n20\"; break; case \"n20\": _pc = (! (! (! (__rvb_import_effect_0)[\"success\"]))) ? \"n19\" : \"n18\"; break; case \"n18\": cells = []; _pc = \"n17\"; break; case \"n17\": dx = (- 1); _pc = \"n16\"; break; case \"n16\": var __rvb_content_graph_loop_break_0 = false, __rvb_content_graph_loop_continue_1 = false; while ((! (! (dx <= 1)))) { __rvb_content_graph_loop_continue_1 = false; { var __rvb_content_graph_region_pc_2 = \"n13\"; while (__rvb_content_graph_region_pc_2 !== \"n7\") { switch (__rvb_content_graph_region_pc_2) { case \"n13\": dy = (- 1); __rvb_content_graph_region_pc_2 = \"n12\"; break; case \"n12\": var __rvb_content_graph_loop_break_3 = false, __rvb_content_graph_loop_continue_4 = false; while ((! (! (dy <= 1)))) { __rvb_content_graph_loop_continue_4 = false; { var __rvb_content_graph_region_pc_5 = \"n9\"; while (__rvb_content_graph_region_pc_5 !== \"n8\") { switch (__rvb_content_graph_region_pc_5) { case \"n9\": (cells).push({x: ((c)[\"x\"] + dx), y: ((c)[\"y\"] + dy)}); __rvb_content_graph_region_pc_5 = \"n8\"; break; case \"n8\": __rvb_content_graph_region_pc_5 = \"n8\"; break; default: throw new Error(\"invalid content graph region node\"); } } } if (__rvb_content_graph_loop_break_3) break; { var __rvb_content_graph_region_pc_6 = \"n11\"; while (__rvb_content_graph_region_pc_6 !== \"n10\") { switch (__rvb_content_graph_region_pc_6) { case \"n11\": dy = ((+ dy) + 1); __rvb_content_graph_region_pc_6 = \"n10\"; break; case \"n10\": __rvb_content_graph_region_pc_6 = \"n10\"; break; default: throw new Error(\"invalid content graph region node\"); } } } if (__rvb_content_graph_loop_break_3) break; if (__rvb_content_graph_loop_continue_4) { __rvb_content_graph_loop_continue_4 = false; continue; } } __rvb_content_graph_region_pc_2 = \"n7\"; break; case \"n7\": __rvb_content_graph_region_pc_2 = \"n7\"; break; default: throw new Error(\"invalid content graph region node\"); } } } if (__rvb_content_graph_loop_break_0) break; { var __rvb_content_graph_region_pc_7 = \"n15\"; while (__rvb_content_graph_region_pc_7 !== \"n14\") { switch (__rvb_content_graph_region_pc_7) { case \"n15\": dx = ((+ dx) + 1); __rvb_content_graph_region_pc_7 = \"n14\"; break; case \"n14\": __rvb_content_graph_region_pc_7 = \"n14\"; break; default: throw new Error(\"invalid content graph region node\"); } } } if (__rvb_content_graph_loop_break_0) break; if (__rvb_content_graph_loop_continue_1) { __rvb_content_graph_loop_continue_1 = false; continue; } } _pc = \"n6\"; break; case \"n6\": flow.effects.destroyWalls(cells); _pc = \"n5\"; break; case \"n5\": es = ((battle)[\"pieces\"])[\"filter\"](function (x) { return (((((x)[\"currentHp\"] > 0) && (! arePlayersAllied(battle, (x)[\"ownerPlayerId\"], (c)[\"ownerPlayerId\"]))) && (Math.abs(((x)[\"x\"] - (c)[\"x\"])) <= 1)) && (Math.abs(((x)[\"y\"] - (c)[\"y\"])) <= 1)); }); _pc = \"n4\"; break; case \"n4\": _pc = (! (! (es)[\"length\"])) ? \"n3\" : \"n2\"; break; case \"n3\": dealDamage(c, es, (c)[\"attack\"], \"physical\", battle, ((context)[\"skill\"])[\"id\"]); _pc = \"n2\"; break; case \"n2\": (c)[\"moveRange\"] = (((c)[\"moveRange\"] || 0) + 1); _pc = \"n1\"; break; case \"n1\": return {success: true, message: ((c)[\"name\"] + \"飞身肘击并破墙\")}; case \"n19\": return {success: true, message: \"位移被阻挡，本次位移效果取消\"}; case \"n22\": return {success: false, message: \"目标地格不可行走\"}; case \"n25\": return p; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\"); }",
   "chargeCostModifiers": [
     {
       "source": "battleExtensionPlayerNumber",
@@ -25,5 +43,889 @@
       "operation": "subtract",
       "minimum": 0
     }
-  ]
+  ],
+  "contentGraph": {
+    "version": "rvb-content-graph/v1",
+    "surface": "skill",
+    "entry": "n28",
+    "nodes": [
+      {
+        "id": "n1",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "c"
+                  },
+                  "key": "name"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "飞身肘击并破墙"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n2",
+        "kind": "set",
+        "target": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "c"
+          },
+          "key": "moveRange"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "binary",
+          "op": "+",
+          "left": {
+            "kind": "binary",
+            "op": "||",
+            "left": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "c"
+              },
+              "key": "moveRange"
+            },
+            "right": {
+              "kind": "literal",
+              "value": 0
+            }
+          },
+          "right": {
+            "kind": "literal",
+            "value": 1
+          }
+        },
+        "next": "n1"
+      },
+      {
+        "id": "n3",
+        "kind": "call",
+        "capability": "dealDamage",
+        "args": [
+          {
+            "kind": "ref",
+            "name": "c"
+          },
+          {
+            "kind": "ref",
+            "name": "es"
+          },
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "c"
+            },
+            "key": "attack"
+          },
+          {
+            "kind": "literal",
+            "value": "physical"
+          },
+          {
+            "kind": "ref",
+            "name": "battle"
+          },
+          {
+            "kind": "get",
+            "object": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "context"
+              },
+              "key": "skill"
+            },
+            "key": "id"
+          }
+        ],
+        "next": "n2"
+      },
+      {
+        "id": "n4",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "es"
+              },
+              "key": "length"
+            }
+          }
+        },
+        "yes": "n3",
+        "no": "n2"
+      },
+      {
+        "id": "n5",
+        "kind": "bind",
+        "name": "es",
+        "expr": {
+          "kind": "collection",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "battle"
+            },
+            "key": "pieces"
+          },
+          "method": "filter",
+          "args": [
+            {
+              "kind": "lambda",
+              "parameters": [
+                "x"
+              ],
+              "body": {
+                "kind": "binary",
+                "op": "&&",
+                "left": {
+                  "kind": "binary",
+                  "op": "&&",
+                  "left": {
+                    "kind": "binary",
+                    "op": "&&",
+                    "left": {
+                      "kind": "binary",
+                      "op": ">",
+                      "left": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "x"
+                        },
+                        "key": "currentHp"
+                      },
+                      "right": {
+                        "kind": "literal",
+                        "value": 0
+                      }
+                    },
+                    "right": {
+                      "kind": "unary",
+                      "op": "!",
+                      "argument": {
+                        "kind": "call",
+                        "callee": "arePlayersAllied",
+                        "args": [
+                          {
+                            "kind": "ref",
+                            "name": "battle"
+                          },
+                          {
+                            "kind": "get",
+                            "object": {
+                              "kind": "ref",
+                              "name": "x"
+                            },
+                            "key": "ownerPlayerId"
+                          },
+                          {
+                            "kind": "get",
+                            "object": {
+                              "kind": "ref",
+                              "name": "c"
+                            },
+                            "key": "ownerPlayerId"
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  "right": {
+                    "kind": "binary",
+                    "op": "<=",
+                    "left": {
+                      "kind": "call",
+                      "callee": "Math.abs",
+                      "args": [
+                        {
+                          "kind": "binary",
+                          "op": "-",
+                          "left": {
+                            "kind": "get",
+                            "object": {
+                              "kind": "ref",
+                              "name": "x"
+                            },
+                            "key": "x"
+                          },
+                          "right": {
+                            "kind": "get",
+                            "object": {
+                              "kind": "ref",
+                              "name": "c"
+                            },
+                            "key": "x"
+                          }
+                        }
+                      ]
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": 1
+                    }
+                  }
+                },
+                "right": {
+                  "kind": "binary",
+                  "op": "<=",
+                  "left": {
+                    "kind": "call",
+                    "callee": "Math.abs",
+                    "args": [
+                      {
+                        "kind": "binary",
+                        "op": "-",
+                        "left": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "x"
+                          },
+                          "key": "y"
+                        },
+                        "right": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "c"
+                          },
+                          "key": "y"
+                        }
+                      }
+                    ]
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": 1
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "next": "n4"
+      },
+      {
+        "id": "n6",
+        "kind": "call",
+        "capability": "flow.effects.destroyWalls",
+        "args": [
+          {
+            "kind": "ref",
+            "name": "cells"
+          }
+        ],
+        "next": "n5"
+      },
+      {
+        "id": "n16",
+        "kind": "loop",
+        "loop": "for",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "<=",
+              "left": {
+                "kind": "ref",
+                "name": "dx"
+              },
+              "right": {
+                "kind": "literal",
+                "value": 1
+              }
+            }
+          }
+        },
+        "body": {
+          "entry": "n13",
+          "end": "n7",
+          "nodes": [
+            {
+              "id": "n7",
+              "kind": "regionEnd"
+            },
+            {
+              "id": "n12",
+              "kind": "loop",
+              "loop": "for",
+              "condition": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "unary",
+                  "op": "!",
+                  "argument": {
+                    "kind": "binary",
+                    "op": "<=",
+                    "left": {
+                      "kind": "ref",
+                      "name": "dy"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": 1
+                    }
+                  }
+                }
+              },
+              "body": {
+                "entry": "n9",
+                "end": "n8",
+                "nodes": [
+                  {
+                    "id": "n8",
+                    "kind": "regionEnd"
+                  },
+                  {
+                    "id": "n9",
+                    "kind": "call",
+                    "capability": "array.push",
+                    "args": [
+                      {
+                        "kind": "ref",
+                        "name": "cells"
+                      },
+                      {
+                        "kind": "object",
+                        "entries": [
+                          {
+                            "key": "x",
+                            "value": {
+                              "kind": "binary",
+                              "op": "+",
+                              "left": {
+                                "kind": "get",
+                                "object": {
+                                  "kind": "ref",
+                                  "name": "c"
+                                },
+                                "key": "x"
+                              },
+                              "right": {
+                                "kind": "ref",
+                                "name": "dx"
+                              }
+                            }
+                          },
+                          {
+                            "key": "y",
+                            "value": {
+                              "kind": "binary",
+                              "op": "+",
+                              "left": {
+                                "kind": "get",
+                                "object": {
+                                  "kind": "ref",
+                                  "name": "c"
+                                },
+                                "key": "y"
+                              },
+                              "right": {
+                                "kind": "ref",
+                                "name": "dy"
+                              }
+                            }
+                          }
+                        ]
+                      }
+                    ],
+                    "next": "n8"
+                  }
+                ]
+              },
+              "update": {
+                "entry": "n11",
+                "end": "n10",
+                "nodes": [
+                  {
+                    "id": "n10",
+                    "kind": "regionEnd"
+                  },
+                  {
+                    "id": "n11",
+                    "kind": "set",
+                    "target": {
+                      "kind": "ref",
+                      "name": "dy"
+                    },
+                    "operator": "=",
+                    "value": {
+                      "kind": "binary",
+                      "op": "+",
+                      "left": {
+                        "kind": "unary",
+                        "op": "+",
+                        "argument": {
+                          "kind": "ref",
+                          "name": "dy"
+                        }
+                      },
+                      "right": {
+                        "kind": "literal",
+                        "value": 1
+                      }
+                    },
+                    "next": "n10"
+                  }
+                ]
+              },
+              "next": "n7"
+            },
+            {
+              "id": "n13",
+              "kind": "bind",
+              "name": "dy",
+              "expr": {
+                "kind": "unary",
+                "op": "-",
+                "argument": {
+                  "kind": "literal",
+                  "value": 1
+                }
+              },
+              "next": "n12"
+            }
+          ]
+        },
+        "update": {
+          "entry": "n15",
+          "end": "n14",
+          "nodes": [
+            {
+              "id": "n14",
+              "kind": "regionEnd"
+            },
+            {
+              "id": "n15",
+              "kind": "set",
+              "target": {
+                "kind": "ref",
+                "name": "dx"
+              },
+              "operator": "=",
+              "value": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "unary",
+                  "op": "+",
+                  "argument": {
+                    "kind": "ref",
+                    "name": "dx"
+                  }
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": 1
+                }
+              },
+              "next": "n14"
+            }
+          ]
+        },
+        "next": "n6"
+      },
+      {
+        "id": "n17",
+        "kind": "bind",
+        "name": "dx",
+        "expr": {
+          "kind": "unary",
+          "op": "-",
+          "argument": {
+            "kind": "literal",
+            "value": 1
+          }
+        },
+        "next": "n16"
+      },
+      {
+        "id": "n18",
+        "kind": "bind",
+        "name": "cells",
+        "expr": {
+          "kind": "array",
+          "items": []
+        },
+        "next": "n17"
+      },
+      {
+        "id": "n19",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": "位移被阻挡，本次位移效果取消"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n20",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "unary",
+              "op": "!",
+              "argument": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "__rvb_import_effect_0"
+                },
+                "key": "success"
+              }
+            }
+          }
+        },
+        "yes": "n19",
+        "no": "n18"
+      },
+      {
+        "id": "n21",
+        "kind": "call",
+        "capability": "flow.effects.displace",
+        "args": [
+          {
+            "kind": "array",
+            "items": [
+              {
+                "kind": "object",
+                "entries": [
+                  {
+                    "key": "pieceId",
+                    "value": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "c"
+                      },
+                      "key": "instanceId"
+                    }
+                  },
+                  {
+                    "key": "x",
+                    "value": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "p"
+                      },
+                      "key": "x"
+                    }
+                  },
+                  {
+                    "key": "y",
+                    "value": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "p"
+                      },
+                      "key": "y"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "kind": "literal",
+            "value": "teleport"
+          }
+        ],
+        "result": "__rvb_import_effect_0",
+        "next": "n20"
+      },
+      {
+        "id": "n22",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": "目标地格不可行走"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n23",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "ref",
+                  "name": "tile"
+                }
+              },
+              "right": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "tile"
+                    },
+                    "key": "props"
+                  },
+                  "key": "walkable"
+                }
+              }
+            }
+          }
+        },
+        "yes": "n22",
+        "no": "n21"
+      },
+      {
+        "id": "n24",
+        "kind": "bind",
+        "name": "tile",
+        "expr": {
+          "kind": "collection",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "battle"
+              },
+              "key": "map"
+            },
+            "key": "tiles"
+          },
+          "method": "find",
+          "args": [
+            {
+              "kind": "lambda",
+              "parameters": [
+                "t"
+              ],
+              "body": {
+                "kind": "binary",
+                "op": "&&",
+                "left": {
+                  "kind": "binary",
+                  "op": "===",
+                  "left": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "t"
+                    },
+                    "key": "x"
+                  },
+                  "right": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "p"
+                    },
+                    "key": "x"
+                  }
+                },
+                "right": {
+                  "kind": "binary",
+                  "op": "===",
+                  "left": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "t"
+                    },
+                    "key": "y"
+                  },
+                  "right": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "p"
+                    },
+                    "key": "y"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "next": "n23"
+      },
+      {
+        "id": "n25",
+        "kind": "return",
+        "value": {
+          "kind": "ref",
+          "name": "p"
+        }
+      },
+      {
+        "id": "n26",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "ref",
+                  "name": "p"
+                }
+              },
+              "right": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "p"
+                },
+                "key": "needsTargetSelection"
+              }
+            }
+          }
+        },
+        "yes": "n25",
+        "no": "n24"
+      },
+      {
+        "id": "n27",
+        "kind": "call",
+        "capability": "selectTarget",
+        "args": [
+          {
+            "kind": "object",
+            "entries": [
+              {
+                "key": "type",
+                "value": {
+                  "kind": "literal",
+                  "value": "grid"
+                }
+              },
+              {
+                "key": "range",
+                "value": {
+                  "kind": "literal",
+                  "value": 7
+                }
+              },
+              {
+                "key": "filter",
+                "value": {
+                  "kind": "literal",
+                  "value": "all"
+                }
+              }
+            ]
+          }
+        ],
+        "result": "p",
+        "next": "n26"
+      },
+      {
+        "id": "n28",
+        "kind": "bind",
+        "name": "c",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "context"
+          },
+          "key": "piece"
+        },
+        "next": "n27"
+      }
+    ]
+  },
+  "contentGraphField": "code",
+  "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1"
 }

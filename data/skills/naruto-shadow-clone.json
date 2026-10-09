@@ -85,6 +85,1177 @@
       ]
     }
   },
-  "code": "function executeSkill(context) { var caster = context.piece; var battle = context.battle; var option = selectOption({ title: '选择影分身方式', options: [{ label: '在目标格召唤分身', value: 'summon' }, { label: '传送至目标格，原地留下分身', value: 'teleport' }] }); if (option === null || option === undefined || option.needsOptionSelection) return option; var pos = selectTarget({ type: 'grid', range: 5, filter: 'all' }); if (!pos || pos.needsTargetSelection) return pos; var dist = Math.abs(pos.x - caster.x) + Math.abs(pos.y - caster.y); if (dist > 5) return { success: false, message: '影分身之术只能选择5格内的位置' }; var targetTile = battle.map && battle.map.tiles && battle.map.tiles.find(function(t) { return t.x === pos.x && t.y === pos.y; }); if (!targetTile || !targetTile.props || !targetTile.props.walkable) return { success: false, message: '目标格不可行走' }; var cloneX, cloneY; if (option === 'summon') { var pieceAtPos = battle.pieces.find(function(p) { return p.x === pos.x && p.y === pos.y && p.currentHp > 0; }); if (pieceAtPos) return { success: false, message: '目标格已被占用' }; cloneX = pos.x; cloneY = pos.y; } else { var pieceAtPos2 = battle.pieces.find(function(p) { return p.x === pos.x && p.y === pos.y && p.currentHp > 0 && p.instanceId !== caster.instanceId; }); if (pieceAtPos2) return { success: false, message: '目标格已被占用' }; cloneX = caster.x; cloneY = caster.y; if (!flow.effects.displace([{pieceId:caster.instanceId,x:pos.x,y:pos.y}], 'teleport').success) return {success:true,message:'传送被阻挡，影分身之术取消'}; } context.summonQueue.push({ summons: [{ x: cloneX, y: cloneY, variant: option }], sourceId: caster.instanceId }); return { success: true, message: caster.name + '使用了影分身之术' }; }",
-  "previewCode": "function calculatePreview(piece, skillDef) { return { description: \"选择地格（5），秘密二选一：召唤影分身；传送至该格并在原地留下影分身。影分身无法行动，受伤1次后消散。\", expectedValues: {} }; }"
+  "code": "function executeSkill(context) { var __rvb_import_effect_0, battle, caster, cloneX, cloneY, dist, option, pieceAtPos, pieceAtPos2, pos, targetTile; var _pc = \"n32\"; for (var _step = 0; _step <= 32; _step++) { switch (_pc) { case \"n32\": caster = (context)[\"piece\"]; _pc = \"n31\"; break; case \"n31\": battle = (context)[\"battle\"]; _pc = \"n30\"; break; case \"n30\": option = selectOption({title: \"选择影分身方式\", options: [{label: \"在目标格召唤分身\", value: \"summon\"}, {label: \"传送至目标格，原地留下分身\", value: \"teleport\"}]}); _pc = \"n29\"; break; case \"n29\": _pc = (! (! (((option === null) || (option === (void 0))) || (option)[\"needsOptionSelection\"]))) ? \"n28\" : \"n27\"; break; case \"n27\": pos = selectTarget({type: \"grid\", range: 5, filter: \"all\"}); _pc = \"n26\"; break; case \"n26\": _pc = (! (! ((! pos) || (pos)[\"needsTargetSelection\"]))) ? \"n25\" : \"n24\"; break; case \"n24\": dist = (Math.abs(((pos)[\"x\"] - (caster)[\"x\"])) + Math.abs(((pos)[\"y\"] - (caster)[\"y\"]))); _pc = \"n23\"; break; case \"n23\": _pc = (! (! (dist > 5))) ? \"n22\" : \"n21\"; break; case \"n21\": targetTile = (((battle)[\"map\"] && ((battle)[\"map\"])[\"tiles\"]) && (((battle)[\"map\"])[\"tiles\"])[\"find\"](function (t) { return (((t)[\"x\"] === (pos)[\"x\"]) && ((t)[\"y\"] === (pos)[\"y\"])); })); _pc = \"n20\"; break; case \"n20\": _pc = (! (! (((! targetTile) || (! (targetTile)[\"props\"])) || (! ((targetTile)[\"props\"])[\"walkable\"])))) ? \"n19\" : \"n18\"; break; case \"n18\": cloneX = (void 0); _pc = \"n17\"; break; case \"n17\": cloneY = (void 0); _pc = \"n16\"; break; case \"n16\": _pc = (! (! (option === \"summon\"))) ? \"n7\" : \"n15\"; break; case \"n15\": pieceAtPos2 = ((battle)[\"pieces\"])[\"find\"](function (p) { return (((((p)[\"x\"] === (pos)[\"x\"]) && ((p)[\"y\"] === (pos)[\"y\"])) && ((p)[\"currentHp\"] > 0)) && ((p)[\"instanceId\"] !== (caster)[\"instanceId\"])); }); _pc = \"n14\"; break; case \"n14\": _pc = (! (! pieceAtPos2)) ? \"n13\" : \"n12\"; break; case \"n12\": cloneX = (caster)[\"x\"]; _pc = \"n11\"; break; case \"n11\": cloneY = (caster)[\"y\"]; _pc = \"n10\"; break; case \"n10\": __rvb_import_effect_0 = flow.effects.displace([{pieceId: (caster)[\"instanceId\"], x: (pos)[\"x\"], y: (pos)[\"y\"]}], \"teleport\"); _pc = \"n9\"; break; case \"n9\": _pc = (! (! (! (__rvb_import_effect_0)[\"success\"]))) ? \"n8\" : \"n2\"; break; case \"n8\": return {success: true, message: \"传送被阻挡，影分身之术取消\"}; case \"n13\": return {success: false, message: \"目标格已被占用\"}; case \"n7\": pieceAtPos = ((battle)[\"pieces\"])[\"find\"](function (p) { return ((((p)[\"x\"] === (pos)[\"x\"]) && ((p)[\"y\"] === (pos)[\"y\"])) && ((p)[\"currentHp\"] > 0)); }); _pc = \"n6\"; break; case \"n6\": _pc = (! (! pieceAtPos)) ? \"n5\" : \"n4\"; break; case \"n4\": cloneX = (pos)[\"x\"]; _pc = \"n3\"; break; case \"n3\": cloneY = (pos)[\"y\"]; _pc = \"n2\"; break; case \"n2\": context.summonQueue.push({summons: [{x: cloneX, y: cloneY, variant: option}], sourceId: (caster)[\"instanceId\"]}); _pc = \"n1\"; break; case \"n1\": return {success: true, message: ((caster)[\"name\"] + \"使用了影分身之术\")}; case \"n5\": return {success: false, message: \"目标格已被占用\"}; case \"n19\": return {success: false, message: \"目标格不可行走\"}; case \"n22\": return {success: false, message: \"影分身之术只能选择5格内的位置\"}; case \"n25\": return pos; case \"n28\": return option; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\"); }",
+  "previewCode": "function calculatePreview(piece, skillDef, currentCooldown) { var _pc = \"n1\"; for (var _step = 0; _step <= 1; _step++) { switch (_pc) { case \"n1\": return {description: \"选择地格（5），秘密二选一：召唤影分身；传送至该格并在原地留下影分身。影分身无法行动，受伤1次后消散。\", expectedValues: {}}; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\"); }",
+  "contentGraph": {
+    "version": "rvb-content-graph/v1",
+    "surface": "skill",
+    "entry": "n32",
+    "nodes": [
+      {
+        "id": "n1",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "caster"
+                  },
+                  "key": "name"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "使用了影分身之术"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n2",
+        "kind": "call",
+        "capability": "queue.summon",
+        "args": [
+          {
+            "kind": "object",
+            "entries": [
+              {
+                "key": "summons",
+                "value": {
+                  "kind": "array",
+                  "items": [
+                    {
+                      "kind": "object",
+                      "entries": [
+                        {
+                          "key": "x",
+                          "value": {
+                            "kind": "ref",
+                            "name": "cloneX"
+                          }
+                        },
+                        {
+                          "key": "y",
+                          "value": {
+                            "kind": "ref",
+                            "name": "cloneY"
+                          }
+                        },
+                        {
+                          "key": "variant",
+                          "value": {
+                            "kind": "ref",
+                            "name": "option"
+                          }
+                        }
+                      ]
+                    }
+                  ]
+                }
+              },
+              {
+                "key": "sourceId",
+                "value": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "caster"
+                  },
+                  "key": "instanceId"
+                }
+              }
+            ]
+          }
+        ],
+        "next": "n1"
+      },
+      {
+        "id": "n3",
+        "kind": "set",
+        "target": {
+          "kind": "ref",
+          "name": "cloneY"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "pos"
+          },
+          "key": "y"
+        },
+        "next": "n2"
+      },
+      {
+        "id": "n4",
+        "kind": "set",
+        "target": {
+          "kind": "ref",
+          "name": "cloneX"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "pos"
+          },
+          "key": "x"
+        },
+        "next": "n3"
+      },
+      {
+        "id": "n5",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": "目标格已被占用"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n6",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "ref",
+              "name": "pieceAtPos"
+            }
+          }
+        },
+        "yes": "n5",
+        "no": "n4"
+      },
+      {
+        "id": "n7",
+        "kind": "bind",
+        "name": "pieceAtPos",
+        "expr": {
+          "kind": "collection",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "battle"
+            },
+            "key": "pieces"
+          },
+          "method": "find",
+          "args": [
+            {
+              "kind": "lambda",
+              "parameters": [
+                "p"
+              ],
+              "body": {
+                "kind": "binary",
+                "op": "&&",
+                "left": {
+                  "kind": "binary",
+                  "op": "&&",
+                  "left": {
+                    "kind": "binary",
+                    "op": "===",
+                    "left": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "p"
+                      },
+                      "key": "x"
+                    },
+                    "right": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "pos"
+                      },
+                      "key": "x"
+                    }
+                  },
+                  "right": {
+                    "kind": "binary",
+                    "op": "===",
+                    "left": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "p"
+                      },
+                      "key": "y"
+                    },
+                    "right": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "pos"
+                      },
+                      "key": "y"
+                    }
+                  }
+                },
+                "right": {
+                  "kind": "binary",
+                  "op": ">",
+                  "left": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "p"
+                    },
+                    "key": "currentHp"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": 0
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "next": "n6"
+      },
+      {
+        "id": "n8",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": "传送被阻挡，影分身之术取消"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n9",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "unary",
+              "op": "!",
+              "argument": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "__rvb_import_effect_0"
+                },
+                "key": "success"
+              }
+            }
+          }
+        },
+        "yes": "n8",
+        "no": "n2"
+      },
+      {
+        "id": "n10",
+        "kind": "call",
+        "capability": "flow.effects.displace",
+        "args": [
+          {
+            "kind": "array",
+            "items": [
+              {
+                "kind": "object",
+                "entries": [
+                  {
+                    "key": "pieceId",
+                    "value": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "caster"
+                      },
+                      "key": "instanceId"
+                    }
+                  },
+                  {
+                    "key": "x",
+                    "value": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "pos"
+                      },
+                      "key": "x"
+                    }
+                  },
+                  {
+                    "key": "y",
+                    "value": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "pos"
+                      },
+                      "key": "y"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "kind": "literal",
+            "value": "teleport"
+          }
+        ],
+        "result": "__rvb_import_effect_0",
+        "next": "n9"
+      },
+      {
+        "id": "n11",
+        "kind": "set",
+        "target": {
+          "kind": "ref",
+          "name": "cloneY"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "caster"
+          },
+          "key": "y"
+        },
+        "next": "n10"
+      },
+      {
+        "id": "n12",
+        "kind": "set",
+        "target": {
+          "kind": "ref",
+          "name": "cloneX"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "caster"
+          },
+          "key": "x"
+        },
+        "next": "n11"
+      },
+      {
+        "id": "n13",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": "目标格已被占用"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n14",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "ref",
+              "name": "pieceAtPos2"
+            }
+          }
+        },
+        "yes": "n13",
+        "no": "n12"
+      },
+      {
+        "id": "n15",
+        "kind": "bind",
+        "name": "pieceAtPos2",
+        "expr": {
+          "kind": "collection",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "battle"
+            },
+            "key": "pieces"
+          },
+          "method": "find",
+          "args": [
+            {
+              "kind": "lambda",
+              "parameters": [
+                "p"
+              ],
+              "body": {
+                "kind": "binary",
+                "op": "&&",
+                "left": {
+                  "kind": "binary",
+                  "op": "&&",
+                  "left": {
+                    "kind": "binary",
+                    "op": "&&",
+                    "left": {
+                      "kind": "binary",
+                      "op": "===",
+                      "left": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "p"
+                        },
+                        "key": "x"
+                      },
+                      "right": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "pos"
+                        },
+                        "key": "x"
+                      }
+                    },
+                    "right": {
+                      "kind": "binary",
+                      "op": "===",
+                      "left": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "p"
+                        },
+                        "key": "y"
+                      },
+                      "right": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "pos"
+                        },
+                        "key": "y"
+                      }
+                    }
+                  },
+                  "right": {
+                    "kind": "binary",
+                    "op": ">",
+                    "left": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "p"
+                      },
+                      "key": "currentHp"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": 0
+                    }
+                  }
+                },
+                "right": {
+                  "kind": "binary",
+                  "op": "!==",
+                  "left": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "p"
+                    },
+                    "key": "instanceId"
+                  },
+                  "right": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "caster"
+                    },
+                    "key": "instanceId"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "next": "n14"
+      },
+      {
+        "id": "n16",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "===",
+              "left": {
+                "kind": "ref",
+                "name": "option"
+              },
+              "right": {
+                "kind": "literal",
+                "value": "summon"
+              }
+            }
+          }
+        },
+        "yes": "n7",
+        "no": "n15"
+      },
+      {
+        "id": "n17",
+        "kind": "bind",
+        "name": "cloneY",
+        "expr": {
+          "kind": "undefined"
+        },
+        "next": "n16"
+      },
+      {
+        "id": "n18",
+        "kind": "bind",
+        "name": "cloneX",
+        "expr": {
+          "kind": "undefined"
+        },
+        "next": "n17"
+      },
+      {
+        "id": "n19",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": "目标格不可行走"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n20",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "binary",
+                "op": "||",
+                "left": {
+                  "kind": "unary",
+                  "op": "!",
+                  "argument": {
+                    "kind": "ref",
+                    "name": "targetTile"
+                  }
+                },
+                "right": {
+                  "kind": "unary",
+                  "op": "!",
+                  "argument": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "targetTile"
+                    },
+                    "key": "props"
+                  }
+                }
+              },
+              "right": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "targetTile"
+                    },
+                    "key": "props"
+                  },
+                  "key": "walkable"
+                }
+              }
+            }
+          }
+        },
+        "yes": "n19",
+        "no": "n18"
+      },
+      {
+        "id": "n21",
+        "kind": "bind",
+        "name": "targetTile",
+        "expr": {
+          "kind": "binary",
+          "op": "&&",
+          "left": {
+            "kind": "binary",
+            "op": "&&",
+            "left": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "battle"
+              },
+              "key": "map"
+            },
+            "right": {
+              "kind": "get",
+              "object": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "battle"
+                },
+                "key": "map"
+              },
+              "key": "tiles"
+            }
+          },
+          "right": {
+            "kind": "collection",
+            "object": {
+              "kind": "get",
+              "object": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "battle"
+                },
+                "key": "map"
+              },
+              "key": "tiles"
+            },
+            "method": "find",
+            "args": [
+              {
+                "kind": "lambda",
+                "parameters": [
+                  "t"
+                ],
+                "body": {
+                  "kind": "binary",
+                  "op": "&&",
+                  "left": {
+                    "kind": "binary",
+                    "op": "===",
+                    "left": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "t"
+                      },
+                      "key": "x"
+                    },
+                    "right": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "pos"
+                      },
+                      "key": "x"
+                    }
+                  },
+                  "right": {
+                    "kind": "binary",
+                    "op": "===",
+                    "left": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "t"
+                      },
+                      "key": "y"
+                    },
+                    "right": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "pos"
+                      },
+                      "key": "y"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "next": "n20"
+      },
+      {
+        "id": "n22",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": "影分身之术只能选择5格内的位置"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n23",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": ">",
+              "left": {
+                "kind": "ref",
+                "name": "dist"
+              },
+              "right": {
+                "kind": "literal",
+                "value": 5
+              }
+            }
+          }
+        },
+        "yes": "n22",
+        "no": "n21"
+      },
+      {
+        "id": "n24",
+        "kind": "bind",
+        "name": "dist",
+        "expr": {
+          "kind": "binary",
+          "op": "+",
+          "left": {
+            "kind": "call",
+            "callee": "Math.abs",
+            "args": [
+              {
+                "kind": "binary",
+                "op": "-",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "pos"
+                  },
+                  "key": "x"
+                },
+                "right": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "caster"
+                  },
+                  "key": "x"
+                }
+              }
+            ]
+          },
+          "right": {
+            "kind": "call",
+            "callee": "Math.abs",
+            "args": [
+              {
+                "kind": "binary",
+                "op": "-",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "pos"
+                  },
+                  "key": "y"
+                },
+                "right": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "caster"
+                  },
+                  "key": "y"
+                }
+              }
+            ]
+          }
+        },
+        "next": "n23"
+      },
+      {
+        "id": "n25",
+        "kind": "return",
+        "value": {
+          "kind": "ref",
+          "name": "pos"
+        }
+      },
+      {
+        "id": "n26",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "ref",
+                  "name": "pos"
+                }
+              },
+              "right": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "pos"
+                },
+                "key": "needsTargetSelection"
+              }
+            }
+          }
+        },
+        "yes": "n25",
+        "no": "n24"
+      },
+      {
+        "id": "n27",
+        "kind": "call",
+        "capability": "selectTarget",
+        "args": [
+          {
+            "kind": "object",
+            "entries": [
+              {
+                "key": "type",
+                "value": {
+                  "kind": "literal",
+                  "value": "grid"
+                }
+              },
+              {
+                "key": "range",
+                "value": {
+                  "kind": "literal",
+                  "value": 5
+                }
+              },
+              {
+                "key": "filter",
+                "value": {
+                  "kind": "literal",
+                  "value": "all"
+                }
+              }
+            ]
+          }
+        ],
+        "result": "pos",
+        "next": "n26"
+      },
+      {
+        "id": "n28",
+        "kind": "return",
+        "value": {
+          "kind": "ref",
+          "name": "option"
+        }
+      },
+      {
+        "id": "n29",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "binary",
+                "op": "||",
+                "left": {
+                  "kind": "binary",
+                  "op": "===",
+                  "left": {
+                    "kind": "ref",
+                    "name": "option"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": null
+                  }
+                },
+                "right": {
+                  "kind": "binary",
+                  "op": "===",
+                  "left": {
+                    "kind": "ref",
+                    "name": "option"
+                  },
+                  "right": {
+                    "kind": "undefined"
+                  }
+                }
+              },
+              "right": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "option"
+                },
+                "key": "needsOptionSelection"
+              }
+            }
+          }
+        },
+        "yes": "n28",
+        "no": "n27"
+      },
+      {
+        "id": "n30",
+        "kind": "call",
+        "capability": "selectOption",
+        "args": [
+          {
+            "kind": "object",
+            "entries": [
+              {
+                "key": "title",
+                "value": {
+                  "kind": "literal",
+                  "value": "选择影分身方式"
+                }
+              },
+              {
+                "key": "options",
+                "value": {
+                  "kind": "array",
+                  "items": [
+                    {
+                      "kind": "object",
+                      "entries": [
+                        {
+                          "key": "label",
+                          "value": {
+                            "kind": "literal",
+                            "value": "在目标格召唤分身"
+                          }
+                        },
+                        {
+                          "key": "value",
+                          "value": {
+                            "kind": "literal",
+                            "value": "summon"
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "kind": "object",
+                      "entries": [
+                        {
+                          "key": "label",
+                          "value": {
+                            "kind": "literal",
+                            "value": "传送至目标格，原地留下分身"
+                          }
+                        },
+                        {
+                          "key": "value",
+                          "value": {
+                            "kind": "literal",
+                            "value": "teleport"
+                          }
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ],
+        "result": "option",
+        "next": "n29"
+      },
+      {
+        "id": "n31",
+        "kind": "bind",
+        "name": "battle",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "context"
+          },
+          "key": "battle"
+        },
+        "next": "n30"
+      },
+      {
+        "id": "n32",
+        "kind": "bind",
+        "name": "caster",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "context"
+          },
+          "key": "piece"
+        },
+        "next": "n31"
+      }
+    ]
+  },
+  "contentGraphField": "code",
+  "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1",
+  "contentGraphEntries": {
+    "previewCode": {
+      "graph": {
+        "version": "rvb-content-graph/v1",
+        "surface": "preview",
+        "entry": "n1",
+        "nodes": [
+          {
+            "id": "n1",
+            "kind": "return",
+            "value": {
+              "kind": "object",
+              "entries": [
+                {
+                  "key": "description",
+                  "value": {
+                    "kind": "literal",
+                    "value": "选择地格（5），秘密二选一：召唤影分身；传送至该格并在原地留下影分身。影分身无法行动，受伤1次后消散。"
+                  }
+                },
+                {
+                  "key": "expectedValues",
+                  "value": {
+                    "kind": "object",
+                    "entries": []
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "compilerVersion": "rvb-content-graph-compiler/v1"
+    }
+  }
 }

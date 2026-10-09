@@ -5,5 +5,476 @@
   "trigger": {
     "type": "beforeDamageTaken"
   },
-  "skillCode": "var holder = context.rulePiece; var victim = context.sourcePiece; var attacker = context.targetPiece; if (!holder || !attacker || attacker.instanceId !== holder.instanceId || !victim || victim.currentHp <= 0 || victim.currentHp !== victim.maxHp || flow.query.pieces({ originId: holder.instanceId, relation: \"enemy\" }).indexOf(victim.instanceId) === -1) return { success: false, message: '' }; var damage = Number(context.damage || 0); if (!(damage > 0)) return { success: false, message: '' }; flow.event.modify('damage', damage * 1.5); return { success: true, message: holder.name + '触发先手斗气，伤害提高50%' };"
+  "skillCode": "var __rvb_import_effect_2, __rvb_import_operand_1, __rvb_import_operand_3, __rvb_import_operand_5, __rvb_import_value_0, attacker, damage, holder, victim; var _pc = \"n18\"; for (var _step = 0; _step <= 18; _step++) { switch (_pc) { case \"n18\": holder = (context)[\"rulePiece\"]; _pc = \"n17\"; break; case \"n17\": victim = (context)[\"sourcePiece\"]; _pc = \"n16\"; break; case \"n16\": attacker = (context)[\"targetPiece\"]; _pc = \"n15\"; break; case \"n15\": __rvb_import_value_0 = (void 0); _pc = \"n14\"; break; case \"n14\": __rvb_import_operand_5 = ((((((! holder) || (! attacker)) || ((attacker)[\"instanceId\"] !== (holder)[\"instanceId\"])) || (! victim)) || ((victim)[\"currentHp\"] <= 0)) || ((victim)[\"currentHp\"] !== (victim)[\"maxHp\"])); _pc = \"n12\"; break; case \"n12\": _pc = (! (! __rvb_import_operand_5)) ? \"n13\" : \"n11\"; break; case \"n11\": __rvb_import_effect_2 = flow.query.pieces({originId: (holder)[\"instanceId\"], relation: \"enemy\"}); _pc = \"n10\"; break; case \"n10\": __rvb_import_operand_3 = __rvb_import_effect_2; _pc = \"n8\"; break; case \"n8\": __rvb_import_operand_1 = (__rvb_import_operand_3)[\"indexOf\"]((victim)[\"instanceId\"]); _pc = \"n9\"; break; case \"n9\": __rvb_import_value_0 = (__rvb_import_operand_1 === (- 1)); _pc = \"n7\"; break; case \"n13\": __rvb_import_value_0 = __rvb_import_operand_5; _pc = \"n7\"; break; case \"n7\": _pc = (! (! __rvb_import_value_0)) ? \"n6\" : \"n5\"; break; case \"n5\": damage = Number(((context)[\"damage\"] || 0)); _pc = \"n4\"; break; case \"n4\": _pc = (! (! (! (damage > 0)))) ? \"n3\" : \"n2\"; break; case \"n2\": flow.event.modify(\"damage\", (damage * 1.5)); _pc = \"n1\"; break; case \"n1\": return {success: true, message: ((holder)[\"name\"] + \"触发先手斗气，伤害提高50%\")}; case \"n3\": return {success: false, message: \"\"}; case \"n6\": return {success: false, message: \"\"}; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\");",
+  "contentGraph": {
+    "version": "rvb-content-graph/v1",
+    "surface": "rule",
+    "entry": "n18",
+    "nodes": [
+      {
+        "id": "n1",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "holder"
+                  },
+                  "key": "name"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "触发先手斗气，伤害提高50%"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n2",
+        "kind": "call",
+        "capability": "flow.event.modify",
+        "args": [
+          {
+            "kind": "literal",
+            "value": "damage"
+          },
+          {
+            "kind": "binary",
+            "op": "*",
+            "left": {
+              "kind": "ref",
+              "name": "damage"
+            },
+            "right": {
+              "kind": "literal",
+              "value": 1.5
+            }
+          }
+        ],
+        "next": "n1"
+      },
+      {
+        "id": "n3",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n4",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "unary",
+              "op": "!",
+              "argument": {
+                "kind": "binary",
+                "op": ">",
+                "left": {
+                  "kind": "ref",
+                  "name": "damage"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": 0
+                }
+              }
+            }
+          }
+        },
+        "yes": "n3",
+        "no": "n2"
+      },
+      {
+        "id": "n5",
+        "kind": "bind",
+        "name": "damage",
+        "expr": {
+          "kind": "call",
+          "callee": "Number",
+          "args": [
+            {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "context"
+                },
+                "key": "damage"
+              },
+              "right": {
+                "kind": "literal",
+                "value": 0
+              }
+            }
+          ]
+        },
+        "next": "n4"
+      },
+      {
+        "id": "n6",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n7",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "ref",
+              "name": "__rvb_import_value_0"
+            }
+          }
+        },
+        "yes": "n6",
+        "no": "n5"
+      },
+      {
+        "id": "n9",
+        "kind": "set",
+        "target": {
+          "kind": "ref",
+          "name": "__rvb_import_value_0"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "binary",
+          "op": "===",
+          "left": {
+            "kind": "ref",
+            "name": "__rvb_import_operand_1"
+          },
+          "right": {
+            "kind": "unary",
+            "op": "-",
+            "argument": {
+              "kind": "literal",
+              "value": 1
+            }
+          }
+        },
+        "next": "n7"
+      },
+      {
+        "id": "n8",
+        "kind": "bind",
+        "name": "__rvb_import_operand_1",
+        "expr": {
+          "kind": "collection",
+          "object": {
+            "kind": "ref",
+            "name": "__rvb_import_operand_3"
+          },
+          "method": "indexOf",
+          "args": [
+            {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "victim"
+              },
+              "key": "instanceId"
+            }
+          ]
+        },
+        "next": "n9"
+      },
+      {
+        "id": "n10",
+        "kind": "bind",
+        "name": "__rvb_import_operand_3",
+        "expr": {
+          "kind": "ref",
+          "name": "__rvb_import_effect_2"
+        },
+        "next": "n8"
+      },
+      {
+        "id": "n11",
+        "kind": "call",
+        "capability": "flow.query.pieces",
+        "args": [
+          {
+            "kind": "object",
+            "entries": [
+              {
+                "key": "originId",
+                "value": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "holder"
+                  },
+                  "key": "instanceId"
+                }
+              },
+              {
+                "key": "relation",
+                "value": {
+                  "kind": "literal",
+                  "value": "enemy"
+                }
+              }
+            ]
+          }
+        ],
+        "result": "__rvb_import_effect_2",
+        "next": "n10"
+      },
+      {
+        "id": "n13",
+        "kind": "set",
+        "target": {
+          "kind": "ref",
+          "name": "__rvb_import_value_0"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "ref",
+          "name": "__rvb_import_operand_5"
+        },
+        "next": "n7"
+      },
+      {
+        "id": "n12",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "ref",
+              "name": "__rvb_import_operand_5"
+            }
+          }
+        },
+        "yes": "n13",
+        "no": "n11"
+      },
+      {
+        "id": "n14",
+        "kind": "bind",
+        "name": "__rvb_import_operand_5",
+        "expr": {
+          "kind": "binary",
+          "op": "||",
+          "left": {
+            "kind": "binary",
+            "op": "||",
+            "left": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "binary",
+                "op": "||",
+                "left": {
+                  "kind": "binary",
+                  "op": "||",
+                  "left": {
+                    "kind": "unary",
+                    "op": "!",
+                    "argument": {
+                      "kind": "ref",
+                      "name": "holder"
+                    }
+                  },
+                  "right": {
+                    "kind": "unary",
+                    "op": "!",
+                    "argument": {
+                      "kind": "ref",
+                      "name": "attacker"
+                    }
+                  }
+                },
+                "right": {
+                  "kind": "binary",
+                  "op": "!==",
+                  "left": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "attacker"
+                    },
+                    "key": "instanceId"
+                  },
+                  "right": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "holder"
+                    },
+                    "key": "instanceId"
+                  }
+                }
+              },
+              "right": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "ref",
+                  "name": "victim"
+                }
+              }
+            },
+            "right": {
+              "kind": "binary",
+              "op": "<=",
+              "left": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "victim"
+                },
+                "key": "currentHp"
+              },
+              "right": {
+                "kind": "literal",
+                "value": 0
+              }
+            }
+          },
+          "right": {
+            "kind": "binary",
+            "op": "!==",
+            "left": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "victim"
+              },
+              "key": "currentHp"
+            },
+            "right": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "victim"
+              },
+              "key": "maxHp"
+            }
+          }
+        },
+        "next": "n12"
+      },
+      {
+        "id": "n15",
+        "kind": "bind",
+        "name": "__rvb_import_value_0",
+        "next": "n14",
+        "expr": {
+          "kind": "undefined"
+        }
+      },
+      {
+        "id": "n16",
+        "kind": "bind",
+        "name": "attacker",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "context"
+          },
+          "key": "targetPiece"
+        },
+        "next": "n15"
+      },
+      {
+        "id": "n17",
+        "kind": "bind",
+        "name": "victim",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "context"
+          },
+          "key": "sourcePiece"
+        },
+        "next": "n16"
+      },
+      {
+        "id": "n18",
+        "kind": "bind",
+        "name": "holder",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "context"
+          },
+          "key": "rulePiece"
+        },
+        "next": "n17"
+      }
+    ]
+  },
+  "contentGraphField": "skillCode",
+  "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1"
 }

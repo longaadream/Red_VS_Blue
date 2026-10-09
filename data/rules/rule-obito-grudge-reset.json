@@ -2,6 +2,456 @@
   "id": "rule-obito-grudge-reset",
   "name": "怨念消散",
   "description": "带土己方回合结束时，清除所有怨念层数并重置攻击力加成",
-  "trigger": { "type": "endTurn" },
-  "skillCode": "var obito = context.rulePiece; var battle = context.battle; if (battle.turn.currentPlayerId !== obito.ownerPlayerId) return { success: false, message: '' }; if (!obito.statusTags) return { success: false, message: '' }; var tagIdx = obito.statusTags.findIndex(function(t) { return t.type === 'obito-grudge'; }); if (tagIdx === -1) return { success: false, message: '' }; var tag = obito.statusTags[tagIdx]; var removed = tag.intensity || 0; if (removed > 0) { obito.attack = Math.max(0, obito.attack - removed); } obito.statusTags.splice(tagIdx, 1); return { success: true, message: obito.name + '的怨念消散，攻击力-' + removed + '，现为' + obito.attack };"
+  "trigger": {
+    "type": "endTurn"
+  },
+  "skillCode": "var __rvb_import_operand_0, battle, obito, removed, tag, tagIdx; var _pc = \"n16\"; for (var _step = 0; _step <= 16; _step++) { switch (_pc) { case \"n16\": obito = (context)[\"rulePiece\"]; _pc = \"n15\"; break; case \"n15\": battle = (context)[\"battle\"]; _pc = \"n14\"; break; case \"n14\": _pc = (! (! (((battle)[\"turn\"])[\"currentPlayerId\"] !== (obito)[\"ownerPlayerId\"]))) ? \"n13\" : \"n12\"; break; case \"n12\": _pc = (! (! (! (obito)[\"statusTags\"]))) ? \"n11\" : \"n10\"; break; case \"n10\": __rvb_import_operand_0 = (obito)[\"statusTags\"]; _pc = \"n9\"; break; case \"n9\": tagIdx = (__rvb_import_operand_0)[\"findIndex\"](function (t) { return ((t)[\"type\"] === \"obito-grudge\"); }); _pc = \"n8\"; break; case \"n8\": _pc = (! (! (tagIdx === (- 1)))) ? \"n7\" : \"n6\"; break; case \"n6\": tag = ((obito)[\"statusTags\"])[(function (key) { if (typeof key === \"string\" && key.split(\".\").some(function (part) { return [\"__proto__\",\"arguments\",\"callee\",\"caller\",\"constructor\",\"prototype\"].indexOf(part) !== -1; })) throw new Error(\"unsafe content graph index\"); return key; })(tagIdx)]; _pc = \"n5\"; break; case \"n5\": removed = ((tag)[\"intensity\"] || 0); _pc = \"n4\"; break; case \"n4\": _pc = (! (! (removed > 0))) ? \"n3\" : \"n2\"; break; case \"n3\": (obito)[\"attack\"] = Math.max(0, ((obito)[\"attack\"] - removed)); _pc = \"n2\"; break; case \"n2\": ((obito)[\"statusTags\"]).splice(tagIdx, 1); _pc = \"n1\"; break; case \"n1\": return {success: true, message: (((((obito)[\"name\"] + \"的怨念消散，攻击力-\") + removed) + \"，现为\") + (obito)[\"attack\"])}; case \"n7\": return {success: false, message: \"\"}; case \"n11\": return {success: false, message: \"\"}; case \"n13\": return {success: false, message: \"\"}; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\");",
+  "contentGraph": {
+    "version": "rvb-content-graph/v1",
+    "surface": "rule",
+    "entry": "n16",
+    "nodes": [
+      {
+        "id": "n1",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "binary",
+                  "op": "+",
+                  "left": {
+                    "kind": "binary",
+                    "op": "+",
+                    "left": {
+                      "kind": "binary",
+                      "op": "+",
+                      "left": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "obito"
+                        },
+                        "key": "name"
+                      },
+                      "right": {
+                        "kind": "literal",
+                        "value": "的怨念消散，攻击力-"
+                      }
+                    },
+                    "right": {
+                      "kind": "ref",
+                      "name": "removed"
+                    }
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": "，现为"
+                  }
+                },
+                "right": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "obito"
+                  },
+                  "key": "attack"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n2",
+        "kind": "call",
+        "capability": "array.splice",
+        "args": [
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "obito"
+            },
+            "key": "statusTags"
+          },
+          {
+            "kind": "ref",
+            "name": "tagIdx"
+          },
+          {
+            "kind": "literal",
+            "value": 1
+          }
+        ],
+        "next": "n1"
+      },
+      {
+        "id": "n3",
+        "kind": "set",
+        "target": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "obito"
+          },
+          "key": "attack"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "call",
+          "callee": "Math.max",
+          "args": [
+            {
+              "kind": "literal",
+              "value": 0
+            },
+            {
+              "kind": "binary",
+              "op": "-",
+              "left": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "obito"
+                },
+                "key": "attack"
+              },
+              "right": {
+                "kind": "ref",
+                "name": "removed"
+              }
+            }
+          ]
+        },
+        "next": "n2"
+      },
+      {
+        "id": "n4",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": ">",
+              "left": {
+                "kind": "ref",
+                "name": "removed"
+              },
+              "right": {
+                "kind": "literal",
+                "value": 0
+              }
+            }
+          }
+        },
+        "yes": "n3",
+        "no": "n2"
+      },
+      {
+        "id": "n5",
+        "kind": "bind",
+        "name": "removed",
+        "expr": {
+          "kind": "binary",
+          "op": "||",
+          "left": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "tag"
+            },
+            "key": "intensity"
+          },
+          "right": {
+            "kind": "literal",
+            "value": 0
+          }
+        },
+        "next": "n4"
+      },
+      {
+        "id": "n6",
+        "kind": "bind",
+        "name": "tag",
+        "expr": {
+          "kind": "index",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "obito"
+            },
+            "key": "statusTags"
+          },
+          "index": {
+            "kind": "ref",
+            "name": "tagIdx"
+          }
+        },
+        "next": "n5"
+      },
+      {
+        "id": "n7",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n8",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "===",
+              "left": {
+                "kind": "ref",
+                "name": "tagIdx"
+              },
+              "right": {
+                "kind": "unary",
+                "op": "-",
+                "argument": {
+                  "kind": "literal",
+                  "value": 1
+                }
+              }
+            }
+          }
+        },
+        "yes": "n7",
+        "no": "n6"
+      },
+      {
+        "id": "n9",
+        "kind": "invoke",
+        "target": {
+          "kind": "array",
+          "object": {
+            "kind": "ref",
+            "name": "__rvb_import_operand_0"
+          },
+          "method": "findIndex"
+        },
+        "args": [
+          {
+            "kind": "lambda",
+            "parameters": [
+              "t"
+            ],
+            "body": {
+              "kind": "binary",
+              "op": "===",
+              "left": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "t"
+                },
+                "key": "type"
+              },
+              "right": {
+                "kind": "literal",
+                "value": "obito-grudge"
+              }
+            }
+          }
+        ],
+        "result": "tagIdx",
+        "next": "n8"
+      },
+      {
+        "id": "n10",
+        "kind": "bind",
+        "name": "__rvb_import_operand_0",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "obito"
+          },
+          "key": "statusTags"
+        },
+        "next": "n9"
+      },
+      {
+        "id": "n11",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n12",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "unary",
+              "op": "!",
+              "argument": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "obito"
+                },
+                "key": "statusTags"
+              }
+            }
+          }
+        },
+        "yes": "n11",
+        "no": "n10"
+      },
+      {
+        "id": "n13",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n14",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "!==",
+              "left": {
+                "kind": "get",
+                "object": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "battle"
+                  },
+                  "key": "turn"
+                },
+                "key": "currentPlayerId"
+              },
+              "right": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "obito"
+                },
+                "key": "ownerPlayerId"
+              }
+            }
+          }
+        },
+        "yes": "n13",
+        "no": "n12"
+      },
+      {
+        "id": "n15",
+        "kind": "bind",
+        "name": "battle",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "context"
+          },
+          "key": "battle"
+        },
+        "next": "n14"
+      },
+      {
+        "id": "n16",
+        "kind": "bind",
+        "name": "obito",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "context"
+          },
+          "key": "rulePiece"
+        },
+        "next": "n15"
+      }
+    ]
+  },
+  "contentGraphField": "skillCode",
+  "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1"
 }

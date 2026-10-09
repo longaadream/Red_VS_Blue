@@ -5,5 +5,2613 @@
   "trigger": {
     "type": "afterCardPlay"
   },
-  "skillCode": "var turalyon = context.rulePiece;\nif (!turalyon || turalyon.currentHp <= 0 || context.playerId !== turalyon.ownerPlayerId) return { success: false, message: '' };\nif (['holy-smite', 'holy-heal', 'holy-charge'].indexOf(context.cardId) === -1) return { success: false, message: '' };\nvar turnNumber = battle.turn && battle.turn.turnNumber ? battle.turn.turnNumber : 0;\nif (!battle.extensions) battle.extensions = {}; if (!battle.extensions.turalyonLightforgedTurns) battle.extensions.turalyonLightforgedTurns = {};\nvar firedTurns = battle.extensions.turalyonLightforgedTurns;\nif (context.cancelled) { firedTurns[turalyon.instanceId] = turnNumber; return { success: true, message: turalyon.name + '放弃了本回合的远征移动' }; }\nvar selectedTargets = Array.isArray(context.selectedTargets) ? context.selectedTargets : [];\nif (selectedTargets.length === 0 && firedTurns[turalyon.instanceId] === turnNumber) return { success: false, message: '' };\nfunction livingAt(x, y) { return battle.pieces.find(function(piece) { return piece.currentHp > 0 && piece.x === x && piece.y === y; }); }\nfunction tileAt(x, y) { return battle.map.tiles.find(function(tile) { return tile.x === x && tile.y === y; }); }\nfunction destinationsFor(mover) {\n  var destinations = []; var maxDistance = Math.min(battle.map.width+battle.map.height, Math.max(0, Math.floor((mover.moveRange || 0) + 2))); var directions = [{x:0,y:-1},{x:-1,y:0},{x:1,y:0},{x:0,y:1}];\n  directions.forEach(function(direction) { var trace = flow.query.tracePath(mover, direction, {excludePieceId:mover.instanceId,maxDistance:maxDistance,passAllies:true}); flow.query.landingCells(trace.cells, [mover.instanceId]).filter(function(cell){return canPlaceAdventurePiece(battle,mover,cell.x,cell.y);}).forEach(function(cell){destinations.push({type:'cell',x:cell.x,y:cell.y});}); });\n  return destinations;\n}\nvar allies = battle.pieces.filter(function(piece) { return piece.currentHp > 0 && canAffectAdventureTarget(battle,turalyon.ownerPlayerId,piece,turalyon) && arePlayersAllied(battle, piece.ownerPlayerId, turalyon.ownerPlayerId) && piece.x !== null && piece.y !== null; }).sort(function(a, b) { return a.instanceId < b.instanceId ? -1 : (a.instanceId > b.instanceId ? 1 : 0); });\nif (selectedTargets.length === 0) {\n  var moverCandidates = allies.filter(function(piece) { return destinationsFor(piece).length > 0; }).map(function(piece) { return { type: 'piece', pieceId: piece.instanceId }; });\n  if (moverCandidates.length === 0) { firedTurns[turalyon.instanceId] = turnNumber; return { success: false, message: '' }; }\n  return { success: false, needsTargetSelection: true, playerId: turalyon.ownerPlayerId, title: '圣铸进军：选择一名友方角色', targetType: 'piece', filter: 'ally', canCancel: true, resumeOnCancel: true, targetCandidates: moverCandidates };\n}\nvar moverRef = selectedTargets[0];\nvar mover = moverRef && moverRef.type === 'piece' ? allies.find(function(piece) { return piece.instanceId === moverRef.pieceId; }) : null;\nif (!mover) return { success: false, message: '选择的远征角色已失效' };\nvar destinations = destinationsFor(mover);\nif (selectedTargets.length === 1) {\n  return { success: false, needsTargetSelection: true, playerId: turalyon.ownerPlayerId, title: '圣铸进军：选择' + (mover.name || mover.templateId) + '的落点（点击高亮格）', targetType: 'grid', filter: 'all', canCancel: true, resumeOnCancel: true, targetCandidates: destinations };\n}\nvar destinationRef = selectedTargets[1];\nvar destination = destinationRef && destinationRef.type === 'cell' ? destinations.find(function(cell) { return cell.x === destinationRef.x && cell.y === destinationRef.y; }) : null;\nif (!destination || livingAt(destination.x, destination.y)) return { success: false, message: '远征移动的落点已失效' };\nfiredTurns[turalyon.instanceId] = turnNumber;\nif (!flow.effects.move([{pieceId:mover.instanceId,x:destination.x,y:destination.y}], 'dash', {\"passAllies\":true}).success) return {success:true,message:'位移被阻挡，本次位移效果取消'};\nreturn { success: true, message: mover.name + '完成圣铸进军，移动至(' + mover.x + ',' + mover.y + ')' };"
+  "skillCode": "var __rvb_import_bound_method_14, __rvb_import_bound_method_25, __rvb_import_effect_0, __rvb_import_effect_13, __rvb_import_effect_2, __rvb_import_effect_21, __rvb_import_operand_3, __rvb_import_operand_5, __rvb_import_operand_6, __rvb_import_value_1, allies, destination, destinationRef, destinations, destinationsFor, firedTurns, livingAt, mover, moverCandidates, moverRef, selectedTargets, tileAt, turalyon, turnNumber; var _pc = \"n109\"; for (var _step = 0; _step <= 55; _step++) { switch (_pc) { case \"n109\": turalyon = (context)[\"rulePiece\"]; _pc = \"n108\"; break; case \"n108\": _pc = (! (! (((! turalyon) || ((turalyon)[\"currentHp\"] <= 0)) || ((context)[\"playerId\"] !== (turalyon)[\"ownerPlayerId\"])))) ? \"n107\" : \"n106\"; break; case \"n106\": _pc = (! (! (([\"holy-smite\", \"holy-heal\", \"holy-charge\"])[\"indexOf\"]((context)[\"cardId\"]) === (- 1)))) ? \"n105\" : \"n104\"; break; case \"n104\": turnNumber = (((battle)[\"turn\"] && ((battle)[\"turn\"])[\"turnNumber\"]) ? ((battle)[\"turn\"])[\"turnNumber\"] : 0); _pc = \"n103\"; break; case \"n103\": _pc = (! (! (! (battle)[\"extensions\"]))) ? \"n102\" : \"n101\"; break; case \"n102\": (battle)[\"extensions\"] = {}; _pc = \"n101\"; break; case \"n101\": _pc = (! (! (! ((battle)[\"extensions\"])[\"turalyonLightforgedTurns\"]))) ? \"n100\" : \"n99\"; break; case \"n100\": ((battle)[\"extensions\"])[\"turalyonLightforgedTurns\"] = {}; _pc = \"n99\"; break; case \"n99\": firedTurns = ((battle)[\"extensions\"])[\"turalyonLightforgedTurns\"]; _pc = \"n98\"; break; case \"n98\": _pc = (! (! (context)[\"cancelled\"])) ? \"n97\" : \"n95\"; break; case \"n95\": selectedTargets = (Array.isArray((context)[\"selectedTargets\"]) ? (context)[\"selectedTargets\"] : []); _pc = \"n94\"; break; case \"n94\": _pc = (! (! (((selectedTargets)[\"length\"] === 0) && ((firedTurns)[(function (key) { if (typeof key === \"string\" && key.split(\".\").some(function (part) { return [\"__proto__\",\"arguments\",\"callee\",\"caller\",\"constructor\",\"prototype\"].indexOf(part) !== -1; })) throw new Error(\"unsafe content graph index\"); return key; })((turalyon)[\"instanceId\"])] === turnNumber)))) ? \"n93\" : \"n90\"; break; case \"n90\": livingAt = function (x, y) { { var __rvb_content_graph_region_pc_0 = \"n92\"; while (__rvb_content_graph_region_pc_0 !== \"n91\") { switch (__rvb_content_graph_region_pc_0) { case \"n92\": return ((battle)[\"pieces\"])[\"find\"](function (piece) { return ((((piece)[\"currentHp\"] > 0) && ((piece)[\"x\"] === x)) && ((piece)[\"y\"] === y)); }); default: throw new Error(\"invalid content graph region node\"); } } } }; _pc = \"n87\"; break; case \"n87\": tileAt = function (x, y) { { var __rvb_content_graph_region_pc_1 = \"n89\"; while (__rvb_content_graph_region_pc_1 !== \"n88\") { switch (__rvb_content_graph_region_pc_1) { case \"n89\": return (((battle)[\"map\"])[\"tiles\"])[\"find\"](function (tile) { return (((tile)[\"x\"] === x) && ((tile)[\"y\"] === y)); }); default: throw new Error(\"invalid content graph region node\"); } } } }; _pc = \"n61\"; break; case \"n61\": destinationsFor = function (mover) { var __rvb_import_bound_method_33, destinations, directions, maxDistance; { var __rvb_content_graph_region_pc_2 = \"n86\"; while (__rvb_content_graph_region_pc_2 !== \"n62\") { switch (__rvb_content_graph_region_pc_2) { case \"n86\": destinations = []; __rvb_content_graph_region_pc_2 = \"n85\"; break; case \"n85\": maxDistance = Math.min((((battle)[\"map\"])[\"width\"] + ((battle)[\"map\"])[\"height\"]), Math.max(0, Math.floor((((mover)[\"moveRange\"] || 0) + 2)))); __rvb_content_graph_region_pc_2 = \"n84\"; break; case \"n84\": directions = [{x: 0, y: (- 1)}, {x: (- 1), y: 0}, {x: 1, y: 0}, {x: 0, y: 1}]; __rvb_content_graph_region_pc_2 = \"n83\"; break; case \"n83\": __rvb_import_bound_method_33 = (function (receiver) { var capturedMethod = receiver[\"forEach\"]; return function () { return Reflect.apply(capturedMethod, receiver, arguments); }; })(directions); __rvb_content_graph_region_pc_2 = \"n64\"; break; case \"n64\": (__rvb_import_bound_method_33)(function (direction) { var __rvb_import_bound_method_26, __rvb_import_bound_method_31, __rvb_import_effect_29, __rvb_import_effect_32, trace; { var __rvb_content_graph_region_pc_3 = \"n82\"; while (__rvb_content_graph_region_pc_3 !== \"n65\") { switch (__rvb_content_graph_region_pc_3) { case \"n82\": trace = flow.query.tracePath(mover, direction, {excludePieceId: (mover)[\"instanceId\"], maxDistance: maxDistance, passAllies: true}); __rvb_content_graph_region_pc_3 = \"n81\"; break; case \"n81\": __rvb_import_effect_32 = flow.query.landingCells((trace)[\"cells\"], [(mover)[\"instanceId\"]]); __rvb_content_graph_region_pc_3 = \"n80\"; break; case \"n80\": __rvb_import_bound_method_31 = (function (receiver) { var capturedMethod = receiver[\"filter\"]; return function () { return Reflect.apply(capturedMethod, receiver, arguments); }; })(__rvb_import_effect_32); __rvb_content_graph_region_pc_3 = \"n76\"; break; case \"n76\": __rvb_import_effect_29 = (__rvb_import_bound_method_31)(function (cell) { var __rvb_import_effect_30; { var __rvb_content_graph_region_pc_4 = \"n79\"; while (__rvb_content_graph_region_pc_4 !== \"n77\") { switch (__rvb_content_graph_region_pc_4) { case \"n79\": __rvb_import_effect_30 = canPlaceAdventurePiece(battle, mover, (cell)[\"x\"], (cell)[\"y\"]); __rvb_content_graph_region_pc_4 = \"n78\"; break; case \"n78\": return __rvb_import_effect_30; default: throw new Error(\"invalid content graph region node\"); } } } }); __rvb_content_graph_region_pc_3 = \"n75\"; break; case \"n75\": __rvb_import_bound_method_26 = (function (receiver) { var capturedMethod = receiver[\"forEach\"]; return function () { return Reflect.apply(capturedMethod, receiver, arguments); }; })(__rvb_import_effect_29); __rvb_content_graph_region_pc_3 = \"n66\"; break; case \"n66\": (__rvb_import_bound_method_26)(function (cell) { { var __rvb_content_graph_region_pc_5 = \"n68\"; while (__rvb_content_graph_region_pc_5 !== \"n67\") { switch (__rvb_content_graph_region_pc_5) { case \"n68\": (destinations).push({type: \"cell\", x: (cell)[\"x\"], y: (cell)[\"y\"]}); __rvb_content_graph_region_pc_5 = \"n67\"; break; case \"n67\": __rvb_content_graph_region_pc_5 = \"n67\"; break; default: throw new Error(\"invalid content graph region node\"); } } } }); __rvb_content_graph_region_pc_3 = \"n65\"; break; case \"n65\": __rvb_content_graph_region_pc_3 = \"n65\"; break; default: throw new Error(\"invalid content graph region node\"); } } } }); __rvb_content_graph_region_pc_2 = \"n63\"; break; case \"n63\": return destinations; default: throw new Error(\"invalid content graph region node\"); } } } }; _pc = \"n60\"; break; case \"n60\": allies = (((battle)[\"pieces\"])[\"filter\"](function (piece) { return ((((((piece)[\"currentHp\"] > 0) && canAffectAdventureTarget(battle, (turalyon)[\"ownerPlayerId\"], piece, turalyon)) && arePlayersAllied(battle, (piece)[\"ownerPlayerId\"], (turalyon)[\"ownerPlayerId\"])) && ((piece)[\"x\"] !== null)) && ((piece)[\"y\"] !== null)); })).sort(function (a, b) { return (((a)[\"instanceId\"] < (b)[\"instanceId\"]) ? (- 1) : (((a)[\"instanceId\"] > (b)[\"instanceId\"]) ? 1 : 0)); }); _pc = \"n59\"; break; case \"n59\": _pc = (! (! ((selectedTargets)[\"length\"] === 0))) ? \"n58\" : \"n24\"; break; case \"n24\": moverRef = (selectedTargets)[0]; _pc = \"n23\"; break; case \"n23\": mover = ((moverRef && ((moverRef)[\"type\"] === \"piece\")) ? (allies)[\"find\"](function (piece) { return ((piece)[\"instanceId\"] === (moverRef)[\"pieceId\"]); }) : null); _pc = \"n22\"; break; case \"n22\": _pc = (! (! (! mover))) ? \"n21\" : \"n20\"; break; case \"n20\": __rvb_import_operand_6 = destinationsFor; _pc = \"n19\"; break; case \"n19\": destinations = (__rvb_import_operand_6)(mover); _pc = \"n18\"; break; case \"n18\": _pc = (! (! ((selectedTargets)[\"length\"] === 1))) ? \"n17\" : \"n16\"; break; case \"n16\": destinationRef = (selectedTargets)[1]; _pc = \"n15\"; break; case \"n15\": destination = ((destinationRef && ((destinationRef)[\"type\"] === \"cell\")) ? (destinations)[\"find\"](function (cell) { return (((cell)[\"x\"] === (destinationRef)[\"x\"]) && ((cell)[\"y\"] === (destinationRef)[\"y\"])); }) : null); _pc = \"n14\"; break; case \"n14\": __rvb_import_value_1 = (void 0); _pc = \"n13\"; break; case \"n13\": __rvb_import_operand_5 = (! destination); _pc = \"n11\"; break; case \"n11\": _pc = (! (! __rvb_import_operand_5)) ? \"n12\" : \"n10\"; break; case \"n10\": __rvb_import_operand_3 = livingAt; _pc = \"n9\"; break; case \"n9\": __rvb_import_effect_2 = (__rvb_import_operand_3)((destination)[\"x\"], (destination)[\"y\"]); _pc = \"n8\"; break; case \"n8\": __rvb_import_value_1 = __rvb_import_effect_2; _pc = \"n7\"; break; case \"n12\": __rvb_import_value_1 = __rvb_import_operand_5; _pc = \"n7\"; break; case \"n7\": _pc = (! (! __rvb_import_value_1)) ? \"n6\" : \"n5\"; break; case \"n5\": (firedTurns)[(function (key) { if (typeof key === \"string\" && key.split(\".\").some(function (part) { return [\"__proto__\",\"arguments\",\"callee\",\"caller\",\"constructor\",\"prototype\"].indexOf(part) !== -1; })) throw new Error(\"unsafe content graph index\"); return key; })((turalyon)[\"instanceId\"])] = turnNumber; _pc = \"n4\"; break; case \"n4\": __rvb_import_effect_0 = flow.effects.move([{pieceId: (mover)[\"instanceId\"], x: (destination)[\"x\"], y: (destination)[\"y\"]}], \"dash\", {passAllies: true}); _pc = \"n3\"; break; case \"n3\": _pc = (! (! (! (__rvb_import_effect_0)[\"success\"]))) ? \"n2\" : \"n1\"; break; case \"n1\": return {success: true, message: ((((((mover)[\"name\"] + \"完成圣铸进军，移动至(\") + (mover)[\"x\"]) + \",\") + (mover)[\"y\"]) + \")\")}; case \"n2\": return {success: true, message: \"位移被阻挡，本次位移效果取消\"}; case \"n6\": return {success: false, message: \"远征移动的落点已失效\"}; case \"n17\": return {success: false, needsTargetSelection: true, playerId: (turalyon)[\"ownerPlayerId\"], title: ((\"圣铸进军：选择\" + ((mover)[\"name\"] || (mover)[\"templateId\"])) + \"的落点（点击高亮格）\"), targetType: \"grid\", filter: \"all\", canCancel: true, resumeOnCancel: true, targetCandidates: destinations}; case \"n21\": return {success: false, message: \"选择的远征角色已失效\"}; case \"n58\": __rvb_import_bound_method_25 = (function (receiver) { var capturedMethod = receiver[\"filter\"]; return function () { return Reflect.apply(capturedMethod, receiver, arguments); }; })(allies); _pc = \"n52\"; break; case \"n52\": __rvb_import_effect_21 = (__rvb_import_bound_method_25)(function (piece) { var __rvb_import_effect_22, __rvb_import_operand_23, __rvb_import_operand_24; { var __rvb_content_graph_region_pc_6 = \"n57\"; while (__rvb_content_graph_region_pc_6 !== \"n53\") { switch (__rvb_content_graph_region_pc_6) { case \"n57\": __rvb_import_operand_24 = destinationsFor; __rvb_content_graph_region_pc_6 = \"n56\"; break; case \"n56\": __rvb_import_effect_22 = (__rvb_import_operand_24)(piece); __rvb_content_graph_region_pc_6 = \"n54\"; break; case \"n54\": __rvb_import_operand_23 = (__rvb_import_effect_22)[\"length\"]; __rvb_content_graph_region_pc_6 = \"n55\"; break; case \"n55\": return (__rvb_import_operand_23 > 0); default: throw new Error(\"invalid content graph region node\"); } } } }); _pc = \"n51\"; break; case \"n51\": __rvb_import_bound_method_14 = (function (receiver) { var capturedMethod = receiver[\"map\"]; return function () { return Reflect.apply(capturedMethod, receiver, arguments); }; })(__rvb_import_effect_21); _pc = \"n40\"; break; case \"n40\": __rvb_import_effect_13 = (__rvb_import_bound_method_14)(function (piece) { return {type: \"piece\", pieceId: (piece)[\"instanceId\"]}; }); _pc = \"n39\"; break; case \"n39\": moverCandidates = __rvb_import_effect_13; _pc = \"n28\"; break; case \"n28\": _pc = (! (! ((moverCandidates)[\"length\"] === 0))) ? \"n27\" : \"n25\"; break; case \"n25\": return {success: false, needsTargetSelection: true, playerId: (turalyon)[\"ownerPlayerId\"], title: \"圣铸进军：选择一名友方角色\", targetType: \"piece\", filter: \"ally\", canCancel: true, resumeOnCancel: true, targetCandidates: moverCandidates}; case \"n27\": (firedTurns)[(function (key) { if (typeof key === \"string\" && key.split(\".\").some(function (part) { return [\"__proto__\",\"arguments\",\"callee\",\"caller\",\"constructor\",\"prototype\"].indexOf(part) !== -1; })) throw new Error(\"unsafe content graph index\"); return key; })((turalyon)[\"instanceId\"])] = turnNumber; _pc = \"n26\"; break; case \"n26\": return {success: false, message: \"\"}; case \"n93\": return {success: false, message: \"\"}; case \"n97\": (firedTurns)[(function (key) { if (typeof key === \"string\" && key.split(\".\").some(function (part) { return [\"__proto__\",\"arguments\",\"callee\",\"caller\",\"constructor\",\"prototype\"].indexOf(part) !== -1; })) throw new Error(\"unsafe content graph index\"); return key; })((turalyon)[\"instanceId\"])] = turnNumber; _pc = \"n96\"; break; case \"n96\": return {success: true, message: ((turalyon)[\"name\"] + \"放弃了本回合的远征移动\")}; case \"n105\": return {success: false, message: \"\"}; case \"n107\": return {success: false, message: \"\"}; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\");",
+  "contentGraph": {
+    "version": "rvb-content-graph/v1",
+    "surface": "rule",
+    "entry": "n109",
+    "nodes": [
+      {
+        "id": "n1",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "binary",
+                  "op": "+",
+                  "left": {
+                    "kind": "binary",
+                    "op": "+",
+                    "left": {
+                      "kind": "binary",
+                      "op": "+",
+                      "left": {
+                        "kind": "binary",
+                        "op": "+",
+                        "left": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "mover"
+                          },
+                          "key": "name"
+                        },
+                        "right": {
+                          "kind": "literal",
+                          "value": "完成圣铸进军，移动至("
+                        }
+                      },
+                      "right": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "mover"
+                        },
+                        "key": "x"
+                      }
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": ","
+                    }
+                  },
+                  "right": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "mover"
+                    },
+                    "key": "y"
+                  }
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": ")"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n2",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": "位移被阻挡，本次位移效果取消"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n3",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "unary",
+              "op": "!",
+              "argument": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "__rvb_import_effect_0"
+                },
+                "key": "success"
+              }
+            }
+          }
+        },
+        "yes": "n2",
+        "no": "n1"
+      },
+      {
+        "id": "n4",
+        "kind": "call",
+        "capability": "flow.effects.move",
+        "args": [
+          {
+            "kind": "array",
+            "items": [
+              {
+                "kind": "object",
+                "entries": [
+                  {
+                    "key": "pieceId",
+                    "value": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "mover"
+                      },
+                      "key": "instanceId"
+                    }
+                  },
+                  {
+                    "key": "x",
+                    "value": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "destination"
+                      },
+                      "key": "x"
+                    }
+                  },
+                  {
+                    "key": "y",
+                    "value": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "destination"
+                      },
+                      "key": "y"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "kind": "literal",
+            "value": "dash"
+          },
+          {
+            "kind": "object",
+            "entries": [
+              {
+                "key": "passAllies",
+                "value": {
+                  "kind": "literal",
+                  "value": true
+                }
+              }
+            ]
+          }
+        ],
+        "result": "__rvb_import_effect_0",
+        "next": "n3"
+      },
+      {
+        "id": "n5",
+        "kind": "set",
+        "target": {
+          "kind": "index",
+          "object": {
+            "kind": "ref",
+            "name": "firedTurns"
+          },
+          "index": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "turalyon"
+            },
+            "key": "instanceId"
+          }
+        },
+        "operator": "=",
+        "value": {
+          "kind": "ref",
+          "name": "turnNumber"
+        },
+        "next": "n4"
+      },
+      {
+        "id": "n6",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": "远征移动的落点已失效"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n7",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "ref",
+              "name": "__rvb_import_value_1"
+            }
+          }
+        },
+        "yes": "n6",
+        "no": "n5"
+      },
+      {
+        "id": "n8",
+        "kind": "set",
+        "target": {
+          "kind": "ref",
+          "name": "__rvb_import_value_1"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "ref",
+          "name": "__rvb_import_effect_2"
+        },
+        "next": "n7"
+      },
+      {
+        "id": "n9",
+        "kind": "invoke",
+        "target": {
+          "kind": "function",
+          "value": {
+            "kind": "ref",
+            "name": "__rvb_import_operand_3"
+          }
+        },
+        "args": [
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "destination"
+            },
+            "key": "x"
+          },
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "destination"
+            },
+            "key": "y"
+          }
+        ],
+        "result": "__rvb_import_effect_2",
+        "next": "n8"
+      },
+      {
+        "id": "n10",
+        "kind": "bind",
+        "name": "__rvb_import_operand_3",
+        "expr": {
+          "kind": "ref",
+          "name": "livingAt"
+        },
+        "next": "n9"
+      },
+      {
+        "id": "n12",
+        "kind": "set",
+        "target": {
+          "kind": "ref",
+          "name": "__rvb_import_value_1"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "ref",
+          "name": "__rvb_import_operand_5"
+        },
+        "next": "n7"
+      },
+      {
+        "id": "n11",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "ref",
+              "name": "__rvb_import_operand_5"
+            }
+          }
+        },
+        "yes": "n12",
+        "no": "n10"
+      },
+      {
+        "id": "n13",
+        "kind": "bind",
+        "name": "__rvb_import_operand_5",
+        "expr": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "ref",
+            "name": "destination"
+          }
+        },
+        "next": "n11"
+      },
+      {
+        "id": "n14",
+        "kind": "bind",
+        "name": "__rvb_import_value_1",
+        "next": "n13",
+        "expr": {
+          "kind": "undefined"
+        }
+      },
+      {
+        "id": "n15",
+        "kind": "bind",
+        "name": "destination",
+        "expr": {
+          "kind": "conditional",
+          "test": {
+            "kind": "binary",
+            "op": "&&",
+            "left": {
+              "kind": "ref",
+              "name": "destinationRef"
+            },
+            "right": {
+              "kind": "binary",
+              "op": "===",
+              "left": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "destinationRef"
+                },
+                "key": "type"
+              },
+              "right": {
+                "kind": "literal",
+                "value": "cell"
+              }
+            }
+          },
+          "consequent": {
+            "kind": "collection",
+            "object": {
+              "kind": "ref",
+              "name": "destinations"
+            },
+            "method": "find",
+            "args": [
+              {
+                "kind": "lambda",
+                "parameters": [
+                  "cell"
+                ],
+                "body": {
+                  "kind": "binary",
+                  "op": "&&",
+                  "left": {
+                    "kind": "binary",
+                    "op": "===",
+                    "left": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "cell"
+                      },
+                      "key": "x"
+                    },
+                    "right": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "destinationRef"
+                      },
+                      "key": "x"
+                    }
+                  },
+                  "right": {
+                    "kind": "binary",
+                    "op": "===",
+                    "left": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "cell"
+                      },
+                      "key": "y"
+                    },
+                    "right": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "destinationRef"
+                      },
+                      "key": "y"
+                    }
+                  }
+                }
+              }
+            ]
+          },
+          "alternate": {
+            "kind": "literal",
+            "value": null
+          }
+        },
+        "next": "n14"
+      },
+      {
+        "id": "n16",
+        "kind": "bind",
+        "name": "destinationRef",
+        "expr": {
+          "kind": "index",
+          "object": {
+            "kind": "ref",
+            "name": "selectedTargets"
+          },
+          "index": {
+            "kind": "literal",
+            "value": 1
+          }
+        },
+        "next": "n15"
+      },
+      {
+        "id": "n17",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "needsTargetSelection",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "playerId",
+              "value": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "turalyon"
+                },
+                "key": "ownerPlayerId"
+              }
+            },
+            {
+              "key": "title",
+              "value": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "binary",
+                  "op": "+",
+                  "left": {
+                    "kind": "literal",
+                    "value": "圣铸进军：选择"
+                  },
+                  "right": {
+                    "kind": "binary",
+                    "op": "||",
+                    "left": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "mover"
+                      },
+                      "key": "name"
+                    },
+                    "right": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "mover"
+                      },
+                      "key": "templateId"
+                    }
+                  }
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "的落点（点击高亮格）"
+                }
+              }
+            },
+            {
+              "key": "targetType",
+              "value": {
+                "kind": "literal",
+                "value": "grid"
+              }
+            },
+            {
+              "key": "filter",
+              "value": {
+                "kind": "literal",
+                "value": "all"
+              }
+            },
+            {
+              "key": "canCancel",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "resumeOnCancel",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "targetCandidates",
+              "value": {
+                "kind": "ref",
+                "name": "destinations"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n18",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "===",
+              "left": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "selectedTargets"
+                },
+                "key": "length"
+              },
+              "right": {
+                "kind": "literal",
+                "value": 1
+              }
+            }
+          }
+        },
+        "yes": "n17",
+        "no": "n16"
+      },
+      {
+        "id": "n19",
+        "kind": "invoke",
+        "target": {
+          "kind": "function",
+          "value": {
+            "kind": "ref",
+            "name": "__rvb_import_operand_6"
+          }
+        },
+        "args": [
+          {
+            "kind": "ref",
+            "name": "mover"
+          }
+        ],
+        "result": "destinations",
+        "next": "n18"
+      },
+      {
+        "id": "n20",
+        "kind": "bind",
+        "name": "__rvb_import_operand_6",
+        "expr": {
+          "kind": "ref",
+          "name": "destinationsFor"
+        },
+        "next": "n19"
+      },
+      {
+        "id": "n21",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": "选择的远征角色已失效"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n22",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "unary",
+              "op": "!",
+              "argument": {
+                "kind": "ref",
+                "name": "mover"
+              }
+            }
+          }
+        },
+        "yes": "n21",
+        "no": "n20"
+      },
+      {
+        "id": "n23",
+        "kind": "bind",
+        "name": "mover",
+        "expr": {
+          "kind": "conditional",
+          "test": {
+            "kind": "binary",
+            "op": "&&",
+            "left": {
+              "kind": "ref",
+              "name": "moverRef"
+            },
+            "right": {
+              "kind": "binary",
+              "op": "===",
+              "left": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "moverRef"
+                },
+                "key": "type"
+              },
+              "right": {
+                "kind": "literal",
+                "value": "piece"
+              }
+            }
+          },
+          "consequent": {
+            "kind": "collection",
+            "object": {
+              "kind": "ref",
+              "name": "allies"
+            },
+            "method": "find",
+            "args": [
+              {
+                "kind": "lambda",
+                "parameters": [
+                  "piece"
+                ],
+                "body": {
+                  "kind": "binary",
+                  "op": "===",
+                  "left": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "piece"
+                    },
+                    "key": "instanceId"
+                  },
+                  "right": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "moverRef"
+                    },
+                    "key": "pieceId"
+                  }
+                }
+              }
+            ]
+          },
+          "alternate": {
+            "kind": "literal",
+            "value": null
+          }
+        },
+        "next": "n22"
+      },
+      {
+        "id": "n24",
+        "kind": "bind",
+        "name": "moverRef",
+        "expr": {
+          "kind": "index",
+          "object": {
+            "kind": "ref",
+            "name": "selectedTargets"
+          },
+          "index": {
+            "kind": "literal",
+            "value": 0
+          }
+        },
+        "next": "n23"
+      },
+      {
+        "id": "n25",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "needsTargetSelection",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "playerId",
+              "value": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "turalyon"
+                },
+                "key": "ownerPlayerId"
+              }
+            },
+            {
+              "key": "title",
+              "value": {
+                "kind": "literal",
+                "value": "圣铸进军：选择一名友方角色"
+              }
+            },
+            {
+              "key": "targetType",
+              "value": {
+                "kind": "literal",
+                "value": "piece"
+              }
+            },
+            {
+              "key": "filter",
+              "value": {
+                "kind": "literal",
+                "value": "ally"
+              }
+            },
+            {
+              "key": "canCancel",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "resumeOnCancel",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "targetCandidates",
+              "value": {
+                "kind": "ref",
+                "name": "moverCandidates"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n26",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n27",
+        "kind": "set",
+        "target": {
+          "kind": "index",
+          "object": {
+            "kind": "ref",
+            "name": "firedTurns"
+          },
+          "index": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "turalyon"
+            },
+            "key": "instanceId"
+          }
+        },
+        "operator": "=",
+        "value": {
+          "kind": "ref",
+          "name": "turnNumber"
+        },
+        "next": "n26"
+      },
+      {
+        "id": "n28",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "===",
+              "left": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "moverCandidates"
+                },
+                "key": "length"
+              },
+              "right": {
+                "kind": "literal",
+                "value": 0
+              }
+            }
+          }
+        },
+        "yes": "n27",
+        "no": "n25"
+      },
+      {
+        "id": "n39",
+        "kind": "bind",
+        "name": "moverCandidates",
+        "expr": {
+          "kind": "ref",
+          "name": "__rvb_import_effect_13"
+        },
+        "next": "n28"
+      },
+      {
+        "id": "n40",
+        "kind": "invoke",
+        "target": {
+          "kind": "function",
+          "value": {
+            "kind": "ref",
+            "name": "__rvb_import_bound_method_14"
+          }
+        },
+        "args": [
+          {
+            "kind": "lambda",
+            "parameters": [
+              "piece"
+            ],
+            "body": {
+              "kind": "object",
+              "entries": [
+                {
+                  "key": "type",
+                  "value": {
+                    "kind": "literal",
+                    "value": "piece"
+                  }
+                },
+                {
+                  "key": "pieceId",
+                  "value": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "piece"
+                    },
+                    "key": "instanceId"
+                  }
+                }
+              ]
+            }
+          }
+        ],
+        "result": "__rvb_import_effect_13",
+        "next": "n39"
+      },
+      {
+        "id": "n51",
+        "kind": "bind",
+        "name": "__rvb_import_bound_method_14",
+        "expr": {
+          "kind": "boundMethod",
+          "object": {
+            "kind": "ref",
+            "name": "__rvb_import_effect_21"
+          },
+          "method": "map"
+        },
+        "next": "n40"
+      },
+      {
+        "id": "n52",
+        "kind": "invoke",
+        "target": {
+          "kind": "function",
+          "value": {
+            "kind": "ref",
+            "name": "__rvb_import_bound_method_25"
+          }
+        },
+        "args": [
+          {
+            "kind": "function",
+            "parameters": [
+              "piece"
+            ],
+            "body": {
+              "entry": "n57",
+              "end": "n53",
+              "nodes": [
+                {
+                  "id": "n55",
+                  "kind": "return",
+                  "value": {
+                    "kind": "binary",
+                    "op": ">",
+                    "left": {
+                      "kind": "ref",
+                      "name": "__rvb_import_operand_23"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": 0
+                    }
+                  }
+                },
+                {
+                  "id": "n54",
+                  "kind": "bind",
+                  "name": "__rvb_import_operand_23",
+                  "expr": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "__rvb_import_effect_22"
+                    },
+                    "key": "length"
+                  },
+                  "next": "n55"
+                },
+                {
+                  "id": "n56",
+                  "kind": "invoke",
+                  "target": {
+                    "kind": "function",
+                    "value": {
+                      "kind": "ref",
+                      "name": "__rvb_import_operand_24"
+                    }
+                  },
+                  "args": [
+                    {
+                      "kind": "ref",
+                      "name": "piece"
+                    }
+                  ],
+                  "result": "__rvb_import_effect_22",
+                  "next": "n54"
+                },
+                {
+                  "id": "n57",
+                  "kind": "bind",
+                  "name": "__rvb_import_operand_24",
+                  "expr": {
+                    "kind": "ref",
+                    "name": "destinationsFor"
+                  },
+                  "next": "n56"
+                },
+                {
+                  "id": "n53",
+                  "kind": "regionEnd"
+                }
+              ]
+            }
+          }
+        ],
+        "result": "__rvb_import_effect_21",
+        "next": "n51"
+      },
+      {
+        "id": "n58",
+        "kind": "bind",
+        "name": "__rvb_import_bound_method_25",
+        "expr": {
+          "kind": "boundMethod",
+          "object": {
+            "kind": "ref",
+            "name": "allies"
+          },
+          "method": "filter"
+        },
+        "next": "n52"
+      },
+      {
+        "id": "n59",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "===",
+              "left": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "selectedTargets"
+                },
+                "key": "length"
+              },
+              "right": {
+                "kind": "literal",
+                "value": 0
+              }
+            }
+          }
+        },
+        "yes": "n58",
+        "no": "n24"
+      },
+      {
+        "id": "n60",
+        "kind": "call",
+        "capability": "array.sort",
+        "args": [
+          {
+            "kind": "collection",
+            "object": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "battle"
+              },
+              "key": "pieces"
+            },
+            "method": "filter",
+            "args": [
+              {
+                "kind": "lambda",
+                "parameters": [
+                  "piece"
+                ],
+                "body": {
+                  "kind": "binary",
+                  "op": "&&",
+                  "left": {
+                    "kind": "binary",
+                    "op": "&&",
+                    "left": {
+                      "kind": "binary",
+                      "op": "&&",
+                      "left": {
+                        "kind": "binary",
+                        "op": "&&",
+                        "left": {
+                          "kind": "binary",
+                          "op": ">",
+                          "left": {
+                            "kind": "get",
+                            "object": {
+                              "kind": "ref",
+                              "name": "piece"
+                            },
+                            "key": "currentHp"
+                          },
+                          "right": {
+                            "kind": "literal",
+                            "value": 0
+                          }
+                        },
+                        "right": {
+                          "kind": "call",
+                          "callee": "canAffectAdventureTarget",
+                          "args": [
+                            {
+                              "kind": "ref",
+                              "name": "battle"
+                            },
+                            {
+                              "kind": "get",
+                              "object": {
+                                "kind": "ref",
+                                "name": "turalyon"
+                              },
+                              "key": "ownerPlayerId"
+                            },
+                            {
+                              "kind": "ref",
+                              "name": "piece"
+                            },
+                            {
+                              "kind": "ref",
+                              "name": "turalyon"
+                            }
+                          ]
+                        }
+                      },
+                      "right": {
+                        "kind": "call",
+                        "callee": "arePlayersAllied",
+                        "args": [
+                          {
+                            "kind": "ref",
+                            "name": "battle"
+                          },
+                          {
+                            "kind": "get",
+                            "object": {
+                              "kind": "ref",
+                              "name": "piece"
+                            },
+                            "key": "ownerPlayerId"
+                          },
+                          {
+                            "kind": "get",
+                            "object": {
+                              "kind": "ref",
+                              "name": "turalyon"
+                            },
+                            "key": "ownerPlayerId"
+                          }
+                        ]
+                      }
+                    },
+                    "right": {
+                      "kind": "binary",
+                      "op": "!==",
+                      "left": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "piece"
+                        },
+                        "key": "x"
+                      },
+                      "right": {
+                        "kind": "literal",
+                        "value": null
+                      }
+                    }
+                  },
+                  "right": {
+                    "kind": "binary",
+                    "op": "!==",
+                    "left": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "piece"
+                      },
+                      "key": "y"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": null
+                    }
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "kind": "lambda",
+            "parameters": [
+              "a",
+              "b"
+            ],
+            "body": {
+              "kind": "conditional",
+              "test": {
+                "kind": "binary",
+                "op": "<",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "a"
+                  },
+                  "key": "instanceId"
+                },
+                "right": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "b"
+                  },
+                  "key": "instanceId"
+                }
+              },
+              "consequent": {
+                "kind": "unary",
+                "op": "-",
+                "argument": {
+                  "kind": "literal",
+                  "value": 1
+                }
+              },
+              "alternate": {
+                "kind": "conditional",
+                "test": {
+                  "kind": "binary",
+                  "op": ">",
+                  "left": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "a"
+                    },
+                    "key": "instanceId"
+                  },
+                  "right": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "b"
+                    },
+                    "key": "instanceId"
+                  }
+                },
+                "consequent": {
+                  "kind": "literal",
+                  "value": 1
+                },
+                "alternate": {
+                  "kind": "literal",
+                  "value": 0
+                }
+              }
+            }
+          }
+        ],
+        "result": "allies",
+        "next": "n59"
+      },
+      {
+        "id": "n61",
+        "kind": "bind",
+        "name": "destinationsFor",
+        "expr": {
+          "kind": "function",
+          "parameters": [
+            "mover"
+          ],
+          "body": {
+            "entry": "n86",
+            "end": "n62",
+            "nodes": [
+              {
+                "id": "n63",
+                "kind": "return",
+                "value": {
+                  "kind": "ref",
+                  "name": "destinations"
+                }
+              },
+              {
+                "id": "n64",
+                "kind": "invoke",
+                "target": {
+                  "kind": "function",
+                  "value": {
+                    "kind": "ref",
+                    "name": "__rvb_import_bound_method_33"
+                  }
+                },
+                "args": [
+                  {
+                    "kind": "function",
+                    "parameters": [
+                      "direction"
+                    ],
+                    "body": {
+                      "entry": "n82",
+                      "end": "n65",
+                      "nodes": [
+                        {
+                          "id": "n65",
+                          "kind": "regionEnd"
+                        },
+                        {
+                          "id": "n66",
+                          "kind": "invoke",
+                          "target": {
+                            "kind": "function",
+                            "value": {
+                              "kind": "ref",
+                              "name": "__rvb_import_bound_method_26"
+                            }
+                          },
+                          "args": [
+                            {
+                              "kind": "function",
+                              "parameters": [
+                                "cell"
+                              ],
+                              "body": {
+                                "entry": "n68",
+                                "end": "n67",
+                                "nodes": [
+                                  {
+                                    "id": "n67",
+                                    "kind": "regionEnd"
+                                  },
+                                  {
+                                    "id": "n68",
+                                    "kind": "call",
+                                    "capability": "array.push",
+                                    "args": [
+                                      {
+                                        "kind": "ref",
+                                        "name": "destinations"
+                                      },
+                                      {
+                                        "kind": "object",
+                                        "entries": [
+                                          {
+                                            "key": "type",
+                                            "value": {
+                                              "kind": "literal",
+                                              "value": "cell"
+                                            }
+                                          },
+                                          {
+                                            "key": "x",
+                                            "value": {
+                                              "kind": "get",
+                                              "object": {
+                                                "kind": "ref",
+                                                "name": "cell"
+                                              },
+                                              "key": "x"
+                                            }
+                                          },
+                                          {
+                                            "key": "y",
+                                            "value": {
+                                              "kind": "get",
+                                              "object": {
+                                                "kind": "ref",
+                                                "name": "cell"
+                                              },
+                                              "key": "y"
+                                            }
+                                          }
+                                        ]
+                                      }
+                                    ],
+                                    "next": "n67"
+                                  }
+                                ]
+                              }
+                            }
+                          ],
+                          "next": "n65"
+                        },
+                        {
+                          "id": "n75",
+                          "kind": "bind",
+                          "name": "__rvb_import_bound_method_26",
+                          "expr": {
+                            "kind": "boundMethod",
+                            "object": {
+                              "kind": "ref",
+                              "name": "__rvb_import_effect_29"
+                            },
+                            "method": "forEach"
+                          },
+                          "next": "n66"
+                        },
+                        {
+                          "id": "n76",
+                          "kind": "invoke",
+                          "target": {
+                            "kind": "function",
+                            "value": {
+                              "kind": "ref",
+                              "name": "__rvb_import_bound_method_31"
+                            }
+                          },
+                          "args": [
+                            {
+                              "kind": "function",
+                              "parameters": [
+                                "cell"
+                              ],
+                              "body": {
+                                "entry": "n79",
+                                "end": "n77",
+                                "nodes": [
+                                  {
+                                    "id": "n78",
+                                    "kind": "return",
+                                    "value": {
+                                      "kind": "ref",
+                                      "name": "__rvb_import_effect_30"
+                                    }
+                                  },
+                                  {
+                                    "id": "n79",
+                                    "kind": "call",
+                                    "capability": "canPlaceAdventurePiece",
+                                    "args": [
+                                      {
+                                        "kind": "ref",
+                                        "name": "battle"
+                                      },
+                                      {
+                                        "kind": "ref",
+                                        "name": "mover"
+                                      },
+                                      {
+                                        "kind": "get",
+                                        "object": {
+                                          "kind": "ref",
+                                          "name": "cell"
+                                        },
+                                        "key": "x"
+                                      },
+                                      {
+                                        "kind": "get",
+                                        "object": {
+                                          "kind": "ref",
+                                          "name": "cell"
+                                        },
+                                        "key": "y"
+                                      }
+                                    ],
+                                    "result": "__rvb_import_effect_30",
+                                    "next": "n78"
+                                  },
+                                  {
+                                    "id": "n77",
+                                    "kind": "regionEnd"
+                                  }
+                                ]
+                              }
+                            }
+                          ],
+                          "result": "__rvb_import_effect_29",
+                          "next": "n75"
+                        },
+                        {
+                          "id": "n80",
+                          "kind": "bind",
+                          "name": "__rvb_import_bound_method_31",
+                          "expr": {
+                            "kind": "boundMethod",
+                            "object": {
+                              "kind": "ref",
+                              "name": "__rvb_import_effect_32"
+                            },
+                            "method": "filter"
+                          },
+                          "next": "n76"
+                        },
+                        {
+                          "id": "n81",
+                          "kind": "call",
+                          "capability": "flow.query.landingCells",
+                          "args": [
+                            {
+                              "kind": "get",
+                              "object": {
+                                "kind": "ref",
+                                "name": "trace"
+                              },
+                              "key": "cells"
+                            },
+                            {
+                              "kind": "array",
+                              "items": [
+                                {
+                                  "kind": "get",
+                                  "object": {
+                                    "kind": "ref",
+                                    "name": "mover"
+                                  },
+                                  "key": "instanceId"
+                                }
+                              ]
+                            }
+                          ],
+                          "result": "__rvb_import_effect_32",
+                          "next": "n80"
+                        },
+                        {
+                          "id": "n82",
+                          "kind": "call",
+                          "capability": "flow.query.tracePath",
+                          "args": [
+                            {
+                              "kind": "ref",
+                              "name": "mover"
+                            },
+                            {
+                              "kind": "ref",
+                              "name": "direction"
+                            },
+                            {
+                              "kind": "object",
+                              "entries": [
+                                {
+                                  "key": "excludePieceId",
+                                  "value": {
+                                    "kind": "get",
+                                    "object": {
+                                      "kind": "ref",
+                                      "name": "mover"
+                                    },
+                                    "key": "instanceId"
+                                  }
+                                },
+                                {
+                                  "key": "maxDistance",
+                                  "value": {
+                                    "kind": "ref",
+                                    "name": "maxDistance"
+                                  }
+                                },
+                                {
+                                  "key": "passAllies",
+                                  "value": {
+                                    "kind": "literal",
+                                    "value": true
+                                  }
+                                }
+                              ]
+                            }
+                          ],
+                          "result": "trace",
+                          "next": "n81"
+                        }
+                      ]
+                    }
+                  }
+                ],
+                "next": "n63"
+              },
+              {
+                "id": "n83",
+                "kind": "bind",
+                "name": "__rvb_import_bound_method_33",
+                "expr": {
+                  "kind": "boundMethod",
+                  "object": {
+                    "kind": "ref",
+                    "name": "directions"
+                  },
+                  "method": "forEach"
+                },
+                "next": "n64"
+              },
+              {
+                "id": "n84",
+                "kind": "bind",
+                "name": "directions",
+                "expr": {
+                  "kind": "array",
+                  "items": [
+                    {
+                      "kind": "object",
+                      "entries": [
+                        {
+                          "key": "x",
+                          "value": {
+                            "kind": "literal",
+                            "value": 0
+                          }
+                        },
+                        {
+                          "key": "y",
+                          "value": {
+                            "kind": "unary",
+                            "op": "-",
+                            "argument": {
+                              "kind": "literal",
+                              "value": 1
+                            }
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "kind": "object",
+                      "entries": [
+                        {
+                          "key": "x",
+                          "value": {
+                            "kind": "unary",
+                            "op": "-",
+                            "argument": {
+                              "kind": "literal",
+                              "value": 1
+                            }
+                          }
+                        },
+                        {
+                          "key": "y",
+                          "value": {
+                            "kind": "literal",
+                            "value": 0
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "kind": "object",
+                      "entries": [
+                        {
+                          "key": "x",
+                          "value": {
+                            "kind": "literal",
+                            "value": 1
+                          }
+                        },
+                        {
+                          "key": "y",
+                          "value": {
+                            "kind": "literal",
+                            "value": 0
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "kind": "object",
+                      "entries": [
+                        {
+                          "key": "x",
+                          "value": {
+                            "kind": "literal",
+                            "value": 0
+                          }
+                        },
+                        {
+                          "key": "y",
+                          "value": {
+                            "kind": "literal",
+                            "value": 1
+                          }
+                        }
+                      ]
+                    }
+                  ]
+                },
+                "next": "n83"
+              },
+              {
+                "id": "n85",
+                "kind": "bind",
+                "name": "maxDistance",
+                "expr": {
+                  "kind": "call",
+                  "callee": "Math.min",
+                  "args": [
+                    {
+                      "kind": "binary",
+                      "op": "+",
+                      "left": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "battle"
+                          },
+                          "key": "map"
+                        },
+                        "key": "width"
+                      },
+                      "right": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "battle"
+                          },
+                          "key": "map"
+                        },
+                        "key": "height"
+                      }
+                    },
+                    {
+                      "kind": "call",
+                      "callee": "Math.max",
+                      "args": [
+                        {
+                          "kind": "literal",
+                          "value": 0
+                        },
+                        {
+                          "kind": "call",
+                          "callee": "Math.floor",
+                          "args": [
+                            {
+                              "kind": "binary",
+                              "op": "+",
+                              "left": {
+                                "kind": "binary",
+                                "op": "||",
+                                "left": {
+                                  "kind": "get",
+                                  "object": {
+                                    "kind": "ref",
+                                    "name": "mover"
+                                  },
+                                  "key": "moveRange"
+                                },
+                                "right": {
+                                  "kind": "literal",
+                                  "value": 0
+                                }
+                              },
+                              "right": {
+                                "kind": "literal",
+                                "value": 2
+                              }
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                "next": "n84"
+              },
+              {
+                "id": "n86",
+                "kind": "bind",
+                "name": "destinations",
+                "expr": {
+                  "kind": "array",
+                  "items": []
+                },
+                "next": "n85"
+              },
+              {
+                "id": "n62",
+                "kind": "regionEnd"
+              }
+            ]
+          }
+        },
+        "next": "n60"
+      },
+      {
+        "id": "n87",
+        "kind": "bind",
+        "name": "tileAt",
+        "expr": {
+          "kind": "function",
+          "parameters": [
+            "x",
+            "y"
+          ],
+          "body": {
+            "entry": "n89",
+            "end": "n88",
+            "nodes": [
+              {
+                "id": "n89",
+                "kind": "return",
+                "value": {
+                  "kind": "collection",
+                  "object": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "battle"
+                      },
+                      "key": "map"
+                    },
+                    "key": "tiles"
+                  },
+                  "method": "find",
+                  "args": [
+                    {
+                      "kind": "lambda",
+                      "parameters": [
+                        "tile"
+                      ],
+                      "body": {
+                        "kind": "binary",
+                        "op": "&&",
+                        "left": {
+                          "kind": "binary",
+                          "op": "===",
+                          "left": {
+                            "kind": "get",
+                            "object": {
+                              "kind": "ref",
+                              "name": "tile"
+                            },
+                            "key": "x"
+                          },
+                          "right": {
+                            "kind": "ref",
+                            "name": "x"
+                          }
+                        },
+                        "right": {
+                          "kind": "binary",
+                          "op": "===",
+                          "left": {
+                            "kind": "get",
+                            "object": {
+                              "kind": "ref",
+                              "name": "tile"
+                            },
+                            "key": "y"
+                          },
+                          "right": {
+                            "kind": "ref",
+                            "name": "y"
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "n88",
+                "kind": "regionEnd"
+              }
+            ]
+          }
+        },
+        "next": "n61"
+      },
+      {
+        "id": "n90",
+        "kind": "bind",
+        "name": "livingAt",
+        "expr": {
+          "kind": "function",
+          "parameters": [
+            "x",
+            "y"
+          ],
+          "body": {
+            "entry": "n92",
+            "end": "n91",
+            "nodes": [
+              {
+                "id": "n92",
+                "kind": "return",
+                "value": {
+                  "kind": "collection",
+                  "object": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "battle"
+                    },
+                    "key": "pieces"
+                  },
+                  "method": "find",
+                  "args": [
+                    {
+                      "kind": "lambda",
+                      "parameters": [
+                        "piece"
+                      ],
+                      "body": {
+                        "kind": "binary",
+                        "op": "&&",
+                        "left": {
+                          "kind": "binary",
+                          "op": "&&",
+                          "left": {
+                            "kind": "binary",
+                            "op": ">",
+                            "left": {
+                              "kind": "get",
+                              "object": {
+                                "kind": "ref",
+                                "name": "piece"
+                              },
+                              "key": "currentHp"
+                            },
+                            "right": {
+                              "kind": "literal",
+                              "value": 0
+                            }
+                          },
+                          "right": {
+                            "kind": "binary",
+                            "op": "===",
+                            "left": {
+                              "kind": "get",
+                              "object": {
+                                "kind": "ref",
+                                "name": "piece"
+                              },
+                              "key": "x"
+                            },
+                            "right": {
+                              "kind": "ref",
+                              "name": "x"
+                            }
+                          }
+                        },
+                        "right": {
+                          "kind": "binary",
+                          "op": "===",
+                          "left": {
+                            "kind": "get",
+                            "object": {
+                              "kind": "ref",
+                              "name": "piece"
+                            },
+                            "key": "y"
+                          },
+                          "right": {
+                            "kind": "ref",
+                            "name": "y"
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "n91",
+                "kind": "regionEnd"
+              }
+            ]
+          }
+        },
+        "next": "n87"
+      },
+      {
+        "id": "n93",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n94",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "&&",
+              "left": {
+                "kind": "binary",
+                "op": "===",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "selectedTargets"
+                  },
+                  "key": "length"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": 0
+                }
+              },
+              "right": {
+                "kind": "binary",
+                "op": "===",
+                "left": {
+                  "kind": "index",
+                  "object": {
+                    "kind": "ref",
+                    "name": "firedTurns"
+                  },
+                  "index": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "turalyon"
+                    },
+                    "key": "instanceId"
+                  }
+                },
+                "right": {
+                  "kind": "ref",
+                  "name": "turnNumber"
+                }
+              }
+            }
+          }
+        },
+        "yes": "n93",
+        "no": "n90"
+      },
+      {
+        "id": "n95",
+        "kind": "bind",
+        "name": "selectedTargets",
+        "expr": {
+          "kind": "conditional",
+          "test": {
+            "kind": "call",
+            "callee": "Array.isArray",
+            "args": [
+              {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "context"
+                },
+                "key": "selectedTargets"
+              }
+            ]
+          },
+          "consequent": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "context"
+            },
+            "key": "selectedTargets"
+          },
+          "alternate": {
+            "kind": "array",
+            "items": []
+          }
+        },
+        "next": "n94"
+      },
+      {
+        "id": "n96",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "turalyon"
+                  },
+                  "key": "name"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "放弃了本回合的远征移动"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n97",
+        "kind": "set",
+        "target": {
+          "kind": "index",
+          "object": {
+            "kind": "ref",
+            "name": "firedTurns"
+          },
+          "index": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "turalyon"
+            },
+            "key": "instanceId"
+          }
+        },
+        "operator": "=",
+        "value": {
+          "kind": "ref",
+          "name": "turnNumber"
+        },
+        "next": "n96"
+      },
+      {
+        "id": "n98",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "context"
+              },
+              "key": "cancelled"
+            }
+          }
+        },
+        "yes": "n97",
+        "no": "n95"
+      },
+      {
+        "id": "n99",
+        "kind": "bind",
+        "name": "firedTurns",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "battle"
+            },
+            "key": "extensions"
+          },
+          "key": "turalyonLightforgedTurns"
+        },
+        "next": "n98"
+      },
+      {
+        "id": "n100",
+        "kind": "set",
+        "target": {
+          "kind": "get",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "battle"
+            },
+            "key": "extensions"
+          },
+          "key": "turalyonLightforgedTurns"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "object",
+          "entries": []
+        },
+        "next": "n99"
+      },
+      {
+        "id": "n101",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "unary",
+              "op": "!",
+              "argument": {
+                "kind": "get",
+                "object": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "battle"
+                  },
+                  "key": "extensions"
+                },
+                "key": "turalyonLightforgedTurns"
+              }
+            }
+          }
+        },
+        "yes": "n100",
+        "no": "n99"
+      },
+      {
+        "id": "n102",
+        "kind": "set",
+        "target": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "battle"
+          },
+          "key": "extensions"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "object",
+          "entries": []
+        },
+        "next": "n101"
+      },
+      {
+        "id": "n103",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "unary",
+              "op": "!",
+              "argument": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "battle"
+                },
+                "key": "extensions"
+              }
+            }
+          }
+        },
+        "yes": "n102",
+        "no": "n101"
+      },
+      {
+        "id": "n104",
+        "kind": "bind",
+        "name": "turnNumber",
+        "expr": {
+          "kind": "conditional",
+          "test": {
+            "kind": "binary",
+            "op": "&&",
+            "left": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "battle"
+              },
+              "key": "turn"
+            },
+            "right": {
+              "kind": "get",
+              "object": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "battle"
+                },
+                "key": "turn"
+              },
+              "key": "turnNumber"
+            }
+          },
+          "consequent": {
+            "kind": "get",
+            "object": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "battle"
+              },
+              "key": "turn"
+            },
+            "key": "turnNumber"
+          },
+          "alternate": {
+            "kind": "literal",
+            "value": 0
+          }
+        },
+        "next": "n103"
+      },
+      {
+        "id": "n105",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n106",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "===",
+              "left": {
+                "kind": "collection",
+                "object": {
+                  "kind": "array",
+                  "items": [
+                    {
+                      "kind": "literal",
+                      "value": "holy-smite"
+                    },
+                    {
+                      "kind": "literal",
+                      "value": "holy-heal"
+                    },
+                    {
+                      "kind": "literal",
+                      "value": "holy-charge"
+                    }
+                  ]
+                },
+                "method": "indexOf",
+                "args": [
+                  {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "context"
+                    },
+                    "key": "cardId"
+                  }
+                ]
+              },
+              "right": {
+                "kind": "unary",
+                "op": "-",
+                "argument": {
+                  "kind": "literal",
+                  "value": 1
+                }
+              }
+            }
+          }
+        },
+        "yes": "n105",
+        "no": "n104"
+      },
+      {
+        "id": "n107",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n108",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "binary",
+                "op": "||",
+                "left": {
+                  "kind": "unary",
+                  "op": "!",
+                  "argument": {
+                    "kind": "ref",
+                    "name": "turalyon"
+                  }
+                },
+                "right": {
+                  "kind": "binary",
+                  "op": "<=",
+                  "left": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "turalyon"
+                    },
+                    "key": "currentHp"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": 0
+                  }
+                }
+              },
+              "right": {
+                "kind": "binary",
+                "op": "!==",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "context"
+                  },
+                  "key": "playerId"
+                },
+                "right": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "turalyon"
+                  },
+                  "key": "ownerPlayerId"
+                }
+              }
+            }
+          }
+        },
+        "yes": "n107",
+        "no": "n106"
+      },
+      {
+        "id": "n109",
+        "kind": "bind",
+        "name": "turalyon",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "context"
+          },
+          "key": "rulePiece"
+        },
+        "next": "n108"
+      }
+    ]
+  },
+  "contentGraphField": "skillCode",
+  "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1"
 }

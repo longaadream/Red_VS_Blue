@@ -16,7 +16,876 @@
   "powerMultiplier": 1,
   "actionPointCost": 3,
   "chargeCost": 1,
-  "code": "function executeSkill(context) { const sourcePiece = context.piece; const targetCell = selectTarget({ type: 'grid', range: 6 }); if (!targetCell || targetCell.needsTargetSelection) return targetCell; const centerX = targetCell.x; const centerY = targetCell.y; const atDistance = function(dist) { return battle.pieces.filter(function(piece) { return piece.currentHp > 0 && Math.abs(piece.x - centerX) + Math.abs(piece.y - centerY) === dist; }); }; const applyRing = function(pieces, value) { const allies = pieces.filter(function(piece) { return arePlayersAllied(battle, piece.ownerPlayerId, sourcePiece.ownerPlayerId); }); const enemies = pieces.filter(function(piece) { return !arePlayersAllied(battle, piece.ownerPlayerId, sourcePiece.ownerPlayerId); }); if (allies.length) healDamage(sourcePiece, allies, value, battle, context.skill.id); if (enemies.length) dealDamage(sourcePiece, enemies, value, 'magical', battle, context.skill.id); }; applyRing(atDistance(0), 9); applyRing(atDistance(1), 7); applyRing(atDistance(2), 4); applyRing(atDistance(3), 4); return { success: true, message: sourcePiece.name + '释放了圣光降临' }; }",
-  "previewCode": "function calculatePreview() { return { description: \"选择地格（6），对其周围友军／敌人造成恢复／伤害：距离为0／1／2～3时，效果量分别为9／7／5。\", expectedValues: { centerHeal: 9, centerDamage: 9, adjacentHeal: 7, adjacentDamage: 7, distantHeal: 4, distantDamage: 4 } }; }",
-  "range": "area"
+  "code": "function executeSkill(context) { var __rvb_import_effect_0, __rvb_import_effect_12, __rvb_import_effect_4, __rvb_import_effect_8, __rvb_import_operand_1, __rvb_import_operand_10, __rvb_import_operand_11, __rvb_import_operand_13, __rvb_import_operand_14, __rvb_import_operand_15, __rvb_import_operand_2, __rvb_import_operand_3, __rvb_import_operand_5, __rvb_import_operand_6, __rvb_import_operand_7, __rvb_import_operand_9, applyRing, atDistance, centerX, centerY, sourcePiece, targetCell; var _pc = \"n36\"; for (var _step = 0; _step <= 29; _step++) { switch (_pc) { case \"n36\": sourcePiece = (context)[\"piece\"]; _pc = \"n35\"; break; case \"n35\": targetCell = selectTarget({type: \"grid\", range: 6}); _pc = \"n34\"; break; case \"n34\": _pc = (! (! ((! targetCell) || (targetCell)[\"needsTargetSelection\"]))) ? \"n33\" : \"n32\"; break; case \"n32\": centerX = (targetCell)[\"x\"]; _pc = \"n31\"; break; case \"n31\": centerY = (targetCell)[\"y\"]; _pc = \"n30\"; break; case \"n30\": atDistance = function (dist) { return ((battle)[\"pieces\"])[\"filter\"](function (piece) { return (((piece)[\"currentHp\"] > 0) && ((Math.abs(((piece)[\"x\"] - centerX)) + Math.abs(((piece)[\"y\"] - centerY))) === dist)); }); }; _pc = \"n29\"; break; case \"n29\": applyRing = function (pieces, value) { var allies, enemies; { var __rvb_content_graph_region_pc_0 = \"n28\"; while (__rvb_content_graph_region_pc_0 !== \"n22\") { switch (__rvb_content_graph_region_pc_0) { case \"n28\": allies = (pieces)[\"filter\"](function (piece) { return arePlayersAllied(battle, (piece)[\"ownerPlayerId\"], (sourcePiece)[\"ownerPlayerId\"]); }); __rvb_content_graph_region_pc_0 = \"n27\"; break; case \"n27\": enemies = (pieces)[\"filter\"](function (piece) { return (! arePlayersAllied(battle, (piece)[\"ownerPlayerId\"], (sourcePiece)[\"ownerPlayerId\"])); }); __rvb_content_graph_region_pc_0 = \"n26\"; break; case \"n26\": __rvb_content_graph_region_pc_0 = (! (! (allies)[\"length\"])) ? \"n25\" : \"n24\"; break; case \"n25\": healDamage(sourcePiece, allies, value, battle, ((context)[\"skill\"])[\"id\"]); __rvb_content_graph_region_pc_0 = \"n24\"; break; case \"n24\": __rvb_content_graph_region_pc_0 = (! (! (enemies)[\"length\"])) ? \"n23\" : \"n22\"; break; case \"n23\": dealDamage(sourcePiece, enemies, value, \"magical\", battle, ((context)[\"skill\"])[\"id\"]); __rvb_content_graph_region_pc_0 = \"n22\"; break; case \"n22\": __rvb_content_graph_region_pc_0 = \"n22\"; break; default: throw new Error(\"invalid content graph region node\"); } } } }; _pc = \"n21\"; break; case \"n21\": __rvb_import_operand_15 = applyRing; _pc = \"n20\"; break; case \"n20\": __rvb_import_operand_14 = atDistance; _pc = \"n19\"; break; case \"n19\": __rvb_import_effect_12 = (__rvb_import_operand_14)(0); _pc = \"n18\"; break; case \"n18\": __rvb_import_operand_13 = __rvb_import_effect_12; _pc = \"n17\"; break; case \"n17\": (__rvb_import_operand_15)(__rvb_import_operand_13, 9); _pc = \"n16\"; break; case \"n16\": __rvb_import_operand_11 = applyRing; _pc = \"n15\"; break; case \"n15\": __rvb_import_operand_10 = atDistance; _pc = \"n14\"; break; case \"n14\": __rvb_import_effect_8 = (__rvb_import_operand_10)(1); _pc = \"n13\"; break; case \"n13\": __rvb_import_operand_9 = __rvb_import_effect_8; _pc = \"n12\"; break; case \"n12\": (__rvb_import_operand_11)(__rvb_import_operand_9, 7); _pc = \"n11\"; break; case \"n11\": __rvb_import_operand_7 = applyRing; _pc = \"n10\"; break; case \"n10\": __rvb_import_operand_6 = atDistance; _pc = \"n9\"; break; case \"n9\": __rvb_import_effect_4 = (__rvb_import_operand_6)(2); _pc = \"n8\"; break; case \"n8\": __rvb_import_operand_5 = __rvb_import_effect_4; _pc = \"n7\"; break; case \"n7\": (__rvb_import_operand_7)(__rvb_import_operand_5, 4); _pc = \"n6\"; break; case \"n6\": __rvb_import_operand_3 = applyRing; _pc = \"n5\"; break; case \"n5\": __rvb_import_operand_2 = atDistance; _pc = \"n4\"; break; case \"n4\": __rvb_import_effect_0 = (__rvb_import_operand_2)(3); _pc = \"n3\"; break; case \"n3\": __rvb_import_operand_1 = __rvb_import_effect_0; _pc = \"n2\"; break; case \"n2\": (__rvb_import_operand_3)(__rvb_import_operand_1, 4); _pc = \"n1\"; break; case \"n1\": return {success: true, message: ((sourcePiece)[\"name\"] + \"释放了圣光降临\")}; case \"n33\": return targetCell; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\"); }",
+  "previewCode": "function calculatePreview(piece, skillDef, currentCooldown) { var _pc = \"n1\"; for (var _step = 0; _step <= 1; _step++) { switch (_pc) { case \"n1\": return {description: \"选择地格（6），对其周围友军／敌人造成恢复／伤害：距离为0／1／2～3时，效果量分别为9／7／5。\", expectedValues: {centerHeal: 9, centerDamage: 9, adjacentHeal: 7, adjacentDamage: 7, distantHeal: 4, distantDamage: 4}}; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\"); }",
+  "range": "area",
+  "contentGraph": {
+    "version": "rvb-content-graph/v1",
+    "surface": "skill",
+    "entry": "n36",
+    "nodes": [
+      {
+        "id": "n1",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "sourcePiece"
+                  },
+                  "key": "name"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "释放了圣光降临"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n2",
+        "kind": "invoke",
+        "target": {
+          "kind": "function",
+          "value": {
+            "kind": "ref",
+            "name": "__rvb_import_operand_3"
+          }
+        },
+        "args": [
+          {
+            "kind": "ref",
+            "name": "__rvb_import_operand_1"
+          },
+          {
+            "kind": "literal",
+            "value": 4
+          }
+        ],
+        "next": "n1"
+      },
+      {
+        "id": "n3",
+        "kind": "bind",
+        "name": "__rvb_import_operand_1",
+        "expr": {
+          "kind": "ref",
+          "name": "__rvb_import_effect_0"
+        },
+        "next": "n2"
+      },
+      {
+        "id": "n4",
+        "kind": "invoke",
+        "target": {
+          "kind": "function",
+          "value": {
+            "kind": "ref",
+            "name": "__rvb_import_operand_2"
+          }
+        },
+        "args": [
+          {
+            "kind": "literal",
+            "value": 3
+          }
+        ],
+        "result": "__rvb_import_effect_0",
+        "next": "n3"
+      },
+      {
+        "id": "n5",
+        "kind": "bind",
+        "name": "__rvb_import_operand_2",
+        "expr": {
+          "kind": "ref",
+          "name": "atDistance"
+        },
+        "next": "n4"
+      },
+      {
+        "id": "n6",
+        "kind": "bind",
+        "name": "__rvb_import_operand_3",
+        "expr": {
+          "kind": "ref",
+          "name": "applyRing"
+        },
+        "next": "n5"
+      },
+      {
+        "id": "n7",
+        "kind": "invoke",
+        "target": {
+          "kind": "function",
+          "value": {
+            "kind": "ref",
+            "name": "__rvb_import_operand_7"
+          }
+        },
+        "args": [
+          {
+            "kind": "ref",
+            "name": "__rvb_import_operand_5"
+          },
+          {
+            "kind": "literal",
+            "value": 4
+          }
+        ],
+        "next": "n6"
+      },
+      {
+        "id": "n8",
+        "kind": "bind",
+        "name": "__rvb_import_operand_5",
+        "expr": {
+          "kind": "ref",
+          "name": "__rvb_import_effect_4"
+        },
+        "next": "n7"
+      },
+      {
+        "id": "n9",
+        "kind": "invoke",
+        "target": {
+          "kind": "function",
+          "value": {
+            "kind": "ref",
+            "name": "__rvb_import_operand_6"
+          }
+        },
+        "args": [
+          {
+            "kind": "literal",
+            "value": 2
+          }
+        ],
+        "result": "__rvb_import_effect_4",
+        "next": "n8"
+      },
+      {
+        "id": "n10",
+        "kind": "bind",
+        "name": "__rvb_import_operand_6",
+        "expr": {
+          "kind": "ref",
+          "name": "atDistance"
+        },
+        "next": "n9"
+      },
+      {
+        "id": "n11",
+        "kind": "bind",
+        "name": "__rvb_import_operand_7",
+        "expr": {
+          "kind": "ref",
+          "name": "applyRing"
+        },
+        "next": "n10"
+      },
+      {
+        "id": "n12",
+        "kind": "invoke",
+        "target": {
+          "kind": "function",
+          "value": {
+            "kind": "ref",
+            "name": "__rvb_import_operand_11"
+          }
+        },
+        "args": [
+          {
+            "kind": "ref",
+            "name": "__rvb_import_operand_9"
+          },
+          {
+            "kind": "literal",
+            "value": 7
+          }
+        ],
+        "next": "n11"
+      },
+      {
+        "id": "n13",
+        "kind": "bind",
+        "name": "__rvb_import_operand_9",
+        "expr": {
+          "kind": "ref",
+          "name": "__rvb_import_effect_8"
+        },
+        "next": "n12"
+      },
+      {
+        "id": "n14",
+        "kind": "invoke",
+        "target": {
+          "kind": "function",
+          "value": {
+            "kind": "ref",
+            "name": "__rvb_import_operand_10"
+          }
+        },
+        "args": [
+          {
+            "kind": "literal",
+            "value": 1
+          }
+        ],
+        "result": "__rvb_import_effect_8",
+        "next": "n13"
+      },
+      {
+        "id": "n15",
+        "kind": "bind",
+        "name": "__rvb_import_operand_10",
+        "expr": {
+          "kind": "ref",
+          "name": "atDistance"
+        },
+        "next": "n14"
+      },
+      {
+        "id": "n16",
+        "kind": "bind",
+        "name": "__rvb_import_operand_11",
+        "expr": {
+          "kind": "ref",
+          "name": "applyRing"
+        },
+        "next": "n15"
+      },
+      {
+        "id": "n17",
+        "kind": "invoke",
+        "target": {
+          "kind": "function",
+          "value": {
+            "kind": "ref",
+            "name": "__rvb_import_operand_15"
+          }
+        },
+        "args": [
+          {
+            "kind": "ref",
+            "name": "__rvb_import_operand_13"
+          },
+          {
+            "kind": "literal",
+            "value": 9
+          }
+        ],
+        "next": "n16"
+      },
+      {
+        "id": "n18",
+        "kind": "bind",
+        "name": "__rvb_import_operand_13",
+        "expr": {
+          "kind": "ref",
+          "name": "__rvb_import_effect_12"
+        },
+        "next": "n17"
+      },
+      {
+        "id": "n19",
+        "kind": "invoke",
+        "target": {
+          "kind": "function",
+          "value": {
+            "kind": "ref",
+            "name": "__rvb_import_operand_14"
+          }
+        },
+        "args": [
+          {
+            "kind": "literal",
+            "value": 0
+          }
+        ],
+        "result": "__rvb_import_effect_12",
+        "next": "n18"
+      },
+      {
+        "id": "n20",
+        "kind": "bind",
+        "name": "__rvb_import_operand_14",
+        "expr": {
+          "kind": "ref",
+          "name": "atDistance"
+        },
+        "next": "n19"
+      },
+      {
+        "id": "n21",
+        "kind": "bind",
+        "name": "__rvb_import_operand_15",
+        "expr": {
+          "kind": "ref",
+          "name": "applyRing"
+        },
+        "next": "n20"
+      },
+      {
+        "id": "n29",
+        "kind": "bind",
+        "name": "applyRing",
+        "expr": {
+          "kind": "function",
+          "parameters": [
+            "pieces",
+            "value"
+          ],
+          "body": {
+            "entry": "n28",
+            "end": "n22",
+            "nodes": [
+              {
+                "id": "n22",
+                "kind": "regionEnd"
+              },
+              {
+                "id": "n23",
+                "kind": "call",
+                "capability": "dealDamage",
+                "args": [
+                  {
+                    "kind": "ref",
+                    "name": "sourcePiece"
+                  },
+                  {
+                    "kind": "ref",
+                    "name": "enemies"
+                  },
+                  {
+                    "kind": "ref",
+                    "name": "value"
+                  },
+                  {
+                    "kind": "literal",
+                    "value": "magical"
+                  },
+                  {
+                    "kind": "ref",
+                    "name": "battle"
+                  },
+                  {
+                    "kind": "get",
+                    "object": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "context"
+                      },
+                      "key": "skill"
+                    },
+                    "key": "id"
+                  }
+                ],
+                "next": "n22"
+              },
+              {
+                "id": "n24",
+                "kind": "branch",
+                "condition": {
+                  "kind": "unary",
+                  "op": "!",
+                  "argument": {
+                    "kind": "unary",
+                    "op": "!",
+                    "argument": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "enemies"
+                      },
+                      "key": "length"
+                    }
+                  }
+                },
+                "yes": "n23",
+                "no": "n22"
+              },
+              {
+                "id": "n25",
+                "kind": "call",
+                "capability": "healDamage",
+                "args": [
+                  {
+                    "kind": "ref",
+                    "name": "sourcePiece"
+                  },
+                  {
+                    "kind": "ref",
+                    "name": "allies"
+                  },
+                  {
+                    "kind": "ref",
+                    "name": "value"
+                  },
+                  {
+                    "kind": "ref",
+                    "name": "battle"
+                  },
+                  {
+                    "kind": "get",
+                    "object": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "context"
+                      },
+                      "key": "skill"
+                    },
+                    "key": "id"
+                  }
+                ],
+                "next": "n24"
+              },
+              {
+                "id": "n26",
+                "kind": "branch",
+                "condition": {
+                  "kind": "unary",
+                  "op": "!",
+                  "argument": {
+                    "kind": "unary",
+                    "op": "!",
+                    "argument": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "allies"
+                      },
+                      "key": "length"
+                    }
+                  }
+                },
+                "yes": "n25",
+                "no": "n24"
+              },
+              {
+                "id": "n27",
+                "kind": "bind",
+                "name": "enemies",
+                "expr": {
+                  "kind": "collection",
+                  "object": {
+                    "kind": "ref",
+                    "name": "pieces"
+                  },
+                  "method": "filter",
+                  "args": [
+                    {
+                      "kind": "lambda",
+                      "parameters": [
+                        "piece"
+                      ],
+                      "body": {
+                        "kind": "unary",
+                        "op": "!",
+                        "argument": {
+                          "kind": "call",
+                          "callee": "arePlayersAllied",
+                          "args": [
+                            {
+                              "kind": "ref",
+                              "name": "battle"
+                            },
+                            {
+                              "kind": "get",
+                              "object": {
+                                "kind": "ref",
+                                "name": "piece"
+                              },
+                              "key": "ownerPlayerId"
+                            },
+                            {
+                              "kind": "get",
+                              "object": {
+                                "kind": "ref",
+                                "name": "sourcePiece"
+                              },
+                              "key": "ownerPlayerId"
+                            }
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                },
+                "next": "n26"
+              },
+              {
+                "id": "n28",
+                "kind": "bind",
+                "name": "allies",
+                "expr": {
+                  "kind": "collection",
+                  "object": {
+                    "kind": "ref",
+                    "name": "pieces"
+                  },
+                  "method": "filter",
+                  "args": [
+                    {
+                      "kind": "lambda",
+                      "parameters": [
+                        "piece"
+                      ],
+                      "body": {
+                        "kind": "call",
+                        "callee": "arePlayersAllied",
+                        "args": [
+                          {
+                            "kind": "ref",
+                            "name": "battle"
+                          },
+                          {
+                            "kind": "get",
+                            "object": {
+                              "kind": "ref",
+                              "name": "piece"
+                            },
+                            "key": "ownerPlayerId"
+                          },
+                          {
+                            "kind": "get",
+                            "object": {
+                              "kind": "ref",
+                              "name": "sourcePiece"
+                            },
+                            "key": "ownerPlayerId"
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                },
+                "next": "n27"
+              }
+            ]
+          }
+        },
+        "next": "n21"
+      },
+      {
+        "id": "n30",
+        "kind": "bind",
+        "name": "atDistance",
+        "expr": {
+          "kind": "lambda",
+          "parameters": [
+            "dist"
+          ],
+          "body": {
+            "kind": "collection",
+            "object": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "battle"
+              },
+              "key": "pieces"
+            },
+            "method": "filter",
+            "args": [
+              {
+                "kind": "lambda",
+                "parameters": [
+                  "piece"
+                ],
+                "body": {
+                  "kind": "binary",
+                  "op": "&&",
+                  "left": {
+                    "kind": "binary",
+                    "op": ">",
+                    "left": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "piece"
+                      },
+                      "key": "currentHp"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": 0
+                    }
+                  },
+                  "right": {
+                    "kind": "binary",
+                    "op": "===",
+                    "left": {
+                      "kind": "binary",
+                      "op": "+",
+                      "left": {
+                        "kind": "call",
+                        "callee": "Math.abs",
+                        "args": [
+                          {
+                            "kind": "binary",
+                            "op": "-",
+                            "left": {
+                              "kind": "get",
+                              "object": {
+                                "kind": "ref",
+                                "name": "piece"
+                              },
+                              "key": "x"
+                            },
+                            "right": {
+                              "kind": "ref",
+                              "name": "centerX"
+                            }
+                          }
+                        ]
+                      },
+                      "right": {
+                        "kind": "call",
+                        "callee": "Math.abs",
+                        "args": [
+                          {
+                            "kind": "binary",
+                            "op": "-",
+                            "left": {
+                              "kind": "get",
+                              "object": {
+                                "kind": "ref",
+                                "name": "piece"
+                              },
+                              "key": "y"
+                            },
+                            "right": {
+                              "kind": "ref",
+                              "name": "centerY"
+                            }
+                          }
+                        ]
+                      }
+                    },
+                    "right": {
+                      "kind": "ref",
+                      "name": "dist"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "next": "n29"
+      },
+      {
+        "id": "n31",
+        "kind": "bind",
+        "name": "centerY",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "targetCell"
+          },
+          "key": "y"
+        },
+        "next": "n30"
+      },
+      {
+        "id": "n32",
+        "kind": "bind",
+        "name": "centerX",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "targetCell"
+          },
+          "key": "x"
+        },
+        "next": "n31"
+      },
+      {
+        "id": "n33",
+        "kind": "return",
+        "value": {
+          "kind": "ref",
+          "name": "targetCell"
+        }
+      },
+      {
+        "id": "n34",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "ref",
+                  "name": "targetCell"
+                }
+              },
+              "right": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "targetCell"
+                },
+                "key": "needsTargetSelection"
+              }
+            }
+          }
+        },
+        "yes": "n33",
+        "no": "n32"
+      },
+      {
+        "id": "n35",
+        "kind": "call",
+        "capability": "selectTarget",
+        "args": [
+          {
+            "kind": "object",
+            "entries": [
+              {
+                "key": "type",
+                "value": {
+                  "kind": "literal",
+                  "value": "grid"
+                }
+              },
+              {
+                "key": "range",
+                "value": {
+                  "kind": "literal",
+                  "value": 6
+                }
+              }
+            ]
+          }
+        ],
+        "result": "targetCell",
+        "next": "n34"
+      },
+      {
+        "id": "n36",
+        "kind": "bind",
+        "name": "sourcePiece",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "context"
+          },
+          "key": "piece"
+        },
+        "next": "n35"
+      }
+    ]
+  },
+  "contentGraphField": "code",
+  "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1",
+  "contentGraphEntries": {
+    "previewCode": {
+      "graph": {
+        "version": "rvb-content-graph/v1",
+        "surface": "preview",
+        "entry": "n1",
+        "nodes": [
+          {
+            "id": "n1",
+            "kind": "return",
+            "value": {
+              "kind": "object",
+              "entries": [
+                {
+                  "key": "description",
+                  "value": {
+                    "kind": "literal",
+                    "value": "选择地格（6），对其周围友军／敌人造成恢复／伤害：距离为0／1／2～3时，效果量分别为9／7／5。"
+                  }
+                },
+                {
+                  "key": "expectedValues",
+                  "value": {
+                    "kind": "object",
+                    "entries": [
+                      {
+                        "key": "centerHeal",
+                        "value": {
+                          "kind": "literal",
+                          "value": 9
+                        }
+                      },
+                      {
+                        "key": "centerDamage",
+                        "value": {
+                          "kind": "literal",
+                          "value": 9
+                        }
+                      },
+                      {
+                        "key": "adjacentHeal",
+                        "value": {
+                          "kind": "literal",
+                          "value": 7
+                        }
+                      },
+                      {
+                        "key": "adjacentDamage",
+                        "value": {
+                          "kind": "literal",
+                          "value": 7
+                        }
+                      },
+                      {
+                        "key": "distantHeal",
+                        "value": {
+                          "kind": "literal",
+                          "value": 4
+                        }
+                      },
+                      {
+                        "key": "distantDamage",
+                        "value": {
+                          "kind": "literal",
+                          "value": 4
+                        }
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "compilerVersion": "rvb-content-graph-compiler/v1"
+    }
+  }
 }

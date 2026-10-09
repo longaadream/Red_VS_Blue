@@ -33,5 +33,1125 @@
       }
     ]
   },
-  "code": "function executeSkill(context){var c=context.piece,b=context.battle,pos=selectTarget({type:'grid',range:5,filter:'all'});if(!pos||pos.needsTargetSelection)return pos;var tile=b.map.tiles.find(function(t){return t.x===pos.x&&t.y===pos.y;});if(!tile||!tile.props.walkable||(tile.props.type!=='floor'&&tile.props.type!=='cover')||b.pieces.some(function(p){return p.currentHp>0&&p.x===pos.x&&p.y===pos.y;}))return {success:false,message:'目标必须是未被占据的空地或掩体'};if (!flow.effects.displace([{pieceId:c.instanceId,x:pos.x,y:pos.y}], 'teleport').success) return {success:true,message:'位移被阻挡，本次位移效果取消'};var affected=0;context.presentationQueue.push(\"statusAdded\", function() { b.pieces.filter(function(p){return p.currentHp>0&&!arePlayersAllied(battle, p.ownerPlayerId, c.ownerPlayerId)&&Math.max(Math.abs(p.x-c.x),Math.abs(p.y-c.y))<=2;}).forEach(function(p){p.statusTags=p.statusTags||[];{addStatusEffectById(p.instanceId, {id:'silenced-'+p.instanceId,type:'silenced',name:'沉默',stacks:1,currentDuration:1,remainingDuration:1,relatedRules:['rule-silenced-block']});addRuleById(p.instanceId,'rule-silenced-block');}var immobilized=p.statusTags.find(function(t){return t.type==='chidori-immobile';});if(immobilized){immobilized.currentDuration=1;immobilized.remainingDuration=1;}else{addStatusEffectById(p.instanceId, {id:'immobile-'+p.instanceId,type:'chidori-immobile',name:'定身',stacks:1,currentDuration:1,remainingDuration:1,relatedRules:['rule-chidori-immobile']});addRuleById(p.instanceId,'rule-chidori-immobile');}affected++;}); }); return {success:true,message:'混沌控制生效，'+affected+'名敌人被沉默并定身1回合'};}"
+  "code": "function executeSkill(context) { var __rvb_import_effect_1, affected, b, c, pos, tile; var _pc = \"n28\"; for (var _step = 0; _step <= 14; _step++) { switch (_pc) { case \"n28\": c = (context)[\"piece\"]; _pc = \"n27\"; break; case \"n27\": b = (context)[\"battle\"]; _pc = \"n26\"; break; case \"n26\": pos = selectTarget({type: \"grid\", range: 5, filter: \"all\"}); _pc = \"n25\"; break; case \"n25\": _pc = (! (! ((! pos) || (pos)[\"needsTargetSelection\"]))) ? \"n24\" : \"n23\"; break; case \"n23\": tile = (((b)[\"map\"])[\"tiles\"])[\"find\"](function (t) { return (((t)[\"x\"] === (pos)[\"x\"]) && ((t)[\"y\"] === (pos)[\"y\"])); }); _pc = \"n22\"; break; case \"n22\": _pc = (! (! ((((! tile) || (! ((tile)[\"props\"])[\"walkable\"])) || ((((tile)[\"props\"])[\"type\"] !== \"floor\") && (((tile)[\"props\"])[\"type\"] !== \"cover\"))) || ((b)[\"pieces\"])[\"some\"](function (p) { return ((((p)[\"currentHp\"] > 0) && ((p)[\"x\"] === (pos)[\"x\"])) && ((p)[\"y\"] === (pos)[\"y\"])); })))) ? \"n21\" : \"n20\"; break; case \"n20\": __rvb_import_effect_1 = flow.effects.displace([{pieceId: (c)[\"instanceId\"], x: (pos)[\"x\"], y: (pos)[\"y\"]}], \"teleport\"); _pc = \"n19\"; break; case \"n19\": _pc = (! (! (! (__rvb_import_effect_1)[\"success\"]))) ? \"n18\" : \"n17\"; break; case \"n17\": affected = 0; _pc = \"n2\"; break; case \"n2\": ((context)[\"presentationQueue\"]).push(\"statusAdded\", function () { var __rvb_import_operand_0; { var __rvb_content_graph_region_pc_0 = \"n16\"; while (__rvb_content_graph_region_pc_0 !== \"n3\") { switch (__rvb_content_graph_region_pc_0) { case \"n16\": __rvb_import_operand_0 = ((b)[\"pieces\"])[\"filter\"](function (p) { return ((((p)[\"currentHp\"] > 0) && (! arePlayersAllied(battle, (p)[\"ownerPlayerId\"], (c)[\"ownerPlayerId\"]))) && (Math.max(Math.abs(((p)[\"x\"] - (c)[\"x\"])), Math.abs(((p)[\"y\"] - (c)[\"y\"]))) <= 2)); }); __rvb_content_graph_region_pc_0 = \"n4\"; break; case \"n4\": (__rvb_import_operand_0)[\"forEach\"](function (p) { var immobilized; { var __rvb_content_graph_region_pc_1 = \"n15\"; while (__rvb_content_graph_region_pc_1 !== \"n5\") { switch (__rvb_content_graph_region_pc_1) { case \"n15\": (p)[\"statusTags\"] = ((p)[\"statusTags\"] || []); __rvb_content_graph_region_pc_1 = \"n14\"; break; case \"n14\": addStatusEffectById((p)[\"instanceId\"], {id: (\"silenced-\" + (p)[\"instanceId\"]), type: \"silenced\", name: \"沉默\", stacks: 1, currentDuration: 1, remainingDuration: 1, relatedRules: [\"rule-silenced-block\"]}); __rvb_content_graph_region_pc_1 = \"n13\"; break; case \"n13\": addRuleById((p)[\"instanceId\"], \"rule-silenced-block\"); __rvb_content_graph_region_pc_1 = \"n12\"; break; case \"n12\": immobilized = ((p)[\"statusTags\"])[\"find\"](function (t) { return ((t)[\"type\"] === \"chidori-immobile\"); }); __rvb_content_graph_region_pc_1 = \"n11\"; break; case \"n11\": __rvb_content_graph_region_pc_1 = (! (! immobilized)) ? \"n8\" : \"n10\"; break; case \"n10\": addStatusEffectById((p)[\"instanceId\"], {id: (\"immobile-\" + (p)[\"instanceId\"]), type: \"chidori-immobile\", name: \"定身\", stacks: 1, currentDuration: 1, remainingDuration: 1, relatedRules: [\"rule-chidori-immobile\"]}); __rvb_content_graph_region_pc_1 = \"n9\"; break; case \"n9\": addRuleById((p)[\"instanceId\"], \"rule-chidori-immobile\"); __rvb_content_graph_region_pc_1 = \"n6\"; break; case \"n8\": (immobilized)[\"currentDuration\"] = 1; __rvb_content_graph_region_pc_1 = \"n7\"; break; case \"n7\": (immobilized)[\"remainingDuration\"] = 1; __rvb_content_graph_region_pc_1 = \"n6\"; break; case \"n6\": affected = ((+ affected) + 1); __rvb_content_graph_region_pc_1 = \"n5\"; break; case \"n5\": __rvb_content_graph_region_pc_1 = \"n5\"; break; default: throw new Error(\"invalid content graph region node\"); } } } }); __rvb_content_graph_region_pc_0 = \"n3\"; break; case \"n3\": __rvb_content_graph_region_pc_0 = \"n3\"; break; default: throw new Error(\"invalid content graph region node\"); } } } }); _pc = \"n1\"; break; case \"n1\": return {success: true, message: ((\"混沌控制生效，\" + affected) + \"名敌人被沉默并定身1回合\")}; case \"n18\": return {success: true, message: \"位移被阻挡，本次位移效果取消\"}; case \"n21\": return {success: false, message: \"目标必须是未被占据的空地或掩体\"}; case \"n24\": return pos; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\"); }",
+  "contentGraph": {
+    "version": "rvb-content-graph/v1",
+    "surface": "skill",
+    "entry": "n28",
+    "nodes": [
+      {
+        "id": "n1",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "binary",
+                  "op": "+",
+                  "left": {
+                    "kind": "literal",
+                    "value": "混沌控制生效，"
+                  },
+                  "right": {
+                    "kind": "ref",
+                    "name": "affected"
+                  }
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "名敌人被沉默并定身1回合"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n2",
+        "kind": "call",
+        "capability": "array.push",
+        "args": [
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "context"
+            },
+            "key": "presentationQueue"
+          },
+          {
+            "kind": "literal",
+            "value": "statusAdded"
+          },
+          {
+            "kind": "function",
+            "parameters": [],
+            "body": {
+              "entry": "n16",
+              "end": "n3",
+              "nodes": [
+                {
+                  "id": "n3",
+                  "kind": "regionEnd"
+                },
+                {
+                  "id": "n4",
+                  "kind": "invoke",
+                  "target": {
+                    "kind": "array",
+                    "object": {
+                      "kind": "ref",
+                      "name": "__rvb_import_operand_0"
+                    },
+                    "method": "forEach"
+                  },
+                  "args": [
+                    {
+                      "kind": "function",
+                      "parameters": [
+                        "p"
+                      ],
+                      "body": {
+                        "entry": "n15",
+                        "end": "n5",
+                        "nodes": [
+                          {
+                            "id": "n5",
+                            "kind": "regionEnd"
+                          },
+                          {
+                            "id": "n6",
+                            "kind": "set",
+                            "target": {
+                              "kind": "ref",
+                              "name": "affected"
+                            },
+                            "operator": "=",
+                            "value": {
+                              "kind": "binary",
+                              "op": "+",
+                              "left": {
+                                "kind": "unary",
+                                "op": "+",
+                                "argument": {
+                                  "kind": "ref",
+                                  "name": "affected"
+                                }
+                              },
+                              "right": {
+                                "kind": "literal",
+                                "value": 1
+                              }
+                            },
+                            "next": "n5"
+                          },
+                          {
+                            "id": "n7",
+                            "kind": "set",
+                            "target": {
+                              "kind": "get",
+                              "object": {
+                                "kind": "ref",
+                                "name": "immobilized"
+                              },
+                              "key": "remainingDuration"
+                            },
+                            "operator": "=",
+                            "value": {
+                              "kind": "literal",
+                              "value": 1
+                            },
+                            "next": "n6"
+                          },
+                          {
+                            "id": "n8",
+                            "kind": "set",
+                            "target": {
+                              "kind": "get",
+                              "object": {
+                                "kind": "ref",
+                                "name": "immobilized"
+                              },
+                              "key": "currentDuration"
+                            },
+                            "operator": "=",
+                            "value": {
+                              "kind": "literal",
+                              "value": 1
+                            },
+                            "next": "n7"
+                          },
+                          {
+                            "id": "n9",
+                            "kind": "call",
+                            "capability": "addRuleById",
+                            "args": [
+                              {
+                                "kind": "get",
+                                "object": {
+                                  "kind": "ref",
+                                  "name": "p"
+                                },
+                                "key": "instanceId"
+                              },
+                              {
+                                "kind": "literal",
+                                "value": "rule-chidori-immobile"
+                              }
+                            ],
+                            "next": "n6"
+                          },
+                          {
+                            "id": "n10",
+                            "kind": "call",
+                            "capability": "addStatusEffectById",
+                            "args": [
+                              {
+                                "kind": "get",
+                                "object": {
+                                  "kind": "ref",
+                                  "name": "p"
+                                },
+                                "key": "instanceId"
+                              },
+                              {
+                                "kind": "object",
+                                "entries": [
+                                  {
+                                    "key": "id",
+                                    "value": {
+                                      "kind": "binary",
+                                      "op": "+",
+                                      "left": {
+                                        "kind": "literal",
+                                        "value": "immobile-"
+                                      },
+                                      "right": {
+                                        "kind": "get",
+                                        "object": {
+                                          "kind": "ref",
+                                          "name": "p"
+                                        },
+                                        "key": "instanceId"
+                                      }
+                                    }
+                                  },
+                                  {
+                                    "key": "type",
+                                    "value": {
+                                      "kind": "literal",
+                                      "value": "chidori-immobile"
+                                    }
+                                  },
+                                  {
+                                    "key": "name",
+                                    "value": {
+                                      "kind": "literal",
+                                      "value": "定身"
+                                    }
+                                  },
+                                  {
+                                    "key": "stacks",
+                                    "value": {
+                                      "kind": "literal",
+                                      "value": 1
+                                    }
+                                  },
+                                  {
+                                    "key": "currentDuration",
+                                    "value": {
+                                      "kind": "literal",
+                                      "value": 1
+                                    }
+                                  },
+                                  {
+                                    "key": "remainingDuration",
+                                    "value": {
+                                      "kind": "literal",
+                                      "value": 1
+                                    }
+                                  },
+                                  {
+                                    "key": "relatedRules",
+                                    "value": {
+                                      "kind": "array",
+                                      "items": [
+                                        {
+                                          "kind": "literal",
+                                          "value": "rule-chidori-immobile"
+                                        }
+                                      ]
+                                    }
+                                  }
+                                ]
+                              }
+                            ],
+                            "next": "n9"
+                          },
+                          {
+                            "id": "n11",
+                            "kind": "branch",
+                            "condition": {
+                              "kind": "unary",
+                              "op": "!",
+                              "argument": {
+                                "kind": "unary",
+                                "op": "!",
+                                "argument": {
+                                  "kind": "ref",
+                                  "name": "immobilized"
+                                }
+                              }
+                            },
+                            "yes": "n8",
+                            "no": "n10"
+                          },
+                          {
+                            "id": "n12",
+                            "kind": "bind",
+                            "name": "immobilized",
+                            "expr": {
+                              "kind": "collection",
+                              "object": {
+                                "kind": "get",
+                                "object": {
+                                  "kind": "ref",
+                                  "name": "p"
+                                },
+                                "key": "statusTags"
+                              },
+                              "method": "find",
+                              "args": [
+                                {
+                                  "kind": "lambda",
+                                  "parameters": [
+                                    "t"
+                                  ],
+                                  "body": {
+                                    "kind": "binary",
+                                    "op": "===",
+                                    "left": {
+                                      "kind": "get",
+                                      "object": {
+                                        "kind": "ref",
+                                        "name": "t"
+                                      },
+                                      "key": "type"
+                                    },
+                                    "right": {
+                                      "kind": "literal",
+                                      "value": "chidori-immobile"
+                                    }
+                                  }
+                                }
+                              ]
+                            },
+                            "next": "n11"
+                          },
+                          {
+                            "id": "n13",
+                            "kind": "call",
+                            "capability": "addRuleById",
+                            "args": [
+                              {
+                                "kind": "get",
+                                "object": {
+                                  "kind": "ref",
+                                  "name": "p"
+                                },
+                                "key": "instanceId"
+                              },
+                              {
+                                "kind": "literal",
+                                "value": "rule-silenced-block"
+                              }
+                            ],
+                            "next": "n12"
+                          },
+                          {
+                            "id": "n14",
+                            "kind": "call",
+                            "capability": "addStatusEffectById",
+                            "args": [
+                              {
+                                "kind": "get",
+                                "object": {
+                                  "kind": "ref",
+                                  "name": "p"
+                                },
+                                "key": "instanceId"
+                              },
+                              {
+                                "kind": "object",
+                                "entries": [
+                                  {
+                                    "key": "id",
+                                    "value": {
+                                      "kind": "binary",
+                                      "op": "+",
+                                      "left": {
+                                        "kind": "literal",
+                                        "value": "silenced-"
+                                      },
+                                      "right": {
+                                        "kind": "get",
+                                        "object": {
+                                          "kind": "ref",
+                                          "name": "p"
+                                        },
+                                        "key": "instanceId"
+                                      }
+                                    }
+                                  },
+                                  {
+                                    "key": "type",
+                                    "value": {
+                                      "kind": "literal",
+                                      "value": "silenced"
+                                    }
+                                  },
+                                  {
+                                    "key": "name",
+                                    "value": {
+                                      "kind": "literal",
+                                      "value": "沉默"
+                                    }
+                                  },
+                                  {
+                                    "key": "stacks",
+                                    "value": {
+                                      "kind": "literal",
+                                      "value": 1
+                                    }
+                                  },
+                                  {
+                                    "key": "currentDuration",
+                                    "value": {
+                                      "kind": "literal",
+                                      "value": 1
+                                    }
+                                  },
+                                  {
+                                    "key": "remainingDuration",
+                                    "value": {
+                                      "kind": "literal",
+                                      "value": 1
+                                    }
+                                  },
+                                  {
+                                    "key": "relatedRules",
+                                    "value": {
+                                      "kind": "array",
+                                      "items": [
+                                        {
+                                          "kind": "literal",
+                                          "value": "rule-silenced-block"
+                                        }
+                                      ]
+                                    }
+                                  }
+                                ]
+                              }
+                            ],
+                            "next": "n13"
+                          },
+                          {
+                            "id": "n15",
+                            "kind": "set",
+                            "target": {
+                              "kind": "get",
+                              "object": {
+                                "kind": "ref",
+                                "name": "p"
+                              },
+                              "key": "statusTags"
+                            },
+                            "operator": "=",
+                            "value": {
+                              "kind": "binary",
+                              "op": "||",
+                              "left": {
+                                "kind": "get",
+                                "object": {
+                                  "kind": "ref",
+                                  "name": "p"
+                                },
+                                "key": "statusTags"
+                              },
+                              "right": {
+                                "kind": "array",
+                                "items": []
+                              }
+                            },
+                            "next": "n14"
+                          }
+                        ]
+                      }
+                    }
+                  ],
+                  "next": "n3"
+                },
+                {
+                  "id": "n16",
+                  "kind": "bind",
+                  "name": "__rvb_import_operand_0",
+                  "expr": {
+                    "kind": "collection",
+                    "object": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "b"
+                      },
+                      "key": "pieces"
+                    },
+                    "method": "filter",
+                    "args": [
+                      {
+                        "kind": "lambda",
+                        "parameters": [
+                          "p"
+                        ],
+                        "body": {
+                          "kind": "binary",
+                          "op": "&&",
+                          "left": {
+                            "kind": "binary",
+                            "op": "&&",
+                            "left": {
+                              "kind": "binary",
+                              "op": ">",
+                              "left": {
+                                "kind": "get",
+                                "object": {
+                                  "kind": "ref",
+                                  "name": "p"
+                                },
+                                "key": "currentHp"
+                              },
+                              "right": {
+                                "kind": "literal",
+                                "value": 0
+                              }
+                            },
+                            "right": {
+                              "kind": "unary",
+                              "op": "!",
+                              "argument": {
+                                "kind": "call",
+                                "callee": "arePlayersAllied",
+                                "args": [
+                                  {
+                                    "kind": "ref",
+                                    "name": "battle"
+                                  },
+                                  {
+                                    "kind": "get",
+                                    "object": {
+                                      "kind": "ref",
+                                      "name": "p"
+                                    },
+                                    "key": "ownerPlayerId"
+                                  },
+                                  {
+                                    "kind": "get",
+                                    "object": {
+                                      "kind": "ref",
+                                      "name": "c"
+                                    },
+                                    "key": "ownerPlayerId"
+                                  }
+                                ]
+                              }
+                            }
+                          },
+                          "right": {
+                            "kind": "binary",
+                            "op": "<=",
+                            "left": {
+                              "kind": "call",
+                              "callee": "Math.max",
+                              "args": [
+                                {
+                                  "kind": "call",
+                                  "callee": "Math.abs",
+                                  "args": [
+                                    {
+                                      "kind": "binary",
+                                      "op": "-",
+                                      "left": {
+                                        "kind": "get",
+                                        "object": {
+                                          "kind": "ref",
+                                          "name": "p"
+                                        },
+                                        "key": "x"
+                                      },
+                                      "right": {
+                                        "kind": "get",
+                                        "object": {
+                                          "kind": "ref",
+                                          "name": "c"
+                                        },
+                                        "key": "x"
+                                      }
+                                    }
+                                  ]
+                                },
+                                {
+                                  "kind": "call",
+                                  "callee": "Math.abs",
+                                  "args": [
+                                    {
+                                      "kind": "binary",
+                                      "op": "-",
+                                      "left": {
+                                        "kind": "get",
+                                        "object": {
+                                          "kind": "ref",
+                                          "name": "p"
+                                        },
+                                        "key": "y"
+                                      },
+                                      "right": {
+                                        "kind": "get",
+                                        "object": {
+                                          "kind": "ref",
+                                          "name": "c"
+                                        },
+                                        "key": "y"
+                                      }
+                                    }
+                                  ]
+                                }
+                              ]
+                            },
+                            "right": {
+                              "kind": "literal",
+                              "value": 2
+                            }
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  "next": "n4"
+                }
+              ]
+            }
+          }
+        ],
+        "next": "n1"
+      },
+      {
+        "id": "n17",
+        "kind": "bind",
+        "name": "affected",
+        "expr": {
+          "kind": "literal",
+          "value": 0
+        },
+        "next": "n2"
+      },
+      {
+        "id": "n18",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": "位移被阻挡，本次位移效果取消"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n19",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "unary",
+              "op": "!",
+              "argument": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "__rvb_import_effect_1"
+                },
+                "key": "success"
+              }
+            }
+          }
+        },
+        "yes": "n18",
+        "no": "n17"
+      },
+      {
+        "id": "n20",
+        "kind": "call",
+        "capability": "flow.effects.displace",
+        "args": [
+          {
+            "kind": "array",
+            "items": [
+              {
+                "kind": "object",
+                "entries": [
+                  {
+                    "key": "pieceId",
+                    "value": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "c"
+                      },
+                      "key": "instanceId"
+                    }
+                  },
+                  {
+                    "key": "x",
+                    "value": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "pos"
+                      },
+                      "key": "x"
+                    }
+                  },
+                  {
+                    "key": "y",
+                    "value": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "pos"
+                      },
+                      "key": "y"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "kind": "literal",
+            "value": "teleport"
+          }
+        ],
+        "result": "__rvb_import_effect_1",
+        "next": "n19"
+      },
+      {
+        "id": "n21",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": "目标必须是未被占据的空地或掩体"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n22",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "binary",
+                "op": "||",
+                "left": {
+                  "kind": "binary",
+                  "op": "||",
+                  "left": {
+                    "kind": "unary",
+                    "op": "!",
+                    "argument": {
+                      "kind": "ref",
+                      "name": "tile"
+                    }
+                  },
+                  "right": {
+                    "kind": "unary",
+                    "op": "!",
+                    "argument": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "tile"
+                        },
+                        "key": "props"
+                      },
+                      "key": "walkable"
+                    }
+                  }
+                },
+                "right": {
+                  "kind": "binary",
+                  "op": "&&",
+                  "left": {
+                    "kind": "binary",
+                    "op": "!==",
+                    "left": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "tile"
+                        },
+                        "key": "props"
+                      },
+                      "key": "type"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": "floor"
+                    }
+                  },
+                  "right": {
+                    "kind": "binary",
+                    "op": "!==",
+                    "left": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "tile"
+                        },
+                        "key": "props"
+                      },
+                      "key": "type"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": "cover"
+                    }
+                  }
+                }
+              },
+              "right": {
+                "kind": "collection",
+                "object": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "b"
+                  },
+                  "key": "pieces"
+                },
+                "method": "some",
+                "args": [
+                  {
+                    "kind": "lambda",
+                    "parameters": [
+                      "p"
+                    ],
+                    "body": {
+                      "kind": "binary",
+                      "op": "&&",
+                      "left": {
+                        "kind": "binary",
+                        "op": "&&",
+                        "left": {
+                          "kind": "binary",
+                          "op": ">",
+                          "left": {
+                            "kind": "get",
+                            "object": {
+                              "kind": "ref",
+                              "name": "p"
+                            },
+                            "key": "currentHp"
+                          },
+                          "right": {
+                            "kind": "literal",
+                            "value": 0
+                          }
+                        },
+                        "right": {
+                          "kind": "binary",
+                          "op": "===",
+                          "left": {
+                            "kind": "get",
+                            "object": {
+                              "kind": "ref",
+                              "name": "p"
+                            },
+                            "key": "x"
+                          },
+                          "right": {
+                            "kind": "get",
+                            "object": {
+                              "kind": "ref",
+                              "name": "pos"
+                            },
+                            "key": "x"
+                          }
+                        }
+                      },
+                      "right": {
+                        "kind": "binary",
+                        "op": "===",
+                        "left": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "p"
+                          },
+                          "key": "y"
+                        },
+                        "right": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "pos"
+                          },
+                          "key": "y"
+                        }
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "yes": "n21",
+        "no": "n20"
+      },
+      {
+        "id": "n23",
+        "kind": "bind",
+        "name": "tile",
+        "expr": {
+          "kind": "collection",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "b"
+              },
+              "key": "map"
+            },
+            "key": "tiles"
+          },
+          "method": "find",
+          "args": [
+            {
+              "kind": "lambda",
+              "parameters": [
+                "t"
+              ],
+              "body": {
+                "kind": "binary",
+                "op": "&&",
+                "left": {
+                  "kind": "binary",
+                  "op": "===",
+                  "left": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "t"
+                    },
+                    "key": "x"
+                  },
+                  "right": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "pos"
+                    },
+                    "key": "x"
+                  }
+                },
+                "right": {
+                  "kind": "binary",
+                  "op": "===",
+                  "left": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "t"
+                    },
+                    "key": "y"
+                  },
+                  "right": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "pos"
+                    },
+                    "key": "y"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "next": "n22"
+      },
+      {
+        "id": "n24",
+        "kind": "return",
+        "value": {
+          "kind": "ref",
+          "name": "pos"
+        }
+      },
+      {
+        "id": "n25",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "ref",
+                  "name": "pos"
+                }
+              },
+              "right": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "pos"
+                },
+                "key": "needsTargetSelection"
+              }
+            }
+          }
+        },
+        "yes": "n24",
+        "no": "n23"
+      },
+      {
+        "id": "n26",
+        "kind": "call",
+        "capability": "selectTarget",
+        "args": [
+          {
+            "kind": "object",
+            "entries": [
+              {
+                "key": "type",
+                "value": {
+                  "kind": "literal",
+                  "value": "grid"
+                }
+              },
+              {
+                "key": "range",
+                "value": {
+                  "kind": "literal",
+                  "value": 5
+                }
+              },
+              {
+                "key": "filter",
+                "value": {
+                  "kind": "literal",
+                  "value": "all"
+                }
+              }
+            ]
+          }
+        ],
+        "result": "pos",
+        "next": "n25"
+      },
+      {
+        "id": "n27",
+        "kind": "bind",
+        "name": "b",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "context"
+          },
+          "key": "battle"
+        },
+        "next": "n26"
+      },
+      {
+        "id": "n28",
+        "kind": "bind",
+        "name": "c",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "context"
+          },
+          "key": "piece"
+        },
+        "next": "n27"
+      }
+    ]
+  },
+  "contentGraphField": "code",
+  "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1"
 }

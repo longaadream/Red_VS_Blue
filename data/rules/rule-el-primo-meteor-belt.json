@@ -3,6 +3,753 @@
   "name": "流星腰带",
   "description": "保护普里莫自身3×3内的其他友军，由普里莫代为承受伤害。",
   "priority": 200,
-  "trigger": { "type": "beforeDamageRedirect" },
-  "skillCode": "var guard=context.rulePiece,target=context.piece;if(!guard||guard.currentHp<=0||!battle.pieces.some(function(piece){return piece.instanceId===guard.instanceId&&piece.currentHp>0;}))return{success:false,message:''};if(!target||target.instanceId===guard.instanceId||target.currentHp<=0||!arePlayersAllied(battle,target.ownerPlayerId,guard.ownerPlayerId))return{success:false,message:''};if(guard.x==null||guard.y==null||target.x==null||target.y==null||Math.abs(target.x-guard.x)>1||Math.abs(target.y-guard.y)>1)return{success:false,message:''};var status=(guard.statusTags||[]).some(function(tag){return tag.type==='el-primo-meteor-belt';});if(!status||!context.damageRedirectQueue||!context.damageRedirectQueue.push({target:guard}))return{success:false,message:''};return{success:true,blocked:true,message:guard.name+'代替'+target.name+'承受伤害'};"
+  "trigger": {
+    "type": "beforeDamageRedirect"
+  },
+  "skillCode": "var __rvb_import_effect_1, __rvb_import_operand_3, __rvb_import_value_0, guard, status, target; var _pc = \"n18\"; for (var _step = 0; _step <= 18; _step++) { switch (_pc) { case \"n18\": guard = (context)[\"rulePiece\"]; _pc = \"n17\"; break; case \"n17\": target = (context)[\"piece\"]; _pc = \"n16\"; break; case \"n16\": _pc = (! (! (((! guard) || ((guard)[\"currentHp\"] <= 0)) || (! ((battle)[\"pieces\"])[\"some\"](function (piece) { return (((piece)[\"instanceId\"] === (guard)[\"instanceId\"]) && ((piece)[\"currentHp\"] > 0)); }))))) ? \"n15\" : \"n14\"; break; case \"n14\": _pc = (! (! ((((! target) || ((target)[\"instanceId\"] === (guard)[\"instanceId\"])) || ((target)[\"currentHp\"] <= 0)) || (! arePlayersAllied(battle, (target)[\"ownerPlayerId\"], (guard)[\"ownerPlayerId\"]))))) ? \"n13\" : \"n12\"; break; case \"n12\": _pc = (! (! (((((((guard)[\"x\"] == null) || ((guard)[\"y\"] == null)) || ((target)[\"x\"] == null)) || ((target)[\"y\"] == null)) || (Math.abs(((target)[\"x\"] - (guard)[\"x\"])) > 1)) || (Math.abs(((target)[\"y\"] - (guard)[\"y\"])) > 1)))) ? \"n11\" : \"n10\"; break; case \"n10\": status = (((guard)[\"statusTags\"] || []))[\"some\"](function (tag) { return ((tag)[\"type\"] === \"el-primo-meteor-belt\"); }); _pc = \"n9\"; break; case \"n9\": __rvb_import_value_0 = (void 0); _pc = \"n8\"; break; case \"n8\": __rvb_import_operand_3 = ((! status) || (! (context)[\"damageRedirectQueue\"])); _pc = \"n6\"; break; case \"n6\": _pc = (! (! __rvb_import_operand_3)) ? \"n7\" : \"n5\"; break; case \"n5\": __rvb_import_effect_1 = context.damageRedirectQueue.push({target: guard}); _pc = \"n4\"; break; case \"n4\": __rvb_import_value_0 = (! __rvb_import_effect_1); _pc = \"n3\"; break; case \"n7\": __rvb_import_value_0 = __rvb_import_operand_3; _pc = \"n3\"; break; case \"n3\": _pc = (! (! __rvb_import_value_0)) ? \"n2\" : \"n1\"; break; case \"n1\": return {success: true, blocked: true, message: ((((guard)[\"name\"] + \"代替\") + (target)[\"name\"]) + \"承受伤害\")}; case \"n2\": return {success: false, message: \"\"}; case \"n11\": return {success: false, message: \"\"}; case \"n13\": return {success: false, message: \"\"}; case \"n15\": return {success: false, message: \"\"}; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\");",
+  "contentGraph": {
+    "version": "rvb-content-graph/v1",
+    "surface": "rule",
+    "entry": "n18",
+    "nodes": [
+      {
+        "id": "n1",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "blocked",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "binary",
+                  "op": "+",
+                  "left": {
+                    "kind": "binary",
+                    "op": "+",
+                    "left": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "guard"
+                      },
+                      "key": "name"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": "代替"
+                    }
+                  },
+                  "right": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "target"
+                    },
+                    "key": "name"
+                  }
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "承受伤害"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n2",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n3",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "ref",
+              "name": "__rvb_import_value_0"
+            }
+          }
+        },
+        "yes": "n2",
+        "no": "n1"
+      },
+      {
+        "id": "n4",
+        "kind": "set",
+        "target": {
+          "kind": "ref",
+          "name": "__rvb_import_value_0"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "ref",
+            "name": "__rvb_import_effect_1"
+          }
+        },
+        "next": "n3"
+      },
+      {
+        "id": "n5",
+        "kind": "call",
+        "capability": "queue.damageRedirect",
+        "args": [
+          {
+            "kind": "object",
+            "entries": [
+              {
+                "key": "target",
+                "value": {
+                  "kind": "ref",
+                  "name": "guard"
+                }
+              }
+            ]
+          }
+        ],
+        "result": "__rvb_import_effect_1",
+        "next": "n4"
+      },
+      {
+        "id": "n7",
+        "kind": "set",
+        "target": {
+          "kind": "ref",
+          "name": "__rvb_import_value_0"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "ref",
+          "name": "__rvb_import_operand_3"
+        },
+        "next": "n3"
+      },
+      {
+        "id": "n6",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "ref",
+              "name": "__rvb_import_operand_3"
+            }
+          }
+        },
+        "yes": "n7",
+        "no": "n5"
+      },
+      {
+        "id": "n8",
+        "kind": "bind",
+        "name": "__rvb_import_operand_3",
+        "expr": {
+          "kind": "binary",
+          "op": "||",
+          "left": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "ref",
+              "name": "status"
+            }
+          },
+          "right": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "context"
+              },
+              "key": "damageRedirectQueue"
+            }
+          }
+        },
+        "next": "n6"
+      },
+      {
+        "id": "n9",
+        "kind": "bind",
+        "name": "__rvb_import_value_0",
+        "next": "n8",
+        "expr": {
+          "kind": "undefined"
+        }
+      },
+      {
+        "id": "n10",
+        "kind": "bind",
+        "name": "status",
+        "expr": {
+          "kind": "collection",
+          "object": {
+            "kind": "binary",
+            "op": "||",
+            "left": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "guard"
+              },
+              "key": "statusTags"
+            },
+            "right": {
+              "kind": "array",
+              "items": []
+            }
+          },
+          "method": "some",
+          "args": [
+            {
+              "kind": "lambda",
+              "parameters": [
+                "tag"
+              ],
+              "body": {
+                "kind": "binary",
+                "op": "===",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "tag"
+                  },
+                  "key": "type"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "el-primo-meteor-belt"
+                }
+              }
+            }
+          ]
+        },
+        "next": "n9"
+      },
+      {
+        "id": "n11",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n12",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "binary",
+                "op": "||",
+                "left": {
+                  "kind": "binary",
+                  "op": "||",
+                  "left": {
+                    "kind": "binary",
+                    "op": "||",
+                    "left": {
+                      "kind": "binary",
+                      "op": "||",
+                      "left": {
+                        "kind": "binary",
+                        "op": "==",
+                        "left": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "guard"
+                          },
+                          "key": "x"
+                        },
+                        "right": {
+                          "kind": "literal",
+                          "value": null
+                        }
+                      },
+                      "right": {
+                        "kind": "binary",
+                        "op": "==",
+                        "left": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "guard"
+                          },
+                          "key": "y"
+                        },
+                        "right": {
+                          "kind": "literal",
+                          "value": null
+                        }
+                      }
+                    },
+                    "right": {
+                      "kind": "binary",
+                      "op": "==",
+                      "left": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "target"
+                        },
+                        "key": "x"
+                      },
+                      "right": {
+                        "kind": "literal",
+                        "value": null
+                      }
+                    }
+                  },
+                  "right": {
+                    "kind": "binary",
+                    "op": "==",
+                    "left": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "target"
+                      },
+                      "key": "y"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": null
+                    }
+                  }
+                },
+                "right": {
+                  "kind": "binary",
+                  "op": ">",
+                  "left": {
+                    "kind": "call",
+                    "callee": "Math.abs",
+                    "args": [
+                      {
+                        "kind": "binary",
+                        "op": "-",
+                        "left": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "target"
+                          },
+                          "key": "x"
+                        },
+                        "right": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "guard"
+                          },
+                          "key": "x"
+                        }
+                      }
+                    ]
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": 1
+                  }
+                }
+              },
+              "right": {
+                "kind": "binary",
+                "op": ">",
+                "left": {
+                  "kind": "call",
+                  "callee": "Math.abs",
+                  "args": [
+                    {
+                      "kind": "binary",
+                      "op": "-",
+                      "left": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "target"
+                        },
+                        "key": "y"
+                      },
+                      "right": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "guard"
+                        },
+                        "key": "y"
+                      }
+                    }
+                  ]
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": 1
+                }
+              }
+            }
+          }
+        },
+        "yes": "n11",
+        "no": "n10"
+      },
+      {
+        "id": "n13",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n14",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "binary",
+                "op": "||",
+                "left": {
+                  "kind": "binary",
+                  "op": "||",
+                  "left": {
+                    "kind": "unary",
+                    "op": "!",
+                    "argument": {
+                      "kind": "ref",
+                      "name": "target"
+                    }
+                  },
+                  "right": {
+                    "kind": "binary",
+                    "op": "===",
+                    "left": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "target"
+                      },
+                      "key": "instanceId"
+                    },
+                    "right": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "guard"
+                      },
+                      "key": "instanceId"
+                    }
+                  }
+                },
+                "right": {
+                  "kind": "binary",
+                  "op": "<=",
+                  "left": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "target"
+                    },
+                    "key": "currentHp"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": 0
+                  }
+                }
+              },
+              "right": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "call",
+                  "callee": "arePlayersAllied",
+                  "args": [
+                    {
+                      "kind": "ref",
+                      "name": "battle"
+                    },
+                    {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "target"
+                      },
+                      "key": "ownerPlayerId"
+                    },
+                    {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "guard"
+                      },
+                      "key": "ownerPlayerId"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "yes": "n13",
+        "no": "n12"
+      },
+      {
+        "id": "n15",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n16",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "binary",
+                "op": "||",
+                "left": {
+                  "kind": "unary",
+                  "op": "!",
+                  "argument": {
+                    "kind": "ref",
+                    "name": "guard"
+                  }
+                },
+                "right": {
+                  "kind": "binary",
+                  "op": "<=",
+                  "left": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "guard"
+                    },
+                    "key": "currentHp"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": 0
+                  }
+                }
+              },
+              "right": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "collection",
+                  "object": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "battle"
+                    },
+                    "key": "pieces"
+                  },
+                  "method": "some",
+                  "args": [
+                    {
+                      "kind": "lambda",
+                      "parameters": [
+                        "piece"
+                      ],
+                      "body": {
+                        "kind": "binary",
+                        "op": "&&",
+                        "left": {
+                          "kind": "binary",
+                          "op": "===",
+                          "left": {
+                            "kind": "get",
+                            "object": {
+                              "kind": "ref",
+                              "name": "piece"
+                            },
+                            "key": "instanceId"
+                          },
+                          "right": {
+                            "kind": "get",
+                            "object": {
+                              "kind": "ref",
+                              "name": "guard"
+                            },
+                            "key": "instanceId"
+                          }
+                        },
+                        "right": {
+                          "kind": "binary",
+                          "op": ">",
+                          "left": {
+                            "kind": "get",
+                            "object": {
+                              "kind": "ref",
+                              "name": "piece"
+                            },
+                            "key": "currentHp"
+                          },
+                          "right": {
+                            "kind": "literal",
+                            "value": 0
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "yes": "n15",
+        "no": "n14"
+      },
+      {
+        "id": "n17",
+        "kind": "bind",
+        "name": "target",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "context"
+          },
+          "key": "piece"
+        },
+        "next": "n16"
+      },
+      {
+        "id": "n18",
+        "kind": "bind",
+        "name": "guard",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "context"
+          },
+          "key": "rulePiece"
+        },
+        "next": "n17"
+      }
+    ]
+  },
+  "contentGraphField": "skillCode",
+  "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1"
 }

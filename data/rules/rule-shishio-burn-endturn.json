@@ -5,5 +5,661 @@
   "trigger": {
     "type": "endTurn"
   },
-  "skillCode": "var shishio = battle.pieces.find(function(p) { return p.templateId === 'red-shishio' && p.ownerPlayerId === context.playerId && p.currentHp > 0; }); if (!shishio) return { success: false, message: '' }; var exts = battle.extensions; var burnTiles = exts && exts.shishioBurnTiles; if (!burnTiles || burnTiles.length === 0) return { success: false, message: '' }; var msgs = []; var alivePieces = battle.pieces.filter(function(p) { return p.currentHp > 0; }); alivePieces.forEach(function(p) { var onTile = burnTiles.some(function(t) { return (!t.sourcePieceId || t.sourcePieceId === shishio.instanceId) && t.x === p.x && t.y === p.y; }); if (!onTile) return; var dmg = Math.floor(p.currentHp * 0.5); dealDamage(shishio, p, dmg, 'true', battle, 'shishio-burn-endturn'); msgs.push(p.name + ' 被燃地炙烤，失去 ' + dmg + ' 点真实伤害（当前生命值50%）'); }); if (msgs.length === 0) return { success: false, message: '' }; return { success: true, message: msgs.join('；') };"
+  "skillCode": "var __rvb_import_operand_0, alivePieces, burnTiles, exts, msgs, shishio; var _pc = \"n21\"; for (var _step = 0; _step <= 14; _step++) { switch (_pc) { case \"n21\": shishio = ((battle)[\"pieces\"])[\"find\"](function (p) { return ((((p)[\"templateId\"] === \"red-shishio\") && ((p)[\"ownerPlayerId\"] === (context)[\"playerId\"])) && ((p)[\"currentHp\"] > 0)); }); _pc = \"n20\"; break; case \"n20\": _pc = (! (! (! shishio))) ? \"n19\" : \"n18\"; break; case \"n18\": exts = (battle)[\"extensions\"]; _pc = \"n17\"; break; case \"n17\": burnTiles = (exts && (exts)[\"shishioBurnTiles\"]); _pc = \"n16\"; break; case \"n16\": _pc = (! (! ((! burnTiles) || ((burnTiles)[\"length\"] === 0)))) ? \"n15\" : \"n14\"; break; case \"n14\": msgs = []; _pc = \"n13\"; break; case \"n13\": alivePieces = ((battle)[\"pieces\"])[\"filter\"](function (p) { return ((p)[\"currentHp\"] > 0); }); _pc = \"n12\"; break; case \"n12\": __rvb_import_operand_0 = alivePieces; _pc = \"n4\"; break; case \"n4\": (__rvb_import_operand_0)[\"forEach\"](function (p) { var dmg, onTile; { var __rvb_content_graph_region_pc_0 = \"n11\"; while (__rvb_content_graph_region_pc_0 !== \"n5\") { switch (__rvb_content_graph_region_pc_0) { case \"n11\": onTile = (burnTiles)[\"some\"](function (t) { return ((((! (t)[\"sourcePieceId\"]) || ((t)[\"sourcePieceId\"] === (shishio)[\"instanceId\"])) && ((t)[\"x\"] === (p)[\"x\"])) && ((t)[\"y\"] === (p)[\"y\"])); }); __rvb_content_graph_region_pc_0 = \"n10\"; break; case \"n10\": __rvb_content_graph_region_pc_0 = (! (! (! onTile))) ? \"n9\" : \"n8\"; break; case \"n8\": dmg = Math.floor(((p)[\"currentHp\"] * 0.5)); __rvb_content_graph_region_pc_0 = \"n7\"; break; case \"n7\": dealDamage(shishio, p, dmg, \"true\", battle, \"shishio-burn-endturn\"); __rvb_content_graph_region_pc_0 = \"n6\"; break; case \"n6\": (msgs).push(((((p)[\"name\"] + \" 被燃地炙烤，失去 \") + dmg) + \" 点真实伤害（当前生命值50%）\")); __rvb_content_graph_region_pc_0 = \"n5\"; break; case \"n5\": __rvb_content_graph_region_pc_0 = \"n5\"; break; case \"n9\": return; default: throw new Error(\"invalid content graph region node\"); } } } }); _pc = \"n3\"; break; case \"n3\": _pc = (! (! ((msgs)[\"length\"] === 0))) ? \"n2\" : \"n1\"; break; case \"n1\": return {success: true, message: (msgs)[\"join\"](\"；\")}; case \"n2\": return {success: false, message: \"\"}; case \"n15\": return {success: false, message: \"\"}; case \"n19\": return {success: false, message: \"\"}; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\");",
+  "contentGraph": {
+    "version": "rvb-content-graph/v1",
+    "surface": "rule",
+    "entry": "n21",
+    "nodes": [
+      {
+        "id": "n1",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "collection",
+                "object": {
+                  "kind": "ref",
+                  "name": "msgs"
+                },
+                "method": "join",
+                "args": [
+                  {
+                    "kind": "literal",
+                    "value": "；"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n2",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n3",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "===",
+              "left": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "msgs"
+                },
+                "key": "length"
+              },
+              "right": {
+                "kind": "literal",
+                "value": 0
+              }
+            }
+          }
+        },
+        "yes": "n2",
+        "no": "n1"
+      },
+      {
+        "id": "n4",
+        "kind": "invoke",
+        "target": {
+          "kind": "array",
+          "object": {
+            "kind": "ref",
+            "name": "__rvb_import_operand_0"
+          },
+          "method": "forEach"
+        },
+        "args": [
+          {
+            "kind": "function",
+            "parameters": [
+              "p"
+            ],
+            "body": {
+              "entry": "n11",
+              "end": "n5",
+              "nodes": [
+                {
+                  "id": "n5",
+                  "kind": "regionEnd"
+                },
+                {
+                  "id": "n6",
+                  "kind": "call",
+                  "capability": "array.push",
+                  "args": [
+                    {
+                      "kind": "ref",
+                      "name": "msgs"
+                    },
+                    {
+                      "kind": "binary",
+                      "op": "+",
+                      "left": {
+                        "kind": "binary",
+                        "op": "+",
+                        "left": {
+                          "kind": "binary",
+                          "op": "+",
+                          "left": {
+                            "kind": "get",
+                            "object": {
+                              "kind": "ref",
+                              "name": "p"
+                            },
+                            "key": "name"
+                          },
+                          "right": {
+                            "kind": "literal",
+                            "value": " 被燃地炙烤，失去 "
+                          }
+                        },
+                        "right": {
+                          "kind": "ref",
+                          "name": "dmg"
+                        }
+                      },
+                      "right": {
+                        "kind": "literal",
+                        "value": " 点真实伤害（当前生命值50%）"
+                      }
+                    }
+                  ],
+                  "next": "n5"
+                },
+                {
+                  "id": "n7",
+                  "kind": "call",
+                  "capability": "dealDamage",
+                  "args": [
+                    {
+                      "kind": "ref",
+                      "name": "shishio"
+                    },
+                    {
+                      "kind": "ref",
+                      "name": "p"
+                    },
+                    {
+                      "kind": "ref",
+                      "name": "dmg"
+                    },
+                    {
+                      "kind": "literal",
+                      "value": "true"
+                    },
+                    {
+                      "kind": "ref",
+                      "name": "battle"
+                    },
+                    {
+                      "kind": "literal",
+                      "value": "shishio-burn-endturn"
+                    }
+                  ],
+                  "next": "n6"
+                },
+                {
+                  "id": "n8",
+                  "kind": "bind",
+                  "name": "dmg",
+                  "expr": {
+                    "kind": "call",
+                    "callee": "Math.floor",
+                    "args": [
+                      {
+                        "kind": "binary",
+                        "op": "*",
+                        "left": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "p"
+                          },
+                          "key": "currentHp"
+                        },
+                        "right": {
+                          "kind": "literal",
+                          "value": 0.5
+                        }
+                      }
+                    ]
+                  },
+                  "next": "n7"
+                },
+                {
+                  "id": "n9",
+                  "kind": "return"
+                },
+                {
+                  "id": "n10",
+                  "kind": "branch",
+                  "condition": {
+                    "kind": "unary",
+                    "op": "!",
+                    "argument": {
+                      "kind": "unary",
+                      "op": "!",
+                      "argument": {
+                        "kind": "unary",
+                        "op": "!",
+                        "argument": {
+                          "kind": "ref",
+                          "name": "onTile"
+                        }
+                      }
+                    }
+                  },
+                  "yes": "n9",
+                  "no": "n8"
+                },
+                {
+                  "id": "n11",
+                  "kind": "bind",
+                  "name": "onTile",
+                  "expr": {
+                    "kind": "collection",
+                    "object": {
+                      "kind": "ref",
+                      "name": "burnTiles"
+                    },
+                    "method": "some",
+                    "args": [
+                      {
+                        "kind": "lambda",
+                        "parameters": [
+                          "t"
+                        ],
+                        "body": {
+                          "kind": "binary",
+                          "op": "&&",
+                          "left": {
+                            "kind": "binary",
+                            "op": "&&",
+                            "left": {
+                              "kind": "binary",
+                              "op": "||",
+                              "left": {
+                                "kind": "unary",
+                                "op": "!",
+                                "argument": {
+                                  "kind": "get",
+                                  "object": {
+                                    "kind": "ref",
+                                    "name": "t"
+                                  },
+                                  "key": "sourcePieceId"
+                                }
+                              },
+                              "right": {
+                                "kind": "binary",
+                                "op": "===",
+                                "left": {
+                                  "kind": "get",
+                                  "object": {
+                                    "kind": "ref",
+                                    "name": "t"
+                                  },
+                                  "key": "sourcePieceId"
+                                },
+                                "right": {
+                                  "kind": "get",
+                                  "object": {
+                                    "kind": "ref",
+                                    "name": "shishio"
+                                  },
+                                  "key": "instanceId"
+                                }
+                              }
+                            },
+                            "right": {
+                              "kind": "binary",
+                              "op": "===",
+                              "left": {
+                                "kind": "get",
+                                "object": {
+                                  "kind": "ref",
+                                  "name": "t"
+                                },
+                                "key": "x"
+                              },
+                              "right": {
+                                "kind": "get",
+                                "object": {
+                                  "kind": "ref",
+                                  "name": "p"
+                                },
+                                "key": "x"
+                              }
+                            }
+                          },
+                          "right": {
+                            "kind": "binary",
+                            "op": "===",
+                            "left": {
+                              "kind": "get",
+                              "object": {
+                                "kind": "ref",
+                                "name": "t"
+                              },
+                              "key": "y"
+                            },
+                            "right": {
+                              "kind": "get",
+                              "object": {
+                                "kind": "ref",
+                                "name": "p"
+                              },
+                              "key": "y"
+                            }
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  "next": "n10"
+                }
+              ]
+            }
+          }
+        ],
+        "next": "n3"
+      },
+      {
+        "id": "n12",
+        "kind": "bind",
+        "name": "__rvb_import_operand_0",
+        "expr": {
+          "kind": "ref",
+          "name": "alivePieces"
+        },
+        "next": "n4"
+      },
+      {
+        "id": "n13",
+        "kind": "bind",
+        "name": "alivePieces",
+        "expr": {
+          "kind": "collection",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "battle"
+            },
+            "key": "pieces"
+          },
+          "method": "filter",
+          "args": [
+            {
+              "kind": "lambda",
+              "parameters": [
+                "p"
+              ],
+              "body": {
+                "kind": "binary",
+                "op": ">",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "p"
+                  },
+                  "key": "currentHp"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": 0
+                }
+              }
+            }
+          ]
+        },
+        "next": "n12"
+      },
+      {
+        "id": "n14",
+        "kind": "bind",
+        "name": "msgs",
+        "expr": {
+          "kind": "array",
+          "items": []
+        },
+        "next": "n13"
+      },
+      {
+        "id": "n15",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n16",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "ref",
+                  "name": "burnTiles"
+                }
+              },
+              "right": {
+                "kind": "binary",
+                "op": "===",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "burnTiles"
+                  },
+                  "key": "length"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": 0
+                }
+              }
+            }
+          }
+        },
+        "yes": "n15",
+        "no": "n14"
+      },
+      {
+        "id": "n17",
+        "kind": "bind",
+        "name": "burnTiles",
+        "expr": {
+          "kind": "binary",
+          "op": "&&",
+          "left": {
+            "kind": "ref",
+            "name": "exts"
+          },
+          "right": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "exts"
+            },
+            "key": "shishioBurnTiles"
+          }
+        },
+        "next": "n16"
+      },
+      {
+        "id": "n18",
+        "kind": "bind",
+        "name": "exts",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "battle"
+          },
+          "key": "extensions"
+        },
+        "next": "n17"
+      },
+      {
+        "id": "n19",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n20",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "unary",
+              "op": "!",
+              "argument": {
+                "kind": "ref",
+                "name": "shishio"
+              }
+            }
+          }
+        },
+        "yes": "n19",
+        "no": "n18"
+      },
+      {
+        "id": "n21",
+        "kind": "bind",
+        "name": "shishio",
+        "expr": {
+          "kind": "collection",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "battle"
+            },
+            "key": "pieces"
+          },
+          "method": "find",
+          "args": [
+            {
+              "kind": "lambda",
+              "parameters": [
+                "p"
+              ],
+              "body": {
+                "kind": "binary",
+                "op": "&&",
+                "left": {
+                  "kind": "binary",
+                  "op": "&&",
+                  "left": {
+                    "kind": "binary",
+                    "op": "===",
+                    "left": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "p"
+                      },
+                      "key": "templateId"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": "red-shishio"
+                    }
+                  },
+                  "right": {
+                    "kind": "binary",
+                    "op": "===",
+                    "left": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "p"
+                      },
+                      "key": "ownerPlayerId"
+                    },
+                    "right": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "context"
+                      },
+                      "key": "playerId"
+                    }
+                  }
+                },
+                "right": {
+                  "kind": "binary",
+                  "op": ">",
+                  "left": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "p"
+                    },
+                    "key": "currentHp"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": 0
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "next": "n20"
+      }
+    ]
+  },
+  "contentGraphField": "skillCode",
+  "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1"
 }

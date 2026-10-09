@@ -4,7 +4,9 @@
   "description": "持续2回合，保护自身3×3内的其他友军；其受到伤害时由你代为承受。",
   "keywords": [],
   "targetText": "自身3×3内的其他友军",
-  "effectTags": ["保护"],
+  "effectTags": [
+    "保护"
+  ],
   "icon": "☄️",
   "kind": "active",
   "type": "normal",
@@ -13,6 +15,237 @@
   "cooldownTurns": 3,
   "maxCharges": 0,
   "powerMultiplier": 1,
-  "targeting": { "steps": [] },
-  "code": "function executeSkill(context){var c=context.piece,turn=Number(battle.turn.turnNumber),statusId='el-primo-meteor-belt-'+c.instanceId+'-'+turn;addStatusEffectById(c.instanceId,{id:statusId,type:'el-primo-meteor-belt',name:'流星腰带',visible:true,stacking:'none',currentDuration:2,remainingDuration:2,stacks:1,relatedRules:['rule-el-primo-meteor-belt']});addRuleById(c.instanceId,'rule-el-primo-meteor-belt');return{success:true,message:c.name+'获得流星腰带，持续2回合'};}"
+  "targeting": {
+    "steps": []
+  },
+  "code": "function executeSkill(context) { var c, statusId, turn; var _pc = \"n6\"; for (var _step = 0; _step <= 6; _step++) { switch (_pc) { case \"n6\": c = (context)[\"piece\"]; _pc = \"n5\"; break; case \"n5\": turn = Number(((battle)[\"turn\"])[\"turnNumber\"]); _pc = \"n4\"; break; case \"n4\": statusId = (((\"el-primo-meteor-belt-\" + (c)[\"instanceId\"]) + \"-\") + turn); _pc = \"n3\"; break; case \"n3\": addStatusEffectById((c)[\"instanceId\"], {id: statusId, type: \"el-primo-meteor-belt\", name: \"流星腰带\", visible: true, stacking: \"none\", currentDuration: 2, remainingDuration: 2, stacks: 1, relatedRules: [\"rule-el-primo-meteor-belt\"]}); _pc = \"n2\"; break; case \"n2\": addRuleById((c)[\"instanceId\"], \"rule-el-primo-meteor-belt\"); _pc = \"n1\"; break; case \"n1\": return {success: true, message: ((c)[\"name\"] + \"获得流星腰带，持续2回合\")}; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\"); }",
+  "contentGraph": {
+    "version": "rvb-content-graph/v1",
+    "surface": "skill",
+    "entry": "n6",
+    "nodes": [
+      {
+        "id": "n1",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "c"
+                  },
+                  "key": "name"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "获得流星腰带，持续2回合"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n2",
+        "kind": "call",
+        "capability": "addRuleById",
+        "args": [
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "c"
+            },
+            "key": "instanceId"
+          },
+          {
+            "kind": "literal",
+            "value": "rule-el-primo-meteor-belt"
+          }
+        ],
+        "next": "n1"
+      },
+      {
+        "id": "n3",
+        "kind": "call",
+        "capability": "addStatusEffectById",
+        "args": [
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "c"
+            },
+            "key": "instanceId"
+          },
+          {
+            "kind": "object",
+            "entries": [
+              {
+                "key": "id",
+                "value": {
+                  "kind": "ref",
+                  "name": "statusId"
+                }
+              },
+              {
+                "key": "type",
+                "value": {
+                  "kind": "literal",
+                  "value": "el-primo-meteor-belt"
+                }
+              },
+              {
+                "key": "name",
+                "value": {
+                  "kind": "literal",
+                  "value": "流星腰带"
+                }
+              },
+              {
+                "key": "visible",
+                "value": {
+                  "kind": "literal",
+                  "value": true
+                }
+              },
+              {
+                "key": "stacking",
+                "value": {
+                  "kind": "literal",
+                  "value": "none"
+                }
+              },
+              {
+                "key": "currentDuration",
+                "value": {
+                  "kind": "literal",
+                  "value": 2
+                }
+              },
+              {
+                "key": "remainingDuration",
+                "value": {
+                  "kind": "literal",
+                  "value": 2
+                }
+              },
+              {
+                "key": "stacks",
+                "value": {
+                  "kind": "literal",
+                  "value": 1
+                }
+              },
+              {
+                "key": "relatedRules",
+                "value": {
+                  "kind": "array",
+                  "items": [
+                    {
+                      "kind": "literal",
+                      "value": "rule-el-primo-meteor-belt"
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ],
+        "next": "n2"
+      },
+      {
+        "id": "n4",
+        "kind": "bind",
+        "name": "statusId",
+        "expr": {
+          "kind": "binary",
+          "op": "+",
+          "left": {
+            "kind": "binary",
+            "op": "+",
+            "left": {
+              "kind": "binary",
+              "op": "+",
+              "left": {
+                "kind": "literal",
+                "value": "el-primo-meteor-belt-"
+              },
+              "right": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "c"
+                },
+                "key": "instanceId"
+              }
+            },
+            "right": {
+              "kind": "literal",
+              "value": "-"
+            }
+          },
+          "right": {
+            "kind": "ref",
+            "name": "turn"
+          }
+        },
+        "next": "n3"
+      },
+      {
+        "id": "n5",
+        "kind": "bind",
+        "name": "turn",
+        "expr": {
+          "kind": "call",
+          "callee": "Number",
+          "args": [
+            {
+              "kind": "get",
+              "object": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "battle"
+                },
+                "key": "turn"
+              },
+              "key": "turnNumber"
+            }
+          ]
+        },
+        "next": "n4"
+      },
+      {
+        "id": "n6",
+        "kind": "bind",
+        "name": "c",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "context"
+          },
+          "key": "piece"
+        },
+        "next": "n5"
+      }
+    ]
+  },
+  "contentGraphField": "code",
+  "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1"
 }

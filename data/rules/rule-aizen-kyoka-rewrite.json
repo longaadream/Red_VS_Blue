@@ -5,5 +5,1362 @@
   "trigger": {
     "type": "beforeSkillUse"
   },
-  "skillCode": "var aizen = context.rulePiece; if (!aizen || aizen.currentHp <= 0) return { success: false, message: '' }; var source = context.sourcePiece; if (!source || arePlayersAllied(battle, source.ownerPlayerId, aizen.ownerPlayerId)) return { success: false, message: '' }; var secret = aizen.statusTags && aizen.statusTags.find(function(tag) { return tag.type === 'aizen-kyoka-secret'; }); if (!secret || secret.opponentPlayerId !== source.ownerPlayerId) return { success: false, message: '' }; if (context.cancelled) return { success: false, message: '' }; var selected = Array.isArray(context.selectedTargets) ? context.selectedTargets : []; if (selected.length > 0) { var ref = selected[0]; var replacement = ref && ref.type === 'piece' ? battle.pieces.find(function(piece) { return piece.instanceId === ref.pieceId && piece.currentHp > 0; }) : null; if (!replacement || arePlayersAllied(battle, replacement.ownerPlayerId, aizen.ownerPlayerId) || Math.abs(replacement.x - aizen.x) + Math.abs(replacement.y - aizen.y) > 3) return { success: false, message: '镜花水月的替代目标已失效' }; aizen.statusTags = (aizen.statusTags || []).filter(function(tag) { return tag.type !== 'aizen-kyoka-active' && tag.type !== 'aizen-kyoka-secret'; }); return { success: true, targetReplacementPieceId: replacement.instanceId, message: aizen.name + '发动镜花水月，改写了技能目标' }; } var original = context.targetPiece; if (!original || original.instanceId !== secret.targetPieceId) return { success: false, message: '' }; if (context.isSinglePieceTargetAction !== true) return { success: false, message: '' }; var candidates = battle.pieces.filter(function(piece) { return piece.currentHp > 0 && !arePlayersAllied(battle, piece.ownerPlayerId, aizen.ownerPlayerId) && Math.abs(piece.x - aizen.x) + Math.abs(piece.y - aizen.y) <= 3; }).sort(function(left, right) { return left.instanceId < right.instanceId ? -1 : left.instanceId > right.instanceId ? 1 : 0; }).map(function(piece) { return { type: 'piece', pieceId: piece.instanceId }; }); if (!candidates.length) return { success: false, message: '' }; return { success: false, needsTargetSelection: true, playerId: aizen.ownerPlayerId, title: '镜花水月：选择替代目标', targetType: 'piece', filter: 'enemy', targetCandidates: candidates, selectionMode: 'single', minSelections: 1, maxSelections: 1, canCancel: true, resumeOnCancel: true };"
+  "skillCode": "var __rvb_import_bound_method_1, __rvb_import_effect_0, __rvb_import_effect_2, aizen, candidates, original, ref, replacement, secret, selected, source; var _pc = \"n31\"; for (var _step = 0; _step <= 31; _step++) { switch (_pc) { case \"n31\": aizen = (context)[\"rulePiece\"]; _pc = \"n30\"; break; case \"n30\": _pc = (! (! ((! aizen) || ((aizen)[\"currentHp\"] <= 0)))) ? \"n29\" : \"n28\"; break; case \"n28\": source = (context)[\"sourcePiece\"]; _pc = \"n27\"; break; case \"n27\": _pc = (! (! ((! source) || arePlayersAllied(battle, (source)[\"ownerPlayerId\"], (aizen)[\"ownerPlayerId\"])))) ? \"n26\" : \"n25\"; break; case \"n25\": secret = ((aizen)[\"statusTags\"] && ((aizen)[\"statusTags\"])[\"find\"](function (tag) { return ((tag)[\"type\"] === \"aizen-kyoka-secret\"); })); _pc = \"n24\"; break; case \"n24\": _pc = (! (! ((! secret) || ((secret)[\"opponentPlayerId\"] !== (source)[\"ownerPlayerId\"])))) ? \"n23\" : \"n22\"; break; case \"n22\": _pc = (! (! (context)[\"cancelled\"])) ? \"n21\" : \"n20\"; break; case \"n20\": selected = (Array.isArray((context)[\"selectedTargets\"]) ? (context)[\"selectedTargets\"] : []); _pc = \"n19\"; break; case \"n19\": _pc = (! (! ((selected)[\"length\"] > 0))) ? \"n18\" : \"n12\"; break; case \"n12\": original = (context)[\"targetPiece\"]; _pc = \"n11\"; break; case \"n11\": _pc = (! (! ((! original) || ((original)[\"instanceId\"] !== (secret)[\"targetPieceId\"])))) ? \"n10\" : \"n9\"; break; case \"n9\": _pc = (! (! ((context)[\"isSinglePieceTargetAction\"] !== true))) ? \"n8\" : \"n7\"; break; case \"n7\": __rvb_import_effect_2 = (((battle)[\"pieces\"])[\"filter\"](function (piece) { return ((((piece)[\"currentHp\"] > 0) && (! arePlayersAllied(battle, (piece)[\"ownerPlayerId\"], (aizen)[\"ownerPlayerId\"]))) && ((Math.abs(((piece)[\"x\"] - (aizen)[\"x\"])) + Math.abs(((piece)[\"y\"] - (aizen)[\"y\"]))) <= 3)); })).sort(function (left, right) { return (((left)[\"instanceId\"] < (right)[\"instanceId\"]) ? (- 1) : (((left)[\"instanceId\"] > (right)[\"instanceId\"]) ? 1 : 0)); }); _pc = \"n6\"; break; case \"n6\": __rvb_import_bound_method_1 = (function (receiver) { var capturedMethod = receiver[\"map\"]; return function () { return Reflect.apply(capturedMethod, receiver, arguments); }; })(__rvb_import_effect_2); _pc = \"n5\"; break; case \"n5\": __rvb_import_effect_0 = (__rvb_import_bound_method_1)(function (piece) { return {type: \"piece\", pieceId: (piece)[\"instanceId\"]}; }); _pc = \"n4\"; break; case \"n4\": candidates = __rvb_import_effect_0; _pc = \"n3\"; break; case \"n3\": _pc = (! (! (! (candidates)[\"length\"]))) ? \"n2\" : \"n1\"; break; case \"n1\": return {success: false, needsTargetSelection: true, playerId: (aizen)[\"ownerPlayerId\"], title: \"镜花水月：选择替代目标\", targetType: \"piece\", filter: \"enemy\", targetCandidates: candidates, selectionMode: \"single\", minSelections: 1, maxSelections: 1, canCancel: true, resumeOnCancel: true}; case \"n2\": return {success: false, message: \"\"}; case \"n8\": return {success: false, message: \"\"}; case \"n10\": return {success: false, message: \"\"}; case \"n18\": ref = (selected)[0]; _pc = \"n17\"; break; case \"n17\": replacement = ((ref && ((ref)[\"type\"] === \"piece\")) ? ((battle)[\"pieces\"])[\"find\"](function (piece) { return (((piece)[\"instanceId\"] === (ref)[\"pieceId\"]) && ((piece)[\"currentHp\"] > 0)); }) : null); _pc = \"n16\"; break; case \"n16\": _pc = (! (! (((! replacement) || arePlayersAllied(battle, (replacement)[\"ownerPlayerId\"], (aizen)[\"ownerPlayerId\"])) || ((Math.abs(((replacement)[\"x\"] - (aizen)[\"x\"])) + Math.abs(((replacement)[\"y\"] - (aizen)[\"y\"]))) > 3)))) ? \"n15\" : \"n14\"; break; case \"n14\": (aizen)[\"statusTags\"] = (((aizen)[\"statusTags\"] || []))[\"filter\"](function (tag) { return (((tag)[\"type\"] !== \"aizen-kyoka-active\") && ((tag)[\"type\"] !== \"aizen-kyoka-secret\")); }); _pc = \"n13\"; break; case \"n13\": return {success: true, targetReplacementPieceId: (replacement)[\"instanceId\"], message: ((aizen)[\"name\"] + \"发动镜花水月，改写了技能目标\")}; case \"n15\": return {success: false, message: \"镜花水月的替代目标已失效\"}; case \"n21\": return {success: false, message: \"\"}; case \"n23\": return {success: false, message: \"\"}; case \"n26\": return {success: false, message: \"\"}; case \"n29\": return {success: false, message: \"\"}; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\");",
+  "contentGraph": {
+    "version": "rvb-content-graph/v1",
+    "surface": "rule",
+    "entry": "n31",
+    "nodes": [
+      {
+        "id": "n1",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "needsTargetSelection",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "playerId",
+              "value": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "aizen"
+                },
+                "key": "ownerPlayerId"
+              }
+            },
+            {
+              "key": "title",
+              "value": {
+                "kind": "literal",
+                "value": "镜花水月：选择替代目标"
+              }
+            },
+            {
+              "key": "targetType",
+              "value": {
+                "kind": "literal",
+                "value": "piece"
+              }
+            },
+            {
+              "key": "filter",
+              "value": {
+                "kind": "literal",
+                "value": "enemy"
+              }
+            },
+            {
+              "key": "targetCandidates",
+              "value": {
+                "kind": "ref",
+                "name": "candidates"
+              }
+            },
+            {
+              "key": "selectionMode",
+              "value": {
+                "kind": "literal",
+                "value": "single"
+              }
+            },
+            {
+              "key": "minSelections",
+              "value": {
+                "kind": "literal",
+                "value": 1
+              }
+            },
+            {
+              "key": "maxSelections",
+              "value": {
+                "kind": "literal",
+                "value": 1
+              }
+            },
+            {
+              "key": "canCancel",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "resumeOnCancel",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n2",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n3",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "unary",
+              "op": "!",
+              "argument": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "candidates"
+                },
+                "key": "length"
+              }
+            }
+          }
+        },
+        "yes": "n2",
+        "no": "n1"
+      },
+      {
+        "id": "n4",
+        "kind": "bind",
+        "name": "candidates",
+        "expr": {
+          "kind": "ref",
+          "name": "__rvb_import_effect_0"
+        },
+        "next": "n3"
+      },
+      {
+        "id": "n5",
+        "kind": "invoke",
+        "target": {
+          "kind": "function",
+          "value": {
+            "kind": "ref",
+            "name": "__rvb_import_bound_method_1"
+          }
+        },
+        "args": [
+          {
+            "kind": "lambda",
+            "parameters": [
+              "piece"
+            ],
+            "body": {
+              "kind": "object",
+              "entries": [
+                {
+                  "key": "type",
+                  "value": {
+                    "kind": "literal",
+                    "value": "piece"
+                  }
+                },
+                {
+                  "key": "pieceId",
+                  "value": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "piece"
+                    },
+                    "key": "instanceId"
+                  }
+                }
+              ]
+            }
+          }
+        ],
+        "result": "__rvb_import_effect_0",
+        "next": "n4"
+      },
+      {
+        "id": "n6",
+        "kind": "bind",
+        "name": "__rvb_import_bound_method_1",
+        "expr": {
+          "kind": "boundMethod",
+          "object": {
+            "kind": "ref",
+            "name": "__rvb_import_effect_2"
+          },
+          "method": "map"
+        },
+        "next": "n5"
+      },
+      {
+        "id": "n7",
+        "kind": "call",
+        "capability": "array.sort",
+        "args": [
+          {
+            "kind": "collection",
+            "object": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "battle"
+              },
+              "key": "pieces"
+            },
+            "method": "filter",
+            "args": [
+              {
+                "kind": "lambda",
+                "parameters": [
+                  "piece"
+                ],
+                "body": {
+                  "kind": "binary",
+                  "op": "&&",
+                  "left": {
+                    "kind": "binary",
+                    "op": "&&",
+                    "left": {
+                      "kind": "binary",
+                      "op": ">",
+                      "left": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "piece"
+                        },
+                        "key": "currentHp"
+                      },
+                      "right": {
+                        "kind": "literal",
+                        "value": 0
+                      }
+                    },
+                    "right": {
+                      "kind": "unary",
+                      "op": "!",
+                      "argument": {
+                        "kind": "call",
+                        "callee": "arePlayersAllied",
+                        "args": [
+                          {
+                            "kind": "ref",
+                            "name": "battle"
+                          },
+                          {
+                            "kind": "get",
+                            "object": {
+                              "kind": "ref",
+                              "name": "piece"
+                            },
+                            "key": "ownerPlayerId"
+                          },
+                          {
+                            "kind": "get",
+                            "object": {
+                              "kind": "ref",
+                              "name": "aizen"
+                            },
+                            "key": "ownerPlayerId"
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  "right": {
+                    "kind": "binary",
+                    "op": "<=",
+                    "left": {
+                      "kind": "binary",
+                      "op": "+",
+                      "left": {
+                        "kind": "call",
+                        "callee": "Math.abs",
+                        "args": [
+                          {
+                            "kind": "binary",
+                            "op": "-",
+                            "left": {
+                              "kind": "get",
+                              "object": {
+                                "kind": "ref",
+                                "name": "piece"
+                              },
+                              "key": "x"
+                            },
+                            "right": {
+                              "kind": "get",
+                              "object": {
+                                "kind": "ref",
+                                "name": "aizen"
+                              },
+                              "key": "x"
+                            }
+                          }
+                        ]
+                      },
+                      "right": {
+                        "kind": "call",
+                        "callee": "Math.abs",
+                        "args": [
+                          {
+                            "kind": "binary",
+                            "op": "-",
+                            "left": {
+                              "kind": "get",
+                              "object": {
+                                "kind": "ref",
+                                "name": "piece"
+                              },
+                              "key": "y"
+                            },
+                            "right": {
+                              "kind": "get",
+                              "object": {
+                                "kind": "ref",
+                                "name": "aizen"
+                              },
+                              "key": "y"
+                            }
+                          }
+                        ]
+                      }
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": 3
+                    }
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "kind": "lambda",
+            "parameters": [
+              "left",
+              "right"
+            ],
+            "body": {
+              "kind": "conditional",
+              "test": {
+                "kind": "binary",
+                "op": "<",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "left"
+                  },
+                  "key": "instanceId"
+                },
+                "right": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "right"
+                  },
+                  "key": "instanceId"
+                }
+              },
+              "consequent": {
+                "kind": "unary",
+                "op": "-",
+                "argument": {
+                  "kind": "literal",
+                  "value": 1
+                }
+              },
+              "alternate": {
+                "kind": "conditional",
+                "test": {
+                  "kind": "binary",
+                  "op": ">",
+                  "left": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "left"
+                    },
+                    "key": "instanceId"
+                  },
+                  "right": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "right"
+                    },
+                    "key": "instanceId"
+                  }
+                },
+                "consequent": {
+                  "kind": "literal",
+                  "value": 1
+                },
+                "alternate": {
+                  "kind": "literal",
+                  "value": 0
+                }
+              }
+            }
+          }
+        ],
+        "result": "__rvb_import_effect_2",
+        "next": "n6"
+      },
+      {
+        "id": "n8",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n9",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "!==",
+              "left": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "context"
+                },
+                "key": "isSinglePieceTargetAction"
+              },
+              "right": {
+                "kind": "literal",
+                "value": true
+              }
+            }
+          }
+        },
+        "yes": "n8",
+        "no": "n7"
+      },
+      {
+        "id": "n10",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n11",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "ref",
+                  "name": "original"
+                }
+              },
+              "right": {
+                "kind": "binary",
+                "op": "!==",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "original"
+                  },
+                  "key": "instanceId"
+                },
+                "right": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "secret"
+                  },
+                  "key": "targetPieceId"
+                }
+              }
+            }
+          }
+        },
+        "yes": "n10",
+        "no": "n9"
+      },
+      {
+        "id": "n12",
+        "kind": "bind",
+        "name": "original",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "context"
+          },
+          "key": "targetPiece"
+        },
+        "next": "n11"
+      },
+      {
+        "id": "n13",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "targetReplacementPieceId",
+              "value": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "replacement"
+                },
+                "key": "instanceId"
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "aizen"
+                  },
+                  "key": "name"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "发动镜花水月，改写了技能目标"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n14",
+        "kind": "set",
+        "target": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "aizen"
+          },
+          "key": "statusTags"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "collection",
+          "object": {
+            "kind": "binary",
+            "op": "||",
+            "left": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "aizen"
+              },
+              "key": "statusTags"
+            },
+            "right": {
+              "kind": "array",
+              "items": []
+            }
+          },
+          "method": "filter",
+          "args": [
+            {
+              "kind": "lambda",
+              "parameters": [
+                "tag"
+              ],
+              "body": {
+                "kind": "binary",
+                "op": "&&",
+                "left": {
+                  "kind": "binary",
+                  "op": "!==",
+                  "left": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "tag"
+                    },
+                    "key": "type"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": "aizen-kyoka-active"
+                  }
+                },
+                "right": {
+                  "kind": "binary",
+                  "op": "!==",
+                  "left": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "tag"
+                    },
+                    "key": "type"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": "aizen-kyoka-secret"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "next": "n13"
+      },
+      {
+        "id": "n15",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": "镜花水月的替代目标已失效"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n16",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "binary",
+                "op": "||",
+                "left": {
+                  "kind": "unary",
+                  "op": "!",
+                  "argument": {
+                    "kind": "ref",
+                    "name": "replacement"
+                  }
+                },
+                "right": {
+                  "kind": "call",
+                  "callee": "arePlayersAllied",
+                  "args": [
+                    {
+                      "kind": "ref",
+                      "name": "battle"
+                    },
+                    {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "replacement"
+                      },
+                      "key": "ownerPlayerId"
+                    },
+                    {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "aizen"
+                      },
+                      "key": "ownerPlayerId"
+                    }
+                  ]
+                }
+              },
+              "right": {
+                "kind": "binary",
+                "op": ">",
+                "left": {
+                  "kind": "binary",
+                  "op": "+",
+                  "left": {
+                    "kind": "call",
+                    "callee": "Math.abs",
+                    "args": [
+                      {
+                        "kind": "binary",
+                        "op": "-",
+                        "left": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "replacement"
+                          },
+                          "key": "x"
+                        },
+                        "right": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "aizen"
+                          },
+                          "key": "x"
+                        }
+                      }
+                    ]
+                  },
+                  "right": {
+                    "kind": "call",
+                    "callee": "Math.abs",
+                    "args": [
+                      {
+                        "kind": "binary",
+                        "op": "-",
+                        "left": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "replacement"
+                          },
+                          "key": "y"
+                        },
+                        "right": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "aizen"
+                          },
+                          "key": "y"
+                        }
+                      }
+                    ]
+                  }
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": 3
+                }
+              }
+            }
+          }
+        },
+        "yes": "n15",
+        "no": "n14"
+      },
+      {
+        "id": "n17",
+        "kind": "bind",
+        "name": "replacement",
+        "expr": {
+          "kind": "conditional",
+          "test": {
+            "kind": "binary",
+            "op": "&&",
+            "left": {
+              "kind": "ref",
+              "name": "ref"
+            },
+            "right": {
+              "kind": "binary",
+              "op": "===",
+              "left": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "ref"
+                },
+                "key": "type"
+              },
+              "right": {
+                "kind": "literal",
+                "value": "piece"
+              }
+            }
+          },
+          "consequent": {
+            "kind": "collection",
+            "object": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "battle"
+              },
+              "key": "pieces"
+            },
+            "method": "find",
+            "args": [
+              {
+                "kind": "lambda",
+                "parameters": [
+                  "piece"
+                ],
+                "body": {
+                  "kind": "binary",
+                  "op": "&&",
+                  "left": {
+                    "kind": "binary",
+                    "op": "===",
+                    "left": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "piece"
+                      },
+                      "key": "instanceId"
+                    },
+                    "right": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "ref"
+                      },
+                      "key": "pieceId"
+                    }
+                  },
+                  "right": {
+                    "kind": "binary",
+                    "op": ">",
+                    "left": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "piece"
+                      },
+                      "key": "currentHp"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": 0
+                    }
+                  }
+                }
+              }
+            ]
+          },
+          "alternate": {
+            "kind": "literal",
+            "value": null
+          }
+        },
+        "next": "n16"
+      },
+      {
+        "id": "n18",
+        "kind": "bind",
+        "name": "ref",
+        "expr": {
+          "kind": "index",
+          "object": {
+            "kind": "ref",
+            "name": "selected"
+          },
+          "index": {
+            "kind": "literal",
+            "value": 0
+          }
+        },
+        "next": "n17"
+      },
+      {
+        "id": "n19",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": ">",
+              "left": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "selected"
+                },
+                "key": "length"
+              },
+              "right": {
+                "kind": "literal",
+                "value": 0
+              }
+            }
+          }
+        },
+        "yes": "n18",
+        "no": "n12"
+      },
+      {
+        "id": "n20",
+        "kind": "bind",
+        "name": "selected",
+        "expr": {
+          "kind": "conditional",
+          "test": {
+            "kind": "call",
+            "callee": "Array.isArray",
+            "args": [
+              {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "context"
+                },
+                "key": "selectedTargets"
+              }
+            ]
+          },
+          "consequent": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "context"
+            },
+            "key": "selectedTargets"
+          },
+          "alternate": {
+            "kind": "array",
+            "items": []
+          }
+        },
+        "next": "n19"
+      },
+      {
+        "id": "n21",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n22",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "context"
+              },
+              "key": "cancelled"
+            }
+          }
+        },
+        "yes": "n21",
+        "no": "n20"
+      },
+      {
+        "id": "n23",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n24",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "ref",
+                  "name": "secret"
+                }
+              },
+              "right": {
+                "kind": "binary",
+                "op": "!==",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "secret"
+                  },
+                  "key": "opponentPlayerId"
+                },
+                "right": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "source"
+                  },
+                  "key": "ownerPlayerId"
+                }
+              }
+            }
+          }
+        },
+        "yes": "n23",
+        "no": "n22"
+      },
+      {
+        "id": "n25",
+        "kind": "bind",
+        "name": "secret",
+        "expr": {
+          "kind": "binary",
+          "op": "&&",
+          "left": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "aizen"
+            },
+            "key": "statusTags"
+          },
+          "right": {
+            "kind": "collection",
+            "object": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "aizen"
+              },
+              "key": "statusTags"
+            },
+            "method": "find",
+            "args": [
+              {
+                "kind": "lambda",
+                "parameters": [
+                  "tag"
+                ],
+                "body": {
+                  "kind": "binary",
+                  "op": "===",
+                  "left": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "tag"
+                    },
+                    "key": "type"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": "aizen-kyoka-secret"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "next": "n24"
+      },
+      {
+        "id": "n26",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n27",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "ref",
+                  "name": "source"
+                }
+              },
+              "right": {
+                "kind": "call",
+                "callee": "arePlayersAllied",
+                "args": [
+                  {
+                    "kind": "ref",
+                    "name": "battle"
+                  },
+                  {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "source"
+                    },
+                    "key": "ownerPlayerId"
+                  },
+                  {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "aizen"
+                    },
+                    "key": "ownerPlayerId"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "yes": "n26",
+        "no": "n25"
+      },
+      {
+        "id": "n28",
+        "kind": "bind",
+        "name": "source",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "context"
+          },
+          "key": "sourcePiece"
+        },
+        "next": "n27"
+      },
+      {
+        "id": "n29",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n30",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "ref",
+                  "name": "aizen"
+                }
+              },
+              "right": {
+                "kind": "binary",
+                "op": "<=",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "aizen"
+                  },
+                  "key": "currentHp"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": 0
+                }
+              }
+            }
+          }
+        },
+        "yes": "n29",
+        "no": "n28"
+      },
+      {
+        "id": "n31",
+        "kind": "bind",
+        "name": "aizen",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "context"
+          },
+          "key": "rulePiece"
+        },
+        "next": "n30"
+      }
+    ]
+  },
+  "contentGraphField": "skillCode",
+  "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1"
 }

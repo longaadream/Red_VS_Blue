@@ -5,5 +5,755 @@
   "trigger": {
     "type": "onPieceDied"
   },
-  "skillCode": "var velen = context.rulePiece; var dead = context.sourcePiece;\nif (!velen || !dead || dead.instanceId !== velen.instanceId) return { success: false, message: '' };\nvar player = battle.players.find(function(item) { return item.playerId === velen.ownerPlayerId; }); var removed = 0;\nif (player && player.hand) player.hand.forEach(function(card) { var prophecy = card.contentState && card.contentState.velenHolyProphecy; if (prophecy && prophecy.sourcePieceId === velen.instanceId) { delete card.contentState.velenHolyProphecy; removed++; } });\nvar allPieces = battle.pieces.concat(battle.graveyard || []);\nallPieces.forEach(function(piece) { var before = piece.statusTags ? piece.statusTags.length : 0; piece.statusTags = (piece.statusTags || []).filter(function(tag) { return !(tag.type === 'velen-fate-shelter' && tag.sourceId === velen.instanceId); }); if (piece.statusTags.length !== before && piece.rules) piece.rules = piece.rules.filter(function(rule) { return rule.id !== 'rule-velen-fate-target'; }); });\nreturn { success: removed > 0, message: removed > 0 ? velen.name + '死亡，' + removed + '张未完预言消散' : '' };"
+  "skillCode": "var __rvb_import_bound_method_0, __rvb_import_bound_method_2, allPieces, dead, player, removed, velen; var _pc = \"n24\"; for (var _step = 0; _step <= 13; _step++) { switch (_pc) { case \"n24\": velen = (context)[\"rulePiece\"]; _pc = \"n23\"; break; case \"n23\": dead = (context)[\"sourcePiece\"]; _pc = \"n22\"; break; case \"n22\": _pc = (! (! (((! velen) || (! dead)) || ((dead)[\"instanceId\"] !== (velen)[\"instanceId\"])))) ? \"n21\" : \"n20\"; break; case \"n20\": player = ((battle)[\"players\"])[\"find\"](function (item) { return ((item)[\"playerId\"] === (velen)[\"ownerPlayerId\"]); }); _pc = \"n19\"; break; case \"n19\": removed = 0; _pc = \"n18\"; break; case \"n18\": _pc = (! (! (player && (player)[\"hand\"]))) ? \"n17\" : \"n9\"; break; case \"n17\": __rvb_import_bound_method_2 = (function (receiver) { var capturedMethod = receiver[\"forEach\"]; return function () { return Reflect.apply(capturedMethod, receiver, arguments); }; })((player)[\"hand\"]); _pc = \"n10\"; break; case \"n10\": (__rvb_import_bound_method_2)(function (card) { var __rvb_import_operand_1, prophecy; { var __rvb_content_graph_region_pc_0 = \"n16\"; while (__rvb_content_graph_region_pc_0 !== \"n11\") { switch (__rvb_content_graph_region_pc_0) { case \"n16\": prophecy = ((card)[\"contentState\"] && ((card)[\"contentState\"])[\"velenHolyProphecy\"]); __rvb_content_graph_region_pc_0 = \"n15\"; break; case \"n15\": __rvb_content_graph_region_pc_0 = (! (! (prophecy && ((prophecy)[\"sourcePieceId\"] === (velen)[\"instanceId\"])))) ? \"n13\" : \"n11\"; break; case \"n13\": __rvb_import_operand_1 = (card)[\"contentState\"]; __rvb_content_graph_region_pc_0 = \"n14\"; break; case \"n14\": delete (__rvb_import_operand_1)[\"velenHolyProphecy\"]; __rvb_content_graph_region_pc_0 = \"n12\"; break; case \"n12\": removed = ((+ removed) + 1); __rvb_content_graph_region_pc_0 = \"n11\"; break; case \"n11\": __rvb_content_graph_region_pc_0 = \"n11\"; break; default: throw new Error(\"invalid content graph region node\"); } } } }); _pc = \"n9\"; break; case \"n9\": allPieces = ((battle)[\"pieces\"])[\"concat\"](((battle)[\"graveyard\"] || [])); _pc = \"n8\"; break; case \"n8\": __rvb_import_bound_method_0 = (function (receiver) { var capturedMethod = receiver[\"forEach\"]; return function () { return Reflect.apply(capturedMethod, receiver, arguments); }; })(allPieces); _pc = \"n2\"; break; case \"n2\": (__rvb_import_bound_method_0)(function (piece) { var before; { var __rvb_content_graph_region_pc_1 = \"n7\"; while (__rvb_content_graph_region_pc_1 !== \"n3\") { switch (__rvb_content_graph_region_pc_1) { case \"n7\": before = ((piece)[\"statusTags\"] ? ((piece)[\"statusTags\"])[\"length\"] : 0); __rvb_content_graph_region_pc_1 = \"n6\"; break; case \"n6\": (piece)[\"statusTags\"] = (((piece)[\"statusTags\"] || []))[\"filter\"](function (tag) { return (! (((tag)[\"type\"] === \"velen-fate-shelter\") && ((tag)[\"sourceId\"] === (velen)[\"instanceId\"]))); }); __rvb_content_graph_region_pc_1 = \"n5\"; break; case \"n5\": __rvb_content_graph_region_pc_1 = (! (! ((((piece)[\"statusTags\"])[\"length\"] !== before) && (piece)[\"rules\"]))) ? \"n4\" : \"n3\"; break; case \"n4\": (piece)[\"rules\"] = ((piece)[\"rules\"])[\"filter\"](function (rule) { return ((rule)[\"id\"] !== \"rule-velen-fate-target\"); }); __rvb_content_graph_region_pc_1 = \"n3\"; break; case \"n3\": __rvb_content_graph_region_pc_1 = \"n3\"; break; default: throw new Error(\"invalid content graph region node\"); } } } }); _pc = \"n1\"; break; case \"n1\": return {success: (removed > 0), message: ((removed > 0) ? ((((velen)[\"name\"] + \"死亡，\") + removed) + \"张未完预言消散\") : \"\")}; case \"n21\": return {success: false, message: \"\"}; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\");",
+  "contentGraph": {
+    "version": "rvb-content-graph/v1",
+    "surface": "rule",
+    "entry": "n24",
+    "nodes": [
+      {
+        "id": "n1",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "binary",
+                "op": ">",
+                "left": {
+                  "kind": "ref",
+                  "name": "removed"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": 0
+                }
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "conditional",
+                "test": {
+                  "kind": "binary",
+                  "op": ">",
+                  "left": {
+                    "kind": "ref",
+                    "name": "removed"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": 0
+                  }
+                },
+                "consequent": {
+                  "kind": "binary",
+                  "op": "+",
+                  "left": {
+                    "kind": "binary",
+                    "op": "+",
+                    "left": {
+                      "kind": "binary",
+                      "op": "+",
+                      "left": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "velen"
+                        },
+                        "key": "name"
+                      },
+                      "right": {
+                        "kind": "literal",
+                        "value": "死亡，"
+                      }
+                    },
+                    "right": {
+                      "kind": "ref",
+                      "name": "removed"
+                    }
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": "张未完预言消散"
+                  }
+                },
+                "alternate": {
+                  "kind": "literal",
+                  "value": ""
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n2",
+        "kind": "invoke",
+        "target": {
+          "kind": "function",
+          "value": {
+            "kind": "ref",
+            "name": "__rvb_import_bound_method_0"
+          }
+        },
+        "args": [
+          {
+            "kind": "function",
+            "parameters": [
+              "piece"
+            ],
+            "body": {
+              "entry": "n7",
+              "end": "n3",
+              "nodes": [
+                {
+                  "id": "n3",
+                  "kind": "regionEnd"
+                },
+                {
+                  "id": "n4",
+                  "kind": "set",
+                  "target": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "piece"
+                    },
+                    "key": "rules"
+                  },
+                  "operator": "=",
+                  "value": {
+                    "kind": "collection",
+                    "object": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "piece"
+                      },
+                      "key": "rules"
+                    },
+                    "method": "filter",
+                    "args": [
+                      {
+                        "kind": "lambda",
+                        "parameters": [
+                          "rule"
+                        ],
+                        "body": {
+                          "kind": "binary",
+                          "op": "!==",
+                          "left": {
+                            "kind": "get",
+                            "object": {
+                              "kind": "ref",
+                              "name": "rule"
+                            },
+                            "key": "id"
+                          },
+                          "right": {
+                            "kind": "literal",
+                            "value": "rule-velen-fate-target"
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  "next": "n3"
+                },
+                {
+                  "id": "n5",
+                  "kind": "branch",
+                  "condition": {
+                    "kind": "unary",
+                    "op": "!",
+                    "argument": {
+                      "kind": "unary",
+                      "op": "!",
+                      "argument": {
+                        "kind": "binary",
+                        "op": "&&",
+                        "left": {
+                          "kind": "binary",
+                          "op": "!==",
+                          "left": {
+                            "kind": "get",
+                            "object": {
+                              "kind": "get",
+                              "object": {
+                                "kind": "ref",
+                                "name": "piece"
+                              },
+                              "key": "statusTags"
+                            },
+                            "key": "length"
+                          },
+                          "right": {
+                            "kind": "ref",
+                            "name": "before"
+                          }
+                        },
+                        "right": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "piece"
+                          },
+                          "key": "rules"
+                        }
+                      }
+                    }
+                  },
+                  "yes": "n4",
+                  "no": "n3"
+                },
+                {
+                  "id": "n6",
+                  "kind": "set",
+                  "target": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "piece"
+                    },
+                    "key": "statusTags"
+                  },
+                  "operator": "=",
+                  "value": {
+                    "kind": "collection",
+                    "object": {
+                      "kind": "binary",
+                      "op": "||",
+                      "left": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "piece"
+                        },
+                        "key": "statusTags"
+                      },
+                      "right": {
+                        "kind": "array",
+                        "items": []
+                      }
+                    },
+                    "method": "filter",
+                    "args": [
+                      {
+                        "kind": "lambda",
+                        "parameters": [
+                          "tag"
+                        ],
+                        "body": {
+                          "kind": "unary",
+                          "op": "!",
+                          "argument": {
+                            "kind": "binary",
+                            "op": "&&",
+                            "left": {
+                              "kind": "binary",
+                              "op": "===",
+                              "left": {
+                                "kind": "get",
+                                "object": {
+                                  "kind": "ref",
+                                  "name": "tag"
+                                },
+                                "key": "type"
+                              },
+                              "right": {
+                                "kind": "literal",
+                                "value": "velen-fate-shelter"
+                              }
+                            },
+                            "right": {
+                              "kind": "binary",
+                              "op": "===",
+                              "left": {
+                                "kind": "get",
+                                "object": {
+                                  "kind": "ref",
+                                  "name": "tag"
+                                },
+                                "key": "sourceId"
+                              },
+                              "right": {
+                                "kind": "get",
+                                "object": {
+                                  "kind": "ref",
+                                  "name": "velen"
+                                },
+                                "key": "instanceId"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  "next": "n5"
+                },
+                {
+                  "id": "n7",
+                  "kind": "bind",
+                  "name": "before",
+                  "expr": {
+                    "kind": "conditional",
+                    "test": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "piece"
+                      },
+                      "key": "statusTags"
+                    },
+                    "consequent": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "piece"
+                        },
+                        "key": "statusTags"
+                      },
+                      "key": "length"
+                    },
+                    "alternate": {
+                      "kind": "literal",
+                      "value": 0
+                    }
+                  },
+                  "next": "n6"
+                }
+              ]
+            }
+          }
+        ],
+        "next": "n1"
+      },
+      {
+        "id": "n8",
+        "kind": "bind",
+        "name": "__rvb_import_bound_method_0",
+        "expr": {
+          "kind": "boundMethod",
+          "object": {
+            "kind": "ref",
+            "name": "allPieces"
+          },
+          "method": "forEach"
+        },
+        "next": "n2"
+      },
+      {
+        "id": "n9",
+        "kind": "bind",
+        "name": "allPieces",
+        "expr": {
+          "kind": "collection",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "battle"
+            },
+            "key": "pieces"
+          },
+          "method": "concat",
+          "args": [
+            {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "battle"
+                },
+                "key": "graveyard"
+              },
+              "right": {
+                "kind": "array",
+                "items": []
+              }
+            }
+          ]
+        },
+        "next": "n8"
+      },
+      {
+        "id": "n10",
+        "kind": "invoke",
+        "target": {
+          "kind": "function",
+          "value": {
+            "kind": "ref",
+            "name": "__rvb_import_bound_method_2"
+          }
+        },
+        "args": [
+          {
+            "kind": "function",
+            "parameters": [
+              "card"
+            ],
+            "body": {
+              "entry": "n16",
+              "end": "n11",
+              "nodes": [
+                {
+                  "id": "n11",
+                  "kind": "regionEnd"
+                },
+                {
+                  "id": "n12",
+                  "kind": "set",
+                  "target": {
+                    "kind": "ref",
+                    "name": "removed"
+                  },
+                  "operator": "=",
+                  "value": {
+                    "kind": "binary",
+                    "op": "+",
+                    "left": {
+                      "kind": "unary",
+                      "op": "+",
+                      "argument": {
+                        "kind": "ref",
+                        "name": "removed"
+                      }
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": 1
+                    }
+                  },
+                  "next": "n11"
+                },
+                {
+                  "id": "n14",
+                  "kind": "delete",
+                  "target": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "__rvb_import_operand_1"
+                    },
+                    "key": "velenHolyProphecy"
+                  },
+                  "next": "n12"
+                },
+                {
+                  "id": "n13",
+                  "kind": "bind",
+                  "name": "__rvb_import_operand_1",
+                  "expr": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "card"
+                    },
+                    "key": "contentState"
+                  },
+                  "next": "n14"
+                },
+                {
+                  "id": "n15",
+                  "kind": "branch",
+                  "condition": {
+                    "kind": "unary",
+                    "op": "!",
+                    "argument": {
+                      "kind": "unary",
+                      "op": "!",
+                      "argument": {
+                        "kind": "binary",
+                        "op": "&&",
+                        "left": {
+                          "kind": "ref",
+                          "name": "prophecy"
+                        },
+                        "right": {
+                          "kind": "binary",
+                          "op": "===",
+                          "left": {
+                            "kind": "get",
+                            "object": {
+                              "kind": "ref",
+                              "name": "prophecy"
+                            },
+                            "key": "sourcePieceId"
+                          },
+                          "right": {
+                            "kind": "get",
+                            "object": {
+                              "kind": "ref",
+                              "name": "velen"
+                            },
+                            "key": "instanceId"
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "yes": "n13",
+                  "no": "n11"
+                },
+                {
+                  "id": "n16",
+                  "kind": "bind",
+                  "name": "prophecy",
+                  "expr": {
+                    "kind": "binary",
+                    "op": "&&",
+                    "left": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "card"
+                      },
+                      "key": "contentState"
+                    },
+                    "right": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "card"
+                        },
+                        "key": "contentState"
+                      },
+                      "key": "velenHolyProphecy"
+                    }
+                  },
+                  "next": "n15"
+                }
+              ]
+            }
+          }
+        ],
+        "next": "n9"
+      },
+      {
+        "id": "n17",
+        "kind": "bind",
+        "name": "__rvb_import_bound_method_2",
+        "expr": {
+          "kind": "boundMethod",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "player"
+            },
+            "key": "hand"
+          },
+          "method": "forEach"
+        },
+        "next": "n10"
+      },
+      {
+        "id": "n18",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "&&",
+              "left": {
+                "kind": "ref",
+                "name": "player"
+              },
+              "right": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "player"
+                },
+                "key": "hand"
+              }
+            }
+          }
+        },
+        "yes": "n17",
+        "no": "n9"
+      },
+      {
+        "id": "n19",
+        "kind": "bind",
+        "name": "removed",
+        "expr": {
+          "kind": "literal",
+          "value": 0
+        },
+        "next": "n18"
+      },
+      {
+        "id": "n20",
+        "kind": "bind",
+        "name": "player",
+        "expr": {
+          "kind": "collection",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "battle"
+            },
+            "key": "players"
+          },
+          "method": "find",
+          "args": [
+            {
+              "kind": "lambda",
+              "parameters": [
+                "item"
+              ],
+              "body": {
+                "kind": "binary",
+                "op": "===",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "item"
+                  },
+                  "key": "playerId"
+                },
+                "right": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "velen"
+                  },
+                  "key": "ownerPlayerId"
+                }
+              }
+            }
+          ]
+        },
+        "next": "n19"
+      },
+      {
+        "id": "n21",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n22",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "binary",
+                "op": "||",
+                "left": {
+                  "kind": "unary",
+                  "op": "!",
+                  "argument": {
+                    "kind": "ref",
+                    "name": "velen"
+                  }
+                },
+                "right": {
+                  "kind": "unary",
+                  "op": "!",
+                  "argument": {
+                    "kind": "ref",
+                    "name": "dead"
+                  }
+                }
+              },
+              "right": {
+                "kind": "binary",
+                "op": "!==",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "dead"
+                  },
+                  "key": "instanceId"
+                },
+                "right": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "velen"
+                  },
+                  "key": "instanceId"
+                }
+              }
+            }
+          }
+        },
+        "yes": "n21",
+        "no": "n20"
+      },
+      {
+        "id": "n23",
+        "kind": "bind",
+        "name": "dead",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "context"
+          },
+          "key": "sourcePiece"
+        },
+        "next": "n22"
+      },
+      {
+        "id": "n24",
+        "kind": "bind",
+        "name": "velen",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "context"
+          },
+          "key": "rulePiece"
+        },
+        "next": "n23"
+      }
+    ]
+  },
+  "contentGraphField": "skillCode",
+  "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1"
 }

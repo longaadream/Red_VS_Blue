@@ -5,5 +5,414 @@
   "trigger": {
     "type": "afterPieceSummoned"
   },
-  "skillCode": "var tyrande = context.rulePiece; var summoned = context.sourcePiece; if (!tyrande || !summoned || summoned.instanceId !== tyrande.instanceId) return { success: false }; var playerId = tyrande.ownerPlayerId; var player = battle.players.find(function(p) { return p.playerId === playerId; }); if (!player) return { success: false }; if (!player.statusTags) player.statusTags = []; var existing = player.statusTags.find(function(t) { return t.type === 'elune-protection'; }); if (existing) return { success: false }; addPlayerStatusEffectById(playerId, { id: 'elune-protection', type: 'elune-protection', name: '艾露恩的守护', description: '当友方任意棋子受到致命伤害时，免疫该伤害并恢复5点生命（全队共用一次）' }); addPlayerRuleById(playerId, 'rule-elune-protection-player'); return { success: true, message: '艾露恩的守护已就绪' };"
+  "skillCode": "var existing, player, playerId, summoned, tyrande; var _pc = \"n16\"; for (var _step = 0; _step <= 16; _step++) { switch (_pc) { case \"n16\": tyrande = (context)[\"rulePiece\"]; _pc = \"n15\"; break; case \"n15\": summoned = (context)[\"sourcePiece\"]; _pc = \"n14\"; break; case \"n14\": _pc = (! (! (((! tyrande) || (! summoned)) || ((summoned)[\"instanceId\"] !== (tyrande)[\"instanceId\"])))) ? \"n13\" : \"n12\"; break; case \"n12\": playerId = (tyrande)[\"ownerPlayerId\"]; _pc = \"n11\"; break; case \"n11\": player = ((battle)[\"players\"])[\"find\"](function (p) { return ((p)[\"playerId\"] === playerId); }); _pc = \"n10\"; break; case \"n10\": _pc = (! (! (! player))) ? \"n9\" : \"n8\"; break; case \"n8\": _pc = (! (! (! (player)[\"statusTags\"]))) ? \"n7\" : \"n6\"; break; case \"n7\": (player)[\"statusTags\"] = []; _pc = \"n6\"; break; case \"n6\": existing = ((player)[\"statusTags\"])[\"find\"](function (t) { return ((t)[\"type\"] === \"elune-protection\"); }); _pc = \"n5\"; break; case \"n5\": _pc = (! (! existing)) ? \"n4\" : \"n3\"; break; case \"n3\": addPlayerStatusEffectById(playerId, {id: \"elune-protection\", type: \"elune-protection\", name: \"艾露恩的守护\", description: \"当友方任意棋子受到致命伤害时，免疫该伤害并恢复5点生命（全队共用一次）\"}); _pc = \"n2\"; break; case \"n2\": addPlayerRuleById(playerId, \"rule-elune-protection-player\"); _pc = \"n1\"; break; case \"n1\": return {success: true, message: \"艾露恩的守护已就绪\"}; case \"n4\": return {success: false}; case \"n9\": return {success: false}; case \"n13\": return {success: false}; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\");",
+  "contentGraph": {
+    "version": "rvb-content-graph/v1",
+    "surface": "rule",
+    "entry": "n16",
+    "nodes": [
+      {
+        "id": "n1",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": "艾露恩的守护已就绪"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n2",
+        "kind": "call",
+        "capability": "addPlayerRuleById",
+        "args": [
+          {
+            "kind": "ref",
+            "name": "playerId"
+          },
+          {
+            "kind": "literal",
+            "value": "rule-elune-protection-player"
+          }
+        ],
+        "next": "n1"
+      },
+      {
+        "id": "n3",
+        "kind": "call",
+        "capability": "addPlayerStatusEffectById",
+        "args": [
+          {
+            "kind": "ref",
+            "name": "playerId"
+          },
+          {
+            "kind": "object",
+            "entries": [
+              {
+                "key": "id",
+                "value": {
+                  "kind": "literal",
+                  "value": "elune-protection"
+                }
+              },
+              {
+                "key": "type",
+                "value": {
+                  "kind": "literal",
+                  "value": "elune-protection"
+                }
+              },
+              {
+                "key": "name",
+                "value": {
+                  "kind": "literal",
+                  "value": "艾露恩的守护"
+                }
+              },
+              {
+                "key": "description",
+                "value": {
+                  "kind": "literal",
+                  "value": "当友方任意棋子受到致命伤害时，免疫该伤害并恢复5点生命（全队共用一次）"
+                }
+              }
+            ]
+          }
+        ],
+        "next": "n2"
+      },
+      {
+        "id": "n4",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n5",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "ref",
+              "name": "existing"
+            }
+          }
+        },
+        "yes": "n4",
+        "no": "n3"
+      },
+      {
+        "id": "n6",
+        "kind": "bind",
+        "name": "existing",
+        "expr": {
+          "kind": "collection",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "player"
+            },
+            "key": "statusTags"
+          },
+          "method": "find",
+          "args": [
+            {
+              "kind": "lambda",
+              "parameters": [
+                "t"
+              ],
+              "body": {
+                "kind": "binary",
+                "op": "===",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "t"
+                  },
+                  "key": "type"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "elune-protection"
+                }
+              }
+            }
+          ]
+        },
+        "next": "n5"
+      },
+      {
+        "id": "n7",
+        "kind": "set",
+        "target": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "player"
+          },
+          "key": "statusTags"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "array",
+          "items": []
+        },
+        "next": "n6"
+      },
+      {
+        "id": "n8",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "unary",
+              "op": "!",
+              "argument": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "player"
+                },
+                "key": "statusTags"
+              }
+            }
+          }
+        },
+        "yes": "n7",
+        "no": "n6"
+      },
+      {
+        "id": "n9",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n10",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "unary",
+              "op": "!",
+              "argument": {
+                "kind": "ref",
+                "name": "player"
+              }
+            }
+          }
+        },
+        "yes": "n9",
+        "no": "n8"
+      },
+      {
+        "id": "n11",
+        "kind": "bind",
+        "name": "player",
+        "expr": {
+          "kind": "collection",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "battle"
+            },
+            "key": "players"
+          },
+          "method": "find",
+          "args": [
+            {
+              "kind": "lambda",
+              "parameters": [
+                "p"
+              ],
+              "body": {
+                "kind": "binary",
+                "op": "===",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "p"
+                  },
+                  "key": "playerId"
+                },
+                "right": {
+                  "kind": "ref",
+                  "name": "playerId"
+                }
+              }
+            }
+          ]
+        },
+        "next": "n10"
+      },
+      {
+        "id": "n12",
+        "kind": "bind",
+        "name": "playerId",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "tyrande"
+          },
+          "key": "ownerPlayerId"
+        },
+        "next": "n11"
+      },
+      {
+        "id": "n13",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n14",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "binary",
+                "op": "||",
+                "left": {
+                  "kind": "unary",
+                  "op": "!",
+                  "argument": {
+                    "kind": "ref",
+                    "name": "tyrande"
+                  }
+                },
+                "right": {
+                  "kind": "unary",
+                  "op": "!",
+                  "argument": {
+                    "kind": "ref",
+                    "name": "summoned"
+                  }
+                }
+              },
+              "right": {
+                "kind": "binary",
+                "op": "!==",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "summoned"
+                  },
+                  "key": "instanceId"
+                },
+                "right": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "tyrande"
+                  },
+                  "key": "instanceId"
+                }
+              }
+            }
+          }
+        },
+        "yes": "n13",
+        "no": "n12"
+      },
+      {
+        "id": "n15",
+        "kind": "bind",
+        "name": "summoned",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "context"
+          },
+          "key": "sourcePiece"
+        },
+        "next": "n14"
+      },
+      {
+        "id": "n16",
+        "kind": "bind",
+        "name": "tyrande",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "context"
+          },
+          "key": "rulePiece"
+        },
+        "next": "n15"
+      }
+    ]
+  },
+  "contentGraphField": "skillCode",
+  "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1"
 }

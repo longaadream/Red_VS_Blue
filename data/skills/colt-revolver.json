@@ -2,7 +2,9 @@
   "id": "colt-revolver",
   "name": "左轮手枪",
   "description": "弹射物。选择正方向，生成随自身移动的6格射击区域，持续2全局回合。每全局回合结束时，对区域内首个敌人造成1倍伤害。与【子弹风暴】互斥。",
-  "keywords": ["弹射物"],
+  "keywords": [
+    "弹射物"
+  ],
   "targetText": "正方向",
   "kind": "active",
   "type": "normal",
@@ -25,7 +27,602 @@
       }
     ]
   },
-  "effectTags": ["伤害", "区域"],
+  "effectTags": [
+    "伤害",
+    "区域"
+  ],
   "icon": "🔫",
-  "code": "function executeSkill(context){var c=context.piece,p=selectTarget({type:'grid',range:6,filter:'all'});if(!p||p.needsTargetSelection)return p;var dx=Math.sign(p.x-c.x),dy=Math.sign(p.y-c.y);if((dx===0&&dy===0)||(dx!==0&&dy!==0))return{success:false,message:'请选择施法者以外的方向格'};if(!battle.extensions)battle.extensions={};if(!battle.extensions.coltZones)battle.extensions.coltZones={};battle.extensions.coltZones[c.instanceId]={sourceId:c.instanceId,kind:'revolver',dx:dx,dy:dy,turns:2};var zoneId='colt-zone-'+c.instanceId;removeStatusEffectById(c.instanceId,zoneId);addStatusEffectById(c.instanceId,{id:zoneId,type:'colt-zone',name:'左轮射击区域',description:'随施法者位置移动；与子弹风暴互斥。',currentDuration:-1,currentUses:-1,stacks:2,intensity:2});return{success:true,message:c.name+'布置左轮手枪射击区域（随自身移动，持续2回合）'};}"
+  "code": "function executeSkill(context) { var c, dx, dy, p, zoneId; var _pc = \"n17\"; for (var _step = 0; _step <= 17; _step++) { switch (_pc) { case \"n17\": c = (context)[\"piece\"]; _pc = \"n16\"; break; case \"n16\": p = selectTarget({type: \"grid\", range: 6, filter: \"all\"}); _pc = \"n15\"; break; case \"n15\": _pc = (! (! ((! p) || (p)[\"needsTargetSelection\"]))) ? \"n14\" : \"n13\"; break; case \"n13\": dx = Math.sign(((p)[\"x\"] - (c)[\"x\"])); _pc = \"n12\"; break; case \"n12\": dy = Math.sign(((p)[\"y\"] - (c)[\"y\"])); _pc = \"n11\"; break; case \"n11\": _pc = (! (! (((dx === 0) && (dy === 0)) || ((dx !== 0) && (dy !== 0))))) ? \"n10\" : \"n9\"; break; case \"n9\": _pc = (! (! (! (battle)[\"extensions\"]))) ? \"n8\" : \"n7\"; break; case \"n8\": (battle)[\"extensions\"] = {}; _pc = \"n7\"; break; case \"n7\": _pc = (! (! (! ((battle)[\"extensions\"])[\"coltZones\"]))) ? \"n6\" : \"n5\"; break; case \"n6\": ((battle)[\"extensions\"])[\"coltZones\"] = {}; _pc = \"n5\"; break; case \"n5\": (((battle)[\"extensions\"])[\"coltZones\"])[(function (key) { if (typeof key === \"string\" && key.split(\".\").some(function (part) { return [\"__proto__\",\"arguments\",\"callee\",\"caller\",\"constructor\",\"prototype\"].indexOf(part) !== -1; })) throw new Error(\"unsafe content graph index\"); return key; })((c)[\"instanceId\"])] = {sourceId: (c)[\"instanceId\"], kind: \"revolver\", dx: dx, dy: dy, turns: 2}; _pc = \"n4\"; break; case \"n4\": zoneId = (\"colt-zone-\" + (c)[\"instanceId\"]); _pc = \"n3\"; break; case \"n3\": removeStatusEffectById((c)[\"instanceId\"], zoneId); _pc = \"n2\"; break; case \"n2\": addStatusEffectById((c)[\"instanceId\"], {id: zoneId, type: \"colt-zone\", name: \"左轮射击区域\", description: \"随施法者位置移动；与子弹风暴互斥。\", currentDuration: (- 1), currentUses: (- 1), stacks: 2, intensity: 2}); _pc = \"n1\"; break; case \"n1\": return {success: true, message: ((c)[\"name\"] + \"布置左轮手枪射击区域（随自身移动，持续2回合）\")}; case \"n10\": return {success: false, message: \"请选择施法者以外的方向格\"}; case \"n14\": return p; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\"); }",
+  "contentGraph": {
+    "version": "rvb-content-graph/v1",
+    "surface": "skill",
+    "entry": "n17",
+    "nodes": [
+      {
+        "id": "n1",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "c"
+                  },
+                  "key": "name"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "布置左轮手枪射击区域（随自身移动，持续2回合）"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n2",
+        "kind": "call",
+        "capability": "addStatusEffectById",
+        "args": [
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "c"
+            },
+            "key": "instanceId"
+          },
+          {
+            "kind": "object",
+            "entries": [
+              {
+                "key": "id",
+                "value": {
+                  "kind": "ref",
+                  "name": "zoneId"
+                }
+              },
+              {
+                "key": "type",
+                "value": {
+                  "kind": "literal",
+                  "value": "colt-zone"
+                }
+              },
+              {
+                "key": "name",
+                "value": {
+                  "kind": "literal",
+                  "value": "左轮射击区域"
+                }
+              },
+              {
+                "key": "description",
+                "value": {
+                  "kind": "literal",
+                  "value": "随施法者位置移动；与子弹风暴互斥。"
+                }
+              },
+              {
+                "key": "currentDuration",
+                "value": {
+                  "kind": "unary",
+                  "op": "-",
+                  "argument": {
+                    "kind": "literal",
+                    "value": 1
+                  }
+                }
+              },
+              {
+                "key": "currentUses",
+                "value": {
+                  "kind": "unary",
+                  "op": "-",
+                  "argument": {
+                    "kind": "literal",
+                    "value": 1
+                  }
+                }
+              },
+              {
+                "key": "stacks",
+                "value": {
+                  "kind": "literal",
+                  "value": 2
+                }
+              },
+              {
+                "key": "intensity",
+                "value": {
+                  "kind": "literal",
+                  "value": 2
+                }
+              }
+            ]
+          }
+        ],
+        "next": "n1"
+      },
+      {
+        "id": "n3",
+        "kind": "call",
+        "capability": "removeStatusEffectById",
+        "args": [
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "c"
+            },
+            "key": "instanceId"
+          },
+          {
+            "kind": "ref",
+            "name": "zoneId"
+          }
+        ],
+        "next": "n2"
+      },
+      {
+        "id": "n4",
+        "kind": "bind",
+        "name": "zoneId",
+        "expr": {
+          "kind": "binary",
+          "op": "+",
+          "left": {
+            "kind": "literal",
+            "value": "colt-zone-"
+          },
+          "right": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "c"
+            },
+            "key": "instanceId"
+          }
+        },
+        "next": "n3"
+      },
+      {
+        "id": "n5",
+        "kind": "set",
+        "target": {
+          "kind": "index",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "battle"
+              },
+              "key": "extensions"
+            },
+            "key": "coltZones"
+          },
+          "index": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "c"
+            },
+            "key": "instanceId"
+          }
+        },
+        "operator": "=",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "sourceId",
+              "value": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "c"
+                },
+                "key": "instanceId"
+              }
+            },
+            {
+              "key": "kind",
+              "value": {
+                "kind": "literal",
+                "value": "revolver"
+              }
+            },
+            {
+              "key": "dx",
+              "value": {
+                "kind": "ref",
+                "name": "dx"
+              }
+            },
+            {
+              "key": "dy",
+              "value": {
+                "kind": "ref",
+                "name": "dy"
+              }
+            },
+            {
+              "key": "turns",
+              "value": {
+                "kind": "literal",
+                "value": 2
+              }
+            }
+          ]
+        },
+        "next": "n4"
+      },
+      {
+        "id": "n6",
+        "kind": "set",
+        "target": {
+          "kind": "get",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "battle"
+            },
+            "key": "extensions"
+          },
+          "key": "coltZones"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "object",
+          "entries": []
+        },
+        "next": "n5"
+      },
+      {
+        "id": "n7",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "unary",
+              "op": "!",
+              "argument": {
+                "kind": "get",
+                "object": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "battle"
+                  },
+                  "key": "extensions"
+                },
+                "key": "coltZones"
+              }
+            }
+          }
+        },
+        "yes": "n6",
+        "no": "n5"
+      },
+      {
+        "id": "n8",
+        "kind": "set",
+        "target": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "battle"
+          },
+          "key": "extensions"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "object",
+          "entries": []
+        },
+        "next": "n7"
+      },
+      {
+        "id": "n9",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "unary",
+              "op": "!",
+              "argument": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "battle"
+                },
+                "key": "extensions"
+              }
+            }
+          }
+        },
+        "yes": "n8",
+        "no": "n7"
+      },
+      {
+        "id": "n10",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": "请选择施法者以外的方向格"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n11",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "binary",
+                "op": "&&",
+                "left": {
+                  "kind": "binary",
+                  "op": "===",
+                  "left": {
+                    "kind": "ref",
+                    "name": "dx"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": 0
+                  }
+                },
+                "right": {
+                  "kind": "binary",
+                  "op": "===",
+                  "left": {
+                    "kind": "ref",
+                    "name": "dy"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": 0
+                  }
+                }
+              },
+              "right": {
+                "kind": "binary",
+                "op": "&&",
+                "left": {
+                  "kind": "binary",
+                  "op": "!==",
+                  "left": {
+                    "kind": "ref",
+                    "name": "dx"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": 0
+                  }
+                },
+                "right": {
+                  "kind": "binary",
+                  "op": "!==",
+                  "left": {
+                    "kind": "ref",
+                    "name": "dy"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": 0
+                  }
+                }
+              }
+            }
+          }
+        },
+        "yes": "n10",
+        "no": "n9"
+      },
+      {
+        "id": "n12",
+        "kind": "bind",
+        "name": "dy",
+        "expr": {
+          "kind": "call",
+          "callee": "Math.sign",
+          "args": [
+            {
+              "kind": "binary",
+              "op": "-",
+              "left": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "p"
+                },
+                "key": "y"
+              },
+              "right": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "c"
+                },
+                "key": "y"
+              }
+            }
+          ]
+        },
+        "next": "n11"
+      },
+      {
+        "id": "n13",
+        "kind": "bind",
+        "name": "dx",
+        "expr": {
+          "kind": "call",
+          "callee": "Math.sign",
+          "args": [
+            {
+              "kind": "binary",
+              "op": "-",
+              "left": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "p"
+                },
+                "key": "x"
+              },
+              "right": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "c"
+                },
+                "key": "x"
+              }
+            }
+          ]
+        },
+        "next": "n12"
+      },
+      {
+        "id": "n14",
+        "kind": "return",
+        "value": {
+          "kind": "ref",
+          "name": "p"
+        }
+      },
+      {
+        "id": "n15",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "ref",
+                  "name": "p"
+                }
+              },
+              "right": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "p"
+                },
+                "key": "needsTargetSelection"
+              }
+            }
+          }
+        },
+        "yes": "n14",
+        "no": "n13"
+      },
+      {
+        "id": "n16",
+        "kind": "call",
+        "capability": "selectTarget",
+        "args": [
+          {
+            "kind": "object",
+            "entries": [
+              {
+                "key": "type",
+                "value": {
+                  "kind": "literal",
+                  "value": "grid"
+                }
+              },
+              {
+                "key": "range",
+                "value": {
+                  "kind": "literal",
+                  "value": 6
+                }
+              },
+              {
+                "key": "filter",
+                "value": {
+                  "kind": "literal",
+                  "value": "all"
+                }
+              }
+            ]
+          }
+        ],
+        "result": "p",
+        "next": "n15"
+      },
+      {
+        "id": "n17",
+        "kind": "bind",
+        "name": "c",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "context"
+          },
+          "key": "piece"
+        },
+        "next": "n16"
+      }
+    ]
+  },
+  "contentGraphField": "code",
+  "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1"
 }

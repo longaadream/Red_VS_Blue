@@ -46,11 +46,1947 @@
       }
     ]
   },
-  "code": "function executeSkill(context){var c=context.piece,b=context.battle,ally=selectTarget({type:'piece',range:4,filter:'ally'});if(!ally||ally.needsTargetSelection)return ally;if(ally.instanceId===c.instanceId)return {success:false,message:'双尾飞行必须选择另一名友军'};var a=selectTarget({type:'grid',range:7,filter:'all'});if(!a||a.needsTargetSelection)return a;var d=selectTarget({type:'grid',range:7,filter:'all'});if(!d||d.needsTargetSelection)return d;if(Math.abs(a.x-d.x)+Math.abs(a.y-d.y)!==1)return {success:false,message:'两个落点必须上下左右相邻'};var cells=[a,d];for(var i=0;i<cells.length;i++){var tile=b.map.tiles.find(function(t){return t.x===cells[i].x&&t.y===cells[i].y;});if(!tile||!tile.props.walkable||(tile.props.type!=='floor'&&tile.props.type!=='cover')||b.pieces.some(function(p){return p.currentHp>0&&p.x===cells[i].x&&p.y===cells[i].y;}))return {success:false,message:'落点必须是未被占据的空地或掩体'};}if(!b.extensions)b.extensions={};b.extensions.tileEffects=b.extensions.tileEffects||[];if(b.extensions.tileEffects.some(function(e){return e.type==='tails-flight-reservation'&&(e.x===a.x&&e.y===a.y||e.x===d.x&&e.y===d.y);} ))return {success:false,message:'落点已被预留'};var flightId='tails-flight-'+c.instanceId+'-'+b.turn.turnNumber+'-'+a.x+'-'+a.y+'-'+d.x+'-'+d.y;b.extensions.tileEffects.push({id:flightId+'-a',type:'tails-flight-reservation',x:a.x,y:a.y,flightId:flightId},{id:flightId+'-b',type:'tails-flight-reservation',x:d.x,y:d.y,flightId:flightId});c.statusTags=c.statusTags||[];addStatusEffectById(c.instanceId, {id:flightId,type:'tails-flight-reservation',name:'双尾飞行预留',turns:2,ownerId:c.instanceId,allyId:ally.instanceId,x:a.x,y:a.y,allyX:d.x,allyY:d.y,flightId:flightId,currentDuration:2,relatedRules:['rule-tails-flight-resolve']});addRuleById(c.instanceId,'rule-tails-flight-resolve');[c,ally].forEach(function(p){p.statusTags=p.statusTags||[];addStatusEffectById(p.instanceId,{id:flightId+'-immune-'+p.instanceId,type:'immune',name:'免疫',flightId:flightId,stacks:1,currentDuration:2,remainingDuration:2,relatedRules:['rule-tails-flight-immune','rule-tails-flight-immune-target']});addStatusEffectById(p.instanceId,{id:flightId+'-inoperable-'+p.instanceId,type:'inoperable',name:'不可操作',flightId:flightId,stacks:1,currentDuration:2,remainingDuration:2,relatedRules:['rule-tails-flight-inoperable','rule-tails-flight-inoperable-skill']});addRuleById(p.instanceId,'rule-tails-flight-immune');addRuleById(p.instanceId,'rule-tails-flight-immune-target');addRuleById(p.instanceId,'rule-tails-flight-inoperable');addRuleById(p.instanceId,'rule-tails-flight-inoperable-skill');});return {success:true,message:'已预留双尾飞行落点'};}",
+  "code": "function executeSkill(context) { var __rvb_import_bound_method_0, a, ally, b, c, cells, d, flightId, i, tile; var _pc = \"n45\"; for (var _step = 0; _step <= 31; _step++) { switch (_pc) { case \"n45\": c = (context)[\"piece\"]; _pc = \"n44\"; break; case \"n44\": b = (context)[\"battle\"]; _pc = \"n43\"; break; case \"n43\": ally = selectTarget({type: \"piece\", range: 4, filter: \"ally\"}); _pc = \"n42\"; break; case \"n42\": _pc = (! (! ((! ally) || (ally)[\"needsTargetSelection\"]))) ? \"n41\" : \"n40\"; break; case \"n40\": _pc = (! (! ((ally)[\"instanceId\"] === (c)[\"instanceId\"]))) ? \"n39\" : \"n38\"; break; case \"n38\": a = selectTarget({type: \"grid\", range: 7, filter: \"all\"}); _pc = \"n37\"; break; case \"n37\": _pc = (! (! ((! a) || (a)[\"needsTargetSelection\"]))) ? \"n36\" : \"n35\"; break; case \"n35\": d = selectTarget({type: \"grid\", range: 7, filter: \"all\"}); _pc = \"n34\"; break; case \"n34\": _pc = (! (! ((! d) || (d)[\"needsTargetSelection\"]))) ? \"n33\" : \"n32\"; break; case \"n32\": _pc = (! (! ((Math.abs(((a)[\"x\"] - (d)[\"x\"])) + Math.abs(((a)[\"y\"] - (d)[\"y\"]))) !== 1))) ? \"n31\" : \"n30\"; break; case \"n30\": cells = [a, d]; _pc = \"n29\"; break; case \"n29\": i = 0; _pc = \"n28\"; break; case \"n28\": var __rvb_content_graph_loop_break_0 = false, __rvb_content_graph_loop_continue_1 = false; while ((! (! (i < (cells)[\"length\"])))) { __rvb_content_graph_loop_continue_1 = false; { var __rvb_content_graph_region_pc_2 = \"n25\"; while (__rvb_content_graph_region_pc_2 !== \"n22\") { switch (__rvb_content_graph_region_pc_2) { case \"n25\": tile = (((b)[\"map\"])[\"tiles\"])[\"find\"](function (t) { return (((t)[\"x\"] === ((cells)[(function (key) { if (typeof key === \"string\" && key.split(\".\").some(function (part) { return [\"__proto__\",\"arguments\",\"callee\",\"caller\",\"constructor\",\"prototype\"].indexOf(part) !== -1; })) throw new Error(\"unsafe content graph index\"); return key; })(i)])[\"x\"]) && ((t)[\"y\"] === ((cells)[(function (key) { if (typeof key === \"string\" && key.split(\".\").some(function (part) { return [\"__proto__\",\"arguments\",\"callee\",\"caller\",\"constructor\",\"prototype\"].indexOf(part) !== -1; })) throw new Error(\"unsafe content graph index\"); return key; })(i)])[\"y\"])); }); __rvb_content_graph_region_pc_2 = \"n24\"; break; case \"n24\": __rvb_content_graph_region_pc_2 = (! (! ((((! tile) || (! ((tile)[\"props\"])[\"walkable\"])) || ((((tile)[\"props\"])[\"type\"] !== \"floor\") && (((tile)[\"props\"])[\"type\"] !== \"cover\"))) || ((b)[\"pieces\"])[\"some\"](function (p) { return ((((p)[\"currentHp\"] > 0) && ((p)[\"x\"] === ((cells)[(function (key) { if (typeof key === \"string\" && key.split(\".\").some(function (part) { return [\"__proto__\",\"arguments\",\"callee\",\"caller\",\"constructor\",\"prototype\"].indexOf(part) !== -1; })) throw new Error(\"unsafe content graph index\"); return key; })(i)])[\"x\"])) && ((p)[\"y\"] === ((cells)[(function (key) { if (typeof key === \"string\" && key.split(\".\").some(function (part) { return [\"__proto__\",\"arguments\",\"callee\",\"caller\",\"constructor\",\"prototype\"].indexOf(part) !== -1; })) throw new Error(\"unsafe content graph index\"); return key; })(i)])[\"y\"])); })))) ? \"n23\" : \"n22\"; break; case \"n22\": __rvb_content_graph_region_pc_2 = \"n22\"; break; case \"n23\": return {success: false, message: \"落点必须是未被占据的空地或掩体\"}; default: throw new Error(\"invalid content graph region node\"); } } } if (__rvb_content_graph_loop_break_0) break; { var __rvb_content_graph_region_pc_3 = \"n27\"; while (__rvb_content_graph_region_pc_3 !== \"n26\") { switch (__rvb_content_graph_region_pc_3) { case \"n27\": i = ((+ i) + 1); __rvb_content_graph_region_pc_3 = \"n26\"; break; case \"n26\": __rvb_content_graph_region_pc_3 = \"n26\"; break; default: throw new Error(\"invalid content graph region node\"); } } } if (__rvb_content_graph_loop_break_0) break; if (__rvb_content_graph_loop_continue_1) { __rvb_content_graph_loop_continue_1 = false; continue; } } _pc = \"n21\"; break; case \"n21\": _pc = (! (! (! (b)[\"extensions\"]))) ? \"n20\" : \"n19\"; break; case \"n20\": (b)[\"extensions\"] = {}; _pc = \"n19\"; break; case \"n19\": ((b)[\"extensions\"])[\"tileEffects\"] = (((b)[\"extensions\"])[\"tileEffects\"] || []); _pc = \"n18\"; break; case \"n18\": _pc = (! (! (((b)[\"extensions\"])[\"tileEffects\"])[\"some\"](function (e) { return (((e)[\"type\"] === \"tails-flight-reservation\") && ((((e)[\"x\"] === (a)[\"x\"]) && ((e)[\"y\"] === (a)[\"y\"])) || (((e)[\"x\"] === (d)[\"x\"]) && ((e)[\"y\"] === (d)[\"y\"])))); }))) ? \"n17\" : \"n16\"; break; case \"n16\": flightId = (((((((((((\"tails-flight-\" + (c)[\"instanceId\"]) + \"-\") + ((b)[\"turn\"])[\"turnNumber\"]) + \"-\") + (a)[\"x\"]) + \"-\") + (a)[\"y\"]) + \"-\") + (d)[\"x\"]) + \"-\") + (d)[\"y\"]); _pc = \"n15\"; break; case \"n15\": (((b)[\"extensions\"])[\"tileEffects\"]).push({id: (flightId + \"-a\"), type: \"tails-flight-reservation\", x: (a)[\"x\"], y: (a)[\"y\"], flightId: flightId}, {id: (flightId + \"-b\"), type: \"tails-flight-reservation\", x: (d)[\"x\"], y: (d)[\"y\"], flightId: flightId}); _pc = \"n14\"; break; case \"n14\": (c)[\"statusTags\"] = ((c)[\"statusTags\"] || []); _pc = \"n13\"; break; case \"n13\": addStatusEffectById((c)[\"instanceId\"], {id: flightId, type: \"tails-flight-reservation\", name: \"双尾飞行预留\", turns: 2, ownerId: (c)[\"instanceId\"], allyId: (ally)[\"instanceId\"], x: (a)[\"x\"], y: (a)[\"y\"], allyX: (d)[\"x\"], allyY: (d)[\"y\"], flightId: flightId, currentDuration: 2, relatedRules: [\"rule-tails-flight-resolve\"]}); _pc = \"n12\"; break; case \"n12\": addRuleById((c)[\"instanceId\"], \"rule-tails-flight-resolve\"); _pc = \"n11\"; break; case \"n11\": __rvb_import_bound_method_0 = (function (receiver) { var capturedMethod = receiver[\"forEach\"]; return function () { return Reflect.apply(capturedMethod, receiver, arguments); }; })([c, ally]); _pc = \"n2\"; break; case \"n2\": (__rvb_import_bound_method_0)(function (p) { { var __rvb_content_graph_region_pc_4 = \"n10\"; while (__rvb_content_graph_region_pc_4 !== \"n3\") { switch (__rvb_content_graph_region_pc_4) { case \"n10\": (p)[\"statusTags\"] = ((p)[\"statusTags\"] || []); __rvb_content_graph_region_pc_4 = \"n9\"; break; case \"n9\": addStatusEffectById((p)[\"instanceId\"], {id: ((flightId + \"-immune-\") + (p)[\"instanceId\"]), type: \"immune\", name: \"免疫\", flightId: flightId, stacks: 1, currentDuration: 2, remainingDuration: 2, relatedRules: [\"rule-tails-flight-immune\", \"rule-tails-flight-immune-target\"]}); __rvb_content_graph_region_pc_4 = \"n8\"; break; case \"n8\": addStatusEffectById((p)[\"instanceId\"], {id: ((flightId + \"-inoperable-\") + (p)[\"instanceId\"]), type: \"inoperable\", name: \"不可操作\", flightId: flightId, stacks: 1, currentDuration: 2, remainingDuration: 2, relatedRules: [\"rule-tails-flight-inoperable\", \"rule-tails-flight-inoperable-skill\"]}); __rvb_content_graph_region_pc_4 = \"n7\"; break; case \"n7\": addRuleById((p)[\"instanceId\"], \"rule-tails-flight-immune\"); __rvb_content_graph_region_pc_4 = \"n6\"; break; case \"n6\": addRuleById((p)[\"instanceId\"], \"rule-tails-flight-immune-target\"); __rvb_content_graph_region_pc_4 = \"n5\"; break; case \"n5\": addRuleById((p)[\"instanceId\"], \"rule-tails-flight-inoperable\"); __rvb_content_graph_region_pc_4 = \"n4\"; break; case \"n4\": addRuleById((p)[\"instanceId\"], \"rule-tails-flight-inoperable-skill\"); __rvb_content_graph_region_pc_4 = \"n3\"; break; case \"n3\": __rvb_content_graph_region_pc_4 = \"n3\"; break; default: throw new Error(\"invalid content graph region node\"); } } } }); _pc = \"n1\"; break; case \"n1\": return {success: true, message: \"已预留双尾飞行落点\"}; case \"n17\": return {success: false, message: \"落点已被预留\"}; case \"n31\": return {success: false, message: \"两个落点必须上下左右相邻\"}; case \"n33\": return d; case \"n36\": return a; case \"n39\": return {success: false, message: \"双尾飞行必须选择另一名友军\"}; case \"n41\": return ally; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\"); }",
   "keywords": [
     "传送",
     "免疫",
     "休眠"
   ],
-  "targetText": "其他友军（4）→相邻落点（7）"
+  "targetText": "其他友军（4）→相邻落点（7）",
+  "contentGraph": {
+    "version": "rvb-content-graph/v1",
+    "surface": "skill",
+    "entry": "n45",
+    "nodes": [
+      {
+        "id": "n1",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": "已预留双尾飞行落点"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n2",
+        "kind": "invoke",
+        "target": {
+          "kind": "function",
+          "value": {
+            "kind": "ref",
+            "name": "__rvb_import_bound_method_0"
+          }
+        },
+        "args": [
+          {
+            "kind": "function",
+            "parameters": [
+              "p"
+            ],
+            "body": {
+              "entry": "n10",
+              "end": "n3",
+              "nodes": [
+                {
+                  "id": "n3",
+                  "kind": "regionEnd"
+                },
+                {
+                  "id": "n4",
+                  "kind": "call",
+                  "capability": "addRuleById",
+                  "args": [
+                    {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "p"
+                      },
+                      "key": "instanceId"
+                    },
+                    {
+                      "kind": "literal",
+                      "value": "rule-tails-flight-inoperable-skill"
+                    }
+                  ],
+                  "next": "n3"
+                },
+                {
+                  "id": "n5",
+                  "kind": "call",
+                  "capability": "addRuleById",
+                  "args": [
+                    {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "p"
+                      },
+                      "key": "instanceId"
+                    },
+                    {
+                      "kind": "literal",
+                      "value": "rule-tails-flight-inoperable"
+                    }
+                  ],
+                  "next": "n4"
+                },
+                {
+                  "id": "n6",
+                  "kind": "call",
+                  "capability": "addRuleById",
+                  "args": [
+                    {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "p"
+                      },
+                      "key": "instanceId"
+                    },
+                    {
+                      "kind": "literal",
+                      "value": "rule-tails-flight-immune-target"
+                    }
+                  ],
+                  "next": "n5"
+                },
+                {
+                  "id": "n7",
+                  "kind": "call",
+                  "capability": "addRuleById",
+                  "args": [
+                    {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "p"
+                      },
+                      "key": "instanceId"
+                    },
+                    {
+                      "kind": "literal",
+                      "value": "rule-tails-flight-immune"
+                    }
+                  ],
+                  "next": "n6"
+                },
+                {
+                  "id": "n8",
+                  "kind": "call",
+                  "capability": "addStatusEffectById",
+                  "args": [
+                    {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "p"
+                      },
+                      "key": "instanceId"
+                    },
+                    {
+                      "kind": "object",
+                      "entries": [
+                        {
+                          "key": "id",
+                          "value": {
+                            "kind": "binary",
+                            "op": "+",
+                            "left": {
+                              "kind": "binary",
+                              "op": "+",
+                              "left": {
+                                "kind": "ref",
+                                "name": "flightId"
+                              },
+                              "right": {
+                                "kind": "literal",
+                                "value": "-inoperable-"
+                              }
+                            },
+                            "right": {
+                              "kind": "get",
+                              "object": {
+                                "kind": "ref",
+                                "name": "p"
+                              },
+                              "key": "instanceId"
+                            }
+                          }
+                        },
+                        {
+                          "key": "type",
+                          "value": {
+                            "kind": "literal",
+                            "value": "inoperable"
+                          }
+                        },
+                        {
+                          "key": "name",
+                          "value": {
+                            "kind": "literal",
+                            "value": "不可操作"
+                          }
+                        },
+                        {
+                          "key": "flightId",
+                          "value": {
+                            "kind": "ref",
+                            "name": "flightId"
+                          }
+                        },
+                        {
+                          "key": "stacks",
+                          "value": {
+                            "kind": "literal",
+                            "value": 1
+                          }
+                        },
+                        {
+                          "key": "currentDuration",
+                          "value": {
+                            "kind": "literal",
+                            "value": 2
+                          }
+                        },
+                        {
+                          "key": "remainingDuration",
+                          "value": {
+                            "kind": "literal",
+                            "value": 2
+                          }
+                        },
+                        {
+                          "key": "relatedRules",
+                          "value": {
+                            "kind": "array",
+                            "items": [
+                              {
+                                "kind": "literal",
+                                "value": "rule-tails-flight-inoperable"
+                              },
+                              {
+                                "kind": "literal",
+                                "value": "rule-tails-flight-inoperable-skill"
+                              }
+                            ]
+                          }
+                        }
+                      ]
+                    }
+                  ],
+                  "next": "n7"
+                },
+                {
+                  "id": "n9",
+                  "kind": "call",
+                  "capability": "addStatusEffectById",
+                  "args": [
+                    {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "p"
+                      },
+                      "key": "instanceId"
+                    },
+                    {
+                      "kind": "object",
+                      "entries": [
+                        {
+                          "key": "id",
+                          "value": {
+                            "kind": "binary",
+                            "op": "+",
+                            "left": {
+                              "kind": "binary",
+                              "op": "+",
+                              "left": {
+                                "kind": "ref",
+                                "name": "flightId"
+                              },
+                              "right": {
+                                "kind": "literal",
+                                "value": "-immune-"
+                              }
+                            },
+                            "right": {
+                              "kind": "get",
+                              "object": {
+                                "kind": "ref",
+                                "name": "p"
+                              },
+                              "key": "instanceId"
+                            }
+                          }
+                        },
+                        {
+                          "key": "type",
+                          "value": {
+                            "kind": "literal",
+                            "value": "immune"
+                          }
+                        },
+                        {
+                          "key": "name",
+                          "value": {
+                            "kind": "literal",
+                            "value": "免疫"
+                          }
+                        },
+                        {
+                          "key": "flightId",
+                          "value": {
+                            "kind": "ref",
+                            "name": "flightId"
+                          }
+                        },
+                        {
+                          "key": "stacks",
+                          "value": {
+                            "kind": "literal",
+                            "value": 1
+                          }
+                        },
+                        {
+                          "key": "currentDuration",
+                          "value": {
+                            "kind": "literal",
+                            "value": 2
+                          }
+                        },
+                        {
+                          "key": "remainingDuration",
+                          "value": {
+                            "kind": "literal",
+                            "value": 2
+                          }
+                        },
+                        {
+                          "key": "relatedRules",
+                          "value": {
+                            "kind": "array",
+                            "items": [
+                              {
+                                "kind": "literal",
+                                "value": "rule-tails-flight-immune"
+                              },
+                              {
+                                "kind": "literal",
+                                "value": "rule-tails-flight-immune-target"
+                              }
+                            ]
+                          }
+                        }
+                      ]
+                    }
+                  ],
+                  "next": "n8"
+                },
+                {
+                  "id": "n10",
+                  "kind": "set",
+                  "target": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "p"
+                    },
+                    "key": "statusTags"
+                  },
+                  "operator": "=",
+                  "value": {
+                    "kind": "binary",
+                    "op": "||",
+                    "left": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "p"
+                      },
+                      "key": "statusTags"
+                    },
+                    "right": {
+                      "kind": "array",
+                      "items": []
+                    }
+                  },
+                  "next": "n9"
+                }
+              ]
+            }
+          }
+        ],
+        "next": "n1"
+      },
+      {
+        "id": "n11",
+        "kind": "bind",
+        "name": "__rvb_import_bound_method_0",
+        "expr": {
+          "kind": "boundMethod",
+          "object": {
+            "kind": "array",
+            "items": [
+              {
+                "kind": "ref",
+                "name": "c"
+              },
+              {
+                "kind": "ref",
+                "name": "ally"
+              }
+            ]
+          },
+          "method": "forEach"
+        },
+        "next": "n2"
+      },
+      {
+        "id": "n12",
+        "kind": "call",
+        "capability": "addRuleById",
+        "args": [
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "c"
+            },
+            "key": "instanceId"
+          },
+          {
+            "kind": "literal",
+            "value": "rule-tails-flight-resolve"
+          }
+        ],
+        "next": "n11"
+      },
+      {
+        "id": "n13",
+        "kind": "call",
+        "capability": "addStatusEffectById",
+        "args": [
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "c"
+            },
+            "key": "instanceId"
+          },
+          {
+            "kind": "object",
+            "entries": [
+              {
+                "key": "id",
+                "value": {
+                  "kind": "ref",
+                  "name": "flightId"
+                }
+              },
+              {
+                "key": "type",
+                "value": {
+                  "kind": "literal",
+                  "value": "tails-flight-reservation"
+                }
+              },
+              {
+                "key": "name",
+                "value": {
+                  "kind": "literal",
+                  "value": "双尾飞行预留"
+                }
+              },
+              {
+                "key": "turns",
+                "value": {
+                  "kind": "literal",
+                  "value": 2
+                }
+              },
+              {
+                "key": "ownerId",
+                "value": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "c"
+                  },
+                  "key": "instanceId"
+                }
+              },
+              {
+                "key": "allyId",
+                "value": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "ally"
+                  },
+                  "key": "instanceId"
+                }
+              },
+              {
+                "key": "x",
+                "value": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "a"
+                  },
+                  "key": "x"
+                }
+              },
+              {
+                "key": "y",
+                "value": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "a"
+                  },
+                  "key": "y"
+                }
+              },
+              {
+                "key": "allyX",
+                "value": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "d"
+                  },
+                  "key": "x"
+                }
+              },
+              {
+                "key": "allyY",
+                "value": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "d"
+                  },
+                  "key": "y"
+                }
+              },
+              {
+                "key": "flightId",
+                "value": {
+                  "kind": "ref",
+                  "name": "flightId"
+                }
+              },
+              {
+                "key": "currentDuration",
+                "value": {
+                  "kind": "literal",
+                  "value": 2
+                }
+              },
+              {
+                "key": "relatedRules",
+                "value": {
+                  "kind": "array",
+                  "items": [
+                    {
+                      "kind": "literal",
+                      "value": "rule-tails-flight-resolve"
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ],
+        "next": "n12"
+      },
+      {
+        "id": "n14",
+        "kind": "set",
+        "target": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "c"
+          },
+          "key": "statusTags"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "binary",
+          "op": "||",
+          "left": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "c"
+            },
+            "key": "statusTags"
+          },
+          "right": {
+            "kind": "array",
+            "items": []
+          }
+        },
+        "next": "n13"
+      },
+      {
+        "id": "n15",
+        "kind": "call",
+        "capability": "array.push",
+        "args": [
+          {
+            "kind": "get",
+            "object": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "b"
+              },
+              "key": "extensions"
+            },
+            "key": "tileEffects"
+          },
+          {
+            "kind": "object",
+            "entries": [
+              {
+                "key": "id",
+                "value": {
+                  "kind": "binary",
+                  "op": "+",
+                  "left": {
+                    "kind": "ref",
+                    "name": "flightId"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": "-a"
+                  }
+                }
+              },
+              {
+                "key": "type",
+                "value": {
+                  "kind": "literal",
+                  "value": "tails-flight-reservation"
+                }
+              },
+              {
+                "key": "x",
+                "value": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "a"
+                  },
+                  "key": "x"
+                }
+              },
+              {
+                "key": "y",
+                "value": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "a"
+                  },
+                  "key": "y"
+                }
+              },
+              {
+                "key": "flightId",
+                "value": {
+                  "kind": "ref",
+                  "name": "flightId"
+                }
+              }
+            ]
+          },
+          {
+            "kind": "object",
+            "entries": [
+              {
+                "key": "id",
+                "value": {
+                  "kind": "binary",
+                  "op": "+",
+                  "left": {
+                    "kind": "ref",
+                    "name": "flightId"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": "-b"
+                  }
+                }
+              },
+              {
+                "key": "type",
+                "value": {
+                  "kind": "literal",
+                  "value": "tails-flight-reservation"
+                }
+              },
+              {
+                "key": "x",
+                "value": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "d"
+                  },
+                  "key": "x"
+                }
+              },
+              {
+                "key": "y",
+                "value": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "d"
+                  },
+                  "key": "y"
+                }
+              },
+              {
+                "key": "flightId",
+                "value": {
+                  "kind": "ref",
+                  "name": "flightId"
+                }
+              }
+            ]
+          }
+        ],
+        "next": "n14"
+      },
+      {
+        "id": "n16",
+        "kind": "bind",
+        "name": "flightId",
+        "expr": {
+          "kind": "binary",
+          "op": "+",
+          "left": {
+            "kind": "binary",
+            "op": "+",
+            "left": {
+              "kind": "binary",
+              "op": "+",
+              "left": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "binary",
+                  "op": "+",
+                  "left": {
+                    "kind": "binary",
+                    "op": "+",
+                    "left": {
+                      "kind": "binary",
+                      "op": "+",
+                      "left": {
+                        "kind": "binary",
+                        "op": "+",
+                        "left": {
+                          "kind": "binary",
+                          "op": "+",
+                          "left": {
+                            "kind": "binary",
+                            "op": "+",
+                            "left": {
+                              "kind": "binary",
+                              "op": "+",
+                              "left": {
+                                "kind": "literal",
+                                "value": "tails-flight-"
+                              },
+                              "right": {
+                                "kind": "get",
+                                "object": {
+                                  "kind": "ref",
+                                  "name": "c"
+                                },
+                                "key": "instanceId"
+                              }
+                            },
+                            "right": {
+                              "kind": "literal",
+                              "value": "-"
+                            }
+                          },
+                          "right": {
+                            "kind": "get",
+                            "object": {
+                              "kind": "get",
+                              "object": {
+                                "kind": "ref",
+                                "name": "b"
+                              },
+                              "key": "turn"
+                            },
+                            "key": "turnNumber"
+                          }
+                        },
+                        "right": {
+                          "kind": "literal",
+                          "value": "-"
+                        }
+                      },
+                      "right": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "a"
+                        },
+                        "key": "x"
+                      }
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": "-"
+                    }
+                  },
+                  "right": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "a"
+                    },
+                    "key": "y"
+                  }
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "-"
+                }
+              },
+              "right": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "d"
+                },
+                "key": "x"
+              }
+            },
+            "right": {
+              "kind": "literal",
+              "value": "-"
+            }
+          },
+          "right": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "d"
+            },
+            "key": "y"
+          }
+        },
+        "next": "n15"
+      },
+      {
+        "id": "n17",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": "落点已被预留"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n18",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "collection",
+              "object": {
+                "kind": "get",
+                "object": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "b"
+                  },
+                  "key": "extensions"
+                },
+                "key": "tileEffects"
+              },
+              "method": "some",
+              "args": [
+                {
+                  "kind": "lambda",
+                  "parameters": [
+                    "e"
+                  ],
+                  "body": {
+                    "kind": "binary",
+                    "op": "&&",
+                    "left": {
+                      "kind": "binary",
+                      "op": "===",
+                      "left": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "e"
+                        },
+                        "key": "type"
+                      },
+                      "right": {
+                        "kind": "literal",
+                        "value": "tails-flight-reservation"
+                      }
+                    },
+                    "right": {
+                      "kind": "binary",
+                      "op": "||",
+                      "left": {
+                        "kind": "binary",
+                        "op": "&&",
+                        "left": {
+                          "kind": "binary",
+                          "op": "===",
+                          "left": {
+                            "kind": "get",
+                            "object": {
+                              "kind": "ref",
+                              "name": "e"
+                            },
+                            "key": "x"
+                          },
+                          "right": {
+                            "kind": "get",
+                            "object": {
+                              "kind": "ref",
+                              "name": "a"
+                            },
+                            "key": "x"
+                          }
+                        },
+                        "right": {
+                          "kind": "binary",
+                          "op": "===",
+                          "left": {
+                            "kind": "get",
+                            "object": {
+                              "kind": "ref",
+                              "name": "e"
+                            },
+                            "key": "y"
+                          },
+                          "right": {
+                            "kind": "get",
+                            "object": {
+                              "kind": "ref",
+                              "name": "a"
+                            },
+                            "key": "y"
+                          }
+                        }
+                      },
+                      "right": {
+                        "kind": "binary",
+                        "op": "&&",
+                        "left": {
+                          "kind": "binary",
+                          "op": "===",
+                          "left": {
+                            "kind": "get",
+                            "object": {
+                              "kind": "ref",
+                              "name": "e"
+                            },
+                            "key": "x"
+                          },
+                          "right": {
+                            "kind": "get",
+                            "object": {
+                              "kind": "ref",
+                              "name": "d"
+                            },
+                            "key": "x"
+                          }
+                        },
+                        "right": {
+                          "kind": "binary",
+                          "op": "===",
+                          "left": {
+                            "kind": "get",
+                            "object": {
+                              "kind": "ref",
+                              "name": "e"
+                            },
+                            "key": "y"
+                          },
+                          "right": {
+                            "kind": "get",
+                            "object": {
+                              "kind": "ref",
+                              "name": "d"
+                            },
+                            "key": "y"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "yes": "n17",
+        "no": "n16"
+      },
+      {
+        "id": "n19",
+        "kind": "set",
+        "target": {
+          "kind": "get",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "b"
+            },
+            "key": "extensions"
+          },
+          "key": "tileEffects"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "binary",
+          "op": "||",
+          "left": {
+            "kind": "get",
+            "object": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "b"
+              },
+              "key": "extensions"
+            },
+            "key": "tileEffects"
+          },
+          "right": {
+            "kind": "array",
+            "items": []
+          }
+        },
+        "next": "n18"
+      },
+      {
+        "id": "n20",
+        "kind": "set",
+        "target": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "b"
+          },
+          "key": "extensions"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "object",
+          "entries": []
+        },
+        "next": "n19"
+      },
+      {
+        "id": "n21",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "unary",
+              "op": "!",
+              "argument": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "b"
+                },
+                "key": "extensions"
+              }
+            }
+          }
+        },
+        "yes": "n20",
+        "no": "n19"
+      },
+      {
+        "id": "n28",
+        "kind": "loop",
+        "loop": "for",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "<",
+              "left": {
+                "kind": "ref",
+                "name": "i"
+              },
+              "right": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "cells"
+                },
+                "key": "length"
+              }
+            }
+          }
+        },
+        "body": {
+          "entry": "n25",
+          "end": "n22",
+          "nodes": [
+            {
+              "id": "n22",
+              "kind": "regionEnd"
+            },
+            {
+              "id": "n23",
+              "kind": "return",
+              "value": {
+                "kind": "object",
+                "entries": [
+                  {
+                    "key": "success",
+                    "value": {
+                      "kind": "literal",
+                      "value": false
+                    }
+                  },
+                  {
+                    "key": "message",
+                    "value": {
+                      "kind": "literal",
+                      "value": "落点必须是未被占据的空地或掩体"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "id": "n24",
+              "kind": "branch",
+              "condition": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "unary",
+                  "op": "!",
+                  "argument": {
+                    "kind": "binary",
+                    "op": "||",
+                    "left": {
+                      "kind": "binary",
+                      "op": "||",
+                      "left": {
+                        "kind": "binary",
+                        "op": "||",
+                        "left": {
+                          "kind": "unary",
+                          "op": "!",
+                          "argument": {
+                            "kind": "ref",
+                            "name": "tile"
+                          }
+                        },
+                        "right": {
+                          "kind": "unary",
+                          "op": "!",
+                          "argument": {
+                            "kind": "get",
+                            "object": {
+                              "kind": "get",
+                              "object": {
+                                "kind": "ref",
+                                "name": "tile"
+                              },
+                              "key": "props"
+                            },
+                            "key": "walkable"
+                          }
+                        }
+                      },
+                      "right": {
+                        "kind": "binary",
+                        "op": "&&",
+                        "left": {
+                          "kind": "binary",
+                          "op": "!==",
+                          "left": {
+                            "kind": "get",
+                            "object": {
+                              "kind": "get",
+                              "object": {
+                                "kind": "ref",
+                                "name": "tile"
+                              },
+                              "key": "props"
+                            },
+                            "key": "type"
+                          },
+                          "right": {
+                            "kind": "literal",
+                            "value": "floor"
+                          }
+                        },
+                        "right": {
+                          "kind": "binary",
+                          "op": "!==",
+                          "left": {
+                            "kind": "get",
+                            "object": {
+                              "kind": "get",
+                              "object": {
+                                "kind": "ref",
+                                "name": "tile"
+                              },
+                              "key": "props"
+                            },
+                            "key": "type"
+                          },
+                          "right": {
+                            "kind": "literal",
+                            "value": "cover"
+                          }
+                        }
+                      }
+                    },
+                    "right": {
+                      "kind": "collection",
+                      "object": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "b"
+                        },
+                        "key": "pieces"
+                      },
+                      "method": "some",
+                      "args": [
+                        {
+                          "kind": "lambda",
+                          "parameters": [
+                            "p"
+                          ],
+                          "body": {
+                            "kind": "binary",
+                            "op": "&&",
+                            "left": {
+                              "kind": "binary",
+                              "op": "&&",
+                              "left": {
+                                "kind": "binary",
+                                "op": ">",
+                                "left": {
+                                  "kind": "get",
+                                  "object": {
+                                    "kind": "ref",
+                                    "name": "p"
+                                  },
+                                  "key": "currentHp"
+                                },
+                                "right": {
+                                  "kind": "literal",
+                                  "value": 0
+                                }
+                              },
+                              "right": {
+                                "kind": "binary",
+                                "op": "===",
+                                "left": {
+                                  "kind": "get",
+                                  "object": {
+                                    "kind": "ref",
+                                    "name": "p"
+                                  },
+                                  "key": "x"
+                                },
+                                "right": {
+                                  "kind": "get",
+                                  "object": {
+                                    "kind": "index",
+                                    "object": {
+                                      "kind": "ref",
+                                      "name": "cells"
+                                    },
+                                    "index": {
+                                      "kind": "ref",
+                                      "name": "i"
+                                    }
+                                  },
+                                  "key": "x"
+                                }
+                              }
+                            },
+                            "right": {
+                              "kind": "binary",
+                              "op": "===",
+                              "left": {
+                                "kind": "get",
+                                "object": {
+                                  "kind": "ref",
+                                  "name": "p"
+                                },
+                                "key": "y"
+                              },
+                              "right": {
+                                "kind": "get",
+                                "object": {
+                                  "kind": "index",
+                                  "object": {
+                                    "kind": "ref",
+                                    "name": "cells"
+                                  },
+                                  "index": {
+                                    "kind": "ref",
+                                    "name": "i"
+                                  }
+                                },
+                                "key": "y"
+                              }
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  }
+                }
+              },
+              "yes": "n23",
+              "no": "n22"
+            },
+            {
+              "id": "n25",
+              "kind": "bind",
+              "name": "tile",
+              "expr": {
+                "kind": "collection",
+                "object": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "b"
+                    },
+                    "key": "map"
+                  },
+                  "key": "tiles"
+                },
+                "method": "find",
+                "args": [
+                  {
+                    "kind": "lambda",
+                    "parameters": [
+                      "t"
+                    ],
+                    "body": {
+                      "kind": "binary",
+                      "op": "&&",
+                      "left": {
+                        "kind": "binary",
+                        "op": "===",
+                        "left": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "t"
+                          },
+                          "key": "x"
+                        },
+                        "right": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "index",
+                            "object": {
+                              "kind": "ref",
+                              "name": "cells"
+                            },
+                            "index": {
+                              "kind": "ref",
+                              "name": "i"
+                            }
+                          },
+                          "key": "x"
+                        }
+                      },
+                      "right": {
+                        "kind": "binary",
+                        "op": "===",
+                        "left": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "t"
+                          },
+                          "key": "y"
+                        },
+                        "right": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "index",
+                            "object": {
+                              "kind": "ref",
+                              "name": "cells"
+                            },
+                            "index": {
+                              "kind": "ref",
+                              "name": "i"
+                            }
+                          },
+                          "key": "y"
+                        }
+                      }
+                    }
+                  }
+                ]
+              },
+              "next": "n24"
+            }
+          ]
+        },
+        "update": {
+          "entry": "n27",
+          "end": "n26",
+          "nodes": [
+            {
+              "id": "n26",
+              "kind": "regionEnd"
+            },
+            {
+              "id": "n27",
+              "kind": "set",
+              "target": {
+                "kind": "ref",
+                "name": "i"
+              },
+              "operator": "=",
+              "value": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "unary",
+                  "op": "+",
+                  "argument": {
+                    "kind": "ref",
+                    "name": "i"
+                  }
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": 1
+                }
+              },
+              "next": "n26"
+            }
+          ]
+        },
+        "next": "n21"
+      },
+      {
+        "id": "n29",
+        "kind": "bind",
+        "name": "i",
+        "expr": {
+          "kind": "literal",
+          "value": 0
+        },
+        "next": "n28"
+      },
+      {
+        "id": "n30",
+        "kind": "bind",
+        "name": "cells",
+        "expr": {
+          "kind": "array",
+          "items": [
+            {
+              "kind": "ref",
+              "name": "a"
+            },
+            {
+              "kind": "ref",
+              "name": "d"
+            }
+          ]
+        },
+        "next": "n29"
+      },
+      {
+        "id": "n31",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": "两个落点必须上下左右相邻"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n32",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "!==",
+              "left": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "call",
+                  "callee": "Math.abs",
+                  "args": [
+                    {
+                      "kind": "binary",
+                      "op": "-",
+                      "left": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "a"
+                        },
+                        "key": "x"
+                      },
+                      "right": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "d"
+                        },
+                        "key": "x"
+                      }
+                    }
+                  ]
+                },
+                "right": {
+                  "kind": "call",
+                  "callee": "Math.abs",
+                  "args": [
+                    {
+                      "kind": "binary",
+                      "op": "-",
+                      "left": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "a"
+                        },
+                        "key": "y"
+                      },
+                      "right": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "d"
+                        },
+                        "key": "y"
+                      }
+                    }
+                  ]
+                }
+              },
+              "right": {
+                "kind": "literal",
+                "value": 1
+              }
+            }
+          }
+        },
+        "yes": "n31",
+        "no": "n30"
+      },
+      {
+        "id": "n33",
+        "kind": "return",
+        "value": {
+          "kind": "ref",
+          "name": "d"
+        }
+      },
+      {
+        "id": "n34",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "ref",
+                  "name": "d"
+                }
+              },
+              "right": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "d"
+                },
+                "key": "needsTargetSelection"
+              }
+            }
+          }
+        },
+        "yes": "n33",
+        "no": "n32"
+      },
+      {
+        "id": "n35",
+        "kind": "call",
+        "capability": "selectTarget",
+        "args": [
+          {
+            "kind": "object",
+            "entries": [
+              {
+                "key": "type",
+                "value": {
+                  "kind": "literal",
+                  "value": "grid"
+                }
+              },
+              {
+                "key": "range",
+                "value": {
+                  "kind": "literal",
+                  "value": 7
+                }
+              },
+              {
+                "key": "filter",
+                "value": {
+                  "kind": "literal",
+                  "value": "all"
+                }
+              }
+            ]
+          }
+        ],
+        "result": "d",
+        "next": "n34"
+      },
+      {
+        "id": "n36",
+        "kind": "return",
+        "value": {
+          "kind": "ref",
+          "name": "a"
+        }
+      },
+      {
+        "id": "n37",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "ref",
+                  "name": "a"
+                }
+              },
+              "right": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "a"
+                },
+                "key": "needsTargetSelection"
+              }
+            }
+          }
+        },
+        "yes": "n36",
+        "no": "n35"
+      },
+      {
+        "id": "n38",
+        "kind": "call",
+        "capability": "selectTarget",
+        "args": [
+          {
+            "kind": "object",
+            "entries": [
+              {
+                "key": "type",
+                "value": {
+                  "kind": "literal",
+                  "value": "grid"
+                }
+              },
+              {
+                "key": "range",
+                "value": {
+                  "kind": "literal",
+                  "value": 7
+                }
+              },
+              {
+                "key": "filter",
+                "value": {
+                  "kind": "literal",
+                  "value": "all"
+                }
+              }
+            ]
+          }
+        ],
+        "result": "a",
+        "next": "n37"
+      },
+      {
+        "id": "n39",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": "双尾飞行必须选择另一名友军"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n40",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "===",
+              "left": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "ally"
+                },
+                "key": "instanceId"
+              },
+              "right": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "c"
+                },
+                "key": "instanceId"
+              }
+            }
+          }
+        },
+        "yes": "n39",
+        "no": "n38"
+      },
+      {
+        "id": "n41",
+        "kind": "return",
+        "value": {
+          "kind": "ref",
+          "name": "ally"
+        }
+      },
+      {
+        "id": "n42",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "ref",
+                  "name": "ally"
+                }
+              },
+              "right": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "ally"
+                },
+                "key": "needsTargetSelection"
+              }
+            }
+          }
+        },
+        "yes": "n41",
+        "no": "n40"
+      },
+      {
+        "id": "n43",
+        "kind": "call",
+        "capability": "selectTarget",
+        "args": [
+          {
+            "kind": "object",
+            "entries": [
+              {
+                "key": "type",
+                "value": {
+                  "kind": "literal",
+                  "value": "piece"
+                }
+              },
+              {
+                "key": "range",
+                "value": {
+                  "kind": "literal",
+                  "value": 4
+                }
+              },
+              {
+                "key": "filter",
+                "value": {
+                  "kind": "literal",
+                  "value": "ally"
+                }
+              }
+            ]
+          }
+        ],
+        "result": "ally",
+        "next": "n42"
+      },
+      {
+        "id": "n44",
+        "kind": "bind",
+        "name": "b",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "context"
+          },
+          "key": "battle"
+        },
+        "next": "n43"
+      },
+      {
+        "id": "n45",
+        "kind": "bind",
+        "name": "c",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "context"
+          },
+          "key": "piece"
+        },
+        "next": "n44"
+      }
+    ]
+  },
+  "contentGraphField": "code",
+  "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1"
 }

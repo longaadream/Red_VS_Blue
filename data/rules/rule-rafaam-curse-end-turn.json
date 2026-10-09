@@ -2,6 +2,829 @@
   "id": "rule-rafaam-curse-end-turn",
   "name": "诅咒-回合结束伤害",
   "description": "持有诅咒牌时，每回合结束对一个随机友方棋子造成伤害，直到打出该牌",
-  "trigger": { "type": "endTurn" },
-  "skillCode": "var playerId = context.playerId; if (battle.turn.currentPlayerId !== playerId) return { success: false }; var player = battle.players.find(function(p) { return p.playerId === playerId; }); if (!player || !player.hand) return { success: false }; var curseCards = player.hand.filter(function(c) { return c.name && c.name.indexOf('诅咒') >= 0; }); if (curseCards.length === 0) { if (player.rules) player.rules = player.rules.filter(function(r) { return r.id !== 'rule-rafaam-curse-end-turn'; }); return { success: false }; } var rafaamPlayerId = battle.players.find(function(p) { return p.playerId !== playerId; }).playerId; var messages = []; curseCards.forEach(function(card) { var cardDef = battle.customCards && battle.customCards[card.cardId]; var dmg = (cardDef && cardDef.damageAmount) ? cardDef.damageAmount : 4; var friendlyPieces = battle.pieces.filter(function(p) { return p.ownerPlayerId === playerId && p.currentHp > 0; }); if (friendlyPieces.length === 0) return; var target = friendlyPieces[Math.floor(Math.random() * friendlyPieces.length)]; var dmgResult = dealDamage(target, target, dmg, 'magical', battle, 'curse-end-turn', false, rafaamPlayerId); messages.push('诅咒对' + target.name + '造成了' + dmgResult.damage + '点伤害'); }); return { success: true, message: messages.join('，') };"
+  "trigger": {
+    "type": "endTurn"
+  },
+  "skillCode": "var __rvb_import_operand_4, curseCards, messages, player, playerId, rafaamPlayerId; var _pc = \"n29\"; for (var _step = 0; _step <= 16; _step++) { switch (_pc) { case \"n29\": playerId = (context)[\"playerId\"]; _pc = \"n28\"; break; case \"n28\": _pc = (! (! (((battle)[\"turn\"])[\"currentPlayerId\"] !== playerId))) ? \"n27\" : \"n26\"; break; case \"n26\": player = ((battle)[\"players\"])[\"find\"](function (p) { return ((p)[\"playerId\"] === playerId); }); _pc = \"n25\"; break; case \"n25\": _pc = (! (! ((! player) || (! (player)[\"hand\"])))) ? \"n24\" : \"n23\"; break; case \"n23\": curseCards = ((player)[\"hand\"])[\"filter\"](function (c) { return ((c)[\"name\"] && (((c)[\"name\"])[\"indexOf\"](\"诅咒\") >= 0)); }); _pc = \"n22\"; break; case \"n22\": _pc = (! (! ((curseCards)[\"length\"] === 0))) ? \"n21\" : \"n18\"; break; case \"n18\": rafaamPlayerId = (((battle)[\"players\"])[\"find\"](function (p) { return ((p)[\"playerId\"] !== playerId); }))[\"playerId\"]; _pc = \"n17\"; break; case \"n17\": messages = []; _pc = \"n16\"; break; case \"n16\": __rvb_import_operand_4 = curseCards; _pc = \"n2\"; break; case \"n2\": (__rvb_import_operand_4)[\"forEach\"](function (card) { var __rvb_import_effect_1, __rvb_import_operand_0, __rvb_import_operand_2, __rvb_import_operand_3, cardDef, dmg, dmgResult, friendlyPieces, target; { var __rvb_content_graph_region_pc_0 = \"n15\"; while (__rvb_content_graph_region_pc_0 !== \"n3\") { switch (__rvb_content_graph_region_pc_0) { case \"n15\": cardDef = ((battle)[\"customCards\"] && ((battle)[\"customCards\"])[(function (key) { if (typeof key === \"string\" && key.split(\".\").some(function (part) { return [\"__proto__\",\"arguments\",\"callee\",\"caller\",\"constructor\",\"prototype\"].indexOf(part) !== -1; })) throw new Error(\"unsafe content graph index\"); return key; })((card)[\"cardId\"])]); __rvb_content_graph_region_pc_0 = \"n14\"; break; case \"n14\": dmg = ((cardDef && (cardDef)[\"damageAmount\"]) ? (cardDef)[\"damageAmount\"] : 4); __rvb_content_graph_region_pc_0 = \"n13\"; break; case \"n13\": friendlyPieces = ((battle)[\"pieces\"])[\"filter\"](function (p) { return (((p)[\"ownerPlayerId\"] === playerId) && ((p)[\"currentHp\"] > 0)); }); __rvb_content_graph_region_pc_0 = \"n12\"; break; case \"n12\": __rvb_content_graph_region_pc_0 = (! (! ((friendlyPieces)[\"length\"] === 0))) ? \"n11\" : \"n6\"; break; case \"n6\": __rvb_import_operand_0 = friendlyPieces; __rvb_content_graph_region_pc_0 = \"n10\"; break; case \"n10\": __rvb_import_effect_1 = Math.random(); __rvb_content_graph_region_pc_0 = \"n8\"; break; case \"n8\": __rvb_import_operand_2 = __rvb_import_effect_1; __rvb_content_graph_region_pc_0 = \"n9\"; break; case \"n9\": __rvb_import_operand_3 = (__rvb_import_operand_2 * (friendlyPieces)[\"length\"]); __rvb_content_graph_region_pc_0 = \"n7\"; break; case \"n7\": target = (__rvb_import_operand_0)[(function (key) { if (typeof key === \"string\" && key.split(\".\").some(function (part) { return [\"__proto__\",\"arguments\",\"callee\",\"caller\",\"constructor\",\"prototype\"].indexOf(part) !== -1; })) throw new Error(\"unsafe content graph index\"); return key; })(Math.floor(__rvb_import_operand_3))]; __rvb_content_graph_region_pc_0 = \"n5\"; break; case \"n5\": dmgResult = dealDamage(target, target, dmg, \"magical\", battle, \"curse-end-turn\", false, rafaamPlayerId); __rvb_content_graph_region_pc_0 = \"n4\"; break; case \"n4\": (messages).push(((((\"诅咒对\" + (target)[\"name\"]) + \"造成了\") + (dmgResult)[\"damage\"]) + \"点伤害\")); __rvb_content_graph_region_pc_0 = \"n3\"; break; case \"n3\": __rvb_content_graph_region_pc_0 = \"n3\"; break; case \"n11\": return; default: throw new Error(\"invalid content graph region node\"); } } } }); _pc = \"n1\"; break; case \"n1\": return {success: true, message: (messages)[\"join\"](\"，\")}; case \"n21\": _pc = (! (! (player)[\"rules\"])) ? \"n20\" : \"n19\"; break; case \"n20\": (player)[\"rules\"] = ((player)[\"rules\"])[\"filter\"](function (r) { return ((r)[\"id\"] !== \"rule-rafaam-curse-end-turn\"); }); _pc = \"n19\"; break; case \"n19\": return {success: false}; case \"n24\": return {success: false}; case \"n27\": return {success: false}; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\");",
+  "contentGraph": {
+    "version": "rvb-content-graph/v1",
+    "surface": "rule",
+    "entry": "n29",
+    "nodes": [
+      {
+        "id": "n1",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "collection",
+                "object": {
+                  "kind": "ref",
+                  "name": "messages"
+                },
+                "method": "join",
+                "args": [
+                  {
+                    "kind": "literal",
+                    "value": "，"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n2",
+        "kind": "invoke",
+        "target": {
+          "kind": "array",
+          "object": {
+            "kind": "ref",
+            "name": "__rvb_import_operand_4"
+          },
+          "method": "forEach"
+        },
+        "args": [
+          {
+            "kind": "function",
+            "parameters": [
+              "card"
+            ],
+            "body": {
+              "entry": "n15",
+              "end": "n3",
+              "nodes": [
+                {
+                  "id": "n3",
+                  "kind": "regionEnd"
+                },
+                {
+                  "id": "n4",
+                  "kind": "call",
+                  "capability": "array.push",
+                  "args": [
+                    {
+                      "kind": "ref",
+                      "name": "messages"
+                    },
+                    {
+                      "kind": "binary",
+                      "op": "+",
+                      "left": {
+                        "kind": "binary",
+                        "op": "+",
+                        "left": {
+                          "kind": "binary",
+                          "op": "+",
+                          "left": {
+                            "kind": "binary",
+                            "op": "+",
+                            "left": {
+                              "kind": "literal",
+                              "value": "诅咒对"
+                            },
+                            "right": {
+                              "kind": "get",
+                              "object": {
+                                "kind": "ref",
+                                "name": "target"
+                              },
+                              "key": "name"
+                            }
+                          },
+                          "right": {
+                            "kind": "literal",
+                            "value": "造成了"
+                          }
+                        },
+                        "right": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "dmgResult"
+                          },
+                          "key": "damage"
+                        }
+                      },
+                      "right": {
+                        "kind": "literal",
+                        "value": "点伤害"
+                      }
+                    }
+                  ],
+                  "next": "n3"
+                },
+                {
+                  "id": "n5",
+                  "kind": "call",
+                  "capability": "dealDamage",
+                  "args": [
+                    {
+                      "kind": "ref",
+                      "name": "target"
+                    },
+                    {
+                      "kind": "ref",
+                      "name": "target"
+                    },
+                    {
+                      "kind": "ref",
+                      "name": "dmg"
+                    },
+                    {
+                      "kind": "literal",
+                      "value": "magical"
+                    },
+                    {
+                      "kind": "ref",
+                      "name": "battle"
+                    },
+                    {
+                      "kind": "literal",
+                      "value": "curse-end-turn"
+                    },
+                    {
+                      "kind": "literal",
+                      "value": false
+                    },
+                    {
+                      "kind": "ref",
+                      "name": "rafaamPlayerId"
+                    }
+                  ],
+                  "result": "dmgResult",
+                  "next": "n4"
+                },
+                {
+                  "id": "n7",
+                  "kind": "bind",
+                  "name": "target",
+                  "expr": {
+                    "kind": "index",
+                    "object": {
+                      "kind": "ref",
+                      "name": "__rvb_import_operand_0"
+                    },
+                    "index": {
+                      "kind": "call",
+                      "callee": "Math.floor",
+                      "args": [
+                        {
+                          "kind": "ref",
+                          "name": "__rvb_import_operand_3"
+                        }
+                      ]
+                    }
+                  },
+                  "next": "n5"
+                },
+                {
+                  "id": "n9",
+                  "kind": "bind",
+                  "name": "__rvb_import_operand_3",
+                  "expr": {
+                    "kind": "binary",
+                    "op": "*",
+                    "left": {
+                      "kind": "ref",
+                      "name": "__rvb_import_operand_2"
+                    },
+                    "right": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "friendlyPieces"
+                      },
+                      "key": "length"
+                    }
+                  },
+                  "next": "n7"
+                },
+                {
+                  "id": "n8",
+                  "kind": "bind",
+                  "name": "__rvb_import_operand_2",
+                  "expr": {
+                    "kind": "ref",
+                    "name": "__rvb_import_effect_1"
+                  },
+                  "next": "n9"
+                },
+                {
+                  "id": "n10",
+                  "kind": "call",
+                  "capability": "Math.random",
+                  "args": [],
+                  "result": "__rvb_import_effect_1",
+                  "next": "n8"
+                },
+                {
+                  "id": "n6",
+                  "kind": "bind",
+                  "name": "__rvb_import_operand_0",
+                  "expr": {
+                    "kind": "ref",
+                    "name": "friendlyPieces"
+                  },
+                  "next": "n10"
+                },
+                {
+                  "id": "n11",
+                  "kind": "return"
+                },
+                {
+                  "id": "n12",
+                  "kind": "branch",
+                  "condition": {
+                    "kind": "unary",
+                    "op": "!",
+                    "argument": {
+                      "kind": "unary",
+                      "op": "!",
+                      "argument": {
+                        "kind": "binary",
+                        "op": "===",
+                        "left": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "friendlyPieces"
+                          },
+                          "key": "length"
+                        },
+                        "right": {
+                          "kind": "literal",
+                          "value": 0
+                        }
+                      }
+                    }
+                  },
+                  "yes": "n11",
+                  "no": "n6"
+                },
+                {
+                  "id": "n13",
+                  "kind": "bind",
+                  "name": "friendlyPieces",
+                  "expr": {
+                    "kind": "collection",
+                    "object": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "battle"
+                      },
+                      "key": "pieces"
+                    },
+                    "method": "filter",
+                    "args": [
+                      {
+                        "kind": "lambda",
+                        "parameters": [
+                          "p"
+                        ],
+                        "body": {
+                          "kind": "binary",
+                          "op": "&&",
+                          "left": {
+                            "kind": "binary",
+                            "op": "===",
+                            "left": {
+                              "kind": "get",
+                              "object": {
+                                "kind": "ref",
+                                "name": "p"
+                              },
+                              "key": "ownerPlayerId"
+                            },
+                            "right": {
+                              "kind": "ref",
+                              "name": "playerId"
+                            }
+                          },
+                          "right": {
+                            "kind": "binary",
+                            "op": ">",
+                            "left": {
+                              "kind": "get",
+                              "object": {
+                                "kind": "ref",
+                                "name": "p"
+                              },
+                              "key": "currentHp"
+                            },
+                            "right": {
+                              "kind": "literal",
+                              "value": 0
+                            }
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  "next": "n12"
+                },
+                {
+                  "id": "n14",
+                  "kind": "bind",
+                  "name": "dmg",
+                  "expr": {
+                    "kind": "conditional",
+                    "test": {
+                      "kind": "binary",
+                      "op": "&&",
+                      "left": {
+                        "kind": "ref",
+                        "name": "cardDef"
+                      },
+                      "right": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "cardDef"
+                        },
+                        "key": "damageAmount"
+                      }
+                    },
+                    "consequent": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "cardDef"
+                      },
+                      "key": "damageAmount"
+                    },
+                    "alternate": {
+                      "kind": "literal",
+                      "value": 4
+                    }
+                  },
+                  "next": "n13"
+                },
+                {
+                  "id": "n15",
+                  "kind": "bind",
+                  "name": "cardDef",
+                  "expr": {
+                    "kind": "binary",
+                    "op": "&&",
+                    "left": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "battle"
+                      },
+                      "key": "customCards"
+                    },
+                    "right": {
+                      "kind": "index",
+                      "object": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "battle"
+                        },
+                        "key": "customCards"
+                      },
+                      "index": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "card"
+                        },
+                        "key": "cardId"
+                      }
+                    }
+                  },
+                  "next": "n14"
+                }
+              ]
+            }
+          }
+        ],
+        "next": "n1"
+      },
+      {
+        "id": "n16",
+        "kind": "bind",
+        "name": "__rvb_import_operand_4",
+        "expr": {
+          "kind": "ref",
+          "name": "curseCards"
+        },
+        "next": "n2"
+      },
+      {
+        "id": "n17",
+        "kind": "bind",
+        "name": "messages",
+        "expr": {
+          "kind": "array",
+          "items": []
+        },
+        "next": "n16"
+      },
+      {
+        "id": "n18",
+        "kind": "bind",
+        "name": "rafaamPlayerId",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "collection",
+            "object": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "battle"
+              },
+              "key": "players"
+            },
+            "method": "find",
+            "args": [
+              {
+                "kind": "lambda",
+                "parameters": [
+                  "p"
+                ],
+                "body": {
+                  "kind": "binary",
+                  "op": "!==",
+                  "left": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "p"
+                    },
+                    "key": "playerId"
+                  },
+                  "right": {
+                    "kind": "ref",
+                    "name": "playerId"
+                  }
+                }
+              }
+            ]
+          },
+          "key": "playerId"
+        },
+        "next": "n17"
+      },
+      {
+        "id": "n19",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n20",
+        "kind": "set",
+        "target": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "player"
+          },
+          "key": "rules"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "collection",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "player"
+            },
+            "key": "rules"
+          },
+          "method": "filter",
+          "args": [
+            {
+              "kind": "lambda",
+              "parameters": [
+                "r"
+              ],
+              "body": {
+                "kind": "binary",
+                "op": "!==",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "r"
+                  },
+                  "key": "id"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "rule-rafaam-curse-end-turn"
+                }
+              }
+            }
+          ]
+        },
+        "next": "n19"
+      },
+      {
+        "id": "n21",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "player"
+              },
+              "key": "rules"
+            }
+          }
+        },
+        "yes": "n20",
+        "no": "n19"
+      },
+      {
+        "id": "n22",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "===",
+              "left": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "curseCards"
+                },
+                "key": "length"
+              },
+              "right": {
+                "kind": "literal",
+                "value": 0
+              }
+            }
+          }
+        },
+        "yes": "n21",
+        "no": "n18"
+      },
+      {
+        "id": "n23",
+        "kind": "bind",
+        "name": "curseCards",
+        "expr": {
+          "kind": "collection",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "player"
+            },
+            "key": "hand"
+          },
+          "method": "filter",
+          "args": [
+            {
+              "kind": "lambda",
+              "parameters": [
+                "c"
+              ],
+              "body": {
+                "kind": "binary",
+                "op": "&&",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "c"
+                  },
+                  "key": "name"
+                },
+                "right": {
+                  "kind": "binary",
+                  "op": ">=",
+                  "left": {
+                    "kind": "collection",
+                    "object": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "c"
+                      },
+                      "key": "name"
+                    },
+                    "method": "indexOf",
+                    "args": [
+                      {
+                        "kind": "literal",
+                        "value": "诅咒"
+                      }
+                    ]
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": 0
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "next": "n22"
+      },
+      {
+        "id": "n24",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n25",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "ref",
+                  "name": "player"
+                }
+              },
+              "right": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "player"
+                  },
+                  "key": "hand"
+                }
+              }
+            }
+          }
+        },
+        "yes": "n24",
+        "no": "n23"
+      },
+      {
+        "id": "n26",
+        "kind": "bind",
+        "name": "player",
+        "expr": {
+          "kind": "collection",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "battle"
+            },
+            "key": "players"
+          },
+          "method": "find",
+          "args": [
+            {
+              "kind": "lambda",
+              "parameters": [
+                "p"
+              ],
+              "body": {
+                "kind": "binary",
+                "op": "===",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "p"
+                  },
+                  "key": "playerId"
+                },
+                "right": {
+                  "kind": "ref",
+                  "name": "playerId"
+                }
+              }
+            }
+          ]
+        },
+        "next": "n25"
+      },
+      {
+        "id": "n27",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n28",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "!==",
+              "left": {
+                "kind": "get",
+                "object": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "battle"
+                  },
+                  "key": "turn"
+                },
+                "key": "currentPlayerId"
+              },
+              "right": {
+                "kind": "ref",
+                "name": "playerId"
+              }
+            }
+          }
+        },
+        "yes": "n27",
+        "no": "n26"
+      },
+      {
+        "id": "n29",
+        "kind": "bind",
+        "name": "playerId",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "context"
+          },
+          "key": "playerId"
+        },
+        "next": "n28"
+      }
+    ]
+  },
+  "contentGraphField": "skillCode",
+  "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1"
 }

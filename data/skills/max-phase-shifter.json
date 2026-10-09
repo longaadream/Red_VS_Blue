@@ -32,5 +32,1458 @@
       }
     ]
   },
-  "code": "function executeSkill(context) { var source = context.piece; var battleState = context.battle; var player = battleState.players.find(function(item) { return item.playerId === source.ownerPlayerId; }); var recast = (source.statusTags || []).find(function(tag) { return tag.type === 'max-phase-recast' && Number(tag.turnNumber) === Number(battleState.turn.turnNumber); }); if (recast && (!player || Number(player.actionPoints || 0) < 1)) return { success: false, message: '再次释放相位偏移器需要1行动点' }; var pos = selectTarget({ type: 'grid', range: 2, filter: 'all' }); if (!pos || pos.needsTargetSelection) return pos; var dx = pos.x - source.x; var dy = pos.y - source.y; if ((dx !== 0 && dy !== 0) || (dx === 0 && dy === 0)) return { success: false, message: '请选择正方向地格' }; var tile = battleState.map.tiles.find(function(item) { return item.x === pos.x && item.y === pos.y; }); var occupied = battleState.pieces.some(function(piece) { return piece.currentHp > 0 && piece.instanceId !== source.instanceId && piece.x === pos.x && piece.y === pos.y; }); if (!tile || !tile.props || !tile.props.walkable || occupied) return { success: false, message: '请选择合法地格' }; if (recast) flow.resources.add(source.ownerPlayerId, 'actionPoints', -1); if (!flow.effects.displace([{ pieceId: source.instanceId, x: pos.x, y: pos.y }], 'teleport').success) return { success: true, message: '位移被阻挡，本次位移效果取消' }; if (recast) { removeStatusEffectById(source.instanceId, recast.id); } else { (source.statusTags || []).slice().forEach(function(tag) { if (tag.type === 'max-phase-recast' && Number(tag.turnNumber) !== Number(battleState.turn.turnNumber)) removeStatusEffectById(source.instanceId, tag.id); }); addStatusEffectById(source.instanceId, { id: 'max-phase-recast-' + source.instanceId, type: 'max-phase-recast', name: '相位偏移器·再次释放', visible: false, turnNumber: battleState.turn.turnNumber, currentDuration: 1, currentUses: 1, relatedRules: ['rule-max-phase-recast-expire'] }); addRuleById(source.instanceId, 'rule-max-phase-recast-expire'); } flow.skills.resetCooldown(source.instanceId, ['max-phase-shifter']); if (recast) { var skillState = (source.skills || []).find(function(item) { return item.skillId === 'max-phase-shifter'; }); if (skillState) skillState.currentCooldown = 3; } return { success: true, message: source.name + '相位偏移至(' + pos.x + ',' + pos.y + ')' + (recast ? '，消耗1行动点完成再次释放' : '，本回合可消耗1行动点再次释放') }; }"
+  "code": "function executeSkill(context) { var __rvb_import_effect_1, __rvb_import_operand_0, battleState, dx, dy, occupied, player, pos, recast, skillState, source, tile; var _pc = \"n37\"; for (var _step = 0; _step <= 34; _step++) { switch (_pc) { case \"n37\": source = (context)[\"piece\"]; _pc = \"n36\"; break; case \"n36\": battleState = (context)[\"battle\"]; _pc = \"n35\"; break; case \"n35\": player = ((battleState)[\"players\"])[\"find\"](function (item) { return ((item)[\"playerId\"] === (source)[\"ownerPlayerId\"]); }); _pc = \"n34\"; break; case \"n34\": recast = (((source)[\"statusTags\"] || []))[\"find\"](function (tag) { return (((tag)[\"type\"] === \"max-phase-recast\") && (Number((tag)[\"turnNumber\"]) === Number(((battleState)[\"turn\"])[\"turnNumber\"]))); }); _pc = \"n33\"; break; case \"n33\": _pc = (! (! (recast && ((! player) || (Number(((player)[\"actionPoints\"] || 0)) < 1))))) ? \"n32\" : \"n31\"; break; case \"n31\": pos = selectTarget({type: \"grid\", range: 2, filter: \"all\"}); _pc = \"n30\"; break; case \"n30\": _pc = (! (! ((! pos) || (pos)[\"needsTargetSelection\"]))) ? \"n29\" : \"n28\"; break; case \"n28\": dx = ((pos)[\"x\"] - (source)[\"x\"]); _pc = \"n27\"; break; case \"n27\": dy = ((pos)[\"y\"] - (source)[\"y\"]); _pc = \"n26\"; break; case \"n26\": _pc = (! (! (((dx !== 0) && (dy !== 0)) || ((dx === 0) && (dy === 0))))) ? \"n25\" : \"n24\"; break; case \"n24\": tile = (((battleState)[\"map\"])[\"tiles\"])[\"find\"](function (item) { return (((item)[\"x\"] === (pos)[\"x\"]) && ((item)[\"y\"] === (pos)[\"y\"])); }); _pc = \"n23\"; break; case \"n23\": occupied = ((battleState)[\"pieces\"])[\"some\"](function (piece) { return (((((piece)[\"currentHp\"] > 0) && ((piece)[\"instanceId\"] !== (source)[\"instanceId\"])) && ((piece)[\"x\"] === (pos)[\"x\"])) && ((piece)[\"y\"] === (pos)[\"y\"])); }); _pc = \"n22\"; break; case \"n22\": _pc = (! (! ((((! tile) || (! (tile)[\"props\"])) || (! ((tile)[\"props\"])[\"walkable\"])) || occupied))) ? \"n21\" : \"n20\"; break; case \"n20\": _pc = (! (! recast)) ? \"n19\" : \"n18\"; break; case \"n19\": flow.resources.add((source)[\"ownerPlayerId\"], \"actionPoints\", (- 1)); _pc = \"n18\"; break; case \"n18\": __rvb_import_effect_1 = flow.effects.displace([{pieceId: (source)[\"instanceId\"], x: (pos)[\"x\"], y: (pos)[\"y\"]}], \"teleport\"); _pc = \"n17\"; break; case \"n17\": _pc = (! (! (! (__rvb_import_effect_1)[\"success\"]))) ? \"n16\" : \"n15\"; break; case \"n15\": _pc = (! (! recast)) ? \"n7\" : \"n14\"; break; case \"n14\": __rvb_import_operand_0 = (((source)[\"statusTags\"] || []))[\"slice\"](); _pc = \"n10\"; break; case \"n10\": (__rvb_import_operand_0)[\"forEach\"](function (tag) { { var __rvb_content_graph_region_pc_0 = \"n13\"; while (__rvb_content_graph_region_pc_0 !== \"n11\") { switch (__rvb_content_graph_region_pc_0) { case \"n13\": __rvb_content_graph_region_pc_0 = (! (! (((tag)[\"type\"] === \"max-phase-recast\") && (Number((tag)[\"turnNumber\"]) !== Number(((battleState)[\"turn\"])[\"turnNumber\"]))))) ? \"n12\" : \"n11\"; break; case \"n12\": removeStatusEffectById((source)[\"instanceId\"], (tag)[\"id\"]); __rvb_content_graph_region_pc_0 = \"n11\"; break; case \"n11\": __rvb_content_graph_region_pc_0 = \"n11\"; break; default: throw new Error(\"invalid content graph region node\"); } } } }); _pc = \"n9\"; break; case \"n9\": addStatusEffectById((source)[\"instanceId\"], {id: (\"max-phase-recast-\" + (source)[\"instanceId\"]), type: \"max-phase-recast\", name: \"相位偏移器·再次释放\", visible: false, turnNumber: ((battleState)[\"turn\"])[\"turnNumber\"], currentDuration: 1, currentUses: 1, relatedRules: [\"rule-max-phase-recast-expire\"]}); _pc = \"n8\"; break; case \"n8\": addRuleById((source)[\"instanceId\"], \"rule-max-phase-recast-expire\"); _pc = \"n6\"; break; case \"n7\": removeStatusEffectById((source)[\"instanceId\"], (recast)[\"id\"]); _pc = \"n6\"; break; case \"n6\": flow.skills.resetCooldown((source)[\"instanceId\"], [\"max-phase-shifter\"]); _pc = \"n5\"; break; case \"n5\": _pc = (! (! recast)) ? \"n4\" : \"n1\"; break; case \"n4\": skillState = (((source)[\"skills\"] || []))[\"find\"](function (item) { return ((item)[\"skillId\"] === \"max-phase-shifter\"); }); _pc = \"n3\"; break; case \"n3\": _pc = (! (! skillState)) ? \"n2\" : \"n1\"; break; case \"n2\": (skillState)[\"currentCooldown\"] = 3; _pc = \"n1\"; break; case \"n1\": return {success: true, message: (((((((source)[\"name\"] + \"相位偏移至(\") + (pos)[\"x\"]) + \",\") + (pos)[\"y\"]) + \")\") + (recast ? \"，消耗1行动点完成再次释放\" : \"，本回合可消耗1行动点再次释放\"))}; case \"n16\": return {success: true, message: \"位移被阻挡，本次位移效果取消\"}; case \"n21\": return {success: false, message: \"请选择合法地格\"}; case \"n25\": return {success: false, message: \"请选择正方向地格\"}; case \"n29\": return pos; case \"n32\": return {success: false, message: \"再次释放相位偏移器需要1行动点\"}; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\"); }",
+  "contentGraph": {
+    "version": "rvb-content-graph/v1",
+    "surface": "skill",
+    "entry": "n37",
+    "nodes": [
+      {
+        "id": "n1",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "binary",
+                  "op": "+",
+                  "left": {
+                    "kind": "binary",
+                    "op": "+",
+                    "left": {
+                      "kind": "binary",
+                      "op": "+",
+                      "left": {
+                        "kind": "binary",
+                        "op": "+",
+                        "left": {
+                          "kind": "binary",
+                          "op": "+",
+                          "left": {
+                            "kind": "get",
+                            "object": {
+                              "kind": "ref",
+                              "name": "source"
+                            },
+                            "key": "name"
+                          },
+                          "right": {
+                            "kind": "literal",
+                            "value": "相位偏移至("
+                          }
+                        },
+                        "right": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "pos"
+                          },
+                          "key": "x"
+                        }
+                      },
+                      "right": {
+                        "kind": "literal",
+                        "value": ","
+                      }
+                    },
+                    "right": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "pos"
+                      },
+                      "key": "y"
+                    }
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": ")"
+                  }
+                },
+                "right": {
+                  "kind": "conditional",
+                  "test": {
+                    "kind": "ref",
+                    "name": "recast"
+                  },
+                  "consequent": {
+                    "kind": "literal",
+                    "value": "，消耗1行动点完成再次释放"
+                  },
+                  "alternate": {
+                    "kind": "literal",
+                    "value": "，本回合可消耗1行动点再次释放"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n2",
+        "kind": "set",
+        "target": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "skillState"
+          },
+          "key": "currentCooldown"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "literal",
+          "value": 3
+        },
+        "next": "n1"
+      },
+      {
+        "id": "n3",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "ref",
+              "name": "skillState"
+            }
+          }
+        },
+        "yes": "n2",
+        "no": "n1"
+      },
+      {
+        "id": "n4",
+        "kind": "bind",
+        "name": "skillState",
+        "expr": {
+          "kind": "collection",
+          "object": {
+            "kind": "binary",
+            "op": "||",
+            "left": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "source"
+              },
+              "key": "skills"
+            },
+            "right": {
+              "kind": "array",
+              "items": []
+            }
+          },
+          "method": "find",
+          "args": [
+            {
+              "kind": "lambda",
+              "parameters": [
+                "item"
+              ],
+              "body": {
+                "kind": "binary",
+                "op": "===",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "item"
+                  },
+                  "key": "skillId"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "max-phase-shifter"
+                }
+              }
+            }
+          ]
+        },
+        "next": "n3"
+      },
+      {
+        "id": "n5",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "ref",
+              "name": "recast"
+            }
+          }
+        },
+        "yes": "n4",
+        "no": "n1"
+      },
+      {
+        "id": "n6",
+        "kind": "call",
+        "capability": "flow.skills.resetCooldown",
+        "args": [
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "source"
+            },
+            "key": "instanceId"
+          },
+          {
+            "kind": "array",
+            "items": [
+              {
+                "kind": "literal",
+                "value": "max-phase-shifter"
+              }
+            ]
+          }
+        ],
+        "next": "n5"
+      },
+      {
+        "id": "n7",
+        "kind": "call",
+        "capability": "removeStatusEffectById",
+        "args": [
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "source"
+            },
+            "key": "instanceId"
+          },
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "recast"
+            },
+            "key": "id"
+          }
+        ],
+        "next": "n6"
+      },
+      {
+        "id": "n8",
+        "kind": "call",
+        "capability": "addRuleById",
+        "args": [
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "source"
+            },
+            "key": "instanceId"
+          },
+          {
+            "kind": "literal",
+            "value": "rule-max-phase-recast-expire"
+          }
+        ],
+        "next": "n6"
+      },
+      {
+        "id": "n9",
+        "kind": "call",
+        "capability": "addStatusEffectById",
+        "args": [
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "source"
+            },
+            "key": "instanceId"
+          },
+          {
+            "kind": "object",
+            "entries": [
+              {
+                "key": "id",
+                "value": {
+                  "kind": "binary",
+                  "op": "+",
+                  "left": {
+                    "kind": "literal",
+                    "value": "max-phase-recast-"
+                  },
+                  "right": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "source"
+                    },
+                    "key": "instanceId"
+                  }
+                }
+              },
+              {
+                "key": "type",
+                "value": {
+                  "kind": "literal",
+                  "value": "max-phase-recast"
+                }
+              },
+              {
+                "key": "name",
+                "value": {
+                  "kind": "literal",
+                  "value": "相位偏移器·再次释放"
+                }
+              },
+              {
+                "key": "visible",
+                "value": {
+                  "kind": "literal",
+                  "value": false
+                }
+              },
+              {
+                "key": "turnNumber",
+                "value": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "battleState"
+                    },
+                    "key": "turn"
+                  },
+                  "key": "turnNumber"
+                }
+              },
+              {
+                "key": "currentDuration",
+                "value": {
+                  "kind": "literal",
+                  "value": 1
+                }
+              },
+              {
+                "key": "currentUses",
+                "value": {
+                  "kind": "literal",
+                  "value": 1
+                }
+              },
+              {
+                "key": "relatedRules",
+                "value": {
+                  "kind": "array",
+                  "items": [
+                    {
+                      "kind": "literal",
+                      "value": "rule-max-phase-recast-expire"
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ],
+        "next": "n8"
+      },
+      {
+        "id": "n10",
+        "kind": "invoke",
+        "target": {
+          "kind": "array",
+          "object": {
+            "kind": "ref",
+            "name": "__rvb_import_operand_0"
+          },
+          "method": "forEach"
+        },
+        "args": [
+          {
+            "kind": "function",
+            "parameters": [
+              "tag"
+            ],
+            "body": {
+              "entry": "n13",
+              "end": "n11",
+              "nodes": [
+                {
+                  "id": "n11",
+                  "kind": "regionEnd"
+                },
+                {
+                  "id": "n12",
+                  "kind": "call",
+                  "capability": "removeStatusEffectById",
+                  "args": [
+                    {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "source"
+                      },
+                      "key": "instanceId"
+                    },
+                    {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "tag"
+                      },
+                      "key": "id"
+                    }
+                  ],
+                  "next": "n11"
+                },
+                {
+                  "id": "n13",
+                  "kind": "branch",
+                  "condition": {
+                    "kind": "unary",
+                    "op": "!",
+                    "argument": {
+                      "kind": "unary",
+                      "op": "!",
+                      "argument": {
+                        "kind": "binary",
+                        "op": "&&",
+                        "left": {
+                          "kind": "binary",
+                          "op": "===",
+                          "left": {
+                            "kind": "get",
+                            "object": {
+                              "kind": "ref",
+                              "name": "tag"
+                            },
+                            "key": "type"
+                          },
+                          "right": {
+                            "kind": "literal",
+                            "value": "max-phase-recast"
+                          }
+                        },
+                        "right": {
+                          "kind": "binary",
+                          "op": "!==",
+                          "left": {
+                            "kind": "call",
+                            "callee": "Number",
+                            "args": [
+                              {
+                                "kind": "get",
+                                "object": {
+                                  "kind": "ref",
+                                  "name": "tag"
+                                },
+                                "key": "turnNumber"
+                              }
+                            ]
+                          },
+                          "right": {
+                            "kind": "call",
+                            "callee": "Number",
+                            "args": [
+                              {
+                                "kind": "get",
+                                "object": {
+                                  "kind": "get",
+                                  "object": {
+                                    "kind": "ref",
+                                    "name": "battleState"
+                                  },
+                                  "key": "turn"
+                                },
+                                "key": "turnNumber"
+                              }
+                            ]
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "yes": "n12",
+                  "no": "n11"
+                }
+              ]
+            }
+          }
+        ],
+        "next": "n9"
+      },
+      {
+        "id": "n14",
+        "kind": "bind",
+        "name": "__rvb_import_operand_0",
+        "expr": {
+          "kind": "collection",
+          "object": {
+            "kind": "binary",
+            "op": "||",
+            "left": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "source"
+              },
+              "key": "statusTags"
+            },
+            "right": {
+              "kind": "array",
+              "items": []
+            }
+          },
+          "method": "slice",
+          "args": []
+        },
+        "next": "n10"
+      },
+      {
+        "id": "n15",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "ref",
+              "name": "recast"
+            }
+          }
+        },
+        "yes": "n7",
+        "no": "n14"
+      },
+      {
+        "id": "n16",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": "位移被阻挡，本次位移效果取消"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n17",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "unary",
+              "op": "!",
+              "argument": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "__rvb_import_effect_1"
+                },
+                "key": "success"
+              }
+            }
+          }
+        },
+        "yes": "n16",
+        "no": "n15"
+      },
+      {
+        "id": "n18",
+        "kind": "call",
+        "capability": "flow.effects.displace",
+        "args": [
+          {
+            "kind": "array",
+            "items": [
+              {
+                "kind": "object",
+                "entries": [
+                  {
+                    "key": "pieceId",
+                    "value": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "source"
+                      },
+                      "key": "instanceId"
+                    }
+                  },
+                  {
+                    "key": "x",
+                    "value": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "pos"
+                      },
+                      "key": "x"
+                    }
+                  },
+                  {
+                    "key": "y",
+                    "value": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "pos"
+                      },
+                      "key": "y"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "kind": "literal",
+            "value": "teleport"
+          }
+        ],
+        "result": "__rvb_import_effect_1",
+        "next": "n17"
+      },
+      {
+        "id": "n19",
+        "kind": "call",
+        "capability": "flow.resources.add",
+        "args": [
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "source"
+            },
+            "key": "ownerPlayerId"
+          },
+          {
+            "kind": "literal",
+            "value": "actionPoints"
+          },
+          {
+            "kind": "unary",
+            "op": "-",
+            "argument": {
+              "kind": "literal",
+              "value": 1
+            }
+          }
+        ],
+        "next": "n18"
+      },
+      {
+        "id": "n20",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "ref",
+              "name": "recast"
+            }
+          }
+        },
+        "yes": "n19",
+        "no": "n18"
+      },
+      {
+        "id": "n21",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": "请选择合法地格"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n22",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "binary",
+                "op": "||",
+                "left": {
+                  "kind": "binary",
+                  "op": "||",
+                  "left": {
+                    "kind": "unary",
+                    "op": "!",
+                    "argument": {
+                      "kind": "ref",
+                      "name": "tile"
+                    }
+                  },
+                  "right": {
+                    "kind": "unary",
+                    "op": "!",
+                    "argument": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "tile"
+                      },
+                      "key": "props"
+                    }
+                  }
+                },
+                "right": {
+                  "kind": "unary",
+                  "op": "!",
+                  "argument": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "tile"
+                      },
+                      "key": "props"
+                    },
+                    "key": "walkable"
+                  }
+                }
+              },
+              "right": {
+                "kind": "ref",
+                "name": "occupied"
+              }
+            }
+          }
+        },
+        "yes": "n21",
+        "no": "n20"
+      },
+      {
+        "id": "n23",
+        "kind": "bind",
+        "name": "occupied",
+        "expr": {
+          "kind": "collection",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "battleState"
+            },
+            "key": "pieces"
+          },
+          "method": "some",
+          "args": [
+            {
+              "kind": "lambda",
+              "parameters": [
+                "piece"
+              ],
+              "body": {
+                "kind": "binary",
+                "op": "&&",
+                "left": {
+                  "kind": "binary",
+                  "op": "&&",
+                  "left": {
+                    "kind": "binary",
+                    "op": "&&",
+                    "left": {
+                      "kind": "binary",
+                      "op": ">",
+                      "left": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "piece"
+                        },
+                        "key": "currentHp"
+                      },
+                      "right": {
+                        "kind": "literal",
+                        "value": 0
+                      }
+                    },
+                    "right": {
+                      "kind": "binary",
+                      "op": "!==",
+                      "left": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "piece"
+                        },
+                        "key": "instanceId"
+                      },
+                      "right": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "source"
+                        },
+                        "key": "instanceId"
+                      }
+                    }
+                  },
+                  "right": {
+                    "kind": "binary",
+                    "op": "===",
+                    "left": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "piece"
+                      },
+                      "key": "x"
+                    },
+                    "right": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "pos"
+                      },
+                      "key": "x"
+                    }
+                  }
+                },
+                "right": {
+                  "kind": "binary",
+                  "op": "===",
+                  "left": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "piece"
+                    },
+                    "key": "y"
+                  },
+                  "right": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "pos"
+                    },
+                    "key": "y"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "next": "n22"
+      },
+      {
+        "id": "n24",
+        "kind": "bind",
+        "name": "tile",
+        "expr": {
+          "kind": "collection",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "battleState"
+              },
+              "key": "map"
+            },
+            "key": "tiles"
+          },
+          "method": "find",
+          "args": [
+            {
+              "kind": "lambda",
+              "parameters": [
+                "item"
+              ],
+              "body": {
+                "kind": "binary",
+                "op": "&&",
+                "left": {
+                  "kind": "binary",
+                  "op": "===",
+                  "left": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "item"
+                    },
+                    "key": "x"
+                  },
+                  "right": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "pos"
+                    },
+                    "key": "x"
+                  }
+                },
+                "right": {
+                  "kind": "binary",
+                  "op": "===",
+                  "left": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "item"
+                    },
+                    "key": "y"
+                  },
+                  "right": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "pos"
+                    },
+                    "key": "y"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "next": "n23"
+      },
+      {
+        "id": "n25",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": "请选择正方向地格"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n26",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "binary",
+                "op": "&&",
+                "left": {
+                  "kind": "binary",
+                  "op": "!==",
+                  "left": {
+                    "kind": "ref",
+                    "name": "dx"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": 0
+                  }
+                },
+                "right": {
+                  "kind": "binary",
+                  "op": "!==",
+                  "left": {
+                    "kind": "ref",
+                    "name": "dy"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": 0
+                  }
+                }
+              },
+              "right": {
+                "kind": "binary",
+                "op": "&&",
+                "left": {
+                  "kind": "binary",
+                  "op": "===",
+                  "left": {
+                    "kind": "ref",
+                    "name": "dx"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": 0
+                  }
+                },
+                "right": {
+                  "kind": "binary",
+                  "op": "===",
+                  "left": {
+                    "kind": "ref",
+                    "name": "dy"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": 0
+                  }
+                }
+              }
+            }
+          }
+        },
+        "yes": "n25",
+        "no": "n24"
+      },
+      {
+        "id": "n27",
+        "kind": "bind",
+        "name": "dy",
+        "expr": {
+          "kind": "binary",
+          "op": "-",
+          "left": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "pos"
+            },
+            "key": "y"
+          },
+          "right": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "source"
+            },
+            "key": "y"
+          }
+        },
+        "next": "n26"
+      },
+      {
+        "id": "n28",
+        "kind": "bind",
+        "name": "dx",
+        "expr": {
+          "kind": "binary",
+          "op": "-",
+          "left": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "pos"
+            },
+            "key": "x"
+          },
+          "right": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "source"
+            },
+            "key": "x"
+          }
+        },
+        "next": "n27"
+      },
+      {
+        "id": "n29",
+        "kind": "return",
+        "value": {
+          "kind": "ref",
+          "name": "pos"
+        }
+      },
+      {
+        "id": "n30",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "ref",
+                  "name": "pos"
+                }
+              },
+              "right": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "pos"
+                },
+                "key": "needsTargetSelection"
+              }
+            }
+          }
+        },
+        "yes": "n29",
+        "no": "n28"
+      },
+      {
+        "id": "n31",
+        "kind": "call",
+        "capability": "selectTarget",
+        "args": [
+          {
+            "kind": "object",
+            "entries": [
+              {
+                "key": "type",
+                "value": {
+                  "kind": "literal",
+                  "value": "grid"
+                }
+              },
+              {
+                "key": "range",
+                "value": {
+                  "kind": "literal",
+                  "value": 2
+                }
+              },
+              {
+                "key": "filter",
+                "value": {
+                  "kind": "literal",
+                  "value": "all"
+                }
+              }
+            ]
+          }
+        ],
+        "result": "pos",
+        "next": "n30"
+      },
+      {
+        "id": "n32",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": "再次释放相位偏移器需要1行动点"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n33",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "&&",
+              "left": {
+                "kind": "ref",
+                "name": "recast"
+              },
+              "right": {
+                "kind": "binary",
+                "op": "||",
+                "left": {
+                  "kind": "unary",
+                  "op": "!",
+                  "argument": {
+                    "kind": "ref",
+                    "name": "player"
+                  }
+                },
+                "right": {
+                  "kind": "binary",
+                  "op": "<",
+                  "left": {
+                    "kind": "call",
+                    "callee": "Number",
+                    "args": [
+                      {
+                        "kind": "binary",
+                        "op": "||",
+                        "left": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "player"
+                          },
+                          "key": "actionPoints"
+                        },
+                        "right": {
+                          "kind": "literal",
+                          "value": 0
+                        }
+                      }
+                    ]
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": 1
+                  }
+                }
+              }
+            }
+          }
+        },
+        "yes": "n32",
+        "no": "n31"
+      },
+      {
+        "id": "n34",
+        "kind": "bind",
+        "name": "recast",
+        "expr": {
+          "kind": "collection",
+          "object": {
+            "kind": "binary",
+            "op": "||",
+            "left": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "source"
+              },
+              "key": "statusTags"
+            },
+            "right": {
+              "kind": "array",
+              "items": []
+            }
+          },
+          "method": "find",
+          "args": [
+            {
+              "kind": "lambda",
+              "parameters": [
+                "tag"
+              ],
+              "body": {
+                "kind": "binary",
+                "op": "&&",
+                "left": {
+                  "kind": "binary",
+                  "op": "===",
+                  "left": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "tag"
+                    },
+                    "key": "type"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": "max-phase-recast"
+                  }
+                },
+                "right": {
+                  "kind": "binary",
+                  "op": "===",
+                  "left": {
+                    "kind": "call",
+                    "callee": "Number",
+                    "args": [
+                      {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "tag"
+                        },
+                        "key": "turnNumber"
+                      }
+                    ]
+                  },
+                  "right": {
+                    "kind": "call",
+                    "callee": "Number",
+                    "args": [
+                      {
+                        "kind": "get",
+                        "object": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "battleState"
+                          },
+                          "key": "turn"
+                        },
+                        "key": "turnNumber"
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "next": "n33"
+      },
+      {
+        "id": "n35",
+        "kind": "bind",
+        "name": "player",
+        "expr": {
+          "kind": "collection",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "battleState"
+            },
+            "key": "players"
+          },
+          "method": "find",
+          "args": [
+            {
+              "kind": "lambda",
+              "parameters": [
+                "item"
+              ],
+              "body": {
+                "kind": "binary",
+                "op": "===",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "item"
+                  },
+                  "key": "playerId"
+                },
+                "right": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "source"
+                  },
+                  "key": "ownerPlayerId"
+                }
+              }
+            }
+          ]
+        },
+        "next": "n34"
+      },
+      {
+        "id": "n36",
+        "kind": "bind",
+        "name": "battleState",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "context"
+          },
+          "key": "battle"
+        },
+        "next": "n35"
+      },
+      {
+        "id": "n37",
+        "kind": "bind",
+        "name": "source",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "context"
+          },
+          "key": "piece"
+        },
+        "next": "n36"
+      }
+    ]
+  },
+  "contentGraphField": "code",
+  "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1"
 }

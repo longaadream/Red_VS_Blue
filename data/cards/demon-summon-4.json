@@ -15,6 +15,319 @@
   "actionPointCost": 2,
   "cardType": "fel",
   "icon": "🔭",
-  "code": "function executeCard(context) { var battle = context.battle; var playerId = context.playerId; var target = selectTarget({ type: 'piece', filter: 'ally', range: 99 }); if (!target || target.needsTargetSelection) return target || { needsTargetSelection: true, targetType: 'piece', range: 99, filter: 'ally' }; var ritual4 = { kind: 'player', instanceId: 'demon-ritual', name: '恶魔仪式', ownerPlayerId: playerId, attack: 0, defense: 0 }; dealDamage(ritual4, target, 5, 'true', battle, 'demon-summon-4'); target.attack += 1; addCardToHand('demon-summon-5', playerId); return { success: true, message: '恶魔仪式第四印记：' + target.name + '承受5点真实伤害，攻击力+1，【恶魔召唤（5）】已加入手牌' }; }",
-  "image": "summon-demon.jpg"
+  "code": "function executeCard(context) { var battle, playerId, ritual4, target; var _pc = \"n10\"; for (var _step = 0; _step <= 10; _step++) { switch (_pc) { case \"n10\": battle = (context)[\"battle\"]; _pc = \"n9\"; break; case \"n9\": playerId = (context)[\"playerId\"]; _pc = \"n8\"; break; case \"n8\": target = selectTarget({type: \"piece\", filter: \"ally\", range: 99}); _pc = \"n7\"; break; case \"n7\": _pc = (! (! ((! target) || (target)[\"needsTargetSelection\"]))) ? \"n6\" : \"n5\"; break; case \"n5\": ritual4 = {kind: \"player\", instanceId: \"demon-ritual\", name: \"恶魔仪式\", ownerPlayerId: playerId, attack: 0, defense: 0}; _pc = \"n4\"; break; case \"n4\": dealDamage(ritual4, target, 5, \"true\", battle, \"demon-summon-4\"); _pc = \"n3\"; break; case \"n3\": (target)[\"attack\"] += 1; _pc = \"n2\"; break; case \"n2\": addCardToHand(\"demon-summon-5\", playerId); _pc = \"n1\"; break; case \"n1\": return {success: true, message: ((\"恶魔仪式第四印记：\" + (target)[\"name\"]) + \"承受5点真实伤害，攻击力+1，【恶魔召唤（5）】已加入手牌\")}; case \"n6\": return (target || {needsTargetSelection: true, targetType: \"piece\", range: 99, filter: \"ally\"}); default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\"); }",
+  "image": "summon-demon.jpg",
+  "contentGraph": {
+    "version": "rvb-content-graph/v1",
+    "surface": "card",
+    "entry": "n10",
+    "nodes": [
+      {
+        "id": "n1",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "binary",
+                  "op": "+",
+                  "left": {
+                    "kind": "literal",
+                    "value": "恶魔仪式第四印记："
+                  },
+                  "right": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "target"
+                    },
+                    "key": "name"
+                  }
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "承受5点真实伤害，攻击力+1，【恶魔召唤（5）】已加入手牌"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n2",
+        "kind": "call",
+        "capability": "addCardToHand",
+        "args": [
+          {
+            "kind": "literal",
+            "value": "demon-summon-5"
+          },
+          {
+            "kind": "ref",
+            "name": "playerId"
+          }
+        ],
+        "next": "n1"
+      },
+      {
+        "id": "n3",
+        "kind": "set",
+        "target": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "target"
+          },
+          "key": "attack"
+        },
+        "operator": "+=",
+        "value": {
+          "kind": "literal",
+          "value": 1
+        },
+        "next": "n2"
+      },
+      {
+        "id": "n4",
+        "kind": "call",
+        "capability": "dealDamage",
+        "args": [
+          {
+            "kind": "ref",
+            "name": "ritual4"
+          },
+          {
+            "kind": "ref",
+            "name": "target"
+          },
+          {
+            "kind": "literal",
+            "value": 5
+          },
+          {
+            "kind": "literal",
+            "value": "true"
+          },
+          {
+            "kind": "ref",
+            "name": "battle"
+          },
+          {
+            "kind": "literal",
+            "value": "demon-summon-4"
+          }
+        ],
+        "next": "n3"
+      },
+      {
+        "id": "n5",
+        "kind": "bind",
+        "name": "ritual4",
+        "expr": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "kind",
+              "value": {
+                "kind": "literal",
+                "value": "player"
+              }
+            },
+            {
+              "key": "instanceId",
+              "value": {
+                "kind": "literal",
+                "value": "demon-ritual"
+              }
+            },
+            {
+              "key": "name",
+              "value": {
+                "kind": "literal",
+                "value": "恶魔仪式"
+              }
+            },
+            {
+              "key": "ownerPlayerId",
+              "value": {
+                "kind": "ref",
+                "name": "playerId"
+              }
+            },
+            {
+              "key": "attack",
+              "value": {
+                "kind": "literal",
+                "value": 0
+              }
+            },
+            {
+              "key": "defense",
+              "value": {
+                "kind": "literal",
+                "value": 0
+              }
+            }
+          ]
+        },
+        "next": "n4"
+      },
+      {
+        "id": "n6",
+        "kind": "return",
+        "value": {
+          "kind": "binary",
+          "op": "||",
+          "left": {
+            "kind": "ref",
+            "name": "target"
+          },
+          "right": {
+            "kind": "object",
+            "entries": [
+              {
+                "key": "needsTargetSelection",
+                "value": {
+                  "kind": "literal",
+                  "value": true
+                }
+              },
+              {
+                "key": "targetType",
+                "value": {
+                  "kind": "literal",
+                  "value": "piece"
+                }
+              },
+              {
+                "key": "range",
+                "value": {
+                  "kind": "literal",
+                  "value": 99
+                }
+              },
+              {
+                "key": "filter",
+                "value": {
+                  "kind": "literal",
+                  "value": "ally"
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "n7",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "ref",
+                  "name": "target"
+                }
+              },
+              "right": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "target"
+                },
+                "key": "needsTargetSelection"
+              }
+            }
+          }
+        },
+        "yes": "n6",
+        "no": "n5"
+      },
+      {
+        "id": "n8",
+        "kind": "call",
+        "capability": "selectTarget",
+        "args": [
+          {
+            "kind": "object",
+            "entries": [
+              {
+                "key": "type",
+                "value": {
+                  "kind": "literal",
+                  "value": "piece"
+                }
+              },
+              {
+                "key": "filter",
+                "value": {
+                  "kind": "literal",
+                  "value": "ally"
+                }
+              },
+              {
+                "key": "range",
+                "value": {
+                  "kind": "literal",
+                  "value": 99
+                }
+              }
+            ]
+          }
+        ],
+        "result": "target",
+        "next": "n7"
+      },
+      {
+        "id": "n9",
+        "kind": "bind",
+        "name": "playerId",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "context"
+          },
+          "key": "playerId"
+        },
+        "next": "n8"
+      },
+      {
+        "id": "n10",
+        "kind": "bind",
+        "name": "battle",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "context"
+          },
+          "key": "battle"
+        },
+        "next": "n9"
+      }
+    ]
+  },
+  "contentGraphField": "code",
+  "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1"
 }

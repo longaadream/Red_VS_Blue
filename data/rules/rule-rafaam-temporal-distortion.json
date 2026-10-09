@@ -5,5 +5,739 @@
   "trigger": {
     "type": "endTurn"
   },
-  "skillCode": "var playerId = context.playerId; if (battle.turn.currentPlayerId !== playerId) return { success: false, message: '' }; var player = battle.players.find(function(item) { return item.playerId === playerId; }); if (!player || !player.statusTags) return { success: false, message: '' }; var records = player.statusTags.filter(function(tag) { return tag.type === 'rafaam-temporal-distortion'; }); if (!records.length) { removePlayerRuleById(playerId, 'rule-rafaam-temporal-distortion'); return { success: false, message: '' }; } var allPieces = battle.pieces.concat(battle.graveyard || []); var returned = 0; records.forEach(function(record) { var amount = Math.max(0, record.intensity || 0); var target = allPieces.find(function(piece) { return piece.instanceId === record.targetId; }); var rafaam = allPieces.find(function(piece) { return piece.instanceId === record.sourceId; }); if (target) target.attack = (target.attack || 0) + amount; if (rafaam) rafaam.attack = Math.max(0, (rafaam.attack || 0) - amount); returned += amount; }); player.statusTags = player.statusTags.filter(function(tag) { return tag.type !== 'rafaam-temporal-distortion'; }); removePlayerRuleById(playerId, 'rule-rafaam-temporal-distortion'); return { success: true, message: '时空扭曲归还了' + returned + '点攻击力' };"
+  "skillCode": "var __rvb_import_operand_0, allPieces, player, playerId, records, returned; var _pc = \"n26\"; for (var _step = 0; _step <= 17; _step++) { switch (_pc) { case \"n26\": playerId = (context)[\"playerId\"]; _pc = \"n25\"; break; case \"n25\": _pc = (! (! (((battle)[\"turn\"])[\"currentPlayerId\"] !== playerId))) ? \"n24\" : \"n23\"; break; case \"n23\": player = ((battle)[\"players\"])[\"find\"](function (item) { return ((item)[\"playerId\"] === playerId); }); _pc = \"n22\"; break; case \"n22\": _pc = (! (! ((! player) || (! (player)[\"statusTags\"])))) ? \"n21\" : \"n20\"; break; case \"n20\": records = ((player)[\"statusTags\"])[\"filter\"](function (tag) { return ((tag)[\"type\"] === \"rafaam-temporal-distortion\"); }); _pc = \"n19\"; break; case \"n19\": _pc = (! (! (! (records)[\"length\"]))) ? \"n18\" : \"n16\"; break; case \"n16\": allPieces = ((battle)[\"pieces\"])[\"concat\"](((battle)[\"graveyard\"] || [])); _pc = \"n15\"; break; case \"n15\": returned = 0; _pc = \"n14\"; break; case \"n14\": __rvb_import_operand_0 = records; _pc = \"n4\"; break; case \"n4\": (__rvb_import_operand_0)[\"forEach\"](function (record) { var amount, rafaam, target; { var __rvb_content_graph_region_pc_0 = \"n13\"; while (__rvb_content_graph_region_pc_0 !== \"n5\") { switch (__rvb_content_graph_region_pc_0) { case \"n13\": amount = Math.max(0, ((record)[\"intensity\"] || 0)); __rvb_content_graph_region_pc_0 = \"n12\"; break; case \"n12\": target = (allPieces)[\"find\"](function (piece) { return ((piece)[\"instanceId\"] === (record)[\"targetId\"]); }); __rvb_content_graph_region_pc_0 = \"n11\"; break; case \"n11\": rafaam = (allPieces)[\"find\"](function (piece) { return ((piece)[\"instanceId\"] === (record)[\"sourceId\"]); }); __rvb_content_graph_region_pc_0 = \"n10\"; break; case \"n10\": __rvb_content_graph_region_pc_0 = (! (! target)) ? \"n9\" : \"n8\"; break; case \"n9\": (target)[\"attack\"] = (((target)[\"attack\"] || 0) + amount); __rvb_content_graph_region_pc_0 = \"n8\"; break; case \"n8\": __rvb_content_graph_region_pc_0 = (! (! rafaam)) ? \"n7\" : \"n6\"; break; case \"n7\": (rafaam)[\"attack\"] = Math.max(0, (((rafaam)[\"attack\"] || 0) - amount)); __rvb_content_graph_region_pc_0 = \"n6\"; break; case \"n6\": returned += amount; __rvb_content_graph_region_pc_0 = \"n5\"; break; case \"n5\": __rvb_content_graph_region_pc_0 = \"n5\"; break; default: throw new Error(\"invalid content graph region node\"); } } } }); _pc = \"n3\"; break; case \"n3\": (player)[\"statusTags\"] = ((player)[\"statusTags\"])[\"filter\"](function (tag) { return ((tag)[\"type\"] !== \"rafaam-temporal-distortion\"); }); _pc = \"n2\"; break; case \"n2\": removePlayerRuleById(playerId, \"rule-rafaam-temporal-distortion\"); _pc = \"n1\"; break; case \"n1\": return {success: true, message: ((\"时空扭曲归还了\" + returned) + \"点攻击力\")}; case \"n18\": removePlayerRuleById(playerId, \"rule-rafaam-temporal-distortion\"); _pc = \"n17\"; break; case \"n17\": return {success: false, message: \"\"}; case \"n21\": return {success: false, message: \"\"}; case \"n24\": return {success: false, message: \"\"}; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\");",
+  "contentGraph": {
+    "version": "rvb-content-graph/v1",
+    "surface": "rule",
+    "entry": "n26",
+    "nodes": [
+      {
+        "id": "n1",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "binary",
+                  "op": "+",
+                  "left": {
+                    "kind": "literal",
+                    "value": "时空扭曲归还了"
+                  },
+                  "right": {
+                    "kind": "ref",
+                    "name": "returned"
+                  }
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "点攻击力"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n2",
+        "kind": "call",
+        "capability": "removePlayerRuleById",
+        "args": [
+          {
+            "kind": "ref",
+            "name": "playerId"
+          },
+          {
+            "kind": "literal",
+            "value": "rule-rafaam-temporal-distortion"
+          }
+        ],
+        "next": "n1"
+      },
+      {
+        "id": "n3",
+        "kind": "set",
+        "target": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "player"
+          },
+          "key": "statusTags"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "collection",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "player"
+            },
+            "key": "statusTags"
+          },
+          "method": "filter",
+          "args": [
+            {
+              "kind": "lambda",
+              "parameters": [
+                "tag"
+              ],
+              "body": {
+                "kind": "binary",
+                "op": "!==",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "tag"
+                  },
+                  "key": "type"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "rafaam-temporal-distortion"
+                }
+              }
+            }
+          ]
+        },
+        "next": "n2"
+      },
+      {
+        "id": "n4",
+        "kind": "invoke",
+        "target": {
+          "kind": "array",
+          "object": {
+            "kind": "ref",
+            "name": "__rvb_import_operand_0"
+          },
+          "method": "forEach"
+        },
+        "args": [
+          {
+            "kind": "function",
+            "parameters": [
+              "record"
+            ],
+            "body": {
+              "entry": "n13",
+              "end": "n5",
+              "nodes": [
+                {
+                  "id": "n5",
+                  "kind": "regionEnd"
+                },
+                {
+                  "id": "n6",
+                  "kind": "set",
+                  "target": {
+                    "kind": "ref",
+                    "name": "returned"
+                  },
+                  "operator": "+=",
+                  "value": {
+                    "kind": "ref",
+                    "name": "amount"
+                  },
+                  "next": "n5"
+                },
+                {
+                  "id": "n7",
+                  "kind": "set",
+                  "target": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "rafaam"
+                    },
+                    "key": "attack"
+                  },
+                  "operator": "=",
+                  "value": {
+                    "kind": "call",
+                    "callee": "Math.max",
+                    "args": [
+                      {
+                        "kind": "literal",
+                        "value": 0
+                      },
+                      {
+                        "kind": "binary",
+                        "op": "-",
+                        "left": {
+                          "kind": "binary",
+                          "op": "||",
+                          "left": {
+                            "kind": "get",
+                            "object": {
+                              "kind": "ref",
+                              "name": "rafaam"
+                            },
+                            "key": "attack"
+                          },
+                          "right": {
+                            "kind": "literal",
+                            "value": 0
+                          }
+                        },
+                        "right": {
+                          "kind": "ref",
+                          "name": "amount"
+                        }
+                      }
+                    ]
+                  },
+                  "next": "n6"
+                },
+                {
+                  "id": "n8",
+                  "kind": "branch",
+                  "condition": {
+                    "kind": "unary",
+                    "op": "!",
+                    "argument": {
+                      "kind": "unary",
+                      "op": "!",
+                      "argument": {
+                        "kind": "ref",
+                        "name": "rafaam"
+                      }
+                    }
+                  },
+                  "yes": "n7",
+                  "no": "n6"
+                },
+                {
+                  "id": "n9",
+                  "kind": "set",
+                  "target": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "target"
+                    },
+                    "key": "attack"
+                  },
+                  "operator": "=",
+                  "value": {
+                    "kind": "binary",
+                    "op": "+",
+                    "left": {
+                      "kind": "binary",
+                      "op": "||",
+                      "left": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "target"
+                        },
+                        "key": "attack"
+                      },
+                      "right": {
+                        "kind": "literal",
+                        "value": 0
+                      }
+                    },
+                    "right": {
+                      "kind": "ref",
+                      "name": "amount"
+                    }
+                  },
+                  "next": "n8"
+                },
+                {
+                  "id": "n10",
+                  "kind": "branch",
+                  "condition": {
+                    "kind": "unary",
+                    "op": "!",
+                    "argument": {
+                      "kind": "unary",
+                      "op": "!",
+                      "argument": {
+                        "kind": "ref",
+                        "name": "target"
+                      }
+                    }
+                  },
+                  "yes": "n9",
+                  "no": "n8"
+                },
+                {
+                  "id": "n11",
+                  "kind": "bind",
+                  "name": "rafaam",
+                  "expr": {
+                    "kind": "collection",
+                    "object": {
+                      "kind": "ref",
+                      "name": "allPieces"
+                    },
+                    "method": "find",
+                    "args": [
+                      {
+                        "kind": "lambda",
+                        "parameters": [
+                          "piece"
+                        ],
+                        "body": {
+                          "kind": "binary",
+                          "op": "===",
+                          "left": {
+                            "kind": "get",
+                            "object": {
+                              "kind": "ref",
+                              "name": "piece"
+                            },
+                            "key": "instanceId"
+                          },
+                          "right": {
+                            "kind": "get",
+                            "object": {
+                              "kind": "ref",
+                              "name": "record"
+                            },
+                            "key": "sourceId"
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  "next": "n10"
+                },
+                {
+                  "id": "n12",
+                  "kind": "bind",
+                  "name": "target",
+                  "expr": {
+                    "kind": "collection",
+                    "object": {
+                      "kind": "ref",
+                      "name": "allPieces"
+                    },
+                    "method": "find",
+                    "args": [
+                      {
+                        "kind": "lambda",
+                        "parameters": [
+                          "piece"
+                        ],
+                        "body": {
+                          "kind": "binary",
+                          "op": "===",
+                          "left": {
+                            "kind": "get",
+                            "object": {
+                              "kind": "ref",
+                              "name": "piece"
+                            },
+                            "key": "instanceId"
+                          },
+                          "right": {
+                            "kind": "get",
+                            "object": {
+                              "kind": "ref",
+                              "name": "record"
+                            },
+                            "key": "targetId"
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  "next": "n11"
+                },
+                {
+                  "id": "n13",
+                  "kind": "bind",
+                  "name": "amount",
+                  "expr": {
+                    "kind": "call",
+                    "callee": "Math.max",
+                    "args": [
+                      {
+                        "kind": "literal",
+                        "value": 0
+                      },
+                      {
+                        "kind": "binary",
+                        "op": "||",
+                        "left": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "record"
+                          },
+                          "key": "intensity"
+                        },
+                        "right": {
+                          "kind": "literal",
+                          "value": 0
+                        }
+                      }
+                    ]
+                  },
+                  "next": "n12"
+                }
+              ]
+            }
+          }
+        ],
+        "next": "n3"
+      },
+      {
+        "id": "n14",
+        "kind": "bind",
+        "name": "__rvb_import_operand_0",
+        "expr": {
+          "kind": "ref",
+          "name": "records"
+        },
+        "next": "n4"
+      },
+      {
+        "id": "n15",
+        "kind": "bind",
+        "name": "returned",
+        "expr": {
+          "kind": "literal",
+          "value": 0
+        },
+        "next": "n14"
+      },
+      {
+        "id": "n16",
+        "kind": "bind",
+        "name": "allPieces",
+        "expr": {
+          "kind": "collection",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "battle"
+            },
+            "key": "pieces"
+          },
+          "method": "concat",
+          "args": [
+            {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "battle"
+                },
+                "key": "graveyard"
+              },
+              "right": {
+                "kind": "array",
+                "items": []
+              }
+            }
+          ]
+        },
+        "next": "n15"
+      },
+      {
+        "id": "n17",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n18",
+        "kind": "call",
+        "capability": "removePlayerRuleById",
+        "args": [
+          {
+            "kind": "ref",
+            "name": "playerId"
+          },
+          {
+            "kind": "literal",
+            "value": "rule-rafaam-temporal-distortion"
+          }
+        ],
+        "next": "n17"
+      },
+      {
+        "id": "n19",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "unary",
+              "op": "!",
+              "argument": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "records"
+                },
+                "key": "length"
+              }
+            }
+          }
+        },
+        "yes": "n18",
+        "no": "n16"
+      },
+      {
+        "id": "n20",
+        "kind": "bind",
+        "name": "records",
+        "expr": {
+          "kind": "collection",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "player"
+            },
+            "key": "statusTags"
+          },
+          "method": "filter",
+          "args": [
+            {
+              "kind": "lambda",
+              "parameters": [
+                "tag"
+              ],
+              "body": {
+                "kind": "binary",
+                "op": "===",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "tag"
+                  },
+                  "key": "type"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "rafaam-temporal-distortion"
+                }
+              }
+            }
+          ]
+        },
+        "next": "n19"
+      },
+      {
+        "id": "n21",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n22",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "ref",
+                  "name": "player"
+                }
+              },
+              "right": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "player"
+                  },
+                  "key": "statusTags"
+                }
+              }
+            }
+          }
+        },
+        "yes": "n21",
+        "no": "n20"
+      },
+      {
+        "id": "n23",
+        "kind": "bind",
+        "name": "player",
+        "expr": {
+          "kind": "collection",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "battle"
+            },
+            "key": "players"
+          },
+          "method": "find",
+          "args": [
+            {
+              "kind": "lambda",
+              "parameters": [
+                "item"
+              ],
+              "body": {
+                "kind": "binary",
+                "op": "===",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "item"
+                  },
+                  "key": "playerId"
+                },
+                "right": {
+                  "kind": "ref",
+                  "name": "playerId"
+                }
+              }
+            }
+          ]
+        },
+        "next": "n22"
+      },
+      {
+        "id": "n24",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n25",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "!==",
+              "left": {
+                "kind": "get",
+                "object": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "battle"
+                  },
+                  "key": "turn"
+                },
+                "key": "currentPlayerId"
+              },
+              "right": {
+                "kind": "ref",
+                "name": "playerId"
+              }
+            }
+          }
+        },
+        "yes": "n24",
+        "no": "n23"
+      },
+      {
+        "id": "n26",
+        "kind": "bind",
+        "name": "playerId",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "context"
+          },
+          "key": "playerId"
+        },
+        "next": "n25"
+      }
+    ]
+  },
+  "contentGraphField": "skillCode",
+  "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1"
 }

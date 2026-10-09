@@ -11,12 +11,552 @@
   "actionPointCost": 1,
   "cooldownTurns": 3,
   "range": "area",
-  "code": "function executeSkill(context){var c=context.piece;var es=battle.pieces.filter(function(p){return p.currentHp>0&&!arePlayersAllied(battle,p.ownerPlayerId,c.ownerPlayerId)&&Math.abs(p.x-c.x)+Math.abs(p.y-c.y)<=2});es.forEach(function(p){addStatusEffectById(p.instanceId,{id:'freeze-'+Date.now()+'-'+p.instanceId,type:'freeze',name:'冰冻',visible:true,currentDuration:1,intensity:1,relatedRules:['rule-freeze-prevent-move','rule-freeze-prevent-skill']});addRuleById(p.instanceId,'rule-freeze-prevent-move');addRuleById(p.instanceId,'rule-freeze-prevent-skill');addSkillById(p.instanceId,'freeze-prevent');});return{success:true,message:c.name+'使周围敌人冰冻'};}",
+  "code": "function executeSkill(context) { var __rvb_import_operand_13, c, es; var _pc = \"n23\"; for (var _step = 0; _step <= 5; _step++) { switch (_pc) { case \"n23\": c = (context)[\"piece\"]; _pc = \"n22\"; break; case \"n22\": es = ((battle)[\"pieces\"])[\"filter\"](function (p) { return ((((p)[\"currentHp\"] > 0) && (! arePlayersAllied(battle, (p)[\"ownerPlayerId\"], (c)[\"ownerPlayerId\"]))) && ((Math.abs(((p)[\"x\"] - (c)[\"x\"])) + Math.abs(((p)[\"y\"] - (c)[\"y\"]))) <= 2)); }); _pc = \"n21\"; break; case \"n21\": __rvb_import_operand_13 = es; _pc = \"n2\"; break; case \"n2\": (__rvb_import_operand_13)[\"forEach\"](function (p) { var __rvb_import_effect_8, __rvb_import_operand_0, __rvb_import_operand_1, __rvb_import_operand_10, __rvb_import_operand_11, __rvb_import_operand_12, __rvb_import_operand_2, __rvb_import_operand_3, __rvb_import_operand_4, __rvb_import_operand_5, __rvb_import_operand_6, __rvb_import_operand_7, __rvb_import_operand_9; { var __rvb_content_graph_region_pc_0 = \"n20\"; while (__rvb_content_graph_region_pc_0 !== \"n3\") { switch (__rvb_content_graph_region_pc_0) { case \"n20\": __rvb_import_operand_12 = (p)[\"instanceId\"]; __rvb_content_graph_region_pc_0 = \"n15\"; break; case \"n15\": __rvb_import_operand_7 = \"freeze-\"; __rvb_content_graph_region_pc_0 = \"n19\"; break; case \"n19\": __rvb_import_effect_8 = Date.now(); __rvb_content_graph_region_pc_0 = \"n16\"; break; case \"n16\": __rvb_import_operand_9 = (__rvb_import_operand_7 + __rvb_import_effect_8); __rvb_content_graph_region_pc_0 = \"n17\"; break; case \"n17\": __rvb_import_operand_10 = (__rvb_import_operand_9 + \"-\"); __rvb_content_graph_region_pc_0 = \"n18\"; break; case \"n18\": __rvb_import_operand_11 = (__rvb_import_operand_10 + (p)[\"instanceId\"]); __rvb_content_graph_region_pc_0 = \"n14\"; break; case \"n14\": __rvb_import_operand_6 = \"freeze\"; __rvb_content_graph_region_pc_0 = \"n13\"; break; case \"n13\": __rvb_import_operand_5 = \"冰冻\"; __rvb_content_graph_region_pc_0 = \"n12\"; break; case \"n12\": __rvb_import_operand_4 = true; __rvb_content_graph_region_pc_0 = \"n11\"; break; case \"n11\": __rvb_import_operand_3 = 1; __rvb_content_graph_region_pc_0 = \"n10\"; break; case \"n10\": __rvb_import_operand_2 = 1; __rvb_content_graph_region_pc_0 = \"n9\"; break; case \"n9\": __rvb_import_operand_1 = [\"rule-freeze-prevent-move\", \"rule-freeze-prevent-skill\"]; __rvb_content_graph_region_pc_0 = \"n8\"; break; case \"n8\": __rvb_import_operand_0 = {id: __rvb_import_operand_11, type: __rvb_import_operand_6, name: __rvb_import_operand_5, visible: __rvb_import_operand_4, currentDuration: __rvb_import_operand_3, intensity: __rvb_import_operand_2, relatedRules: __rvb_import_operand_1}; __rvb_content_graph_region_pc_0 = \"n7\"; break; case \"n7\": addStatusEffectById(__rvb_import_operand_12, __rvb_import_operand_0); __rvb_content_graph_region_pc_0 = \"n6\"; break; case \"n6\": addRuleById((p)[\"instanceId\"], \"rule-freeze-prevent-move\"); __rvb_content_graph_region_pc_0 = \"n5\"; break; case \"n5\": addRuleById((p)[\"instanceId\"], \"rule-freeze-prevent-skill\"); __rvb_content_graph_region_pc_0 = \"n4\"; break; case \"n4\": addSkillById((p)[\"instanceId\"], \"freeze-prevent\"); __rvb_content_graph_region_pc_0 = \"n3\"; break; case \"n3\": __rvb_content_graph_region_pc_0 = \"n3\"; break; default: throw new Error(\"invalid content graph region node\"); } } } }); _pc = \"n1\"; break; case \"n1\": return {success: true, message: ((c)[\"name\"] + \"使周围敌人冰冻\")}; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\"); }",
   "icon": "✦",
-  "effectTags": ["控制"],
+  "effectTags": [
+    "控制"
+  ],
   "maxCharges": 0,
   "powerMultiplier": 1,
   "targeting": {
     "steps": []
-  }
+  },
+  "contentGraph": {
+    "version": "rvb-content-graph/v1",
+    "surface": "skill",
+    "entry": "n23",
+    "nodes": [
+      {
+        "id": "n1",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "c"
+                  },
+                  "key": "name"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "使周围敌人冰冻"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n2",
+        "kind": "invoke",
+        "target": {
+          "kind": "array",
+          "object": {
+            "kind": "ref",
+            "name": "__rvb_import_operand_13"
+          },
+          "method": "forEach"
+        },
+        "args": [
+          {
+            "kind": "function",
+            "parameters": [
+              "p"
+            ],
+            "body": {
+              "entry": "n20",
+              "end": "n3",
+              "nodes": [
+                {
+                  "id": "n3",
+                  "kind": "regionEnd"
+                },
+                {
+                  "id": "n4",
+                  "kind": "call",
+                  "capability": "addSkillById",
+                  "args": [
+                    {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "p"
+                      },
+                      "key": "instanceId"
+                    },
+                    {
+                      "kind": "literal",
+                      "value": "freeze-prevent"
+                    }
+                  ],
+                  "next": "n3"
+                },
+                {
+                  "id": "n5",
+                  "kind": "call",
+                  "capability": "addRuleById",
+                  "args": [
+                    {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "p"
+                      },
+                      "key": "instanceId"
+                    },
+                    {
+                      "kind": "literal",
+                      "value": "rule-freeze-prevent-skill"
+                    }
+                  ],
+                  "next": "n4"
+                },
+                {
+                  "id": "n6",
+                  "kind": "call",
+                  "capability": "addRuleById",
+                  "args": [
+                    {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "p"
+                      },
+                      "key": "instanceId"
+                    },
+                    {
+                      "kind": "literal",
+                      "value": "rule-freeze-prevent-move"
+                    }
+                  ],
+                  "next": "n5"
+                },
+                {
+                  "id": "n7",
+                  "kind": "call",
+                  "capability": "addStatusEffectById",
+                  "args": [
+                    {
+                      "kind": "ref",
+                      "name": "__rvb_import_operand_12"
+                    },
+                    {
+                      "kind": "ref",
+                      "name": "__rvb_import_operand_0"
+                    }
+                  ],
+                  "next": "n6"
+                },
+                {
+                  "id": "n8",
+                  "kind": "bind",
+                  "name": "__rvb_import_operand_0",
+                  "expr": {
+                    "kind": "object",
+                    "entries": [
+                      {
+                        "key": "id",
+                        "value": {
+                          "kind": "ref",
+                          "name": "__rvb_import_operand_11"
+                        }
+                      },
+                      {
+                        "key": "type",
+                        "value": {
+                          "kind": "ref",
+                          "name": "__rvb_import_operand_6"
+                        }
+                      },
+                      {
+                        "key": "name",
+                        "value": {
+                          "kind": "ref",
+                          "name": "__rvb_import_operand_5"
+                        }
+                      },
+                      {
+                        "key": "visible",
+                        "value": {
+                          "kind": "ref",
+                          "name": "__rvb_import_operand_4"
+                        }
+                      },
+                      {
+                        "key": "currentDuration",
+                        "value": {
+                          "kind": "ref",
+                          "name": "__rvb_import_operand_3"
+                        }
+                      },
+                      {
+                        "key": "intensity",
+                        "value": {
+                          "kind": "ref",
+                          "name": "__rvb_import_operand_2"
+                        }
+                      },
+                      {
+                        "key": "relatedRules",
+                        "value": {
+                          "kind": "ref",
+                          "name": "__rvb_import_operand_1"
+                        }
+                      }
+                    ]
+                  },
+                  "next": "n7"
+                },
+                {
+                  "id": "n9",
+                  "kind": "bind",
+                  "name": "__rvb_import_operand_1",
+                  "expr": {
+                    "kind": "array",
+                    "items": [
+                      {
+                        "kind": "literal",
+                        "value": "rule-freeze-prevent-move"
+                      },
+                      {
+                        "kind": "literal",
+                        "value": "rule-freeze-prevent-skill"
+                      }
+                    ]
+                  },
+                  "next": "n8"
+                },
+                {
+                  "id": "n10",
+                  "kind": "bind",
+                  "name": "__rvb_import_operand_2",
+                  "expr": {
+                    "kind": "literal",
+                    "value": 1
+                  },
+                  "next": "n9"
+                },
+                {
+                  "id": "n11",
+                  "kind": "bind",
+                  "name": "__rvb_import_operand_3",
+                  "expr": {
+                    "kind": "literal",
+                    "value": 1
+                  },
+                  "next": "n10"
+                },
+                {
+                  "id": "n12",
+                  "kind": "bind",
+                  "name": "__rvb_import_operand_4",
+                  "expr": {
+                    "kind": "literal",
+                    "value": true
+                  },
+                  "next": "n11"
+                },
+                {
+                  "id": "n13",
+                  "kind": "bind",
+                  "name": "__rvb_import_operand_5",
+                  "expr": {
+                    "kind": "literal",
+                    "value": "冰冻"
+                  },
+                  "next": "n12"
+                },
+                {
+                  "id": "n14",
+                  "kind": "bind",
+                  "name": "__rvb_import_operand_6",
+                  "expr": {
+                    "kind": "literal",
+                    "value": "freeze"
+                  },
+                  "next": "n13"
+                },
+                {
+                  "id": "n18",
+                  "kind": "bind",
+                  "name": "__rvb_import_operand_11",
+                  "expr": {
+                    "kind": "binary",
+                    "op": "+",
+                    "left": {
+                      "kind": "ref",
+                      "name": "__rvb_import_operand_10"
+                    },
+                    "right": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "p"
+                      },
+                      "key": "instanceId"
+                    }
+                  },
+                  "next": "n14"
+                },
+                {
+                  "id": "n17",
+                  "kind": "bind",
+                  "name": "__rvb_import_operand_10",
+                  "expr": {
+                    "kind": "binary",
+                    "op": "+",
+                    "left": {
+                      "kind": "ref",
+                      "name": "__rvb_import_operand_9"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": "-"
+                    }
+                  },
+                  "next": "n18"
+                },
+                {
+                  "id": "n16",
+                  "kind": "bind",
+                  "name": "__rvb_import_operand_9",
+                  "expr": {
+                    "kind": "binary",
+                    "op": "+",
+                    "left": {
+                      "kind": "ref",
+                      "name": "__rvb_import_operand_7"
+                    },
+                    "right": {
+                      "kind": "ref",
+                      "name": "__rvb_import_effect_8"
+                    }
+                  },
+                  "next": "n17"
+                },
+                {
+                  "id": "n19",
+                  "kind": "call",
+                  "capability": "Date.now",
+                  "args": [],
+                  "result": "__rvb_import_effect_8",
+                  "next": "n16"
+                },
+                {
+                  "id": "n15",
+                  "kind": "bind",
+                  "name": "__rvb_import_operand_7",
+                  "expr": {
+                    "kind": "literal",
+                    "value": "freeze-"
+                  },
+                  "next": "n19"
+                },
+                {
+                  "id": "n20",
+                  "kind": "bind",
+                  "name": "__rvb_import_operand_12",
+                  "expr": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "p"
+                    },
+                    "key": "instanceId"
+                  },
+                  "next": "n15"
+                }
+              ]
+            }
+          }
+        ],
+        "next": "n1"
+      },
+      {
+        "id": "n21",
+        "kind": "bind",
+        "name": "__rvb_import_operand_13",
+        "expr": {
+          "kind": "ref",
+          "name": "es"
+        },
+        "next": "n2"
+      },
+      {
+        "id": "n22",
+        "kind": "bind",
+        "name": "es",
+        "expr": {
+          "kind": "collection",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "battle"
+            },
+            "key": "pieces"
+          },
+          "method": "filter",
+          "args": [
+            {
+              "kind": "lambda",
+              "parameters": [
+                "p"
+              ],
+              "body": {
+                "kind": "binary",
+                "op": "&&",
+                "left": {
+                  "kind": "binary",
+                  "op": "&&",
+                  "left": {
+                    "kind": "binary",
+                    "op": ">",
+                    "left": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "p"
+                      },
+                      "key": "currentHp"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": 0
+                    }
+                  },
+                  "right": {
+                    "kind": "unary",
+                    "op": "!",
+                    "argument": {
+                      "kind": "call",
+                      "callee": "arePlayersAllied",
+                      "args": [
+                        {
+                          "kind": "ref",
+                          "name": "battle"
+                        },
+                        {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "p"
+                          },
+                          "key": "ownerPlayerId"
+                        },
+                        {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "c"
+                          },
+                          "key": "ownerPlayerId"
+                        }
+                      ]
+                    }
+                  }
+                },
+                "right": {
+                  "kind": "binary",
+                  "op": "<=",
+                  "left": {
+                    "kind": "binary",
+                    "op": "+",
+                    "left": {
+                      "kind": "call",
+                      "callee": "Math.abs",
+                      "args": [
+                        {
+                          "kind": "binary",
+                          "op": "-",
+                          "left": {
+                            "kind": "get",
+                            "object": {
+                              "kind": "ref",
+                              "name": "p"
+                            },
+                            "key": "x"
+                          },
+                          "right": {
+                            "kind": "get",
+                            "object": {
+                              "kind": "ref",
+                              "name": "c"
+                            },
+                            "key": "x"
+                          }
+                        }
+                      ]
+                    },
+                    "right": {
+                      "kind": "call",
+                      "callee": "Math.abs",
+                      "args": [
+                        {
+                          "kind": "binary",
+                          "op": "-",
+                          "left": {
+                            "kind": "get",
+                            "object": {
+                              "kind": "ref",
+                              "name": "p"
+                            },
+                            "key": "y"
+                          },
+                          "right": {
+                            "kind": "get",
+                            "object": {
+                              "kind": "ref",
+                              "name": "c"
+                            },
+                            "key": "y"
+                          }
+                        }
+                      ]
+                    }
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": 2
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "next": "n21"
+      },
+      {
+        "id": "n23",
+        "kind": "bind",
+        "name": "c",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "context"
+          },
+          "key": "piece"
+        },
+        "next": "n22"
+      }
+    ]
+  },
+  "contentGraphField": "code",
+  "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1"
 }

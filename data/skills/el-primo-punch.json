@@ -13,9 +13,555 @@
   "powerMultiplier": 1,
   "range": "area",
   "targeting": {
-    "steps": [{ "kind": "target", "type": "piece", "filter": "enemy", "range": 1 }]
+    "steps": [
+      {
+        "kind": "target",
+        "type": "piece",
+        "filter": "enemy",
+        "range": 1
+      }
+    ]
   },
   "effectTags": [],
   "icon": "🥊",
-  "code": "function executeSkill(context){var c=context.piece,b=context.battle;var target=selectTarget({type:'piece',range:1,filter:'enemy'});if(!target||target.needsTargetSelection)return target;var t=b.pieces.find(function(p){return p.instanceId===target.instanceId&&p.currentHp>0;});if(!t)return{success:false,message:'目标不存在或不相邻'};var total=0,hits=0;for(var i=0;i<4;i++){if(t.currentHp<=0)break;var r=dealDamage(c,t,Math.floor(c.attack*.25),'physical',b,context.skill.id);total+=r.damage||0;hits++;}return{success:true,message:c.name+'连续挥拳'+hits+'次，造成'+total+'点伤害'};}"
+  "code": "function executeSkill(context) { var b, c, hits, i, r, t, target, total; var _pc = \"n21\"; for (var _step = 0; _step <= 13; _step++) { switch (_pc) { case \"n21\": c = (context)[\"piece\"]; _pc = \"n20\"; break; case \"n20\": b = (context)[\"battle\"]; _pc = \"n19\"; break; case \"n19\": target = selectTarget({type: \"piece\", range: 1, filter: \"enemy\"}); _pc = \"n18\"; break; case \"n18\": _pc = (! (! ((! target) || (target)[\"needsTargetSelection\"]))) ? \"n17\" : \"n16\"; break; case \"n16\": t = ((b)[\"pieces\"])[\"find\"](function (p) { return (((p)[\"instanceId\"] === (target)[\"instanceId\"]) && ((p)[\"currentHp\"] > 0)); }); _pc = \"n15\"; break; case \"n15\": _pc = (! (! (! t))) ? \"n14\" : \"n13\"; break; case \"n13\": total = 0; _pc = \"n12\"; break; case \"n12\": hits = 0; _pc = \"n11\"; break; case \"n11\": i = 0; _pc = \"n10\"; break; case \"n10\": var __rvb_content_graph_loop_break_0 = false, __rvb_content_graph_loop_continue_1 = false; while ((! (! (i < 4)))) { __rvb_content_graph_loop_continue_1 = false; { var __rvb_content_graph_region_pc_2 = \"n7\"; while (__rvb_content_graph_region_pc_2 !== \"n2\") { switch (__rvb_content_graph_region_pc_2) { case \"n7\": __rvb_content_graph_region_pc_2 = (! (! ((t)[\"currentHp\"] <= 0))) ? \"n6\" : \"n5\"; break; case \"n5\": r = dealDamage(c, t, Math.floor(((c)[\"attack\"] * 0.25)), \"physical\", b, ((context)[\"skill\"])[\"id\"]); __rvb_content_graph_region_pc_2 = \"n4\"; break; case \"n4\": total += ((r)[\"damage\"] || 0); __rvb_content_graph_region_pc_2 = \"n3\"; break; case \"n3\": hits = ((+ hits) + 1); __rvb_content_graph_region_pc_2 = \"n2\"; break; case \"n2\": __rvb_content_graph_region_pc_2 = \"n2\"; break; case \"n6\": __rvb_content_graph_loop_break_0 = true; __rvb_content_graph_region_pc_2 = \"n2\"; break; default: throw new Error(\"invalid content graph region node\"); } } } if (__rvb_content_graph_loop_break_0) break; { var __rvb_content_graph_region_pc_3 = \"n9\"; while (__rvb_content_graph_region_pc_3 !== \"n8\") { switch (__rvb_content_graph_region_pc_3) { case \"n9\": i = ((+ i) + 1); __rvb_content_graph_region_pc_3 = \"n8\"; break; case \"n8\": __rvb_content_graph_region_pc_3 = \"n8\"; break; default: throw new Error(\"invalid content graph region node\"); } } } if (__rvb_content_graph_loop_break_0) break; if (__rvb_content_graph_loop_continue_1) { __rvb_content_graph_loop_continue_1 = false; continue; } } _pc = \"n1\"; break; case \"n1\": return {success: true, message: ((((((c)[\"name\"] + \"连续挥拳\") + hits) + \"次，造成\") + total) + \"点伤害\")}; case \"n14\": return {success: false, message: \"目标不存在或不相邻\"}; case \"n17\": return target; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\"); }",
+  "contentGraph": {
+    "version": "rvb-content-graph/v1",
+    "surface": "skill",
+    "entry": "n21",
+    "nodes": [
+      {
+        "id": "n1",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "binary",
+                  "op": "+",
+                  "left": {
+                    "kind": "binary",
+                    "op": "+",
+                    "left": {
+                      "kind": "binary",
+                      "op": "+",
+                      "left": {
+                        "kind": "binary",
+                        "op": "+",
+                        "left": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "c"
+                          },
+                          "key": "name"
+                        },
+                        "right": {
+                          "kind": "literal",
+                          "value": "连续挥拳"
+                        }
+                      },
+                      "right": {
+                        "kind": "ref",
+                        "name": "hits"
+                      }
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": "次，造成"
+                    }
+                  },
+                  "right": {
+                    "kind": "ref",
+                    "name": "total"
+                  }
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "点伤害"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n10",
+        "kind": "loop",
+        "loop": "for",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "<",
+              "left": {
+                "kind": "ref",
+                "name": "i"
+              },
+              "right": {
+                "kind": "literal",
+                "value": 4
+              }
+            }
+          }
+        },
+        "body": {
+          "entry": "n7",
+          "end": "n2",
+          "nodes": [
+            {
+              "id": "n2",
+              "kind": "regionEnd"
+            },
+            {
+              "id": "n3",
+              "kind": "set",
+              "target": {
+                "kind": "ref",
+                "name": "hits"
+              },
+              "operator": "=",
+              "value": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "unary",
+                  "op": "+",
+                  "argument": {
+                    "kind": "ref",
+                    "name": "hits"
+                  }
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": 1
+                }
+              },
+              "next": "n2"
+            },
+            {
+              "id": "n4",
+              "kind": "set",
+              "target": {
+                "kind": "ref",
+                "name": "total"
+              },
+              "operator": "+=",
+              "value": {
+                "kind": "binary",
+                "op": "||",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "r"
+                  },
+                  "key": "damage"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": 0
+                }
+              },
+              "next": "n3"
+            },
+            {
+              "id": "n5",
+              "kind": "call",
+              "capability": "dealDamage",
+              "args": [
+                {
+                  "kind": "ref",
+                  "name": "c"
+                },
+                {
+                  "kind": "ref",
+                  "name": "t"
+                },
+                {
+                  "kind": "call",
+                  "callee": "Math.floor",
+                  "args": [
+                    {
+                      "kind": "binary",
+                      "op": "*",
+                      "left": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "c"
+                        },
+                        "key": "attack"
+                      },
+                      "right": {
+                        "kind": "literal",
+                        "value": 0.25
+                      }
+                    }
+                  ]
+                },
+                {
+                  "kind": "literal",
+                  "value": "physical"
+                },
+                {
+                  "kind": "ref",
+                  "name": "b"
+                },
+                {
+                  "kind": "get",
+                  "object": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "context"
+                    },
+                    "key": "skill"
+                  },
+                  "key": "id"
+                }
+              ],
+              "result": "r",
+              "next": "n4"
+            },
+            {
+              "id": "n6",
+              "kind": "break"
+            },
+            {
+              "id": "n7",
+              "kind": "branch",
+              "condition": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "unary",
+                  "op": "!",
+                  "argument": {
+                    "kind": "binary",
+                    "op": "<=",
+                    "left": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "t"
+                      },
+                      "key": "currentHp"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": 0
+                    }
+                  }
+                }
+              },
+              "yes": "n6",
+              "no": "n5"
+            }
+          ]
+        },
+        "update": {
+          "entry": "n9",
+          "end": "n8",
+          "nodes": [
+            {
+              "id": "n8",
+              "kind": "regionEnd"
+            },
+            {
+              "id": "n9",
+              "kind": "set",
+              "target": {
+                "kind": "ref",
+                "name": "i"
+              },
+              "operator": "=",
+              "value": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "unary",
+                  "op": "+",
+                  "argument": {
+                    "kind": "ref",
+                    "name": "i"
+                  }
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": 1
+                }
+              },
+              "next": "n8"
+            }
+          ]
+        },
+        "next": "n1"
+      },
+      {
+        "id": "n11",
+        "kind": "bind",
+        "name": "i",
+        "expr": {
+          "kind": "literal",
+          "value": 0
+        },
+        "next": "n10"
+      },
+      {
+        "id": "n12",
+        "kind": "bind",
+        "name": "hits",
+        "expr": {
+          "kind": "literal",
+          "value": 0
+        },
+        "next": "n11"
+      },
+      {
+        "id": "n13",
+        "kind": "bind",
+        "name": "total",
+        "expr": {
+          "kind": "literal",
+          "value": 0
+        },
+        "next": "n12"
+      },
+      {
+        "id": "n14",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": "目标不存在或不相邻"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n15",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "unary",
+              "op": "!",
+              "argument": {
+                "kind": "ref",
+                "name": "t"
+              }
+            }
+          }
+        },
+        "yes": "n14",
+        "no": "n13"
+      },
+      {
+        "id": "n16",
+        "kind": "bind",
+        "name": "t",
+        "expr": {
+          "kind": "collection",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "b"
+            },
+            "key": "pieces"
+          },
+          "method": "find",
+          "args": [
+            {
+              "kind": "lambda",
+              "parameters": [
+                "p"
+              ],
+              "body": {
+                "kind": "binary",
+                "op": "&&",
+                "left": {
+                  "kind": "binary",
+                  "op": "===",
+                  "left": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "p"
+                    },
+                    "key": "instanceId"
+                  },
+                  "right": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "target"
+                    },
+                    "key": "instanceId"
+                  }
+                },
+                "right": {
+                  "kind": "binary",
+                  "op": ">",
+                  "left": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "p"
+                    },
+                    "key": "currentHp"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": 0
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "next": "n15"
+      },
+      {
+        "id": "n17",
+        "kind": "return",
+        "value": {
+          "kind": "ref",
+          "name": "target"
+        }
+      },
+      {
+        "id": "n18",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "ref",
+                  "name": "target"
+                }
+              },
+              "right": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "target"
+                },
+                "key": "needsTargetSelection"
+              }
+            }
+          }
+        },
+        "yes": "n17",
+        "no": "n16"
+      },
+      {
+        "id": "n19",
+        "kind": "call",
+        "capability": "selectTarget",
+        "args": [
+          {
+            "kind": "object",
+            "entries": [
+              {
+                "key": "type",
+                "value": {
+                  "kind": "literal",
+                  "value": "piece"
+                }
+              },
+              {
+                "key": "range",
+                "value": {
+                  "kind": "literal",
+                  "value": 1
+                }
+              },
+              {
+                "key": "filter",
+                "value": {
+                  "kind": "literal",
+                  "value": "enemy"
+                }
+              }
+            ]
+          }
+        ],
+        "result": "target",
+        "next": "n18"
+      },
+      {
+        "id": "n20",
+        "kind": "bind",
+        "name": "b",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "context"
+          },
+          "key": "battle"
+        },
+        "next": "n19"
+      },
+      {
+        "id": "n21",
+        "kind": "bind",
+        "name": "c",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "context"
+          },
+          "key": "piece"
+        },
+        "next": "n20"
+      }
+    ]
+  },
+  "contentGraphField": "code",
+  "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1"
 }

@@ -13,6 +13,806 @@
   "type": "active",
   "actionPointCost": 1,
   "icon": "Shield",
-  "code": "function executeCard(context) { var watcher = battle.pieces.find(function(p) { return p.ownerPlayerId === playerId && p.templateId === 'blue-watcher' && p.currentHp > 0; }); if (!watcher) return { success: false, message: '找不到观察者棋子' }; var existingShield = watcher.statusTags && watcher.statusTags.find(function(t) { return t.type === 'calm-shield'; }); if (existingShield) { existingShield.intensity = (existingShield.intensity || 0) + 2; } else { addStatusEffectById(watcher.instanceId, { id: 'calm-shield-' + watcher.instanceId, type: 'calm-shield', name: '平静护盾', currentDuration: -1, currentUses: -1, intensity: 2, stacks: 1, relatedRules: ['rule-watcher-shield'] }); addRuleById(watcher.instanceId, 'rule-watcher-shield'); } var rageStance = watcher.statusTags && watcher.statusTags.find(function(t) { return t.type === 'rage-stance'; }); if (rageStance) { removeStatusEffectById(watcher.instanceId, rageStance.id); removeRuleById(watcher.instanceId, 'rule-watcher-rage-taken'); removeRuleById(watcher.instanceId, 'rule-watcher-rage-dealt'); } var calmStance = watcher.statusTags && watcher.statusTags.find(function(t) { return t.type === 'calm-stance'; }); if (!calmStance) { addStatusEffectById(watcher.instanceId, { id: 'calm-stance-' + watcher.instanceId, type: 'calm-stance', name: '平静姿态', currentDuration: -1, currentUses: -1, intensity: 1, stacks: 1 }); } var shieldTag = watcher.statusTags && watcher.statusTags.find(function(t) { return t.type === 'calm-shield'; }); var totalShield = shieldTag ? shieldTag.intensity : 2; return { success: true, message: watcher.name + '进入平静姿态，护盾可格挡' + totalShield + '点伤害' }; }",
-  "image": "watcher-calm.jpg"
+  "code": "function executeCard(context) { var calmStance, existingShield, rageStance, shieldTag, totalShield, watcher; var _pc = \"n19\"; for (var _step = 0; _step <= 19; _step++) { switch (_pc) { case \"n19\": watcher = ((battle)[\"pieces\"])[\"find\"](function (p) { return ((((p)[\"ownerPlayerId\"] === playerId) && ((p)[\"templateId\"] === \"blue-watcher\")) && ((p)[\"currentHp\"] > 0)); }); _pc = \"n18\"; break; case \"n18\": _pc = (! (! (! watcher))) ? \"n17\" : \"n16\"; break; case \"n16\": existingShield = ((watcher)[\"statusTags\"] && ((watcher)[\"statusTags\"])[\"find\"](function (t) { return ((t)[\"type\"] === \"calm-shield\"); })); _pc = \"n15\"; break; case \"n15\": _pc = (! (! existingShield)) ? \"n12\" : \"n14\"; break; case \"n14\": addStatusEffectById((watcher)[\"instanceId\"], {id: (\"calm-shield-\" + (watcher)[\"instanceId\"]), type: \"calm-shield\", name: \"平静护盾\", currentDuration: (- 1), currentUses: (- 1), intensity: 2, stacks: 1, relatedRules: [\"rule-watcher-shield\"]}); _pc = \"n13\"; break; case \"n13\": addRuleById((watcher)[\"instanceId\"], \"rule-watcher-shield\"); _pc = \"n11\"; break; case \"n12\": (existingShield)[\"intensity\"] = (((existingShield)[\"intensity\"] || 0) + 2); _pc = \"n11\"; break; case \"n11\": rageStance = ((watcher)[\"statusTags\"] && ((watcher)[\"statusTags\"])[\"find\"](function (t) { return ((t)[\"type\"] === \"rage-stance\"); })); _pc = \"n10\"; break; case \"n10\": _pc = (! (! rageStance)) ? \"n9\" : \"n6\"; break; case \"n9\": removeStatusEffectById((watcher)[\"instanceId\"], (rageStance)[\"id\"]); _pc = \"n8\"; break; case \"n8\": removeRuleById((watcher)[\"instanceId\"], \"rule-watcher-rage-taken\"); _pc = \"n7\"; break; case \"n7\": removeRuleById((watcher)[\"instanceId\"], \"rule-watcher-rage-dealt\"); _pc = \"n6\"; break; case \"n6\": calmStance = ((watcher)[\"statusTags\"] && ((watcher)[\"statusTags\"])[\"find\"](function (t) { return ((t)[\"type\"] === \"calm-stance\"); })); _pc = \"n5\"; break; case \"n5\": _pc = (! (! (! calmStance))) ? \"n4\" : \"n3\"; break; case \"n4\": addStatusEffectById((watcher)[\"instanceId\"], {id: (\"calm-stance-\" + (watcher)[\"instanceId\"]), type: \"calm-stance\", name: \"平静姿态\", currentDuration: (- 1), currentUses: (- 1), intensity: 1, stacks: 1}); _pc = \"n3\"; break; case \"n3\": shieldTag = ((watcher)[\"statusTags\"] && ((watcher)[\"statusTags\"])[\"find\"](function (t) { return ((t)[\"type\"] === \"calm-shield\"); })); _pc = \"n2\"; break; case \"n2\": totalShield = (shieldTag ? (shieldTag)[\"intensity\"] : 2); _pc = \"n1\"; break; case \"n1\": return {success: true, message: ((((watcher)[\"name\"] + \"进入平静姿态，护盾可格挡\") + totalShield) + \"点伤害\")}; case \"n17\": return {success: false, message: \"找不到观察者棋子\"}; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\"); }",
+  "image": "watcher-calm.jpg",
+  "contentGraph": {
+    "version": "rvb-content-graph/v1",
+    "surface": "card",
+    "entry": "n19",
+    "nodes": [
+      {
+        "id": "n1",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "binary",
+                  "op": "+",
+                  "left": {
+                    "kind": "binary",
+                    "op": "+",
+                    "left": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "watcher"
+                      },
+                      "key": "name"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": "进入平静姿态，护盾可格挡"
+                    }
+                  },
+                  "right": {
+                    "kind": "ref",
+                    "name": "totalShield"
+                  }
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "点伤害"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n2",
+        "kind": "bind",
+        "name": "totalShield",
+        "expr": {
+          "kind": "conditional",
+          "test": {
+            "kind": "ref",
+            "name": "shieldTag"
+          },
+          "consequent": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "shieldTag"
+            },
+            "key": "intensity"
+          },
+          "alternate": {
+            "kind": "literal",
+            "value": 2
+          }
+        },
+        "next": "n1"
+      },
+      {
+        "id": "n3",
+        "kind": "bind",
+        "name": "shieldTag",
+        "expr": {
+          "kind": "binary",
+          "op": "&&",
+          "left": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "watcher"
+            },
+            "key": "statusTags"
+          },
+          "right": {
+            "kind": "collection",
+            "object": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "watcher"
+              },
+              "key": "statusTags"
+            },
+            "method": "find",
+            "args": [
+              {
+                "kind": "lambda",
+                "parameters": [
+                  "t"
+                ],
+                "body": {
+                  "kind": "binary",
+                  "op": "===",
+                  "left": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "t"
+                    },
+                    "key": "type"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": "calm-shield"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "next": "n2"
+      },
+      {
+        "id": "n4",
+        "kind": "call",
+        "capability": "addStatusEffectById",
+        "args": [
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "watcher"
+            },
+            "key": "instanceId"
+          },
+          {
+            "kind": "object",
+            "entries": [
+              {
+                "key": "id",
+                "value": {
+                  "kind": "binary",
+                  "op": "+",
+                  "left": {
+                    "kind": "literal",
+                    "value": "calm-stance-"
+                  },
+                  "right": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "watcher"
+                    },
+                    "key": "instanceId"
+                  }
+                }
+              },
+              {
+                "key": "type",
+                "value": {
+                  "kind": "literal",
+                  "value": "calm-stance"
+                }
+              },
+              {
+                "key": "name",
+                "value": {
+                  "kind": "literal",
+                  "value": "平静姿态"
+                }
+              },
+              {
+                "key": "currentDuration",
+                "value": {
+                  "kind": "unary",
+                  "op": "-",
+                  "argument": {
+                    "kind": "literal",
+                    "value": 1
+                  }
+                }
+              },
+              {
+                "key": "currentUses",
+                "value": {
+                  "kind": "unary",
+                  "op": "-",
+                  "argument": {
+                    "kind": "literal",
+                    "value": 1
+                  }
+                }
+              },
+              {
+                "key": "intensity",
+                "value": {
+                  "kind": "literal",
+                  "value": 1
+                }
+              },
+              {
+                "key": "stacks",
+                "value": {
+                  "kind": "literal",
+                  "value": 1
+                }
+              }
+            ]
+          }
+        ],
+        "next": "n3"
+      },
+      {
+        "id": "n5",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "unary",
+              "op": "!",
+              "argument": {
+                "kind": "ref",
+                "name": "calmStance"
+              }
+            }
+          }
+        },
+        "yes": "n4",
+        "no": "n3"
+      },
+      {
+        "id": "n6",
+        "kind": "bind",
+        "name": "calmStance",
+        "expr": {
+          "kind": "binary",
+          "op": "&&",
+          "left": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "watcher"
+            },
+            "key": "statusTags"
+          },
+          "right": {
+            "kind": "collection",
+            "object": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "watcher"
+              },
+              "key": "statusTags"
+            },
+            "method": "find",
+            "args": [
+              {
+                "kind": "lambda",
+                "parameters": [
+                  "t"
+                ],
+                "body": {
+                  "kind": "binary",
+                  "op": "===",
+                  "left": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "t"
+                    },
+                    "key": "type"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": "calm-stance"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "next": "n5"
+      },
+      {
+        "id": "n7",
+        "kind": "call",
+        "capability": "removeRuleById",
+        "args": [
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "watcher"
+            },
+            "key": "instanceId"
+          },
+          {
+            "kind": "literal",
+            "value": "rule-watcher-rage-dealt"
+          }
+        ],
+        "next": "n6"
+      },
+      {
+        "id": "n8",
+        "kind": "call",
+        "capability": "removeRuleById",
+        "args": [
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "watcher"
+            },
+            "key": "instanceId"
+          },
+          {
+            "kind": "literal",
+            "value": "rule-watcher-rage-taken"
+          }
+        ],
+        "next": "n7"
+      },
+      {
+        "id": "n9",
+        "kind": "call",
+        "capability": "removeStatusEffectById",
+        "args": [
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "watcher"
+            },
+            "key": "instanceId"
+          },
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "rageStance"
+            },
+            "key": "id"
+          }
+        ],
+        "next": "n8"
+      },
+      {
+        "id": "n10",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "ref",
+              "name": "rageStance"
+            }
+          }
+        },
+        "yes": "n9",
+        "no": "n6"
+      },
+      {
+        "id": "n11",
+        "kind": "bind",
+        "name": "rageStance",
+        "expr": {
+          "kind": "binary",
+          "op": "&&",
+          "left": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "watcher"
+            },
+            "key": "statusTags"
+          },
+          "right": {
+            "kind": "collection",
+            "object": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "watcher"
+              },
+              "key": "statusTags"
+            },
+            "method": "find",
+            "args": [
+              {
+                "kind": "lambda",
+                "parameters": [
+                  "t"
+                ],
+                "body": {
+                  "kind": "binary",
+                  "op": "===",
+                  "left": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "t"
+                    },
+                    "key": "type"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": "rage-stance"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "next": "n10"
+      },
+      {
+        "id": "n12",
+        "kind": "set",
+        "target": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "existingShield"
+          },
+          "key": "intensity"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "binary",
+          "op": "+",
+          "left": {
+            "kind": "binary",
+            "op": "||",
+            "left": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "existingShield"
+              },
+              "key": "intensity"
+            },
+            "right": {
+              "kind": "literal",
+              "value": 0
+            }
+          },
+          "right": {
+            "kind": "literal",
+            "value": 2
+          }
+        },
+        "next": "n11"
+      },
+      {
+        "id": "n13",
+        "kind": "call",
+        "capability": "addRuleById",
+        "args": [
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "watcher"
+            },
+            "key": "instanceId"
+          },
+          {
+            "kind": "literal",
+            "value": "rule-watcher-shield"
+          }
+        ],
+        "next": "n11"
+      },
+      {
+        "id": "n14",
+        "kind": "call",
+        "capability": "addStatusEffectById",
+        "args": [
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "watcher"
+            },
+            "key": "instanceId"
+          },
+          {
+            "kind": "object",
+            "entries": [
+              {
+                "key": "id",
+                "value": {
+                  "kind": "binary",
+                  "op": "+",
+                  "left": {
+                    "kind": "literal",
+                    "value": "calm-shield-"
+                  },
+                  "right": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "watcher"
+                    },
+                    "key": "instanceId"
+                  }
+                }
+              },
+              {
+                "key": "type",
+                "value": {
+                  "kind": "literal",
+                  "value": "calm-shield"
+                }
+              },
+              {
+                "key": "name",
+                "value": {
+                  "kind": "literal",
+                  "value": "平静护盾"
+                }
+              },
+              {
+                "key": "currentDuration",
+                "value": {
+                  "kind": "unary",
+                  "op": "-",
+                  "argument": {
+                    "kind": "literal",
+                    "value": 1
+                  }
+                }
+              },
+              {
+                "key": "currentUses",
+                "value": {
+                  "kind": "unary",
+                  "op": "-",
+                  "argument": {
+                    "kind": "literal",
+                    "value": 1
+                  }
+                }
+              },
+              {
+                "key": "intensity",
+                "value": {
+                  "kind": "literal",
+                  "value": 2
+                }
+              },
+              {
+                "key": "stacks",
+                "value": {
+                  "kind": "literal",
+                  "value": 1
+                }
+              },
+              {
+                "key": "relatedRules",
+                "value": {
+                  "kind": "array",
+                  "items": [
+                    {
+                      "kind": "literal",
+                      "value": "rule-watcher-shield"
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ],
+        "next": "n13"
+      },
+      {
+        "id": "n15",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "ref",
+              "name": "existingShield"
+            }
+          }
+        },
+        "yes": "n12",
+        "no": "n14"
+      },
+      {
+        "id": "n16",
+        "kind": "bind",
+        "name": "existingShield",
+        "expr": {
+          "kind": "binary",
+          "op": "&&",
+          "left": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "watcher"
+            },
+            "key": "statusTags"
+          },
+          "right": {
+            "kind": "collection",
+            "object": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "watcher"
+              },
+              "key": "statusTags"
+            },
+            "method": "find",
+            "args": [
+              {
+                "kind": "lambda",
+                "parameters": [
+                  "t"
+                ],
+                "body": {
+                  "kind": "binary",
+                  "op": "===",
+                  "left": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "t"
+                    },
+                    "key": "type"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": "calm-shield"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "next": "n15"
+      },
+      {
+        "id": "n17",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": "找不到观察者棋子"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n18",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "unary",
+              "op": "!",
+              "argument": {
+                "kind": "ref",
+                "name": "watcher"
+              }
+            }
+          }
+        },
+        "yes": "n17",
+        "no": "n16"
+      },
+      {
+        "id": "n19",
+        "kind": "bind",
+        "name": "watcher",
+        "expr": {
+          "kind": "collection",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "battle"
+            },
+            "key": "pieces"
+          },
+          "method": "find",
+          "args": [
+            {
+              "kind": "lambda",
+              "parameters": [
+                "p"
+              ],
+              "body": {
+                "kind": "binary",
+                "op": "&&",
+                "left": {
+                  "kind": "binary",
+                  "op": "&&",
+                  "left": {
+                    "kind": "binary",
+                    "op": "===",
+                    "left": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "p"
+                      },
+                      "key": "ownerPlayerId"
+                    },
+                    "right": {
+                      "kind": "ref",
+                      "name": "playerId"
+                    }
+                  },
+                  "right": {
+                    "kind": "binary",
+                    "op": "===",
+                    "left": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "p"
+                      },
+                      "key": "templateId"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": "blue-watcher"
+                    }
+                  }
+                },
+                "right": {
+                  "kind": "binary",
+                  "op": ">",
+                  "left": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "p"
+                    },
+                    "key": "currentHp"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": 0
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "next": "n18"
+      }
+    ]
+  },
+  "contentGraphField": "code",
+  "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1"
 }

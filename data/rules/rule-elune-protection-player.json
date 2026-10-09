@@ -6,5 +6,572 @@
     "type": "beforeDamageApplied"
   },
   "priority": -100,
-  "skillCode": "var player = battle.players.find(function(p) { return p.playerId === context.playerId; }); if (!player) return { success: false }; var targetPiece = context.piece; if (!targetPiece || !arePlayersAllied(battle, targetPiece.ownerPlayerId, player.playerId)) return { success: false }; var effectiveDamage = context.damage || 0; if (effectiveDamage <= 0) return { success: false }; if (targetPiece.currentHp > effectiveDamage) return { success: false }; if (!player.statusTags) return { success: false }; var shieldTag = player.statusTags.find(function(t) { return t.type === 'elune-protection'; }); if (!shieldTag) return { success: false }; player.statusTags = player.statusTags.filter(function(t) { return t.type !== 'elune-protection'; }); targetPiece.currentHp = Math.min(targetPiece.currentHp + 5, targetPiece.maxHp); return { success: true, blocked: true, message: '艾露恩的守护：' + (targetPiece.name || targetPiece.templateId) + '免疫致命伤害并恢复5点生命（守护已消耗）' };"
+  "skillCode": "var effectiveDamage, player, shieldTag, targetPiece; var _pc = \"n19\"; for (var _step = 0; _step <= 19; _step++) { switch (_pc) { case \"n19\": player = ((battle)[\"players\"])[\"find\"](function (p) { return ((p)[\"playerId\"] === (context)[\"playerId\"]); }); _pc = \"n18\"; break; case \"n18\": _pc = (! (! (! player))) ? \"n17\" : \"n16\"; break; case \"n16\": targetPiece = (context)[\"piece\"]; _pc = \"n15\"; break; case \"n15\": _pc = (! (! ((! targetPiece) || (! arePlayersAllied(battle, (targetPiece)[\"ownerPlayerId\"], (player)[\"playerId\"]))))) ? \"n14\" : \"n13\"; break; case \"n13\": effectiveDamage = ((context)[\"damage\"] || 0); _pc = \"n12\"; break; case \"n12\": _pc = (! (! (effectiveDamage <= 0))) ? \"n11\" : \"n10\"; break; case \"n10\": _pc = (! (! ((targetPiece)[\"currentHp\"] > effectiveDamage))) ? \"n9\" : \"n8\"; break; case \"n8\": _pc = (! (! (! (player)[\"statusTags\"]))) ? \"n7\" : \"n6\"; break; case \"n6\": shieldTag = ((player)[\"statusTags\"])[\"find\"](function (t) { return ((t)[\"type\"] === \"elune-protection\"); }); _pc = \"n5\"; break; case \"n5\": _pc = (! (! (! shieldTag))) ? \"n4\" : \"n3\"; break; case \"n3\": (player)[\"statusTags\"] = ((player)[\"statusTags\"])[\"filter\"](function (t) { return ((t)[\"type\"] !== \"elune-protection\"); }); _pc = \"n2\"; break; case \"n2\": (targetPiece)[\"currentHp\"] = Math.min(((targetPiece)[\"currentHp\"] + 5), (targetPiece)[\"maxHp\"]); _pc = \"n1\"; break; case \"n1\": return {success: true, blocked: true, message: ((\"艾露恩的守护：\" + ((targetPiece)[\"name\"] || (targetPiece)[\"templateId\"])) + \"免疫致命伤害并恢复5点生命（守护已消耗）\")}; case \"n4\": return {success: false}; case \"n7\": return {success: false}; case \"n9\": return {success: false}; case \"n11\": return {success: false}; case \"n14\": return {success: false}; case \"n17\": return {success: false}; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\");",
+  "contentGraph": {
+    "version": "rvb-content-graph/v1",
+    "surface": "rule",
+    "entry": "n19",
+    "nodes": [
+      {
+        "id": "n1",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "blocked",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "binary",
+                  "op": "+",
+                  "left": {
+                    "kind": "literal",
+                    "value": "艾露恩的守护："
+                  },
+                  "right": {
+                    "kind": "binary",
+                    "op": "||",
+                    "left": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "targetPiece"
+                      },
+                      "key": "name"
+                    },
+                    "right": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "targetPiece"
+                      },
+                      "key": "templateId"
+                    }
+                  }
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "免疫致命伤害并恢复5点生命（守护已消耗）"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n2",
+        "kind": "set",
+        "target": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "targetPiece"
+          },
+          "key": "currentHp"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "call",
+          "callee": "Math.min",
+          "args": [
+            {
+              "kind": "binary",
+              "op": "+",
+              "left": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "targetPiece"
+                },
+                "key": "currentHp"
+              },
+              "right": {
+                "kind": "literal",
+                "value": 5
+              }
+            },
+            {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "targetPiece"
+              },
+              "key": "maxHp"
+            }
+          ]
+        },
+        "next": "n1"
+      },
+      {
+        "id": "n3",
+        "kind": "set",
+        "target": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "player"
+          },
+          "key": "statusTags"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "collection",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "player"
+            },
+            "key": "statusTags"
+          },
+          "method": "filter",
+          "args": [
+            {
+              "kind": "lambda",
+              "parameters": [
+                "t"
+              ],
+              "body": {
+                "kind": "binary",
+                "op": "!==",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "t"
+                  },
+                  "key": "type"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "elune-protection"
+                }
+              }
+            }
+          ]
+        },
+        "next": "n2"
+      },
+      {
+        "id": "n4",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n5",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "unary",
+              "op": "!",
+              "argument": {
+                "kind": "ref",
+                "name": "shieldTag"
+              }
+            }
+          }
+        },
+        "yes": "n4",
+        "no": "n3"
+      },
+      {
+        "id": "n6",
+        "kind": "bind",
+        "name": "shieldTag",
+        "expr": {
+          "kind": "collection",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "player"
+            },
+            "key": "statusTags"
+          },
+          "method": "find",
+          "args": [
+            {
+              "kind": "lambda",
+              "parameters": [
+                "t"
+              ],
+              "body": {
+                "kind": "binary",
+                "op": "===",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "t"
+                  },
+                  "key": "type"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "elune-protection"
+                }
+              }
+            }
+          ]
+        },
+        "next": "n5"
+      },
+      {
+        "id": "n7",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n8",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "unary",
+              "op": "!",
+              "argument": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "player"
+                },
+                "key": "statusTags"
+              }
+            }
+          }
+        },
+        "yes": "n7",
+        "no": "n6"
+      },
+      {
+        "id": "n9",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n10",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": ">",
+              "left": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "targetPiece"
+                },
+                "key": "currentHp"
+              },
+              "right": {
+                "kind": "ref",
+                "name": "effectiveDamage"
+              }
+            }
+          }
+        },
+        "yes": "n9",
+        "no": "n8"
+      },
+      {
+        "id": "n11",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n12",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "<=",
+              "left": {
+                "kind": "ref",
+                "name": "effectiveDamage"
+              },
+              "right": {
+                "kind": "literal",
+                "value": 0
+              }
+            }
+          }
+        },
+        "yes": "n11",
+        "no": "n10"
+      },
+      {
+        "id": "n13",
+        "kind": "bind",
+        "name": "effectiveDamage",
+        "expr": {
+          "kind": "binary",
+          "op": "||",
+          "left": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "context"
+            },
+            "key": "damage"
+          },
+          "right": {
+            "kind": "literal",
+            "value": 0
+          }
+        },
+        "next": "n12"
+      },
+      {
+        "id": "n14",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n15",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "ref",
+                  "name": "targetPiece"
+                }
+              },
+              "right": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "call",
+                  "callee": "arePlayersAllied",
+                  "args": [
+                    {
+                      "kind": "ref",
+                      "name": "battle"
+                    },
+                    {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "targetPiece"
+                      },
+                      "key": "ownerPlayerId"
+                    },
+                    {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "player"
+                      },
+                      "key": "playerId"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "yes": "n14",
+        "no": "n13"
+      },
+      {
+        "id": "n16",
+        "kind": "bind",
+        "name": "targetPiece",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "context"
+          },
+          "key": "piece"
+        },
+        "next": "n15"
+      },
+      {
+        "id": "n17",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n18",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "unary",
+              "op": "!",
+              "argument": {
+                "kind": "ref",
+                "name": "player"
+              }
+            }
+          }
+        },
+        "yes": "n17",
+        "no": "n16"
+      },
+      {
+        "id": "n19",
+        "kind": "bind",
+        "name": "player",
+        "expr": {
+          "kind": "collection",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "battle"
+            },
+            "key": "players"
+          },
+          "method": "find",
+          "args": [
+            {
+              "kind": "lambda",
+              "parameters": [
+                "p"
+              ],
+              "body": {
+                "kind": "binary",
+                "op": "===",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "p"
+                  },
+                  "key": "playerId"
+                },
+                "right": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "context"
+                  },
+                  "key": "playerId"
+                }
+              }
+            }
+          ]
+        },
+        "next": "n18"
+      }
+    ]
+  },
+  "contentGraphField": "skillCode",
+  "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1"
 }

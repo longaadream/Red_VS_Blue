@@ -5,5 +5,824 @@
   "trigger": {
     "type": "beforeDamageDealt"
   },
-  "skillCode": "var piece = context.rulePiece; if (!context.sourcePiece || context.sourcePiece.instanceId !== piece.instanceId) return { success: false, message: '' }; if (!context.targetPiece || context.targetPiece.instanceId === piece.instanceId) return { success: false, message: '' }; var currentTurn = (battle.turn && battle.turn.turnNumber) || 0; if (!piece.statusTags) piece.statusTags = []; var firedTag = piece.statusTags.find(function(t) { return t.type === 'shishio-cooldown-fired'; }); if (firedTag && firedTag.intensity === currentTurn) return { success: false, message: '' }; if (!firedTag) { firedTag = { id: 'shishio-cooldown-fired-' + piece.instanceId, type: 'shishio-cooldown-fired', name: '压制已触发', intensity: currentTurn, currentDuration: -1, visible: false }; piece.statusTags.push(firedTag); } else { firedTag.intensity = currentTurn; } var target = battle.pieces.find(function(p) { return p.instanceId === context.targetPiece.instanceId; }); if (!target || target.currentHp <= 0) return { success: false, message: '' }; if (target.skills && target.skills.length > 0) { target.skills.forEach(function(s) { s.currentCooldown = Math.max(s.currentCooldown || 0, 1); }); return { success: true, message: piece.name + ' 自燃·压制：' + target.name + ' 所有技能进入至少1回合冷却！' }; } return { success: false, message: '' };"
+  "skillCode": "var __rvb_import_operand_0, currentTurn, firedTag, piece, target; var _pc = \"n25\"; for (var _step = 0; _step <= 23; _step++) { switch (_pc) { case \"n25\": piece = (context)[\"rulePiece\"]; _pc = \"n24\"; break; case \"n24\": _pc = (! (! ((! (context)[\"sourcePiece\"]) || (((context)[\"sourcePiece\"])[\"instanceId\"] !== (piece)[\"instanceId\"])))) ? \"n23\" : \"n22\"; break; case \"n22\": _pc = (! (! ((! (context)[\"targetPiece\"]) || (((context)[\"targetPiece\"])[\"instanceId\"] === (piece)[\"instanceId\"])))) ? \"n21\" : \"n20\"; break; case \"n20\": currentTurn = (((battle)[\"turn\"] && ((battle)[\"turn\"])[\"turnNumber\"]) || 0); _pc = \"n19\"; break; case \"n19\": _pc = (! (! (! (piece)[\"statusTags\"]))) ? \"n18\" : \"n17\"; break; case \"n18\": (piece)[\"statusTags\"] = []; _pc = \"n17\"; break; case \"n17\": firedTag = ((piece)[\"statusTags\"])[\"find\"](function (t) { return ((t)[\"type\"] === \"shishio-cooldown-fired\"); }); _pc = \"n16\"; break; case \"n16\": _pc = (! (! (firedTag && ((firedTag)[\"intensity\"] === currentTurn)))) ? \"n15\" : \"n14\"; break; case \"n14\": _pc = (! (! (! firedTag))) ? \"n12\" : \"n13\"; break; case \"n13\": (firedTag)[\"intensity\"] = currentTurn; _pc = \"n10\"; break; case \"n12\": firedTag = {id: (\"shishio-cooldown-fired-\" + (piece)[\"instanceId\"]), type: \"shishio-cooldown-fired\", name: \"压制已触发\", intensity: currentTurn, currentDuration: (- 1), visible: false}; _pc = \"n11\"; break; case \"n11\": ((piece)[\"statusTags\"]).push(firedTag); _pc = \"n10\"; break; case \"n10\": target = ((battle)[\"pieces\"])[\"find\"](function (p) { return ((p)[\"instanceId\"] === ((context)[\"targetPiece\"])[\"instanceId\"]); }); _pc = \"n9\"; break; case \"n9\": _pc = (! (! ((! target) || ((target)[\"currentHp\"] <= 0)))) ? \"n8\" : \"n7\"; break; case \"n7\": _pc = (! (! ((target)[\"skills\"] && (((target)[\"skills\"])[\"length\"] > 0)))) ? \"n6\" : \"n1\"; break; case \"n1\": return {success: false, message: \"\"}; case \"n6\": __rvb_import_operand_0 = (target)[\"skills\"]; _pc = \"n3\"; break; case \"n3\": (__rvb_import_operand_0)[\"forEach\"](function (s) { { var __rvb_content_graph_region_pc_0 = \"n5\"; while (__rvb_content_graph_region_pc_0 !== \"n4\") { switch (__rvb_content_graph_region_pc_0) { case \"n5\": (s)[\"currentCooldown\"] = Math.max(((s)[\"currentCooldown\"] || 0), 1); __rvb_content_graph_region_pc_0 = \"n4\"; break; case \"n4\": __rvb_content_graph_region_pc_0 = \"n4\"; break; default: throw new Error(\"invalid content graph region node\"); } } } }); _pc = \"n2\"; break; case \"n2\": return {success: true, message: ((((piece)[\"name\"] + \" 自燃·压制：\") + (target)[\"name\"]) + \" 所有技能进入至少1回合冷却！\")}; case \"n8\": return {success: false, message: \"\"}; case \"n15\": return {success: false, message: \"\"}; case \"n21\": return {success: false, message: \"\"}; case \"n23\": return {success: false, message: \"\"}; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\");",
+  "contentGraph": {
+    "version": "rvb-content-graph/v1",
+    "surface": "rule",
+    "entry": "n25",
+    "nodes": [
+      {
+        "id": "n1",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n2",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "binary",
+                  "op": "+",
+                  "left": {
+                    "kind": "binary",
+                    "op": "+",
+                    "left": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "piece"
+                      },
+                      "key": "name"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": " 自燃·压制："
+                    }
+                  },
+                  "right": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "target"
+                    },
+                    "key": "name"
+                  }
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": " 所有技能进入至少1回合冷却！"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n3",
+        "kind": "invoke",
+        "target": {
+          "kind": "array",
+          "object": {
+            "kind": "ref",
+            "name": "__rvb_import_operand_0"
+          },
+          "method": "forEach"
+        },
+        "args": [
+          {
+            "kind": "function",
+            "parameters": [
+              "s"
+            ],
+            "body": {
+              "entry": "n5",
+              "end": "n4",
+              "nodes": [
+                {
+                  "id": "n4",
+                  "kind": "regionEnd"
+                },
+                {
+                  "id": "n5",
+                  "kind": "set",
+                  "target": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "s"
+                    },
+                    "key": "currentCooldown"
+                  },
+                  "operator": "=",
+                  "value": {
+                    "kind": "call",
+                    "callee": "Math.max",
+                    "args": [
+                      {
+                        "kind": "binary",
+                        "op": "||",
+                        "left": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "s"
+                          },
+                          "key": "currentCooldown"
+                        },
+                        "right": {
+                          "kind": "literal",
+                          "value": 0
+                        }
+                      },
+                      {
+                        "kind": "literal",
+                        "value": 1
+                      }
+                    ]
+                  },
+                  "next": "n4"
+                }
+              ]
+            }
+          }
+        ],
+        "next": "n2"
+      },
+      {
+        "id": "n6",
+        "kind": "bind",
+        "name": "__rvb_import_operand_0",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "target"
+          },
+          "key": "skills"
+        },
+        "next": "n3"
+      },
+      {
+        "id": "n7",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "&&",
+              "left": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "target"
+                },
+                "key": "skills"
+              },
+              "right": {
+                "kind": "binary",
+                "op": ">",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "target"
+                    },
+                    "key": "skills"
+                  },
+                  "key": "length"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": 0
+                }
+              }
+            }
+          }
+        },
+        "yes": "n6",
+        "no": "n1"
+      },
+      {
+        "id": "n8",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n9",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "ref",
+                  "name": "target"
+                }
+              },
+              "right": {
+                "kind": "binary",
+                "op": "<=",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "target"
+                  },
+                  "key": "currentHp"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": 0
+                }
+              }
+            }
+          }
+        },
+        "yes": "n8",
+        "no": "n7"
+      },
+      {
+        "id": "n10",
+        "kind": "bind",
+        "name": "target",
+        "expr": {
+          "kind": "collection",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "battle"
+            },
+            "key": "pieces"
+          },
+          "method": "find",
+          "args": [
+            {
+              "kind": "lambda",
+              "parameters": [
+                "p"
+              ],
+              "body": {
+                "kind": "binary",
+                "op": "===",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "p"
+                  },
+                  "key": "instanceId"
+                },
+                "right": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "context"
+                    },
+                    "key": "targetPiece"
+                  },
+                  "key": "instanceId"
+                }
+              }
+            }
+          ]
+        },
+        "next": "n9"
+      },
+      {
+        "id": "n11",
+        "kind": "call",
+        "capability": "array.push",
+        "args": [
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "piece"
+            },
+            "key": "statusTags"
+          },
+          {
+            "kind": "ref",
+            "name": "firedTag"
+          }
+        ],
+        "next": "n10"
+      },
+      {
+        "id": "n12",
+        "kind": "set",
+        "target": {
+          "kind": "ref",
+          "name": "firedTag"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "id",
+              "value": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "literal",
+                  "value": "shishio-cooldown-fired-"
+                },
+                "right": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "piece"
+                  },
+                  "key": "instanceId"
+                }
+              }
+            },
+            {
+              "key": "type",
+              "value": {
+                "kind": "literal",
+                "value": "shishio-cooldown-fired"
+              }
+            },
+            {
+              "key": "name",
+              "value": {
+                "kind": "literal",
+                "value": "压制已触发"
+              }
+            },
+            {
+              "key": "intensity",
+              "value": {
+                "kind": "ref",
+                "name": "currentTurn"
+              }
+            },
+            {
+              "key": "currentDuration",
+              "value": {
+                "kind": "unary",
+                "op": "-",
+                "argument": {
+                  "kind": "literal",
+                  "value": 1
+                }
+              }
+            },
+            {
+              "key": "visible",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            }
+          ]
+        },
+        "next": "n11"
+      },
+      {
+        "id": "n13",
+        "kind": "set",
+        "target": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "firedTag"
+          },
+          "key": "intensity"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "ref",
+          "name": "currentTurn"
+        },
+        "next": "n10"
+      },
+      {
+        "id": "n14",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "unary",
+              "op": "!",
+              "argument": {
+                "kind": "ref",
+                "name": "firedTag"
+              }
+            }
+          }
+        },
+        "yes": "n12",
+        "no": "n13"
+      },
+      {
+        "id": "n15",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n16",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "&&",
+              "left": {
+                "kind": "ref",
+                "name": "firedTag"
+              },
+              "right": {
+                "kind": "binary",
+                "op": "===",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "firedTag"
+                  },
+                  "key": "intensity"
+                },
+                "right": {
+                  "kind": "ref",
+                  "name": "currentTurn"
+                }
+              }
+            }
+          }
+        },
+        "yes": "n15",
+        "no": "n14"
+      },
+      {
+        "id": "n17",
+        "kind": "bind",
+        "name": "firedTag",
+        "expr": {
+          "kind": "collection",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "piece"
+            },
+            "key": "statusTags"
+          },
+          "method": "find",
+          "args": [
+            {
+              "kind": "lambda",
+              "parameters": [
+                "t"
+              ],
+              "body": {
+                "kind": "binary",
+                "op": "===",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "t"
+                  },
+                  "key": "type"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "shishio-cooldown-fired"
+                }
+              }
+            }
+          ]
+        },
+        "next": "n16"
+      },
+      {
+        "id": "n18",
+        "kind": "set",
+        "target": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "piece"
+          },
+          "key": "statusTags"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "array",
+          "items": []
+        },
+        "next": "n17"
+      },
+      {
+        "id": "n19",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "unary",
+              "op": "!",
+              "argument": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "piece"
+                },
+                "key": "statusTags"
+              }
+            }
+          }
+        },
+        "yes": "n18",
+        "no": "n17"
+      },
+      {
+        "id": "n20",
+        "kind": "bind",
+        "name": "currentTurn",
+        "expr": {
+          "kind": "binary",
+          "op": "||",
+          "left": {
+            "kind": "binary",
+            "op": "&&",
+            "left": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "battle"
+              },
+              "key": "turn"
+            },
+            "right": {
+              "kind": "get",
+              "object": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "battle"
+                },
+                "key": "turn"
+              },
+              "key": "turnNumber"
+            }
+          },
+          "right": {
+            "kind": "literal",
+            "value": 0
+          }
+        },
+        "next": "n19"
+      },
+      {
+        "id": "n21",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n22",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "context"
+                  },
+                  "key": "targetPiece"
+                }
+              },
+              "right": {
+                "kind": "binary",
+                "op": "===",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "context"
+                    },
+                    "key": "targetPiece"
+                  },
+                  "key": "instanceId"
+                },
+                "right": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "piece"
+                  },
+                  "key": "instanceId"
+                }
+              }
+            }
+          }
+        },
+        "yes": "n21",
+        "no": "n20"
+      },
+      {
+        "id": "n23",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n24",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "context"
+                  },
+                  "key": "sourcePiece"
+                }
+              },
+              "right": {
+                "kind": "binary",
+                "op": "!==",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "context"
+                    },
+                    "key": "sourcePiece"
+                  },
+                  "key": "instanceId"
+                },
+                "right": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "piece"
+                  },
+                  "key": "instanceId"
+                }
+              }
+            }
+          }
+        },
+        "yes": "n23",
+        "no": "n22"
+      },
+      {
+        "id": "n25",
+        "kind": "bind",
+        "name": "piece",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "context"
+          },
+          "key": "rulePiece"
+        },
+        "next": "n24"
+      }
+    ]
+  },
+  "contentGraphField": "skillCode",
+  "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1"
 }

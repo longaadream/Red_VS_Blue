@@ -18,8 +18,8 @@
   "maxCharges": 0,
   "powerMultiplier": 1,
   "actionPointCost": 1,
-  "code": "function executeSkill(context) { var caster = context.piece; var pos = selectTarget({ type: 'grid', range: 6, filter: 'all' }); if (!pos || pos.needsTargetSelection) return pos; if (pos.x !== caster.x && pos.y !== caster.y) return { success: false, message: '千鸟只能冲刺至同一行或同一列的格子' }; var dist = Math.abs(pos.x - caster.x) + Math.abs(pos.y - caster.y); if (dist === 0 || dist > 6) return { success: false, message: '目标距离必须在1-6格内' }; var tile = battle.map.tiles.find(function(item) { return item.x === pos.x && item.y === pos.y; }); if (!tile || !tile.props || !tile.props.walkable) return { success: false, message: '目标格不可行走' }; if (battle.pieces.some(function(piece) { return piece.currentHp > 0 && piece.x === pos.x && piece.y === pos.y; })) return { success: false, message: '目标位置已有棋子' }; var trace = flow.query.tracePath(caster, {x:Math.sign(pos.x-caster.x),y:Math.sign(pos.y-caster.y)}, {excludePieceId:caster.instanceId,maxDistance:dist,passAllies:true,passEnemies:true,terrain:'any'}); var enemies = trace.encounters.filter(function(e){return e.type==='piece';}).map(function(e){return flow.query.piece(e.pieceId);}).filter(function(p){return p && !arePlayersAllied(battle,p.ownerPlayerId,caster.ownerPlayerId);}); if (!flow.effects.displace([{pieceId:caster.instanceId,x:pos.x,y:pos.y}], 'dash', {\"passAllies\":true,\"passEnemies\":true,\"terrain\":\"any\"}).success) return {success:true,message:'位移被阻挡，本次位移效果取消'}; var damage = Math.floor(caster.attack * context.skill.powerMultiplier); if (enemies.length) { dealDamage(caster, enemies, damage, 'physical', battle, context.skill.id); enemies.forEach(function(enemy) { if (enemy.currentHp <= 0) return; var existing = enemy.statusTags && enemy.statusTags.find(function(tag) { return tag.type === 'chidori-immobile'; }); if (existing) { existing.currentDuration = 1; existing.remainingDuration = 1; } else { addStatusEffectById(enemy.instanceId, { id: 'chidori-immobile-' + enemy.instanceId, name: '被千鸟贯穿', type: 'chidori-immobile', currentDuration: 1, remainingDuration: 1, currentUses: -1, intensity: 1, stacks: 1, relatedRules: ['rule-chidori-immobile'] }); addRuleById(enemy.instanceId, 'rule-chidori-immobile'); } }); } return { success: true, message: caster.name + '发动千鸟，冲刺至(' + pos.x + ',' + pos.y + ')并贯穿' + enemies.length + '名敌人' }; }",
-  "previewCode": "function calculatePreview(piece, skillDef) { var damage = Math.floor((piece.attack || 0) * skillDef.powerMultiplier); return { description: \"选择正方向地格（6），冲刺至该格，并对路径上所有敌人造成1倍伤害。对其施加定身[1]。\", expectedValues: { damage: damage, range: 6 } }; }",
+  "code": "function executeSkill(context) { var __rvb_import_effect_1, __rvb_import_effect_5, __rvb_import_operand_0, __rvb_import_operand_6, __rvb_import_operand_8, caster, damage, dist, enemies, pos, tile, trace; var _pc = \"n49\"; for (var _step = 0; _step <= 28; _step++) { switch (_pc) { case \"n49\": caster = (context)[\"piece\"]; _pc = \"n48\"; break; case \"n48\": pos = selectTarget({type: \"grid\", range: 6, filter: \"all\"}); _pc = \"n47\"; break; case \"n47\": _pc = (! (! ((! pos) || (pos)[\"needsTargetSelection\"]))) ? \"n46\" : \"n45\"; break; case \"n45\": _pc = (! (! (((pos)[\"x\"] !== (caster)[\"x\"]) && ((pos)[\"y\"] !== (caster)[\"y\"])))) ? \"n44\" : \"n43\"; break; case \"n43\": dist = (Math.abs(((pos)[\"x\"] - (caster)[\"x\"])) + Math.abs(((pos)[\"y\"] - (caster)[\"y\"]))); _pc = \"n42\"; break; case \"n42\": _pc = (! (! ((dist === 0) || (dist > 6)))) ? \"n41\" : \"n40\"; break; case \"n40\": tile = (((battle)[\"map\"])[\"tiles\"])[\"find\"](function (item) { return (((item)[\"x\"] === (pos)[\"x\"]) && ((item)[\"y\"] === (pos)[\"y\"])); }); _pc = \"n39\"; break; case \"n39\": _pc = (! (! (((! tile) || (! (tile)[\"props\"])) || (! ((tile)[\"props\"])[\"walkable\"])))) ? \"n38\" : \"n37\"; break; case \"n37\": _pc = (! (! ((battle)[\"pieces\"])[\"some\"](function (piece) { return ((((piece)[\"currentHp\"] > 0) && ((piece)[\"x\"] === (pos)[\"x\"])) && ((piece)[\"y\"] === (pos)[\"y\"])); }))) ? \"n36\" : \"n35\"; break; case \"n35\": trace = flow.query.tracePath(caster, {x: Math.sign(((pos)[\"x\"] - (caster)[\"x\"])), y: Math.sign(((pos)[\"y\"] - (caster)[\"y\"]))}, {excludePieceId: (caster)[\"instanceId\"], maxDistance: dist, passAllies: true, passEnemies: true, terrain: \"any\"}); _pc = \"n34\"; break; case \"n34\": __rvb_import_operand_8 = ((trace)[\"encounters\"])[\"filter\"](function (e) { return ((e)[\"type\"] === \"piece\"); }); _pc = \"n30\"; break; case \"n30\": __rvb_import_effect_5 = (__rvb_import_operand_8)[\"map\"](function (e) { var __rvb_import_effect_7; { var __rvb_content_graph_region_pc_0 = \"n33\"; while (__rvb_content_graph_region_pc_0 !== \"n31\") { switch (__rvb_content_graph_region_pc_0) { case \"n33\": __rvb_import_effect_7 = flow.query.piece((e)[\"pieceId\"]); __rvb_content_graph_region_pc_0 = \"n32\"; break; case \"n32\": return __rvb_import_effect_7; default: throw new Error(\"invalid content graph region node\"); } } } }); _pc = \"n29\"; break; case \"n29\": __rvb_import_operand_6 = __rvb_import_effect_5; _pc = \"n22\"; break; case \"n22\": enemies = (__rvb_import_operand_6)[\"filter\"](function (p) { return (p && (! arePlayersAllied(battle, (p)[\"ownerPlayerId\"], (caster)[\"ownerPlayerId\"]))); }); _pc = \"n18\"; break; case \"n18\": __rvb_import_effect_1 = flow.effects.displace([{pieceId: (caster)[\"instanceId\"], x: (pos)[\"x\"], y: (pos)[\"y\"]}], \"dash\", {passAllies: true, passEnemies: true, terrain: \"any\"}); _pc = \"n17\"; break; case \"n17\": _pc = (! (! (! (__rvb_import_effect_1)[\"success\"]))) ? \"n16\" : \"n15\"; break; case \"n15\": damage = Math.floor(((caster)[\"attack\"] * ((context)[\"skill\"])[\"powerMultiplier\"])); _pc = \"n14\"; break; case \"n14\": _pc = (! (! (enemies)[\"length\"])) ? \"n13\" : \"n1\"; break; case \"n13\": dealDamage(caster, enemies, damage, \"physical\", battle, ((context)[\"skill\"])[\"id\"]); _pc = \"n12\"; break; case \"n12\": __rvb_import_operand_0 = enemies; _pc = \"n2\"; break; case \"n2\": (__rvb_import_operand_0)[\"forEach\"](function (enemy) { var existing; { var __rvb_content_graph_region_pc_1 = \"n11\"; while (__rvb_content_graph_region_pc_1 !== \"n3\") { switch (__rvb_content_graph_region_pc_1) { case \"n11\": __rvb_content_graph_region_pc_1 = (! (! ((enemy)[\"currentHp\"] <= 0))) ? \"n10\" : \"n9\"; break; case \"n9\": existing = ((enemy)[\"statusTags\"] && ((enemy)[\"statusTags\"])[\"find\"](function (tag) { return ((tag)[\"type\"] === \"chidori-immobile\"); })); __rvb_content_graph_region_pc_1 = \"n8\"; break; case \"n8\": __rvb_content_graph_region_pc_1 = (! (! existing)) ? \"n5\" : \"n7\"; break; case \"n7\": addStatusEffectById((enemy)[\"instanceId\"], {id: (\"chidori-immobile-\" + (enemy)[\"instanceId\"]), name: \"被千鸟贯穿\", type: \"chidori-immobile\", currentDuration: 1, remainingDuration: 1, currentUses: (- 1), intensity: 1, stacks: 1, relatedRules: [\"rule-chidori-immobile\"]}); __rvb_content_graph_region_pc_1 = \"n6\"; break; case \"n6\": addRuleById((enemy)[\"instanceId\"], \"rule-chidori-immobile\"); __rvb_content_graph_region_pc_1 = \"n3\"; break; case \"n5\": (existing)[\"currentDuration\"] = 1; __rvb_content_graph_region_pc_1 = \"n4\"; break; case \"n4\": (existing)[\"remainingDuration\"] = 1; __rvb_content_graph_region_pc_1 = \"n3\"; break; case \"n3\": __rvb_content_graph_region_pc_1 = \"n3\"; break; case \"n10\": return; default: throw new Error(\"invalid content graph region node\"); } } } }); _pc = \"n1\"; break; case \"n1\": return {success: true, message: ((((((((caster)[\"name\"] + \"发动千鸟，冲刺至(\") + (pos)[\"x\"]) + \",\") + (pos)[\"y\"]) + \")并贯穿\") + (enemies)[\"length\"]) + \"名敌人\")}; case \"n16\": return {success: true, message: \"位移被阻挡，本次位移效果取消\"}; case \"n36\": return {success: false, message: \"目标位置已有棋子\"}; case \"n38\": return {success: false, message: \"目标格不可行走\"}; case \"n41\": return {success: false, message: \"目标距离必须在1-6格内\"}; case \"n44\": return {success: false, message: \"千鸟只能冲刺至同一行或同一列的格子\"}; case \"n46\": return pos; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\"); }",
+  "previewCode": "function calculatePreview(piece, skillDef, currentCooldown) { var damage; var _pc = \"n2\"; for (var _step = 0; _step <= 2; _step++) { switch (_pc) { case \"n2\": damage = Math.floor((((piece)[\"attack\"] || 0) * (skillDef)[\"powerMultiplier\"])); _pc = \"n1\"; break; case \"n1\": return {description: \"选择正方向地格（6），冲刺至该格，并对路径上所有敌人造成1倍伤害。对其施加定身[1]。\", expectedValues: {damage: damage, range: 6}}; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\"); }",
   "targeting": {
     "steps": [
       {
@@ -33,5 +33,1600 @@
         "requireUnoccupied": true
       }
     ]
+  },
+  "contentGraph": {
+    "version": "rvb-content-graph/v1",
+    "surface": "skill",
+    "entry": "n49",
+    "nodes": [
+      {
+        "id": "n1",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "binary",
+                  "op": "+",
+                  "left": {
+                    "kind": "binary",
+                    "op": "+",
+                    "left": {
+                      "kind": "binary",
+                      "op": "+",
+                      "left": {
+                        "kind": "binary",
+                        "op": "+",
+                        "left": {
+                          "kind": "binary",
+                          "op": "+",
+                          "left": {
+                            "kind": "binary",
+                            "op": "+",
+                            "left": {
+                              "kind": "get",
+                              "object": {
+                                "kind": "ref",
+                                "name": "caster"
+                              },
+                              "key": "name"
+                            },
+                            "right": {
+                              "kind": "literal",
+                              "value": "发动千鸟，冲刺至("
+                            }
+                          },
+                          "right": {
+                            "kind": "get",
+                            "object": {
+                              "kind": "ref",
+                              "name": "pos"
+                            },
+                            "key": "x"
+                          }
+                        },
+                        "right": {
+                          "kind": "literal",
+                          "value": ","
+                        }
+                      },
+                      "right": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "pos"
+                        },
+                        "key": "y"
+                      }
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": ")并贯穿"
+                    }
+                  },
+                  "right": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "enemies"
+                    },
+                    "key": "length"
+                  }
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "名敌人"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n2",
+        "kind": "invoke",
+        "target": {
+          "kind": "array",
+          "object": {
+            "kind": "ref",
+            "name": "__rvb_import_operand_0"
+          },
+          "method": "forEach"
+        },
+        "args": [
+          {
+            "kind": "function",
+            "parameters": [
+              "enemy"
+            ],
+            "body": {
+              "entry": "n11",
+              "end": "n3",
+              "nodes": [
+                {
+                  "id": "n3",
+                  "kind": "regionEnd"
+                },
+                {
+                  "id": "n4",
+                  "kind": "set",
+                  "target": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "existing"
+                    },
+                    "key": "remainingDuration"
+                  },
+                  "operator": "=",
+                  "value": {
+                    "kind": "literal",
+                    "value": 1
+                  },
+                  "next": "n3"
+                },
+                {
+                  "id": "n5",
+                  "kind": "set",
+                  "target": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "existing"
+                    },
+                    "key": "currentDuration"
+                  },
+                  "operator": "=",
+                  "value": {
+                    "kind": "literal",
+                    "value": 1
+                  },
+                  "next": "n4"
+                },
+                {
+                  "id": "n6",
+                  "kind": "call",
+                  "capability": "addRuleById",
+                  "args": [
+                    {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "enemy"
+                      },
+                      "key": "instanceId"
+                    },
+                    {
+                      "kind": "literal",
+                      "value": "rule-chidori-immobile"
+                    }
+                  ],
+                  "next": "n3"
+                },
+                {
+                  "id": "n7",
+                  "kind": "call",
+                  "capability": "addStatusEffectById",
+                  "args": [
+                    {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "enemy"
+                      },
+                      "key": "instanceId"
+                    },
+                    {
+                      "kind": "object",
+                      "entries": [
+                        {
+                          "key": "id",
+                          "value": {
+                            "kind": "binary",
+                            "op": "+",
+                            "left": {
+                              "kind": "literal",
+                              "value": "chidori-immobile-"
+                            },
+                            "right": {
+                              "kind": "get",
+                              "object": {
+                                "kind": "ref",
+                                "name": "enemy"
+                              },
+                              "key": "instanceId"
+                            }
+                          }
+                        },
+                        {
+                          "key": "name",
+                          "value": {
+                            "kind": "literal",
+                            "value": "被千鸟贯穿"
+                          }
+                        },
+                        {
+                          "key": "type",
+                          "value": {
+                            "kind": "literal",
+                            "value": "chidori-immobile"
+                          }
+                        },
+                        {
+                          "key": "currentDuration",
+                          "value": {
+                            "kind": "literal",
+                            "value": 1
+                          }
+                        },
+                        {
+                          "key": "remainingDuration",
+                          "value": {
+                            "kind": "literal",
+                            "value": 1
+                          }
+                        },
+                        {
+                          "key": "currentUses",
+                          "value": {
+                            "kind": "unary",
+                            "op": "-",
+                            "argument": {
+                              "kind": "literal",
+                              "value": 1
+                            }
+                          }
+                        },
+                        {
+                          "key": "intensity",
+                          "value": {
+                            "kind": "literal",
+                            "value": 1
+                          }
+                        },
+                        {
+                          "key": "stacks",
+                          "value": {
+                            "kind": "literal",
+                            "value": 1
+                          }
+                        },
+                        {
+                          "key": "relatedRules",
+                          "value": {
+                            "kind": "array",
+                            "items": [
+                              {
+                                "kind": "literal",
+                                "value": "rule-chidori-immobile"
+                              }
+                            ]
+                          }
+                        }
+                      ]
+                    }
+                  ],
+                  "next": "n6"
+                },
+                {
+                  "id": "n8",
+                  "kind": "branch",
+                  "condition": {
+                    "kind": "unary",
+                    "op": "!",
+                    "argument": {
+                      "kind": "unary",
+                      "op": "!",
+                      "argument": {
+                        "kind": "ref",
+                        "name": "existing"
+                      }
+                    }
+                  },
+                  "yes": "n5",
+                  "no": "n7"
+                },
+                {
+                  "id": "n9",
+                  "kind": "bind",
+                  "name": "existing",
+                  "expr": {
+                    "kind": "binary",
+                    "op": "&&",
+                    "left": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "enemy"
+                      },
+                      "key": "statusTags"
+                    },
+                    "right": {
+                      "kind": "collection",
+                      "object": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "enemy"
+                        },
+                        "key": "statusTags"
+                      },
+                      "method": "find",
+                      "args": [
+                        {
+                          "kind": "lambda",
+                          "parameters": [
+                            "tag"
+                          ],
+                          "body": {
+                            "kind": "binary",
+                            "op": "===",
+                            "left": {
+                              "kind": "get",
+                              "object": {
+                                "kind": "ref",
+                                "name": "tag"
+                              },
+                              "key": "type"
+                            },
+                            "right": {
+                              "kind": "literal",
+                              "value": "chidori-immobile"
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  },
+                  "next": "n8"
+                },
+                {
+                  "id": "n10",
+                  "kind": "return"
+                },
+                {
+                  "id": "n11",
+                  "kind": "branch",
+                  "condition": {
+                    "kind": "unary",
+                    "op": "!",
+                    "argument": {
+                      "kind": "unary",
+                      "op": "!",
+                      "argument": {
+                        "kind": "binary",
+                        "op": "<=",
+                        "left": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "enemy"
+                          },
+                          "key": "currentHp"
+                        },
+                        "right": {
+                          "kind": "literal",
+                          "value": 0
+                        }
+                      }
+                    }
+                  },
+                  "yes": "n10",
+                  "no": "n9"
+                }
+              ]
+            }
+          }
+        ],
+        "next": "n1"
+      },
+      {
+        "id": "n12",
+        "kind": "bind",
+        "name": "__rvb_import_operand_0",
+        "expr": {
+          "kind": "ref",
+          "name": "enemies"
+        },
+        "next": "n2"
+      },
+      {
+        "id": "n13",
+        "kind": "call",
+        "capability": "dealDamage",
+        "args": [
+          {
+            "kind": "ref",
+            "name": "caster"
+          },
+          {
+            "kind": "ref",
+            "name": "enemies"
+          },
+          {
+            "kind": "ref",
+            "name": "damage"
+          },
+          {
+            "kind": "literal",
+            "value": "physical"
+          },
+          {
+            "kind": "ref",
+            "name": "battle"
+          },
+          {
+            "kind": "get",
+            "object": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "context"
+              },
+              "key": "skill"
+            },
+            "key": "id"
+          }
+        ],
+        "next": "n12"
+      },
+      {
+        "id": "n14",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "enemies"
+              },
+              "key": "length"
+            }
+          }
+        },
+        "yes": "n13",
+        "no": "n1"
+      },
+      {
+        "id": "n15",
+        "kind": "bind",
+        "name": "damage",
+        "expr": {
+          "kind": "call",
+          "callee": "Math.floor",
+          "args": [
+            {
+              "kind": "binary",
+              "op": "*",
+              "left": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "caster"
+                },
+                "key": "attack"
+              },
+              "right": {
+                "kind": "get",
+                "object": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "context"
+                  },
+                  "key": "skill"
+                },
+                "key": "powerMultiplier"
+              }
+            }
+          ]
+        },
+        "next": "n14"
+      },
+      {
+        "id": "n16",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": "位移被阻挡，本次位移效果取消"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n17",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "unary",
+              "op": "!",
+              "argument": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "__rvb_import_effect_1"
+                },
+                "key": "success"
+              }
+            }
+          }
+        },
+        "yes": "n16",
+        "no": "n15"
+      },
+      {
+        "id": "n18",
+        "kind": "call",
+        "capability": "flow.effects.displace",
+        "args": [
+          {
+            "kind": "array",
+            "items": [
+              {
+                "kind": "object",
+                "entries": [
+                  {
+                    "key": "pieceId",
+                    "value": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "caster"
+                      },
+                      "key": "instanceId"
+                    }
+                  },
+                  {
+                    "key": "x",
+                    "value": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "pos"
+                      },
+                      "key": "x"
+                    }
+                  },
+                  {
+                    "key": "y",
+                    "value": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "pos"
+                      },
+                      "key": "y"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "kind": "literal",
+            "value": "dash"
+          },
+          {
+            "kind": "object",
+            "entries": [
+              {
+                "key": "passAllies",
+                "value": {
+                  "kind": "literal",
+                  "value": true
+                }
+              },
+              {
+                "key": "passEnemies",
+                "value": {
+                  "kind": "literal",
+                  "value": true
+                }
+              },
+              {
+                "key": "terrain",
+                "value": {
+                  "kind": "literal",
+                  "value": "any"
+                }
+              }
+            ]
+          }
+        ],
+        "result": "__rvb_import_effect_1",
+        "next": "n17"
+      },
+      {
+        "id": "n22",
+        "kind": "bind",
+        "name": "enemies",
+        "expr": {
+          "kind": "collection",
+          "object": {
+            "kind": "ref",
+            "name": "__rvb_import_operand_6"
+          },
+          "method": "filter",
+          "args": [
+            {
+              "kind": "lambda",
+              "parameters": [
+                "p"
+              ],
+              "body": {
+                "kind": "binary",
+                "op": "&&",
+                "left": {
+                  "kind": "ref",
+                  "name": "p"
+                },
+                "right": {
+                  "kind": "unary",
+                  "op": "!",
+                  "argument": {
+                    "kind": "call",
+                    "callee": "arePlayersAllied",
+                    "args": [
+                      {
+                        "kind": "ref",
+                        "name": "battle"
+                      },
+                      {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "p"
+                        },
+                        "key": "ownerPlayerId"
+                      },
+                      {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "caster"
+                        },
+                        "key": "ownerPlayerId"
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "next": "n18"
+      },
+      {
+        "id": "n29",
+        "kind": "bind",
+        "name": "__rvb_import_operand_6",
+        "expr": {
+          "kind": "ref",
+          "name": "__rvb_import_effect_5"
+        },
+        "next": "n22"
+      },
+      {
+        "id": "n30",
+        "kind": "invoke",
+        "target": {
+          "kind": "array",
+          "object": {
+            "kind": "ref",
+            "name": "__rvb_import_operand_8"
+          },
+          "method": "map"
+        },
+        "args": [
+          {
+            "kind": "function",
+            "parameters": [
+              "e"
+            ],
+            "body": {
+              "entry": "n33",
+              "end": "n31",
+              "nodes": [
+                {
+                  "id": "n32",
+                  "kind": "return",
+                  "value": {
+                    "kind": "ref",
+                    "name": "__rvb_import_effect_7"
+                  }
+                },
+                {
+                  "id": "n33",
+                  "kind": "call",
+                  "capability": "flow.query.piece",
+                  "args": [
+                    {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "e"
+                      },
+                      "key": "pieceId"
+                    }
+                  ],
+                  "result": "__rvb_import_effect_7",
+                  "next": "n32"
+                },
+                {
+                  "id": "n31",
+                  "kind": "regionEnd"
+                }
+              ]
+            }
+          }
+        ],
+        "result": "__rvb_import_effect_5",
+        "next": "n29"
+      },
+      {
+        "id": "n34",
+        "kind": "bind",
+        "name": "__rvb_import_operand_8",
+        "expr": {
+          "kind": "collection",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "trace"
+            },
+            "key": "encounters"
+          },
+          "method": "filter",
+          "args": [
+            {
+              "kind": "lambda",
+              "parameters": [
+                "e"
+              ],
+              "body": {
+                "kind": "binary",
+                "op": "===",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "e"
+                  },
+                  "key": "type"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "piece"
+                }
+              }
+            }
+          ]
+        },
+        "next": "n30"
+      },
+      {
+        "id": "n35",
+        "kind": "call",
+        "capability": "flow.query.tracePath",
+        "args": [
+          {
+            "kind": "ref",
+            "name": "caster"
+          },
+          {
+            "kind": "object",
+            "entries": [
+              {
+                "key": "x",
+                "value": {
+                  "kind": "call",
+                  "callee": "Math.sign",
+                  "args": [
+                    {
+                      "kind": "binary",
+                      "op": "-",
+                      "left": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "pos"
+                        },
+                        "key": "x"
+                      },
+                      "right": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "caster"
+                        },
+                        "key": "x"
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "key": "y",
+                "value": {
+                  "kind": "call",
+                  "callee": "Math.sign",
+                  "args": [
+                    {
+                      "kind": "binary",
+                      "op": "-",
+                      "left": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "pos"
+                        },
+                        "key": "y"
+                      },
+                      "right": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "caster"
+                        },
+                        "key": "y"
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "kind": "object",
+            "entries": [
+              {
+                "key": "excludePieceId",
+                "value": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "caster"
+                  },
+                  "key": "instanceId"
+                }
+              },
+              {
+                "key": "maxDistance",
+                "value": {
+                  "kind": "ref",
+                  "name": "dist"
+                }
+              },
+              {
+                "key": "passAllies",
+                "value": {
+                  "kind": "literal",
+                  "value": true
+                }
+              },
+              {
+                "key": "passEnemies",
+                "value": {
+                  "kind": "literal",
+                  "value": true
+                }
+              },
+              {
+                "key": "terrain",
+                "value": {
+                  "kind": "literal",
+                  "value": "any"
+                }
+              }
+            ]
+          }
+        ],
+        "result": "trace",
+        "next": "n34"
+      },
+      {
+        "id": "n36",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": "目标位置已有棋子"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n37",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "collection",
+              "object": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "battle"
+                },
+                "key": "pieces"
+              },
+              "method": "some",
+              "args": [
+                {
+                  "kind": "lambda",
+                  "parameters": [
+                    "piece"
+                  ],
+                  "body": {
+                    "kind": "binary",
+                    "op": "&&",
+                    "left": {
+                      "kind": "binary",
+                      "op": "&&",
+                      "left": {
+                        "kind": "binary",
+                        "op": ">",
+                        "left": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "piece"
+                          },
+                          "key": "currentHp"
+                        },
+                        "right": {
+                          "kind": "literal",
+                          "value": 0
+                        }
+                      },
+                      "right": {
+                        "kind": "binary",
+                        "op": "===",
+                        "left": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "piece"
+                          },
+                          "key": "x"
+                        },
+                        "right": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "pos"
+                          },
+                          "key": "x"
+                        }
+                      }
+                    },
+                    "right": {
+                      "kind": "binary",
+                      "op": "===",
+                      "left": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "piece"
+                        },
+                        "key": "y"
+                      },
+                      "right": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "pos"
+                        },
+                        "key": "y"
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "yes": "n36",
+        "no": "n35"
+      },
+      {
+        "id": "n38",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": "目标格不可行走"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n39",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "binary",
+                "op": "||",
+                "left": {
+                  "kind": "unary",
+                  "op": "!",
+                  "argument": {
+                    "kind": "ref",
+                    "name": "tile"
+                  }
+                },
+                "right": {
+                  "kind": "unary",
+                  "op": "!",
+                  "argument": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "tile"
+                    },
+                    "key": "props"
+                  }
+                }
+              },
+              "right": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "tile"
+                    },
+                    "key": "props"
+                  },
+                  "key": "walkable"
+                }
+              }
+            }
+          }
+        },
+        "yes": "n38",
+        "no": "n37"
+      },
+      {
+        "id": "n40",
+        "kind": "bind",
+        "name": "tile",
+        "expr": {
+          "kind": "collection",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "battle"
+              },
+              "key": "map"
+            },
+            "key": "tiles"
+          },
+          "method": "find",
+          "args": [
+            {
+              "kind": "lambda",
+              "parameters": [
+                "item"
+              ],
+              "body": {
+                "kind": "binary",
+                "op": "&&",
+                "left": {
+                  "kind": "binary",
+                  "op": "===",
+                  "left": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "item"
+                    },
+                    "key": "x"
+                  },
+                  "right": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "pos"
+                    },
+                    "key": "x"
+                  }
+                },
+                "right": {
+                  "kind": "binary",
+                  "op": "===",
+                  "left": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "item"
+                    },
+                    "key": "y"
+                  },
+                  "right": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "pos"
+                    },
+                    "key": "y"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "next": "n39"
+      },
+      {
+        "id": "n41",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": "目标距离必须在1-6格内"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n42",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "binary",
+                "op": "===",
+                "left": {
+                  "kind": "ref",
+                  "name": "dist"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": 0
+                }
+              },
+              "right": {
+                "kind": "binary",
+                "op": ">",
+                "left": {
+                  "kind": "ref",
+                  "name": "dist"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": 6
+                }
+              }
+            }
+          }
+        },
+        "yes": "n41",
+        "no": "n40"
+      },
+      {
+        "id": "n43",
+        "kind": "bind",
+        "name": "dist",
+        "expr": {
+          "kind": "binary",
+          "op": "+",
+          "left": {
+            "kind": "call",
+            "callee": "Math.abs",
+            "args": [
+              {
+                "kind": "binary",
+                "op": "-",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "pos"
+                  },
+                  "key": "x"
+                },
+                "right": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "caster"
+                  },
+                  "key": "x"
+                }
+              }
+            ]
+          },
+          "right": {
+            "kind": "call",
+            "callee": "Math.abs",
+            "args": [
+              {
+                "kind": "binary",
+                "op": "-",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "pos"
+                  },
+                  "key": "y"
+                },
+                "right": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "caster"
+                  },
+                  "key": "y"
+                }
+              }
+            ]
+          }
+        },
+        "next": "n42"
+      },
+      {
+        "id": "n44",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": "千鸟只能冲刺至同一行或同一列的格子"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n45",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "&&",
+              "left": {
+                "kind": "binary",
+                "op": "!==",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "pos"
+                  },
+                  "key": "x"
+                },
+                "right": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "caster"
+                  },
+                  "key": "x"
+                }
+              },
+              "right": {
+                "kind": "binary",
+                "op": "!==",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "pos"
+                  },
+                  "key": "y"
+                },
+                "right": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "caster"
+                  },
+                  "key": "y"
+                }
+              }
+            }
+          }
+        },
+        "yes": "n44",
+        "no": "n43"
+      },
+      {
+        "id": "n46",
+        "kind": "return",
+        "value": {
+          "kind": "ref",
+          "name": "pos"
+        }
+      },
+      {
+        "id": "n47",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "ref",
+                  "name": "pos"
+                }
+              },
+              "right": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "pos"
+                },
+                "key": "needsTargetSelection"
+              }
+            }
+          }
+        },
+        "yes": "n46",
+        "no": "n45"
+      },
+      {
+        "id": "n48",
+        "kind": "call",
+        "capability": "selectTarget",
+        "args": [
+          {
+            "kind": "object",
+            "entries": [
+              {
+                "key": "type",
+                "value": {
+                  "kind": "literal",
+                  "value": "grid"
+                }
+              },
+              {
+                "key": "range",
+                "value": {
+                  "kind": "literal",
+                  "value": 6
+                }
+              },
+              {
+                "key": "filter",
+                "value": {
+                  "kind": "literal",
+                  "value": "all"
+                }
+              }
+            ]
+          }
+        ],
+        "result": "pos",
+        "next": "n47"
+      },
+      {
+        "id": "n49",
+        "kind": "bind",
+        "name": "caster",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "context"
+          },
+          "key": "piece"
+        },
+        "next": "n48"
+      }
+    ]
+  },
+  "contentGraphField": "code",
+  "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1",
+  "contentGraphEntries": {
+    "previewCode": {
+      "graph": {
+        "version": "rvb-content-graph/v1",
+        "surface": "preview",
+        "entry": "n2",
+        "nodes": [
+          {
+            "id": "n1",
+            "kind": "return",
+            "value": {
+              "kind": "object",
+              "entries": [
+                {
+                  "key": "description",
+                  "value": {
+                    "kind": "literal",
+                    "value": "选择正方向地格（6），冲刺至该格，并对路径上所有敌人造成1倍伤害。对其施加定身[1]。"
+                  }
+                },
+                {
+                  "key": "expectedValues",
+                  "value": {
+                    "kind": "object",
+                    "entries": [
+                      {
+                        "key": "damage",
+                        "value": {
+                          "kind": "ref",
+                          "name": "damage"
+                        }
+                      },
+                      {
+                        "key": "range",
+                        "value": {
+                          "kind": "literal",
+                          "value": 6
+                        }
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "id": "n2",
+            "kind": "bind",
+            "name": "damage",
+            "expr": {
+              "kind": "call",
+              "callee": "Math.floor",
+              "args": [
+                {
+                  "kind": "binary",
+                  "op": "*",
+                  "left": {
+                    "kind": "binary",
+                    "op": "||",
+                    "left": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "piece"
+                      },
+                      "key": "attack"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": 0
+                    }
+                  },
+                  "right": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "skillDef"
+                    },
+                    "key": "powerMultiplier"
+                  }
+                }
+              ]
+            },
+            "next": "n1"
+          }
+        ]
+      },
+      "compilerVersion": "rvb-content-graph-compiler/v1"
+    }
   }
 }

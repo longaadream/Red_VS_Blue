@@ -5,5 +5,900 @@
   "trigger": {
     "type": "afterDamageDealt"
   },
-  "skillCode": "var piece = context.rulePiece; if (!context.sourcePiece || context.sourcePiece.instanceId !== piece.instanceId) return { success: false, message: '' }; if (!context.targetPiece || context.targetPiece.instanceId === piece.instanceId) return { success: false, message: '' }; var excludeIds = ['shishio-burn-endturn', 'shishio-burn-move', 'combustion-self']; if (context.skillId && excludeIds.indexOf(context.skillId) >= 0) return { success: false, message: '' }; var damage = context.damage || 0; if (damage <= 0) return { success: false, message: '' }; if (!piece.statusTags) piece.statusTags = []; var counter = piece.statusTags.find(function(t) { return t.type === 'shishio-dmg-counter'; }); if (!counter) { counter = { id: 'shishio-dmg-counter-' + piece.instanceId, type: 'shishio-dmg-counter', name: '灵力消耗', intensity: 0, currentDuration: -1, visible: false }; piece.statusTags.push(counter); } var prevIntensity = counter.intensity; counter.intensity += damage; var newIntensity = counter.intensity; var selfDmgTimes = Math.floor(newIntensity / 5); counter.intensity = newIntensity % 5; if (selfDmgTimes <= 0) return { success: false, message: '' }; context.damageQueue.push({ attacker: piece, target: piece, damage: selfDmgTimes, damageType: 'true', skillId: 'combustion-self' }); return { success: true, message: piece.name + ' 自燃·灵力消耗：计数 ' + prevIntensity + '+' + damage + '=' + newIntensity + '，触发' + selfDmgTimes + '次，' + piece.name + ' 失去 ' + selfDmgTimes + ' 点生命值（剩余计数：' + counter.intensity + '）' };"
+  "skillCode": "var counter, damage, excludeIds, newIntensity, piece, prevIntensity, selfDmgTimes; var _pc = \"n26\"; for (var _step = 0; _step <= 26; _step++) { switch (_pc) { case \"n26\": piece = (context)[\"rulePiece\"]; _pc = \"n25\"; break; case \"n25\": _pc = (! (! ((! (context)[\"sourcePiece\"]) || (((context)[\"sourcePiece\"])[\"instanceId\"] !== (piece)[\"instanceId\"])))) ? \"n24\" : \"n23\"; break; case \"n23\": _pc = (! (! ((! (context)[\"targetPiece\"]) || (((context)[\"targetPiece\"])[\"instanceId\"] === (piece)[\"instanceId\"])))) ? \"n22\" : \"n21\"; break; case \"n21\": excludeIds = [\"shishio-burn-endturn\", \"shishio-burn-move\", \"combustion-self\"]; _pc = \"n20\"; break; case \"n20\": _pc = (! (! ((context)[\"skillId\"] && ((excludeIds)[\"indexOf\"]((context)[\"skillId\"]) >= 0)))) ? \"n19\" : \"n18\"; break; case \"n18\": damage = ((context)[\"damage\"] || 0); _pc = \"n17\"; break; case \"n17\": _pc = (! (! (damage <= 0))) ? \"n16\" : \"n15\"; break; case \"n15\": _pc = (! (! (! (piece)[\"statusTags\"]))) ? \"n14\" : \"n13\"; break; case \"n14\": (piece)[\"statusTags\"] = []; _pc = \"n13\"; break; case \"n13\": counter = ((piece)[\"statusTags\"])[\"find\"](function (t) { return ((t)[\"type\"] === \"shishio-dmg-counter\"); }); _pc = \"n12\"; break; case \"n12\": _pc = (! (! (! counter))) ? \"n11\" : \"n9\"; break; case \"n11\": counter = {id: (\"shishio-dmg-counter-\" + (piece)[\"instanceId\"]), type: \"shishio-dmg-counter\", name: \"灵力消耗\", intensity: 0, currentDuration: (- 1), visible: false}; _pc = \"n10\"; break; case \"n10\": ((piece)[\"statusTags\"]).push(counter); _pc = \"n9\"; break; case \"n9\": prevIntensity = (counter)[\"intensity\"]; _pc = \"n8\"; break; case \"n8\": (counter)[\"intensity\"] += damage; _pc = \"n7\"; break; case \"n7\": newIntensity = (counter)[\"intensity\"]; _pc = \"n6\"; break; case \"n6\": selfDmgTimes = Math.floor((newIntensity / 5)); _pc = \"n5\"; break; case \"n5\": (counter)[\"intensity\"] = (newIntensity % 5); _pc = \"n4\"; break; case \"n4\": _pc = (! (! (selfDmgTimes <= 0))) ? \"n3\" : \"n2\"; break; case \"n2\": context.damageQueue.push({attacker: piece, target: piece, damage: selfDmgTimes, damageType: \"true\", skillId: \"combustion-self\"}); _pc = \"n1\"; break; case \"n1\": return {success: true, message: ((((((((((((((((piece)[\"name\"] + \" 自燃·灵力消耗：计数 \") + prevIntensity) + \"+\") + damage) + \"=\") + newIntensity) + \"，触发\") + selfDmgTimes) + \"次，\") + (piece)[\"name\"]) + \" 失去 \") + selfDmgTimes) + \" 点生命值（剩余计数：\") + (counter)[\"intensity\"]) + \"）\")}; case \"n3\": return {success: false, message: \"\"}; case \"n16\": return {success: false, message: \"\"}; case \"n19\": return {success: false, message: \"\"}; case \"n22\": return {success: false, message: \"\"}; case \"n24\": return {success: false, message: \"\"}; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\");",
+  "contentGraph": {
+    "version": "rvb-content-graph/v1",
+    "surface": "rule",
+    "entry": "n26",
+    "nodes": [
+      {
+        "id": "n1",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "binary",
+                  "op": "+",
+                  "left": {
+                    "kind": "binary",
+                    "op": "+",
+                    "left": {
+                      "kind": "binary",
+                      "op": "+",
+                      "left": {
+                        "kind": "binary",
+                        "op": "+",
+                        "left": {
+                          "kind": "binary",
+                          "op": "+",
+                          "left": {
+                            "kind": "binary",
+                            "op": "+",
+                            "left": {
+                              "kind": "binary",
+                              "op": "+",
+                              "left": {
+                                "kind": "binary",
+                                "op": "+",
+                                "left": {
+                                  "kind": "binary",
+                                  "op": "+",
+                                  "left": {
+                                    "kind": "binary",
+                                    "op": "+",
+                                    "left": {
+                                      "kind": "binary",
+                                      "op": "+",
+                                      "left": {
+                                        "kind": "binary",
+                                        "op": "+",
+                                        "left": {
+                                          "kind": "binary",
+                                          "op": "+",
+                                          "left": {
+                                            "kind": "binary",
+                                            "op": "+",
+                                            "left": {
+                                              "kind": "get",
+                                              "object": {
+                                                "kind": "ref",
+                                                "name": "piece"
+                                              },
+                                              "key": "name"
+                                            },
+                                            "right": {
+                                              "kind": "literal",
+                                              "value": " 自燃·灵力消耗：计数 "
+                                            }
+                                          },
+                                          "right": {
+                                            "kind": "ref",
+                                            "name": "prevIntensity"
+                                          }
+                                        },
+                                        "right": {
+                                          "kind": "literal",
+                                          "value": "+"
+                                        }
+                                      },
+                                      "right": {
+                                        "kind": "ref",
+                                        "name": "damage"
+                                      }
+                                    },
+                                    "right": {
+                                      "kind": "literal",
+                                      "value": "="
+                                    }
+                                  },
+                                  "right": {
+                                    "kind": "ref",
+                                    "name": "newIntensity"
+                                  }
+                                },
+                                "right": {
+                                  "kind": "literal",
+                                  "value": "，触发"
+                                }
+                              },
+                              "right": {
+                                "kind": "ref",
+                                "name": "selfDmgTimes"
+                              }
+                            },
+                            "right": {
+                              "kind": "literal",
+                              "value": "次，"
+                            }
+                          },
+                          "right": {
+                            "kind": "get",
+                            "object": {
+                              "kind": "ref",
+                              "name": "piece"
+                            },
+                            "key": "name"
+                          }
+                        },
+                        "right": {
+                          "kind": "literal",
+                          "value": " 失去 "
+                        }
+                      },
+                      "right": {
+                        "kind": "ref",
+                        "name": "selfDmgTimes"
+                      }
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": " 点生命值（剩余计数："
+                    }
+                  },
+                  "right": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "counter"
+                    },
+                    "key": "intensity"
+                  }
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "）"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n2",
+        "kind": "call",
+        "capability": "queue.damage",
+        "args": [
+          {
+            "kind": "object",
+            "entries": [
+              {
+                "key": "attacker",
+                "value": {
+                  "kind": "ref",
+                  "name": "piece"
+                }
+              },
+              {
+                "key": "target",
+                "value": {
+                  "kind": "ref",
+                  "name": "piece"
+                }
+              },
+              {
+                "key": "damage",
+                "value": {
+                  "kind": "ref",
+                  "name": "selfDmgTimes"
+                }
+              },
+              {
+                "key": "damageType",
+                "value": {
+                  "kind": "literal",
+                  "value": "true"
+                }
+              },
+              {
+                "key": "skillId",
+                "value": {
+                  "kind": "literal",
+                  "value": "combustion-self"
+                }
+              }
+            ]
+          }
+        ],
+        "next": "n1"
+      },
+      {
+        "id": "n3",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n4",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "<=",
+              "left": {
+                "kind": "ref",
+                "name": "selfDmgTimes"
+              },
+              "right": {
+                "kind": "literal",
+                "value": 0
+              }
+            }
+          }
+        },
+        "yes": "n3",
+        "no": "n2"
+      },
+      {
+        "id": "n5",
+        "kind": "set",
+        "target": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "counter"
+          },
+          "key": "intensity"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "binary",
+          "op": "%",
+          "left": {
+            "kind": "ref",
+            "name": "newIntensity"
+          },
+          "right": {
+            "kind": "literal",
+            "value": 5
+          }
+        },
+        "next": "n4"
+      },
+      {
+        "id": "n6",
+        "kind": "bind",
+        "name": "selfDmgTimes",
+        "expr": {
+          "kind": "call",
+          "callee": "Math.floor",
+          "args": [
+            {
+              "kind": "binary",
+              "op": "/",
+              "left": {
+                "kind": "ref",
+                "name": "newIntensity"
+              },
+              "right": {
+                "kind": "literal",
+                "value": 5
+              }
+            }
+          ]
+        },
+        "next": "n5"
+      },
+      {
+        "id": "n7",
+        "kind": "bind",
+        "name": "newIntensity",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "counter"
+          },
+          "key": "intensity"
+        },
+        "next": "n6"
+      },
+      {
+        "id": "n8",
+        "kind": "set",
+        "target": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "counter"
+          },
+          "key": "intensity"
+        },
+        "operator": "+=",
+        "value": {
+          "kind": "ref",
+          "name": "damage"
+        },
+        "next": "n7"
+      },
+      {
+        "id": "n9",
+        "kind": "bind",
+        "name": "prevIntensity",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "counter"
+          },
+          "key": "intensity"
+        },
+        "next": "n8"
+      },
+      {
+        "id": "n10",
+        "kind": "call",
+        "capability": "array.push",
+        "args": [
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "piece"
+            },
+            "key": "statusTags"
+          },
+          {
+            "kind": "ref",
+            "name": "counter"
+          }
+        ],
+        "next": "n9"
+      },
+      {
+        "id": "n11",
+        "kind": "set",
+        "target": {
+          "kind": "ref",
+          "name": "counter"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "id",
+              "value": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "literal",
+                  "value": "shishio-dmg-counter-"
+                },
+                "right": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "piece"
+                  },
+                  "key": "instanceId"
+                }
+              }
+            },
+            {
+              "key": "type",
+              "value": {
+                "kind": "literal",
+                "value": "shishio-dmg-counter"
+              }
+            },
+            {
+              "key": "name",
+              "value": {
+                "kind": "literal",
+                "value": "灵力消耗"
+              }
+            },
+            {
+              "key": "intensity",
+              "value": {
+                "kind": "literal",
+                "value": 0
+              }
+            },
+            {
+              "key": "currentDuration",
+              "value": {
+                "kind": "unary",
+                "op": "-",
+                "argument": {
+                  "kind": "literal",
+                  "value": 1
+                }
+              }
+            },
+            {
+              "key": "visible",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            }
+          ]
+        },
+        "next": "n10"
+      },
+      {
+        "id": "n12",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "unary",
+              "op": "!",
+              "argument": {
+                "kind": "ref",
+                "name": "counter"
+              }
+            }
+          }
+        },
+        "yes": "n11",
+        "no": "n9"
+      },
+      {
+        "id": "n13",
+        "kind": "bind",
+        "name": "counter",
+        "expr": {
+          "kind": "collection",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "piece"
+            },
+            "key": "statusTags"
+          },
+          "method": "find",
+          "args": [
+            {
+              "kind": "lambda",
+              "parameters": [
+                "t"
+              ],
+              "body": {
+                "kind": "binary",
+                "op": "===",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "t"
+                  },
+                  "key": "type"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "shishio-dmg-counter"
+                }
+              }
+            }
+          ]
+        },
+        "next": "n12"
+      },
+      {
+        "id": "n14",
+        "kind": "set",
+        "target": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "piece"
+          },
+          "key": "statusTags"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "array",
+          "items": []
+        },
+        "next": "n13"
+      },
+      {
+        "id": "n15",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "unary",
+              "op": "!",
+              "argument": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "piece"
+                },
+                "key": "statusTags"
+              }
+            }
+          }
+        },
+        "yes": "n14",
+        "no": "n13"
+      },
+      {
+        "id": "n16",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n17",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "<=",
+              "left": {
+                "kind": "ref",
+                "name": "damage"
+              },
+              "right": {
+                "kind": "literal",
+                "value": 0
+              }
+            }
+          }
+        },
+        "yes": "n16",
+        "no": "n15"
+      },
+      {
+        "id": "n18",
+        "kind": "bind",
+        "name": "damage",
+        "expr": {
+          "kind": "binary",
+          "op": "||",
+          "left": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "context"
+            },
+            "key": "damage"
+          },
+          "right": {
+            "kind": "literal",
+            "value": 0
+          }
+        },
+        "next": "n17"
+      },
+      {
+        "id": "n19",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n20",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "&&",
+              "left": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "context"
+                },
+                "key": "skillId"
+              },
+              "right": {
+                "kind": "binary",
+                "op": ">=",
+                "left": {
+                  "kind": "collection",
+                  "object": {
+                    "kind": "ref",
+                    "name": "excludeIds"
+                  },
+                  "method": "indexOf",
+                  "args": [
+                    {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "context"
+                      },
+                      "key": "skillId"
+                    }
+                  ]
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": 0
+                }
+              }
+            }
+          }
+        },
+        "yes": "n19",
+        "no": "n18"
+      },
+      {
+        "id": "n21",
+        "kind": "bind",
+        "name": "excludeIds",
+        "expr": {
+          "kind": "array",
+          "items": [
+            {
+              "kind": "literal",
+              "value": "shishio-burn-endturn"
+            },
+            {
+              "kind": "literal",
+              "value": "shishio-burn-move"
+            },
+            {
+              "kind": "literal",
+              "value": "combustion-self"
+            }
+          ]
+        },
+        "next": "n20"
+      },
+      {
+        "id": "n22",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n23",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "context"
+                  },
+                  "key": "targetPiece"
+                }
+              },
+              "right": {
+                "kind": "binary",
+                "op": "===",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "context"
+                    },
+                    "key": "targetPiece"
+                  },
+                  "key": "instanceId"
+                },
+                "right": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "piece"
+                  },
+                  "key": "instanceId"
+                }
+              }
+            }
+          }
+        },
+        "yes": "n22",
+        "no": "n21"
+      },
+      {
+        "id": "n24",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n25",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "context"
+                  },
+                  "key": "sourcePiece"
+                }
+              },
+              "right": {
+                "kind": "binary",
+                "op": "!==",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "context"
+                    },
+                    "key": "sourcePiece"
+                  },
+                  "key": "instanceId"
+                },
+                "right": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "piece"
+                  },
+                  "key": "instanceId"
+                }
+              }
+            }
+          }
+        },
+        "yes": "n24",
+        "no": "n23"
+      },
+      {
+        "id": "n26",
+        "kind": "bind",
+        "name": "piece",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "context"
+          },
+          "key": "rulePiece"
+        },
+        "next": "n25"
+      }
+    ]
+  },
+  "contentGraphField": "skillCode",
+  "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1"
 }

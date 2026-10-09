@@ -2,6 +2,623 @@
   "id": "rule-arthas-slow-restore",
   "name": "减速恢复",
   "description": "每个己方回合结束时减少减速层数，归零时恢复移动范围",
-  "trigger": { "type": "endTurn" },
-  "skillCode": "var piece = context.rulePiece; if (!piece) return { success: false, message: '' }; if (piece.currentHp <= 0) { removeRuleById(piece.instanceId, 'rule-arthas-slow-restore'); return { success: false, message: '' }; } if (context.playerId !== piece.ownerPlayerId) return { success: false, message: '' }; var slowTag = piece.statusTags && piece.statusTags.find(function(t) { return t.type === 'arthas-slow'; }); if (!slowTag) { removeRuleById(piece.instanceId, 'rule-arthas-slow-restore'); return { success: false, message: '' }; } slowTag.stacks = (slowTag.stacks || 1) - 1; if (slowTag.stacks > 0) { return { success: true, message: piece.name + '的减速还剩' + slowTag.stacks + '回合' }; } var moveRestored = slowTag.intensity || 1; piece.moveRange = (piece.moveRange || 1) + moveRestored; var si = piece.statusTags.indexOf(slowTag); piece.statusTags.splice(si, 1); removeRuleById(piece.instanceId, 'rule-arthas-slow-restore'); return { success: true, message: piece.name + '的减速解除，移动范围恢复至' + piece.moveRange };"
+  "trigger": {
+    "type": "endTurn"
+  },
+  "skillCode": "var moveRestored, piece, si, slowTag; var _pc = \"n21\"; for (var _step = 0; _step <= 21; _step++) { switch (_pc) { case \"n21\": piece = (context)[\"rulePiece\"]; _pc = \"n20\"; break; case \"n20\": _pc = (! (! (! piece))) ? \"n19\" : \"n18\"; break; case \"n18\": _pc = (! (! ((piece)[\"currentHp\"] <= 0))) ? \"n17\" : \"n15\"; break; case \"n15\": _pc = (! (! ((context)[\"playerId\"] !== (piece)[\"ownerPlayerId\"]))) ? \"n14\" : \"n13\"; break; case \"n13\": slowTag = ((piece)[\"statusTags\"] && ((piece)[\"statusTags\"])[\"find\"](function (t) { return ((t)[\"type\"] === \"arthas-slow\"); })); _pc = \"n12\"; break; case \"n12\": _pc = (! (! (! slowTag))) ? \"n11\" : \"n9\"; break; case \"n9\": (slowTag)[\"stacks\"] = (((slowTag)[\"stacks\"] || 1) - 1); _pc = \"n8\"; break; case \"n8\": _pc = (! (! ((slowTag)[\"stacks\"] > 0))) ? \"n7\" : \"n6\"; break; case \"n6\": moveRestored = ((slowTag)[\"intensity\"] || 1); _pc = \"n5\"; break; case \"n5\": (piece)[\"moveRange\"] = (((piece)[\"moveRange\"] || 1) + moveRestored); _pc = \"n4\"; break; case \"n4\": si = ((piece)[\"statusTags\"])[\"indexOf\"](slowTag); _pc = \"n3\"; break; case \"n3\": ((piece)[\"statusTags\"]).splice(si, 1); _pc = \"n2\"; break; case \"n2\": removeRuleById((piece)[\"instanceId\"], \"rule-arthas-slow-restore\"); _pc = \"n1\"; break; case \"n1\": return {success: true, message: (((piece)[\"name\"] + \"的减速解除，移动范围恢复至\") + (piece)[\"moveRange\"])}; case \"n7\": return {success: true, message: ((((piece)[\"name\"] + \"的减速还剩\") + (slowTag)[\"stacks\"]) + \"回合\")}; case \"n11\": removeRuleById((piece)[\"instanceId\"], \"rule-arthas-slow-restore\"); _pc = \"n10\"; break; case \"n10\": return {success: false, message: \"\"}; case \"n14\": return {success: false, message: \"\"}; case \"n17\": removeRuleById((piece)[\"instanceId\"], \"rule-arthas-slow-restore\"); _pc = \"n16\"; break; case \"n16\": return {success: false, message: \"\"}; case \"n19\": return {success: false, message: \"\"}; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\");",
+  "contentGraph": {
+    "version": "rvb-content-graph/v1",
+    "surface": "rule",
+    "entry": "n21",
+    "nodes": [
+      {
+        "id": "n1",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "binary",
+                  "op": "+",
+                  "left": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "piece"
+                    },
+                    "key": "name"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": "的减速解除，移动范围恢复至"
+                  }
+                },
+                "right": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "piece"
+                  },
+                  "key": "moveRange"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n2",
+        "kind": "call",
+        "capability": "removeRuleById",
+        "args": [
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "piece"
+            },
+            "key": "instanceId"
+          },
+          {
+            "kind": "literal",
+            "value": "rule-arthas-slow-restore"
+          }
+        ],
+        "next": "n1"
+      },
+      {
+        "id": "n3",
+        "kind": "call",
+        "capability": "array.splice",
+        "args": [
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "piece"
+            },
+            "key": "statusTags"
+          },
+          {
+            "kind": "ref",
+            "name": "si"
+          },
+          {
+            "kind": "literal",
+            "value": 1
+          }
+        ],
+        "next": "n2"
+      },
+      {
+        "id": "n4",
+        "kind": "bind",
+        "name": "si",
+        "expr": {
+          "kind": "collection",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "piece"
+            },
+            "key": "statusTags"
+          },
+          "method": "indexOf",
+          "args": [
+            {
+              "kind": "ref",
+              "name": "slowTag"
+            }
+          ]
+        },
+        "next": "n3"
+      },
+      {
+        "id": "n5",
+        "kind": "set",
+        "target": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "piece"
+          },
+          "key": "moveRange"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "binary",
+          "op": "+",
+          "left": {
+            "kind": "binary",
+            "op": "||",
+            "left": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "piece"
+              },
+              "key": "moveRange"
+            },
+            "right": {
+              "kind": "literal",
+              "value": 1
+            }
+          },
+          "right": {
+            "kind": "ref",
+            "name": "moveRestored"
+          }
+        },
+        "next": "n4"
+      },
+      {
+        "id": "n6",
+        "kind": "bind",
+        "name": "moveRestored",
+        "expr": {
+          "kind": "binary",
+          "op": "||",
+          "left": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "slowTag"
+            },
+            "key": "intensity"
+          },
+          "right": {
+            "kind": "literal",
+            "value": 1
+          }
+        },
+        "next": "n5"
+      },
+      {
+        "id": "n7",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "binary",
+                  "op": "+",
+                  "left": {
+                    "kind": "binary",
+                    "op": "+",
+                    "left": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "piece"
+                      },
+                      "key": "name"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": "的减速还剩"
+                    }
+                  },
+                  "right": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "slowTag"
+                    },
+                    "key": "stacks"
+                  }
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "回合"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n8",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": ">",
+              "left": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "slowTag"
+                },
+                "key": "stacks"
+              },
+              "right": {
+                "kind": "literal",
+                "value": 0
+              }
+            }
+          }
+        },
+        "yes": "n7",
+        "no": "n6"
+      },
+      {
+        "id": "n9",
+        "kind": "set",
+        "target": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "slowTag"
+          },
+          "key": "stacks"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "binary",
+          "op": "-",
+          "left": {
+            "kind": "binary",
+            "op": "||",
+            "left": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "slowTag"
+              },
+              "key": "stacks"
+            },
+            "right": {
+              "kind": "literal",
+              "value": 1
+            }
+          },
+          "right": {
+            "kind": "literal",
+            "value": 1
+          }
+        },
+        "next": "n8"
+      },
+      {
+        "id": "n10",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n11",
+        "kind": "call",
+        "capability": "removeRuleById",
+        "args": [
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "piece"
+            },
+            "key": "instanceId"
+          },
+          {
+            "kind": "literal",
+            "value": "rule-arthas-slow-restore"
+          }
+        ],
+        "next": "n10"
+      },
+      {
+        "id": "n12",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "unary",
+              "op": "!",
+              "argument": {
+                "kind": "ref",
+                "name": "slowTag"
+              }
+            }
+          }
+        },
+        "yes": "n11",
+        "no": "n9"
+      },
+      {
+        "id": "n13",
+        "kind": "bind",
+        "name": "slowTag",
+        "expr": {
+          "kind": "binary",
+          "op": "&&",
+          "left": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "piece"
+            },
+            "key": "statusTags"
+          },
+          "right": {
+            "kind": "collection",
+            "object": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "piece"
+              },
+              "key": "statusTags"
+            },
+            "method": "find",
+            "args": [
+              {
+                "kind": "lambda",
+                "parameters": [
+                  "t"
+                ],
+                "body": {
+                  "kind": "binary",
+                  "op": "===",
+                  "left": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "t"
+                    },
+                    "key": "type"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": "arthas-slow"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "next": "n12"
+      },
+      {
+        "id": "n14",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n15",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "!==",
+              "left": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "context"
+                },
+                "key": "playerId"
+              },
+              "right": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "piece"
+                },
+                "key": "ownerPlayerId"
+              }
+            }
+          }
+        },
+        "yes": "n14",
+        "no": "n13"
+      },
+      {
+        "id": "n16",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n17",
+        "kind": "call",
+        "capability": "removeRuleById",
+        "args": [
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "piece"
+            },
+            "key": "instanceId"
+          },
+          {
+            "kind": "literal",
+            "value": "rule-arthas-slow-restore"
+          }
+        ],
+        "next": "n16"
+      },
+      {
+        "id": "n18",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "<=",
+              "left": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "piece"
+                },
+                "key": "currentHp"
+              },
+              "right": {
+                "kind": "literal",
+                "value": 0
+              }
+            }
+          }
+        },
+        "yes": "n17",
+        "no": "n15"
+      },
+      {
+        "id": "n19",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n20",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "unary",
+              "op": "!",
+              "argument": {
+                "kind": "ref",
+                "name": "piece"
+              }
+            }
+          }
+        },
+        "yes": "n19",
+        "no": "n18"
+      },
+      {
+        "id": "n21",
+        "kind": "bind",
+        "name": "piece",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "context"
+          },
+          "key": "rulePiece"
+        },
+        "next": "n20"
+      }
+    ]
+  },
+  "contentGraphField": "skillCode",
+  "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1"
 }

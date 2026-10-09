@@ -19,7 +19,7 @@ type CompatibilityAuditReport = {
     executionFields: Array<{
       path: string
       surface?: string
-      bindings: Array<{ status: string }>
+      bindings: Array<{ name: string; status: string }>
     }>
   }>>
   syntaxErrors: unknown[]
@@ -88,6 +88,17 @@ describe('RED-45 skillCode static compatibility audit', () => {
     const { report } = runCompatibilityAudit()
 
     expect(report.unsupportedUse).toEqual({})
+  })
+
+  it('classifies compiler wrapper intrinsics as ambient host bindings', () => {
+    const { report } = runCompatibilityAudit()
+    const bindings = Object.values(report.groups)
+      .flat()
+      .flatMap(entry => entry.executionFields)
+      .flatMap(field => field.bindings)
+    for (const name of ['Reflect', 'globalThis', 'arguments']) {
+      expect(bindings.some(binding => binding.name === name && binding.status === 'ambient')).toBe(true)
+    }
   })
 })
 

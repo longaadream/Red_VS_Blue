@@ -17,8 +17,969 @@
   "targeting": {
     "steps": []
   },
-  "code": "function executeSkill(context) {\n  var caster = context.piece; var player = battle.players.find(function(p) { return p.playerId === caster.ownerPlayerId; });\n  if (!player) return { success: false, message: '未找到玩家' };\n  function isOrdinaryHoly(card) {\n  return card && ['holy-smite', 'holy-heal', 'holy-charge'].indexOf(card.cardId) !== -1;\n}\n  var eligible = player.hand.filter(function(card) { var state = card.contentState || {}; return isOrdinaryHoly(card) && !state.velenHolyProphecy && !state.velenHolyProphecyEnhanced; });\n  if (eligible.length === 0) return { success: false, message: '没有可预言的圣光手牌' };\n  var cardNames = { 'holy-smite': '圣光惩击', 'holy-heal': '圣光治疗', 'holy-charge': '圣光充能' };\n  var options = eligible.map(function(card) { return { label: card.name || cardNames[card.cardId], value: card.instanceId }; });\n  var choice = selectOption({ title: '圣光预言：选择一张圣光手牌', options: options, selectionMode: 'single', presentation: 'hand', minSelections: 1, maxSelections: 1 });\n  if (choice === undefined || choice === null || choice.needsOptionSelection) return choice;\n  var card = eligible.find(function(item) { return item.instanceId === choice; });\n  if (!card) return { success: false, message: '选择的手牌已无法被预言' };\n  if (!card.contentState) card.contentState = {}; card.contentState.velenHolyProphecy = { sourcePieceId: caster.instanceId, createdTurnNumber: battle.turn.turnNumber };\n  return { success: true, message: caster.name + '留下了圣光预言' };\n}",
-  "previewCode": "function calculatePreview(piece, skillDef) { return { description: \"选择一张未经强化的圣光手牌。你的下回合开始时，若其仍在手中，将其强化50%。\", expectedValues: {} }; }",
+  "code": "function executeSkill(context) { var __rvb_import_bound_method_16, card, cardNames, caster, choice, eligible, isOrdinaryHoly, options, player; var _pc = \"n53\"; for (var _step = 0; _step <= 21; _step++) { switch (_pc) { case \"n53\": caster = (context)[\"piece\"]; _pc = \"n52\"; break; case \"n52\": player = ((battle)[\"players\"])[\"find\"](function (p) { return ((p)[\"playerId\"] === (caster)[\"ownerPlayerId\"]); }); _pc = \"n51\"; break; case \"n51\": _pc = (! (! (! player))) ? \"n50\" : \"n47\"; break; case \"n47\": isOrdinaryHoly = function (card) { { var __rvb_content_graph_region_pc_0 = \"n49\"; while (__rvb_content_graph_region_pc_0 !== \"n48\") { switch (__rvb_content_graph_region_pc_0) { case \"n49\": return (card && (([\"holy-smite\", \"holy-heal\", \"holy-charge\"])[\"indexOf\"]((card)[\"cardId\"]) !== (- 1))); default: throw new Error(\"invalid content graph region node\"); } } } }; _pc = \"n46\"; break; case \"n46\": __rvb_import_bound_method_16 = (function (receiver) { var capturedMethod = receiver[\"filter\"]; return function () { return Reflect.apply(capturedMethod, receiver, arguments); }; })((player)[\"hand\"]); _pc = \"n30\"; break; case \"n30\": eligible = (__rvb_import_bound_method_16)(function (card) { var __rvb_import_effect_13, __rvb_import_operand_11, __rvb_import_operand_14, __rvb_import_operand_15, __rvb_import_value_10, __rvb_import_value_8, state; { var __rvb_content_graph_region_pc_1 = \"n45\"; while (__rvb_content_graph_region_pc_1 !== \"n31\") { switch (__rvb_content_graph_region_pc_1) { case \"n45\": state = ((card)[\"contentState\"] || {}); __rvb_content_graph_region_pc_1 = \"n44\"; break; case \"n44\": __rvb_import_value_8 = (void 0); __rvb_content_graph_region_pc_1 = \"n43\"; break; case \"n43\": __rvb_import_value_10 = (void 0); __rvb_content_graph_region_pc_1 = \"n42\"; break; case \"n42\": __rvb_import_operand_15 = isOrdinaryHoly; __rvb_content_graph_region_pc_1 = \"n41\"; break; case \"n41\": __rvb_import_effect_13 = (__rvb_import_operand_15)(card); __rvb_content_graph_region_pc_1 = \"n40\"; break; case \"n40\": __rvb_import_operand_14 = __rvb_import_effect_13; __rvb_content_graph_region_pc_1 = \"n38\"; break; case \"n38\": __rvb_content_graph_region_pc_1 = (! (! __rvb_import_operand_14)) ? \"n37\" : \"n39\"; break; case \"n39\": __rvb_import_value_10 = __rvb_import_operand_14; __rvb_content_graph_region_pc_1 = \"n36\"; break; case \"n37\": __rvb_import_value_10 = (! (state)[\"velenHolyProphecy\"]); __rvb_content_graph_region_pc_1 = \"n36\"; break; case \"n36\": __rvb_import_operand_11 = __rvb_import_value_10; __rvb_content_graph_region_pc_1 = \"n34\"; break; case \"n34\": __rvb_content_graph_region_pc_1 = (! (! __rvb_import_operand_11)) ? \"n33\" : \"n35\"; break; case \"n35\": __rvb_import_value_8 = __rvb_import_operand_11; __rvb_content_graph_region_pc_1 = \"n32\"; break; case \"n33\": __rvb_import_value_8 = (! (state)[\"velenHolyProphecyEnhanced\"]); __rvb_content_graph_region_pc_1 = \"n32\"; break; case \"n32\": return __rvb_import_value_8; default: throw new Error(\"invalid content graph region node\"); } } } }); _pc = \"n14\"; break; case \"n14\": _pc = (! (! ((eligible)[\"length\"] === 0))) ? \"n13\" : \"n12\"; break; case \"n12\": cardNames = {\"holy-smite\": \"圣光惩击\", \"holy-heal\": \"圣光治疗\", \"holy-charge\": \"圣光充能\"}; _pc = \"n11\"; break; case \"n11\": options = (eligible)[\"map\"](function (card) { return {label: ((card)[\"name\"] || (cardNames)[(function (key) { if (typeof key === \"string\" && key.split(\".\").some(function (part) { return [\"__proto__\",\"arguments\",\"callee\",\"caller\",\"constructor\",\"prototype\"].indexOf(part) !== -1; })) throw new Error(\"unsafe content graph index\"); return key; })((card)[\"cardId\"])]), value: (card)[\"instanceId\"]}; }); _pc = \"n10\"; break; case \"n10\": choice = selectOption({title: \"圣光预言：选择一张圣光手牌\", options: options, selectionMode: \"single\", presentation: \"hand\", minSelections: 1, maxSelections: 1}); _pc = \"n9\"; break; case \"n9\": _pc = (! (! (((choice === (void 0)) || (choice === null)) || (choice)[\"needsOptionSelection\"]))) ? \"n8\" : \"n7\"; break; case \"n7\": card = (eligible)[\"find\"](function (item) { return ((item)[\"instanceId\"] === choice); }); _pc = \"n6\"; break; case \"n6\": _pc = (! (! (! card))) ? \"n5\" : \"n4\"; break; case \"n4\": _pc = (! (! (! (card)[\"contentState\"]))) ? \"n3\" : \"n2\"; break; case \"n3\": (card)[\"contentState\"] = {}; _pc = \"n2\"; break; case \"n2\": ((card)[\"contentState\"])[\"velenHolyProphecy\"] = {sourcePieceId: (caster)[\"instanceId\"], createdTurnNumber: ((battle)[\"turn\"])[\"turnNumber\"]}; _pc = \"n1\"; break; case \"n1\": return {success: true, message: ((caster)[\"name\"] + \"留下了圣光预言\")}; case \"n5\": return {success: false, message: \"选择的手牌已无法被预言\"}; case \"n8\": return choice; case \"n13\": return {success: false, message: \"没有可预言的圣光手牌\"}; case \"n50\": return {success: false, message: \"未找到玩家\"}; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\"); }",
+  "previewCode": "function calculatePreview(piece, skillDef, currentCooldown) { var _pc = \"n1\"; for (var _step = 0; _step <= 1; _step++) { switch (_pc) { case \"n1\": return {description: \"选择一张未经强化的圣光手牌。你的下回合开始时，若其仍在手中，将其强化50%。\", expectedValues: {}}; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\"); }",
   "range": "self",
-  "concealTargetInBattleLog": true
+  "concealTargetInBattleLog": true,
+  "contentGraph": {
+    "version": "rvb-content-graph/v1",
+    "surface": "skill",
+    "entry": "n53",
+    "nodes": [
+      {
+        "id": "n1",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "caster"
+                  },
+                  "key": "name"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "留下了圣光预言"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n2",
+        "kind": "set",
+        "target": {
+          "kind": "get",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "card"
+            },
+            "key": "contentState"
+          },
+          "key": "velenHolyProphecy"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "sourcePieceId",
+              "value": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "caster"
+                },
+                "key": "instanceId"
+              }
+            },
+            {
+              "key": "createdTurnNumber",
+              "value": {
+                "kind": "get",
+                "object": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "battle"
+                  },
+                  "key": "turn"
+                },
+                "key": "turnNumber"
+              }
+            }
+          ]
+        },
+        "next": "n1"
+      },
+      {
+        "id": "n3",
+        "kind": "set",
+        "target": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "card"
+          },
+          "key": "contentState"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "object",
+          "entries": []
+        },
+        "next": "n2"
+      },
+      {
+        "id": "n4",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "unary",
+              "op": "!",
+              "argument": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "card"
+                },
+                "key": "contentState"
+              }
+            }
+          }
+        },
+        "yes": "n3",
+        "no": "n2"
+      },
+      {
+        "id": "n5",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": "选择的手牌已无法被预言"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n6",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "unary",
+              "op": "!",
+              "argument": {
+                "kind": "ref",
+                "name": "card"
+              }
+            }
+          }
+        },
+        "yes": "n5",
+        "no": "n4"
+      },
+      {
+        "id": "n7",
+        "kind": "bind",
+        "name": "card",
+        "expr": {
+          "kind": "collection",
+          "object": {
+            "kind": "ref",
+            "name": "eligible"
+          },
+          "method": "find",
+          "args": [
+            {
+              "kind": "lambda",
+              "parameters": [
+                "item"
+              ],
+              "body": {
+                "kind": "binary",
+                "op": "===",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "item"
+                  },
+                  "key": "instanceId"
+                },
+                "right": {
+                  "kind": "ref",
+                  "name": "choice"
+                }
+              }
+            }
+          ]
+        },
+        "next": "n6"
+      },
+      {
+        "id": "n8",
+        "kind": "return",
+        "value": {
+          "kind": "ref",
+          "name": "choice"
+        }
+      },
+      {
+        "id": "n9",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "binary",
+                "op": "||",
+                "left": {
+                  "kind": "binary",
+                  "op": "===",
+                  "left": {
+                    "kind": "ref",
+                    "name": "choice"
+                  },
+                  "right": {
+                    "kind": "undefined"
+                  }
+                },
+                "right": {
+                  "kind": "binary",
+                  "op": "===",
+                  "left": {
+                    "kind": "ref",
+                    "name": "choice"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": null
+                  }
+                }
+              },
+              "right": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "choice"
+                },
+                "key": "needsOptionSelection"
+              }
+            }
+          }
+        },
+        "yes": "n8",
+        "no": "n7"
+      },
+      {
+        "id": "n10",
+        "kind": "call",
+        "capability": "selectOption",
+        "args": [
+          {
+            "kind": "object",
+            "entries": [
+              {
+                "key": "title",
+                "value": {
+                  "kind": "literal",
+                  "value": "圣光预言：选择一张圣光手牌"
+                }
+              },
+              {
+                "key": "options",
+                "value": {
+                  "kind": "ref",
+                  "name": "options"
+                }
+              },
+              {
+                "key": "selectionMode",
+                "value": {
+                  "kind": "literal",
+                  "value": "single"
+                }
+              },
+              {
+                "key": "presentation",
+                "value": {
+                  "kind": "literal",
+                  "value": "hand"
+                }
+              },
+              {
+                "key": "minSelections",
+                "value": {
+                  "kind": "literal",
+                  "value": 1
+                }
+              },
+              {
+                "key": "maxSelections",
+                "value": {
+                  "kind": "literal",
+                  "value": 1
+                }
+              }
+            ]
+          }
+        ],
+        "result": "choice",
+        "next": "n9"
+      },
+      {
+        "id": "n11",
+        "kind": "bind",
+        "name": "options",
+        "expr": {
+          "kind": "collection",
+          "object": {
+            "kind": "ref",
+            "name": "eligible"
+          },
+          "method": "map",
+          "args": [
+            {
+              "kind": "lambda",
+              "parameters": [
+                "card"
+              ],
+              "body": {
+                "kind": "object",
+                "entries": [
+                  {
+                    "key": "label",
+                    "value": {
+                      "kind": "binary",
+                      "op": "||",
+                      "left": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "card"
+                        },
+                        "key": "name"
+                      },
+                      "right": {
+                        "kind": "index",
+                        "object": {
+                          "kind": "ref",
+                          "name": "cardNames"
+                        },
+                        "index": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "card"
+                          },
+                          "key": "cardId"
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "key": "value",
+                    "value": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "card"
+                      },
+                      "key": "instanceId"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "next": "n10"
+      },
+      {
+        "id": "n12",
+        "kind": "bind",
+        "name": "cardNames",
+        "expr": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "holy-smite",
+              "value": {
+                "kind": "literal",
+                "value": "圣光惩击"
+              }
+            },
+            {
+              "key": "holy-heal",
+              "value": {
+                "kind": "literal",
+                "value": "圣光治疗"
+              }
+            },
+            {
+              "key": "holy-charge",
+              "value": {
+                "kind": "literal",
+                "value": "圣光充能"
+              }
+            }
+          ]
+        },
+        "next": "n11"
+      },
+      {
+        "id": "n13",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": "没有可预言的圣光手牌"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n14",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "===",
+              "left": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "eligible"
+                },
+                "key": "length"
+              },
+              "right": {
+                "kind": "literal",
+                "value": 0
+              }
+            }
+          }
+        },
+        "yes": "n13",
+        "no": "n12"
+      },
+      {
+        "id": "n30",
+        "kind": "invoke",
+        "target": {
+          "kind": "function",
+          "value": {
+            "kind": "ref",
+            "name": "__rvb_import_bound_method_16"
+          }
+        },
+        "args": [
+          {
+            "kind": "function",
+            "parameters": [
+              "card"
+            ],
+            "body": {
+              "entry": "n45",
+              "end": "n31",
+              "nodes": [
+                {
+                  "id": "n32",
+                  "kind": "return",
+                  "value": {
+                    "kind": "ref",
+                    "name": "__rvb_import_value_8"
+                  }
+                },
+                {
+                  "id": "n33",
+                  "kind": "set",
+                  "target": {
+                    "kind": "ref",
+                    "name": "__rvb_import_value_8"
+                  },
+                  "operator": "=",
+                  "value": {
+                    "kind": "unary",
+                    "op": "!",
+                    "argument": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "state"
+                      },
+                      "key": "velenHolyProphecyEnhanced"
+                    }
+                  },
+                  "next": "n32"
+                },
+                {
+                  "id": "n35",
+                  "kind": "set",
+                  "target": {
+                    "kind": "ref",
+                    "name": "__rvb_import_value_8"
+                  },
+                  "operator": "=",
+                  "value": {
+                    "kind": "ref",
+                    "name": "__rvb_import_operand_11"
+                  },
+                  "next": "n32"
+                },
+                {
+                  "id": "n34",
+                  "kind": "branch",
+                  "condition": {
+                    "kind": "unary",
+                    "op": "!",
+                    "argument": {
+                      "kind": "unary",
+                      "op": "!",
+                      "argument": {
+                        "kind": "ref",
+                        "name": "__rvb_import_operand_11"
+                      }
+                    }
+                  },
+                  "yes": "n33",
+                  "no": "n35"
+                },
+                {
+                  "id": "n36",
+                  "kind": "bind",
+                  "name": "__rvb_import_operand_11",
+                  "expr": {
+                    "kind": "ref",
+                    "name": "__rvb_import_value_10"
+                  },
+                  "next": "n34"
+                },
+                {
+                  "id": "n37",
+                  "kind": "set",
+                  "target": {
+                    "kind": "ref",
+                    "name": "__rvb_import_value_10"
+                  },
+                  "operator": "=",
+                  "value": {
+                    "kind": "unary",
+                    "op": "!",
+                    "argument": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "state"
+                      },
+                      "key": "velenHolyProphecy"
+                    }
+                  },
+                  "next": "n36"
+                },
+                {
+                  "id": "n39",
+                  "kind": "set",
+                  "target": {
+                    "kind": "ref",
+                    "name": "__rvb_import_value_10"
+                  },
+                  "operator": "=",
+                  "value": {
+                    "kind": "ref",
+                    "name": "__rvb_import_operand_14"
+                  },
+                  "next": "n36"
+                },
+                {
+                  "id": "n38",
+                  "kind": "branch",
+                  "condition": {
+                    "kind": "unary",
+                    "op": "!",
+                    "argument": {
+                      "kind": "unary",
+                      "op": "!",
+                      "argument": {
+                        "kind": "ref",
+                        "name": "__rvb_import_operand_14"
+                      }
+                    }
+                  },
+                  "yes": "n37",
+                  "no": "n39"
+                },
+                {
+                  "id": "n40",
+                  "kind": "bind",
+                  "name": "__rvb_import_operand_14",
+                  "expr": {
+                    "kind": "ref",
+                    "name": "__rvb_import_effect_13"
+                  },
+                  "next": "n38"
+                },
+                {
+                  "id": "n41",
+                  "kind": "invoke",
+                  "target": {
+                    "kind": "function",
+                    "value": {
+                      "kind": "ref",
+                      "name": "__rvb_import_operand_15"
+                    }
+                  },
+                  "args": [
+                    {
+                      "kind": "ref",
+                      "name": "card"
+                    }
+                  ],
+                  "result": "__rvb_import_effect_13",
+                  "next": "n40"
+                },
+                {
+                  "id": "n42",
+                  "kind": "bind",
+                  "name": "__rvb_import_operand_15",
+                  "expr": {
+                    "kind": "ref",
+                    "name": "isOrdinaryHoly"
+                  },
+                  "next": "n41"
+                },
+                {
+                  "id": "n43",
+                  "kind": "bind",
+                  "name": "__rvb_import_value_10",
+                  "next": "n42",
+                  "expr": {
+                    "kind": "undefined"
+                  }
+                },
+                {
+                  "id": "n44",
+                  "kind": "bind",
+                  "name": "__rvb_import_value_8",
+                  "next": "n43",
+                  "expr": {
+                    "kind": "undefined"
+                  }
+                },
+                {
+                  "id": "n45",
+                  "kind": "bind",
+                  "name": "state",
+                  "expr": {
+                    "kind": "binary",
+                    "op": "||",
+                    "left": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "card"
+                      },
+                      "key": "contentState"
+                    },
+                    "right": {
+                      "kind": "object",
+                      "entries": []
+                    }
+                  },
+                  "next": "n44"
+                },
+                {
+                  "id": "n31",
+                  "kind": "regionEnd"
+                }
+              ]
+            }
+          }
+        ],
+        "result": "eligible",
+        "next": "n14"
+      },
+      {
+        "id": "n46",
+        "kind": "bind",
+        "name": "__rvb_import_bound_method_16",
+        "expr": {
+          "kind": "boundMethod",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "player"
+            },
+            "key": "hand"
+          },
+          "method": "filter"
+        },
+        "next": "n30"
+      },
+      {
+        "id": "n47",
+        "kind": "bind",
+        "name": "isOrdinaryHoly",
+        "expr": {
+          "kind": "function",
+          "parameters": [
+            "card"
+          ],
+          "body": {
+            "entry": "n49",
+            "end": "n48",
+            "nodes": [
+              {
+                "id": "n49",
+                "kind": "return",
+                "value": {
+                  "kind": "binary",
+                  "op": "&&",
+                  "left": {
+                    "kind": "ref",
+                    "name": "card"
+                  },
+                  "right": {
+                    "kind": "binary",
+                    "op": "!==",
+                    "left": {
+                      "kind": "collection",
+                      "object": {
+                        "kind": "array",
+                        "items": [
+                          {
+                            "kind": "literal",
+                            "value": "holy-smite"
+                          },
+                          {
+                            "kind": "literal",
+                            "value": "holy-heal"
+                          },
+                          {
+                            "kind": "literal",
+                            "value": "holy-charge"
+                          }
+                        ]
+                      },
+                      "method": "indexOf",
+                      "args": [
+                        {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "card"
+                          },
+                          "key": "cardId"
+                        }
+                      ]
+                    },
+                    "right": {
+                      "kind": "unary",
+                      "op": "-",
+                      "argument": {
+                        "kind": "literal",
+                        "value": 1
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "id": "n48",
+                "kind": "regionEnd"
+              }
+            ]
+          }
+        },
+        "next": "n46"
+      },
+      {
+        "id": "n50",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": "未找到玩家"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n51",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "unary",
+              "op": "!",
+              "argument": {
+                "kind": "ref",
+                "name": "player"
+              }
+            }
+          }
+        },
+        "yes": "n50",
+        "no": "n47"
+      },
+      {
+        "id": "n52",
+        "kind": "bind",
+        "name": "player",
+        "expr": {
+          "kind": "collection",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "battle"
+            },
+            "key": "players"
+          },
+          "method": "find",
+          "args": [
+            {
+              "kind": "lambda",
+              "parameters": [
+                "p"
+              ],
+              "body": {
+                "kind": "binary",
+                "op": "===",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "p"
+                  },
+                  "key": "playerId"
+                },
+                "right": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "caster"
+                  },
+                  "key": "ownerPlayerId"
+                }
+              }
+            }
+          ]
+        },
+        "next": "n51"
+      },
+      {
+        "id": "n53",
+        "kind": "bind",
+        "name": "caster",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "context"
+          },
+          "key": "piece"
+        },
+        "next": "n52"
+      }
+    ]
+  },
+  "contentGraphField": "code",
+  "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1",
+  "contentGraphEntries": {
+    "previewCode": {
+      "graph": {
+        "version": "rvb-content-graph/v1",
+        "surface": "preview",
+        "entry": "n1",
+        "nodes": [
+          {
+            "id": "n1",
+            "kind": "return",
+            "value": {
+              "kind": "object",
+              "entries": [
+                {
+                  "key": "description",
+                  "value": {
+                    "kind": "literal",
+                    "value": "选择一张未经强化的圣光手牌。你的下回合开始时，若其仍在手中，将其强化50%。"
+                  }
+                },
+                {
+                  "key": "expectedValues",
+                  "value": {
+                    "kind": "object",
+                    "entries": []
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "compilerVersion": "rvb-content-graph-compiler/v1"
+    }
+  }
 }

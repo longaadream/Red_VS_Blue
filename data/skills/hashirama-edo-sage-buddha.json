@@ -32,6 +32,1372 @@
       }
     ]
   },
-  "code": "function executeSkill(context) { var caster = context.piece; var pos = selectTarget({ type: 'grid', range: 2, filter: 'all' }); if (!pos || pos.needsTargetSelection) return pos; var targetTile = battle.map && battle.map.tiles && battle.map.tiles.find(function(t) { return t.x === pos.x && t.y === pos.y; }); if (!targetTile || !targetTile.props || !targetTile.props.walkable) return { success: false, message: '目标格不可移动' }; var blocked = battle.pieces.find(function(p) { return p.x === pos.x && p.y === pos.y && p.currentHp > 0 && p.instanceId !== caster.instanceId; }); if (blocked) return { success: false, message: '目标格已被占用' }; if (!flow.effects.displace([{pieceId:caster.instanceId,x:pos.x,y:pos.y}], 'teleport').success) return {success:true,message:'位移被阻挡，本次位移效果取消'}; var msgs = [caster.name + '施放仙术·顶上化佛，瞬移至(' + pos.x + ',' + pos.y + ')']; if (caster.skills) { for (var j = 0; j < caster.skills.length; j++) { var s = caster.skills[j]; if (s.skillId !== 'hashirama-edo-sage-buddha' && s.currentCooldown > 0) { s.currentCooldown = 0; } } msgs.push('其他技能冷却已重置'); } addCardToHand('hashirama-edo-thousand-hands', caster.ownerPlayerId); var hand1 = getHand(caster.ownerPlayerId); for (var k1 = hand1.length - 1; k1 >= 0; k1--) { if (hand1[k1].cardId === 'hashirama-edo-thousand-hands' && !hand1[k1].boundPieceInstanceId) { hand1[k1].boundPieceInstanceId = caster.instanceId; break; } } addCardToHand('hashirama-edo-nature-heal', caster.ownerPlayerId); var hand2 = getHand(caster.ownerPlayerId); for (var k2 = hand2.length - 1; k2 >= 0; k2--) { if (hand2[k2].cardId === 'hashirama-edo-nature-heal' && !hand2[k2].boundPieceInstanceId) { hand2[k2].boundPieceInstanceId = caster.instanceId; break; } } msgs.push('获得【木遁·真数千手】和【仙术·大自然愈合】各1张'); return { success: true, message: msgs.join('，') }; }",
-  "previewCode": "function calculatePreview(piece, skillDef) { return { description: \"选择地格（2），传送至该格，重置其他技能冷却，获得【木遁·真数千手】和【仙术·大自然愈合】各1张。\", expectedValues: {}, chargeCost: 3 }; }"
+  "code": "function executeSkill(context) { var __rvb_import_effect_0, blocked, caster, hand1, hand2, j, k1, k2, msgs, pos, s, targetTile; var _pc = \"n46\"; for (var _step = 0; _step <= 28; _step++) { switch (_pc) { case \"n46\": caster = (context)[\"piece\"]; _pc = \"n45\"; break; case \"n45\": pos = selectTarget({type: \"grid\", range: 2, filter: \"all\"}); _pc = \"n44\"; break; case \"n44\": _pc = (! (! ((! pos) || (pos)[\"needsTargetSelection\"]))) ? \"n43\" : \"n42\"; break; case \"n42\": targetTile = (((battle)[\"map\"] && ((battle)[\"map\"])[\"tiles\"]) && (((battle)[\"map\"])[\"tiles\"])[\"find\"](function (t) { return (((t)[\"x\"] === (pos)[\"x\"]) && ((t)[\"y\"] === (pos)[\"y\"])); })); _pc = \"n41\"; break; case \"n41\": _pc = (! (! (((! targetTile) || (! (targetTile)[\"props\"])) || (! ((targetTile)[\"props\"])[\"walkable\"])))) ? \"n40\" : \"n39\"; break; case \"n39\": blocked = ((battle)[\"pieces\"])[\"find\"](function (p) { return (((((p)[\"x\"] === (pos)[\"x\"]) && ((p)[\"y\"] === (pos)[\"y\"])) && ((p)[\"currentHp\"] > 0)) && ((p)[\"instanceId\"] !== (caster)[\"instanceId\"])); }); _pc = \"n38\"; break; case \"n38\": _pc = (! (! blocked)) ? \"n37\" : \"n36\"; break; case \"n36\": __rvb_import_effect_0 = flow.effects.displace([{pieceId: (caster)[\"instanceId\"], x: (pos)[\"x\"], y: (pos)[\"y\"]}], \"teleport\"); _pc = \"n35\"; break; case \"n35\": _pc = (! (! (! (__rvb_import_effect_0)[\"success\"]))) ? \"n34\" : \"n33\"; break; case \"n33\": msgs = [((((((caster)[\"name\"] + \"施放仙术·顶上化佛，瞬移至(\") + (pos)[\"x\"]) + \",\") + (pos)[\"y\"]) + \")\")]; _pc = \"n32\"; break; case \"n32\": _pc = (! (! (caster)[\"skills\"])) ? \"n31\" : \"n22\"; break; case \"n31\": j = 0; _pc = \"n30\"; break; case \"n30\": var __rvb_content_graph_loop_break_0 = false, __rvb_content_graph_loop_continue_1 = false; while ((! (! (j < ((caster)[\"skills\"])[\"length\"])))) { __rvb_content_graph_loop_continue_1 = false; { var __rvb_content_graph_region_pc_2 = \"n27\"; while (__rvb_content_graph_region_pc_2 !== \"n24\") { switch (__rvb_content_graph_region_pc_2) { case \"n27\": s = ((caster)[\"skills\"])[(function (key) { if (typeof key === \"string\" && key.split(\".\").some(function (part) { return [\"__proto__\",\"arguments\",\"callee\",\"caller\",\"constructor\",\"prototype\"].indexOf(part) !== -1; })) throw new Error(\"unsafe content graph index\"); return key; })(j)]; __rvb_content_graph_region_pc_2 = \"n26\"; break; case \"n26\": __rvb_content_graph_region_pc_2 = (! (! (((s)[\"skillId\"] !== \"hashirama-edo-sage-buddha\") && ((s)[\"currentCooldown\"] > 0)))) ? \"n25\" : \"n24\"; break; case \"n25\": (s)[\"currentCooldown\"] = 0; __rvb_content_graph_region_pc_2 = \"n24\"; break; case \"n24\": __rvb_content_graph_region_pc_2 = \"n24\"; break; default: throw new Error(\"invalid content graph region node\"); } } } if (__rvb_content_graph_loop_break_0) break; { var __rvb_content_graph_region_pc_3 = \"n29\"; while (__rvb_content_graph_region_pc_3 !== \"n28\") { switch (__rvb_content_graph_region_pc_3) { case \"n29\": j = ((+ j) + 1); __rvb_content_graph_region_pc_3 = \"n28\"; break; case \"n28\": __rvb_content_graph_region_pc_3 = \"n28\"; break; default: throw new Error(\"invalid content graph region node\"); } } } if (__rvb_content_graph_loop_break_0) break; if (__rvb_content_graph_loop_continue_1) { __rvb_content_graph_loop_continue_1 = false; continue; } } _pc = \"n23\"; break; case \"n23\": (msgs).push(\"其他技能冷却已重置\"); _pc = \"n22\"; break; case \"n22\": addCardToHand(\"hashirama-edo-thousand-hands\", (caster)[\"ownerPlayerId\"]); _pc = \"n21\"; break; case \"n21\": hand1 = getHand((caster)[\"ownerPlayerId\"]); _pc = \"n20\"; break; case \"n20\": k1 = ((hand1)[\"length\"] - 1); _pc = \"n19\"; break; case \"n19\": var __rvb_content_graph_loop_break_4 = false, __rvb_content_graph_loop_continue_5 = false; while ((! (! (k1 >= 0)))) { __rvb_content_graph_loop_continue_5 = false; { var __rvb_content_graph_region_pc_6 = \"n16\"; while (__rvb_content_graph_region_pc_6 !== \"n13\") { switch (__rvb_content_graph_region_pc_6) { case \"n16\": __rvb_content_graph_region_pc_6 = (! (! ((((hand1)[(function (key) { if (typeof key === \"string\" && key.split(\".\").some(function (part) { return [\"__proto__\",\"arguments\",\"callee\",\"caller\",\"constructor\",\"prototype\"].indexOf(part) !== -1; })) throw new Error(\"unsafe content graph index\"); return key; })(k1)])[\"cardId\"] === \"hashirama-edo-thousand-hands\") && (! ((hand1)[(function (key) { if (typeof key === \"string\" && key.split(\".\").some(function (part) { return [\"__proto__\",\"arguments\",\"callee\",\"caller\",\"constructor\",\"prototype\"].indexOf(part) !== -1; })) throw new Error(\"unsafe content graph index\"); return key; })(k1)])[\"boundPieceInstanceId\"])))) ? \"n15\" : \"n13\"; break; case \"n13\": __rvb_content_graph_region_pc_6 = \"n13\"; break; case \"n15\": ((hand1)[(function (key) { if (typeof key === \"string\" && key.split(\".\").some(function (part) { return [\"__proto__\",\"arguments\",\"callee\",\"caller\",\"constructor\",\"prototype\"].indexOf(part) !== -1; })) throw new Error(\"unsafe content graph index\"); return key; })(k1)])[\"boundPieceInstanceId\"] = (caster)[\"instanceId\"]; __rvb_content_graph_region_pc_6 = \"n14\"; break; case \"n14\": __rvb_content_graph_loop_break_4 = true; __rvb_content_graph_region_pc_6 = \"n13\"; break; default: throw new Error(\"invalid content graph region node\"); } } } if (__rvb_content_graph_loop_break_4) break; { var __rvb_content_graph_region_pc_7 = \"n18\"; while (__rvb_content_graph_region_pc_7 !== \"n17\") { switch (__rvb_content_graph_region_pc_7) { case \"n18\": k1 = ((+ k1) - 1); __rvb_content_graph_region_pc_7 = \"n17\"; break; case \"n17\": __rvb_content_graph_region_pc_7 = \"n17\"; break; default: throw new Error(\"invalid content graph region node\"); } } } if (__rvb_content_graph_loop_break_4) break; if (__rvb_content_graph_loop_continue_5) { __rvb_content_graph_loop_continue_5 = false; continue; } } _pc = \"n12\"; break; case \"n12\": addCardToHand(\"hashirama-edo-nature-heal\", (caster)[\"ownerPlayerId\"]); _pc = \"n11\"; break; case \"n11\": hand2 = getHand((caster)[\"ownerPlayerId\"]); _pc = \"n10\"; break; case \"n10\": k2 = ((hand2)[\"length\"] - 1); _pc = \"n9\"; break; case \"n9\": var __rvb_content_graph_loop_break_8 = false, __rvb_content_graph_loop_continue_9 = false; while ((! (! (k2 >= 0)))) { __rvb_content_graph_loop_continue_9 = false; { var __rvb_content_graph_region_pc_10 = \"n6\"; while (__rvb_content_graph_region_pc_10 !== \"n3\") { switch (__rvb_content_graph_region_pc_10) { case \"n6\": __rvb_content_graph_region_pc_10 = (! (! ((((hand2)[(function (key) { if (typeof key === \"string\" && key.split(\".\").some(function (part) { return [\"__proto__\",\"arguments\",\"callee\",\"caller\",\"constructor\",\"prototype\"].indexOf(part) !== -1; })) throw new Error(\"unsafe content graph index\"); return key; })(k2)])[\"cardId\"] === \"hashirama-edo-nature-heal\") && (! ((hand2)[(function (key) { if (typeof key === \"string\" && key.split(\".\").some(function (part) { return [\"__proto__\",\"arguments\",\"callee\",\"caller\",\"constructor\",\"prototype\"].indexOf(part) !== -1; })) throw new Error(\"unsafe content graph index\"); return key; })(k2)])[\"boundPieceInstanceId\"])))) ? \"n5\" : \"n3\"; break; case \"n3\": __rvb_content_graph_region_pc_10 = \"n3\"; break; case \"n5\": ((hand2)[(function (key) { if (typeof key === \"string\" && key.split(\".\").some(function (part) { return [\"__proto__\",\"arguments\",\"callee\",\"caller\",\"constructor\",\"prototype\"].indexOf(part) !== -1; })) throw new Error(\"unsafe content graph index\"); return key; })(k2)])[\"boundPieceInstanceId\"] = (caster)[\"instanceId\"]; __rvb_content_graph_region_pc_10 = \"n4\"; break; case \"n4\": __rvb_content_graph_loop_break_8 = true; __rvb_content_graph_region_pc_10 = \"n3\"; break; default: throw new Error(\"invalid content graph region node\"); } } } if (__rvb_content_graph_loop_break_8) break; { var __rvb_content_graph_region_pc_11 = \"n8\"; while (__rvb_content_graph_region_pc_11 !== \"n7\") { switch (__rvb_content_graph_region_pc_11) { case \"n8\": k2 = ((+ k2) - 1); __rvb_content_graph_region_pc_11 = \"n7\"; break; case \"n7\": __rvb_content_graph_region_pc_11 = \"n7\"; break; default: throw new Error(\"invalid content graph region node\"); } } } if (__rvb_content_graph_loop_break_8) break; if (__rvb_content_graph_loop_continue_9) { __rvb_content_graph_loop_continue_9 = false; continue; } } _pc = \"n2\"; break; case \"n2\": (msgs).push(\"获得【木遁·真数千手】和【仙术·大自然愈合】各1张\"); _pc = \"n1\"; break; case \"n1\": return {success: true, message: (msgs)[\"join\"](\"，\")}; case \"n34\": return {success: true, message: \"位移被阻挡，本次位移效果取消\"}; case \"n37\": return {success: false, message: \"目标格已被占用\"}; case \"n40\": return {success: false, message: \"目标格不可移动\"}; case \"n43\": return pos; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\"); }",
+  "previewCode": "function calculatePreview(piece, skillDef, currentCooldown) { var _pc = \"n1\"; for (var _step = 0; _step <= 1; _step++) { switch (_pc) { case \"n1\": return {description: \"选择地格（2），传送至该格，重置其他技能冷却，获得【木遁·真数千手】和【仙术·大自然愈合】各1张。\", expectedValues: {}, chargeCost: 3}; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\"); }",
+  "contentGraph": {
+    "version": "rvb-content-graph/v1",
+    "surface": "skill",
+    "entry": "n46",
+    "nodes": [
+      {
+        "id": "n1",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "collection",
+                "object": {
+                  "kind": "ref",
+                  "name": "msgs"
+                },
+                "method": "join",
+                "args": [
+                  {
+                    "kind": "literal",
+                    "value": "，"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n2",
+        "kind": "call",
+        "capability": "array.push",
+        "args": [
+          {
+            "kind": "ref",
+            "name": "msgs"
+          },
+          {
+            "kind": "literal",
+            "value": "获得【木遁·真数千手】和【仙术·大自然愈合】各1张"
+          }
+        ],
+        "next": "n1"
+      },
+      {
+        "id": "n9",
+        "kind": "loop",
+        "loop": "for",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": ">=",
+              "left": {
+                "kind": "ref",
+                "name": "k2"
+              },
+              "right": {
+                "kind": "literal",
+                "value": 0
+              }
+            }
+          }
+        },
+        "body": {
+          "entry": "n6",
+          "end": "n3",
+          "nodes": [
+            {
+              "id": "n3",
+              "kind": "regionEnd"
+            },
+            {
+              "id": "n4",
+              "kind": "break"
+            },
+            {
+              "id": "n5",
+              "kind": "set",
+              "target": {
+                "kind": "get",
+                "object": {
+                  "kind": "index",
+                  "object": {
+                    "kind": "ref",
+                    "name": "hand2"
+                  },
+                  "index": {
+                    "kind": "ref",
+                    "name": "k2"
+                  }
+                },
+                "key": "boundPieceInstanceId"
+              },
+              "operator": "=",
+              "value": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "caster"
+                },
+                "key": "instanceId"
+              },
+              "next": "n4"
+            },
+            {
+              "id": "n6",
+              "kind": "branch",
+              "condition": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "unary",
+                  "op": "!",
+                  "argument": {
+                    "kind": "binary",
+                    "op": "&&",
+                    "left": {
+                      "kind": "binary",
+                      "op": "===",
+                      "left": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "index",
+                          "object": {
+                            "kind": "ref",
+                            "name": "hand2"
+                          },
+                          "index": {
+                            "kind": "ref",
+                            "name": "k2"
+                          }
+                        },
+                        "key": "cardId"
+                      },
+                      "right": {
+                        "kind": "literal",
+                        "value": "hashirama-edo-nature-heal"
+                      }
+                    },
+                    "right": {
+                      "kind": "unary",
+                      "op": "!",
+                      "argument": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "index",
+                          "object": {
+                            "kind": "ref",
+                            "name": "hand2"
+                          },
+                          "index": {
+                            "kind": "ref",
+                            "name": "k2"
+                          }
+                        },
+                        "key": "boundPieceInstanceId"
+                      }
+                    }
+                  }
+                }
+              },
+              "yes": "n5",
+              "no": "n3"
+            }
+          ]
+        },
+        "update": {
+          "entry": "n8",
+          "end": "n7",
+          "nodes": [
+            {
+              "id": "n7",
+              "kind": "regionEnd"
+            },
+            {
+              "id": "n8",
+              "kind": "set",
+              "target": {
+                "kind": "ref",
+                "name": "k2"
+              },
+              "operator": "=",
+              "value": {
+                "kind": "binary",
+                "op": "-",
+                "left": {
+                  "kind": "unary",
+                  "op": "+",
+                  "argument": {
+                    "kind": "ref",
+                    "name": "k2"
+                  }
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": 1
+                }
+              },
+              "next": "n7"
+            }
+          ]
+        },
+        "next": "n2"
+      },
+      {
+        "id": "n10",
+        "kind": "bind",
+        "name": "k2",
+        "expr": {
+          "kind": "binary",
+          "op": "-",
+          "left": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "hand2"
+            },
+            "key": "length"
+          },
+          "right": {
+            "kind": "literal",
+            "value": 1
+          }
+        },
+        "next": "n9"
+      },
+      {
+        "id": "n11",
+        "kind": "call",
+        "capability": "getHand",
+        "args": [
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "caster"
+            },
+            "key": "ownerPlayerId"
+          }
+        ],
+        "result": "hand2",
+        "next": "n10"
+      },
+      {
+        "id": "n12",
+        "kind": "call",
+        "capability": "addCardToHand",
+        "args": [
+          {
+            "kind": "literal",
+            "value": "hashirama-edo-nature-heal"
+          },
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "caster"
+            },
+            "key": "ownerPlayerId"
+          }
+        ],
+        "next": "n11"
+      },
+      {
+        "id": "n19",
+        "kind": "loop",
+        "loop": "for",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": ">=",
+              "left": {
+                "kind": "ref",
+                "name": "k1"
+              },
+              "right": {
+                "kind": "literal",
+                "value": 0
+              }
+            }
+          }
+        },
+        "body": {
+          "entry": "n16",
+          "end": "n13",
+          "nodes": [
+            {
+              "id": "n13",
+              "kind": "regionEnd"
+            },
+            {
+              "id": "n14",
+              "kind": "break"
+            },
+            {
+              "id": "n15",
+              "kind": "set",
+              "target": {
+                "kind": "get",
+                "object": {
+                  "kind": "index",
+                  "object": {
+                    "kind": "ref",
+                    "name": "hand1"
+                  },
+                  "index": {
+                    "kind": "ref",
+                    "name": "k1"
+                  }
+                },
+                "key": "boundPieceInstanceId"
+              },
+              "operator": "=",
+              "value": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "caster"
+                },
+                "key": "instanceId"
+              },
+              "next": "n14"
+            },
+            {
+              "id": "n16",
+              "kind": "branch",
+              "condition": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "unary",
+                  "op": "!",
+                  "argument": {
+                    "kind": "binary",
+                    "op": "&&",
+                    "left": {
+                      "kind": "binary",
+                      "op": "===",
+                      "left": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "index",
+                          "object": {
+                            "kind": "ref",
+                            "name": "hand1"
+                          },
+                          "index": {
+                            "kind": "ref",
+                            "name": "k1"
+                          }
+                        },
+                        "key": "cardId"
+                      },
+                      "right": {
+                        "kind": "literal",
+                        "value": "hashirama-edo-thousand-hands"
+                      }
+                    },
+                    "right": {
+                      "kind": "unary",
+                      "op": "!",
+                      "argument": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "index",
+                          "object": {
+                            "kind": "ref",
+                            "name": "hand1"
+                          },
+                          "index": {
+                            "kind": "ref",
+                            "name": "k1"
+                          }
+                        },
+                        "key": "boundPieceInstanceId"
+                      }
+                    }
+                  }
+                }
+              },
+              "yes": "n15",
+              "no": "n13"
+            }
+          ]
+        },
+        "update": {
+          "entry": "n18",
+          "end": "n17",
+          "nodes": [
+            {
+              "id": "n17",
+              "kind": "regionEnd"
+            },
+            {
+              "id": "n18",
+              "kind": "set",
+              "target": {
+                "kind": "ref",
+                "name": "k1"
+              },
+              "operator": "=",
+              "value": {
+                "kind": "binary",
+                "op": "-",
+                "left": {
+                  "kind": "unary",
+                  "op": "+",
+                  "argument": {
+                    "kind": "ref",
+                    "name": "k1"
+                  }
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": 1
+                }
+              },
+              "next": "n17"
+            }
+          ]
+        },
+        "next": "n12"
+      },
+      {
+        "id": "n20",
+        "kind": "bind",
+        "name": "k1",
+        "expr": {
+          "kind": "binary",
+          "op": "-",
+          "left": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "hand1"
+            },
+            "key": "length"
+          },
+          "right": {
+            "kind": "literal",
+            "value": 1
+          }
+        },
+        "next": "n19"
+      },
+      {
+        "id": "n21",
+        "kind": "call",
+        "capability": "getHand",
+        "args": [
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "caster"
+            },
+            "key": "ownerPlayerId"
+          }
+        ],
+        "result": "hand1",
+        "next": "n20"
+      },
+      {
+        "id": "n22",
+        "kind": "call",
+        "capability": "addCardToHand",
+        "args": [
+          {
+            "kind": "literal",
+            "value": "hashirama-edo-thousand-hands"
+          },
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "caster"
+            },
+            "key": "ownerPlayerId"
+          }
+        ],
+        "next": "n21"
+      },
+      {
+        "id": "n23",
+        "kind": "call",
+        "capability": "array.push",
+        "args": [
+          {
+            "kind": "ref",
+            "name": "msgs"
+          },
+          {
+            "kind": "literal",
+            "value": "其他技能冷却已重置"
+          }
+        ],
+        "next": "n22"
+      },
+      {
+        "id": "n30",
+        "kind": "loop",
+        "loop": "for",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "<",
+              "left": {
+                "kind": "ref",
+                "name": "j"
+              },
+              "right": {
+                "kind": "get",
+                "object": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "caster"
+                  },
+                  "key": "skills"
+                },
+                "key": "length"
+              }
+            }
+          }
+        },
+        "body": {
+          "entry": "n27",
+          "end": "n24",
+          "nodes": [
+            {
+              "id": "n24",
+              "kind": "regionEnd"
+            },
+            {
+              "id": "n25",
+              "kind": "set",
+              "target": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "s"
+                },
+                "key": "currentCooldown"
+              },
+              "operator": "=",
+              "value": {
+                "kind": "literal",
+                "value": 0
+              },
+              "next": "n24"
+            },
+            {
+              "id": "n26",
+              "kind": "branch",
+              "condition": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "unary",
+                  "op": "!",
+                  "argument": {
+                    "kind": "binary",
+                    "op": "&&",
+                    "left": {
+                      "kind": "binary",
+                      "op": "!==",
+                      "left": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "s"
+                        },
+                        "key": "skillId"
+                      },
+                      "right": {
+                        "kind": "literal",
+                        "value": "hashirama-edo-sage-buddha"
+                      }
+                    },
+                    "right": {
+                      "kind": "binary",
+                      "op": ">",
+                      "left": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "s"
+                        },
+                        "key": "currentCooldown"
+                      },
+                      "right": {
+                        "kind": "literal",
+                        "value": 0
+                      }
+                    }
+                  }
+                }
+              },
+              "yes": "n25",
+              "no": "n24"
+            },
+            {
+              "id": "n27",
+              "kind": "bind",
+              "name": "s",
+              "expr": {
+                "kind": "index",
+                "object": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "caster"
+                  },
+                  "key": "skills"
+                },
+                "index": {
+                  "kind": "ref",
+                  "name": "j"
+                }
+              },
+              "next": "n26"
+            }
+          ]
+        },
+        "update": {
+          "entry": "n29",
+          "end": "n28",
+          "nodes": [
+            {
+              "id": "n28",
+              "kind": "regionEnd"
+            },
+            {
+              "id": "n29",
+              "kind": "set",
+              "target": {
+                "kind": "ref",
+                "name": "j"
+              },
+              "operator": "=",
+              "value": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "unary",
+                  "op": "+",
+                  "argument": {
+                    "kind": "ref",
+                    "name": "j"
+                  }
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": 1
+                }
+              },
+              "next": "n28"
+            }
+          ]
+        },
+        "next": "n23"
+      },
+      {
+        "id": "n31",
+        "kind": "bind",
+        "name": "j",
+        "expr": {
+          "kind": "literal",
+          "value": 0
+        },
+        "next": "n30"
+      },
+      {
+        "id": "n32",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "caster"
+              },
+              "key": "skills"
+            }
+          }
+        },
+        "yes": "n31",
+        "no": "n22"
+      },
+      {
+        "id": "n33",
+        "kind": "bind",
+        "name": "msgs",
+        "expr": {
+          "kind": "array",
+          "items": [
+            {
+              "kind": "binary",
+              "op": "+",
+              "left": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "binary",
+                  "op": "+",
+                  "left": {
+                    "kind": "binary",
+                    "op": "+",
+                    "left": {
+                      "kind": "binary",
+                      "op": "+",
+                      "left": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "caster"
+                        },
+                        "key": "name"
+                      },
+                      "right": {
+                        "kind": "literal",
+                        "value": "施放仙术·顶上化佛，瞬移至("
+                      }
+                    },
+                    "right": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "pos"
+                      },
+                      "key": "x"
+                    }
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": ","
+                  }
+                },
+                "right": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "pos"
+                  },
+                  "key": "y"
+                }
+              },
+              "right": {
+                "kind": "literal",
+                "value": ")"
+              }
+            }
+          ]
+        },
+        "next": "n32"
+      },
+      {
+        "id": "n34",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": "位移被阻挡，本次位移效果取消"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n35",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "unary",
+              "op": "!",
+              "argument": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "__rvb_import_effect_0"
+                },
+                "key": "success"
+              }
+            }
+          }
+        },
+        "yes": "n34",
+        "no": "n33"
+      },
+      {
+        "id": "n36",
+        "kind": "call",
+        "capability": "flow.effects.displace",
+        "args": [
+          {
+            "kind": "array",
+            "items": [
+              {
+                "kind": "object",
+                "entries": [
+                  {
+                    "key": "pieceId",
+                    "value": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "caster"
+                      },
+                      "key": "instanceId"
+                    }
+                  },
+                  {
+                    "key": "x",
+                    "value": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "pos"
+                      },
+                      "key": "x"
+                    }
+                  },
+                  {
+                    "key": "y",
+                    "value": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "pos"
+                      },
+                      "key": "y"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "kind": "literal",
+            "value": "teleport"
+          }
+        ],
+        "result": "__rvb_import_effect_0",
+        "next": "n35"
+      },
+      {
+        "id": "n37",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": "目标格已被占用"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n38",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "ref",
+              "name": "blocked"
+            }
+          }
+        },
+        "yes": "n37",
+        "no": "n36"
+      },
+      {
+        "id": "n39",
+        "kind": "bind",
+        "name": "blocked",
+        "expr": {
+          "kind": "collection",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "battle"
+            },
+            "key": "pieces"
+          },
+          "method": "find",
+          "args": [
+            {
+              "kind": "lambda",
+              "parameters": [
+                "p"
+              ],
+              "body": {
+                "kind": "binary",
+                "op": "&&",
+                "left": {
+                  "kind": "binary",
+                  "op": "&&",
+                  "left": {
+                    "kind": "binary",
+                    "op": "&&",
+                    "left": {
+                      "kind": "binary",
+                      "op": "===",
+                      "left": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "p"
+                        },
+                        "key": "x"
+                      },
+                      "right": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "pos"
+                        },
+                        "key": "x"
+                      }
+                    },
+                    "right": {
+                      "kind": "binary",
+                      "op": "===",
+                      "left": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "p"
+                        },
+                        "key": "y"
+                      },
+                      "right": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "pos"
+                        },
+                        "key": "y"
+                      }
+                    }
+                  },
+                  "right": {
+                    "kind": "binary",
+                    "op": ">",
+                    "left": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "p"
+                      },
+                      "key": "currentHp"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": 0
+                    }
+                  }
+                },
+                "right": {
+                  "kind": "binary",
+                  "op": "!==",
+                  "left": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "p"
+                    },
+                    "key": "instanceId"
+                  },
+                  "right": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "caster"
+                    },
+                    "key": "instanceId"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "next": "n38"
+      },
+      {
+        "id": "n40",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": "目标格不可移动"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n41",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "binary",
+                "op": "||",
+                "left": {
+                  "kind": "unary",
+                  "op": "!",
+                  "argument": {
+                    "kind": "ref",
+                    "name": "targetTile"
+                  }
+                },
+                "right": {
+                  "kind": "unary",
+                  "op": "!",
+                  "argument": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "targetTile"
+                    },
+                    "key": "props"
+                  }
+                }
+              },
+              "right": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "targetTile"
+                    },
+                    "key": "props"
+                  },
+                  "key": "walkable"
+                }
+              }
+            }
+          }
+        },
+        "yes": "n40",
+        "no": "n39"
+      },
+      {
+        "id": "n42",
+        "kind": "bind",
+        "name": "targetTile",
+        "expr": {
+          "kind": "binary",
+          "op": "&&",
+          "left": {
+            "kind": "binary",
+            "op": "&&",
+            "left": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "battle"
+              },
+              "key": "map"
+            },
+            "right": {
+              "kind": "get",
+              "object": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "battle"
+                },
+                "key": "map"
+              },
+              "key": "tiles"
+            }
+          },
+          "right": {
+            "kind": "collection",
+            "object": {
+              "kind": "get",
+              "object": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "battle"
+                },
+                "key": "map"
+              },
+              "key": "tiles"
+            },
+            "method": "find",
+            "args": [
+              {
+                "kind": "lambda",
+                "parameters": [
+                  "t"
+                ],
+                "body": {
+                  "kind": "binary",
+                  "op": "&&",
+                  "left": {
+                    "kind": "binary",
+                    "op": "===",
+                    "left": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "t"
+                      },
+                      "key": "x"
+                    },
+                    "right": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "pos"
+                      },
+                      "key": "x"
+                    }
+                  },
+                  "right": {
+                    "kind": "binary",
+                    "op": "===",
+                    "left": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "t"
+                      },
+                      "key": "y"
+                    },
+                    "right": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "pos"
+                      },
+                      "key": "y"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "next": "n41"
+      },
+      {
+        "id": "n43",
+        "kind": "return",
+        "value": {
+          "kind": "ref",
+          "name": "pos"
+        }
+      },
+      {
+        "id": "n44",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "ref",
+                  "name": "pos"
+                }
+              },
+              "right": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "pos"
+                },
+                "key": "needsTargetSelection"
+              }
+            }
+          }
+        },
+        "yes": "n43",
+        "no": "n42"
+      },
+      {
+        "id": "n45",
+        "kind": "call",
+        "capability": "selectTarget",
+        "args": [
+          {
+            "kind": "object",
+            "entries": [
+              {
+                "key": "type",
+                "value": {
+                  "kind": "literal",
+                  "value": "grid"
+                }
+              },
+              {
+                "key": "range",
+                "value": {
+                  "kind": "literal",
+                  "value": 2
+                }
+              },
+              {
+                "key": "filter",
+                "value": {
+                  "kind": "literal",
+                  "value": "all"
+                }
+              }
+            ]
+          }
+        ],
+        "result": "pos",
+        "next": "n44"
+      },
+      {
+        "id": "n46",
+        "kind": "bind",
+        "name": "caster",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "context"
+          },
+          "key": "piece"
+        },
+        "next": "n45"
+      }
+    ]
+  },
+  "contentGraphField": "code",
+  "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1",
+  "contentGraphEntries": {
+    "previewCode": {
+      "graph": {
+        "version": "rvb-content-graph/v1",
+        "surface": "preview",
+        "entry": "n1",
+        "nodes": [
+          {
+            "id": "n1",
+            "kind": "return",
+            "value": {
+              "kind": "object",
+              "entries": [
+                {
+                  "key": "description",
+                  "value": {
+                    "kind": "literal",
+                    "value": "选择地格（2），传送至该格，重置其他技能冷却，获得【木遁·真数千手】和【仙术·大自然愈合】各1张。"
+                  }
+                },
+                {
+                  "key": "expectedValues",
+                  "value": {
+                    "kind": "object",
+                    "entries": []
+                  }
+                },
+                {
+                  "key": "chargeCost",
+                  "value": {
+                    "kind": "literal",
+                    "value": 3
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "compilerVersion": "rvb-content-graph-compiler/v1"
+    }
+  }
 }

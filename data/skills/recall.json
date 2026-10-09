@@ -66,5 +66,964 @@
       }
     ]
   },
-  "code": "function executeSkill(context) { var caster = context.piece; var result = Number(context.selectedOption); if (!Number.isInteger(result) || result < 1 || result > 10) { return { success: false, message: 'Invalid Recall action count' }; } if (!battle.extensions) { battle.extensions = {}; } if (!battle.extensions.recallData) { battle.extensions.recallData = []; } var data = battle.extensions.recallData; data = data.filter(function(r) { return r.pieceId !== caster.instanceId; }); data.push({ pieceId: caster.instanceId, ownerPlayerId: caster.ownerPlayerId, projectionVisibility: 'owner', targetCount: result, actionCount: 0, snapshot: { x: caster.x, y: caster.y, hp: caster.currentHp, shield: caster.shield, statusTags: caster.statusTags ? JSON.parse(JSON.stringify(caster.statusTags)) : [], buffs: caster.buffs ? JSON.parse(JSON.stringify(caster.buffs)) : [], debuffs: caster.debuffs ? JSON.parse(JSON.stringify(caster.debuffs)) : [] } }); battle.extensions.recallData = data; return { success: true, message: caster.name + '已设置回溯' }; }"
+  "code": "function executeSkill(context) { var __rvb_import_bound_method_29, __rvb_import_effect_10, __rvb_import_effect_11, __rvb_import_effect_16, __rvb_import_effect_17, __rvb_import_effect_4, __rvb_import_effect_5, __rvb_import_operand_0, __rvb_import_operand_1, __rvb_import_operand_12, __rvb_import_operand_13, __rvb_import_operand_15, __rvb_import_operand_18, __rvb_import_operand_19, __rvb_import_operand_20, __rvb_import_operand_21, __rvb_import_operand_22, __rvb_import_operand_23, __rvb_import_operand_24, __rvb_import_operand_25, __rvb_import_operand_26, __rvb_import_operand_27, __rvb_import_operand_28, __rvb_import_operand_3, __rvb_import_operand_6, __rvb_import_operand_7, __rvb_import_operand_9, __rvb_import_value_14, __rvb_import_value_2, __rvb_import_value_8, caster, data, result; var _pc = \"n52\"; for (var _step = 0; _step <= 52; _step++) { switch (_pc) { case \"n52\": caster = (context)[\"piece\"]; _pc = \"n51\"; break; case \"n51\": result = Number((context)[\"selectedOption\"]); _pc = \"n50\"; break; case \"n50\": _pc = (! (! (((! Number.isInteger(result)) || (result < 1)) || (result > 10)))) ? \"n49\" : \"n48\"; break; case \"n48\": _pc = (! (! (! (battle)[\"extensions\"]))) ? \"n47\" : \"n46\"; break; case \"n47\": (battle)[\"extensions\"] = {}; _pc = \"n46\"; break; case \"n46\": _pc = (! (! (! ((battle)[\"extensions\"])[\"recallData\"]))) ? \"n45\" : \"n44\"; break; case \"n45\": ((battle)[\"extensions\"])[\"recallData\"] = []; _pc = \"n44\"; break; case \"n44\": data = ((battle)[\"extensions\"])[\"recallData\"]; _pc = \"n43\"; break; case \"n43\": data = (data)[\"filter\"](function (r) { return ((r)[\"pieceId\"] !== (caster)[\"instanceId\"]); }); _pc = \"n42\"; break; case \"n42\": __rvb_import_bound_method_29 = (function (receiver) { var capturedMethod = receiver[\"push\"]; return function () { return Reflect.apply(capturedMethod, receiver, arguments); }; })(data); _pc = \"n41\"; break; case \"n41\": __rvb_import_operand_28 = (caster)[\"instanceId\"]; _pc = \"n40\"; break; case \"n40\": __rvb_import_operand_27 = (caster)[\"ownerPlayerId\"]; _pc = \"n39\"; break; case \"n39\": __rvb_import_operand_26 = \"owner\"; _pc = \"n38\"; break; case \"n38\": __rvb_import_operand_25 = result; _pc = \"n37\"; break; case \"n37\": __rvb_import_operand_24 = 0; _pc = \"n36\"; break; case \"n36\": __rvb_import_operand_23 = (caster)[\"x\"]; _pc = \"n35\"; break; case \"n35\": __rvb_import_operand_22 = (caster)[\"y\"]; _pc = \"n34\"; break; case \"n34\": __rvb_import_operand_21 = (caster)[\"currentHp\"]; _pc = \"n33\"; break; case \"n33\": __rvb_import_operand_20 = (caster)[\"shield\"]; _pc = \"n32\"; break; case \"n32\": __rvb_import_value_14 = (void 0); _pc = \"n31\"; break; case \"n31\": __rvb_import_operand_19 = (caster)[\"statusTags\"]; _pc = \"n30\"; break; case \"n30\": _pc = (! (! __rvb_import_operand_19)) ? \"n28\" : \"n29\"; break; case \"n29\": __rvb_import_value_14 = []; _pc = \"n24\"; break; case \"n28\": __rvb_import_effect_17 = JSON.stringify((caster)[\"statusTags\"]); _pc = \"n27\"; break; case \"n27\": __rvb_import_operand_18 = __rvb_import_effect_17; _pc = \"n26\"; break; case \"n26\": __rvb_import_effect_16 = JSON.parse(__rvb_import_operand_18); _pc = \"n25\"; break; case \"n25\": __rvb_import_value_14 = __rvb_import_effect_16; _pc = \"n24\"; break; case \"n24\": __rvb_import_operand_15 = __rvb_import_value_14; _pc = \"n23\"; break; case \"n23\": __rvb_import_value_8 = (void 0); _pc = \"n22\"; break; case \"n22\": __rvb_import_operand_13 = (caster)[\"buffs\"]; _pc = \"n21\"; break; case \"n21\": _pc = (! (! __rvb_import_operand_13)) ? \"n19\" : \"n20\"; break; case \"n20\": __rvb_import_value_8 = []; _pc = \"n15\"; break; case \"n19\": __rvb_import_effect_11 = JSON.stringify((caster)[\"buffs\"]); _pc = \"n18\"; break; case \"n18\": __rvb_import_operand_12 = __rvb_import_effect_11; _pc = \"n17\"; break; case \"n17\": __rvb_import_effect_10 = JSON.parse(__rvb_import_operand_12); _pc = \"n16\"; break; case \"n16\": __rvb_import_value_8 = __rvb_import_effect_10; _pc = \"n15\"; break; case \"n15\": __rvb_import_operand_9 = __rvb_import_value_8; _pc = \"n14\"; break; case \"n14\": __rvb_import_value_2 = (void 0); _pc = \"n13\"; break; case \"n13\": __rvb_import_operand_7 = (caster)[\"debuffs\"]; _pc = \"n12\"; break; case \"n12\": _pc = (! (! __rvb_import_operand_7)) ? \"n10\" : \"n11\"; break; case \"n11\": __rvb_import_value_2 = []; _pc = \"n6\"; break; case \"n10\": __rvb_import_effect_5 = JSON.stringify((caster)[\"debuffs\"]); _pc = \"n9\"; break; case \"n9\": __rvb_import_operand_6 = __rvb_import_effect_5; _pc = \"n8\"; break; case \"n8\": __rvb_import_effect_4 = JSON.parse(__rvb_import_operand_6); _pc = \"n7\"; break; case \"n7\": __rvb_import_value_2 = __rvb_import_effect_4; _pc = \"n6\"; break; case \"n6\": __rvb_import_operand_3 = __rvb_import_value_2; _pc = \"n5\"; break; case \"n5\": __rvb_import_operand_1 = {x: __rvb_import_operand_23, y: __rvb_import_operand_22, hp: __rvb_import_operand_21, shield: __rvb_import_operand_20, statusTags: __rvb_import_operand_15, buffs: __rvb_import_operand_9, debuffs: __rvb_import_operand_3}; _pc = \"n4\"; break; case \"n4\": __rvb_import_operand_0 = {pieceId: __rvb_import_operand_28, ownerPlayerId: __rvb_import_operand_27, projectionVisibility: __rvb_import_operand_26, targetCount: __rvb_import_operand_25, actionCount: __rvb_import_operand_24, snapshot: __rvb_import_operand_1}; _pc = \"n3\"; break; case \"n3\": (__rvb_import_bound_method_29)(__rvb_import_operand_0); _pc = \"n2\"; break; case \"n2\": ((battle)[\"extensions\"])[\"recallData\"] = data; _pc = \"n1\"; break; case \"n1\": return {success: true, message: ((caster)[\"name\"] + \"已设置回溯\")}; case \"n49\": return {success: false, message: \"Invalid Recall action count\"}; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\"); }",
+  "contentGraph": {
+    "version": "rvb-content-graph/v1",
+    "surface": "skill",
+    "entry": "n52",
+    "nodes": [
+      {
+        "id": "n1",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "caster"
+                  },
+                  "key": "name"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "已设置回溯"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n2",
+        "kind": "set",
+        "target": {
+          "kind": "get",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "battle"
+            },
+            "key": "extensions"
+          },
+          "key": "recallData"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "ref",
+          "name": "data"
+        },
+        "next": "n1"
+      },
+      {
+        "id": "n3",
+        "kind": "invoke",
+        "target": {
+          "kind": "function",
+          "value": {
+            "kind": "ref",
+            "name": "__rvb_import_bound_method_29"
+          }
+        },
+        "args": [
+          {
+            "kind": "ref",
+            "name": "__rvb_import_operand_0"
+          }
+        ],
+        "next": "n2"
+      },
+      {
+        "id": "n4",
+        "kind": "bind",
+        "name": "__rvb_import_operand_0",
+        "expr": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "pieceId",
+              "value": {
+                "kind": "ref",
+                "name": "__rvb_import_operand_28"
+              }
+            },
+            {
+              "key": "ownerPlayerId",
+              "value": {
+                "kind": "ref",
+                "name": "__rvb_import_operand_27"
+              }
+            },
+            {
+              "key": "projectionVisibility",
+              "value": {
+                "kind": "ref",
+                "name": "__rvb_import_operand_26"
+              }
+            },
+            {
+              "key": "targetCount",
+              "value": {
+                "kind": "ref",
+                "name": "__rvb_import_operand_25"
+              }
+            },
+            {
+              "key": "actionCount",
+              "value": {
+                "kind": "ref",
+                "name": "__rvb_import_operand_24"
+              }
+            },
+            {
+              "key": "snapshot",
+              "value": {
+                "kind": "ref",
+                "name": "__rvb_import_operand_1"
+              }
+            }
+          ]
+        },
+        "next": "n3"
+      },
+      {
+        "id": "n5",
+        "kind": "bind",
+        "name": "__rvb_import_operand_1",
+        "expr": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "x",
+              "value": {
+                "kind": "ref",
+                "name": "__rvb_import_operand_23"
+              }
+            },
+            {
+              "key": "y",
+              "value": {
+                "kind": "ref",
+                "name": "__rvb_import_operand_22"
+              }
+            },
+            {
+              "key": "hp",
+              "value": {
+                "kind": "ref",
+                "name": "__rvb_import_operand_21"
+              }
+            },
+            {
+              "key": "shield",
+              "value": {
+                "kind": "ref",
+                "name": "__rvb_import_operand_20"
+              }
+            },
+            {
+              "key": "statusTags",
+              "value": {
+                "kind": "ref",
+                "name": "__rvb_import_operand_15"
+              }
+            },
+            {
+              "key": "buffs",
+              "value": {
+                "kind": "ref",
+                "name": "__rvb_import_operand_9"
+              }
+            },
+            {
+              "key": "debuffs",
+              "value": {
+                "kind": "ref",
+                "name": "__rvb_import_operand_3"
+              }
+            }
+          ]
+        },
+        "next": "n4"
+      },
+      {
+        "id": "n6",
+        "kind": "bind",
+        "name": "__rvb_import_operand_3",
+        "expr": {
+          "kind": "ref",
+          "name": "__rvb_import_value_2"
+        },
+        "next": "n5"
+      },
+      {
+        "id": "n7",
+        "kind": "set",
+        "target": {
+          "kind": "ref",
+          "name": "__rvb_import_value_2"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "ref",
+          "name": "__rvb_import_effect_4"
+        },
+        "next": "n6"
+      },
+      {
+        "id": "n8",
+        "kind": "call",
+        "capability": "JSON.parse",
+        "args": [
+          {
+            "kind": "ref",
+            "name": "__rvb_import_operand_6"
+          }
+        ],
+        "result": "__rvb_import_effect_4",
+        "next": "n7"
+      },
+      {
+        "id": "n9",
+        "kind": "bind",
+        "name": "__rvb_import_operand_6",
+        "expr": {
+          "kind": "ref",
+          "name": "__rvb_import_effect_5"
+        },
+        "next": "n8"
+      },
+      {
+        "id": "n10",
+        "kind": "call",
+        "capability": "JSON.stringify",
+        "args": [
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "caster"
+            },
+            "key": "debuffs"
+          }
+        ],
+        "result": "__rvb_import_effect_5",
+        "next": "n9"
+      },
+      {
+        "id": "n11",
+        "kind": "set",
+        "target": {
+          "kind": "ref",
+          "name": "__rvb_import_value_2"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "array",
+          "items": []
+        },
+        "next": "n6"
+      },
+      {
+        "id": "n12",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "ref",
+              "name": "__rvb_import_operand_7"
+            }
+          }
+        },
+        "yes": "n10",
+        "no": "n11"
+      },
+      {
+        "id": "n13",
+        "kind": "bind",
+        "name": "__rvb_import_operand_7",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "caster"
+          },
+          "key": "debuffs"
+        },
+        "next": "n12"
+      },
+      {
+        "id": "n14",
+        "kind": "bind",
+        "name": "__rvb_import_value_2",
+        "next": "n13",
+        "expr": {
+          "kind": "undefined"
+        }
+      },
+      {
+        "id": "n15",
+        "kind": "bind",
+        "name": "__rvb_import_operand_9",
+        "expr": {
+          "kind": "ref",
+          "name": "__rvb_import_value_8"
+        },
+        "next": "n14"
+      },
+      {
+        "id": "n16",
+        "kind": "set",
+        "target": {
+          "kind": "ref",
+          "name": "__rvb_import_value_8"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "ref",
+          "name": "__rvb_import_effect_10"
+        },
+        "next": "n15"
+      },
+      {
+        "id": "n17",
+        "kind": "call",
+        "capability": "JSON.parse",
+        "args": [
+          {
+            "kind": "ref",
+            "name": "__rvb_import_operand_12"
+          }
+        ],
+        "result": "__rvb_import_effect_10",
+        "next": "n16"
+      },
+      {
+        "id": "n18",
+        "kind": "bind",
+        "name": "__rvb_import_operand_12",
+        "expr": {
+          "kind": "ref",
+          "name": "__rvb_import_effect_11"
+        },
+        "next": "n17"
+      },
+      {
+        "id": "n19",
+        "kind": "call",
+        "capability": "JSON.stringify",
+        "args": [
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "caster"
+            },
+            "key": "buffs"
+          }
+        ],
+        "result": "__rvb_import_effect_11",
+        "next": "n18"
+      },
+      {
+        "id": "n20",
+        "kind": "set",
+        "target": {
+          "kind": "ref",
+          "name": "__rvb_import_value_8"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "array",
+          "items": []
+        },
+        "next": "n15"
+      },
+      {
+        "id": "n21",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "ref",
+              "name": "__rvb_import_operand_13"
+            }
+          }
+        },
+        "yes": "n19",
+        "no": "n20"
+      },
+      {
+        "id": "n22",
+        "kind": "bind",
+        "name": "__rvb_import_operand_13",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "caster"
+          },
+          "key": "buffs"
+        },
+        "next": "n21"
+      },
+      {
+        "id": "n23",
+        "kind": "bind",
+        "name": "__rvb_import_value_8",
+        "next": "n22",
+        "expr": {
+          "kind": "undefined"
+        }
+      },
+      {
+        "id": "n24",
+        "kind": "bind",
+        "name": "__rvb_import_operand_15",
+        "expr": {
+          "kind": "ref",
+          "name": "__rvb_import_value_14"
+        },
+        "next": "n23"
+      },
+      {
+        "id": "n25",
+        "kind": "set",
+        "target": {
+          "kind": "ref",
+          "name": "__rvb_import_value_14"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "ref",
+          "name": "__rvb_import_effect_16"
+        },
+        "next": "n24"
+      },
+      {
+        "id": "n26",
+        "kind": "call",
+        "capability": "JSON.parse",
+        "args": [
+          {
+            "kind": "ref",
+            "name": "__rvb_import_operand_18"
+          }
+        ],
+        "result": "__rvb_import_effect_16",
+        "next": "n25"
+      },
+      {
+        "id": "n27",
+        "kind": "bind",
+        "name": "__rvb_import_operand_18",
+        "expr": {
+          "kind": "ref",
+          "name": "__rvb_import_effect_17"
+        },
+        "next": "n26"
+      },
+      {
+        "id": "n28",
+        "kind": "call",
+        "capability": "JSON.stringify",
+        "args": [
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "caster"
+            },
+            "key": "statusTags"
+          }
+        ],
+        "result": "__rvb_import_effect_17",
+        "next": "n27"
+      },
+      {
+        "id": "n29",
+        "kind": "set",
+        "target": {
+          "kind": "ref",
+          "name": "__rvb_import_value_14"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "array",
+          "items": []
+        },
+        "next": "n24"
+      },
+      {
+        "id": "n30",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "ref",
+              "name": "__rvb_import_operand_19"
+            }
+          }
+        },
+        "yes": "n28",
+        "no": "n29"
+      },
+      {
+        "id": "n31",
+        "kind": "bind",
+        "name": "__rvb_import_operand_19",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "caster"
+          },
+          "key": "statusTags"
+        },
+        "next": "n30"
+      },
+      {
+        "id": "n32",
+        "kind": "bind",
+        "name": "__rvb_import_value_14",
+        "next": "n31",
+        "expr": {
+          "kind": "undefined"
+        }
+      },
+      {
+        "id": "n33",
+        "kind": "bind",
+        "name": "__rvb_import_operand_20",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "caster"
+          },
+          "key": "shield"
+        },
+        "next": "n32"
+      },
+      {
+        "id": "n34",
+        "kind": "bind",
+        "name": "__rvb_import_operand_21",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "caster"
+          },
+          "key": "currentHp"
+        },
+        "next": "n33"
+      },
+      {
+        "id": "n35",
+        "kind": "bind",
+        "name": "__rvb_import_operand_22",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "caster"
+          },
+          "key": "y"
+        },
+        "next": "n34"
+      },
+      {
+        "id": "n36",
+        "kind": "bind",
+        "name": "__rvb_import_operand_23",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "caster"
+          },
+          "key": "x"
+        },
+        "next": "n35"
+      },
+      {
+        "id": "n37",
+        "kind": "bind",
+        "name": "__rvb_import_operand_24",
+        "expr": {
+          "kind": "literal",
+          "value": 0
+        },
+        "next": "n36"
+      },
+      {
+        "id": "n38",
+        "kind": "bind",
+        "name": "__rvb_import_operand_25",
+        "expr": {
+          "kind": "ref",
+          "name": "result"
+        },
+        "next": "n37"
+      },
+      {
+        "id": "n39",
+        "kind": "bind",
+        "name": "__rvb_import_operand_26",
+        "expr": {
+          "kind": "literal",
+          "value": "owner"
+        },
+        "next": "n38"
+      },
+      {
+        "id": "n40",
+        "kind": "bind",
+        "name": "__rvb_import_operand_27",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "caster"
+          },
+          "key": "ownerPlayerId"
+        },
+        "next": "n39"
+      },
+      {
+        "id": "n41",
+        "kind": "bind",
+        "name": "__rvb_import_operand_28",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "caster"
+          },
+          "key": "instanceId"
+        },
+        "next": "n40"
+      },
+      {
+        "id": "n42",
+        "kind": "bind",
+        "name": "__rvb_import_bound_method_29",
+        "expr": {
+          "kind": "boundMethod",
+          "object": {
+            "kind": "ref",
+            "name": "data"
+          },
+          "method": "push"
+        },
+        "next": "n41"
+      },
+      {
+        "id": "n43",
+        "kind": "set",
+        "target": {
+          "kind": "ref",
+          "name": "data"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "collection",
+          "object": {
+            "kind": "ref",
+            "name": "data"
+          },
+          "method": "filter",
+          "args": [
+            {
+              "kind": "lambda",
+              "parameters": [
+                "r"
+              ],
+              "body": {
+                "kind": "binary",
+                "op": "!==",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "r"
+                  },
+                  "key": "pieceId"
+                },
+                "right": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "caster"
+                  },
+                  "key": "instanceId"
+                }
+              }
+            }
+          ]
+        },
+        "next": "n42"
+      },
+      {
+        "id": "n44",
+        "kind": "bind",
+        "name": "data",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "battle"
+            },
+            "key": "extensions"
+          },
+          "key": "recallData"
+        },
+        "next": "n43"
+      },
+      {
+        "id": "n45",
+        "kind": "set",
+        "target": {
+          "kind": "get",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "battle"
+            },
+            "key": "extensions"
+          },
+          "key": "recallData"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "array",
+          "items": []
+        },
+        "next": "n44"
+      },
+      {
+        "id": "n46",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "unary",
+              "op": "!",
+              "argument": {
+                "kind": "get",
+                "object": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "battle"
+                  },
+                  "key": "extensions"
+                },
+                "key": "recallData"
+              }
+            }
+          }
+        },
+        "yes": "n45",
+        "no": "n44"
+      },
+      {
+        "id": "n47",
+        "kind": "set",
+        "target": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "battle"
+          },
+          "key": "extensions"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "object",
+          "entries": []
+        },
+        "next": "n46"
+      },
+      {
+        "id": "n48",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "unary",
+              "op": "!",
+              "argument": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "battle"
+                },
+                "key": "extensions"
+              }
+            }
+          }
+        },
+        "yes": "n47",
+        "no": "n46"
+      },
+      {
+        "id": "n49",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": "Invalid Recall action count"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n50",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "binary",
+                "op": "||",
+                "left": {
+                  "kind": "unary",
+                  "op": "!",
+                  "argument": {
+                    "kind": "call",
+                    "callee": "Number.isInteger",
+                    "args": [
+                      {
+                        "kind": "ref",
+                        "name": "result"
+                      }
+                    ]
+                  }
+                },
+                "right": {
+                  "kind": "binary",
+                  "op": "<",
+                  "left": {
+                    "kind": "ref",
+                    "name": "result"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": 1
+                  }
+                }
+              },
+              "right": {
+                "kind": "binary",
+                "op": ">",
+                "left": {
+                  "kind": "ref",
+                  "name": "result"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": 10
+                }
+              }
+            }
+          }
+        },
+        "yes": "n49",
+        "no": "n48"
+      },
+      {
+        "id": "n51",
+        "kind": "bind",
+        "name": "result",
+        "expr": {
+          "kind": "call",
+          "callee": "Number",
+          "args": [
+            {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "context"
+              },
+              "key": "selectedOption"
+            }
+          ]
+        },
+        "next": "n50"
+      },
+      {
+        "id": "n52",
+        "kind": "bind",
+        "name": "caster",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "context"
+          },
+          "key": "piece"
+        },
+        "next": "n51"
+      }
+    ]
+  },
+  "contentGraphField": "code",
+  "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1"
 }

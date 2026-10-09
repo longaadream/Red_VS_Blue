@@ -5,5 +5,802 @@
   "trigger": {
     "type": "beginTurn"
   },
-  "skillCode": "var piece = context.rulePiece; if (!piece || piece.currentHp <= 0) return { success: false, message: '' }; if (context.playerId !== piece.ownerPlayerId) return { success: false, message: '' }; var sageTag = piece.statusTags && piece.statusTags.find(function(t) { return t.type === 'sage-mode'; }); if (!sageTag) { removeRuleById(piece.instanceId, 'rule-naruto-sage-tick'); return { success: false, message: '' }; } var cloneCount = battle.pieces.filter(function(p) { return p.currentHp > 0 && p.ownerPlayerId === piece.ownerPlayerId && p.statusTags && p.statusTags.some(function(t) { return t.type === 'naruto-clone'; }); }).length; sageTag.stacks = Math.max(0, (sageTag.stacks == null ? 6 : sageTag.stacks) - 1 - cloneCount); if (sageTag.stacks > 0) { return { success: true, message: piece.name + '仙人模式还剩' + sageTag.stacks + '点准备进度' }; } var shieldTag = piece.statusTags && piece.statusTags.find(function(t) { return t.type === 'sage-mode-shield'; }); if (shieldTag) { removeStatusEffectById(piece.instanceId, shieldTag.id); } removeStatusEffectById(piece.instanceId, sageTag.id); var playerMeta = battle.players.find(function(p) { return p.playerId === piece.ownerPlayerId; }); if (playerMeta) { playerMeta.actionPoints += 3; playerMeta.chargePoints += 1; } return { success: true, message: piece.name + '仙人模式完成！获得3行动点和1充能点' };"
+  "skillCode": "var cloneCount, piece, playerMeta, sageTag, shieldTag; var _pc = \"n22\"; for (var _step = 0; _step <= 22; _step++) { switch (_pc) { case \"n22\": piece = (context)[\"rulePiece\"]; _pc = \"n21\"; break; case \"n21\": _pc = (! (! ((! piece) || ((piece)[\"currentHp\"] <= 0)))) ? \"n20\" : \"n19\"; break; case \"n19\": _pc = (! (! ((context)[\"playerId\"] !== (piece)[\"ownerPlayerId\"]))) ? \"n18\" : \"n17\"; break; case \"n17\": sageTag = ((piece)[\"statusTags\"] && ((piece)[\"statusTags\"])[\"find\"](function (t) { return ((t)[\"type\"] === \"sage-mode\"); })); _pc = \"n16\"; break; case \"n16\": _pc = (! (! (! sageTag))) ? \"n15\" : \"n13\"; break; case \"n13\": cloneCount = (((battle)[\"pieces\"])[\"filter\"](function (p) { return (((((p)[\"currentHp\"] > 0) && ((p)[\"ownerPlayerId\"] === (piece)[\"ownerPlayerId\"])) && (p)[\"statusTags\"]) && ((p)[\"statusTags\"])[\"some\"](function (t) { return ((t)[\"type\"] === \"naruto-clone\"); })); }))[\"length\"]; _pc = \"n12\"; break; case \"n12\": (sageTag)[\"stacks\"] = Math.max(0, (((((sageTag)[\"stacks\"] == null) ? 6 : (sageTag)[\"stacks\"]) - 1) - cloneCount)); _pc = \"n11\"; break; case \"n11\": _pc = (! (! ((sageTag)[\"stacks\"] > 0))) ? \"n10\" : \"n9\"; break; case \"n9\": shieldTag = ((piece)[\"statusTags\"] && ((piece)[\"statusTags\"])[\"find\"](function (t) { return ((t)[\"type\"] === \"sage-mode-shield\"); })); _pc = \"n8\"; break; case \"n8\": _pc = (! (! shieldTag)) ? \"n7\" : \"n6\"; break; case \"n7\": removeStatusEffectById((piece)[\"instanceId\"], (shieldTag)[\"id\"]); _pc = \"n6\"; break; case \"n6\": removeStatusEffectById((piece)[\"instanceId\"], (sageTag)[\"id\"]); _pc = \"n5\"; break; case \"n5\": playerMeta = ((battle)[\"players\"])[\"find\"](function (p) { return ((p)[\"playerId\"] === (piece)[\"ownerPlayerId\"]); }); _pc = \"n4\"; break; case \"n4\": _pc = (! (! playerMeta)) ? \"n3\" : \"n1\"; break; case \"n3\": (playerMeta)[\"actionPoints\"] += 3; _pc = \"n2\"; break; case \"n2\": (playerMeta)[\"chargePoints\"] += 1; _pc = \"n1\"; break; case \"n1\": return {success: true, message: ((piece)[\"name\"] + \"仙人模式完成！获得3行动点和1充能点\")}; case \"n10\": return {success: true, message: ((((piece)[\"name\"] + \"仙人模式还剩\") + (sageTag)[\"stacks\"]) + \"点准备进度\")}; case \"n15\": removeRuleById((piece)[\"instanceId\"], \"rule-naruto-sage-tick\"); _pc = \"n14\"; break; case \"n14\": return {success: false, message: \"\"}; case \"n18\": return {success: false, message: \"\"}; case \"n20\": return {success: false, message: \"\"}; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\");",
+  "contentGraph": {
+    "version": "rvb-content-graph/v1",
+    "surface": "rule",
+    "entry": "n22",
+    "nodes": [
+      {
+        "id": "n1",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "piece"
+                  },
+                  "key": "name"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "仙人模式完成！获得3行动点和1充能点"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n2",
+        "kind": "set",
+        "target": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "playerMeta"
+          },
+          "key": "chargePoints"
+        },
+        "operator": "+=",
+        "value": {
+          "kind": "literal",
+          "value": 1
+        },
+        "next": "n1"
+      },
+      {
+        "id": "n3",
+        "kind": "set",
+        "target": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "playerMeta"
+          },
+          "key": "actionPoints"
+        },
+        "operator": "+=",
+        "value": {
+          "kind": "literal",
+          "value": 3
+        },
+        "next": "n2"
+      },
+      {
+        "id": "n4",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "ref",
+              "name": "playerMeta"
+            }
+          }
+        },
+        "yes": "n3",
+        "no": "n1"
+      },
+      {
+        "id": "n5",
+        "kind": "bind",
+        "name": "playerMeta",
+        "expr": {
+          "kind": "collection",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "battle"
+            },
+            "key": "players"
+          },
+          "method": "find",
+          "args": [
+            {
+              "kind": "lambda",
+              "parameters": [
+                "p"
+              ],
+              "body": {
+                "kind": "binary",
+                "op": "===",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "p"
+                  },
+                  "key": "playerId"
+                },
+                "right": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "piece"
+                  },
+                  "key": "ownerPlayerId"
+                }
+              }
+            }
+          ]
+        },
+        "next": "n4"
+      },
+      {
+        "id": "n6",
+        "kind": "call",
+        "capability": "removeStatusEffectById",
+        "args": [
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "piece"
+            },
+            "key": "instanceId"
+          },
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "sageTag"
+            },
+            "key": "id"
+          }
+        ],
+        "next": "n5"
+      },
+      {
+        "id": "n7",
+        "kind": "call",
+        "capability": "removeStatusEffectById",
+        "args": [
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "piece"
+            },
+            "key": "instanceId"
+          },
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "shieldTag"
+            },
+            "key": "id"
+          }
+        ],
+        "next": "n6"
+      },
+      {
+        "id": "n8",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "ref",
+              "name": "shieldTag"
+            }
+          }
+        },
+        "yes": "n7",
+        "no": "n6"
+      },
+      {
+        "id": "n9",
+        "kind": "bind",
+        "name": "shieldTag",
+        "expr": {
+          "kind": "binary",
+          "op": "&&",
+          "left": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "piece"
+            },
+            "key": "statusTags"
+          },
+          "right": {
+            "kind": "collection",
+            "object": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "piece"
+              },
+              "key": "statusTags"
+            },
+            "method": "find",
+            "args": [
+              {
+                "kind": "lambda",
+                "parameters": [
+                  "t"
+                ],
+                "body": {
+                  "kind": "binary",
+                  "op": "===",
+                  "left": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "t"
+                    },
+                    "key": "type"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": "sage-mode-shield"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "next": "n8"
+      },
+      {
+        "id": "n10",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "binary",
+                  "op": "+",
+                  "left": {
+                    "kind": "binary",
+                    "op": "+",
+                    "left": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "piece"
+                      },
+                      "key": "name"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": "仙人模式还剩"
+                    }
+                  },
+                  "right": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "sageTag"
+                    },
+                    "key": "stacks"
+                  }
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "点准备进度"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n11",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": ">",
+              "left": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "sageTag"
+                },
+                "key": "stacks"
+              },
+              "right": {
+                "kind": "literal",
+                "value": 0
+              }
+            }
+          }
+        },
+        "yes": "n10",
+        "no": "n9"
+      },
+      {
+        "id": "n12",
+        "kind": "set",
+        "target": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "sageTag"
+          },
+          "key": "stacks"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "call",
+          "callee": "Math.max",
+          "args": [
+            {
+              "kind": "literal",
+              "value": 0
+            },
+            {
+              "kind": "binary",
+              "op": "-",
+              "left": {
+                "kind": "binary",
+                "op": "-",
+                "left": {
+                  "kind": "conditional",
+                  "test": {
+                    "kind": "binary",
+                    "op": "==",
+                    "left": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "sageTag"
+                      },
+                      "key": "stacks"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": null
+                    }
+                  },
+                  "consequent": {
+                    "kind": "literal",
+                    "value": 6
+                  },
+                  "alternate": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "sageTag"
+                    },
+                    "key": "stacks"
+                  }
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": 1
+                }
+              },
+              "right": {
+                "kind": "ref",
+                "name": "cloneCount"
+              }
+            }
+          ]
+        },
+        "next": "n11"
+      },
+      {
+        "id": "n13",
+        "kind": "bind",
+        "name": "cloneCount",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "collection",
+            "object": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "battle"
+              },
+              "key": "pieces"
+            },
+            "method": "filter",
+            "args": [
+              {
+                "kind": "lambda",
+                "parameters": [
+                  "p"
+                ],
+                "body": {
+                  "kind": "binary",
+                  "op": "&&",
+                  "left": {
+                    "kind": "binary",
+                    "op": "&&",
+                    "left": {
+                      "kind": "binary",
+                      "op": "&&",
+                      "left": {
+                        "kind": "binary",
+                        "op": ">",
+                        "left": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "p"
+                          },
+                          "key": "currentHp"
+                        },
+                        "right": {
+                          "kind": "literal",
+                          "value": 0
+                        }
+                      },
+                      "right": {
+                        "kind": "binary",
+                        "op": "===",
+                        "left": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "p"
+                          },
+                          "key": "ownerPlayerId"
+                        },
+                        "right": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "piece"
+                          },
+                          "key": "ownerPlayerId"
+                        }
+                      }
+                    },
+                    "right": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "p"
+                      },
+                      "key": "statusTags"
+                    }
+                  },
+                  "right": {
+                    "kind": "collection",
+                    "object": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "p"
+                      },
+                      "key": "statusTags"
+                    },
+                    "method": "some",
+                    "args": [
+                      {
+                        "kind": "lambda",
+                        "parameters": [
+                          "t"
+                        ],
+                        "body": {
+                          "kind": "binary",
+                          "op": "===",
+                          "left": {
+                            "kind": "get",
+                            "object": {
+                              "kind": "ref",
+                              "name": "t"
+                            },
+                            "key": "type"
+                          },
+                          "right": {
+                            "kind": "literal",
+                            "value": "naruto-clone"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            ]
+          },
+          "key": "length"
+        },
+        "next": "n12"
+      },
+      {
+        "id": "n14",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n15",
+        "kind": "call",
+        "capability": "removeRuleById",
+        "args": [
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "piece"
+            },
+            "key": "instanceId"
+          },
+          {
+            "kind": "literal",
+            "value": "rule-naruto-sage-tick"
+          }
+        ],
+        "next": "n14"
+      },
+      {
+        "id": "n16",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "unary",
+              "op": "!",
+              "argument": {
+                "kind": "ref",
+                "name": "sageTag"
+              }
+            }
+          }
+        },
+        "yes": "n15",
+        "no": "n13"
+      },
+      {
+        "id": "n17",
+        "kind": "bind",
+        "name": "sageTag",
+        "expr": {
+          "kind": "binary",
+          "op": "&&",
+          "left": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "piece"
+            },
+            "key": "statusTags"
+          },
+          "right": {
+            "kind": "collection",
+            "object": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "piece"
+              },
+              "key": "statusTags"
+            },
+            "method": "find",
+            "args": [
+              {
+                "kind": "lambda",
+                "parameters": [
+                  "t"
+                ],
+                "body": {
+                  "kind": "binary",
+                  "op": "===",
+                  "left": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "t"
+                    },
+                    "key": "type"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": "sage-mode"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "next": "n16"
+      },
+      {
+        "id": "n18",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n19",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "!==",
+              "left": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "context"
+                },
+                "key": "playerId"
+              },
+              "right": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "piece"
+                },
+                "key": "ownerPlayerId"
+              }
+            }
+          }
+        },
+        "yes": "n18",
+        "no": "n17"
+      },
+      {
+        "id": "n20",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n21",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "ref",
+                  "name": "piece"
+                }
+              },
+              "right": {
+                "kind": "binary",
+                "op": "<=",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "piece"
+                  },
+                  "key": "currentHp"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": 0
+                }
+              }
+            }
+          }
+        },
+        "yes": "n20",
+        "no": "n19"
+      },
+      {
+        "id": "n22",
+        "kind": "bind",
+        "name": "piece",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "context"
+          },
+          "key": "rulePiece"
+        },
+        "next": "n21"
+      }
+    ]
+  },
+  "contentGraphField": "skillCode",
+  "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1"
 }

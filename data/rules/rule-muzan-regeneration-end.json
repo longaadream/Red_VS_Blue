@@ -5,5 +5,1127 @@
   "trigger": {
     "type": "endTurn"
   },
-  "skillCode": "var id = flow.refs.holder(); if (!id) return { success: false, message: '' }; var piece = flow.query.piece(id); var turnNumber = Number(battle.turn && battle.turn.turnNumber); if (!piece || !Number.isFinite(turnNumber)) return { success: false, message: '' }; var lastCheckTurn = flow.state.get('piece', id, 'muzan-flesh-regeneration', 'lastCheckTurn'); if (lastCheckTurn === turnNumber) return { success: false, message: '' }; flow.state.set('piece', id, 'muzan-flesh-regeneration', 'lastCheckTurn', turnNumber, 'battle'); if (piece.currentHp <= 0 || piece.currentHp >= piece.maxHp) return { success: false, message: '' }; var lastDamageTurn = flow.state.get('piece', id, 'muzan-flesh-regeneration', 'lastDamageTurn'); var damagedThisTurn = lastDamageTurn === turnNumber; if (!damagedThisTurn && Array.isArray(battle.actions)) { for (var index = 0; index < battle.actions.length; index++) { var action = battle.actions[index]; var payload = action && action.payload; if (action && action.type === 'damage' && Number(action.turn) === turnNumber && payload && payload.targetId === id && Number(payload.finalDamage) > 0) { damagedThisTurn = true; break; } } } if (damagedThisTurn) return { success: false, message: '' }; var successfulHeals = Number(flow.state.get('piece', id, 'muzan-flesh-regeneration', 'successfulHeals') || 0); if (successfulHeals >= 3) return { success: false, message: '' }; var result = flow.effects.heal(id, id, 2, 'muzan-flesh-regeneration'); if (!result || result.blocked || !(Number(result.heal) > 0)) return { success: false, message: '' }; flow.state.set('piece', id, 'muzan-flesh-regeneration', 'successfulHeals', successfulHeals + 1, 'battle'); return { success: true, message: piece.name + '触发血肉再生，恢复' + result.heal + '点生命' };"
+  "skillCode": "var __rvb_import_effect_3, __rvb_import_operand_1, __rvb_import_operand_4, __rvb_import_value_0, action, damagedThisTurn, id, index, lastCheckTurn, lastDamageTurn, payload, piece, result, successfulHeals, turnNumber; var _pc = \"n43\"; for (var _step = 0; _step <= 35; _step++) { switch (_pc) { case \"n43\": id = flow.refs.holder(); _pc = \"n42\"; break; case \"n42\": _pc = (! (! (! id))) ? \"n41\" : \"n40\"; break; case \"n40\": piece = flow.query.piece(id); _pc = \"n39\"; break; case \"n39\": turnNumber = Number(((battle)[\"turn\"] && ((battle)[\"turn\"])[\"turnNumber\"])); _pc = \"n38\"; break; case \"n38\": _pc = (! (! ((! piece) || (! Number.isFinite(turnNumber))))) ? \"n37\" : \"n36\"; break; case \"n36\": lastCheckTurn = flow.state.get(\"piece\", id, \"muzan-flesh-regeneration\", \"lastCheckTurn\"); _pc = \"n35\"; break; case \"n35\": _pc = (! (! (lastCheckTurn === turnNumber))) ? \"n34\" : \"n33\"; break; case \"n33\": flow.state.set(\"piece\", id, \"muzan-flesh-regeneration\", \"lastCheckTurn\", turnNumber, \"battle\"); _pc = \"n32\"; break; case \"n32\": _pc = (! (! (((piece)[\"currentHp\"] <= 0) || ((piece)[\"currentHp\"] >= (piece)[\"maxHp\"])))) ? \"n31\" : \"n30\"; break; case \"n30\": lastDamageTurn = flow.state.get(\"piece\", id, \"muzan-flesh-regeneration\", \"lastDamageTurn\"); _pc = \"n29\"; break; case \"n29\": damagedThisTurn = (lastDamageTurn === turnNumber); _pc = \"n28\"; break; case \"n28\": _pc = (! (! ((! damagedThisTurn) && Array.isArray((battle)[\"actions\"])))) ? \"n27\" : \"n17\"; break; case \"n27\": index = 0; _pc = \"n26\"; break; case \"n26\": var __rvb_content_graph_loop_break_0 = false, __rvb_content_graph_loop_continue_1 = false; while ((! (! (index < ((battle)[\"actions\"])[\"length\"])))) { __rvb_content_graph_loop_continue_1 = false; { var __rvb_content_graph_region_pc_2 = \"n23\"; while (__rvb_content_graph_region_pc_2 !== \"n18\") { switch (__rvb_content_graph_region_pc_2) { case \"n23\": action = ((battle)[\"actions\"])[(function (key) { if (typeof key === \"string\" && key.split(\".\").some(function (part) { return [\"__proto__\",\"arguments\",\"callee\",\"caller\",\"constructor\",\"prototype\"].indexOf(part) !== -1; })) throw new Error(\"unsafe content graph index\"); return key; })(index)]; __rvb_content_graph_region_pc_2 = \"n22\"; break; case \"n22\": payload = (action && (action)[\"payload\"]); __rvb_content_graph_region_pc_2 = \"n21\"; break; case \"n21\": __rvb_content_graph_region_pc_2 = (! (! (((((action && ((action)[\"type\"] === \"damage\")) && (Number((action)[\"turn\"]) === turnNumber)) && payload) && ((payload)[\"targetId\"] === id)) && (Number((payload)[\"finalDamage\"]) > 0)))) ? \"n20\" : \"n18\"; break; case \"n18\": __rvb_content_graph_region_pc_2 = \"n18\"; break; case \"n20\": damagedThisTurn = true; __rvb_content_graph_region_pc_2 = \"n19\"; break; case \"n19\": __rvb_content_graph_loop_break_0 = true; __rvb_content_graph_region_pc_2 = \"n18\"; break; default: throw new Error(\"invalid content graph region node\"); } } } if (__rvb_content_graph_loop_break_0) break; { var __rvb_content_graph_region_pc_3 = \"n25\"; while (__rvb_content_graph_region_pc_3 !== \"n24\") { switch (__rvb_content_graph_region_pc_3) { case \"n25\": index = ((+ index) + 1); __rvb_content_graph_region_pc_3 = \"n24\"; break; case \"n24\": __rvb_content_graph_region_pc_3 = \"n24\"; break; default: throw new Error(\"invalid content graph region node\"); } } } if (__rvb_content_graph_loop_break_0) break; if (__rvb_content_graph_loop_continue_1) { __rvb_content_graph_loop_continue_1 = false; continue; } } _pc = \"n17\"; break; case \"n17\": _pc = (! (! damagedThisTurn)) ? \"n16\" : \"n15\"; break; case \"n15\": __rvb_import_value_0 = (void 0); _pc = \"n14\"; break; case \"n14\": __rvb_import_effect_3 = flow.state.get(\"piece\", id, \"muzan-flesh-regeneration\", \"successfulHeals\"); _pc = \"n13\"; break; case \"n13\": __rvb_import_operand_4 = __rvb_import_effect_3; _pc = \"n11\"; break; case \"n11\": _pc = (! (! __rvb_import_operand_4)) ? \"n12\" : \"n10\"; break; case \"n10\": __rvb_import_value_0 = 0; _pc = \"n9\"; break; case \"n12\": __rvb_import_value_0 = __rvb_import_operand_4; _pc = \"n9\"; break; case \"n9\": __rvb_import_operand_1 = __rvb_import_value_0; _pc = \"n8\"; break; case \"n8\": successfulHeals = Number(__rvb_import_operand_1); _pc = \"n7\"; break; case \"n7\": _pc = (! (! (successfulHeals >= 3))) ? \"n6\" : \"n5\"; break; case \"n5\": result = flow.effects.heal(id, id, 2, \"muzan-flesh-regeneration\"); _pc = \"n4\"; break; case \"n4\": _pc = (! (! (((! result) || (result)[\"blocked\"]) || (! (Number((result)[\"heal\"]) > 0))))) ? \"n3\" : \"n2\"; break; case \"n2\": flow.state.set(\"piece\", id, \"muzan-flesh-regeneration\", \"successfulHeals\", (successfulHeals + 1), \"battle\"); _pc = \"n1\"; break; case \"n1\": return {success: true, message: ((((piece)[\"name\"] + \"触发血肉再生，恢复\") + (result)[\"heal\"]) + \"点生命\")}; case \"n3\": return {success: false, message: \"\"}; case \"n6\": return {success: false, message: \"\"}; case \"n16\": return {success: false, message: \"\"}; case \"n31\": return {success: false, message: \"\"}; case \"n34\": return {success: false, message: \"\"}; case \"n37\": return {success: false, message: \"\"}; case \"n41\": return {success: false, message: \"\"}; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\");",
+  "contentGraph": {
+    "version": "rvb-content-graph/v1",
+    "surface": "rule",
+    "entry": "n43",
+    "nodes": [
+      {
+        "id": "n1",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "binary",
+                  "op": "+",
+                  "left": {
+                    "kind": "binary",
+                    "op": "+",
+                    "left": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "piece"
+                      },
+                      "key": "name"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": "触发血肉再生，恢复"
+                    }
+                  },
+                  "right": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "result"
+                    },
+                    "key": "heal"
+                  }
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "点生命"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n2",
+        "kind": "call",
+        "capability": "flow.state.set",
+        "args": [
+          {
+            "kind": "literal",
+            "value": "piece"
+          },
+          {
+            "kind": "ref",
+            "name": "id"
+          },
+          {
+            "kind": "literal",
+            "value": "muzan-flesh-regeneration"
+          },
+          {
+            "kind": "literal",
+            "value": "successfulHeals"
+          },
+          {
+            "kind": "binary",
+            "op": "+",
+            "left": {
+              "kind": "ref",
+              "name": "successfulHeals"
+            },
+            "right": {
+              "kind": "literal",
+              "value": 1
+            }
+          },
+          {
+            "kind": "literal",
+            "value": "battle"
+          }
+        ],
+        "next": "n1"
+      },
+      {
+        "id": "n3",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n4",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "binary",
+                "op": "||",
+                "left": {
+                  "kind": "unary",
+                  "op": "!",
+                  "argument": {
+                    "kind": "ref",
+                    "name": "result"
+                  }
+                },
+                "right": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "result"
+                  },
+                  "key": "blocked"
+                }
+              },
+              "right": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "binary",
+                  "op": ">",
+                  "left": {
+                    "kind": "call",
+                    "callee": "Number",
+                    "args": [
+                      {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "result"
+                        },
+                        "key": "heal"
+                      }
+                    ]
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": 0
+                  }
+                }
+              }
+            }
+          }
+        },
+        "yes": "n3",
+        "no": "n2"
+      },
+      {
+        "id": "n5",
+        "kind": "call",
+        "capability": "flow.effects.heal",
+        "args": [
+          {
+            "kind": "ref",
+            "name": "id"
+          },
+          {
+            "kind": "ref",
+            "name": "id"
+          },
+          {
+            "kind": "literal",
+            "value": 2
+          },
+          {
+            "kind": "literal",
+            "value": "muzan-flesh-regeneration"
+          }
+        ],
+        "result": "result",
+        "next": "n4"
+      },
+      {
+        "id": "n6",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n7",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": ">=",
+              "left": {
+                "kind": "ref",
+                "name": "successfulHeals"
+              },
+              "right": {
+                "kind": "literal",
+                "value": 3
+              }
+            }
+          }
+        },
+        "yes": "n6",
+        "no": "n5"
+      },
+      {
+        "id": "n8",
+        "kind": "bind",
+        "name": "successfulHeals",
+        "expr": {
+          "kind": "call",
+          "callee": "Number",
+          "args": [
+            {
+              "kind": "ref",
+              "name": "__rvb_import_operand_1"
+            }
+          ]
+        },
+        "next": "n7"
+      },
+      {
+        "id": "n9",
+        "kind": "bind",
+        "name": "__rvb_import_operand_1",
+        "expr": {
+          "kind": "ref",
+          "name": "__rvb_import_value_0"
+        },
+        "next": "n8"
+      },
+      {
+        "id": "n10",
+        "kind": "set",
+        "target": {
+          "kind": "ref",
+          "name": "__rvb_import_value_0"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "literal",
+          "value": 0
+        },
+        "next": "n9"
+      },
+      {
+        "id": "n12",
+        "kind": "set",
+        "target": {
+          "kind": "ref",
+          "name": "__rvb_import_value_0"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "ref",
+          "name": "__rvb_import_operand_4"
+        },
+        "next": "n9"
+      },
+      {
+        "id": "n11",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "ref",
+              "name": "__rvb_import_operand_4"
+            }
+          }
+        },
+        "yes": "n12",
+        "no": "n10"
+      },
+      {
+        "id": "n13",
+        "kind": "bind",
+        "name": "__rvb_import_operand_4",
+        "expr": {
+          "kind": "ref",
+          "name": "__rvb_import_effect_3"
+        },
+        "next": "n11"
+      },
+      {
+        "id": "n14",
+        "kind": "call",
+        "capability": "flow.state.get",
+        "args": [
+          {
+            "kind": "literal",
+            "value": "piece"
+          },
+          {
+            "kind": "ref",
+            "name": "id"
+          },
+          {
+            "kind": "literal",
+            "value": "muzan-flesh-regeneration"
+          },
+          {
+            "kind": "literal",
+            "value": "successfulHeals"
+          }
+        ],
+        "result": "__rvb_import_effect_3",
+        "next": "n13"
+      },
+      {
+        "id": "n15",
+        "kind": "bind",
+        "name": "__rvb_import_value_0",
+        "next": "n14",
+        "expr": {
+          "kind": "undefined"
+        }
+      },
+      {
+        "id": "n16",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n17",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "ref",
+              "name": "damagedThisTurn"
+            }
+          }
+        },
+        "yes": "n16",
+        "no": "n15"
+      },
+      {
+        "id": "n26",
+        "kind": "loop",
+        "loop": "for",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "<",
+              "left": {
+                "kind": "ref",
+                "name": "index"
+              },
+              "right": {
+                "kind": "get",
+                "object": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "battle"
+                  },
+                  "key": "actions"
+                },
+                "key": "length"
+              }
+            }
+          }
+        },
+        "body": {
+          "entry": "n23",
+          "end": "n18",
+          "nodes": [
+            {
+              "id": "n18",
+              "kind": "regionEnd"
+            },
+            {
+              "id": "n19",
+              "kind": "break"
+            },
+            {
+              "id": "n20",
+              "kind": "set",
+              "target": {
+                "kind": "ref",
+                "name": "damagedThisTurn"
+              },
+              "operator": "=",
+              "value": {
+                "kind": "literal",
+                "value": true
+              },
+              "next": "n19"
+            },
+            {
+              "id": "n21",
+              "kind": "branch",
+              "condition": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "unary",
+                  "op": "!",
+                  "argument": {
+                    "kind": "binary",
+                    "op": "&&",
+                    "left": {
+                      "kind": "binary",
+                      "op": "&&",
+                      "left": {
+                        "kind": "binary",
+                        "op": "&&",
+                        "left": {
+                          "kind": "binary",
+                          "op": "&&",
+                          "left": {
+                            "kind": "binary",
+                            "op": "&&",
+                            "left": {
+                              "kind": "ref",
+                              "name": "action"
+                            },
+                            "right": {
+                              "kind": "binary",
+                              "op": "===",
+                              "left": {
+                                "kind": "get",
+                                "object": {
+                                  "kind": "ref",
+                                  "name": "action"
+                                },
+                                "key": "type"
+                              },
+                              "right": {
+                                "kind": "literal",
+                                "value": "damage"
+                              }
+                            }
+                          },
+                          "right": {
+                            "kind": "binary",
+                            "op": "===",
+                            "left": {
+                              "kind": "call",
+                              "callee": "Number",
+                              "args": [
+                                {
+                                  "kind": "get",
+                                  "object": {
+                                    "kind": "ref",
+                                    "name": "action"
+                                  },
+                                  "key": "turn"
+                                }
+                              ]
+                            },
+                            "right": {
+                              "kind": "ref",
+                              "name": "turnNumber"
+                            }
+                          }
+                        },
+                        "right": {
+                          "kind": "ref",
+                          "name": "payload"
+                        }
+                      },
+                      "right": {
+                        "kind": "binary",
+                        "op": "===",
+                        "left": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "payload"
+                          },
+                          "key": "targetId"
+                        },
+                        "right": {
+                          "kind": "ref",
+                          "name": "id"
+                        }
+                      }
+                    },
+                    "right": {
+                      "kind": "binary",
+                      "op": ">",
+                      "left": {
+                        "kind": "call",
+                        "callee": "Number",
+                        "args": [
+                          {
+                            "kind": "get",
+                            "object": {
+                              "kind": "ref",
+                              "name": "payload"
+                            },
+                            "key": "finalDamage"
+                          }
+                        ]
+                      },
+                      "right": {
+                        "kind": "literal",
+                        "value": 0
+                      }
+                    }
+                  }
+                }
+              },
+              "yes": "n20",
+              "no": "n18"
+            },
+            {
+              "id": "n22",
+              "kind": "bind",
+              "name": "payload",
+              "expr": {
+                "kind": "binary",
+                "op": "&&",
+                "left": {
+                  "kind": "ref",
+                  "name": "action"
+                },
+                "right": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "action"
+                  },
+                  "key": "payload"
+                }
+              },
+              "next": "n21"
+            },
+            {
+              "id": "n23",
+              "kind": "bind",
+              "name": "action",
+              "expr": {
+                "kind": "index",
+                "object": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "battle"
+                  },
+                  "key": "actions"
+                },
+                "index": {
+                  "kind": "ref",
+                  "name": "index"
+                }
+              },
+              "next": "n22"
+            }
+          ]
+        },
+        "update": {
+          "entry": "n25",
+          "end": "n24",
+          "nodes": [
+            {
+              "id": "n24",
+              "kind": "regionEnd"
+            },
+            {
+              "id": "n25",
+              "kind": "set",
+              "target": {
+                "kind": "ref",
+                "name": "index"
+              },
+              "operator": "=",
+              "value": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "unary",
+                  "op": "+",
+                  "argument": {
+                    "kind": "ref",
+                    "name": "index"
+                  }
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": 1
+                }
+              },
+              "next": "n24"
+            }
+          ]
+        },
+        "next": "n17"
+      },
+      {
+        "id": "n27",
+        "kind": "bind",
+        "name": "index",
+        "expr": {
+          "kind": "literal",
+          "value": 0
+        },
+        "next": "n26"
+      },
+      {
+        "id": "n28",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "&&",
+              "left": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "ref",
+                  "name": "damagedThisTurn"
+                }
+              },
+              "right": {
+                "kind": "call",
+                "callee": "Array.isArray",
+                "args": [
+                  {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "battle"
+                    },
+                    "key": "actions"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "yes": "n27",
+        "no": "n17"
+      },
+      {
+        "id": "n29",
+        "kind": "bind",
+        "name": "damagedThisTurn",
+        "expr": {
+          "kind": "binary",
+          "op": "===",
+          "left": {
+            "kind": "ref",
+            "name": "lastDamageTurn"
+          },
+          "right": {
+            "kind": "ref",
+            "name": "turnNumber"
+          }
+        },
+        "next": "n28"
+      },
+      {
+        "id": "n30",
+        "kind": "call",
+        "capability": "flow.state.get",
+        "args": [
+          {
+            "kind": "literal",
+            "value": "piece"
+          },
+          {
+            "kind": "ref",
+            "name": "id"
+          },
+          {
+            "kind": "literal",
+            "value": "muzan-flesh-regeneration"
+          },
+          {
+            "kind": "literal",
+            "value": "lastDamageTurn"
+          }
+        ],
+        "result": "lastDamageTurn",
+        "next": "n29"
+      },
+      {
+        "id": "n31",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n32",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "binary",
+                "op": "<=",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "piece"
+                  },
+                  "key": "currentHp"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": 0
+                }
+              },
+              "right": {
+                "kind": "binary",
+                "op": ">=",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "piece"
+                  },
+                  "key": "currentHp"
+                },
+                "right": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "piece"
+                  },
+                  "key": "maxHp"
+                }
+              }
+            }
+          }
+        },
+        "yes": "n31",
+        "no": "n30"
+      },
+      {
+        "id": "n33",
+        "kind": "call",
+        "capability": "flow.state.set",
+        "args": [
+          {
+            "kind": "literal",
+            "value": "piece"
+          },
+          {
+            "kind": "ref",
+            "name": "id"
+          },
+          {
+            "kind": "literal",
+            "value": "muzan-flesh-regeneration"
+          },
+          {
+            "kind": "literal",
+            "value": "lastCheckTurn"
+          },
+          {
+            "kind": "ref",
+            "name": "turnNumber"
+          },
+          {
+            "kind": "literal",
+            "value": "battle"
+          }
+        ],
+        "next": "n32"
+      },
+      {
+        "id": "n34",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n35",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "===",
+              "left": {
+                "kind": "ref",
+                "name": "lastCheckTurn"
+              },
+              "right": {
+                "kind": "ref",
+                "name": "turnNumber"
+              }
+            }
+          }
+        },
+        "yes": "n34",
+        "no": "n33"
+      },
+      {
+        "id": "n36",
+        "kind": "call",
+        "capability": "flow.state.get",
+        "args": [
+          {
+            "kind": "literal",
+            "value": "piece"
+          },
+          {
+            "kind": "ref",
+            "name": "id"
+          },
+          {
+            "kind": "literal",
+            "value": "muzan-flesh-regeneration"
+          },
+          {
+            "kind": "literal",
+            "value": "lastCheckTurn"
+          }
+        ],
+        "result": "lastCheckTurn",
+        "next": "n35"
+      },
+      {
+        "id": "n37",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n38",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "ref",
+                  "name": "piece"
+                }
+              },
+              "right": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "call",
+                  "callee": "Number.isFinite",
+                  "args": [
+                    {
+                      "kind": "ref",
+                      "name": "turnNumber"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "yes": "n37",
+        "no": "n36"
+      },
+      {
+        "id": "n39",
+        "kind": "bind",
+        "name": "turnNumber",
+        "expr": {
+          "kind": "call",
+          "callee": "Number",
+          "args": [
+            {
+              "kind": "binary",
+              "op": "&&",
+              "left": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "battle"
+                },
+                "key": "turn"
+              },
+              "right": {
+                "kind": "get",
+                "object": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "battle"
+                  },
+                  "key": "turn"
+                },
+                "key": "turnNumber"
+              }
+            }
+          ]
+        },
+        "next": "n38"
+      },
+      {
+        "id": "n40",
+        "kind": "call",
+        "capability": "flow.query.piece",
+        "args": [
+          {
+            "kind": "ref",
+            "name": "id"
+          }
+        ],
+        "result": "piece",
+        "next": "n39"
+      },
+      {
+        "id": "n41",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n42",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "unary",
+              "op": "!",
+              "argument": {
+                "kind": "ref",
+                "name": "id"
+              }
+            }
+          }
+        },
+        "yes": "n41",
+        "no": "n40"
+      },
+      {
+        "id": "n43",
+        "kind": "call",
+        "capability": "flow.refs.holder",
+        "args": [],
+        "result": "id",
+        "next": "n42"
+      }
+    ]
+  },
+  "contentGraphField": "skillCode",
+  "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1"
 }

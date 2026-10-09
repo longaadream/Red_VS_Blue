@@ -15,8 +15,8 @@
   "maxCharges": 0,
   "powerMultiplier": 1,
   "actionPointCost": 1,
-  "code": "function executeSkill(context) { var caster = context.piece; var target = selectTarget({ type: 'piece', range: 5, filter: 'enemy' }); if (!target || target.needsTargetSelection) return target; var stolen = Math.max(0, target.attack || 0); target.attack -= stolen; caster.attack += stolen; addPlayerStatusEffectById(target.ownerPlayerId, { id: 'rafaam-temporal-distortion-' + caster.instanceId + '-' + target.instanceId + '-' + Date.now(), name: '时空扭曲', type: 'rafaam-temporal-distortion', currentDuration: -1, currentUses: -1, intensity: stolen, sourceId: caster.instanceId, targetId: target.instanceId }); addPlayerRuleById(target.ownerPlayerId, 'rule-rafaam-temporal-distortion'); return { success: true, message: caster.name + '从' + target.name + '偷取' + stolen + '点攻击力，将在对方下回合结束时归还' }; }",
-  "previewCode": "function calculatePreview() { return { description: \"选择敌人（5），偷取其攻击力，至对方下回合结束时归还。\", expectedValues: {} }; }",
+  "code": "function executeSkill(context) { var __rvb_import_effect_9, __rvb_import_operand_0, __rvb_import_operand_1, __rvb_import_operand_10, __rvb_import_operand_11, __rvb_import_operand_2, __rvb_import_operand_3, __rvb_import_operand_4, __rvb_import_operand_5, __rvb_import_operand_6, __rvb_import_operand_7, __rvb_import_operand_8, caster, stolen, target; var _pc = \"n22\"; for (var _step = 0; _step <= 22; _step++) { switch (_pc) { case \"n22\": caster = (context)[\"piece\"]; _pc = \"n21\"; break; case \"n21\": target = selectTarget({type: \"piece\", range: 5, filter: \"enemy\"}); _pc = \"n20\"; break; case \"n20\": _pc = (! (! ((! target) || (target)[\"needsTargetSelection\"]))) ? \"n19\" : \"n18\"; break; case \"n18\": stolen = Math.max(0, ((target)[\"attack\"] || 0)); _pc = \"n17\"; break; case \"n17\": (target)[\"attack\"] -= stolen; _pc = \"n16\"; break; case \"n16\": (caster)[\"attack\"] += stolen; _pc = \"n15\"; break; case \"n15\": __rvb_import_operand_11 = (target)[\"ownerPlayerId\"]; _pc = \"n12\"; break; case \"n12\": __rvb_import_operand_8 = ((((\"rafaam-temporal-distortion-\" + (caster)[\"instanceId\"]) + \"-\") + (target)[\"instanceId\"]) + \"-\"); _pc = \"n14\"; break; case \"n14\": __rvb_import_effect_9 = Date.now(); _pc = \"n13\"; break; case \"n13\": __rvb_import_operand_10 = (__rvb_import_operand_8 + __rvb_import_effect_9); _pc = \"n11\"; break; case \"n11\": __rvb_import_operand_7 = \"时空扭曲\"; _pc = \"n10\"; break; case \"n10\": __rvb_import_operand_6 = \"rafaam-temporal-distortion\"; _pc = \"n9\"; break; case \"n9\": __rvb_import_operand_5 = (- 1); _pc = \"n8\"; break; case \"n8\": __rvb_import_operand_4 = (- 1); _pc = \"n7\"; break; case \"n7\": __rvb_import_operand_3 = stolen; _pc = \"n6\"; break; case \"n6\": __rvb_import_operand_2 = (caster)[\"instanceId\"]; _pc = \"n5\"; break; case \"n5\": __rvb_import_operand_1 = (target)[\"instanceId\"]; _pc = \"n4\"; break; case \"n4\": __rvb_import_operand_0 = {id: __rvb_import_operand_10, name: __rvb_import_operand_7, type: __rvb_import_operand_6, currentDuration: __rvb_import_operand_5, currentUses: __rvb_import_operand_4, intensity: __rvb_import_operand_3, sourceId: __rvb_import_operand_2, targetId: __rvb_import_operand_1}; _pc = \"n3\"; break; case \"n3\": addPlayerStatusEffectById(__rvb_import_operand_11, __rvb_import_operand_0); _pc = \"n2\"; break; case \"n2\": addPlayerRuleById((target)[\"ownerPlayerId\"], \"rule-rafaam-temporal-distortion\"); _pc = \"n1\"; break; case \"n1\": return {success: true, message: ((((((caster)[\"name\"] + \"从\") + (target)[\"name\"]) + \"偷取\") + stolen) + \"点攻击力，将在对方下回合结束时归还\")}; case \"n19\": return target; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\"); }",
+  "previewCode": "function calculatePreview(piece, skillDef, currentCooldown) { var _pc = \"n1\"; for (var _step = 0; _step <= 1; _step++) { switch (_pc) { case \"n1\": return {description: \"选择敌人（5），偷取其攻击力，至对方下回合结束时归还。\", expectedValues: {}}; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\"); }",
   "range": "single",
   "requiresTarget": true,
   "targeting": {
@@ -28,5 +28,558 @@
         "range": 5
       }
     ]
+  },
+  "contentGraph": {
+    "version": "rvb-content-graph/v1",
+    "surface": "skill",
+    "entry": "n22",
+    "nodes": [
+      {
+        "id": "n1",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "binary",
+                  "op": "+",
+                  "left": {
+                    "kind": "binary",
+                    "op": "+",
+                    "left": {
+                      "kind": "binary",
+                      "op": "+",
+                      "left": {
+                        "kind": "binary",
+                        "op": "+",
+                        "left": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "caster"
+                          },
+                          "key": "name"
+                        },
+                        "right": {
+                          "kind": "literal",
+                          "value": "从"
+                        }
+                      },
+                      "right": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "target"
+                        },
+                        "key": "name"
+                      }
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": "偷取"
+                    }
+                  },
+                  "right": {
+                    "kind": "ref",
+                    "name": "stolen"
+                  }
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "点攻击力，将在对方下回合结束时归还"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n2",
+        "kind": "call",
+        "capability": "addPlayerRuleById",
+        "args": [
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "target"
+            },
+            "key": "ownerPlayerId"
+          },
+          {
+            "kind": "literal",
+            "value": "rule-rafaam-temporal-distortion"
+          }
+        ],
+        "next": "n1"
+      },
+      {
+        "id": "n3",
+        "kind": "call",
+        "capability": "addPlayerStatusEffectById",
+        "args": [
+          {
+            "kind": "ref",
+            "name": "__rvb_import_operand_11"
+          },
+          {
+            "kind": "ref",
+            "name": "__rvb_import_operand_0"
+          }
+        ],
+        "next": "n2"
+      },
+      {
+        "id": "n4",
+        "kind": "bind",
+        "name": "__rvb_import_operand_0",
+        "expr": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "id",
+              "value": {
+                "kind": "ref",
+                "name": "__rvb_import_operand_10"
+              }
+            },
+            {
+              "key": "name",
+              "value": {
+                "kind": "ref",
+                "name": "__rvb_import_operand_7"
+              }
+            },
+            {
+              "key": "type",
+              "value": {
+                "kind": "ref",
+                "name": "__rvb_import_operand_6"
+              }
+            },
+            {
+              "key": "currentDuration",
+              "value": {
+                "kind": "ref",
+                "name": "__rvb_import_operand_5"
+              }
+            },
+            {
+              "key": "currentUses",
+              "value": {
+                "kind": "ref",
+                "name": "__rvb_import_operand_4"
+              }
+            },
+            {
+              "key": "intensity",
+              "value": {
+                "kind": "ref",
+                "name": "__rvb_import_operand_3"
+              }
+            },
+            {
+              "key": "sourceId",
+              "value": {
+                "kind": "ref",
+                "name": "__rvb_import_operand_2"
+              }
+            },
+            {
+              "key": "targetId",
+              "value": {
+                "kind": "ref",
+                "name": "__rvb_import_operand_1"
+              }
+            }
+          ]
+        },
+        "next": "n3"
+      },
+      {
+        "id": "n5",
+        "kind": "bind",
+        "name": "__rvb_import_operand_1",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "target"
+          },
+          "key": "instanceId"
+        },
+        "next": "n4"
+      },
+      {
+        "id": "n6",
+        "kind": "bind",
+        "name": "__rvb_import_operand_2",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "caster"
+          },
+          "key": "instanceId"
+        },
+        "next": "n5"
+      },
+      {
+        "id": "n7",
+        "kind": "bind",
+        "name": "__rvb_import_operand_3",
+        "expr": {
+          "kind": "ref",
+          "name": "stolen"
+        },
+        "next": "n6"
+      },
+      {
+        "id": "n8",
+        "kind": "bind",
+        "name": "__rvb_import_operand_4",
+        "expr": {
+          "kind": "unary",
+          "op": "-",
+          "argument": {
+            "kind": "literal",
+            "value": 1
+          }
+        },
+        "next": "n7"
+      },
+      {
+        "id": "n9",
+        "kind": "bind",
+        "name": "__rvb_import_operand_5",
+        "expr": {
+          "kind": "unary",
+          "op": "-",
+          "argument": {
+            "kind": "literal",
+            "value": 1
+          }
+        },
+        "next": "n8"
+      },
+      {
+        "id": "n10",
+        "kind": "bind",
+        "name": "__rvb_import_operand_6",
+        "expr": {
+          "kind": "literal",
+          "value": "rafaam-temporal-distortion"
+        },
+        "next": "n9"
+      },
+      {
+        "id": "n11",
+        "kind": "bind",
+        "name": "__rvb_import_operand_7",
+        "expr": {
+          "kind": "literal",
+          "value": "时空扭曲"
+        },
+        "next": "n10"
+      },
+      {
+        "id": "n13",
+        "kind": "bind",
+        "name": "__rvb_import_operand_10",
+        "expr": {
+          "kind": "binary",
+          "op": "+",
+          "left": {
+            "kind": "ref",
+            "name": "__rvb_import_operand_8"
+          },
+          "right": {
+            "kind": "ref",
+            "name": "__rvb_import_effect_9"
+          }
+        },
+        "next": "n11"
+      },
+      {
+        "id": "n14",
+        "kind": "call",
+        "capability": "Date.now",
+        "args": [],
+        "result": "__rvb_import_effect_9",
+        "next": "n13"
+      },
+      {
+        "id": "n12",
+        "kind": "bind",
+        "name": "__rvb_import_operand_8",
+        "expr": {
+          "kind": "binary",
+          "op": "+",
+          "left": {
+            "kind": "binary",
+            "op": "+",
+            "left": {
+              "kind": "binary",
+              "op": "+",
+              "left": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "literal",
+                  "value": "rafaam-temporal-distortion-"
+                },
+                "right": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "caster"
+                  },
+                  "key": "instanceId"
+                }
+              },
+              "right": {
+                "kind": "literal",
+                "value": "-"
+              }
+            },
+            "right": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "target"
+              },
+              "key": "instanceId"
+            }
+          },
+          "right": {
+            "kind": "literal",
+            "value": "-"
+          }
+        },
+        "next": "n14"
+      },
+      {
+        "id": "n15",
+        "kind": "bind",
+        "name": "__rvb_import_operand_11",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "target"
+          },
+          "key": "ownerPlayerId"
+        },
+        "next": "n12"
+      },
+      {
+        "id": "n16",
+        "kind": "set",
+        "target": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "caster"
+          },
+          "key": "attack"
+        },
+        "operator": "+=",
+        "value": {
+          "kind": "ref",
+          "name": "stolen"
+        },
+        "next": "n15"
+      },
+      {
+        "id": "n17",
+        "kind": "set",
+        "target": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "target"
+          },
+          "key": "attack"
+        },
+        "operator": "-=",
+        "value": {
+          "kind": "ref",
+          "name": "stolen"
+        },
+        "next": "n16"
+      },
+      {
+        "id": "n18",
+        "kind": "bind",
+        "name": "stolen",
+        "expr": {
+          "kind": "call",
+          "callee": "Math.max",
+          "args": [
+            {
+              "kind": "literal",
+              "value": 0
+            },
+            {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "target"
+                },
+                "key": "attack"
+              },
+              "right": {
+                "kind": "literal",
+                "value": 0
+              }
+            }
+          ]
+        },
+        "next": "n17"
+      },
+      {
+        "id": "n19",
+        "kind": "return",
+        "value": {
+          "kind": "ref",
+          "name": "target"
+        }
+      },
+      {
+        "id": "n20",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "ref",
+                  "name": "target"
+                }
+              },
+              "right": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "target"
+                },
+                "key": "needsTargetSelection"
+              }
+            }
+          }
+        },
+        "yes": "n19",
+        "no": "n18"
+      },
+      {
+        "id": "n21",
+        "kind": "call",
+        "capability": "selectTarget",
+        "args": [
+          {
+            "kind": "object",
+            "entries": [
+              {
+                "key": "type",
+                "value": {
+                  "kind": "literal",
+                  "value": "piece"
+                }
+              },
+              {
+                "key": "range",
+                "value": {
+                  "kind": "literal",
+                  "value": 5
+                }
+              },
+              {
+                "key": "filter",
+                "value": {
+                  "kind": "literal",
+                  "value": "enemy"
+                }
+              }
+            ]
+          }
+        ],
+        "result": "target",
+        "next": "n20"
+      },
+      {
+        "id": "n22",
+        "kind": "bind",
+        "name": "caster",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "context"
+          },
+          "key": "piece"
+        },
+        "next": "n21"
+      }
+    ]
+  },
+  "contentGraphField": "code",
+  "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1",
+  "contentGraphEntries": {
+    "previewCode": {
+      "graph": {
+        "version": "rvb-content-graph/v1",
+        "surface": "preview",
+        "entry": "n1",
+        "nodes": [
+          {
+            "id": "n1",
+            "kind": "return",
+            "value": {
+              "kind": "object",
+              "entries": [
+                {
+                  "key": "description",
+                  "value": {
+                    "kind": "literal",
+                    "value": "选择敌人（5），偷取其攻击力，至对方下回合结束时归还。"
+                  }
+                },
+                {
+                  "key": "expectedValues",
+                  "value": {
+                    "kind": "object",
+                    "entries": []
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "compilerVersion": "rvb-content-graph-compiler/v1"
+    }
   }
 }

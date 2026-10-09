@@ -10,6 +10,10 @@ const JS_AMBIENT = new Set([
   'Array', 'Boolean', 'Error', 'Infinity', 'JSON', 'Map', 'NaN', 'Number', 'Object',
   'Promise', 'RegExp', 'Set', 'String', 'Symbol', 'console', 'isFinite', 'isNaN',
   'parseFloat', 'parseInt', 'setTimeout', 'undefined',
+  // The content graph emitter uses these native intrinsics in generated
+  // wrappers. `arguments` is the implicit binding of those wrappers rather
+  // than an arbitrary content capability.
+  'Reflect', 'globalThis', 'arguments',
 ])
 
 const SURFACES = {

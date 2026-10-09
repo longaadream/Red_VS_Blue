@@ -8,9 +8,649 @@
   "maxCharges": 0,
   "powerMultiplier": 1,
   "actionPointCost": 0,
-  "code": "function executeSkill(context) { console.log('=== sleep-prevent skill called ==='); console.log('context.piece:', context.piece ? context.piece.name : 'null'); if (!context.piece) { console.log('No piece in context'); return { message: '没有目标', success: false }; } console.log('context.piece.statusTags:', context.piece.statusTags); var isSleeping = false; if (context.piece.statusTags) { for (var i = 0; i < context.piece.statusTags.length; i++) { var tag = context.piece.statusTags[i]; console.log('Checking tag:', tag); if (typeof tag === 'object' && tag.type === 'sleep') { isSleeping = true; console.log('Found sleep tag!'); break; } } } console.log('isSleeping:', isSleeping); if (isSleeping) { var actionType = '执行该操作'; if (context.type === 'beforeMove') { actionType = '移动'; } else if (context.type === 'beforeSkillUse') { actionType = '使用技能'; } console.log('Blocking action:', actionType); return { message: context.piece.name + '处于麻醉状态，无法' + actionType, success: true, blocked: true, showUIEffect: true }; } console.log('Not sleeping, action allowed'); return { message: '目标未处于麻醉状态或行动未被阻止', success: false }; }",
+  "code": "function executeSkill(context) { var actionType, i, isSleeping, tag; var _pc = \"n30\"; for (var _step = 0; _step <= 21; _step++) { switch (_pc) { case \"n30\": console.log(\"=== sleep-prevent skill called ===\"); _pc = \"n29\"; break; case \"n29\": console.log(\"context.piece:\", ((context)[\"piece\"] ? ((context)[\"piece\"])[\"name\"] : \"null\")); _pc = \"n28\"; break; case \"n28\": _pc = (! (! (! (context)[\"piece\"]))) ? \"n27\" : \"n25\"; break; case \"n25\": console.log(\"context.piece.statusTags:\", ((context)[\"piece\"])[\"statusTags\"]); _pc = \"n24\"; break; case \"n24\": isSleeping = false; _pc = \"n23\"; break; case \"n23\": _pc = (! (! ((context)[\"piece\"])[\"statusTags\"])) ? \"n22\" : \"n11\"; break; case \"n22\": i = 0; _pc = \"n21\"; break; case \"n21\": var __rvb_content_graph_loop_break_0 = false, __rvb_content_graph_loop_continue_1 = false; while ((! (! (i < (((context)[\"piece\"])[\"statusTags\"])[\"length\"])))) { __rvb_content_graph_loop_continue_1 = false; { var __rvb_content_graph_region_pc_2 = \"n18\"; while (__rvb_content_graph_region_pc_2 !== \"n12\") { switch (__rvb_content_graph_region_pc_2) { case \"n18\": tag = (((context)[\"piece\"])[\"statusTags\"])[(function (key) { if (typeof key === \"string\" && key.split(\".\").some(function (part) { return [\"__proto__\",\"arguments\",\"callee\",\"caller\",\"constructor\",\"prototype\"].indexOf(part) !== -1; })) throw new Error(\"unsafe content graph index\"); return key; })(i)]; __rvb_content_graph_region_pc_2 = \"n17\"; break; case \"n17\": console.log(\"Checking tag:\", tag); __rvb_content_graph_region_pc_2 = \"n16\"; break; case \"n16\": __rvb_content_graph_region_pc_2 = (! (! (((typeof tag) === \"object\") && ((tag)[\"type\"] === \"sleep\")))) ? \"n15\" : \"n12\"; break; case \"n12\": __rvb_content_graph_region_pc_2 = \"n12\"; break; case \"n15\": isSleeping = true; __rvb_content_graph_region_pc_2 = \"n14\"; break; case \"n14\": console.log(\"Found sleep tag!\"); __rvb_content_graph_region_pc_2 = \"n13\"; break; case \"n13\": __rvb_content_graph_loop_break_0 = true; __rvb_content_graph_region_pc_2 = \"n12\"; break; default: throw new Error(\"invalid content graph region node\"); } } } if (__rvb_content_graph_loop_break_0) break; { var __rvb_content_graph_region_pc_3 = \"n20\"; while (__rvb_content_graph_region_pc_3 !== \"n19\") { switch (__rvb_content_graph_region_pc_3) { case \"n20\": i = ((+ i) + 1); __rvb_content_graph_region_pc_3 = \"n19\"; break; case \"n19\": __rvb_content_graph_region_pc_3 = \"n19\"; break; default: throw new Error(\"invalid content graph region node\"); } } } if (__rvb_content_graph_loop_break_0) break; if (__rvb_content_graph_loop_continue_1) { __rvb_content_graph_loop_continue_1 = false; continue; } } _pc = \"n11\"; break; case \"n11\": console.log(\"isSleeping:\", isSleeping); _pc = \"n10\"; break; case \"n10\": _pc = (! (! isSleeping)) ? \"n9\" : \"n2\"; break; case \"n2\": console.log(\"Not sleeping, action allowed\"); _pc = \"n1\"; break; case \"n1\": return {message: \"目标未处于麻醉状态或行动未被阻止\", success: false}; case \"n9\": actionType = \"执行该操作\"; _pc = \"n8\"; break; case \"n8\": _pc = (! (! ((context)[\"type\"] === \"beforeMove\"))) ? \"n5\" : \"n7\"; break; case \"n7\": _pc = (! (! ((context)[\"type\"] === \"beforeSkillUse\"))) ? \"n6\" : \"n4\"; break; case \"n6\": actionType = \"使用技能\"; _pc = \"n4\"; break; case \"n5\": actionType = \"移动\"; _pc = \"n4\"; break; case \"n4\": console.log(\"Blocking action:\", actionType); _pc = \"n3\"; break; case \"n3\": return {message: ((((context)[\"piece\"])[\"name\"] + \"处于麻醉状态，无法\") + actionType), success: true, blocked: true, showUIEffect: true}; case \"n27\": console.log(\"No piece in context\"); _pc = \"n26\"; break; case \"n26\": return {message: \"没有目标\", success: false}; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\"); }",
   "showInUI": false,
   "keywords": [
     "睡眠"
-  ]
+  ],
+  "contentGraph": {
+    "version": "rvb-content-graph/v1",
+    "surface": "triggerSkill",
+    "entry": "n30",
+    "nodes": [
+      {
+        "id": "n1",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": "目标未处于麻醉状态或行动未被阻止"
+              }
+            },
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n2",
+        "kind": "call",
+        "capability": "console.log",
+        "args": [
+          {
+            "kind": "literal",
+            "value": "Not sleeping, action allowed"
+          }
+        ],
+        "next": "n1"
+      },
+      {
+        "id": "n3",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "message",
+              "value": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "binary",
+                  "op": "+",
+                  "left": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "context"
+                      },
+                      "key": "piece"
+                    },
+                    "key": "name"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": "处于麻醉状态，无法"
+                  }
+                },
+                "right": {
+                  "kind": "ref",
+                  "name": "actionType"
+                }
+              }
+            },
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "blocked",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "showUIEffect",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n4",
+        "kind": "call",
+        "capability": "console.log",
+        "args": [
+          {
+            "kind": "literal",
+            "value": "Blocking action:"
+          },
+          {
+            "kind": "ref",
+            "name": "actionType"
+          }
+        ],
+        "next": "n3"
+      },
+      {
+        "id": "n5",
+        "kind": "set",
+        "target": {
+          "kind": "ref",
+          "name": "actionType"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "literal",
+          "value": "移动"
+        },
+        "next": "n4"
+      },
+      {
+        "id": "n6",
+        "kind": "set",
+        "target": {
+          "kind": "ref",
+          "name": "actionType"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "literal",
+          "value": "使用技能"
+        },
+        "next": "n4"
+      },
+      {
+        "id": "n7",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "===",
+              "left": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "context"
+                },
+                "key": "type"
+              },
+              "right": {
+                "kind": "literal",
+                "value": "beforeSkillUse"
+              }
+            }
+          }
+        },
+        "yes": "n6",
+        "no": "n4"
+      },
+      {
+        "id": "n8",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "===",
+              "left": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "context"
+                },
+                "key": "type"
+              },
+              "right": {
+                "kind": "literal",
+                "value": "beforeMove"
+              }
+            }
+          }
+        },
+        "yes": "n5",
+        "no": "n7"
+      },
+      {
+        "id": "n9",
+        "kind": "bind",
+        "name": "actionType",
+        "expr": {
+          "kind": "literal",
+          "value": "执行该操作"
+        },
+        "next": "n8"
+      },
+      {
+        "id": "n10",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "ref",
+              "name": "isSleeping"
+            }
+          }
+        },
+        "yes": "n9",
+        "no": "n2"
+      },
+      {
+        "id": "n11",
+        "kind": "call",
+        "capability": "console.log",
+        "args": [
+          {
+            "kind": "literal",
+            "value": "isSleeping:"
+          },
+          {
+            "kind": "ref",
+            "name": "isSleeping"
+          }
+        ],
+        "next": "n10"
+      },
+      {
+        "id": "n21",
+        "kind": "loop",
+        "loop": "for",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "<",
+              "left": {
+                "kind": "ref",
+                "name": "i"
+              },
+              "right": {
+                "kind": "get",
+                "object": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "context"
+                    },
+                    "key": "piece"
+                  },
+                  "key": "statusTags"
+                },
+                "key": "length"
+              }
+            }
+          }
+        },
+        "body": {
+          "entry": "n18",
+          "end": "n12",
+          "nodes": [
+            {
+              "id": "n12",
+              "kind": "regionEnd"
+            },
+            {
+              "id": "n13",
+              "kind": "break"
+            },
+            {
+              "id": "n14",
+              "kind": "call",
+              "capability": "console.log",
+              "args": [
+                {
+                  "kind": "literal",
+                  "value": "Found sleep tag!"
+                }
+              ],
+              "next": "n13"
+            },
+            {
+              "id": "n15",
+              "kind": "set",
+              "target": {
+                "kind": "ref",
+                "name": "isSleeping"
+              },
+              "operator": "=",
+              "value": {
+                "kind": "literal",
+                "value": true
+              },
+              "next": "n14"
+            },
+            {
+              "id": "n16",
+              "kind": "branch",
+              "condition": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "unary",
+                  "op": "!",
+                  "argument": {
+                    "kind": "binary",
+                    "op": "&&",
+                    "left": {
+                      "kind": "binary",
+                      "op": "===",
+                      "left": {
+                        "kind": "unary",
+                        "op": "typeof",
+                        "argument": {
+                          "kind": "ref",
+                          "name": "tag"
+                        }
+                      },
+                      "right": {
+                        "kind": "literal",
+                        "value": "object"
+                      }
+                    },
+                    "right": {
+                      "kind": "binary",
+                      "op": "===",
+                      "left": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "tag"
+                        },
+                        "key": "type"
+                      },
+                      "right": {
+                        "kind": "literal",
+                        "value": "sleep"
+                      }
+                    }
+                  }
+                }
+              },
+              "yes": "n15",
+              "no": "n12"
+            },
+            {
+              "id": "n17",
+              "kind": "call",
+              "capability": "console.log",
+              "args": [
+                {
+                  "kind": "literal",
+                  "value": "Checking tag:"
+                },
+                {
+                  "kind": "ref",
+                  "name": "tag"
+                }
+              ],
+              "next": "n16"
+            },
+            {
+              "id": "n18",
+              "kind": "bind",
+              "name": "tag",
+              "expr": {
+                "kind": "index",
+                "object": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "context"
+                    },
+                    "key": "piece"
+                  },
+                  "key": "statusTags"
+                },
+                "index": {
+                  "kind": "ref",
+                  "name": "i"
+                }
+              },
+              "next": "n17"
+            }
+          ]
+        },
+        "update": {
+          "entry": "n20",
+          "end": "n19",
+          "nodes": [
+            {
+              "id": "n19",
+              "kind": "regionEnd"
+            },
+            {
+              "id": "n20",
+              "kind": "set",
+              "target": {
+                "kind": "ref",
+                "name": "i"
+              },
+              "operator": "=",
+              "value": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "unary",
+                  "op": "+",
+                  "argument": {
+                    "kind": "ref",
+                    "name": "i"
+                  }
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": 1
+                }
+              },
+              "next": "n19"
+            }
+          ]
+        },
+        "next": "n11"
+      },
+      {
+        "id": "n22",
+        "kind": "bind",
+        "name": "i",
+        "expr": {
+          "kind": "literal",
+          "value": 0
+        },
+        "next": "n21"
+      },
+      {
+        "id": "n23",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "get",
+              "object": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "context"
+                },
+                "key": "piece"
+              },
+              "key": "statusTags"
+            }
+          }
+        },
+        "yes": "n22",
+        "no": "n11"
+      },
+      {
+        "id": "n24",
+        "kind": "bind",
+        "name": "isSleeping",
+        "expr": {
+          "kind": "literal",
+          "value": false
+        },
+        "next": "n23"
+      },
+      {
+        "id": "n25",
+        "kind": "call",
+        "capability": "console.log",
+        "args": [
+          {
+            "kind": "literal",
+            "value": "context.piece.statusTags:"
+          },
+          {
+            "kind": "get",
+            "object": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "context"
+              },
+              "key": "piece"
+            },
+            "key": "statusTags"
+          }
+        ],
+        "next": "n24"
+      },
+      {
+        "id": "n26",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": "没有目标"
+              }
+            },
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n27",
+        "kind": "call",
+        "capability": "console.log",
+        "args": [
+          {
+            "kind": "literal",
+            "value": "No piece in context"
+          }
+        ],
+        "next": "n26"
+      },
+      {
+        "id": "n28",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "unary",
+              "op": "!",
+              "argument": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "context"
+                },
+                "key": "piece"
+              }
+            }
+          }
+        },
+        "yes": "n27",
+        "no": "n25"
+      },
+      {
+        "id": "n29",
+        "kind": "call",
+        "capability": "console.log",
+        "args": [
+          {
+            "kind": "literal",
+            "value": "context.piece:"
+          },
+          {
+            "kind": "conditional",
+            "test": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "context"
+              },
+              "key": "piece"
+            },
+            "consequent": {
+              "kind": "get",
+              "object": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "context"
+                },
+                "key": "piece"
+              },
+              "key": "name"
+            },
+            "alternate": {
+              "kind": "literal",
+              "value": "null"
+            }
+          }
+        ],
+        "next": "n28"
+      },
+      {
+        "id": "n30",
+        "kind": "call",
+        "capability": "console.log",
+        "args": [
+          {
+            "kind": "literal",
+            "value": "=== sleep-prevent skill called ==="
+          }
+        ],
+        "next": "n29"
+      }
+    ]
+  },
+  "contentGraphField": "code",
+  "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1"
 }
