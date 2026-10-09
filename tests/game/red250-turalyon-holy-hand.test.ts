@@ -673,9 +673,9 @@ describe('RED-250 Turalyon holy-hand authority continuation', () => {
         candidates: expect.arrayContaining([{ type: 'piece', pieceId: 'training-blue-2' }]),
       },
     })
-    expect(ownerPreparation.preparation?.candidates)
-      .not.toContainEqual({ type: 'piece', pieceId: 'training-red-1' })
     if (ownerPreparation.status !== 'needs-input' || !ownerPreparation.preparation) return
+    expect(ownerPreparation.preparation.candidates)
+      .not.toContainEqual({ type: 'piece', pieceId: 'training-red-1' })
     const firstChoice = {
       kind: 'target' as const,
       source: ownerPreparation.preparation.source,
