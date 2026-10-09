@@ -1,29 +1,33 @@
 {
-  "version": "0.1.13",
+  "version": "0.1.14",
   "windows": {
-    "url": "https://github.com/longaadream/Red_VS_Blue/releases/download/v0.1.13/RED-vs-BLUE-0.1.13-Setup.exe"
+    "url": "https://github.com/longaadream/Red_VS_Blue/releases/download/v0.1.14/RED-vs-BLUE-0.1.14-Setup.exe"
   },
   "android": {
-    "url": "https://github.com/longaadream/Red_VS_Blue/releases/download/v0.1.13/RED-vs-BLUE-0.1.13-Android.apk"
+    "url": "https://github.com/longaadream/Red_VS_Blue/releases/download/v0.1.14/RED-vs-BLUE-0.1.14-Android.apk"
   },
   "resource": {
-    "version": "1.0.12",
-    "minimumClientVersion": "0.1.13",
-    "contentHash": "25b673f202e1b9eeace0fce32398439c3178c7b128b23a32b3710e5c7e6d2346",
-    "url": "https://github.com/longaadream/Red_VS_Blue/releases/download/content-test-25b673f202e1b9eeace0fce32398439c3178c7b128b23a32b3710e5c7e6d2346/content.rvbpack"
+    "version": "1.0.13",
+    "minimumClientVersion": "0.1.14",
+    "contentHash": "cf7d0c22733a652b9e507638374adb28c87af835cb1c502320cf2d1c39117251",
+    "url": "https://github.com/longaadream/Red_VS_Blue/releases/download/content-test-cf7d0c22733a652b9e507638374adb28c87af835cb1c502320cf2d1c39117251/content.rvbpack"
   },
   "notes": [
     {
-      "title": "移动与预演",
-      "body": "支持拖动规划多段转弯路径，补齐技能、手牌及地格预演，修复目标选择和训练营移动后的操作问题。"
+      "title": "服务器管理与地图池",
+      "body": "新增统一官方服务器管理面板，可查看状态、执行维护与赛季操作，并管理排位地图池、公告和社区内容审核。"
     },
     {
-      "title": "社区与回放",
-      "body": "新增好友、公告板、约桌帖子与在线社区入口；可查看资料、对局战绩和已结束对局回放。"
+      "title": "四张新地图",
+      "body": "资源地图目录新增双桥裂谷、四通广场、群垒庭院和宽环回廊；排位地图池由管理员明确选择并确认。"
+    },
+    {
+      "title": "战斗流程修复",
+      "body": "修复目标选择、技能与卡牌预演、续选和取消流程中的操作问题，保留服务端校验与原有费用、伤害规则。"
     },
     {
       "title": "发行同步",
-      "body": "Windows、Android、官方服务器与引擎同步本版本规则，请使用配套资源包 1.0.12。"
+      "body": "Windows、Android、官方服务器与引擎同步本版本规则，请使用配套资源包 1.0.13。"
     }
   ]
 }

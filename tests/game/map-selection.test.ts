@@ -91,19 +91,28 @@ describe('RED-119 authoritative map selection', () => {
   })
 
   it('discovers every loaded map while keeping new maps disabled by default', () => {
-    const state = getRankedMapPoolState([...SELECTABLE_MAP_IDS])
+    const savedPool = ['large-hole-arena', 'open-expanse', 'winding-pass', 'narrow-corridors']
+    const state = getRankedMapPoolState(savedPool)
     expect(state.catalog.map(map => map.id)).toEqual([
       'adventure-act-1-v1',
       'adventure-act-2-v1',
       'adventure-act-3-v1',
+      'broad-ring',
+      'crossroads-plaza',
+      'island-courtyard',
       'large-hole-arena',
       'narrow-corridors',
       'open-expanse',
+      'twin-bridges',
       'twin-fronts',
       'winding-pass',
     ])
     expect(state.catalog.filter(map => map.eligible).map(map => map.id)).toEqual([...SELECTABLE_MAP_IDS].sort())
-    expect(state.enabledIds).toEqual([...SELECTABLE_MAP_IDS])
+    expect(state.enabledIds).toEqual(savedPool)
+    for (const id of SELECTABLE_MAP_IDS.slice(4)) {
+      expect(state.catalog.find(map => map.id === id)).toMatchObject({ eligible: true })
+      expect(state.enabledIds).not.toContain(id)
+    }
     expect(state.blocked).toBe(false)
     expect(state.catalog.find(map => map.id === 'twin-fronts')).toMatchObject({ eligible: false })
     expect(getRankedMapCatalog()).toEqual(state.catalog)
