@@ -71,6 +71,41 @@
     .user-pill:hover { background: #18243a; border-color: #64748b; }
     .user-dot { width: 7px; height: 7px; border-radius: 50%; background: #f59e0b; }
     .user-elo { color: #94a3b8; font-size: 11px; }
+    .header-actions { display: flex; align-items: flex-start; justify-content: flex-end; gap: 10px; min-width: 0; }
+    .application-exit-control {
+      position: fixed !important;
+      top: max(16px, env(safe-area-inset-top)) !important;
+      right: max(16px, env(safe-area-inset-right)) !important;
+      z-index: 2147483647 !important;
+      display: grid;
+      justify-items: end;
+      gap: 4px;
+      pointer-events: auto;
+    }
+    .application-exit-control[hidden] { display: none !important; }
+    .application-exit-button {
+      min-height: 42px;
+      padding: 9px 13px;
+      border: 1px solid #7f1d1d;
+      border-radius: 9px;
+      background: #35151d;
+      color: #fecaca;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 800;
+    }
+    .official-update-panel .application-exit-button {
+      min-height: 42px !important;
+      padding: 9px 13px !important;
+      border: 1px solid #7f1d1d !important;
+      background: #35151d !important;
+      color: #fecaca !important;
+      font-size: 13px !important;
+      font-weight: 800 !important;
+    }
+    .application-exit-button:hover { background: #4c1d27; border-color: #ef4444; }
+    .application-exit-button:disabled { cursor: wait; opacity: .7; }
+    .application-exit-error { max-width: 18ch; color: #fca5a5; font-size: 11px; line-height: 1.35; text-align: right; }
 
     /* ── Primary workspace ── */
     .menu-workspace {
@@ -263,6 +298,8 @@
       .connection-groups { grid-template-columns: 1fr; }
       .action-button { min-height: 74px; grid-template-columns: 50px minmax(0, 1fr) auto; gap: 12px; padding: 12px; }
       .action-code { width: 50px; height: 44px; }
+      .header-actions { gap: 6px; }
+      .application-exit-button { min-height: 38px; padding: 7px 9px; font-size: 12px; }
       .utility-button { flex-direction: column; gap: 3px; text-align: center; }
       .utility-meta { max-width: 100%; }
     }
@@ -407,11 +444,17 @@
         <span class="brand-vs">vs</span>
         <span class="brand-blue">BLUE</span>
       </h1>
-      <button id="userPill" class="user-pill" type="button" onclick="openIdentitySheet()" aria-label="登录或管理服务器账号">
-        <span class="user-dot" id="userDot"></span>
-        <span id="userName">玩家</span>
-        <span class="user-elo" id="userElo"></span>
-      </button>
+      <div class="header-actions">
+        <button id="userPill" class="user-pill" type="button" onclick="openIdentitySheet()" aria-label="登录或管理服务器账号">
+          <span class="user-dot" id="userDot"></span>
+          <span id="userName">玩家</span>
+          <span class="user-elo" id="userElo"></span>
+        </button>
+        <div class="application-exit-control" data-application-exit-control hidden>
+          <button id="applicationExitButton" class="application-exit-button" data-application-exit type="button" aria-describedby="applicationExitError">退出程序</button>
+          <span id="applicationExitError" class="application-exit-error" data-application-exit-error role="alert" hidden></span>
+        </div>
+      </div>
     </header>
 
     <details style="margin:0 0 12px auto;max-width:300px;color:var(--ink, #ead4a3)">
@@ -660,7 +703,6 @@
         <button type="button" id="homeAccountManage">注册 / 找回密码</button>
       </div>
       <button type="button" id="homeCommunityRetry" hidden>重新连接社区</button>
-      <button type="button" id="homeLogout" hidden>退出登录</button>
     </form>
     <hr>
     <label>离线 / LAN 昵称<input id="homeGuestName" maxlength="20" style="display:block;width:100%;box-sizing:border-box;margin:8px 0;padding:10px"></label>
@@ -1564,6 +1606,54 @@
       })
     }
 
+    function initApplicationExitControl() {
+      const control = document.querySelector('[data-application-exit-control]')
+      const button = control && control.querySelector('[data-application-exit]')
+      const error = control && control.querySelector('[data-application-exit-error]')
+      const api = window.electronAPI
+      if (!control || !button) return
+      if (!api || typeof api.requestApplicationExit !== 'function') {
+        control.hidden = true
+        return
+      }
+
+      control.hidden = false
+      const headerParent = control.parentElement
+      const updatePanel = document.querySelector('dialog.official-update-panel')
+      const syncExitLayer = () => {
+        if (!headerParent) return
+        const destination = updatePanel?.open ? updatePanel : headerParent
+        if (control.parentElement !== destination) destination.appendChild(control)
+      }
+      if (updatePanel) {
+        const panelObserver = new MutationObserver(syncExitLayer)
+        panelObserver.observe(updatePanel, { attributes: true, attributeFilter: ['open'] })
+        window.addEventListener('pagehide', () => panelObserver.disconnect(), { once: true })
+        syncExitLayer()
+      }
+      let exitRequested = false
+      button.addEventListener('click', async () => {
+        if (exitRequested || button.disabled) return
+        exitRequested = true
+        button.disabled = true
+        if (error) {
+          error.hidden = true
+          error.textContent = ''
+        }
+        try {
+          await api.requestApplicationExit()
+        } catch (reason) {
+          exitRequested = false
+          button.disabled = false
+          if (error) {
+            error.hidden = false
+            error.textContent = '退出失败，请稍后重试'
+          }
+          console.error('[client] application exit request failed:', reason)
+        }
+      })
+    }
+
     window.addEventListener('load', () => { if (new URLSearchParams(location.search).get('lan') === 'join') showJoinSheet() })
     // ── Service Worker ────────────────────────────────────────────────────────
     // 版本标识，方便确认运行的是最新构建
@@ -1614,6 +1704,7 @@
       }
       updateTutorialEntry()
       void initWindowFullscreenSetting()
+      initApplicationExitControl()
       // Show connected server in server section if saved
       const saved = getSavedUrl()
       if (saved) {

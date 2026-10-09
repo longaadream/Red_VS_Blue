@@ -15,7 +15,7 @@
   "chargeCost": 2,
   "powerMultiplier": 2,
   "actionPointCost": 1,
-  "code": "function executeSkill(context) { var caster = context.piece; var target = selectTarget({ type: 'piece', range: 99, filter: 'enemy' }); if (!target || target.needsTargetSelection) return target; var distance = Math.abs(target.x - caster.x) + Math.abs(target.y - caster.y); if (distance <= 6) { return { success: false, message: '目标距离太近，必须选择6格外的敌人' }; }; var damage = Math.floor(caster.attack * context.skill.powerMultiplier); var result = dealDamage(caster, target, damage, 'physical', context.battle, context.skill.id); return { success: true, message: caster.name + '发动致命视线，对' + target.name + '造成' + result.damage + '点伤害（距离' + distance + '格）' }; }",
+  "code": "function executeSkill(context) { var caster = context.piece; var target = selectTarget({ type: 'piece', range: 99, filter: 'enemy' }); if (!target || target.needsTargetSelection) return target; var mirrorRewrite = context.ruleRewrittenPrimaryTargetPieceId === target.instanceId; var distance = Math.abs(target.x - caster.x) + Math.abs(target.y - caster.y); if (!mirrorRewrite && distance <= 6) { return { success: false, message: '目标距离太近，必须选择6格外的敌人' }; }; var damage = Math.floor(caster.attack * context.skill.powerMultiplier); var result = dealDamage(caster, target, damage, 'physical', context.battle, context.skill.id); return { success: true, message: caster.name + '发动致命视线，对' + target.name + '造成' + result.damage + '点伤害（距离' + distance + '格）' }; }",
   "previewCode": "function calculatePreview(piece, skillDef) { return { description: \"选择敌人（>6），造成2倍伤害。\", expectedValues: { damage: Math.floor(piece.attack * 2) } }; }",
   "targeting": {
     "steps": [

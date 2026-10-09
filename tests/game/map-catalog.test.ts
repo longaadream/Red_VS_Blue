@@ -197,7 +197,7 @@ const analyzeMap = (config: AsciiMapConfig) => {
 }
 
 describe('RED-119 selectable map catalog', () => {
-  it('retires large-battlefield and catalogs four duel maps plus the dedicated team map', () => {
+  it('retires large-battlefield and catalogs duel maps plus the dedicated team map', () => {
     const manifest = JSON.parse(
       readFileSync(resolve(mapsDirectory, 'manifest.json'), 'utf8'),
     ) as string[]
@@ -209,6 +209,7 @@ describe('RED-119 selectable map catalog', () => {
     expect(manifest).toEqual([
       'large-trap-arena',
       ...newMaps.map(map => map.filename),
+      'twin-bridges', 'crossroads-plaza', 'island-courtyard', 'broad-ring',
       'twin-fronts',
       'adventure-act-1-v1', 'adventure-act-2-v1', 'adventure-act-3-v1',
     ])
@@ -314,6 +315,7 @@ describe('RED-119 selectable map catalog', () => {
     expect(repositoryIds).toEqual(new Set([
       'large-hole-arena',
       ...newMaps.map(map => map.id),
+      'twin-bridges', 'crossroads-plaza', 'island-courtyard', 'broad-ring',
       'twin-fronts',
     ]))
     expect(apiIds).toEqual(new Set([...repositoryIds,'adventure-act-1-v1','adventure-act-2-v1','adventure-act-3-v1']))

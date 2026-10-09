@@ -12,6 +12,7 @@
     sonic: '输出 / 机动', tails: '辅助 / 机动', uther: '辅助 / 治疗', velen: '治疗 / 辅助',
     arthas: '输出 / 控制', 'dark-aizen': '控制 / 输出', 'dark-grimmjow': '输出 / 机动',
     'dark-ulquiorra': '输出 / 治疗', guldan: '输出 / 辅助', kiljaedan: '输出 / 控制',
+    'dark-muzan': '输出 / 治疗', 'dark-akaza': '输出 / 机动',
     reaper: '输出 / 机动', 'red-blackwidow': '输出 / 控制',
     'red-doomsday-fist': '输出 / 机动', 'red-hidan': '输出 / 辅助',
     'red-illidan': '输出 / 机动', 'red-itachi': '控制 / 输出',

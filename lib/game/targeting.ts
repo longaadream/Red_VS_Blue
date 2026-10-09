@@ -1122,6 +1122,13 @@ function validateCredential(
 export function isSinglePieceTargetAction(state: BattleState, draftCommand: BattleAction | any): boolean {
   const source = getSource(state, draftCommand)
   if ('kind' in source) return false
+  if (draftCommand?.type === 'useBasicSkill' || draftCommand?.type === 'useChargeSkill') {
+    const skillId = typeof draftCommand.skillId === 'string' ? draftCommand.skillId : undefined
+    const definition = skillId
+      ? (state.skillsById?.[skillId] || getSkillById(skillId))
+      : undefined
+    if (definition?.range === 'area') return false
+  }
   const targetSteps = source.steps.filter(step => step.kind === 'target') as TargetSpec[]
   return targetSteps.length === 1 && targetSteps[0].type === 'piece'
 }

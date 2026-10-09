@@ -590,6 +590,8 @@ export type BattleAction =
       playerId: PlayerId
       cardInstanceId: string
       selectedOption?: any
+      /** Locally collected public continuation choices; validated by authority. */
+      skillChoices?: SkillChoiceInput[]
     } & TargetedActionFields)
   | {
       type: "pendingOptionSelect"
