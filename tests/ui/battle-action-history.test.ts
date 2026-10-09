@@ -703,3 +703,18 @@ it('renders response effects nested and resumed card effects at the root level',
   expect(list.innerHTML.indexOf('圣铸进军')).toBeLessThan(list.innerHTML.lastIndexOf('结算'))
   expect(list.innerHTML).not.toContain('data-history-event-id="action-2:0"')
 })
+
+it('RED-254 identifies a player-owned persistent damage response in its causal title', () => {
+  const { history, icons } = loadActionHistory()
+  const list = { innerHTML: '' }
+  const dock = { hidden: false, dataset: {}, innerHTML: '', classList: { toggle: vi.fn() }, querySelector: (selector: string) => selector === '.action-history-list' ? list : { setAttribute: vi.fn() }, addEventListener: vi.fn(), removeEventListener: vi.fn() }
+  const ui = history.create({ document: { getElementById: () => null }, window: { innerWidth: 1280, innerHeight: 720, addEventListener: vi.fn(), getComputedStyle: () => ({ display: 'none' }) }, icons })
+  ui.mount({ element: dock })
+  const action = rootEvent(1, { kind: 'endTurn', sourcePieceId: undefined, actorPlayerId: 'blue' })
+  const damage = { ...action, eventId: 'burn-tick', sequence: 1, parentEventId: action.eventId, kind: 'damage', sourcePieceId: 'red', actorPlayerId: 'red', result: { amount: 2, damageType: 'true' }, causePath: [{ id: 'player-burn', sourcePieceId: 'red', actorPlayerId: 'red', ruleId: 'rule-sasuke-amaterasu-damage', label: '天照灼烧结算' }] }
+  ui.update({ pieces: [], players: [{ id: 'red', name: '红方玩家', faction: 'red' }, { id: 'blue', name: '蓝方玩家', faction: 'blue' }], presentationEvents: [action, damage] })
+  const responseTitle = list.innerHTML.match(/class="history-response-title">([\s\S]*?)<\/span> · 天照灼烧结算/)
+  expect(responseTitle).not.toBeNull()
+  expect(responseTitle?.[1]).toContain('data-player-id="red"')
+  expect(responseTitle?.[1]).toContain('红方玩家')
+})

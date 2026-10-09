@@ -535,7 +535,7 @@
           const cause = branch.cause
           const label = cause.label || (cause.skillId && resolveIdentity(cause).skillName) || '响应效果'
           return '<span class="history-response"><span class="history-response-title">'
-            + displayPiece(cause.sourcePieceId, false) + ' · ' + escapeHtml(label) + '</span>'
+            + (displayPiece(cause.sourcePieceId, false) || displayPlayer(cause.sourcePieceId || cause.actorPlayerId, false)) + ' · ' + escapeHtml(label) + '</span>'
             + renderNode(branch) + '</span>'
         }).join('')
       }
