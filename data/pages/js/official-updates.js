@@ -3,6 +3,9 @@
   const api = window.electronAPI;
   const android = !api?.getOfficialUpdateStatus && window.Capacitor?.isNativePlatform?.() === true;
   if (!api?.getOfficialUpdateStatus && !android) return;
+  const requestedUpdate = !android && window.RvBCompatibilityPresentation && typeof window.RvBCompatibilityPresentation.consumeHomepageRequest === 'function'
+    ? window.RvBCompatibilityPresentation.consumeHomepageRequest()
+    : null;
   const host = document.querySelector('.header');
   if (!host) return;
   const style = document.createElement('style');
@@ -60,7 +63,7 @@
   const panel = document.createElement('dialog');
   panel.className = 'official-update-panel';
   panel.setAttribute('aria-labelledby', 'official-update-title');
-  panel.innerHTML = '<h2 id="official-update-title">检查更新</h2><p data-current></p><section class="official-update-section"><h3>资源包 · 测试频道</h3><p data-resource role="status"></p></section><section class="official-update-section"><h3>客户端 · 稳定频道</h3><p data-client role="status"></p></section><section class="official-update-section"><h3>本机游戏服务</h3><p data-local role="status">正在准备游戏…</p><button type="button" data-local-retry hidden>重新准备游戏</button></section><label><input type="checkbox" data-automatic> 后台自动检查并下载</label><p class="official-update-note">检查不会阻止离线游玩。发现更新后可稍后处理；客户端安装需要重启。</p><p data-error role="alert"></p><div class="official-update-footer"><button type="button" data-recovery>资源管理</button><button type="button" data-check>立即检查</button><button type="button" data-install hidden>重启并安装</button><button type="button" data-close disabled>进入游戏</button></div>';
+  panel.innerHTML = '<h2 id="official-update-title">检查更新</h2><p data-compatibility hidden></p><p data-current></p><section class="official-update-section"><h3>资源包 · 测试频道</h3><p data-resource role="status"></p></section><section class="official-update-section"><h3>客户端 · 稳定频道</h3><p data-client role="status"></p></section><section class="official-update-section"><h3>本机游戏服务</h3><p data-local role="status">正在准备游戏…</p><button type="button" data-local-retry hidden>重新准备游戏</button></section><label><input type="checkbox" data-automatic> 后台自动检查并下载</label><p class="official-update-note">检查不会阻止离线游玩。发现更新后可稍后处理；客户端安装需要重启。</p><p data-error role="alert"></p><div class="official-update-footer"><button type="button" data-recovery>资源管理</button><button type="button" data-check>立即检查</button><button type="button" data-install hidden>重启并安装</button><button type="button" data-close disabled>进入游戏</button></div>';
   document.body.appendChild(panel);
   const sourceLabel = document.createElement('label');
   sourceLabel.innerHTML = '下载源 <select data-source aria-label="更新下载源"><option value="github">GitHub 官方源</option><option value="cos">COS 香港源</option></select>';
@@ -72,8 +75,14 @@
   const find = selector => panel.querySelector(selector);
   let startupPending = true;
   let canEnter = false;
+  let requestedUpdatePending = Boolean(requestedUpdate);
   let disposed = false;
   let localTimer;
+  if (requestedUpdate) {
+    const requestedLabels = { client: '联机检查发现客户端版本不兼容，请检查客户端更新。', resource: '联机检查发现资源版本不兼容，请检查资源包。', generic: '联机检查发现版本不兼容，请检查客户端和资源更新。' };
+    find('[data-compatibility]').textContent = requestedLabels[requestedUpdate] || requestedLabels.generic;
+    find('[data-compatibility]').hidden = false;
+  }
   async function refreshLocal() {
     if (disposed || !api.getMode) return;
     try {
@@ -95,7 +104,7 @@
   function render(status) {
     startupPending = status.startupPending === true;
     canEnter = status.canEnter === true;
-    if (startupPending && !panel.open) panel.showModal();
+    if ((startupPending || requestedUpdatePending) && !panel.open) panel.showModal();
     if (disposed) return;
     find('[data-check]').textContent = status.resource.phase === 'error' || status.client.phase === 'error' ? '重试更新检查' : '检查更新';
     find('[data-close]').disabled = startupPending && !status.canEnter;
@@ -120,11 +129,16 @@
     catch (error) { find('[data-error]').textContent = error.message || '更新暂时不可用，请稍后重试'; }
   }
   button.onclick = () => { panel.showModal(); void action(() => Promise.resolve()); };
+  panel.addEventListener('close', () => { requestedUpdatePending = false; });
   panel.addEventListener('cancel', event => {
     if (startupPending && !canEnter) event.preventDefault();
-    else if (startupPending) void action(async () => { render(await api.enterAfterUpdateCheck()); panel.close(); });
+    else {
+      requestedUpdatePending = false;
+      if (startupPending) void action(async () => { render(await api.enterAfterUpdateCheck()); panel.close(); });
+    }
   });
   find('[data-close]').onclick = () => action(async () => {
+    requestedUpdatePending = false;
     if (startupPending) render(await api.enterAfterUpdateCheck());
     panel.close();
   });
@@ -156,6 +170,6 @@
     const status = await api.getOfficialUpdateStatus();
     render(status);
     if (status.startupPending) await api.checkOfficialUpdates();
-    else panel.close();
+    else if (!requestedUpdatePending) panel.close();
   });
 })();
