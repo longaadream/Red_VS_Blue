@@ -6,8 +6,8 @@ import vm from 'node:vm'
 
 const root = path.resolve(import.meta.dirname, '..')
 const website = path.join(root, 'website')
-const clientVersion = '0.1.14'
-const resourceVersion = '1.0.13'
+const clientVersion = '0.1.15'
+const resourceVersion = '1.0.14'
 const semver = /^\d+\.\d+\.\d+$/
 
 function usage() {

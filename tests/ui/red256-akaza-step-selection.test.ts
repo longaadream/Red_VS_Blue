@@ -165,6 +165,7 @@ function pageTargetHarness(engine: any, publicState: any, authorityState: any, s
     currentTargetSourceName: () => '猗窝座瞬步',
     showTileStatus: vi.fn(),
     selectPiece: vi.fn(),
+    cancelLocalCardContinuation: vi.fn(() => false),
   }) as unknown as Record<string, any>
   context.window = context
   context.clearTargetInteraction = vi.fn(() => {
