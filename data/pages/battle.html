@@ -939,6 +939,7 @@
       min-height: 20px; padding: 2px 7px; border: 1px solid transparent;
       border-radius: 999px; font-size: 10px; font-weight: 900; letter-spacing: .04em;
     }
+    .pi-identity[hidden] { display: none; }
     .pi-identity.core {
       color: #fde68a; border-color: rgba(245,158,11,.58); background: rgba(120,53,15,.58);
       box-shadow: inset 0 1px 0 rgba(254,243,199,.1);
@@ -4284,9 +4285,33 @@
     }
 
     // ── Piece info modal ──
+    function pieceIdentityDisguiseGroup(piece) {
+      if (!piece) return false
+      if (typeof piece.masterPieceId === 'string' && piece.masterPieceId.trim()) return true
+      const pieces = typeof G !== 'undefined' && G && Array.isArray(G.pieces) ? G.pieces : []
+      return pieces.some(function(candidate) {
+        return candidate && candidate.currentHp > 0 && candidate.masterPieceId === piece.instanceId
+      })
+    }
+    function shouldHidePieceIdentityBadge(piece) {
+      if (typeof SPECTATE_MODE !== 'undefined' && SPECTATE_MODE) return true
+      if (!pieceIdentityDisguiseGroup(piece)) return false
+      const ownerId = String(piece.ownerPlayerId || '').trim().toLowerCase()
+      const viewerId = String(typeof myPlayerId !== 'undefined' ? myPlayerId : '').trim().toLowerCase()
+      return !ownerId || !viewerId || ownerId !== viewerId
+    }
     function renderPieceIdentity(piece) {
       const badge = document.getElementById('pieceInfoIdentity')
       if (!badge) return
+      if (shouldHidePieceIdentityBadge(piece)) {
+        badge.hidden = true
+        badge.textContent = ''
+        badge.className = 'pi-identity'
+        badge.title = ''
+        badge.setAttribute('aria-label', '')
+        return
+      }
+      badge.hidden = false
       const isCore = piece && piece.isCore === true
       badge.textContent = isCore ? '核心棋子' : '非核心棋子'
       badge.className = 'pi-identity ' + (isCore ? 'core' : 'non-core')
