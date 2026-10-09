@@ -92,6 +92,9 @@ function createCardContext(prepared: unknown[] = []) {
     'continueLocalCardPreparation',
     'advanceLocalCardTarget',
     'cancelTargetSelection',
+    'targetTypeText',
+    'targetStepPrefix',
+    'localCardTargetPrompt',
   ]
   new Script(functions.map(source).concat([
     source('cancelLocalCardContinuation'),
@@ -188,6 +191,33 @@ describe('RED-250 Turalyon card continuation', () => {
       targetY: 1,
     })
     expect(submitted[0]).not.toHaveProperty('skillChoices')
+  })
+
+  it('commits the completed root when a draft still carries a stale base action', () => {
+    const { context, submitted } = createCardContext()
+    const staleBaseAction = {
+      type: 'playCard',
+      playerId: 'player-red',
+      cardInstanceId: 'card-1',
+      stateRevision: 6,
+      skillChoices: [{ kind: 'target', promptKey: 'stale-choice' }],
+    }
+    const completedRootAction = {
+      type: 'playCard',
+      playerId: 'player-red',
+      cardInstanceId: 'card-1',
+      stateRevision: 7,
+      skillChoices: [{ kind: 'target', promptKey: 'completed-choice' }],
+    }
+
+    new Script(`commitLocalCardAction(${JSON.stringify(completedRootAction)}, ${JSON.stringify({
+      cardId: 'holy-heal',
+      baseAction: staleBaseAction,
+    })})`).runInContext(context)
+
+    expect(submitted).toHaveLength(1)
+    expect(submitted[0]).toMatchObject(completedRootAction)
+    expect(submitted[0]).not.toMatchObject(staleBaseAction)
   })
 
   it('uses the same continuation answer shape for hover preview as board click', () => {

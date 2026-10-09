@@ -73,6 +73,28 @@ npm.cmd test -- tests/game/red250-turalyon-holy-hand.test.ts tests/game/holy-han
 
 黑虚闪追加验证：修改前真实准备凭证下预演返回 unavailable，修复后普通选择与续选都返回 ready，预演伤害 8、敌人生命 30→22，与真实结算一致且悬停不改原状态。新增 9 项回归包含重建浏览器引擎 VM、灵压/归刃/范围拒绝和未知或带效果规则的拒绝。直接与相邻验证合计 **14 文件、196 项通过**；类型检查、定向 ESLint、编码（1523 文件）、diff 和 main-baseline 通过。三个引擎重新构建，Next webpack 与 Colyseus 构建通过。独立审查无阻塞，另独立运行 **5 文件、107 项通过**。尚待用户在重启后的候选训练局完成悬停体验验收。撤销本次预演源码提交并重建引擎可回退。
 
+## 圣铸进军二次验收与响应说明
+
+用户训练截图仍提示“选择被拒绝：没有合法地格；请重新选择”，见 [用户现场](RED250/turalyon-user-rejected-ground.png)。因此上一轮自动回归不能视为该项人工验收通过。现场提示来自页面对所有 `TARGET_*` 拒绝的统一替换，尚不能据此判定真实原因是空落点。
+
+本轮范围：复现完整页面续选与提交；保留移动距离、路径阻挡及 RED-209 位置提交规则，原圣光牌费用/效果仍只结算一次；卡牌触发附加选择时保留公开准备标题并解释来源；对手获得输入权时使用持续等待提示，隐藏本方确认/取消控件且不读取对手规则标题、来源或候选。无更新机制、规则数值或会话协议变更。
+
+确认并修复一个有条件的页面根动作问题：卡牌同时带旧 `baseAction` 与已完成续选的 `rootAction` 时，预演取旧 base，提交可能丢失新选择。现在优先取 root，与提交根动作语义一致；回归调用实际 `commitLocalCardAction` 验证旧 base 不覆盖已完成答案。这不是截图现场根因的确认。
+
+圣光牌续选提示现在说明“圣光惩击触发了圣铸进军”，保留公开准备给出的友军/落点说明及可选取消语义；没有声称原牌已结算。自己的回合触发对手选择时，持续提示“你的行动触发了对方响应，请等待对方完成选择”，本方结束回合显示“等待对方响应”。等待文案只读取所有者关系，不读取对手标题、来源、候选或选项。拒绝提示保留具体原因，例如不可行走、占用、超出范围、凭证过期；诊断记录保留原始错误码和消息。
+
+最终直接与相邻回归 **11 文件、120 项通过**；随后新增等待 class 恢复及最终移动坐标断言的两个文件 **9 项通过**。类型检查、6 个受影响测试文件的 ESLint、编码检查（1526 文件）、页面内联脚本语法、diff 与 main-baseline 通过。独立审查另运行 **8 文件、72 项通过**，无阻塞发现。
+
+```powershell
+npm.cmd test -- tests/ui/red250-march-integration.test.ts tests/ui/red250-target-rejection-message.test.ts tests/ui/red250-pending-guidance.test.ts tests/ui/red250-holy-card-continuation.test.ts tests/ui/opponent-pending-input.test.ts tests/ui/target-overlay-controls.test.ts tests/ui/red250-pending-cancel.test.ts tests/ui/battle-skill-preview-page.test.ts tests/game/red250-turalyon-holy-hand.test.ts tests/game/holy-hand-system.test.ts tests/game/battle-public-projection.test.ts
+```
+
+四个集成场景覆盖红/蓝双方、本地完成续选及权威 pending 接管：真实公开准备、页面收集答案、真实规则结算，验证落点、生命 30→25、AP 10→9、手牌消耗一次。原生测试窗口也执行了两方实际页面函数的完整手牌→友军→落点链，均成功。使用 canonical 训练状态和固定测试手牌；不是用户原现场状态，也不是人工鼠标验收。因此截图那次拒绝仍未复现，圣铸进军的现场验收仍未通过。
+
+原生窗口在清缓存刷新后截取 1280×720 与 844×390 的两阶段提示及等待状态；对手等待使用明确标记的所有权 fixture，不代表联网双端验证。取消按钮高 48px、中心命中；窄屏等待提示位于 HUD 下方，确认/取消隐藏且禁用。证据：[友军选择](RED250/march-friendly-1280x720.png)、[落点选择](RED250/march-landing-1280x720.png)、[对手响应](RED250/march-waiting-1280x720.png)、[窄屏友军](RED250/march-friendly-844x390.png)、[窄屏落点](RED250/march-landing-844x390.png)、[窄屏等待](RED250/march-waiting-844x390.png)、[布局与 fixture 记录](RED250/march-guidance-geometry.json)。测试窗口已刷新至本轮页面并回到训练设置；没有修改引擎，因此无需重建引擎。
+
+人工复测：新建训练局，首次使用圣光手牌，检查提示来源；友军与高亮落点各点击一次，检查牌和行动点只消耗一次。分别取消两个附加阶段，确认原牌正常结算；对手响应检查持续等待提示并完成响应，随后本方控件恢复。若再次拒绝，保留本轮显示的具体错误及当时选择阶段。可单独撤销本轮页面/CSS提交回退；没有规则、存档或依赖迁移。
+
 ## 验证记录
 
 - 虚闪定向回归：修复前失败，修复后通过。

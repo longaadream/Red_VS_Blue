@@ -2613,6 +2613,37 @@
       return !/(?:VERSION_CONFLICT|AUTHORITY_VERSION_MISMATCH|PERSISTENCE|TERMINAL|TURN_EXPIRED|DEPLOYMENT_EXPIRED|PENDING_RESPONSE_EXPIRED|ACTION_INVALID|ACTION_PLAYER_MISMATCH|TARGET_DECLARATION_MISSING|OPTION_SELECTION_REQUIRED|TARGET_SELECTION_REQUIRED|PENDING_SELECTION_ACTIVE|SESSION_(?:STALE|EXPIRED|ID_MISMATCH|PLAYER_MISMATCH|ALREADY_RESOLVED)|SELECTION_(?:STALE|EXPIRED|ID_MISMATCH|PLAYER_MISMATCH|ALREADY_RESOLVED)|SOURCE_MISSING|PENDING_TARGET_CANCEL_FORBIDDEN|PENDING_(?:TARGET_SELECTION|OPTION)_(?:NOT_FOUND|STALE|ID_MISMATCH|PLAYER_MISMATCH|ALREADY_RESOLVED|CANCEL_FORBIDDEN))/.test(normalized)
     }
 
+    function targetRejectionMessage(codeOrError, rawMessage) {
+      const errorLike = codeOrError && typeof codeOrError === 'object' ? codeOrError : null
+      const code = errorLike ? errorLike.code : codeOrError
+      const original = errorLike
+        ? (errorLike.message || errorLike.error || rawMessage)
+        : rawMessage
+      const normalized = String(code || '').toUpperCase()
+      if (normalized === 'TARGET_SELECTION_STALE' || normalized === 'TARGET_SELECTION_ID_MISMATCH') {
+        return '目标选择已过期，请重新选择'
+      }
+      if (normalized === 'TARGET_SELECTION_PLAYER_MISMATCH') {
+        return '当前玩家无法完成此目标选择'
+      }
+      if (normalized === 'TARGET_REFERENCE_MISMATCH') return '目标位置已变化，请重新选择'
+      if (normalized === 'TARGET_NOT_WALKABLE') return '所选地格不可行走'
+      if (normalized === 'TARGET_OUT_OF_RANGE') return '目标超出允许范围'
+      if (normalized === 'TARGET_TYPE_MISMATCH') return '目标类型不匹配，请重新选择'
+      if (normalized === 'TARGET_OCCUPIED') return '所选地格已被占用'
+      if (normalized === 'TARGET_NOT_ORTHOGONAL') return '目标必须在同一行或列'
+      if (normalized === 'TARGET_FILTER_MISMATCH'
+        || normalized === 'TARGET_NOT_FOUND'
+        || normalized === 'TARGET_NOT_ALIVE'
+        || normalized === 'TARGET_SELECTION_COUNT_INVALID'
+        || normalized === 'TARGET_SELECTION_DUPLICATE'
+        || normalized === 'TARGET_SOURCE_CONSTRAINT_FAILED'
+        || normalized === 'TARGET_RULE_FAILED') {
+        return '目标不在合法候选中'
+      }
+      return typeof original === 'string' && original.trim() ? original : '操作失败'
+    }
+
     function shouldRetainTargetAfterRejection(action, errorLike) {
       const submission = targetSubmissionPending
       const hasDraft = !!(submission && submission.draft && (submission.draft.skill || submission.draft.card))
@@ -3029,7 +3060,7 @@
     }
 
     function cardPreviewAction(card) {
-      const source = card && (card.baseAction || card.rootAction) ? (card.baseAction || card.rootAction) : card
+      const source = card && (card.rootAction || card.baseAction) ? (card.rootAction || card.baseAction) : card
       const action = cloneLocalSkillValue(source || {})
       // These fields only describe the local presentation draft. They must
       // never reach either the isolated preview executor or the authority.
@@ -6330,7 +6361,7 @@
         pendingCardAction.previewOrigin = card && card.previewOrigin || 'click'
         renderLocalCardPreparation(pendingCardAction)
         if (prepared.preparation.kind === 'needTarget') {
-          setStatusMsg(targetStepPrefix(prepared.preparation.step) + targetTypeText(prepared.preparation.targetType, prepared.preparation.filter))
+          setStatusMsg(localCardTargetPrompt(card, prepared.preparation, selected))
         } else {
           setStatusMsg(prepared.preparation.title || '请选择')
         }
@@ -6785,10 +6816,38 @@
       const idx = Number(index)
       return Number.isFinite(idx) && idx > 0 ? '第' + (idx + 1) + '步：' : ''
     }
+    function localCardTargetPrompt(card, preparation, choices) {
+      const prep = preparation || {}
+      const title = typeof prep.title === 'string' && prep.title.trim() ? prep.title.trim() : ''
+      const step = prep.step === undefined ? card && card.pendingTargetIndex : prep.step
+      const targetType = prep.targetType || card && card.pendingTargetType
+      const filter = prep.filter || card && card.pendingTargetFilter
+      const fallback = targetStepPrefix(step) + targetTypeText(targetType, filter)
+      let prompt = title || fallback
+      const selected = Array.isArray(choices)
+        ? choices
+        : Array.isArray(card && card.skillChoices) ? card.skillChoices : []
+      const firstContinuation = step == null || Number(step) === 0
+      if (prep.continuation === true && firstContinuation && selected.length === 0 && title) {
+        const cardId = card && (card.cardId || (card.rootAction && card.rootAction.cardId))
+        const definition = typeof cardsById !== 'undefined' && cardId ? cardsById[cardId] : null
+        const customDefinition = typeof G !== 'undefined' && G && G.customCards && cardId
+          ? G.customCards[cardId]
+          : null
+        const cardName = card && (card.name || card.cardName)
+          || definition && definition.name
+          || customDefinition && customDefinition.name
+        if (cardName && !title.includes(String(cardName))) prompt = String(cardName) + '触发了' + title
+      }
+      if (prep.continuation === true && prep.canCancel === true
+        && !/(取消|放弃|不移动|不触发|跳过)/.test(prompt)) {
+        prompt += '（可取消本次附加选择）'
+      }
+      return prompt
+    }
     function _targetPromptText() {
       if (cardNeedsTarget(pendingCardAction)) {
-        return targetStepPrefix(pendingCardAction.pendingTargetIndex) +
-          targetTypeText(pendingCardAction.pendingTargetType, pendingCardAction.pendingTargetFilter)
+        return localCardTargetPrompt(pendingCardAction, pendingCardAction.preparation || {}, pendingCardAction.skillChoices)
       }
       if (!pendingSkill) return ''
       if (pendingSkill.hint) return pendingSkill.hint
@@ -6818,26 +6877,36 @@
       const submissionDraft = targetSubmissionPending && targetSubmissionPending.draft
       const targetSubmissionNeedsOverlay = !!(targetSubmissionPending
         && !(submissionDraft && submissionDraft.card && !cardNeedsTarget(submissionDraft.card)))
-      const active = !!(cardNeedsTarget(pendingCardAction) || targetSubmissionNeedsOverlay || (pendingSkill && !pendingSkill.previewOnly))
+      const opponentPendingMessage = typeof pendingOpponentGuidanceText === 'function'
+        ? pendingOpponentGuidanceText()
+        : ''
+      const active = !opponentPendingMessage
+        && !!(cardNeedsTarget(pendingCardAction) || targetSubmissionNeedsOverlay || (pendingSkill && !pendingSkill.previewOnly))
+      const overlayActive = !!(opponentPendingMessage || active)
+      // The board is in local target mode only while this client owns the
+      // selection. An opponent response still keeps the public overlay alive,
+      // but must not leave local target-mode controls active underneath it.
       document.body.classList.toggle('target-mode-active', active)
+      document.body.classList.toggle('pending-response-waiting', !!opponentPendingMessage)
       const controls = document.getElementById('targetSelectionControls')
       if (controls) controls.classList.toggle('show', active)
-      if (active) {
-        if (window.refreshTargetSkillButtonState) window.refreshTargetSkillButtonState()
+      if (overlayActive) {
+        if (active && window.refreshTargetSkillButtonState) window.refreshTargetSkillButtonState()
         if (typeof placeTargetOverlayHost === 'function') placeTargetOverlayHost()
-        if (!(pendingSkill && !pendingCardAction && !targetSubmissionPending)) closePieceContextMenu()
-        document.getElementById('targetPromptText').textContent = targetSubmissionPending
+        if (opponentPendingMessage || !(pendingSkill && !pendingCardAction && !targetSubmissionPending)) closePieceContextMenu()
+        const prompt = document.getElementById('targetPromptText')
+        if (prompt) prompt.textContent = opponentPendingMessage || (targetSubmissionPending
           ? '指令已提交 · 等待权威确认'
-          : _targetPromptText()
+          : _targetPromptText())
         const multiSummary = document.getElementById('targetMultiSummary')
         const confirmButton = document.getElementById('targetConfirmButton')
-        const multiActive = isPendingBoardMultiTarget()
+        const multiActive = !opponentPendingMessage && isPendingBoardMultiTarget()
         if (multiSummary) {
           multiSummary.style.display = multiActive ? '' : 'none'
           multiSummary.textContent = multiActive ? pendingBoardMultiSummary() : ''
         }
         if (confirmButton) {
-          const count = pendingSkill && pendingSkill.preparation && pendingSkill.preparation.targetType === 'cell' ? (pendingBoardTargetSelection.selectedCells || []).length : pendingBoardTargetSelection.selectedPieceIds.length
+          const count = !opponentPendingMessage && pendingSkill && pendingSkill.preparation && pendingSkill.preparation.targetType === 'cell' ? (pendingBoardTargetSelection.selectedCells || []).length : !opponentPendingMessage && pendingBoardTargetSelection.selectedPieceIds.length || 0
           const limits = pendingBoardMultiLimits()
           confirmButton.style.display = multiActive ? '' : 'none'
           confirmButton.disabled = !multiActive || count < limits.min || count > limits.max || !!targetSubmissionPending
@@ -6845,12 +6914,19 @@
         }
         const cancelButton = document.getElementById('targetCancelButton')
         if (cancelButton) {
-          const authoritativeSelection = G && (G.pendingTargetSelection || G.pendingOptionSelection)
+          const authoritativeSelection = !opponentPendingMessage && G
+            ? (G.pendingTargetSelection || G.pendingOptionSelection)
+            : null
+          const localSelectionCannotCancel = !!(pendingCardAction && pendingCardAction.preparation
+            && pendingCardAction.preparation.canCancel === false)
           // Every cancellable pending session keeps a shared explicit entry,
           // including an active skill row with its own second-click affordance.
           cancelButton.hidden = !!(authoritativeSelection && authoritativeSelection.canCancel === false)
-          cancelButton.disabled = !!targetSubmissionPending
-          cancelButton.textContent = targetSubmissionPending ? '等待确认…' : '取消目标选择'
+          cancelButton.hidden = !!opponentPendingMessage || localSelectionCannotCancel || cancelButton.hidden
+          cancelButton.disabled = !!opponentPendingMessage || !!targetSubmissionPending
+          cancelButton.textContent = opponentPendingMessage
+            ? '等待对方…'
+            : targetSubmissionPending ? '等待确认…' : '取消目标选择'
         }
         el.classList.add('show')
       } else {
@@ -7956,7 +8032,12 @@
       }
       if (G.pendingOptionSelection || G.pendingTargetSelection) {
         const pending = G.pendingOptionSelection || G.pendingTargetSelection
-        setStatusMsg(clientOwns(pending.playerId) ? '请先完成当前规则选择' : '等待对方完成规则选择')
+        const waitingMessage = typeof pendingOpponentGuidanceText === 'function'
+          ? pendingOpponentGuidanceText()
+          : ''
+        setStatusMsg(waitingMessage || (pending && pending.playerId && clientOwns(pending.playerId)
+          ? '请先完成当前规则选择'
+          : '等待对方完成选择'))
         return
       }
       if (typeof progressiveDeploymentPending === 'function' && progressiveDeploymentPending(G)) {
@@ -8034,7 +8115,11 @@
         )
         pendingCardAction.previewOrigin = 'click'
         renderLocalCardPreparation(pendingCardAction)
-        setStatusMsg(targetStepPrefix(prepared.preparation.step) + targetTypeText(prepared.preparation.targetType, prepared.preparation.filter))
+        setStatusMsg(localCardTargetPrompt(
+          Object.assign({}, tutorialCardAction, { cardId: cardId }),
+          prepared.preparation,
+          [],
+        ))
         return
       }
 
@@ -8302,8 +8387,10 @@
       const inEnd   = phase === 'end'
       const inStart = phase === 'start'
 
-      const _waitingForOther = pendingOptionSelectionForOther()
-        || !!(G.pendingTargetSelection && G.pendingTargetSelection.playerId && !clientOwns(G.pendingTargetSelection.playerId))
+      const _waitingForOther = typeof waitingForOtherPending === 'function'
+        ? waitingForOtherPending()
+        : pendingOptionSelectionForOther()
+          || !!(G.pendingTargetSelection && G.pendingTargetSelection.playerId && !clientOwns(G.pendingTargetSelection.playerId))
       const _waitingForOwn = pendingOptionSelectionForMe() || pendingTargetSelectionForMe()
       const btnEnd = document.getElementById('btnEnd')
       const deploymentPending = G.deployment && G.deployment.status === 'awaiting-locks'
@@ -8346,7 +8433,7 @@
       if (btnEnd) {
         btnEnd.disabled = !!pendingActionFeedback || !!targetSubmissionPending || _waitingForOwn || _waitingForOther || !isMyTurn || (!inStart && !inAction && !inEnd)
         btnEnd.textContent = _waitingForOther
-          ? '等待对方操作'
+          ? '等待对方响应'
           : _waitingForOwn
             ? '请完成选择'
             : inAction ? '结束回合 ->' : '继续 ->'
@@ -8359,7 +8446,10 @@
       setMoveButtonDisabled(!!pendingActionFeedback || !!targetSubmissionPending || _waitingForOwn || _waitingForOther || !isMyTurn || !selectedPieceId || !inAction || !_isOwnSelected || !_canMoveSelected)
 
       if (_waitingForOther) {
-        setStatusMsg('等待对方操作')
+        const waitingMessage = typeof pendingOpponentGuidanceText === 'function'
+          ? pendingOpponentGuidanceText()
+          : '等待对方完成选择'
+        setStatusMsg(waitingMessage)
         pendingMove = false
         clearMoveDraft('waiting-for-other')
         pendingSkill = null
@@ -8371,7 +8461,10 @@
       } else if (pendingSkill && pendingSkill.turnTargetActionType) {
         setStatusMsg(_targetPromptText() || '选择回合目标')
       } else if (pendingOptionSelectionForOther()) {
-        setStatusMsg('等待对方选择...')
+        const waitingMessage = typeof pendingOpponentGuidanceText === 'function'
+          ? pendingOpponentGuidanceText()
+          : '等待对方完成选择'
+        setStatusMsg(waitingMessage)
         pendingMove = false
         pendingSkill = null
         setMoveButtonClass(false)
@@ -9500,8 +9593,10 @@
           showOptionPicker(e.title||'请选择', e.options||[], optionRetry)
         } else {
           const rawErrMsg = e.message || String(e) || '操作失败'
-          const errMsg = (typeof e.code === 'string' && e.code.indexOf('TARGET_') === 0 || /不可行走|not walkable|没有合法|无合法/i.test(rawErrMsg)) ? '没有合法地格' : rawErrMsg
-          red50Evidence.rejections.push({ code: e.code || '', message: errMsg, at: Date.now() })
+          const errMsg = typeof targetRejectionMessage === 'function'
+            ? targetRejectionMessage(e.code, rawErrMsg)
+            : rawErrMsg
+          red50Evidence.rejections.push({ code: e.code || '', message: rawErrMsg, at: Date.now() })
           const retainTarget = shouldRetainTargetAfterRejection(action, e)
           const rejectedPending = (
             (action.type === 'pendingTargetSelect' && G && G.pendingTargetSelection)
@@ -9806,13 +9901,25 @@
       return [G.pendingOptionSelection, G.pendingTargetSelection].some(pending =>
         pending && pending.playerId && !clientOwns(pending.playerId))
     }
+    function pendingOpponentGuidanceText() {
+      if (!G) return ''
+      const pending = [G.pendingOptionSelection, G.pendingTargetSelection].find(function(candidate) {
+        return candidate && candidate.playerId && !clientOwns(candidate.playerId)
+      })
+      if (!pending) return ''
+      const currentPlayerId = G.turn && G.turn.currentPlayerId
+      return currentPlayerId && clientOwns(currentPlayerId)
+        ? '你的行动触发了对方响应，请等待对方完成选择'
+        : '等待对方完成选择'
+    }
     ;['pointerdown', 'click', 'dblclick', 'contextmenu', 'keydown', 'wheel'].forEach(type => {
       document.addEventListener(type, event => {
         if (event.target?.closest?.('#rulebook, #rulebookButton')) return
-        if (!waitingForOtherPending()) return
+        const waitingMessage = pendingOpponentGuidanceText()
+        if (!waitingMessage) return
         event.preventDefault()
         event.stopImmediatePropagation()
-        setStatusMsg('等待对方操作')
+        setStatusMsg(waitingMessage)
       }, { capture: true, passive: false })
     })
     let lastDmFeedback = { key: '', at: 0 }
@@ -9869,7 +9976,10 @@
     }
     function setStatusMsg(msg) {
       const el = document.getElementById('statusMsg')
-      const shown = waitingForOtherPending() ? '等待对方操作' : msg
+      const waitingMessage = typeof pendingOpponentGuidanceText === 'function'
+        ? pendingOpponentGuidanceText()
+        : ''
+      const shown = waitingMessage || msg
       if (el) el.textContent = shown
       const aiming = (typeof pendingSkill !== 'undefined' && pendingSkill)
         || (typeof pendingCardAction !== 'undefined' && pendingCardAction)

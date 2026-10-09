@@ -862,14 +862,15 @@ body #targetOverlay #targetPromptText {
   -webkit-text-stroke: 2px #16110d;
   paint-order: stroke fill;
   text-shadow: -1px 0 #16110d, 1px 0 #16110d, 0 -1px #16110d, 0 1px #16110d;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-align: center;
   max-width: 100%;
 }
 body.target-mode-active #opponentHandStack { visibility: hidden !important; }
 body.target-mode-active #statusMsg,
 body.target-mode-active #dmBubble { display: none !important; }
+body.pending-response-waiting #statusMsg { display: none !important; }
 body #targetSelectionControls {
   display: none;
   position: static !important;
@@ -1004,6 +1005,7 @@ body #targetOverlay #targetSelectionControls { z-index: auto; }
   body.character-dock-open #pieceInfoModal.character-dock .character-portrait { width: 38px; height: 38px; }
   body.target-mode-active #pieceInfoModal.character-dock .pi-piece-state { display: none; }
   body #targetOverlay { top: calc(env(safe-area-inset-top) + 10px) !important; }
+  body.pending-response-waiting #targetOverlay { top: calc(env(safe-area-inset-top) + 64px) !important; }
   body #targetOverlay #targetPromptText { font-size: 16px !important; }
 }
 

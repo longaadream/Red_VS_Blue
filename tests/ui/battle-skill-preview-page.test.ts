@@ -354,6 +354,7 @@ function createCardClickHarness(preparation: Record<string, any> | null | Array<
     readNamedFunction(html, 'prepareLocalCardAction'),
     readNamedFunction(html, 'targetTypeText'),
     readNamedFunction(html, 'targetStepPrefix'),
+    readNamedFunction(html, 'localCardTargetPrompt'),
     readNamedFunction(html, 'onCardClick'),
   ].join('\n'), { filename: 'battle.html:card-click' }).runInContext(context as any)
   return { context, prepare, doAction, submitTargetAction, statusMessages, renderTargetOverlay }
