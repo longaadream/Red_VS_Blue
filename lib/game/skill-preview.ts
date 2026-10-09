@@ -712,6 +712,11 @@ function redactSkill(skill: unknown): unknown {
   const result = { ...skill }
   delete result.code
   delete result.previewCode
+  // Authoring artifacts carry executable structure just like generated code.
+  delete result.contentGraph
+  delete result.contentGraphField
+  delete result.contentGraphCompilerVersion
+  delete result.contentGraphEntries
   delete result.statusTag
   delete result.summonCapability
   delete result.deathParasitism

@@ -29,6 +29,10 @@
       function changeNode(id, change) { const next = clone(graph()); change(next.nodes.find(node => node.id === id)); update(next) }
       function refresh() {
         container.replaceChildren()
+        if (getDraft().contentGraph) {
+          container.append(el('p', '当前内容由模块化内容图生成，请在上方内容图中修改；解除关联后才能创建原版技能图。'))
+          return
+        }
         const help = el('p', '连接“主动使用 → 选择 → 条件或效果 → 完成”。可配置显示来源、数值进度、地格标记、文字／高亮／音效和可见对象。一个技能可有一组选项，支持多选。回合被动、召唤及复杂旧脚本仍使用代码编辑。', 'graph-help')
         container.append(help)
         const current = graph()

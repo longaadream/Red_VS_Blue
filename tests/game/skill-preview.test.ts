@@ -230,6 +230,7 @@ describe('RED-224 isolated public skill preview', () => {
       .toBe(actual.players.find(player => player.playerId === 'player-red')?.actionPoints)
     expect(result.events.some(event => event.kind === 'damage')).toBe(true)
     expect(JSON.stringify(result)).not.toContain('previewCode')
+    expect(JSON.stringify(result)).not.toContain('contentGraph')
     expect(JSON.stringify(result)).not.toContain('venom-claw-rend-random')
     expect(JSON.stringify(state)).toBe(before)
   })

@@ -8,6 +8,7 @@ import { preparePublicationIdentity } from './publication-identity'
 import { openTrainingPreview, closeTrainingPreviews } from './training-preview'
 import type { TrainingSnapshot } from './training-resources'
 import { readCodeImport } from './code-import'
+import { assertContentGraphArtifact } from './content-graph-document'
 import { assertSkillGraphArtifact } from './skill-graph'
 import { assertContentProjectRoot, createContentProject, openContentProject, readDocumentSnapshot, writeDocumentSnapshot } from './content-project'
 import {
@@ -325,6 +326,7 @@ handleTrusted('read-file', (_e, subdir: string, filename: string) => {
 
 handleTrusted('write-file', (_e, subdir: string, filename: string, data: unknown) => {
   assertSkillGraphArtifact(data)
+  assertContentGraphArtifact(data)
   const file = safePath(subdir, filename, 'write')
   fs.writeFileSync(file, JSON.stringify(data, null, 2) + '\n', 'utf-8')
   return { ok: true }
@@ -334,6 +336,7 @@ handleTrusted('write-file', (_e, subdir: string, filename: string, data: unknown
 
 handleTrusted('create-file', (_e, subdir: string, id: string, data: unknown) => {
   assertSkillGraphArtifact(data)
+  assertContentGraphArtifact(data)
   if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(id)) {
     throw new Error('ID 只能包含小写字母、数字和单个连字符')
   }
