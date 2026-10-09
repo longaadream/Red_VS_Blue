@@ -310,6 +310,34 @@ function resolveColtEndTurnBrowser(engine: BrowserEngine, cancel: boolean) {
 }
 
 describe('RED-218 browser game-engine bundle regressions', () => {
+  it('uses the executed detour path for momentum gain in Node and the browser bundle', () => {
+    const path = [{ x: 0, y: 1 }, { x: 1, y: 1 }, { x: 2, y: 1 }, { x: 2, y: 0 }]
+    const makeDetourState = () => {
+      const sonic = makePiece({
+        instanceId: 'detour-sonic', templateId: 'sonic', ownerPlayerId: 'player-red', x: 0, y: 0, moveRange: 4,
+        skills: [{ skillId: 'sonic-spin-dash', currentCooldown: 0, usesRemaining: -1 }],
+      })
+      sonic.statusTags = [{ type: 'momentum-core', stacks: 0 }]
+      const blocker = makePiece({ instanceId: 'detour-blocker', ownerPlayerId: 'player-blue', x: 1, y: 0 })
+      return makeState({ pieces: [sonic, blocker], currentPlayerId: 'player-red', phase: 'action', width: 5, height: 3 }) as any
+    }
+    const engine = browserEngine()
+    const nodeState = makeDetourState()
+    const nodeSonic = nodeState.pieces.find((piece: any) => piece.instanceId === 'detour-sonic')
+    attachNodeRule(nodeSonic, 'rule-momentum-gain')
+    const browserState = makeDetourState()
+    const browserSonic = browserState.pieces.find((piece: any) => piece.instanceId === 'detour-sonic')
+    attachBrowserRule(engine, browserSonic, 'rule-momentum-gain')
+
+    const action = { type: 'move', playerId: 'player-red', pieceId: 'detour-sonic', toX: 2, toY: 0, path }
+    const nodeResult = applyNodeBattleAction(nodeState, action as any)
+    const browserResult = engine.applyBattleAction(browserState, action)
+
+    expect((nodeResult.pieces.find((piece: any) => piece.instanceId === 'detour-sonic') as any)?.momentum).toBe(4)
+    expect(browserResult.pieces.find((piece: any) => piece.instanceId === 'detour-sonic')?.momentum).toBe(4)
+    expect(browserResult.actions?.find((entry: any) => entry.type === 'move')?.payload?.path).toEqual(path)
+  })
+
   it('matches Node for Shadow momentum-7 side fire through cover and beyond four cells', () => {
     const engine = browserEngine()
     const nodeState = makeShadowState(7)
