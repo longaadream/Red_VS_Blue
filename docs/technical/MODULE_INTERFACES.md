@@ -652,6 +652,7 @@ RED-186 正式接入：battle.html 直接加载 tabletop-battle 样式与角色�
 
 - `GameEngine.previewBattleAction(snapshot, action, viewerId)` 同步计算查看者的技能根动作；结果为 `ready`（公开假设快照、公开表现事件、计算耗时）、`needs-input` 或 `unavailable`。它不生成提交凭证、不写真实行动历史、不发送网络命令。
 - 预演先建立查看者可知的 JSON 状态，再在独立 `RuleExecutionContext`、`TriggerSystem` 与固定预演运行时中执行真实规则。运行时规则必须从公开资源重新建立，不复用源战局 effect 闭包。正式结算路径不安装预演策略。
+- RED-250 黑虚闪：可信 canonical 技能引用的纯目标校验声明可进入预演；规则原始 JSON 必须只有允许的描述字段与 `comparePieceNumber` 数值比较，不能包含效果、触发或未知字段。已编译规则的 `targetValidation` 不足以证明纯度。灵压目标约束仍由原目标准备/校验执行，未归刃、攻击不符合或超出范围继续拒绝；任意状态效果、召唤及其他执行能力保持既有边界。
 - canonical 预加载与执行均使用独立缓存；只接受可信资源包中的技能，不执行快照任意 code。此边界不是任意代码沙箱。对手伪装使用公开显示属性计算；未知扩展数据不进入隔离输入。
 - 隐藏效果不参与假设局面；反应规则引出的额外选择应跳过并重新计算普通效果，不能清掉 pending 后接受半结算状态。根技能尚未完成的选择不猜测；随机或无法可靠计算的效果不显示确定结局。
 - `BattleSkillPreview.create()` 只管理当前选择的派生显示、缓存和旧结果失效；缓存按查看者、快照引用、revision 与目标动作区分，最多 16 个结果。诊断最多 64 条，不持有完整快照。

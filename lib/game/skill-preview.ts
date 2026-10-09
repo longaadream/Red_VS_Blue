@@ -5,7 +5,10 @@ import {
 } from './battle-presentation-events'
 import { recordBattlePresentation, recordedProjectilePaths } from './battle-presentation-recording'
 import { toPublicBattleState } from './deployment'
-import { createPublicRuleSource } from './public-rule-source'
+import {
+  createPublicRuleSource,
+  isCanonicalPureTargetValidationRule,
+} from './public-rule-source'
 import { skillChoicePromptKey } from './skill-choice-sequence'
 import { loadSkillById } from './skills'
 import { prepareAction } from './targeting'
@@ -613,6 +616,40 @@ function loadCanonicalPublicSkill(skillId: string): JsonRecord | undefined {
   }
 }
 
+const PURE_TARGET_STATUS_TAG_KEYS = new Set(['id', 'type', 'name', 'rule', 'rules'])
+
+function hasOnlyKeys(value: JsonRecord, allowed: Set<string>): boolean {
+  return Object.keys(value).every(key => allowed.has(key))
+}
+
+function hasOnlyPureTargetValidationStatusTag(skill: JsonRecord): boolean {
+  if (skill.statusTag === undefined) return true
+  const tags = Array.isArray(skill.statusTag) ? skill.statusTag : [skill.statusTag]
+  if (tags.length === 0) return false
+  return tags.every(tag => {
+    if (!isRecord(tag) || !hasOnlyKeys(tag, PURE_TARGET_STATUS_TAG_KEYS)
+      || typeof tag.id !== 'string' || !tag.id
+      || tag.type !== 'skill-rule'
+      || (tag.name !== undefined && typeof tag.name !== 'string')) return false
+    if (Object.prototype.hasOwnProperty.call(tag, 'rule') && typeof tag.rule !== 'string') return false
+    if (Object.prototype.hasOwnProperty.call(tag, 'rules') && !Array.isArray(tag.rules)) return false
+    const listedRules = Array.isArray(tag.rules) ? tag.rules : []
+    if (listedRules.some(ruleId => typeof ruleId !== 'string' || !ruleId)) return false
+    const ruleIds = [
+      ...(typeof tag.rule === 'string' ? [tag.rule] : []),
+      ...listedRules,
+    ]
+    return ruleIds.length > 0 && ruleIds.every(isCanonicalPureTargetValidationRule)
+  })
+}
+
+function hasUnsupportedExecutableDeclaration(definition: JsonRecord | undefined): boolean {
+  if (!definition) return false
+  return !hasOnlyPureTargetValidationStatusTag(definition)
+    || !!definition.summonCapability
+    || !!definition.deathParasitism
+}
+
 function publicSkillDefinition(state: BattleState, skillId: string, preparationOnly = false): JsonRecord | undefined {
   const embedded = state.skillsById?.[skillId] as unknown
   const canonical = loadCanonicalPublicSkill(skillId)
@@ -626,8 +663,9 @@ function publicSkillDefinition(state: BattleState, skillId: string, preparationO
   // guard also closes resources that can reach randomness through a compiled
   // surface which does not receive the scoped Math object.
   if (!preparationOnly && /\bMath\s*\.\s*random\s*\(/.test(skill.code)) return undefined
-  // A declaration which itself names a rule/capability is not a public pure skill source.
-  if (!preparationOnly && (skill.statusTag || skill.summonCapability || skill.deathParasitism)) return undefined
+  // A status declaration is safe only when every referenced canonical rule is
+  // proven to be a pure target gate; effectful and unknown declarations fail closed.
+  if (!preparationOnly && hasUnsupportedExecutableDeclaration(skill)) return undefined
   return skill
 }
 
@@ -953,8 +991,8 @@ function runPublicSkillAction(
           // Public input metadata can be prepared even for effects that are
           // outside the supported preview executor. Never execute those
           // effects merely because their root choices have been completed.
-          if (skill?.statusTag || skill?.summonCapability || skill?.deathParasitism
-            || cardDefinition?.statusTag || cardDefinition?.summonCapability || cardDefinition?.deathParasitism
+          if (hasUnsupportedExecutableDeclaration(skill)
+            || hasUnsupportedExecutableDeclaration(cardDefinition)
             || /\bMath\s*\.\s*random\s*\(/.test(String(skill?.code ?? ''))
             || /\bMath\s*\.\s*random\s*\(/.test(String(cardDefinition?.code ?? ''))) return unavailable(started)
         }
