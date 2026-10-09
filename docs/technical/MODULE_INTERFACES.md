@@ -726,3 +726,5 @@ RED-250 工具栏补充：战局右上 `.topbar` 所有现有按钮在空间不�
 `applySkillChoiceSequence` 续选重放前回退上次暂态表现记录，再执行真实规则；最终事件只包含实际结算。取消附加效果不生成HP恢复事件，真实治疗照常记录一次；非法输入原子回滚不变。
 
 双人地图白名单新增 twin-bridges、crossroads-plaza、island-courtyard、broad-ring；全部中立20×16既有地形，2v2/PVE目录不变。一护两个月牙 cooldownTurns=2 为用户明确的本轮平衡校正。定位标签和历史CSS仅影响显示。详细验证、既有测试失败边界与回退见 docs/qa/RED250-urgent-fixes.md 最终追加。
+
+RED-250 镜花内联过滤补充：权威 beforeSkillUse 返回的 ruleRewrittenPrimaryTargetPieceId 已由基本/充能技能上下文传入首目标选择。索尼克追踪攻击、黑百合致命视线、毒液宿主转移的额外方向/距离/自身检查，须精确匹配该标记后豁免原始目标过滤；正常施放契约保留，实际效果的存活/位置/落点合法性不豁免。镜花将宿主转移指向原施法者时完成无位置变化，不提交重复ID位移。客户端动作不能声明权威改写标记。具体现场复现与人工验收边界见RED250 QA最终追加。

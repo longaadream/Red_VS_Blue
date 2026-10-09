@@ -4,7 +4,7 @@ import { resolve } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { runBattleAction } from '@/lib/game/battle-runner'
-import { loadRuleById } from '@/lib/game/skills'
+import { executeSkillFunction, loadRuleById } from '@/lib/game/skills'
 import { isSinglePieceTargetAction, prepareAction } from '@/lib/game/targeting'
 import { globalTriggerSystem } from '@/lib/game/triggers'
 import { makePiece, makeState } from '../helpers/minimal-state'
@@ -53,6 +53,12 @@ function fixture(
     instanceId: 'red250-caster', ownerPlayerId: 'player-blue', faction: 'blue',
     x: options.caster?.x ?? 5, y: options.caster?.y ?? 1, currentHp: 10, maxHp: 10, attack: 4,
   }) as any
+  if (skillId === 'sonic-homing-attack') {
+    caster.templateId = 'sonic'
+    caster.momentum = 4
+    caster.statusTags = [{ id: 'red250-sonic-momentum', type: 'momentum-core', stacks: 4, skillIds: [skillId] }]
+    caster.rules = [rule('rule-momentum-consume')]
+  }
   const extraTargets = (options.extraTargets || []).map(extra => makePiece({
     instanceId: extra.instanceId, ownerPlayerId: 'player-blue', faction: 'blue',
     x: extra.x, y: extra.y, currentHp: 10, maxHp: 10, attack: 3,
@@ -147,6 +153,131 @@ describe('RED250 Aizen target replacement geometry', () => {
         expect.objectContaining({ type: 'aizen-kyoka-active' }),
         expect.objectContaining({ type: 'aizen-kyoka-secret' }),
       ]))
+  })
+
+  it('resolves Sonic homing after Kyoka rewrites to a diagonal target allied to the caster', () => {
+    const { state, original, replacement, caster } = fixture(
+      'sonic-homing-attack', { x: 3, y: 2 }, { caster: { x: 5, y: 1 } },
+    )
+    const pending = startKyokaAction(state, caster, original, 'sonic-homing-attack')
+    expect(pending.pendingTargetSelection.candidates).toEqual([
+      { type: 'piece', pieceId: replacement.instanceId },
+    ])
+
+    const resolved = submitReplacement(pending, replacement)
+    expect(resolved.pendingTargetSelection).toBeUndefined()
+    expect(resolved.pieces.find((piece: any) => piece.instanceId === replacement.instanceId).currentHp).toBe(7)
+    expect(resolved.pieces.find((piece: any) => piece.instanceId === original.instanceId).currentHp).toBe(10)
+    expect(resolved.players[1].actionPoints).toBe(2)
+    const resolvedCaster = resolved.pieces.find((piece: any) => piece.instanceId === caster.instanceId)
+    expect(Math.abs(resolvedCaster.x - replacement.x) + Math.abs(resolvedCaster.y - replacement.y)).toBe(1)
+    expect(resolvedCaster.momentum).toBe(0)
+    expect(resolvedCaster.statusTags).toEqual(expect.arrayContaining([
+      expect.objectContaining({ type: 'momentum-core', stacks: 0 }),
+    ]))
+    expect(resolved.actions.filter((entry: any) => entry.type === 'useBasicSkill' && entry.payload?.skillId === 'sonic-homing-attack'))
+      .toHaveLength(1)
+  })
+
+  it('keeps ordinary Sonic diagonal rejection without a trusted rewrite', () => {
+    const definition = json('data/skills/sonic-homing-attack.json')
+    const sonic = makePiece({
+      instanceId: 'red250-ordinary-sonic', templateId: 'sonic', ownerPlayerId: 'player-blue', faction: 'blue',
+      x: 5, y: 1, attack: 4,
+    }) as any
+    const diagonal = makePiece({
+      instanceId: 'red250-ordinary-diagonal', ownerPlayerId: 'player-red', faction: 'red',
+      x: 3, y: 2, currentHp: 10, maxHp: 10,
+    }) as any
+    const state = makeState({ pieces: [sonic, diagonal], width: 7, height: 5 }) as any
+
+    const result = executeSkillFunction(definition, {
+      piece: sonic,
+      target: diagonal,
+      targetPosition: null,
+      targets: [{ info: diagonal, pos: null }],
+      battle: state,
+      skill: definition,
+    } as any, state)
+
+    expect(result).toMatchObject({ success: false, message: '请选择正方向内的敌人' })
+    expect(sonic).toMatchObject({ x: 5, y: 1 })
+    expect(diagonal.currentHp).toBe(10)
+  })
+
+  it('cancels Kyoka rewrite and resolves the original orthogonal Sonic target once', () => {
+    const { state, original, replacement, caster } = fixture(
+      'sonic-homing-attack', { x: 3, y: 2 }, { caster: { x: 5, y: 1 } },
+    )
+    const pending = startKyokaAction(state, caster, original, 'sonic-homing-attack')
+    const session = pending.pendingTargetSelection
+    expect(session).toBeDefined()
+
+    const resolved = runBattleAction(pending, {
+      type: 'cancelPendingSelection', playerId: 'player-red',
+      selectionId: session.selectionId, stateRevision: session.stateRevision,
+    } as any, { rootSeed: 250 }).state as any
+
+    expect(resolved.pendingTargetSelection).toBeUndefined()
+    expect(resolved.pieces.find((piece: any) => piece.instanceId === original.instanceId).currentHp).toBe(7)
+    expect(resolved.pieces.find((piece: any) => piece.instanceId === replacement.instanceId).currentHp).toBe(10)
+    expect(resolved.players[1].actionPoints).toBe(2)
+    const resolvedCaster = resolved.pieces.find((piece: any) => piece.instanceId === caster.instanceId)
+    expect(Math.abs(resolvedCaster.x - original.x) + Math.abs(resolvedCaster.y - original.y)).toBe(1)
+    expect(resolvedCaster.momentum).toBe(0)
+    expect(resolved.actions.filter((entry: any) => entry.type === 'useBasicSkill' && entry.payload?.skillId === 'sonic-homing-attack'))
+      .toHaveLength(1)
+  })
+
+  it('rejects a Sonic rewrite outside Aizen range without mutating the pending session', () => {
+    const { state, original, replacement, caster } = fixture(
+      'sonic-homing-attack', { x: 3, y: 2 }, {
+        caster: { x: 5, y: 1 },
+        extraTargets: [{ instanceId: 'red250-sonic-outside', x: 5, y: 2 }],
+      },
+    )
+    const pending = startKyokaAction(state, caster, original, 'sonic-homing-attack')
+    expect(pending.pendingTargetSelection.candidates).toEqual([
+      { type: 'piece', pieceId: replacement.instanceId },
+    ])
+    const before = JSON.stringify(pending)
+
+    expect(() => submitReplacement(
+      pending,
+      pending.pieces.find((piece: any) => piece.instanceId === 'red250-sonic-outside'),
+    )).toThrow()
+    expect(JSON.stringify(pending)).toBe(before)
+  })
+
+  it('ignores a client-supplied rewrite marker for an ordinary diagonal Sonic action', () => {
+    const definition = json('data/skills/sonic-homing-attack.json')
+    const sonic = makePiece({
+      instanceId: 'red250-forged-sonic', templateId: 'sonic', ownerPlayerId: 'player-blue', faction: 'blue',
+      x: 5, y: 1, attack: 4, skills: [{ skillId: definition.id, currentCooldown: 0, usesRemaining: -1 }],
+    }) as any
+    const diagonal = makePiece({
+      instanceId: 'red250-forged-target', ownerPlayerId: 'player-red', faction: 'red',
+      x: 3, y: 2, currentHp: 10, maxHp: 10,
+    }) as any
+    const state = makeState({ pieces: [sonic, diagonal], currentPlayerId: 'player-blue', width: 7, height: 5 }) as any
+    state.players[1].actionPoints = 3
+    state.skillsById[definition.id] = definition
+    const base = {
+      type: 'useBasicSkill' as const, playerId: 'player-blue' as const,
+      pieceId: sonic.instanceId, skillId: definition.id,
+    }
+    const prepared = prepareAction(state, base)
+    if (prepared.kind !== 'needTarget') throw new Error(`Expected target selection, got ${prepared.kind}`)
+    const before = JSON.stringify(state)
+
+    expect(() => runBattleAction(state, {
+      ...base,
+      targetPieceId: diagonal.instanceId,
+      selectionId: prepared.selectionId,
+      stateRevision: prepared.stateRevision,
+      ruleRewrittenPrimaryTargetPieceId: diagonal.instanceId,
+    } as any, { rootSeed: 250 })).toThrow()
+    expect(JSON.stringify(state)).toBe(before)
   })
 
   it('rejects a replacement outside Aizen Manhattan range without mutating pending state', () => {
