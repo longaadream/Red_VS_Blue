@@ -12,6 +12,8 @@ export interface SkillChoiceInput {
   source: SkillChoiceSource
   /** Signature of a locally generated public prompt, not authority credentials. */
   promptKey: string
+  /** Cancel the matched pending prompt through the authoritative reducer. */
+  cancelled?: true
   targetPieceId?: string
   targetX?: number
   targetY?: number
@@ -99,9 +101,12 @@ export function readSkillChoices(value: unknown): SkillChoiceInput[] {
       || typeof choice.source.id !== 'string' || !choice.source.id.trim()
       || typeof choice.promptKey !== 'string' || !/^public-choice-v1-[a-f0-9]{64}$/.test(choice.promptKey)
       || choice.source.pieceId !== undefined && typeof choice.source.pieceId !== 'string') invalid()
-    if (Object.keys(choice).some(key => !['kind', 'source', 'promptKey', 'targetPieceId', 'targetX', 'targetY', 'extraTargets', 'selectedOption'].includes(key))
+    if (Object.keys(choice).some(key => !['kind', 'source', 'promptKey', 'cancelled', 'targetPieceId', 'targetX', 'targetY', 'extraTargets', 'selectedOption'].includes(key))
       || Object.keys(choice.source).some(key => !['type', 'id', 'pieceId'].includes(key))) invalid()
-    if (choice.kind === 'option') {
+    if (choice.cancelled !== undefined && choice.cancelled !== true) invalid()
+    if (choice.cancelled === true) {
+      if (['targetPieceId', 'targetX', 'targetY', 'extraTargets', 'selectedOption'].some(key => Object.hasOwn(choice, key))) invalid()
+    } else if (choice.kind === 'option') {
       if (!Object.hasOwn(choice, 'selectedOption') || ['targetPieceId', 'targetX', 'targetY', 'extraTargets'].some(key => Object.hasOwn(choice, key))) invalid()
     } else {
       if (Object.hasOwn(choice, 'selectedOption')) invalid()
@@ -135,7 +140,7 @@ export function applySkillChoiceSequence(
   action: BattleAction & { skillChoices: SkillChoiceInput[] },
   reduce: (state: BattleState, action: BattleAction) => BattleState,
 ): BattleState {
-  if (action.type !== 'useBasicSkill' && action.type !== 'useChargeSkill'
+  if (action.type !== 'useBasicSkill' && action.type !== 'useChargeSkill' && action.type !== 'playCard'
     || state.pendingTargetSelection || state.pendingOptionSelection) invalid()
   const choices = readSkillChoices(action.skillChoices)
   if (action.stateRevision !== undefined && action.stateRevision !== getTargetingStateRevision(state)) {
@@ -162,16 +167,23 @@ export function applySkillChoiceSequence(
       // not feed our answer to it or skip it; keep the authority pending flow.
       if (!skillChoiceMatchesPrompt(choice, next, action.playerId)) break
       const pending = next.pendingTargetSelection ?? next.pendingOptionSelection!
-      const { kind, source: _source, promptKey: _promptKey, ...input } = choice
+      const { kind, source: _source, promptKey: _promptKey, cancelled, ...input } = choice
       void _source
       void _promptKey
-      next = reduce(next, {
-        ...input,
-        type: kind === 'target' ? 'pendingTargetSelect' : 'pendingOptionSelect',
-        playerId: action.playerId,
-        selectionId: pending.selectionId,
-        stateRevision: pending.stateRevision,
-      } as BattleAction)
+      next = reduce(next, cancelled === true
+        ? {
+            type: 'cancelPendingSelection',
+            playerId: action.playerId,
+            selectionId: pending.selectionId,
+            stateRevision: pending.stateRevision,
+          }
+        : {
+            ...input,
+            type: kind === 'target' ? 'pendingTargetSelect' : 'pendingOptionSelect',
+            playerId: action.playerId,
+            selectionId: pending.selectionId,
+            stateRevision: pending.stateRevision,
+          } as BattleAction)
     }
     next = stampTargetingRevision(state, next)
     if (next.pendingOptionSelection) next.pendingOptionSelection = finalizePendingOptionSession(next.pendingOptionSelection, next.targetingRevision!)

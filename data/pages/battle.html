@@ -3078,23 +3078,94 @@
       return { status: 'needs-input', preparation, result }
     }
 
-    function installLocalCardDraft(rootAction, card, preparation) {
+    function localCardSource(card, preparation) {
+      const source = preparation && preparation.source
+      if (source && typeof source === 'object' && typeof source.type === 'string' && typeof source.id === 'string') {
+        return cloneLocalSkillValue(source)
+      }
+      const root = card && (card.rootAction || card.baseAction) || card || {}
+      return {
+        type: 'card',
+        id: card && card.cardId || root.cardInstanceId || '',
+        ...(root.pieceId ? { pieceId: root.pieceId } : {}),
+      }
+    }
+
+    function localCardChoices(card) {
+      return Array.isArray(card && card.skillChoices)
+        ? cloneLocalSkillValue(card.skillChoices)
+        : []
+    }
+
+    function localCardUsesRootInput(card) {
+      const preparation = card && card.preparation
+      // Public root prompts belong on the playCard action. An after-card
+      // continuation is an owned answer and must travel as skillChoices.
+      if (preparation && preparation.continuation !== true) return true
+      if (preparation && typeof preparation.promptKey !== 'string') return true
+      if (preparation && preparation.continuation === true) return false
+      const root = card && (card.rootAction || card.baseAction) || {}
+      return !localCardChoices(card).length
+        && !_actionHasFirstTarget(root)
+        && root.selectedOption === undefined
+    }
+
+    function localCardTargetChoice(card, piece, x, y, preparation) {
+      const targetType = preparation && preparation.targetType
+      const choice = Object.assign({ kind: 'target', source: localCardSource(card, preparation) },
+        preparation && typeof preparation.promptKey === 'string' ? { promptKey: preparation.promptKey } : {})
+      if (targetType === 'piece' && piece) choice.targetPieceId = piece.instanceId
+      else { choice.targetX = x; choice.targetY = y }
+      return choice
+    }
+
+    function localCardBatchAction(card, rootAction, choices) {
+      const root = cardRootAction(rootAction || card && (card.rootAction || card.baseAction) || card)
+      const selected = Array.isArray(choices) ? cloneLocalSkillValue(choices) : localCardChoices(card)
+      if (selected.length) {
+        root.skillChoices = selected
+        if (root.stateRevision === undefined && card && Number.isSafeInteger(card.rootStateRevision)) {
+          root.stateRevision = card.rootStateRevision
+        }
+      } else delete root.skillChoices
+      return root
+    }
+
+    function installLocalCardDraft(rootAction, card, preparation, choices) {
       const root = cardRootAction(Object.assign({}, card || {}, { rootAction: rootAction }))
-      if (root.selectionId === undefined && preparation && preparation.selectionId !== undefined) root.selectionId = preparation.selectionId
-      if (root.stateRevision === undefined && preparation && preparation.stateRevision !== undefined) root.stateRevision = preparation.stateRevision
+      const inheritedChoices = Array.isArray(root.skillChoices) ? root.skillChoices : []
+      const selected = Array.isArray(choices) ? cloneLocalSkillValue(choices) : cloneLocalSkillValue(inheritedChoices)
+      if (selected.length) root.skillChoices = selected
+      else delete root.skillChoices
+      // Credentials from a public root prompt belong to the root action only.
+      // Continuation credentials are synthetic prompt metadata and must stay
+      // in preparation/skillChoices, never on the card root.
+      if (!selected.length && !_actionHasFirstTarget(root) && root.selectedOption === undefined
+        && preparation && preparation.continuation !== true) {
+        if (preparation.selectionId !== undefined) root.selectionId = preparation.selectionId
+        if (preparation.stateRevision !== undefined) root.stateRevision = preparation.stateRevision
+      }
       const next = Object.assign({}, card || {}, {
         type: 'playCard',
         playerId: rootAction && rootAction.playerId || myPlayerId,
         cardInstanceId: rootAction && rootAction.cardInstanceId || card && card.cardInstanceId,
         rootAction: root,
         localCardDraft: true,
+        skillChoices: selected,
         preparation: cloneLocalSkillValue(preparation),
         previewOnly: false,
         previewEligible: false,
       })
       next.cardId = next.cardId || card && card.cardId
-      if (next.selectionId === undefined && preparation && preparation.selectionId !== undefined) next.selectionId = preparation.selectionId
-      if (next.stateRevision === undefined && preparation && preparation.stateRevision !== undefined) next.stateRevision = preparation.stateRevision
+      if (next.selectionId === undefined && preparation && preparation.continuation !== true
+        && preparation.selectionId !== undefined) next.selectionId = preparation.selectionId
+      if (next.stateRevision === undefined && preparation && preparation.continuation !== true
+        && preparation.stateRevision !== undefined) next.stateRevision = preparation.stateRevision
+      next.rootStateRevision = root.stateRevision !== undefined
+        ? root.stateRevision
+        : G && Number.isSafeInteger(Number(G.targetingRevision))
+          ? Number(G.targetingRevision)
+          : null
       next.pendingTargetIndex = preparation && preparation.step
       next.pendingTargetType = preparation && preparation.targetType
       next.pendingTargetFilter = preparation && preparation.filter
@@ -6206,35 +6277,75 @@
       return submitTargetAction(action, targetLabel)
     }
 
-    function continueLocalCardPreparation(rootAction, card, prepared, commitReady) {
+    function cancelLocalCardContinuation() {
+      if (!isLocalCardDraft(pendingCardAction) || !pendingCardAction.preparation
+        || pendingCardAction.preparation.continuation !== true) return false
+      const preparation = pendingCardAction.preparation
+      if (preparation.canCancel === false) {
+        setStatusMsg('请先完成当前规则选择')
+        return true
+      }
+      const kind = preparation.kind === 'needOption' ? 'option' : 'target'
+      const cancelChoice = Object.assign({
+        kind,
+        source: localCardSource(pendingCardAction, preparation),
+        cancelled: true,
+      }, typeof preparation.promptKey === 'string' ? { promptKey: preparation.promptKey } : {})
+      const root = cardRootAction(pendingCardAction)
+      const choices = localCardChoices(pendingCardAction)
+      choices.push(cancelChoice)
+      const action = localCardBatchAction(pendingCardAction, root, choices)
+      const targetLabel = currentTargetSourceName()
+      rememberTargetInteraction()
+      pendingCardAction = null
+      pendingOptionAction = null
+      pendingOptionPickerSelection = { selectionId: null, selectedValues: [] }
+      _pickerOptions = []
+      const optionOverlay = document.getElementById('optionPickerOverlay')
+      if (optionOverlay) optionOverlay.classList.remove('show')
+      clearSkillPreview()
+      renderHand(); renderBoard(); renderActionBar(); renderTargetOverlay()
+      submitTargetAction(action, targetLabel)
+      return true
+    }
+
+    function continueLocalCardPreparation(rootAction, card, prepared, commitReady, choices) {
+      const selected = Array.isArray(choices) ? cloneLocalSkillValue(choices) : localCardChoices(card)
+      const batchRoot = localCardBatchAction(card, rootAction, selected)
       if (!prepared || prepared.status === 'unavailable') {
-        if (commitReady) return commitLocalCardAction(rootAction, card)
+        if (commitReady) return commitLocalCardAction(batchRoot, card)
         setStatusMsg('此卡牌的后续选择暂无法预演')
         return false
       }
       if (prepared.status === 'needs-input' && prepared.preparation) {
-        // The current card set only exposes target continuations. If a
-        // future/dynamic card asks for an option here, let the authority
-        // enter its existing option flow instead of leaving an inert card
-        // draft that would discard the targets already selected.
+        // Cards currently expose target continuations only. If a future or
+        // dynamic card asks for an option here, submit the completed root to
+        // the authority so it can enter its existing option flow.
         if (prepared.preparation.kind !== 'needTarget') {
-          if (commitReady) return commitLocalCardAction(rootAction, card)
+          if (commitReady) return commitLocalCardAction(batchRoot, card)
           setStatusMsg('此卡牌的后续选择暂无法预演')
           return false
         }
-        pendingCardAction = installLocalCardDraft(rootAction, card, prepared.preparation)
+        pendingCardAction = installLocalCardDraft(batchRoot, card, prepared.preparation, selected)
         pendingCardAction.previewOrigin = card && card.previewOrigin || 'click'
         renderLocalCardPreparation(pendingCardAction)
-        setStatusMsg(targetStepPrefix(prepared.preparation.step) + targetTypeText(prepared.preparation.targetType, prepared.preparation.filter))
+        if (prepared.preparation.kind === 'needTarget') {
+          setStatusMsg(targetStepPrefix(prepared.preparation.step) + targetTypeText(prepared.preparation.targetType, prepared.preparation.filter))
+        } else {
+          setStatusMsg(prepared.preparation.title || '请选择')
+        }
         return false
       }
       if (prepared.status !== 'ready') {
         setStatusMsg('此卡牌的后续选择暂无法预演')
         return false
       }
-      if (commitReady) return commitLocalCardAction(rootAction, card)
+      if (commitReady) {
+        return commitLocalCardAction(batchRoot, card)
+      }
       pendingCardAction = Object.assign({}, card || {}, {
-        rootAction: cardRootAction(Object.assign({}, card || {}, { rootAction: rootAction })),
+        rootAction: batchRoot,
+        skillChoices: selected,
         localCardDraft: true,
         preparation: null,
         validTargets: new Set(),
@@ -6251,19 +6362,28 @@
     function advanceLocalCardTarget(piece, x, y) {
       if (!isLocalCardDraft(pendingCardAction) || !cardNeedsTarget(pendingCardAction)) return false
       const root = cardRootAction(pendingCardAction)
+      const choices = localCardChoices(pendingCardAction)
       const targetType = pendingCardAction.preparation && pendingCardAction.preparation.targetType
-      const firstTarget = !_actionHasFirstTarget(root)
-      _appendTargetToAction(root, piece, x, y, targetType)
-      // Preserve the coordinates included by the legacy card submission path
-      // alongside a piece id. Later targets stay in extraTargets, whose cell
-      // payload already carries coordinates.
-      if (firstTarget && targetType === 'piece' && piece) {
-        root.targetX = x
-        root.targetY = y
+      const useRootInput = localCardUsesRootInput(pendingCardAction)
+      if (useRootInput) {
+        const firstTarget = !_actionHasFirstTarget(root)
+        _appendTargetToAction(root, piece, x, y, targetType)
+        // Preserve the coordinates included by the legacy card submission path
+        // alongside a piece id. Later targets stay in extraTargets, whose cell
+        // payload already carries coordinates.
+        if (firstTarget && targetType === 'piece' && piece) {
+          root.targetX = x
+          root.targetY = y
+        }
+      } else {
+        const prep = pendingCardAction.preparation
+        choices.push(localCardTargetChoice(pendingCardAction, piece, x, y, prep))
       }
-      const prepared = prepareLocalCardAction(root)
-      return continueLocalCardPreparation(root, pendingCardAction, prepared, true)
+      const batchRoot = localCardBatchAction(pendingCardAction, root, choices)
+      const prepared = prepareLocalCardAction(batchRoot)
+      return continueLocalCardPreparation(batchRoot, pendingCardAction, prepared, true, choices)
     }
+
 
     function localSkillInitialOptionPreparation(action, skillData) {
       // Initial option prompts must come from the same public preparation
@@ -6807,6 +6927,8 @@
           stateRevision: pendingTarget && pendingTarget.stateRevision,
         })
       }
+      if (!(G && (pendingTargetSelectionForMe() || pendingOptionSelectionForMe()))
+        && cancelLocalCardContinuation()) return
       if (isLocalSkillDraft(pendingSkill) || (pendingOptionAction && pendingOptionAction.localSkillDraft)) {
         const optionOverlay = document.getElementById('optionPickerOverlay')
         if (optionOverlay) optionOverlay.classList.remove('show')
@@ -7102,9 +7224,16 @@
             setStatusMsg(pbt.title || _targetPromptText() || '请选择目标')
           }
         } else if (serverPendingTargetChanged(pendingSkill, pbt)) {
+          // A rule continuation belongs to the already submitted card root.
+          // Do not let the old local card draft mask the authoritative prompt.
+          if (pendingCardAction) {
+            pendingCardAction = null
+            clearSkillPreview()
+          }
           pendingSkill = {
             targetType: pbt.targetType,
             hint: pbt.title,
+            source: pbt.source,
             range: pbt.range || 99,
             filter: pbt.filter || 'all',
             pendingTargetIndex: Number(pbt.step) || 0,
@@ -7112,6 +7241,8 @@
             turnTargetPlayerId: pbt.playerId,
             preparation: {
               kind: 'needTarget',
+              continuation: true,
+              source: pbt.source,
               selectionId: pbt.selectionId,
               stateRevision: pbt.stateRevision,
               step: Number(pbt.step) || 0,
@@ -8569,8 +8700,16 @@
       if (!previewOnly) {
         const piece = G.pieces.find(p => p.x === x && p.y === y && p.currentHp > 0)
         if (isCard) {
-          action = cardPreviewAction(draft)
-          _appendTargetToAction(action, piece, x, y, targetPreparation && targetPreparation.targetType)
+          const root = cardRootAction(draft)
+          const choices = localCardChoices(draft)
+          const useRootInput = localCardUsesRootInput(draft)
+          if (useRootInput) {
+            action = root
+            _appendTargetToAction(action, piece, x, y, targetPreparation && targetPreparation.targetType)
+          } else {
+            choices.push(localCardTargetChoice(draft, piece, x, y, targetPreparation))
+            action = localCardBatchAction(draft, root, choices)
+          }
         } else if (pendingSkill.localChoiceDraft === true) {
           const root = localSkillRootAction(pendingSkill)
           const choices = localSkillChoices(pendingSkill)

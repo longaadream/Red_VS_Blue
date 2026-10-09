@@ -126,6 +126,7 @@ function cancellationContext(overrides: Record<string, unknown> = {}) {
     selectedPieceId: null,
     pendingTargetSelectionForMe: () => true,
     pendingOptionSelectionForMe: () => false,
+    cancelLocalCardContinuation: () => false,
     isLocalSkillDraft: () => false,
     doAction,
     clearTargetInteraction,

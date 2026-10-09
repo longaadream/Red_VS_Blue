@@ -31,6 +31,26 @@
 
 主菜单与战局设置提供“退出程序”。只允许可信 `game` 窗口通过 preload 请求既有 `requestApplicationExit()`，复用停服/持久化保护。共享 Promise 将异步停服失败传回 renderer，按钮恢复重试；原生关闭调用点接住已记录的失败。网页没有对应桥时隐藏入口。
 
+## 图拉扬：圣铸进军卡住圣光手牌
+
+用户追加复现：场上有图拉扬，本回合首次打出圣光牌，界面进入“选择一名友方角色”后反复点击无法继续。三种圣光牌自身均自动选目标，这一步实际来自 `afterCardPlay` 的圣铸进军。
+
+根因有两层：卡牌 UI 将规则续选追加到原牌目标字段，并把公开预演的续选凭证写入原牌；公共批量续选 reducer 又只接受技能根动作。即使构造正确的卡牌 `skillChoices`，原实现仍拒绝。修复将手牌续选接入既有严格提示匹配与权威 pending 验证，友军、落点分别收集为有序答案。悬停预演采用相同分流，根目标凭证保留。
+
+取消圣铸进军会提交匹配当前提示的 `cancelled:true`，复用权威取消规则：只跳过额外移动，原牌正常消耗并结算，且本回合圣铸次数正常记账。尚未完成原牌目标的取消仍仅清理本地草稿。没有改动圣铸移动范围、路径、费用、每回合次数或三张圣光牌数据。
+
+游戏回归的最小初始状态：固定种子 250，图拉扬附着 canonical 圣铸规则、受伤友军、圣光手牌；经公开准备收集两步答案，再向真实 `runBattleAction` 提交。新增最初 3 项回归在修复前有 2 项失败（卡牌续选/取消预演返回 `unavailable`），修复后通过。
+
+扩展后的游戏回归 10 项通过：治疗、惩击、充能分别核对真实效果、单次费用/消耗；两阶段取消、同回合下一张牌、错误提示保留权威 pending、非法候选/过期根凭证原子拒绝及合法重试。三个浏览器引擎已重新构建。扩大页面预演验证时发现 11 项 `bindBattlePlayerAvatars is not defined`；独立代理将相同 harness 的页面输入替换为 `git show origin/main:data/pages/battle.html`，得到相同 11 项失败，证明为已有测试隔离缺口。本次仅补相邻预演测试的依赖，不修改头像实现、断言期望或快照。
+
+追加最终验证：以下 20 文件共 352 项通过；独立审查另运行其中 6 文件 84 项通过，无阻塞发现。测试覆盖页面真实函数与规则引擎，未执行本轮完整战局原生鼠标冒烟，悬停和权威分叉接管的最终体验仍待人工。
+
+最终 `npm.cmd run typecheck`、受影响 TS 的 ESLint、HTML 内联脚本语法、编码（1520 文件）、`git diff --check`、`check:main-baseline` 均通过。新增 UI 测试的非可选属性删除类型错误已修正为测试数据字典类型，随后重新运行类型检查与该文件 5 项测试通过。
+
+```powershell
+npm.cmd test -- tests/game/red250-turalyon-holy-hand.test.ts tests/game/holy-hand-system.test.ts tests/game/holy-hand-performance.test.ts tests/game/red250-ulquiorra-cero.test.ts tests/game/red250-ichigo-choice.test.ts tests/game/red227-local-skill-sequence.test.ts tests/game/skill-preview-privacy.test.ts tests/game/pending-interaction.test.ts tests/game/effect-chain-transaction.test.ts tests/game/deterministic-runtime.test.ts tests/ui/red250-holy-card-continuation.test.ts tests/ui/red250-pending-cancel.test.ts tests/ui/target-overlay-controls.test.ts tests/ui/red227-local-skill-sequence.test.ts tests/ui/battle-skill-preview-page.test.ts tests/ui/battle-skill-preview.test.ts tests/electron/red250-exit.test.ts tests/electron/ipc-trust.test.ts tests/electron/client-startup.test.ts tests/electron/local-game-lifecycle.test.ts
+```
+
 ## 验证记录
 
 - 虚闪定向回归：修复前失败，修复后通过。
@@ -55,3 +75,5 @@ npm.cmd test -- tests/game/red250-ulquiorra-cero.test.ts tests/game/red250-ichig
 撤销本任务提交；若包含引擎源修改，使用项目构建脚本同步重新生成引擎。无存档、数据库、随机算法或依赖迁移。
 
 人工验收：主菜单与战局关闭入口可见且能关闭客户端；可取消选择有显式入口且取消不误释放；黑色月牙每个阶段点击一次即可推进；虚闪实际伤害符合 0.5 倍。不得把自动测试视为人工体验验收、合并或发布授权。
+
+图拉扬追加验收：分别使用圣光治疗、惩击、充能，首次圣铸进军选择友军和落点各点击一次；另开局分别在友军、落点阶段取消，确认原牌结算但没有额外移动；同回合再出一张圣光牌不重复触发进军。观察 AP、手牌及效果没有重复结算，悬停预演和真正点击保持一致。
