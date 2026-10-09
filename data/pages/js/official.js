@@ -4,6 +4,7 @@
   var current = null, activeMatch = null, busy = false, polling = false
   var selectedRankTab = 'prepare', officialHistorySnapshot = '', officialHistoryDirty = true
   var announcedMatch = null, matchAudio = window.BattleAudio ? window.BattleAudio.create() : null
+  var compatibilityPresentation = window.RvBCompatibilityPresentation
   if (matchAudio) window.addEventListener('pagehide', function () { matchAudio.dispose() }, { once: true })
   var nativeApp = location.protocol === 'rvb-client:' || !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform())
   function sessionFor(origin) {
@@ -25,7 +26,16 @@
     if (url.username || url.password || url.search || url.hash || (url.protocol !== 'https:' && !(url.protocol === 'http:' && ['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname)))) throw new Error('账号登录必须使用 HTTPS；只有本机 localhost/127.0.0.1 可使用 HTTP')
     return url.href.replace(/\/+$/, '')
   }
-  function message(text) { $('message').textContent = text; $('authMessage').textContent = text; $('connectionMessage').textContent = text }
+  function message(text, error) {
+    var entry = compatibilityPresentation && typeof compatibilityPresentation.render === 'function'
+      ? compatibilityPresentation.render($('message'), error, { message: text, field: error && error.context && error.context.field })
+      : null
+    if (!entry) {
+      $('message').textContent = text
+      $('message').hidden = false
+    }
+    $('authMessage').textContent = text; $('connectionMessage').textContent = text
+  }
   function renderAccountIdentity(element, account, avatarClass, fallback) {
     if (!element) return
     if (account && account.id && window.RvBPlayerProfile && typeof window.RvBPlayerProfile.renderIdentity === 'function') {
@@ -157,7 +167,7 @@
         playerCell.appendChild(playerName); row.appendChild(playerCell)
         cell(row, player.rating); cell(row, player.games); $('leaderboard').appendChild(row)
       })
-    } catch (error) { message(error.message) } finally { polling = false }
+    } catch (error) { message(error.message, error) } finally { polling = false }
   }
   async function connect() {
     var info = await api('/official/info')
@@ -172,7 +182,7 @@
     document.querySelector('#authForm button').disabled = busy
     $('join').disabled = busy || !!(current && (current.cooldownUntil || current.season.maintenance))
   }
-  function run(work) { return async function (event) { if (event) event.preventDefault(); if (busy) return false; busy = true; busyControls(); try { await work(); return true } catch (error) { message(error.message); return false } finally { busy = false; busyControls() } } }
+  function run(work) { return async function (event) { if (event) event.preventDefault(); if (busy) return false; busy = true; busyControls(); try { await work(); return true } catch (error) { message(error.message, error); return false } finally { busy = false; busyControls() } } }
   $('connect').onclick = run(connect)
   $('authAction').onchange = function () {
     var action = $('authAction').value
@@ -237,7 +247,7 @@
   $('authAction').onchange()
   var initialQuery = new URLSearchParams(location.search)
   if (initialQuery.get('account') === '1') $('accountDialog').showModal()
-  if ($('server').value) void connect().then(function () { if (initialQuery.get('tab') === 'history') selectRankTab('history') }).catch(function (error) { message(error.message) })
+  if ($('server').value) void connect().then(function () { if (initialQuery.get('tab') === 'history') selectRankTab('history') }).catch(function (error) { message(error.message, error) })
   else message('请先设置官方服务器地址，再登录并匹配')
   setInterval(refresh, 4000)
 })()

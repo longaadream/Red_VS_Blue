@@ -11,6 +11,7 @@
   <script src="js/lan-discover.js"></script>
   <script src="js/crypto-lib.js"></script>
   <script src="js/identity.js"></script>
+  <script src="js/compatibility-presentation.js"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
     body {
@@ -606,6 +607,7 @@
         <span class="utility-title">开发者中心</span><span class="utility-meta">固定种子与赛后 Trace</span>
       </button>
     </footer>
+  <div id="compatibilityRecovery" class="compatibility-recovery" role="alert" hidden></div>
   </div>
 
   <!-- ── Connect Sheet ── -->
@@ -678,6 +680,7 @@
       </form>
       </details>
       <div id="lanConnectError" role="alert" style="display:none;margin-bottom:8px"></div>
+      <div id="lanCompatibilityRecovery" class="compatibility-recovery" role="alert" hidden></div>
       <div class="lan-progress-bar"><div class="lan-progress-fill" id="lanProgressFill"></div></div>
       <div class="lan-scanning" id="lanScanningRow"><span class="spin">⟳</span><span id="lanScanningText">快速扫描中（约10秒）…</span></div>
       <label>玩法 <select id="lanModeFilter" onchange="filterLanRooms()"><option value="all">全部</option><option value="1v1">1v1 对战</option><option value="2v2">2v2 组队</option><option value="pve">PVE 冒险</option></select></label><div class="lan-server-list" id="lanServerList">
@@ -932,6 +935,7 @@
 
     function showJoinSheet() {
       _lanFound = []
+      if (typeof clearCompatibilityRecovery === 'function') clearCompatibilityRecovery(document.getElementById('lanCompatibilityRecovery'))
       document.getElementById('lanOverlay').classList.add('show')
       document.getElementById('lanSubtitle').textContent = '正在搜索局域网主机…'
       document.getElementById('lanServerList').innerHTML = '<div class="lan-empty">尚未发现主机</div>'
@@ -1053,9 +1057,12 @@
     async function connectLanServer(url, roomId) {
       if (_lanScanner) _lanScanner.cancel()
       _lanScanner = null
+      const recoveryHost = document.getElementById('lanCompatibilityRecovery')
+      if (typeof clearCompatibilityRecovery === 'function') clearCompatibilityRecovery(recoveryHost)
       document.getElementById('lanScanningRow').style.display = 'none'
       document.getElementById('lanRescanBtn').style.display = 'block'
       const errorBox = document.getElementById('lanConnectError')
+      errorBox.hidden = false
       errorBox.style.display = 'block'
       errorBox.textContent = '正在连接…'
       try {
@@ -1070,7 +1077,9 @@
         if (await checkProfileAndGo(url, 'lan', roomId ? { joinRoom: roomId } : undefined)) closeLanSheet()
         else errorBox.textContent = '未进入大厅，请检查刚才的资源版本提示。'
       } catch (error) {
-        errorBox.textContent = '无法连接 ' + url + '：' + error.message + '。请确认房主显示“服务器已运行”。使用 Radmin 等虚拟局域网时，请填写房主的虚拟网卡 IP 和游戏端口；同一 Wi-Fi／热点才使用对应无线网卡地址。'
+        const detail = '无法连接 ' + url + '：' + error.message + '。请确认房主显示“服务器已运行”。使用 Radmin 等虚拟局域网时，请填写房主的虚拟网卡 IP 和游戏端口；同一 Wi-Fi／热点才使用对应无线网卡地址。'
+        errorBox.textContent = detail
+        showCompatibilityRecovery(error, detail, error && error.context && error.context.field, recoveryHost)
       }
     }
 
@@ -1173,7 +1182,9 @@
       } catch (e) {
         if (btn) btn.textContent = '›'
         if (desc) desc.textContent = '对阵 AI，开始独立 PVE 冒险'
-        alert('创建 PVE 房间失败：' + ((e && e.message) || e))
+        const detail = '创建 PVE 房间失败：' + ((e && e.message) || e)
+        showCompatibilityRecovery(e, detail)
+        alert(detail)
       }
     }
 
@@ -1507,33 +1518,86 @@
         || !/^[a-f0-9]{64}$/.test(identity.resolvedProfileHash)
         || !/^[a-f0-9]{64}$/.test(identity.authorityContentHash)
       ) {
-        throw new Error('本地 Profile Identity 无效，请打开“资源包管理”检查安装状态')
+        const invalid = new Error('本地 Profile Identity 无效，请打开“资源包管理”检查安装状态')
+        invalid.code = 'PROFILE_INVALID'
+        throw invalid
       }
       try { localStorage.setItem('rvb_game_profile_identity', JSON.stringify(identity)) } catch {}
       return identity
     }
 
 
+    function getCompatibilityRecoveryHost(target) {
+      if (target) return target
+      const lanOverlay = document.getElementById('lanOverlay')
+      const lanHost = document.getElementById('lanCompatibilityRecovery')
+      if (lanOverlay && lanHost && lanOverlay.classList.contains('show')) return lanHost
+      return document.getElementById('compatibilityRecovery')
+    }
+
+    function showCompatibilityRecovery(error, message, field, target) {
+      const host = getCompatibilityRecoveryHost(target)
+      const presentation = window.RvBCompatibilityPresentation
+      if (!host || !presentation || typeof presentation.render !== 'function') return null
+      const entry = presentation.render(host, error, { message, field, buttonClass: 'btn-primary' })
+      if (!entry && host.id === 'lanCompatibilityRecovery') {
+        host.textContent = message
+        host.hidden = false
+      }
+      return entry
+    }
+
+    function clearCompatibilityRecovery(target) {
+      const hosts = target
+        ? [target]
+        : [document.getElementById('compatibilityRecovery'), document.getElementById('lanCompatibilityRecovery')]
+      const presentation = window.RvBCompatibilityPresentation
+      if (!presentation || typeof presentation.clear !== 'function') return
+      hosts.forEach(host => { if (host) presentation.clear(host) })
+    }
+
     async function checkProfileAndGo(serverUrl, mode, intent) {
       let installed
       try {
         installed = await getLocalGameProfileIdentity(serverUrl)
       } catch (error) {
-        alert('无法进入大厅：' + ((error && error.message) || error))
+        const detail = '无法进入大厅：' + ((error && error.message) || error)
+        showCompatibilityRecovery(error, detail)
+        alert(detail)
         return false
       }
       try {
         const data = await RvBColyseus.requestCatalogIdentityAt(serverUrl, 'remote-server')
-        if (!/^[a-f0-9]{64}$/.test(data?.profileIdentity?.resolvedProfileHash || '')) throw new Error('主机返回的资源身份无效')
+        if (!/^[a-f0-9]{64}$/.test(data?.profileIdentity?.resolvedProfileHash || '')) {
+          const invalid = new Error('主机返回的资源身份无效')
+          invalid.code = 'PROFILE_INVALID'
+          throw invalid
+        }
         for (const key of ['schemaVersion', 'engineAbi', 'runnerRevision', 'authorityContentHash']) {
-          if (!data?.profileIdentity || installed[key] !== data.profileIdentity[key]) throw new Error('主机与本机资源版本不同，请两端使用配套版本')
+          if (!data?.profileIdentity || installed[key] !== data.profileIdentity[key]) {
+            const mismatch = new Error('主机与本机资源版本不同，请两端使用配套版本')
+            mismatch.code = key === 'engineAbi'
+              ? 'ENGINE_ABI_MISMATCH'
+              : key === 'runnerRevision'
+                ? 'RUNNER_REVISION_MISMATCH'
+                : 'PROFILE_IDENTITY_MISMATCH'
+            mismatch.context = { field: key, actual: installed, expected: data?.profileIdentity }
+            throw mismatch
+          }
         }
         if (data && data.profileIdentity) {
           try { localStorage.setItem('rvb_server_profile_identity', JSON.stringify(data.profileIdentity)) } catch {}
         }
       } catch (error) {
-        alert('无法进入大厅：' + ((error && error.message) || error))
+        const detail = '无法进入大厅：' + ((error && error.message) || error)
+        showCompatibilityRecovery(error, detail, error && error.context && error.context.field)
+        alert(detail)
         return false
+      }
+      if (typeof clearCompatibilityRecovery === 'function') clearCompatibilityRecovery()
+      else {
+        const recovery = document.getElementById('compatibilityRecovery')
+        if (recovery && window.RvBCompatibilityPresentation) window.RvBCompatibilityPresentation.clear(recovery)
       }
       goLobby(mode, serverUrl, intent)
       return true

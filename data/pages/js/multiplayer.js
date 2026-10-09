@@ -7,6 +7,7 @@
   var officialUrl = 'https://play.redvsblue.top'
   var candidate = { version: '0.1.0', relayUrl: officialUrl }
   var entryMode = new URLSearchParams(location.search).get('mode')
+  var compatibilityPresentation = window.RvBCompatibilityPresentation
   fetch('config/multiplayer.json').then(function (response) { return response.json() }).then(function (value) { candidate = value; if (!byId('relayUrl').value && value.relayUrl) byId('relayUrl').value = value.relayUrl }).catch(function () {})
   var byId = function (id) { return document.getElementById(id) }
   byId('relayUrl').value = localStorage.getItem('rvb_relay_url') || ''
@@ -45,7 +46,17 @@
     busy = true; byId('error').textContent = ''; document.querySelectorAll('.modalError').forEach(function (el) { el.textContent = '' })
     var controls = Array.from(document.querySelectorAll('button, select, input')).map(function (control) { return { control: control, disabled: control.disabled } })
     controls.forEach(function (item) { item.control.disabled = true })
-    try { await task() } catch (error) { lastFailure = error.message || String(error); byId('error').textContent = lastFailure; document.querySelectorAll('.modalError').forEach(function (el) { el.textContent = lastFailure }) }
+    try { await task() } catch (error) {
+      lastFailure = error.message || String(error)
+      var entry = compatibilityPresentation && typeof compatibilityPresentation.render === 'function'
+        ? compatibilityPresentation.render(byId('error'), error, { message: lastFailure, field: error && error.context && error.context.field })
+        : null
+      if (!entry) {
+        byId('error').textContent = lastFailure
+        byId('error').hidden = false
+      }
+      document.querySelectorAll('.modalError').forEach(function (el) { el.textContent = lastFailure })
+    }
     finally { busy = false; controls.forEach(function (item) { item.control.disabled = item.disabled }) }
   }
   function showPublication(value) {
@@ -72,7 +83,12 @@
     }
     if (!installed || !remote.profileIdentity) throw new Error('资源版本不可用，请检查资源包')
     for (var key of ['schemaVersion', 'engineAbi', 'runnerRevision', 'resolvedProfileHash', 'authorityContentHash']) {
-      if (installed[key] !== remote.profileIdentity[key]) throw new Error('主机和本机资源版本不同，请安装相同版本后重试')
+      if (installed[key] !== remote.profileIdentity[key]) {
+        var mismatch = new Error('主机和本机资源版本不同，请安装相同版本后重试')
+        mismatch.code = 'PROFILE_IDENTITY_MISMATCH'
+        mismatch.context = { field: key, actual: installed, expected: remote.profileIdentity }
+        throw mismatch
+      }
     }
     localStorage.setItem('rvb_game_profile_identity', JSON.stringify(installed))
     localStorage.setItem('rvb_server_profile_identity', JSON.stringify(remote.profileIdentity))
