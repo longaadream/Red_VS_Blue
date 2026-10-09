@@ -83,6 +83,12 @@ cue 的 kind 为 float、flash、sound。音效只允许 notice、success、warn
 
 终局回放是共享的显示检查点，不是可执行存档。创建检查点时排除整组表现声明，再计算检查点哈希；权威状态／哈希保留声明。旧回放若夹带此组原始声明，出站时不提供该回放，避免泄露或悄悄改坏哈希。当前共享回放不重现这组新提示；实时对局与存档恢复支持它们。
 
+### RED-253 身份 badge 的客户端边界
+
+战斗页棋子详情的核心／非核心 badge 只读取当前页面已经收到的 `isCore`，不会改变权威状态或终局判定。页面仅用显式 `masterPieceId` 识别显示替换组：活跃 clone 关联到的 source 与 clone 对非 owner 统一隐藏 badge；source 在墓地但 clone 仍存活时同样隐藏，clone 消散后 source 恢复原标签。缺少 source 的 clone snapshot 仍保留关联并隐藏。
+
+棋子所有者可以看到自己的原始核心／非核心标签，队友沿现有 private status 权限视为非 owner。观战页不显示身份 badge，以覆盖公开 projection 在 source 死亡或缺失时移除 `masterPieceId` 的降级态；这不新增字段、不改变 `projectSpectatorDisguises`、权威 state hash 或 sealed summon recipe。玩家视角的普通棋子只能按原始 `isCore` 显示，不能通过名称、模板或实例 ID 前缀猜测分身关系。
+
 ## 选择接口
 
 继续使用 `flow.choice.option`、`flow.choice.target` 与 `flow.choice.deferTarget` 及既有权威选择协议。deferTarget 新增 single/multi、minSelections/maxSelections，拒绝不存在的目标、重复候选和无效数量。棋子和地格都支持多选后确认。返回待选择描述，由既有战斗流程安装并恢复；单独调用不会提前写入 pending 状态。
