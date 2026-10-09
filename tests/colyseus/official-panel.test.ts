@@ -45,10 +45,21 @@ describe.skipIf(process.platform !== 'win32')('local operations with actual Post
   it('shows real counts, masks account email and never exposes stored credentials', async () => {
     const snapshot = JSON.parse((await request('/api/snapshot')).text)
     expect(snapshot.counts.accounts).toBe(2); expect(snapshot.runtime.database).toBe('connected'); expect(snapshot.connections).toBe(0)
+    expect(snapshot.capabilities).toMatchObject({ rankedMapCatalog: true, communityModeration: true, communityRestore: true, communitySearch: true })
+    expect(snapshot.rankedMaps.catalog.length).toBeGreaterThanOrEqual(4)
+    expect(snapshot.rankedMaps.enabledIds).toEqual(snapshot.settings.ranked_maps)
+    expect(snapshot.rankedMaps.blocked).toBe(false)
     const response = await request('/api/accounts?q=secret%40example.test')
     expect(JSON.parse(response.text).rows).toHaveLength(1); expect(response.text).toContain('s***@example.test')
     for (const value of ['secret@example.test', 'password_hash', 'never-return', 'token_hash']) expect(response.text).not.toContain(value)
     expect(JSON.parse((await request('/api/accounts?q=' + encodeURIComponent("' OR 1=1 --"))).text).rows).toHaveLength(0)
+  })
+  it('serves bounded moderation filters and rejects cross-origin restoration', async () => {
+    expect((await request('/api/community?q=absent&status=hidden')).status).toBe(200)
+    expect((await request('/api/community?status=invalid')).status).toBe(400)
+    expect((await request('/api/community?q=' + 'x'.repeat(201))).status).toBe(400)
+    expect((await request('/api/action', { action: 'community-restore-post', value: 'missing', reason: 'reviewed' }, { Origin: 'https://foreign.test' })).status).toBe(403)
+    expect((await request('/api/action', { action: 'community-restore-post', value: 'missing', reason: 'reviewed' })).status).toBe(404)
   })
   it('revokes a banned session and queue; rejects nonexistent targets and duplicate seasons without leaking SQL', async () => {
     await app.ranked.enqueue('panel-a', getServerGameProfileIdentityV1())

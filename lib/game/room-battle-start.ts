@@ -4,7 +4,7 @@ import {
 } from '../content-pipeline/runtime/profile-game-identity'
 import { orderedMatchPlayers } from './match-teams'
 import { createInitialBattleForPlayers } from './battle-setup'
-import { assertSelectableMapId } from './map-selection'
+import { assertRankedMapId, assertSelectableMapId } from './map-selection'
 import { hashPublicBattleState } from './battle-public-patch'
 import { hashBattleState, runBattleAction } from './battle-runner'
 import {
@@ -89,7 +89,9 @@ async function startBattleFromLockedRostersQueued(
       return { room: authorityReadyRoom, started: false }
     }
 
-    const mapId = assertSelectableMapId(room.mapId, room.mode)
+    const mapId = room.officialRanked
+      ? assertRankedMapId(room.mapId)
+      : assertSelectableMapId(room.mapId, room.mode)
     resetRoomBattleAuthorityClock(roomId)
     assertDemoRostersReady(room)
 
@@ -133,6 +135,7 @@ async function startBattleFromLockedRostersQueued(
         rootSeed: seed,
         profileIdentity,
         deploymentEnabled: true,
+        rankedMap: room.officialRanked === true,
         deploymentMode: 'progressive-reserve-v1',
         deploymentStartedAt: clock.now(),
         ruleExecutionContext: roomRuleRuntime.executionContext,
