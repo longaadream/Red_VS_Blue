@@ -487,7 +487,7 @@ describe('RED-250 Turalyon holy-hand authority continuation', () => {
     } as BattleAction, 'player-red')
     expect(secondPreparation.status).toBe('needs-input')
     if (secondPreparation.status !== 'needs-input' || !secondPreparation.preparation) return
-    expect(secondPreparation.preparation.candidates).toContainEqual({ type: 'cell', x: 3, y: 1 })
+    expect(secondPreparation.preparation.candidates).toContainEqual({ type: 'cell', x: 3, y: 2 })
     const invalidLanding = {
       kind: 'target' as const,
       source: secondPreparation.preparation.source,
@@ -504,7 +504,7 @@ describe('RED-250 Turalyon holy-hand authority continuation', () => {
     expect(authorityState.players[0]).toMatchObject({ actionPoints: 3, discardPile: [] })
     expect(authorityState.pendingTargetSelection).toBeUndefined()
 
-    const legalLanding = { ...invalidLanding, targetX: 3, targetY: 1 }
+    const legalLanding = { ...invalidLanding, targetX: 3, targetY: 2 }
     const completedPreview = preparePublicSkillAction(publicState, {
       ...root,
       skillChoices: [firstChoice, legalLanding],
@@ -516,15 +516,25 @@ describe('RED-250 Turalyon holy-hand authority continuation', () => {
     } as BattleAction, { rootSeed: 250 }).state as any
     expect(resolved.players[0]).toMatchObject({ actionPoints: 1, hand: [], discardPile: ['holy-heal'] })
     expect(resolved.pieces.find((piece: any) => piece.instanceId === 'red250-ally'))
-      .toMatchObject({ x: 3, y: 1 })
+      .toMatchObject({ x: 3, y: 2 })
   })
 
-  it('does not open a second march prompt for another holy card in the same turn', () => {
+  it('opens a fresh march prompt for a second holy card and settles its effect once', () => {
     const authorityState = makeHolyHandState()
+    authorityState.pieces.push(makePiece({
+      instanceId: 'red250-smite-enemy',
+      templateId: 'test-enemy',
+      ownerPlayerId: 'player-blue',
+      faction: 'blue',
+      x: 5,
+      y: 5,
+      currentHp: 30,
+      maxHp: 30,
+    }) as any)
     authorityState.players[0].actionPoints = 5
     authorityState.players[0].hand.push({
-      cardId: 'holy-charge',
-      instanceId: 'red250-holy-charge',
+      cardId: 'holy-smite',
+      instanceId: 'red250-holy-smite',
       ownerPlayerId: 'player-red',
       actionPointCost: 2,
     })
@@ -560,19 +570,63 @@ describe('RED-250 Turalyon holy-hand authority continuation', () => {
       ...firstRoot,
       skillChoices: [firstChoice, secondChoice],
     } as BattleAction, { rootSeed: 250 }).state as any
-    expect(firstResolved.players[0]).toMatchObject({ actionPoints: 3, hand: [{ cardId: 'holy-charge' }] })
+    expect(firstResolved.players[0]).toMatchObject({
+      actionPoints: 3,
+      hand: [{ cardId: 'holy-smite' }],
+      discardPile: ['holy-heal'],
+    })
+    expect(firstResolved.pieces.find((piece: any) => piece.instanceId === 'red250-smite-enemy'))
+      .toMatchObject({ currentHp: 30 })
 
-    const secondResolved = runBattleAction(firstResolved, {
+    const secondPending = runBattleAction(firstResolved, {
       type: 'playCard',
       playerId: 'player-red',
-      cardInstanceId: 'red250-holy-charge',
+      cardInstanceId: 'red250-holy-smite',
+    } as BattleAction, { rootSeed: 250 }).state as any
+    expect(secondPending.pendingTargetSelection).toMatchObject({
+      targetType: 'piece',
+      candidates: expect.arrayContaining([{ type: 'piece', pieceId: 'red250-ally' }]),
+    })
+    expect(secondPending.players[0]).toMatchObject({
+      actionPoints: 3,
+      hand: [{ cardId: 'holy-smite', instanceId: 'red250-holy-smite' }],
+      discardPile: ['holy-heal'],
+    })
+    const secondDestination = runBattleAction(secondPending, {
+      type: 'pendingTargetSelect',
+      playerId: 'player-red',
+      targetPieceId: 'red250-ally',
+      selectionId: secondPending.pendingTargetSelection.selectionId,
+      stateRevision: secondPending.pendingTargetSelection.stateRevision,
+    } as BattleAction, { rootSeed: 250 }).state as any
+    expect(secondDestination.pendingTargetSelection).toMatchObject({
+      targetType: 'grid',
+      candidates: expect.arrayContaining([{ type: 'cell', x: 3, y: 1 }]),
+    })
+
+    const secondResolved = runBattleAction(secondDestination, {
+      type: 'pendingTargetSelect',
+      playerId: 'player-red',
+      targetX: 3,
+      targetY: 1,
+      selectionId: secondDestination.pendingTargetSelection.selectionId,
+      stateRevision: secondDestination.pendingTargetSelection.stateRevision,
     } as BattleAction, { rootSeed: 250 }).state as any
     expect(secondResolved.pendingTargetSelection).toBeUndefined()
-    expect(secondResolved.players[0]).toMatchObject({ actionPoints: 1, hand: [], discardPile: ['holy-heal', 'holy-charge'] })
+    expect(secondResolved.players[0]).toMatchObject({
+      actionPoints: 1,
+      hand: [],
+      discardPile: ['holy-heal', 'holy-smite'],
+    })
+    expect(secondResolved.pieces.find((piece: any) => piece.instanceId === 'red250-smite-enemy'))
+      .toMatchObject({ currentHp: 25 })
     expect(secondResolved.actions.filter((entry: any) => entry.type === 'playCard')).toHaveLength(2)
+    expect(secondResolved.actions.filter((entry: any) => entry.type === 'damage'
+      && entry.payload?.skillId === 'holy-smite')).toHaveLength(1)
+    expect(secondResolved.actions.filter((entry: any) => entry.type === 'move')).toHaveLength(2)
   })
 
-  it('keeps a same-turn march marker in the owner public preparation without leaking source IDs', () => {
+  it('ignores a stale same-turn march marker, opens a fresh prompt, and keeps source IDs private', () => {
     const authorityState = makeHolyHandState()
     authorityState.turn.turnNumber = 2
     authorityState.pieces[0].instanceId = 'training-blue-2'
@@ -612,10 +666,49 @@ describe('RED-250 Turalyon holy-hand authority continuation', () => {
       .toEqual({})
 
     const ownerPreparation = preparePublicSkillAction(ownerProjection, root, 'player-red')
-    expect(ownerPreparation.status).toBe('ready')
-    const accepted = runBattleAction(authorityState, root, { rootSeed: 250 }).state as any
+    expect(ownerPreparation).toMatchObject({
+      status: 'needs-input',
+      preparation: {
+        targetType: 'piece',
+        candidates: expect.arrayContaining([{ type: 'piece', pieceId: 'training-blue-2' }]),
+      },
+    })
+    expect(ownerPreparation.preparation?.candidates)
+      .not.toContainEqual({ type: 'piece', pieceId: 'training-red-1' })
+    if (ownerPreparation.status !== 'needs-input' || !ownerPreparation.preparation) return
+    const firstChoice = {
+      kind: 'target' as const,
+      source: ownerPreparation.preparation.source,
+      promptKey: ownerPreparation.preparation.promptKey,
+      targetPieceId: 'training-blue-2',
+    }
+    const destinationPreparation = preparePublicSkillAction(ownerProjection, {
+      ...root,
+      skillChoices: [firstChoice],
+    } as BattleAction, 'player-red')
+    expect(destinationPreparation).toMatchObject({
+      status: 'needs-input',
+      preparation: {
+        targetType: 'cell',
+        candidates: expect.arrayContaining([{ type: 'cell', x: 1, y: 0 }]),
+      },
+    })
+    if (destinationPreparation.status !== 'needs-input' || !destinationPreparation.preparation) return
+    const secondChoice = {
+      kind: 'target' as const,
+      source: destinationPreparation.preparation.source,
+      promptKey: destinationPreparation.preparation.promptKey,
+      targetX: 1,
+      targetY: 0,
+    }
+    const accepted = runBattleAction(authorityState, {
+      ...root,
+      skillChoices: [firstChoice, secondChoice],
+    } as BattleAction, { rootSeed: 250 }).state as any
     expect(accepted.pendingTargetSelection).toBeUndefined()
     expect(accepted.players[0]).toMatchObject({ actionPoints: 1, hand: [], discardPile: ['holy-heal'] })
+    expect(accepted.pieces.find((piece: any) => piece.instanceId === 'training-blue-2'))
+      .toMatchObject({ x: 1, y: 0 })
 
     const nextTurn = makeHolyHandState()
     nextTurn.turn.turnNumber = 3

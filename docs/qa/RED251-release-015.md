@@ -42,3 +42,5 @@ allowed_paths: 上述已审查PR的原始路径；package.json/package-lock.json
 - 发布冻结后平台打包、隔离候选冒烟与最终独立审查结果写入ignored output/RED251-015/release-report.json，尚未执行的项目不记作PASS。
 
 整合测试补齐 tests/ui/red256-akaza-step-selection.test.ts 的隔离VM取消辅助函数（真实页面已有该函数）；失败前70PASS/1FAIL，补齐后猗窝座3/3PASS。没有修改真实取消流程。兼容入口/官方服/注销76/76PASS。移动/圣光邻近108PASS/5FAIL，五项索尼克旧断言与既有RED257基线一致，待独立测试者最终核对；不擅自修复范围外玩法。
+
+最终候选同步上一版 tests/game/red250-turalyon-holy-hand.test.ts 的三项圣铸测试：合法普通落点(3,2)、每张牌独立两阶段移动且伤害/AP/弃牌只结算一次、忽略旧同回合标记但保留来源隐私。失败前3项证据red250-all.json，更新后本文件11/11及圣光/RED259相关50/50PASS。仅测试和本记录变化，无生产修改；因此重新冻结并重建全部平台。剩余五项索尼克失败是已记录旧基线，未修改范围外玩法。
