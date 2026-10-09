@@ -3154,6 +3154,15 @@
     function enterActionTargetMode(action, preparation, options) {
       if (!action || !preparation || preparation.kind !== 'needTarget') return false
       const input = options || {}
+      if ((action.type === 'useBasicSkill' || action.type === 'useChargeSkill')
+        && Array.isArray(preparation.candidates) && preparation.candidates.length === 0) {
+        // The authoritative query can also be empty; do not install an inert draft.
+        clearTargetInteraction('authoritative-no-skill-target')
+        const selected = G && G.pieces ? G.pieces.find(p => p.instanceId === selectedPieceId) : null
+        renderBoard(); if (!input.preserveDock) renderPieceContextMenu(selected || null); renderActionBar(); renderTargetOverlay()
+        setStatusMsg('没有可用目标；请在满足技能条件后重试')
+        return true
+      }
       flushPresentationBeforePendingSelection()
       if (targetSubmissionPending) {
         targetSubmissionPending = null
@@ -6414,6 +6423,13 @@
         return false
       }
       if (prepared.status === 'needs-input' && prepared.preparation) {
+        if (prepared.preparation.kind === 'needTarget'
+          && Array.isArray(prepared.preparation.candidates)
+          && prepared.preparation.candidates.length === 0) {
+          // A public projection can omit dynamic candidates. Submit the
+          // partial root so authority can return the next target step.
+          return submitLocalSkillBatch(rootAction, skill, choices)
+        }
         const skillData = skillDefOf(skill.skillId)
         installLocalSkillDraft(
           localSkillBatchAction(skill, rootAction, choices),
@@ -9229,6 +9245,9 @@
       setMoveButtonClass(false)
       if (publicRootPreparation && publicRootPreparation.status === 'needs-input'
         && publicRootPreparation.preparation
+        && (publicRootPreparation.preparation.kind !== 'needTarget'
+          || !Array.isArray(publicRootPreparation.preparation.candidates)
+          || publicRootPreparation.preparation.candidates.length > 0)
         && installLocalSkillDraft(draftAction, skData, publicRootPreparation.preparation, 'click')) return
       if (publicRootPreparation && publicRootPreparation.status !== 'needs-input') {
         closePieceContextMenu()
@@ -9413,6 +9432,8 @@
           clearPendingActionFeedback('authoritative-target-step')
           if (!enterActionTargetMode(action, targetPreparationFromError(e))) {
             setStatusMsg('权威目标查询未返回候选集合')
+          } else {
+            return
           }
         } else if (e.needsOptionSelection) {
           clearPendingActionFeedback('authoritative-option-step')
