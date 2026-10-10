@@ -25,5 +25,1196 @@
       }
     ]
   },
-  "code": "function executeSkill(context){var c=context.piece,t=selectTarget({type:'piece',range:7,filter:'ally'});if(!t||t.needsTargetSelection)return t;var m=c.momentum||0,heal=5+(m>=4?2:0),r=healDamage(c,t,heal,context.battle,context.skill.id);t.statusTags=t.statusTags||[];var finish=function(removed){if(m>=8){var free=t.statusTags.find(function(tag){return tag.type==='deployment-first-move-free';});if(!free){free={id:'mechanical-support-free-move-'+t.instanceId,type:'deployment-first-move-free',name:'下一次普通移动免费',visible:true};t.statusTags.push(free);}free.grantedTurnNumber=context.battle.turn.turnNumber;free.currentDuration=1;free.currentUses=1;free.remainingUses=1;free.createdTurnNumber=context.battle.turn.turnNumber;}return {success:true,message:'回复'+r.heal+'点生命'+(removed?'，移除了'+(removed.name||removed.type||'一个效果'):'')+(m>=8?'，下一次普通移动免费':'')};};if(t.statusTags.length===0)return finish(null);var choices=t.statusTags.map(function(tag,index){return {label:(tag.name||tag.type||'效果')+'（'+(index+1)+'）',value:String(index)};});choices.push({label:'不移除效果',value:'none'});var chosen=selectOption({title:'机械支援：选择要解除的效果',options:choices,canCancel:true,cancelValue:'none'});if(chosen&&chosen.needsOptionSelection)return chosen;if(chosen==='none')return finish(null);var index=Number(chosen);if(!Number.isInteger(index)||index<0||index>=t.statusTags.length)return {success:false,message:'选择的效果无效'};return finish(t.statusTags.splice(index,1)[0]);}"
+  "code": "function executeSkill(context) { var __rvb_import_effect_0, __rvb_import_effect_1, __rvb_import_effect_4, __rvb_import_effect_6, __rvb_import_operand_2, __rvb_import_operand_3, __rvb_import_operand_5, __rvb_import_operand_7, c, choices, chosen, finish, heal, index, m, r, t; var _pc = \"n42\"; for (var _step = 0; _step <= 30; _step++) { switch (_pc) { case \"n42\": c = (context)[\"piece\"]; _pc = \"n41\"; break; case \"n41\": t = selectTarget({type: \"piece\", range: 7, filter: \"ally\"}); _pc = \"n40\"; break; case \"n40\": _pc = (! (! ((! t) || (t)[\"needsTargetSelection\"]))) ? \"n39\" : \"n38\"; break; case \"n38\": m = ((c)[\"momentum\"] || 0); _pc = \"n37\"; break; case \"n37\": heal = (5 + ((m >= 4) ? 2 : 0)); _pc = \"n36\"; break; case \"n36\": r = healDamage(c, t, heal, (context)[\"battle\"], ((context)[\"skill\"])[\"id\"]); _pc = \"n35\"; break; case \"n35\": (t)[\"statusTags\"] = ((t)[\"statusTags\"] || []); _pc = \"n34\"; break; case \"n34\": finish = function (removed) { var free; { var __rvb_content_graph_region_pc_0 = \"n33\"; while (__rvb_content_graph_region_pc_0 !== \"n22\") { switch (__rvb_content_graph_region_pc_0) { case \"n33\": __rvb_content_graph_region_pc_0 = (! (! (m >= 8))) ? \"n32\" : \"n23\"; break; case \"n32\": free = ((t)[\"statusTags\"])[\"find\"](function (tag) { return ((tag)[\"type\"] === \"deployment-first-move-free\"); }); __rvb_content_graph_region_pc_0 = \"n31\"; break; case \"n31\": __rvb_content_graph_region_pc_0 = (! (! (! free))) ? \"n30\" : \"n28\"; break; case \"n30\": free = {id: (\"mechanical-support-free-move-\" + (t)[\"instanceId\"]), type: \"deployment-first-move-free\", name: \"下一次普通移动免费\", visible: true}; __rvb_content_graph_region_pc_0 = \"n29\"; break; case \"n29\": ((t)[\"statusTags\"]).push(free); __rvb_content_graph_region_pc_0 = \"n28\"; break; case \"n28\": (free)[\"grantedTurnNumber\"] = (((context)[\"battle\"])[\"turn\"])[\"turnNumber\"]; __rvb_content_graph_region_pc_0 = \"n27\"; break; case \"n27\": (free)[\"currentDuration\"] = 1; __rvb_content_graph_region_pc_0 = \"n26\"; break; case \"n26\": (free)[\"currentUses\"] = 1; __rvb_content_graph_region_pc_0 = \"n25\"; break; case \"n25\": (free)[\"remainingUses\"] = 1; __rvb_content_graph_region_pc_0 = \"n24\"; break; case \"n24\": (free)[\"createdTurnNumber\"] = (((context)[\"battle\"])[\"turn\"])[\"turnNumber\"]; __rvb_content_graph_region_pc_0 = \"n23\"; break; case \"n23\": return {success: true, message: ((((\"回复\" + (r)[\"heal\"]) + \"点生命\") + (removed ? (\"，移除了\" + (((removed)[\"name\"] || (removed)[\"type\"]) || \"一个效果\")) : \"\")) + ((m >= 8) ? \"，下一次普通移动免费\" : \"\"))}; default: throw new Error(\"invalid content graph region node\"); } } } }; _pc = \"n21\"; break; case \"n21\": _pc = (! (! (((t)[\"statusTags\"])[\"length\"] === 0))) ? \"n20\" : \"n17\"; break; case \"n17\": choices = ((t)[\"statusTags\"])[\"map\"](function (tag, index) { return {label: ((((((tag)[\"name\"] || (tag)[\"type\"]) || \"效果\") + \"（\") + (index + 1)) + \"）\"), value: String(index)}; }); _pc = \"n16\"; break; case \"n16\": (choices).push({label: \"不移除效果\", value: \"none\"}); _pc = \"n15\"; break; case \"n15\": chosen = selectOption({title: \"机械支援：选择要解除的效果\", options: choices, canCancel: true, cancelValue: \"none\"}); _pc = \"n14\"; break; case \"n14\": _pc = (! (! (chosen && (chosen)[\"needsOptionSelection\"]))) ? \"n13\" : \"n12\"; break; case \"n12\": _pc = (! (! (chosen === \"none\"))) ? \"n11\" : \"n8\"; break; case \"n8\": index = Number(chosen); _pc = \"n7\"; break; case \"n7\": _pc = (! (! (((! Number.isInteger(index)) || (index < 0)) || (index >= ((t)[\"statusTags\"])[\"length\"])))) ? \"n6\" : \"n5\"; break; case \"n5\": __rvb_import_operand_3 = finish; _pc = \"n4\"; break; case \"n4\": __rvb_import_effect_1 = ((t)[\"statusTags\"]).splice(index, 1); _pc = \"n3\"; break; case \"n3\": __rvb_import_operand_2 = (__rvb_import_effect_1)[0]; _pc = \"n2\"; break; case \"n2\": __rvb_import_effect_0 = (__rvb_import_operand_3)(__rvb_import_operand_2); _pc = \"n1\"; break; case \"n1\": return __rvb_import_effect_0; case \"n6\": return {success: false, message: \"选择的效果无效\"}; case \"n11\": __rvb_import_operand_5 = finish; _pc = \"n10\"; break; case \"n10\": __rvb_import_effect_4 = (__rvb_import_operand_5)(null); _pc = \"n9\"; break; case \"n9\": return __rvb_import_effect_4; case \"n13\": return chosen; case \"n20\": __rvb_import_operand_7 = finish; _pc = \"n19\"; break; case \"n19\": __rvb_import_effect_6 = (__rvb_import_operand_7)(null); _pc = \"n18\"; break; case \"n18\": return __rvb_import_effect_6; case \"n39\": return t; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\"); }",
+  "contentGraph": {
+    "version": "rvb-content-graph/v1",
+    "surface": "skill",
+    "entry": "n42",
+    "nodes": [
+      {
+        "id": "n1",
+        "kind": "return",
+        "value": {
+          "kind": "ref",
+          "name": "__rvb_import_effect_0"
+        }
+      },
+      {
+        "id": "n2",
+        "kind": "invoke",
+        "target": {
+          "kind": "function",
+          "value": {
+            "kind": "ref",
+            "name": "__rvb_import_operand_3"
+          }
+        },
+        "args": [
+          {
+            "kind": "ref",
+            "name": "__rvb_import_operand_2"
+          }
+        ],
+        "result": "__rvb_import_effect_0",
+        "next": "n1"
+      },
+      {
+        "id": "n3",
+        "kind": "bind",
+        "name": "__rvb_import_operand_2",
+        "expr": {
+          "kind": "index",
+          "object": {
+            "kind": "ref",
+            "name": "__rvb_import_effect_1"
+          },
+          "index": {
+            "kind": "literal",
+            "value": 0
+          }
+        },
+        "next": "n2"
+      },
+      {
+        "id": "n4",
+        "kind": "call",
+        "capability": "array.splice",
+        "args": [
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "t"
+            },
+            "key": "statusTags"
+          },
+          {
+            "kind": "ref",
+            "name": "index"
+          },
+          {
+            "kind": "literal",
+            "value": 1
+          }
+        ],
+        "result": "__rvb_import_effect_1",
+        "next": "n3"
+      },
+      {
+        "id": "n5",
+        "kind": "bind",
+        "name": "__rvb_import_operand_3",
+        "expr": {
+          "kind": "ref",
+          "name": "finish"
+        },
+        "next": "n4"
+      },
+      {
+        "id": "n6",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": "选择的效果无效"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n7",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "binary",
+                "op": "||",
+                "left": {
+                  "kind": "unary",
+                  "op": "!",
+                  "argument": {
+                    "kind": "call",
+                    "callee": "Number.isInteger",
+                    "args": [
+                      {
+                        "kind": "ref",
+                        "name": "index"
+                      }
+                    ]
+                  }
+                },
+                "right": {
+                  "kind": "binary",
+                  "op": "<",
+                  "left": {
+                    "kind": "ref",
+                    "name": "index"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": 0
+                  }
+                }
+              },
+              "right": {
+                "kind": "binary",
+                "op": ">=",
+                "left": {
+                  "kind": "ref",
+                  "name": "index"
+                },
+                "right": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "t"
+                    },
+                    "key": "statusTags"
+                  },
+                  "key": "length"
+                }
+              }
+            }
+          }
+        },
+        "yes": "n6",
+        "no": "n5"
+      },
+      {
+        "id": "n8",
+        "kind": "bind",
+        "name": "index",
+        "expr": {
+          "kind": "call",
+          "callee": "Number",
+          "args": [
+            {
+              "kind": "ref",
+              "name": "chosen"
+            }
+          ]
+        },
+        "next": "n7"
+      },
+      {
+        "id": "n9",
+        "kind": "return",
+        "value": {
+          "kind": "ref",
+          "name": "__rvb_import_effect_4"
+        }
+      },
+      {
+        "id": "n10",
+        "kind": "invoke",
+        "target": {
+          "kind": "function",
+          "value": {
+            "kind": "ref",
+            "name": "__rvb_import_operand_5"
+          }
+        },
+        "args": [
+          {
+            "kind": "literal",
+            "value": null
+          }
+        ],
+        "result": "__rvb_import_effect_4",
+        "next": "n9"
+      },
+      {
+        "id": "n11",
+        "kind": "bind",
+        "name": "__rvb_import_operand_5",
+        "expr": {
+          "kind": "ref",
+          "name": "finish"
+        },
+        "next": "n10"
+      },
+      {
+        "id": "n12",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "===",
+              "left": {
+                "kind": "ref",
+                "name": "chosen"
+              },
+              "right": {
+                "kind": "literal",
+                "value": "none"
+              }
+            }
+          }
+        },
+        "yes": "n11",
+        "no": "n8"
+      },
+      {
+        "id": "n13",
+        "kind": "return",
+        "value": {
+          "kind": "ref",
+          "name": "chosen"
+        }
+      },
+      {
+        "id": "n14",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "&&",
+              "left": {
+                "kind": "ref",
+                "name": "chosen"
+              },
+              "right": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "chosen"
+                },
+                "key": "needsOptionSelection"
+              }
+            }
+          }
+        },
+        "yes": "n13",
+        "no": "n12"
+      },
+      {
+        "id": "n15",
+        "kind": "call",
+        "capability": "selectOption",
+        "args": [
+          {
+            "kind": "object",
+            "entries": [
+              {
+                "key": "title",
+                "value": {
+                  "kind": "literal",
+                  "value": "机械支援：选择要解除的效果"
+                }
+              },
+              {
+                "key": "options",
+                "value": {
+                  "kind": "ref",
+                  "name": "choices"
+                }
+              },
+              {
+                "key": "canCancel",
+                "value": {
+                  "kind": "literal",
+                  "value": true
+                }
+              },
+              {
+                "key": "cancelValue",
+                "value": {
+                  "kind": "literal",
+                  "value": "none"
+                }
+              }
+            ]
+          }
+        ],
+        "result": "chosen",
+        "next": "n14"
+      },
+      {
+        "id": "n16",
+        "kind": "call",
+        "capability": "array.push",
+        "args": [
+          {
+            "kind": "ref",
+            "name": "choices"
+          },
+          {
+            "kind": "object",
+            "entries": [
+              {
+                "key": "label",
+                "value": {
+                  "kind": "literal",
+                  "value": "不移除效果"
+                }
+              },
+              {
+                "key": "value",
+                "value": {
+                  "kind": "literal",
+                  "value": "none"
+                }
+              }
+            ]
+          }
+        ],
+        "next": "n15"
+      },
+      {
+        "id": "n17",
+        "kind": "bind",
+        "name": "choices",
+        "expr": {
+          "kind": "collection",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "t"
+            },
+            "key": "statusTags"
+          },
+          "method": "map",
+          "args": [
+            {
+              "kind": "lambda",
+              "parameters": [
+                "tag",
+                "index"
+              ],
+              "body": {
+                "kind": "object",
+                "entries": [
+                  {
+                    "key": "label",
+                    "value": {
+                      "kind": "binary",
+                      "op": "+",
+                      "left": {
+                        "kind": "binary",
+                        "op": "+",
+                        "left": {
+                          "kind": "binary",
+                          "op": "+",
+                          "left": {
+                            "kind": "binary",
+                            "op": "||",
+                            "left": {
+                              "kind": "binary",
+                              "op": "||",
+                              "left": {
+                                "kind": "get",
+                                "object": {
+                                  "kind": "ref",
+                                  "name": "tag"
+                                },
+                                "key": "name"
+                              },
+                              "right": {
+                                "kind": "get",
+                                "object": {
+                                  "kind": "ref",
+                                  "name": "tag"
+                                },
+                                "key": "type"
+                              }
+                            },
+                            "right": {
+                              "kind": "literal",
+                              "value": "效果"
+                            }
+                          },
+                          "right": {
+                            "kind": "literal",
+                            "value": "（"
+                          }
+                        },
+                        "right": {
+                          "kind": "binary",
+                          "op": "+",
+                          "left": {
+                            "kind": "ref",
+                            "name": "index"
+                          },
+                          "right": {
+                            "kind": "literal",
+                            "value": 1
+                          }
+                        }
+                      },
+                      "right": {
+                        "kind": "literal",
+                        "value": "）"
+                      }
+                    }
+                  },
+                  {
+                    "key": "value",
+                    "value": {
+                      "kind": "call",
+                      "callee": "String",
+                      "args": [
+                        {
+                          "kind": "ref",
+                          "name": "index"
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "next": "n16"
+      },
+      {
+        "id": "n18",
+        "kind": "return",
+        "value": {
+          "kind": "ref",
+          "name": "__rvb_import_effect_6"
+        }
+      },
+      {
+        "id": "n19",
+        "kind": "invoke",
+        "target": {
+          "kind": "function",
+          "value": {
+            "kind": "ref",
+            "name": "__rvb_import_operand_7"
+          }
+        },
+        "args": [
+          {
+            "kind": "literal",
+            "value": null
+          }
+        ],
+        "result": "__rvb_import_effect_6",
+        "next": "n18"
+      },
+      {
+        "id": "n20",
+        "kind": "bind",
+        "name": "__rvb_import_operand_7",
+        "expr": {
+          "kind": "ref",
+          "name": "finish"
+        },
+        "next": "n19"
+      },
+      {
+        "id": "n21",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "===",
+              "left": {
+                "kind": "get",
+                "object": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "t"
+                  },
+                  "key": "statusTags"
+                },
+                "key": "length"
+              },
+              "right": {
+                "kind": "literal",
+                "value": 0
+              }
+            }
+          }
+        },
+        "yes": "n20",
+        "no": "n17"
+      },
+      {
+        "id": "n34",
+        "kind": "bind",
+        "name": "finish",
+        "expr": {
+          "kind": "function",
+          "parameters": [
+            "removed"
+          ],
+          "body": {
+            "entry": "n33",
+            "end": "n22",
+            "nodes": [
+              {
+                "id": "n23",
+                "kind": "return",
+                "value": {
+                  "kind": "object",
+                  "entries": [
+                    {
+                      "key": "success",
+                      "value": {
+                        "kind": "literal",
+                        "value": true
+                      }
+                    },
+                    {
+                      "key": "message",
+                      "value": {
+                        "kind": "binary",
+                        "op": "+",
+                        "left": {
+                          "kind": "binary",
+                          "op": "+",
+                          "left": {
+                            "kind": "binary",
+                            "op": "+",
+                            "left": {
+                              "kind": "binary",
+                              "op": "+",
+                              "left": {
+                                "kind": "literal",
+                                "value": "回复"
+                              },
+                              "right": {
+                                "kind": "get",
+                                "object": {
+                                  "kind": "ref",
+                                  "name": "r"
+                                },
+                                "key": "heal"
+                              }
+                            },
+                            "right": {
+                              "kind": "literal",
+                              "value": "点生命"
+                            }
+                          },
+                          "right": {
+                            "kind": "conditional",
+                            "test": {
+                              "kind": "ref",
+                              "name": "removed"
+                            },
+                            "consequent": {
+                              "kind": "binary",
+                              "op": "+",
+                              "left": {
+                                "kind": "literal",
+                                "value": "，移除了"
+                              },
+                              "right": {
+                                "kind": "binary",
+                                "op": "||",
+                                "left": {
+                                  "kind": "binary",
+                                  "op": "||",
+                                  "left": {
+                                    "kind": "get",
+                                    "object": {
+                                      "kind": "ref",
+                                      "name": "removed"
+                                    },
+                                    "key": "name"
+                                  },
+                                  "right": {
+                                    "kind": "get",
+                                    "object": {
+                                      "kind": "ref",
+                                      "name": "removed"
+                                    },
+                                    "key": "type"
+                                  }
+                                },
+                                "right": {
+                                  "kind": "literal",
+                                  "value": "一个效果"
+                                }
+                              }
+                            },
+                            "alternate": {
+                              "kind": "literal",
+                              "value": ""
+                            }
+                          }
+                        },
+                        "right": {
+                          "kind": "conditional",
+                          "test": {
+                            "kind": "binary",
+                            "op": ">=",
+                            "left": {
+                              "kind": "ref",
+                              "name": "m"
+                            },
+                            "right": {
+                              "kind": "literal",
+                              "value": 8
+                            }
+                          },
+                          "consequent": {
+                            "kind": "literal",
+                            "value": "，下一次普通移动免费"
+                          },
+                          "alternate": {
+                            "kind": "literal",
+                            "value": ""
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "n24",
+                "kind": "set",
+                "target": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "free"
+                  },
+                  "key": "createdTurnNumber"
+                },
+                "operator": "=",
+                "value": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "context"
+                      },
+                      "key": "battle"
+                    },
+                    "key": "turn"
+                  },
+                  "key": "turnNumber"
+                },
+                "next": "n23"
+              },
+              {
+                "id": "n25",
+                "kind": "set",
+                "target": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "free"
+                  },
+                  "key": "remainingUses"
+                },
+                "operator": "=",
+                "value": {
+                  "kind": "literal",
+                  "value": 1
+                },
+                "next": "n24"
+              },
+              {
+                "id": "n26",
+                "kind": "set",
+                "target": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "free"
+                  },
+                  "key": "currentUses"
+                },
+                "operator": "=",
+                "value": {
+                  "kind": "literal",
+                  "value": 1
+                },
+                "next": "n25"
+              },
+              {
+                "id": "n27",
+                "kind": "set",
+                "target": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "free"
+                  },
+                  "key": "currentDuration"
+                },
+                "operator": "=",
+                "value": {
+                  "kind": "literal",
+                  "value": 1
+                },
+                "next": "n26"
+              },
+              {
+                "id": "n28",
+                "kind": "set",
+                "target": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "free"
+                  },
+                  "key": "grantedTurnNumber"
+                },
+                "operator": "=",
+                "value": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "context"
+                      },
+                      "key": "battle"
+                    },
+                    "key": "turn"
+                  },
+                  "key": "turnNumber"
+                },
+                "next": "n27"
+              },
+              {
+                "id": "n29",
+                "kind": "call",
+                "capability": "array.push",
+                "args": [
+                  {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "t"
+                    },
+                    "key": "statusTags"
+                  },
+                  {
+                    "kind": "ref",
+                    "name": "free"
+                  }
+                ],
+                "next": "n28"
+              },
+              {
+                "id": "n30",
+                "kind": "set",
+                "target": {
+                  "kind": "ref",
+                  "name": "free"
+                },
+                "operator": "=",
+                "value": {
+                  "kind": "object",
+                  "entries": [
+                    {
+                      "key": "id",
+                      "value": {
+                        "kind": "binary",
+                        "op": "+",
+                        "left": {
+                          "kind": "literal",
+                          "value": "mechanical-support-free-move-"
+                        },
+                        "right": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "t"
+                          },
+                          "key": "instanceId"
+                        }
+                      }
+                    },
+                    {
+                      "key": "type",
+                      "value": {
+                        "kind": "literal",
+                        "value": "deployment-first-move-free"
+                      }
+                    },
+                    {
+                      "key": "name",
+                      "value": {
+                        "kind": "literal",
+                        "value": "下一次普通移动免费"
+                      }
+                    },
+                    {
+                      "key": "visible",
+                      "value": {
+                        "kind": "literal",
+                        "value": true
+                      }
+                    }
+                  ]
+                },
+                "next": "n29"
+              },
+              {
+                "id": "n31",
+                "kind": "branch",
+                "condition": {
+                  "kind": "unary",
+                  "op": "!",
+                  "argument": {
+                    "kind": "unary",
+                    "op": "!",
+                    "argument": {
+                      "kind": "unary",
+                      "op": "!",
+                      "argument": {
+                        "kind": "ref",
+                        "name": "free"
+                      }
+                    }
+                  }
+                },
+                "yes": "n30",
+                "no": "n28"
+              },
+              {
+                "id": "n32",
+                "kind": "bind",
+                "name": "free",
+                "expr": {
+                  "kind": "collection",
+                  "object": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "t"
+                    },
+                    "key": "statusTags"
+                  },
+                  "method": "find",
+                  "args": [
+                    {
+                      "kind": "lambda",
+                      "parameters": [
+                        "tag"
+                      ],
+                      "body": {
+                        "kind": "binary",
+                        "op": "===",
+                        "left": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "tag"
+                          },
+                          "key": "type"
+                        },
+                        "right": {
+                          "kind": "literal",
+                          "value": "deployment-first-move-free"
+                        }
+                      }
+                    }
+                  ]
+                },
+                "next": "n31"
+              },
+              {
+                "id": "n33",
+                "kind": "branch",
+                "condition": {
+                  "kind": "unary",
+                  "op": "!",
+                  "argument": {
+                    "kind": "unary",
+                    "op": "!",
+                    "argument": {
+                      "kind": "binary",
+                      "op": ">=",
+                      "left": {
+                        "kind": "ref",
+                        "name": "m"
+                      },
+                      "right": {
+                        "kind": "literal",
+                        "value": 8
+                      }
+                    }
+                  }
+                },
+                "yes": "n32",
+                "no": "n23"
+              },
+              {
+                "id": "n22",
+                "kind": "regionEnd"
+              }
+            ]
+          }
+        },
+        "next": "n21"
+      },
+      {
+        "id": "n35",
+        "kind": "set",
+        "target": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "t"
+          },
+          "key": "statusTags"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "binary",
+          "op": "||",
+          "left": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "t"
+            },
+            "key": "statusTags"
+          },
+          "right": {
+            "kind": "array",
+            "items": []
+          }
+        },
+        "next": "n34"
+      },
+      {
+        "id": "n36",
+        "kind": "call",
+        "capability": "healDamage",
+        "args": [
+          {
+            "kind": "ref",
+            "name": "c"
+          },
+          {
+            "kind": "ref",
+            "name": "t"
+          },
+          {
+            "kind": "ref",
+            "name": "heal"
+          },
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "context"
+            },
+            "key": "battle"
+          },
+          {
+            "kind": "get",
+            "object": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "context"
+              },
+              "key": "skill"
+            },
+            "key": "id"
+          }
+        ],
+        "result": "r",
+        "next": "n35"
+      },
+      {
+        "id": "n37",
+        "kind": "bind",
+        "name": "heal",
+        "expr": {
+          "kind": "binary",
+          "op": "+",
+          "left": {
+            "kind": "literal",
+            "value": 5
+          },
+          "right": {
+            "kind": "conditional",
+            "test": {
+              "kind": "binary",
+              "op": ">=",
+              "left": {
+                "kind": "ref",
+                "name": "m"
+              },
+              "right": {
+                "kind": "literal",
+                "value": 4
+              }
+            },
+            "consequent": {
+              "kind": "literal",
+              "value": 2
+            },
+            "alternate": {
+              "kind": "literal",
+              "value": 0
+            }
+          }
+        },
+        "next": "n36"
+      },
+      {
+        "id": "n38",
+        "kind": "bind",
+        "name": "m",
+        "expr": {
+          "kind": "binary",
+          "op": "||",
+          "left": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "c"
+            },
+            "key": "momentum"
+          },
+          "right": {
+            "kind": "literal",
+            "value": 0
+          }
+        },
+        "next": "n37"
+      },
+      {
+        "id": "n39",
+        "kind": "return",
+        "value": {
+          "kind": "ref",
+          "name": "t"
+        }
+      },
+      {
+        "id": "n40",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "ref",
+                  "name": "t"
+                }
+              },
+              "right": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "t"
+                },
+                "key": "needsTargetSelection"
+              }
+            }
+          }
+        },
+        "yes": "n39",
+        "no": "n38"
+      },
+      {
+        "id": "n41",
+        "kind": "call",
+        "capability": "selectTarget",
+        "args": [
+          {
+            "kind": "object",
+            "entries": [
+              {
+                "key": "type",
+                "value": {
+                  "kind": "literal",
+                  "value": "piece"
+                }
+              },
+              {
+                "key": "range",
+                "value": {
+                  "kind": "literal",
+                  "value": 7
+                }
+              },
+              {
+                "key": "filter",
+                "value": {
+                  "kind": "literal",
+                  "value": "ally"
+                }
+              }
+            ]
+          }
+        ],
+        "result": "t",
+        "next": "n40"
+      },
+      {
+        "id": "n42",
+        "kind": "bind",
+        "name": "c",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "context"
+          },
+          "key": "piece"
+        },
+        "next": "n41"
+      }
+    ]
+  },
+  "contentGraphField": "code",
+  "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1"
 }

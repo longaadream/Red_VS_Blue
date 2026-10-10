@@ -8,9 +8,1540 @@
   "maxCharges": 0,
   "powerMultiplier": 1,
   "actionPointCost": 0,
-  "code": "function executeSkill(context) {\n    // context.player 由 triggers.ts 注入，是拥有 rule-blizzard-active 的玩家对象\n    var sourcePlayer = context.player;\n    if (!sourcePlayer) {\n      // 兜底：通过 playerId 查找\n      if (context.playerId) {\n        sourcePlayer = context.battle.players.find(function(p) { return p.playerId === context.playerId; });\n      }\n    }\n    if (!sourcePlayer) return { message: '找不到暴风雪施法者', success: false };\n    var sourcePlayerId = sourcePlayer.playerId;\n    if (arePlayersAllied(battle, context.battle.turn.currentPlayerId, sourcePlayerId)) return { message: '暴风雪只在对方回合结束时触发', success: false };\n    var blizzardStatus = sourcePlayer.statusTags && sourcePlayer.statusTags.find(function(t) { return t.type === 'blizzard'; });\n    if (!blizzardStatus) return { message: '没有暴风雪状态', success: false };\n    var centerX = blizzardStatus.centerX;\n    var centerY = blizzardStatus.centerY;\n    var damageValue = blizzardStatus.damage;\n    var bSourceId = blizzardStatus.id;\n    // 清理三件套\n    removePlayerStatusEffectById(sourcePlayerId, blizzardStatus.id);\n    removePlayerRuleById(sourcePlayerId, 'rule-blizzard-active');\n    removePlayerSkillById(sourcePlayerId, 'blizzard-damage');\n    if (context.battle.extensions && context.battle.extensions.tileEffects) {\n      context.battle.extensions.tileEffects = context.battle.extensions.tileEffects.filter(function(te) { return te.sourceId !== bSourceId; });\n    }\n    var radius = 3;\n    var enemiesInArea = context.battle.pieces.filter(function(piece) {\n      if (arePlayersAllied(battle, piece.ownerPlayerId, sourcePlayerId)) return false;\n      if (piece.currentHp <= 0) return false;\n      return Math.abs(piece.x - centerX) <= radius && Math.abs(piece.y - centerY) <= radius;\n    });\n    var attackerPiece = context.battle.pieces.find(function(p) { return p.ownerPlayerId === sourcePlayerId && p.currentHp > 0; });\n    if (!attackerPiece) return { message: '施法者已无存活棋子，暴风雪自动消散', success: true };\n    var dmgResult = dealDamage(attackerPiece, enemiesInArea, damageValue, 'magical', context.battle, 'blizzard');\n    var totalDamage = dmgResult.totalDamage || 0;\n    enemiesInArea.forEach(function(enemy, i) {\n      var r = dmgResult.results && dmgResult.results[i];\n      if (r && r.success) {\n        var statusId = 'freeze-' + Date.now() + '-' + enemy.instanceId;\n        addStatusEffectById(enemy.instanceId, { id: statusId, type: 'freeze', currentDuration: 1, intensity: 1 });\n        addRuleById(enemy.instanceId, 'rule-freeze-prevent-move');\n        addRuleById(enemy.instanceId, 'rule-freeze-prevent-skill');\n        addSkillById(enemy.instanceId, 'freeze-prevent');\n        enemy.showFreezeEffect = true;\n      }\n    });\n    var hitEnemies = enemiesInArea.filter(function(e, i) { return dmgResult.results && dmgResult.results[i] && dmgResult.results[i].success; });\n    var message = attackerPiece.name + '的暴风雪效果（中心坐标：(' + centerX + ',' + centerY + ')）';\n    if (hitEnemies.length > 0) {\n      message += '对' + hitEnemies.map(function(e) { return e.name; }).join('、') + '造成了' + totalDamage + '点伤害并使其冰冻';\n    } else {\n      message += '没有对任何敌人造成伤害';\n    }\n    return { message: message, success: true, showUIEffects: true };\n  }",
+  "code": "function executeSkill(context) { var __rvb_import_operand_4, __rvb_import_operand_5, attackerPiece, bSourceId, blizzardStatus, centerX, centerY, damageValue, dmgResult, enemiesInArea, hitEnemies, message, radius, sourcePlayer, sourcePlayerId, totalDamage; var _pc = \"n62\"; for (var _step = 0; _step <= 37; _step++) { switch (_pc) { case \"n62\": sourcePlayer = (context)[\"player\"]; _pc = \"n61\"; break; case \"n61\": _pc = (! (! (! sourcePlayer))) ? \"n60\" : \"n58\"; break; case \"n60\": _pc = (! (! (context)[\"playerId\"])) ? \"n59\" : \"n58\"; break; case \"n59\": sourcePlayer = (((context)[\"battle\"])[\"players\"])[\"find\"](function (p) { return ((p)[\"playerId\"] === (context)[\"playerId\"]); }); _pc = \"n58\"; break; case \"n58\": _pc = (! (! (! sourcePlayer))) ? \"n57\" : \"n56\"; break; case \"n56\": sourcePlayerId = (sourcePlayer)[\"playerId\"]; _pc = \"n55\"; break; case \"n55\": _pc = (! (! arePlayersAllied(battle, (((context)[\"battle\"])[\"turn\"])[\"currentPlayerId\"], sourcePlayerId))) ? \"n54\" : \"n53\"; break; case \"n53\": blizzardStatus = ((sourcePlayer)[\"statusTags\"] && ((sourcePlayer)[\"statusTags\"])[\"find\"](function (t) { return ((t)[\"type\"] === \"blizzard\"); })); _pc = \"n52\"; break; case \"n52\": _pc = (! (! (! blizzardStatus))) ? \"n51\" : \"n50\"; break; case \"n50\": centerX = (blizzardStatus)[\"centerX\"]; _pc = \"n49\"; break; case \"n49\": centerY = (blizzardStatus)[\"centerY\"]; _pc = \"n48\"; break; case \"n48\": damageValue = (blizzardStatus)[\"damage\"]; _pc = \"n47\"; break; case \"n47\": bSourceId = (blizzardStatus)[\"id\"]; _pc = \"n46\"; break; case \"n46\": removePlayerStatusEffectById(sourcePlayerId, (blizzardStatus)[\"id\"]); _pc = \"n45\"; break; case \"n45\": removePlayerRuleById(sourcePlayerId, \"rule-blizzard-active\"); _pc = \"n44\"; break; case \"n44\": removePlayerSkillById(sourcePlayerId, \"blizzard-damage\"); _pc = \"n43\"; break; case \"n43\": _pc = (! (! (((context)[\"battle\"])[\"extensions\"] && (((context)[\"battle\"])[\"extensions\"])[\"tileEffects\"]))) ? \"n42\" : \"n41\"; break; case \"n42\": (((context)[\"battle\"])[\"extensions\"])[\"tileEffects\"] = ((((context)[\"battle\"])[\"extensions\"])[\"tileEffects\"])[\"filter\"](function (te) { return ((te)[\"sourceId\"] !== bSourceId); }); _pc = \"n41\"; break; case \"n41\": radius = 3; _pc = \"n40\"; break; case \"n40\": __rvb_import_operand_5 = ((context)[\"battle\"])[\"pieces\"]; _pc = \"n33\"; break; case \"n33\": enemiesInArea = (__rvb_import_operand_5)[\"filter\"](function (piece) { { var __rvb_content_graph_region_pc_0 = \"n39\"; while (__rvb_content_graph_region_pc_0 !== \"n34\") { switch (__rvb_content_graph_region_pc_0) { case \"n39\": __rvb_content_graph_region_pc_0 = (! (! arePlayersAllied(battle, (piece)[\"ownerPlayerId\"], sourcePlayerId))) ? \"n38\" : \"n37\"; break; case \"n37\": __rvb_content_graph_region_pc_0 = (! (! ((piece)[\"currentHp\"] <= 0))) ? \"n36\" : \"n35\"; break; case \"n35\": return ((Math.abs(((piece)[\"x\"] - centerX)) <= radius) && (Math.abs(((piece)[\"y\"] - centerY)) <= radius)); case \"n36\": return false; case \"n38\": return false; default: throw new Error(\"invalid content graph region node\"); } } } }); _pc = \"n26\"; break; case \"n26\": attackerPiece = (((context)[\"battle\"])[\"pieces\"])[\"find\"](function (p) { return (((p)[\"ownerPlayerId\"] === sourcePlayerId) && ((p)[\"currentHp\"] > 0)); }); _pc = \"n25\"; break; case \"n25\": _pc = (! (! (! attackerPiece))) ? \"n24\" : \"n23\"; break; case \"n23\": dmgResult = dealDamage(attackerPiece, enemiesInArea, damageValue, \"magical\", (context)[\"battle\"], \"blizzard\"); _pc = \"n22\"; break; case \"n22\": totalDamage = ((dmgResult)[\"totalDamage\"] || 0); _pc = \"n21\"; break; case \"n21\": __rvb_import_operand_4 = enemiesInArea; _pc = \"n7\"; break; case \"n7\": (__rvb_import_operand_4)[\"forEach\"](function (enemy, i) { var __rvb_import_effect_1, __rvb_import_operand_0, __rvb_import_operand_2, __rvb_import_operand_3, r, statusId; { var __rvb_content_graph_region_pc_1 = \"n20\"; while (__rvb_content_graph_region_pc_1 !== \"n8\") { switch (__rvb_content_graph_region_pc_1) { case \"n20\": r = ((dmgResult)[\"results\"] && ((dmgResult)[\"results\"])[(function (key) { if (typeof key === \"string\" && key.split(\".\").some(function (part) { return [\"__proto__\",\"arguments\",\"callee\",\"caller\",\"constructor\",\"prototype\"].indexOf(part) !== -1; })) throw new Error(\"unsafe content graph index\"); return key; })(i)]); __rvb_content_graph_region_pc_1 = \"n19\"; break; case \"n19\": __rvb_content_graph_region_pc_1 = (! (! (r && (r)[\"success\"]))) ? \"n14\" : \"n8\"; break; case \"n14\": __rvb_import_operand_0 = \"freeze-\"; __rvb_content_graph_region_pc_1 = \"n18\"; break; case \"n18\": __rvb_import_effect_1 = Date.now(); __rvb_content_graph_region_pc_1 = \"n15\"; break; case \"n15\": __rvb_import_operand_2 = (__rvb_import_operand_0 + __rvb_import_effect_1); __rvb_content_graph_region_pc_1 = \"n16\"; break; case \"n16\": __rvb_import_operand_3 = (__rvb_import_operand_2 + \"-\"); __rvb_content_graph_region_pc_1 = \"n17\"; break; case \"n17\": statusId = (__rvb_import_operand_3 + (enemy)[\"instanceId\"]); __rvb_content_graph_region_pc_1 = \"n13\"; break; case \"n13\": addStatusEffectById((enemy)[\"instanceId\"], {id: statusId, type: \"freeze\", currentDuration: 1, intensity: 1}); __rvb_content_graph_region_pc_1 = \"n12\"; break; case \"n12\": addRuleById((enemy)[\"instanceId\"], \"rule-freeze-prevent-move\"); __rvb_content_graph_region_pc_1 = \"n11\"; break; case \"n11\": addRuleById((enemy)[\"instanceId\"], \"rule-freeze-prevent-skill\"); __rvb_content_graph_region_pc_1 = \"n10\"; break; case \"n10\": addSkillById((enemy)[\"instanceId\"], \"freeze-prevent\"); __rvb_content_graph_region_pc_1 = \"n9\"; break; case \"n9\": (enemy)[\"showFreezeEffect\"] = true; __rvb_content_graph_region_pc_1 = \"n8\"; break; case \"n8\": __rvb_content_graph_region_pc_1 = \"n8\"; break; default: throw new Error(\"invalid content graph region node\"); } } } }); _pc = \"n6\"; break; case \"n6\": hitEnemies = (enemiesInArea)[\"filter\"](function (e, i) { return (((dmgResult)[\"results\"] && ((dmgResult)[\"results\"])[(function (key) { if (typeof key === \"string\" && key.split(\".\").some(function (part) { return [\"__proto__\",\"arguments\",\"callee\",\"caller\",\"constructor\",\"prototype\"].indexOf(part) !== -1; })) throw new Error(\"unsafe content graph index\"); return key; })(i)]) && (((dmgResult)[\"results\"])[(function (key) { if (typeof key === \"string\" && key.split(\".\").some(function (part) { return [\"__proto__\",\"arguments\",\"callee\",\"caller\",\"constructor\",\"prototype\"].indexOf(part) !== -1; })) throw new Error(\"unsafe content graph index\"); return key; })(i)])[\"success\"]); }); _pc = \"n5\"; break; case \"n5\": message = ((((((attackerPiece)[\"name\"] + \"的暴风雪效果（中心坐标：(\") + centerX) + \",\") + centerY) + \")）\"); _pc = \"n4\"; break; case \"n4\": _pc = (! (! ((hitEnemies)[\"length\"] > 0))) ? \"n2\" : \"n3\"; break; case \"n3\": message += \"没有对任何敌人造成伤害\"; _pc = \"n1\"; break; case \"n2\": message += ((((\"对\" + ((hitEnemies)[\"map\"](function (e) { return (e)[\"name\"]; }))[\"join\"](\"、\")) + \"造成了\") + totalDamage) + \"点伤害并使其冰冻\"); _pc = \"n1\"; break; case \"n1\": return {message: message, success: true, showUIEffects: true}; case \"n24\": return {message: \"施法者已无存活棋子，暴风雪自动消散\", success: true}; case \"n51\": return {message: \"没有暴风雪状态\", success: false}; case \"n54\": return {message: \"暴风雪只在对方回合结束时触发\", success: false}; case \"n57\": return {message: \"找不到暴风雪施法者\", success: false}; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\"); }",
   "showInUI": false,
   "keywords": [
     "冰冻"
-  ]
+  ],
+  "contentGraph": {
+    "version": "rvb-content-graph/v1",
+    "surface": "triggerSkill",
+    "entry": "n62",
+    "nodes": [
+      {
+        "id": "n1",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "message",
+              "value": {
+                "kind": "ref",
+                "name": "message"
+              }
+            },
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "showUIEffects",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n2",
+        "kind": "set",
+        "target": {
+          "kind": "ref",
+          "name": "message"
+        },
+        "operator": "+=",
+        "value": {
+          "kind": "binary",
+          "op": "+",
+          "left": {
+            "kind": "binary",
+            "op": "+",
+            "left": {
+              "kind": "binary",
+              "op": "+",
+              "left": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "literal",
+                  "value": "对"
+                },
+                "right": {
+                  "kind": "collection",
+                  "object": {
+                    "kind": "collection",
+                    "object": {
+                      "kind": "ref",
+                      "name": "hitEnemies"
+                    },
+                    "method": "map",
+                    "args": [
+                      {
+                        "kind": "lambda",
+                        "parameters": [
+                          "e"
+                        ],
+                        "body": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "e"
+                          },
+                          "key": "name"
+                        }
+                      }
+                    ]
+                  },
+                  "method": "join",
+                  "args": [
+                    {
+                      "kind": "literal",
+                      "value": "、"
+                    }
+                  ]
+                }
+              },
+              "right": {
+                "kind": "literal",
+                "value": "造成了"
+              }
+            },
+            "right": {
+              "kind": "ref",
+              "name": "totalDamage"
+            }
+          },
+          "right": {
+            "kind": "literal",
+            "value": "点伤害并使其冰冻"
+          }
+        },
+        "next": "n1"
+      },
+      {
+        "id": "n3",
+        "kind": "set",
+        "target": {
+          "kind": "ref",
+          "name": "message"
+        },
+        "operator": "+=",
+        "value": {
+          "kind": "literal",
+          "value": "没有对任何敌人造成伤害"
+        },
+        "next": "n1"
+      },
+      {
+        "id": "n4",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": ">",
+              "left": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "hitEnemies"
+                },
+                "key": "length"
+              },
+              "right": {
+                "kind": "literal",
+                "value": 0
+              }
+            }
+          }
+        },
+        "yes": "n2",
+        "no": "n3"
+      },
+      {
+        "id": "n5",
+        "kind": "bind",
+        "name": "message",
+        "expr": {
+          "kind": "binary",
+          "op": "+",
+          "left": {
+            "kind": "binary",
+            "op": "+",
+            "left": {
+              "kind": "binary",
+              "op": "+",
+              "left": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "binary",
+                  "op": "+",
+                  "left": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "attackerPiece"
+                    },
+                    "key": "name"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": "的暴风雪效果（中心坐标：("
+                  }
+                },
+                "right": {
+                  "kind": "ref",
+                  "name": "centerX"
+                }
+              },
+              "right": {
+                "kind": "literal",
+                "value": ","
+              }
+            },
+            "right": {
+              "kind": "ref",
+              "name": "centerY"
+            }
+          },
+          "right": {
+            "kind": "literal",
+            "value": ")）"
+          }
+        },
+        "next": "n4"
+      },
+      {
+        "id": "n6",
+        "kind": "bind",
+        "name": "hitEnemies",
+        "expr": {
+          "kind": "collection",
+          "object": {
+            "kind": "ref",
+            "name": "enemiesInArea"
+          },
+          "method": "filter",
+          "args": [
+            {
+              "kind": "lambda",
+              "parameters": [
+                "e",
+                "i"
+              ],
+              "body": {
+                "kind": "binary",
+                "op": "&&",
+                "left": {
+                  "kind": "binary",
+                  "op": "&&",
+                  "left": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "dmgResult"
+                    },
+                    "key": "results"
+                  },
+                  "right": {
+                    "kind": "index",
+                    "object": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "dmgResult"
+                      },
+                      "key": "results"
+                    },
+                    "index": {
+                      "kind": "ref",
+                      "name": "i"
+                    }
+                  }
+                },
+                "right": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "index",
+                    "object": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "dmgResult"
+                      },
+                      "key": "results"
+                    },
+                    "index": {
+                      "kind": "ref",
+                      "name": "i"
+                    }
+                  },
+                  "key": "success"
+                }
+              }
+            }
+          ]
+        },
+        "next": "n5"
+      },
+      {
+        "id": "n7",
+        "kind": "invoke",
+        "target": {
+          "kind": "array",
+          "object": {
+            "kind": "ref",
+            "name": "__rvb_import_operand_4"
+          },
+          "method": "forEach"
+        },
+        "args": [
+          {
+            "kind": "function",
+            "parameters": [
+              "enemy",
+              "i"
+            ],
+            "body": {
+              "entry": "n20",
+              "end": "n8",
+              "nodes": [
+                {
+                  "id": "n8",
+                  "kind": "regionEnd"
+                },
+                {
+                  "id": "n9",
+                  "kind": "set",
+                  "target": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "enemy"
+                    },
+                    "key": "showFreezeEffect"
+                  },
+                  "operator": "=",
+                  "value": {
+                    "kind": "literal",
+                    "value": true
+                  },
+                  "next": "n8"
+                },
+                {
+                  "id": "n10",
+                  "kind": "call",
+                  "capability": "addSkillById",
+                  "args": [
+                    {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "enemy"
+                      },
+                      "key": "instanceId"
+                    },
+                    {
+                      "kind": "literal",
+                      "value": "freeze-prevent"
+                    }
+                  ],
+                  "next": "n9"
+                },
+                {
+                  "id": "n11",
+                  "kind": "call",
+                  "capability": "addRuleById",
+                  "args": [
+                    {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "enemy"
+                      },
+                      "key": "instanceId"
+                    },
+                    {
+                      "kind": "literal",
+                      "value": "rule-freeze-prevent-skill"
+                    }
+                  ],
+                  "next": "n10"
+                },
+                {
+                  "id": "n12",
+                  "kind": "call",
+                  "capability": "addRuleById",
+                  "args": [
+                    {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "enemy"
+                      },
+                      "key": "instanceId"
+                    },
+                    {
+                      "kind": "literal",
+                      "value": "rule-freeze-prevent-move"
+                    }
+                  ],
+                  "next": "n11"
+                },
+                {
+                  "id": "n13",
+                  "kind": "call",
+                  "capability": "addStatusEffectById",
+                  "args": [
+                    {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "enemy"
+                      },
+                      "key": "instanceId"
+                    },
+                    {
+                      "kind": "object",
+                      "entries": [
+                        {
+                          "key": "id",
+                          "value": {
+                            "kind": "ref",
+                            "name": "statusId"
+                          }
+                        },
+                        {
+                          "key": "type",
+                          "value": {
+                            "kind": "literal",
+                            "value": "freeze"
+                          }
+                        },
+                        {
+                          "key": "currentDuration",
+                          "value": {
+                            "kind": "literal",
+                            "value": 1
+                          }
+                        },
+                        {
+                          "key": "intensity",
+                          "value": {
+                            "kind": "literal",
+                            "value": 1
+                          }
+                        }
+                      ]
+                    }
+                  ],
+                  "next": "n12"
+                },
+                {
+                  "id": "n17",
+                  "kind": "bind",
+                  "name": "statusId",
+                  "expr": {
+                    "kind": "binary",
+                    "op": "+",
+                    "left": {
+                      "kind": "ref",
+                      "name": "__rvb_import_operand_3"
+                    },
+                    "right": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "enemy"
+                      },
+                      "key": "instanceId"
+                    }
+                  },
+                  "next": "n13"
+                },
+                {
+                  "id": "n16",
+                  "kind": "bind",
+                  "name": "__rvb_import_operand_3",
+                  "expr": {
+                    "kind": "binary",
+                    "op": "+",
+                    "left": {
+                      "kind": "ref",
+                      "name": "__rvb_import_operand_2"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": "-"
+                    }
+                  },
+                  "next": "n17"
+                },
+                {
+                  "id": "n15",
+                  "kind": "bind",
+                  "name": "__rvb_import_operand_2",
+                  "expr": {
+                    "kind": "binary",
+                    "op": "+",
+                    "left": {
+                      "kind": "ref",
+                      "name": "__rvb_import_operand_0"
+                    },
+                    "right": {
+                      "kind": "ref",
+                      "name": "__rvb_import_effect_1"
+                    }
+                  },
+                  "next": "n16"
+                },
+                {
+                  "id": "n18",
+                  "kind": "call",
+                  "capability": "Date.now",
+                  "args": [],
+                  "result": "__rvb_import_effect_1",
+                  "next": "n15"
+                },
+                {
+                  "id": "n14",
+                  "kind": "bind",
+                  "name": "__rvb_import_operand_0",
+                  "expr": {
+                    "kind": "literal",
+                    "value": "freeze-"
+                  },
+                  "next": "n18"
+                },
+                {
+                  "id": "n19",
+                  "kind": "branch",
+                  "condition": {
+                    "kind": "unary",
+                    "op": "!",
+                    "argument": {
+                      "kind": "unary",
+                      "op": "!",
+                      "argument": {
+                        "kind": "binary",
+                        "op": "&&",
+                        "left": {
+                          "kind": "ref",
+                          "name": "r"
+                        },
+                        "right": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "r"
+                          },
+                          "key": "success"
+                        }
+                      }
+                    }
+                  },
+                  "yes": "n14",
+                  "no": "n8"
+                },
+                {
+                  "id": "n20",
+                  "kind": "bind",
+                  "name": "r",
+                  "expr": {
+                    "kind": "binary",
+                    "op": "&&",
+                    "left": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "dmgResult"
+                      },
+                      "key": "results"
+                    },
+                    "right": {
+                      "kind": "index",
+                      "object": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "dmgResult"
+                        },
+                        "key": "results"
+                      },
+                      "index": {
+                        "kind": "ref",
+                        "name": "i"
+                      }
+                    }
+                  },
+                  "next": "n19"
+                }
+              ]
+            }
+          }
+        ],
+        "next": "n6"
+      },
+      {
+        "id": "n21",
+        "kind": "bind",
+        "name": "__rvb_import_operand_4",
+        "expr": {
+          "kind": "ref",
+          "name": "enemiesInArea"
+        },
+        "next": "n7"
+      },
+      {
+        "id": "n22",
+        "kind": "bind",
+        "name": "totalDamage",
+        "expr": {
+          "kind": "binary",
+          "op": "||",
+          "left": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "dmgResult"
+            },
+            "key": "totalDamage"
+          },
+          "right": {
+            "kind": "literal",
+            "value": 0
+          }
+        },
+        "next": "n21"
+      },
+      {
+        "id": "n23",
+        "kind": "call",
+        "capability": "dealDamage",
+        "args": [
+          {
+            "kind": "ref",
+            "name": "attackerPiece"
+          },
+          {
+            "kind": "ref",
+            "name": "enemiesInArea"
+          },
+          {
+            "kind": "ref",
+            "name": "damageValue"
+          },
+          {
+            "kind": "literal",
+            "value": "magical"
+          },
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "context"
+            },
+            "key": "battle"
+          },
+          {
+            "kind": "literal",
+            "value": "blizzard"
+          }
+        ],
+        "result": "dmgResult",
+        "next": "n22"
+      },
+      {
+        "id": "n24",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": "施法者已无存活棋子，暴风雪自动消散"
+              }
+            },
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n25",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "unary",
+              "op": "!",
+              "argument": {
+                "kind": "ref",
+                "name": "attackerPiece"
+              }
+            }
+          }
+        },
+        "yes": "n24",
+        "no": "n23"
+      },
+      {
+        "id": "n26",
+        "kind": "bind",
+        "name": "attackerPiece",
+        "expr": {
+          "kind": "collection",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "context"
+              },
+              "key": "battle"
+            },
+            "key": "pieces"
+          },
+          "method": "find",
+          "args": [
+            {
+              "kind": "lambda",
+              "parameters": [
+                "p"
+              ],
+              "body": {
+                "kind": "binary",
+                "op": "&&",
+                "left": {
+                  "kind": "binary",
+                  "op": "===",
+                  "left": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "p"
+                    },
+                    "key": "ownerPlayerId"
+                  },
+                  "right": {
+                    "kind": "ref",
+                    "name": "sourcePlayerId"
+                  }
+                },
+                "right": {
+                  "kind": "binary",
+                  "op": ">",
+                  "left": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "p"
+                    },
+                    "key": "currentHp"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": 0
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "next": "n25"
+      },
+      {
+        "id": "n33",
+        "kind": "invoke",
+        "target": {
+          "kind": "array",
+          "object": {
+            "kind": "ref",
+            "name": "__rvb_import_operand_5"
+          },
+          "method": "filter"
+        },
+        "args": [
+          {
+            "kind": "function",
+            "parameters": [
+              "piece"
+            ],
+            "body": {
+              "entry": "n39",
+              "end": "n34",
+              "nodes": [
+                {
+                  "id": "n35",
+                  "kind": "return",
+                  "value": {
+                    "kind": "binary",
+                    "op": "&&",
+                    "left": {
+                      "kind": "binary",
+                      "op": "<=",
+                      "left": {
+                        "kind": "call",
+                        "callee": "Math.abs",
+                        "args": [
+                          {
+                            "kind": "binary",
+                            "op": "-",
+                            "left": {
+                              "kind": "get",
+                              "object": {
+                                "kind": "ref",
+                                "name": "piece"
+                              },
+                              "key": "x"
+                            },
+                            "right": {
+                              "kind": "ref",
+                              "name": "centerX"
+                            }
+                          }
+                        ]
+                      },
+                      "right": {
+                        "kind": "ref",
+                        "name": "radius"
+                      }
+                    },
+                    "right": {
+                      "kind": "binary",
+                      "op": "<=",
+                      "left": {
+                        "kind": "call",
+                        "callee": "Math.abs",
+                        "args": [
+                          {
+                            "kind": "binary",
+                            "op": "-",
+                            "left": {
+                              "kind": "get",
+                              "object": {
+                                "kind": "ref",
+                                "name": "piece"
+                              },
+                              "key": "y"
+                            },
+                            "right": {
+                              "kind": "ref",
+                              "name": "centerY"
+                            }
+                          }
+                        ]
+                      },
+                      "right": {
+                        "kind": "ref",
+                        "name": "radius"
+                      }
+                    }
+                  }
+                },
+                {
+                  "id": "n36",
+                  "kind": "return",
+                  "value": {
+                    "kind": "literal",
+                    "value": false
+                  }
+                },
+                {
+                  "id": "n37",
+                  "kind": "branch",
+                  "condition": {
+                    "kind": "unary",
+                    "op": "!",
+                    "argument": {
+                      "kind": "unary",
+                      "op": "!",
+                      "argument": {
+                        "kind": "binary",
+                        "op": "<=",
+                        "left": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "piece"
+                          },
+                          "key": "currentHp"
+                        },
+                        "right": {
+                          "kind": "literal",
+                          "value": 0
+                        }
+                      }
+                    }
+                  },
+                  "yes": "n36",
+                  "no": "n35"
+                },
+                {
+                  "id": "n38",
+                  "kind": "return",
+                  "value": {
+                    "kind": "literal",
+                    "value": false
+                  }
+                },
+                {
+                  "id": "n39",
+                  "kind": "branch",
+                  "condition": {
+                    "kind": "unary",
+                    "op": "!",
+                    "argument": {
+                      "kind": "unary",
+                      "op": "!",
+                      "argument": {
+                        "kind": "call",
+                        "callee": "arePlayersAllied",
+                        "args": [
+                          {
+                            "kind": "ref",
+                            "name": "battle"
+                          },
+                          {
+                            "kind": "get",
+                            "object": {
+                              "kind": "ref",
+                              "name": "piece"
+                            },
+                            "key": "ownerPlayerId"
+                          },
+                          {
+                            "kind": "ref",
+                            "name": "sourcePlayerId"
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  "yes": "n38",
+                  "no": "n37"
+                },
+                {
+                  "id": "n34",
+                  "kind": "regionEnd"
+                }
+              ]
+            }
+          }
+        ],
+        "result": "enemiesInArea",
+        "next": "n26"
+      },
+      {
+        "id": "n40",
+        "kind": "bind",
+        "name": "__rvb_import_operand_5",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "context"
+            },
+            "key": "battle"
+          },
+          "key": "pieces"
+        },
+        "next": "n33"
+      },
+      {
+        "id": "n41",
+        "kind": "bind",
+        "name": "radius",
+        "expr": {
+          "kind": "literal",
+          "value": 3
+        },
+        "next": "n40"
+      },
+      {
+        "id": "n42",
+        "kind": "set",
+        "target": {
+          "kind": "get",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "context"
+              },
+              "key": "battle"
+            },
+            "key": "extensions"
+          },
+          "key": "tileEffects"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "collection",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "get",
+              "object": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "context"
+                },
+                "key": "battle"
+              },
+              "key": "extensions"
+            },
+            "key": "tileEffects"
+          },
+          "method": "filter",
+          "args": [
+            {
+              "kind": "lambda",
+              "parameters": [
+                "te"
+              ],
+              "body": {
+                "kind": "binary",
+                "op": "!==",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "te"
+                  },
+                  "key": "sourceId"
+                },
+                "right": {
+                  "kind": "ref",
+                  "name": "bSourceId"
+                }
+              }
+            }
+          ]
+        },
+        "next": "n41"
+      },
+      {
+        "id": "n43",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "&&",
+              "left": {
+                "kind": "get",
+                "object": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "context"
+                  },
+                  "key": "battle"
+                },
+                "key": "extensions"
+              },
+              "right": {
+                "kind": "get",
+                "object": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "context"
+                    },
+                    "key": "battle"
+                  },
+                  "key": "extensions"
+                },
+                "key": "tileEffects"
+              }
+            }
+          }
+        },
+        "yes": "n42",
+        "no": "n41"
+      },
+      {
+        "id": "n44",
+        "kind": "call",
+        "capability": "removePlayerSkillById",
+        "args": [
+          {
+            "kind": "ref",
+            "name": "sourcePlayerId"
+          },
+          {
+            "kind": "literal",
+            "value": "blizzard-damage"
+          }
+        ],
+        "next": "n43"
+      },
+      {
+        "id": "n45",
+        "kind": "call",
+        "capability": "removePlayerRuleById",
+        "args": [
+          {
+            "kind": "ref",
+            "name": "sourcePlayerId"
+          },
+          {
+            "kind": "literal",
+            "value": "rule-blizzard-active"
+          }
+        ],
+        "next": "n44"
+      },
+      {
+        "id": "n46",
+        "kind": "call",
+        "capability": "removePlayerStatusEffectById",
+        "args": [
+          {
+            "kind": "ref",
+            "name": "sourcePlayerId"
+          },
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "blizzardStatus"
+            },
+            "key": "id"
+          }
+        ],
+        "next": "n45"
+      },
+      {
+        "id": "n47",
+        "kind": "bind",
+        "name": "bSourceId",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "blizzardStatus"
+          },
+          "key": "id"
+        },
+        "next": "n46"
+      },
+      {
+        "id": "n48",
+        "kind": "bind",
+        "name": "damageValue",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "blizzardStatus"
+          },
+          "key": "damage"
+        },
+        "next": "n47"
+      },
+      {
+        "id": "n49",
+        "kind": "bind",
+        "name": "centerY",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "blizzardStatus"
+          },
+          "key": "centerY"
+        },
+        "next": "n48"
+      },
+      {
+        "id": "n50",
+        "kind": "bind",
+        "name": "centerX",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "blizzardStatus"
+          },
+          "key": "centerX"
+        },
+        "next": "n49"
+      },
+      {
+        "id": "n51",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": "没有暴风雪状态"
+              }
+            },
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n52",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "unary",
+              "op": "!",
+              "argument": {
+                "kind": "ref",
+                "name": "blizzardStatus"
+              }
+            }
+          }
+        },
+        "yes": "n51",
+        "no": "n50"
+      },
+      {
+        "id": "n53",
+        "kind": "bind",
+        "name": "blizzardStatus",
+        "expr": {
+          "kind": "binary",
+          "op": "&&",
+          "left": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "sourcePlayer"
+            },
+            "key": "statusTags"
+          },
+          "right": {
+            "kind": "collection",
+            "object": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "sourcePlayer"
+              },
+              "key": "statusTags"
+            },
+            "method": "find",
+            "args": [
+              {
+                "kind": "lambda",
+                "parameters": [
+                  "t"
+                ],
+                "body": {
+                  "kind": "binary",
+                  "op": "===",
+                  "left": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "t"
+                    },
+                    "key": "type"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": "blizzard"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "next": "n52"
+      },
+      {
+        "id": "n54",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": "暴风雪只在对方回合结束时触发"
+              }
+            },
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n55",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "call",
+              "callee": "arePlayersAllied",
+              "args": [
+                {
+                  "kind": "ref",
+                  "name": "battle"
+                },
+                {
+                  "kind": "get",
+                  "object": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "context"
+                      },
+                      "key": "battle"
+                    },
+                    "key": "turn"
+                  },
+                  "key": "currentPlayerId"
+                },
+                {
+                  "kind": "ref",
+                  "name": "sourcePlayerId"
+                }
+              ]
+            }
+          }
+        },
+        "yes": "n54",
+        "no": "n53"
+      },
+      {
+        "id": "n56",
+        "kind": "bind",
+        "name": "sourcePlayerId",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "sourcePlayer"
+          },
+          "key": "playerId"
+        },
+        "next": "n55"
+      },
+      {
+        "id": "n57",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": "找不到暴风雪施法者"
+              }
+            },
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n58",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "unary",
+              "op": "!",
+              "argument": {
+                "kind": "ref",
+                "name": "sourcePlayer"
+              }
+            }
+          }
+        },
+        "yes": "n57",
+        "no": "n56"
+      },
+      {
+        "id": "n59",
+        "kind": "set",
+        "target": {
+          "kind": "ref",
+          "name": "sourcePlayer"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "collection",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "context"
+              },
+              "key": "battle"
+            },
+            "key": "players"
+          },
+          "method": "find",
+          "args": [
+            {
+              "kind": "lambda",
+              "parameters": [
+                "p"
+              ],
+              "body": {
+                "kind": "binary",
+                "op": "===",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "p"
+                  },
+                  "key": "playerId"
+                },
+                "right": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "context"
+                  },
+                  "key": "playerId"
+                }
+              }
+            }
+          ]
+        },
+        "next": "n58"
+      },
+      {
+        "id": "n60",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "context"
+              },
+              "key": "playerId"
+            }
+          }
+        },
+        "yes": "n59",
+        "no": "n58"
+      },
+      {
+        "id": "n61",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "unary",
+              "op": "!",
+              "argument": {
+                "kind": "ref",
+                "name": "sourcePlayer"
+              }
+            }
+          }
+        },
+        "yes": "n60",
+        "no": "n58"
+      },
+      {
+        "id": "n62",
+        "kind": "bind",
+        "name": "sourcePlayer",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "context"
+          },
+          "key": "player"
+        },
+        "next": "n61"
+      }
+    ]
+  },
+  "contentGraphField": "code",
+  "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1"
 }

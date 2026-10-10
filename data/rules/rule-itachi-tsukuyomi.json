@@ -2,6 +2,445 @@
   "id": "rule-itachi-tsukuyomi",
   "name": "月读·冷却延长",
   "description": "目标下一次实际使用技能后，使该技能额外增加1回合冷却并移除月读。",
-  "trigger": { "type": "afterSkillUsed" },
-  "skillCode": "var target = context.rulePiece; var source = context.sourcePiece; if (!target || !source || source.instanceId !== target.instanceId) return { success: false, message: '' }; var tag = target.statusTags && target.statusTags.find(function(status) { return status.type === 'itachi-tsukuyomi'; }); if (!tag) return { success: false, message: '' }; var skillState = target.skills && target.skills.find(function(skill) { return skill.skillId === context.skillId; }); if (!skillState) return { success: false, message: '' }; skillState.currentCooldown = (skillState.currentCooldown || 0) + 1; removeStatusEffectById(target.instanceId, tag.id); return { success: true, message: target.name + '受到月读影响，' + context.skillId + '额外增加1回合冷却' };"
+  "trigger": {
+    "type": "afterSkillUsed"
+  },
+  "skillCode": "var skillState, source, tag, target; var _pc = \"n13\"; for (var _step = 0; _step <= 13; _step++) { switch (_pc) { case \"n13\": target = (context)[\"rulePiece\"]; _pc = \"n12\"; break; case \"n12\": source = (context)[\"sourcePiece\"]; _pc = \"n11\"; break; case \"n11\": _pc = (! (! (((! target) || (! source)) || ((source)[\"instanceId\"] !== (target)[\"instanceId\"])))) ? \"n10\" : \"n9\"; break; case \"n9\": tag = ((target)[\"statusTags\"] && ((target)[\"statusTags\"])[\"find\"](function (status) { return ((status)[\"type\"] === \"itachi-tsukuyomi\"); })); _pc = \"n8\"; break; case \"n8\": _pc = (! (! (! tag))) ? \"n7\" : \"n6\"; break; case \"n6\": skillState = ((target)[\"skills\"] && ((target)[\"skills\"])[\"find\"](function (skill) { return ((skill)[\"skillId\"] === (context)[\"skillId\"]); })); _pc = \"n5\"; break; case \"n5\": _pc = (! (! (! skillState))) ? \"n4\" : \"n3\"; break; case \"n3\": (skillState)[\"currentCooldown\"] = (((skillState)[\"currentCooldown\"] || 0) + 1); _pc = \"n2\"; break; case \"n2\": removeStatusEffectById((target)[\"instanceId\"], (tag)[\"id\"]); _pc = \"n1\"; break; case \"n1\": return {success: true, message: ((((target)[\"name\"] + \"受到月读影响，\") + (context)[\"skillId\"]) + \"额外增加1回合冷却\")}; case \"n4\": return {success: false, message: \"\"}; case \"n7\": return {success: false, message: \"\"}; case \"n10\": return {success: false, message: \"\"}; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\");",
+  "contentGraph": {
+    "version": "rvb-content-graph/v1",
+    "surface": "rule",
+    "entry": "n13",
+    "nodes": [
+      {
+        "id": "n1",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "binary",
+                  "op": "+",
+                  "left": {
+                    "kind": "binary",
+                    "op": "+",
+                    "left": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "target"
+                      },
+                      "key": "name"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": "受到月读影响，"
+                    }
+                  },
+                  "right": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "context"
+                    },
+                    "key": "skillId"
+                  }
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "额外增加1回合冷却"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n2",
+        "kind": "call",
+        "capability": "removeStatusEffectById",
+        "args": [
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "target"
+            },
+            "key": "instanceId"
+          },
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "tag"
+            },
+            "key": "id"
+          }
+        ],
+        "next": "n1"
+      },
+      {
+        "id": "n3",
+        "kind": "set",
+        "target": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "skillState"
+          },
+          "key": "currentCooldown"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "binary",
+          "op": "+",
+          "left": {
+            "kind": "binary",
+            "op": "||",
+            "left": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "skillState"
+              },
+              "key": "currentCooldown"
+            },
+            "right": {
+              "kind": "literal",
+              "value": 0
+            }
+          },
+          "right": {
+            "kind": "literal",
+            "value": 1
+          }
+        },
+        "next": "n2"
+      },
+      {
+        "id": "n4",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n5",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "unary",
+              "op": "!",
+              "argument": {
+                "kind": "ref",
+                "name": "skillState"
+              }
+            }
+          }
+        },
+        "yes": "n4",
+        "no": "n3"
+      },
+      {
+        "id": "n6",
+        "kind": "bind",
+        "name": "skillState",
+        "expr": {
+          "kind": "binary",
+          "op": "&&",
+          "left": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "target"
+            },
+            "key": "skills"
+          },
+          "right": {
+            "kind": "collection",
+            "object": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "target"
+              },
+              "key": "skills"
+            },
+            "method": "find",
+            "args": [
+              {
+                "kind": "lambda",
+                "parameters": [
+                  "skill"
+                ],
+                "body": {
+                  "kind": "binary",
+                  "op": "===",
+                  "left": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "skill"
+                    },
+                    "key": "skillId"
+                  },
+                  "right": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "context"
+                    },
+                    "key": "skillId"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "next": "n5"
+      },
+      {
+        "id": "n7",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n8",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "unary",
+              "op": "!",
+              "argument": {
+                "kind": "ref",
+                "name": "tag"
+              }
+            }
+          }
+        },
+        "yes": "n7",
+        "no": "n6"
+      },
+      {
+        "id": "n9",
+        "kind": "bind",
+        "name": "tag",
+        "expr": {
+          "kind": "binary",
+          "op": "&&",
+          "left": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "target"
+            },
+            "key": "statusTags"
+          },
+          "right": {
+            "kind": "collection",
+            "object": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "target"
+              },
+              "key": "statusTags"
+            },
+            "method": "find",
+            "args": [
+              {
+                "kind": "lambda",
+                "parameters": [
+                  "status"
+                ],
+                "body": {
+                  "kind": "binary",
+                  "op": "===",
+                  "left": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "status"
+                    },
+                    "key": "type"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": "itachi-tsukuyomi"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "next": "n8"
+      },
+      {
+        "id": "n10",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n11",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "binary",
+                "op": "||",
+                "left": {
+                  "kind": "unary",
+                  "op": "!",
+                  "argument": {
+                    "kind": "ref",
+                    "name": "target"
+                  }
+                },
+                "right": {
+                  "kind": "unary",
+                  "op": "!",
+                  "argument": {
+                    "kind": "ref",
+                    "name": "source"
+                  }
+                }
+              },
+              "right": {
+                "kind": "binary",
+                "op": "!==",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "source"
+                  },
+                  "key": "instanceId"
+                },
+                "right": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "target"
+                  },
+                  "key": "instanceId"
+                }
+              }
+            }
+          }
+        },
+        "yes": "n10",
+        "no": "n9"
+      },
+      {
+        "id": "n12",
+        "kind": "bind",
+        "name": "source",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "context"
+          },
+          "key": "sourcePiece"
+        },
+        "next": "n11"
+      },
+      {
+        "id": "n13",
+        "kind": "bind",
+        "name": "target",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "context"
+          },
+          "key": "rulePiece"
+        },
+        "next": "n12"
+      }
+    ]
+  },
+  "contentGraphField": "skillCode",
+  "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1"
 }

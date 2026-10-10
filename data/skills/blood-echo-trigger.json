@@ -15,8 +15,519 @@
   "maxCharges": 0,
   "powerMultiplier": 1,
   "actionPointCost": 0,
-  "code": "function executeSkill(context) {\n  if (context.statusId !== 'divine-shield') return { success: false, message: '' };\n  var sourcePiece = context.sourcePiece || context.piece;\n  if (!sourcePiece) return { success: false, message: '' };\n  var bound = context.rulePiece;\n  var liadrin = bound && battle.pieces.find(function(piece) { return piece.instanceId === bound.instanceId && piece.templateId === 'liadrin' && piece.currentHp > 0; });\n  if (!liadrin || !arePlayersAllied(battle, liadrin.ownerPlayerId, sourcePiece.ownerPlayerId)) return { success: false, message: '' };\n  if (!liadrin) return { success: false, message: '' };\n  var player = battle.players.find(function(item) { return item.playerId === liadrin.ownerPlayerId; });\n  if (!player) return { success: false, message: '' };\n  var added = addCardToHand('holy-charge', player.playerId);\n  return { success: added, message: added ? '血色回响生成了1张圣光充能' : '' };\n}",
+  "code": "function executeSkill(context) { var added, bound, liadrin, player, sourcePiece; var _pc = \"n16\"; for (var _step = 0; _step <= 16; _step++) { switch (_pc) { case \"n16\": _pc = (! (! ((context)[\"statusId\"] !== \"divine-shield\"))) ? \"n15\" : \"n14\"; break; case \"n14\": sourcePiece = ((context)[\"sourcePiece\"] || (context)[\"piece\"]); _pc = \"n13\"; break; case \"n13\": _pc = (! (! (! sourcePiece))) ? \"n12\" : \"n11\"; break; case \"n11\": bound = (context)[\"rulePiece\"]; _pc = \"n10\"; break; case \"n10\": liadrin = (bound && ((battle)[\"pieces\"])[\"find\"](function (piece) { return ((((piece)[\"instanceId\"] === (bound)[\"instanceId\"]) && ((piece)[\"templateId\"] === \"liadrin\")) && ((piece)[\"currentHp\"] > 0)); })); _pc = \"n9\"; break; case \"n9\": _pc = (! (! ((! liadrin) || (! arePlayersAllied(battle, (liadrin)[\"ownerPlayerId\"], (sourcePiece)[\"ownerPlayerId\"]))))) ? \"n8\" : \"n7\"; break; case \"n7\": _pc = (! (! (! liadrin))) ? \"n6\" : \"n5\"; break; case \"n5\": player = ((battle)[\"players\"])[\"find\"](function (item) { return ((item)[\"playerId\"] === (liadrin)[\"ownerPlayerId\"]); }); _pc = \"n4\"; break; case \"n4\": _pc = (! (! (! player))) ? \"n3\" : \"n2\"; break; case \"n2\": added = addCardToHand(\"holy-charge\", (player)[\"playerId\"]); _pc = \"n1\"; break; case \"n1\": return {success: added, message: (added ? \"血色回响生成了1张圣光充能\" : \"\")}; case \"n3\": return {success: false, message: \"\"}; case \"n6\": return {success: false, message: \"\"}; case \"n8\": return {success: false, message: \"\"}; case \"n12\": return {success: false, message: \"\"}; case \"n15\": return {success: false, message: \"\"}; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\"); }",
   "keywords": [
     "圣盾"
-  ]
+  ],
+  "contentGraph": {
+    "version": "rvb-content-graph/v1",
+    "surface": "triggerSkill",
+    "entry": "n16",
+    "nodes": [
+      {
+        "id": "n1",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "ref",
+                "name": "added"
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "conditional",
+                "test": {
+                  "kind": "ref",
+                  "name": "added"
+                },
+                "consequent": {
+                  "kind": "literal",
+                  "value": "血色回响生成了1张圣光充能"
+                },
+                "alternate": {
+                  "kind": "literal",
+                  "value": ""
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n2",
+        "kind": "call",
+        "capability": "addCardToHand",
+        "args": [
+          {
+            "kind": "literal",
+            "value": "holy-charge"
+          },
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "player"
+            },
+            "key": "playerId"
+          }
+        ],
+        "result": "added",
+        "next": "n1"
+      },
+      {
+        "id": "n3",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n4",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "unary",
+              "op": "!",
+              "argument": {
+                "kind": "ref",
+                "name": "player"
+              }
+            }
+          }
+        },
+        "yes": "n3",
+        "no": "n2"
+      },
+      {
+        "id": "n5",
+        "kind": "bind",
+        "name": "player",
+        "expr": {
+          "kind": "collection",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "battle"
+            },
+            "key": "players"
+          },
+          "method": "find",
+          "args": [
+            {
+              "kind": "lambda",
+              "parameters": [
+                "item"
+              ],
+              "body": {
+                "kind": "binary",
+                "op": "===",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "item"
+                  },
+                  "key": "playerId"
+                },
+                "right": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "liadrin"
+                  },
+                  "key": "ownerPlayerId"
+                }
+              }
+            }
+          ]
+        },
+        "next": "n4"
+      },
+      {
+        "id": "n6",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n7",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "unary",
+              "op": "!",
+              "argument": {
+                "kind": "ref",
+                "name": "liadrin"
+              }
+            }
+          }
+        },
+        "yes": "n6",
+        "no": "n5"
+      },
+      {
+        "id": "n8",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n9",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "ref",
+                  "name": "liadrin"
+                }
+              },
+              "right": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "call",
+                  "callee": "arePlayersAllied",
+                  "args": [
+                    {
+                      "kind": "ref",
+                      "name": "battle"
+                    },
+                    {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "liadrin"
+                      },
+                      "key": "ownerPlayerId"
+                    },
+                    {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "sourcePiece"
+                      },
+                      "key": "ownerPlayerId"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "yes": "n8",
+        "no": "n7"
+      },
+      {
+        "id": "n10",
+        "kind": "bind",
+        "name": "liadrin",
+        "expr": {
+          "kind": "binary",
+          "op": "&&",
+          "left": {
+            "kind": "ref",
+            "name": "bound"
+          },
+          "right": {
+            "kind": "collection",
+            "object": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "battle"
+              },
+              "key": "pieces"
+            },
+            "method": "find",
+            "args": [
+              {
+                "kind": "lambda",
+                "parameters": [
+                  "piece"
+                ],
+                "body": {
+                  "kind": "binary",
+                  "op": "&&",
+                  "left": {
+                    "kind": "binary",
+                    "op": "&&",
+                    "left": {
+                      "kind": "binary",
+                      "op": "===",
+                      "left": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "piece"
+                        },
+                        "key": "instanceId"
+                      },
+                      "right": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "bound"
+                        },
+                        "key": "instanceId"
+                      }
+                    },
+                    "right": {
+                      "kind": "binary",
+                      "op": "===",
+                      "left": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "piece"
+                        },
+                        "key": "templateId"
+                      },
+                      "right": {
+                        "kind": "literal",
+                        "value": "liadrin"
+                      }
+                    }
+                  },
+                  "right": {
+                    "kind": "binary",
+                    "op": ">",
+                    "left": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "piece"
+                      },
+                      "key": "currentHp"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": 0
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "next": "n9"
+      },
+      {
+        "id": "n11",
+        "kind": "bind",
+        "name": "bound",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "context"
+          },
+          "key": "rulePiece"
+        },
+        "next": "n10"
+      },
+      {
+        "id": "n12",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n13",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "unary",
+              "op": "!",
+              "argument": {
+                "kind": "ref",
+                "name": "sourcePiece"
+              }
+            }
+          }
+        },
+        "yes": "n12",
+        "no": "n11"
+      },
+      {
+        "id": "n14",
+        "kind": "bind",
+        "name": "sourcePiece",
+        "expr": {
+          "kind": "binary",
+          "op": "||",
+          "left": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "context"
+            },
+            "key": "sourcePiece"
+          },
+          "right": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "context"
+            },
+            "key": "piece"
+          }
+        },
+        "next": "n13"
+      },
+      {
+        "id": "n15",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n16",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "!==",
+              "left": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "context"
+                },
+                "key": "statusId"
+              },
+              "right": {
+                "kind": "literal",
+                "value": "divine-shield"
+              }
+            }
+          }
+        },
+        "yes": "n15",
+        "no": "n14"
+      }
+    ]
+  },
+  "contentGraphField": "code",
+  "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1"
 }

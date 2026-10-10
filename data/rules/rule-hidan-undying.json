@@ -6,5 +6,684 @@
   "trigger": {
     "type": "beforeDamageApplied"
   },
-  "skillCode": "var hidan = context.rulePiece; if (context.piece.instanceId !== hidan.instanceId) return { success: false, message: '' }; var inDying = hidan.statusTags && hidan.statusTags.some(function(t) { return t.type === 'hidan-dying'; }); if (inDying) return { success: false, message: '' }; var alreadyTriggered = (hidan.spentPassives || []).indexOf('hidan-undying') !== -1 || hidan.statusTags && hidan.statusTags.some(function(t) { return t.type === 'hidan-undying-used'; }); if (alreadyTriggered) return { success: false, message: '' }; var effectiveDamage = context.damage || 0; if (effectiveDamage < hidan.currentHp) return { success: false, message: '' }; hidan.spentPassives = (hidan.spentPassives || []).concat(['hidan-undying']); hidan.currentHp = 1; addStatusEffectById(hidan.instanceId, { id: 'hidan-dying', name: '濒死', type: 'hidan-dying', currentDuration: -1, currentUses: -1, intensity: 1, stacks: 1, remainingTurns: 2 }); addStatusEffectById(hidan.instanceId, { id: 'hidan-undying-used', name: '不死已触发', type: 'hidan-undying-used', currentDuration: -1, currentUses: -1, intensity: 1, stacks: 1 }); addRuleById(hidan.instanceId, 'rule-hidan-undying-tick'); return { success: true, blocked: true, message: hidan.name + '的不死神体触发！HP强制保留1点，进入濒死状态（下回合结束后死亡）' };"
+  "skillCode": "var alreadyTriggered, effectiveDamage, hidan, inDying; var _pc = \"n18\"; for (var _step = 0; _step <= 18; _step++) { switch (_pc) { case \"n18\": hidan = (context)[\"rulePiece\"]; _pc = \"n17\"; break; case \"n17\": _pc = (! (! (((context)[\"piece\"])[\"instanceId\"] !== (hidan)[\"instanceId\"]))) ? \"n16\" : \"n15\"; break; case \"n15\": inDying = ((hidan)[\"statusTags\"] && ((hidan)[\"statusTags\"])[\"some\"](function (t) { return ((t)[\"type\"] === \"hidan-dying\"); })); _pc = \"n14\"; break; case \"n14\": _pc = (! (! inDying)) ? \"n13\" : \"n12\"; break; case \"n12\": alreadyTriggered = (((((hidan)[\"spentPassives\"] || []))[\"indexOf\"](\"hidan-undying\") !== (- 1)) || ((hidan)[\"statusTags\"] && ((hidan)[\"statusTags\"])[\"some\"](function (t) { return ((t)[\"type\"] === \"hidan-undying-used\"); }))); _pc = \"n11\"; break; case \"n11\": _pc = (! (! alreadyTriggered)) ? \"n10\" : \"n9\"; break; case \"n9\": effectiveDamage = ((context)[\"damage\"] || 0); _pc = \"n8\"; break; case \"n8\": _pc = (! (! (effectiveDamage < (hidan)[\"currentHp\"]))) ? \"n7\" : \"n6\"; break; case \"n6\": (hidan)[\"spentPassives\"] = (((hidan)[\"spentPassives\"] || []))[\"concat\"]([\"hidan-undying\"]); _pc = \"n5\"; break; case \"n5\": (hidan)[\"currentHp\"] = 1; _pc = \"n4\"; break; case \"n4\": addStatusEffectById((hidan)[\"instanceId\"], {id: \"hidan-dying\", name: \"濒死\", type: \"hidan-dying\", currentDuration: (- 1), currentUses: (- 1), intensity: 1, stacks: 1, remainingTurns: 2}); _pc = \"n3\"; break; case \"n3\": addStatusEffectById((hidan)[\"instanceId\"], {id: \"hidan-undying-used\", name: \"不死已触发\", type: \"hidan-undying-used\", currentDuration: (- 1), currentUses: (- 1), intensity: 1, stacks: 1}); _pc = \"n2\"; break; case \"n2\": addRuleById((hidan)[\"instanceId\"], \"rule-hidan-undying-tick\"); _pc = \"n1\"; break; case \"n1\": return {success: true, blocked: true, message: ((hidan)[\"name\"] + \"的不死神体触发！HP强制保留1点，进入濒死状态（下回合结束后死亡）\")}; case \"n7\": return {success: false, message: \"\"}; case \"n10\": return {success: false, message: \"\"}; case \"n13\": return {success: false, message: \"\"}; case \"n16\": return {success: false, message: \"\"}; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\");",
+  "contentGraph": {
+    "version": "rvb-content-graph/v1",
+    "surface": "rule",
+    "entry": "n18",
+    "nodes": [
+      {
+        "id": "n1",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "blocked",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "hidan"
+                  },
+                  "key": "name"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "的不死神体触发！HP强制保留1点，进入濒死状态（下回合结束后死亡）"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n2",
+        "kind": "call",
+        "capability": "addRuleById",
+        "args": [
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "hidan"
+            },
+            "key": "instanceId"
+          },
+          {
+            "kind": "literal",
+            "value": "rule-hidan-undying-tick"
+          }
+        ],
+        "next": "n1"
+      },
+      {
+        "id": "n3",
+        "kind": "call",
+        "capability": "addStatusEffectById",
+        "args": [
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "hidan"
+            },
+            "key": "instanceId"
+          },
+          {
+            "kind": "object",
+            "entries": [
+              {
+                "key": "id",
+                "value": {
+                  "kind": "literal",
+                  "value": "hidan-undying-used"
+                }
+              },
+              {
+                "key": "name",
+                "value": {
+                  "kind": "literal",
+                  "value": "不死已触发"
+                }
+              },
+              {
+                "key": "type",
+                "value": {
+                  "kind": "literal",
+                  "value": "hidan-undying-used"
+                }
+              },
+              {
+                "key": "currentDuration",
+                "value": {
+                  "kind": "unary",
+                  "op": "-",
+                  "argument": {
+                    "kind": "literal",
+                    "value": 1
+                  }
+                }
+              },
+              {
+                "key": "currentUses",
+                "value": {
+                  "kind": "unary",
+                  "op": "-",
+                  "argument": {
+                    "kind": "literal",
+                    "value": 1
+                  }
+                }
+              },
+              {
+                "key": "intensity",
+                "value": {
+                  "kind": "literal",
+                  "value": 1
+                }
+              },
+              {
+                "key": "stacks",
+                "value": {
+                  "kind": "literal",
+                  "value": 1
+                }
+              }
+            ]
+          }
+        ],
+        "next": "n2"
+      },
+      {
+        "id": "n4",
+        "kind": "call",
+        "capability": "addStatusEffectById",
+        "args": [
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "hidan"
+            },
+            "key": "instanceId"
+          },
+          {
+            "kind": "object",
+            "entries": [
+              {
+                "key": "id",
+                "value": {
+                  "kind": "literal",
+                  "value": "hidan-dying"
+                }
+              },
+              {
+                "key": "name",
+                "value": {
+                  "kind": "literal",
+                  "value": "濒死"
+                }
+              },
+              {
+                "key": "type",
+                "value": {
+                  "kind": "literal",
+                  "value": "hidan-dying"
+                }
+              },
+              {
+                "key": "currentDuration",
+                "value": {
+                  "kind": "unary",
+                  "op": "-",
+                  "argument": {
+                    "kind": "literal",
+                    "value": 1
+                  }
+                }
+              },
+              {
+                "key": "currentUses",
+                "value": {
+                  "kind": "unary",
+                  "op": "-",
+                  "argument": {
+                    "kind": "literal",
+                    "value": 1
+                  }
+                }
+              },
+              {
+                "key": "intensity",
+                "value": {
+                  "kind": "literal",
+                  "value": 1
+                }
+              },
+              {
+                "key": "stacks",
+                "value": {
+                  "kind": "literal",
+                  "value": 1
+                }
+              },
+              {
+                "key": "remainingTurns",
+                "value": {
+                  "kind": "literal",
+                  "value": 2
+                }
+              }
+            ]
+          }
+        ],
+        "next": "n3"
+      },
+      {
+        "id": "n5",
+        "kind": "set",
+        "target": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "hidan"
+          },
+          "key": "currentHp"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "literal",
+          "value": 1
+        },
+        "next": "n4"
+      },
+      {
+        "id": "n6",
+        "kind": "set",
+        "target": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "hidan"
+          },
+          "key": "spentPassives"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "collection",
+          "object": {
+            "kind": "binary",
+            "op": "||",
+            "left": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "hidan"
+              },
+              "key": "spentPassives"
+            },
+            "right": {
+              "kind": "array",
+              "items": []
+            }
+          },
+          "method": "concat",
+          "args": [
+            {
+              "kind": "array",
+              "items": [
+                {
+                  "kind": "literal",
+                  "value": "hidan-undying"
+                }
+              ]
+            }
+          ]
+        },
+        "next": "n5"
+      },
+      {
+        "id": "n7",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n8",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "<",
+              "left": {
+                "kind": "ref",
+                "name": "effectiveDamage"
+              },
+              "right": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "hidan"
+                },
+                "key": "currentHp"
+              }
+            }
+          }
+        },
+        "yes": "n7",
+        "no": "n6"
+      },
+      {
+        "id": "n9",
+        "kind": "bind",
+        "name": "effectiveDamage",
+        "expr": {
+          "kind": "binary",
+          "op": "||",
+          "left": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "context"
+            },
+            "key": "damage"
+          },
+          "right": {
+            "kind": "literal",
+            "value": 0
+          }
+        },
+        "next": "n8"
+      },
+      {
+        "id": "n10",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n11",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "ref",
+              "name": "alreadyTriggered"
+            }
+          }
+        },
+        "yes": "n10",
+        "no": "n9"
+      },
+      {
+        "id": "n12",
+        "kind": "bind",
+        "name": "alreadyTriggered",
+        "expr": {
+          "kind": "binary",
+          "op": "||",
+          "left": {
+            "kind": "binary",
+            "op": "!==",
+            "left": {
+              "kind": "collection",
+              "object": {
+                "kind": "binary",
+                "op": "||",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "hidan"
+                  },
+                  "key": "spentPassives"
+                },
+                "right": {
+                  "kind": "array",
+                  "items": []
+                }
+              },
+              "method": "indexOf",
+              "args": [
+                {
+                  "kind": "literal",
+                  "value": "hidan-undying"
+                }
+              ]
+            },
+            "right": {
+              "kind": "unary",
+              "op": "-",
+              "argument": {
+                "kind": "literal",
+                "value": 1
+              }
+            }
+          },
+          "right": {
+            "kind": "binary",
+            "op": "&&",
+            "left": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "hidan"
+              },
+              "key": "statusTags"
+            },
+            "right": {
+              "kind": "collection",
+              "object": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "hidan"
+                },
+                "key": "statusTags"
+              },
+              "method": "some",
+              "args": [
+                {
+                  "kind": "lambda",
+                  "parameters": [
+                    "t"
+                  ],
+                  "body": {
+                    "kind": "binary",
+                    "op": "===",
+                    "left": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "t"
+                      },
+                      "key": "type"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": "hidan-undying-used"
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "next": "n11"
+      },
+      {
+        "id": "n13",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n14",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "ref",
+              "name": "inDying"
+            }
+          }
+        },
+        "yes": "n13",
+        "no": "n12"
+      },
+      {
+        "id": "n15",
+        "kind": "bind",
+        "name": "inDying",
+        "expr": {
+          "kind": "binary",
+          "op": "&&",
+          "left": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "hidan"
+            },
+            "key": "statusTags"
+          },
+          "right": {
+            "kind": "collection",
+            "object": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "hidan"
+              },
+              "key": "statusTags"
+            },
+            "method": "some",
+            "args": [
+              {
+                "kind": "lambda",
+                "parameters": [
+                  "t"
+                ],
+                "body": {
+                  "kind": "binary",
+                  "op": "===",
+                  "left": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "t"
+                    },
+                    "key": "type"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": "hidan-dying"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "next": "n14"
+      },
+      {
+        "id": "n16",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n17",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "!==",
+              "left": {
+                "kind": "get",
+                "object": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "context"
+                  },
+                  "key": "piece"
+                },
+                "key": "instanceId"
+              },
+              "right": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "hidan"
+                },
+                "key": "instanceId"
+              }
+            }
+          }
+        },
+        "yes": "n16",
+        "no": "n15"
+      },
+      {
+        "id": "n18",
+        "kind": "bind",
+        "name": "hidan",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "context"
+          },
+          "key": "rulePiece"
+        },
+        "next": "n17"
+      }
+    ]
+  },
+  "contentGraphField": "skillCode",
+  "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1"
 }

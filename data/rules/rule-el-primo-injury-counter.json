@@ -5,5 +5,567 @@
   "trigger": {
     "type": "afterDamageTaken"
   },
-  "skillCode": "var p=context.rulePiece;if(!p||!context.sourcePiece||context.sourcePiece.instanceId!==p.instanceId||!(context.damage>0))return{success:false,message:''};battle.extensions=battle.extensions||{};battle.extensions.contentCounters=battle.extensions.contentCounters||{};var key=p.ownerPlayerId;var old=Number(battle.extensions.contentCounters[key]||0);var total=old+Number(context.damage||0);var discount=Math.floor(total/4);battle.extensions.contentCounters[key]=total%4;battle.extensions.contentCounters.elPrimoChargeDiscount=battle.extensions.contentCounters.elPrimoChargeDiscount||{};battle.extensions.contentCounters.elPrimoChargeDiscount[key]=Math.min(2,Number(battle.extensions.contentCounters.elPrimoChargeDiscount[key]||0)+discount);return{success:discount>0,message:discount>0?p.name+'受伤计数达到'+discount+'层':''};"
+  "skillCode": "var discount, key, old, p, total; var _pc = \"n13\"; for (var _step = 0; _step <= 13; _step++) { switch (_pc) { case \"n13\": p = (context)[\"rulePiece\"]; _pc = \"n12\"; break; case \"n12\": _pc = (! (! ((((! p) || (! (context)[\"sourcePiece\"])) || (((context)[\"sourcePiece\"])[\"instanceId\"] !== (p)[\"instanceId\"])) || (! ((context)[\"damage\"] > 0))))) ? \"n11\" : \"n10\"; break; case \"n10\": (battle)[\"extensions\"] = ((battle)[\"extensions\"] || {}); _pc = \"n9\"; break; case \"n9\": ((battle)[\"extensions\"])[\"contentCounters\"] = (((battle)[\"extensions\"])[\"contentCounters\"] || {}); _pc = \"n8\"; break; case \"n8\": key = (p)[\"ownerPlayerId\"]; _pc = \"n7\"; break; case \"n7\": old = Number(((((battle)[\"extensions\"])[\"contentCounters\"])[(function (key) { if (typeof key === \"string\" && key.split(\".\").some(function (part) { return [\"__proto__\",\"arguments\",\"callee\",\"caller\",\"constructor\",\"prototype\"].indexOf(part) !== -1; })) throw new Error(\"unsafe content graph index\"); return key; })(key)] || 0)); _pc = \"n6\"; break; case \"n6\": total = (old + Number(((context)[\"damage\"] || 0))); _pc = \"n5\"; break; case \"n5\": discount = Math.floor((total / 4)); _pc = \"n4\"; break; case \"n4\": (((battle)[\"extensions\"])[\"contentCounters\"])[(function (key) { if (typeof key === \"string\" && key.split(\".\").some(function (part) { return [\"__proto__\",\"arguments\",\"callee\",\"caller\",\"constructor\",\"prototype\"].indexOf(part) !== -1; })) throw new Error(\"unsafe content graph index\"); return key; })(key)] = (total % 4); _pc = \"n3\"; break; case \"n3\": (((battle)[\"extensions\"])[\"contentCounters\"])[\"elPrimoChargeDiscount\"] = ((((battle)[\"extensions\"])[\"contentCounters\"])[\"elPrimoChargeDiscount\"] || {}); _pc = \"n2\"; break; case \"n2\": ((((battle)[\"extensions\"])[\"contentCounters\"])[\"elPrimoChargeDiscount\"])[(function (key) { if (typeof key === \"string\" && key.split(\".\").some(function (part) { return [\"__proto__\",\"arguments\",\"callee\",\"caller\",\"constructor\",\"prototype\"].indexOf(part) !== -1; })) throw new Error(\"unsafe content graph index\"); return key; })(key)] = Math.min(2, (Number((((((battle)[\"extensions\"])[\"contentCounters\"])[\"elPrimoChargeDiscount\"])[(function (key) { if (typeof key === \"string\" && key.split(\".\").some(function (part) { return [\"__proto__\",\"arguments\",\"callee\",\"caller\",\"constructor\",\"prototype\"].indexOf(part) !== -1; })) throw new Error(\"unsafe content graph index\"); return key; })(key)] || 0)) + discount)); _pc = \"n1\"; break; case \"n1\": return {success: (discount > 0), message: ((discount > 0) ? ((((p)[\"name\"] + \"受伤计数达到\") + discount) + \"层\") : \"\")}; case \"n11\": return {success: false, message: \"\"}; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\");",
+  "contentGraph": {
+    "version": "rvb-content-graph/v1",
+    "surface": "rule",
+    "entry": "n13",
+    "nodes": [
+      {
+        "id": "n1",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "binary",
+                "op": ">",
+                "left": {
+                  "kind": "ref",
+                  "name": "discount"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": 0
+                }
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "conditional",
+                "test": {
+                  "kind": "binary",
+                  "op": ">",
+                  "left": {
+                    "kind": "ref",
+                    "name": "discount"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": 0
+                  }
+                },
+                "consequent": {
+                  "kind": "binary",
+                  "op": "+",
+                  "left": {
+                    "kind": "binary",
+                    "op": "+",
+                    "left": {
+                      "kind": "binary",
+                      "op": "+",
+                      "left": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "p"
+                        },
+                        "key": "name"
+                      },
+                      "right": {
+                        "kind": "literal",
+                        "value": "受伤计数达到"
+                      }
+                    },
+                    "right": {
+                      "kind": "ref",
+                      "name": "discount"
+                    }
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": "层"
+                  }
+                },
+                "alternate": {
+                  "kind": "literal",
+                  "value": ""
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n2",
+        "kind": "set",
+        "target": {
+          "kind": "index",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "get",
+              "object": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "battle"
+                },
+                "key": "extensions"
+              },
+              "key": "contentCounters"
+            },
+            "key": "elPrimoChargeDiscount"
+          },
+          "index": {
+            "kind": "ref",
+            "name": "key"
+          }
+        },
+        "operator": "=",
+        "value": {
+          "kind": "call",
+          "callee": "Math.min",
+          "args": [
+            {
+              "kind": "literal",
+              "value": 2
+            },
+            {
+              "kind": "binary",
+              "op": "+",
+              "left": {
+                "kind": "call",
+                "callee": "Number",
+                "args": [
+                  {
+                    "kind": "binary",
+                    "op": "||",
+                    "left": {
+                      "kind": "index",
+                      "object": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "get",
+                            "object": {
+                              "kind": "ref",
+                              "name": "battle"
+                            },
+                            "key": "extensions"
+                          },
+                          "key": "contentCounters"
+                        },
+                        "key": "elPrimoChargeDiscount"
+                      },
+                      "index": {
+                        "kind": "ref",
+                        "name": "key"
+                      }
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": 0
+                    }
+                  }
+                ]
+              },
+              "right": {
+                "kind": "ref",
+                "name": "discount"
+              }
+            }
+          ]
+        },
+        "next": "n1"
+      },
+      {
+        "id": "n3",
+        "kind": "set",
+        "target": {
+          "kind": "get",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "battle"
+              },
+              "key": "extensions"
+            },
+            "key": "contentCounters"
+          },
+          "key": "elPrimoChargeDiscount"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "binary",
+          "op": "||",
+          "left": {
+            "kind": "get",
+            "object": {
+              "kind": "get",
+              "object": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "battle"
+                },
+                "key": "extensions"
+              },
+              "key": "contentCounters"
+            },
+            "key": "elPrimoChargeDiscount"
+          },
+          "right": {
+            "kind": "object",
+            "entries": []
+          }
+        },
+        "next": "n2"
+      },
+      {
+        "id": "n4",
+        "kind": "set",
+        "target": {
+          "kind": "index",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "battle"
+              },
+              "key": "extensions"
+            },
+            "key": "contentCounters"
+          },
+          "index": {
+            "kind": "ref",
+            "name": "key"
+          }
+        },
+        "operator": "=",
+        "value": {
+          "kind": "binary",
+          "op": "%",
+          "left": {
+            "kind": "ref",
+            "name": "total"
+          },
+          "right": {
+            "kind": "literal",
+            "value": 4
+          }
+        },
+        "next": "n3"
+      },
+      {
+        "id": "n5",
+        "kind": "bind",
+        "name": "discount",
+        "expr": {
+          "kind": "call",
+          "callee": "Math.floor",
+          "args": [
+            {
+              "kind": "binary",
+              "op": "/",
+              "left": {
+                "kind": "ref",
+                "name": "total"
+              },
+              "right": {
+                "kind": "literal",
+                "value": 4
+              }
+            }
+          ]
+        },
+        "next": "n4"
+      },
+      {
+        "id": "n6",
+        "kind": "bind",
+        "name": "total",
+        "expr": {
+          "kind": "binary",
+          "op": "+",
+          "left": {
+            "kind": "ref",
+            "name": "old"
+          },
+          "right": {
+            "kind": "call",
+            "callee": "Number",
+            "args": [
+              {
+                "kind": "binary",
+                "op": "||",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "context"
+                  },
+                  "key": "damage"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": 0
+                }
+              }
+            ]
+          }
+        },
+        "next": "n5"
+      },
+      {
+        "id": "n7",
+        "kind": "bind",
+        "name": "old",
+        "expr": {
+          "kind": "call",
+          "callee": "Number",
+          "args": [
+            {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "index",
+                "object": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "battle"
+                    },
+                    "key": "extensions"
+                  },
+                  "key": "contentCounters"
+                },
+                "index": {
+                  "kind": "ref",
+                  "name": "key"
+                }
+              },
+              "right": {
+                "kind": "literal",
+                "value": 0
+              }
+            }
+          ]
+        },
+        "next": "n6"
+      },
+      {
+        "id": "n8",
+        "kind": "bind",
+        "name": "key",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "p"
+          },
+          "key": "ownerPlayerId"
+        },
+        "next": "n7"
+      },
+      {
+        "id": "n9",
+        "kind": "set",
+        "target": {
+          "kind": "get",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "battle"
+            },
+            "key": "extensions"
+          },
+          "key": "contentCounters"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "binary",
+          "op": "||",
+          "left": {
+            "kind": "get",
+            "object": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "battle"
+              },
+              "key": "extensions"
+            },
+            "key": "contentCounters"
+          },
+          "right": {
+            "kind": "object",
+            "entries": []
+          }
+        },
+        "next": "n8"
+      },
+      {
+        "id": "n10",
+        "kind": "set",
+        "target": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "battle"
+          },
+          "key": "extensions"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "binary",
+          "op": "||",
+          "left": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "battle"
+            },
+            "key": "extensions"
+          },
+          "right": {
+            "kind": "object",
+            "entries": []
+          }
+        },
+        "next": "n9"
+      },
+      {
+        "id": "n11",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n12",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "binary",
+                "op": "||",
+                "left": {
+                  "kind": "binary",
+                  "op": "||",
+                  "left": {
+                    "kind": "unary",
+                    "op": "!",
+                    "argument": {
+                      "kind": "ref",
+                      "name": "p"
+                    }
+                  },
+                  "right": {
+                    "kind": "unary",
+                    "op": "!",
+                    "argument": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "context"
+                      },
+                      "key": "sourcePiece"
+                    }
+                  }
+                },
+                "right": {
+                  "kind": "binary",
+                  "op": "!==",
+                  "left": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "context"
+                      },
+                      "key": "sourcePiece"
+                    },
+                    "key": "instanceId"
+                  },
+                  "right": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "p"
+                    },
+                    "key": "instanceId"
+                  }
+                }
+              },
+              "right": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "binary",
+                  "op": ">",
+                  "left": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "context"
+                    },
+                    "key": "damage"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": 0
+                  }
+                }
+              }
+            }
+          }
+        },
+        "yes": "n11",
+        "no": "n10"
+      },
+      {
+        "id": "n13",
+        "kind": "bind",
+        "name": "p",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "context"
+          },
+          "key": "rulePiece"
+        },
+        "next": "n12"
+      }
+    ]
+  },
+  "contentGraphField": "skillCode",
+  "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1"
 }

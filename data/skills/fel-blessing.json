@@ -18,6 +18,294 @@
   "powerMultiplier": 1,
   "actionPointCost": 0,
   "range": "single",
-  "code": "function executeSkill(context) {\n  const sourcePiece = context.piece;\n  const targetAlly = selectTarget({ type: 'piece', range: 99, filter: 'ally' });\n  if (!targetAlly || targetAlly.needsTargetSelection) {\n    return targetAlly;\n  }\n  targetAlly.attack += 2;\n  const damageResult = dealDamage(sourcePiece, targetAlly, 2, 'true', context.battle, context.skill.id);\n  return {\n    message: sourcePiece.name + '使用邪能赐福，使' + targetAlly.name + '攻击力+2并受到' + damageResult.damage + '点真实伤害',\n    success: true\n  };\n}",
-  "previewCode": "function calculatePreview(piece, skillDef) {\n  return {\n    description: \"选择全图友军，攻击力+2。目标受到2点真实伤害。\",\n    expectedValues: { attackBonus: 2, selfDamage: 2 }\n  };\n}"
+  "code": "function executeSkill(context) { var damageResult, sourcePiece, targetAlly; var _pc = \"n7\"; for (var _step = 0; _step <= 7; _step++) { switch (_pc) { case \"n7\": sourcePiece = (context)[\"piece\"]; _pc = \"n6\"; break; case \"n6\": targetAlly = selectTarget({type: \"piece\", range: 99, filter: \"ally\"}); _pc = \"n5\"; break; case \"n5\": _pc = (! (! ((! targetAlly) || (targetAlly)[\"needsTargetSelection\"]))) ? \"n4\" : \"n3\"; break; case \"n3\": (targetAlly)[\"attack\"] += 2; _pc = \"n2\"; break; case \"n2\": damageResult = dealDamage(sourcePiece, targetAlly, 2, \"true\", (context)[\"battle\"], ((context)[\"skill\"])[\"id\"]); _pc = \"n1\"; break; case \"n1\": return {message: ((((((sourcePiece)[\"name\"] + \"使用邪能赐福，使\") + (targetAlly)[\"name\"]) + \"攻击力+2并受到\") + (damageResult)[\"damage\"]) + \"点真实伤害\"), success: true}; case \"n4\": return targetAlly; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\"); }",
+  "previewCode": "function calculatePreview(piece, skillDef, currentCooldown) { var _pc = \"n1\"; for (var _step = 0; _step <= 1; _step++) { switch (_pc) { case \"n1\": return {description: \"选择全图友军，攻击力+2。目标受到2点真实伤害。\", expectedValues: {attackBonus: 2, selfDamage: 2}}; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\"); }",
+  "contentGraph": {
+    "version": "rvb-content-graph/v1",
+    "surface": "skill",
+    "entry": "n7",
+    "nodes": [
+      {
+        "id": "n1",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "message",
+              "value": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "binary",
+                  "op": "+",
+                  "left": {
+                    "kind": "binary",
+                    "op": "+",
+                    "left": {
+                      "kind": "binary",
+                      "op": "+",
+                      "left": {
+                        "kind": "binary",
+                        "op": "+",
+                        "left": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "sourcePiece"
+                          },
+                          "key": "name"
+                        },
+                        "right": {
+                          "kind": "literal",
+                          "value": "使用邪能赐福，使"
+                        }
+                      },
+                      "right": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "targetAlly"
+                        },
+                        "key": "name"
+                      }
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": "攻击力+2并受到"
+                    }
+                  },
+                  "right": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "damageResult"
+                    },
+                    "key": "damage"
+                  }
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "点真实伤害"
+                }
+              }
+            },
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n2",
+        "kind": "call",
+        "capability": "dealDamage",
+        "args": [
+          {
+            "kind": "ref",
+            "name": "sourcePiece"
+          },
+          {
+            "kind": "ref",
+            "name": "targetAlly"
+          },
+          {
+            "kind": "literal",
+            "value": 2
+          },
+          {
+            "kind": "literal",
+            "value": "true"
+          },
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "context"
+            },
+            "key": "battle"
+          },
+          {
+            "kind": "get",
+            "object": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "context"
+              },
+              "key": "skill"
+            },
+            "key": "id"
+          }
+        ],
+        "result": "damageResult",
+        "next": "n1"
+      },
+      {
+        "id": "n3",
+        "kind": "set",
+        "target": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "targetAlly"
+          },
+          "key": "attack"
+        },
+        "operator": "+=",
+        "value": {
+          "kind": "literal",
+          "value": 2
+        },
+        "next": "n2"
+      },
+      {
+        "id": "n4",
+        "kind": "return",
+        "value": {
+          "kind": "ref",
+          "name": "targetAlly"
+        }
+      },
+      {
+        "id": "n5",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "ref",
+                  "name": "targetAlly"
+                }
+              },
+              "right": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "targetAlly"
+                },
+                "key": "needsTargetSelection"
+              }
+            }
+          }
+        },
+        "yes": "n4",
+        "no": "n3"
+      },
+      {
+        "id": "n6",
+        "kind": "call",
+        "capability": "selectTarget",
+        "args": [
+          {
+            "kind": "object",
+            "entries": [
+              {
+                "key": "type",
+                "value": {
+                  "kind": "literal",
+                  "value": "piece"
+                }
+              },
+              {
+                "key": "range",
+                "value": {
+                  "kind": "literal",
+                  "value": 99
+                }
+              },
+              {
+                "key": "filter",
+                "value": {
+                  "kind": "literal",
+                  "value": "ally"
+                }
+              }
+            ]
+          }
+        ],
+        "result": "targetAlly",
+        "next": "n5"
+      },
+      {
+        "id": "n7",
+        "kind": "bind",
+        "name": "sourcePiece",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "context"
+          },
+          "key": "piece"
+        },
+        "next": "n6"
+      }
+    ]
+  },
+  "contentGraphField": "code",
+  "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1",
+  "contentGraphEntries": {
+    "previewCode": {
+      "graph": {
+        "version": "rvb-content-graph/v1",
+        "surface": "preview",
+        "entry": "n1",
+        "nodes": [
+          {
+            "id": "n1",
+            "kind": "return",
+            "value": {
+              "kind": "object",
+              "entries": [
+                {
+                  "key": "description",
+                  "value": {
+                    "kind": "literal",
+                    "value": "选择全图友军，攻击力+2。目标受到2点真实伤害。"
+                  }
+                },
+                {
+                  "key": "expectedValues",
+                  "value": {
+                    "kind": "object",
+                    "entries": [
+                      {
+                        "key": "attackBonus",
+                        "value": {
+                          "kind": "literal",
+                          "value": 2
+                        }
+                      },
+                      {
+                        "key": "selfDamage",
+                        "value": {
+                          "kind": "literal",
+                          "value": 2
+                        }
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "compilerVersion": "rvb-content-graph-compiler/v1"
+    }
+  }
 }

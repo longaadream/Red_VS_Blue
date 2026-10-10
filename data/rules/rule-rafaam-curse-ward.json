@@ -5,5 +5,1429 @@
   "trigger": {
     "type": "beforeDamageTaken"
   },
-  "skillCode": "var piece = context.rulePiece; if (!piece || !context.piece || context.piece.instanceId !== piece.instanceId) return { success: false, message: '' }; if (battle.turn.currentPlayerId !== piece.ownerPlayerId) return { success: false, message: '' }; if (!piece.statusTags) piece.statusTags = []; if (piece.statusTags.some(function(tag) { return tag.type === 'curse-ward-used'; })) return { success: false, message: '' }; var damageAmount = Math.max(0, (context.damage || 0) + Math.floor((piece.attack || 0) * 0.5)); addStatusEffectById(piece.instanceId, { id: 'curse-ward-used-' + Date.now(), type: 'curse-ward-used', name: '诅咒结界已使用', remainingDuration: -1, currentDuration: -1, expiresAtTurnEnd: battle.turn.turnNumber }); var opponent = battle.players.find(function(player) { return player.playerId === nextEnemyPlayer(battle, piece.ownerPlayerId); }); if (opponent) { var cardId = 'rafaam-curse-' + Date.now(); if (!battle.customCards) battle.customCards = {}; battle.customCards[cardId] = { id: cardId, name: '诅咒(' + damageAmount + ')', description: '可消耗1点行动点弃置；若未弃置，回合结束时使1个随机友军受到' + damageAmount + '点伤害。', type: 'reactive', trigger: { type: 'endTurn' }, icon: '💀', actionPointCost: 1, damageAmount: damageAmount, sourcePieceId: piece.instanceId, code: 'function executeCard(context) { if (context.type !== \"endTurn\") return { success: true, message: \"弃置了诅咒\" }; if (battle.turn.currentPlayerId !== playerId) return { success: false }; var allies = battle.pieces.filter(function(piece) { return piece.ownerPlayerId === playerId && piece.currentHp > 0; }); if (!allies.length) return { success: true, message: \"诅咒结算时没有存活的友军目标\" }; var target = allies[Math.floor(Math.random() * allies.length)]; var cardData = battle.customCards && battle.customCards[context.card.id]; var damage = cardData && cardData.damageAmount !== undefined ? cardData.damageAmount : 0; var source = battle.pieces.concat(battle.graveyard || []).find(function(piece) { return piece.instanceId === cardData.sourcePieceId; }) || target; var result = dealDamage(source, target, damage, \"true\", battle, \"curse-end-turn\", true); return { success: true, keepInHand: true, message: \"诅咒对\" + target.name + \"造成了\" + result.damage + \"点伤害\" }; }' }; addCardToHand(cardId, opponent.playerId); } return { success: true, blocked: true, message: piece.name + '的诅咒结界免疫伤害并交给对手1张记录' + damageAmount + '点伤害的诅咒' };"
+  "skillCode": "var __rvb_import_effect_1, __rvb_import_effect_9, __rvb_import_operand_0, __rvb_import_operand_10, __rvb_import_operand_11, __rvb_import_operand_2, __rvb_import_operand_3, __rvb_import_operand_4, __rvb_import_operand_5, __rvb_import_operand_6, __rvb_import_operand_7, __rvb_import_operand_8, cardId, damageAmount, opponent, piece; var _pc = \"n31\"; for (var _step = 0; _step <= 31; _step++) { switch (_pc) { case \"n31\": piece = (context)[\"rulePiece\"]; _pc = \"n30\"; break; case \"n30\": _pc = (! (! (((! piece) || (! (context)[\"piece\"])) || (((context)[\"piece\"])[\"instanceId\"] !== (piece)[\"instanceId\"])))) ? \"n29\" : \"n28\"; break; case \"n28\": _pc = (! (! (((battle)[\"turn\"])[\"currentPlayerId\"] !== (piece)[\"ownerPlayerId\"]))) ? \"n27\" : \"n26\"; break; case \"n26\": _pc = (! (! (! (piece)[\"statusTags\"]))) ? \"n25\" : \"n24\"; break; case \"n25\": (piece)[\"statusTags\"] = []; _pc = \"n24\"; break; case \"n24\": _pc = (! (! ((piece)[\"statusTags\"])[\"some\"](function (tag) { return ((tag)[\"type\"] === \"curse-ward-used\"); }))) ? \"n23\" : \"n22\"; break; case \"n22\": damageAmount = Math.max(0, (((context)[\"damage\"] || 0) + Math.floor((((piece)[\"attack\"] || 0) * 0.5)))); _pc = \"n21\"; break; case \"n21\": __rvb_import_operand_11 = (piece)[\"instanceId\"]; _pc = \"n18\"; break; case \"n18\": __rvb_import_operand_8 = \"curse-ward-used-\"; _pc = \"n20\"; break; case \"n20\": __rvb_import_effect_9 = Date.now(); _pc = \"n19\"; break; case \"n19\": __rvb_import_operand_10 = (__rvb_import_operand_8 + __rvb_import_effect_9); _pc = \"n17\"; break; case \"n17\": __rvb_import_operand_7 = \"curse-ward-used\"; _pc = \"n16\"; break; case \"n16\": __rvb_import_operand_6 = \"诅咒结界已使用\"; _pc = \"n15\"; break; case \"n15\": __rvb_import_operand_5 = (- 1); _pc = \"n14\"; break; case \"n14\": __rvb_import_operand_4 = (- 1); _pc = \"n13\"; break; case \"n13\": __rvb_import_operand_3 = ((battle)[\"turn\"])[\"turnNumber\"]; _pc = \"n12\"; break; case \"n12\": __rvb_import_operand_2 = {id: __rvb_import_operand_10, type: __rvb_import_operand_7, name: __rvb_import_operand_6, remainingDuration: __rvb_import_operand_5, currentDuration: __rvb_import_operand_4, expiresAtTurnEnd: __rvb_import_operand_3}; _pc = \"n11\"; break; case \"n11\": addStatusEffectById(__rvb_import_operand_11, __rvb_import_operand_2); _pc = \"n10\"; break; case \"n10\": opponent = ((battle)[\"players\"])[\"find\"](function (player) { return ((player)[\"playerId\"] === nextEnemyPlayer(battle, (piece)[\"ownerPlayerId\"])); }); _pc = \"n9\"; break; case \"n9\": _pc = (! (! opponent)) ? \"n6\" : \"n1\"; break; case \"n6\": __rvb_import_operand_0 = \"rafaam-curse-\"; _pc = \"n8\"; break; case \"n8\": __rvb_import_effect_1 = Date.now(); _pc = \"n7\"; break; case \"n7\": cardId = (__rvb_import_operand_0 + __rvb_import_effect_1); _pc = \"n5\"; break; case \"n5\": _pc = (! (! (! (battle)[\"customCards\"]))) ? \"n4\" : \"n3\"; break; case \"n4\": (battle)[\"customCards\"] = {}; _pc = \"n3\"; break; case \"n3\": ((battle)[\"customCards\"])[(function (key) { if (typeof key === \"string\" && key.split(\".\").some(function (part) { return [\"__proto__\",\"arguments\",\"callee\",\"caller\",\"constructor\",\"prototype\"].indexOf(part) !== -1; })) throw new Error(\"unsafe content graph index\"); return key; })(cardId)] = {id: cardId, name: ((\"诅咒(\" + damageAmount) + \")\"), description: ((\"可消耗1点行动点弃置；若未弃置，回合结束时使1个随机友军受到\" + damageAmount) + \"点伤害。\"), type: \"reactive\", trigger: {type: \"endTurn\"}, icon: \"💀\", actionPointCost: 1, damageAmount: damageAmount, sourcePieceId: (piece)[\"instanceId\"], code: 'function executeCard(context) { var allPieces, allies, cardData, damage, random, randomIndex, result, source, target; var _pc = \"start\"; for (var _step = 0; _step <= 16; _step++) { switch (_pc) { case \"start\": _pc = ((context)[\"type\"] !== \"endTurn\") ? \"discard\" : \"turn\"; break; case \"turn\": _pc = (((battle)[\"turn\"])[\"currentPlayerId\"] !== playerId) ? \"wrong-player\" : \"allies\"; break; case \"allies\": allies = ((battle)[\"pieces\"])[\"filter\"](function (piece) { return (((piece)[\"ownerPlayerId\"] === playerId) && ((piece)[\"currentHp\"] > 0)); }); _pc = \"has-allies\"; break; case \"has-allies\": _pc = ((allies)[\"length\"] === 0) ? \"no-allies\" : \"random\"; break; case \"random\": random = Math.random(); _pc = \"random-index\"; break; case \"random-index\": randomIndex = Math.floor((random * (allies)[\"length\"])); _pc = \"target\"; break; case \"target\": target = (allies)[(function (key) { if (typeof key === \"string\" && key.split(\".\").some(function (part) { return [\"__proto__\",\"arguments\",\"callee\",\"caller\",\"constructor\",\"prototype\"].indexOf(part) !== -1; })) throw new Error(\"unsafe content graph index\"); return key; })(randomIndex)]; _pc = \"card-data\"; break; case \"card-data\": cardData = ((battle)[\"customCards\"] && ((battle)[\"customCards\"])[(function (key) { if (typeof key === \"string\" && key.split(\".\").some(function (part) { return [\"__proto__\",\"arguments\",\"callee\",\"caller\",\"constructor\",\"prototype\"].indexOf(part) !== -1; })) throw new Error(\"unsafe content graph index\"); return key; })(((context)[\"card\"])[\"id\"])]); _pc = \"damage\"; break; case \"damage\": damage = ((cardData && ((cardData)[\"damageAmount\"] !== (void 0))) ? (cardData)[\"damageAmount\"] : 0); _pc = \"all-pieces\"; break; case \"all-pieces\": allPieces = ((battle)[\"pieces\"])[\"concat\"](((battle)[\"graveyard\"] || [])); _pc = \"source\"; break; case \"source\": source = ((allPieces)[\"find\"](function (piece) { return ((piece)[\"instanceId\"] === (cardData)[\"sourcePieceId\"]); }) || target); _pc = \"deal\"; break; case \"deal\": result = dealDamage(source, target, damage, \"true\", battle, \"curse-end-turn\", true); _pc = \"done\"; break; case \"done\": return {success: true, keepInHand: true, message: ((\"诅咒对\" + (target)[\"name\"]) + ((\"造成了\" + (result)[\"damage\"]) + \"点伤害\"))}; case \"no-allies\": return {success: true, message: \"诅咒结算时没有存活的友军目标\"}; case \"wrong-player\": return {success: false}; case \"discard\": return {success: true, message: \"弃置了诅咒\"}; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\"); }'}; _pc = \"n2\"; break; case \"n2\": addCardToHand(cardId, (opponent)[\"playerId\"]); _pc = \"n1\"; break; case \"n1\": return {success: true, blocked: true, message: ((((piece)[\"name\"] + \"的诅咒结界免疫伤害并交给对手1张记录\") + damageAmount) + \"点伤害的诅咒\")}; case \"n23\": return {success: false, message: \"\"}; case \"n27\": return {success: false, message: \"\"}; case \"n29\": return {success: false, message: \"\"}; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\");",
+  "contentGraph": {
+    "version": "rvb-content-graph/v1",
+    "surface": "rule",
+    "entry": "n31",
+    "nodes": [
+      {
+        "id": "n1",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "blocked",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "binary",
+                  "op": "+",
+                  "left": {
+                    "kind": "binary",
+                    "op": "+",
+                    "left": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "piece"
+                      },
+                      "key": "name"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": "的诅咒结界免疫伤害并交给对手1张记录"
+                    }
+                  },
+                  "right": {
+                    "kind": "ref",
+                    "name": "damageAmount"
+                  }
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "点伤害的诅咒"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n2",
+        "kind": "call",
+        "capability": "addCardToHand",
+        "args": [
+          {
+            "kind": "ref",
+            "name": "cardId"
+          },
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "opponent"
+            },
+            "key": "playerId"
+          }
+        ],
+        "next": "n1"
+      },
+      {
+        "id": "n3",
+        "kind": "set",
+        "target": {
+          "kind": "index",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "battle"
+            },
+            "key": "customCards"
+          },
+          "index": {
+            "kind": "ref",
+            "name": "cardId"
+          }
+        },
+        "operator": "=",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "id",
+              "value": {
+                "kind": "ref",
+                "name": "cardId"
+              }
+            },
+            {
+              "key": "name",
+              "value": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "binary",
+                  "op": "+",
+                  "left": {
+                    "kind": "literal",
+                    "value": "诅咒("
+                  },
+                  "right": {
+                    "kind": "ref",
+                    "name": "damageAmount"
+                  }
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": ")"
+                }
+              }
+            },
+            {
+              "key": "description",
+              "value": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "binary",
+                  "op": "+",
+                  "left": {
+                    "kind": "literal",
+                    "value": "可消耗1点行动点弃置；若未弃置，回合结束时使1个随机友军受到"
+                  },
+                  "right": {
+                    "kind": "ref",
+                    "name": "damageAmount"
+                  }
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "点伤害。"
+                }
+              }
+            },
+            {
+              "key": "type",
+              "value": {
+                "kind": "literal",
+                "value": "reactive"
+              }
+            },
+            {
+              "key": "trigger",
+              "value": {
+                "kind": "object",
+                "entries": [
+                  {
+                    "key": "type",
+                    "value": {
+                      "kind": "literal",
+                      "value": "endTurn"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "key": "icon",
+              "value": {
+                "kind": "literal",
+                "value": "💀"
+              }
+            },
+            {
+              "key": "actionPointCost",
+              "value": {
+                "kind": "literal",
+                "value": 1
+              }
+            },
+            {
+              "key": "damageAmount",
+              "value": {
+                "kind": "ref",
+                "name": "damageAmount"
+              }
+            },
+            {
+              "key": "sourcePieceId",
+              "value": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "piece"
+                },
+                "key": "instanceId"
+              }
+            },
+            {
+              "key": "code",
+              "value": {
+                "kind": "source",
+                "graph": {
+                  "version": "rvb-content-graph/v1",
+                  "surface": "card",
+                  "entry": "start",
+                  "nodes": [
+                    {
+                      "id": "start",
+                      "kind": "branch",
+                      "condition": {
+                        "kind": "binary",
+                        "op": "!==",
+                        "left": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "context"
+                          },
+                          "key": "type"
+                        },
+                        "right": {
+                          "kind": "literal",
+                          "value": "endTurn"
+                        }
+                      },
+                      "yes": "discard",
+                      "no": "turn"
+                    },
+                    {
+                      "id": "discard",
+                      "kind": "return",
+                      "value": {
+                        "kind": "object",
+                        "entries": {
+                          "success": {
+                            "kind": "literal",
+                            "value": true
+                          },
+                          "message": {
+                            "kind": "literal",
+                            "value": "弃置了诅咒"
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "id": "turn",
+                      "kind": "branch",
+                      "condition": {
+                        "kind": "binary",
+                        "op": "!==",
+                        "left": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "get",
+                            "object": {
+                              "kind": "ref",
+                              "name": "battle"
+                            },
+                            "key": "turn"
+                          },
+                          "key": "currentPlayerId"
+                        },
+                        "right": {
+                          "kind": "ref",
+                          "name": "playerId"
+                        }
+                      },
+                      "yes": "wrong-player",
+                      "no": "allies"
+                    },
+                    {
+                      "id": "wrong-player",
+                      "kind": "return",
+                      "value": {
+                        "kind": "object",
+                        "entries": {
+                          "success": {
+                            "kind": "literal",
+                            "value": false
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "id": "allies",
+                      "kind": "bind",
+                      "name": "allies",
+                      "expr": {
+                        "kind": "collection",
+                        "object": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "battle"
+                          },
+                          "key": "pieces"
+                        },
+                        "method": "filter",
+                        "args": [
+                          {
+                            "kind": "lambda",
+                            "parameters": [
+                              "piece"
+                            ],
+                            "body": {
+                              "kind": "binary",
+                              "op": "&&",
+                              "left": {
+                                "kind": "binary",
+                                "op": "===",
+                                "left": {
+                                  "kind": "get",
+                                  "object": {
+                                    "kind": "ref",
+                                    "name": "piece"
+                                  },
+                                  "key": "ownerPlayerId"
+                                },
+                                "right": {
+                                  "kind": "ref",
+                                  "name": "playerId"
+                                }
+                              },
+                              "right": {
+                                "kind": "binary",
+                                "op": ">",
+                                "left": {
+                                  "kind": "get",
+                                  "object": {
+                                    "kind": "ref",
+                                    "name": "piece"
+                                  },
+                                  "key": "currentHp"
+                                },
+                                "right": {
+                                  "kind": "literal",
+                                  "value": 0
+                                }
+                              }
+                            }
+                          }
+                        ]
+                      },
+                      "next": "has-allies"
+                    },
+                    {
+                      "id": "has-allies",
+                      "kind": "branch",
+                      "condition": {
+                        "kind": "binary",
+                        "op": "===",
+                        "left": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "allies"
+                          },
+                          "key": "length"
+                        },
+                        "right": {
+                          "kind": "literal",
+                          "value": 0
+                        }
+                      },
+                      "yes": "no-allies",
+                      "no": "random"
+                    },
+                    {
+                      "id": "no-allies",
+                      "kind": "return",
+                      "value": {
+                        "kind": "object",
+                        "entries": {
+                          "success": {
+                            "kind": "literal",
+                            "value": true
+                          },
+                          "message": {
+                            "kind": "literal",
+                            "value": "诅咒结算时没有存活的友军目标"
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "id": "random",
+                      "kind": "call",
+                      "capability": "Math.random",
+                      "args": [],
+                      "result": "random",
+                      "next": "random-index"
+                    },
+                    {
+                      "id": "random-index",
+                      "kind": "bind",
+                      "name": "randomIndex",
+                      "expr": {
+                        "kind": "call",
+                        "callee": "Math.floor",
+                        "args": [
+                          {
+                            "kind": "binary",
+                            "op": "*",
+                            "left": {
+                              "kind": "ref",
+                              "name": "random"
+                            },
+                            "right": {
+                              "kind": "get",
+                              "object": {
+                                "kind": "ref",
+                                "name": "allies"
+                              },
+                              "key": "length"
+                            }
+                          }
+                        ]
+                      },
+                      "next": "target"
+                    },
+                    {
+                      "id": "target",
+                      "kind": "bind",
+                      "name": "target",
+                      "expr": {
+                        "kind": "index",
+                        "object": {
+                          "kind": "ref",
+                          "name": "allies"
+                        },
+                        "index": {
+                          "kind": "ref",
+                          "name": "randomIndex"
+                        }
+                      },
+                      "next": "card-data"
+                    },
+                    {
+                      "id": "card-data",
+                      "kind": "bind",
+                      "name": "cardData",
+                      "expr": {
+                        "kind": "binary",
+                        "op": "&&",
+                        "left": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "battle"
+                          },
+                          "key": "customCards"
+                        },
+                        "right": {
+                          "kind": "index",
+                          "object": {
+                            "kind": "get",
+                            "object": {
+                              "kind": "ref",
+                              "name": "battle"
+                            },
+                            "key": "customCards"
+                          },
+                          "index": {
+                            "kind": "get",
+                            "object": {
+                              "kind": "get",
+                              "object": {
+                                "kind": "ref",
+                                "name": "context"
+                              },
+                              "key": "card"
+                            },
+                            "key": "id"
+                          }
+                        }
+                      },
+                      "next": "damage"
+                    },
+                    {
+                      "id": "damage",
+                      "kind": "bind",
+                      "name": "damage",
+                      "expr": {
+                        "kind": "conditional",
+                        "test": {
+                          "kind": "binary",
+                          "op": "&&",
+                          "left": {
+                            "kind": "ref",
+                            "name": "cardData"
+                          },
+                          "right": {
+                            "kind": "binary",
+                            "op": "!==",
+                            "left": {
+                              "kind": "get",
+                              "object": {
+                                "kind": "ref",
+                                "name": "cardData"
+                              },
+                              "key": "damageAmount"
+                            },
+                            "right": {
+                              "kind": "undefined"
+                            }
+                          }
+                        },
+                        "consequent": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "cardData"
+                          },
+                          "key": "damageAmount"
+                        },
+                        "alternate": {
+                          "kind": "literal",
+                          "value": 0
+                        }
+                      },
+                      "next": "all-pieces"
+                    },
+                    {
+                      "id": "all-pieces",
+                      "kind": "bind",
+                      "name": "allPieces",
+                      "expr": {
+                        "kind": "collection",
+                        "object": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "battle"
+                          },
+                          "key": "pieces"
+                        },
+                        "method": "concat",
+                        "args": [
+                          {
+                            "kind": "binary",
+                            "op": "||",
+                            "left": {
+                              "kind": "get",
+                              "object": {
+                                "kind": "ref",
+                                "name": "battle"
+                              },
+                              "key": "graveyard"
+                            },
+                            "right": {
+                              "kind": "array",
+                              "items": []
+                            }
+                          }
+                        ]
+                      },
+                      "next": "source"
+                    },
+                    {
+                      "id": "source",
+                      "kind": "bind",
+                      "name": "source",
+                      "expr": {
+                        "kind": "binary",
+                        "op": "||",
+                        "left": {
+                          "kind": "collection",
+                          "object": {
+                            "kind": "ref",
+                            "name": "allPieces"
+                          },
+                          "method": "find",
+                          "args": [
+                            {
+                              "kind": "lambda",
+                              "parameters": [
+                                "piece"
+                              ],
+                              "body": {
+                                "kind": "binary",
+                                "op": "===",
+                                "left": {
+                                  "kind": "get",
+                                  "object": {
+                                    "kind": "ref",
+                                    "name": "piece"
+                                  },
+                                  "key": "instanceId"
+                                },
+                                "right": {
+                                  "kind": "get",
+                                  "object": {
+                                    "kind": "ref",
+                                    "name": "cardData"
+                                  },
+                                  "key": "sourcePieceId"
+                                }
+                              }
+                            }
+                          ]
+                        },
+                        "right": {
+                          "kind": "ref",
+                          "name": "target"
+                        }
+                      },
+                      "next": "deal"
+                    },
+                    {
+                      "id": "deal",
+                      "kind": "call",
+                      "capability": "dealDamage",
+                      "args": [
+                        {
+                          "kind": "ref",
+                          "name": "source"
+                        },
+                        {
+                          "kind": "ref",
+                          "name": "target"
+                        },
+                        {
+                          "kind": "ref",
+                          "name": "damage"
+                        },
+                        {
+                          "kind": "literal",
+                          "value": "true"
+                        },
+                        {
+                          "kind": "ref",
+                          "name": "battle"
+                        },
+                        {
+                          "kind": "literal",
+                          "value": "curse-end-turn"
+                        },
+                        {
+                          "kind": "literal",
+                          "value": true
+                        }
+                      ],
+                      "result": "result",
+                      "next": "done"
+                    },
+                    {
+                      "id": "done",
+                      "kind": "return",
+                      "value": {
+                        "kind": "object",
+                        "entries": {
+                          "success": {
+                            "kind": "literal",
+                            "value": true
+                          },
+                          "keepInHand": {
+                            "kind": "literal",
+                            "value": true
+                          },
+                          "message": {
+                            "kind": "binary",
+                            "op": "+",
+                            "left": {
+                              "kind": "binary",
+                              "op": "+",
+                              "left": {
+                                "kind": "literal",
+                                "value": "诅咒对"
+                              },
+                              "right": {
+                                "kind": "get",
+                                "object": {
+                                  "kind": "ref",
+                                  "name": "target"
+                                },
+                                "key": "name"
+                              }
+                            },
+                            "right": {
+                              "kind": "binary",
+                              "op": "+",
+                              "left": {
+                                "kind": "binary",
+                                "op": "+",
+                                "left": {
+                                  "kind": "literal",
+                                  "value": "造成了"
+                                },
+                                "right": {
+                                  "kind": "get",
+                                  "object": {
+                                    "kind": "ref",
+                                    "name": "result"
+                                  },
+                                  "key": "damage"
+                                }
+                              },
+                              "right": {
+                                "kind": "literal",
+                                "value": "点伤害"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ],
+                  "metadata": {
+                    "generatedFamily": "rafaam-curse",
+                    "sourceField": "customCards.code"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "next": "n2"
+      },
+      {
+        "id": "n4",
+        "kind": "set",
+        "target": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "battle"
+          },
+          "key": "customCards"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "object",
+          "entries": []
+        },
+        "next": "n3"
+      },
+      {
+        "id": "n5",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "unary",
+              "op": "!",
+              "argument": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "battle"
+                },
+                "key": "customCards"
+              }
+            }
+          }
+        },
+        "yes": "n4",
+        "no": "n3"
+      },
+      {
+        "id": "n7",
+        "kind": "bind",
+        "name": "cardId",
+        "expr": {
+          "kind": "binary",
+          "op": "+",
+          "left": {
+            "kind": "ref",
+            "name": "__rvb_import_operand_0"
+          },
+          "right": {
+            "kind": "ref",
+            "name": "__rvb_import_effect_1"
+          }
+        },
+        "next": "n5"
+      },
+      {
+        "id": "n8",
+        "kind": "call",
+        "capability": "Date.now",
+        "args": [],
+        "result": "__rvb_import_effect_1",
+        "next": "n7"
+      },
+      {
+        "id": "n6",
+        "kind": "bind",
+        "name": "__rvb_import_operand_0",
+        "expr": {
+          "kind": "literal",
+          "value": "rafaam-curse-"
+        },
+        "next": "n8"
+      },
+      {
+        "id": "n9",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "ref",
+              "name": "opponent"
+            }
+          }
+        },
+        "yes": "n6",
+        "no": "n1"
+      },
+      {
+        "id": "n10",
+        "kind": "bind",
+        "name": "opponent",
+        "expr": {
+          "kind": "collection",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "battle"
+            },
+            "key": "players"
+          },
+          "method": "find",
+          "args": [
+            {
+              "kind": "lambda",
+              "parameters": [
+                "player"
+              ],
+              "body": {
+                "kind": "binary",
+                "op": "===",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "player"
+                  },
+                  "key": "playerId"
+                },
+                "right": {
+                  "kind": "call",
+                  "callee": "nextEnemyPlayer",
+                  "args": [
+                    {
+                      "kind": "ref",
+                      "name": "battle"
+                    },
+                    {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "piece"
+                      },
+                      "key": "ownerPlayerId"
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        "next": "n9"
+      },
+      {
+        "id": "n11",
+        "kind": "call",
+        "capability": "addStatusEffectById",
+        "args": [
+          {
+            "kind": "ref",
+            "name": "__rvb_import_operand_11"
+          },
+          {
+            "kind": "ref",
+            "name": "__rvb_import_operand_2"
+          }
+        ],
+        "next": "n10"
+      },
+      {
+        "id": "n12",
+        "kind": "bind",
+        "name": "__rvb_import_operand_2",
+        "expr": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "id",
+              "value": {
+                "kind": "ref",
+                "name": "__rvb_import_operand_10"
+              }
+            },
+            {
+              "key": "type",
+              "value": {
+                "kind": "ref",
+                "name": "__rvb_import_operand_7"
+              }
+            },
+            {
+              "key": "name",
+              "value": {
+                "kind": "ref",
+                "name": "__rvb_import_operand_6"
+              }
+            },
+            {
+              "key": "remainingDuration",
+              "value": {
+                "kind": "ref",
+                "name": "__rvb_import_operand_5"
+              }
+            },
+            {
+              "key": "currentDuration",
+              "value": {
+                "kind": "ref",
+                "name": "__rvb_import_operand_4"
+              }
+            },
+            {
+              "key": "expiresAtTurnEnd",
+              "value": {
+                "kind": "ref",
+                "name": "__rvb_import_operand_3"
+              }
+            }
+          ]
+        },
+        "next": "n11"
+      },
+      {
+        "id": "n13",
+        "kind": "bind",
+        "name": "__rvb_import_operand_3",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "battle"
+            },
+            "key": "turn"
+          },
+          "key": "turnNumber"
+        },
+        "next": "n12"
+      },
+      {
+        "id": "n14",
+        "kind": "bind",
+        "name": "__rvb_import_operand_4",
+        "expr": {
+          "kind": "unary",
+          "op": "-",
+          "argument": {
+            "kind": "literal",
+            "value": 1
+          }
+        },
+        "next": "n13"
+      },
+      {
+        "id": "n15",
+        "kind": "bind",
+        "name": "__rvb_import_operand_5",
+        "expr": {
+          "kind": "unary",
+          "op": "-",
+          "argument": {
+            "kind": "literal",
+            "value": 1
+          }
+        },
+        "next": "n14"
+      },
+      {
+        "id": "n16",
+        "kind": "bind",
+        "name": "__rvb_import_operand_6",
+        "expr": {
+          "kind": "literal",
+          "value": "诅咒结界已使用"
+        },
+        "next": "n15"
+      },
+      {
+        "id": "n17",
+        "kind": "bind",
+        "name": "__rvb_import_operand_7",
+        "expr": {
+          "kind": "literal",
+          "value": "curse-ward-used"
+        },
+        "next": "n16"
+      },
+      {
+        "id": "n19",
+        "kind": "bind",
+        "name": "__rvb_import_operand_10",
+        "expr": {
+          "kind": "binary",
+          "op": "+",
+          "left": {
+            "kind": "ref",
+            "name": "__rvb_import_operand_8"
+          },
+          "right": {
+            "kind": "ref",
+            "name": "__rvb_import_effect_9"
+          }
+        },
+        "next": "n17"
+      },
+      {
+        "id": "n20",
+        "kind": "call",
+        "capability": "Date.now",
+        "args": [],
+        "result": "__rvb_import_effect_9",
+        "next": "n19"
+      },
+      {
+        "id": "n18",
+        "kind": "bind",
+        "name": "__rvb_import_operand_8",
+        "expr": {
+          "kind": "literal",
+          "value": "curse-ward-used-"
+        },
+        "next": "n20"
+      },
+      {
+        "id": "n21",
+        "kind": "bind",
+        "name": "__rvb_import_operand_11",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "piece"
+          },
+          "key": "instanceId"
+        },
+        "next": "n18"
+      },
+      {
+        "id": "n22",
+        "kind": "bind",
+        "name": "damageAmount",
+        "expr": {
+          "kind": "call",
+          "callee": "Math.max",
+          "args": [
+            {
+              "kind": "literal",
+              "value": 0
+            },
+            {
+              "kind": "binary",
+              "op": "+",
+              "left": {
+                "kind": "binary",
+                "op": "||",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "context"
+                  },
+                  "key": "damage"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": 0
+                }
+              },
+              "right": {
+                "kind": "call",
+                "callee": "Math.floor",
+                "args": [
+                  {
+                    "kind": "binary",
+                    "op": "*",
+                    "left": {
+                      "kind": "binary",
+                      "op": "||",
+                      "left": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "piece"
+                        },
+                        "key": "attack"
+                      },
+                      "right": {
+                        "kind": "literal",
+                        "value": 0
+                      }
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": 0.5
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "next": "n21"
+      },
+      {
+        "id": "n23",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n24",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "collection",
+              "object": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "piece"
+                },
+                "key": "statusTags"
+              },
+              "method": "some",
+              "args": [
+                {
+                  "kind": "lambda",
+                  "parameters": [
+                    "tag"
+                  ],
+                  "body": {
+                    "kind": "binary",
+                    "op": "===",
+                    "left": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "tag"
+                      },
+                      "key": "type"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": "curse-ward-used"
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "yes": "n23",
+        "no": "n22"
+      },
+      {
+        "id": "n25",
+        "kind": "set",
+        "target": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "piece"
+          },
+          "key": "statusTags"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "array",
+          "items": []
+        },
+        "next": "n24"
+      },
+      {
+        "id": "n26",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "unary",
+              "op": "!",
+              "argument": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "piece"
+                },
+                "key": "statusTags"
+              }
+            }
+          }
+        },
+        "yes": "n25",
+        "no": "n24"
+      },
+      {
+        "id": "n27",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n28",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "!==",
+              "left": {
+                "kind": "get",
+                "object": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "battle"
+                  },
+                  "key": "turn"
+                },
+                "key": "currentPlayerId"
+              },
+              "right": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "piece"
+                },
+                "key": "ownerPlayerId"
+              }
+            }
+          }
+        },
+        "yes": "n27",
+        "no": "n26"
+      },
+      {
+        "id": "n29",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n30",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "binary",
+                "op": "||",
+                "left": {
+                  "kind": "unary",
+                  "op": "!",
+                  "argument": {
+                    "kind": "ref",
+                    "name": "piece"
+                  }
+                },
+                "right": {
+                  "kind": "unary",
+                  "op": "!",
+                  "argument": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "context"
+                    },
+                    "key": "piece"
+                  }
+                }
+              },
+              "right": {
+                "kind": "binary",
+                "op": "!==",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "context"
+                    },
+                    "key": "piece"
+                  },
+                  "key": "instanceId"
+                },
+                "right": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "piece"
+                  },
+                  "key": "instanceId"
+                }
+              }
+            }
+          }
+        },
+        "yes": "n29",
+        "no": "n28"
+      },
+      {
+        "id": "n31",
+        "kind": "bind",
+        "name": "piece",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "context"
+          },
+          "key": "rulePiece"
+        },
+        "next": "n30"
+      }
+    ]
+  },
+  "contentGraphField": "skillCode",
+  "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1"
 }

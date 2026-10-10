@@ -90,6 +90,10 @@ export function createFlowRuntime(battle: BattleState, context: any, surface: Fl
     },
     query: {
       piece, player,
+      // Module execution can invalidate one dependency without aborting later,
+      // independent nodes. These probes never expose mutable entities.
+      hasPiece: (id: unknown) => typeof id === 'string' && battle.pieces.some(p => p.instanceId === id),
+      hasPlayer: (id: unknown) => typeof id === 'string' && battle.players.some(p => p.playerId === id),
       pieces: (options: { ownerId?: string; relation?: 'ally' | 'enemy'; originId?: string; range?: number; includeDead?: boolean } = {}) => {
         const origin = options.originId ? piece(options.originId) : holder()
         const owner = options.ownerId || origin?.ownerPlayerId

@@ -1,0 +1,55 @@
+{
+  "ok": true,
+  "surfaces": {
+    "skill": {
+      "nodeCount": 5,
+      "generatedField": "code"
+    },
+    "preview": {
+      "nodeCount": 2,
+      "generatedField": "previewCode",
+      "codeDetachPreservedPreview": true,
+      "editableAfterPromotion": true,
+      "finalDetached": true
+    },
+    "previewCreate": {
+      "nodeCount": 2,
+      "generatedField": "previewCode",
+      "preservedMain": true
+    },
+    "card": {
+      "nodeCount": 3,
+      "generatedField": "code"
+    },
+    "rule": {
+      "nodeCount": 3,
+      "generatedField": "skillCode"
+    }
+  },
+  "checks": [
+    "skill graph creation",
+    "node drag",
+    "save lock blocks drag",
+    "bind/call/branch/return connections",
+    "structured expression edit",
+    "invalid primary and preview drafts repair and save",
+    "skill atomic save and reload",
+    "generated-code tamper rejected without file mutation",
+    "preview field switch and independent edit",
+    "preview save preserves main code/description/targeting",
+    "primary code detach promotes preview graph",
+    "promoted preview reload, edit, and save",
+    "preview detach leaves no graph",
+    "preview graph creation when source exists",
+    "card set graph save and reload",
+    "rule set graph save and reload",
+    "card/rule description and targeting preserved"
+  ],
+  "screenshot": "output/playwright/content-graph-editor.png",
+  "pageScreenshots": [
+    "output/playwright/content-graph-preview.png",
+    "output/playwright/content-graph-cards.png",
+    "output/playwright/content-graph-rules.png"
+  ],
+  "project": "C:\\Users\\lngsc\\AppData\\Local\\Temp\\rvb-content-graph-smoke-3AduXb\\rvb-content-0707c38b"
+}

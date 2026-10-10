@@ -2,6 +2,488 @@
   "id": "rule-kenshin-tenken-boost",
   "name": "飞天御剑流·剑速",
   "description": "剑心有「飞天御剑流」状态时，下次造成伤害前消耗该状态，伤害提升50%",
-  "trigger": { "type": "beforeDamageDealt" },
-  "skillCode": "var piece = context.rulePiece; if (!piece) return { success: false, message: '' }; if (!context.sourcePiece || context.sourcePiece.instanceId !== piece.instanceId) return { success: false, message: '' }; var tagId = 'tenken-charge-' + piece.instanceId; var tag = piece.statusTags && piece.statusTags.find(function(t) { return t.id === tagId; }); if (!tag) return { success: false, message: '' }; var uses = tag.remainingUses !== undefined ? tag.remainingUses : (tag.currentUses !== undefined ? tag.currentUses : 0); if (uses <= 0) return { success: false, message: '' }; removeStatusEffectById(piece.instanceId, tag.id); context.damage = Math.floor((context.damage || 0) * 1.5); return { success: true, message: piece.name + '飞天御剑流发动！本次攻击伤害提升50%' };"
+  "trigger": {
+    "type": "beforeDamageDealt"
+  },
+  "skillCode": "var piece, tag, tagId, uses; var _pc = \"n15\"; for (var _step = 0; _step <= 15; _step++) { switch (_pc) { case \"n15\": piece = (context)[\"rulePiece\"]; _pc = \"n14\"; break; case \"n14\": _pc = (! (! (! piece))) ? \"n13\" : \"n12\"; break; case \"n12\": _pc = (! (! ((! (context)[\"sourcePiece\"]) || (((context)[\"sourcePiece\"])[\"instanceId\"] !== (piece)[\"instanceId\"])))) ? \"n11\" : \"n10\"; break; case \"n10\": tagId = (\"tenken-charge-\" + (piece)[\"instanceId\"]); _pc = \"n9\"; break; case \"n9\": tag = ((piece)[\"statusTags\"] && ((piece)[\"statusTags\"])[\"find\"](function (t) { return ((t)[\"id\"] === tagId); })); _pc = \"n8\"; break; case \"n8\": _pc = (! (! (! tag))) ? \"n7\" : \"n6\"; break; case \"n6\": uses = (((tag)[\"remainingUses\"] !== (void 0)) ? (tag)[\"remainingUses\"] : (((tag)[\"currentUses\"] !== (void 0)) ? (tag)[\"currentUses\"] : 0)); _pc = \"n5\"; break; case \"n5\": _pc = (! (! (uses <= 0))) ? \"n4\" : \"n3\"; break; case \"n3\": removeStatusEffectById((piece)[\"instanceId\"], (tag)[\"id\"]); _pc = \"n2\"; break; case \"n2\": (context)[\"damage\"] = Math.floor((((context)[\"damage\"] || 0) * 1.5)); _pc = \"n1\"; break; case \"n1\": return {success: true, message: ((piece)[\"name\"] + \"飞天御剑流发动！本次攻击伤害提升50%\")}; case \"n4\": return {success: false, message: \"\"}; case \"n7\": return {success: false, message: \"\"}; case \"n11\": return {success: false, message: \"\"}; case \"n13\": return {success: false, message: \"\"}; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\");",
+  "contentGraph": {
+    "version": "rvb-content-graph/v1",
+    "surface": "rule",
+    "entry": "n15",
+    "nodes": [
+      {
+        "id": "n1",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "piece"
+                  },
+                  "key": "name"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "飞天御剑流发动！本次攻击伤害提升50%"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n2",
+        "kind": "set",
+        "target": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "context"
+          },
+          "key": "damage"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "call",
+          "callee": "Math.floor",
+          "args": [
+            {
+              "kind": "binary",
+              "op": "*",
+              "left": {
+                "kind": "binary",
+                "op": "||",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "context"
+                  },
+                  "key": "damage"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": 0
+                }
+              },
+              "right": {
+                "kind": "literal",
+                "value": 1.5
+              }
+            }
+          ]
+        },
+        "next": "n1"
+      },
+      {
+        "id": "n3",
+        "kind": "call",
+        "capability": "removeStatusEffectById",
+        "args": [
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "piece"
+            },
+            "key": "instanceId"
+          },
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "tag"
+            },
+            "key": "id"
+          }
+        ],
+        "next": "n2"
+      },
+      {
+        "id": "n4",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n5",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "<=",
+              "left": {
+                "kind": "ref",
+                "name": "uses"
+              },
+              "right": {
+                "kind": "literal",
+                "value": 0
+              }
+            }
+          }
+        },
+        "yes": "n4",
+        "no": "n3"
+      },
+      {
+        "id": "n6",
+        "kind": "bind",
+        "name": "uses",
+        "expr": {
+          "kind": "conditional",
+          "test": {
+            "kind": "binary",
+            "op": "!==",
+            "left": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "tag"
+              },
+              "key": "remainingUses"
+            },
+            "right": {
+              "kind": "undefined"
+            }
+          },
+          "consequent": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "tag"
+            },
+            "key": "remainingUses"
+          },
+          "alternate": {
+            "kind": "conditional",
+            "test": {
+              "kind": "binary",
+              "op": "!==",
+              "left": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "tag"
+                },
+                "key": "currentUses"
+              },
+              "right": {
+                "kind": "undefined"
+              }
+            },
+            "consequent": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "tag"
+              },
+              "key": "currentUses"
+            },
+            "alternate": {
+              "kind": "literal",
+              "value": 0
+            }
+          }
+        },
+        "next": "n5"
+      },
+      {
+        "id": "n7",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n8",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "unary",
+              "op": "!",
+              "argument": {
+                "kind": "ref",
+                "name": "tag"
+              }
+            }
+          }
+        },
+        "yes": "n7",
+        "no": "n6"
+      },
+      {
+        "id": "n9",
+        "kind": "bind",
+        "name": "tag",
+        "expr": {
+          "kind": "binary",
+          "op": "&&",
+          "left": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "piece"
+            },
+            "key": "statusTags"
+          },
+          "right": {
+            "kind": "collection",
+            "object": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "piece"
+              },
+              "key": "statusTags"
+            },
+            "method": "find",
+            "args": [
+              {
+                "kind": "lambda",
+                "parameters": [
+                  "t"
+                ],
+                "body": {
+                  "kind": "binary",
+                  "op": "===",
+                  "left": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "t"
+                    },
+                    "key": "id"
+                  },
+                  "right": {
+                    "kind": "ref",
+                    "name": "tagId"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "next": "n8"
+      },
+      {
+        "id": "n10",
+        "kind": "bind",
+        "name": "tagId",
+        "expr": {
+          "kind": "binary",
+          "op": "+",
+          "left": {
+            "kind": "literal",
+            "value": "tenken-charge-"
+          },
+          "right": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "piece"
+            },
+            "key": "instanceId"
+          }
+        },
+        "next": "n9"
+      },
+      {
+        "id": "n11",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n12",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "context"
+                  },
+                  "key": "sourcePiece"
+                }
+              },
+              "right": {
+                "kind": "binary",
+                "op": "!==",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "context"
+                    },
+                    "key": "sourcePiece"
+                  },
+                  "key": "instanceId"
+                },
+                "right": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "piece"
+                  },
+                  "key": "instanceId"
+                }
+              }
+            }
+          }
+        },
+        "yes": "n11",
+        "no": "n10"
+      },
+      {
+        "id": "n13",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n14",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "unary",
+              "op": "!",
+              "argument": {
+                "kind": "ref",
+                "name": "piece"
+              }
+            }
+          }
+        },
+        "yes": "n13",
+        "no": "n12"
+      },
+      {
+        "id": "n15",
+        "kind": "bind",
+        "name": "piece",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "context"
+          },
+          "key": "rulePiece"
+        },
+        "next": "n14"
+      }
+    ]
+  },
+  "contentGraphField": "skillCode",
+  "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1"
 }

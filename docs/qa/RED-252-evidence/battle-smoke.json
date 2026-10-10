@@ -1,0 +1,430 @@
+{
+  "ok": true,
+  "startedAt": "2026-10-09T14:30:20.534Z",
+  "completedAt": "2026-10-09T14:30:47.277Z",
+  "entry": "http://127.0.0.1:8875/battle.html?mode=training",
+  "seed": 594,
+  "setup": {
+    "mode": "controlled-initTraining-fixture",
+    "firstPlayerId": "training-red",
+    "firstFaction": "blue",
+    "secondFaction": "red",
+    "firstTemplateIds": [
+      "tails",
+      "blue-naruto"
+    ],
+    "secondTemplateIds": [
+      "red-rafaam"
+    ]
+  },
+  "graph": {
+    "amplify": true,
+    "armor": true,
+    "armorSurface": "skill",
+    "armorHasMaterializeSource": true,
+    "graphVersion": "rvb-content-graph/v1"
+  },
+  "resourceProof": [
+    {
+      "id": "tails-twin-flight",
+      "sha256": "f0200ae9d99dd11df6124f81760a721e4a734a78f47c0e5b1b257bd5728c3fe0"
+    },
+    {
+      "id": "tails-armor-assembly",
+      "sha256": "73c1cf4b90daffee5a9cc4c40e0bc31c5fc093ae74e32ee4f4c9a8157d8fa16e"
+    },
+    {
+      "id": "rafaam-curse-amplify",
+      "sha256": "c9b7f82f59d2c9e9bff53fd9ef78baf23ef24f7f124825001b5a1d4fba19789e"
+    },
+    {
+      "id": "minato-spiral-barrage",
+      "sha256": "2acd2a61213adadbe6191112eaf9898135f7544694da25e1bc4febf259a546f1"
+    },
+    {
+      "id": "turalyon-grand-crusade",
+      "sha256": "e7a7d0f574ca30b36f28b1619440afdd5a5a319d5753ea0913cea5dc49fd9c7a"
+    }
+  ],
+  "screenshots": {
+    "target": "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\output\\qa\\red252-candidate-ui-target-visible.png",
+    "animation": "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\output\\qa\\red252-candidate-ui-animation-visible.png",
+    "settlement": "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\output\\qa\\red252-candidate-ui-settlement-visible.png"
+  },
+  "interactions": {
+    "fixed": {
+      "seed": 594,
+      "phase": "action",
+      "pieces": [
+        {
+          "id": "training-red-1",
+          "templateId": "tails",
+          "x": 5,
+          "y": 5
+        },
+        {
+          "id": "training-red-2",
+          "templateId": "blue-naruto",
+          "x": 6,
+          "y": 5
+        },
+        {
+          "id": "training-blue-1",
+          "templateId": "red-rafaam",
+          "x": 12,
+          "y": 12
+        }
+      ],
+      "graph": true
+    },
+    "selected": {
+      "pieceId": "training-red-1",
+      "point": {
+        "x": 493.02999503578377,
+        "y": 360.16528398849596
+      },
+      "hit": {
+        "x": 5,
+        "y": 5
+      }
+    },
+    "armed": {
+      "pending": true,
+      "overlay": "show",
+      "prompt": "选择一个友方角色",
+      "targetType": "piece",
+      "candidates": [
+        {
+          "type": "piece",
+          "pieceId": "training-red-1"
+        },
+        {
+          "type": "piece",
+          "pieceId": "training-red-2"
+        }
+      ]
+    },
+    "invalid": {
+      "before": true,
+      "after": {
+        "pending": true,
+        "status": "目标不在技能范围内"
+      }
+    },
+    "cancelled": {
+      "pending": false,
+      "status": "已取消目标选择",
+      "overlay": ""
+    },
+    "ally": {
+      "x": 6,
+      "y": 5,
+      "pieceId": "training-red-2"
+    },
+    "firstCell": {
+      "x": 2,
+      "y": 1
+    },
+    "secondCell": {
+      "x": 3,
+      "y": 1
+    },
+    "skillAfter": {
+      "seed": 594,
+      "actions": [
+        {
+          "type": "triggerEffect",
+          "playerId": "training-red",
+          "turn": 1,
+          "payload": {
+            "message": "后手获得幸运币"
+          }
+        },
+        {
+          "type": "useBasicSkill",
+          "playerId": "training-red",
+          "turn": 1,
+          "payload": {
+            "message": "塔尔斯使用了双尾飞行，目标是漩涡鸣人，已预留双尾飞行落点",
+            "skillId": "tails-twin-flight",
+            "pieceId": "training-red-1"
+          }
+        }
+      ],
+      "tileEffects": [
+        {
+          "id": "tails-flight-training-red-1-1-2-1-3-1-a",
+          "type": "tails-flight-reservation",
+          "x": 2,
+          "y": 1,
+          "flightId": "tails-flight-training-red-1-1-2-1-3-1"
+        },
+        {
+          "id": "tails-flight-training-red-1-1-2-1-3-1-b",
+          "type": "tails-flight-reservation",
+          "x": 3,
+          "y": 1,
+          "flightId": "tails-flight-training-red-1-1-2-1-3-1"
+        }
+      ],
+      "tails": [
+        {
+          "id": "tails-momentum-core",
+          "type": "momentum-core",
+          "name": "动能",
+          "stacks": 0,
+          "visible": true,
+          "skillIds": [
+            "tails-mechanical-support"
+          ],
+          "relatedRules": [
+            "rule-momentum-gain",
+            "rule-momentum-consume"
+          ]
+        },
+        {
+          "id": "tails-flight-training-red-1-1-2-1-3-1",
+          "type": "tails-flight-reservation",
+          "name": "双尾飞行预留",
+          "turns": 2,
+          "ownerId": "training-red-1",
+          "allyId": "training-red-2",
+          "x": 2,
+          "y": 1,
+          "allyX": 3,
+          "allyY": 1,
+          "flightId": "tails-flight-training-red-1-1-2-1-3-1",
+          "currentDuration": 2,
+          "relatedRules": [
+            "rule-tails-flight-resolve"
+          ],
+          "remainingDuration": 2,
+          "stacking": "independent",
+          "appliedTurn": 1,
+          "expiresAfterTurn": 5,
+          "ownerTurnCycle": 2,
+          "remainingUses": -1,
+          "statusOrigins": [
+            {
+              "id": "tails-flight-training-red-1-1-2-1-3-1",
+              "type": "tails-flight-reservation",
+              "name": "双尾飞行预留",
+              "turns": 2,
+              "ownerId": "training-red-1",
+              "allyId": "training-red-2",
+              "x": 2,
+              "y": 1,
+              "allyX": 3,
+              "allyY": 1,
+              "flightId": "tails-flight-training-red-1-1-2-1-3-1",
+              "currentDuration": 2,
+              "relatedRules": [
+                "rule-tails-flight-resolve"
+              ],
+              "remainingDuration": 2,
+              "appliedTurn": 1,
+              "expiresAfterTurn": 5
+            }
+          ]
+        },
+        {
+          "id": "tails-flight-training-red-1-1-2-1-3-1-immune-training-red-1",
+          "type": "immune",
+          "name": "免疫",
+          "flightId": "tails-flight-training-red-1-1-2-1-3-1",
+          "stacks": 1,
+          "currentDuration": 2,
+          "remainingDuration": 2,
+          "relatedRules": [
+            "rule-tails-flight-immune",
+            "rule-tails-flight-immune-target"
+          ],
+          "stacking": "independent",
+          "appliedTurn": 1,
+          "expiresAfterTurn": 5,
+          "ownerTurnCycle": 2,
+          "remainingUses": -1,
+          "statusOrigins": [
+            {
+              "id": "tails-flight-training-red-1-1-2-1-3-1-immune-training-red-1",
+              "type": "immune",
+              "name": "免疫",
+              "flightId": "tails-flight-training-red-1-1-2-1-3-1",
+              "stacks": 1,
+              "currentDuration": 2,
+              "remainingDuration": 2,
+              "relatedRules": [
+                "rule-tails-flight-immune",
+                "rule-tails-flight-immune-target"
+              ],
+              "appliedTurn": 1,
+              "expiresAfterTurn": 5
+            }
+          ]
+        },
+        {
+          "id": "tails-flight-training-red-1-1-2-1-3-1-inoperable-training-red-1",
+          "type": "inoperable",
+          "name": "不可操作",
+          "flightId": "tails-flight-training-red-1-1-2-1-3-1",
+          "stacks": 1,
+          "currentDuration": 2,
+          "remainingDuration": 2,
+          "relatedRules": [
+            "rule-tails-flight-inoperable",
+            "rule-tails-flight-inoperable-skill"
+          ],
+          "stacking": "independent",
+          "appliedTurn": 1,
+          "expiresAfterTurn": 5,
+          "ownerTurnCycle": 2,
+          "remainingUses": -1,
+          "statusOrigins": [
+            {
+              "id": "tails-flight-training-red-1-1-2-1-3-1-inoperable-training-red-1",
+              "type": "inoperable",
+              "name": "不可操作",
+              "flightId": "tails-flight-training-red-1-1-2-1-3-1",
+              "stacks": 1,
+              "currentDuration": 2,
+              "remainingDuration": 2,
+              "relatedRules": [
+                "rule-tails-flight-inoperable",
+                "rule-tails-flight-inoperable-skill"
+              ],
+              "appliedTurn": 1,
+              "expiresAfterTurn": 5
+            }
+          ]
+        }
+      ],
+      "ally": [
+        {
+          "id": "tails-flight-training-red-1-1-2-1-3-1-immune-training-red-2",
+          "type": "immune",
+          "name": "免疫",
+          "flightId": "tails-flight-training-red-1-1-2-1-3-1",
+          "stacks": 1,
+          "currentDuration": 2,
+          "remainingDuration": 2,
+          "relatedRules": [
+            "rule-tails-flight-immune",
+            "rule-tails-flight-immune-target"
+          ],
+          "stacking": "independent",
+          "appliedTurn": 1,
+          "expiresAfterTurn": 5,
+          "ownerTurnCycle": 2,
+          "remainingUses": -1,
+          "statusOrigins": [
+            {
+              "id": "tails-flight-training-red-1-1-2-1-3-1-immune-training-red-2",
+              "type": "immune",
+              "name": "免疫",
+              "flightId": "tails-flight-training-red-1-1-2-1-3-1",
+              "stacks": 1,
+              "currentDuration": 2,
+              "remainingDuration": 2,
+              "relatedRules": [
+                "rule-tails-flight-immune",
+                "rule-tails-flight-immune-target"
+              ],
+              "appliedTurn": 1,
+              "expiresAfterTurn": 5
+            }
+          ]
+        },
+        {
+          "id": "tails-flight-training-red-1-1-2-1-3-1-inoperable-training-red-2",
+          "type": "inoperable",
+          "name": "不可操作",
+          "flightId": "tails-flight-training-red-1-1-2-1-3-1",
+          "stacks": 1,
+          "currentDuration": 2,
+          "remainingDuration": 2,
+          "relatedRules": [
+            "rule-tails-flight-inoperable",
+            "rule-tails-flight-inoperable-skill"
+          ],
+          "stacking": "independent",
+          "appliedTurn": 1,
+          "expiresAfterTurn": 5,
+          "ownerTurnCycle": 2,
+          "remainingUses": -1,
+          "statusOrigins": [
+            {
+              "id": "tails-flight-training-red-1-1-2-1-3-1-inoperable-training-red-2",
+              "type": "inoperable",
+              "name": "不可操作",
+              "flightId": "tails-flight-training-red-1-1-2-1-3-1",
+              "stacks": 1,
+              "currentDuration": 2,
+              "remainingDuration": 2,
+              "relatedRules": [
+                "rule-tails-flight-inoperable",
+                "rule-tails-flight-inoperable-skill"
+              ],
+              "appliedTurn": 1,
+              "expiresAfterTurn": 5
+            }
+          ]
+        }
+      ],
+      "logs": [
+        "训练营开始 - 暗 先手",
+        "[T1] 塔尔斯使用了双尾飞行，目标是漩涡鸣人，已预留双尾飞行落点"
+      ],
+      "presentationEvents": 10,
+      "presentationChains": 2,
+      "visibleModals": {
+        "guide": false,
+        "piece": false,
+        "setup": false
+      }
+    },
+    "cardAfter": {
+      "actionPoints": 9,
+      "hand": [],
+      "logs": [
+        "训练营开始 - 暗 先手",
+        "[T1] 塔尔斯使用了双尾飞行，目标是漩涡鸣人，已预留双尾飞行落点",
+        "[T1] 幸运币：获得1点行动力（当前：9）"
+      ],
+      "actions": [
+        {
+          "type": "triggerEffect",
+          "playerId": "training-red",
+          "turn": 1,
+          "payload": {
+            "message": "后手获得幸运币"
+          }
+        },
+        {
+          "type": "useBasicSkill",
+          "playerId": "training-red",
+          "turn": 1,
+          "payload": {
+            "message": "塔尔斯使用了双尾飞行，目标是漩涡鸣人，已预留双尾飞行落点",
+            "skillId": "tails-twin-flight",
+            "pieceId": "training-red-1"
+          }
+        },
+        {
+          "type": "playCard",
+          "playerId": "training-red",
+          "turn": 1,
+          "payload": {
+            "message": "幸运币：获得1点行动力（当前：9）",
+            "cardId": "lucky-coin"
+          }
+        }
+      ],
+      "visibleModals": {
+        "guide": false,
+        "piece": false,
+        "setup": false,
+        "settings": false
+      }
+    }
+  }
+}

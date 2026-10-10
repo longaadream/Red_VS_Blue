@@ -43,6 +43,630 @@
       }
     ]
   },
-  "code": "function executeSkill(context) { var caster = context.piece; var ally = selectTarget({ type: 'piece', range: 7, filter: 'ally' }); if (!ally || ally.needsTargetSelection) return ally; var pos = selectTarget({ type: 'grid', range: 7, filter: 'all' }); if (!pos || pos.needsTargetSelection) return pos; if (ally.instanceId === caster.instanceId || !arePlayersAllied(battle, ally.ownerPlayerId, caster.ownerPlayerId) || Math.abs(ally.x-caster.x)+Math.abs(ally.y-caster.y)>7 || Math.abs(pos.x-caster.x)+Math.abs(pos.y-caster.y)>7) return { success: false, message: '神威转移目标不合法' }; var result = teleport(pos.x, pos.y, ally.instanceId); if (!result.success) return { success: false, message: '友军无法传送至该落点' }; return { success: true, message: caster.name + '将' + ally.name + '传送至(' + pos.x + ',' + pos.y + ')' }; }",
-  "previewCode": "function calculatePreview() { return { description: \"选择其他友军（7），将其传送至自身周围地格（7）。\", expectedValues: { range: 7 } }; }"
+  "code": "function executeSkill(context) { var ally, caster, pos, result; var _pc = \"n13\"; for (var _step = 0; _step <= 13; _step++) { switch (_pc) { case \"n13\": caster = (context)[\"piece\"]; _pc = \"n12\"; break; case \"n12\": ally = selectTarget({type: \"piece\", range: 7, filter: \"ally\"}); _pc = \"n11\"; break; case \"n11\": _pc = (! (! ((! ally) || (ally)[\"needsTargetSelection\"]))) ? \"n10\" : \"n9\"; break; case \"n9\": pos = selectTarget({type: \"grid\", range: 7, filter: \"all\"}); _pc = \"n8\"; break; case \"n8\": _pc = (! (! ((! pos) || (pos)[\"needsTargetSelection\"]))) ? \"n7\" : \"n6\"; break; case \"n6\": _pc = (! (! (((((ally)[\"instanceId\"] === (caster)[\"instanceId\"]) || (! arePlayersAllied(battle, (ally)[\"ownerPlayerId\"], (caster)[\"ownerPlayerId\"]))) || ((Math.abs(((ally)[\"x\"] - (caster)[\"x\"])) + Math.abs(((ally)[\"y\"] - (caster)[\"y\"]))) > 7)) || ((Math.abs(((pos)[\"x\"] - (caster)[\"x\"])) + Math.abs(((pos)[\"y\"] - (caster)[\"y\"]))) > 7)))) ? \"n5\" : \"n4\"; break; case \"n4\": result = teleport((pos)[\"x\"], (pos)[\"y\"], (ally)[\"instanceId\"]); _pc = \"n3\"; break; case \"n3\": _pc = (! (! (! (result)[\"success\"]))) ? \"n2\" : \"n1\"; break; case \"n1\": return {success: true, message: ((((((((caster)[\"name\"] + \"将\") + (ally)[\"name\"]) + \"传送至(\") + (pos)[\"x\"]) + \",\") + (pos)[\"y\"]) + \")\")}; case \"n2\": return {success: false, message: \"友军无法传送至该落点\"}; case \"n5\": return {success: false, message: \"神威转移目标不合法\"}; case \"n7\": return pos; case \"n10\": return ally; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\"); }",
+  "previewCode": "function calculatePreview(piece, skillDef, currentCooldown) { var _pc = \"n1\"; for (var _step = 0; _step <= 1; _step++) { switch (_pc) { case \"n1\": return {description: \"选择其他友军（7），将其传送至自身周围地格（7）。\", expectedValues: {range: 7}}; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\"); }",
+  "contentGraph": {
+    "version": "rvb-content-graph/v1",
+    "surface": "skill",
+    "entry": "n13",
+    "nodes": [
+      {
+        "id": "n1",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "binary",
+                  "op": "+",
+                  "left": {
+                    "kind": "binary",
+                    "op": "+",
+                    "left": {
+                      "kind": "binary",
+                      "op": "+",
+                      "left": {
+                        "kind": "binary",
+                        "op": "+",
+                        "left": {
+                          "kind": "binary",
+                          "op": "+",
+                          "left": {
+                            "kind": "binary",
+                            "op": "+",
+                            "left": {
+                              "kind": "get",
+                              "object": {
+                                "kind": "ref",
+                                "name": "caster"
+                              },
+                              "key": "name"
+                            },
+                            "right": {
+                              "kind": "literal",
+                              "value": "将"
+                            }
+                          },
+                          "right": {
+                            "kind": "get",
+                            "object": {
+                              "kind": "ref",
+                              "name": "ally"
+                            },
+                            "key": "name"
+                          }
+                        },
+                        "right": {
+                          "kind": "literal",
+                          "value": "传送至("
+                        }
+                      },
+                      "right": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "pos"
+                        },
+                        "key": "x"
+                      }
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": ","
+                    }
+                  },
+                  "right": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "pos"
+                    },
+                    "key": "y"
+                  }
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": ")"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n2",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": "友军无法传送至该落点"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n3",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "unary",
+              "op": "!",
+              "argument": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "result"
+                },
+                "key": "success"
+              }
+            }
+          }
+        },
+        "yes": "n2",
+        "no": "n1"
+      },
+      {
+        "id": "n4",
+        "kind": "call",
+        "capability": "teleport",
+        "args": [
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "pos"
+            },
+            "key": "x"
+          },
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "pos"
+            },
+            "key": "y"
+          },
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "ally"
+            },
+            "key": "instanceId"
+          }
+        ],
+        "result": "result",
+        "next": "n3"
+      },
+      {
+        "id": "n5",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": "神威转移目标不合法"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n6",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "binary",
+                "op": "||",
+                "left": {
+                  "kind": "binary",
+                  "op": "||",
+                  "left": {
+                    "kind": "binary",
+                    "op": "===",
+                    "left": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "ally"
+                      },
+                      "key": "instanceId"
+                    },
+                    "right": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "caster"
+                      },
+                      "key": "instanceId"
+                    }
+                  },
+                  "right": {
+                    "kind": "unary",
+                    "op": "!",
+                    "argument": {
+                      "kind": "call",
+                      "callee": "arePlayersAllied",
+                      "args": [
+                        {
+                          "kind": "ref",
+                          "name": "battle"
+                        },
+                        {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "ally"
+                          },
+                          "key": "ownerPlayerId"
+                        },
+                        {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "caster"
+                          },
+                          "key": "ownerPlayerId"
+                        }
+                      ]
+                    }
+                  }
+                },
+                "right": {
+                  "kind": "binary",
+                  "op": ">",
+                  "left": {
+                    "kind": "binary",
+                    "op": "+",
+                    "left": {
+                      "kind": "call",
+                      "callee": "Math.abs",
+                      "args": [
+                        {
+                          "kind": "binary",
+                          "op": "-",
+                          "left": {
+                            "kind": "get",
+                            "object": {
+                              "kind": "ref",
+                              "name": "ally"
+                            },
+                            "key": "x"
+                          },
+                          "right": {
+                            "kind": "get",
+                            "object": {
+                              "kind": "ref",
+                              "name": "caster"
+                            },
+                            "key": "x"
+                          }
+                        }
+                      ]
+                    },
+                    "right": {
+                      "kind": "call",
+                      "callee": "Math.abs",
+                      "args": [
+                        {
+                          "kind": "binary",
+                          "op": "-",
+                          "left": {
+                            "kind": "get",
+                            "object": {
+                              "kind": "ref",
+                              "name": "ally"
+                            },
+                            "key": "y"
+                          },
+                          "right": {
+                            "kind": "get",
+                            "object": {
+                              "kind": "ref",
+                              "name": "caster"
+                            },
+                            "key": "y"
+                          }
+                        }
+                      ]
+                    }
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": 7
+                  }
+                }
+              },
+              "right": {
+                "kind": "binary",
+                "op": ">",
+                "left": {
+                  "kind": "binary",
+                  "op": "+",
+                  "left": {
+                    "kind": "call",
+                    "callee": "Math.abs",
+                    "args": [
+                      {
+                        "kind": "binary",
+                        "op": "-",
+                        "left": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "pos"
+                          },
+                          "key": "x"
+                        },
+                        "right": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "caster"
+                          },
+                          "key": "x"
+                        }
+                      }
+                    ]
+                  },
+                  "right": {
+                    "kind": "call",
+                    "callee": "Math.abs",
+                    "args": [
+                      {
+                        "kind": "binary",
+                        "op": "-",
+                        "left": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "pos"
+                          },
+                          "key": "y"
+                        },
+                        "right": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "caster"
+                          },
+                          "key": "y"
+                        }
+                      }
+                    ]
+                  }
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": 7
+                }
+              }
+            }
+          }
+        },
+        "yes": "n5",
+        "no": "n4"
+      },
+      {
+        "id": "n7",
+        "kind": "return",
+        "value": {
+          "kind": "ref",
+          "name": "pos"
+        }
+      },
+      {
+        "id": "n8",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "ref",
+                  "name": "pos"
+                }
+              },
+              "right": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "pos"
+                },
+                "key": "needsTargetSelection"
+              }
+            }
+          }
+        },
+        "yes": "n7",
+        "no": "n6"
+      },
+      {
+        "id": "n9",
+        "kind": "call",
+        "capability": "selectTarget",
+        "args": [
+          {
+            "kind": "object",
+            "entries": [
+              {
+                "key": "type",
+                "value": {
+                  "kind": "literal",
+                  "value": "grid"
+                }
+              },
+              {
+                "key": "range",
+                "value": {
+                  "kind": "literal",
+                  "value": 7
+                }
+              },
+              {
+                "key": "filter",
+                "value": {
+                  "kind": "literal",
+                  "value": "all"
+                }
+              }
+            ]
+          }
+        ],
+        "result": "pos",
+        "next": "n8"
+      },
+      {
+        "id": "n10",
+        "kind": "return",
+        "value": {
+          "kind": "ref",
+          "name": "ally"
+        }
+      },
+      {
+        "id": "n11",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "ref",
+                  "name": "ally"
+                }
+              },
+              "right": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "ally"
+                },
+                "key": "needsTargetSelection"
+              }
+            }
+          }
+        },
+        "yes": "n10",
+        "no": "n9"
+      },
+      {
+        "id": "n12",
+        "kind": "call",
+        "capability": "selectTarget",
+        "args": [
+          {
+            "kind": "object",
+            "entries": [
+              {
+                "key": "type",
+                "value": {
+                  "kind": "literal",
+                  "value": "piece"
+                }
+              },
+              {
+                "key": "range",
+                "value": {
+                  "kind": "literal",
+                  "value": 7
+                }
+              },
+              {
+                "key": "filter",
+                "value": {
+                  "kind": "literal",
+                  "value": "ally"
+                }
+              }
+            ]
+          }
+        ],
+        "result": "ally",
+        "next": "n11"
+      },
+      {
+        "id": "n13",
+        "kind": "bind",
+        "name": "caster",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "context"
+          },
+          "key": "piece"
+        },
+        "next": "n12"
+      }
+    ]
+  },
+  "contentGraphField": "code",
+  "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1",
+  "contentGraphEntries": {
+    "previewCode": {
+      "graph": {
+        "version": "rvb-content-graph/v1",
+        "surface": "preview",
+        "entry": "n1",
+        "nodes": [
+          {
+            "id": "n1",
+            "kind": "return",
+            "value": {
+              "kind": "object",
+              "entries": [
+                {
+                  "key": "description",
+                  "value": {
+                    "kind": "literal",
+                    "value": "选择其他友军（7），将其传送至自身周围地格（7）。"
+                  }
+                },
+                {
+                  "key": "expectedValues",
+                  "value": {
+                    "kind": "object",
+                    "entries": [
+                      {
+                        "key": "range",
+                        "value": {
+                          "kind": "literal",
+                          "value": 7
+                        }
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "compilerVersion": "rvb-content-graph-compiler/v1"
+    }
+  }
 }

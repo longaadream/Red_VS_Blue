@@ -15,6 +15,776 @@
   "powerMultiplier": 1,
   "actionPointCost": 0,
   "chargeCost": 1,
-  "code": "function executeSkill(context) { var caster = context.piece; var opponent = battle.players.find(function(player) { return player.playerId === nextEnemyPlayer(battle, caster.ownerPlayerId); }); if (!opponent || !opponent.hand) return { success: false, message: '对手没有手牌' }; var curses = opponent.hand.filter(function(card) { return (card.name && card.name.indexOf('诅咒') >= 0) || (card.cardId && card.cardId.indexOf('rafaam-curse') === 0); }); if (!curses.length) return { success: false, message: '对手手牌中没有诅咒' }; if (!battle.customCards) battle.customCards = {}; for (var i = 0; i < curses.length; i++) { var card = curses[i]; var cardId = card.cardId; var custom = battle.customCards[cardId]; if (custom) { var copyId = 'rafaam-curse-copy-' + Date.now() + '-' + i; var copy = JSON.parse(JSON.stringify(custom)); copy.id = copyId; battle.customCards[copyId] = copy; cardId = copyId; } addCardToHand(cardId, opponent.playerId); } return { success: true, message: caster.name + '给对方复制了' + curses.length + '张诅咒' }; }",
-  "previewCode": "function calculatePreview() { return { description: \"复制对方手中所有诅咒，加入对方手牌。\", expectedValues: {} }; }"
+  "code": "function executeSkill(context) { var __rvb_import_effect_0, __rvb_import_effect_3, __rvb_import_operand_1, __rvb_import_operand_2, __rvb_import_operand_4, __rvb_import_operand_5, card, cardId, caster, copy, copyId, curses, custom, i, opponent; var _pc = \"n31\"; for (var _step = 0; _step <= 12; _step++) { switch (_pc) { case \"n31\": caster = (context)[\"piece\"]; _pc = \"n30\"; break; case \"n30\": opponent = ((battle)[\"players\"])[\"find\"](function (player) { return ((player)[\"playerId\"] === nextEnemyPlayer(battle, (caster)[\"ownerPlayerId\"])); }); _pc = \"n29\"; break; case \"n29\": _pc = (! (! ((! opponent) || (! (opponent)[\"hand\"])))) ? \"n28\" : \"n27\"; break; case \"n27\": curses = ((opponent)[\"hand\"])[\"filter\"](function (card) { return (((card)[\"name\"] && (((card)[\"name\"])[\"indexOf\"](\"诅咒\") >= 0)) || ((card)[\"cardId\"] && (((card)[\"cardId\"])[\"indexOf\"](\"rafaam-curse\") === 0))); }); _pc = \"n26\"; break; case \"n26\": _pc = (! (! (! (curses)[\"length\"]))) ? \"n25\" : \"n24\"; break; case \"n24\": _pc = (! (! (! (battle)[\"customCards\"]))) ? \"n23\" : \"n22\"; break; case \"n23\": (battle)[\"customCards\"] = {}; _pc = \"n22\"; break; case \"n22\": i = 0; _pc = \"n21\"; break; case \"n21\": var __rvb_content_graph_loop_break_0 = false, __rvb_content_graph_loop_continue_1 = false; while ((! (! (i < (curses)[\"length\"])))) { __rvb_content_graph_loop_continue_1 = false; { var __rvb_content_graph_region_pc_2 = \"n18\"; while (__rvb_content_graph_region_pc_2 !== \"n2\") { switch (__rvb_content_graph_region_pc_2) { case \"n18\": card = (curses)[(function (key) { if (typeof key === \"string\" && key.split(\".\").some(function (part) { return [\"__proto__\",\"arguments\",\"callee\",\"caller\",\"constructor\",\"prototype\"].indexOf(part) !== -1; })) throw new Error(\"unsafe content graph index\"); return key; })(i)]; __rvb_content_graph_region_pc_2 = \"n17\"; break; case \"n17\": cardId = (card)[\"cardId\"]; __rvb_content_graph_region_pc_2 = \"n16\"; break; case \"n16\": custom = ((battle)[\"customCards\"])[(function (key) { if (typeof key === \"string\" && key.split(\".\").some(function (part) { return [\"__proto__\",\"arguments\",\"callee\",\"caller\",\"constructor\",\"prototype\"].indexOf(part) !== -1; })) throw new Error(\"unsafe content graph index\"); return key; })(cardId)]; __rvb_content_graph_region_pc_2 = \"n15\"; break; case \"n15\": __rvb_content_graph_region_pc_2 = (! (! custom)) ? \"n10\" : \"n3\"; break; case \"n10\": __rvb_import_operand_2 = \"rafaam-curse-copy-\"; __rvb_content_graph_region_pc_2 = \"n14\"; break; case \"n14\": __rvb_import_effect_3 = Date.now(); __rvb_content_graph_region_pc_2 = \"n11\"; break; case \"n11\": __rvb_import_operand_4 = (__rvb_import_operand_2 + __rvb_import_effect_3); __rvb_content_graph_region_pc_2 = \"n12\"; break; case \"n12\": __rvb_import_operand_5 = (__rvb_import_operand_4 + \"-\"); __rvb_content_graph_region_pc_2 = \"n13\"; break; case \"n13\": copyId = (__rvb_import_operand_5 + i); __rvb_content_graph_region_pc_2 = \"n9\"; break; case \"n9\": __rvb_import_effect_0 = JSON.stringify(custom); __rvb_content_graph_region_pc_2 = \"n8\"; break; case \"n8\": __rvb_import_operand_1 = __rvb_import_effect_0; __rvb_content_graph_region_pc_2 = \"n7\"; break; case \"n7\": copy = JSON.parse(__rvb_import_operand_1); __rvb_content_graph_region_pc_2 = \"n6\"; break; case \"n6\": (copy)[\"id\"] = copyId; __rvb_content_graph_region_pc_2 = \"n5\"; break; case \"n5\": ((battle)[\"customCards\"])[(function (key) { if (typeof key === \"string\" && key.split(\".\").some(function (part) { return [\"__proto__\",\"arguments\",\"callee\",\"caller\",\"constructor\",\"prototype\"].indexOf(part) !== -1; })) throw new Error(\"unsafe content graph index\"); return key; })(copyId)] = copy; __rvb_content_graph_region_pc_2 = \"n4\"; break; case \"n4\": cardId = copyId; __rvb_content_graph_region_pc_2 = \"n3\"; break; case \"n3\": addCardToHand(cardId, (opponent)[\"playerId\"]); __rvb_content_graph_region_pc_2 = \"n2\"; break; case \"n2\": __rvb_content_graph_region_pc_2 = \"n2\"; break; default: throw new Error(\"invalid content graph region node\"); } } } if (__rvb_content_graph_loop_break_0) break; { var __rvb_content_graph_region_pc_3 = \"n20\"; while (__rvb_content_graph_region_pc_3 !== \"n19\") { switch (__rvb_content_graph_region_pc_3) { case \"n20\": i = ((+ i) + 1); __rvb_content_graph_region_pc_3 = \"n19\"; break; case \"n19\": __rvb_content_graph_region_pc_3 = \"n19\"; break; default: throw new Error(\"invalid content graph region node\"); } } } if (__rvb_content_graph_loop_break_0) break; if (__rvb_content_graph_loop_continue_1) { __rvb_content_graph_loop_continue_1 = false; continue; } } _pc = \"n1\"; break; case \"n1\": return {success: true, message: ((((caster)[\"name\"] + \"给对方复制了\") + (curses)[\"length\"]) + \"张诅咒\")}; case \"n25\": return {success: false, message: \"对手手牌中没有诅咒\"}; case \"n28\": return {success: false, message: \"对手没有手牌\"}; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\"); }",
+  "previewCode": "function calculatePreview(piece, skillDef, currentCooldown) { var _pc = \"n1\"; for (var _step = 0; _step <= 1; _step++) { switch (_pc) { case \"n1\": return {description: \"复制对方手中所有诅咒，加入对方手牌。\", expectedValues: {}}; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\"); }",
+  "contentGraph": {
+    "version": "rvb-content-graph/v1",
+    "surface": "skill",
+    "entry": "n31",
+    "nodes": [
+      {
+        "id": "n1",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "binary",
+                  "op": "+",
+                  "left": {
+                    "kind": "binary",
+                    "op": "+",
+                    "left": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "caster"
+                      },
+                      "key": "name"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": "给对方复制了"
+                    }
+                  },
+                  "right": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "curses"
+                    },
+                    "key": "length"
+                  }
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "张诅咒"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n21",
+        "kind": "loop",
+        "loop": "for",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "<",
+              "left": {
+                "kind": "ref",
+                "name": "i"
+              },
+              "right": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "curses"
+                },
+                "key": "length"
+              }
+            }
+          }
+        },
+        "body": {
+          "entry": "n18",
+          "end": "n2",
+          "nodes": [
+            {
+              "id": "n2",
+              "kind": "regionEnd"
+            },
+            {
+              "id": "n3",
+              "kind": "call",
+              "capability": "addCardToHand",
+              "args": [
+                {
+                  "kind": "ref",
+                  "name": "cardId"
+                },
+                {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "opponent"
+                  },
+                  "key": "playerId"
+                }
+              ],
+              "next": "n2"
+            },
+            {
+              "id": "n4",
+              "kind": "set",
+              "target": {
+                "kind": "ref",
+                "name": "cardId"
+              },
+              "operator": "=",
+              "value": {
+                "kind": "ref",
+                "name": "copyId"
+              },
+              "next": "n3"
+            },
+            {
+              "id": "n5",
+              "kind": "set",
+              "target": {
+                "kind": "index",
+                "object": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "battle"
+                  },
+                  "key": "customCards"
+                },
+                "index": {
+                  "kind": "ref",
+                  "name": "copyId"
+                }
+              },
+              "operator": "=",
+              "value": {
+                "kind": "ref",
+                "name": "copy"
+              },
+              "next": "n4"
+            },
+            {
+              "id": "n6",
+              "kind": "set",
+              "target": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "copy"
+                },
+                "key": "id"
+              },
+              "operator": "=",
+              "value": {
+                "kind": "ref",
+                "name": "copyId"
+              },
+              "next": "n5"
+            },
+            {
+              "id": "n7",
+              "kind": "call",
+              "capability": "JSON.parse",
+              "args": [
+                {
+                  "kind": "ref",
+                  "name": "__rvb_import_operand_1"
+                }
+              ],
+              "result": "copy",
+              "next": "n6"
+            },
+            {
+              "id": "n8",
+              "kind": "bind",
+              "name": "__rvb_import_operand_1",
+              "expr": {
+                "kind": "ref",
+                "name": "__rvb_import_effect_0"
+              },
+              "next": "n7"
+            },
+            {
+              "id": "n9",
+              "kind": "call",
+              "capability": "JSON.stringify",
+              "args": [
+                {
+                  "kind": "ref",
+                  "name": "custom"
+                }
+              ],
+              "result": "__rvb_import_effect_0",
+              "next": "n8"
+            },
+            {
+              "id": "n13",
+              "kind": "bind",
+              "name": "copyId",
+              "expr": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "ref",
+                  "name": "__rvb_import_operand_5"
+                },
+                "right": {
+                  "kind": "ref",
+                  "name": "i"
+                }
+              },
+              "next": "n9"
+            },
+            {
+              "id": "n12",
+              "kind": "bind",
+              "name": "__rvb_import_operand_5",
+              "expr": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "ref",
+                  "name": "__rvb_import_operand_4"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "-"
+                }
+              },
+              "next": "n13"
+            },
+            {
+              "id": "n11",
+              "kind": "bind",
+              "name": "__rvb_import_operand_4",
+              "expr": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "ref",
+                  "name": "__rvb_import_operand_2"
+                },
+                "right": {
+                  "kind": "ref",
+                  "name": "__rvb_import_effect_3"
+                }
+              },
+              "next": "n12"
+            },
+            {
+              "id": "n14",
+              "kind": "call",
+              "capability": "Date.now",
+              "args": [],
+              "result": "__rvb_import_effect_3",
+              "next": "n11"
+            },
+            {
+              "id": "n10",
+              "kind": "bind",
+              "name": "__rvb_import_operand_2",
+              "expr": {
+                "kind": "literal",
+                "value": "rafaam-curse-copy-"
+              },
+              "next": "n14"
+            },
+            {
+              "id": "n15",
+              "kind": "branch",
+              "condition": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "unary",
+                  "op": "!",
+                  "argument": {
+                    "kind": "ref",
+                    "name": "custom"
+                  }
+                }
+              },
+              "yes": "n10",
+              "no": "n3"
+            },
+            {
+              "id": "n16",
+              "kind": "bind",
+              "name": "custom",
+              "expr": {
+                "kind": "index",
+                "object": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "battle"
+                  },
+                  "key": "customCards"
+                },
+                "index": {
+                  "kind": "ref",
+                  "name": "cardId"
+                }
+              },
+              "next": "n15"
+            },
+            {
+              "id": "n17",
+              "kind": "bind",
+              "name": "cardId",
+              "expr": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "card"
+                },
+                "key": "cardId"
+              },
+              "next": "n16"
+            },
+            {
+              "id": "n18",
+              "kind": "bind",
+              "name": "card",
+              "expr": {
+                "kind": "index",
+                "object": {
+                  "kind": "ref",
+                  "name": "curses"
+                },
+                "index": {
+                  "kind": "ref",
+                  "name": "i"
+                }
+              },
+              "next": "n17"
+            }
+          ]
+        },
+        "update": {
+          "entry": "n20",
+          "end": "n19",
+          "nodes": [
+            {
+              "id": "n19",
+              "kind": "regionEnd"
+            },
+            {
+              "id": "n20",
+              "kind": "set",
+              "target": {
+                "kind": "ref",
+                "name": "i"
+              },
+              "operator": "=",
+              "value": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "unary",
+                  "op": "+",
+                  "argument": {
+                    "kind": "ref",
+                    "name": "i"
+                  }
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": 1
+                }
+              },
+              "next": "n19"
+            }
+          ]
+        },
+        "next": "n1"
+      },
+      {
+        "id": "n22",
+        "kind": "bind",
+        "name": "i",
+        "expr": {
+          "kind": "literal",
+          "value": 0
+        },
+        "next": "n21"
+      },
+      {
+        "id": "n23",
+        "kind": "set",
+        "target": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "battle"
+          },
+          "key": "customCards"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "object",
+          "entries": []
+        },
+        "next": "n22"
+      },
+      {
+        "id": "n24",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "unary",
+              "op": "!",
+              "argument": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "battle"
+                },
+                "key": "customCards"
+              }
+            }
+          }
+        },
+        "yes": "n23",
+        "no": "n22"
+      },
+      {
+        "id": "n25",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": "对手手牌中没有诅咒"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n26",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "unary",
+              "op": "!",
+              "argument": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "curses"
+                },
+                "key": "length"
+              }
+            }
+          }
+        },
+        "yes": "n25",
+        "no": "n24"
+      },
+      {
+        "id": "n27",
+        "kind": "bind",
+        "name": "curses",
+        "expr": {
+          "kind": "collection",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "opponent"
+            },
+            "key": "hand"
+          },
+          "method": "filter",
+          "args": [
+            {
+              "kind": "lambda",
+              "parameters": [
+                "card"
+              ],
+              "body": {
+                "kind": "binary",
+                "op": "||",
+                "left": {
+                  "kind": "binary",
+                  "op": "&&",
+                  "left": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "card"
+                    },
+                    "key": "name"
+                  },
+                  "right": {
+                    "kind": "binary",
+                    "op": ">=",
+                    "left": {
+                      "kind": "collection",
+                      "object": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "card"
+                        },
+                        "key": "name"
+                      },
+                      "method": "indexOf",
+                      "args": [
+                        {
+                          "kind": "literal",
+                          "value": "诅咒"
+                        }
+                      ]
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": 0
+                    }
+                  }
+                },
+                "right": {
+                  "kind": "binary",
+                  "op": "&&",
+                  "left": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "card"
+                    },
+                    "key": "cardId"
+                  },
+                  "right": {
+                    "kind": "binary",
+                    "op": "===",
+                    "left": {
+                      "kind": "collection",
+                      "object": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "card"
+                        },
+                        "key": "cardId"
+                      },
+                      "method": "indexOf",
+                      "args": [
+                        {
+                          "kind": "literal",
+                          "value": "rafaam-curse"
+                        }
+                      ]
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": 0
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "next": "n26"
+      },
+      {
+        "id": "n28",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": "对手没有手牌"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n29",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "ref",
+                  "name": "opponent"
+                }
+              },
+              "right": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "opponent"
+                  },
+                  "key": "hand"
+                }
+              }
+            }
+          }
+        },
+        "yes": "n28",
+        "no": "n27"
+      },
+      {
+        "id": "n30",
+        "kind": "bind",
+        "name": "opponent",
+        "expr": {
+          "kind": "collection",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "battle"
+            },
+            "key": "players"
+          },
+          "method": "find",
+          "args": [
+            {
+              "kind": "lambda",
+              "parameters": [
+                "player"
+              ],
+              "body": {
+                "kind": "binary",
+                "op": "===",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "player"
+                  },
+                  "key": "playerId"
+                },
+                "right": {
+                  "kind": "call",
+                  "callee": "nextEnemyPlayer",
+                  "args": [
+                    {
+                      "kind": "ref",
+                      "name": "battle"
+                    },
+                    {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "caster"
+                      },
+                      "key": "ownerPlayerId"
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        "next": "n29"
+      },
+      {
+        "id": "n31",
+        "kind": "bind",
+        "name": "caster",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "context"
+          },
+          "key": "piece"
+        },
+        "next": "n30"
+      }
+    ]
+  },
+  "contentGraphField": "code",
+  "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1",
+  "contentGraphEntries": {
+    "previewCode": {
+      "graph": {
+        "version": "rvb-content-graph/v1",
+        "surface": "preview",
+        "entry": "n1",
+        "nodes": [
+          {
+            "id": "n1",
+            "kind": "return",
+            "value": {
+              "kind": "object",
+              "entries": [
+                {
+                  "key": "description",
+                  "value": {
+                    "kind": "literal",
+                    "value": "复制对方手中所有诅咒，加入对方手牌。"
+                  }
+                },
+                {
+                  "key": "expectedValues",
+                  "value": {
+                    "kind": "object",
+                    "entries": []
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "compilerVersion": "rvb-content-graph-compiler/v1"
+    }
+  }
 }

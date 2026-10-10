@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, expect, it } from 'vitest'
 import { createContentProject, openContentProject, readDocumentSnapshot, writeDocumentSnapshot } from '../../electron-editor/content-project'
+import { applyGameplayModuleGraph, createGameplayModuleGraph } from '../../lib/skill-graph/module-document'
 
 const roots: string[] = []
 function fixture() {
@@ -64,4 +65,18 @@ it('rejects unknown project formats rather than interpreting arbitrary folders',
   const root = fixture()
   writeFileSync(path.join(root, 'rvb-content-project.json'), '{"schema":"unknown"}')
   expect(() => openContentProject(root)).toThrow('不支持的内容项目版本')
+})
+
+it('preserves module ownership and exact disk bytes when an edit strips its graph', () => {
+  const file = path.join(fixture(), 'skill.json')
+  const document = applyGameplayModuleGraph({ id: 'example' }, createGameplayModuleGraph('skill'))
+  const bytes = JSON.stringify(document, null, 2)
+  writeFileSync(file, bytes)
+  const before = readDocumentSnapshot(file)
+  const detached = { ...document }
+  delete detached.gameplayModules
+  expect(() => writeDocumentSnapshot(file, detached, before.revision)).toThrow('cannot detach')
+  expect(readFileSync(file, 'utf8')).toBe(bytes)
+  const saved = writeDocumentSnapshot(file, { ...document, description: '修改说明' }, before.revision)
+  expect(saved.revision).not.toBe(before.revision)
 })

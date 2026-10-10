@@ -2,6 +2,556 @@
   "id": "rule-ulquiorra-resurreccion",
   "name": "归刃·黑翼大魔",
   "description": "归刃进度达到3后，于乌尔奇奥拉的回合开始时归刃。",
-  "trigger": { "type": "beginTurn" },
-  "skillCode": "var piece = context.rulePiece; if (!piece || piece.currentHp <= 0 || context.playerId !== piece.ownerPlayerId) return { success: false, message: '' }; if (piece.statusTags && piece.statusTags.some(function(tag) { return tag.id === 'ulquiorra-resurreccion-' + piece.instanceId; })) return { success: false, message: '' }; var progress = piece.statusTags && piece.statusTags.find(function(tag) { return tag.type === 'ulquiorra-resurreccion-progress'; }); if (!progress || (progress.intensity || 0) < 3) return { success: false, message: '' }; piece.attack += 1; piece.moveRange += 1; removeStatusEffectById(piece.instanceId, progress.id); addSkillById(piece.instanceId, 'ulquiorra-black-cero'); addStatusEffectById(piece.instanceId, { id: 'ulquiorra-resurreccion-' + piece.instanceId, type: 'resurreccion', name: '归刃', visible: true, currentDuration: -1, currentUses: -1, intensity: 1, stacks: 1 }); return { success: true, message: piece.name + '归刃为黑翼大魔' };"
+  "trigger": {
+    "type": "beginTurn"
+  },
+  "skillCode": "var piece, progress; var _pc = \"n14\"; for (var _step = 0; _step <= 14; _step++) { switch (_pc) { case \"n14\": piece = (context)[\"rulePiece\"]; _pc = \"n13\"; break; case \"n13\": _pc = (! (! (((! piece) || ((piece)[\"currentHp\"] <= 0)) || ((context)[\"playerId\"] !== (piece)[\"ownerPlayerId\"])))) ? \"n12\" : \"n11\"; break; case \"n11\": _pc = (! (! ((piece)[\"statusTags\"] && ((piece)[\"statusTags\"])[\"some\"](function (tag) { return ((tag)[\"id\"] === (\"ulquiorra-resurreccion-\" + (piece)[\"instanceId\"])); })))) ? \"n10\" : \"n9\"; break; case \"n9\": progress = ((piece)[\"statusTags\"] && ((piece)[\"statusTags\"])[\"find\"](function (tag) { return ((tag)[\"type\"] === \"ulquiorra-resurreccion-progress\"); })); _pc = \"n8\"; break; case \"n8\": _pc = (! (! ((! progress) || (((progress)[\"intensity\"] || 0) < 3)))) ? \"n7\" : \"n6\"; break; case \"n6\": (piece)[\"attack\"] += 1; _pc = \"n5\"; break; case \"n5\": (piece)[\"moveRange\"] += 1; _pc = \"n4\"; break; case \"n4\": removeStatusEffectById((piece)[\"instanceId\"], (progress)[\"id\"]); _pc = \"n3\"; break; case \"n3\": addSkillById((piece)[\"instanceId\"], \"ulquiorra-black-cero\"); _pc = \"n2\"; break; case \"n2\": addStatusEffectById((piece)[\"instanceId\"], {id: (\"ulquiorra-resurreccion-\" + (piece)[\"instanceId\"]), type: \"resurreccion\", name: \"归刃\", visible: true, currentDuration: (- 1), currentUses: (- 1), intensity: 1, stacks: 1}); _pc = \"n1\"; break; case \"n1\": return {success: true, message: ((piece)[\"name\"] + \"归刃为黑翼大魔\")}; case \"n7\": return {success: false, message: \"\"}; case \"n10\": return {success: false, message: \"\"}; case \"n12\": return {success: false, message: \"\"}; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\");",
+  "contentGraph": {
+    "version": "rvb-content-graph/v1",
+    "surface": "rule",
+    "entry": "n14",
+    "nodes": [
+      {
+        "id": "n1",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "piece"
+                  },
+                  "key": "name"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "归刃为黑翼大魔"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n2",
+        "kind": "call",
+        "capability": "addStatusEffectById",
+        "args": [
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "piece"
+            },
+            "key": "instanceId"
+          },
+          {
+            "kind": "object",
+            "entries": [
+              {
+                "key": "id",
+                "value": {
+                  "kind": "binary",
+                  "op": "+",
+                  "left": {
+                    "kind": "literal",
+                    "value": "ulquiorra-resurreccion-"
+                  },
+                  "right": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "piece"
+                    },
+                    "key": "instanceId"
+                  }
+                }
+              },
+              {
+                "key": "type",
+                "value": {
+                  "kind": "literal",
+                  "value": "resurreccion"
+                }
+              },
+              {
+                "key": "name",
+                "value": {
+                  "kind": "literal",
+                  "value": "归刃"
+                }
+              },
+              {
+                "key": "visible",
+                "value": {
+                  "kind": "literal",
+                  "value": true
+                }
+              },
+              {
+                "key": "currentDuration",
+                "value": {
+                  "kind": "unary",
+                  "op": "-",
+                  "argument": {
+                    "kind": "literal",
+                    "value": 1
+                  }
+                }
+              },
+              {
+                "key": "currentUses",
+                "value": {
+                  "kind": "unary",
+                  "op": "-",
+                  "argument": {
+                    "kind": "literal",
+                    "value": 1
+                  }
+                }
+              },
+              {
+                "key": "intensity",
+                "value": {
+                  "kind": "literal",
+                  "value": 1
+                }
+              },
+              {
+                "key": "stacks",
+                "value": {
+                  "kind": "literal",
+                  "value": 1
+                }
+              }
+            ]
+          }
+        ],
+        "next": "n1"
+      },
+      {
+        "id": "n3",
+        "kind": "call",
+        "capability": "addSkillById",
+        "args": [
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "piece"
+            },
+            "key": "instanceId"
+          },
+          {
+            "kind": "literal",
+            "value": "ulquiorra-black-cero"
+          }
+        ],
+        "next": "n2"
+      },
+      {
+        "id": "n4",
+        "kind": "call",
+        "capability": "removeStatusEffectById",
+        "args": [
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "piece"
+            },
+            "key": "instanceId"
+          },
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "progress"
+            },
+            "key": "id"
+          }
+        ],
+        "next": "n3"
+      },
+      {
+        "id": "n5",
+        "kind": "set",
+        "target": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "piece"
+          },
+          "key": "moveRange"
+        },
+        "operator": "+=",
+        "value": {
+          "kind": "literal",
+          "value": 1
+        },
+        "next": "n4"
+      },
+      {
+        "id": "n6",
+        "kind": "set",
+        "target": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "piece"
+          },
+          "key": "attack"
+        },
+        "operator": "+=",
+        "value": {
+          "kind": "literal",
+          "value": 1
+        },
+        "next": "n5"
+      },
+      {
+        "id": "n7",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n8",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "ref",
+                  "name": "progress"
+                }
+              },
+              "right": {
+                "kind": "binary",
+                "op": "<",
+                "left": {
+                  "kind": "binary",
+                  "op": "||",
+                  "left": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "progress"
+                    },
+                    "key": "intensity"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": 0
+                  }
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": 3
+                }
+              }
+            }
+          }
+        },
+        "yes": "n7",
+        "no": "n6"
+      },
+      {
+        "id": "n9",
+        "kind": "bind",
+        "name": "progress",
+        "expr": {
+          "kind": "binary",
+          "op": "&&",
+          "left": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "piece"
+            },
+            "key": "statusTags"
+          },
+          "right": {
+            "kind": "collection",
+            "object": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "piece"
+              },
+              "key": "statusTags"
+            },
+            "method": "find",
+            "args": [
+              {
+                "kind": "lambda",
+                "parameters": [
+                  "tag"
+                ],
+                "body": {
+                  "kind": "binary",
+                  "op": "===",
+                  "left": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "tag"
+                    },
+                    "key": "type"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": "ulquiorra-resurreccion-progress"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "next": "n8"
+      },
+      {
+        "id": "n10",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n11",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "&&",
+              "left": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "piece"
+                },
+                "key": "statusTags"
+              },
+              "right": {
+                "kind": "collection",
+                "object": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "piece"
+                  },
+                  "key": "statusTags"
+                },
+                "method": "some",
+                "args": [
+                  {
+                    "kind": "lambda",
+                    "parameters": [
+                      "tag"
+                    ],
+                    "body": {
+                      "kind": "binary",
+                      "op": "===",
+                      "left": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "tag"
+                        },
+                        "key": "id"
+                      },
+                      "right": {
+                        "kind": "binary",
+                        "op": "+",
+                        "left": {
+                          "kind": "literal",
+                          "value": "ulquiorra-resurreccion-"
+                        },
+                        "right": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "piece"
+                          },
+                          "key": "instanceId"
+                        }
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "yes": "n10",
+        "no": "n9"
+      },
+      {
+        "id": "n12",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n13",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "binary",
+                "op": "||",
+                "left": {
+                  "kind": "unary",
+                  "op": "!",
+                  "argument": {
+                    "kind": "ref",
+                    "name": "piece"
+                  }
+                },
+                "right": {
+                  "kind": "binary",
+                  "op": "<=",
+                  "left": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "piece"
+                    },
+                    "key": "currentHp"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": 0
+                  }
+                }
+              },
+              "right": {
+                "kind": "binary",
+                "op": "!==",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "context"
+                  },
+                  "key": "playerId"
+                },
+                "right": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "piece"
+                  },
+                  "key": "ownerPlayerId"
+                }
+              }
+            }
+          }
+        },
+        "yes": "n12",
+        "no": "n11"
+      },
+      {
+        "id": "n14",
+        "kind": "bind",
+        "name": "piece",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "context"
+          },
+          "key": "rulePiece"
+        },
+        "next": "n13"
+      }
+    ]
+  },
+  "contentGraphField": "skillCode",
+  "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1"
 }

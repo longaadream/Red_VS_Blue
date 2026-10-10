@@ -5,5 +5,548 @@
   "trigger": {
     "type": "beginTurn"
   },
-  "skillCode": "var piece = context.rulePiece; if (!piece || piece.currentHp <= 0) return { success: false, message: '' }; var currentPlayerId = battle && battle.turn && battle.turn.currentPlayerId; if (!currentPlayerId || String(currentPlayerId).toLowerCase() !== String(piece.ownerPlayerId).toLowerCase()) return { success: false, message: '' }; var chosen = selectOption({ title: piece.name + ' 红蓝形态：选择加入手牌的卡', playerId: piece.ownerPlayerId, canCancel: false, options: [ { id: 'calm', label: '平静（护盾2点，进入平静姿态）' }, { id: 'rage', label: '暴怒（造成1倍伤害，进入暴怒姿态）' } ] }); if (!chosen || chosen.needsOptionSelection) { if (chosen) chosen.playerId = piece.ownerPlayerId; return chosen; } var cardId = (chosen === 'calm' || chosen.id === 'calm' || chosen.value === 'calm') ? 'watcher-calm' : 'watcher-rage'; addCardToHand(cardId, piece.ownerPlayerId); return { success: true, message: piece.name + '的红蓝形态发动：' + (cardId === 'watcher-calm' ? '获得平静' : '获得暴怒') };"
+  "skillCode": "var cardId, chosen, currentPlayerId, piece; var _pc = \"n14\"; for (var _step = 0; _step <= 14; _step++) { switch (_pc) { case \"n14\": piece = (context)[\"rulePiece\"]; _pc = \"n13\"; break; case \"n13\": _pc = (! (! ((! piece) || ((piece)[\"currentHp\"] <= 0)))) ? \"n12\" : \"n11\"; break; case \"n11\": currentPlayerId = ((battle && (battle)[\"turn\"]) && ((battle)[\"turn\"])[\"currentPlayerId\"]); _pc = \"n10\"; break; case \"n10\": _pc = (! (! ((! currentPlayerId) || ((String(currentPlayerId))[\"toLowerCase\"]() !== (String((piece)[\"ownerPlayerId\"]))[\"toLowerCase\"]())))) ? \"n9\" : \"n8\"; break; case \"n8\": chosen = selectOption({title: ((piece)[\"name\"] + \" 红蓝形态：选择加入手牌的卡\"), playerId: (piece)[\"ownerPlayerId\"], canCancel: false, options: [{id: \"calm\", label: \"平静（护盾2点，进入平静姿态）\"}, {id: \"rage\", label: \"暴怒（造成1倍伤害，进入暴怒姿态）\"}]}); _pc = \"n7\"; break; case \"n7\": _pc = (! (! ((! chosen) || (chosen)[\"needsOptionSelection\"]))) ? \"n6\" : \"n3\"; break; case \"n3\": cardId = ((((chosen === \"calm\") || ((chosen)[\"id\"] === \"calm\")) || ((chosen)[\"value\"] === \"calm\")) ? \"watcher-calm\" : \"watcher-rage\"); _pc = \"n2\"; break; case \"n2\": addCardToHand(cardId, (piece)[\"ownerPlayerId\"]); _pc = \"n1\"; break; case \"n1\": return {success: true, message: (((piece)[\"name\"] + \"的红蓝形态发动：\") + ((cardId === \"watcher-calm\") ? \"获得平静\" : \"获得暴怒\"))}; case \"n6\": _pc = (! (! chosen)) ? \"n5\" : \"n4\"; break; case \"n5\": (chosen)[\"playerId\"] = (piece)[\"ownerPlayerId\"]; _pc = \"n4\"; break; case \"n4\": return chosen; case \"n9\": return {success: false, message: \"\"}; case \"n12\": return {success: false, message: \"\"}; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\");",
+  "contentGraph": {
+    "version": "rvb-content-graph/v1",
+    "surface": "rule",
+    "entry": "n14",
+    "nodes": [
+      {
+        "id": "n1",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "binary",
+                  "op": "+",
+                  "left": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "piece"
+                    },
+                    "key": "name"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": "的红蓝形态发动："
+                  }
+                },
+                "right": {
+                  "kind": "conditional",
+                  "test": {
+                    "kind": "binary",
+                    "op": "===",
+                    "left": {
+                      "kind": "ref",
+                      "name": "cardId"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": "watcher-calm"
+                    }
+                  },
+                  "consequent": {
+                    "kind": "literal",
+                    "value": "获得平静"
+                  },
+                  "alternate": {
+                    "kind": "literal",
+                    "value": "获得暴怒"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n2",
+        "kind": "call",
+        "capability": "addCardToHand",
+        "args": [
+          {
+            "kind": "ref",
+            "name": "cardId"
+          },
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "piece"
+            },
+            "key": "ownerPlayerId"
+          }
+        ],
+        "next": "n1"
+      },
+      {
+        "id": "n3",
+        "kind": "bind",
+        "name": "cardId",
+        "expr": {
+          "kind": "conditional",
+          "test": {
+            "kind": "binary",
+            "op": "||",
+            "left": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "binary",
+                "op": "===",
+                "left": {
+                  "kind": "ref",
+                  "name": "chosen"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "calm"
+                }
+              },
+              "right": {
+                "kind": "binary",
+                "op": "===",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "chosen"
+                  },
+                  "key": "id"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "calm"
+                }
+              }
+            },
+            "right": {
+              "kind": "binary",
+              "op": "===",
+              "left": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "chosen"
+                },
+                "key": "value"
+              },
+              "right": {
+                "kind": "literal",
+                "value": "calm"
+              }
+            }
+          },
+          "consequent": {
+            "kind": "literal",
+            "value": "watcher-calm"
+          },
+          "alternate": {
+            "kind": "literal",
+            "value": "watcher-rage"
+          }
+        },
+        "next": "n2"
+      },
+      {
+        "id": "n4",
+        "kind": "return",
+        "value": {
+          "kind": "ref",
+          "name": "chosen"
+        }
+      },
+      {
+        "id": "n5",
+        "kind": "set",
+        "target": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "chosen"
+          },
+          "key": "playerId"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "piece"
+          },
+          "key": "ownerPlayerId"
+        },
+        "next": "n4"
+      },
+      {
+        "id": "n6",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "ref",
+              "name": "chosen"
+            }
+          }
+        },
+        "yes": "n5",
+        "no": "n4"
+      },
+      {
+        "id": "n7",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "ref",
+                  "name": "chosen"
+                }
+              },
+              "right": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "chosen"
+                },
+                "key": "needsOptionSelection"
+              }
+            }
+          }
+        },
+        "yes": "n6",
+        "no": "n3"
+      },
+      {
+        "id": "n8",
+        "kind": "call",
+        "capability": "selectOption",
+        "args": [
+          {
+            "kind": "object",
+            "entries": [
+              {
+                "key": "title",
+                "value": {
+                  "kind": "binary",
+                  "op": "+",
+                  "left": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "piece"
+                    },
+                    "key": "name"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": " 红蓝形态：选择加入手牌的卡"
+                  }
+                }
+              },
+              {
+                "key": "playerId",
+                "value": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "piece"
+                  },
+                  "key": "ownerPlayerId"
+                }
+              },
+              {
+                "key": "canCancel",
+                "value": {
+                  "kind": "literal",
+                  "value": false
+                }
+              },
+              {
+                "key": "options",
+                "value": {
+                  "kind": "array",
+                  "items": [
+                    {
+                      "kind": "object",
+                      "entries": [
+                        {
+                          "key": "id",
+                          "value": {
+                            "kind": "literal",
+                            "value": "calm"
+                          }
+                        },
+                        {
+                          "key": "label",
+                          "value": {
+                            "kind": "literal",
+                            "value": "平静（护盾2点，进入平静姿态）"
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "kind": "object",
+                      "entries": [
+                        {
+                          "key": "id",
+                          "value": {
+                            "kind": "literal",
+                            "value": "rage"
+                          }
+                        },
+                        {
+                          "key": "label",
+                          "value": {
+                            "kind": "literal",
+                            "value": "暴怒（造成1倍伤害，进入暴怒姿态）"
+                          }
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ],
+        "result": "chosen",
+        "next": "n7"
+      },
+      {
+        "id": "n9",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n10",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "ref",
+                  "name": "currentPlayerId"
+                }
+              },
+              "right": {
+                "kind": "binary",
+                "op": "!==",
+                "left": {
+                  "kind": "collection",
+                  "object": {
+                    "kind": "call",
+                    "callee": "String",
+                    "args": [
+                      {
+                        "kind": "ref",
+                        "name": "currentPlayerId"
+                      }
+                    ]
+                  },
+                  "method": "toLowerCase",
+                  "args": []
+                },
+                "right": {
+                  "kind": "collection",
+                  "object": {
+                    "kind": "call",
+                    "callee": "String",
+                    "args": [
+                      {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "piece"
+                        },
+                        "key": "ownerPlayerId"
+                      }
+                    ]
+                  },
+                  "method": "toLowerCase",
+                  "args": []
+                }
+              }
+            }
+          }
+        },
+        "yes": "n9",
+        "no": "n8"
+      },
+      {
+        "id": "n11",
+        "kind": "bind",
+        "name": "currentPlayerId",
+        "expr": {
+          "kind": "binary",
+          "op": "&&",
+          "left": {
+            "kind": "binary",
+            "op": "&&",
+            "left": {
+              "kind": "ref",
+              "name": "battle"
+            },
+            "right": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "battle"
+              },
+              "key": "turn"
+            }
+          },
+          "right": {
+            "kind": "get",
+            "object": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "battle"
+              },
+              "key": "turn"
+            },
+            "key": "currentPlayerId"
+          }
+        },
+        "next": "n10"
+      },
+      {
+        "id": "n12",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n13",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "ref",
+                  "name": "piece"
+                }
+              },
+              "right": {
+                "kind": "binary",
+                "op": "<=",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "piece"
+                  },
+                  "key": "currentHp"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": 0
+                }
+              }
+            }
+          }
+        },
+        "yes": "n12",
+        "no": "n11"
+      },
+      {
+        "id": "n14",
+        "kind": "bind",
+        "name": "piece",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "context"
+          },
+          "key": "rulePiece"
+        },
+        "next": "n13"
+      }
+    ]
+  },
+  "contentGraphField": "skillCode",
+  "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1"
 }

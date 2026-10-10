@@ -5,5 +5,819 @@
   "trigger": {
     "type": "onPieceDied"
   },
-  "skillCode": "var witness = context.rulePiece; var dead = context.sourcePiece; if (!witness || !dead || !arePlayersAllied(battle, witness.ownerPlayerId, dead.ownerPlayerId)) return { success: false, message: '' }; var witnesses = (battle.pieces || []).filter(function(piece) { return piece.ownerPlayerId === witness.ownerPlayerId && (piece.statusTags || []).some(function(tag) { return tag.type === 'mangekyo-witness'; }); }).sort(function(a, b) { return String(a.instanceId).localeCompare(String(b.instanceId)); }); if (!witnesses.length || witnesses[0].instanceId !== witness.instanceId) return { success: false, message: '' }; if (!battle.extensions) battle.extensions = {}; if (!battle.extensions.contentCounters) battle.extensions.contentCounters = {}; if (!battle.extensions.contentCounters.mangekyoDeaths) battle.extensions.contentCounters.mangekyoDeaths = {}; var counts = battle.extensions.contentCounters.mangekyoDeaths; var next = (Number(counts[witness.ownerPlayerId]) || 0) + 1; counts[witness.ownerPlayerId] = next; if (!battle.actions) battle.actions = []; var message = (dead.name || dead.templateId) + '的死亡令【万花筒】充能消耗降低1'; battle.actions.push({ type: 'mangekyoDeath', playerId: witness.ownerPlayerId, turn: battle.turn ? battle.turn.turnNumber : 0, payload: { message: message, pieceId: dead.instanceId, pieceTemplateId: dead.templateId, mangekyoDeathCount: next } }); return { success: true, message: message };"
+  "skillCode": "var counts, dead, message, next, witness, witnesses; var _pc = \"n21\"; for (var _step = 0; _step <= 21; _step++) { switch (_pc) { case \"n21\": witness = (context)[\"rulePiece\"]; _pc = \"n20\"; break; case \"n20\": dead = (context)[\"sourcePiece\"]; _pc = \"n19\"; break; case \"n19\": _pc = (! (! (((! witness) || (! dead)) || (! arePlayersAllied(battle, (witness)[\"ownerPlayerId\"], (dead)[\"ownerPlayerId\"]))))) ? \"n18\" : \"n17\"; break; case \"n17\": witnesses = ((((battle)[\"pieces\"] || []))[\"filter\"](function (piece) { return (((piece)[\"ownerPlayerId\"] === (witness)[\"ownerPlayerId\"]) && (((piece)[\"statusTags\"] || []))[\"some\"](function (tag) { return ((tag)[\"type\"] === \"mangekyo-witness\"); })); })).sort(function (a, b) { return (String((a)[\"instanceId\"]))[\"localeCompare\"](String((b)[\"instanceId\"])); }); _pc = \"n16\"; break; case \"n16\": _pc = (! (! ((! (witnesses)[\"length\"]) || (((witnesses)[0])[\"instanceId\"] !== (witness)[\"instanceId\"])))) ? \"n15\" : \"n14\"; break; case \"n14\": _pc = (! (! (! (battle)[\"extensions\"]))) ? \"n13\" : \"n12\"; break; case \"n13\": (battle)[\"extensions\"] = {}; _pc = \"n12\"; break; case \"n12\": _pc = (! (! (! ((battle)[\"extensions\"])[\"contentCounters\"]))) ? \"n11\" : \"n10\"; break; case \"n11\": ((battle)[\"extensions\"])[\"contentCounters\"] = {}; _pc = \"n10\"; break; case \"n10\": _pc = (! (! (! (((battle)[\"extensions\"])[\"contentCounters\"])[\"mangekyoDeaths\"]))) ? \"n9\" : \"n8\"; break; case \"n9\": (((battle)[\"extensions\"])[\"contentCounters\"])[\"mangekyoDeaths\"] = {}; _pc = \"n8\"; break; case \"n8\": counts = (((battle)[\"extensions\"])[\"contentCounters\"])[\"mangekyoDeaths\"]; _pc = \"n7\"; break; case \"n7\": next = ((Number((counts)[(function (key) { if (typeof key === \"string\" && key.split(\".\").some(function (part) { return [\"__proto__\",\"arguments\",\"callee\",\"caller\",\"constructor\",\"prototype\"].indexOf(part) !== -1; })) throw new Error(\"unsafe content graph index\"); return key; })((witness)[\"ownerPlayerId\"])]) || 0) + 1); _pc = \"n6\"; break; case \"n6\": (counts)[(function (key) { if (typeof key === \"string\" && key.split(\".\").some(function (part) { return [\"__proto__\",\"arguments\",\"callee\",\"caller\",\"constructor\",\"prototype\"].indexOf(part) !== -1; })) throw new Error(\"unsafe content graph index\"); return key; })((witness)[\"ownerPlayerId\"])] = next; _pc = \"n5\"; break; case \"n5\": _pc = (! (! (! (battle)[\"actions\"]))) ? \"n4\" : \"n3\"; break; case \"n4\": (battle)[\"actions\"] = []; _pc = \"n3\"; break; case \"n3\": message = (((dead)[\"name\"] || (dead)[\"templateId\"]) + \"的死亡令【万花筒】充能消耗降低1\"); _pc = \"n2\"; break; case \"n2\": ((battle)[\"actions\"]).push({type: \"mangekyoDeath\", playerId: (witness)[\"ownerPlayerId\"], turn: ((battle)[\"turn\"] ? ((battle)[\"turn\"])[\"turnNumber\"] : 0), payload: {message: message, pieceId: (dead)[\"instanceId\"], pieceTemplateId: (dead)[\"templateId\"], mangekyoDeathCount: next}}); _pc = \"n1\"; break; case \"n1\": return {success: true, message: message}; case \"n15\": return {success: false, message: \"\"}; case \"n18\": return {success: false, message: \"\"}; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\");",
+  "contentGraph": {
+    "version": "rvb-content-graph/v1",
+    "surface": "rule",
+    "entry": "n21",
+    "nodes": [
+      {
+        "id": "n1",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "ref",
+                "name": "message"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n2",
+        "kind": "call",
+        "capability": "array.push",
+        "args": [
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "battle"
+            },
+            "key": "actions"
+          },
+          {
+            "kind": "object",
+            "entries": [
+              {
+                "key": "type",
+                "value": {
+                  "kind": "literal",
+                  "value": "mangekyoDeath"
+                }
+              },
+              {
+                "key": "playerId",
+                "value": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "witness"
+                  },
+                  "key": "ownerPlayerId"
+                }
+              },
+              {
+                "key": "turn",
+                "value": {
+                  "kind": "conditional",
+                  "test": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "battle"
+                    },
+                    "key": "turn"
+                  },
+                  "consequent": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "battle"
+                      },
+                      "key": "turn"
+                    },
+                    "key": "turnNumber"
+                  },
+                  "alternate": {
+                    "kind": "literal",
+                    "value": 0
+                  }
+                }
+              },
+              {
+                "key": "payload",
+                "value": {
+                  "kind": "object",
+                  "entries": [
+                    {
+                      "key": "message",
+                      "value": {
+                        "kind": "ref",
+                        "name": "message"
+                      }
+                    },
+                    {
+                      "key": "pieceId",
+                      "value": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "dead"
+                        },
+                        "key": "instanceId"
+                      }
+                    },
+                    {
+                      "key": "pieceTemplateId",
+                      "value": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "dead"
+                        },
+                        "key": "templateId"
+                      }
+                    },
+                    {
+                      "key": "mangekyoDeathCount",
+                      "value": {
+                        "kind": "ref",
+                        "name": "next"
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ],
+        "next": "n1"
+      },
+      {
+        "id": "n3",
+        "kind": "bind",
+        "name": "message",
+        "expr": {
+          "kind": "binary",
+          "op": "+",
+          "left": {
+            "kind": "binary",
+            "op": "||",
+            "left": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "dead"
+              },
+              "key": "name"
+            },
+            "right": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "dead"
+              },
+              "key": "templateId"
+            }
+          },
+          "right": {
+            "kind": "literal",
+            "value": "的死亡令【万花筒】充能消耗降低1"
+          }
+        },
+        "next": "n2"
+      },
+      {
+        "id": "n4",
+        "kind": "set",
+        "target": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "battle"
+          },
+          "key": "actions"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "array",
+          "items": []
+        },
+        "next": "n3"
+      },
+      {
+        "id": "n5",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "unary",
+              "op": "!",
+              "argument": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "battle"
+                },
+                "key": "actions"
+              }
+            }
+          }
+        },
+        "yes": "n4",
+        "no": "n3"
+      },
+      {
+        "id": "n6",
+        "kind": "set",
+        "target": {
+          "kind": "index",
+          "object": {
+            "kind": "ref",
+            "name": "counts"
+          },
+          "index": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "witness"
+            },
+            "key": "ownerPlayerId"
+          }
+        },
+        "operator": "=",
+        "value": {
+          "kind": "ref",
+          "name": "next"
+        },
+        "next": "n5"
+      },
+      {
+        "id": "n7",
+        "kind": "bind",
+        "name": "next",
+        "expr": {
+          "kind": "binary",
+          "op": "+",
+          "left": {
+            "kind": "binary",
+            "op": "||",
+            "left": {
+              "kind": "call",
+              "callee": "Number",
+              "args": [
+                {
+                  "kind": "index",
+                  "object": {
+                    "kind": "ref",
+                    "name": "counts"
+                  },
+                  "index": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "witness"
+                    },
+                    "key": "ownerPlayerId"
+                  }
+                }
+              ]
+            },
+            "right": {
+              "kind": "literal",
+              "value": 0
+            }
+          },
+          "right": {
+            "kind": "literal",
+            "value": 1
+          }
+        },
+        "next": "n6"
+      },
+      {
+        "id": "n8",
+        "kind": "bind",
+        "name": "counts",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "battle"
+              },
+              "key": "extensions"
+            },
+            "key": "contentCounters"
+          },
+          "key": "mangekyoDeaths"
+        },
+        "next": "n7"
+      },
+      {
+        "id": "n9",
+        "kind": "set",
+        "target": {
+          "kind": "get",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "battle"
+              },
+              "key": "extensions"
+            },
+            "key": "contentCounters"
+          },
+          "key": "mangekyoDeaths"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "object",
+          "entries": []
+        },
+        "next": "n8"
+      },
+      {
+        "id": "n10",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "unary",
+              "op": "!",
+              "argument": {
+                "kind": "get",
+                "object": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "battle"
+                    },
+                    "key": "extensions"
+                  },
+                  "key": "contentCounters"
+                },
+                "key": "mangekyoDeaths"
+              }
+            }
+          }
+        },
+        "yes": "n9",
+        "no": "n8"
+      },
+      {
+        "id": "n11",
+        "kind": "set",
+        "target": {
+          "kind": "get",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "battle"
+            },
+            "key": "extensions"
+          },
+          "key": "contentCounters"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "object",
+          "entries": []
+        },
+        "next": "n10"
+      },
+      {
+        "id": "n12",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "unary",
+              "op": "!",
+              "argument": {
+                "kind": "get",
+                "object": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "battle"
+                  },
+                  "key": "extensions"
+                },
+                "key": "contentCounters"
+              }
+            }
+          }
+        },
+        "yes": "n11",
+        "no": "n10"
+      },
+      {
+        "id": "n13",
+        "kind": "set",
+        "target": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "battle"
+          },
+          "key": "extensions"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "object",
+          "entries": []
+        },
+        "next": "n12"
+      },
+      {
+        "id": "n14",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "unary",
+              "op": "!",
+              "argument": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "battle"
+                },
+                "key": "extensions"
+              }
+            }
+          }
+        },
+        "yes": "n13",
+        "no": "n12"
+      },
+      {
+        "id": "n15",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n16",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "witnesses"
+                  },
+                  "key": "length"
+                }
+              },
+              "right": {
+                "kind": "binary",
+                "op": "!==",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "index",
+                    "object": {
+                      "kind": "ref",
+                      "name": "witnesses"
+                    },
+                    "index": {
+                      "kind": "literal",
+                      "value": 0
+                    }
+                  },
+                  "key": "instanceId"
+                },
+                "right": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "witness"
+                  },
+                  "key": "instanceId"
+                }
+              }
+            }
+          }
+        },
+        "yes": "n15",
+        "no": "n14"
+      },
+      {
+        "id": "n17",
+        "kind": "call",
+        "capability": "array.sort",
+        "args": [
+          {
+            "kind": "collection",
+            "object": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "battle"
+                },
+                "key": "pieces"
+              },
+              "right": {
+                "kind": "array",
+                "items": []
+              }
+            },
+            "method": "filter",
+            "args": [
+              {
+                "kind": "lambda",
+                "parameters": [
+                  "piece"
+                ],
+                "body": {
+                  "kind": "binary",
+                  "op": "&&",
+                  "left": {
+                    "kind": "binary",
+                    "op": "===",
+                    "left": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "piece"
+                      },
+                      "key": "ownerPlayerId"
+                    },
+                    "right": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "witness"
+                      },
+                      "key": "ownerPlayerId"
+                    }
+                  },
+                  "right": {
+                    "kind": "collection",
+                    "object": {
+                      "kind": "binary",
+                      "op": "||",
+                      "left": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "piece"
+                        },
+                        "key": "statusTags"
+                      },
+                      "right": {
+                        "kind": "array",
+                        "items": []
+                      }
+                    },
+                    "method": "some",
+                    "args": [
+                      {
+                        "kind": "lambda",
+                        "parameters": [
+                          "tag"
+                        ],
+                        "body": {
+                          "kind": "binary",
+                          "op": "===",
+                          "left": {
+                            "kind": "get",
+                            "object": {
+                              "kind": "ref",
+                              "name": "tag"
+                            },
+                            "key": "type"
+                          },
+                          "right": {
+                            "kind": "literal",
+                            "value": "mangekyo-witness"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "kind": "lambda",
+            "parameters": [
+              "a",
+              "b"
+            ],
+            "body": {
+              "kind": "collection",
+              "object": {
+                "kind": "call",
+                "callee": "String",
+                "args": [
+                  {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "a"
+                    },
+                    "key": "instanceId"
+                  }
+                ]
+              },
+              "method": "localeCompare",
+              "args": [
+                {
+                  "kind": "call",
+                  "callee": "String",
+                  "args": [
+                    {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "b"
+                      },
+                      "key": "instanceId"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        ],
+        "result": "witnesses",
+        "next": "n16"
+      },
+      {
+        "id": "n18",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n19",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "binary",
+                "op": "||",
+                "left": {
+                  "kind": "unary",
+                  "op": "!",
+                  "argument": {
+                    "kind": "ref",
+                    "name": "witness"
+                  }
+                },
+                "right": {
+                  "kind": "unary",
+                  "op": "!",
+                  "argument": {
+                    "kind": "ref",
+                    "name": "dead"
+                  }
+                }
+              },
+              "right": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "call",
+                  "callee": "arePlayersAllied",
+                  "args": [
+                    {
+                      "kind": "ref",
+                      "name": "battle"
+                    },
+                    {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "witness"
+                      },
+                      "key": "ownerPlayerId"
+                    },
+                    {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "dead"
+                      },
+                      "key": "ownerPlayerId"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "yes": "n18",
+        "no": "n17"
+      },
+      {
+        "id": "n20",
+        "kind": "bind",
+        "name": "dead",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "context"
+          },
+          "key": "sourcePiece"
+        },
+        "next": "n19"
+      },
+      {
+        "id": "n21",
+        "kind": "bind",
+        "name": "witness",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "context"
+          },
+          "key": "rulePiece"
+        },
+        "next": "n20"
+      }
+    ]
+  },
+  "contentGraphField": "skillCode",
+  "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1"
 }

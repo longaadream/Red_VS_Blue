@@ -2,6 +2,390 @@
   "id": "rule-hashirama-edo-regen",
   "name": "秽土转生自愈",
   "description": "血量低于50%时，每回合结束自愈2点生命，回到50%即停止",
-  "trigger": { "type": "endTurn" },
-  "skillCode": "var piece = context.rulePiece; if (!piece) return { success: false, message: '' }; if (battle.turn.currentPlayerId !== piece.ownerPlayerId) return { success: false, message: '' }; if (piece.currentHp <= 0) return { success: false, message: '' }; var halfHp = Math.floor(piece.maxHp / 2); if (piece.currentHp >= halfHp) return { success: false, message: '' }; var healAmt = 2; piece.currentHp += healAmt; return { success: true, message: piece.name + ' 秽土转生自愈 ' + healAmt + ' 点（' + piece.currentHp + '/' + piece.maxHp + '）' };"
+  "trigger": {
+    "type": "endTurn"
+  },
+  "skillCode": "var halfHp, healAmt, piece; var _pc = \"n13\"; for (var _step = 0; _step <= 13; _step++) { switch (_pc) { case \"n13\": piece = (context)[\"rulePiece\"]; _pc = \"n12\"; break; case \"n12\": _pc = (! (! (! piece))) ? \"n11\" : \"n10\"; break; case \"n10\": _pc = (! (! (((battle)[\"turn\"])[\"currentPlayerId\"] !== (piece)[\"ownerPlayerId\"]))) ? \"n9\" : \"n8\"; break; case \"n8\": _pc = (! (! ((piece)[\"currentHp\"] <= 0))) ? \"n7\" : \"n6\"; break; case \"n6\": halfHp = Math.floor(((piece)[\"maxHp\"] / 2)); _pc = \"n5\"; break; case \"n5\": _pc = (! (! ((piece)[\"currentHp\"] >= halfHp))) ? \"n4\" : \"n3\"; break; case \"n3\": healAmt = 2; _pc = \"n2\"; break; case \"n2\": (piece)[\"currentHp\"] += healAmt; _pc = \"n1\"; break; case \"n1\": return {success: true, message: ((((((((piece)[\"name\"] + \" 秽土转生自愈 \") + healAmt) + \" 点（\") + (piece)[\"currentHp\"]) + \"/\") + (piece)[\"maxHp\"]) + \"）\")}; case \"n4\": return {success: false, message: \"\"}; case \"n7\": return {success: false, message: \"\"}; case \"n9\": return {success: false, message: \"\"}; case \"n11\": return {success: false, message: \"\"}; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\");",
+  "contentGraph": {
+    "version": "rvb-content-graph/v1",
+    "surface": "rule",
+    "entry": "n13",
+    "nodes": [
+      {
+        "id": "n1",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "binary",
+                  "op": "+",
+                  "left": {
+                    "kind": "binary",
+                    "op": "+",
+                    "left": {
+                      "kind": "binary",
+                      "op": "+",
+                      "left": {
+                        "kind": "binary",
+                        "op": "+",
+                        "left": {
+                          "kind": "binary",
+                          "op": "+",
+                          "left": {
+                            "kind": "binary",
+                            "op": "+",
+                            "left": {
+                              "kind": "get",
+                              "object": {
+                                "kind": "ref",
+                                "name": "piece"
+                              },
+                              "key": "name"
+                            },
+                            "right": {
+                              "kind": "literal",
+                              "value": " 秽土转生自愈 "
+                            }
+                          },
+                          "right": {
+                            "kind": "ref",
+                            "name": "healAmt"
+                          }
+                        },
+                        "right": {
+                          "kind": "literal",
+                          "value": " 点（"
+                        }
+                      },
+                      "right": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "piece"
+                        },
+                        "key": "currentHp"
+                      }
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": "/"
+                    }
+                  },
+                  "right": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "piece"
+                    },
+                    "key": "maxHp"
+                  }
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "）"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n2",
+        "kind": "set",
+        "target": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "piece"
+          },
+          "key": "currentHp"
+        },
+        "operator": "+=",
+        "value": {
+          "kind": "ref",
+          "name": "healAmt"
+        },
+        "next": "n1"
+      },
+      {
+        "id": "n3",
+        "kind": "bind",
+        "name": "healAmt",
+        "expr": {
+          "kind": "literal",
+          "value": 2
+        },
+        "next": "n2"
+      },
+      {
+        "id": "n4",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n5",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": ">=",
+              "left": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "piece"
+                },
+                "key": "currentHp"
+              },
+              "right": {
+                "kind": "ref",
+                "name": "halfHp"
+              }
+            }
+          }
+        },
+        "yes": "n4",
+        "no": "n3"
+      },
+      {
+        "id": "n6",
+        "kind": "bind",
+        "name": "halfHp",
+        "expr": {
+          "kind": "call",
+          "callee": "Math.floor",
+          "args": [
+            {
+              "kind": "binary",
+              "op": "/",
+              "left": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "piece"
+                },
+                "key": "maxHp"
+              },
+              "right": {
+                "kind": "literal",
+                "value": 2
+              }
+            }
+          ]
+        },
+        "next": "n5"
+      },
+      {
+        "id": "n7",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n8",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "<=",
+              "left": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "piece"
+                },
+                "key": "currentHp"
+              },
+              "right": {
+                "kind": "literal",
+                "value": 0
+              }
+            }
+          }
+        },
+        "yes": "n7",
+        "no": "n6"
+      },
+      {
+        "id": "n9",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n10",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "!==",
+              "left": {
+                "kind": "get",
+                "object": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "battle"
+                  },
+                  "key": "turn"
+                },
+                "key": "currentPlayerId"
+              },
+              "right": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "piece"
+                },
+                "key": "ownerPlayerId"
+              }
+            }
+          }
+        },
+        "yes": "n9",
+        "no": "n8"
+      },
+      {
+        "id": "n11",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n12",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "unary",
+              "op": "!",
+              "argument": {
+                "kind": "ref",
+                "name": "piece"
+              }
+            }
+          }
+        },
+        "yes": "n11",
+        "no": "n10"
+      },
+      {
+        "id": "n13",
+        "kind": "bind",
+        "name": "piece",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "context"
+          },
+          "key": "rulePiece"
+        },
+        "next": "n12"
+      }
+    ]
+  },
+  "contentGraphField": "skillCode",
+  "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1"
 }

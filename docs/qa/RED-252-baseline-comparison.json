@@ -1,0 +1,339 @@
+{
+  "baseSha": "00df31f8bd35b34200d507fd83853bf5ac99ba94",
+  "stage": "final: 276 primary entries, 84 previews, generated and pending graphs",
+  "baseline": {
+    "total": 1782,
+    "failed": 40
+  },
+  "current": {
+    "total": 2452,
+    "failed": 39
+  },
+  "added": [],
+  "fixed": [
+    {
+      "file": "game/battle-state-hash.test.ts",
+      "name": "battle state chunked hash v1 keeps the frozen Unicode vector identical in Node, desktop and Android bundles"
+    }
+  ],
+  "baselineFailures": [
+    {
+      "file": "game/ai-semantics.test.ts",
+      "name": "AI semantic contract audits every current manifest and makes a changed admission manifest fail closed"
+    },
+    {
+      "file": "game/battle-card-metadata-runtime.test.ts",
+      "name": "LAN battle hand card display metadata marks the page disposed before clearing in-flight card metadata requests"
+    },
+    {
+      "file": "game/battle-state-hash.test.ts",
+      "name": "battle state chunked hash v1 keeps the frozen Unicode vector identical in Node, desktop and Android bundles"
+    },
+    {
+      "file": "game/battle-ui-boundary.test.ts",
+      "name": "battle presentation boundary keeps renderer and DOM responsibilities behind explicit modules"
+    },
+    {
+      "file": "game/colyseus-client-reconnect.test.ts",
+      "name": "Colyseus reconnect and authority resync state machine allows native resumption after a compatible raster-only update"
+    },
+    {
+      "file": "game/colyseus-client-reconnect.test.ts",
+      "name": "Colyseus reconnect and authority resync state machine uses native Room reconnection without creating a replacement join"
+    },
+    {
+      "file": "game/colyseus-client-reconnect.test.ts",
+      "name": "Colyseus reconnect and authority resync state machine reconnects the existing Colyseus session after page navigation instead of duplicating the player join"
+    },
+    {
+      "file": "game/colyseus-client-reconnect.test.ts",
+      "name": "Colyseus reconnect and authority resync state machine ignores a stale Room leave after a replacement join"
+    },
+    {
+      "file": "game/colyseus-client-reconnect.test.ts",
+      "name": "Colyseus reconnect and authority resync state machine surfaces Colyseus Room errors without silently applying an action"
+    },
+    {
+      "file": "game/colyseus-client-reconnect.test.ts",
+      "name": "Colyseus reconnect and authority resync state machine requests the exact authoritative receipt and gates actions until it arrives"
+    },
+    {
+      "file": "game/colyseus-client-reconnect.test.ts",
+      "name": "Colyseus reconnect and authority resync state machine correlates a resync request with the original timed-out action"
+    },
+    {
+      "file": "game/colyseus-client-reconnect.test.ts",
+      "name": "Colyseus reconnect and authority resync state machine releases the authority sync gate on timeout and disconnect"
+    },
+    {
+      "file": "game/colyseus-origin-architecture.test.ts",
+      "name": "public single-port networking contract derives the only Colyseus endpoint from 'http://127.0.0.1:4200'"
+    },
+    {
+      "file": "game/colyseus-origin-architecture.test.ts",
+      "name": "public single-port networking contract derives the only Colyseus endpoint from 'http://192.168.1.20:8080'"
+    },
+    {
+      "file": "game/colyseus-origin-architecture.test.ts",
+      "name": "public single-port networking contract derives the only Colyseus endpoint from 'https://relay.example:8443'"
+    },
+    {
+      "file": "game/developer-tools-trace.test.ts",
+      "name": "developer tools match trace boundary keeps a multi-command Trace compact while preserving skills and materialized states"
+    },
+    {
+      "file": "game/flight-landing-contact.test.ts",
+      "name": "RED-209 flight markers do not block entry settles the whole flight using occupancy at expiry (occupant leaves: false)"
+    },
+    {
+      "file": "game/ichigo-itachi.test.ts",
+      "name": "RED-120 character data contract registers Ichigo and Itachi with the approved stats and skill text"
+    },
+    {
+      "file": "game/mangekyo.test.ts",
+      "name": "RED-124 Mangekyo data contract defines the keyword once and marks the three Uchiha ultimates with approved base costs"
+    },
+    {
+      "file": "game/pending-presentation-contract.test.ts",
+      "name": "pending selection live board settles newly delivered animation only for the choosing viewer=true"
+    },
+    {
+      "file": "game/player-colyseus-contract.test.ts",
+      "name": "RED-116 Electron lobby profile bridge pins the local Profile Identity before navigating to the server lobby"
+    },
+    {
+      "file": "game/player-colyseus-contract.test.ts",
+      "name": "RED-116 Electron lobby profile bridge resolves the client local runtime through trusted game IPC"
+    },
+    {
+      "file": "game/projectile-trace.test.ts",
+      "name": "death blossom approved area behavior damages only living enemies in the caster-centered 3×3 area and ignores projectile blockers"
+    },
+    {
+      "file": "game/red-129-rule-interactions.test.ts",
+      "name": "RED-129 波风水门回合结束锚点 opens a mandatory atomic target pending and commits one anchor after selection"
+    },
+    {
+      "file": "game/red-163-dark-characters.test.ts",
+      "name": "RED-163 dark character contract registers Aizen, Ulquiorra and Grimmjow with their approved base stats"
+    },
+    {
+      "file": "game/red-183-regressions.test.ts",
+      "name": "RED-183 character rules and selection UI regressions documents the self-cast AP refund on Shield of Light"
+    },
+    {
+      "file": "game/red-183-regressions.test.ts",
+      "name": "RED-183 character rules and selection UI regressions keeps Tails Twin Flight immunity and inoperable buffs at two turns"
+    },
+    {
+      "file": "game/red-183-regressions.test.ts",
+      "name": "RED-183 character rules and selection UI regressions uses Manhattan distance for Naruto candidates and execution"
+    },
+    {
+      "file": "game/red-183-regressions.test.ts",
+      "name": "RED-183 character rules and selection UI regressions uses the approved Grimmjow wording and hides the Recall number from its result message"
+    },
+    {
+      "file": "game/red-183-regressions.test.ts",
+      "name": "RED-183 character rules and selection UI regressions keeps selection, encyclopedia, history, tutorial, and related-card UI contracts visible in source"
+    },
+    {
+      "file": "game/skill-presentation-ui.test.ts",
+      "name": "projected skill display in the actual browser consumers plays one sound for each real queue AOE batch while preserving separate hit batches"
+    },
+    {
+      "file": "game/skill-presentation-ui.test.ts",
+      "name": "projected skill display in the actual browser consumers the battle controller consumes new cues without modifying the model"
+    },
+    {
+      "file": "game/skillcode-static-audit.test.ts",
+      "name": "RED-45 skillCode static compatibility audit classifies every executable field and every lexical free variable"
+    },
+    {
+      "file": "game/skillcode-static-audit.test.ts",
+      "name": "RED-45 data parse and production loader smoke parses every JSON definition and loads every skill, rule, and card"
+    },
+    {
+      "file": "game/sonic-roster.test.ts",
+      "name": "Sonic roster mechanics only exposes skill keywords that have a glossary explanation"
+    },
+    {
+      "file": "game/sonic-roster.test.ts",
+      "name": "Sonic roster mechanics uses the requested Sonic and Shadow skill descriptions and Super Form costs"
+    },
+    {
+      "file": "game/sonic-roster.test.ts",
+      "name": "Sonic roster mechanics extends Sonic spin dash target selection to seven cells at three momentum and stops at the selected cell"
+    },
+    {
+      "file": "game/sonic-roster.test.ts",
+      "name": "Sonic roster mechanics replaces consumed Sonic momentum with the distance gained from spin dash"
+    },
+    {
+      "file": "game/sonic-roster.test.ts",
+      "name": "Sonic roster mechanics grants temporary action points and keeps the displayed momentum in sync through Sonic Super Form"
+    },
+    {
+      "file": "game/turn.test.ts",
+      "name": "interrupted skill release does not pay or execute a skill when the resumed trigger blocks"
+    }
+  ],
+  "currentFailures": [
+    {
+      "file": "game/ai-semantics.test.ts",
+      "name": "AI semantic contract audits every current manifest and makes a changed admission manifest fail closed"
+    },
+    {
+      "file": "game/battle-card-metadata-runtime.test.ts",
+      "name": "LAN battle hand card display metadata marks the page disposed before clearing in-flight card metadata requests"
+    },
+    {
+      "file": "game/battle-ui-boundary.test.ts",
+      "name": "battle presentation boundary keeps renderer and DOM responsibilities behind explicit modules"
+    },
+    {
+      "file": "game/colyseus-client-reconnect.test.ts",
+      "name": "Colyseus reconnect and authority resync state machine allows native resumption after a compatible raster-only update"
+    },
+    {
+      "file": "game/colyseus-client-reconnect.test.ts",
+      "name": "Colyseus reconnect and authority resync state machine uses native Room reconnection without creating a replacement join"
+    },
+    {
+      "file": "game/colyseus-client-reconnect.test.ts",
+      "name": "Colyseus reconnect and authority resync state machine reconnects the existing Colyseus session after page navigation instead of duplicating the player join"
+    },
+    {
+      "file": "game/colyseus-client-reconnect.test.ts",
+      "name": "Colyseus reconnect and authority resync state machine ignores a stale Room leave after a replacement join"
+    },
+    {
+      "file": "game/colyseus-client-reconnect.test.ts",
+      "name": "Colyseus reconnect and authority resync state machine surfaces Colyseus Room errors without silently applying an action"
+    },
+    {
+      "file": "game/colyseus-client-reconnect.test.ts",
+      "name": "Colyseus reconnect and authority resync state machine requests the exact authoritative receipt and gates actions until it arrives"
+    },
+    {
+      "file": "game/colyseus-client-reconnect.test.ts",
+      "name": "Colyseus reconnect and authority resync state machine correlates a resync request with the original timed-out action"
+    },
+    {
+      "file": "game/colyseus-client-reconnect.test.ts",
+      "name": "Colyseus reconnect and authority resync state machine releases the authority sync gate on timeout and disconnect"
+    },
+    {
+      "file": "game/colyseus-origin-architecture.test.ts",
+      "name": "public single-port networking contract derives the only Colyseus endpoint from 'http://127.0.0.1:4200'"
+    },
+    {
+      "file": "game/colyseus-origin-architecture.test.ts",
+      "name": "public single-port networking contract derives the only Colyseus endpoint from 'http://192.168.1.20:8080'"
+    },
+    {
+      "file": "game/colyseus-origin-architecture.test.ts",
+      "name": "public single-port networking contract derives the only Colyseus endpoint from 'https://relay.example:8443'"
+    },
+    {
+      "file": "game/developer-tools-trace.test.ts",
+      "name": "developer tools match trace boundary keeps a multi-command Trace compact while preserving skills and materialized states"
+    },
+    {
+      "file": "game/flight-landing-contact.test.ts",
+      "name": "RED-209 flight markers do not block entry settles the whole flight using occupancy at expiry (occupant leaves: false)"
+    },
+    {
+      "file": "game/ichigo-itachi.test.ts",
+      "name": "RED-120 character data contract registers Ichigo and Itachi with the approved stats and skill text"
+    },
+    {
+      "file": "game/mangekyo.test.ts",
+      "name": "RED-124 Mangekyo data contract defines the keyword once and marks the three Uchiha ultimates with approved base costs"
+    },
+    {
+      "file": "game/pending-presentation-contract.test.ts",
+      "name": "pending selection live board settles newly delivered animation only for the choosing viewer=true"
+    },
+    {
+      "file": "game/player-colyseus-contract.test.ts",
+      "name": "RED-116 Electron lobby profile bridge pins the local Profile Identity before navigating to the server lobby"
+    },
+    {
+      "file": "game/player-colyseus-contract.test.ts",
+      "name": "RED-116 Electron lobby profile bridge resolves the client local runtime through trusted game IPC"
+    },
+    {
+      "file": "game/projectile-trace.test.ts",
+      "name": "death blossom approved area behavior damages only living enemies in the caster-centered 3×3 area and ignores projectile blockers"
+    },
+    {
+      "file": "game/red-129-rule-interactions.test.ts",
+      "name": "RED-129 波风水门回合结束锚点 opens a mandatory atomic target pending and commits one anchor after selection"
+    },
+    {
+      "file": "game/red-163-dark-characters.test.ts",
+      "name": "RED-163 dark character contract registers Aizen, Ulquiorra and Grimmjow with their approved base stats"
+    },
+    {
+      "file": "game/red-183-regressions.test.ts",
+      "name": "RED-183 character rules and selection UI regressions documents the self-cast AP refund on Shield of Light"
+    },
+    {
+      "file": "game/red-183-regressions.test.ts",
+      "name": "RED-183 character rules and selection UI regressions keeps Tails Twin Flight immunity and inoperable buffs at two turns"
+    },
+    {
+      "file": "game/red-183-regressions.test.ts",
+      "name": "RED-183 character rules and selection UI regressions uses Manhattan distance for Naruto candidates and execution"
+    },
+    {
+      "file": "game/red-183-regressions.test.ts",
+      "name": "RED-183 character rules and selection UI regressions uses the approved Grimmjow wording and hides the Recall number from its result message"
+    },
+    {
+      "file": "game/red-183-regressions.test.ts",
+      "name": "RED-183 character rules and selection UI regressions keeps selection, encyclopedia, history, tutorial, and related-card UI contracts visible in source"
+    },
+    {
+      "file": "game/skill-presentation-ui.test.ts",
+      "name": "projected skill display in the actual browser consumers plays one sound for each real queue AOE batch while preserving separate hit batches"
+    },
+    {
+      "file": "game/skill-presentation-ui.test.ts",
+      "name": "projected skill display in the actual browser consumers the battle controller consumes new cues without modifying the model"
+    },
+    {
+      "file": "game/skillcode-static-audit.test.ts",
+      "name": "RED-45 skillCode static compatibility audit classifies every executable field and every lexical free variable"
+    },
+    {
+      "file": "game/skillcode-static-audit.test.ts",
+      "name": "RED-45 data parse and production loader smoke parses every JSON definition and loads every skill, rule, and card"
+    },
+    {
+      "file": "game/sonic-roster.test.ts",
+      "name": "Sonic roster mechanics only exposes skill keywords that have a glossary explanation"
+    },
+    {
+      "file": "game/sonic-roster.test.ts",
+      "name": "Sonic roster mechanics uses the requested Sonic and Shadow skill descriptions and Super Form costs"
+    },
+    {
+      "file": "game/sonic-roster.test.ts",
+      "name": "Sonic roster mechanics extends Sonic spin dash target selection to seven cells at three momentum and stops at the selected cell"
+    },
+    {
+      "file": "game/sonic-roster.test.ts",
+      "name": "Sonic roster mechanics replaces consumed Sonic momentum with the distance gained from spin dash"
+    },
+    {
+      "file": "game/sonic-roster.test.ts",
+      "name": "Sonic roster mechanics grants temporary action points and keeps the displayed momentum in sync through Sonic Super Form"
+    },
+    {
+      "file": "game/turn.test.ts",
+      "name": "interrupted skill release does not pay or execute a skill when the resumed trigger blocks"
+    }
+  ]
+}

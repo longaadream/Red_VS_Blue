@@ -2,9 +2,13 @@
   "id": "max-speed-shot",
   "name": "速射能量炮",
   "description": "弹射物。选择正方向，对4格内首个敌人造成4次1点伤害；本回合可额外释放1次，每次消耗1行动点，每回合最多释放2次。",
-  "keywords": ["弹射物"],
+  "keywords": [
+    "弹射物"
+  ],
   "targetText": "正方向",
-  "effectTags": ["伤害"],
+  "effectTags": [
+    "伤害"
+  ],
   "icon": "🔫",
   "kind": "active",
   "type": "normal",
@@ -15,6 +19,1904 @@
   "actionPointCost": 1,
   "range": "single",
   "requiresTarget": true,
-  "targeting": { "steps": [{ "kind": "target", "type": "grid", "filter": "all", "range": 4, "sameRowOrColumn": true, "distanceMetric": "manhattan", "excludeSourceCell": true }] },
-  "code": "function executeSkill(context) { var source = context.piece; var turnNumber = Number(battle.turn.turnNumber); var castCount = (battle.actions || []).filter(function(action) { var payload = action && action.payload; return action && action.type === 'useBasicSkill' && Number(action.turn) === turnNumber && payload && payload.pieceId === source.instanceId && payload.skillId === 'max-speed-shot' && payload.interrupted !== true; }).length; if (castCount >= 2) return { success: false, message: '本回合速射能量炮最多释放2次' }; var recast = castCount === 1; var pos = selectTarget({ type: 'grid', range: 4, filter: 'all' }); if (!pos || pos.needsTargetSelection) return pos; var dx = pos.x - source.x; var dy = pos.y - source.y; if ((dx !== 0 && dy !== 0) || (dx === 0 && dy === 0)) return { success: false, message: '请选择正方向' }; (source.statusTags || []).slice().forEach(function(tag) { if (tag.type === 'max-speed-shot-recast' && Number(tag.turnNumber) !== turnNumber) removeStatusEffectById(source.instanceId, tag.id); }); if (recast) { (source.statusTags || []).slice().forEach(function(tag) { if (tag.type === 'max-speed-shot-recast' && Number(tag.turnNumber) === turnNumber) removeStatusEffectById(source.instanceId, tag.id); }); var skillState = (source.skills || []).find(function(skill) { return skill.skillId === 'max-speed-shot'; }); if (skillState) skillState.currentCooldown = 1; } else { addStatusEffectById(source.instanceId, { id: 'max-speed-shot-recast-' + source.instanceId + '-' + turnNumber, type: 'max-speed-shot-recast', name: '速射能量炮·再次释放', visible: false, stacking: 'independent', turnNumber: turnNumber, currentDuration: 1, currentUses: 1, remainingUses: 1 }); flow.skills.resetCooldown(source.instanceId, ['max-speed-shot']); } var direction = { x: dx === 0 ? 0 : (dx > 0 ? 1 : -1), y: dy === 0 ? 0 : (dy > 0 ? 1 : -1) }; var events = traceProjectile({ x: source.x, y: source.y }, direction, { excludePieceId: source.instanceId, maxDistance: 4 }); for (var i = 0; i < events.length; i++) { var event = events[i]; if (event.type === 'piece') { if (arePlayersAllied(battle, event.piece.ownerPlayerId, source.ownerPlayerId)) return { success: true, message: source.name + '的速射能量炮被友方棋子阻挡' }; var hits = 0; var damage = 0; for (var shot = 0; shot < 4 && event.piece.currentHp > 0; shot++) { var result = dealDamage(source, event.piece, 1, 'physical', battle, context.skill.id); damage += Number(result.damage || 0); hits += 1; } return { success: true, message: source.name + '的速射能量炮命中' + event.piece.name + '，进行' + hits + '次射击并造成' + damage + '点伤害' }; } if (event.type === 'terrain' && event.blocksProjectile) return { success: true, message: source.name + '的速射能量炮被地形阻挡' }; } return { success: true, message: source.name + '的速射能量炮未命中敌人' }; }"
+  "targeting": {
+    "steps": [
+      {
+        "kind": "target",
+        "type": "grid",
+        "filter": "all",
+        "range": 4,
+        "sameRowOrColumn": true,
+        "distanceMetric": "manhattan",
+        "excludeSourceCell": true
+      }
+    ]
+  },
+  "code": "function executeSkill(context) { var __rvb_import_bound_method_0, __rvb_import_bound_method_1, __rvb_import_bound_method_3, __rvb_import_effect_2, castCount, damage, direction, dx, dy, event, events, hits, i, pos, recast, result, shot, skillState, source, turnNumber; var _pc = \"n68\"; for (var _step = 0; _step <= 30; _step++) { switch (_pc) { case \"n68\": source = (context)[\"piece\"]; _pc = \"n67\"; break; case \"n67\": turnNumber = Number(((battle)[\"turn\"])[\"turnNumber\"]); _pc = \"n66\"; break; case \"n66\": __rvb_import_bound_method_3 = (function (receiver) { var capturedMethod = receiver[\"filter\"]; return function () { return Reflect.apply(capturedMethod, receiver, arguments); }; })(((battle)[\"actions\"] || [])); _pc = \"n62\"; break; case \"n62\": __rvb_import_effect_2 = (__rvb_import_bound_method_3)(function (action) { var payload; { var __rvb_content_graph_region_pc_0 = \"n65\"; while (__rvb_content_graph_region_pc_0 !== \"n63\") { switch (__rvb_content_graph_region_pc_0) { case \"n65\": payload = (action && (action)[\"payload\"]); __rvb_content_graph_region_pc_0 = \"n64\"; break; case \"n64\": return ((((((action && ((action)[\"type\"] === \"useBasicSkill\")) && (Number((action)[\"turn\"]) === turnNumber)) && payload) && ((payload)[\"pieceId\"] === (source)[\"instanceId\"])) && ((payload)[\"skillId\"] === \"max-speed-shot\")) && ((payload)[\"interrupted\"] !== true)); default: throw new Error(\"invalid content graph region node\"); } } } }); _pc = \"n61\"; break; case \"n61\": castCount = (__rvb_import_effect_2)[\"length\"]; _pc = \"n51\"; break; case \"n51\": _pc = (! (! (castCount >= 2))) ? \"n50\" : \"n49\"; break; case \"n49\": recast = (castCount === 1); _pc = \"n48\"; break; case \"n48\": pos = selectTarget({type: \"grid\", range: 4, filter: \"all\"}); _pc = \"n47\"; break; case \"n47\": _pc = (! (! ((! pos) || (pos)[\"needsTargetSelection\"]))) ? \"n46\" : \"n45\"; break; case \"n45\": dx = ((pos)[\"x\"] - (source)[\"x\"]); _pc = \"n44\"; break; case \"n44\": dy = ((pos)[\"y\"] - (source)[\"y\"]); _pc = \"n43\"; break; case \"n43\": _pc = (! (! (((dx !== 0) && (dy !== 0)) || ((dx === 0) && (dy === 0))))) ? \"n42\" : \"n41\"; break; case \"n41\": __rvb_import_bound_method_1 = (function (receiver) { var capturedMethod = receiver[\"forEach\"]; return function () { return Reflect.apply(capturedMethod, receiver, arguments); }; })((((source)[\"statusTags\"] || []))[\"slice\"]()); _pc = \"n37\"; break; case \"n37\": (__rvb_import_bound_method_1)(function (tag) { { var __rvb_content_graph_region_pc_1 = \"n40\"; while (__rvb_content_graph_region_pc_1 !== \"n38\") { switch (__rvb_content_graph_region_pc_1) { case \"n40\": __rvb_content_graph_region_pc_1 = (! (! (((tag)[\"type\"] === \"max-speed-shot-recast\") && (Number((tag)[\"turnNumber\"]) !== turnNumber)))) ? \"n39\" : \"n38\"; break; case \"n39\": removeStatusEffectById((source)[\"instanceId\"], (tag)[\"id\"]); __rvb_content_graph_region_pc_1 = \"n38\"; break; case \"n38\": __rvb_content_graph_region_pc_1 = \"n38\"; break; default: throw new Error(\"invalid content graph region node\"); } } } }); _pc = \"n36\"; break; case \"n36\": _pc = (! (! recast)) ? \"n33\" : \"n35\"; break; case \"n35\": addStatusEffectById((source)[\"instanceId\"], {id: (((\"max-speed-shot-recast-\" + (source)[\"instanceId\"]) + \"-\") + turnNumber), type: \"max-speed-shot-recast\", name: \"速射能量炮·再次释放\", visible: false, stacking: \"independent\", turnNumber: turnNumber, currentDuration: 1, currentUses: 1, remainingUses: 1}); _pc = \"n34\"; break; case \"n34\": flow.skills.resetCooldown((source)[\"instanceId\"], [\"max-speed-shot\"]); _pc = \"n25\"; break; case \"n33\": __rvb_import_bound_method_0 = (function (receiver) { var capturedMethod = receiver[\"forEach\"]; return function () { return Reflect.apply(capturedMethod, receiver, arguments); }; })((((source)[\"statusTags\"] || []))[\"slice\"]()); _pc = \"n29\"; break; case \"n29\": (__rvb_import_bound_method_0)(function (tag) { { var __rvb_content_graph_region_pc_2 = \"n32\"; while (__rvb_content_graph_region_pc_2 !== \"n30\") { switch (__rvb_content_graph_region_pc_2) { case \"n32\": __rvb_content_graph_region_pc_2 = (! (! (((tag)[\"type\"] === \"max-speed-shot-recast\") && (Number((tag)[\"turnNumber\"]) === turnNumber)))) ? \"n31\" : \"n30\"; break; case \"n31\": removeStatusEffectById((source)[\"instanceId\"], (tag)[\"id\"]); __rvb_content_graph_region_pc_2 = \"n30\"; break; case \"n30\": __rvb_content_graph_region_pc_2 = \"n30\"; break; default: throw new Error(\"invalid content graph region node\"); } } } }); _pc = \"n28\"; break; case \"n28\": skillState = (((source)[\"skills\"] || []))[\"find\"](function (skill) { return ((skill)[\"skillId\"] === \"max-speed-shot\"); }); _pc = \"n27\"; break; case \"n27\": _pc = (! (! skillState)) ? \"n26\" : \"n25\"; break; case \"n26\": (skillState)[\"currentCooldown\"] = 1; _pc = \"n25\"; break; case \"n25\": direction = {x: ((dx === 0) ? 0 : ((dx > 0) ? 1 : (- 1))), y: ((dy === 0) ? 0 : ((dy > 0) ? 1 : (- 1)))}; _pc = \"n24\"; break; case \"n24\": events = traceProjectile({x: (source)[\"x\"], y: (source)[\"y\"]}, direction, {excludePieceId: (source)[\"instanceId\"], maxDistance: 4}); _pc = \"n23\"; break; case \"n23\": i = 0; _pc = \"n22\"; break; case \"n22\": var __rvb_content_graph_loop_break_3 = false, __rvb_content_graph_loop_continue_4 = false; while ((! (! (i < (events)[\"length\"])))) { __rvb_content_graph_loop_continue_4 = false; { var __rvb_content_graph_region_pc_5 = \"n19\"; while (__rvb_content_graph_region_pc_5 !== \"n2\") { switch (__rvb_content_graph_region_pc_5) { case \"n19\": event = (events)[(function (key) { if (typeof key === \"string\" && key.split(\".\").some(function (part) { return [\"__proto__\",\"arguments\",\"callee\",\"caller\",\"constructor\",\"prototype\"].indexOf(part) !== -1; })) throw new Error(\"unsafe content graph index\"); return key; })(i)]; __rvb_content_graph_region_pc_5 = \"n18\"; break; case \"n18\": __rvb_content_graph_region_pc_5 = (! (! ((event)[\"type\"] === \"piece\"))) ? \"n17\" : \"n4\"; break; case \"n4\": __rvb_content_graph_region_pc_5 = (! (! (((event)[\"type\"] === \"terrain\") && (event)[\"blocksProjectile\"]))) ? \"n3\" : \"n2\"; break; case \"n2\": __rvb_content_graph_region_pc_5 = \"n2\"; break; case \"n3\": return {success: true, message: ((source)[\"name\"] + \"的速射能量炮被地形阻挡\")}; case \"n17\": __rvb_content_graph_region_pc_5 = (! (! arePlayersAllied(battle, ((event)[\"piece\"])[\"ownerPlayerId\"], (source)[\"ownerPlayerId\"]))) ? \"n16\" : \"n15\"; break; case \"n15\": hits = 0; __rvb_content_graph_region_pc_5 = \"n14\"; break; case \"n14\": damage = 0; __rvb_content_graph_region_pc_5 = \"n13\"; break; case \"n13\": shot = 0; __rvb_content_graph_region_pc_5 = \"n12\"; break; case \"n12\": var __rvb_content_graph_loop_break_6 = false, __rvb_content_graph_loop_continue_7 = false; while ((! (! ((shot < 4) && (((event)[\"piece\"])[\"currentHp\"] > 0))))) { __rvb_content_graph_loop_continue_7 = false; { var __rvb_content_graph_region_pc_8 = \"n9\"; while (__rvb_content_graph_region_pc_8 !== \"n6\") { switch (__rvb_content_graph_region_pc_8) { case \"n9\": result = dealDamage(source, (event)[\"piece\"], 1, \"physical\", battle, ((context)[\"skill\"])[\"id\"]); __rvb_content_graph_region_pc_8 = \"n8\"; break; case \"n8\": damage += Number(((result)[\"damage\"] || 0)); __rvb_content_graph_region_pc_8 = \"n7\"; break; case \"n7\": hits += 1; __rvb_content_graph_region_pc_8 = \"n6\"; break; case \"n6\": __rvb_content_graph_region_pc_8 = \"n6\"; break; default: throw new Error(\"invalid content graph region node\"); } } } if (__rvb_content_graph_loop_break_6) break; { var __rvb_content_graph_region_pc_9 = \"n11\"; while (__rvb_content_graph_region_pc_9 !== \"n10\") { switch (__rvb_content_graph_region_pc_9) { case \"n11\": shot = ((+ shot) + 1); __rvb_content_graph_region_pc_9 = \"n10\"; break; case \"n10\": __rvb_content_graph_region_pc_9 = \"n10\"; break; default: throw new Error(\"invalid content graph region node\"); } } } if (__rvb_content_graph_loop_break_6) break; if (__rvb_content_graph_loop_continue_7) { __rvb_content_graph_loop_continue_7 = false; continue; } } __rvb_content_graph_region_pc_5 = \"n5\"; break; case \"n5\": return {success: true, message: ((((((((source)[\"name\"] + \"的速射能量炮命中\") + ((event)[\"piece\"])[\"name\"]) + \"，进行\") + hits) + \"次射击并造成\") + damage) + \"点伤害\")}; case \"n16\": return {success: true, message: ((source)[\"name\"] + \"的速射能量炮被友方棋子阻挡\")}; default: throw new Error(\"invalid content graph region node\"); } } } if (__rvb_content_graph_loop_break_3) break; { var __rvb_content_graph_region_pc_10 = \"n21\"; while (__rvb_content_graph_region_pc_10 !== \"n20\") { switch (__rvb_content_graph_region_pc_10) { case \"n21\": i = ((+ i) + 1); __rvb_content_graph_region_pc_10 = \"n20\"; break; case \"n20\": __rvb_content_graph_region_pc_10 = \"n20\"; break; default: throw new Error(\"invalid content graph region node\"); } } } if (__rvb_content_graph_loop_break_3) break; if (__rvb_content_graph_loop_continue_4) { __rvb_content_graph_loop_continue_4 = false; continue; } } _pc = \"n1\"; break; case \"n1\": return {success: true, message: ((source)[\"name\"] + \"的速射能量炮未命中敌人\")}; case \"n42\": return {success: false, message: \"请选择正方向\"}; case \"n46\": return pos; case \"n50\": return {success: false, message: \"本回合速射能量炮最多释放2次\"}; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\"); }",
+  "contentGraph": {
+    "version": "rvb-content-graph/v1",
+    "surface": "skill",
+    "entry": "n68",
+    "nodes": [
+      {
+        "id": "n1",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "source"
+                  },
+                  "key": "name"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "的速射能量炮未命中敌人"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n22",
+        "kind": "loop",
+        "loop": "for",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "<",
+              "left": {
+                "kind": "ref",
+                "name": "i"
+              },
+              "right": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "events"
+                },
+                "key": "length"
+              }
+            }
+          }
+        },
+        "body": {
+          "entry": "n19",
+          "end": "n2",
+          "nodes": [
+            {
+              "id": "n2",
+              "kind": "regionEnd"
+            },
+            {
+              "id": "n3",
+              "kind": "return",
+              "value": {
+                "kind": "object",
+                "entries": [
+                  {
+                    "key": "success",
+                    "value": {
+                      "kind": "literal",
+                      "value": true
+                    }
+                  },
+                  {
+                    "key": "message",
+                    "value": {
+                      "kind": "binary",
+                      "op": "+",
+                      "left": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "source"
+                        },
+                        "key": "name"
+                      },
+                      "right": {
+                        "kind": "literal",
+                        "value": "的速射能量炮被地形阻挡"
+                      }
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "id": "n4",
+              "kind": "branch",
+              "condition": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "unary",
+                  "op": "!",
+                  "argument": {
+                    "kind": "binary",
+                    "op": "&&",
+                    "left": {
+                      "kind": "binary",
+                      "op": "===",
+                      "left": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "event"
+                        },
+                        "key": "type"
+                      },
+                      "right": {
+                        "kind": "literal",
+                        "value": "terrain"
+                      }
+                    },
+                    "right": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "event"
+                      },
+                      "key": "blocksProjectile"
+                    }
+                  }
+                }
+              },
+              "yes": "n3",
+              "no": "n2"
+            },
+            {
+              "id": "n5",
+              "kind": "return",
+              "value": {
+                "kind": "object",
+                "entries": [
+                  {
+                    "key": "success",
+                    "value": {
+                      "kind": "literal",
+                      "value": true
+                    }
+                  },
+                  {
+                    "key": "message",
+                    "value": {
+                      "kind": "binary",
+                      "op": "+",
+                      "left": {
+                        "kind": "binary",
+                        "op": "+",
+                        "left": {
+                          "kind": "binary",
+                          "op": "+",
+                          "left": {
+                            "kind": "binary",
+                            "op": "+",
+                            "left": {
+                              "kind": "binary",
+                              "op": "+",
+                              "left": {
+                                "kind": "binary",
+                                "op": "+",
+                                "left": {
+                                  "kind": "binary",
+                                  "op": "+",
+                                  "left": {
+                                    "kind": "get",
+                                    "object": {
+                                      "kind": "ref",
+                                      "name": "source"
+                                    },
+                                    "key": "name"
+                                  },
+                                  "right": {
+                                    "kind": "literal",
+                                    "value": "的速射能量炮命中"
+                                  }
+                                },
+                                "right": {
+                                  "kind": "get",
+                                  "object": {
+                                    "kind": "get",
+                                    "object": {
+                                      "kind": "ref",
+                                      "name": "event"
+                                    },
+                                    "key": "piece"
+                                  },
+                                  "key": "name"
+                                }
+                              },
+                              "right": {
+                                "kind": "literal",
+                                "value": "，进行"
+                              }
+                            },
+                            "right": {
+                              "kind": "ref",
+                              "name": "hits"
+                            }
+                          },
+                          "right": {
+                            "kind": "literal",
+                            "value": "次射击并造成"
+                          }
+                        },
+                        "right": {
+                          "kind": "ref",
+                          "name": "damage"
+                        }
+                      },
+                      "right": {
+                        "kind": "literal",
+                        "value": "点伤害"
+                      }
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "id": "n12",
+              "kind": "loop",
+              "loop": "for",
+              "condition": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "unary",
+                  "op": "!",
+                  "argument": {
+                    "kind": "binary",
+                    "op": "&&",
+                    "left": {
+                      "kind": "binary",
+                      "op": "<",
+                      "left": {
+                        "kind": "ref",
+                        "name": "shot"
+                      },
+                      "right": {
+                        "kind": "literal",
+                        "value": 4
+                      }
+                    },
+                    "right": {
+                      "kind": "binary",
+                      "op": ">",
+                      "left": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "event"
+                          },
+                          "key": "piece"
+                        },
+                        "key": "currentHp"
+                      },
+                      "right": {
+                        "kind": "literal",
+                        "value": 0
+                      }
+                    }
+                  }
+                }
+              },
+              "body": {
+                "entry": "n9",
+                "end": "n6",
+                "nodes": [
+                  {
+                    "id": "n6",
+                    "kind": "regionEnd"
+                  },
+                  {
+                    "id": "n7",
+                    "kind": "set",
+                    "target": {
+                      "kind": "ref",
+                      "name": "hits"
+                    },
+                    "operator": "+=",
+                    "value": {
+                      "kind": "literal",
+                      "value": 1
+                    },
+                    "next": "n6"
+                  },
+                  {
+                    "id": "n8",
+                    "kind": "set",
+                    "target": {
+                      "kind": "ref",
+                      "name": "damage"
+                    },
+                    "operator": "+=",
+                    "value": {
+                      "kind": "call",
+                      "callee": "Number",
+                      "args": [
+                        {
+                          "kind": "binary",
+                          "op": "||",
+                          "left": {
+                            "kind": "get",
+                            "object": {
+                              "kind": "ref",
+                              "name": "result"
+                            },
+                            "key": "damage"
+                          },
+                          "right": {
+                            "kind": "literal",
+                            "value": 0
+                          }
+                        }
+                      ]
+                    },
+                    "next": "n7"
+                  },
+                  {
+                    "id": "n9",
+                    "kind": "call",
+                    "capability": "dealDamage",
+                    "args": [
+                      {
+                        "kind": "ref",
+                        "name": "source"
+                      },
+                      {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "event"
+                        },
+                        "key": "piece"
+                      },
+                      {
+                        "kind": "literal",
+                        "value": 1
+                      },
+                      {
+                        "kind": "literal",
+                        "value": "physical"
+                      },
+                      {
+                        "kind": "ref",
+                        "name": "battle"
+                      },
+                      {
+                        "kind": "get",
+                        "object": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "context"
+                          },
+                          "key": "skill"
+                        },
+                        "key": "id"
+                      }
+                    ],
+                    "result": "result",
+                    "next": "n8"
+                  }
+                ]
+              },
+              "update": {
+                "entry": "n11",
+                "end": "n10",
+                "nodes": [
+                  {
+                    "id": "n10",
+                    "kind": "regionEnd"
+                  },
+                  {
+                    "id": "n11",
+                    "kind": "set",
+                    "target": {
+                      "kind": "ref",
+                      "name": "shot"
+                    },
+                    "operator": "=",
+                    "value": {
+                      "kind": "binary",
+                      "op": "+",
+                      "left": {
+                        "kind": "unary",
+                        "op": "+",
+                        "argument": {
+                          "kind": "ref",
+                          "name": "shot"
+                        }
+                      },
+                      "right": {
+                        "kind": "literal",
+                        "value": 1
+                      }
+                    },
+                    "next": "n10"
+                  }
+                ]
+              },
+              "next": "n5"
+            },
+            {
+              "id": "n13",
+              "kind": "bind",
+              "name": "shot",
+              "expr": {
+                "kind": "literal",
+                "value": 0
+              },
+              "next": "n12"
+            },
+            {
+              "id": "n14",
+              "kind": "bind",
+              "name": "damage",
+              "expr": {
+                "kind": "literal",
+                "value": 0
+              },
+              "next": "n13"
+            },
+            {
+              "id": "n15",
+              "kind": "bind",
+              "name": "hits",
+              "expr": {
+                "kind": "literal",
+                "value": 0
+              },
+              "next": "n14"
+            },
+            {
+              "id": "n16",
+              "kind": "return",
+              "value": {
+                "kind": "object",
+                "entries": [
+                  {
+                    "key": "success",
+                    "value": {
+                      "kind": "literal",
+                      "value": true
+                    }
+                  },
+                  {
+                    "key": "message",
+                    "value": {
+                      "kind": "binary",
+                      "op": "+",
+                      "left": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "source"
+                        },
+                        "key": "name"
+                      },
+                      "right": {
+                        "kind": "literal",
+                        "value": "的速射能量炮被友方棋子阻挡"
+                      }
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "id": "n17",
+              "kind": "branch",
+              "condition": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "unary",
+                  "op": "!",
+                  "argument": {
+                    "kind": "call",
+                    "callee": "arePlayersAllied",
+                    "args": [
+                      {
+                        "kind": "ref",
+                        "name": "battle"
+                      },
+                      {
+                        "kind": "get",
+                        "object": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "event"
+                          },
+                          "key": "piece"
+                        },
+                        "key": "ownerPlayerId"
+                      },
+                      {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "source"
+                        },
+                        "key": "ownerPlayerId"
+                      }
+                    ]
+                  }
+                }
+              },
+              "yes": "n16",
+              "no": "n15"
+            },
+            {
+              "id": "n18",
+              "kind": "branch",
+              "condition": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "unary",
+                  "op": "!",
+                  "argument": {
+                    "kind": "binary",
+                    "op": "===",
+                    "left": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "event"
+                      },
+                      "key": "type"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": "piece"
+                    }
+                  }
+                }
+              },
+              "yes": "n17",
+              "no": "n4"
+            },
+            {
+              "id": "n19",
+              "kind": "bind",
+              "name": "event",
+              "expr": {
+                "kind": "index",
+                "object": {
+                  "kind": "ref",
+                  "name": "events"
+                },
+                "index": {
+                  "kind": "ref",
+                  "name": "i"
+                }
+              },
+              "next": "n18"
+            }
+          ]
+        },
+        "update": {
+          "entry": "n21",
+          "end": "n20",
+          "nodes": [
+            {
+              "id": "n20",
+              "kind": "regionEnd"
+            },
+            {
+              "id": "n21",
+              "kind": "set",
+              "target": {
+                "kind": "ref",
+                "name": "i"
+              },
+              "operator": "=",
+              "value": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "unary",
+                  "op": "+",
+                  "argument": {
+                    "kind": "ref",
+                    "name": "i"
+                  }
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": 1
+                }
+              },
+              "next": "n20"
+            }
+          ]
+        },
+        "next": "n1"
+      },
+      {
+        "id": "n23",
+        "kind": "bind",
+        "name": "i",
+        "expr": {
+          "kind": "literal",
+          "value": 0
+        },
+        "next": "n22"
+      },
+      {
+        "id": "n24",
+        "kind": "call",
+        "capability": "traceProjectile",
+        "args": [
+          {
+            "kind": "object",
+            "entries": [
+              {
+                "key": "x",
+                "value": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "source"
+                  },
+                  "key": "x"
+                }
+              },
+              {
+                "key": "y",
+                "value": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "source"
+                  },
+                  "key": "y"
+                }
+              }
+            ]
+          },
+          {
+            "kind": "ref",
+            "name": "direction"
+          },
+          {
+            "kind": "object",
+            "entries": [
+              {
+                "key": "excludePieceId",
+                "value": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "source"
+                  },
+                  "key": "instanceId"
+                }
+              },
+              {
+                "key": "maxDistance",
+                "value": {
+                  "kind": "literal",
+                  "value": 4
+                }
+              }
+            ]
+          }
+        ],
+        "result": "events",
+        "next": "n23"
+      },
+      {
+        "id": "n25",
+        "kind": "bind",
+        "name": "direction",
+        "expr": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "x",
+              "value": {
+                "kind": "conditional",
+                "test": {
+                  "kind": "binary",
+                  "op": "===",
+                  "left": {
+                    "kind": "ref",
+                    "name": "dx"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": 0
+                  }
+                },
+                "consequent": {
+                  "kind": "literal",
+                  "value": 0
+                },
+                "alternate": {
+                  "kind": "conditional",
+                  "test": {
+                    "kind": "binary",
+                    "op": ">",
+                    "left": {
+                      "kind": "ref",
+                      "name": "dx"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": 0
+                    }
+                  },
+                  "consequent": {
+                    "kind": "literal",
+                    "value": 1
+                  },
+                  "alternate": {
+                    "kind": "unary",
+                    "op": "-",
+                    "argument": {
+                      "kind": "literal",
+                      "value": 1
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "key": "y",
+              "value": {
+                "kind": "conditional",
+                "test": {
+                  "kind": "binary",
+                  "op": "===",
+                  "left": {
+                    "kind": "ref",
+                    "name": "dy"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": 0
+                  }
+                },
+                "consequent": {
+                  "kind": "literal",
+                  "value": 0
+                },
+                "alternate": {
+                  "kind": "conditional",
+                  "test": {
+                    "kind": "binary",
+                    "op": ">",
+                    "left": {
+                      "kind": "ref",
+                      "name": "dy"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": 0
+                    }
+                  },
+                  "consequent": {
+                    "kind": "literal",
+                    "value": 1
+                  },
+                  "alternate": {
+                    "kind": "unary",
+                    "op": "-",
+                    "argument": {
+                      "kind": "literal",
+                      "value": 1
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "next": "n24"
+      },
+      {
+        "id": "n26",
+        "kind": "set",
+        "target": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "skillState"
+          },
+          "key": "currentCooldown"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "literal",
+          "value": 1
+        },
+        "next": "n25"
+      },
+      {
+        "id": "n27",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "ref",
+              "name": "skillState"
+            }
+          }
+        },
+        "yes": "n26",
+        "no": "n25"
+      },
+      {
+        "id": "n28",
+        "kind": "bind",
+        "name": "skillState",
+        "expr": {
+          "kind": "collection",
+          "object": {
+            "kind": "binary",
+            "op": "||",
+            "left": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "source"
+              },
+              "key": "skills"
+            },
+            "right": {
+              "kind": "array",
+              "items": []
+            }
+          },
+          "method": "find",
+          "args": [
+            {
+              "kind": "lambda",
+              "parameters": [
+                "skill"
+              ],
+              "body": {
+                "kind": "binary",
+                "op": "===",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "skill"
+                  },
+                  "key": "skillId"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "max-speed-shot"
+                }
+              }
+            }
+          ]
+        },
+        "next": "n27"
+      },
+      {
+        "id": "n29",
+        "kind": "invoke",
+        "target": {
+          "kind": "function",
+          "value": {
+            "kind": "ref",
+            "name": "__rvb_import_bound_method_0"
+          }
+        },
+        "args": [
+          {
+            "kind": "function",
+            "parameters": [
+              "tag"
+            ],
+            "body": {
+              "entry": "n32",
+              "end": "n30",
+              "nodes": [
+                {
+                  "id": "n30",
+                  "kind": "regionEnd"
+                },
+                {
+                  "id": "n31",
+                  "kind": "call",
+                  "capability": "removeStatusEffectById",
+                  "args": [
+                    {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "source"
+                      },
+                      "key": "instanceId"
+                    },
+                    {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "tag"
+                      },
+                      "key": "id"
+                    }
+                  ],
+                  "next": "n30"
+                },
+                {
+                  "id": "n32",
+                  "kind": "branch",
+                  "condition": {
+                    "kind": "unary",
+                    "op": "!",
+                    "argument": {
+                      "kind": "unary",
+                      "op": "!",
+                      "argument": {
+                        "kind": "binary",
+                        "op": "&&",
+                        "left": {
+                          "kind": "binary",
+                          "op": "===",
+                          "left": {
+                            "kind": "get",
+                            "object": {
+                              "kind": "ref",
+                              "name": "tag"
+                            },
+                            "key": "type"
+                          },
+                          "right": {
+                            "kind": "literal",
+                            "value": "max-speed-shot-recast"
+                          }
+                        },
+                        "right": {
+                          "kind": "binary",
+                          "op": "===",
+                          "left": {
+                            "kind": "call",
+                            "callee": "Number",
+                            "args": [
+                              {
+                                "kind": "get",
+                                "object": {
+                                  "kind": "ref",
+                                  "name": "tag"
+                                },
+                                "key": "turnNumber"
+                              }
+                            ]
+                          },
+                          "right": {
+                            "kind": "ref",
+                            "name": "turnNumber"
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "yes": "n31",
+                  "no": "n30"
+                }
+              ]
+            }
+          }
+        ],
+        "next": "n28"
+      },
+      {
+        "id": "n33",
+        "kind": "bind",
+        "name": "__rvb_import_bound_method_0",
+        "expr": {
+          "kind": "boundMethod",
+          "object": {
+            "kind": "collection",
+            "object": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "source"
+                },
+                "key": "statusTags"
+              },
+              "right": {
+                "kind": "array",
+                "items": []
+              }
+            },
+            "method": "slice",
+            "args": []
+          },
+          "method": "forEach"
+        },
+        "next": "n29"
+      },
+      {
+        "id": "n34",
+        "kind": "call",
+        "capability": "flow.skills.resetCooldown",
+        "args": [
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "source"
+            },
+            "key": "instanceId"
+          },
+          {
+            "kind": "array",
+            "items": [
+              {
+                "kind": "literal",
+                "value": "max-speed-shot"
+              }
+            ]
+          }
+        ],
+        "next": "n25"
+      },
+      {
+        "id": "n35",
+        "kind": "call",
+        "capability": "addStatusEffectById",
+        "args": [
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "source"
+            },
+            "key": "instanceId"
+          },
+          {
+            "kind": "object",
+            "entries": [
+              {
+                "key": "id",
+                "value": {
+                  "kind": "binary",
+                  "op": "+",
+                  "left": {
+                    "kind": "binary",
+                    "op": "+",
+                    "left": {
+                      "kind": "binary",
+                      "op": "+",
+                      "left": {
+                        "kind": "literal",
+                        "value": "max-speed-shot-recast-"
+                      },
+                      "right": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "source"
+                        },
+                        "key": "instanceId"
+                      }
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": "-"
+                    }
+                  },
+                  "right": {
+                    "kind": "ref",
+                    "name": "turnNumber"
+                  }
+                }
+              },
+              {
+                "key": "type",
+                "value": {
+                  "kind": "literal",
+                  "value": "max-speed-shot-recast"
+                }
+              },
+              {
+                "key": "name",
+                "value": {
+                  "kind": "literal",
+                  "value": "速射能量炮·再次释放"
+                }
+              },
+              {
+                "key": "visible",
+                "value": {
+                  "kind": "literal",
+                  "value": false
+                }
+              },
+              {
+                "key": "stacking",
+                "value": {
+                  "kind": "literal",
+                  "value": "independent"
+                }
+              },
+              {
+                "key": "turnNumber",
+                "value": {
+                  "kind": "ref",
+                  "name": "turnNumber"
+                }
+              },
+              {
+                "key": "currentDuration",
+                "value": {
+                  "kind": "literal",
+                  "value": 1
+                }
+              },
+              {
+                "key": "currentUses",
+                "value": {
+                  "kind": "literal",
+                  "value": 1
+                }
+              },
+              {
+                "key": "remainingUses",
+                "value": {
+                  "kind": "literal",
+                  "value": 1
+                }
+              }
+            ]
+          }
+        ],
+        "next": "n34"
+      },
+      {
+        "id": "n36",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "ref",
+              "name": "recast"
+            }
+          }
+        },
+        "yes": "n33",
+        "no": "n35"
+      },
+      {
+        "id": "n37",
+        "kind": "invoke",
+        "target": {
+          "kind": "function",
+          "value": {
+            "kind": "ref",
+            "name": "__rvb_import_bound_method_1"
+          }
+        },
+        "args": [
+          {
+            "kind": "function",
+            "parameters": [
+              "tag"
+            ],
+            "body": {
+              "entry": "n40",
+              "end": "n38",
+              "nodes": [
+                {
+                  "id": "n38",
+                  "kind": "regionEnd"
+                },
+                {
+                  "id": "n39",
+                  "kind": "call",
+                  "capability": "removeStatusEffectById",
+                  "args": [
+                    {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "source"
+                      },
+                      "key": "instanceId"
+                    },
+                    {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "tag"
+                      },
+                      "key": "id"
+                    }
+                  ],
+                  "next": "n38"
+                },
+                {
+                  "id": "n40",
+                  "kind": "branch",
+                  "condition": {
+                    "kind": "unary",
+                    "op": "!",
+                    "argument": {
+                      "kind": "unary",
+                      "op": "!",
+                      "argument": {
+                        "kind": "binary",
+                        "op": "&&",
+                        "left": {
+                          "kind": "binary",
+                          "op": "===",
+                          "left": {
+                            "kind": "get",
+                            "object": {
+                              "kind": "ref",
+                              "name": "tag"
+                            },
+                            "key": "type"
+                          },
+                          "right": {
+                            "kind": "literal",
+                            "value": "max-speed-shot-recast"
+                          }
+                        },
+                        "right": {
+                          "kind": "binary",
+                          "op": "!==",
+                          "left": {
+                            "kind": "call",
+                            "callee": "Number",
+                            "args": [
+                              {
+                                "kind": "get",
+                                "object": {
+                                  "kind": "ref",
+                                  "name": "tag"
+                                },
+                                "key": "turnNumber"
+                              }
+                            ]
+                          },
+                          "right": {
+                            "kind": "ref",
+                            "name": "turnNumber"
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "yes": "n39",
+                  "no": "n38"
+                }
+              ]
+            }
+          }
+        ],
+        "next": "n36"
+      },
+      {
+        "id": "n41",
+        "kind": "bind",
+        "name": "__rvb_import_bound_method_1",
+        "expr": {
+          "kind": "boundMethod",
+          "object": {
+            "kind": "collection",
+            "object": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "source"
+                },
+                "key": "statusTags"
+              },
+              "right": {
+                "kind": "array",
+                "items": []
+              }
+            },
+            "method": "slice",
+            "args": []
+          },
+          "method": "forEach"
+        },
+        "next": "n37"
+      },
+      {
+        "id": "n42",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": "请选择正方向"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n43",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "binary",
+                "op": "&&",
+                "left": {
+                  "kind": "binary",
+                  "op": "!==",
+                  "left": {
+                    "kind": "ref",
+                    "name": "dx"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": 0
+                  }
+                },
+                "right": {
+                  "kind": "binary",
+                  "op": "!==",
+                  "left": {
+                    "kind": "ref",
+                    "name": "dy"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": 0
+                  }
+                }
+              },
+              "right": {
+                "kind": "binary",
+                "op": "&&",
+                "left": {
+                  "kind": "binary",
+                  "op": "===",
+                  "left": {
+                    "kind": "ref",
+                    "name": "dx"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": 0
+                  }
+                },
+                "right": {
+                  "kind": "binary",
+                  "op": "===",
+                  "left": {
+                    "kind": "ref",
+                    "name": "dy"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": 0
+                  }
+                }
+              }
+            }
+          }
+        },
+        "yes": "n42",
+        "no": "n41"
+      },
+      {
+        "id": "n44",
+        "kind": "bind",
+        "name": "dy",
+        "expr": {
+          "kind": "binary",
+          "op": "-",
+          "left": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "pos"
+            },
+            "key": "y"
+          },
+          "right": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "source"
+            },
+            "key": "y"
+          }
+        },
+        "next": "n43"
+      },
+      {
+        "id": "n45",
+        "kind": "bind",
+        "name": "dx",
+        "expr": {
+          "kind": "binary",
+          "op": "-",
+          "left": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "pos"
+            },
+            "key": "x"
+          },
+          "right": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "source"
+            },
+            "key": "x"
+          }
+        },
+        "next": "n44"
+      },
+      {
+        "id": "n46",
+        "kind": "return",
+        "value": {
+          "kind": "ref",
+          "name": "pos"
+        }
+      },
+      {
+        "id": "n47",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "ref",
+                  "name": "pos"
+                }
+              },
+              "right": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "pos"
+                },
+                "key": "needsTargetSelection"
+              }
+            }
+          }
+        },
+        "yes": "n46",
+        "no": "n45"
+      },
+      {
+        "id": "n48",
+        "kind": "call",
+        "capability": "selectTarget",
+        "args": [
+          {
+            "kind": "object",
+            "entries": [
+              {
+                "key": "type",
+                "value": {
+                  "kind": "literal",
+                  "value": "grid"
+                }
+              },
+              {
+                "key": "range",
+                "value": {
+                  "kind": "literal",
+                  "value": 4
+                }
+              },
+              {
+                "key": "filter",
+                "value": {
+                  "kind": "literal",
+                  "value": "all"
+                }
+              }
+            ]
+          }
+        ],
+        "result": "pos",
+        "next": "n47"
+      },
+      {
+        "id": "n49",
+        "kind": "bind",
+        "name": "recast",
+        "expr": {
+          "kind": "binary",
+          "op": "===",
+          "left": {
+            "kind": "ref",
+            "name": "castCount"
+          },
+          "right": {
+            "kind": "literal",
+            "value": 1
+          }
+        },
+        "next": "n48"
+      },
+      {
+        "id": "n50",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": "本回合速射能量炮最多释放2次"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n51",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": ">=",
+              "left": {
+                "kind": "ref",
+                "name": "castCount"
+              },
+              "right": {
+                "kind": "literal",
+                "value": 2
+              }
+            }
+          }
+        },
+        "yes": "n50",
+        "no": "n49"
+      },
+      {
+        "id": "n61",
+        "kind": "bind",
+        "name": "castCount",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "__rvb_import_effect_2"
+          },
+          "key": "length"
+        },
+        "next": "n51"
+      },
+      {
+        "id": "n62",
+        "kind": "invoke",
+        "target": {
+          "kind": "function",
+          "value": {
+            "kind": "ref",
+            "name": "__rvb_import_bound_method_3"
+          }
+        },
+        "args": [
+          {
+            "kind": "function",
+            "parameters": [
+              "action"
+            ],
+            "body": {
+              "entry": "n65",
+              "end": "n63",
+              "nodes": [
+                {
+                  "id": "n64",
+                  "kind": "return",
+                  "value": {
+                    "kind": "binary",
+                    "op": "&&",
+                    "left": {
+                      "kind": "binary",
+                      "op": "&&",
+                      "left": {
+                        "kind": "binary",
+                        "op": "&&",
+                        "left": {
+                          "kind": "binary",
+                          "op": "&&",
+                          "left": {
+                            "kind": "binary",
+                            "op": "&&",
+                            "left": {
+                              "kind": "binary",
+                              "op": "&&",
+                              "left": {
+                                "kind": "ref",
+                                "name": "action"
+                              },
+                              "right": {
+                                "kind": "binary",
+                                "op": "===",
+                                "left": {
+                                  "kind": "get",
+                                  "object": {
+                                    "kind": "ref",
+                                    "name": "action"
+                                  },
+                                  "key": "type"
+                                },
+                                "right": {
+                                  "kind": "literal",
+                                  "value": "useBasicSkill"
+                                }
+                              }
+                            },
+                            "right": {
+                              "kind": "binary",
+                              "op": "===",
+                              "left": {
+                                "kind": "call",
+                                "callee": "Number",
+                                "args": [
+                                  {
+                                    "kind": "get",
+                                    "object": {
+                                      "kind": "ref",
+                                      "name": "action"
+                                    },
+                                    "key": "turn"
+                                  }
+                                ]
+                              },
+                              "right": {
+                                "kind": "ref",
+                                "name": "turnNumber"
+                              }
+                            }
+                          },
+                          "right": {
+                            "kind": "ref",
+                            "name": "payload"
+                          }
+                        },
+                        "right": {
+                          "kind": "binary",
+                          "op": "===",
+                          "left": {
+                            "kind": "get",
+                            "object": {
+                              "kind": "ref",
+                              "name": "payload"
+                            },
+                            "key": "pieceId"
+                          },
+                          "right": {
+                            "kind": "get",
+                            "object": {
+                              "kind": "ref",
+                              "name": "source"
+                            },
+                            "key": "instanceId"
+                          }
+                        }
+                      },
+                      "right": {
+                        "kind": "binary",
+                        "op": "===",
+                        "left": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "payload"
+                          },
+                          "key": "skillId"
+                        },
+                        "right": {
+                          "kind": "literal",
+                          "value": "max-speed-shot"
+                        }
+                      }
+                    },
+                    "right": {
+                      "kind": "binary",
+                      "op": "!==",
+                      "left": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "payload"
+                        },
+                        "key": "interrupted"
+                      },
+                      "right": {
+                        "kind": "literal",
+                        "value": true
+                      }
+                    }
+                  }
+                },
+                {
+                  "id": "n65",
+                  "kind": "bind",
+                  "name": "payload",
+                  "expr": {
+                    "kind": "binary",
+                    "op": "&&",
+                    "left": {
+                      "kind": "ref",
+                      "name": "action"
+                    },
+                    "right": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "action"
+                      },
+                      "key": "payload"
+                    }
+                  },
+                  "next": "n64"
+                },
+                {
+                  "id": "n63",
+                  "kind": "regionEnd"
+                }
+              ]
+            }
+          }
+        ],
+        "result": "__rvb_import_effect_2",
+        "next": "n61"
+      },
+      {
+        "id": "n66",
+        "kind": "bind",
+        "name": "__rvb_import_bound_method_3",
+        "expr": {
+          "kind": "boundMethod",
+          "object": {
+            "kind": "binary",
+            "op": "||",
+            "left": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "battle"
+              },
+              "key": "actions"
+            },
+            "right": {
+              "kind": "array",
+              "items": []
+            }
+          },
+          "method": "filter"
+        },
+        "next": "n62"
+      },
+      {
+        "id": "n67",
+        "kind": "bind",
+        "name": "turnNumber",
+        "expr": {
+          "kind": "call",
+          "callee": "Number",
+          "args": [
+            {
+              "kind": "get",
+              "object": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "battle"
+                },
+                "key": "turn"
+              },
+              "key": "turnNumber"
+            }
+          ]
+        },
+        "next": "n66"
+      },
+      {
+        "id": "n68",
+        "kind": "bind",
+        "name": "source",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "context"
+          },
+          "key": "piece"
+        },
+        "next": "n67"
+      }
+    ]
+  },
+  "contentGraphField": "code",
+  "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1"
 }

@@ -25,6 +25,341 @@
       }
     ]
   },
-  "code": "function executeSkill(context) { var caster = context.piece; var target = selectTarget({ type: 'piece', range: 1, filter: 'enemy' }); if (!target || target.needsTargetSelection) return target; var damage = Math.floor(caster.attack * context.skill.powerMultiplier); var result = dealDamage(caster, target, damage, 'physical', battle, context.skill.id); return { success: true, message: caster.name + '以斩月对' + target.name + '造成' + result.damage + '点物理伤害' }; }",
-  "previewCode": "function calculatePreview(piece, skillDef) { var damage = Math.floor((piece.attack || 0) * skillDef.powerMultiplier); return { description: \"选择敌人（1），造成1倍伤害。\", expectedValues: { damage: damage } }; }"
+  "code": "function executeSkill(context) { var caster, damage, result, target; var _pc = \"n7\"; for (var _step = 0; _step <= 7; _step++) { switch (_pc) { case \"n7\": caster = (context)[\"piece\"]; _pc = \"n6\"; break; case \"n6\": target = selectTarget({type: \"piece\", range: 1, filter: \"enemy\"}); _pc = \"n5\"; break; case \"n5\": _pc = (! (! ((! target) || (target)[\"needsTargetSelection\"]))) ? \"n4\" : \"n3\"; break; case \"n3\": damage = Math.floor(((caster)[\"attack\"] * ((context)[\"skill\"])[\"powerMultiplier\"])); _pc = \"n2\"; break; case \"n2\": result = dealDamage(caster, target, damage, \"physical\", battle, ((context)[\"skill\"])[\"id\"]); _pc = \"n1\"; break; case \"n1\": return {success: true, message: ((((((caster)[\"name\"] + \"以斩月对\") + (target)[\"name\"]) + \"造成\") + (result)[\"damage\"]) + \"点物理伤害\")}; case \"n4\": return target; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\"); }",
+  "previewCode": "function calculatePreview(piece, skillDef, currentCooldown) { var damage; var _pc = \"n2\"; for (var _step = 0; _step <= 2; _step++) { switch (_pc) { case \"n2\": damage = Math.floor((((piece)[\"attack\"] || 0) * (skillDef)[\"powerMultiplier\"])); _pc = \"n1\"; break; case \"n1\": return {description: \"选择敌人（1），造成1倍伤害。\", expectedValues: {damage: damage}}; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\"); }",
+  "contentGraph": {
+    "version": "rvb-content-graph/v1",
+    "surface": "skill",
+    "entry": "n7",
+    "nodes": [
+      {
+        "id": "n1",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "binary",
+                  "op": "+",
+                  "left": {
+                    "kind": "binary",
+                    "op": "+",
+                    "left": {
+                      "kind": "binary",
+                      "op": "+",
+                      "left": {
+                        "kind": "binary",
+                        "op": "+",
+                        "left": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "caster"
+                          },
+                          "key": "name"
+                        },
+                        "right": {
+                          "kind": "literal",
+                          "value": "以斩月对"
+                        }
+                      },
+                      "right": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "target"
+                        },
+                        "key": "name"
+                      }
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": "造成"
+                    }
+                  },
+                  "right": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "result"
+                    },
+                    "key": "damage"
+                  }
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "点物理伤害"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n2",
+        "kind": "call",
+        "capability": "dealDamage",
+        "args": [
+          {
+            "kind": "ref",
+            "name": "caster"
+          },
+          {
+            "kind": "ref",
+            "name": "target"
+          },
+          {
+            "kind": "ref",
+            "name": "damage"
+          },
+          {
+            "kind": "literal",
+            "value": "physical"
+          },
+          {
+            "kind": "ref",
+            "name": "battle"
+          },
+          {
+            "kind": "get",
+            "object": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "context"
+              },
+              "key": "skill"
+            },
+            "key": "id"
+          }
+        ],
+        "result": "result",
+        "next": "n1"
+      },
+      {
+        "id": "n3",
+        "kind": "bind",
+        "name": "damage",
+        "expr": {
+          "kind": "call",
+          "callee": "Math.floor",
+          "args": [
+            {
+              "kind": "binary",
+              "op": "*",
+              "left": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "caster"
+                },
+                "key": "attack"
+              },
+              "right": {
+                "kind": "get",
+                "object": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "context"
+                  },
+                  "key": "skill"
+                },
+                "key": "powerMultiplier"
+              }
+            }
+          ]
+        },
+        "next": "n2"
+      },
+      {
+        "id": "n4",
+        "kind": "return",
+        "value": {
+          "kind": "ref",
+          "name": "target"
+        }
+      },
+      {
+        "id": "n5",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "ref",
+                  "name": "target"
+                }
+              },
+              "right": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "target"
+                },
+                "key": "needsTargetSelection"
+              }
+            }
+          }
+        },
+        "yes": "n4",
+        "no": "n3"
+      },
+      {
+        "id": "n6",
+        "kind": "call",
+        "capability": "selectTarget",
+        "args": [
+          {
+            "kind": "object",
+            "entries": [
+              {
+                "key": "type",
+                "value": {
+                  "kind": "literal",
+                  "value": "piece"
+                }
+              },
+              {
+                "key": "range",
+                "value": {
+                  "kind": "literal",
+                  "value": 1
+                }
+              },
+              {
+                "key": "filter",
+                "value": {
+                  "kind": "literal",
+                  "value": "enemy"
+                }
+              }
+            ]
+          }
+        ],
+        "result": "target",
+        "next": "n5"
+      },
+      {
+        "id": "n7",
+        "kind": "bind",
+        "name": "caster",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "context"
+          },
+          "key": "piece"
+        },
+        "next": "n6"
+      }
+    ]
+  },
+  "contentGraphField": "code",
+  "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1",
+  "contentGraphEntries": {
+    "previewCode": {
+      "graph": {
+        "version": "rvb-content-graph/v1",
+        "surface": "preview",
+        "entry": "n2",
+        "nodes": [
+          {
+            "id": "n1",
+            "kind": "return",
+            "value": {
+              "kind": "object",
+              "entries": [
+                {
+                  "key": "description",
+                  "value": {
+                    "kind": "literal",
+                    "value": "选择敌人（1），造成1倍伤害。"
+                  }
+                },
+                {
+                  "key": "expectedValues",
+                  "value": {
+                    "kind": "object",
+                    "entries": [
+                      {
+                        "key": "damage",
+                        "value": {
+                          "kind": "ref",
+                          "name": "damage"
+                        }
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "id": "n2",
+            "kind": "bind",
+            "name": "damage",
+            "expr": {
+              "kind": "call",
+              "callee": "Math.floor",
+              "args": [
+                {
+                  "kind": "binary",
+                  "op": "*",
+                  "left": {
+                    "kind": "binary",
+                    "op": "||",
+                    "left": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "piece"
+                      },
+                      "key": "attack"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": 0
+                    }
+                  },
+                  "right": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "skillDef"
+                    },
+                    "key": "powerMultiplier"
+                  }
+                }
+              ]
+            },
+            "next": "n1"
+          }
+        ]
+      },
+      "compilerVersion": "rvb-content-graph-compiler/v1"
+    }
+  }
 }

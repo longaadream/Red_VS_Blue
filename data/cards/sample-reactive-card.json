@@ -2,11 +2,298 @@
   "id": "sample-reactive-card",
   "name": "反击意志",
   "description": "当任意友方棋子受到伤害后自动触发：对攻击者造成5点真实伤害。",
-  "keywords": ["真实伤害"],
+  "keywords": [
+    "真实伤害"
+  ],
   "targetText": "攻击者",
-  "effectTags": ["真实伤害"],
+  "effectTags": [
+    "真实伤害"
+  ],
   "type": "reactive",
-  "trigger": { "type": "afterDamageTaken" },
+  "trigger": {
+    "type": "afterDamageTaken"
+  },
   "icon": "Zap",
-  "code": "function executeCard(context) {\n  if (!context.sourcePiece) return { success: false };\n  if (context.targetPiece && context.targetPiece.ownerPlayerId !== playerId) return { success: false };\n  const attacker = context.sourcePiece;\n  const defender = context.targetPiece;\n  if (!defender || defender.ownerPlayerId !== playerId) return { success: false };\n  const result = dealDamage(defender, attacker, 5, 'true', battle, 'sample-reactive-card');\n  return { success: true, message: `反击意志：对${attacker.name || attacker.templateId}造成5点真实伤害` };\n}"
+  "code": "function executeCard(context) { var __rvb_lexical_0_attacker, __rvb_lexical_1_defender, __rvb_lexical_2_result; var _pc = \"n10\"; for (var _step = 0; _step <= 10; _step++) { switch (_pc) { case \"n10\": _pc = (! (! (! (context)[\"sourcePiece\"]))) ? \"n9\" : \"n8\"; break; case \"n8\": _pc = (! (! ((context)[\"targetPiece\"] && (((context)[\"targetPiece\"])[\"ownerPlayerId\"] !== playerId)))) ? \"n7\" : \"n6\"; break; case \"n6\": __rvb_lexical_0_attacker = (context)[\"sourcePiece\"]; _pc = \"n5\"; break; case \"n5\": __rvb_lexical_1_defender = (context)[\"targetPiece\"]; _pc = \"n4\"; break; case \"n4\": _pc = (! (! ((! __rvb_lexical_1_defender) || ((__rvb_lexical_1_defender)[\"ownerPlayerId\"] !== playerId)))) ? \"n3\" : \"n2\"; break; case \"n2\": __rvb_lexical_2_result = dealDamage(__rvb_lexical_1_defender, __rvb_lexical_0_attacker, 5, \"true\", battle, \"sample-reactive-card\"); _pc = \"n1\"; break; case \"n1\": return {success: true, message: `反击意志：对${((__rvb_lexical_0_attacker)[\"name\"] || (__rvb_lexical_0_attacker)[\"templateId\"])}造成5点真实伤害`}; case \"n3\": return {success: false}; case \"n7\": return {success: false}; case \"n9\": return {success: false}; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\"); }",
+  "contentGraph": {
+    "version": "rvb-content-graph/v1",
+    "surface": "card",
+    "entry": "n10",
+    "nodes": [
+      {
+        "id": "n1",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "template",
+                "head": "反击意志：对",
+                "spans": [
+                  {
+                    "kind": "binary",
+                    "op": "||",
+                    "left": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "__rvb_lexical_0_attacker"
+                      },
+                      "key": "name"
+                    },
+                    "right": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "__rvb_lexical_0_attacker"
+                      },
+                      "key": "templateId"
+                    }
+                  }
+                ],
+                "tails": [
+                  "",
+                  "造成5点真实伤害"
+                ]
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n2",
+        "kind": "call",
+        "capability": "dealDamage",
+        "args": [
+          {
+            "kind": "ref",
+            "name": "__rvb_lexical_1_defender"
+          },
+          {
+            "kind": "ref",
+            "name": "__rvb_lexical_0_attacker"
+          },
+          {
+            "kind": "literal",
+            "value": 5
+          },
+          {
+            "kind": "literal",
+            "value": "true"
+          },
+          {
+            "kind": "ref",
+            "name": "battle"
+          },
+          {
+            "kind": "literal",
+            "value": "sample-reactive-card"
+          }
+        ],
+        "result": "__rvb_lexical_2_result",
+        "next": "n1"
+      },
+      {
+        "id": "n3",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n4",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "ref",
+                  "name": "__rvb_lexical_1_defender"
+                }
+              },
+              "right": {
+                "kind": "binary",
+                "op": "!==",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "__rvb_lexical_1_defender"
+                  },
+                  "key": "ownerPlayerId"
+                },
+                "right": {
+                  "kind": "ref",
+                  "name": "playerId"
+                }
+              }
+            }
+          }
+        },
+        "yes": "n3",
+        "no": "n2"
+      },
+      {
+        "id": "n5",
+        "kind": "bind",
+        "name": "__rvb_lexical_1_defender",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "context"
+          },
+          "key": "targetPiece"
+        },
+        "next": "n4"
+      },
+      {
+        "id": "n6",
+        "kind": "bind",
+        "name": "__rvb_lexical_0_attacker",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "context"
+          },
+          "key": "sourcePiece"
+        },
+        "next": "n5"
+      },
+      {
+        "id": "n7",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n8",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "&&",
+              "left": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "context"
+                },
+                "key": "targetPiece"
+              },
+              "right": {
+                "kind": "binary",
+                "op": "!==",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "context"
+                    },
+                    "key": "targetPiece"
+                  },
+                  "key": "ownerPlayerId"
+                },
+                "right": {
+                  "kind": "ref",
+                  "name": "playerId"
+                }
+              }
+            }
+          }
+        },
+        "yes": "n7",
+        "no": "n6"
+      },
+      {
+        "id": "n9",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n10",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "unary",
+              "op": "!",
+              "argument": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "context"
+                },
+                "key": "sourcePiece"
+              }
+            }
+          }
+        },
+        "yes": "n9",
+        "no": "n8"
+      }
+    ]
+  },
+  "contentGraphField": "code",
+  "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1"
 }

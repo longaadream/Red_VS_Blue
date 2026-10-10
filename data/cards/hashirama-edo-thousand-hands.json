@@ -26,6 +26,634 @@
   },
   "cardType": "wood",
   "icon": "🌦",
-  "code": "function executeCard(context) { var battle = context.battle; var playerId = context.playerId; var player = battle.players.find(function(p) { return p.playerId === playerId; }); var cardInHand = player && player.hand && player.hand.find(function(c) { return c.cardId === 'hashirama-edo-thousand-hands' && c.boundPieceInstanceId; }); var boundId = cardInHand && cardInHand.boundPieceInstanceId; var hashirama = boundId ? battle.pieces.find(function(p) { return p.instanceId === boundId && p.currentHp > 0; }) : battle.pieces.find(function(p) { return p.ownerPlayerId === playerId && p.templateId === 'hashirama-edo' && p.currentHp > 0; }); if (!hashirama) return { success: false, message: '场上没有存活的柱间' }; var target = context.target; if (!target) { target = selectTarget({ filter: 'enemy', range: 99 }); if (!target || target.needsTargetSelection) return target || { success: false, message: '请选择一名敌人' }; } var result = dealDamage(hashirama, target, hashirama.attack, 'physical', battle, 'hashirama-edo-thousand-hands'); return { success: true, message: '木遁·真数千手：' + hashirama.name + ' 对' + target.name + ' 造成 ' + result.damage + ' 点物理伤害' }; }",
-  "image": "hashirama-edo-thousand-hands.png"
+  "code": "function executeCard(context) { var __rvb_import_effect_0, battle, boundId, cardInHand, hashirama, player, playerId, result, target; var _pc = \"n16\"; for (var _step = 0; _step <= 16; _step++) { switch (_pc) { case \"n16\": battle = (context)[\"battle\"]; _pc = \"n15\"; break; case \"n15\": playerId = (context)[\"playerId\"]; _pc = \"n14\"; break; case \"n14\": player = ((battle)[\"players\"])[\"find\"](function (p) { return ((p)[\"playerId\"] === playerId); }); _pc = \"n13\"; break; case \"n13\": cardInHand = ((player && (player)[\"hand\"]) && ((player)[\"hand\"])[\"find\"](function (c) { return (((c)[\"cardId\"] === \"hashirama-edo-thousand-hands\") && (c)[\"boundPieceInstanceId\"]); })); _pc = \"n12\"; break; case \"n12\": boundId = (cardInHand && (cardInHand)[\"boundPieceInstanceId\"]); _pc = \"n11\"; break; case \"n11\": hashirama = (boundId ? ((battle)[\"pieces\"])[\"find\"](function (p) { return (((p)[\"instanceId\"] === boundId) && ((p)[\"currentHp\"] > 0)); }) : ((battle)[\"pieces\"])[\"find\"](function (p) { return ((((p)[\"ownerPlayerId\"] === playerId) && ((p)[\"templateId\"] === \"hashirama-edo\")) && ((p)[\"currentHp\"] > 0)); })); _pc = \"n10\"; break; case \"n10\": _pc = (! (! (! hashirama))) ? \"n9\" : \"n8\"; break; case \"n8\": target = (context)[\"target\"]; _pc = \"n7\"; break; case \"n7\": _pc = (! (! (! target))) ? \"n6\" : \"n2\"; break; case \"n6\": __rvb_import_effect_0 = selectTarget({filter: \"enemy\", range: 99}); _pc = \"n5\"; break; case \"n5\": target = __rvb_import_effect_0; _pc = \"n4\"; break; case \"n4\": _pc = (! (! ((! target) || (target)[\"needsTargetSelection\"]))) ? \"n3\" : \"n2\"; break; case \"n2\": result = dealDamage(hashirama, target, (hashirama)[\"attack\"], \"physical\", battle, \"hashirama-edo-thousand-hands\"); _pc = \"n1\"; break; case \"n1\": return {success: true, message: ((((((\"木遁·真数千手：\" + (hashirama)[\"name\"]) + \" 对\") + (target)[\"name\"]) + \" 造成 \") + (result)[\"damage\"]) + \" 点物理伤害\")}; case \"n3\": return (target || {success: false, message: \"请选择一名敌人\"}); case \"n9\": return {success: false, message: \"场上没有存活的柱间\"}; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\"); }",
+  "image": "hashirama-edo-thousand-hands.png",
+  "contentGraph": {
+    "version": "rvb-content-graph/v1",
+    "surface": "card",
+    "entry": "n16",
+    "nodes": [
+      {
+        "id": "n1",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "binary",
+                  "op": "+",
+                  "left": {
+                    "kind": "binary",
+                    "op": "+",
+                    "left": {
+                      "kind": "binary",
+                      "op": "+",
+                      "left": {
+                        "kind": "binary",
+                        "op": "+",
+                        "left": {
+                          "kind": "binary",
+                          "op": "+",
+                          "left": {
+                            "kind": "literal",
+                            "value": "木遁·真数千手："
+                          },
+                          "right": {
+                            "kind": "get",
+                            "object": {
+                              "kind": "ref",
+                              "name": "hashirama"
+                            },
+                            "key": "name"
+                          }
+                        },
+                        "right": {
+                          "kind": "literal",
+                          "value": " 对"
+                        }
+                      },
+                      "right": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "target"
+                        },
+                        "key": "name"
+                      }
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": " 造成 "
+                    }
+                  },
+                  "right": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "result"
+                    },
+                    "key": "damage"
+                  }
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": " 点物理伤害"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n2",
+        "kind": "call",
+        "capability": "dealDamage",
+        "args": [
+          {
+            "kind": "ref",
+            "name": "hashirama"
+          },
+          {
+            "kind": "ref",
+            "name": "target"
+          },
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "hashirama"
+            },
+            "key": "attack"
+          },
+          {
+            "kind": "literal",
+            "value": "physical"
+          },
+          {
+            "kind": "ref",
+            "name": "battle"
+          },
+          {
+            "kind": "literal",
+            "value": "hashirama-edo-thousand-hands"
+          }
+        ],
+        "result": "result",
+        "next": "n1"
+      },
+      {
+        "id": "n3",
+        "kind": "return",
+        "value": {
+          "kind": "binary",
+          "op": "||",
+          "left": {
+            "kind": "ref",
+            "name": "target"
+          },
+          "right": {
+            "kind": "object",
+            "entries": [
+              {
+                "key": "success",
+                "value": {
+                  "kind": "literal",
+                  "value": false
+                }
+              },
+              {
+                "key": "message",
+                "value": {
+                  "kind": "literal",
+                  "value": "请选择一名敌人"
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "n4",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "ref",
+                  "name": "target"
+                }
+              },
+              "right": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "target"
+                },
+                "key": "needsTargetSelection"
+              }
+            }
+          }
+        },
+        "yes": "n3",
+        "no": "n2"
+      },
+      {
+        "id": "n5",
+        "kind": "set",
+        "target": {
+          "kind": "ref",
+          "name": "target"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "ref",
+          "name": "__rvb_import_effect_0"
+        },
+        "next": "n4"
+      },
+      {
+        "id": "n6",
+        "kind": "call",
+        "capability": "selectTarget",
+        "args": [
+          {
+            "kind": "object",
+            "entries": [
+              {
+                "key": "filter",
+                "value": {
+                  "kind": "literal",
+                  "value": "enemy"
+                }
+              },
+              {
+                "key": "range",
+                "value": {
+                  "kind": "literal",
+                  "value": 99
+                }
+              }
+            ]
+          }
+        ],
+        "result": "__rvb_import_effect_0",
+        "next": "n5"
+      },
+      {
+        "id": "n7",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "unary",
+              "op": "!",
+              "argument": {
+                "kind": "ref",
+                "name": "target"
+              }
+            }
+          }
+        },
+        "yes": "n6",
+        "no": "n2"
+      },
+      {
+        "id": "n8",
+        "kind": "bind",
+        "name": "target",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "context"
+          },
+          "key": "target"
+        },
+        "next": "n7"
+      },
+      {
+        "id": "n9",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": "场上没有存活的柱间"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n10",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "unary",
+              "op": "!",
+              "argument": {
+                "kind": "ref",
+                "name": "hashirama"
+              }
+            }
+          }
+        },
+        "yes": "n9",
+        "no": "n8"
+      },
+      {
+        "id": "n11",
+        "kind": "bind",
+        "name": "hashirama",
+        "expr": {
+          "kind": "conditional",
+          "test": {
+            "kind": "ref",
+            "name": "boundId"
+          },
+          "consequent": {
+            "kind": "collection",
+            "object": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "battle"
+              },
+              "key": "pieces"
+            },
+            "method": "find",
+            "args": [
+              {
+                "kind": "lambda",
+                "parameters": [
+                  "p"
+                ],
+                "body": {
+                  "kind": "binary",
+                  "op": "&&",
+                  "left": {
+                    "kind": "binary",
+                    "op": "===",
+                    "left": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "p"
+                      },
+                      "key": "instanceId"
+                    },
+                    "right": {
+                      "kind": "ref",
+                      "name": "boundId"
+                    }
+                  },
+                  "right": {
+                    "kind": "binary",
+                    "op": ">",
+                    "left": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "p"
+                      },
+                      "key": "currentHp"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": 0
+                    }
+                  }
+                }
+              }
+            ]
+          },
+          "alternate": {
+            "kind": "collection",
+            "object": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "battle"
+              },
+              "key": "pieces"
+            },
+            "method": "find",
+            "args": [
+              {
+                "kind": "lambda",
+                "parameters": [
+                  "p"
+                ],
+                "body": {
+                  "kind": "binary",
+                  "op": "&&",
+                  "left": {
+                    "kind": "binary",
+                    "op": "&&",
+                    "left": {
+                      "kind": "binary",
+                      "op": "===",
+                      "left": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "p"
+                        },
+                        "key": "ownerPlayerId"
+                      },
+                      "right": {
+                        "kind": "ref",
+                        "name": "playerId"
+                      }
+                    },
+                    "right": {
+                      "kind": "binary",
+                      "op": "===",
+                      "left": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "p"
+                        },
+                        "key": "templateId"
+                      },
+                      "right": {
+                        "kind": "literal",
+                        "value": "hashirama-edo"
+                      }
+                    }
+                  },
+                  "right": {
+                    "kind": "binary",
+                    "op": ">",
+                    "left": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "p"
+                      },
+                      "key": "currentHp"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": 0
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "next": "n10"
+      },
+      {
+        "id": "n12",
+        "kind": "bind",
+        "name": "boundId",
+        "expr": {
+          "kind": "binary",
+          "op": "&&",
+          "left": {
+            "kind": "ref",
+            "name": "cardInHand"
+          },
+          "right": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "cardInHand"
+            },
+            "key": "boundPieceInstanceId"
+          }
+        },
+        "next": "n11"
+      },
+      {
+        "id": "n13",
+        "kind": "bind",
+        "name": "cardInHand",
+        "expr": {
+          "kind": "binary",
+          "op": "&&",
+          "left": {
+            "kind": "binary",
+            "op": "&&",
+            "left": {
+              "kind": "ref",
+              "name": "player"
+            },
+            "right": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "player"
+              },
+              "key": "hand"
+            }
+          },
+          "right": {
+            "kind": "collection",
+            "object": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "player"
+              },
+              "key": "hand"
+            },
+            "method": "find",
+            "args": [
+              {
+                "kind": "lambda",
+                "parameters": [
+                  "c"
+                ],
+                "body": {
+                  "kind": "binary",
+                  "op": "&&",
+                  "left": {
+                    "kind": "binary",
+                    "op": "===",
+                    "left": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "c"
+                      },
+                      "key": "cardId"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": "hashirama-edo-thousand-hands"
+                    }
+                  },
+                  "right": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "c"
+                    },
+                    "key": "boundPieceInstanceId"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "next": "n12"
+      },
+      {
+        "id": "n14",
+        "kind": "bind",
+        "name": "player",
+        "expr": {
+          "kind": "collection",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "battle"
+            },
+            "key": "players"
+          },
+          "method": "find",
+          "args": [
+            {
+              "kind": "lambda",
+              "parameters": [
+                "p"
+              ],
+              "body": {
+                "kind": "binary",
+                "op": "===",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "p"
+                  },
+                  "key": "playerId"
+                },
+                "right": {
+                  "kind": "ref",
+                  "name": "playerId"
+                }
+              }
+            }
+          ]
+        },
+        "next": "n13"
+      },
+      {
+        "id": "n15",
+        "kind": "bind",
+        "name": "playerId",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "context"
+          },
+          "key": "playerId"
+        },
+        "next": "n14"
+      },
+      {
+        "id": "n16",
+        "kind": "bind",
+        "name": "battle",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "context"
+          },
+          "key": "battle"
+        },
+        "next": "n15"
+      }
+    ]
+  },
+  "contentGraphField": "code",
+  "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1"
 }

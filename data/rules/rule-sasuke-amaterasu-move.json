@@ -5,5 +5,893 @@
   "trigger": {
     "type": "afterPiecePathContact"
   },
-  "skillCode": "if (battle.extensions && battle.extensions.amaterasuOwnerPlayerId && context.playerId !== battle.extensions.amaterasuOwnerPlayerId) return { success: false, message: '' }; if (!battle.extensions || !battle.extensions.amaterasuCells || battle.extensions.amaterasuCells.length === 0) return { success: false, message: '' }; var movedPiece = context.sourcePiece; if (!movedPiece || movedPiece.currentHp <= 0) return { success: false, message: '' }; var pathCells = Array.isArray(context.contactCells) ? context.contactCells : []; var sourceCell; var amaterasuHit = 0; pathCells.forEach(function(cell) { var hit = battle.extensions.amaterasuCells.find(function(c) { return c.x === cell.x && c.y === cell.y; }); if (hit) { sourceCell = sourceCell || hit; amaterasuHit++; } }); if (amaterasuHit === 0) return { success: false, message: '' }; var tag = movedPiece.statusTags && movedPiece.statusTags.find(function(t) { return t.type === 'amaterasu-burn'; }); var newStacks; if (tag) { tag.stacks = (tag.stacks || 1) + amaterasuHit; newStacks = tag.stacks; } else { addStatusEffectById(movedPiece.instanceId, { id: 'amaterasu-burn-' + movedPiece.instanceId, name: '天照灼烧', type: 'amaterasu-burn', sourcePieceId: sourceCell && sourceCell.sourcePieceId, currentDuration: -1, currentUses: -1, intensity: 2, stacks: amaterasuHit }); newStacks = amaterasuHit; } return { success: true, message: movedPiece.name + '经过天照范围，附加' + amaterasuHit + '层天照效果（当前' + newStacks + '层）' };"
+  "skillCode": "var __rvb_import_bound_method_0, amaterasuHit, movedPiece, newStacks, pathCells, sourceCell, tag; var _pc = \"n27\"; for (var _step = 0; _step <= 22; _step++) { switch (_pc) { case \"n27\": _pc = (! (! (((battle)[\"extensions\"] && ((battle)[\"extensions\"])[\"amaterasuOwnerPlayerId\"]) && ((context)[\"playerId\"] !== ((battle)[\"extensions\"])[\"amaterasuOwnerPlayerId\"])))) ? \"n26\" : \"n25\"; break; case \"n25\": _pc = (! (! (((! (battle)[\"extensions\"]) || (! ((battle)[\"extensions\"])[\"amaterasuCells\"])) || ((((battle)[\"extensions\"])[\"amaterasuCells\"])[\"length\"] === 0)))) ? \"n24\" : \"n23\"; break; case \"n23\": movedPiece = (context)[\"sourcePiece\"]; _pc = \"n22\"; break; case \"n22\": _pc = (! (! ((! movedPiece) || ((movedPiece)[\"currentHp\"] <= 0)))) ? \"n21\" : \"n20\"; break; case \"n20\": pathCells = (Array.isArray((context)[\"contactCells\"]) ? (context)[\"contactCells\"] : []); _pc = \"n19\"; break; case \"n19\": sourceCell = (void 0); _pc = \"n18\"; break; case \"n18\": amaterasuHit = 0; _pc = \"n17\"; break; case \"n17\": __rvb_import_bound_method_0 = (function (receiver) { var capturedMethod = receiver[\"forEach\"]; return function () { return Reflect.apply(capturedMethod, receiver, arguments); }; })(pathCells); _pc = \"n11\"; break; case \"n11\": (__rvb_import_bound_method_0)(function (cell) { var hit; { var __rvb_content_graph_region_pc_0 = \"n16\"; while (__rvb_content_graph_region_pc_0 !== \"n12\") { switch (__rvb_content_graph_region_pc_0) { case \"n16\": hit = (((battle)[\"extensions\"])[\"amaterasuCells\"])[\"find\"](function (c) { return (((c)[\"x\"] === (cell)[\"x\"]) && ((c)[\"y\"] === (cell)[\"y\"])); }); __rvb_content_graph_region_pc_0 = \"n15\"; break; case \"n15\": __rvb_content_graph_region_pc_0 = (! (! hit)) ? \"n14\" : \"n12\"; break; case \"n14\": sourceCell = (sourceCell || hit); __rvb_content_graph_region_pc_0 = \"n13\"; break; case \"n13\": amaterasuHit = ((+ amaterasuHit) + 1); __rvb_content_graph_region_pc_0 = \"n12\"; break; case \"n12\": __rvb_content_graph_region_pc_0 = \"n12\"; break; default: throw new Error(\"invalid content graph region node\"); } } } }); _pc = \"n10\"; break; case \"n10\": _pc = (! (! (amaterasuHit === 0))) ? \"n9\" : \"n8\"; break; case \"n8\": tag = ((movedPiece)[\"statusTags\"] && ((movedPiece)[\"statusTags\"])[\"find\"](function (t) { return ((t)[\"type\"] === \"amaterasu-burn\"); })); _pc = \"n7\"; break; case \"n7\": newStacks = (void 0); _pc = \"n6\"; break; case \"n6\": _pc = (! (! tag)) ? \"n3\" : \"n5\"; break; case \"n5\": addStatusEffectById((movedPiece)[\"instanceId\"], {id: (\"amaterasu-burn-\" + (movedPiece)[\"instanceId\"]), name: \"天照灼烧\", type: \"amaterasu-burn\", sourcePieceId: (sourceCell && (sourceCell)[\"sourcePieceId\"]), currentDuration: (- 1), currentUses: (- 1), intensity: 2, stacks: amaterasuHit}); _pc = \"n4\"; break; case \"n4\": newStacks = amaterasuHit; _pc = \"n1\"; break; case \"n3\": (tag)[\"stacks\"] = (((tag)[\"stacks\"] || 1) + amaterasuHit); _pc = \"n2\"; break; case \"n2\": newStacks = (tag)[\"stacks\"]; _pc = \"n1\"; break; case \"n1\": return {success: true, message: ((((((movedPiece)[\"name\"] + \"经过天照范围，附加\") + amaterasuHit) + \"层天照效果（当前\") + newStacks) + \"层）\")}; case \"n9\": return {success: false, message: \"\"}; case \"n21\": return {success: false, message: \"\"}; case \"n24\": return {success: false, message: \"\"}; case \"n26\": return {success: false, message: \"\"}; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\");",
+  "contentGraph": {
+    "version": "rvb-content-graph/v1",
+    "surface": "rule",
+    "entry": "n27",
+    "nodes": [
+      {
+        "id": "n1",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "binary",
+                  "op": "+",
+                  "left": {
+                    "kind": "binary",
+                    "op": "+",
+                    "left": {
+                      "kind": "binary",
+                      "op": "+",
+                      "left": {
+                        "kind": "binary",
+                        "op": "+",
+                        "left": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "movedPiece"
+                          },
+                          "key": "name"
+                        },
+                        "right": {
+                          "kind": "literal",
+                          "value": "经过天照范围，附加"
+                        }
+                      },
+                      "right": {
+                        "kind": "ref",
+                        "name": "amaterasuHit"
+                      }
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": "层天照效果（当前"
+                    }
+                  },
+                  "right": {
+                    "kind": "ref",
+                    "name": "newStacks"
+                  }
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "层）"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n2",
+        "kind": "set",
+        "target": {
+          "kind": "ref",
+          "name": "newStacks"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "tag"
+          },
+          "key": "stacks"
+        },
+        "next": "n1"
+      },
+      {
+        "id": "n3",
+        "kind": "set",
+        "target": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "tag"
+          },
+          "key": "stacks"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "binary",
+          "op": "+",
+          "left": {
+            "kind": "binary",
+            "op": "||",
+            "left": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "tag"
+              },
+              "key": "stacks"
+            },
+            "right": {
+              "kind": "literal",
+              "value": 1
+            }
+          },
+          "right": {
+            "kind": "ref",
+            "name": "amaterasuHit"
+          }
+        },
+        "next": "n2"
+      },
+      {
+        "id": "n4",
+        "kind": "set",
+        "target": {
+          "kind": "ref",
+          "name": "newStacks"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "ref",
+          "name": "amaterasuHit"
+        },
+        "next": "n1"
+      },
+      {
+        "id": "n5",
+        "kind": "call",
+        "capability": "addStatusEffectById",
+        "args": [
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "movedPiece"
+            },
+            "key": "instanceId"
+          },
+          {
+            "kind": "object",
+            "entries": [
+              {
+                "key": "id",
+                "value": {
+                  "kind": "binary",
+                  "op": "+",
+                  "left": {
+                    "kind": "literal",
+                    "value": "amaterasu-burn-"
+                  },
+                  "right": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "movedPiece"
+                    },
+                    "key": "instanceId"
+                  }
+                }
+              },
+              {
+                "key": "name",
+                "value": {
+                  "kind": "literal",
+                  "value": "天照灼烧"
+                }
+              },
+              {
+                "key": "type",
+                "value": {
+                  "kind": "literal",
+                  "value": "amaterasu-burn"
+                }
+              },
+              {
+                "key": "sourcePieceId",
+                "value": {
+                  "kind": "binary",
+                  "op": "&&",
+                  "left": {
+                    "kind": "ref",
+                    "name": "sourceCell"
+                  },
+                  "right": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "sourceCell"
+                    },
+                    "key": "sourcePieceId"
+                  }
+                }
+              },
+              {
+                "key": "currentDuration",
+                "value": {
+                  "kind": "unary",
+                  "op": "-",
+                  "argument": {
+                    "kind": "literal",
+                    "value": 1
+                  }
+                }
+              },
+              {
+                "key": "currentUses",
+                "value": {
+                  "kind": "unary",
+                  "op": "-",
+                  "argument": {
+                    "kind": "literal",
+                    "value": 1
+                  }
+                }
+              },
+              {
+                "key": "intensity",
+                "value": {
+                  "kind": "literal",
+                  "value": 2
+                }
+              },
+              {
+                "key": "stacks",
+                "value": {
+                  "kind": "ref",
+                  "name": "amaterasuHit"
+                }
+              }
+            ]
+          }
+        ],
+        "next": "n4"
+      },
+      {
+        "id": "n6",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "ref",
+              "name": "tag"
+            }
+          }
+        },
+        "yes": "n3",
+        "no": "n5"
+      },
+      {
+        "id": "n7",
+        "kind": "bind",
+        "name": "newStacks",
+        "expr": {
+          "kind": "undefined"
+        },
+        "next": "n6"
+      },
+      {
+        "id": "n8",
+        "kind": "bind",
+        "name": "tag",
+        "expr": {
+          "kind": "binary",
+          "op": "&&",
+          "left": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "movedPiece"
+            },
+            "key": "statusTags"
+          },
+          "right": {
+            "kind": "collection",
+            "object": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "movedPiece"
+              },
+              "key": "statusTags"
+            },
+            "method": "find",
+            "args": [
+              {
+                "kind": "lambda",
+                "parameters": [
+                  "t"
+                ],
+                "body": {
+                  "kind": "binary",
+                  "op": "===",
+                  "left": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "t"
+                    },
+                    "key": "type"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": "amaterasu-burn"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "next": "n7"
+      },
+      {
+        "id": "n9",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n10",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "===",
+              "left": {
+                "kind": "ref",
+                "name": "amaterasuHit"
+              },
+              "right": {
+                "kind": "literal",
+                "value": 0
+              }
+            }
+          }
+        },
+        "yes": "n9",
+        "no": "n8"
+      },
+      {
+        "id": "n11",
+        "kind": "invoke",
+        "target": {
+          "kind": "function",
+          "value": {
+            "kind": "ref",
+            "name": "__rvb_import_bound_method_0"
+          }
+        },
+        "args": [
+          {
+            "kind": "function",
+            "parameters": [
+              "cell"
+            ],
+            "body": {
+              "entry": "n16",
+              "end": "n12",
+              "nodes": [
+                {
+                  "id": "n12",
+                  "kind": "regionEnd"
+                },
+                {
+                  "id": "n13",
+                  "kind": "set",
+                  "target": {
+                    "kind": "ref",
+                    "name": "amaterasuHit"
+                  },
+                  "operator": "=",
+                  "value": {
+                    "kind": "binary",
+                    "op": "+",
+                    "left": {
+                      "kind": "unary",
+                      "op": "+",
+                      "argument": {
+                        "kind": "ref",
+                        "name": "amaterasuHit"
+                      }
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": 1
+                    }
+                  },
+                  "next": "n12"
+                },
+                {
+                  "id": "n14",
+                  "kind": "set",
+                  "target": {
+                    "kind": "ref",
+                    "name": "sourceCell"
+                  },
+                  "operator": "=",
+                  "value": {
+                    "kind": "binary",
+                    "op": "||",
+                    "left": {
+                      "kind": "ref",
+                      "name": "sourceCell"
+                    },
+                    "right": {
+                      "kind": "ref",
+                      "name": "hit"
+                    }
+                  },
+                  "next": "n13"
+                },
+                {
+                  "id": "n15",
+                  "kind": "branch",
+                  "condition": {
+                    "kind": "unary",
+                    "op": "!",
+                    "argument": {
+                      "kind": "unary",
+                      "op": "!",
+                      "argument": {
+                        "kind": "ref",
+                        "name": "hit"
+                      }
+                    }
+                  },
+                  "yes": "n14",
+                  "no": "n12"
+                },
+                {
+                  "id": "n16",
+                  "kind": "bind",
+                  "name": "hit",
+                  "expr": {
+                    "kind": "collection",
+                    "object": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "battle"
+                        },
+                        "key": "extensions"
+                      },
+                      "key": "amaterasuCells"
+                    },
+                    "method": "find",
+                    "args": [
+                      {
+                        "kind": "lambda",
+                        "parameters": [
+                          "c"
+                        ],
+                        "body": {
+                          "kind": "binary",
+                          "op": "&&",
+                          "left": {
+                            "kind": "binary",
+                            "op": "===",
+                            "left": {
+                              "kind": "get",
+                              "object": {
+                                "kind": "ref",
+                                "name": "c"
+                              },
+                              "key": "x"
+                            },
+                            "right": {
+                              "kind": "get",
+                              "object": {
+                                "kind": "ref",
+                                "name": "cell"
+                              },
+                              "key": "x"
+                            }
+                          },
+                          "right": {
+                            "kind": "binary",
+                            "op": "===",
+                            "left": {
+                              "kind": "get",
+                              "object": {
+                                "kind": "ref",
+                                "name": "c"
+                              },
+                              "key": "y"
+                            },
+                            "right": {
+                              "kind": "get",
+                              "object": {
+                                "kind": "ref",
+                                "name": "cell"
+                              },
+                              "key": "y"
+                            }
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  "next": "n15"
+                }
+              ]
+            }
+          }
+        ],
+        "next": "n10"
+      },
+      {
+        "id": "n17",
+        "kind": "bind",
+        "name": "__rvb_import_bound_method_0",
+        "expr": {
+          "kind": "boundMethod",
+          "object": {
+            "kind": "ref",
+            "name": "pathCells"
+          },
+          "method": "forEach"
+        },
+        "next": "n11"
+      },
+      {
+        "id": "n18",
+        "kind": "bind",
+        "name": "amaterasuHit",
+        "expr": {
+          "kind": "literal",
+          "value": 0
+        },
+        "next": "n17"
+      },
+      {
+        "id": "n19",
+        "kind": "bind",
+        "name": "sourceCell",
+        "expr": {
+          "kind": "undefined"
+        },
+        "next": "n18"
+      },
+      {
+        "id": "n20",
+        "kind": "bind",
+        "name": "pathCells",
+        "expr": {
+          "kind": "conditional",
+          "test": {
+            "kind": "call",
+            "callee": "Array.isArray",
+            "args": [
+              {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "context"
+                },
+                "key": "contactCells"
+              }
+            ]
+          },
+          "consequent": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "context"
+            },
+            "key": "contactCells"
+          },
+          "alternate": {
+            "kind": "array",
+            "items": []
+          }
+        },
+        "next": "n19"
+      },
+      {
+        "id": "n21",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n22",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "ref",
+                  "name": "movedPiece"
+                }
+              },
+              "right": {
+                "kind": "binary",
+                "op": "<=",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "movedPiece"
+                  },
+                  "key": "currentHp"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": 0
+                }
+              }
+            }
+          }
+        },
+        "yes": "n21",
+        "no": "n20"
+      },
+      {
+        "id": "n23",
+        "kind": "bind",
+        "name": "movedPiece",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "context"
+          },
+          "key": "sourcePiece"
+        },
+        "next": "n22"
+      },
+      {
+        "id": "n24",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n25",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "binary",
+                "op": "||",
+                "left": {
+                  "kind": "unary",
+                  "op": "!",
+                  "argument": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "battle"
+                    },
+                    "key": "extensions"
+                  }
+                },
+                "right": {
+                  "kind": "unary",
+                  "op": "!",
+                  "argument": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "battle"
+                      },
+                      "key": "extensions"
+                    },
+                    "key": "amaterasuCells"
+                  }
+                }
+              },
+              "right": {
+                "kind": "binary",
+                "op": "===",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "battle"
+                      },
+                      "key": "extensions"
+                    },
+                    "key": "amaterasuCells"
+                  },
+                  "key": "length"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": 0
+                }
+              }
+            }
+          }
+        },
+        "yes": "n24",
+        "no": "n23"
+      },
+      {
+        "id": "n26",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n27",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "&&",
+              "left": {
+                "kind": "binary",
+                "op": "&&",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "battle"
+                  },
+                  "key": "extensions"
+                },
+                "right": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "battle"
+                    },
+                    "key": "extensions"
+                  },
+                  "key": "amaterasuOwnerPlayerId"
+                }
+              },
+              "right": {
+                "kind": "binary",
+                "op": "!==",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "context"
+                  },
+                  "key": "playerId"
+                },
+                "right": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "battle"
+                    },
+                    "key": "extensions"
+                  },
+                  "key": "amaterasuOwnerPlayerId"
+                }
+              }
+            }
+          }
+        },
+        "yes": "n26",
+        "no": "n25"
+      }
+    ]
+  },
+  "contentGraphField": "skillCode",
+  "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1"
 }

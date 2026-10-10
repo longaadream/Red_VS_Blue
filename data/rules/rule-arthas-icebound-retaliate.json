@@ -5,5 +5,495 @@
   "trigger": {
     "type": "afterDamageTaken"
   },
-  "skillCode": "var defender = context.rulePiece; if (!defender || !context.piece || context.piece.instanceId !== defender.instanceId || !(context.damage > 0) || !defender.statusTags.some(function(t) { return t.type === 'icebound-fortitude'; })) return { success: false, message: '' }; var attacker = context.targetPiece; if (!attacker || attacker.currentHp <= 0 || attacker.ownerPlayerId === defender.ownerPlayerId || !battle.pieces.some(function(p) { return p.instanceId === attacker.instanceId; })) return { success: false, message: '' }; addStatusEffectById(attacker.instanceId, { id: 'icebound-freeze-' + attacker.instanceId, name: '冰冻', type: 'freeze', currentDuration: 1, intensity: 1, relatedRules: ['rule-freeze-prevent-move', 'rule-freeze-prevent-skill'] }); addRuleById(attacker.instanceId, 'rule-freeze-prevent-move'); addRuleById(attacker.instanceId, 'rule-freeze-prevent-skill'); return { success: true, message: attacker.name + '被寒冰坚忍冰冻1回合' };"
+  "skillCode": "var attacker, defender; var _pc = \"n10\"; for (var _step = 0; _step <= 10; _step++) { switch (_pc) { case \"n10\": defender = (context)[\"rulePiece\"]; _pc = \"n9\"; break; case \"n9\": _pc = (! (! (((((! defender) || (! (context)[\"piece\"])) || (((context)[\"piece\"])[\"instanceId\"] !== (defender)[\"instanceId\"])) || (! ((context)[\"damage\"] > 0))) || (! ((defender)[\"statusTags\"])[\"some\"](function (t) { return ((t)[\"type\"] === \"icebound-fortitude\"); }))))) ? \"n8\" : \"n7\"; break; case \"n7\": attacker = (context)[\"targetPiece\"]; _pc = \"n6\"; break; case \"n6\": _pc = (! (! ((((! attacker) || ((attacker)[\"currentHp\"] <= 0)) || ((attacker)[\"ownerPlayerId\"] === (defender)[\"ownerPlayerId\"])) || (! ((battle)[\"pieces\"])[\"some\"](function (p) { return ((p)[\"instanceId\"] === (attacker)[\"instanceId\"]); }))))) ? \"n5\" : \"n4\"; break; case \"n4\": addStatusEffectById((attacker)[\"instanceId\"], {id: (\"icebound-freeze-\" + (attacker)[\"instanceId\"]), name: \"冰冻\", type: \"freeze\", currentDuration: 1, intensity: 1, relatedRules: [\"rule-freeze-prevent-move\", \"rule-freeze-prevent-skill\"]}); _pc = \"n3\"; break; case \"n3\": addRuleById((attacker)[\"instanceId\"], \"rule-freeze-prevent-move\"); _pc = \"n2\"; break; case \"n2\": addRuleById((attacker)[\"instanceId\"], \"rule-freeze-prevent-skill\"); _pc = \"n1\"; break; case \"n1\": return {success: true, message: ((attacker)[\"name\"] + \"被寒冰坚忍冰冻1回合\")}; case \"n5\": return {success: false, message: \"\"}; case \"n8\": return {success: false, message: \"\"}; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\");",
+  "contentGraph": {
+    "version": "rvb-content-graph/v1",
+    "surface": "rule",
+    "entry": "n10",
+    "nodes": [
+      {
+        "id": "n1",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "attacker"
+                  },
+                  "key": "name"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "被寒冰坚忍冰冻1回合"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n2",
+        "kind": "call",
+        "capability": "addRuleById",
+        "args": [
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "attacker"
+            },
+            "key": "instanceId"
+          },
+          {
+            "kind": "literal",
+            "value": "rule-freeze-prevent-skill"
+          }
+        ],
+        "next": "n1"
+      },
+      {
+        "id": "n3",
+        "kind": "call",
+        "capability": "addRuleById",
+        "args": [
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "attacker"
+            },
+            "key": "instanceId"
+          },
+          {
+            "kind": "literal",
+            "value": "rule-freeze-prevent-move"
+          }
+        ],
+        "next": "n2"
+      },
+      {
+        "id": "n4",
+        "kind": "call",
+        "capability": "addStatusEffectById",
+        "args": [
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "attacker"
+            },
+            "key": "instanceId"
+          },
+          {
+            "kind": "object",
+            "entries": [
+              {
+                "key": "id",
+                "value": {
+                  "kind": "binary",
+                  "op": "+",
+                  "left": {
+                    "kind": "literal",
+                    "value": "icebound-freeze-"
+                  },
+                  "right": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "attacker"
+                    },
+                    "key": "instanceId"
+                  }
+                }
+              },
+              {
+                "key": "name",
+                "value": {
+                  "kind": "literal",
+                  "value": "冰冻"
+                }
+              },
+              {
+                "key": "type",
+                "value": {
+                  "kind": "literal",
+                  "value": "freeze"
+                }
+              },
+              {
+                "key": "currentDuration",
+                "value": {
+                  "kind": "literal",
+                  "value": 1
+                }
+              },
+              {
+                "key": "intensity",
+                "value": {
+                  "kind": "literal",
+                  "value": 1
+                }
+              },
+              {
+                "key": "relatedRules",
+                "value": {
+                  "kind": "array",
+                  "items": [
+                    {
+                      "kind": "literal",
+                      "value": "rule-freeze-prevent-move"
+                    },
+                    {
+                      "kind": "literal",
+                      "value": "rule-freeze-prevent-skill"
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ],
+        "next": "n3"
+      },
+      {
+        "id": "n5",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n6",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "binary",
+                "op": "||",
+                "left": {
+                  "kind": "binary",
+                  "op": "||",
+                  "left": {
+                    "kind": "unary",
+                    "op": "!",
+                    "argument": {
+                      "kind": "ref",
+                      "name": "attacker"
+                    }
+                  },
+                  "right": {
+                    "kind": "binary",
+                    "op": "<=",
+                    "left": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "attacker"
+                      },
+                      "key": "currentHp"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": 0
+                    }
+                  }
+                },
+                "right": {
+                  "kind": "binary",
+                  "op": "===",
+                  "left": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "attacker"
+                    },
+                    "key": "ownerPlayerId"
+                  },
+                  "right": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "defender"
+                    },
+                    "key": "ownerPlayerId"
+                  }
+                }
+              },
+              "right": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "collection",
+                  "object": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "battle"
+                    },
+                    "key": "pieces"
+                  },
+                  "method": "some",
+                  "args": [
+                    {
+                      "kind": "lambda",
+                      "parameters": [
+                        "p"
+                      ],
+                      "body": {
+                        "kind": "binary",
+                        "op": "===",
+                        "left": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "p"
+                          },
+                          "key": "instanceId"
+                        },
+                        "right": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "attacker"
+                          },
+                          "key": "instanceId"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "yes": "n5",
+        "no": "n4"
+      },
+      {
+        "id": "n7",
+        "kind": "bind",
+        "name": "attacker",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "context"
+          },
+          "key": "targetPiece"
+        },
+        "next": "n6"
+      },
+      {
+        "id": "n8",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n9",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "binary",
+                "op": "||",
+                "left": {
+                  "kind": "binary",
+                  "op": "||",
+                  "left": {
+                    "kind": "binary",
+                    "op": "||",
+                    "left": {
+                      "kind": "unary",
+                      "op": "!",
+                      "argument": {
+                        "kind": "ref",
+                        "name": "defender"
+                      }
+                    },
+                    "right": {
+                      "kind": "unary",
+                      "op": "!",
+                      "argument": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "context"
+                        },
+                        "key": "piece"
+                      }
+                    }
+                  },
+                  "right": {
+                    "kind": "binary",
+                    "op": "!==",
+                    "left": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "context"
+                        },
+                        "key": "piece"
+                      },
+                      "key": "instanceId"
+                    },
+                    "right": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "defender"
+                      },
+                      "key": "instanceId"
+                    }
+                  }
+                },
+                "right": {
+                  "kind": "unary",
+                  "op": "!",
+                  "argument": {
+                    "kind": "binary",
+                    "op": ">",
+                    "left": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "context"
+                      },
+                      "key": "damage"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": 0
+                    }
+                  }
+                }
+              },
+              "right": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "collection",
+                  "object": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "defender"
+                    },
+                    "key": "statusTags"
+                  },
+                  "method": "some",
+                  "args": [
+                    {
+                      "kind": "lambda",
+                      "parameters": [
+                        "t"
+                      ],
+                      "body": {
+                        "kind": "binary",
+                        "op": "===",
+                        "left": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "t"
+                          },
+                          "key": "type"
+                        },
+                        "right": {
+                          "kind": "literal",
+                          "value": "icebound-fortitude"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "yes": "n8",
+        "no": "n7"
+      },
+      {
+        "id": "n10",
+        "kind": "bind",
+        "name": "defender",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "context"
+          },
+          "key": "rulePiece"
+        },
+        "next": "n9"
+      }
+    ]
+  },
+  "contentGraphField": "skillCode",
+  "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1"
 }

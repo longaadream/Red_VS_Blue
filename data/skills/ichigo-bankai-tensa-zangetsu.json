@@ -19,7 +19,497 @@
   "targeting": {
     "steps": []
   },
-  "code": "function executeSkill(context) { var caster = context.piece; var active = caster.statusTags && caster.statusTags.some(function(tag) { return tag.type === 'ichigo-bankai'; }); if (active) return { success: false, message: '卍解·天锁斩月每局只能使用一次' }; caster.attack += 1; caster.moveRange += 2; var player = battle.players && battle.players.find(function(p) { return p.playerId === caster.ownerPlayerId; }); if (player) player.actionPoints += 1; removeSkillById(caster.instanceId, 'ichigo-getsuga-tensho'); removeSkillById(caster.instanceId, 'ichigo-bankai-tensa-zangetsu'); addSkillById(caster.instanceId, 'ichigo-black-getsuga-tensho'); addStatusEffectById(caster.instanceId, { id: 'ichigo-bankai-' + caster.instanceId, name: '卍解·天锁斩月', type: 'ichigo-bankai', currentDuration: -1, currentUses: -1, intensity: 1, stacks: 1 }); return { success: true, message: caster.name + '发动卍解·天锁斩月，攻击力+1、移动值+2并获得1点临时行动点' }; }",
-  "previewCode": "function calculatePreview() { return { description: \"攻击力+1、移动力+2。获得1点临时行动点。【月牙天冲】替换为可立即使用的【黑色月牙天冲】。\", expectedValues: { attackBonus: 1, moveBonus: 2, actionPointBonus: 1 } }; }",
-  "usesPerBattle": 1
+  "code": "function executeSkill(context) { var active, caster, player; var _pc = \"n14\"; for (var _step = 0; _step <= 14; _step++) { switch (_pc) { case \"n14\": caster = (context)[\"piece\"]; _pc = \"n13\"; break; case \"n13\": active = ((caster)[\"statusTags\"] && ((caster)[\"statusTags\"])[\"some\"](function (tag) { return ((tag)[\"type\"] === \"ichigo-bankai\"); })); _pc = \"n12\"; break; case \"n12\": _pc = (! (! active)) ? \"n11\" : \"n10\"; break; case \"n10\": (caster)[\"attack\"] += 1; _pc = \"n9\"; break; case \"n9\": (caster)[\"moveRange\"] += 2; _pc = \"n8\"; break; case \"n8\": player = ((battle)[\"players\"] && ((battle)[\"players\"])[\"find\"](function (p) { return ((p)[\"playerId\"] === (caster)[\"ownerPlayerId\"]); })); _pc = \"n7\"; break; case \"n7\": _pc = (! (! player)) ? \"n6\" : \"n5\"; break; case \"n6\": (player)[\"actionPoints\"] += 1; _pc = \"n5\"; break; case \"n5\": removeSkillById((caster)[\"instanceId\"], \"ichigo-getsuga-tensho\"); _pc = \"n4\"; break; case \"n4\": removeSkillById((caster)[\"instanceId\"], \"ichigo-bankai-tensa-zangetsu\"); _pc = \"n3\"; break; case \"n3\": addSkillById((caster)[\"instanceId\"], \"ichigo-black-getsuga-tensho\"); _pc = \"n2\"; break; case \"n2\": addStatusEffectById((caster)[\"instanceId\"], {id: (\"ichigo-bankai-\" + (caster)[\"instanceId\"]), name: \"卍解·天锁斩月\", type: \"ichigo-bankai\", currentDuration: (- 1), currentUses: (- 1), intensity: 1, stacks: 1}); _pc = \"n1\"; break; case \"n1\": return {success: true, message: ((caster)[\"name\"] + \"发动卍解·天锁斩月，攻击力+1、移动值+2并获得1点临时行动点\")}; case \"n11\": return {success: false, message: \"卍解·天锁斩月每局只能使用一次\"}; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\"); }",
+  "previewCode": "function calculatePreview(piece, skillDef, currentCooldown) { var _pc = \"n1\"; for (var _step = 0; _step <= 1; _step++) { switch (_pc) { case \"n1\": return {description: \"攻击力+1、移动力+2。获得1点临时行动点。【月牙天冲】替换为可立即使用的【黑色月牙天冲】。\", expectedValues: {attackBonus: 1, moveBonus: 2, actionPointBonus: 1}}; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\"); }",
+  "usesPerBattle": 1,
+  "contentGraph": {
+    "version": "rvb-content-graph/v1",
+    "surface": "skill",
+    "entry": "n14",
+    "nodes": [
+      {
+        "id": "n1",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "caster"
+                  },
+                  "key": "name"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "发动卍解·天锁斩月，攻击力+1、移动值+2并获得1点临时行动点"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n2",
+        "kind": "call",
+        "capability": "addStatusEffectById",
+        "args": [
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "caster"
+            },
+            "key": "instanceId"
+          },
+          {
+            "kind": "object",
+            "entries": [
+              {
+                "key": "id",
+                "value": {
+                  "kind": "binary",
+                  "op": "+",
+                  "left": {
+                    "kind": "literal",
+                    "value": "ichigo-bankai-"
+                  },
+                  "right": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "caster"
+                    },
+                    "key": "instanceId"
+                  }
+                }
+              },
+              {
+                "key": "name",
+                "value": {
+                  "kind": "literal",
+                  "value": "卍解·天锁斩月"
+                }
+              },
+              {
+                "key": "type",
+                "value": {
+                  "kind": "literal",
+                  "value": "ichigo-bankai"
+                }
+              },
+              {
+                "key": "currentDuration",
+                "value": {
+                  "kind": "unary",
+                  "op": "-",
+                  "argument": {
+                    "kind": "literal",
+                    "value": 1
+                  }
+                }
+              },
+              {
+                "key": "currentUses",
+                "value": {
+                  "kind": "unary",
+                  "op": "-",
+                  "argument": {
+                    "kind": "literal",
+                    "value": 1
+                  }
+                }
+              },
+              {
+                "key": "intensity",
+                "value": {
+                  "kind": "literal",
+                  "value": 1
+                }
+              },
+              {
+                "key": "stacks",
+                "value": {
+                  "kind": "literal",
+                  "value": 1
+                }
+              }
+            ]
+          }
+        ],
+        "next": "n1"
+      },
+      {
+        "id": "n3",
+        "kind": "call",
+        "capability": "addSkillById",
+        "args": [
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "caster"
+            },
+            "key": "instanceId"
+          },
+          {
+            "kind": "literal",
+            "value": "ichigo-black-getsuga-tensho"
+          }
+        ],
+        "next": "n2"
+      },
+      {
+        "id": "n4",
+        "kind": "call",
+        "capability": "removeSkillById",
+        "args": [
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "caster"
+            },
+            "key": "instanceId"
+          },
+          {
+            "kind": "literal",
+            "value": "ichigo-bankai-tensa-zangetsu"
+          }
+        ],
+        "next": "n3"
+      },
+      {
+        "id": "n5",
+        "kind": "call",
+        "capability": "removeSkillById",
+        "args": [
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "caster"
+            },
+            "key": "instanceId"
+          },
+          {
+            "kind": "literal",
+            "value": "ichigo-getsuga-tensho"
+          }
+        ],
+        "next": "n4"
+      },
+      {
+        "id": "n6",
+        "kind": "set",
+        "target": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "player"
+          },
+          "key": "actionPoints"
+        },
+        "operator": "+=",
+        "value": {
+          "kind": "literal",
+          "value": 1
+        },
+        "next": "n5"
+      },
+      {
+        "id": "n7",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "ref",
+              "name": "player"
+            }
+          }
+        },
+        "yes": "n6",
+        "no": "n5"
+      },
+      {
+        "id": "n8",
+        "kind": "bind",
+        "name": "player",
+        "expr": {
+          "kind": "binary",
+          "op": "&&",
+          "left": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "battle"
+            },
+            "key": "players"
+          },
+          "right": {
+            "kind": "collection",
+            "object": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "battle"
+              },
+              "key": "players"
+            },
+            "method": "find",
+            "args": [
+              {
+                "kind": "lambda",
+                "parameters": [
+                  "p"
+                ],
+                "body": {
+                  "kind": "binary",
+                  "op": "===",
+                  "left": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "p"
+                    },
+                    "key": "playerId"
+                  },
+                  "right": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "caster"
+                    },
+                    "key": "ownerPlayerId"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "next": "n7"
+      },
+      {
+        "id": "n9",
+        "kind": "set",
+        "target": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "caster"
+          },
+          "key": "moveRange"
+        },
+        "operator": "+=",
+        "value": {
+          "kind": "literal",
+          "value": 2
+        },
+        "next": "n8"
+      },
+      {
+        "id": "n10",
+        "kind": "set",
+        "target": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "caster"
+          },
+          "key": "attack"
+        },
+        "operator": "+=",
+        "value": {
+          "kind": "literal",
+          "value": 1
+        },
+        "next": "n9"
+      },
+      {
+        "id": "n11",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": "卍解·天锁斩月每局只能使用一次"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n12",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "ref",
+              "name": "active"
+            }
+          }
+        },
+        "yes": "n11",
+        "no": "n10"
+      },
+      {
+        "id": "n13",
+        "kind": "bind",
+        "name": "active",
+        "expr": {
+          "kind": "binary",
+          "op": "&&",
+          "left": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "caster"
+            },
+            "key": "statusTags"
+          },
+          "right": {
+            "kind": "collection",
+            "object": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "caster"
+              },
+              "key": "statusTags"
+            },
+            "method": "some",
+            "args": [
+              {
+                "kind": "lambda",
+                "parameters": [
+                  "tag"
+                ],
+                "body": {
+                  "kind": "binary",
+                  "op": "===",
+                  "left": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "tag"
+                    },
+                    "key": "type"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": "ichigo-bankai"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "next": "n12"
+      },
+      {
+        "id": "n14",
+        "kind": "bind",
+        "name": "caster",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "context"
+          },
+          "key": "piece"
+        },
+        "next": "n13"
+      }
+    ]
+  },
+  "contentGraphField": "code",
+  "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1",
+  "contentGraphEntries": {
+    "previewCode": {
+      "graph": {
+        "version": "rvb-content-graph/v1",
+        "surface": "preview",
+        "entry": "n1",
+        "nodes": [
+          {
+            "id": "n1",
+            "kind": "return",
+            "value": {
+              "kind": "object",
+              "entries": [
+                {
+                  "key": "description",
+                  "value": {
+                    "kind": "literal",
+                    "value": "攻击力+1、移动力+2。获得1点临时行动点。【月牙天冲】替换为可立即使用的【黑色月牙天冲】。"
+                  }
+                },
+                {
+                  "key": "expectedValues",
+                  "value": {
+                    "kind": "object",
+                    "entries": [
+                      {
+                        "key": "attackBonus",
+                        "value": {
+                          "kind": "literal",
+                          "value": 1
+                        }
+                      },
+                      {
+                        "key": "moveBonus",
+                        "value": {
+                          "kind": "literal",
+                          "value": 2
+                        }
+                      },
+                      {
+                        "key": "actionPointBonus",
+                        "value": {
+                          "kind": "literal",
+                          "value": 1
+                        }
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "compilerVersion": "rvb-content-graph-compiler/v1"
+    }
+  }
 }

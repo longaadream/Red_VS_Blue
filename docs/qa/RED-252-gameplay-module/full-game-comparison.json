@@ -1,0 +1,246 @@
+{
+  "baseline": {
+    "total": 2452,
+    "passed": 2413,
+    "failed": 39
+  },
+  "candidate": {
+    "total": 2464,
+    "passed": 2423,
+    "failed": 41
+  },
+  "added": [
+    {
+      "name": "game/ai-environment.test.ts:versioned headless AI environment enumerates deployment, pending option, and a real rule-produced pending target",
+      "messages": [
+        "Error: STACK_TRACE_ERROR\n    at task (file:///C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/node_modules/@vitest/runner/dist/chunk-artifact.js:1784:27)\n    at Object.<anonymous> (file:///C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/node_modules/@vitest/runner/dist/chunk-artifact.js:1817:16)\n    at Object.<anonymous> (file:///C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/node_modules/@vitest/runner/dist/chunk-artifact.js:1563:28)\n    at chain (file:///C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/node_modules/@vitest/runner/dist/chunk-artifact.js:599:14)\n    at C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/tests/game/ai-environment.test.ts:395:3\n    at file:///C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/node_modules/@vitest/runner/dist/chunk-artifact.js:1889:40\n    at runWithSuite (file:///C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/node_modules/@vitest/runner/dist/chunk-artifact.js:2258:8)\n    at Object.collect (file:///C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/node_modules/@vitest/runner/dist/chunk-artifact.js:1889:10)\n    at Object.collect (file:///C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/node_modules/@vitest/runner/dist/chunk-artifact.js:1893:54)\n    at processTicksAndRejections (node:internal/process/task_queues:103:5)"
+      ]
+    },
+    {
+      "name": "game/room-runtime-isolation.test.ts:RED-141 room rule runtime isolation matches two interleaved 100-transition rooms with their solo hashes, RNG cursors, pending state, and limits",
+      "messages": [
+        "Error: STACK_TRACE_ERROR\n    at task (file:///C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/node_modules/@vitest/runner/dist/chunk-artifact.js:1784:27)\n    at Object.<anonymous> (file:///C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/node_modules/@vitest/runner/dist/chunk-artifact.js:1817:16)\n    at Object.<anonymous> (file:///C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/node_modules/@vitest/runner/dist/chunk-artifact.js:1563:28)\n    at chain (file:///C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/node_modules/@vitest/runner/dist/chunk-artifact.js:599:14)\n    at C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/tests/game/room-runtime-isolation.test.ts:530:3\n    at file:///C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/node_modules/@vitest/runner/dist/chunk-artifact.js:1889:40\n    at runWithSuite (file:///C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/node_modules/@vitest/runner/dist/chunk-artifact.js:2258:8)\n    at Object.collect (file:///C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/node_modules/@vitest/runner/dist/chunk-artifact.js:1889:10)\n    at Object.collect (file:///C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/node_modules/@vitest/runner/dist/chunk-artifact.js:1893:54)\n    at processTicksAndRejections (node:internal/process/task_queues:103:5)"
+      ]
+    }
+  ],
+  "removed": [],
+  "failedSuites": [],
+  "candidateFailures": [
+    {
+      "file": "game/ai-environment.test.ts",
+      "test": "versioned headless AI environment enumerates deployment, pending option, and a real rule-produced pending target",
+      "durationMs": 6206.539199999999
+    },
+    {
+      "file": "game/ai-semantics.test.ts",
+      "test": "AI semantic contract audits every current manifest and makes a changed admission manifest fail closed",
+      "durationMs": 192.54600000000005
+    },
+    {
+      "file": "game/battle-card-metadata-runtime.test.ts",
+      "test": "LAN battle hand card display metadata marks the page disposed before clearing in-flight card metadata requests",
+      "durationMs": 5.105400000000003
+    },
+    {
+      "file": "game/battle-ui-boundary.test.ts",
+      "test": "battle presentation boundary keeps renderer and DOM responsibilities behind explicit modules",
+      "durationMs": 13.284600000000012
+    },
+    {
+      "file": "game/colyseus-client-reconnect.test.ts",
+      "test": "Colyseus reconnect and authority resync state machine allows native resumption after a compatible raster-only update",
+      "durationMs": 1008.8229000000001
+    },
+    {
+      "file": "game/colyseus-client-reconnect.test.ts",
+      "test": "Colyseus reconnect and authority resync state machine uses native Room reconnection without creating a replacement join",
+      "durationMs": 2.632000000000062
+    },
+    {
+      "file": "game/colyseus-client-reconnect.test.ts",
+      "test": "Colyseus reconnect and authority resync state machine reconnects the existing Colyseus session after page navigation instead of duplicating the player join",
+      "durationMs": 2.45909999999958
+    },
+    {
+      "file": "game/colyseus-client-reconnect.test.ts",
+      "test": "Colyseus reconnect and authority resync state machine ignores a stale Room leave after a replacement join",
+      "durationMs": 1.3141000000000531
+    },
+    {
+      "file": "game/colyseus-client-reconnect.test.ts",
+      "test": "Colyseus reconnect and authority resync state machine surfaces Colyseus Room errors without silently applying an action",
+      "durationMs": 1.1113000000000284
+    },
+    {
+      "file": "game/colyseus-client-reconnect.test.ts",
+      "test": "Colyseus reconnect and authority resync state machine requests the exact authoritative receipt and gates actions until it arrives",
+      "durationMs": 1.2109999999997854
+    },
+    {
+      "file": "game/colyseus-client-reconnect.test.ts",
+      "test": "Colyseus reconnect and authority resync state machine correlates a resync request with the original timed-out action",
+      "durationMs": 1.7255999999997584
+    },
+    {
+      "file": "game/colyseus-client-reconnect.test.ts",
+      "test": "Colyseus reconnect and authority resync state machine releases the authority sync gate on timeout and disconnect",
+      "durationMs": 1.3635000000003856
+    },
+    {
+      "file": "game/colyseus-origin-architecture.test.ts",
+      "test": "public single-port networking contract derives the only Colyseus endpoint from 'http://127.0.0.1:4200'",
+      "durationMs": 5.668399999999991
+    },
+    {
+      "file": "game/colyseus-origin-architecture.test.ts",
+      "test": "public single-port networking contract derives the only Colyseus endpoint from 'http://192.168.1.20:8080'",
+      "durationMs": 1.3677999999999884
+    },
+    {
+      "file": "game/colyseus-origin-architecture.test.ts",
+      "test": "public single-port networking contract derives the only Colyseus endpoint from 'https://relay.example:8443'",
+      "durationMs": 1.2774
+    },
+    {
+      "file": "game/developer-tools-trace.test.ts",
+      "test": "developer tools match trace boundary keeps a multi-command Trace compact while preserving skills and materialized states",
+      "durationMs": 272.0319999999999
+    },
+    {
+      "file": "game/flight-landing-contact.test.ts",
+      "test": "RED-209 flight markers do not block entry settles the whole flight using occupancy at expiry (occupant leaves: false)",
+      "durationMs": 15.86420000000004
+    },
+    {
+      "file": "game/ichigo-itachi.test.ts",
+      "test": "RED-120 character data contract registers Ichigo and Itachi with the approved stats and skill text",
+      "durationMs": 7.096000000000004
+    },
+    {
+      "file": "game/mangekyo.test.ts",
+      "test": "RED-124 Mangekyo data contract defines the keyword once and marks the three Uchiha ultimates with approved base costs",
+      "durationMs": 6.733400000000017
+    },
+    {
+      "file": "game/pending-presentation-contract.test.ts",
+      "test": "pending selection live board settles newly delivered animation only for the choosing viewer=true",
+      "durationMs": 5.474100000000021
+    },
+    {
+      "file": "game/player-colyseus-contract.test.ts",
+      "test": "RED-116 Electron lobby profile bridge pins the local Profile Identity before navigating to the server lobby",
+      "durationMs": 2.453499999999991
+    },
+    {
+      "file": "game/player-colyseus-contract.test.ts",
+      "test": "RED-116 Electron lobby profile bridge resolves the client local runtime through trusted game IPC",
+      "durationMs": 3.9987000000000137
+    },
+    {
+      "file": "game/projectile-trace.test.ts",
+      "test": "death blossom approved area behavior damages only living enemies in the caster-centered 3×3 area and ignores projectile blockers",
+      "durationMs": 4.633800000000008
+    },
+    {
+      "file": "game/red-129-rule-interactions.test.ts",
+      "test": "RED-129 波风水门回合结束锚点 opens a mandatory atomic target pending and commits one anchor after selection",
+      "durationMs": 67.33939999999984
+    },
+    {
+      "file": "game/red-163-dark-characters.test.ts",
+      "test": "RED-163 dark character contract registers Aizen, Ulquiorra and Grimmjow with their approved base stats",
+      "durationMs": 7.301300000000026
+    },
+    {
+      "file": "game/red-183-regressions.test.ts",
+      "test": "RED-183 character rules and selection UI regressions documents the self-cast AP refund on Shield of Light",
+      "durationMs": 4.2823999999999955
+    },
+    {
+      "file": "game/red-183-regressions.test.ts",
+      "test": "RED-183 character rules and selection UI regressions keeps Tails Twin Flight immunity and inoperable buffs at two turns",
+      "durationMs": 1.3512000000000057
+    },
+    {
+      "file": "game/red-183-regressions.test.ts",
+      "test": "RED-183 character rules and selection UI regressions uses Manhattan distance for Naruto candidates and execution",
+      "durationMs": 1.2757000000000005
+    },
+    {
+      "file": "game/red-183-regressions.test.ts",
+      "test": "RED-183 character rules and selection UI regressions uses the approved Grimmjow wording and hides the Recall number from its result message",
+      "durationMs": 0.7028999999999996
+    },
+    {
+      "file": "game/red-183-regressions.test.ts",
+      "test": "RED-183 character rules and selection UI regressions keeps selection, encyclopedia, history, tutorial, and related-card UI contracts visible in source",
+      "durationMs": 9.725100000000026
+    },
+    {
+      "file": "game/room-runtime-isolation.test.ts",
+      "test": "RED-141 room rule runtime isolation matches two interleaved 100-transition rooms with their solo hashes, RNG cursors, pending state, and limits",
+      "durationMs": 23919.7457
+    },
+    {
+      "file": "game/skill-presentation-ui.test.ts",
+      "test": "projected skill display in the actual browser consumers plays one sound for each real queue AOE batch while preserving separate hit batches",
+      "durationMs": 5.801400000000001
+    },
+    {
+      "file": "game/skill-presentation-ui.test.ts",
+      "test": "projected skill display in the actual browser consumers the battle controller consumes new cues without modifying the model",
+      "durationMs": 5.925900000000013
+    },
+    {
+      "file": "game/skillcode-static-audit.test.ts",
+      "test": "RED-45 skillCode static compatibility audit classifies every executable field and every lexical free variable",
+      "durationMs": 762.8132
+    },
+    {
+      "file": "game/skillcode-static-audit.test.ts",
+      "test": "RED-45 data parse and production loader smoke parses every JSON definition and loads every skill, rule, and card",
+      "durationMs": 232.17079999999987
+    },
+    {
+      "file": "game/sonic-roster.test.ts",
+      "test": "Sonic roster mechanics only exposes skill keywords that have a glossary explanation",
+      "durationMs": 35.32249999999999
+    },
+    {
+      "file": "game/sonic-roster.test.ts",
+      "test": "Sonic roster mechanics uses the requested Sonic and Shadow skill descriptions and Super Form costs",
+      "durationMs": 3.1003000000000043
+    },
+    {
+      "file": "game/sonic-roster.test.ts",
+      "test": "Sonic roster mechanics extends Sonic spin dash target selection to seven cells at three momentum and stops at the selected cell",
+      "durationMs": 2.053600000000074
+    },
+    {
+      "file": "game/sonic-roster.test.ts",
+      "test": "Sonic roster mechanics replaces consumed Sonic momentum with the distance gained from spin dash",
+      "durationMs": 3.2910000000000537
+    },
+    {
+      "file": "game/sonic-roster.test.ts",
+      "test": "Sonic roster mechanics grants temporary action points and keeps the displayed momentum in sync through Sonic Super Form",
+      "durationMs": 2.6341999999999643
+    },
+    {
+      "file": "game/turn.test.ts",
+      "test": "interrupted skill release does not pay or execute a skill when the resumed trigger blocks",
+      "durationMs": 6.15360000000004
+    }
+  ],
+  "diagnostic": {
+    "command": "npm.cmd exec vitest -- run tests/game/ai-environment.test.ts tests/game/room-runtime-isolation.test.ts --maxWorkers=1 --reporter=verbose",
+    "passed": 31,
+    "failed": 0,
+    "exitCode": 0,
+    "durationSeconds": 54.36,
+    "codeOrTimeoutChanged": false,
+    "aiPendingDurationMs": 4489,
+    "room100TransitionDurationMs": 17962,
+    "note": "Full-suite failures remain recorded; isolated success does not make full suite green or establish a performance root cause."
+  }
+}

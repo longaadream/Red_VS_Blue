@@ -16,5 +16,121 @@
   "actionPointCost": 0,
   "range": "self",
   "requiresTarget": false,
-  "code": "function executeSkill(context) { return { message: '收割被动技能已激活', success: true } }"
+  "code": "function executeSkill(context) { var __gameplayInvalid = {}; var _composite0 = { \"success\": __gameplayInvalid, \"message\": __gameplayInvalid }; if ((\"收割被动技能已激活\" === __gameplayInvalid) || (\"收割被动技能已激活\" === undefined) || (\"收割被动技能已激活\" === null)) { _composite0 = { \"success\": __gameplayInvalid, \"message\": __gameplayInvalid }; } else { _done1: { if ((\"收割被动技能已激活\" === __gameplayInvalid) || (\"收割被动技能已激活\" === undefined) || (\"收割被动技能已激活\" === null)) { _module2 = { \"success\": __gameplayInvalid, \"message\": __gameplayInvalid }; } else { var _module2 = ({success: true, message: \"收割被动技能已激活\"}); } if (!(((_module2[\"success\"]) === __gameplayInvalid) || ((_module2[\"message\"]) === __gameplayInvalid))) { _composite0 = { \"success\": (_module2[\"success\"]), \"message\": (_module2[\"message\"]) }; break _done1; } } } if (!(((_composite0[\"success\"]) === __gameplayInvalid) || ((_composite0[\"message\"]) === __gameplayInvalid))) { return { \"success\": (_composite0[\"success\"]), \"message\": (_composite0[\"message\"]) }; } }",
+  "gameplayModules": {
+    "version": "rvb-gameplay-module-document/v1",
+    "entries": {
+      "code": {
+        "graph": {
+          "version": "rvb-gameplay-modules/v1",
+          "surface": "triggerSkill",
+          "outputs": [
+            {
+              "name": "success",
+              "type": "boolean"
+            },
+            {
+              "name": "message",
+              "type": "string",
+              "optional": true
+            }
+          ],
+          "composites": [
+            {
+              "id": "shared.result-message",
+              "version": "1",
+              "label": "成功消息",
+              "description": "将一段已计算文本转换为统一的成功消息结果。",
+              "inputs": [
+                {
+                  "name": "message",
+                  "type": "string"
+                }
+              ],
+              "outputs": [
+                {
+                  "name": "success",
+                  "type": "boolean"
+                },
+                {
+                  "name": "message",
+                  "type": "string"
+                }
+              ],
+              "allowedSurfaces": [
+                "skill",
+                "card",
+                "rule",
+                "triggerSkill",
+                "pending"
+              ],
+              "body": [
+                {
+                  "kind": "call",
+                  "id": "result-message",
+                  "module": "result.message",
+                  "version": "1",
+                  "inputs": {
+                    "message": {
+                      "kind": "input",
+                      "name": "message"
+                    }
+                  },
+                  "parameters": {}
+                },
+                {
+                  "kind": "return",
+                  "id": "return-result-message",
+                  "values": {
+                    "success": {
+                      "kind": "output",
+                      "node": "result-message",
+                      "port": "success"
+                    },
+                    "message": {
+                      "kind": "output",
+                      "node": "result-message",
+                      "port": "message"
+                    }
+                  }
+                }
+              ]
+            }
+          ],
+          "body": [
+            {
+              "kind": "call",
+              "id": "message",
+              "module": "shared.result-message",
+              "version": "1",
+              "inputs": {
+                "message": {
+                  "kind": "literal",
+                  "value": "收割被动技能已激活"
+                }
+              },
+              "parameters": {}
+            },
+            {
+              "kind": "return",
+              "id": "return",
+              "values": {
+                "success": {
+                  "kind": "output",
+                  "node": "message",
+                  "port": "success"
+                },
+                "message": {
+                  "kind": "output",
+                  "node": "message",
+                  "port": "message"
+                }
+              }
+            }
+          ]
+        },
+        "compilerVersion": "rvb-gameplay-module-compiler/v1"
+      }
+    }
+  }
 }

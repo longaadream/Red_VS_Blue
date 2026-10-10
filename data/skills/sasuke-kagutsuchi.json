@@ -17,8 +17,8 @@
   "maxCharges": 0,
   "powerMultiplier": 1,
   "actionPointCost": 1,
-  "code": "function executeSkill(context) { var caster = context.piece; var target = selectTarget({ type: 'piece', range: 99, filter: 'all' }); if (!target || target.needsTargetSelection) return target; if (!battle.extensions) battle.extensions = {}; var cells = battle.extensions.amaterasuCells || []; var removed = cells.filter(function(cell) { return Math.abs(cell.x - target.x) + Math.abs(cell.y - target.y) <= 4; }); context.presentationQueue.push(\"tileEffectRemoved\", function() { battle.extensions.amaterasuCells = cells.filter(function(cell) { return removed.indexOf(cell) === -1; }); if (battle.extensions.tileEffects) battle.extensions.tileEffects = battle.extensions.tileEffects.filter(function(effect) { if (effect.tileType !== 'amaterasu') return true; return !removed.some(function(cell) { return cell.x === effect.x && cell.y === effect.y; }); });  }); var layers = 2 + Math.min(2, removed.length); var existing = target.statusTags && target.statusTags.find(function(tag) { return tag.type === 'amaterasu-burn'; }); if (existing) { existing.stacks = Math.min(4, (existing.stacks || 0) + layers); } else { addStatusEffectById(target.instanceId, { id: 'amaterasu-burn-' + target.instanceId, name: '天照灼烧', type: 'amaterasu-burn', currentDuration: -1, currentUses: -1, intensity: 2, stacks: layers }); } return { success: true, message: caster.name + '使用加具土命，移除目标周围' + removed.length + '个天照地格，为' + target.name + '附加' + layers + '层天照' }; }",
-  "previewCode": "function calculatePreview() { return { description: \"选择全图棋子，赋予天照 x 2。消耗目标4格内的全部天照地格，每格额外+1层，本次最多4层。\", expectedValues: { baseStacks: 2, maxStacks: 4 } }; }",
+  "code": "function executeSkill(context) { var caster, cells, existing, layers, removed, target; var _pc = \"n33\"; for (var _step = 0; _step <= 15; _step++) { switch (_pc) { case \"n33\": caster = (context)[\"piece\"]; _pc = \"n32\"; break; case \"n32\": target = selectTarget({type: \"piece\", range: 99, filter: \"all\"}); _pc = \"n31\"; break; case \"n31\": _pc = (! (! ((! target) || (target)[\"needsTargetSelection\"]))) ? \"n30\" : \"n29\"; break; case \"n29\": _pc = (! (! (! (battle)[\"extensions\"]))) ? \"n28\" : \"n27\"; break; case \"n28\": (battle)[\"extensions\"] = {}; _pc = \"n27\"; break; case \"n27\": cells = (((battle)[\"extensions\"])[\"amaterasuCells\"] || []); _pc = \"n26\"; break; case \"n26\": removed = (cells)[\"filter\"](function (cell) { return ((Math.abs(((cell)[\"x\"] - (target)[\"x\"])) + Math.abs(((cell)[\"y\"] - (target)[\"y\"]))) <= 4); }); _pc = \"n7\"; break; case \"n7\": ((context)[\"presentationQueue\"]).push(\"tileEffectRemoved\", function () { var __rvb_import_bound_method_1, __rvb_import_effect_0; { var __rvb_content_graph_region_pc_0 = \"n25\"; while (__rvb_content_graph_region_pc_0 !== \"n8\") { switch (__rvb_content_graph_region_pc_0) { case \"n25\": ((battle)[\"extensions\"])[\"amaterasuCells\"] = (cells)[\"filter\"](function (cell) { return ((removed)[\"indexOf\"](cell) === (- 1)); }); __rvb_content_graph_region_pc_0 = \"n24\"; break; case \"n24\": __rvb_content_graph_region_pc_0 = (! (! ((battle)[\"extensions\"])[\"tileEffects\"])) ? \"n23\" : \"n8\"; break; case \"n23\": __rvb_import_bound_method_1 = (function (receiver) { var capturedMethod = receiver[\"filter\"]; return function () { return Reflect.apply(capturedMethod, receiver, arguments); }; })(((battle)[\"extensions\"])[\"tileEffects\"]); __rvb_content_graph_region_pc_0 = \"n18\"; break; case \"n18\": __rvb_import_effect_0 = (__rvb_import_bound_method_1)(function (effect) { { var __rvb_content_graph_region_pc_1 = \"n22\"; while (__rvb_content_graph_region_pc_1 !== \"n19\") { switch (__rvb_content_graph_region_pc_1) { case \"n22\": __rvb_content_graph_region_pc_1 = (! (! ((effect)[\"tileType\"] !== \"amaterasu\"))) ? \"n21\" : \"n20\"; break; case \"n20\": return (! (removed)[\"some\"](function (cell) { return (((cell)[\"x\"] === (effect)[\"x\"]) && ((cell)[\"y\"] === (effect)[\"y\"])); })); case \"n21\": return true; default: throw new Error(\"invalid content graph region node\"); } } } }); __rvb_content_graph_region_pc_0 = \"n17\"; break; case \"n17\": ((battle)[\"extensions\"])[\"tileEffects\"] = __rvb_import_effect_0; __rvb_content_graph_region_pc_0 = \"n8\"; break; case \"n8\": __rvb_content_graph_region_pc_0 = \"n8\"; break; default: throw new Error(\"invalid content graph region node\"); } } } }); _pc = \"n6\"; break; case \"n6\": layers = (2 + Math.min(2, (removed)[\"length\"])); _pc = \"n5\"; break; case \"n5\": existing = ((target)[\"statusTags\"] && ((target)[\"statusTags\"])[\"find\"](function (tag) { return ((tag)[\"type\"] === \"amaterasu-burn\"); })); _pc = \"n4\"; break; case \"n4\": _pc = (! (! existing)) ? \"n2\" : \"n3\"; break; case \"n3\": addStatusEffectById((target)[\"instanceId\"], {id: (\"amaterasu-burn-\" + (target)[\"instanceId\"]), name: \"天照灼烧\", type: \"amaterasu-burn\", currentDuration: (- 1), currentUses: (- 1), intensity: 2, stacks: layers}); _pc = \"n1\"; break; case \"n2\": (existing)[\"stacks\"] = Math.min(4, (((existing)[\"stacks\"] || 0) + layers)); _pc = \"n1\"; break; case \"n1\": return {success: true, message: ((((((((caster)[\"name\"] + \"使用加具土命，移除目标周围\") + (removed)[\"length\"]) + \"个天照地格，为\") + (target)[\"name\"]) + \"附加\") + layers) + \"层天照\")}; case \"n30\": return target; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\"); }",
+  "previewCode": "function calculatePreview(piece, skillDef, currentCooldown) { var _pc = \"n1\"; for (var _step = 0; _step <= 1; _step++) { switch (_pc) { case \"n1\": return {description: \"选择全图棋子，赋予天照 x 2。消耗目标4格内的全部天照地格，每格额外+1层，本次最多4层。\", expectedValues: {baseStacks: 2, maxStacks: 4}}; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\"); }",
   "targeting": {
     "steps": [
       {
@@ -28,5 +28,945 @@
         "range": 99
       }
     ]
+  },
+  "contentGraph": {
+    "version": "rvb-content-graph/v1",
+    "surface": "skill",
+    "entry": "n33",
+    "nodes": [
+      {
+        "id": "n1",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "binary",
+                  "op": "+",
+                  "left": {
+                    "kind": "binary",
+                    "op": "+",
+                    "left": {
+                      "kind": "binary",
+                      "op": "+",
+                      "left": {
+                        "kind": "binary",
+                        "op": "+",
+                        "left": {
+                          "kind": "binary",
+                          "op": "+",
+                          "left": {
+                            "kind": "binary",
+                            "op": "+",
+                            "left": {
+                              "kind": "get",
+                              "object": {
+                                "kind": "ref",
+                                "name": "caster"
+                              },
+                              "key": "name"
+                            },
+                            "right": {
+                              "kind": "literal",
+                              "value": "使用加具土命，移除目标周围"
+                            }
+                          },
+                          "right": {
+                            "kind": "get",
+                            "object": {
+                              "kind": "ref",
+                              "name": "removed"
+                            },
+                            "key": "length"
+                          }
+                        },
+                        "right": {
+                          "kind": "literal",
+                          "value": "个天照地格，为"
+                        }
+                      },
+                      "right": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "target"
+                        },
+                        "key": "name"
+                      }
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": "附加"
+                    }
+                  },
+                  "right": {
+                    "kind": "ref",
+                    "name": "layers"
+                  }
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "层天照"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n2",
+        "kind": "set",
+        "target": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "existing"
+          },
+          "key": "stacks"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "call",
+          "callee": "Math.min",
+          "args": [
+            {
+              "kind": "literal",
+              "value": 4
+            },
+            {
+              "kind": "binary",
+              "op": "+",
+              "left": {
+                "kind": "binary",
+                "op": "||",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "existing"
+                  },
+                  "key": "stacks"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": 0
+                }
+              },
+              "right": {
+                "kind": "ref",
+                "name": "layers"
+              }
+            }
+          ]
+        },
+        "next": "n1"
+      },
+      {
+        "id": "n3",
+        "kind": "call",
+        "capability": "addStatusEffectById",
+        "args": [
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "target"
+            },
+            "key": "instanceId"
+          },
+          {
+            "kind": "object",
+            "entries": [
+              {
+                "key": "id",
+                "value": {
+                  "kind": "binary",
+                  "op": "+",
+                  "left": {
+                    "kind": "literal",
+                    "value": "amaterasu-burn-"
+                  },
+                  "right": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "target"
+                    },
+                    "key": "instanceId"
+                  }
+                }
+              },
+              {
+                "key": "name",
+                "value": {
+                  "kind": "literal",
+                  "value": "天照灼烧"
+                }
+              },
+              {
+                "key": "type",
+                "value": {
+                  "kind": "literal",
+                  "value": "amaterasu-burn"
+                }
+              },
+              {
+                "key": "currentDuration",
+                "value": {
+                  "kind": "unary",
+                  "op": "-",
+                  "argument": {
+                    "kind": "literal",
+                    "value": 1
+                  }
+                }
+              },
+              {
+                "key": "currentUses",
+                "value": {
+                  "kind": "unary",
+                  "op": "-",
+                  "argument": {
+                    "kind": "literal",
+                    "value": 1
+                  }
+                }
+              },
+              {
+                "key": "intensity",
+                "value": {
+                  "kind": "literal",
+                  "value": 2
+                }
+              },
+              {
+                "key": "stacks",
+                "value": {
+                  "kind": "ref",
+                  "name": "layers"
+                }
+              }
+            ]
+          }
+        ],
+        "next": "n1"
+      },
+      {
+        "id": "n4",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "ref",
+              "name": "existing"
+            }
+          }
+        },
+        "yes": "n2",
+        "no": "n3"
+      },
+      {
+        "id": "n5",
+        "kind": "bind",
+        "name": "existing",
+        "expr": {
+          "kind": "binary",
+          "op": "&&",
+          "left": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "target"
+            },
+            "key": "statusTags"
+          },
+          "right": {
+            "kind": "collection",
+            "object": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "target"
+              },
+              "key": "statusTags"
+            },
+            "method": "find",
+            "args": [
+              {
+                "kind": "lambda",
+                "parameters": [
+                  "tag"
+                ],
+                "body": {
+                  "kind": "binary",
+                  "op": "===",
+                  "left": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "tag"
+                    },
+                    "key": "type"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": "amaterasu-burn"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "next": "n4"
+      },
+      {
+        "id": "n6",
+        "kind": "bind",
+        "name": "layers",
+        "expr": {
+          "kind": "binary",
+          "op": "+",
+          "left": {
+            "kind": "literal",
+            "value": 2
+          },
+          "right": {
+            "kind": "call",
+            "callee": "Math.min",
+            "args": [
+              {
+                "kind": "literal",
+                "value": 2
+              },
+              {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "removed"
+                },
+                "key": "length"
+              }
+            ]
+          }
+        },
+        "next": "n5"
+      },
+      {
+        "id": "n7",
+        "kind": "call",
+        "capability": "array.push",
+        "args": [
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "context"
+            },
+            "key": "presentationQueue"
+          },
+          {
+            "kind": "literal",
+            "value": "tileEffectRemoved"
+          },
+          {
+            "kind": "function",
+            "parameters": [],
+            "body": {
+              "entry": "n25",
+              "end": "n8",
+              "nodes": [
+                {
+                  "id": "n8",
+                  "kind": "regionEnd"
+                },
+                {
+                  "id": "n17",
+                  "kind": "set",
+                  "target": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "battle"
+                      },
+                      "key": "extensions"
+                    },
+                    "key": "tileEffects"
+                  },
+                  "operator": "=",
+                  "value": {
+                    "kind": "ref",
+                    "name": "__rvb_import_effect_0"
+                  },
+                  "next": "n8"
+                },
+                {
+                  "id": "n18",
+                  "kind": "invoke",
+                  "target": {
+                    "kind": "function",
+                    "value": {
+                      "kind": "ref",
+                      "name": "__rvb_import_bound_method_1"
+                    }
+                  },
+                  "args": [
+                    {
+                      "kind": "function",
+                      "parameters": [
+                        "effect"
+                      ],
+                      "body": {
+                        "entry": "n22",
+                        "end": "n19",
+                        "nodes": [
+                          {
+                            "id": "n20",
+                            "kind": "return",
+                            "value": {
+                              "kind": "unary",
+                              "op": "!",
+                              "argument": {
+                                "kind": "collection",
+                                "object": {
+                                  "kind": "ref",
+                                  "name": "removed"
+                                },
+                                "method": "some",
+                                "args": [
+                                  {
+                                    "kind": "lambda",
+                                    "parameters": [
+                                      "cell"
+                                    ],
+                                    "body": {
+                                      "kind": "binary",
+                                      "op": "&&",
+                                      "left": {
+                                        "kind": "binary",
+                                        "op": "===",
+                                        "left": {
+                                          "kind": "get",
+                                          "object": {
+                                            "kind": "ref",
+                                            "name": "cell"
+                                          },
+                                          "key": "x"
+                                        },
+                                        "right": {
+                                          "kind": "get",
+                                          "object": {
+                                            "kind": "ref",
+                                            "name": "effect"
+                                          },
+                                          "key": "x"
+                                        }
+                                      },
+                                      "right": {
+                                        "kind": "binary",
+                                        "op": "===",
+                                        "left": {
+                                          "kind": "get",
+                                          "object": {
+                                            "kind": "ref",
+                                            "name": "cell"
+                                          },
+                                          "key": "y"
+                                        },
+                                        "right": {
+                                          "kind": "get",
+                                          "object": {
+                                            "kind": "ref",
+                                            "name": "effect"
+                                          },
+                                          "key": "y"
+                                        }
+                                      }
+                                    }
+                                  }
+                                ]
+                              }
+                            }
+                          },
+                          {
+                            "id": "n21",
+                            "kind": "return",
+                            "value": {
+                              "kind": "literal",
+                              "value": true
+                            }
+                          },
+                          {
+                            "id": "n22",
+                            "kind": "branch",
+                            "condition": {
+                              "kind": "unary",
+                              "op": "!",
+                              "argument": {
+                                "kind": "unary",
+                                "op": "!",
+                                "argument": {
+                                  "kind": "binary",
+                                  "op": "!==",
+                                  "left": {
+                                    "kind": "get",
+                                    "object": {
+                                      "kind": "ref",
+                                      "name": "effect"
+                                    },
+                                    "key": "tileType"
+                                  },
+                                  "right": {
+                                    "kind": "literal",
+                                    "value": "amaterasu"
+                                  }
+                                }
+                              }
+                            },
+                            "yes": "n21",
+                            "no": "n20"
+                          },
+                          {
+                            "id": "n19",
+                            "kind": "regionEnd"
+                          }
+                        ]
+                      }
+                    }
+                  ],
+                  "result": "__rvb_import_effect_0",
+                  "next": "n17"
+                },
+                {
+                  "id": "n23",
+                  "kind": "bind",
+                  "name": "__rvb_import_bound_method_1",
+                  "expr": {
+                    "kind": "boundMethod",
+                    "object": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "battle"
+                        },
+                        "key": "extensions"
+                      },
+                      "key": "tileEffects"
+                    },
+                    "method": "filter"
+                  },
+                  "next": "n18"
+                },
+                {
+                  "id": "n24",
+                  "kind": "branch",
+                  "condition": {
+                    "kind": "unary",
+                    "op": "!",
+                    "argument": {
+                      "kind": "unary",
+                      "op": "!",
+                      "argument": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "battle"
+                          },
+                          "key": "extensions"
+                        },
+                        "key": "tileEffects"
+                      }
+                    }
+                  },
+                  "yes": "n23",
+                  "no": "n8"
+                },
+                {
+                  "id": "n25",
+                  "kind": "set",
+                  "target": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "battle"
+                      },
+                      "key": "extensions"
+                    },
+                    "key": "amaterasuCells"
+                  },
+                  "operator": "=",
+                  "value": {
+                    "kind": "collection",
+                    "object": {
+                      "kind": "ref",
+                      "name": "cells"
+                    },
+                    "method": "filter",
+                    "args": [
+                      {
+                        "kind": "lambda",
+                        "parameters": [
+                          "cell"
+                        ],
+                        "body": {
+                          "kind": "binary",
+                          "op": "===",
+                          "left": {
+                            "kind": "collection",
+                            "object": {
+                              "kind": "ref",
+                              "name": "removed"
+                            },
+                            "method": "indexOf",
+                            "args": [
+                              {
+                                "kind": "ref",
+                                "name": "cell"
+                              }
+                            ]
+                          },
+                          "right": {
+                            "kind": "unary",
+                            "op": "-",
+                            "argument": {
+                              "kind": "literal",
+                              "value": 1
+                            }
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  "next": "n24"
+                }
+              ]
+            }
+          }
+        ],
+        "next": "n6"
+      },
+      {
+        "id": "n26",
+        "kind": "bind",
+        "name": "removed",
+        "expr": {
+          "kind": "collection",
+          "object": {
+            "kind": "ref",
+            "name": "cells"
+          },
+          "method": "filter",
+          "args": [
+            {
+              "kind": "lambda",
+              "parameters": [
+                "cell"
+              ],
+              "body": {
+                "kind": "binary",
+                "op": "<=",
+                "left": {
+                  "kind": "binary",
+                  "op": "+",
+                  "left": {
+                    "kind": "call",
+                    "callee": "Math.abs",
+                    "args": [
+                      {
+                        "kind": "binary",
+                        "op": "-",
+                        "left": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "cell"
+                          },
+                          "key": "x"
+                        },
+                        "right": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "target"
+                          },
+                          "key": "x"
+                        }
+                      }
+                    ]
+                  },
+                  "right": {
+                    "kind": "call",
+                    "callee": "Math.abs",
+                    "args": [
+                      {
+                        "kind": "binary",
+                        "op": "-",
+                        "left": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "cell"
+                          },
+                          "key": "y"
+                        },
+                        "right": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "target"
+                          },
+                          "key": "y"
+                        }
+                      }
+                    ]
+                  }
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": 4
+                }
+              }
+            }
+          ]
+        },
+        "next": "n7"
+      },
+      {
+        "id": "n27",
+        "kind": "bind",
+        "name": "cells",
+        "expr": {
+          "kind": "binary",
+          "op": "||",
+          "left": {
+            "kind": "get",
+            "object": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "battle"
+              },
+              "key": "extensions"
+            },
+            "key": "amaterasuCells"
+          },
+          "right": {
+            "kind": "array",
+            "items": []
+          }
+        },
+        "next": "n26"
+      },
+      {
+        "id": "n28",
+        "kind": "set",
+        "target": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "battle"
+          },
+          "key": "extensions"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "object",
+          "entries": []
+        },
+        "next": "n27"
+      },
+      {
+        "id": "n29",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "unary",
+              "op": "!",
+              "argument": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "battle"
+                },
+                "key": "extensions"
+              }
+            }
+          }
+        },
+        "yes": "n28",
+        "no": "n27"
+      },
+      {
+        "id": "n30",
+        "kind": "return",
+        "value": {
+          "kind": "ref",
+          "name": "target"
+        }
+      },
+      {
+        "id": "n31",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "ref",
+                  "name": "target"
+                }
+              },
+              "right": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "target"
+                },
+                "key": "needsTargetSelection"
+              }
+            }
+          }
+        },
+        "yes": "n30",
+        "no": "n29"
+      },
+      {
+        "id": "n32",
+        "kind": "call",
+        "capability": "selectTarget",
+        "args": [
+          {
+            "kind": "object",
+            "entries": [
+              {
+                "key": "type",
+                "value": {
+                  "kind": "literal",
+                  "value": "piece"
+                }
+              },
+              {
+                "key": "range",
+                "value": {
+                  "kind": "literal",
+                  "value": 99
+                }
+              },
+              {
+                "key": "filter",
+                "value": {
+                  "kind": "literal",
+                  "value": "all"
+                }
+              }
+            ]
+          }
+        ],
+        "result": "target",
+        "next": "n31"
+      },
+      {
+        "id": "n33",
+        "kind": "bind",
+        "name": "caster",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "context"
+          },
+          "key": "piece"
+        },
+        "next": "n32"
+      }
+    ]
+  },
+  "contentGraphField": "code",
+  "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1",
+  "contentGraphEntries": {
+    "previewCode": {
+      "graph": {
+        "version": "rvb-content-graph/v1",
+        "surface": "preview",
+        "entry": "n1",
+        "nodes": [
+          {
+            "id": "n1",
+            "kind": "return",
+            "value": {
+              "kind": "object",
+              "entries": [
+                {
+                  "key": "description",
+                  "value": {
+                    "kind": "literal",
+                    "value": "选择全图棋子，赋予天照 x 2。消耗目标4格内的全部天照地格，每格额外+1层，本次最多4层。"
+                  }
+                },
+                {
+                  "key": "expectedValues",
+                  "value": {
+                    "kind": "object",
+                    "entries": [
+                      {
+                        "key": "baseStacks",
+                        "value": {
+                          "kind": "literal",
+                          "value": 2
+                        }
+                      },
+                      {
+                        "key": "maxStacks",
+                        "value": {
+                          "kind": "literal",
+                          "value": 4
+                        }
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "compilerVersion": "rvb-content-graph-compiler/v1"
+    }
   }
 }

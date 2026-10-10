@@ -2,6 +2,436 @@
   "id": "rule-grimmjow-resurreccion",
   "name": "归刃·豹王",
   "description": "葛力姆乔首次死亡结算后，在原地重新召唤归刃形态。",
-  "trigger": { "type": "onPieceDied" },
-  "skillCode": "var grimm = context.rulePiece; var dead = context.sourcePiece; if (!grimm || !dead || dead.instanceId !== grimm.instanceId || grimm.currentHp !== 0) return { success: false, message: '' }; if (grimm.statusTags && grimm.statusTags.some(function(tag) { return tag.type === 'resurreccion'; })) return { success: false, message: '' }; return { success: true, summonAfterDeath: { skillId: 'grimmjow-resurreccion', maxHp: 10, currentHp: 10, attack: 5, defense: 0, moveRange: 5, skillIds: ['grimmjow-destruction-instinct', 'grimmjow-hunting-instinct', 'grimmjow-resurreccion', 'grimmjow-panther-claw'], statusTags: [{ id: 'grimmjow-resurreccion', type: 'resurreccion', name: '归刃', visible: true, currentDuration: -1, currentUses: -1, intensity: 1, stacks: 1 }], message: grimm.name + '以豹王形态在原地重新召唤' }, message: grimm.name + '完成死亡结算，准备在原地重新召唤豹王形态' };"
+  "trigger": {
+    "type": "onPieceDied"
+  },
+  "skillCode": "var dead, grimm; var _pc = \"n7\"; for (var _step = 0; _step <= 7; _step++) { switch (_pc) { case \"n7\": grimm = (context)[\"rulePiece\"]; _pc = \"n6\"; break; case \"n6\": dead = (context)[\"sourcePiece\"]; _pc = \"n5\"; break; case \"n5\": _pc = (! (! ((((! grimm) || (! dead)) || ((dead)[\"instanceId\"] !== (grimm)[\"instanceId\"])) || ((grimm)[\"currentHp\"] !== 0)))) ? \"n4\" : \"n3\"; break; case \"n3\": _pc = (! (! ((grimm)[\"statusTags\"] && ((grimm)[\"statusTags\"])[\"some\"](function (tag) { return ((tag)[\"type\"] === \"resurreccion\"); })))) ? \"n2\" : \"n1\"; break; case \"n1\": return {success: true, summonAfterDeath: {skillId: \"grimmjow-resurreccion\", maxHp: 10, currentHp: 10, attack: 5, defense: 0, moveRange: 5, skillIds: [\"grimmjow-destruction-instinct\", \"grimmjow-hunting-instinct\", \"grimmjow-resurreccion\", \"grimmjow-panther-claw\"], statusTags: [{id: \"grimmjow-resurreccion\", type: \"resurreccion\", name: \"归刃\", visible: true, currentDuration: (- 1), currentUses: (- 1), intensity: 1, stacks: 1}], message: ((grimm)[\"name\"] + \"以豹王形态在原地重新召唤\")}, message: ((grimm)[\"name\"] + \"完成死亡结算，准备在原地重新召唤豹王形态\")}; case \"n2\": return {success: false, message: \"\"}; case \"n4\": return {success: false, message: \"\"}; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\");",
+  "contentGraph": {
+    "version": "rvb-content-graph/v1",
+    "surface": "rule",
+    "entry": "n7",
+    "nodes": [
+      {
+        "id": "n1",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "summonAfterDeath",
+              "value": {
+                "kind": "object",
+                "entries": [
+                  {
+                    "key": "skillId",
+                    "value": {
+                      "kind": "literal",
+                      "value": "grimmjow-resurreccion"
+                    }
+                  },
+                  {
+                    "key": "maxHp",
+                    "value": {
+                      "kind": "literal",
+                      "value": 10
+                    }
+                  },
+                  {
+                    "key": "currentHp",
+                    "value": {
+                      "kind": "literal",
+                      "value": 10
+                    }
+                  },
+                  {
+                    "key": "attack",
+                    "value": {
+                      "kind": "literal",
+                      "value": 5
+                    }
+                  },
+                  {
+                    "key": "defense",
+                    "value": {
+                      "kind": "literal",
+                      "value": 0
+                    }
+                  },
+                  {
+                    "key": "moveRange",
+                    "value": {
+                      "kind": "literal",
+                      "value": 5
+                    }
+                  },
+                  {
+                    "key": "skillIds",
+                    "value": {
+                      "kind": "array",
+                      "items": [
+                        {
+                          "kind": "literal",
+                          "value": "grimmjow-destruction-instinct"
+                        },
+                        {
+                          "kind": "literal",
+                          "value": "grimmjow-hunting-instinct"
+                        },
+                        {
+                          "kind": "literal",
+                          "value": "grimmjow-resurreccion"
+                        },
+                        {
+                          "kind": "literal",
+                          "value": "grimmjow-panther-claw"
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "key": "statusTags",
+                    "value": {
+                      "kind": "array",
+                      "items": [
+                        {
+                          "kind": "object",
+                          "entries": [
+                            {
+                              "key": "id",
+                              "value": {
+                                "kind": "literal",
+                                "value": "grimmjow-resurreccion"
+                              }
+                            },
+                            {
+                              "key": "type",
+                              "value": {
+                                "kind": "literal",
+                                "value": "resurreccion"
+                              }
+                            },
+                            {
+                              "key": "name",
+                              "value": {
+                                "kind": "literal",
+                                "value": "归刃"
+                              }
+                            },
+                            {
+                              "key": "visible",
+                              "value": {
+                                "kind": "literal",
+                                "value": true
+                              }
+                            },
+                            {
+                              "key": "currentDuration",
+                              "value": {
+                                "kind": "unary",
+                                "op": "-",
+                                "argument": {
+                                  "kind": "literal",
+                                  "value": 1
+                                }
+                              }
+                            },
+                            {
+                              "key": "currentUses",
+                              "value": {
+                                "kind": "unary",
+                                "op": "-",
+                                "argument": {
+                                  "kind": "literal",
+                                  "value": 1
+                                }
+                              }
+                            },
+                            {
+                              "key": "intensity",
+                              "value": {
+                                "kind": "literal",
+                                "value": 1
+                              }
+                            },
+                            {
+                              "key": "stacks",
+                              "value": {
+                                "kind": "literal",
+                                "value": 1
+                              }
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "key": "message",
+                    "value": {
+                      "kind": "binary",
+                      "op": "+",
+                      "left": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "grimm"
+                        },
+                        "key": "name"
+                      },
+                      "right": {
+                        "kind": "literal",
+                        "value": "以豹王形态在原地重新召唤"
+                      }
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "grimm"
+                  },
+                  "key": "name"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "完成死亡结算，准备在原地重新召唤豹王形态"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n2",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n3",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "&&",
+              "left": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "grimm"
+                },
+                "key": "statusTags"
+              },
+              "right": {
+                "kind": "collection",
+                "object": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "grimm"
+                  },
+                  "key": "statusTags"
+                },
+                "method": "some",
+                "args": [
+                  {
+                    "kind": "lambda",
+                    "parameters": [
+                      "tag"
+                    ],
+                    "body": {
+                      "kind": "binary",
+                      "op": "===",
+                      "left": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "tag"
+                        },
+                        "key": "type"
+                      },
+                      "right": {
+                        "kind": "literal",
+                        "value": "resurreccion"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "yes": "n2",
+        "no": "n1"
+      },
+      {
+        "id": "n4",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n5",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "binary",
+                "op": "||",
+                "left": {
+                  "kind": "binary",
+                  "op": "||",
+                  "left": {
+                    "kind": "unary",
+                    "op": "!",
+                    "argument": {
+                      "kind": "ref",
+                      "name": "grimm"
+                    }
+                  },
+                  "right": {
+                    "kind": "unary",
+                    "op": "!",
+                    "argument": {
+                      "kind": "ref",
+                      "name": "dead"
+                    }
+                  }
+                },
+                "right": {
+                  "kind": "binary",
+                  "op": "!==",
+                  "left": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "dead"
+                    },
+                    "key": "instanceId"
+                  },
+                  "right": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "grimm"
+                    },
+                    "key": "instanceId"
+                  }
+                }
+              },
+              "right": {
+                "kind": "binary",
+                "op": "!==",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "grimm"
+                  },
+                  "key": "currentHp"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": 0
+                }
+              }
+            }
+          }
+        },
+        "yes": "n4",
+        "no": "n3"
+      },
+      {
+        "id": "n6",
+        "kind": "bind",
+        "name": "dead",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "context"
+          },
+          "key": "sourcePiece"
+        },
+        "next": "n5"
+      },
+      {
+        "id": "n7",
+        "kind": "bind",
+        "name": "grimm",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "context"
+          },
+          "key": "rulePiece"
+        },
+        "next": "n6"
+      }
+    ]
+  },
+  "contentGraphField": "skillCode",
+  "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1"
 }

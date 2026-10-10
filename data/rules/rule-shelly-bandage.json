@@ -2,6 +2,508 @@
   "id": "rule-shelly-bandage",
   "name": "止血绷带",
   "description": "当雪莉的血量降至6及以下时恢复4点生命，每局限一次。",
-  "trigger": { "type": "afterDamageTaken" },
-  "skillCode": "var piece = context.rulePiece; if (!piece || !context.piece || context.piece.instanceId !== piece.instanceId || !(context.damage > 0) || piece.currentHp <= 0 || piece.currentHp > 6) return { success: false, message: '' }; if ((piece.spentPassives || []).indexOf('shelly-bandage') !== -1) return { success: false, message: '' }; piece.spentPassives = (piece.spentPassives || []).concat(['shelly-bandage']); var before = piece.currentHp; piece.currentHp = Math.min(piece.maxHp, piece.currentHp + 4); addStatusEffectById(piece.instanceId, { id: 'shelly-bandage-used-' + piece.instanceId, type: 'shelly-bandage-used', name: '止血绷带已触发', stacks: 1, currentDuration: -1, currentUses: -1 }); return { success: true, message: piece.name + '触发止血绷带，恢复' + (piece.currentHp - before) + '点生命' };"
+  "trigger": {
+    "type": "afterDamageTaken"
+  },
+  "skillCode": "var before, piece; var _pc = \"n10\"; for (var _step = 0; _step <= 10; _step++) { switch (_pc) { case \"n10\": piece = (context)[\"rulePiece\"]; _pc = \"n9\"; break; case \"n9\": _pc = (! (! ((((((! piece) || (! (context)[\"piece\"])) || (((context)[\"piece\"])[\"instanceId\"] !== (piece)[\"instanceId\"])) || (! ((context)[\"damage\"] > 0))) || ((piece)[\"currentHp\"] <= 0)) || ((piece)[\"currentHp\"] > 6)))) ? \"n8\" : \"n7\"; break; case \"n7\": _pc = (! (! ((((piece)[\"spentPassives\"] || []))[\"indexOf\"](\"shelly-bandage\") !== (- 1)))) ? \"n6\" : \"n5\"; break; case \"n5\": (piece)[\"spentPassives\"] = (((piece)[\"spentPassives\"] || []))[\"concat\"]([\"shelly-bandage\"]); _pc = \"n4\"; break; case \"n4\": before = (piece)[\"currentHp\"]; _pc = \"n3\"; break; case \"n3\": (piece)[\"currentHp\"] = Math.min((piece)[\"maxHp\"], ((piece)[\"currentHp\"] + 4)); _pc = \"n2\"; break; case \"n2\": addStatusEffectById((piece)[\"instanceId\"], {id: (\"shelly-bandage-used-\" + (piece)[\"instanceId\"]), type: \"shelly-bandage-used\", name: \"止血绷带已触发\", stacks: 1, currentDuration: (- 1), currentUses: (- 1)}); _pc = \"n1\"; break; case \"n1\": return {success: true, message: ((((piece)[\"name\"] + \"触发止血绷带，恢复\") + ((piece)[\"currentHp\"] - before)) + \"点生命\")}; case \"n6\": return {success: false, message: \"\"}; case \"n8\": return {success: false, message: \"\"}; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\");",
+  "contentGraph": {
+    "version": "rvb-content-graph/v1",
+    "surface": "rule",
+    "entry": "n10",
+    "nodes": [
+      {
+        "id": "n1",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "binary",
+                  "op": "+",
+                  "left": {
+                    "kind": "binary",
+                    "op": "+",
+                    "left": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "piece"
+                      },
+                      "key": "name"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": "触发止血绷带，恢复"
+                    }
+                  },
+                  "right": {
+                    "kind": "binary",
+                    "op": "-",
+                    "left": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "piece"
+                      },
+                      "key": "currentHp"
+                    },
+                    "right": {
+                      "kind": "ref",
+                      "name": "before"
+                    }
+                  }
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "点生命"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n2",
+        "kind": "call",
+        "capability": "addStatusEffectById",
+        "args": [
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "piece"
+            },
+            "key": "instanceId"
+          },
+          {
+            "kind": "object",
+            "entries": [
+              {
+                "key": "id",
+                "value": {
+                  "kind": "binary",
+                  "op": "+",
+                  "left": {
+                    "kind": "literal",
+                    "value": "shelly-bandage-used-"
+                  },
+                  "right": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "piece"
+                    },
+                    "key": "instanceId"
+                  }
+                }
+              },
+              {
+                "key": "type",
+                "value": {
+                  "kind": "literal",
+                  "value": "shelly-bandage-used"
+                }
+              },
+              {
+                "key": "name",
+                "value": {
+                  "kind": "literal",
+                  "value": "止血绷带已触发"
+                }
+              },
+              {
+                "key": "stacks",
+                "value": {
+                  "kind": "literal",
+                  "value": 1
+                }
+              },
+              {
+                "key": "currentDuration",
+                "value": {
+                  "kind": "unary",
+                  "op": "-",
+                  "argument": {
+                    "kind": "literal",
+                    "value": 1
+                  }
+                }
+              },
+              {
+                "key": "currentUses",
+                "value": {
+                  "kind": "unary",
+                  "op": "-",
+                  "argument": {
+                    "kind": "literal",
+                    "value": 1
+                  }
+                }
+              }
+            ]
+          }
+        ],
+        "next": "n1"
+      },
+      {
+        "id": "n3",
+        "kind": "set",
+        "target": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "piece"
+          },
+          "key": "currentHp"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "call",
+          "callee": "Math.min",
+          "args": [
+            {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "piece"
+              },
+              "key": "maxHp"
+            },
+            {
+              "kind": "binary",
+              "op": "+",
+              "left": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "piece"
+                },
+                "key": "currentHp"
+              },
+              "right": {
+                "kind": "literal",
+                "value": 4
+              }
+            }
+          ]
+        },
+        "next": "n2"
+      },
+      {
+        "id": "n4",
+        "kind": "bind",
+        "name": "before",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "piece"
+          },
+          "key": "currentHp"
+        },
+        "next": "n3"
+      },
+      {
+        "id": "n5",
+        "kind": "set",
+        "target": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "piece"
+          },
+          "key": "spentPassives"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "collection",
+          "object": {
+            "kind": "binary",
+            "op": "||",
+            "left": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "piece"
+              },
+              "key": "spentPassives"
+            },
+            "right": {
+              "kind": "array",
+              "items": []
+            }
+          },
+          "method": "concat",
+          "args": [
+            {
+              "kind": "array",
+              "items": [
+                {
+                  "kind": "literal",
+                  "value": "shelly-bandage"
+                }
+              ]
+            }
+          ]
+        },
+        "next": "n4"
+      },
+      {
+        "id": "n6",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n7",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "!==",
+              "left": {
+                "kind": "collection",
+                "object": {
+                  "kind": "binary",
+                  "op": "||",
+                  "left": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "piece"
+                    },
+                    "key": "spentPassives"
+                  },
+                  "right": {
+                    "kind": "array",
+                    "items": []
+                  }
+                },
+                "method": "indexOf",
+                "args": [
+                  {
+                    "kind": "literal",
+                    "value": "shelly-bandage"
+                  }
+                ]
+              },
+              "right": {
+                "kind": "unary",
+                "op": "-",
+                "argument": {
+                  "kind": "literal",
+                  "value": 1
+                }
+              }
+            }
+          }
+        },
+        "yes": "n6",
+        "no": "n5"
+      },
+      {
+        "id": "n8",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n9",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "binary",
+                "op": "||",
+                "left": {
+                  "kind": "binary",
+                  "op": "||",
+                  "left": {
+                    "kind": "binary",
+                    "op": "||",
+                    "left": {
+                      "kind": "binary",
+                      "op": "||",
+                      "left": {
+                        "kind": "unary",
+                        "op": "!",
+                        "argument": {
+                          "kind": "ref",
+                          "name": "piece"
+                        }
+                      },
+                      "right": {
+                        "kind": "unary",
+                        "op": "!",
+                        "argument": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "context"
+                          },
+                          "key": "piece"
+                        }
+                      }
+                    },
+                    "right": {
+                      "kind": "binary",
+                      "op": "!==",
+                      "left": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "context"
+                          },
+                          "key": "piece"
+                        },
+                        "key": "instanceId"
+                      },
+                      "right": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "piece"
+                        },
+                        "key": "instanceId"
+                      }
+                    }
+                  },
+                  "right": {
+                    "kind": "unary",
+                    "op": "!",
+                    "argument": {
+                      "kind": "binary",
+                      "op": ">",
+                      "left": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "context"
+                        },
+                        "key": "damage"
+                      },
+                      "right": {
+                        "kind": "literal",
+                        "value": 0
+                      }
+                    }
+                  }
+                },
+                "right": {
+                  "kind": "binary",
+                  "op": "<=",
+                  "left": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "piece"
+                    },
+                    "key": "currentHp"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": 0
+                  }
+                }
+              },
+              "right": {
+                "kind": "binary",
+                "op": ">",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "piece"
+                  },
+                  "key": "currentHp"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": 6
+                }
+              }
+            }
+          }
+        },
+        "yes": "n8",
+        "no": "n7"
+      },
+      {
+        "id": "n10",
+        "kind": "bind",
+        "name": "piece",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "context"
+          },
+          "key": "rulePiece"
+        },
+        "next": "n9"
+      }
+    ]
+  },
+  "contentGraphField": "skillCode",
+  "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1"
 }

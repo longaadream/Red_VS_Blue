@@ -21,7 +21,7 @@
   "range": 99,
   "targetType": "grid",
   "filter": "all",
-  "code": "function executeSkill(context) { var caster = context.piece; var battle = context.battle; var anchorPos = selectTarget({ type: 'grid', range: 99, filter: 'all' }); if (!anchorPos || anchorPos.needsTargetSelection) return anchorPos; if (!battle.extensions) battle.extensions = {}; var anchors = battle.extensions.minatoAnchors || []; var anchorIdx = anchors.findIndex(function(a) { return a.sourceId === caster.instanceId && a.x === anchorPos.x && a.y === anchorPos.y; }); if (anchorIdx === -1) return { success: false, message: '目标位置不是水门的飞雷神锚点' }; var anchorTile = battle.map.tiles.find(function(t) { return t.x === anchorPos.x && t.y === anchorPos.y; }); if (!anchorTile || !anchorTile.props.walkable) return { success: false, message: '锚点位置不可行走' }; var nearbyEnemies = battle.pieces.filter(function(p) { return p.currentHp > 0 && !arePlayersAllied(battle, p.ownerPlayerId, caster.ownerPlayerId) && Math.abs(p.x - anchorPos.x) + Math.abs(p.y - anchorPos.y) <= 3; }); if (nearbyEnemies.length === 0) return { success: false, message: '锚点3格内没有敌人' }; var target = nearbyEnemies[Math.floor(Math.random() * nearbyEnemies.length)]; function findLanding(enemy) { var dirs = [[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]]; var best = null; var bestD = 9999; for (var i = 0; i < dirs.length; i++) { var x = enemy.x + dirs[i][0]; var y = enemy.y + dirs[i][1]; var tile = battle.map.tiles.find(function(t) { return t.x === x && t.y === y; }); if (!tile || !tile.props.walkable) continue; var occ = battle.pieces.find(function(p) { return p.instanceId !== caster.instanceId && p.x === x && p.y === y && p.currentHp > 0; }); if (occ) continue; var d = Math.abs(x - anchorPos.x) + Math.abs(y - anchorPos.y); if (d < bestD) { bestD = d; best = { x: x, y: y }; } } return best; } var landing = findLanding(target); if (!landing) return { success: false, message: '目标相邻地格没有合法落点' }; battle.extensions.minatoAnchors = anchors.filter(function(a, i) { return i !== anchorIdx; }); if (battle.extensions.tileEffects) { battle.extensions.tileEffects = battle.extensions.tileEffects.filter(function(te) { return !(te.tileType === 'flying-raijin-anchor' && te.sourceId === caster.instanceId && te.x === anchorPos.x && te.y === anchorPos.y); }); } if (!flow.effects.displace([{pieceId:caster.instanceId,x:landing.x,y:landing.y}], 'teleport').success) return {success:true,message:'位移被阻挡，本次位移效果取消'}; var result = dealDamage(caster, target, caster.attack, 'physical', battle, context.skill.id); caster.attack += 1; var killed = target.currentHp <= 0; if (!killed) { if (!target.statusTags) target.statusTags = []; var tag = target.statusTags.find(function(t) { return t.type === 'flying-raijin-mark' && t.sourceId === caster.instanceId; }); if (tag) tag.stacks = (tag.stacks || 1) + 1; else addStatusEffectById(target.instanceId, { id: 'flying-raijin-mark-' + caster.instanceId + '-' + target.instanceId + '-' + Date.now(), type: 'flying-raijin-mark', name: '飞雷神', visible: true, currentDuration: -1, currentUses: -1, intensity: 1, stacks: 1, sourceId: caster.instanceId }); return { success: true, message: caster.name + '发动螺旋连丸，经由锚点(' + anchorPos.x + ',' + anchorPos.y + ')闪至' + target.name + '相邻地格，造成' + result.damage + '点伤害并攻击力+1，附加飞雷神标记' }; } return { success: true, message: caster.name + '发动螺旋连丸击杀' + target.name + '，造成' + result.damage + '点伤害并攻击力+1，请选择新的飞雷神锚点', pendingTargetSelection: { playerId: caster.ownerPlayerId, title: caster.name + '选择新的飞雷神锚点', targetType: 'cell', range: 99, filter: 'all', payload: { casterId: caster.instanceId }, effectCode: \"function(ctx) { var battle = ctx.battle; var x = ctx.targetX; var y = ctx.targetY; var casterId = ctx.payload && ctx.payload.casterId; var tile = battle.map.tiles.find(function(t) { return t.x === x && t.y === y; }); if (!tile || !tile.props.walkable) return { success: false, message: '必须选择可行走格' }; if (!battle.extensions) battle.extensions = {}; if (!battle.extensions.minatoAnchors) battle.extensions.minatoAnchors = []; if (!battle.extensions.tileEffects) battle.extensions.tileEffects = []; var casterPiece = battle.pieces.concat(battle.graveyard || []).find(function(p) { return p.instanceId === casterId; }); battle.extensions.minatoAnchors.push({ x: x, y: y, sourceId: casterId, ownerPlayerId: casterPiece ? casterPiece.ownerPlayerId : ctx.playerId, createdAt: Date.now() }); battle.extensions.tileEffects = battle.extensions.tileEffects.filter(function(te) { return !(te.tileType === 'flying-raijin-anchor' && te.sourceId === casterId && te.x === x && te.y === y); }); battle.extensions.tileEffects.push({ x: x, y: y, sourceId: casterId, tileType: 'flying-raijin-anchor', icon: '⚡', bgColor: 'rgba(250, 204, 21, 0.14)', boxShadow: 'inset 0 0 0 2px rgba(250, 204, 21, 0.75)', iconPosition: 'top-left' }); while (battle.extensions.minatoAnchors.filter(function(a) { return a.sourceId === casterId; }).length > 3) { var oldest = battle.extensions.minatoAnchors.filter(function(a) { return a.sourceId === casterId; }).sort(function(a,b) { return (a.createdAt || 0) - (b.createdAt || 0); })[0]; battle.extensions.minatoAnchors = battle.extensions.minatoAnchors.filter(function(a) { return a !== oldest; }); battle.extensions.tileEffects = battle.extensions.tileEffects.filter(function(te) { return !(te.tileType === 'flying-raijin-anchor' && te.sourceId === casterId && te.x === oldest.x && te.y === oldest.y); }); } return { success: true, message: '飞雷神锚点设置在(' + x + ',' + y + ')' }; }\" } }; }",
+  "code": "function executeSkill(context) { var __rvb_import_bound_method_19, __rvb_import_effect_10, __rvb_import_effect_13, __rvb_import_effect_16, __rvb_import_operand_0, __rvb_import_operand_1, __rvb_import_operand_11, __rvb_import_operand_12, __rvb_import_operand_14, __rvb_import_operand_15, __rvb_import_operand_17, __rvb_import_operand_18, __rvb_import_operand_2, __rvb_import_operand_3, __rvb_import_operand_4, __rvb_import_operand_5, __rvb_import_operand_6, __rvb_import_operand_7, __rvb_import_operand_8, __rvb_import_operand_9, anchorIdx, anchorPos, anchorTile, anchors, battle, caster, findLanding, killed, landing, nearbyEnemies, result, tag, target; var _pc = \"n81\"; for (var _step = 0; _step <= 59; _step++) { switch (_pc) { case \"n81\": caster = (context)[\"piece\"]; _pc = \"n80\"; break; case \"n80\": battle = (context)[\"battle\"]; _pc = \"n79\"; break; case \"n79\": anchorPos = selectTarget({type: \"grid\", range: 99, filter: \"all\"}); _pc = \"n78\"; break; case \"n78\": _pc = (! (! ((! anchorPos) || (anchorPos)[\"needsTargetSelection\"]))) ? \"n77\" : \"n76\"; break; case \"n76\": _pc = (! (! (! (battle)[\"extensions\"]))) ? \"n75\" : \"n74\"; break; case \"n75\": (battle)[\"extensions\"] = {}; _pc = \"n74\"; break; case \"n74\": anchors = (((battle)[\"extensions\"])[\"minatoAnchors\"] || []); _pc = \"n73\"; break; case \"n73\": __rvb_import_bound_method_19 = (function (receiver) { var capturedMethod = receiver[\"findIndex\"]; return function () { return Reflect.apply(capturedMethod, receiver, arguments); }; })(anchors); _pc = \"n72\"; break; case \"n72\": anchorIdx = (__rvb_import_bound_method_19)(function (a) { return ((((a)[\"sourceId\"] === (caster)[\"instanceId\"]) && ((a)[\"x\"] === (anchorPos)[\"x\"])) && ((a)[\"y\"] === (anchorPos)[\"y\"])); }); _pc = \"n71\"; break; case \"n71\": _pc = (! (! (anchorIdx === (- 1)))) ? \"n70\" : \"n69\"; break; case \"n69\": anchorTile = (((battle)[\"map\"])[\"tiles\"])[\"find\"](function (t) { return (((t)[\"x\"] === (anchorPos)[\"x\"]) && ((t)[\"y\"] === (anchorPos)[\"y\"])); }); _pc = \"n68\"; break; case \"n68\": _pc = (! (! ((! anchorTile) || (! ((anchorTile)[\"props\"])[\"walkable\"])))) ? \"n67\" : \"n66\"; break; case \"n66\": nearbyEnemies = ((battle)[\"pieces\"])[\"filter\"](function (p) { return ((((p)[\"currentHp\"] > 0) && (! arePlayersAllied(battle, (p)[\"ownerPlayerId\"], (caster)[\"ownerPlayerId\"]))) && ((Math.abs(((p)[\"x\"] - (anchorPos)[\"x\"])) + Math.abs(((p)[\"y\"] - (anchorPos)[\"y\"]))) <= 3)); }); _pc = \"n65\"; break; case \"n65\": _pc = (! (! ((nearbyEnemies)[\"length\"] === 0))) ? \"n64\" : \"n59\"; break; case \"n59\": __rvb_import_operand_15 = nearbyEnemies; _pc = \"n63\"; break; case \"n63\": __rvb_import_effect_16 = Math.random(); _pc = \"n61\"; break; case \"n61\": __rvb_import_operand_17 = __rvb_import_effect_16; _pc = \"n62\"; break; case \"n62\": __rvb_import_operand_18 = (__rvb_import_operand_17 * (nearbyEnemies)[\"length\"]); _pc = \"n60\"; break; case \"n60\": target = (__rvb_import_operand_15)[(function (key) { if (typeof key === \"string\" && key.split(\".\").some(function (part) { return [\"__proto__\",\"arguments\",\"callee\",\"caller\",\"constructor\",\"prototype\"].indexOf(part) !== -1; })) throw new Error(\"unsafe content graph index\"); return key; })(Math.floor(__rvb_import_operand_18))]; _pc = \"n36\"; break; case \"n36\": findLanding = function (enemy) { var best, bestD, d, dirs, i, occ, tile, x, y; { var __rvb_content_graph_region_pc_0 = \"n58\"; while (__rvb_content_graph_region_pc_0 !== \"n37\") { switch (__rvb_content_graph_region_pc_0) { case \"n58\": dirs = [[1, 0], [(- 1), 0], [0, 1], [0, (- 1)], [1, 1], [1, (- 1)], [(- 1), 1], [(- 1), (- 1)]]; __rvb_content_graph_region_pc_0 = \"n57\"; break; case \"n57\": best = null; __rvb_content_graph_region_pc_0 = \"n56\"; break; case \"n56\": bestD = 9999; __rvb_content_graph_region_pc_0 = \"n55\"; break; case \"n55\": i = 0; __rvb_content_graph_region_pc_0 = \"n54\"; break; case \"n54\": var __rvb_content_graph_loop_break_1 = false, __rvb_content_graph_loop_continue_2 = false; while ((! (! (i < (dirs)[\"length\"])))) { __rvb_content_graph_loop_continue_2 = false; { var __rvb_content_graph_region_pc_3 = \"n51\"; while (__rvb_content_graph_region_pc_3 !== \"n39\") { switch (__rvb_content_graph_region_pc_3) { case \"n51\": x = ((enemy)[\"x\"] + ((dirs)[(function (key) { if (typeof key === \"string\" && key.split(\".\").some(function (part) { return [\"__proto__\",\"arguments\",\"callee\",\"caller\",\"constructor\",\"prototype\"].indexOf(part) !== -1; })) throw new Error(\"unsafe content graph index\"); return key; })(i)])[0]); __rvb_content_graph_region_pc_3 = \"n50\"; break; case \"n50\": y = ((enemy)[\"y\"] + ((dirs)[(function (key) { if (typeof key === \"string\" && key.split(\".\").some(function (part) { return [\"__proto__\",\"arguments\",\"callee\",\"caller\",\"constructor\",\"prototype\"].indexOf(part) !== -1; })) throw new Error(\"unsafe content graph index\"); return key; })(i)])[1]); __rvb_content_graph_region_pc_3 = \"n49\"; break; case \"n49\": tile = (((battle)[\"map\"])[\"tiles\"])[\"find\"](function (t) { return (((t)[\"x\"] === x) && ((t)[\"y\"] === y)); }); __rvb_content_graph_region_pc_3 = \"n48\"; break; case \"n48\": __rvb_content_graph_region_pc_3 = (! (! ((! tile) || (! ((tile)[\"props\"])[\"walkable\"])))) ? \"n47\" : \"n46\"; break; case \"n46\": occ = ((battle)[\"pieces\"])[\"find\"](function (p) { return (((((p)[\"instanceId\"] !== (caster)[\"instanceId\"]) && ((p)[\"x\"] === x)) && ((p)[\"y\"] === y)) && ((p)[\"currentHp\"] > 0)); }); __rvb_content_graph_region_pc_3 = \"n45\"; break; case \"n45\": __rvb_content_graph_region_pc_3 = (! (! occ)) ? \"n44\" : \"n43\"; break; case \"n43\": d = (Math.abs((x - (anchorPos)[\"x\"])) + Math.abs((y - (anchorPos)[\"y\"]))); __rvb_content_graph_region_pc_3 = \"n42\"; break; case \"n42\": __rvb_content_graph_region_pc_3 = (! (! (d < bestD))) ? \"n41\" : \"n39\"; break; case \"n41\": bestD = d; __rvb_content_graph_region_pc_3 = \"n40\"; break; case \"n40\": best = {x: x, y: y}; __rvb_content_graph_region_pc_3 = \"n39\"; break; case \"n39\": __rvb_content_graph_region_pc_3 = \"n39\"; break; case \"n44\": __rvb_content_graph_loop_continue_2 = true; __rvb_content_graph_region_pc_3 = \"n39\"; break; case \"n47\": __rvb_content_graph_loop_continue_2 = true; __rvb_content_graph_region_pc_3 = \"n39\"; break; default: throw new Error(\"invalid content graph region node\"); } } } if (__rvb_content_graph_loop_break_1) break; { var __rvb_content_graph_region_pc_4 = \"n53\"; while (__rvb_content_graph_region_pc_4 !== \"n52\") { switch (__rvb_content_graph_region_pc_4) { case \"n53\": i = ((+ i) + 1); __rvb_content_graph_region_pc_4 = \"n52\"; break; case \"n52\": __rvb_content_graph_region_pc_4 = \"n52\"; break; default: throw new Error(\"invalid content graph region node\"); } } } if (__rvb_content_graph_loop_break_1) break; if (__rvb_content_graph_loop_continue_2) { __rvb_content_graph_loop_continue_2 = false; continue; } } __rvb_content_graph_region_pc_0 = \"n38\"; break; case \"n38\": return best; default: throw new Error(\"invalid content graph region node\"); } } } }; _pc = \"n35\"; break; case \"n35\": __rvb_import_operand_14 = findLanding; _pc = \"n34\"; break; case \"n34\": landing = (__rvb_import_operand_14)(target); _pc = \"n33\"; break; case \"n33\": _pc = (! (! (! landing))) ? \"n32\" : \"n31\"; break; case \"n31\": ((battle)[\"extensions\"])[\"minatoAnchors\"] = (anchors)[\"filter\"](function (a, i) { return (i !== anchorIdx); }); _pc = \"n30\"; break; case \"n30\": _pc = (! (! ((battle)[\"extensions\"])[\"tileEffects\"])) ? \"n29\" : \"n28\"; break; case \"n29\": ((battle)[\"extensions\"])[\"tileEffects\"] = (((battle)[\"extensions\"])[\"tileEffects\"])[\"filter\"](function (te) { return (! (((((te)[\"tileType\"] === \"flying-raijin-anchor\") && ((te)[\"sourceId\"] === (caster)[\"instanceId\"])) && ((te)[\"x\"] === (anchorPos)[\"x\"])) && ((te)[\"y\"] === (anchorPos)[\"y\"]))); }); _pc = \"n28\"; break; case \"n28\": __rvb_import_effect_13 = flow.effects.displace([{pieceId: (caster)[\"instanceId\"], x: (landing)[\"x\"], y: (landing)[\"y\"]}], \"teleport\"); _pc = \"n27\"; break; case \"n27\": _pc = (! (! (! (__rvb_import_effect_13)[\"success\"]))) ? \"n26\" : \"n25\"; break; case \"n25\": result = dealDamage(caster, target, (caster)[\"attack\"], \"physical\", battle, ((context)[\"skill\"])[\"id\"]); _pc = \"n24\"; break; case \"n24\": (caster)[\"attack\"] += 1; _pc = \"n23\"; break; case \"n23\": killed = ((target)[\"currentHp\"] <= 0); _pc = \"n22\"; break; case \"n22\": _pc = (! (! (! killed))) ? \"n21\" : \"n1\"; break; case \"n1\": return {success: true, message: ((((((caster)[\"name\"] + \"发动螺旋连丸击杀\") + (target)[\"name\"]) + \"，造成\") + (result)[\"damage\"]) + \"点伤害并攻击力+1，请选择新的飞雷神锚点\"), pendingTargetSelection: {playerId: (caster)[\"ownerPlayerId\"], title: ((caster)[\"name\"] + \"选择新的飞雷神锚点\"), targetType: \"cell\", range: 99, filter: \"all\", payload: {casterId: (caster)[\"instanceId\"]}, effectCode: 'function(ctx) { var __rvb_import_bound_method_8, __rvb_import_effect_0, __rvb_import_effect_2, __rvb_import_operand_1, __rvb_import_operand_3, __rvb_import_operand_4, __rvb_import_operand_5, __rvb_import_operand_6, __rvb_import_operand_7, battle, casterId, casterPiece, oldest, tile, x, y; var _pc = \"n32\"; for (var _step = 0; _step <= 27; _step++) { switch (_pc) { case \"n32\": battle = (ctx)[\"battle\"]; _pc = \"n31\"; break; case \"n31\": x = (ctx)[\"targetX\"]; _pc = \"n30\"; break; case \"n30\": y = (ctx)[\"targetY\"]; _pc = \"n29\"; break; case \"n29\": casterId = ((ctx)[\"payload\"] && ((ctx)[\"payload\"])[\"casterId\"]); _pc = \"n28\"; break; case \"n28\": tile = (((battle)[\"map\"])[\"tiles\"])[\"find\"](function (t) { return (((t)[\"x\"] === x) && ((t)[\"y\"] === y)); }); _pc = \"n27\"; break; case \"n27\": _pc = (! (! ((! tile) || (! ((tile)[\"props\"])[\"walkable\"])))) ? \"n26\" : \"n25\"; break; case \"n25\": _pc = (! (! (! (battle)[\"extensions\"]))) ? \"n24\" : \"n23\"; break; case \"n24\": (battle)[\"extensions\"] = {}; _pc = \"n23\"; break; case \"n23\": _pc = (! (! (! ((battle)[\"extensions\"])[\"minatoAnchors\"]))) ? \"n22\" : \"n21\"; break; case \"n22\": ((battle)[\"extensions\"])[\"minatoAnchors\"] = []; _pc = \"n21\"; break; case \"n21\": _pc = (! (! (! ((battle)[\"extensions\"])[\"tileEffects\"]))) ? \"n20\" : \"n19\"; break; case \"n20\": ((battle)[\"extensions\"])[\"tileEffects\"] = []; _pc = \"n19\"; break; case \"n19\": casterPiece = (((battle)[\"pieces\"])[\"concat\"](((battle)[\"graveyard\"] || [])))[\"find\"](function (p) { return ((p)[\"instanceId\"] === casterId); }); _pc = \"n18\"; break; case \"n18\": __rvb_import_bound_method_8 = (function (receiver) { var capturedMethod = receiver[\"push\"]; return function () { return Reflect.apply(capturedMethod, receiver, arguments); }; })(((battle)[\"extensions\"])[\"minatoAnchors\"]); _pc = \"n17\"; break; case \"n17\": __rvb_import_operand_7 = x; _pc = \"n16\"; break; case \"n16\": __rvb_import_operand_6 = y; _pc = \"n15\"; break; case \"n15\": __rvb_import_operand_5 = casterId; _pc = \"n14\"; break; case \"n14\": __rvb_import_operand_4 = (casterPiece ? (casterPiece)[\"ownerPlayerId\"] : (ctx)[\"playerId\"]); _pc = \"n13\"; break; case \"n13\": __rvb_import_effect_2 = Date.now(); _pc = \"n12\"; break; case \"n12\": __rvb_import_operand_3 = __rvb_import_effect_2; _pc = \"n11\"; break; case \"n11\": __rvb_import_operand_1 = {x: __rvb_import_operand_7, y: __rvb_import_operand_6, sourceId: __rvb_import_operand_5, ownerPlayerId: __rvb_import_operand_4, createdAt: __rvb_import_operand_3}; _pc = \"n10\"; break; case \"n10\": (__rvb_import_bound_method_8)(__rvb_import_operand_1); _pc = \"n9\"; break; case \"n9\": ((battle)[\"extensions\"])[\"tileEffects\"] = (((battle)[\"extensions\"])[\"tileEffects\"])[\"filter\"](function (te) { return (! (((((te)[\"tileType\"] === \"flying-raijin-anchor\") && ((te)[\"sourceId\"] === casterId)) && ((te)[\"x\"] === x)) && ((te)[\"y\"] === y))); }); _pc = \"n8\"; break; case \"n8\": (((battle)[\"extensions\"])[\"tileEffects\"]).push({x: x, y: y, sourceId: casterId, tileType: \"flying-raijin-anchor\", icon: \"⚡\", bgColor: \"rgba(250, 204, 21, 0.14)\", boxShadow: \"inset 0 0 0 2px rgba(250, 204, 21, 0.75)\", iconPosition: \"top-left\"}); _pc = \"n7\"; break; case \"n7\": var __rvb_content_graph_loop_break_0 = false, __rvb_content_graph_loop_continue_1 = false; while ((! (! (((((battle)[\"extensions\"])[\"minatoAnchors\"])[\"filter\"](function (a) { return ((a)[\"sourceId\"] === casterId); }))[\"length\"] > 3)))) { __rvb_content_graph_loop_continue_1 = false; { var __rvb_content_graph_region_pc_2 = \"n6\"; while (__rvb_content_graph_region_pc_2 !== \"n2\") { switch (__rvb_content_graph_region_pc_2) { case \"n6\": __rvb_import_effect_0 = ((((battle)[\"extensions\"])[\"minatoAnchors\"])[\"filter\"](function (a) { return ((a)[\"sourceId\"] === casterId); })).sort(function (a, b) { return (((a)[\"createdAt\"] || 0) - ((b)[\"createdAt\"] || 0)); }); __rvb_content_graph_region_pc_2 = \"n5\"; break; case \"n5\": oldest = (__rvb_import_effect_0)[0]; __rvb_content_graph_region_pc_2 = \"n4\"; break; case \"n4\": ((battle)[\"extensions\"])[\"minatoAnchors\"] = (((battle)[\"extensions\"])[\"minatoAnchors\"])[\"filter\"](function (a) { return (a !== oldest); }); __rvb_content_graph_region_pc_2 = \"n3\"; break; case \"n3\": ((battle)[\"extensions\"])[\"tileEffects\"] = (((battle)[\"extensions\"])[\"tileEffects\"])[\"filter\"](function (te) { return (! (((((te)[\"tileType\"] === \"flying-raijin-anchor\") && ((te)[\"sourceId\"] === casterId)) && ((te)[\"x\"] === (oldest)[\"x\"])) && ((te)[\"y\"] === (oldest)[\"y\"]))); }); __rvb_content_graph_region_pc_2 = \"n2\"; break; case \"n2\": __rvb_content_graph_region_pc_2 = \"n2\"; break; default: throw new Error(\"invalid content graph region node\"); } } } if (__rvb_content_graph_loop_break_0) break; if (__rvb_content_graph_loop_break_0) break; if (__rvb_content_graph_loop_continue_1) { __rvb_content_graph_loop_continue_1 = false; continue; } } _pc = \"n1\"; break; case \"n1\": return {success: true, message: ((((\"飞雷神锚点设置在(\" + x) + \",\") + y) + \")\")}; case \"n26\": return {success: false, message: \"必须选择可行走格\"}; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\"); }'}}; case \"n21\": _pc = (! (! (! (target)[\"statusTags\"]))) ? \"n20\" : \"n19\"; break; case \"n20\": (target)[\"statusTags\"] = []; _pc = \"n19\"; break; case \"n19\": tag = ((target)[\"statusTags\"])[\"find\"](function (t) { return (((t)[\"type\"] === \"flying-raijin-mark\") && ((t)[\"sourceId\"] === (caster)[\"instanceId\"])); }); _pc = \"n18\"; break; case \"n18\": _pc = (! (! tag)) ? \"n3\" : \"n17\"; break; case \"n17\": __rvb_import_operand_12 = (target)[\"instanceId\"]; _pc = \"n14\"; break; case \"n14\": __rvb_import_operand_9 = ((((\"flying-raijin-mark-\" + (caster)[\"instanceId\"]) + \"-\") + (target)[\"instanceId\"]) + \"-\"); _pc = \"n16\"; break; case \"n16\": __rvb_import_effect_10 = Date.now(); _pc = \"n15\"; break; case \"n15\": __rvb_import_operand_11 = (__rvb_import_operand_9 + __rvb_import_effect_10); _pc = \"n13\"; break; case \"n13\": __rvb_import_operand_8 = \"flying-raijin-mark\"; _pc = \"n12\"; break; case \"n12\": __rvb_import_operand_7 = \"飞雷神\"; _pc = \"n11\"; break; case \"n11\": __rvb_import_operand_6 = true; _pc = \"n10\"; break; case \"n10\": __rvb_import_operand_5 = (- 1); _pc = \"n9\"; break; case \"n9\": __rvb_import_operand_4 = (- 1); _pc = \"n8\"; break; case \"n8\": __rvb_import_operand_3 = 1; _pc = \"n7\"; break; case \"n7\": __rvb_import_operand_2 = 1; _pc = \"n6\"; break; case \"n6\": __rvb_import_operand_1 = (caster)[\"instanceId\"]; _pc = \"n5\"; break; case \"n5\": __rvb_import_operand_0 = {id: __rvb_import_operand_11, type: __rvb_import_operand_8, name: __rvb_import_operand_7, visible: __rvb_import_operand_6, currentDuration: __rvb_import_operand_5, currentUses: __rvb_import_operand_4, intensity: __rvb_import_operand_3, stacks: __rvb_import_operand_2, sourceId: __rvb_import_operand_1}; _pc = \"n4\"; break; case \"n4\": addStatusEffectById(__rvb_import_operand_12, __rvb_import_operand_0); _pc = \"n2\"; break; case \"n3\": (tag)[\"stacks\"] = (((tag)[\"stacks\"] || 1) + 1); _pc = \"n2\"; break; case \"n2\": return {success: true, message: ((((((((((caster)[\"name\"] + \"发动螺旋连丸，经由锚点(\") + (anchorPos)[\"x\"]) + \",\") + (anchorPos)[\"y\"]) + \")闪至\") + (target)[\"name\"]) + \"相邻地格，造成\") + (result)[\"damage\"]) + \"点伤害并攻击力+1，附加飞雷神标记\")}; case \"n26\": return {success: true, message: \"位移被阻挡，本次位移效果取消\"}; case \"n32\": return {success: false, message: \"目标相邻地格没有合法落点\"}; case \"n64\": return {success: false, message: \"锚点3格内没有敌人\"}; case \"n67\": return {success: false, message: \"锚点位置不可行走\"}; case \"n70\": return {success: false, message: \"目标位置不是水门的飞雷神锚点\"}; case \"n77\": return anchorPos; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\"); }",
   "targeting": {
     "steps": [
       {
@@ -37,5 +37,3887 @@
         "requireEnemyWithinRange": 3
       }
     ]
-  }
+  },
+  "contentGraph": {
+    "version": "rvb-content-graph/v1",
+    "surface": "skill",
+    "entry": "n81",
+    "nodes": [
+      {
+        "id": "n1",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "binary",
+                  "op": "+",
+                  "left": {
+                    "kind": "binary",
+                    "op": "+",
+                    "left": {
+                      "kind": "binary",
+                      "op": "+",
+                      "left": {
+                        "kind": "binary",
+                        "op": "+",
+                        "left": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "caster"
+                          },
+                          "key": "name"
+                        },
+                        "right": {
+                          "kind": "literal",
+                          "value": "发动螺旋连丸击杀"
+                        }
+                      },
+                      "right": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "target"
+                        },
+                        "key": "name"
+                      }
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": "，造成"
+                    }
+                  },
+                  "right": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "result"
+                    },
+                    "key": "damage"
+                  }
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "点伤害并攻击力+1，请选择新的飞雷神锚点"
+                }
+              }
+            },
+            {
+              "key": "pendingTargetSelection",
+              "value": {
+                "kind": "object",
+                "entries": [
+                  {
+                    "key": "playerId",
+                    "value": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "caster"
+                      },
+                      "key": "ownerPlayerId"
+                    }
+                  },
+                  {
+                    "key": "title",
+                    "value": {
+                      "kind": "binary",
+                      "op": "+",
+                      "left": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "caster"
+                        },
+                        "key": "name"
+                      },
+                      "right": {
+                        "kind": "literal",
+                        "value": "选择新的飞雷神锚点"
+                      }
+                    }
+                  },
+                  {
+                    "key": "targetType",
+                    "value": {
+                      "kind": "literal",
+                      "value": "cell"
+                    }
+                  },
+                  {
+                    "key": "range",
+                    "value": {
+                      "kind": "literal",
+                      "value": 99
+                    }
+                  },
+                  {
+                    "key": "filter",
+                    "value": {
+                      "kind": "literal",
+                      "value": "all"
+                    }
+                  },
+                  {
+                    "key": "payload",
+                    "value": {
+                      "kind": "object",
+                      "entries": [
+                        {
+                          "key": "casterId",
+                          "value": {
+                            "kind": "get",
+                            "object": {
+                              "kind": "ref",
+                              "name": "caster"
+                            },
+                            "key": "instanceId"
+                          }
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "key": "effectCode",
+                    "value": {
+                      "kind": "source",
+                      "graph": {
+                        "version": "rvb-content-graph/v1",
+                        "surface": "pending",
+                        "entry": "n32",
+                        "nodes": [
+                          {
+                            "id": "n1",
+                            "kind": "return",
+                            "value": {
+                              "kind": "object",
+                              "entries": [
+                                {
+                                  "key": "success",
+                                  "value": {
+                                    "kind": "literal",
+                                    "value": true
+                                  }
+                                },
+                                {
+                                  "key": "message",
+                                  "value": {
+                                    "kind": "binary",
+                                    "op": "+",
+                                    "left": {
+                                      "kind": "binary",
+                                      "op": "+",
+                                      "left": {
+                                        "kind": "binary",
+                                        "op": "+",
+                                        "left": {
+                                          "kind": "binary",
+                                          "op": "+",
+                                          "left": {
+                                            "kind": "literal",
+                                            "value": "飞雷神锚点设置在("
+                                          },
+                                          "right": {
+                                            "kind": "ref",
+                                            "name": "x"
+                                          }
+                                        },
+                                        "right": {
+                                          "kind": "literal",
+                                          "value": ","
+                                        }
+                                      },
+                                      "right": {
+                                        "kind": "ref",
+                                        "name": "y"
+                                      }
+                                    },
+                                    "right": {
+                                      "kind": "literal",
+                                      "value": ")"
+                                    }
+                                  }
+                                }
+                              ]
+                            }
+                          },
+                          {
+                            "id": "n7",
+                            "kind": "loop",
+                            "loop": "while",
+                            "condition": {
+                              "kind": "unary",
+                              "op": "!",
+                              "argument": {
+                                "kind": "unary",
+                                "op": "!",
+                                "argument": {
+                                  "kind": "binary",
+                                  "op": ">",
+                                  "left": {
+                                    "kind": "get",
+                                    "object": {
+                                      "kind": "collection",
+                                      "object": {
+                                        "kind": "get",
+                                        "object": {
+                                          "kind": "get",
+                                          "object": {
+                                            "kind": "ref",
+                                            "name": "battle"
+                                          },
+                                          "key": "extensions"
+                                        },
+                                        "key": "minatoAnchors"
+                                      },
+                                      "method": "filter",
+                                      "args": [
+                                        {
+                                          "kind": "lambda",
+                                          "parameters": [
+                                            "a"
+                                          ],
+                                          "body": {
+                                            "kind": "binary",
+                                            "op": "===",
+                                            "left": {
+                                              "kind": "get",
+                                              "object": {
+                                                "kind": "ref",
+                                                "name": "a"
+                                              },
+                                              "key": "sourceId"
+                                            },
+                                            "right": {
+                                              "kind": "ref",
+                                              "name": "casterId"
+                                            }
+                                          }
+                                        }
+                                      ]
+                                    },
+                                    "key": "length"
+                                  },
+                                  "right": {
+                                    "kind": "literal",
+                                    "value": 3
+                                  }
+                                }
+                              }
+                            },
+                            "body": {
+                              "entry": "n6",
+                              "end": "n2",
+                              "nodes": [
+                                {
+                                  "id": "n2",
+                                  "kind": "regionEnd"
+                                },
+                                {
+                                  "id": "n3",
+                                  "kind": "set",
+                                  "target": {
+                                    "kind": "get",
+                                    "object": {
+                                      "kind": "get",
+                                      "object": {
+                                        "kind": "ref",
+                                        "name": "battle"
+                                      },
+                                      "key": "extensions"
+                                    },
+                                    "key": "tileEffects"
+                                  },
+                                  "operator": "=",
+                                  "value": {
+                                    "kind": "collection",
+                                    "object": {
+                                      "kind": "get",
+                                      "object": {
+                                        "kind": "get",
+                                        "object": {
+                                          "kind": "ref",
+                                          "name": "battle"
+                                        },
+                                        "key": "extensions"
+                                      },
+                                      "key": "tileEffects"
+                                    },
+                                    "method": "filter",
+                                    "args": [
+                                      {
+                                        "kind": "lambda",
+                                        "parameters": [
+                                          "te"
+                                        ],
+                                        "body": {
+                                          "kind": "unary",
+                                          "op": "!",
+                                          "argument": {
+                                            "kind": "binary",
+                                            "op": "&&",
+                                            "left": {
+                                              "kind": "binary",
+                                              "op": "&&",
+                                              "left": {
+                                                "kind": "binary",
+                                                "op": "&&",
+                                                "left": {
+                                                  "kind": "binary",
+                                                  "op": "===",
+                                                  "left": {
+                                                    "kind": "get",
+                                                    "object": {
+                                                      "kind": "ref",
+                                                      "name": "te"
+                                                    },
+                                                    "key": "tileType"
+                                                  },
+                                                  "right": {
+                                                    "kind": "literal",
+                                                    "value": "flying-raijin-anchor"
+                                                  }
+                                                },
+                                                "right": {
+                                                  "kind": "binary",
+                                                  "op": "===",
+                                                  "left": {
+                                                    "kind": "get",
+                                                    "object": {
+                                                      "kind": "ref",
+                                                      "name": "te"
+                                                    },
+                                                    "key": "sourceId"
+                                                  },
+                                                  "right": {
+                                                    "kind": "ref",
+                                                    "name": "casterId"
+                                                  }
+                                                }
+                                              },
+                                              "right": {
+                                                "kind": "binary",
+                                                "op": "===",
+                                                "left": {
+                                                  "kind": "get",
+                                                  "object": {
+                                                    "kind": "ref",
+                                                    "name": "te"
+                                                  },
+                                                  "key": "x"
+                                                },
+                                                "right": {
+                                                  "kind": "get",
+                                                  "object": {
+                                                    "kind": "ref",
+                                                    "name": "oldest"
+                                                  },
+                                                  "key": "x"
+                                                }
+                                              }
+                                            },
+                                            "right": {
+                                              "kind": "binary",
+                                              "op": "===",
+                                              "left": {
+                                                "kind": "get",
+                                                "object": {
+                                                  "kind": "ref",
+                                                  "name": "te"
+                                                },
+                                                "key": "y"
+                                              },
+                                              "right": {
+                                                "kind": "get",
+                                                "object": {
+                                                  "kind": "ref",
+                                                  "name": "oldest"
+                                                },
+                                                "key": "y"
+                                              }
+                                            }
+                                          }
+                                        }
+                                      }
+                                    ]
+                                  },
+                                  "next": "n2"
+                                },
+                                {
+                                  "id": "n4",
+                                  "kind": "set",
+                                  "target": {
+                                    "kind": "get",
+                                    "object": {
+                                      "kind": "get",
+                                      "object": {
+                                        "kind": "ref",
+                                        "name": "battle"
+                                      },
+                                      "key": "extensions"
+                                    },
+                                    "key": "minatoAnchors"
+                                  },
+                                  "operator": "=",
+                                  "value": {
+                                    "kind": "collection",
+                                    "object": {
+                                      "kind": "get",
+                                      "object": {
+                                        "kind": "get",
+                                        "object": {
+                                          "kind": "ref",
+                                          "name": "battle"
+                                        },
+                                        "key": "extensions"
+                                      },
+                                      "key": "minatoAnchors"
+                                    },
+                                    "method": "filter",
+                                    "args": [
+                                      {
+                                        "kind": "lambda",
+                                        "parameters": [
+                                          "a"
+                                        ],
+                                        "body": {
+                                          "kind": "binary",
+                                          "op": "!==",
+                                          "left": {
+                                            "kind": "ref",
+                                            "name": "a"
+                                          },
+                                          "right": {
+                                            "kind": "ref",
+                                            "name": "oldest"
+                                          }
+                                        }
+                                      }
+                                    ]
+                                  },
+                                  "next": "n3"
+                                },
+                                {
+                                  "id": "n5",
+                                  "kind": "bind",
+                                  "name": "oldest",
+                                  "expr": {
+                                    "kind": "index",
+                                    "object": {
+                                      "kind": "ref",
+                                      "name": "__rvb_import_effect_0"
+                                    },
+                                    "index": {
+                                      "kind": "literal",
+                                      "value": 0
+                                    }
+                                  },
+                                  "next": "n4"
+                                },
+                                {
+                                  "id": "n6",
+                                  "kind": "call",
+                                  "capability": "array.sort",
+                                  "args": [
+                                    {
+                                      "kind": "collection",
+                                      "object": {
+                                        "kind": "get",
+                                        "object": {
+                                          "kind": "get",
+                                          "object": {
+                                            "kind": "ref",
+                                            "name": "battle"
+                                          },
+                                          "key": "extensions"
+                                        },
+                                        "key": "minatoAnchors"
+                                      },
+                                      "method": "filter",
+                                      "args": [
+                                        {
+                                          "kind": "lambda",
+                                          "parameters": [
+                                            "a"
+                                          ],
+                                          "body": {
+                                            "kind": "binary",
+                                            "op": "===",
+                                            "left": {
+                                              "kind": "get",
+                                              "object": {
+                                                "kind": "ref",
+                                                "name": "a"
+                                              },
+                                              "key": "sourceId"
+                                            },
+                                            "right": {
+                                              "kind": "ref",
+                                              "name": "casterId"
+                                            }
+                                          }
+                                        }
+                                      ]
+                                    },
+                                    {
+                                      "kind": "lambda",
+                                      "parameters": [
+                                        "a",
+                                        "b"
+                                      ],
+                                      "body": {
+                                        "kind": "binary",
+                                        "op": "-",
+                                        "left": {
+                                          "kind": "binary",
+                                          "op": "||",
+                                          "left": {
+                                            "kind": "get",
+                                            "object": {
+                                              "kind": "ref",
+                                              "name": "a"
+                                            },
+                                            "key": "createdAt"
+                                          },
+                                          "right": {
+                                            "kind": "literal",
+                                            "value": 0
+                                          }
+                                        },
+                                        "right": {
+                                          "kind": "binary",
+                                          "op": "||",
+                                          "left": {
+                                            "kind": "get",
+                                            "object": {
+                                              "kind": "ref",
+                                              "name": "b"
+                                            },
+                                            "key": "createdAt"
+                                          },
+                                          "right": {
+                                            "kind": "literal",
+                                            "value": 0
+                                          }
+                                        }
+                                      }
+                                    }
+                                  ],
+                                  "result": "__rvb_import_effect_0",
+                                  "next": "n5"
+                                }
+                              ]
+                            },
+                            "next": "n1"
+                          },
+                          {
+                            "id": "n8",
+                            "kind": "call",
+                            "capability": "array.push",
+                            "args": [
+                              {
+                                "kind": "get",
+                                "object": {
+                                  "kind": "get",
+                                  "object": {
+                                    "kind": "ref",
+                                    "name": "battle"
+                                  },
+                                  "key": "extensions"
+                                },
+                                "key": "tileEffects"
+                              },
+                              {
+                                "kind": "object",
+                                "entries": [
+                                  {
+                                    "key": "x",
+                                    "value": {
+                                      "kind": "ref",
+                                      "name": "x"
+                                    }
+                                  },
+                                  {
+                                    "key": "y",
+                                    "value": {
+                                      "kind": "ref",
+                                      "name": "y"
+                                    }
+                                  },
+                                  {
+                                    "key": "sourceId",
+                                    "value": {
+                                      "kind": "ref",
+                                      "name": "casterId"
+                                    }
+                                  },
+                                  {
+                                    "key": "tileType",
+                                    "value": {
+                                      "kind": "literal",
+                                      "value": "flying-raijin-anchor"
+                                    }
+                                  },
+                                  {
+                                    "key": "icon",
+                                    "value": {
+                                      "kind": "literal",
+                                      "value": "⚡"
+                                    }
+                                  },
+                                  {
+                                    "key": "bgColor",
+                                    "value": {
+                                      "kind": "literal",
+                                      "value": "rgba(250, 204, 21, 0.14)"
+                                    }
+                                  },
+                                  {
+                                    "key": "boxShadow",
+                                    "value": {
+                                      "kind": "literal",
+                                      "value": "inset 0 0 0 2px rgba(250, 204, 21, 0.75)"
+                                    }
+                                  },
+                                  {
+                                    "key": "iconPosition",
+                                    "value": {
+                                      "kind": "literal",
+                                      "value": "top-left"
+                                    }
+                                  }
+                                ]
+                              }
+                            ],
+                            "next": "n7"
+                          },
+                          {
+                            "id": "n9",
+                            "kind": "set",
+                            "target": {
+                              "kind": "get",
+                              "object": {
+                                "kind": "get",
+                                "object": {
+                                  "kind": "ref",
+                                  "name": "battle"
+                                },
+                                "key": "extensions"
+                              },
+                              "key": "tileEffects"
+                            },
+                            "operator": "=",
+                            "value": {
+                              "kind": "collection",
+                              "object": {
+                                "kind": "get",
+                                "object": {
+                                  "kind": "get",
+                                  "object": {
+                                    "kind": "ref",
+                                    "name": "battle"
+                                  },
+                                  "key": "extensions"
+                                },
+                                "key": "tileEffects"
+                              },
+                              "method": "filter",
+                              "args": [
+                                {
+                                  "kind": "lambda",
+                                  "parameters": [
+                                    "te"
+                                  ],
+                                  "body": {
+                                    "kind": "unary",
+                                    "op": "!",
+                                    "argument": {
+                                      "kind": "binary",
+                                      "op": "&&",
+                                      "left": {
+                                        "kind": "binary",
+                                        "op": "&&",
+                                        "left": {
+                                          "kind": "binary",
+                                          "op": "&&",
+                                          "left": {
+                                            "kind": "binary",
+                                            "op": "===",
+                                            "left": {
+                                              "kind": "get",
+                                              "object": {
+                                                "kind": "ref",
+                                                "name": "te"
+                                              },
+                                              "key": "tileType"
+                                            },
+                                            "right": {
+                                              "kind": "literal",
+                                              "value": "flying-raijin-anchor"
+                                            }
+                                          },
+                                          "right": {
+                                            "kind": "binary",
+                                            "op": "===",
+                                            "left": {
+                                              "kind": "get",
+                                              "object": {
+                                                "kind": "ref",
+                                                "name": "te"
+                                              },
+                                              "key": "sourceId"
+                                            },
+                                            "right": {
+                                              "kind": "ref",
+                                              "name": "casterId"
+                                            }
+                                          }
+                                        },
+                                        "right": {
+                                          "kind": "binary",
+                                          "op": "===",
+                                          "left": {
+                                            "kind": "get",
+                                            "object": {
+                                              "kind": "ref",
+                                              "name": "te"
+                                            },
+                                            "key": "x"
+                                          },
+                                          "right": {
+                                            "kind": "ref",
+                                            "name": "x"
+                                          }
+                                        }
+                                      },
+                                      "right": {
+                                        "kind": "binary",
+                                        "op": "===",
+                                        "left": {
+                                          "kind": "get",
+                                          "object": {
+                                            "kind": "ref",
+                                            "name": "te"
+                                          },
+                                          "key": "y"
+                                        },
+                                        "right": {
+                                          "kind": "ref",
+                                          "name": "y"
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              ]
+                            },
+                            "next": "n8"
+                          },
+                          {
+                            "id": "n10",
+                            "kind": "invoke",
+                            "target": {
+                              "kind": "function",
+                              "value": {
+                                "kind": "ref",
+                                "name": "__rvb_import_bound_method_8"
+                              }
+                            },
+                            "args": [
+                              {
+                                "kind": "ref",
+                                "name": "__rvb_import_operand_1"
+                              }
+                            ],
+                            "next": "n9"
+                          },
+                          {
+                            "id": "n11",
+                            "kind": "bind",
+                            "name": "__rvb_import_operand_1",
+                            "expr": {
+                              "kind": "object",
+                              "entries": [
+                                {
+                                  "key": "x",
+                                  "value": {
+                                    "kind": "ref",
+                                    "name": "__rvb_import_operand_7"
+                                  }
+                                },
+                                {
+                                  "key": "y",
+                                  "value": {
+                                    "kind": "ref",
+                                    "name": "__rvb_import_operand_6"
+                                  }
+                                },
+                                {
+                                  "key": "sourceId",
+                                  "value": {
+                                    "kind": "ref",
+                                    "name": "__rvb_import_operand_5"
+                                  }
+                                },
+                                {
+                                  "key": "ownerPlayerId",
+                                  "value": {
+                                    "kind": "ref",
+                                    "name": "__rvb_import_operand_4"
+                                  }
+                                },
+                                {
+                                  "key": "createdAt",
+                                  "value": {
+                                    "kind": "ref",
+                                    "name": "__rvb_import_operand_3"
+                                  }
+                                }
+                              ]
+                            },
+                            "next": "n10"
+                          },
+                          {
+                            "id": "n12",
+                            "kind": "bind",
+                            "name": "__rvb_import_operand_3",
+                            "expr": {
+                              "kind": "ref",
+                              "name": "__rvb_import_effect_2"
+                            },
+                            "next": "n11"
+                          },
+                          {
+                            "id": "n13",
+                            "kind": "call",
+                            "capability": "Date.now",
+                            "args": [],
+                            "result": "__rvb_import_effect_2",
+                            "next": "n12"
+                          },
+                          {
+                            "id": "n14",
+                            "kind": "bind",
+                            "name": "__rvb_import_operand_4",
+                            "expr": {
+                              "kind": "conditional",
+                              "test": {
+                                "kind": "ref",
+                                "name": "casterPiece"
+                              },
+                              "consequent": {
+                                "kind": "get",
+                                "object": {
+                                  "kind": "ref",
+                                  "name": "casterPiece"
+                                },
+                                "key": "ownerPlayerId"
+                              },
+                              "alternate": {
+                                "kind": "get",
+                                "object": {
+                                  "kind": "ref",
+                                  "name": "ctx"
+                                },
+                                "key": "playerId"
+                              }
+                            },
+                            "next": "n13"
+                          },
+                          {
+                            "id": "n15",
+                            "kind": "bind",
+                            "name": "__rvb_import_operand_5",
+                            "expr": {
+                              "kind": "ref",
+                              "name": "casterId"
+                            },
+                            "next": "n14"
+                          },
+                          {
+                            "id": "n16",
+                            "kind": "bind",
+                            "name": "__rvb_import_operand_6",
+                            "expr": {
+                              "kind": "ref",
+                              "name": "y"
+                            },
+                            "next": "n15"
+                          },
+                          {
+                            "id": "n17",
+                            "kind": "bind",
+                            "name": "__rvb_import_operand_7",
+                            "expr": {
+                              "kind": "ref",
+                              "name": "x"
+                            },
+                            "next": "n16"
+                          },
+                          {
+                            "id": "n18",
+                            "kind": "bind",
+                            "name": "__rvb_import_bound_method_8",
+                            "expr": {
+                              "kind": "boundMethod",
+                              "object": {
+                                "kind": "get",
+                                "object": {
+                                  "kind": "get",
+                                  "object": {
+                                    "kind": "ref",
+                                    "name": "battle"
+                                  },
+                                  "key": "extensions"
+                                },
+                                "key": "minatoAnchors"
+                              },
+                              "method": "push"
+                            },
+                            "next": "n17"
+                          },
+                          {
+                            "id": "n19",
+                            "kind": "bind",
+                            "name": "casterPiece",
+                            "expr": {
+                              "kind": "collection",
+                              "object": {
+                                "kind": "collection",
+                                "object": {
+                                  "kind": "get",
+                                  "object": {
+                                    "kind": "ref",
+                                    "name": "battle"
+                                  },
+                                  "key": "pieces"
+                                },
+                                "method": "concat",
+                                "args": [
+                                  {
+                                    "kind": "binary",
+                                    "op": "||",
+                                    "left": {
+                                      "kind": "get",
+                                      "object": {
+                                        "kind": "ref",
+                                        "name": "battle"
+                                      },
+                                      "key": "graveyard"
+                                    },
+                                    "right": {
+                                      "kind": "array",
+                                      "items": []
+                                    }
+                                  }
+                                ]
+                              },
+                              "method": "find",
+                              "args": [
+                                {
+                                  "kind": "lambda",
+                                  "parameters": [
+                                    "p"
+                                  ],
+                                  "body": {
+                                    "kind": "binary",
+                                    "op": "===",
+                                    "left": {
+                                      "kind": "get",
+                                      "object": {
+                                        "kind": "ref",
+                                        "name": "p"
+                                      },
+                                      "key": "instanceId"
+                                    },
+                                    "right": {
+                                      "kind": "ref",
+                                      "name": "casterId"
+                                    }
+                                  }
+                                }
+                              ]
+                            },
+                            "next": "n18"
+                          },
+                          {
+                            "id": "n20",
+                            "kind": "set",
+                            "target": {
+                              "kind": "get",
+                              "object": {
+                                "kind": "get",
+                                "object": {
+                                  "kind": "ref",
+                                  "name": "battle"
+                                },
+                                "key": "extensions"
+                              },
+                              "key": "tileEffects"
+                            },
+                            "operator": "=",
+                            "value": {
+                              "kind": "array",
+                              "items": []
+                            },
+                            "next": "n19"
+                          },
+                          {
+                            "id": "n21",
+                            "kind": "branch",
+                            "condition": {
+                              "kind": "unary",
+                              "op": "!",
+                              "argument": {
+                                "kind": "unary",
+                                "op": "!",
+                                "argument": {
+                                  "kind": "unary",
+                                  "op": "!",
+                                  "argument": {
+                                    "kind": "get",
+                                    "object": {
+                                      "kind": "get",
+                                      "object": {
+                                        "kind": "ref",
+                                        "name": "battle"
+                                      },
+                                      "key": "extensions"
+                                    },
+                                    "key": "tileEffects"
+                                  }
+                                }
+                              }
+                            },
+                            "yes": "n20",
+                            "no": "n19"
+                          },
+                          {
+                            "id": "n22",
+                            "kind": "set",
+                            "target": {
+                              "kind": "get",
+                              "object": {
+                                "kind": "get",
+                                "object": {
+                                  "kind": "ref",
+                                  "name": "battle"
+                                },
+                                "key": "extensions"
+                              },
+                              "key": "minatoAnchors"
+                            },
+                            "operator": "=",
+                            "value": {
+                              "kind": "array",
+                              "items": []
+                            },
+                            "next": "n21"
+                          },
+                          {
+                            "id": "n23",
+                            "kind": "branch",
+                            "condition": {
+                              "kind": "unary",
+                              "op": "!",
+                              "argument": {
+                                "kind": "unary",
+                                "op": "!",
+                                "argument": {
+                                  "kind": "unary",
+                                  "op": "!",
+                                  "argument": {
+                                    "kind": "get",
+                                    "object": {
+                                      "kind": "get",
+                                      "object": {
+                                        "kind": "ref",
+                                        "name": "battle"
+                                      },
+                                      "key": "extensions"
+                                    },
+                                    "key": "minatoAnchors"
+                                  }
+                                }
+                              }
+                            },
+                            "yes": "n22",
+                            "no": "n21"
+                          },
+                          {
+                            "id": "n24",
+                            "kind": "set",
+                            "target": {
+                              "kind": "get",
+                              "object": {
+                                "kind": "ref",
+                                "name": "battle"
+                              },
+                              "key": "extensions"
+                            },
+                            "operator": "=",
+                            "value": {
+                              "kind": "object",
+                              "entries": []
+                            },
+                            "next": "n23"
+                          },
+                          {
+                            "id": "n25",
+                            "kind": "branch",
+                            "condition": {
+                              "kind": "unary",
+                              "op": "!",
+                              "argument": {
+                                "kind": "unary",
+                                "op": "!",
+                                "argument": {
+                                  "kind": "unary",
+                                  "op": "!",
+                                  "argument": {
+                                    "kind": "get",
+                                    "object": {
+                                      "kind": "ref",
+                                      "name": "battle"
+                                    },
+                                    "key": "extensions"
+                                  }
+                                }
+                              }
+                            },
+                            "yes": "n24",
+                            "no": "n23"
+                          },
+                          {
+                            "id": "n26",
+                            "kind": "return",
+                            "value": {
+                              "kind": "object",
+                              "entries": [
+                                {
+                                  "key": "success",
+                                  "value": {
+                                    "kind": "literal",
+                                    "value": false
+                                  }
+                                },
+                                {
+                                  "key": "message",
+                                  "value": {
+                                    "kind": "literal",
+                                    "value": "必须选择可行走格"
+                                  }
+                                }
+                              ]
+                            }
+                          },
+                          {
+                            "id": "n27",
+                            "kind": "branch",
+                            "condition": {
+                              "kind": "unary",
+                              "op": "!",
+                              "argument": {
+                                "kind": "unary",
+                                "op": "!",
+                                "argument": {
+                                  "kind": "binary",
+                                  "op": "||",
+                                  "left": {
+                                    "kind": "unary",
+                                    "op": "!",
+                                    "argument": {
+                                      "kind": "ref",
+                                      "name": "tile"
+                                    }
+                                  },
+                                  "right": {
+                                    "kind": "unary",
+                                    "op": "!",
+                                    "argument": {
+                                      "kind": "get",
+                                      "object": {
+                                        "kind": "get",
+                                        "object": {
+                                          "kind": "ref",
+                                          "name": "tile"
+                                        },
+                                        "key": "props"
+                                      },
+                                      "key": "walkable"
+                                    }
+                                  }
+                                }
+                              }
+                            },
+                            "yes": "n26",
+                            "no": "n25"
+                          },
+                          {
+                            "id": "n28",
+                            "kind": "bind",
+                            "name": "tile",
+                            "expr": {
+                              "kind": "collection",
+                              "object": {
+                                "kind": "get",
+                                "object": {
+                                  "kind": "get",
+                                  "object": {
+                                    "kind": "ref",
+                                    "name": "battle"
+                                  },
+                                  "key": "map"
+                                },
+                                "key": "tiles"
+                              },
+                              "method": "find",
+                              "args": [
+                                {
+                                  "kind": "lambda",
+                                  "parameters": [
+                                    "t"
+                                  ],
+                                  "body": {
+                                    "kind": "binary",
+                                    "op": "&&",
+                                    "left": {
+                                      "kind": "binary",
+                                      "op": "===",
+                                      "left": {
+                                        "kind": "get",
+                                        "object": {
+                                          "kind": "ref",
+                                          "name": "t"
+                                        },
+                                        "key": "x"
+                                      },
+                                      "right": {
+                                        "kind": "ref",
+                                        "name": "x"
+                                      }
+                                    },
+                                    "right": {
+                                      "kind": "binary",
+                                      "op": "===",
+                                      "left": {
+                                        "kind": "get",
+                                        "object": {
+                                          "kind": "ref",
+                                          "name": "t"
+                                        },
+                                        "key": "y"
+                                      },
+                                      "right": {
+                                        "kind": "ref",
+                                        "name": "y"
+                                      }
+                                    }
+                                  }
+                                }
+                              ]
+                            },
+                            "next": "n27"
+                          },
+                          {
+                            "id": "n29",
+                            "kind": "bind",
+                            "name": "casterId",
+                            "expr": {
+                              "kind": "binary",
+                              "op": "&&",
+                              "left": {
+                                "kind": "get",
+                                "object": {
+                                  "kind": "ref",
+                                  "name": "ctx"
+                                },
+                                "key": "payload"
+                              },
+                              "right": {
+                                "kind": "get",
+                                "object": {
+                                  "kind": "get",
+                                  "object": {
+                                    "kind": "ref",
+                                    "name": "ctx"
+                                  },
+                                  "key": "payload"
+                                },
+                                "key": "casterId"
+                              }
+                            },
+                            "next": "n28"
+                          },
+                          {
+                            "id": "n30",
+                            "kind": "bind",
+                            "name": "y",
+                            "expr": {
+                              "kind": "get",
+                              "object": {
+                                "kind": "ref",
+                                "name": "ctx"
+                              },
+                              "key": "targetY"
+                            },
+                            "next": "n29"
+                          },
+                          {
+                            "id": "n31",
+                            "kind": "bind",
+                            "name": "x",
+                            "expr": {
+                              "kind": "get",
+                              "object": {
+                                "kind": "ref",
+                                "name": "ctx"
+                              },
+                              "key": "targetX"
+                            },
+                            "next": "n30"
+                          },
+                          {
+                            "id": "n32",
+                            "kind": "bind",
+                            "name": "battle",
+                            "expr": {
+                              "kind": "get",
+                              "object": {
+                                "kind": "ref",
+                                "name": "ctx"
+                              },
+                              "key": "battle"
+                            },
+                            "next": "n31"
+                          }
+                        ],
+                        "metadata": {
+                          "pendingParameterAliases": [
+                            "ctx"
+                          ],
+                          "pendingSourceKind": "effectCode-string"
+                        }
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n2",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "binary",
+                  "op": "+",
+                  "left": {
+                    "kind": "binary",
+                    "op": "+",
+                    "left": {
+                      "kind": "binary",
+                      "op": "+",
+                      "left": {
+                        "kind": "binary",
+                        "op": "+",
+                        "left": {
+                          "kind": "binary",
+                          "op": "+",
+                          "left": {
+                            "kind": "binary",
+                            "op": "+",
+                            "left": {
+                              "kind": "binary",
+                              "op": "+",
+                              "left": {
+                                "kind": "binary",
+                                "op": "+",
+                                "left": {
+                                  "kind": "get",
+                                  "object": {
+                                    "kind": "ref",
+                                    "name": "caster"
+                                  },
+                                  "key": "name"
+                                },
+                                "right": {
+                                  "kind": "literal",
+                                  "value": "发动螺旋连丸，经由锚点("
+                                }
+                              },
+                              "right": {
+                                "kind": "get",
+                                "object": {
+                                  "kind": "ref",
+                                  "name": "anchorPos"
+                                },
+                                "key": "x"
+                              }
+                            },
+                            "right": {
+                              "kind": "literal",
+                              "value": ","
+                            }
+                          },
+                          "right": {
+                            "kind": "get",
+                            "object": {
+                              "kind": "ref",
+                              "name": "anchorPos"
+                            },
+                            "key": "y"
+                          }
+                        },
+                        "right": {
+                          "kind": "literal",
+                          "value": ")闪至"
+                        }
+                      },
+                      "right": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "target"
+                        },
+                        "key": "name"
+                      }
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": "相邻地格，造成"
+                    }
+                  },
+                  "right": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "result"
+                    },
+                    "key": "damage"
+                  }
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "点伤害并攻击力+1，附加飞雷神标记"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n3",
+        "kind": "set",
+        "target": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "tag"
+          },
+          "key": "stacks"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "binary",
+          "op": "+",
+          "left": {
+            "kind": "binary",
+            "op": "||",
+            "left": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "tag"
+              },
+              "key": "stacks"
+            },
+            "right": {
+              "kind": "literal",
+              "value": 1
+            }
+          },
+          "right": {
+            "kind": "literal",
+            "value": 1
+          }
+        },
+        "next": "n2"
+      },
+      {
+        "id": "n4",
+        "kind": "call",
+        "capability": "addStatusEffectById",
+        "args": [
+          {
+            "kind": "ref",
+            "name": "__rvb_import_operand_12"
+          },
+          {
+            "kind": "ref",
+            "name": "__rvb_import_operand_0"
+          }
+        ],
+        "next": "n2"
+      },
+      {
+        "id": "n5",
+        "kind": "bind",
+        "name": "__rvb_import_operand_0",
+        "expr": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "id",
+              "value": {
+                "kind": "ref",
+                "name": "__rvb_import_operand_11"
+              }
+            },
+            {
+              "key": "type",
+              "value": {
+                "kind": "ref",
+                "name": "__rvb_import_operand_8"
+              }
+            },
+            {
+              "key": "name",
+              "value": {
+                "kind": "ref",
+                "name": "__rvb_import_operand_7"
+              }
+            },
+            {
+              "key": "visible",
+              "value": {
+                "kind": "ref",
+                "name": "__rvb_import_operand_6"
+              }
+            },
+            {
+              "key": "currentDuration",
+              "value": {
+                "kind": "ref",
+                "name": "__rvb_import_operand_5"
+              }
+            },
+            {
+              "key": "currentUses",
+              "value": {
+                "kind": "ref",
+                "name": "__rvb_import_operand_4"
+              }
+            },
+            {
+              "key": "intensity",
+              "value": {
+                "kind": "ref",
+                "name": "__rvb_import_operand_3"
+              }
+            },
+            {
+              "key": "stacks",
+              "value": {
+                "kind": "ref",
+                "name": "__rvb_import_operand_2"
+              }
+            },
+            {
+              "key": "sourceId",
+              "value": {
+                "kind": "ref",
+                "name": "__rvb_import_operand_1"
+              }
+            }
+          ]
+        },
+        "next": "n4"
+      },
+      {
+        "id": "n6",
+        "kind": "bind",
+        "name": "__rvb_import_operand_1",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "caster"
+          },
+          "key": "instanceId"
+        },
+        "next": "n5"
+      },
+      {
+        "id": "n7",
+        "kind": "bind",
+        "name": "__rvb_import_operand_2",
+        "expr": {
+          "kind": "literal",
+          "value": 1
+        },
+        "next": "n6"
+      },
+      {
+        "id": "n8",
+        "kind": "bind",
+        "name": "__rvb_import_operand_3",
+        "expr": {
+          "kind": "literal",
+          "value": 1
+        },
+        "next": "n7"
+      },
+      {
+        "id": "n9",
+        "kind": "bind",
+        "name": "__rvb_import_operand_4",
+        "expr": {
+          "kind": "unary",
+          "op": "-",
+          "argument": {
+            "kind": "literal",
+            "value": 1
+          }
+        },
+        "next": "n8"
+      },
+      {
+        "id": "n10",
+        "kind": "bind",
+        "name": "__rvb_import_operand_5",
+        "expr": {
+          "kind": "unary",
+          "op": "-",
+          "argument": {
+            "kind": "literal",
+            "value": 1
+          }
+        },
+        "next": "n9"
+      },
+      {
+        "id": "n11",
+        "kind": "bind",
+        "name": "__rvb_import_operand_6",
+        "expr": {
+          "kind": "literal",
+          "value": true
+        },
+        "next": "n10"
+      },
+      {
+        "id": "n12",
+        "kind": "bind",
+        "name": "__rvb_import_operand_7",
+        "expr": {
+          "kind": "literal",
+          "value": "飞雷神"
+        },
+        "next": "n11"
+      },
+      {
+        "id": "n13",
+        "kind": "bind",
+        "name": "__rvb_import_operand_8",
+        "expr": {
+          "kind": "literal",
+          "value": "flying-raijin-mark"
+        },
+        "next": "n12"
+      },
+      {
+        "id": "n15",
+        "kind": "bind",
+        "name": "__rvb_import_operand_11",
+        "expr": {
+          "kind": "binary",
+          "op": "+",
+          "left": {
+            "kind": "ref",
+            "name": "__rvb_import_operand_9"
+          },
+          "right": {
+            "kind": "ref",
+            "name": "__rvb_import_effect_10"
+          }
+        },
+        "next": "n13"
+      },
+      {
+        "id": "n16",
+        "kind": "call",
+        "capability": "Date.now",
+        "args": [],
+        "result": "__rvb_import_effect_10",
+        "next": "n15"
+      },
+      {
+        "id": "n14",
+        "kind": "bind",
+        "name": "__rvb_import_operand_9",
+        "expr": {
+          "kind": "binary",
+          "op": "+",
+          "left": {
+            "kind": "binary",
+            "op": "+",
+            "left": {
+              "kind": "binary",
+              "op": "+",
+              "left": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "literal",
+                  "value": "flying-raijin-mark-"
+                },
+                "right": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "caster"
+                  },
+                  "key": "instanceId"
+                }
+              },
+              "right": {
+                "kind": "literal",
+                "value": "-"
+              }
+            },
+            "right": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "target"
+              },
+              "key": "instanceId"
+            }
+          },
+          "right": {
+            "kind": "literal",
+            "value": "-"
+          }
+        },
+        "next": "n16"
+      },
+      {
+        "id": "n17",
+        "kind": "bind",
+        "name": "__rvb_import_operand_12",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "target"
+          },
+          "key": "instanceId"
+        },
+        "next": "n14"
+      },
+      {
+        "id": "n18",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "ref",
+              "name": "tag"
+            }
+          }
+        },
+        "yes": "n3",
+        "no": "n17"
+      },
+      {
+        "id": "n19",
+        "kind": "bind",
+        "name": "tag",
+        "expr": {
+          "kind": "collection",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "target"
+            },
+            "key": "statusTags"
+          },
+          "method": "find",
+          "args": [
+            {
+              "kind": "lambda",
+              "parameters": [
+                "t"
+              ],
+              "body": {
+                "kind": "binary",
+                "op": "&&",
+                "left": {
+                  "kind": "binary",
+                  "op": "===",
+                  "left": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "t"
+                    },
+                    "key": "type"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": "flying-raijin-mark"
+                  }
+                },
+                "right": {
+                  "kind": "binary",
+                  "op": "===",
+                  "left": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "t"
+                    },
+                    "key": "sourceId"
+                  },
+                  "right": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "caster"
+                    },
+                    "key": "instanceId"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "next": "n18"
+      },
+      {
+        "id": "n20",
+        "kind": "set",
+        "target": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "target"
+          },
+          "key": "statusTags"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "array",
+          "items": []
+        },
+        "next": "n19"
+      },
+      {
+        "id": "n21",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "unary",
+              "op": "!",
+              "argument": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "target"
+                },
+                "key": "statusTags"
+              }
+            }
+          }
+        },
+        "yes": "n20",
+        "no": "n19"
+      },
+      {
+        "id": "n22",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "unary",
+              "op": "!",
+              "argument": {
+                "kind": "ref",
+                "name": "killed"
+              }
+            }
+          }
+        },
+        "yes": "n21",
+        "no": "n1"
+      },
+      {
+        "id": "n23",
+        "kind": "bind",
+        "name": "killed",
+        "expr": {
+          "kind": "binary",
+          "op": "<=",
+          "left": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "target"
+            },
+            "key": "currentHp"
+          },
+          "right": {
+            "kind": "literal",
+            "value": 0
+          }
+        },
+        "next": "n22"
+      },
+      {
+        "id": "n24",
+        "kind": "set",
+        "target": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "caster"
+          },
+          "key": "attack"
+        },
+        "operator": "+=",
+        "value": {
+          "kind": "literal",
+          "value": 1
+        },
+        "next": "n23"
+      },
+      {
+        "id": "n25",
+        "kind": "call",
+        "capability": "dealDamage",
+        "args": [
+          {
+            "kind": "ref",
+            "name": "caster"
+          },
+          {
+            "kind": "ref",
+            "name": "target"
+          },
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "caster"
+            },
+            "key": "attack"
+          },
+          {
+            "kind": "literal",
+            "value": "physical"
+          },
+          {
+            "kind": "ref",
+            "name": "battle"
+          },
+          {
+            "kind": "get",
+            "object": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "context"
+              },
+              "key": "skill"
+            },
+            "key": "id"
+          }
+        ],
+        "result": "result",
+        "next": "n24"
+      },
+      {
+        "id": "n26",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": "位移被阻挡，本次位移效果取消"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n27",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "unary",
+              "op": "!",
+              "argument": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "__rvb_import_effect_13"
+                },
+                "key": "success"
+              }
+            }
+          }
+        },
+        "yes": "n26",
+        "no": "n25"
+      },
+      {
+        "id": "n28",
+        "kind": "call",
+        "capability": "flow.effects.displace",
+        "args": [
+          {
+            "kind": "array",
+            "items": [
+              {
+                "kind": "object",
+                "entries": [
+                  {
+                    "key": "pieceId",
+                    "value": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "caster"
+                      },
+                      "key": "instanceId"
+                    }
+                  },
+                  {
+                    "key": "x",
+                    "value": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "landing"
+                      },
+                      "key": "x"
+                    }
+                  },
+                  {
+                    "key": "y",
+                    "value": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "landing"
+                      },
+                      "key": "y"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "kind": "literal",
+            "value": "teleport"
+          }
+        ],
+        "result": "__rvb_import_effect_13",
+        "next": "n27"
+      },
+      {
+        "id": "n29",
+        "kind": "set",
+        "target": {
+          "kind": "get",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "battle"
+            },
+            "key": "extensions"
+          },
+          "key": "tileEffects"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "collection",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "battle"
+              },
+              "key": "extensions"
+            },
+            "key": "tileEffects"
+          },
+          "method": "filter",
+          "args": [
+            {
+              "kind": "lambda",
+              "parameters": [
+                "te"
+              ],
+              "body": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "binary",
+                  "op": "&&",
+                  "left": {
+                    "kind": "binary",
+                    "op": "&&",
+                    "left": {
+                      "kind": "binary",
+                      "op": "&&",
+                      "left": {
+                        "kind": "binary",
+                        "op": "===",
+                        "left": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "te"
+                          },
+                          "key": "tileType"
+                        },
+                        "right": {
+                          "kind": "literal",
+                          "value": "flying-raijin-anchor"
+                        }
+                      },
+                      "right": {
+                        "kind": "binary",
+                        "op": "===",
+                        "left": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "te"
+                          },
+                          "key": "sourceId"
+                        },
+                        "right": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "caster"
+                          },
+                          "key": "instanceId"
+                        }
+                      }
+                    },
+                    "right": {
+                      "kind": "binary",
+                      "op": "===",
+                      "left": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "te"
+                        },
+                        "key": "x"
+                      },
+                      "right": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "anchorPos"
+                        },
+                        "key": "x"
+                      }
+                    }
+                  },
+                  "right": {
+                    "kind": "binary",
+                    "op": "===",
+                    "left": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "te"
+                      },
+                      "key": "y"
+                    },
+                    "right": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "anchorPos"
+                      },
+                      "key": "y"
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "next": "n28"
+      },
+      {
+        "id": "n30",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "get",
+              "object": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "battle"
+                },
+                "key": "extensions"
+              },
+              "key": "tileEffects"
+            }
+          }
+        },
+        "yes": "n29",
+        "no": "n28"
+      },
+      {
+        "id": "n31",
+        "kind": "set",
+        "target": {
+          "kind": "get",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "battle"
+            },
+            "key": "extensions"
+          },
+          "key": "minatoAnchors"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "collection",
+          "object": {
+            "kind": "ref",
+            "name": "anchors"
+          },
+          "method": "filter",
+          "args": [
+            {
+              "kind": "lambda",
+              "parameters": [
+                "a",
+                "i"
+              ],
+              "body": {
+                "kind": "binary",
+                "op": "!==",
+                "left": {
+                  "kind": "ref",
+                  "name": "i"
+                },
+                "right": {
+                  "kind": "ref",
+                  "name": "anchorIdx"
+                }
+              }
+            }
+          ]
+        },
+        "next": "n30"
+      },
+      {
+        "id": "n32",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": "目标相邻地格没有合法落点"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n33",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "unary",
+              "op": "!",
+              "argument": {
+                "kind": "ref",
+                "name": "landing"
+              }
+            }
+          }
+        },
+        "yes": "n32",
+        "no": "n31"
+      },
+      {
+        "id": "n34",
+        "kind": "invoke",
+        "target": {
+          "kind": "function",
+          "value": {
+            "kind": "ref",
+            "name": "__rvb_import_operand_14"
+          }
+        },
+        "args": [
+          {
+            "kind": "ref",
+            "name": "target"
+          }
+        ],
+        "result": "landing",
+        "next": "n33"
+      },
+      {
+        "id": "n35",
+        "kind": "bind",
+        "name": "__rvb_import_operand_14",
+        "expr": {
+          "kind": "ref",
+          "name": "findLanding"
+        },
+        "next": "n34"
+      },
+      {
+        "id": "n36",
+        "kind": "bind",
+        "name": "findLanding",
+        "expr": {
+          "kind": "function",
+          "parameters": [
+            "enemy"
+          ],
+          "body": {
+            "entry": "n58",
+            "end": "n37",
+            "nodes": [
+              {
+                "id": "n38",
+                "kind": "return",
+                "value": {
+                  "kind": "ref",
+                  "name": "best"
+                }
+              },
+              {
+                "id": "n54",
+                "kind": "loop",
+                "loop": "for",
+                "condition": {
+                  "kind": "unary",
+                  "op": "!",
+                  "argument": {
+                    "kind": "unary",
+                    "op": "!",
+                    "argument": {
+                      "kind": "binary",
+                      "op": "<",
+                      "left": {
+                        "kind": "ref",
+                        "name": "i"
+                      },
+                      "right": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "dirs"
+                        },
+                        "key": "length"
+                      }
+                    }
+                  }
+                },
+                "body": {
+                  "entry": "n51",
+                  "end": "n39",
+                  "nodes": [
+                    {
+                      "id": "n39",
+                      "kind": "regionEnd"
+                    },
+                    {
+                      "id": "n40",
+                      "kind": "set",
+                      "target": {
+                        "kind": "ref",
+                        "name": "best"
+                      },
+                      "operator": "=",
+                      "value": {
+                        "kind": "object",
+                        "entries": [
+                          {
+                            "key": "x",
+                            "value": {
+                              "kind": "ref",
+                              "name": "x"
+                            }
+                          },
+                          {
+                            "key": "y",
+                            "value": {
+                              "kind": "ref",
+                              "name": "y"
+                            }
+                          }
+                        ]
+                      },
+                      "next": "n39"
+                    },
+                    {
+                      "id": "n41",
+                      "kind": "set",
+                      "target": {
+                        "kind": "ref",
+                        "name": "bestD"
+                      },
+                      "operator": "=",
+                      "value": {
+                        "kind": "ref",
+                        "name": "d"
+                      },
+                      "next": "n40"
+                    },
+                    {
+                      "id": "n42",
+                      "kind": "branch",
+                      "condition": {
+                        "kind": "unary",
+                        "op": "!",
+                        "argument": {
+                          "kind": "unary",
+                          "op": "!",
+                          "argument": {
+                            "kind": "binary",
+                            "op": "<",
+                            "left": {
+                              "kind": "ref",
+                              "name": "d"
+                            },
+                            "right": {
+                              "kind": "ref",
+                              "name": "bestD"
+                            }
+                          }
+                        }
+                      },
+                      "yes": "n41",
+                      "no": "n39"
+                    },
+                    {
+                      "id": "n43",
+                      "kind": "bind",
+                      "name": "d",
+                      "expr": {
+                        "kind": "binary",
+                        "op": "+",
+                        "left": {
+                          "kind": "call",
+                          "callee": "Math.abs",
+                          "args": [
+                            {
+                              "kind": "binary",
+                              "op": "-",
+                              "left": {
+                                "kind": "ref",
+                                "name": "x"
+                              },
+                              "right": {
+                                "kind": "get",
+                                "object": {
+                                  "kind": "ref",
+                                  "name": "anchorPos"
+                                },
+                                "key": "x"
+                              }
+                            }
+                          ]
+                        },
+                        "right": {
+                          "kind": "call",
+                          "callee": "Math.abs",
+                          "args": [
+                            {
+                              "kind": "binary",
+                              "op": "-",
+                              "left": {
+                                "kind": "ref",
+                                "name": "y"
+                              },
+                              "right": {
+                                "kind": "get",
+                                "object": {
+                                  "kind": "ref",
+                                  "name": "anchorPos"
+                                },
+                                "key": "y"
+                              }
+                            }
+                          ]
+                        }
+                      },
+                      "next": "n42"
+                    },
+                    {
+                      "id": "n44",
+                      "kind": "continue"
+                    },
+                    {
+                      "id": "n45",
+                      "kind": "branch",
+                      "condition": {
+                        "kind": "unary",
+                        "op": "!",
+                        "argument": {
+                          "kind": "unary",
+                          "op": "!",
+                          "argument": {
+                            "kind": "ref",
+                            "name": "occ"
+                          }
+                        }
+                      },
+                      "yes": "n44",
+                      "no": "n43"
+                    },
+                    {
+                      "id": "n46",
+                      "kind": "bind",
+                      "name": "occ",
+                      "expr": {
+                        "kind": "collection",
+                        "object": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "battle"
+                          },
+                          "key": "pieces"
+                        },
+                        "method": "find",
+                        "args": [
+                          {
+                            "kind": "lambda",
+                            "parameters": [
+                              "p"
+                            ],
+                            "body": {
+                              "kind": "binary",
+                              "op": "&&",
+                              "left": {
+                                "kind": "binary",
+                                "op": "&&",
+                                "left": {
+                                  "kind": "binary",
+                                  "op": "&&",
+                                  "left": {
+                                    "kind": "binary",
+                                    "op": "!==",
+                                    "left": {
+                                      "kind": "get",
+                                      "object": {
+                                        "kind": "ref",
+                                        "name": "p"
+                                      },
+                                      "key": "instanceId"
+                                    },
+                                    "right": {
+                                      "kind": "get",
+                                      "object": {
+                                        "kind": "ref",
+                                        "name": "caster"
+                                      },
+                                      "key": "instanceId"
+                                    }
+                                  },
+                                  "right": {
+                                    "kind": "binary",
+                                    "op": "===",
+                                    "left": {
+                                      "kind": "get",
+                                      "object": {
+                                        "kind": "ref",
+                                        "name": "p"
+                                      },
+                                      "key": "x"
+                                    },
+                                    "right": {
+                                      "kind": "ref",
+                                      "name": "x"
+                                    }
+                                  }
+                                },
+                                "right": {
+                                  "kind": "binary",
+                                  "op": "===",
+                                  "left": {
+                                    "kind": "get",
+                                    "object": {
+                                      "kind": "ref",
+                                      "name": "p"
+                                    },
+                                    "key": "y"
+                                  },
+                                  "right": {
+                                    "kind": "ref",
+                                    "name": "y"
+                                  }
+                                }
+                              },
+                              "right": {
+                                "kind": "binary",
+                                "op": ">",
+                                "left": {
+                                  "kind": "get",
+                                  "object": {
+                                    "kind": "ref",
+                                    "name": "p"
+                                  },
+                                  "key": "currentHp"
+                                },
+                                "right": {
+                                  "kind": "literal",
+                                  "value": 0
+                                }
+                              }
+                            }
+                          }
+                        ]
+                      },
+                      "next": "n45"
+                    },
+                    {
+                      "id": "n47",
+                      "kind": "continue"
+                    },
+                    {
+                      "id": "n48",
+                      "kind": "branch",
+                      "condition": {
+                        "kind": "unary",
+                        "op": "!",
+                        "argument": {
+                          "kind": "unary",
+                          "op": "!",
+                          "argument": {
+                            "kind": "binary",
+                            "op": "||",
+                            "left": {
+                              "kind": "unary",
+                              "op": "!",
+                              "argument": {
+                                "kind": "ref",
+                                "name": "tile"
+                              }
+                            },
+                            "right": {
+                              "kind": "unary",
+                              "op": "!",
+                              "argument": {
+                                "kind": "get",
+                                "object": {
+                                  "kind": "get",
+                                  "object": {
+                                    "kind": "ref",
+                                    "name": "tile"
+                                  },
+                                  "key": "props"
+                                },
+                                "key": "walkable"
+                              }
+                            }
+                          }
+                        }
+                      },
+                      "yes": "n47",
+                      "no": "n46"
+                    },
+                    {
+                      "id": "n49",
+                      "kind": "bind",
+                      "name": "tile",
+                      "expr": {
+                        "kind": "collection",
+                        "object": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "get",
+                            "object": {
+                              "kind": "ref",
+                              "name": "battle"
+                            },
+                            "key": "map"
+                          },
+                          "key": "tiles"
+                        },
+                        "method": "find",
+                        "args": [
+                          {
+                            "kind": "lambda",
+                            "parameters": [
+                              "t"
+                            ],
+                            "body": {
+                              "kind": "binary",
+                              "op": "&&",
+                              "left": {
+                                "kind": "binary",
+                                "op": "===",
+                                "left": {
+                                  "kind": "get",
+                                  "object": {
+                                    "kind": "ref",
+                                    "name": "t"
+                                  },
+                                  "key": "x"
+                                },
+                                "right": {
+                                  "kind": "ref",
+                                  "name": "x"
+                                }
+                              },
+                              "right": {
+                                "kind": "binary",
+                                "op": "===",
+                                "left": {
+                                  "kind": "get",
+                                  "object": {
+                                    "kind": "ref",
+                                    "name": "t"
+                                  },
+                                  "key": "y"
+                                },
+                                "right": {
+                                  "kind": "ref",
+                                  "name": "y"
+                                }
+                              }
+                            }
+                          }
+                        ]
+                      },
+                      "next": "n48"
+                    },
+                    {
+                      "id": "n50",
+                      "kind": "bind",
+                      "name": "y",
+                      "expr": {
+                        "kind": "binary",
+                        "op": "+",
+                        "left": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "enemy"
+                          },
+                          "key": "y"
+                        },
+                        "right": {
+                          "kind": "index",
+                          "object": {
+                            "kind": "index",
+                            "object": {
+                              "kind": "ref",
+                              "name": "dirs"
+                            },
+                            "index": {
+                              "kind": "ref",
+                              "name": "i"
+                            }
+                          },
+                          "index": {
+                            "kind": "literal",
+                            "value": 1
+                          }
+                        }
+                      },
+                      "next": "n49"
+                    },
+                    {
+                      "id": "n51",
+                      "kind": "bind",
+                      "name": "x",
+                      "expr": {
+                        "kind": "binary",
+                        "op": "+",
+                        "left": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "enemy"
+                          },
+                          "key": "x"
+                        },
+                        "right": {
+                          "kind": "index",
+                          "object": {
+                            "kind": "index",
+                            "object": {
+                              "kind": "ref",
+                              "name": "dirs"
+                            },
+                            "index": {
+                              "kind": "ref",
+                              "name": "i"
+                            }
+                          },
+                          "index": {
+                            "kind": "literal",
+                            "value": 0
+                          }
+                        }
+                      },
+                      "next": "n50"
+                    }
+                  ]
+                },
+                "update": {
+                  "entry": "n53",
+                  "end": "n52",
+                  "nodes": [
+                    {
+                      "id": "n52",
+                      "kind": "regionEnd"
+                    },
+                    {
+                      "id": "n53",
+                      "kind": "set",
+                      "target": {
+                        "kind": "ref",
+                        "name": "i"
+                      },
+                      "operator": "=",
+                      "value": {
+                        "kind": "binary",
+                        "op": "+",
+                        "left": {
+                          "kind": "unary",
+                          "op": "+",
+                          "argument": {
+                            "kind": "ref",
+                            "name": "i"
+                          }
+                        },
+                        "right": {
+                          "kind": "literal",
+                          "value": 1
+                        }
+                      },
+                      "next": "n52"
+                    }
+                  ]
+                },
+                "next": "n38"
+              },
+              {
+                "id": "n55",
+                "kind": "bind",
+                "name": "i",
+                "expr": {
+                  "kind": "literal",
+                  "value": 0
+                },
+                "next": "n54"
+              },
+              {
+                "id": "n56",
+                "kind": "bind",
+                "name": "bestD",
+                "expr": {
+                  "kind": "literal",
+                  "value": 9999
+                },
+                "next": "n55"
+              },
+              {
+                "id": "n57",
+                "kind": "bind",
+                "name": "best",
+                "expr": {
+                  "kind": "literal",
+                  "value": null
+                },
+                "next": "n56"
+              },
+              {
+                "id": "n58",
+                "kind": "bind",
+                "name": "dirs",
+                "expr": {
+                  "kind": "array",
+                  "items": [
+                    {
+                      "kind": "array",
+                      "items": [
+                        {
+                          "kind": "literal",
+                          "value": 1
+                        },
+                        {
+                          "kind": "literal",
+                          "value": 0
+                        }
+                      ]
+                    },
+                    {
+                      "kind": "array",
+                      "items": [
+                        {
+                          "kind": "unary",
+                          "op": "-",
+                          "argument": {
+                            "kind": "literal",
+                            "value": 1
+                          }
+                        },
+                        {
+                          "kind": "literal",
+                          "value": 0
+                        }
+                      ]
+                    },
+                    {
+                      "kind": "array",
+                      "items": [
+                        {
+                          "kind": "literal",
+                          "value": 0
+                        },
+                        {
+                          "kind": "literal",
+                          "value": 1
+                        }
+                      ]
+                    },
+                    {
+                      "kind": "array",
+                      "items": [
+                        {
+                          "kind": "literal",
+                          "value": 0
+                        },
+                        {
+                          "kind": "unary",
+                          "op": "-",
+                          "argument": {
+                            "kind": "literal",
+                            "value": 1
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "kind": "array",
+                      "items": [
+                        {
+                          "kind": "literal",
+                          "value": 1
+                        },
+                        {
+                          "kind": "literal",
+                          "value": 1
+                        }
+                      ]
+                    },
+                    {
+                      "kind": "array",
+                      "items": [
+                        {
+                          "kind": "literal",
+                          "value": 1
+                        },
+                        {
+                          "kind": "unary",
+                          "op": "-",
+                          "argument": {
+                            "kind": "literal",
+                            "value": 1
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "kind": "array",
+                      "items": [
+                        {
+                          "kind": "unary",
+                          "op": "-",
+                          "argument": {
+                            "kind": "literal",
+                            "value": 1
+                          }
+                        },
+                        {
+                          "kind": "literal",
+                          "value": 1
+                        }
+                      ]
+                    },
+                    {
+                      "kind": "array",
+                      "items": [
+                        {
+                          "kind": "unary",
+                          "op": "-",
+                          "argument": {
+                            "kind": "literal",
+                            "value": 1
+                          }
+                        },
+                        {
+                          "kind": "unary",
+                          "op": "-",
+                          "argument": {
+                            "kind": "literal",
+                            "value": 1
+                          }
+                        }
+                      ]
+                    }
+                  ]
+                },
+                "next": "n57"
+              },
+              {
+                "id": "n37",
+                "kind": "regionEnd"
+              }
+            ]
+          }
+        },
+        "next": "n35"
+      },
+      {
+        "id": "n60",
+        "kind": "bind",
+        "name": "target",
+        "expr": {
+          "kind": "index",
+          "object": {
+            "kind": "ref",
+            "name": "__rvb_import_operand_15"
+          },
+          "index": {
+            "kind": "call",
+            "callee": "Math.floor",
+            "args": [
+              {
+                "kind": "ref",
+                "name": "__rvb_import_operand_18"
+              }
+            ]
+          }
+        },
+        "next": "n36"
+      },
+      {
+        "id": "n62",
+        "kind": "bind",
+        "name": "__rvb_import_operand_18",
+        "expr": {
+          "kind": "binary",
+          "op": "*",
+          "left": {
+            "kind": "ref",
+            "name": "__rvb_import_operand_17"
+          },
+          "right": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "nearbyEnemies"
+            },
+            "key": "length"
+          }
+        },
+        "next": "n60"
+      },
+      {
+        "id": "n61",
+        "kind": "bind",
+        "name": "__rvb_import_operand_17",
+        "expr": {
+          "kind": "ref",
+          "name": "__rvb_import_effect_16"
+        },
+        "next": "n62"
+      },
+      {
+        "id": "n63",
+        "kind": "call",
+        "capability": "Math.random",
+        "args": [],
+        "result": "__rvb_import_effect_16",
+        "next": "n61"
+      },
+      {
+        "id": "n59",
+        "kind": "bind",
+        "name": "__rvb_import_operand_15",
+        "expr": {
+          "kind": "ref",
+          "name": "nearbyEnemies"
+        },
+        "next": "n63"
+      },
+      {
+        "id": "n64",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": "锚点3格内没有敌人"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n65",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "===",
+              "left": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "nearbyEnemies"
+                },
+                "key": "length"
+              },
+              "right": {
+                "kind": "literal",
+                "value": 0
+              }
+            }
+          }
+        },
+        "yes": "n64",
+        "no": "n59"
+      },
+      {
+        "id": "n66",
+        "kind": "bind",
+        "name": "nearbyEnemies",
+        "expr": {
+          "kind": "collection",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "battle"
+            },
+            "key": "pieces"
+          },
+          "method": "filter",
+          "args": [
+            {
+              "kind": "lambda",
+              "parameters": [
+                "p"
+              ],
+              "body": {
+                "kind": "binary",
+                "op": "&&",
+                "left": {
+                  "kind": "binary",
+                  "op": "&&",
+                  "left": {
+                    "kind": "binary",
+                    "op": ">",
+                    "left": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "p"
+                      },
+                      "key": "currentHp"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": 0
+                    }
+                  },
+                  "right": {
+                    "kind": "unary",
+                    "op": "!",
+                    "argument": {
+                      "kind": "call",
+                      "callee": "arePlayersAllied",
+                      "args": [
+                        {
+                          "kind": "ref",
+                          "name": "battle"
+                        },
+                        {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "p"
+                          },
+                          "key": "ownerPlayerId"
+                        },
+                        {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "caster"
+                          },
+                          "key": "ownerPlayerId"
+                        }
+                      ]
+                    }
+                  }
+                },
+                "right": {
+                  "kind": "binary",
+                  "op": "<=",
+                  "left": {
+                    "kind": "binary",
+                    "op": "+",
+                    "left": {
+                      "kind": "call",
+                      "callee": "Math.abs",
+                      "args": [
+                        {
+                          "kind": "binary",
+                          "op": "-",
+                          "left": {
+                            "kind": "get",
+                            "object": {
+                              "kind": "ref",
+                              "name": "p"
+                            },
+                            "key": "x"
+                          },
+                          "right": {
+                            "kind": "get",
+                            "object": {
+                              "kind": "ref",
+                              "name": "anchorPos"
+                            },
+                            "key": "x"
+                          }
+                        }
+                      ]
+                    },
+                    "right": {
+                      "kind": "call",
+                      "callee": "Math.abs",
+                      "args": [
+                        {
+                          "kind": "binary",
+                          "op": "-",
+                          "left": {
+                            "kind": "get",
+                            "object": {
+                              "kind": "ref",
+                              "name": "p"
+                            },
+                            "key": "y"
+                          },
+                          "right": {
+                            "kind": "get",
+                            "object": {
+                              "kind": "ref",
+                              "name": "anchorPos"
+                            },
+                            "key": "y"
+                          }
+                        }
+                      ]
+                    }
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": 3
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "next": "n65"
+      },
+      {
+        "id": "n67",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": "锚点位置不可行走"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n68",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "ref",
+                  "name": "anchorTile"
+                }
+              },
+              "right": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "anchorTile"
+                    },
+                    "key": "props"
+                  },
+                  "key": "walkable"
+                }
+              }
+            }
+          }
+        },
+        "yes": "n67",
+        "no": "n66"
+      },
+      {
+        "id": "n69",
+        "kind": "bind",
+        "name": "anchorTile",
+        "expr": {
+          "kind": "collection",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "battle"
+              },
+              "key": "map"
+            },
+            "key": "tiles"
+          },
+          "method": "find",
+          "args": [
+            {
+              "kind": "lambda",
+              "parameters": [
+                "t"
+              ],
+              "body": {
+                "kind": "binary",
+                "op": "&&",
+                "left": {
+                  "kind": "binary",
+                  "op": "===",
+                  "left": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "t"
+                    },
+                    "key": "x"
+                  },
+                  "right": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "anchorPos"
+                    },
+                    "key": "x"
+                  }
+                },
+                "right": {
+                  "kind": "binary",
+                  "op": "===",
+                  "left": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "t"
+                    },
+                    "key": "y"
+                  },
+                  "right": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "anchorPos"
+                    },
+                    "key": "y"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "next": "n68"
+      },
+      {
+        "id": "n70",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": "目标位置不是水门的飞雷神锚点"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n71",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "===",
+              "left": {
+                "kind": "ref",
+                "name": "anchorIdx"
+              },
+              "right": {
+                "kind": "unary",
+                "op": "-",
+                "argument": {
+                  "kind": "literal",
+                  "value": 1
+                }
+              }
+            }
+          }
+        },
+        "yes": "n70",
+        "no": "n69"
+      },
+      {
+        "id": "n72",
+        "kind": "invoke",
+        "target": {
+          "kind": "function",
+          "value": {
+            "kind": "ref",
+            "name": "__rvb_import_bound_method_19"
+          }
+        },
+        "args": [
+          {
+            "kind": "lambda",
+            "parameters": [
+              "a"
+            ],
+            "body": {
+              "kind": "binary",
+              "op": "&&",
+              "left": {
+                "kind": "binary",
+                "op": "&&",
+                "left": {
+                  "kind": "binary",
+                  "op": "===",
+                  "left": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "a"
+                    },
+                    "key": "sourceId"
+                  },
+                  "right": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "caster"
+                    },
+                    "key": "instanceId"
+                  }
+                },
+                "right": {
+                  "kind": "binary",
+                  "op": "===",
+                  "left": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "a"
+                    },
+                    "key": "x"
+                  },
+                  "right": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "anchorPos"
+                    },
+                    "key": "x"
+                  }
+                }
+              },
+              "right": {
+                "kind": "binary",
+                "op": "===",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "a"
+                  },
+                  "key": "y"
+                },
+                "right": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "anchorPos"
+                  },
+                  "key": "y"
+                }
+              }
+            }
+          }
+        ],
+        "result": "anchorIdx",
+        "next": "n71"
+      },
+      {
+        "id": "n73",
+        "kind": "bind",
+        "name": "__rvb_import_bound_method_19",
+        "expr": {
+          "kind": "boundMethod",
+          "object": {
+            "kind": "ref",
+            "name": "anchors"
+          },
+          "method": "findIndex"
+        },
+        "next": "n72"
+      },
+      {
+        "id": "n74",
+        "kind": "bind",
+        "name": "anchors",
+        "expr": {
+          "kind": "binary",
+          "op": "||",
+          "left": {
+            "kind": "get",
+            "object": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "battle"
+              },
+              "key": "extensions"
+            },
+            "key": "minatoAnchors"
+          },
+          "right": {
+            "kind": "array",
+            "items": []
+          }
+        },
+        "next": "n73"
+      },
+      {
+        "id": "n75",
+        "kind": "set",
+        "target": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "battle"
+          },
+          "key": "extensions"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "object",
+          "entries": []
+        },
+        "next": "n74"
+      },
+      {
+        "id": "n76",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "unary",
+              "op": "!",
+              "argument": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "battle"
+                },
+                "key": "extensions"
+              }
+            }
+          }
+        },
+        "yes": "n75",
+        "no": "n74"
+      },
+      {
+        "id": "n77",
+        "kind": "return",
+        "value": {
+          "kind": "ref",
+          "name": "anchorPos"
+        }
+      },
+      {
+        "id": "n78",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "ref",
+                  "name": "anchorPos"
+                }
+              },
+              "right": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "anchorPos"
+                },
+                "key": "needsTargetSelection"
+              }
+            }
+          }
+        },
+        "yes": "n77",
+        "no": "n76"
+      },
+      {
+        "id": "n79",
+        "kind": "call",
+        "capability": "selectTarget",
+        "args": [
+          {
+            "kind": "object",
+            "entries": [
+              {
+                "key": "type",
+                "value": {
+                  "kind": "literal",
+                  "value": "grid"
+                }
+              },
+              {
+                "key": "range",
+                "value": {
+                  "kind": "literal",
+                  "value": 99
+                }
+              },
+              {
+                "key": "filter",
+                "value": {
+                  "kind": "literal",
+                  "value": "all"
+                }
+              }
+            ]
+          }
+        ],
+        "result": "anchorPos",
+        "next": "n78"
+      },
+      {
+        "id": "n80",
+        "kind": "bind",
+        "name": "battle",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "context"
+          },
+          "key": "battle"
+        },
+        "next": "n79"
+      },
+      {
+        "id": "n81",
+        "kind": "bind",
+        "name": "caster",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "context"
+          },
+          "key": "piece"
+        },
+        "next": "n80"
+      }
+    ]
+  },
+  "contentGraphField": "code",
+  "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1"
 }

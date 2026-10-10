@@ -11,6 +11,652 @@
   "actionPointCost": 1,
   "cardType": "holy",
   "icon": "💌",
-  "code": "function executeCard(context) { const battle = context.battle; const playerId = context.playerId; const player = battle.players.find(function(p) { return p.playerId === playerId; }); if (!player) { return { success: false, message: '找不到玩家' }; } const allies = battle.pieces.filter(function(p) { return arePlayersAllied(battle, p.ownerPlayerId, playerId) && p.currentHp > 0 && canAffectAdventureTarget(battle, playerId, p); }); if (allies.length === 0) { return { success: false, message: '没有友方' }; } const target = allies.sort(function(a, b) { return a.currentHp - b.currentHp; })[0]; let heal = 8; let buffMsg = ''; if (player.buffs && player.buffs['elune-blessing-buff'] && player.buffs['elune-blessing-buff'].uses > 0) { heal = Math.floor(heal * player.buffs['elune-blessing-buff'].multiplier); player.buffs['elune-blessing-buff'].uses--; buffMsg = '（月神赐福强化）'; } const result = healDamage(target, target, heal, battle, 'holy-heal'); return { success: true, message: '圣光治疗' + buffMsg + '使' + target.name + '恢复' + result.heal + '点生命' }; }",
-  "image": "holy-heal.jpg"
+  "code": "function executeCard(context) { var __rvb_import_effect_2, __rvb_import_increment_old_1, __rvb_import_operand_0, __rvb_lexical_0_battle, __rvb_lexical_1_playerId, __rvb_lexical_2_player, __rvb_lexical_3_allies, __rvb_lexical_4_target, __rvb_lexical_5_heal, __rvb_lexical_6_buffMsg, __rvb_lexical_7_result; var _pc = \"n20\"; for (var _step = 0; _step <= 20; _step++) { switch (_pc) { case \"n20\": __rvb_lexical_0_battle = (context)[\"battle\"]; _pc = \"n19\"; break; case \"n19\": __rvb_lexical_1_playerId = (context)[\"playerId\"]; _pc = \"n18\"; break; case \"n18\": __rvb_lexical_2_player = ((__rvb_lexical_0_battle)[\"players\"])[\"find\"](function (p) { return ((p)[\"playerId\"] === __rvb_lexical_1_playerId); }); _pc = \"n17\"; break; case \"n17\": _pc = (! (! (! __rvb_lexical_2_player))) ? \"n16\" : \"n15\"; break; case \"n15\": __rvb_lexical_3_allies = ((__rvb_lexical_0_battle)[\"pieces\"])[\"filter\"](function (p) { return ((arePlayersAllied(__rvb_lexical_0_battle, (p)[\"ownerPlayerId\"], __rvb_lexical_1_playerId) && ((p)[\"currentHp\"] > 0)) && canAffectAdventureTarget(__rvb_lexical_0_battle, __rvb_lexical_1_playerId, p)); }); _pc = \"n14\"; break; case \"n14\": _pc = (! (! ((__rvb_lexical_3_allies)[\"length\"] === 0))) ? \"n13\" : \"n12\"; break; case \"n12\": __rvb_import_effect_2 = (__rvb_lexical_3_allies).sort(function (a, b) { return ((a)[\"currentHp\"] - (b)[\"currentHp\"]); }); _pc = \"n11\"; break; case \"n11\": __rvb_lexical_4_target = (__rvb_import_effect_2)[0]; _pc = \"n10\"; break; case \"n10\": __rvb_lexical_5_heal = 8; _pc = \"n9\"; break; case \"n9\": __rvb_lexical_6_buffMsg = \"\"; _pc = \"n8\"; break; case \"n8\": _pc = (! (! (((__rvb_lexical_2_player)[\"buffs\"] && ((__rvb_lexical_2_player)[\"buffs\"])[\"elune-blessing-buff\"]) && ((((__rvb_lexical_2_player)[\"buffs\"])[\"elune-blessing-buff\"])[\"uses\"] > 0)))) ? \"n7\" : \"n2\"; break; case \"n7\": __rvb_lexical_5_heal = Math.floor((__rvb_lexical_5_heal * (((__rvb_lexical_2_player)[\"buffs\"])[\"elune-blessing-buff\"])[\"multiplier\"])); _pc = \"n4\"; break; case \"n4\": __rvb_import_operand_0 = ((__rvb_lexical_2_player)[\"buffs\"])[\"elune-blessing-buff\"]; _pc = \"n6\"; break; case \"n6\": __rvb_import_increment_old_1 = (__rvb_import_operand_0)[\"uses\"]; _pc = \"n5\"; break; case \"n5\": (__rvb_import_operand_0)[\"uses\"] = ((+ __rvb_import_increment_old_1) - 1); _pc = \"n3\"; break; case \"n3\": __rvb_lexical_6_buffMsg = \"（月神赐福强化）\"; _pc = \"n2\"; break; case \"n2\": __rvb_lexical_7_result = healDamage(__rvb_lexical_4_target, __rvb_lexical_4_target, __rvb_lexical_5_heal, __rvb_lexical_0_battle, \"holy-heal\"); _pc = \"n1\"; break; case \"n1\": return {success: true, message: ((((((\"圣光治疗\" + __rvb_lexical_6_buffMsg) + \"使\") + (__rvb_lexical_4_target)[\"name\"]) + \"恢复\") + (__rvb_lexical_7_result)[\"heal\"]) + \"点生命\")}; case \"n13\": return {success: false, message: \"没有友方\"}; case \"n16\": return {success: false, message: \"找不到玩家\"}; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\"); }",
+  "image": "holy-heal.jpg",
+  "contentGraph": {
+    "version": "rvb-content-graph/v1",
+    "surface": "card",
+    "entry": "n20",
+    "nodes": [
+      {
+        "id": "n1",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "binary",
+                  "op": "+",
+                  "left": {
+                    "kind": "binary",
+                    "op": "+",
+                    "left": {
+                      "kind": "binary",
+                      "op": "+",
+                      "left": {
+                        "kind": "binary",
+                        "op": "+",
+                        "left": {
+                          "kind": "binary",
+                          "op": "+",
+                          "left": {
+                            "kind": "literal",
+                            "value": "圣光治疗"
+                          },
+                          "right": {
+                            "kind": "ref",
+                            "name": "__rvb_lexical_6_buffMsg"
+                          }
+                        },
+                        "right": {
+                          "kind": "literal",
+                          "value": "使"
+                        }
+                      },
+                      "right": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "__rvb_lexical_4_target"
+                        },
+                        "key": "name"
+                      }
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": "恢复"
+                    }
+                  },
+                  "right": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "__rvb_lexical_7_result"
+                    },
+                    "key": "heal"
+                  }
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "点生命"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n2",
+        "kind": "call",
+        "capability": "healDamage",
+        "args": [
+          {
+            "kind": "ref",
+            "name": "__rvb_lexical_4_target"
+          },
+          {
+            "kind": "ref",
+            "name": "__rvb_lexical_4_target"
+          },
+          {
+            "kind": "ref",
+            "name": "__rvb_lexical_5_heal"
+          },
+          {
+            "kind": "ref",
+            "name": "__rvb_lexical_0_battle"
+          },
+          {
+            "kind": "literal",
+            "value": "holy-heal"
+          }
+        ],
+        "result": "__rvb_lexical_7_result",
+        "next": "n1"
+      },
+      {
+        "id": "n3",
+        "kind": "set",
+        "target": {
+          "kind": "ref",
+          "name": "__rvb_lexical_6_buffMsg"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "literal",
+          "value": "（月神赐福强化）"
+        },
+        "next": "n2"
+      },
+      {
+        "id": "n5",
+        "kind": "set",
+        "target": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "__rvb_import_operand_0"
+          },
+          "key": "uses"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "binary",
+          "op": "-",
+          "left": {
+            "kind": "unary",
+            "op": "+",
+            "argument": {
+              "kind": "ref",
+              "name": "__rvb_import_increment_old_1"
+            }
+          },
+          "right": {
+            "kind": "literal",
+            "value": 1
+          }
+        },
+        "next": "n3"
+      },
+      {
+        "id": "n6",
+        "kind": "bind",
+        "name": "__rvb_import_increment_old_1",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "__rvb_import_operand_0"
+          },
+          "key": "uses"
+        },
+        "next": "n5"
+      },
+      {
+        "id": "n4",
+        "kind": "bind",
+        "name": "__rvb_import_operand_0",
+        "expr": {
+          "kind": "index",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "__rvb_lexical_2_player"
+            },
+            "key": "buffs"
+          },
+          "index": {
+            "kind": "literal",
+            "value": "elune-blessing-buff"
+          }
+        },
+        "next": "n6"
+      },
+      {
+        "id": "n7",
+        "kind": "set",
+        "target": {
+          "kind": "ref",
+          "name": "__rvb_lexical_5_heal"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "call",
+          "callee": "Math.floor",
+          "args": [
+            {
+              "kind": "binary",
+              "op": "*",
+              "left": {
+                "kind": "ref",
+                "name": "__rvb_lexical_5_heal"
+              },
+              "right": {
+                "kind": "get",
+                "object": {
+                  "kind": "index",
+                  "object": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "__rvb_lexical_2_player"
+                    },
+                    "key": "buffs"
+                  },
+                  "index": {
+                    "kind": "literal",
+                    "value": "elune-blessing-buff"
+                  }
+                },
+                "key": "multiplier"
+              }
+            }
+          ]
+        },
+        "next": "n4"
+      },
+      {
+        "id": "n8",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "&&",
+              "left": {
+                "kind": "binary",
+                "op": "&&",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "__rvb_lexical_2_player"
+                  },
+                  "key": "buffs"
+                },
+                "right": {
+                  "kind": "index",
+                  "object": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "__rvb_lexical_2_player"
+                    },
+                    "key": "buffs"
+                  },
+                  "index": {
+                    "kind": "literal",
+                    "value": "elune-blessing-buff"
+                  }
+                }
+              },
+              "right": {
+                "kind": "binary",
+                "op": ">",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "index",
+                    "object": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "__rvb_lexical_2_player"
+                      },
+                      "key": "buffs"
+                    },
+                    "index": {
+                      "kind": "literal",
+                      "value": "elune-blessing-buff"
+                    }
+                  },
+                  "key": "uses"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": 0
+                }
+              }
+            }
+          }
+        },
+        "yes": "n7",
+        "no": "n2"
+      },
+      {
+        "id": "n9",
+        "kind": "bind",
+        "name": "__rvb_lexical_6_buffMsg",
+        "expr": {
+          "kind": "literal",
+          "value": ""
+        },
+        "next": "n8"
+      },
+      {
+        "id": "n10",
+        "kind": "bind",
+        "name": "__rvb_lexical_5_heal",
+        "expr": {
+          "kind": "literal",
+          "value": 8
+        },
+        "next": "n9"
+      },
+      {
+        "id": "n11",
+        "kind": "bind",
+        "name": "__rvb_lexical_4_target",
+        "expr": {
+          "kind": "index",
+          "object": {
+            "kind": "ref",
+            "name": "__rvb_import_effect_2"
+          },
+          "index": {
+            "kind": "literal",
+            "value": 0
+          }
+        },
+        "next": "n10"
+      },
+      {
+        "id": "n12",
+        "kind": "call",
+        "capability": "array.sort",
+        "args": [
+          {
+            "kind": "ref",
+            "name": "__rvb_lexical_3_allies"
+          },
+          {
+            "kind": "lambda",
+            "parameters": [
+              "a",
+              "b"
+            ],
+            "body": {
+              "kind": "binary",
+              "op": "-",
+              "left": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "a"
+                },
+                "key": "currentHp"
+              },
+              "right": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "b"
+                },
+                "key": "currentHp"
+              }
+            }
+          }
+        ],
+        "result": "__rvb_import_effect_2",
+        "next": "n11"
+      },
+      {
+        "id": "n13",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": "没有友方"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n14",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "===",
+              "left": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "__rvb_lexical_3_allies"
+                },
+                "key": "length"
+              },
+              "right": {
+                "kind": "literal",
+                "value": 0
+              }
+            }
+          }
+        },
+        "yes": "n13",
+        "no": "n12"
+      },
+      {
+        "id": "n15",
+        "kind": "bind",
+        "name": "__rvb_lexical_3_allies",
+        "expr": {
+          "kind": "collection",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "__rvb_lexical_0_battle"
+            },
+            "key": "pieces"
+          },
+          "method": "filter",
+          "args": [
+            {
+              "kind": "lambda",
+              "parameters": [
+                "p"
+              ],
+              "body": {
+                "kind": "binary",
+                "op": "&&",
+                "left": {
+                  "kind": "binary",
+                  "op": "&&",
+                  "left": {
+                    "kind": "call",
+                    "callee": "arePlayersAllied",
+                    "args": [
+                      {
+                        "kind": "ref",
+                        "name": "__rvb_lexical_0_battle"
+                      },
+                      {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "p"
+                        },
+                        "key": "ownerPlayerId"
+                      },
+                      {
+                        "kind": "ref",
+                        "name": "__rvb_lexical_1_playerId"
+                      }
+                    ]
+                  },
+                  "right": {
+                    "kind": "binary",
+                    "op": ">",
+                    "left": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "p"
+                      },
+                      "key": "currentHp"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": 0
+                    }
+                  }
+                },
+                "right": {
+                  "kind": "call",
+                  "callee": "canAffectAdventureTarget",
+                  "args": [
+                    {
+                      "kind": "ref",
+                      "name": "__rvb_lexical_0_battle"
+                    },
+                    {
+                      "kind": "ref",
+                      "name": "__rvb_lexical_1_playerId"
+                    },
+                    {
+                      "kind": "ref",
+                      "name": "p"
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        "next": "n14"
+      },
+      {
+        "id": "n16",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": "找不到玩家"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n17",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "unary",
+              "op": "!",
+              "argument": {
+                "kind": "ref",
+                "name": "__rvb_lexical_2_player"
+              }
+            }
+          }
+        },
+        "yes": "n16",
+        "no": "n15"
+      },
+      {
+        "id": "n18",
+        "kind": "bind",
+        "name": "__rvb_lexical_2_player",
+        "expr": {
+          "kind": "collection",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "__rvb_lexical_0_battle"
+            },
+            "key": "players"
+          },
+          "method": "find",
+          "args": [
+            {
+              "kind": "lambda",
+              "parameters": [
+                "p"
+              ],
+              "body": {
+                "kind": "binary",
+                "op": "===",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "p"
+                  },
+                  "key": "playerId"
+                },
+                "right": {
+                  "kind": "ref",
+                  "name": "__rvb_lexical_1_playerId"
+                }
+              }
+            }
+          ]
+        },
+        "next": "n17"
+      },
+      {
+        "id": "n19",
+        "kind": "bind",
+        "name": "__rvb_lexical_1_playerId",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "context"
+          },
+          "key": "playerId"
+        },
+        "next": "n18"
+      },
+      {
+        "id": "n20",
+        "kind": "bind",
+        "name": "__rvb_lexical_0_battle",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "context"
+          },
+          "key": "battle"
+        },
+        "next": "n19"
+      }
+    ]
+  },
+  "contentGraphField": "code",
+  "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1"
 }

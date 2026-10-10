@@ -18,8 +18,8 @@
   "actionPointCost": 0,
   "range": "single",
   "requiresTarget": true,
-  "code": "function executeSkill(context) { const sourcePiece = context.piece; const targetPosition = selectTarget({ type: 'grid', range: 7, filter: 'all' }); if (!targetPosition || targetPosition.needsTargetSelection) return targetPosition; const tile = battle.map.tiles.find(function(item) { return item.x === targetPosition.x && item.y === targetPosition.y; }); if (!tile || !tile.props.walkable) return { message: '目标位置不可行走', success: false }; const occupied = battle.pieces.some(function(piece) { return piece.x === targetPosition.x && piece.y === targetPosition.y && piece.currentHp > 0; }); if (occupied) return { message: '目标位置已被占用', success: false }; if (!sourcePiece.statusTags) sourcePiece.statusTags = []; if (!battle.extensions) battle.extensions = {}; if (!battle.extensions.tileEffects) battle.extensions.tileEffects = []; const sourceId = 'shadow-step-' + sourcePiece.instanceId; const existing = sourcePiece.statusTags.find(function(tag) { return tag.type === 'shadow-step'; }); if (existing) { battle.extensions.tileEffects = battle.extensions.tileEffects.filter(function(effect) { return !(effect.tileType === 'shadow-step' && effect.sourceId === sourceId); }); existing.value = targetPosition.x; existing.intensity = targetPosition.y; existing.remainingDuration = 2; } else { addStatusEffectById(sourcePiece.instanceId, { id: 'shadow-step-' + Date.now(), type: 'shadow-step', name: '暗影步', remainingDuration: 2, value: targetPosition.x, intensity: targetPosition.y, relatedRules: ['rule-shadow-step'] }); } battle.extensions.tileEffects.push({ x: targetPosition.x, y: targetPosition.y, sourceId: sourceId, tileType: 'shadow-step', icon: '👁', bgColor: 'rgba(147, 51, 234, 0.12)', boxShadow: 'inset 0 0 0 2px rgba(168, 85, 247, 0.65)', iconPosition: 'top-left' }); if (!sourcePiece.rules || !sourcePiece.rules.some(function(rule) { return rule.id === 'rule-shadow-step'; })) addRuleById(sourcePiece.instanceId, 'rule-shadow-step'); return { success: true, message: sourcePiece.name + '标记了暗影步位置，将在下回合开始时传送到(' + targetPosition.x + ',' + targetPosition.y + ')' }; }",
-  "previewCode": "function calculatePreview() { return { description: \"标记地格（7）。你的下回合开始时传送至该格。\", expectedValues: { range: 7 } }; }",
+  "code": "function executeSkill(context) { var __rvb_import_effect_8, __rvb_import_operand_0, __rvb_import_operand_1, __rvb_import_operand_10, __rvb_import_operand_2, __rvb_import_operand_3, __rvb_import_operand_4, __rvb_import_operand_5, __rvb_import_operand_6, __rvb_import_operand_7, __rvb_import_operand_9, existing, occupied, sourceId, sourcePiece, targetPosition, tile; var _pc = \"n39\"; for (var _step = 0; _step <= 39; _step++) { switch (_pc) { case \"n39\": sourcePiece = (context)[\"piece\"]; _pc = \"n38\"; break; case \"n38\": targetPosition = selectTarget({type: \"grid\", range: 7, filter: \"all\"}); _pc = \"n37\"; break; case \"n37\": _pc = (! (! ((! targetPosition) || (targetPosition)[\"needsTargetSelection\"]))) ? \"n36\" : \"n35\"; break; case \"n35\": tile = (((battle)[\"map\"])[\"tiles\"])[\"find\"](function (item) { return (((item)[\"x\"] === (targetPosition)[\"x\"]) && ((item)[\"y\"] === (targetPosition)[\"y\"])); }); _pc = \"n34\"; break; case \"n34\": _pc = (! (! ((! tile) || (! ((tile)[\"props\"])[\"walkable\"])))) ? \"n33\" : \"n32\"; break; case \"n32\": occupied = ((battle)[\"pieces\"])[\"some\"](function (piece) { return ((((piece)[\"x\"] === (targetPosition)[\"x\"]) && ((piece)[\"y\"] === (targetPosition)[\"y\"])) && ((piece)[\"currentHp\"] > 0)); }); _pc = \"n31\"; break; case \"n31\": _pc = (! (! occupied)) ? \"n30\" : \"n29\"; break; case \"n29\": _pc = (! (! (! (sourcePiece)[\"statusTags\"]))) ? \"n28\" : \"n27\"; break; case \"n28\": (sourcePiece)[\"statusTags\"] = []; _pc = \"n27\"; break; case \"n27\": _pc = (! (! (! (battle)[\"extensions\"]))) ? \"n26\" : \"n25\"; break; case \"n26\": (battle)[\"extensions\"] = {}; _pc = \"n25\"; break; case \"n25\": _pc = (! (! (! ((battle)[\"extensions\"])[\"tileEffects\"]))) ? \"n24\" : \"n23\"; break; case \"n24\": ((battle)[\"extensions\"])[\"tileEffects\"] = []; _pc = \"n23\"; break; case \"n23\": sourceId = (\"shadow-step-\" + (sourcePiece)[\"instanceId\"]); _pc = \"n22\"; break; case \"n22\": existing = ((sourcePiece)[\"statusTags\"])[\"find\"](function (tag) { return ((tag)[\"type\"] === \"shadow-step\"); }); _pc = \"n21\"; break; case \"n21\": _pc = (! (! existing)) ? \"n8\" : \"n20\"; break; case \"n20\": __rvb_import_operand_10 = (sourcePiece)[\"instanceId\"]; _pc = \"n17\"; break; case \"n17\": __rvb_import_operand_7 = \"shadow-step-\"; _pc = \"n19\"; break; case \"n19\": __rvb_import_effect_8 = Date.now(); _pc = \"n18\"; break; case \"n18\": __rvb_import_operand_9 = (__rvb_import_operand_7 + __rvb_import_effect_8); _pc = \"n16\"; break; case \"n16\": __rvb_import_operand_6 = \"shadow-step\"; _pc = \"n15\"; break; case \"n15\": __rvb_import_operand_5 = \"暗影步\"; _pc = \"n14\"; break; case \"n14\": __rvb_import_operand_4 = 2; _pc = \"n13\"; break; case \"n13\": __rvb_import_operand_3 = (targetPosition)[\"x\"]; _pc = \"n12\"; break; case \"n12\": __rvb_import_operand_2 = (targetPosition)[\"y\"]; _pc = \"n11\"; break; case \"n11\": __rvb_import_operand_1 = [\"rule-shadow-step\"]; _pc = \"n10\"; break; case \"n10\": __rvb_import_operand_0 = {id: __rvb_import_operand_9, type: __rvb_import_operand_6, name: __rvb_import_operand_5, remainingDuration: __rvb_import_operand_4, value: __rvb_import_operand_3, intensity: __rvb_import_operand_2, relatedRules: __rvb_import_operand_1}; _pc = \"n9\"; break; case \"n9\": addStatusEffectById(__rvb_import_operand_10, __rvb_import_operand_0); _pc = \"n4\"; break; case \"n8\": ((battle)[\"extensions\"])[\"tileEffects\"] = (((battle)[\"extensions\"])[\"tileEffects\"])[\"filter\"](function (effect) { return (! (((effect)[\"tileType\"] === \"shadow-step\") && ((effect)[\"sourceId\"] === sourceId))); }); _pc = \"n7\"; break; case \"n7\": (existing)[\"value\"] = (targetPosition)[\"x\"]; _pc = \"n6\"; break; case \"n6\": (existing)[\"intensity\"] = (targetPosition)[\"y\"]; _pc = \"n5\"; break; case \"n5\": (existing)[\"remainingDuration\"] = 2; _pc = \"n4\"; break; case \"n4\": (((battle)[\"extensions\"])[\"tileEffects\"]).push({x: (targetPosition)[\"x\"], y: (targetPosition)[\"y\"], sourceId: sourceId, tileType: \"shadow-step\", icon: \"👁\", bgColor: \"rgba(147, 51, 234, 0.12)\", boxShadow: \"inset 0 0 0 2px rgba(168, 85, 247, 0.65)\", iconPosition: \"top-left\"}); _pc = \"n3\"; break; case \"n3\": _pc = (! (! ((! (sourcePiece)[\"rules\"]) || (! ((sourcePiece)[\"rules\"])[\"some\"](function (rule) { return ((rule)[\"id\"] === \"rule-shadow-step\"); }))))) ? \"n2\" : \"n1\"; break; case \"n2\": addRuleById((sourcePiece)[\"instanceId\"], \"rule-shadow-step\"); _pc = \"n1\"; break; case \"n1\": return {success: true, message: ((((((sourcePiece)[\"name\"] + \"标记了暗影步位置，将在下回合开始时传送到(\") + (targetPosition)[\"x\"]) + \",\") + (targetPosition)[\"y\"]) + \")\")}; case \"n30\": return {message: \"目标位置已被占用\", success: false}; case \"n33\": return {message: \"目标位置不可行走\", success: false}; case \"n36\": return targetPosition; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\"); }",
+  "previewCode": "function calculatePreview(piece, skillDef, currentCooldown) { var _pc = \"n1\"; for (var _step = 0; _step <= 1; _step++) { switch (_pc) { case \"n1\": return {description: \"标记地格（7）。你的下回合开始时传送至该格。\", expectedValues: {range: 7}}; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\"); }",
   "targeting": {
     "steps": [
       {
@@ -32,5 +32,1237 @@
         "requireUnoccupied": true
       }
     ]
+  },
+  "contentGraph": {
+    "version": "rvb-content-graph/v1",
+    "surface": "skill",
+    "entry": "n39",
+    "nodes": [
+      {
+        "id": "n1",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "binary",
+                  "op": "+",
+                  "left": {
+                    "kind": "binary",
+                    "op": "+",
+                    "left": {
+                      "kind": "binary",
+                      "op": "+",
+                      "left": {
+                        "kind": "binary",
+                        "op": "+",
+                        "left": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "sourcePiece"
+                          },
+                          "key": "name"
+                        },
+                        "right": {
+                          "kind": "literal",
+                          "value": "标记了暗影步位置，将在下回合开始时传送到("
+                        }
+                      },
+                      "right": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "targetPosition"
+                        },
+                        "key": "x"
+                      }
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": ","
+                    }
+                  },
+                  "right": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "targetPosition"
+                    },
+                    "key": "y"
+                  }
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": ")"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n2",
+        "kind": "call",
+        "capability": "addRuleById",
+        "args": [
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "sourcePiece"
+            },
+            "key": "instanceId"
+          },
+          {
+            "kind": "literal",
+            "value": "rule-shadow-step"
+          }
+        ],
+        "next": "n1"
+      },
+      {
+        "id": "n3",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "sourcePiece"
+                  },
+                  "key": "rules"
+                }
+              },
+              "right": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "collection",
+                  "object": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "sourcePiece"
+                    },
+                    "key": "rules"
+                  },
+                  "method": "some",
+                  "args": [
+                    {
+                      "kind": "lambda",
+                      "parameters": [
+                        "rule"
+                      ],
+                      "body": {
+                        "kind": "binary",
+                        "op": "===",
+                        "left": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "rule"
+                          },
+                          "key": "id"
+                        },
+                        "right": {
+                          "kind": "literal",
+                          "value": "rule-shadow-step"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "yes": "n2",
+        "no": "n1"
+      },
+      {
+        "id": "n4",
+        "kind": "call",
+        "capability": "array.push",
+        "args": [
+          {
+            "kind": "get",
+            "object": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "battle"
+              },
+              "key": "extensions"
+            },
+            "key": "tileEffects"
+          },
+          {
+            "kind": "object",
+            "entries": [
+              {
+                "key": "x",
+                "value": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "targetPosition"
+                  },
+                  "key": "x"
+                }
+              },
+              {
+                "key": "y",
+                "value": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "targetPosition"
+                  },
+                  "key": "y"
+                }
+              },
+              {
+                "key": "sourceId",
+                "value": {
+                  "kind": "ref",
+                  "name": "sourceId"
+                }
+              },
+              {
+                "key": "tileType",
+                "value": {
+                  "kind": "literal",
+                  "value": "shadow-step"
+                }
+              },
+              {
+                "key": "icon",
+                "value": {
+                  "kind": "literal",
+                  "value": "👁"
+                }
+              },
+              {
+                "key": "bgColor",
+                "value": {
+                  "kind": "literal",
+                  "value": "rgba(147, 51, 234, 0.12)"
+                }
+              },
+              {
+                "key": "boxShadow",
+                "value": {
+                  "kind": "literal",
+                  "value": "inset 0 0 0 2px rgba(168, 85, 247, 0.65)"
+                }
+              },
+              {
+                "key": "iconPosition",
+                "value": {
+                  "kind": "literal",
+                  "value": "top-left"
+                }
+              }
+            ]
+          }
+        ],
+        "next": "n3"
+      },
+      {
+        "id": "n5",
+        "kind": "set",
+        "target": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "existing"
+          },
+          "key": "remainingDuration"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "literal",
+          "value": 2
+        },
+        "next": "n4"
+      },
+      {
+        "id": "n6",
+        "kind": "set",
+        "target": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "existing"
+          },
+          "key": "intensity"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "targetPosition"
+          },
+          "key": "y"
+        },
+        "next": "n5"
+      },
+      {
+        "id": "n7",
+        "kind": "set",
+        "target": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "existing"
+          },
+          "key": "value"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "targetPosition"
+          },
+          "key": "x"
+        },
+        "next": "n6"
+      },
+      {
+        "id": "n8",
+        "kind": "set",
+        "target": {
+          "kind": "get",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "battle"
+            },
+            "key": "extensions"
+          },
+          "key": "tileEffects"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "collection",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "battle"
+              },
+              "key": "extensions"
+            },
+            "key": "tileEffects"
+          },
+          "method": "filter",
+          "args": [
+            {
+              "kind": "lambda",
+              "parameters": [
+                "effect"
+              ],
+              "body": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "binary",
+                  "op": "&&",
+                  "left": {
+                    "kind": "binary",
+                    "op": "===",
+                    "left": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "effect"
+                      },
+                      "key": "tileType"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": "shadow-step"
+                    }
+                  },
+                  "right": {
+                    "kind": "binary",
+                    "op": "===",
+                    "left": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "effect"
+                      },
+                      "key": "sourceId"
+                    },
+                    "right": {
+                      "kind": "ref",
+                      "name": "sourceId"
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "next": "n7"
+      },
+      {
+        "id": "n9",
+        "kind": "call",
+        "capability": "addStatusEffectById",
+        "args": [
+          {
+            "kind": "ref",
+            "name": "__rvb_import_operand_10"
+          },
+          {
+            "kind": "ref",
+            "name": "__rvb_import_operand_0"
+          }
+        ],
+        "next": "n4"
+      },
+      {
+        "id": "n10",
+        "kind": "bind",
+        "name": "__rvb_import_operand_0",
+        "expr": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "id",
+              "value": {
+                "kind": "ref",
+                "name": "__rvb_import_operand_9"
+              }
+            },
+            {
+              "key": "type",
+              "value": {
+                "kind": "ref",
+                "name": "__rvb_import_operand_6"
+              }
+            },
+            {
+              "key": "name",
+              "value": {
+                "kind": "ref",
+                "name": "__rvb_import_operand_5"
+              }
+            },
+            {
+              "key": "remainingDuration",
+              "value": {
+                "kind": "ref",
+                "name": "__rvb_import_operand_4"
+              }
+            },
+            {
+              "key": "value",
+              "value": {
+                "kind": "ref",
+                "name": "__rvb_import_operand_3"
+              }
+            },
+            {
+              "key": "intensity",
+              "value": {
+                "kind": "ref",
+                "name": "__rvb_import_operand_2"
+              }
+            },
+            {
+              "key": "relatedRules",
+              "value": {
+                "kind": "ref",
+                "name": "__rvb_import_operand_1"
+              }
+            }
+          ]
+        },
+        "next": "n9"
+      },
+      {
+        "id": "n11",
+        "kind": "bind",
+        "name": "__rvb_import_operand_1",
+        "expr": {
+          "kind": "array",
+          "items": [
+            {
+              "kind": "literal",
+              "value": "rule-shadow-step"
+            }
+          ]
+        },
+        "next": "n10"
+      },
+      {
+        "id": "n12",
+        "kind": "bind",
+        "name": "__rvb_import_operand_2",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "targetPosition"
+          },
+          "key": "y"
+        },
+        "next": "n11"
+      },
+      {
+        "id": "n13",
+        "kind": "bind",
+        "name": "__rvb_import_operand_3",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "targetPosition"
+          },
+          "key": "x"
+        },
+        "next": "n12"
+      },
+      {
+        "id": "n14",
+        "kind": "bind",
+        "name": "__rvb_import_operand_4",
+        "expr": {
+          "kind": "literal",
+          "value": 2
+        },
+        "next": "n13"
+      },
+      {
+        "id": "n15",
+        "kind": "bind",
+        "name": "__rvb_import_operand_5",
+        "expr": {
+          "kind": "literal",
+          "value": "暗影步"
+        },
+        "next": "n14"
+      },
+      {
+        "id": "n16",
+        "kind": "bind",
+        "name": "__rvb_import_operand_6",
+        "expr": {
+          "kind": "literal",
+          "value": "shadow-step"
+        },
+        "next": "n15"
+      },
+      {
+        "id": "n18",
+        "kind": "bind",
+        "name": "__rvb_import_operand_9",
+        "expr": {
+          "kind": "binary",
+          "op": "+",
+          "left": {
+            "kind": "ref",
+            "name": "__rvb_import_operand_7"
+          },
+          "right": {
+            "kind": "ref",
+            "name": "__rvb_import_effect_8"
+          }
+        },
+        "next": "n16"
+      },
+      {
+        "id": "n19",
+        "kind": "call",
+        "capability": "Date.now",
+        "args": [],
+        "result": "__rvb_import_effect_8",
+        "next": "n18"
+      },
+      {
+        "id": "n17",
+        "kind": "bind",
+        "name": "__rvb_import_operand_7",
+        "expr": {
+          "kind": "literal",
+          "value": "shadow-step-"
+        },
+        "next": "n19"
+      },
+      {
+        "id": "n20",
+        "kind": "bind",
+        "name": "__rvb_import_operand_10",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "sourcePiece"
+          },
+          "key": "instanceId"
+        },
+        "next": "n17"
+      },
+      {
+        "id": "n21",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "ref",
+              "name": "existing"
+            }
+          }
+        },
+        "yes": "n8",
+        "no": "n20"
+      },
+      {
+        "id": "n22",
+        "kind": "bind",
+        "name": "existing",
+        "expr": {
+          "kind": "collection",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "sourcePiece"
+            },
+            "key": "statusTags"
+          },
+          "method": "find",
+          "args": [
+            {
+              "kind": "lambda",
+              "parameters": [
+                "tag"
+              ],
+              "body": {
+                "kind": "binary",
+                "op": "===",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "tag"
+                  },
+                  "key": "type"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "shadow-step"
+                }
+              }
+            }
+          ]
+        },
+        "next": "n21"
+      },
+      {
+        "id": "n23",
+        "kind": "bind",
+        "name": "sourceId",
+        "expr": {
+          "kind": "binary",
+          "op": "+",
+          "left": {
+            "kind": "literal",
+            "value": "shadow-step-"
+          },
+          "right": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "sourcePiece"
+            },
+            "key": "instanceId"
+          }
+        },
+        "next": "n22"
+      },
+      {
+        "id": "n24",
+        "kind": "set",
+        "target": {
+          "kind": "get",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "battle"
+            },
+            "key": "extensions"
+          },
+          "key": "tileEffects"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "array",
+          "items": []
+        },
+        "next": "n23"
+      },
+      {
+        "id": "n25",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "unary",
+              "op": "!",
+              "argument": {
+                "kind": "get",
+                "object": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "battle"
+                  },
+                  "key": "extensions"
+                },
+                "key": "tileEffects"
+              }
+            }
+          }
+        },
+        "yes": "n24",
+        "no": "n23"
+      },
+      {
+        "id": "n26",
+        "kind": "set",
+        "target": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "battle"
+          },
+          "key": "extensions"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "object",
+          "entries": []
+        },
+        "next": "n25"
+      },
+      {
+        "id": "n27",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "unary",
+              "op": "!",
+              "argument": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "battle"
+                },
+                "key": "extensions"
+              }
+            }
+          }
+        },
+        "yes": "n26",
+        "no": "n25"
+      },
+      {
+        "id": "n28",
+        "kind": "set",
+        "target": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "sourcePiece"
+          },
+          "key": "statusTags"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "array",
+          "items": []
+        },
+        "next": "n27"
+      },
+      {
+        "id": "n29",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "unary",
+              "op": "!",
+              "argument": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "sourcePiece"
+                },
+                "key": "statusTags"
+              }
+            }
+          }
+        },
+        "yes": "n28",
+        "no": "n27"
+      },
+      {
+        "id": "n30",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": "目标位置已被占用"
+              }
+            },
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n31",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "ref",
+              "name": "occupied"
+            }
+          }
+        },
+        "yes": "n30",
+        "no": "n29"
+      },
+      {
+        "id": "n32",
+        "kind": "bind",
+        "name": "occupied",
+        "expr": {
+          "kind": "collection",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "battle"
+            },
+            "key": "pieces"
+          },
+          "method": "some",
+          "args": [
+            {
+              "kind": "lambda",
+              "parameters": [
+                "piece"
+              ],
+              "body": {
+                "kind": "binary",
+                "op": "&&",
+                "left": {
+                  "kind": "binary",
+                  "op": "&&",
+                  "left": {
+                    "kind": "binary",
+                    "op": "===",
+                    "left": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "piece"
+                      },
+                      "key": "x"
+                    },
+                    "right": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "targetPosition"
+                      },
+                      "key": "x"
+                    }
+                  },
+                  "right": {
+                    "kind": "binary",
+                    "op": "===",
+                    "left": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "piece"
+                      },
+                      "key": "y"
+                    },
+                    "right": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "targetPosition"
+                      },
+                      "key": "y"
+                    }
+                  }
+                },
+                "right": {
+                  "kind": "binary",
+                  "op": ">",
+                  "left": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "piece"
+                    },
+                    "key": "currentHp"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": 0
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "next": "n31"
+      },
+      {
+        "id": "n33",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": "目标位置不可行走"
+              }
+            },
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n34",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "ref",
+                  "name": "tile"
+                }
+              },
+              "right": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "tile"
+                    },
+                    "key": "props"
+                  },
+                  "key": "walkable"
+                }
+              }
+            }
+          }
+        },
+        "yes": "n33",
+        "no": "n32"
+      },
+      {
+        "id": "n35",
+        "kind": "bind",
+        "name": "tile",
+        "expr": {
+          "kind": "collection",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "battle"
+              },
+              "key": "map"
+            },
+            "key": "tiles"
+          },
+          "method": "find",
+          "args": [
+            {
+              "kind": "lambda",
+              "parameters": [
+                "item"
+              ],
+              "body": {
+                "kind": "binary",
+                "op": "&&",
+                "left": {
+                  "kind": "binary",
+                  "op": "===",
+                  "left": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "item"
+                    },
+                    "key": "x"
+                  },
+                  "right": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "targetPosition"
+                    },
+                    "key": "x"
+                  }
+                },
+                "right": {
+                  "kind": "binary",
+                  "op": "===",
+                  "left": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "item"
+                    },
+                    "key": "y"
+                  },
+                  "right": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "targetPosition"
+                    },
+                    "key": "y"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "next": "n34"
+      },
+      {
+        "id": "n36",
+        "kind": "return",
+        "value": {
+          "kind": "ref",
+          "name": "targetPosition"
+        }
+      },
+      {
+        "id": "n37",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "ref",
+                  "name": "targetPosition"
+                }
+              },
+              "right": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "targetPosition"
+                },
+                "key": "needsTargetSelection"
+              }
+            }
+          }
+        },
+        "yes": "n36",
+        "no": "n35"
+      },
+      {
+        "id": "n38",
+        "kind": "call",
+        "capability": "selectTarget",
+        "args": [
+          {
+            "kind": "object",
+            "entries": [
+              {
+                "key": "type",
+                "value": {
+                  "kind": "literal",
+                  "value": "grid"
+                }
+              },
+              {
+                "key": "range",
+                "value": {
+                  "kind": "literal",
+                  "value": 7
+                }
+              },
+              {
+                "key": "filter",
+                "value": {
+                  "kind": "literal",
+                  "value": "all"
+                }
+              }
+            ]
+          }
+        ],
+        "result": "targetPosition",
+        "next": "n37"
+      },
+      {
+        "id": "n39",
+        "kind": "bind",
+        "name": "sourcePiece",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "context"
+          },
+          "key": "piece"
+        },
+        "next": "n38"
+      }
+    ]
+  },
+  "contentGraphField": "code",
+  "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1",
+  "contentGraphEntries": {
+    "previewCode": {
+      "graph": {
+        "version": "rvb-content-graph/v1",
+        "surface": "preview",
+        "entry": "n1",
+        "nodes": [
+          {
+            "id": "n1",
+            "kind": "return",
+            "value": {
+              "kind": "object",
+              "entries": [
+                {
+                  "key": "description",
+                  "value": {
+                    "kind": "literal",
+                    "value": "标记地格（7）。你的下回合开始时传送至该格。"
+                  }
+                },
+                {
+                  "key": "expectedValues",
+                  "value": {
+                    "kind": "object",
+                    "entries": [
+                      {
+                        "key": "range",
+                        "value": {
+                          "kind": "literal",
+                          "value": 7
+                        }
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "compilerVersion": "rvb-content-graph-compiler/v1"
+    }
   }
 }

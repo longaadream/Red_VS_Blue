@@ -2,9 +2,15 @@
   "id": "edgar-pogo-jump",
   "name": "撑“杆”跳跃",
   "description": "传送至地格（5）。对以自身为中心的3×3范围内：对敌人造成3点伤害，然后移速+1。",
-  "keywords": ["传送"],
+  "keywords": [
+    "传送"
+  ],
   "targetText": "地格（5）",
-  "effectTags": ["位移", "伤害", "强化"],
+  "effectTags": [
+    "位移",
+    "伤害",
+    "强化"
+  ],
   "icon": "🪄",
   "kind": "active",
   "type": "super",
@@ -25,6 +31,905 @@
       }
     ]
   },
-  "code": "function executeSkill(context) { var source = context.piece; var targetPosition = selectTarget({ type: 'grid', range: 5, filter: 'all' }); if (!targetPosition || targetPosition.needsTargetSelection) return targetPosition; var tile = battle.map.tiles.find(function(item) { return item.x === targetPosition.x && item.y === targetPosition.y; }); if (!tile || !tile.props || !tile.props.walkable) return { success: false, message: '目标地格不可行走' }; var occupied = battle.pieces.some(function(piece) { return piece.currentHp > 0 && piece.instanceId !== source.instanceId && piece.x === targetPosition.x && piece.y === targetPosition.y; }); if (occupied) return { success: false, message: '目标地格已有棋子' }; if (!flow.effects.displace([{ pieceId: source.instanceId, x: targetPosition.x, y: targetPosition.y }], 'teleport').success) return { success: true, message: '位移被阻挡，本次位移效果取消' }; var enemies = battle.pieces.filter(function(piece) { return piece.currentHp > 0 && !arePlayersAllied(battle, piece.ownerPlayerId, source.ownerPlayerId) && Math.abs(piece.x - source.x) <= 1 && Math.abs(piece.y - source.y) <= 1; }); if (enemies.length) dealDamage(source, enemies, 3, 'physical', battle, context.skill.id); source.moveRange = (source.moveRange || 0) + 1; return { success: true, message: source.name + '跳跃至(' + targetPosition.x + ',' + targetPosition.y + ')并对周围敌人造成3点伤害，移速+1' }; }",
-  "previewCode": "function calculatePreview() { return { description: '传送至地格（5），对相邻地格内所有敌人造成3点伤害，然后移速+1。', expectedValues: { damage: 3, area: '3×3', moveRange: 1 } }; }"
+  "code": "function executeSkill(context) { var __rvb_import_effect_0, enemies, occupied, source, targetPosition, tile; var _pc = \"n18\"; for (var _step = 0; _step <= 18; _step++) { switch (_pc) { case \"n18\": source = (context)[\"piece\"]; _pc = \"n17\"; break; case \"n17\": targetPosition = selectTarget({type: \"grid\", range: 5, filter: \"all\"}); _pc = \"n16\"; break; case \"n16\": _pc = (! (! ((! targetPosition) || (targetPosition)[\"needsTargetSelection\"]))) ? \"n15\" : \"n14\"; break; case \"n14\": tile = (((battle)[\"map\"])[\"tiles\"])[\"find\"](function (item) { return (((item)[\"x\"] === (targetPosition)[\"x\"]) && ((item)[\"y\"] === (targetPosition)[\"y\"])); }); _pc = \"n13\"; break; case \"n13\": _pc = (! (! (((! tile) || (! (tile)[\"props\"])) || (! ((tile)[\"props\"])[\"walkable\"])))) ? \"n12\" : \"n11\"; break; case \"n11\": occupied = ((battle)[\"pieces\"])[\"some\"](function (piece) { return (((((piece)[\"currentHp\"] > 0) && ((piece)[\"instanceId\"] !== (source)[\"instanceId\"])) && ((piece)[\"x\"] === (targetPosition)[\"x\"])) && ((piece)[\"y\"] === (targetPosition)[\"y\"])); }); _pc = \"n10\"; break; case \"n10\": _pc = (! (! occupied)) ? \"n9\" : \"n8\"; break; case \"n8\": __rvb_import_effect_0 = flow.effects.displace([{pieceId: (source)[\"instanceId\"], x: (targetPosition)[\"x\"], y: (targetPosition)[\"y\"]}], \"teleport\"); _pc = \"n7\"; break; case \"n7\": _pc = (! (! (! (__rvb_import_effect_0)[\"success\"]))) ? \"n6\" : \"n5\"; break; case \"n5\": enemies = ((battle)[\"pieces\"])[\"filter\"](function (piece) { return (((((piece)[\"currentHp\"] > 0) && (! arePlayersAllied(battle, (piece)[\"ownerPlayerId\"], (source)[\"ownerPlayerId\"]))) && (Math.abs(((piece)[\"x\"] - (source)[\"x\"])) <= 1)) && (Math.abs(((piece)[\"y\"] - (source)[\"y\"])) <= 1)); }); _pc = \"n4\"; break; case \"n4\": _pc = (! (! (enemies)[\"length\"])) ? \"n3\" : \"n2\"; break; case \"n3\": dealDamage(source, enemies, 3, \"physical\", battle, ((context)[\"skill\"])[\"id\"]); _pc = \"n2\"; break; case \"n2\": (source)[\"moveRange\"] = (((source)[\"moveRange\"] || 0) + 1); _pc = \"n1\"; break; case \"n1\": return {success: true, message: ((((((source)[\"name\"] + \"跳跃至(\") + (targetPosition)[\"x\"]) + \",\") + (targetPosition)[\"y\"]) + \")并对周围敌人造成3点伤害，移速+1\")}; case \"n6\": return {success: true, message: \"位移被阻挡，本次位移效果取消\"}; case \"n9\": return {success: false, message: \"目标地格已有棋子\"}; case \"n12\": return {success: false, message: \"目标地格不可行走\"}; case \"n15\": return targetPosition; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\"); }",
+  "previewCode": "function calculatePreview(piece, skillDef, currentCooldown) { var _pc = \"n1\"; for (var _step = 0; _step <= 1; _step++) { switch (_pc) { case \"n1\": return {description: \"传送至地格（5），对相邻地格内所有敌人造成3点伤害，然后移速+1。\", expectedValues: {damage: 3, area: \"3×3\", moveRange: 1}}; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\"); }",
+  "contentGraph": {
+    "version": "rvb-content-graph/v1",
+    "surface": "skill",
+    "entry": "n18",
+    "nodes": [
+      {
+        "id": "n1",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "binary",
+                  "op": "+",
+                  "left": {
+                    "kind": "binary",
+                    "op": "+",
+                    "left": {
+                      "kind": "binary",
+                      "op": "+",
+                      "left": {
+                        "kind": "binary",
+                        "op": "+",
+                        "left": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "source"
+                          },
+                          "key": "name"
+                        },
+                        "right": {
+                          "kind": "literal",
+                          "value": "跳跃至("
+                        }
+                      },
+                      "right": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "targetPosition"
+                        },
+                        "key": "x"
+                      }
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": ","
+                    }
+                  },
+                  "right": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "targetPosition"
+                    },
+                    "key": "y"
+                  }
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": ")并对周围敌人造成3点伤害，移速+1"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n2",
+        "kind": "set",
+        "target": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "source"
+          },
+          "key": "moveRange"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "binary",
+          "op": "+",
+          "left": {
+            "kind": "binary",
+            "op": "||",
+            "left": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "source"
+              },
+              "key": "moveRange"
+            },
+            "right": {
+              "kind": "literal",
+              "value": 0
+            }
+          },
+          "right": {
+            "kind": "literal",
+            "value": 1
+          }
+        },
+        "next": "n1"
+      },
+      {
+        "id": "n3",
+        "kind": "call",
+        "capability": "dealDamage",
+        "args": [
+          {
+            "kind": "ref",
+            "name": "source"
+          },
+          {
+            "kind": "ref",
+            "name": "enemies"
+          },
+          {
+            "kind": "literal",
+            "value": 3
+          },
+          {
+            "kind": "literal",
+            "value": "physical"
+          },
+          {
+            "kind": "ref",
+            "name": "battle"
+          },
+          {
+            "kind": "get",
+            "object": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "context"
+              },
+              "key": "skill"
+            },
+            "key": "id"
+          }
+        ],
+        "next": "n2"
+      },
+      {
+        "id": "n4",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "enemies"
+              },
+              "key": "length"
+            }
+          }
+        },
+        "yes": "n3",
+        "no": "n2"
+      },
+      {
+        "id": "n5",
+        "kind": "bind",
+        "name": "enemies",
+        "expr": {
+          "kind": "collection",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "battle"
+            },
+            "key": "pieces"
+          },
+          "method": "filter",
+          "args": [
+            {
+              "kind": "lambda",
+              "parameters": [
+                "piece"
+              ],
+              "body": {
+                "kind": "binary",
+                "op": "&&",
+                "left": {
+                  "kind": "binary",
+                  "op": "&&",
+                  "left": {
+                    "kind": "binary",
+                    "op": "&&",
+                    "left": {
+                      "kind": "binary",
+                      "op": ">",
+                      "left": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "piece"
+                        },
+                        "key": "currentHp"
+                      },
+                      "right": {
+                        "kind": "literal",
+                        "value": 0
+                      }
+                    },
+                    "right": {
+                      "kind": "unary",
+                      "op": "!",
+                      "argument": {
+                        "kind": "call",
+                        "callee": "arePlayersAllied",
+                        "args": [
+                          {
+                            "kind": "ref",
+                            "name": "battle"
+                          },
+                          {
+                            "kind": "get",
+                            "object": {
+                              "kind": "ref",
+                              "name": "piece"
+                            },
+                            "key": "ownerPlayerId"
+                          },
+                          {
+                            "kind": "get",
+                            "object": {
+                              "kind": "ref",
+                              "name": "source"
+                            },
+                            "key": "ownerPlayerId"
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  "right": {
+                    "kind": "binary",
+                    "op": "<=",
+                    "left": {
+                      "kind": "call",
+                      "callee": "Math.abs",
+                      "args": [
+                        {
+                          "kind": "binary",
+                          "op": "-",
+                          "left": {
+                            "kind": "get",
+                            "object": {
+                              "kind": "ref",
+                              "name": "piece"
+                            },
+                            "key": "x"
+                          },
+                          "right": {
+                            "kind": "get",
+                            "object": {
+                              "kind": "ref",
+                              "name": "source"
+                            },
+                            "key": "x"
+                          }
+                        }
+                      ]
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": 1
+                    }
+                  }
+                },
+                "right": {
+                  "kind": "binary",
+                  "op": "<=",
+                  "left": {
+                    "kind": "call",
+                    "callee": "Math.abs",
+                    "args": [
+                      {
+                        "kind": "binary",
+                        "op": "-",
+                        "left": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "piece"
+                          },
+                          "key": "y"
+                        },
+                        "right": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "source"
+                          },
+                          "key": "y"
+                        }
+                      }
+                    ]
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": 1
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "next": "n4"
+      },
+      {
+        "id": "n6",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": "位移被阻挡，本次位移效果取消"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n7",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "unary",
+              "op": "!",
+              "argument": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "__rvb_import_effect_0"
+                },
+                "key": "success"
+              }
+            }
+          }
+        },
+        "yes": "n6",
+        "no": "n5"
+      },
+      {
+        "id": "n8",
+        "kind": "call",
+        "capability": "flow.effects.displace",
+        "args": [
+          {
+            "kind": "array",
+            "items": [
+              {
+                "kind": "object",
+                "entries": [
+                  {
+                    "key": "pieceId",
+                    "value": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "source"
+                      },
+                      "key": "instanceId"
+                    }
+                  },
+                  {
+                    "key": "x",
+                    "value": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "targetPosition"
+                      },
+                      "key": "x"
+                    }
+                  },
+                  {
+                    "key": "y",
+                    "value": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "targetPosition"
+                      },
+                      "key": "y"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "kind": "literal",
+            "value": "teleport"
+          }
+        ],
+        "result": "__rvb_import_effect_0",
+        "next": "n7"
+      },
+      {
+        "id": "n9",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": "目标地格已有棋子"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n10",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "ref",
+              "name": "occupied"
+            }
+          }
+        },
+        "yes": "n9",
+        "no": "n8"
+      },
+      {
+        "id": "n11",
+        "kind": "bind",
+        "name": "occupied",
+        "expr": {
+          "kind": "collection",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "battle"
+            },
+            "key": "pieces"
+          },
+          "method": "some",
+          "args": [
+            {
+              "kind": "lambda",
+              "parameters": [
+                "piece"
+              ],
+              "body": {
+                "kind": "binary",
+                "op": "&&",
+                "left": {
+                  "kind": "binary",
+                  "op": "&&",
+                  "left": {
+                    "kind": "binary",
+                    "op": "&&",
+                    "left": {
+                      "kind": "binary",
+                      "op": ">",
+                      "left": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "piece"
+                        },
+                        "key": "currentHp"
+                      },
+                      "right": {
+                        "kind": "literal",
+                        "value": 0
+                      }
+                    },
+                    "right": {
+                      "kind": "binary",
+                      "op": "!==",
+                      "left": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "piece"
+                        },
+                        "key": "instanceId"
+                      },
+                      "right": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "source"
+                        },
+                        "key": "instanceId"
+                      }
+                    }
+                  },
+                  "right": {
+                    "kind": "binary",
+                    "op": "===",
+                    "left": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "piece"
+                      },
+                      "key": "x"
+                    },
+                    "right": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "targetPosition"
+                      },
+                      "key": "x"
+                    }
+                  }
+                },
+                "right": {
+                  "kind": "binary",
+                  "op": "===",
+                  "left": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "piece"
+                    },
+                    "key": "y"
+                  },
+                  "right": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "targetPosition"
+                    },
+                    "key": "y"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "next": "n10"
+      },
+      {
+        "id": "n12",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": "目标地格不可行走"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n13",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "binary",
+                "op": "||",
+                "left": {
+                  "kind": "unary",
+                  "op": "!",
+                  "argument": {
+                    "kind": "ref",
+                    "name": "tile"
+                  }
+                },
+                "right": {
+                  "kind": "unary",
+                  "op": "!",
+                  "argument": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "tile"
+                    },
+                    "key": "props"
+                  }
+                }
+              },
+              "right": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "tile"
+                    },
+                    "key": "props"
+                  },
+                  "key": "walkable"
+                }
+              }
+            }
+          }
+        },
+        "yes": "n12",
+        "no": "n11"
+      },
+      {
+        "id": "n14",
+        "kind": "bind",
+        "name": "tile",
+        "expr": {
+          "kind": "collection",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "battle"
+              },
+              "key": "map"
+            },
+            "key": "tiles"
+          },
+          "method": "find",
+          "args": [
+            {
+              "kind": "lambda",
+              "parameters": [
+                "item"
+              ],
+              "body": {
+                "kind": "binary",
+                "op": "&&",
+                "left": {
+                  "kind": "binary",
+                  "op": "===",
+                  "left": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "item"
+                    },
+                    "key": "x"
+                  },
+                  "right": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "targetPosition"
+                    },
+                    "key": "x"
+                  }
+                },
+                "right": {
+                  "kind": "binary",
+                  "op": "===",
+                  "left": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "item"
+                    },
+                    "key": "y"
+                  },
+                  "right": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "targetPosition"
+                    },
+                    "key": "y"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "next": "n13"
+      },
+      {
+        "id": "n15",
+        "kind": "return",
+        "value": {
+          "kind": "ref",
+          "name": "targetPosition"
+        }
+      },
+      {
+        "id": "n16",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "ref",
+                  "name": "targetPosition"
+                }
+              },
+              "right": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "targetPosition"
+                },
+                "key": "needsTargetSelection"
+              }
+            }
+          }
+        },
+        "yes": "n15",
+        "no": "n14"
+      },
+      {
+        "id": "n17",
+        "kind": "call",
+        "capability": "selectTarget",
+        "args": [
+          {
+            "kind": "object",
+            "entries": [
+              {
+                "key": "type",
+                "value": {
+                  "kind": "literal",
+                  "value": "grid"
+                }
+              },
+              {
+                "key": "range",
+                "value": {
+                  "kind": "literal",
+                  "value": 5
+                }
+              },
+              {
+                "key": "filter",
+                "value": {
+                  "kind": "literal",
+                  "value": "all"
+                }
+              }
+            ]
+          }
+        ],
+        "result": "targetPosition",
+        "next": "n16"
+      },
+      {
+        "id": "n18",
+        "kind": "bind",
+        "name": "source",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "context"
+          },
+          "key": "piece"
+        },
+        "next": "n17"
+      }
+    ]
+  },
+  "contentGraphField": "code",
+  "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1",
+  "contentGraphEntries": {
+    "previewCode": {
+      "graph": {
+        "version": "rvb-content-graph/v1",
+        "surface": "preview",
+        "entry": "n1",
+        "nodes": [
+          {
+            "id": "n1",
+            "kind": "return",
+            "value": {
+              "kind": "object",
+              "entries": [
+                {
+                  "key": "description",
+                  "value": {
+                    "kind": "literal",
+                    "value": "传送至地格（5），对相邻地格内所有敌人造成3点伤害，然后移速+1。"
+                  }
+                },
+                {
+                  "key": "expectedValues",
+                  "value": {
+                    "kind": "object",
+                    "entries": [
+                      {
+                        "key": "damage",
+                        "value": {
+                          "kind": "literal",
+                          "value": 3
+                        }
+                      },
+                      {
+                        "key": "area",
+                        "value": {
+                          "kind": "literal",
+                          "value": "3×3"
+                        }
+                      },
+                      {
+                        "key": "moveRange",
+                        "value": {
+                          "kind": "literal",
+                          "value": 1
+                        }
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "compilerVersion": "rvb-content-graph-compiler/v1"
+    }
+  }
 }

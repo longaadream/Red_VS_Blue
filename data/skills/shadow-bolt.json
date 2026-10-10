@@ -16,8 +16,8 @@
   "chargeCost": 1,
   "powerMultiplier": 1,
   "actionPointCost": 4,
-  "code": "function executeSkill(context) { var targetPos = selectTarget({ type: 'grid', range: 99, filter: 'all' }); if (targetPos && targetPos.needsTargetSelection) { return targetPos; } if (!targetPos || !targetPos.x) { return { success: false, message: '无效目标' }; } var caster = context.piece; var dx = targetPos.x - caster.x; var dy = targetPos.y - caster.y; if (dx !== 0 && dy !== 0) { return { success: false, message: '必须选择同一行或同一列的格子' }; } var battle = context.battle; var player = battle.players.find(function(p) { return p.playerId === caster.ownerPlayerId; }); var soulFragments = []; if (player.hand) { for (var i = 0; i < player.hand.length; i++) { var card = player.hand[i]; if (card && card.cardId === 'soul-fragment') { soulFragments.push(card); } } } var fragmentCount = soulFragments.length; for (var j = 0; j < soulFragments.length; j++) { var fragment = soulFragments[j]; if (fragment && fragment.instanceId) { discardCard(fragment.instanceId); } } var dirX = dx === 0 ? 0 : (dx > 0 ? 1 : -1); var dirY = dy === 0 ? 0 : (dy > 0 ? 1 : -1); var damageValue = caster.attack + fragmentCount; var hitPieces = []; for (var k = 1; k <= 99; k++) { var checkX = caster.x + dirX * k; var checkY = caster.y + dirY * k; var target = battle.pieces.find(function(p) { return p.x === checkX && p.y === checkY && p.currentHp > 0 && p.faction !== caster.faction; }); if (target) { dealDamage(caster, target, damageValue, 'magical', battle, context.skill.id); hitPieces.push(target.name); } } return { success: true, message: caster.name + '释放暗影箭，弃置' + fragmentCount + '个灵魂残片，对' + hitPieces.join('、') + '造成' + damageValue + '点伤害' }; }",
-  "previewCode": "function calculatePreview(piece, skillDef) { return { description: \"选择正方向，消耗全部【灵魂残片】，对该方向所有敌人造成1倍+残片数的伤害。\", expectedValues: {} }; }",
+  "code": "function executeSkill(context) { var battle, card, caster, checkX, checkY, damageValue, dirX, dirY, dx, dy, fragment, fragmentCount, hitPieces, i, j, k, player, soulFragments, target, targetPos; var _pc = \"n47\"; for (var _step = 0; _step <= 26; _step++) { switch (_pc) { case \"n47\": targetPos = selectTarget({type: \"grid\", range: 99, filter: \"all\"}); _pc = \"n46\"; break; case \"n46\": _pc = (! (! (targetPos && (targetPos)[\"needsTargetSelection\"]))) ? \"n45\" : \"n44\"; break; case \"n44\": _pc = (! (! ((! targetPos) || (! (targetPos)[\"x\"])))) ? \"n43\" : \"n42\"; break; case \"n42\": caster = (context)[\"piece\"]; _pc = \"n41\"; break; case \"n41\": dx = ((targetPos)[\"x\"] - (caster)[\"x\"]); _pc = \"n40\"; break; case \"n40\": dy = ((targetPos)[\"y\"] - (caster)[\"y\"]); _pc = \"n39\"; break; case \"n39\": _pc = (! (! ((dx !== 0) && (dy !== 0)))) ? \"n38\" : \"n37\"; break; case \"n37\": battle = (context)[\"battle\"]; _pc = \"n36\"; break; case \"n36\": player = ((battle)[\"players\"])[\"find\"](function (p) { return ((p)[\"playerId\"] === (caster)[\"ownerPlayerId\"]); }); _pc = \"n35\"; break; case \"n35\": soulFragments = []; _pc = \"n34\"; break; case \"n34\": _pc = (! (! (player)[\"hand\"])) ? \"n33\" : \"n25\"; break; case \"n33\": i = 0; _pc = \"n32\"; break; case \"n32\": var __rvb_content_graph_loop_break_0 = false, __rvb_content_graph_loop_continue_1 = false; while ((! (! (i < ((player)[\"hand\"])[\"length\"])))) { __rvb_content_graph_loop_continue_1 = false; { var __rvb_content_graph_region_pc_2 = \"n29\"; while (__rvb_content_graph_region_pc_2 !== \"n26\") { switch (__rvb_content_graph_region_pc_2) { case \"n29\": card = ((player)[\"hand\"])[(function (key) { if (typeof key === \"string\" && key.split(\".\").some(function (part) { return [\"__proto__\",\"arguments\",\"callee\",\"caller\",\"constructor\",\"prototype\"].indexOf(part) !== -1; })) throw new Error(\"unsafe content graph index\"); return key; })(i)]; __rvb_content_graph_region_pc_2 = \"n28\"; break; case \"n28\": __rvb_content_graph_region_pc_2 = (! (! (card && ((card)[\"cardId\"] === \"soul-fragment\")))) ? \"n27\" : \"n26\"; break; case \"n27\": (soulFragments).push(card); __rvb_content_graph_region_pc_2 = \"n26\"; break; case \"n26\": __rvb_content_graph_region_pc_2 = \"n26\"; break; default: throw new Error(\"invalid content graph region node\"); } } } if (__rvb_content_graph_loop_break_0) break; { var __rvb_content_graph_region_pc_3 = \"n31\"; while (__rvb_content_graph_region_pc_3 !== \"n30\") { switch (__rvb_content_graph_region_pc_3) { case \"n31\": i = ((+ i) + 1); __rvb_content_graph_region_pc_3 = \"n30\"; break; case \"n30\": __rvb_content_graph_region_pc_3 = \"n30\"; break; default: throw new Error(\"invalid content graph region node\"); } } } if (__rvb_content_graph_loop_break_0) break; if (__rvb_content_graph_loop_continue_1) { __rvb_content_graph_loop_continue_1 = false; continue; } } _pc = \"n25\"; break; case \"n25\": fragmentCount = (soulFragments)[\"length\"]; _pc = \"n24\"; break; case \"n24\": j = 0; _pc = \"n23\"; break; case \"n23\": var __rvb_content_graph_loop_break_4 = false, __rvb_content_graph_loop_continue_5 = false; while ((! (! (j < (soulFragments)[\"length\"])))) { __rvb_content_graph_loop_continue_5 = false; { var __rvb_content_graph_region_pc_6 = \"n20\"; while (__rvb_content_graph_region_pc_6 !== \"n17\") { switch (__rvb_content_graph_region_pc_6) { case \"n20\": fragment = (soulFragments)[(function (key) { if (typeof key === \"string\" && key.split(\".\").some(function (part) { return [\"__proto__\",\"arguments\",\"callee\",\"caller\",\"constructor\",\"prototype\"].indexOf(part) !== -1; })) throw new Error(\"unsafe content graph index\"); return key; })(j)]; __rvb_content_graph_region_pc_6 = \"n19\"; break; case \"n19\": __rvb_content_graph_region_pc_6 = (! (! (fragment && (fragment)[\"instanceId\"]))) ? \"n18\" : \"n17\"; break; case \"n18\": discardCard((fragment)[\"instanceId\"]); __rvb_content_graph_region_pc_6 = \"n17\"; break; case \"n17\": __rvb_content_graph_region_pc_6 = \"n17\"; break; default: throw new Error(\"invalid content graph region node\"); } } } if (__rvb_content_graph_loop_break_4) break; { var __rvb_content_graph_region_pc_7 = \"n22\"; while (__rvb_content_graph_region_pc_7 !== \"n21\") { switch (__rvb_content_graph_region_pc_7) { case \"n22\": j = ((+ j) + 1); __rvb_content_graph_region_pc_7 = \"n21\"; break; case \"n21\": __rvb_content_graph_region_pc_7 = \"n21\"; break; default: throw new Error(\"invalid content graph region node\"); } } } if (__rvb_content_graph_loop_break_4) break; if (__rvb_content_graph_loop_continue_5) { __rvb_content_graph_loop_continue_5 = false; continue; } } _pc = \"n16\"; break; case \"n16\": dirX = ((dx === 0) ? 0 : ((dx > 0) ? 1 : (- 1))); _pc = \"n15\"; break; case \"n15\": dirY = ((dy === 0) ? 0 : ((dy > 0) ? 1 : (- 1))); _pc = \"n14\"; break; case \"n14\": damageValue = ((caster)[\"attack\"] + fragmentCount); _pc = \"n13\"; break; case \"n13\": hitPieces = []; _pc = \"n12\"; break; case \"n12\": k = 1; _pc = \"n11\"; break; case \"n11\": var __rvb_content_graph_loop_break_8 = false, __rvb_content_graph_loop_continue_9 = false; while ((! (! (k <= 99)))) { __rvb_content_graph_loop_continue_9 = false; { var __rvb_content_graph_region_pc_10 = \"n8\"; while (__rvb_content_graph_region_pc_10 !== \"n2\") { switch (__rvb_content_graph_region_pc_10) { case \"n8\": checkX = ((caster)[\"x\"] + (dirX * k)); __rvb_content_graph_region_pc_10 = \"n7\"; break; case \"n7\": checkY = ((caster)[\"y\"] + (dirY * k)); __rvb_content_graph_region_pc_10 = \"n6\"; break; case \"n6\": target = ((battle)[\"pieces\"])[\"find\"](function (p) { return (((((p)[\"x\"] === checkX) && ((p)[\"y\"] === checkY)) && ((p)[\"currentHp\"] > 0)) && ((p)[\"faction\"] !== (caster)[\"faction\"])); }); __rvb_content_graph_region_pc_10 = \"n5\"; break; case \"n5\": __rvb_content_graph_region_pc_10 = (! (! target)) ? \"n4\" : \"n2\"; break; case \"n4\": dealDamage(caster, target, damageValue, \"magical\", battle, ((context)[\"skill\"])[\"id\"]); __rvb_content_graph_region_pc_10 = \"n3\"; break; case \"n3\": (hitPieces).push((target)[\"name\"]); __rvb_content_graph_region_pc_10 = \"n2\"; break; case \"n2\": __rvb_content_graph_region_pc_10 = \"n2\"; break; default: throw new Error(\"invalid content graph region node\"); } } } if (__rvb_content_graph_loop_break_8) break; { var __rvb_content_graph_region_pc_11 = \"n10\"; while (__rvb_content_graph_region_pc_11 !== \"n9\") { switch (__rvb_content_graph_region_pc_11) { case \"n10\": k = ((+ k) + 1); __rvb_content_graph_region_pc_11 = \"n9\"; break; case \"n9\": __rvb_content_graph_region_pc_11 = \"n9\"; break; default: throw new Error(\"invalid content graph region node\"); } } } if (__rvb_content_graph_loop_break_8) break; if (__rvb_content_graph_loop_continue_9) { __rvb_content_graph_loop_continue_9 = false; continue; } } _pc = \"n1\"; break; case \"n1\": return {success: true, message: ((((((((caster)[\"name\"] + \"释放暗影箭，弃置\") + fragmentCount) + \"个灵魂残片，对\") + (hitPieces)[\"join\"](\"、\")) + \"造成\") + damageValue) + \"点伤害\")}; case \"n38\": return {success: false, message: \"必须选择同一行或同一列的格子\"}; case \"n43\": return {success: false, message: \"无效目标\"}; case \"n45\": return targetPos; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\"); }",
+  "previewCode": "function calculatePreview(piece, skillDef, currentCooldown) { var _pc = \"n1\"; for (var _step = 0; _step <= 1; _step++) { switch (_pc) { case \"n1\": return {description: \"选择正方向，消耗全部【灵魂残片】，对该方向所有敌人造成1倍+残片数的伤害。\", expectedValues: {}}; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\"); }",
   "targeting": {
     "steps": [
       {
@@ -32,5 +32,1289 @@
         ]
       }
     ]
+  },
+  "contentGraph": {
+    "version": "rvb-content-graph/v1",
+    "surface": "skill",
+    "entry": "n47",
+    "nodes": [
+      {
+        "id": "n1",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "binary",
+                  "op": "+",
+                  "left": {
+                    "kind": "binary",
+                    "op": "+",
+                    "left": {
+                      "kind": "binary",
+                      "op": "+",
+                      "left": {
+                        "kind": "binary",
+                        "op": "+",
+                        "left": {
+                          "kind": "binary",
+                          "op": "+",
+                          "left": {
+                            "kind": "binary",
+                            "op": "+",
+                            "left": {
+                              "kind": "get",
+                              "object": {
+                                "kind": "ref",
+                                "name": "caster"
+                              },
+                              "key": "name"
+                            },
+                            "right": {
+                              "kind": "literal",
+                              "value": "释放暗影箭，弃置"
+                            }
+                          },
+                          "right": {
+                            "kind": "ref",
+                            "name": "fragmentCount"
+                          }
+                        },
+                        "right": {
+                          "kind": "literal",
+                          "value": "个灵魂残片，对"
+                        }
+                      },
+                      "right": {
+                        "kind": "collection",
+                        "object": {
+                          "kind": "ref",
+                          "name": "hitPieces"
+                        },
+                        "method": "join",
+                        "args": [
+                          {
+                            "kind": "literal",
+                            "value": "、"
+                          }
+                        ]
+                      }
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": "造成"
+                    }
+                  },
+                  "right": {
+                    "kind": "ref",
+                    "name": "damageValue"
+                  }
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "点伤害"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n11",
+        "kind": "loop",
+        "loop": "for",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "<=",
+              "left": {
+                "kind": "ref",
+                "name": "k"
+              },
+              "right": {
+                "kind": "literal",
+                "value": 99
+              }
+            }
+          }
+        },
+        "body": {
+          "entry": "n8",
+          "end": "n2",
+          "nodes": [
+            {
+              "id": "n2",
+              "kind": "regionEnd"
+            },
+            {
+              "id": "n3",
+              "kind": "call",
+              "capability": "array.push",
+              "args": [
+                {
+                  "kind": "ref",
+                  "name": "hitPieces"
+                },
+                {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "target"
+                  },
+                  "key": "name"
+                }
+              ],
+              "next": "n2"
+            },
+            {
+              "id": "n4",
+              "kind": "call",
+              "capability": "dealDamage",
+              "args": [
+                {
+                  "kind": "ref",
+                  "name": "caster"
+                },
+                {
+                  "kind": "ref",
+                  "name": "target"
+                },
+                {
+                  "kind": "ref",
+                  "name": "damageValue"
+                },
+                {
+                  "kind": "literal",
+                  "value": "magical"
+                },
+                {
+                  "kind": "ref",
+                  "name": "battle"
+                },
+                {
+                  "kind": "get",
+                  "object": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "context"
+                    },
+                    "key": "skill"
+                  },
+                  "key": "id"
+                }
+              ],
+              "next": "n3"
+            },
+            {
+              "id": "n5",
+              "kind": "branch",
+              "condition": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "unary",
+                  "op": "!",
+                  "argument": {
+                    "kind": "ref",
+                    "name": "target"
+                  }
+                }
+              },
+              "yes": "n4",
+              "no": "n2"
+            },
+            {
+              "id": "n6",
+              "kind": "bind",
+              "name": "target",
+              "expr": {
+                "kind": "collection",
+                "object": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "battle"
+                  },
+                  "key": "pieces"
+                },
+                "method": "find",
+                "args": [
+                  {
+                    "kind": "lambda",
+                    "parameters": [
+                      "p"
+                    ],
+                    "body": {
+                      "kind": "binary",
+                      "op": "&&",
+                      "left": {
+                        "kind": "binary",
+                        "op": "&&",
+                        "left": {
+                          "kind": "binary",
+                          "op": "&&",
+                          "left": {
+                            "kind": "binary",
+                            "op": "===",
+                            "left": {
+                              "kind": "get",
+                              "object": {
+                                "kind": "ref",
+                                "name": "p"
+                              },
+                              "key": "x"
+                            },
+                            "right": {
+                              "kind": "ref",
+                              "name": "checkX"
+                            }
+                          },
+                          "right": {
+                            "kind": "binary",
+                            "op": "===",
+                            "left": {
+                              "kind": "get",
+                              "object": {
+                                "kind": "ref",
+                                "name": "p"
+                              },
+                              "key": "y"
+                            },
+                            "right": {
+                              "kind": "ref",
+                              "name": "checkY"
+                            }
+                          }
+                        },
+                        "right": {
+                          "kind": "binary",
+                          "op": ">",
+                          "left": {
+                            "kind": "get",
+                            "object": {
+                              "kind": "ref",
+                              "name": "p"
+                            },
+                            "key": "currentHp"
+                          },
+                          "right": {
+                            "kind": "literal",
+                            "value": 0
+                          }
+                        }
+                      },
+                      "right": {
+                        "kind": "binary",
+                        "op": "!==",
+                        "left": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "p"
+                          },
+                          "key": "faction"
+                        },
+                        "right": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "caster"
+                          },
+                          "key": "faction"
+                        }
+                      }
+                    }
+                  }
+                ]
+              },
+              "next": "n5"
+            },
+            {
+              "id": "n7",
+              "kind": "bind",
+              "name": "checkY",
+              "expr": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "caster"
+                  },
+                  "key": "y"
+                },
+                "right": {
+                  "kind": "binary",
+                  "op": "*",
+                  "left": {
+                    "kind": "ref",
+                    "name": "dirY"
+                  },
+                  "right": {
+                    "kind": "ref",
+                    "name": "k"
+                  }
+                }
+              },
+              "next": "n6"
+            },
+            {
+              "id": "n8",
+              "kind": "bind",
+              "name": "checkX",
+              "expr": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "caster"
+                  },
+                  "key": "x"
+                },
+                "right": {
+                  "kind": "binary",
+                  "op": "*",
+                  "left": {
+                    "kind": "ref",
+                    "name": "dirX"
+                  },
+                  "right": {
+                    "kind": "ref",
+                    "name": "k"
+                  }
+                }
+              },
+              "next": "n7"
+            }
+          ]
+        },
+        "update": {
+          "entry": "n10",
+          "end": "n9",
+          "nodes": [
+            {
+              "id": "n9",
+              "kind": "regionEnd"
+            },
+            {
+              "id": "n10",
+              "kind": "set",
+              "target": {
+                "kind": "ref",
+                "name": "k"
+              },
+              "operator": "=",
+              "value": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "unary",
+                  "op": "+",
+                  "argument": {
+                    "kind": "ref",
+                    "name": "k"
+                  }
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": 1
+                }
+              },
+              "next": "n9"
+            }
+          ]
+        },
+        "next": "n1"
+      },
+      {
+        "id": "n12",
+        "kind": "bind",
+        "name": "k",
+        "expr": {
+          "kind": "literal",
+          "value": 1
+        },
+        "next": "n11"
+      },
+      {
+        "id": "n13",
+        "kind": "bind",
+        "name": "hitPieces",
+        "expr": {
+          "kind": "array",
+          "items": []
+        },
+        "next": "n12"
+      },
+      {
+        "id": "n14",
+        "kind": "bind",
+        "name": "damageValue",
+        "expr": {
+          "kind": "binary",
+          "op": "+",
+          "left": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "caster"
+            },
+            "key": "attack"
+          },
+          "right": {
+            "kind": "ref",
+            "name": "fragmentCount"
+          }
+        },
+        "next": "n13"
+      },
+      {
+        "id": "n15",
+        "kind": "bind",
+        "name": "dirY",
+        "expr": {
+          "kind": "conditional",
+          "test": {
+            "kind": "binary",
+            "op": "===",
+            "left": {
+              "kind": "ref",
+              "name": "dy"
+            },
+            "right": {
+              "kind": "literal",
+              "value": 0
+            }
+          },
+          "consequent": {
+            "kind": "literal",
+            "value": 0
+          },
+          "alternate": {
+            "kind": "conditional",
+            "test": {
+              "kind": "binary",
+              "op": ">",
+              "left": {
+                "kind": "ref",
+                "name": "dy"
+              },
+              "right": {
+                "kind": "literal",
+                "value": 0
+              }
+            },
+            "consequent": {
+              "kind": "literal",
+              "value": 1
+            },
+            "alternate": {
+              "kind": "unary",
+              "op": "-",
+              "argument": {
+                "kind": "literal",
+                "value": 1
+              }
+            }
+          }
+        },
+        "next": "n14"
+      },
+      {
+        "id": "n16",
+        "kind": "bind",
+        "name": "dirX",
+        "expr": {
+          "kind": "conditional",
+          "test": {
+            "kind": "binary",
+            "op": "===",
+            "left": {
+              "kind": "ref",
+              "name": "dx"
+            },
+            "right": {
+              "kind": "literal",
+              "value": 0
+            }
+          },
+          "consequent": {
+            "kind": "literal",
+            "value": 0
+          },
+          "alternate": {
+            "kind": "conditional",
+            "test": {
+              "kind": "binary",
+              "op": ">",
+              "left": {
+                "kind": "ref",
+                "name": "dx"
+              },
+              "right": {
+                "kind": "literal",
+                "value": 0
+              }
+            },
+            "consequent": {
+              "kind": "literal",
+              "value": 1
+            },
+            "alternate": {
+              "kind": "unary",
+              "op": "-",
+              "argument": {
+                "kind": "literal",
+                "value": 1
+              }
+            }
+          }
+        },
+        "next": "n15"
+      },
+      {
+        "id": "n23",
+        "kind": "loop",
+        "loop": "for",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "<",
+              "left": {
+                "kind": "ref",
+                "name": "j"
+              },
+              "right": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "soulFragments"
+                },
+                "key": "length"
+              }
+            }
+          }
+        },
+        "body": {
+          "entry": "n20",
+          "end": "n17",
+          "nodes": [
+            {
+              "id": "n17",
+              "kind": "regionEnd"
+            },
+            {
+              "id": "n18",
+              "kind": "call",
+              "capability": "discardCard",
+              "args": [
+                {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "fragment"
+                  },
+                  "key": "instanceId"
+                }
+              ],
+              "next": "n17"
+            },
+            {
+              "id": "n19",
+              "kind": "branch",
+              "condition": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "unary",
+                  "op": "!",
+                  "argument": {
+                    "kind": "binary",
+                    "op": "&&",
+                    "left": {
+                      "kind": "ref",
+                      "name": "fragment"
+                    },
+                    "right": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "fragment"
+                      },
+                      "key": "instanceId"
+                    }
+                  }
+                }
+              },
+              "yes": "n18",
+              "no": "n17"
+            },
+            {
+              "id": "n20",
+              "kind": "bind",
+              "name": "fragment",
+              "expr": {
+                "kind": "index",
+                "object": {
+                  "kind": "ref",
+                  "name": "soulFragments"
+                },
+                "index": {
+                  "kind": "ref",
+                  "name": "j"
+                }
+              },
+              "next": "n19"
+            }
+          ]
+        },
+        "update": {
+          "entry": "n22",
+          "end": "n21",
+          "nodes": [
+            {
+              "id": "n21",
+              "kind": "regionEnd"
+            },
+            {
+              "id": "n22",
+              "kind": "set",
+              "target": {
+                "kind": "ref",
+                "name": "j"
+              },
+              "operator": "=",
+              "value": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "unary",
+                  "op": "+",
+                  "argument": {
+                    "kind": "ref",
+                    "name": "j"
+                  }
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": 1
+                }
+              },
+              "next": "n21"
+            }
+          ]
+        },
+        "next": "n16"
+      },
+      {
+        "id": "n24",
+        "kind": "bind",
+        "name": "j",
+        "expr": {
+          "kind": "literal",
+          "value": 0
+        },
+        "next": "n23"
+      },
+      {
+        "id": "n25",
+        "kind": "bind",
+        "name": "fragmentCount",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "soulFragments"
+          },
+          "key": "length"
+        },
+        "next": "n24"
+      },
+      {
+        "id": "n32",
+        "kind": "loop",
+        "loop": "for",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "<",
+              "left": {
+                "kind": "ref",
+                "name": "i"
+              },
+              "right": {
+                "kind": "get",
+                "object": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "player"
+                  },
+                  "key": "hand"
+                },
+                "key": "length"
+              }
+            }
+          }
+        },
+        "body": {
+          "entry": "n29",
+          "end": "n26",
+          "nodes": [
+            {
+              "id": "n26",
+              "kind": "regionEnd"
+            },
+            {
+              "id": "n27",
+              "kind": "call",
+              "capability": "array.push",
+              "args": [
+                {
+                  "kind": "ref",
+                  "name": "soulFragments"
+                },
+                {
+                  "kind": "ref",
+                  "name": "card"
+                }
+              ],
+              "next": "n26"
+            },
+            {
+              "id": "n28",
+              "kind": "branch",
+              "condition": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "unary",
+                  "op": "!",
+                  "argument": {
+                    "kind": "binary",
+                    "op": "&&",
+                    "left": {
+                      "kind": "ref",
+                      "name": "card"
+                    },
+                    "right": {
+                      "kind": "binary",
+                      "op": "===",
+                      "left": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "card"
+                        },
+                        "key": "cardId"
+                      },
+                      "right": {
+                        "kind": "literal",
+                        "value": "soul-fragment"
+                      }
+                    }
+                  }
+                }
+              },
+              "yes": "n27",
+              "no": "n26"
+            },
+            {
+              "id": "n29",
+              "kind": "bind",
+              "name": "card",
+              "expr": {
+                "kind": "index",
+                "object": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "player"
+                  },
+                  "key": "hand"
+                },
+                "index": {
+                  "kind": "ref",
+                  "name": "i"
+                }
+              },
+              "next": "n28"
+            }
+          ]
+        },
+        "update": {
+          "entry": "n31",
+          "end": "n30",
+          "nodes": [
+            {
+              "id": "n30",
+              "kind": "regionEnd"
+            },
+            {
+              "id": "n31",
+              "kind": "set",
+              "target": {
+                "kind": "ref",
+                "name": "i"
+              },
+              "operator": "=",
+              "value": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "unary",
+                  "op": "+",
+                  "argument": {
+                    "kind": "ref",
+                    "name": "i"
+                  }
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": 1
+                }
+              },
+              "next": "n30"
+            }
+          ]
+        },
+        "next": "n25"
+      },
+      {
+        "id": "n33",
+        "kind": "bind",
+        "name": "i",
+        "expr": {
+          "kind": "literal",
+          "value": 0
+        },
+        "next": "n32"
+      },
+      {
+        "id": "n34",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "player"
+              },
+              "key": "hand"
+            }
+          }
+        },
+        "yes": "n33",
+        "no": "n25"
+      },
+      {
+        "id": "n35",
+        "kind": "bind",
+        "name": "soulFragments",
+        "expr": {
+          "kind": "array",
+          "items": []
+        },
+        "next": "n34"
+      },
+      {
+        "id": "n36",
+        "kind": "bind",
+        "name": "player",
+        "expr": {
+          "kind": "collection",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "battle"
+            },
+            "key": "players"
+          },
+          "method": "find",
+          "args": [
+            {
+              "kind": "lambda",
+              "parameters": [
+                "p"
+              ],
+              "body": {
+                "kind": "binary",
+                "op": "===",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "p"
+                  },
+                  "key": "playerId"
+                },
+                "right": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "caster"
+                  },
+                  "key": "ownerPlayerId"
+                }
+              }
+            }
+          ]
+        },
+        "next": "n35"
+      },
+      {
+        "id": "n37",
+        "kind": "bind",
+        "name": "battle",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "context"
+          },
+          "key": "battle"
+        },
+        "next": "n36"
+      },
+      {
+        "id": "n38",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": "必须选择同一行或同一列的格子"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n39",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "&&",
+              "left": {
+                "kind": "binary",
+                "op": "!==",
+                "left": {
+                  "kind": "ref",
+                  "name": "dx"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": 0
+                }
+              },
+              "right": {
+                "kind": "binary",
+                "op": "!==",
+                "left": {
+                  "kind": "ref",
+                  "name": "dy"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": 0
+                }
+              }
+            }
+          }
+        },
+        "yes": "n38",
+        "no": "n37"
+      },
+      {
+        "id": "n40",
+        "kind": "bind",
+        "name": "dy",
+        "expr": {
+          "kind": "binary",
+          "op": "-",
+          "left": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "targetPos"
+            },
+            "key": "y"
+          },
+          "right": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "caster"
+            },
+            "key": "y"
+          }
+        },
+        "next": "n39"
+      },
+      {
+        "id": "n41",
+        "kind": "bind",
+        "name": "dx",
+        "expr": {
+          "kind": "binary",
+          "op": "-",
+          "left": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "targetPos"
+            },
+            "key": "x"
+          },
+          "right": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "caster"
+            },
+            "key": "x"
+          }
+        },
+        "next": "n40"
+      },
+      {
+        "id": "n42",
+        "kind": "bind",
+        "name": "caster",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "context"
+          },
+          "key": "piece"
+        },
+        "next": "n41"
+      },
+      {
+        "id": "n43",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": "无效目标"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n44",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "ref",
+                  "name": "targetPos"
+                }
+              },
+              "right": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "targetPos"
+                  },
+                  "key": "x"
+                }
+              }
+            }
+          }
+        },
+        "yes": "n43",
+        "no": "n42"
+      },
+      {
+        "id": "n45",
+        "kind": "return",
+        "value": {
+          "kind": "ref",
+          "name": "targetPos"
+        }
+      },
+      {
+        "id": "n46",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "&&",
+              "left": {
+                "kind": "ref",
+                "name": "targetPos"
+              },
+              "right": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "targetPos"
+                },
+                "key": "needsTargetSelection"
+              }
+            }
+          }
+        },
+        "yes": "n45",
+        "no": "n44"
+      },
+      {
+        "id": "n47",
+        "kind": "call",
+        "capability": "selectTarget",
+        "args": [
+          {
+            "kind": "object",
+            "entries": [
+              {
+                "key": "type",
+                "value": {
+                  "kind": "literal",
+                  "value": "grid"
+                }
+              },
+              {
+                "key": "range",
+                "value": {
+                  "kind": "literal",
+                  "value": 99
+                }
+              },
+              {
+                "key": "filter",
+                "value": {
+                  "kind": "literal",
+                  "value": "all"
+                }
+              }
+            ]
+          }
+        ],
+        "result": "targetPos",
+        "next": "n46"
+      }
+    ]
+  },
+  "contentGraphField": "code",
+  "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1",
+  "contentGraphEntries": {
+    "previewCode": {
+      "graph": {
+        "version": "rvb-content-graph/v1",
+        "surface": "preview",
+        "entry": "n1",
+        "nodes": [
+          {
+            "id": "n1",
+            "kind": "return",
+            "value": {
+              "kind": "object",
+              "entries": [
+                {
+                  "key": "description",
+                  "value": {
+                    "kind": "literal",
+                    "value": "选择正方向，消耗全部【灵魂残片】，对该方向所有敌人造成1倍+残片数的伤害。"
+                  }
+                },
+                {
+                  "key": "expectedValues",
+                  "value": {
+                    "kind": "object",
+                    "entries": []
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "compilerVersion": "rvb-content-graph-compiler/v1"
+    }
   }
 }

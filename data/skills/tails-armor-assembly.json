@@ -13,5 +13,1258 @@
   "targeting": {
     "steps": []
   },
-  "code": "function executeSkill(context){var c=context.piece,b=context.battle,modules=[{label:'恢复模块',value:'heal'},{label:'攻击模块',value:'attack'},{label:'高速模块',value:'speed'},{label:'硬化模块',value:'defense'}],choice=selectOption({title:'护甲组装：选择两个不同模块',options:modules,selectionMode:'multi',minSelections:2,maxSelections:2});if(choice&&choice.needsOptionSelection)return choice;if(!Array.isArray(choice)||choice.length!==2||choice[0]===choice[1])return {success:false,message:'必须选择两个不同模块'};var selected=[String(choice[0]),String(choice[1])].sort(),id='armor-'+selected.join('-');if(modules.filter(function(m){return selected.indexOf(m.value)!==-1;}).length!==2)return {success:false,message:'模块选择无效'};if(!b.customCards)b.customCards={};b.customCards[id]={id:id,name:'组合护甲（'+selected.join(' + ')+'）',description:'对一名友军使用，永久获得所选模块效果。',type:'active',actionPointCost:2,code:`function executeCard(context){var t=selectTarget({type:'piece',range:99,filter:'ally'});if(!t||t.needsTargetSelection)return t;var ms='${selected.join(',')}'.split(',');t.statusTags=t.statusTags||[];ms.forEach(function(m){if(m==='heal'){t.statusTags.push({id:'periodic-heal-'+t.instanceId+'-'+Date.now(),type:'periodic-heal',name:'恢复模块',stacks:1,relatedRules:['rule-tails-armor-recovery']});addRuleById(t.instanceId,'rule-tails-armor-recovery');}if(m==='attack'){t.attack=(t.attack||0)+3;}if(m==='speed'){t.statusTags.push({id:'free-normal-move-every-turn-'+t.instanceId+'-'+Date.now(),type:'free-normal-move-every-turn',name:'高速模块',stacks:1,relatedRules:['rule-sonic-free-move']});addRuleById(t.instanceId,'rule-sonic-free-move');}if(m==='defense'){t.defense=(t.defense||0)+2;}});return {success:true,message:'获得组合护甲效果'};}`};if(!addCardToHand(id,c.ownerPlayerId))return {success:false,message:'无法创建组合护甲手牌'};return {success:true,message:'创造了组合护甲手牌'};}"
+  "code": "function executeSkill(context) { var __rvb_import_effect_0, b, c, choice, generatedCardSource, id, modules, selected; var _pc = \"n19\"; for (var _step = 0; _step <= 20; _step++) { switch (_pc) { case \"n19\": c = (context)[\"piece\"]; _pc = \"n18\"; break; case \"n18\": b = (context)[\"battle\"]; _pc = \"n17\"; break; case \"n17\": modules = [{label: \"恢复模块\", value: \"heal\"}, {label: \"攻击模块\", value: \"attack\"}, {label: \"高速模块\", value: \"speed\"}, {label: \"硬化模块\", value: \"defense\"}]; _pc = \"n16\"; break; case \"n16\": choice = selectOption({title: \"护甲组装：选择两个不同模块\", options: modules, selectionMode: \"multi\", minSelections: 2, maxSelections: 2}); _pc = \"n15\"; break; case \"n15\": _pc = (! (! (choice && (choice)[\"needsOptionSelection\"]))) ? \"n14\" : \"n13\"; break; case \"n13\": _pc = (! (! (((! Array.isArray(choice)) || ((choice)[\"length\"] !== 2)) || ((choice)[0] === (choice)[1])))) ? \"n12\" : \"n11\"; break; case \"n11\": selected = ([String((choice)[0]), String((choice)[1])]).sort(); _pc = \"n10\"; break; case \"n10\": id = (\"armor-\" + (selected)[\"join\"](\"-\")); _pc = \"n9\"; break; case \"n9\": _pc = (! (! (((modules)[\"filter\"](function (m) { return ((selected)[\"indexOf\"]((m)[\"value\"]) !== (- 1)); }))[\"length\"] !== 2))) ? \"n8\" : \"n7\"; break; case \"n7\": _pc = (! (! (! (b)[\"customCards\"]))) ? \"n6\" : \"generated-card-source\"; break; case \"n6\": (b)[\"customCards\"] = {}; _pc = \"generated-card-source\"; break; case \"generated-card-source\": generatedCardSource = (function () { var __rvb_content_graph_materialized_source_0; var __rvb_content_graph_binding_snapshot_1 = (function snapshot(value, seen, g) { var type = typeof value; var encode = function (data) { var text = g.JSON.stringify(data); return text.split(g.String.fromCharCode(8232)).join(\"\\\\u2028\").split(g.String.fromCharCode(8233)).join(\"\\\\u2029\"); }; if (value === null) return \"null\"; if (type === \"string\") return encode(value); if (type === \"boolean\") return value ? \"true\" : \"false\"; if (type === \"number\") { if (!g.Number.isFinite(value)) throw new g.TypeError(\"content graph binding must be finite JSON\"); return encode(value); } if (type !== \"object\") throw new g.TypeError(\"content graph binding must be JSON data\"); if (seen.indexOf(value) !== -1) throw new g.TypeError(\"content graph binding must not contain cycles\"); seen.push(value); var prototype = g.Object.getPrototypeOf(value); if (g.Array.isArray(value) ? prototype !== g.Array.prototype : prototype !== g.Object.prototype) throw new g.TypeError(\"content graph binding must be a plain JSON object or array\"); for (var cursor = prototype; cursor !== null; cursor = g.Object.getPrototypeOf(cursor)) { if (g.Object.getOwnPropertyDescriptor(cursor, \"toJSON\")) throw new g.TypeError(\"content graph binding must not define toJSON\"); } var ownNames = g.Object.getOwnPropertyNames(value); for (var ownIndex = 0; ownIndex < ownNames.length; ownIndex += 1) { var ownDescriptor = g.Object.getOwnPropertyDescriptor(value, ownNames[ownIndex]); if (ownNames[ownIndex] === \"toJSON\") throw new g.TypeError(\"content graph binding must not define toJSON\"); if (!ownDescriptor || !(\"value\" in ownDescriptor)) throw new g.TypeError(\"content graph binding must not contain getters\"); } var symbols = g.Object.getOwnPropertySymbols ? g.Object.getOwnPropertySymbols(value) : []; if (symbols.length) throw new g.TypeError(\"content graph binding must not contain symbol properties\"); var parts = []; if (g.Array.isArray(value)) { var lengthDescriptor = g.Object.getOwnPropertyDescriptor(value, \"length\"); var length = lengthDescriptor && lengthDescriptor.value; if (typeof length !== \"number\" || !g.Number.isFinite(length) || length < 0 || g.Math.floor(length) !== length) throw new g.TypeError(\"content graph binding array length is invalid\"); var keys = g.Object.keys(value); for (var keyIndex = 0; keyIndex < keys.length; keyIndex += 1) { var key = keys[keyIndex]; var numericKey = g.Number(key); if (g.String(numericKey) !== key || numericKey < 0 || numericKey >= length || g.Math.floor(numericKey) !== numericKey) throw new g.TypeError(\"content graph binding array has unsupported properties\"); } for (var index = 0; index < length; index += 1) { var indexDescriptor = g.Object.getOwnPropertyDescriptor(value, g.String(index)); if (!indexDescriptor || !(\"value\" in indexDescriptor)) throw new g.TypeError(\"content graph binding array must not contain holes or getters\"); parts.push(snapshot(indexDescriptor.value, seen, g)); } seen.pop(); return \"[\" + parts.join(\",\") + \"]\"; } var objectKeys = g.Object.keys(value); for (var objectIndex = 0; objectIndex < objectKeys.length; objectIndex += 1) { var objectKey = objectKeys[objectIndex]; var objectDescriptor = g.Object.getOwnPropertyDescriptor(value, objectKey); if (!objectDescriptor || !(\"value\" in objectDescriptor)) throw new g.TypeError(\"content graph binding must not contain getters\"); parts.push(encode(objectKey) + \":\" + snapshot(objectDescriptor.value, seen, g)); } seen.pop(); return \"{\" + parts.join(\",\") + \"}\"; })(selected, [], globalThis); __rvb_content_graph_materialized_source_0 = 'function executeCard(context) { var ms, t; ' + \"var selected = globalThis.JSON.parse(\" + globalThis.JSON.stringify(__rvb_content_graph_binding_snapshot_1) + \");\" + ' var _pc = \"select\"; for (var _step = 0; _step <= 7; _step++) { switch (_pc) { case \"select\": t = selectTarget({type: \"piece\", range: 99, filter: \"ally\"}); _pc = \"target-check\"; break; case \"target-check\": _pc = ((! t) || (t)[\"needsTargetSelection\"]) ? \"return-target\" : \"modules\"; break; case \"modules\": ms = ((selected)[\"join\"](\",\"))[\"split\"](\",\"); _pc = \"init-status\"; break; case \"init-status\": (t)[\"statusTags\"] = ((t)[\"statusTags\"] || []); _pc = \"apply-modules\"; break; case \"apply-modules\": (ms)[\"forEach\"](function (m) { var healNow, speedNow; { var __rvb_content_graph_region_pc_0 = \"check-heal\"; while (__rvb_content_graph_region_pc_0 !== \"callback-end\") { switch (__rvb_content_graph_region_pc_0) { case \"check-heal\": __rvb_content_graph_region_pc_0 = (m === \"heal\") ? \"heal-clock\" : \"check-attack\"; break; case \"heal-clock\": healNow = Date.now(); __rvb_content_graph_region_pc_0 = \"heal-push\"; break; case \"heal-push\": ((t)[\"statusTags\"]).push({id: (((\"periodic-heal-\" + (t)[\"instanceId\"]) + \"-\") + healNow), type: \"periodic-heal\", name: \"恢复模块\", stacks: 1, relatedRules: [\"rule-tails-armor-recovery\"]}); __rvb_content_graph_region_pc_0 = \"heal-rule\"; break; case \"heal-rule\": addRuleById((t)[\"instanceId\"], \"rule-tails-armor-recovery\"); __rvb_content_graph_region_pc_0 = \"check-attack\"; break; case \"check-attack\": __rvb_content_graph_region_pc_0 = (m === \"attack\") ? \"attack-set\" : \"check-speed\"; break; case \"attack-set\": (t)[\"attack\"] = (((t)[\"attack\"] || 0) + 3); __rvb_content_graph_region_pc_0 = \"check-speed\"; break; case \"check-speed\": __rvb_content_graph_region_pc_0 = (m === \"speed\") ? \"speed-clock\" : \"check-defense\"; break; case \"speed-clock\": speedNow = Date.now(); __rvb_content_graph_region_pc_0 = \"speed-push\"; break; case \"speed-push\": ((t)[\"statusTags\"]).push({id: (((\"free-normal-move-every-turn-\" + (t)[\"instanceId\"]) + \"-\") + speedNow), type: \"free-normal-move-every-turn\", name: \"高速模块\", stacks: 1, relatedRules: [\"rule-sonic-free-move\"]}); __rvb_content_graph_region_pc_0 = \"speed-rule\"; break; case \"speed-rule\": addRuleById((t)[\"instanceId\"], \"rule-sonic-free-move\"); __rvb_content_graph_region_pc_0 = \"check-defense\"; break; case \"check-defense\": __rvb_content_graph_region_pc_0 = (m === \"defense\") ? \"defense-set\" : \"callback-end\"; break; case \"defense-set\": (t)[\"defense\"] = (((t)[\"defense\"] || 0) + 2); __rvb_content_graph_region_pc_0 = \"callback-end\"; break; case \"callback-end\": __rvb_content_graph_region_pc_0 = \"callback-end\"; break; default: throw new Error(\"invalid content graph region node\"); } } } }); _pc = \"done\"; break; case \"done\": return {success: true, message: \"获得组合护甲效果\"}; case \"return-target\": return t; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\"); }'; return __rvb_content_graph_materialized_source_0; })(); _pc = \"n5\"; break; case \"n5\": ((b)[\"customCards\"])[(function (key) { if (typeof key === \"string\" && key.split(\".\").some(function (part) { return [\"__proto__\",\"arguments\",\"callee\",\"caller\",\"constructor\",\"prototype\"].indexOf(part) !== -1; })) throw new Error(\"unsafe content graph index\"); return key; })(id)] = {id: id, name: ((\"组合护甲（\" + (selected)[\"join\"](\" + \")) + \"）\"), description: \"对一名友军使用，永久获得所选模块效果。\", type: \"active\", actionPointCost: 2, code: generatedCardSource}; _pc = \"n4\"; break; case \"n4\": __rvb_import_effect_0 = addCardToHand(id, (c)[\"ownerPlayerId\"]); _pc = \"n3\"; break; case \"n3\": _pc = (! (! (! __rvb_import_effect_0))) ? \"n2\" : \"n1\"; break; case \"n1\": return {success: true, message: \"创造了组合护甲手牌\"}; case \"n2\": return {success: false, message: \"无法创建组合护甲手牌\"}; case \"n8\": return {success: false, message: \"模块选择无效\"}; case \"n12\": return {success: false, message: \"必须选择两个不同模块\"}; case \"n14\": return choice; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\"); }",
+  "contentGraph": {
+    "version": "rvb-content-graph/v1",
+    "surface": "skill",
+    "entry": "n19",
+    "nodes": [
+      {
+        "id": "n1",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": "创造了组合护甲手牌"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n2",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": "无法创建组合护甲手牌"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n3",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "unary",
+              "op": "!",
+              "argument": {
+                "kind": "ref",
+                "name": "__rvb_import_effect_0"
+              }
+            }
+          }
+        },
+        "yes": "n2",
+        "no": "n1"
+      },
+      {
+        "id": "n4",
+        "kind": "call",
+        "capability": "addCardToHand",
+        "args": [
+          {
+            "kind": "ref",
+            "name": "id"
+          },
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "c"
+            },
+            "key": "ownerPlayerId"
+          }
+        ],
+        "result": "__rvb_import_effect_0",
+        "next": "n3"
+      },
+      {
+        "id": "n5",
+        "kind": "set",
+        "target": {
+          "kind": "index",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "b"
+            },
+            "key": "customCards"
+          },
+          "index": {
+            "kind": "ref",
+            "name": "id"
+          }
+        },
+        "operator": "=",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "id",
+              "value": {
+                "kind": "ref",
+                "name": "id"
+              }
+            },
+            {
+              "key": "name",
+              "value": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "binary",
+                  "op": "+",
+                  "left": {
+                    "kind": "literal",
+                    "value": "组合护甲（"
+                  },
+                  "right": {
+                    "kind": "collection",
+                    "object": {
+                      "kind": "ref",
+                      "name": "selected"
+                    },
+                    "method": "join",
+                    "args": [
+                      {
+                        "kind": "literal",
+                        "value": " + "
+                      }
+                    ]
+                  }
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "）"
+                }
+              }
+            },
+            {
+              "key": "description",
+              "value": {
+                "kind": "literal",
+                "value": "对一名友军使用，永久获得所选模块效果。"
+              }
+            },
+            {
+              "key": "type",
+              "value": {
+                "kind": "literal",
+                "value": "active"
+              }
+            },
+            {
+              "key": "actionPointCost",
+              "value": {
+                "kind": "literal",
+                "value": 2
+              }
+            },
+            {
+              "key": "code",
+              "value": {
+                "kind": "ref",
+                "name": "generatedCardSource"
+              }
+            }
+          ]
+        },
+        "next": "n4"
+      },
+      {
+        "id": "n6",
+        "kind": "set",
+        "target": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "b"
+          },
+          "key": "customCards"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "object",
+          "entries": []
+        },
+        "next": "generated-card-source"
+      },
+      {
+        "id": "n7",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "unary",
+              "op": "!",
+              "argument": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "b"
+                },
+                "key": "customCards"
+              }
+            }
+          }
+        },
+        "yes": "n6",
+        "no": "generated-card-source"
+      },
+      {
+        "id": "n8",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": "模块选择无效"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n9",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "!==",
+              "left": {
+                "kind": "get",
+                "object": {
+                  "kind": "collection",
+                  "object": {
+                    "kind": "ref",
+                    "name": "modules"
+                  },
+                  "method": "filter",
+                  "args": [
+                    {
+                      "kind": "lambda",
+                      "parameters": [
+                        "m"
+                      ],
+                      "body": {
+                        "kind": "binary",
+                        "op": "!==",
+                        "left": {
+                          "kind": "collection",
+                          "object": {
+                            "kind": "ref",
+                            "name": "selected"
+                          },
+                          "method": "indexOf",
+                          "args": [
+                            {
+                              "kind": "get",
+                              "object": {
+                                "kind": "ref",
+                                "name": "m"
+                              },
+                              "key": "value"
+                            }
+                          ]
+                        },
+                        "right": {
+                          "kind": "unary",
+                          "op": "-",
+                          "argument": {
+                            "kind": "literal",
+                            "value": 1
+                          }
+                        }
+                      }
+                    }
+                  ]
+                },
+                "key": "length"
+              },
+              "right": {
+                "kind": "literal",
+                "value": 2
+              }
+            }
+          }
+        },
+        "yes": "n8",
+        "no": "n7"
+      },
+      {
+        "id": "n10",
+        "kind": "bind",
+        "name": "id",
+        "expr": {
+          "kind": "binary",
+          "op": "+",
+          "left": {
+            "kind": "literal",
+            "value": "armor-"
+          },
+          "right": {
+            "kind": "collection",
+            "object": {
+              "kind": "ref",
+              "name": "selected"
+            },
+            "method": "join",
+            "args": [
+              {
+                "kind": "literal",
+                "value": "-"
+              }
+            ]
+          }
+        },
+        "next": "n9"
+      },
+      {
+        "id": "n11",
+        "kind": "call",
+        "capability": "array.sort",
+        "args": [
+          {
+            "kind": "array",
+            "items": [
+              {
+                "kind": "call",
+                "callee": "String",
+                "args": [
+                  {
+                    "kind": "index",
+                    "object": {
+                      "kind": "ref",
+                      "name": "choice"
+                    },
+                    "index": {
+                      "kind": "literal",
+                      "value": 0
+                    }
+                  }
+                ]
+              },
+              {
+                "kind": "call",
+                "callee": "String",
+                "args": [
+                  {
+                    "kind": "index",
+                    "object": {
+                      "kind": "ref",
+                      "name": "choice"
+                    },
+                    "index": {
+                      "kind": "literal",
+                      "value": 1
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "result": "selected",
+        "next": "n10"
+      },
+      {
+        "id": "n12",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": "必须选择两个不同模块"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n13",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "binary",
+                "op": "||",
+                "left": {
+                  "kind": "unary",
+                  "op": "!",
+                  "argument": {
+                    "kind": "call",
+                    "callee": "Array.isArray",
+                    "args": [
+                      {
+                        "kind": "ref",
+                        "name": "choice"
+                      }
+                    ]
+                  }
+                },
+                "right": {
+                  "kind": "binary",
+                  "op": "!==",
+                  "left": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "choice"
+                    },
+                    "key": "length"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": 2
+                  }
+                }
+              },
+              "right": {
+                "kind": "binary",
+                "op": "===",
+                "left": {
+                  "kind": "index",
+                  "object": {
+                    "kind": "ref",
+                    "name": "choice"
+                  },
+                  "index": {
+                    "kind": "literal",
+                    "value": 0
+                  }
+                },
+                "right": {
+                  "kind": "index",
+                  "object": {
+                    "kind": "ref",
+                    "name": "choice"
+                  },
+                  "index": {
+                    "kind": "literal",
+                    "value": 1
+                  }
+                }
+              }
+            }
+          }
+        },
+        "yes": "n12",
+        "no": "n11"
+      },
+      {
+        "id": "n14",
+        "kind": "return",
+        "value": {
+          "kind": "ref",
+          "name": "choice"
+        }
+      },
+      {
+        "id": "n15",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "&&",
+              "left": {
+                "kind": "ref",
+                "name": "choice"
+              },
+              "right": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "choice"
+                },
+                "key": "needsOptionSelection"
+              }
+            }
+          }
+        },
+        "yes": "n14",
+        "no": "n13"
+      },
+      {
+        "id": "n16",
+        "kind": "call",
+        "capability": "selectOption",
+        "args": [
+          {
+            "kind": "object",
+            "entries": [
+              {
+                "key": "title",
+                "value": {
+                  "kind": "literal",
+                  "value": "护甲组装：选择两个不同模块"
+                }
+              },
+              {
+                "key": "options",
+                "value": {
+                  "kind": "ref",
+                  "name": "modules"
+                }
+              },
+              {
+                "key": "selectionMode",
+                "value": {
+                  "kind": "literal",
+                  "value": "multi"
+                }
+              },
+              {
+                "key": "minSelections",
+                "value": {
+                  "kind": "literal",
+                  "value": 2
+                }
+              },
+              {
+                "key": "maxSelections",
+                "value": {
+                  "kind": "literal",
+                  "value": 2
+                }
+              }
+            ]
+          }
+        ],
+        "result": "choice",
+        "next": "n15"
+      },
+      {
+        "id": "n17",
+        "kind": "bind",
+        "name": "modules",
+        "expr": {
+          "kind": "array",
+          "items": [
+            {
+              "kind": "object",
+              "entries": [
+                {
+                  "key": "label",
+                  "value": {
+                    "kind": "literal",
+                    "value": "恢复模块"
+                  }
+                },
+                {
+                  "key": "value",
+                  "value": {
+                    "kind": "literal",
+                    "value": "heal"
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "object",
+              "entries": [
+                {
+                  "key": "label",
+                  "value": {
+                    "kind": "literal",
+                    "value": "攻击模块"
+                  }
+                },
+                {
+                  "key": "value",
+                  "value": {
+                    "kind": "literal",
+                    "value": "attack"
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "object",
+              "entries": [
+                {
+                  "key": "label",
+                  "value": {
+                    "kind": "literal",
+                    "value": "高速模块"
+                  }
+                },
+                {
+                  "key": "value",
+                  "value": {
+                    "kind": "literal",
+                    "value": "speed"
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "object",
+              "entries": [
+                {
+                  "key": "label",
+                  "value": {
+                    "kind": "literal",
+                    "value": "硬化模块"
+                  }
+                },
+                {
+                  "key": "value",
+                  "value": {
+                    "kind": "literal",
+                    "value": "defense"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "next": "n16"
+      },
+      {
+        "id": "n18",
+        "kind": "bind",
+        "name": "b",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "context"
+          },
+          "key": "battle"
+        },
+        "next": "n17"
+      },
+      {
+        "id": "n19",
+        "kind": "bind",
+        "name": "c",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "context"
+          },
+          "key": "piece"
+        },
+        "next": "n18"
+      },
+      {
+        "id": "generated-card-source",
+        "kind": "materializeSource",
+        "graph": {
+          "version": "rvb-content-graph/v1",
+          "surface": "card",
+          "entry": "select",
+          "nodes": [
+            {
+              "id": "select",
+              "kind": "call",
+              "capability": "selectTarget",
+              "args": [
+                {
+                  "kind": "object",
+                  "entries": {
+                    "type": {
+                      "kind": "literal",
+                      "value": "piece"
+                    },
+                    "range": {
+                      "kind": "literal",
+                      "value": 99
+                    },
+                    "filter": {
+                      "kind": "literal",
+                      "value": "ally"
+                    }
+                  }
+                }
+              ],
+              "result": "t",
+              "next": "target-check"
+            },
+            {
+              "id": "target-check",
+              "kind": "branch",
+              "condition": {
+                "kind": "binary",
+                "op": "||",
+                "left": {
+                  "kind": "unary",
+                  "op": "!",
+                  "argument": {
+                    "kind": "ref",
+                    "name": "t"
+                  }
+                },
+                "right": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "t"
+                  },
+                  "key": "needsTargetSelection"
+                }
+              },
+              "yes": "return-target",
+              "no": "modules"
+            },
+            {
+              "id": "return-target",
+              "kind": "return",
+              "value": {
+                "kind": "ref",
+                "name": "t"
+              }
+            },
+            {
+              "id": "modules",
+              "kind": "bind",
+              "name": "ms",
+              "expr": {
+                "kind": "collection",
+                "object": {
+                  "kind": "collection",
+                  "object": {
+                    "kind": "ref",
+                    "name": "selected"
+                  },
+                  "method": "join",
+                  "args": [
+                    {
+                      "kind": "literal",
+                      "value": ","
+                    }
+                  ]
+                },
+                "method": "split",
+                "args": [
+                  {
+                    "kind": "literal",
+                    "value": ","
+                  }
+                ]
+              },
+              "next": "init-status"
+            },
+            {
+              "id": "init-status",
+              "kind": "set",
+              "target": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "t"
+                },
+                "key": "statusTags"
+              },
+              "operator": "=",
+              "value": {
+                "kind": "binary",
+                "op": "||",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "t"
+                  },
+                  "key": "statusTags"
+                },
+                "right": {
+                  "kind": "array",
+                  "items": []
+                }
+              },
+              "next": "apply-modules"
+            },
+            {
+              "id": "apply-modules",
+              "kind": "invoke",
+              "target": {
+                "kind": "array",
+                "object": {
+                  "kind": "ref",
+                  "name": "ms"
+                },
+                "method": "forEach"
+              },
+              "args": [
+                {
+                  "kind": "function",
+                  "parameters": [
+                    "m"
+                  ],
+                  "body": {
+                    "entry": "check-heal",
+                    "end": "callback-end",
+                    "nodes": [
+                      {
+                        "id": "check-heal",
+                        "kind": "branch",
+                        "condition": {
+                          "kind": "binary",
+                          "op": "===",
+                          "left": {
+                            "kind": "ref",
+                            "name": "m"
+                          },
+                          "right": {
+                            "kind": "literal",
+                            "value": "heal"
+                          }
+                        },
+                        "yes": "heal-clock",
+                        "no": "check-attack"
+                      },
+                      {
+                        "id": "heal-clock",
+                        "kind": "call",
+                        "capability": "Date.now",
+                        "args": [],
+                        "result": "healNow",
+                        "next": "heal-push"
+                      },
+                      {
+                        "id": "heal-push",
+                        "kind": "call",
+                        "capability": "array.push",
+                        "args": [
+                          {
+                            "kind": "get",
+                            "object": {
+                              "kind": "ref",
+                              "name": "t"
+                            },
+                            "key": "statusTags"
+                          },
+                          {
+                            "kind": "object",
+                            "entries": {
+                              "id": {
+                                "kind": "binary",
+                                "op": "+",
+                                "left": {
+                                  "kind": "binary",
+                                  "op": "+",
+                                  "left": {
+                                    "kind": "binary",
+                                    "op": "+",
+                                    "left": {
+                                      "kind": "literal",
+                                      "value": "periodic-heal-"
+                                    },
+                                    "right": {
+                                      "kind": "get",
+                                      "object": {
+                                        "kind": "ref",
+                                        "name": "t"
+                                      },
+                                      "key": "instanceId"
+                                    }
+                                  },
+                                  "right": {
+                                    "kind": "literal",
+                                    "value": "-"
+                                  }
+                                },
+                                "right": {
+                                  "kind": "ref",
+                                  "name": "healNow"
+                                }
+                              },
+                              "type": {
+                                "kind": "literal",
+                                "value": "periodic-heal"
+                              },
+                              "name": {
+                                "kind": "literal",
+                                "value": "恢复模块"
+                              },
+                              "stacks": {
+                                "kind": "literal",
+                                "value": 1
+                              },
+                              "relatedRules": {
+                                "kind": "array",
+                                "items": [
+                                  {
+                                    "kind": "literal",
+                                    "value": "rule-tails-armor-recovery"
+                                  }
+                                ]
+                              }
+                            }
+                          }
+                        ],
+                        "next": "heal-rule"
+                      },
+                      {
+                        "id": "heal-rule",
+                        "kind": "call",
+                        "capability": "addRuleById",
+                        "args": [
+                          {
+                            "kind": "get",
+                            "object": {
+                              "kind": "ref",
+                              "name": "t"
+                            },
+                            "key": "instanceId"
+                          },
+                          {
+                            "kind": "literal",
+                            "value": "rule-tails-armor-recovery"
+                          }
+                        ],
+                        "next": "check-attack"
+                      },
+                      {
+                        "id": "check-attack",
+                        "kind": "branch",
+                        "condition": {
+                          "kind": "binary",
+                          "op": "===",
+                          "left": {
+                            "kind": "ref",
+                            "name": "m"
+                          },
+                          "right": {
+                            "kind": "literal",
+                            "value": "attack"
+                          }
+                        },
+                        "yes": "attack-set",
+                        "no": "check-speed"
+                      },
+                      {
+                        "id": "attack-set",
+                        "kind": "set",
+                        "target": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "t"
+                          },
+                          "key": "attack"
+                        },
+                        "operator": "=",
+                        "value": {
+                          "kind": "binary",
+                          "op": "+",
+                          "left": {
+                            "kind": "binary",
+                            "op": "||",
+                            "left": {
+                              "kind": "get",
+                              "object": {
+                                "kind": "ref",
+                                "name": "t"
+                              },
+                              "key": "attack"
+                            },
+                            "right": {
+                              "kind": "literal",
+                              "value": 0
+                            }
+                          },
+                          "right": {
+                            "kind": "literal",
+                            "value": 3
+                          }
+                        },
+                        "next": "check-speed"
+                      },
+                      {
+                        "id": "check-speed",
+                        "kind": "branch",
+                        "condition": {
+                          "kind": "binary",
+                          "op": "===",
+                          "left": {
+                            "kind": "ref",
+                            "name": "m"
+                          },
+                          "right": {
+                            "kind": "literal",
+                            "value": "speed"
+                          }
+                        },
+                        "yes": "speed-clock",
+                        "no": "check-defense"
+                      },
+                      {
+                        "id": "speed-clock",
+                        "kind": "call",
+                        "capability": "Date.now",
+                        "args": [],
+                        "result": "speedNow",
+                        "next": "speed-push"
+                      },
+                      {
+                        "id": "speed-push",
+                        "kind": "call",
+                        "capability": "array.push",
+                        "args": [
+                          {
+                            "kind": "get",
+                            "object": {
+                              "kind": "ref",
+                              "name": "t"
+                            },
+                            "key": "statusTags"
+                          },
+                          {
+                            "kind": "object",
+                            "entries": {
+                              "id": {
+                                "kind": "binary",
+                                "op": "+",
+                                "left": {
+                                  "kind": "binary",
+                                  "op": "+",
+                                  "left": {
+                                    "kind": "binary",
+                                    "op": "+",
+                                    "left": {
+                                      "kind": "literal",
+                                      "value": "free-normal-move-every-turn-"
+                                    },
+                                    "right": {
+                                      "kind": "get",
+                                      "object": {
+                                        "kind": "ref",
+                                        "name": "t"
+                                      },
+                                      "key": "instanceId"
+                                    }
+                                  },
+                                  "right": {
+                                    "kind": "literal",
+                                    "value": "-"
+                                  }
+                                },
+                                "right": {
+                                  "kind": "ref",
+                                  "name": "speedNow"
+                                }
+                              },
+                              "type": {
+                                "kind": "literal",
+                                "value": "free-normal-move-every-turn"
+                              },
+                              "name": {
+                                "kind": "literal",
+                                "value": "高速模块"
+                              },
+                              "stacks": {
+                                "kind": "literal",
+                                "value": 1
+                              },
+                              "relatedRules": {
+                                "kind": "array",
+                                "items": [
+                                  {
+                                    "kind": "literal",
+                                    "value": "rule-sonic-free-move"
+                                  }
+                                ]
+                              }
+                            }
+                          }
+                        ],
+                        "next": "speed-rule"
+                      },
+                      {
+                        "id": "speed-rule",
+                        "kind": "call",
+                        "capability": "addRuleById",
+                        "args": [
+                          {
+                            "kind": "get",
+                            "object": {
+                              "kind": "ref",
+                              "name": "t"
+                            },
+                            "key": "instanceId"
+                          },
+                          {
+                            "kind": "literal",
+                            "value": "rule-sonic-free-move"
+                          }
+                        ],
+                        "next": "check-defense"
+                      },
+                      {
+                        "id": "check-defense",
+                        "kind": "branch",
+                        "condition": {
+                          "kind": "binary",
+                          "op": "===",
+                          "left": {
+                            "kind": "ref",
+                            "name": "m"
+                          },
+                          "right": {
+                            "kind": "literal",
+                            "value": "defense"
+                          }
+                        },
+                        "yes": "defense-set",
+                        "no": "callback-end"
+                      },
+                      {
+                        "id": "defense-set",
+                        "kind": "set",
+                        "target": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "t"
+                          },
+                          "key": "defense"
+                        },
+                        "operator": "=",
+                        "value": {
+                          "kind": "binary",
+                          "op": "+",
+                          "left": {
+                            "kind": "binary",
+                            "op": "||",
+                            "left": {
+                              "kind": "get",
+                              "object": {
+                                "kind": "ref",
+                                "name": "t"
+                              },
+                              "key": "defense"
+                            },
+                            "right": {
+                              "kind": "literal",
+                              "value": 0
+                            }
+                          },
+                          "right": {
+                            "kind": "literal",
+                            "value": 2
+                          }
+                        },
+                        "next": "callback-end"
+                      },
+                      {
+                        "id": "callback-end",
+                        "kind": "regionEnd"
+                      }
+                    ]
+                  }
+                }
+              ],
+              "next": "done"
+            },
+            {
+              "id": "done",
+              "kind": "return",
+              "value": {
+                "kind": "object",
+                "entries": {
+                  "success": {
+                    "kind": "literal",
+                    "value": true
+                  },
+                  "message": {
+                    "kind": "literal",
+                    "value": "获得组合护甲效果"
+                  }
+                }
+              }
+            }
+          ],
+          "metadata": {
+            "generatedFamily": "tails-armor",
+            "sourceField": "customCards.code"
+          }
+        },
+        "bindings": {
+          "selected": {
+            "kind": "ref",
+            "name": "selected"
+          }
+        },
+        "result": "generatedCardSource",
+        "next": "n5"
+      }
+    ]
+  },
+  "contentGraphField": "code",
+  "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1"
 }

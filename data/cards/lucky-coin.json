@@ -10,6 +10,273 @@
   "type": "active",
   "actionPointCost": 0,
   "icon": "Coins",
-  "code": "function executeCard(context) {\n  const player = battle.players.find(p => p.playerId === playerId);\n  if (!player) return { success: false, message: '找不到玩家' };\n  player.actionPoints += 1;\n  return { success: true, message: `幸运币：获得1点行动力（当前：${player.actionPoints}）` };\n}",
-  "image": "the-coin.jpg"
+  "code": "function executeCard(context) { var __gameplayInvalid = {}; var _module0 = (flow.refs.player()); if ((((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"player\")) ? _module0[\"player\"] : _module0) === __gameplayInvalid) || (((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"player\")) ? _module0[\"player\"] : _module0) === undefined)) { _module1 = __gameplayInvalid; } else { var _module1 = (flow.query.hasPlayer(((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"player\")) ? _module0[\"player\"] : _module0))); } var _condition11 = ((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"exists\")) ? _module1[\"exists\"] : _module1); if (_condition11 !== __gameplayInvalid && _condition11) { if ((((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"player\")) ? _module0[\"player\"] : _module0) === __gameplayInvalid) || (((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"player\")) ? _module0[\"player\"] : _module0) === undefined) || (((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"player\")) ? _module0[\"player\"] : _module0) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPlayer === \"function\" && !flow.query.hasPlayer(((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"player\")) ? _module0[\"player\"] : _module0)))) { _module2 = __gameplayInvalid; } else { var _module2 = (flow.query.hasPlayer(((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"player\")) ? _module0[\"player\"] : _module0)) ? flow.query.player(((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"player\")) ? _module0[\"player\"] : _module0)).playerId : null); } if ((((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"player\")) ? _module2[\"player\"] : _module2) === __gameplayInvalid) || (((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"player\")) ? _module2[\"player\"] : _module2) === undefined) || (((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"player\")) ? _module2[\"player\"] : _module2) === null) || (((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"player\")) ? _module2[\"player\"] : _module2) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPlayer === \"function\" && !flow.query.hasPlayer(((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"player\")) ? _module2[\"player\"] : _module2))) || (1 === __gameplayInvalid) || (1 === undefined) || (1 === null)) { _module3 = __gameplayInvalid; } else { var _module3 = (flow.resources.add(((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"player\")) ? _module2[\"player\"] : _module2), \"actionPoints\", 1)); } if ((((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"value\")) ? _module3[\"value\"] : _module3) === __gameplayInvalid) || (((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"value\")) ? _module3[\"value\"] : _module3) === undefined) || (((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"value\")) ? _module3[\"value\"] : _module3) === null)) { _module4 = __gameplayInvalid; } else { var _module4 = (String(((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"value\")) ? _module3[\"value\"] : _module3))); } if ((\"幸运币：获得1点行动力（当前：\" === __gameplayInvalid) || (\"幸运币：获得1点行动力（当前：\" === undefined) || (\"幸运币：获得1点行动力（当前：\" === null) || (((_module4 !== null && typeof _module4 === \"object\" && Object.prototype.hasOwnProperty.call(_module4, \"text\")) ? _module4[\"text\"] : _module4) === __gameplayInvalid) || (((_module4 !== null && typeof _module4 === \"object\" && Object.prototype.hasOwnProperty.call(_module4, \"text\")) ? _module4[\"text\"] : _module4) === undefined) || (((_module4 !== null && typeof _module4 === \"object\" && Object.prototype.hasOwnProperty.call(_module4, \"text\")) ? _module4[\"text\"] : _module4) === null)) { _module5 = __gameplayInvalid; } else { var _module5 = ((\"幸运币：获得1点行动力（当前：\" + ((_module4 !== null && typeof _module4 === \"object\" && Object.prototype.hasOwnProperty.call(_module4, \"text\")) ? _module4[\"text\"] : _module4))); } if ((((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"text\")) ? _module5[\"text\"] : _module5) === __gameplayInvalid) || (((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"text\")) ? _module5[\"text\"] : _module5) === undefined) || (((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"text\")) ? _module5[\"text\"] : _module5) === null) || (\"）\" === __gameplayInvalid) || (\"）\" === undefined) || (\"）\" === null)) { _module6 = __gameplayInvalid; } else { var _module6 = ((((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"text\")) ? _module5[\"text\"] : _module5) + \"）\")); } var _composite7 = { \"success\": __gameplayInvalid, \"message\": __gameplayInvalid }; if ((((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"text\")) ? _module6[\"text\"] : _module6) === __gameplayInvalid) || (((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"text\")) ? _module6[\"text\"] : _module6) === undefined) || (((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"text\")) ? _module6[\"text\"] : _module6) === null)) { _composite7 = { \"success\": __gameplayInvalid, \"message\": __gameplayInvalid }; } else { _done8: { if ((((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"text\")) ? _module6[\"text\"] : _module6) === __gameplayInvalid) || (((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"text\")) ? _module6[\"text\"] : _module6) === undefined) || (((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"text\")) ? _module6[\"text\"] : _module6) === null)) { _module9 = { \"success\": __gameplayInvalid, \"message\": __gameplayInvalid }; } else { var _module9 = ({success: true, message: ((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"text\")) ? _module6[\"text\"] : _module6)}); } if (!(((_module9[\"success\"]) === __gameplayInvalid) || ((_module9[\"message\"]) === __gameplayInvalid))) { _composite7 = { \"success\": (_module9[\"success\"]), \"message\": (_module9[\"message\"]) }; break _done8; } } } if (!(((_composite7[\"success\"]) === __gameplayInvalid) || ((_composite7[\"message\"]) === __gameplayInvalid))) { return { \"success\": (_composite7[\"success\"]), \"message\": (_composite7[\"message\"]) }; } } else if (_condition11 !== __gameplayInvalid) { if ((\"找不到玩家\" === __gameplayInvalid) || (\"找不到玩家\" === undefined) || (\"找不到玩家\" === null)) { _module10 = { \"success\": __gameplayInvalid, \"message\": __gameplayInvalid }; } else { var _module10 = ({success: false, message: \"找不到玩家\"}); } if (!(((_module10[\"success\"]) === __gameplayInvalid) || ((_module10[\"message\"]) === __gameplayInvalid))) { return { \"success\": (_module10[\"success\"]), \"message\": (_module10[\"message\"]) }; } } }",
+  "image": "the-coin.jpg",
+  "gameplayModules": {
+    "version": "rvb-gameplay-module-document/v1",
+    "entries": {
+      "code": {
+        "graph": {
+          "version": "rvb-gameplay-modules/v1",
+          "surface": "card",
+          "outputs": [
+            {
+              "name": "success",
+              "type": "boolean"
+            },
+            {
+              "name": "message",
+              "type": "string",
+              "optional": true
+            }
+          ],
+          "composites": [
+            {
+              "id": "shared.result-message",
+              "version": "1",
+              "label": "成功消息",
+              "description": "将一段已计算文本转换为统一的成功消息结果。",
+              "inputs": [
+                {
+                  "name": "message",
+                  "type": "string"
+                }
+              ],
+              "outputs": [
+                {
+                  "name": "success",
+                  "type": "boolean"
+                },
+                {
+                  "name": "message",
+                  "type": "string"
+                }
+              ],
+              "allowedSurfaces": [
+                "skill",
+                "card",
+                "rule",
+                "triggerSkill",
+                "pending"
+              ],
+              "body": [
+                {
+                  "kind": "call",
+                  "id": "result-message",
+                  "module": "result.message",
+                  "version": "1",
+                  "inputs": {
+                    "message": {
+                      "kind": "input",
+                      "name": "message"
+                    }
+                  },
+                  "parameters": {}
+                },
+                {
+                  "kind": "return",
+                  "id": "return-result-message",
+                  "values": {
+                    "success": {
+                      "kind": "output",
+                      "node": "result-message",
+                      "port": "success"
+                    },
+                    "message": {
+                      "kind": "output",
+                      "node": "result-message",
+                      "port": "message"
+                    }
+                  }
+                }
+              ]
+            }
+          ],
+          "body": [
+            {
+              "kind": "call",
+              "id": "player-ref",
+              "module": "ref.player",
+              "version": "1",
+              "inputs": {},
+              "parameters": {}
+            },
+            {
+              "kind": "call",
+              "id": "player-exists",
+              "module": "query.has-player",
+              "version": "1",
+              "inputs": {
+                "playerId": {
+                  "kind": "output",
+                  "node": "player-ref",
+                  "port": "player"
+                }
+              },
+              "parameters": {}
+            },
+            {
+              "kind": "if",
+              "id": "player-guard",
+              "condition": {
+                "kind": "output",
+                "node": "player-exists",
+                "port": "exists"
+              },
+              "then": [
+                {
+                  "kind": "call",
+                  "id": "player",
+                  "module": "query.player",
+                  "version": "1",
+                  "inputs": {
+                    "playerId": {
+                      "kind": "output",
+                      "node": "player-ref",
+                      "port": "player"
+                    }
+                  },
+                  "parameters": {}
+                },
+                {
+                  "kind": "call",
+                  "id": "updated-action-points",
+                  "module": "resource.adjust",
+                  "version": "1",
+                  "inputs": {
+                    "player": {
+                      "kind": "output",
+                      "node": "player",
+                      "port": "player"
+                    },
+                    "amount": {
+                      "kind": "literal",
+                      "value": 1
+                    }
+                  },
+                  "parameters": {
+                    "resource": "actionPoints"
+                  }
+                },
+                {
+                  "kind": "call",
+                  "id": "number-text",
+                  "module": "text.from-number",
+                  "version": "1",
+                  "inputs": {
+                    "value": {
+                      "kind": "output",
+                      "node": "updated-action-points",
+                      "port": "value"
+                    }
+                  },
+                  "parameters": {}
+                },
+                {
+                  "kind": "call",
+                  "id": "message-prefix",
+                  "module": "text.concat",
+                  "version": "1",
+                  "inputs": {
+                    "left": {
+                      "kind": "literal",
+                      "value": "幸运币：获得1点行动力（当前："
+                    },
+                    "right": {
+                      "kind": "output",
+                      "node": "number-text",
+                      "port": "text"
+                    }
+                  },
+                  "parameters": {}
+                },
+                {
+                  "kind": "call",
+                  "id": "message",
+                  "module": "text.concat",
+                  "version": "1",
+                  "inputs": {
+                    "left": {
+                      "kind": "output",
+                      "node": "message-prefix",
+                      "port": "text"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": "）"
+                    }
+                  },
+                  "parameters": {}
+                },
+                {
+                  "kind": "call",
+                  "id": "result",
+                  "module": "shared.result-message",
+                  "version": "1",
+                  "inputs": {
+                    "message": {
+                      "kind": "output",
+                      "node": "message",
+                      "port": "text"
+                    }
+                  },
+                  "parameters": {}
+                },
+                {
+                  "kind": "return",
+                  "id": "return-success",
+                  "values": {
+                    "success": {
+                      "kind": "output",
+                      "node": "result",
+                      "port": "success"
+                    },
+                    "message": {
+                      "kind": "output",
+                      "node": "result",
+                      "port": "message"
+                    }
+                  }
+                }
+              ],
+              "else": [
+                {
+                  "kind": "call",
+                  "id": "missing-player",
+                  "module": "result.message",
+                  "version": "1",
+                  "inputs": {
+                    "message": {
+                      "kind": "literal",
+                      "value": "找不到玩家"
+                    }
+                  },
+                  "parameters": {
+                    "success": false
+                  }
+                },
+                {
+                  "kind": "return",
+                  "id": "return-missing-player",
+                  "values": {
+                    "success": {
+                      "kind": "output",
+                      "node": "missing-player",
+                      "port": "success"
+                    },
+                    "message": {
+                      "kind": "output",
+                      "node": "missing-player",
+                      "port": "message"
+                    }
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "compilerVersion": "rvb-gameplay-module-compiler/v1"
+      }
+    }
+  }
 }

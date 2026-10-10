@@ -14,5 +14,469 @@
   "cooldownTurns": 0,
   "maxCharges": 0,
   "powerMultiplier": 1,
-  "code": "function executeSkill(context) { const piece = context.piece; const damage = context.damage; let hasDivineShield = false; if (piece.statusTags) { hasDivineShield = piece.statusTags.some(tag => tag.type === 'divine-shield'); } if (!hasDivineShield) { return { success: true, blocked: false, message: '' }; } if (!damage || damage <= 0) { return { success: true, blocked: false, message: '没有需要抵挡的伤害' }; } if (typeof removeStatusEffectById === 'function') { removeStatusEffectById(piece.instanceId, 'divine-shield'); } if (typeof removeRuleById === 'function') { removeRuleById(piece.instanceId, 'rule-divine-shield'); } if (typeof removeSkillById === 'function') { removeSkillById(piece.instanceId, 'divine-shield-defense'); } const attacker = context.target ? context.target.name : '未知敌人'; return { success: true, blocked: true, message: piece.name + '的圣盾破裂，抵挡了来自' + attacker + '的伤害' }; }"
+  "code": "function executeSkill(context) { var attacker, damage, hasDivineShield, piece; var _pc = \"n17\"; for (var _step = 0; _step <= 17; _step++) { switch (_pc) { case \"n17\": piece = (context)[\"piece\"]; _pc = \"n16\"; break; case \"n16\": damage = (context)[\"damage\"]; _pc = \"n15\"; break; case \"n15\": hasDivineShield = false; _pc = \"n14\"; break; case \"n14\": _pc = (! (! (piece)[\"statusTags\"])) ? \"n13\" : \"n12\"; break; case \"n13\": hasDivineShield = ((piece)[\"statusTags\"])[\"some\"](function (tag) { return ((tag)[\"type\"] === \"divine-shield\"); }); _pc = \"n12\"; break; case \"n12\": _pc = (! (! (! hasDivineShield))) ? \"n11\" : \"n10\"; break; case \"n10\": _pc = (! (! ((! damage) || (damage <= 0)))) ? \"n9\" : \"n8\"; break; case \"n8\": _pc = (! (! (typeof removeStatusEffectById === \"function\"))) ? \"n7\" : \"n6\"; break; case \"n7\": removeStatusEffectById((piece)[\"instanceId\"], \"divine-shield\"); _pc = \"n6\"; break; case \"n6\": _pc = (! (! (typeof removeRuleById === \"function\"))) ? \"n5\" : \"n4\"; break; case \"n5\": removeRuleById((piece)[\"instanceId\"], \"rule-divine-shield\"); _pc = \"n4\"; break; case \"n4\": _pc = (! (! (typeof removeSkillById === \"function\"))) ? \"n3\" : \"n2\"; break; case \"n3\": removeSkillById((piece)[\"instanceId\"], \"divine-shield-defense\"); _pc = \"n2\"; break; case \"n2\": attacker = ((context)[\"target\"] ? ((context)[\"target\"])[\"name\"] : \"未知敌人\"); _pc = \"n1\"; break; case \"n1\": return {success: true, blocked: true, message: ((((piece)[\"name\"] + \"的圣盾破裂，抵挡了来自\") + attacker) + \"的伤害\")}; case \"n9\": return {success: true, blocked: false, message: \"没有需要抵挡的伤害\"}; case \"n11\": return {success: true, blocked: false, message: \"\"}; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\"); }",
+  "contentGraph": {
+    "version": "rvb-content-graph/v1",
+    "surface": "triggerSkill",
+    "entry": "n17",
+    "nodes": [
+      {
+        "id": "n1",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "blocked",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "binary",
+                  "op": "+",
+                  "left": {
+                    "kind": "binary",
+                    "op": "+",
+                    "left": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "piece"
+                      },
+                      "key": "name"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": "的圣盾破裂，抵挡了来自"
+                    }
+                  },
+                  "right": {
+                    "kind": "ref",
+                    "name": "attacker"
+                  }
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "的伤害"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n2",
+        "kind": "bind",
+        "name": "attacker",
+        "expr": {
+          "kind": "conditional",
+          "test": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "context"
+            },
+            "key": "target"
+          },
+          "consequent": {
+            "kind": "get",
+            "object": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "context"
+              },
+              "key": "target"
+            },
+            "key": "name"
+          },
+          "alternate": {
+            "kind": "literal",
+            "value": "未知敌人"
+          }
+        },
+        "next": "n1"
+      },
+      {
+        "id": "n3",
+        "kind": "call",
+        "capability": "removeSkillById",
+        "args": [
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "piece"
+            },
+            "key": "instanceId"
+          },
+          {
+            "kind": "literal",
+            "value": "divine-shield-defense"
+          }
+        ],
+        "next": "n2"
+      },
+      {
+        "id": "n4",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "===",
+              "left": {
+                "kind": "capabilityType",
+                "capability": "removeSkillById"
+              },
+              "right": {
+                "kind": "literal",
+                "value": "function"
+              }
+            }
+          }
+        },
+        "yes": "n3",
+        "no": "n2"
+      },
+      {
+        "id": "n5",
+        "kind": "call",
+        "capability": "removeRuleById",
+        "args": [
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "piece"
+            },
+            "key": "instanceId"
+          },
+          {
+            "kind": "literal",
+            "value": "rule-divine-shield"
+          }
+        ],
+        "next": "n4"
+      },
+      {
+        "id": "n6",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "===",
+              "left": {
+                "kind": "capabilityType",
+                "capability": "removeRuleById"
+              },
+              "right": {
+                "kind": "literal",
+                "value": "function"
+              }
+            }
+          }
+        },
+        "yes": "n5",
+        "no": "n4"
+      },
+      {
+        "id": "n7",
+        "kind": "call",
+        "capability": "removeStatusEffectById",
+        "args": [
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "piece"
+            },
+            "key": "instanceId"
+          },
+          {
+            "kind": "literal",
+            "value": "divine-shield"
+          }
+        ],
+        "next": "n6"
+      },
+      {
+        "id": "n8",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "===",
+              "left": {
+                "kind": "capabilityType",
+                "capability": "removeStatusEffectById"
+              },
+              "right": {
+                "kind": "literal",
+                "value": "function"
+              }
+            }
+          }
+        },
+        "yes": "n7",
+        "no": "n6"
+      },
+      {
+        "id": "n9",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "blocked",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": "没有需要抵挡的伤害"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n10",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "ref",
+                  "name": "damage"
+                }
+              },
+              "right": {
+                "kind": "binary",
+                "op": "<=",
+                "left": {
+                  "kind": "ref",
+                  "name": "damage"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": 0
+                }
+              }
+            }
+          }
+        },
+        "yes": "n9",
+        "no": "n8"
+      },
+      {
+        "id": "n11",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "blocked",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n12",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "unary",
+              "op": "!",
+              "argument": {
+                "kind": "ref",
+                "name": "hasDivineShield"
+              }
+            }
+          }
+        },
+        "yes": "n11",
+        "no": "n10"
+      },
+      {
+        "id": "n13",
+        "kind": "set",
+        "target": {
+          "kind": "ref",
+          "name": "hasDivineShield"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "collection",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "piece"
+            },
+            "key": "statusTags"
+          },
+          "method": "some",
+          "args": [
+            {
+              "kind": "lambda",
+              "parameters": [
+                "tag"
+              ],
+              "body": {
+                "kind": "binary",
+                "op": "===",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "tag"
+                  },
+                  "key": "type"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "divine-shield"
+                }
+              }
+            }
+          ]
+        },
+        "next": "n12"
+      },
+      {
+        "id": "n14",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "piece"
+              },
+              "key": "statusTags"
+            }
+          }
+        },
+        "yes": "n13",
+        "no": "n12"
+      },
+      {
+        "id": "n15",
+        "kind": "bind",
+        "name": "hasDivineShield",
+        "expr": {
+          "kind": "literal",
+          "value": false
+        },
+        "next": "n14"
+      },
+      {
+        "id": "n16",
+        "kind": "bind",
+        "name": "damage",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "context"
+          },
+          "key": "damage"
+        },
+        "next": "n15"
+      },
+      {
+        "id": "n17",
+        "kind": "bind",
+        "name": "piece",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "context"
+          },
+          "key": "piece"
+        },
+        "next": "n16"
+      }
+    ]
+  },
+  "contentGraphField": "code",
+  "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1"
 }

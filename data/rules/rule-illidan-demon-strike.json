@@ -2,6 +2,567 @@
   "id": "rule-illidan-demon-strike",
   "name": "恶魔冲击计数",
   "description": "每次恶魔冲击命中后消耗一次使用次数；次数耗尽时自动移除技能和规则",
-  "trigger": { "type": "afterSkillUsed" },
-  "skillCode": "if (context.skillId !== 'illidan-demon-strike') return { success: false, message: '' }; var illidan = context.rulePiece; if (!illidan) return { success: false, message: '' }; var tag = illidan.statusTags && illidan.statusTags.find(function(t) { return t.id === 'demon-strike-charges'; }); if (!tag) return { success: false, message: '' }; if (tag.remainingUses === undefined) { tag.remainingUses = tag.currentUses || 2; } tag.remainingUses -= 1; var remaining = tag.remainingUses; if (remaining <= 0) { removeStatusEffectById(illidan.instanceId, 'demon-strike-charges'); illidan.skills = (illidan.skills || []).filter(function(s) { return s.skillId !== 'illidan-demon-strike'; }); illidan.rules = (illidan.rules || []).filter(function(r) { return r.id !== 'rule-illidan-demon-strike'; }); return { success: true, message: illidan.name + '的恶魔冲击次数耗尽，技能已移除' }; } return { success: true, message: illidan.name + '恶魔冲击剩余' + remaining + '次' };"
+  "trigger": {
+    "type": "afterSkillUsed"
+  },
+  "skillCode": "var illidan, remaining, tag; var _pc = \"n18\"; for (var _step = 0; _step <= 18; _step++) { switch (_pc) { case \"n18\": _pc = (! (! ((context)[\"skillId\"] !== \"illidan-demon-strike\"))) ? \"n17\" : \"n16\"; break; case \"n16\": illidan = (context)[\"rulePiece\"]; _pc = \"n15\"; break; case \"n15\": _pc = (! (! (! illidan))) ? \"n14\" : \"n13\"; break; case \"n13\": tag = ((illidan)[\"statusTags\"] && ((illidan)[\"statusTags\"])[\"find\"](function (t) { return ((t)[\"id\"] === \"demon-strike-charges\"); })); _pc = \"n12\"; break; case \"n12\": _pc = (! (! (! tag))) ? \"n11\" : \"n10\"; break; case \"n10\": _pc = (! (! ((tag)[\"remainingUses\"] === (void 0)))) ? \"n9\" : \"n8\"; break; case \"n9\": (tag)[\"remainingUses\"] = ((tag)[\"currentUses\"] || 2); _pc = \"n8\"; break; case \"n8\": (tag)[\"remainingUses\"] -= 1; _pc = \"n7\"; break; case \"n7\": remaining = (tag)[\"remainingUses\"]; _pc = \"n6\"; break; case \"n6\": _pc = (! (! (remaining <= 0))) ? \"n5\" : \"n1\"; break; case \"n1\": return {success: true, message: ((((illidan)[\"name\"] + \"恶魔冲击剩余\") + remaining) + \"次\")}; case \"n5\": removeStatusEffectById((illidan)[\"instanceId\"], \"demon-strike-charges\"); _pc = \"n4\"; break; case \"n4\": (illidan)[\"skills\"] = (((illidan)[\"skills\"] || []))[\"filter\"](function (s) { return ((s)[\"skillId\"] !== \"illidan-demon-strike\"); }); _pc = \"n3\"; break; case \"n3\": (illidan)[\"rules\"] = (((illidan)[\"rules\"] || []))[\"filter\"](function (r) { return ((r)[\"id\"] !== \"rule-illidan-demon-strike\"); }); _pc = \"n2\"; break; case \"n2\": return {success: true, message: ((illidan)[\"name\"] + \"的恶魔冲击次数耗尽，技能已移除\")}; case \"n11\": return {success: false, message: \"\"}; case \"n14\": return {success: false, message: \"\"}; case \"n17\": return {success: false, message: \"\"}; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\");",
+  "contentGraph": {
+    "version": "rvb-content-graph/v1",
+    "surface": "rule",
+    "entry": "n18",
+    "nodes": [
+      {
+        "id": "n1",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "binary",
+                  "op": "+",
+                  "left": {
+                    "kind": "binary",
+                    "op": "+",
+                    "left": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "illidan"
+                      },
+                      "key": "name"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": "恶魔冲击剩余"
+                    }
+                  },
+                  "right": {
+                    "kind": "ref",
+                    "name": "remaining"
+                  }
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "次"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n2",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "illidan"
+                  },
+                  "key": "name"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "的恶魔冲击次数耗尽，技能已移除"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n3",
+        "kind": "set",
+        "target": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "illidan"
+          },
+          "key": "rules"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "collection",
+          "object": {
+            "kind": "binary",
+            "op": "||",
+            "left": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "illidan"
+              },
+              "key": "rules"
+            },
+            "right": {
+              "kind": "array",
+              "items": []
+            }
+          },
+          "method": "filter",
+          "args": [
+            {
+              "kind": "lambda",
+              "parameters": [
+                "r"
+              ],
+              "body": {
+                "kind": "binary",
+                "op": "!==",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "r"
+                  },
+                  "key": "id"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "rule-illidan-demon-strike"
+                }
+              }
+            }
+          ]
+        },
+        "next": "n2"
+      },
+      {
+        "id": "n4",
+        "kind": "set",
+        "target": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "illidan"
+          },
+          "key": "skills"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "collection",
+          "object": {
+            "kind": "binary",
+            "op": "||",
+            "left": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "illidan"
+              },
+              "key": "skills"
+            },
+            "right": {
+              "kind": "array",
+              "items": []
+            }
+          },
+          "method": "filter",
+          "args": [
+            {
+              "kind": "lambda",
+              "parameters": [
+                "s"
+              ],
+              "body": {
+                "kind": "binary",
+                "op": "!==",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "s"
+                  },
+                  "key": "skillId"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "illidan-demon-strike"
+                }
+              }
+            }
+          ]
+        },
+        "next": "n3"
+      },
+      {
+        "id": "n5",
+        "kind": "call",
+        "capability": "removeStatusEffectById",
+        "args": [
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "illidan"
+            },
+            "key": "instanceId"
+          },
+          {
+            "kind": "literal",
+            "value": "demon-strike-charges"
+          }
+        ],
+        "next": "n4"
+      },
+      {
+        "id": "n6",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "<=",
+              "left": {
+                "kind": "ref",
+                "name": "remaining"
+              },
+              "right": {
+                "kind": "literal",
+                "value": 0
+              }
+            }
+          }
+        },
+        "yes": "n5",
+        "no": "n1"
+      },
+      {
+        "id": "n7",
+        "kind": "bind",
+        "name": "remaining",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "tag"
+          },
+          "key": "remainingUses"
+        },
+        "next": "n6"
+      },
+      {
+        "id": "n8",
+        "kind": "set",
+        "target": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "tag"
+          },
+          "key": "remainingUses"
+        },
+        "operator": "-=",
+        "value": {
+          "kind": "literal",
+          "value": 1
+        },
+        "next": "n7"
+      },
+      {
+        "id": "n9",
+        "kind": "set",
+        "target": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "tag"
+          },
+          "key": "remainingUses"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "binary",
+          "op": "||",
+          "left": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "tag"
+            },
+            "key": "currentUses"
+          },
+          "right": {
+            "kind": "literal",
+            "value": 2
+          }
+        },
+        "next": "n8"
+      },
+      {
+        "id": "n10",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "===",
+              "left": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "tag"
+                },
+                "key": "remainingUses"
+              },
+              "right": {
+                "kind": "undefined"
+              }
+            }
+          }
+        },
+        "yes": "n9",
+        "no": "n8"
+      },
+      {
+        "id": "n11",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n12",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "unary",
+              "op": "!",
+              "argument": {
+                "kind": "ref",
+                "name": "tag"
+              }
+            }
+          }
+        },
+        "yes": "n11",
+        "no": "n10"
+      },
+      {
+        "id": "n13",
+        "kind": "bind",
+        "name": "tag",
+        "expr": {
+          "kind": "binary",
+          "op": "&&",
+          "left": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "illidan"
+            },
+            "key": "statusTags"
+          },
+          "right": {
+            "kind": "collection",
+            "object": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "illidan"
+              },
+              "key": "statusTags"
+            },
+            "method": "find",
+            "args": [
+              {
+                "kind": "lambda",
+                "parameters": [
+                  "t"
+                ],
+                "body": {
+                  "kind": "binary",
+                  "op": "===",
+                  "left": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "t"
+                    },
+                    "key": "id"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": "demon-strike-charges"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "next": "n12"
+      },
+      {
+        "id": "n14",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n15",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "unary",
+              "op": "!",
+              "argument": {
+                "kind": "ref",
+                "name": "illidan"
+              }
+            }
+          }
+        },
+        "yes": "n14",
+        "no": "n13"
+      },
+      {
+        "id": "n16",
+        "kind": "bind",
+        "name": "illidan",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "context"
+          },
+          "key": "rulePiece"
+        },
+        "next": "n15"
+      },
+      {
+        "id": "n17",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n18",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "!==",
+              "left": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "context"
+                },
+                "key": "skillId"
+              },
+              "right": {
+                "kind": "literal",
+                "value": "illidan-demon-strike"
+              }
+            }
+          }
+        },
+        "yes": "n17",
+        "no": "n16"
+      }
+    ]
+  },
+  "contentGraphField": "skillCode",
+  "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1"
 }

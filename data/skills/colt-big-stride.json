@@ -4,7 +4,9 @@
   "description": "对方回合结束时，可以免费移动一次，先于射击区域结算。",
   "keywords": [],
   "targetText": "被动",
-  "effectTags": ["移动"],
+  "effectTags": [
+    "移动"
+  ],
   "icon": "👢",
   "kind": "passive",
   "type": "normal",
@@ -13,6 +15,40 @@
   "powerMultiplier": 1,
   "actionPointCost": 0,
   "range": "self",
-  "targeting": { "steps": [] },
-  "code": "function executeSkill() { return { success: false, message: '这是被动技能，自动触发，无法手动使用' }; }"
+  "targeting": {
+    "steps": []
+  },
+  "code": "function executeSkill(context) { var _pc = \"n1\"; for (var _step = 0; _step <= 1; _step++) { switch (_pc) { case \"n1\": return {success: false, message: \"这是被动技能，自动触发，无法手动使用\"}; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\"); }",
+  "contentGraph": {
+    "version": "rvb-content-graph/v1",
+    "surface": "triggerSkill",
+    "entry": "n1",
+    "nodes": [
+      {
+        "id": "n1",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": "这是被动技能，自动触发，无法手动使用"
+              }
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "contentGraphField": "code",
+  "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1"
 }

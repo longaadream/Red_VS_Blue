@@ -13,5 +13,1148 @@
   "maxCharges": 0,
   "powerMultiplier": 1,
   "actionPointCost": 0,
-  "code": "function executeSkill(context) { if (!battle.extensions || !battle.extensions.recallData || battle.extensions.recallData.length === 0) return { success: false }; var actor = context.sourcePiece; if (!actor) return { success: false }; for (var i = battle.extensions.recallData.length - 1; i >= 0; i--) { var recall = battle.extensions.recallData[i]; if (!context.rulePiece || recall.pieceId !== context.rulePiece.instanceId) continue; if (arePlayersAllied(battle, actor.ownerPlayerId, recall.ownerPlayerId)) continue; recall.actionCount = (recall.actionCount || 0) + 1; var piece = battle.pieces.find(function(p) { return p.instanceId === recall.pieceId; }); if (recall.actionCount >= recall.targetCount) { if (piece && recall.snapshot) { var occupied = battle.pieces.find(function(p) { return p.instanceId !== piece.instanceId && p.currentHp > 0 && p.x === recall.snapshot.x && p.y === recall.snapshot.y; }); if (flow.effects.displace([{pieceId:piece.instanceId,x:recall.snapshot.x,y:recall.snapshot.y}], 'teleport').success) { piece.currentHp = Math.min(recall.snapshot.hp, piece.maxHp); if (recall.snapshot.shield !== undefined) piece.shield = recall.snapshot.shield; if (recall.snapshot.statusTags) piece.statusTags = JSON.parse(JSON.stringify(recall.snapshot.statusTags)); if (recall.snapshot.buffs) piece.buffs = JSON.parse(JSON.stringify(recall.snapshot.buffs)); if (recall.snapshot.debuffs) piece.debuffs = JSON.parse(JSON.stringify(recall.snapshot.debuffs)); } } battle.extensions.recallData.splice(i, 1); } } return { success: false }; }"
+  "code": "function executeSkill(context) { var __rvb_import_effect_0, __rvb_import_effect_1, __rvb_import_effect_3, __rvb_import_effect_4, __rvb_import_effect_6, __rvb_import_effect_7, __rvb_import_effect_9, __rvb_import_operand_2, __rvb_import_operand_5, __rvb_import_operand_8, actor, i, occupied, piece, recall; var _pc = \"n42\"; for (var _step = 0; _step <= 8; _step++) { switch (_pc) { case \"n42\": _pc = (! (! (((! (battle)[\"extensions\"]) || (! ((battle)[\"extensions\"])[\"recallData\"])) || ((((battle)[\"extensions\"])[\"recallData\"])[\"length\"] === 0)))) ? \"n41\" : \"n40\"; break; case \"n40\": actor = (context)[\"sourcePiece\"]; _pc = \"n39\"; break; case \"n39\": _pc = (! (! (! actor))) ? \"n38\" : \"n37\"; break; case \"n37\": i = ((((battle)[\"extensions\"])[\"recallData\"])[\"length\"] - 1); _pc = \"n36\"; break; case \"n36\": var __rvb_content_graph_loop_break_0 = false, __rvb_content_graph_loop_continue_1 = false; while ((! (! (i >= 0)))) { __rvb_content_graph_loop_continue_1 = false; { var __rvb_content_graph_region_pc_2 = \"n33\"; while (__rvb_content_graph_region_pc_2 !== \"n2\") { switch (__rvb_content_graph_region_pc_2) { case \"n33\": recall = (((battle)[\"extensions\"])[\"recallData\"])[(function (key) { if (typeof key === \"string\" && key.split(\".\").some(function (part) { return [\"__proto__\",\"arguments\",\"callee\",\"caller\",\"constructor\",\"prototype\"].indexOf(part) !== -1; })) throw new Error(\"unsafe content graph index\"); return key; })(i)]; __rvb_content_graph_region_pc_2 = \"n32\"; break; case \"n32\": __rvb_content_graph_region_pc_2 = (! (! ((! (context)[\"rulePiece\"]) || ((recall)[\"pieceId\"] !== ((context)[\"rulePiece\"])[\"instanceId\"])))) ? \"n31\" : \"n30\"; break; case \"n30\": __rvb_content_graph_region_pc_2 = (! (! arePlayersAllied(battle, (actor)[\"ownerPlayerId\"], (recall)[\"ownerPlayerId\"]))) ? \"n29\" : \"n28\"; break; case \"n28\": (recall)[\"actionCount\"] = (((recall)[\"actionCount\"] || 0) + 1); __rvb_content_graph_region_pc_2 = \"n27\"; break; case \"n27\": piece = ((battle)[\"pieces\"])[\"find\"](function (p) { return ((p)[\"instanceId\"] === (recall)[\"pieceId\"]); }); __rvb_content_graph_region_pc_2 = \"n26\"; break; case \"n26\": __rvb_content_graph_region_pc_2 = (! (! ((recall)[\"actionCount\"] >= (recall)[\"targetCount\"]))) ? \"n25\" : \"n2\"; break; case \"n25\": __rvb_content_graph_region_pc_2 = (! (! (piece && (recall)[\"snapshot\"]))) ? \"n24\" : \"n3\"; break; case \"n24\": occupied = ((battle)[\"pieces\"])[\"find\"](function (p) { return (((((p)[\"instanceId\"] !== (piece)[\"instanceId\"]) && ((p)[\"currentHp\"] > 0)) && ((p)[\"x\"] === ((recall)[\"snapshot\"])[\"x\"])) && ((p)[\"y\"] === ((recall)[\"snapshot\"])[\"y\"])); }); __rvb_content_graph_region_pc_2 = \"n23\"; break; case \"n23\": __rvb_import_effect_9 = flow.effects.displace([{pieceId: (piece)[\"instanceId\"], x: ((recall)[\"snapshot\"])[\"x\"], y: ((recall)[\"snapshot\"])[\"y\"]}], \"teleport\"); __rvb_content_graph_region_pc_2 = \"n22\"; break; case \"n22\": __rvb_content_graph_region_pc_2 = (! (! (__rvb_import_effect_9)[\"success\"])) ? \"n21\" : \"n3\"; break; case \"n21\": (piece)[\"currentHp\"] = Math.min(((recall)[\"snapshot\"])[\"hp\"], (piece)[\"maxHp\"]); __rvb_content_graph_region_pc_2 = \"n20\"; break; case \"n20\": __rvb_content_graph_region_pc_2 = (! (! (((recall)[\"snapshot\"])[\"shield\"] !== (void 0)))) ? \"n19\" : \"n18\"; break; case \"n19\": (piece)[\"shield\"] = ((recall)[\"snapshot\"])[\"shield\"]; __rvb_content_graph_region_pc_2 = \"n18\"; break; case \"n18\": __rvb_content_graph_region_pc_2 = (! (! ((recall)[\"snapshot\"])[\"statusTags\"])) ? \"n17\" : \"n13\"; break; case \"n17\": __rvb_import_effect_7 = JSON.stringify(((recall)[\"snapshot\"])[\"statusTags\"]); __rvb_content_graph_region_pc_2 = \"n16\"; break; case \"n16\": __rvb_import_operand_8 = __rvb_import_effect_7; __rvb_content_graph_region_pc_2 = \"n15\"; break; case \"n15\": __rvb_import_effect_6 = JSON.parse(__rvb_import_operand_8); __rvb_content_graph_region_pc_2 = \"n14\"; break; case \"n14\": (piece)[\"statusTags\"] = __rvb_import_effect_6; __rvb_content_graph_region_pc_2 = \"n13\"; break; case \"n13\": __rvb_content_graph_region_pc_2 = (! (! ((recall)[\"snapshot\"])[\"buffs\"])) ? \"n12\" : \"n8\"; break; case \"n12\": __rvb_import_effect_4 = JSON.stringify(((recall)[\"snapshot\"])[\"buffs\"]); __rvb_content_graph_region_pc_2 = \"n11\"; break; case \"n11\": __rvb_import_operand_5 = __rvb_import_effect_4; __rvb_content_graph_region_pc_2 = \"n10\"; break; case \"n10\": __rvb_import_effect_3 = JSON.parse(__rvb_import_operand_5); __rvb_content_graph_region_pc_2 = \"n9\"; break; case \"n9\": (piece)[\"buffs\"] = __rvb_import_effect_3; __rvb_content_graph_region_pc_2 = \"n8\"; break; case \"n8\": __rvb_content_graph_region_pc_2 = (! (! ((recall)[\"snapshot\"])[\"debuffs\"])) ? \"n7\" : \"n3\"; break; case \"n7\": __rvb_import_effect_1 = JSON.stringify(((recall)[\"snapshot\"])[\"debuffs\"]); __rvb_content_graph_region_pc_2 = \"n6\"; break; case \"n6\": __rvb_import_operand_2 = __rvb_import_effect_1; __rvb_content_graph_region_pc_2 = \"n5\"; break; case \"n5\": __rvb_import_effect_0 = JSON.parse(__rvb_import_operand_2); __rvb_content_graph_region_pc_2 = \"n4\"; break; case \"n4\": (piece)[\"debuffs\"] = __rvb_import_effect_0; __rvb_content_graph_region_pc_2 = \"n3\"; break; case \"n3\": (((battle)[\"extensions\"])[\"recallData\"]).splice(i, 1); __rvb_content_graph_region_pc_2 = \"n2\"; break; case \"n2\": __rvb_content_graph_region_pc_2 = \"n2\"; break; case \"n29\": __rvb_content_graph_loop_continue_1 = true; __rvb_content_graph_region_pc_2 = \"n2\"; break; case \"n31\": __rvb_content_graph_loop_continue_1 = true; __rvb_content_graph_region_pc_2 = \"n2\"; break; default: throw new Error(\"invalid content graph region node\"); } } } if (__rvb_content_graph_loop_break_0) break; { var __rvb_content_graph_region_pc_3 = \"n35\"; while (__rvb_content_graph_region_pc_3 !== \"n34\") { switch (__rvb_content_graph_region_pc_3) { case \"n35\": i = ((+ i) - 1); __rvb_content_graph_region_pc_3 = \"n34\"; break; case \"n34\": __rvb_content_graph_region_pc_3 = \"n34\"; break; default: throw new Error(\"invalid content graph region node\"); } } } if (__rvb_content_graph_loop_break_0) break; if (__rvb_content_graph_loop_continue_1) { __rvb_content_graph_loop_continue_1 = false; continue; } } _pc = \"n1\"; break; case \"n1\": return {success: false}; case \"n38\": return {success: false}; case \"n41\": return {success: false}; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\"); }",
+  "contentGraph": {
+    "version": "rvb-content-graph/v1",
+    "surface": "triggerSkill",
+    "entry": "n42",
+    "nodes": [
+      {
+        "id": "n1",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n36",
+        "kind": "loop",
+        "loop": "for",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": ">=",
+              "left": {
+                "kind": "ref",
+                "name": "i"
+              },
+              "right": {
+                "kind": "literal",
+                "value": 0
+              }
+            }
+          }
+        },
+        "body": {
+          "entry": "n33",
+          "end": "n2",
+          "nodes": [
+            {
+              "id": "n2",
+              "kind": "regionEnd"
+            },
+            {
+              "id": "n3",
+              "kind": "call",
+              "capability": "array.splice",
+              "args": [
+                {
+                  "kind": "get",
+                  "object": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "battle"
+                    },
+                    "key": "extensions"
+                  },
+                  "key": "recallData"
+                },
+                {
+                  "kind": "ref",
+                  "name": "i"
+                },
+                {
+                  "kind": "literal",
+                  "value": 1
+                }
+              ],
+              "next": "n2"
+            },
+            {
+              "id": "n4",
+              "kind": "set",
+              "target": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "piece"
+                },
+                "key": "debuffs"
+              },
+              "operator": "=",
+              "value": {
+                "kind": "ref",
+                "name": "__rvb_import_effect_0"
+              },
+              "next": "n3"
+            },
+            {
+              "id": "n5",
+              "kind": "call",
+              "capability": "JSON.parse",
+              "args": [
+                {
+                  "kind": "ref",
+                  "name": "__rvb_import_operand_2"
+                }
+              ],
+              "result": "__rvb_import_effect_0",
+              "next": "n4"
+            },
+            {
+              "id": "n6",
+              "kind": "bind",
+              "name": "__rvb_import_operand_2",
+              "expr": {
+                "kind": "ref",
+                "name": "__rvb_import_effect_1"
+              },
+              "next": "n5"
+            },
+            {
+              "id": "n7",
+              "kind": "call",
+              "capability": "JSON.stringify",
+              "args": [
+                {
+                  "kind": "get",
+                  "object": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "recall"
+                    },
+                    "key": "snapshot"
+                  },
+                  "key": "debuffs"
+                }
+              ],
+              "result": "__rvb_import_effect_1",
+              "next": "n6"
+            },
+            {
+              "id": "n8",
+              "kind": "branch",
+              "condition": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "unary",
+                  "op": "!",
+                  "argument": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "recall"
+                      },
+                      "key": "snapshot"
+                    },
+                    "key": "debuffs"
+                  }
+                }
+              },
+              "yes": "n7",
+              "no": "n3"
+            },
+            {
+              "id": "n9",
+              "kind": "set",
+              "target": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "piece"
+                },
+                "key": "buffs"
+              },
+              "operator": "=",
+              "value": {
+                "kind": "ref",
+                "name": "__rvb_import_effect_3"
+              },
+              "next": "n8"
+            },
+            {
+              "id": "n10",
+              "kind": "call",
+              "capability": "JSON.parse",
+              "args": [
+                {
+                  "kind": "ref",
+                  "name": "__rvb_import_operand_5"
+                }
+              ],
+              "result": "__rvb_import_effect_3",
+              "next": "n9"
+            },
+            {
+              "id": "n11",
+              "kind": "bind",
+              "name": "__rvb_import_operand_5",
+              "expr": {
+                "kind": "ref",
+                "name": "__rvb_import_effect_4"
+              },
+              "next": "n10"
+            },
+            {
+              "id": "n12",
+              "kind": "call",
+              "capability": "JSON.stringify",
+              "args": [
+                {
+                  "kind": "get",
+                  "object": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "recall"
+                    },
+                    "key": "snapshot"
+                  },
+                  "key": "buffs"
+                }
+              ],
+              "result": "__rvb_import_effect_4",
+              "next": "n11"
+            },
+            {
+              "id": "n13",
+              "kind": "branch",
+              "condition": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "unary",
+                  "op": "!",
+                  "argument": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "recall"
+                      },
+                      "key": "snapshot"
+                    },
+                    "key": "buffs"
+                  }
+                }
+              },
+              "yes": "n12",
+              "no": "n8"
+            },
+            {
+              "id": "n14",
+              "kind": "set",
+              "target": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "piece"
+                },
+                "key": "statusTags"
+              },
+              "operator": "=",
+              "value": {
+                "kind": "ref",
+                "name": "__rvb_import_effect_6"
+              },
+              "next": "n13"
+            },
+            {
+              "id": "n15",
+              "kind": "call",
+              "capability": "JSON.parse",
+              "args": [
+                {
+                  "kind": "ref",
+                  "name": "__rvb_import_operand_8"
+                }
+              ],
+              "result": "__rvb_import_effect_6",
+              "next": "n14"
+            },
+            {
+              "id": "n16",
+              "kind": "bind",
+              "name": "__rvb_import_operand_8",
+              "expr": {
+                "kind": "ref",
+                "name": "__rvb_import_effect_7"
+              },
+              "next": "n15"
+            },
+            {
+              "id": "n17",
+              "kind": "call",
+              "capability": "JSON.stringify",
+              "args": [
+                {
+                  "kind": "get",
+                  "object": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "recall"
+                    },
+                    "key": "snapshot"
+                  },
+                  "key": "statusTags"
+                }
+              ],
+              "result": "__rvb_import_effect_7",
+              "next": "n16"
+            },
+            {
+              "id": "n18",
+              "kind": "branch",
+              "condition": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "unary",
+                  "op": "!",
+                  "argument": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "recall"
+                      },
+                      "key": "snapshot"
+                    },
+                    "key": "statusTags"
+                  }
+                }
+              },
+              "yes": "n17",
+              "no": "n13"
+            },
+            {
+              "id": "n19",
+              "kind": "set",
+              "target": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "piece"
+                },
+                "key": "shield"
+              },
+              "operator": "=",
+              "value": {
+                "kind": "get",
+                "object": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "recall"
+                  },
+                  "key": "snapshot"
+                },
+                "key": "shield"
+              },
+              "next": "n18"
+            },
+            {
+              "id": "n20",
+              "kind": "branch",
+              "condition": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "unary",
+                  "op": "!",
+                  "argument": {
+                    "kind": "binary",
+                    "op": "!==",
+                    "left": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "recall"
+                        },
+                        "key": "snapshot"
+                      },
+                      "key": "shield"
+                    },
+                    "right": {
+                      "kind": "undefined"
+                    }
+                  }
+                }
+              },
+              "yes": "n19",
+              "no": "n18"
+            },
+            {
+              "id": "n21",
+              "kind": "set",
+              "target": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "piece"
+                },
+                "key": "currentHp"
+              },
+              "operator": "=",
+              "value": {
+                "kind": "call",
+                "callee": "Math.min",
+                "args": [
+                  {
+                    "kind": "get",
+                    "object": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "recall"
+                      },
+                      "key": "snapshot"
+                    },
+                    "key": "hp"
+                  },
+                  {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "piece"
+                    },
+                    "key": "maxHp"
+                  }
+                ]
+              },
+              "next": "n20"
+            },
+            {
+              "id": "n22",
+              "kind": "branch",
+              "condition": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "unary",
+                  "op": "!",
+                  "argument": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "__rvb_import_effect_9"
+                    },
+                    "key": "success"
+                  }
+                }
+              },
+              "yes": "n21",
+              "no": "n3"
+            },
+            {
+              "id": "n23",
+              "kind": "call",
+              "capability": "flow.effects.displace",
+              "args": [
+                {
+                  "kind": "array",
+                  "items": [
+                    {
+                      "kind": "object",
+                      "entries": [
+                        {
+                          "key": "pieceId",
+                          "value": {
+                            "kind": "get",
+                            "object": {
+                              "kind": "ref",
+                              "name": "piece"
+                            },
+                            "key": "instanceId"
+                          }
+                        },
+                        {
+                          "key": "x",
+                          "value": {
+                            "kind": "get",
+                            "object": {
+                              "kind": "get",
+                              "object": {
+                                "kind": "ref",
+                                "name": "recall"
+                              },
+                              "key": "snapshot"
+                            },
+                            "key": "x"
+                          }
+                        },
+                        {
+                          "key": "y",
+                          "value": {
+                            "kind": "get",
+                            "object": {
+                              "kind": "get",
+                              "object": {
+                                "kind": "ref",
+                                "name": "recall"
+                              },
+                              "key": "snapshot"
+                            },
+                            "key": "y"
+                          }
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "kind": "literal",
+                  "value": "teleport"
+                }
+              ],
+              "result": "__rvb_import_effect_9",
+              "next": "n22"
+            },
+            {
+              "id": "n24",
+              "kind": "bind",
+              "name": "occupied",
+              "expr": {
+                "kind": "collection",
+                "object": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "battle"
+                  },
+                  "key": "pieces"
+                },
+                "method": "find",
+                "args": [
+                  {
+                    "kind": "lambda",
+                    "parameters": [
+                      "p"
+                    ],
+                    "body": {
+                      "kind": "binary",
+                      "op": "&&",
+                      "left": {
+                        "kind": "binary",
+                        "op": "&&",
+                        "left": {
+                          "kind": "binary",
+                          "op": "&&",
+                          "left": {
+                            "kind": "binary",
+                            "op": "!==",
+                            "left": {
+                              "kind": "get",
+                              "object": {
+                                "kind": "ref",
+                                "name": "p"
+                              },
+                              "key": "instanceId"
+                            },
+                            "right": {
+                              "kind": "get",
+                              "object": {
+                                "kind": "ref",
+                                "name": "piece"
+                              },
+                              "key": "instanceId"
+                            }
+                          },
+                          "right": {
+                            "kind": "binary",
+                            "op": ">",
+                            "left": {
+                              "kind": "get",
+                              "object": {
+                                "kind": "ref",
+                                "name": "p"
+                              },
+                              "key": "currentHp"
+                            },
+                            "right": {
+                              "kind": "literal",
+                              "value": 0
+                            }
+                          }
+                        },
+                        "right": {
+                          "kind": "binary",
+                          "op": "===",
+                          "left": {
+                            "kind": "get",
+                            "object": {
+                              "kind": "ref",
+                              "name": "p"
+                            },
+                            "key": "x"
+                          },
+                          "right": {
+                            "kind": "get",
+                            "object": {
+                              "kind": "get",
+                              "object": {
+                                "kind": "ref",
+                                "name": "recall"
+                              },
+                              "key": "snapshot"
+                            },
+                            "key": "x"
+                          }
+                        }
+                      },
+                      "right": {
+                        "kind": "binary",
+                        "op": "===",
+                        "left": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "p"
+                          },
+                          "key": "y"
+                        },
+                        "right": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "get",
+                            "object": {
+                              "kind": "ref",
+                              "name": "recall"
+                            },
+                            "key": "snapshot"
+                          },
+                          "key": "y"
+                        }
+                      }
+                    }
+                  }
+                ]
+              },
+              "next": "n23"
+            },
+            {
+              "id": "n25",
+              "kind": "branch",
+              "condition": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "unary",
+                  "op": "!",
+                  "argument": {
+                    "kind": "binary",
+                    "op": "&&",
+                    "left": {
+                      "kind": "ref",
+                      "name": "piece"
+                    },
+                    "right": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "recall"
+                      },
+                      "key": "snapshot"
+                    }
+                  }
+                }
+              },
+              "yes": "n24",
+              "no": "n3"
+            },
+            {
+              "id": "n26",
+              "kind": "branch",
+              "condition": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "unary",
+                  "op": "!",
+                  "argument": {
+                    "kind": "binary",
+                    "op": ">=",
+                    "left": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "recall"
+                      },
+                      "key": "actionCount"
+                    },
+                    "right": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "recall"
+                      },
+                      "key": "targetCount"
+                    }
+                  }
+                }
+              },
+              "yes": "n25",
+              "no": "n2"
+            },
+            {
+              "id": "n27",
+              "kind": "bind",
+              "name": "piece",
+              "expr": {
+                "kind": "collection",
+                "object": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "battle"
+                  },
+                  "key": "pieces"
+                },
+                "method": "find",
+                "args": [
+                  {
+                    "kind": "lambda",
+                    "parameters": [
+                      "p"
+                    ],
+                    "body": {
+                      "kind": "binary",
+                      "op": "===",
+                      "left": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "p"
+                        },
+                        "key": "instanceId"
+                      },
+                      "right": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "recall"
+                        },
+                        "key": "pieceId"
+                      }
+                    }
+                  }
+                ]
+              },
+              "next": "n26"
+            },
+            {
+              "id": "n28",
+              "kind": "set",
+              "target": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "recall"
+                },
+                "key": "actionCount"
+              },
+              "operator": "=",
+              "value": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "binary",
+                  "op": "||",
+                  "left": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "recall"
+                    },
+                    "key": "actionCount"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": 0
+                  }
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": 1
+                }
+              },
+              "next": "n27"
+            },
+            {
+              "id": "n29",
+              "kind": "continue"
+            },
+            {
+              "id": "n30",
+              "kind": "branch",
+              "condition": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "unary",
+                  "op": "!",
+                  "argument": {
+                    "kind": "call",
+                    "callee": "arePlayersAllied",
+                    "args": [
+                      {
+                        "kind": "ref",
+                        "name": "battle"
+                      },
+                      {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "actor"
+                        },
+                        "key": "ownerPlayerId"
+                      },
+                      {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "recall"
+                        },
+                        "key": "ownerPlayerId"
+                      }
+                    ]
+                  }
+                }
+              },
+              "yes": "n29",
+              "no": "n28"
+            },
+            {
+              "id": "n31",
+              "kind": "continue"
+            },
+            {
+              "id": "n32",
+              "kind": "branch",
+              "condition": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "unary",
+                  "op": "!",
+                  "argument": {
+                    "kind": "binary",
+                    "op": "||",
+                    "left": {
+                      "kind": "unary",
+                      "op": "!",
+                      "argument": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "context"
+                        },
+                        "key": "rulePiece"
+                      }
+                    },
+                    "right": {
+                      "kind": "binary",
+                      "op": "!==",
+                      "left": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "recall"
+                        },
+                        "key": "pieceId"
+                      },
+                      "right": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "context"
+                          },
+                          "key": "rulePiece"
+                        },
+                        "key": "instanceId"
+                      }
+                    }
+                  }
+                }
+              },
+              "yes": "n31",
+              "no": "n30"
+            },
+            {
+              "id": "n33",
+              "kind": "bind",
+              "name": "recall",
+              "expr": {
+                "kind": "index",
+                "object": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "battle"
+                    },
+                    "key": "extensions"
+                  },
+                  "key": "recallData"
+                },
+                "index": {
+                  "kind": "ref",
+                  "name": "i"
+                }
+              },
+              "next": "n32"
+            }
+          ]
+        },
+        "update": {
+          "entry": "n35",
+          "end": "n34",
+          "nodes": [
+            {
+              "id": "n34",
+              "kind": "regionEnd"
+            },
+            {
+              "id": "n35",
+              "kind": "set",
+              "target": {
+                "kind": "ref",
+                "name": "i"
+              },
+              "operator": "=",
+              "value": {
+                "kind": "binary",
+                "op": "-",
+                "left": {
+                  "kind": "unary",
+                  "op": "+",
+                  "argument": {
+                    "kind": "ref",
+                    "name": "i"
+                  }
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": 1
+                }
+              },
+              "next": "n34"
+            }
+          ]
+        },
+        "next": "n1"
+      },
+      {
+        "id": "n37",
+        "kind": "bind",
+        "name": "i",
+        "expr": {
+          "kind": "binary",
+          "op": "-",
+          "left": {
+            "kind": "get",
+            "object": {
+              "kind": "get",
+              "object": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "battle"
+                },
+                "key": "extensions"
+              },
+              "key": "recallData"
+            },
+            "key": "length"
+          },
+          "right": {
+            "kind": "literal",
+            "value": 1
+          }
+        },
+        "next": "n36"
+      },
+      {
+        "id": "n38",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n39",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "unary",
+              "op": "!",
+              "argument": {
+                "kind": "ref",
+                "name": "actor"
+              }
+            }
+          }
+        },
+        "yes": "n38",
+        "no": "n37"
+      },
+      {
+        "id": "n40",
+        "kind": "bind",
+        "name": "actor",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "context"
+          },
+          "key": "sourcePiece"
+        },
+        "next": "n39"
+      },
+      {
+        "id": "n41",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n42",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "binary",
+                "op": "||",
+                "left": {
+                  "kind": "unary",
+                  "op": "!",
+                  "argument": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "ref",
+                      "name": "battle"
+                    },
+                    "key": "extensions"
+                  }
+                },
+                "right": {
+                  "kind": "unary",
+                  "op": "!",
+                  "argument": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "battle"
+                      },
+                      "key": "extensions"
+                    },
+                    "key": "recallData"
+                  }
+                }
+              },
+              "right": {
+                "kind": "binary",
+                "op": "===",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "get",
+                    "object": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "battle"
+                      },
+                      "key": "extensions"
+                    },
+                    "key": "recallData"
+                  },
+                  "key": "length"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": 0
+                }
+              }
+            }
+          }
+        },
+        "yes": "n41",
+        "no": "n40"
+      }
+    ]
+  },
+  "contentGraphField": "code",
+  "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1"
 }

@@ -4,7 +4,10 @@
   "description": "选择正方向，对7格内所有敌人造成4点伤害，并回复等同于实际总伤害。",
   "keywords": [],
   "targetText": "正方向",
-  "effectTags": ["伤害", "治疗"],
+  "effectTags": [
+    "伤害",
+    "治疗"
+  ],
   "icon": "🦇",
   "kind": "active",
   "type": "normal",
@@ -14,6 +17,1243 @@
   "actionPointCost": 1,
   "range": "single",
   "requiresTarget": true,
-  "targeting": { "steps": [{ "kind": "target", "type": "grid", "filter": "all", "range": 7, "sameRowOrColumn": true, "distanceMetric": "manhattan", "excludeSourceCell": true }] },
-  "code": "function executeSkill(context) { var source = context.piece; var counter = (source.statusTags || []).find(function(tag) { return tag.type === 'mortis-damage-counter'; }); if (!counter || Number(counter.readyCharges || counter.intensity || 0) <= 0) return { success: false, message: '尚未解锁蝙蝠增援' }; var pos = selectTarget({ type: 'grid', range: 7, filter: 'all' }); if (!pos || pos.needsTargetSelection) return pos; var dx = pos.x - source.x; var dy = pos.y - source.y; if ((dx !== 0 && dy !== 0) || (dx === 0 && dy === 0)) return { success: false, message: '请选择正方向' }; var direction = { x: dx === 0 ? 0 : (dx > 0 ? 1 : -1), y: dy === 0 ? 0 : (dy > 0 ? 1 : -1) }; var cells = []; for (var distance = 1; distance <= 7; distance++) cells.push({ x: source.x + direction.x * distance, y: source.y + direction.y * distance }); var enemies = battle.pieces.filter(function(piece) { return piece.currentHp > 0 && !arePlayersAllied(battle, piece.ownerPlayerId, source.ownerPlayerId) && cells.some(function(cell) { return cell.x === piece.x && cell.y === piece.y; }); }); var ready = Math.max(0, Number(counter.readyCharges || counter.intensity || 0) - 1); counter.readyCharges = ready; counter.intensity = ready; if (ready <= 0) removeSkillById(source.instanceId, 'mortis-bat-support'); if (!enemies.length) return { success: true, message: source.name + '释放蝙蝠增援，但7格内没有敌人' }; var result = dealDamage(source, enemies, 4, 'physical', battle, context.skill.id); var totalDamage = Number(result.totalDamage || result.damage || 0); if (totalDamage > 0) healDamage(source, source, totalDamage, battle, context.skill.id); return { success: true, message: source.name + '释放蝙蝠增援，对' + enemies.length + '名敌人造成' + totalDamage + '点伤害并回复等量生命' }; }"
+  "targeting": {
+    "steps": [
+      {
+        "kind": "target",
+        "type": "grid",
+        "filter": "all",
+        "range": 7,
+        "sameRowOrColumn": true,
+        "distanceMetric": "manhattan",
+        "excludeSourceCell": true
+      }
+    ]
+  },
+  "code": "function executeSkill(context) { var cells, counter, direction, distance, dx, dy, enemies, pos, ready, result, source, totalDamage; var _pc = \"n32\"; for (var _step = 0; _step <= 28; _step++) { switch (_pc) { case \"n32\": source = (context)[\"piece\"]; _pc = \"n31\"; break; case \"n31\": counter = (((source)[\"statusTags\"] || []))[\"find\"](function (tag) { return ((tag)[\"type\"] === \"mortis-damage-counter\"); }); _pc = \"n30\"; break; case \"n30\": _pc = (! (! ((! counter) || (Number((((counter)[\"readyCharges\"] || (counter)[\"intensity\"]) || 0)) <= 0)))) ? \"n29\" : \"n28\"; break; case \"n28\": pos = selectTarget({type: \"grid\", range: 7, filter: \"all\"}); _pc = \"n27\"; break; case \"n27\": _pc = (! (! ((! pos) || (pos)[\"needsTargetSelection\"]))) ? \"n26\" : \"n25\"; break; case \"n25\": dx = ((pos)[\"x\"] - (source)[\"x\"]); _pc = \"n24\"; break; case \"n24\": dy = ((pos)[\"y\"] - (source)[\"y\"]); _pc = \"n23\"; break; case \"n23\": _pc = (! (! (((dx !== 0) && (dy !== 0)) || ((dx === 0) && (dy === 0))))) ? \"n22\" : \"n21\"; break; case \"n21\": direction = {x: ((dx === 0) ? 0 : ((dx > 0) ? 1 : (- 1))), y: ((dy === 0) ? 0 : ((dy > 0) ? 1 : (- 1)))}; _pc = \"n20\"; break; case \"n20\": cells = []; _pc = \"n19\"; break; case \"n19\": distance = 1; _pc = \"n18\"; break; case \"n18\": var __rvb_content_graph_loop_break_0 = false, __rvb_content_graph_loop_continue_1 = false; while ((! (! (distance <= 7)))) { __rvb_content_graph_loop_continue_1 = false; { var __rvb_content_graph_region_pc_2 = \"n15\"; while (__rvb_content_graph_region_pc_2 !== \"n14\") { switch (__rvb_content_graph_region_pc_2) { case \"n15\": (cells).push({x: ((source)[\"x\"] + ((direction)[\"x\"] * distance)), y: ((source)[\"y\"] + ((direction)[\"y\"] * distance))}); __rvb_content_graph_region_pc_2 = \"n14\"; break; case \"n14\": __rvb_content_graph_region_pc_2 = \"n14\"; break; default: throw new Error(\"invalid content graph region node\"); } } } if (__rvb_content_graph_loop_break_0) break; { var __rvb_content_graph_region_pc_3 = \"n17\"; while (__rvb_content_graph_region_pc_3 !== \"n16\") { switch (__rvb_content_graph_region_pc_3) { case \"n17\": distance = ((+ distance) + 1); __rvb_content_graph_region_pc_3 = \"n16\"; break; case \"n16\": __rvb_content_graph_region_pc_3 = \"n16\"; break; default: throw new Error(\"invalid content graph region node\"); } } } if (__rvb_content_graph_loop_break_0) break; if (__rvb_content_graph_loop_continue_1) { __rvb_content_graph_loop_continue_1 = false; continue; } } _pc = \"n13\"; break; case \"n13\": enemies = ((battle)[\"pieces\"])[\"filter\"](function (piece) { return ((((piece)[\"currentHp\"] > 0) && (! arePlayersAllied(battle, (piece)[\"ownerPlayerId\"], (source)[\"ownerPlayerId\"]))) && (cells)[\"some\"](function (cell) { return (((cell)[\"x\"] === (piece)[\"x\"]) && ((cell)[\"y\"] === (piece)[\"y\"])); })); }); _pc = \"n12\"; break; case \"n12\": ready = Math.max(0, (Number((((counter)[\"readyCharges\"] || (counter)[\"intensity\"]) || 0)) - 1)); _pc = \"n11\"; break; case \"n11\": (counter)[\"readyCharges\"] = ready; _pc = \"n10\"; break; case \"n10\": (counter)[\"intensity\"] = ready; _pc = \"n9\"; break; case \"n9\": _pc = (! (! (ready <= 0))) ? \"n8\" : \"n7\"; break; case \"n8\": removeSkillById((source)[\"instanceId\"], \"mortis-bat-support\"); _pc = \"n7\"; break; case \"n7\": _pc = (! (! (! (enemies)[\"length\"]))) ? \"n6\" : \"n5\"; break; case \"n5\": result = dealDamage(source, enemies, 4, \"physical\", battle, ((context)[\"skill\"])[\"id\"]); _pc = \"n4\"; break; case \"n4\": totalDamage = Number((((result)[\"totalDamage\"] || (result)[\"damage\"]) || 0)); _pc = \"n3\"; break; case \"n3\": _pc = (! (! (totalDamage > 0))) ? \"n2\" : \"n1\"; break; case \"n2\": healDamage(source, source, totalDamage, battle, ((context)[\"skill\"])[\"id\"]); _pc = \"n1\"; break; case \"n1\": return {success: true, message: ((((((source)[\"name\"] + \"释放蝙蝠增援，对\") + (enemies)[\"length\"]) + \"名敌人造成\") + totalDamage) + \"点伤害并回复等量生命\")}; case \"n6\": return {success: true, message: ((source)[\"name\"] + \"释放蝙蝠增援，但7格内没有敌人\")}; case \"n22\": return {success: false, message: \"请选择正方向\"}; case \"n26\": return pos; case \"n29\": return {success: false, message: \"尚未解锁蝙蝠增援\"}; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\"); }",
+  "contentGraph": {
+    "version": "rvb-content-graph/v1",
+    "surface": "skill",
+    "entry": "n32",
+    "nodes": [
+      {
+        "id": "n1",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "binary",
+                  "op": "+",
+                  "left": {
+                    "kind": "binary",
+                    "op": "+",
+                    "left": {
+                      "kind": "binary",
+                      "op": "+",
+                      "left": {
+                        "kind": "binary",
+                        "op": "+",
+                        "left": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "source"
+                          },
+                          "key": "name"
+                        },
+                        "right": {
+                          "kind": "literal",
+                          "value": "释放蝙蝠增援，对"
+                        }
+                      },
+                      "right": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "enemies"
+                        },
+                        "key": "length"
+                      }
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": "名敌人造成"
+                    }
+                  },
+                  "right": {
+                    "kind": "ref",
+                    "name": "totalDamage"
+                  }
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "点伤害并回复等量生命"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n2",
+        "kind": "call",
+        "capability": "healDamage",
+        "args": [
+          {
+            "kind": "ref",
+            "name": "source"
+          },
+          {
+            "kind": "ref",
+            "name": "source"
+          },
+          {
+            "kind": "ref",
+            "name": "totalDamage"
+          },
+          {
+            "kind": "ref",
+            "name": "battle"
+          },
+          {
+            "kind": "get",
+            "object": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "context"
+              },
+              "key": "skill"
+            },
+            "key": "id"
+          }
+        ],
+        "next": "n1"
+      },
+      {
+        "id": "n3",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": ">",
+              "left": {
+                "kind": "ref",
+                "name": "totalDamage"
+              },
+              "right": {
+                "kind": "literal",
+                "value": 0
+              }
+            }
+          }
+        },
+        "yes": "n2",
+        "no": "n1"
+      },
+      {
+        "id": "n4",
+        "kind": "bind",
+        "name": "totalDamage",
+        "expr": {
+          "kind": "call",
+          "callee": "Number",
+          "args": [
+            {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "binary",
+                "op": "||",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "result"
+                  },
+                  "key": "totalDamage"
+                },
+                "right": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "result"
+                  },
+                  "key": "damage"
+                }
+              },
+              "right": {
+                "kind": "literal",
+                "value": 0
+              }
+            }
+          ]
+        },
+        "next": "n3"
+      },
+      {
+        "id": "n5",
+        "kind": "call",
+        "capability": "dealDamage",
+        "args": [
+          {
+            "kind": "ref",
+            "name": "source"
+          },
+          {
+            "kind": "ref",
+            "name": "enemies"
+          },
+          {
+            "kind": "literal",
+            "value": 4
+          },
+          {
+            "kind": "literal",
+            "value": "physical"
+          },
+          {
+            "kind": "ref",
+            "name": "battle"
+          },
+          {
+            "kind": "get",
+            "object": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "context"
+              },
+              "key": "skill"
+            },
+            "key": "id"
+          }
+        ],
+        "result": "result",
+        "next": "n4"
+      },
+      {
+        "id": "n6",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": true
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "source"
+                  },
+                  "key": "name"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "释放蝙蝠增援，但7格内没有敌人"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n7",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "unary",
+              "op": "!",
+              "argument": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "enemies"
+                },
+                "key": "length"
+              }
+            }
+          }
+        },
+        "yes": "n6",
+        "no": "n5"
+      },
+      {
+        "id": "n8",
+        "kind": "call",
+        "capability": "removeSkillById",
+        "args": [
+          {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "source"
+            },
+            "key": "instanceId"
+          },
+          {
+            "kind": "literal",
+            "value": "mortis-bat-support"
+          }
+        ],
+        "next": "n7"
+      },
+      {
+        "id": "n9",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "<=",
+              "left": {
+                "kind": "ref",
+                "name": "ready"
+              },
+              "right": {
+                "kind": "literal",
+                "value": 0
+              }
+            }
+          }
+        },
+        "yes": "n8",
+        "no": "n7"
+      },
+      {
+        "id": "n10",
+        "kind": "set",
+        "target": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "counter"
+          },
+          "key": "intensity"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "ref",
+          "name": "ready"
+        },
+        "next": "n9"
+      },
+      {
+        "id": "n11",
+        "kind": "set",
+        "target": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "counter"
+          },
+          "key": "readyCharges"
+        },
+        "operator": "=",
+        "value": {
+          "kind": "ref",
+          "name": "ready"
+        },
+        "next": "n10"
+      },
+      {
+        "id": "n12",
+        "kind": "bind",
+        "name": "ready",
+        "expr": {
+          "kind": "call",
+          "callee": "Math.max",
+          "args": [
+            {
+              "kind": "literal",
+              "value": 0
+            },
+            {
+              "kind": "binary",
+              "op": "-",
+              "left": {
+                "kind": "call",
+                "callee": "Number",
+                "args": [
+                  {
+                    "kind": "binary",
+                    "op": "||",
+                    "left": {
+                      "kind": "binary",
+                      "op": "||",
+                      "left": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "counter"
+                        },
+                        "key": "readyCharges"
+                      },
+                      "right": {
+                        "kind": "get",
+                        "object": {
+                          "kind": "ref",
+                          "name": "counter"
+                        },
+                        "key": "intensity"
+                      }
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": 0
+                    }
+                  }
+                ]
+              },
+              "right": {
+                "kind": "literal",
+                "value": 1
+              }
+            }
+          ]
+        },
+        "next": "n11"
+      },
+      {
+        "id": "n13",
+        "kind": "bind",
+        "name": "enemies",
+        "expr": {
+          "kind": "collection",
+          "object": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "battle"
+            },
+            "key": "pieces"
+          },
+          "method": "filter",
+          "args": [
+            {
+              "kind": "lambda",
+              "parameters": [
+                "piece"
+              ],
+              "body": {
+                "kind": "binary",
+                "op": "&&",
+                "left": {
+                  "kind": "binary",
+                  "op": "&&",
+                  "left": {
+                    "kind": "binary",
+                    "op": ">",
+                    "left": {
+                      "kind": "get",
+                      "object": {
+                        "kind": "ref",
+                        "name": "piece"
+                      },
+                      "key": "currentHp"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": 0
+                    }
+                  },
+                  "right": {
+                    "kind": "unary",
+                    "op": "!",
+                    "argument": {
+                      "kind": "call",
+                      "callee": "arePlayersAllied",
+                      "args": [
+                        {
+                          "kind": "ref",
+                          "name": "battle"
+                        },
+                        {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "piece"
+                          },
+                          "key": "ownerPlayerId"
+                        },
+                        {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "source"
+                          },
+                          "key": "ownerPlayerId"
+                        }
+                      ]
+                    }
+                  }
+                },
+                "right": {
+                  "kind": "collection",
+                  "object": {
+                    "kind": "ref",
+                    "name": "cells"
+                  },
+                  "method": "some",
+                  "args": [
+                    {
+                      "kind": "lambda",
+                      "parameters": [
+                        "cell"
+                      ],
+                      "body": {
+                        "kind": "binary",
+                        "op": "&&",
+                        "left": {
+                          "kind": "binary",
+                          "op": "===",
+                          "left": {
+                            "kind": "get",
+                            "object": {
+                              "kind": "ref",
+                              "name": "cell"
+                            },
+                            "key": "x"
+                          },
+                          "right": {
+                            "kind": "get",
+                            "object": {
+                              "kind": "ref",
+                              "name": "piece"
+                            },
+                            "key": "x"
+                          }
+                        },
+                        "right": {
+                          "kind": "binary",
+                          "op": "===",
+                          "left": {
+                            "kind": "get",
+                            "object": {
+                              "kind": "ref",
+                              "name": "cell"
+                            },
+                            "key": "y"
+                          },
+                          "right": {
+                            "kind": "get",
+                            "object": {
+                              "kind": "ref",
+                              "name": "piece"
+                            },
+                            "key": "y"
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        "next": "n12"
+      },
+      {
+        "id": "n18",
+        "kind": "loop",
+        "loop": "for",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "<=",
+              "left": {
+                "kind": "ref",
+                "name": "distance"
+              },
+              "right": {
+                "kind": "literal",
+                "value": 7
+              }
+            }
+          }
+        },
+        "body": {
+          "entry": "n15",
+          "end": "n14",
+          "nodes": [
+            {
+              "id": "n14",
+              "kind": "regionEnd"
+            },
+            {
+              "id": "n15",
+              "kind": "call",
+              "capability": "array.push",
+              "args": [
+                {
+                  "kind": "ref",
+                  "name": "cells"
+                },
+                {
+                  "kind": "object",
+                  "entries": [
+                    {
+                      "key": "x",
+                      "value": {
+                        "kind": "binary",
+                        "op": "+",
+                        "left": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "source"
+                          },
+                          "key": "x"
+                        },
+                        "right": {
+                          "kind": "binary",
+                          "op": "*",
+                          "left": {
+                            "kind": "get",
+                            "object": {
+                              "kind": "ref",
+                              "name": "direction"
+                            },
+                            "key": "x"
+                          },
+                          "right": {
+                            "kind": "ref",
+                            "name": "distance"
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "key": "y",
+                      "value": {
+                        "kind": "binary",
+                        "op": "+",
+                        "left": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "source"
+                          },
+                          "key": "y"
+                        },
+                        "right": {
+                          "kind": "binary",
+                          "op": "*",
+                          "left": {
+                            "kind": "get",
+                            "object": {
+                              "kind": "ref",
+                              "name": "direction"
+                            },
+                            "key": "y"
+                          },
+                          "right": {
+                            "kind": "ref",
+                            "name": "distance"
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              ],
+              "next": "n14"
+            }
+          ]
+        },
+        "update": {
+          "entry": "n17",
+          "end": "n16",
+          "nodes": [
+            {
+              "id": "n16",
+              "kind": "regionEnd"
+            },
+            {
+              "id": "n17",
+              "kind": "set",
+              "target": {
+                "kind": "ref",
+                "name": "distance"
+              },
+              "operator": "=",
+              "value": {
+                "kind": "binary",
+                "op": "+",
+                "left": {
+                  "kind": "unary",
+                  "op": "+",
+                  "argument": {
+                    "kind": "ref",
+                    "name": "distance"
+                  }
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": 1
+                }
+              },
+              "next": "n16"
+            }
+          ]
+        },
+        "next": "n13"
+      },
+      {
+        "id": "n19",
+        "kind": "bind",
+        "name": "distance",
+        "expr": {
+          "kind": "literal",
+          "value": 1
+        },
+        "next": "n18"
+      },
+      {
+        "id": "n20",
+        "kind": "bind",
+        "name": "cells",
+        "expr": {
+          "kind": "array",
+          "items": []
+        },
+        "next": "n19"
+      },
+      {
+        "id": "n21",
+        "kind": "bind",
+        "name": "direction",
+        "expr": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "x",
+              "value": {
+                "kind": "conditional",
+                "test": {
+                  "kind": "binary",
+                  "op": "===",
+                  "left": {
+                    "kind": "ref",
+                    "name": "dx"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": 0
+                  }
+                },
+                "consequent": {
+                  "kind": "literal",
+                  "value": 0
+                },
+                "alternate": {
+                  "kind": "conditional",
+                  "test": {
+                    "kind": "binary",
+                    "op": ">",
+                    "left": {
+                      "kind": "ref",
+                      "name": "dx"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": 0
+                    }
+                  },
+                  "consequent": {
+                    "kind": "literal",
+                    "value": 1
+                  },
+                  "alternate": {
+                    "kind": "unary",
+                    "op": "-",
+                    "argument": {
+                      "kind": "literal",
+                      "value": 1
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "key": "y",
+              "value": {
+                "kind": "conditional",
+                "test": {
+                  "kind": "binary",
+                  "op": "===",
+                  "left": {
+                    "kind": "ref",
+                    "name": "dy"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": 0
+                  }
+                },
+                "consequent": {
+                  "kind": "literal",
+                  "value": 0
+                },
+                "alternate": {
+                  "kind": "conditional",
+                  "test": {
+                    "kind": "binary",
+                    "op": ">",
+                    "left": {
+                      "kind": "ref",
+                      "name": "dy"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": 0
+                    }
+                  },
+                  "consequent": {
+                    "kind": "literal",
+                    "value": 1
+                  },
+                  "alternate": {
+                    "kind": "unary",
+                    "op": "-",
+                    "argument": {
+                      "kind": "literal",
+                      "value": 1
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "next": "n20"
+      },
+      {
+        "id": "n22",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": "请选择正方向"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n23",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "binary",
+                "op": "&&",
+                "left": {
+                  "kind": "binary",
+                  "op": "!==",
+                  "left": {
+                    "kind": "ref",
+                    "name": "dx"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": 0
+                  }
+                },
+                "right": {
+                  "kind": "binary",
+                  "op": "!==",
+                  "left": {
+                    "kind": "ref",
+                    "name": "dy"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": 0
+                  }
+                }
+              },
+              "right": {
+                "kind": "binary",
+                "op": "&&",
+                "left": {
+                  "kind": "binary",
+                  "op": "===",
+                  "left": {
+                    "kind": "ref",
+                    "name": "dx"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": 0
+                  }
+                },
+                "right": {
+                  "kind": "binary",
+                  "op": "===",
+                  "left": {
+                    "kind": "ref",
+                    "name": "dy"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": 0
+                  }
+                }
+              }
+            }
+          }
+        },
+        "yes": "n22",
+        "no": "n21"
+      },
+      {
+        "id": "n24",
+        "kind": "bind",
+        "name": "dy",
+        "expr": {
+          "kind": "binary",
+          "op": "-",
+          "left": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "pos"
+            },
+            "key": "y"
+          },
+          "right": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "source"
+            },
+            "key": "y"
+          }
+        },
+        "next": "n23"
+      },
+      {
+        "id": "n25",
+        "kind": "bind",
+        "name": "dx",
+        "expr": {
+          "kind": "binary",
+          "op": "-",
+          "left": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "pos"
+            },
+            "key": "x"
+          },
+          "right": {
+            "kind": "get",
+            "object": {
+              "kind": "ref",
+              "name": "source"
+            },
+            "key": "x"
+          }
+        },
+        "next": "n24"
+      },
+      {
+        "id": "n26",
+        "kind": "return",
+        "value": {
+          "kind": "ref",
+          "name": "pos"
+        }
+      },
+      {
+        "id": "n27",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "ref",
+                  "name": "pos"
+                }
+              },
+              "right": {
+                "kind": "get",
+                "object": {
+                  "kind": "ref",
+                  "name": "pos"
+                },
+                "key": "needsTargetSelection"
+              }
+            }
+          }
+        },
+        "yes": "n26",
+        "no": "n25"
+      },
+      {
+        "id": "n28",
+        "kind": "call",
+        "capability": "selectTarget",
+        "args": [
+          {
+            "kind": "object",
+            "entries": [
+              {
+                "key": "type",
+                "value": {
+                  "kind": "literal",
+                  "value": "grid"
+                }
+              },
+              {
+                "key": "range",
+                "value": {
+                  "kind": "literal",
+                  "value": 7
+                }
+              },
+              {
+                "key": "filter",
+                "value": {
+                  "kind": "literal",
+                  "value": "all"
+                }
+              }
+            ]
+          }
+        ],
+        "result": "pos",
+        "next": "n27"
+      },
+      {
+        "id": "n29",
+        "kind": "return",
+        "value": {
+          "kind": "object",
+          "entries": [
+            {
+              "key": "success",
+              "value": {
+                "kind": "literal",
+                "value": false
+              }
+            },
+            {
+              "key": "message",
+              "value": {
+                "kind": "literal",
+                "value": "尚未解锁蝙蝠增援"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "n30",
+        "kind": "branch",
+        "condition": {
+          "kind": "unary",
+          "op": "!",
+          "argument": {
+            "kind": "unary",
+            "op": "!",
+            "argument": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "unary",
+                "op": "!",
+                "argument": {
+                  "kind": "ref",
+                  "name": "counter"
+                }
+              },
+              "right": {
+                "kind": "binary",
+                "op": "<=",
+                "left": {
+                  "kind": "call",
+                  "callee": "Number",
+                  "args": [
+                    {
+                      "kind": "binary",
+                      "op": "||",
+                      "left": {
+                        "kind": "binary",
+                        "op": "||",
+                        "left": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "counter"
+                          },
+                          "key": "readyCharges"
+                        },
+                        "right": {
+                          "kind": "get",
+                          "object": {
+                            "kind": "ref",
+                            "name": "counter"
+                          },
+                          "key": "intensity"
+                        }
+                      },
+                      "right": {
+                        "kind": "literal",
+                        "value": 0
+                      }
+                    }
+                  ]
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": 0
+                }
+              }
+            }
+          }
+        },
+        "yes": "n29",
+        "no": "n28"
+      },
+      {
+        "id": "n31",
+        "kind": "bind",
+        "name": "counter",
+        "expr": {
+          "kind": "collection",
+          "object": {
+            "kind": "binary",
+            "op": "||",
+            "left": {
+              "kind": "get",
+              "object": {
+                "kind": "ref",
+                "name": "source"
+              },
+              "key": "statusTags"
+            },
+            "right": {
+              "kind": "array",
+              "items": []
+            }
+          },
+          "method": "find",
+          "args": [
+            {
+              "kind": "lambda",
+              "parameters": [
+                "tag"
+              ],
+              "body": {
+                "kind": "binary",
+                "op": "===",
+                "left": {
+                  "kind": "get",
+                  "object": {
+                    "kind": "ref",
+                    "name": "tag"
+                  },
+                  "key": "type"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "mortis-damage-counter"
+                }
+              }
+            }
+          ]
+        },
+        "next": "n30"
+      },
+      {
+        "id": "n32",
+        "kind": "bind",
+        "name": "source",
+        "expr": {
+          "kind": "get",
+          "object": {
+            "kind": "ref",
+            "name": "context"
+          },
+          "key": "piece"
+        },
+        "next": "n31"
+      }
+    ]
+  },
+  "contentGraphField": "code",
+  "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1"
 }
