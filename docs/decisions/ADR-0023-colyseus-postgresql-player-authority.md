@@ -22,6 +22,8 @@ SQLite/Prisma 进程中。单 writer 争用和动作回执等待持久化放大�
   网络往返前呈现候选目标。预检不得写回状态、消费随机、读取未投影隐藏信息，或预测伤害、触发链、
   终局和持久化结果；最终 action 必须由 Colyseus 服务端完整校验，服务端 continuation/rejected 始终
   覆盖本地展示。该例外不批准通用客户端预测或 Web Worker。
+  RED-249 批准的独立 Node AI 进程可见信息隔离推演例外见
+  [ADR-0038](./ADR-0038-cloud-ai-player.md)；普通客户端的上述边界继续有效。
 - SQLite/Prisma 不再参与新 Colyseus 玩家房间或战斗动作路径。现有内容 Profile 管理进程暂时保留，
   其移除属于后续迁移，不得把它误写成玩家动作仍经过 SQLite。
 - Windows LAN 房主随玩家客户端携带 PostgreSQL 16 x64 原生运行时；仅在选择“本机开服”时按需启动，
