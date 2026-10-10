@@ -652,7 +652,7 @@
 #boardStage3d:has(.action-history-dock.is-preview-open) { will-change:auto !important; }
 .is-viewing-history #handCards { opacity:.3; pointer-events:none; }
 .is-viewing-history #pieceInfoModal, .is-viewing-history #tileStatusPanel,
-.is-viewing-history .battle-vignette-veil, .is-viewing-history .battle-vignette-status,
+.is-viewing-history .battle-vignette-status,
 .is-viewing-history .battle-comic-beat { visibility:hidden; }
 .action-history-sentence:hover { outline:1px dashed #bc9b6c; outline-offset:2px; }
   .action-history-player-avatar { display:inline-grid; place-items:center; width:22px; height:22px; border:2px solid #3b2b20; border-radius:6px; background:#80594c; color:#f0dfbe; font-size:12px; }
@@ -721,15 +721,6 @@ body #playerResCards .player-state-tags { display:flex; position:absolute; top:c
 }
 @media (prefers-reduced-motion: reduce) {
   .battle-comic-beat { animation: none; transform: translate(-50%, -50%); }
-}
-
-.battle-vignette-veil {
-  position: absolute;
-  inset: 0;
-  background: rgba(2, 6, 23, 0.2);
-  opacity: 1;
-  pointer-events: none;
-  animation: battle-vignette-veil-in 120ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .battle-vignette-status {
@@ -861,11 +852,6 @@ body #playerResCards .player-state-tags { display:flex; position:absolute; top:c
 
 body.full-map .battle-vignette-speed-control { top: 12px; }
 body.target-mode-active .battle-vignette-speed-control { top: calc(env(safe-area-inset-top) + 66px); }
-
-@keyframes battle-vignette-veil-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
 
 .piece-context-menu {
   --piece-menu-origin-x: left;
@@ -1247,7 +1233,6 @@ body.target-mode-active .battle-vignette-speed-control { top: calc(env(safe-area
   .card-item,
   .action-history-item,
   .action-history-branch { transition-duration: 1ms !important; }
-  .battle-vignette-veil { animation: none !important; }
 }
 
 @media (orientation: landscape) and (max-height: 500px) {
