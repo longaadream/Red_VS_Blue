@@ -1,13 +1,20 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- fixtures exercise the serialized battle contract. */
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
+import { runInNewContext } from 'node:vm'
 
-import { describe, expect, it } from 'vitest'
+import { beforeAll, describe, expect, it, vi } from 'vitest'
 
+import { loadMaps } from '@/config/maps'
 import { planBotActions } from '@/lib/game/ai'
+import { listLegalAIActions } from '@/lib/game/ai-environment'
+import { createInitialBattleForPlayers } from '@/lib/game/battle-setup'
+import { runBattleAction } from '@/lib/game/battle-runner'
+import { getPieceById } from '@/lib/game/piece-repository'
 import { planTutorialAiAction } from '@/lib/game/tutorial-ai'
 import { hashStable } from '@/lib/game/battle-trace'
 import { practiceEnvironment } from '@/lib/practice/environment'
+import { evaluateZeroStageState } from '@/lib/practice/evaluator'
 import { makePiece, makeState } from '../helpers/minimal-state'
 
 const ROOT_SEED = 0x228a11
@@ -25,6 +32,11 @@ const SEARCH_CONFIG = {
   decisionTimeMs: 0,
   deploymentTimeMs: 0,
 }
+
+beforeAll(async () => {
+  vi.spyOn(console, 'log').mockImplementation(() => undefined)
+  await loadMaps()
+})
 
 function loadJson(relativePath: string): any {
   return JSON.parse(readFileSync(resolve(process.cwd(), relativePath), 'utf8'))
@@ -165,6 +177,72 @@ function plan(state: any, options: Record<string, unknown> = {}) {
   })
 }
 
+const deploy = (playerId: string, expectedDeploymentRevision: number, pieceId: string, toX?: number, toY?: number) => ({
+  type: 'deployReservePiece', playerId, expectedDeploymentRevision, pieceId,
+  ...(toX === undefined ? {} : { toX, toY }),
+} as const)
+const endTurn = (playerId: string) => ({ type: 'endTurn', playerId } as const)
+const beginPhase = () => ({ type: 'beginPhase' } as const)
+const basicSkill = (
+  playerId: string,
+  pieceId: string,
+  skillId: string,
+  selectionId: string,
+  stateRevision: number,
+  targetX: number,
+  targetY: number,
+) => ({ type: 'useBasicSkill', playerId, pieceId, skillId, selectionId, stateRevision, targetX, targetY } as const)
+
+/**
+ * Compact replay of the canonical RED-232 late state. The commands are the
+ * public action log from seed 18707; replaying them keeps the fixture tied to
+ * the real authority/profile without checking in a serialized battle blob.
+ */
+const CANONICAL_LATE_ACTIONS = [
+  deploy('training-red', 1, 'training-red-1', 1, 10),
+  endTurn('training-red'), beginPhase(),
+  deploy('training-blue', 3, 'training-blue-6', 6, 7),
+  basicSkill('training-blue', 'training-blue-6', 'blackwidow-lethal-toxin', 'sel-1-5-hnvo4n', 5, 3, 9),
+  { type: 'move', playerId: 'training-blue', pieceId: 'training-blue-6', toX: 1, toY: 9 },
+  { type: 'playCard', playerId: 'training-blue', cardInstanceId: 'ci-lucky-coin-00004913-1ufqatl-0-zqxdji' },
+  { type: 'move', playerId: 'training-blue', pieceId: 'training-blue-8', toX: 15, toY: 1 },
+  endTurn('training-blue'), beginPhase(),
+  deploy('training-red', 5, 'training-red-2', 1, 2), endTurn('training-red'), beginPhase(),
+  deploy('training-blue', 7, 'training-blue-2', 16, 8), endTurn('training-blue'), beginPhase(),
+  deploy('training-red', 9, 'training-red-3', 10, 10), endTurn('training-red'), beginPhase(),
+  deploy('training-blue', 11, 'training-blue-3', 12, 14),
+  basicSkill('training-blue', 'training-blue-6', 'blackwidow-lethal-strike', 'sel-1-l-y56z55', 21, 1, 10),
+  endTurn('training-blue'), beginPhase(),
+  deploy('training-red', 13, 'training-red-5', 10, 3), endTurn('training-red'), beginPhase(),
+  deploy('training-blue', 15, 'training-blue-1', 7, 7),
+  basicSkill('training-blue', 'training-blue-6', 'blackwidow-lethal-strike', 'sel-1-s-1sfhlvy', 28, 1, 10),
+  basicSkill('training-blue', 'training-blue-6', 'blackwidow-lethal-toxin', 'sel-1-t-vxii65', 29, 2, 10),
+  endTurn('training-blue'), beginPhase(),
+  deploy('training-red', 17, 'training-red-4', 17, 13), endTurn('training-red'), beginPhase(),
+  deploy('training-blue', 19, 'training-blue-5', 6, 12),
+  basicSkill('training-blue', 'training-blue-6', 'blackwidow-lethal-strike', 'sel-1-10-htx2tt', 36, 1, 10),
+  endTurn('training-blue'), beginPhase(),
+  deploy('training-red', 21, 'training-red-6', 6, 1), endTurn('training-red'), beginPhase(),
+  deploy('training-blue', 23, 'training-blue-4'), endTurn('training-blue'), beginPhase(),
+  deploy('training-red', 25, 'training-red-7'), endTurn('training-red'), beginPhase(),
+  deploy('training-blue', 27, 'training-blue-7'), endTurn('training-blue'), beginPhase(),
+  endTurn('training-red'), beginPhase(),
+] as const
+
+async function canonicalLateState() {
+  const sandbox = {} as { RvBTutorialLessons?: any }
+  runInNewContext(readFileSync('data/pages/js/tutorial/tutorial-lessons.js', 'utf8'), sandbox)
+  const lessons = sandbox.RvBTutorialLessons!
+  const lesson = lessons.get('tactical-intuition')
+  let state = await lessons.createBattle({ createInitialBattleForPlayers, getPieceById }, lesson)
+  for (const [index, action] of CANONICAL_LATE_ACTIONS.entries()) {
+    const transition = runBattleAction(state, action, { rootSeed: lesson.rootSeed })
+    if (!transition.state) throw new Error(`Canonical lesson action produced no state at step ${index + 1}`)
+    state = transition.state
+  }
+  return state
+}
+
 function applyPlanned(state: any, decision: any) {
   expect(decision.nextAction, `expected an action; stopReason=${decision.stopReason}`).toBeDefined()
   const beforeHash = hashStable(state)
@@ -301,6 +379,63 @@ describe('RED-228 tutorial tactical planner', () => {
     expect(hiddenPlan.nextAction?.action).toEqual(first.nextAction?.action)
     expect(hiddenPlan.score).toBe(first.score)
   })
+
+  it('compares an ordinary root action when the stop baseline consumes the soft cutoff', () => {
+    const state = fixture({ casterSkills: ['fireball'], targetHp: 12 })
+    let reads = 0
+    const decision = plan(state, {
+      config: { ...SEARCH_CONFIG, turnTimeMs: 2_000, decisionTimeMs: 250 },
+      now: () => ++reads <= 2 ? 0 : 250,
+    })
+    const endTurnId = practiceEnvironment.listLegalActions(state, 'player-red')
+      .find(candidate => candidate.kind === 'end-turn')?.id
+
+    expect(decision.nextAction?.kind).toBe('basic-skill')
+    expect(decision.nodes).toBeGreaterThanOrEqual(2)
+    expect(decision.trace.filter(row => row.depth === 0 && row.reason === 'evaluated')
+      .map(row => row.candidateId)).toEqual(expect.arrayContaining([endTurnId]))
+    expect(decision.elapsedMs).toBe(250)
+  })
+
+  it('keeps a canonical full-roster late turn from stopping after the baseline only', async () => {
+    const state = await canonicalLateState()
+    expect(state.turn.turnNumber).toBe(16)
+    expect(state.pieces).toHaveLength(15)
+    expect(Object.values(state.deployment?.reserves ?? {}).flat()).toHaveLength(0)
+    const beforeHash = hashStable(state)
+    let reads = 0
+    const decision = planTutorialAiAction(state, 'training-blue', 18707, {
+      now: () => ++reads <= 2 ? 0 : 251,
+      config: { ...SEARCH_CONFIG, turnTimeMs: 2_500, decisionTimeMs: 250 },
+    })
+    const legalAtRoot = listLegalAIActions(state, 'training-blue')
+    const baseline = legalAtRoot.find(candidate => candidate.kind === 'end-turn')!
+    const baselineTransition = practiceEnvironment.simulate(state, baseline, { rootSeed: 18707 })
+    const baselineScore = baselineTransition.accepted
+      ? evaluateZeroStageState(practiceEnvironment.observe(baselineTransition.state, 'training-blue')).total
+      : Number.NEGATIVE_INFINITY
+    expect(decision.nodes).toBeGreaterThanOrEqual(12)
+    expect(decision.overDecisionBudget).toBe(true)
+    const evaluatedRoots = decision.trace.filter(row => row.depth === 0 && row.reason === 'evaluated')
+    expect(evaluatedRoots).toHaveLength(12)
+    expect(evaluatedRoots.map(row => row.candidateId)).toContain(baseline.id)
+    expect(evaluatedRoots.some(row => row.candidateId !== baseline.id)).toBe(true)
+    expect(decision.nextAction?.action).toMatchObject({
+      type: 'useBasicSkill',
+      pieceId: 'training-blue-3',
+      skillId: 'ulquiorra-cero',
+      targetPieceId: 'training-red-7',
+    })
+    const chosenTransition = practiceEnvironment.simulate(state, decision.nextAction!, { rootSeed: 18707 })
+    expect(chosenTransition.accepted, JSON.stringify(chosenTransition)).toBe(true)
+    if (!chosenTransition.accepted) throw new Error('expected the canonical ordinary action to be accepted')
+    const chosenScore = evaluateZeroStageState(
+      practiceEnvironment.observe(chosenTransition.state, 'training-blue'),
+    ).total
+    expect(decision.score).toBeGreaterThan(baselineScore)
+    expect(chosenScore).toBeGreaterThan(baselineScore)
+    expect(hashStable(state)).toBe(beforeHash)
+  }, 15_000)
 
   it('uses a deterministic coordinate-less deployment boundary without simulating hidden landing', () => {
     const state = fixture({ progressiveDeployment: true, fallbackDeployment: true, casterSkills: [] })

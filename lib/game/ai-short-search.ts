@@ -14,12 +14,15 @@ export interface ShortSearchConfig {
   turnTimeMs: number
   decisionTimeMs: number
   deploymentTimeMs: number
+  /** Optional caller-owned root coverage; zero keeps the legacy search order. */
+  minimumRootCoverage?: number
 }
 
 export const SHORT_SEARCH_DEFAULTS: Readonly<ShortSearchConfig> = Object.freeze({
   depth: 3, beamWidth: 6, rootCandidates: 24, childCandidates: 10,
   nodesPerDecision: 128, deploymentNodesPerDecision: 384, nodesPerTurn: 896, maxActionsPerTurn: 24,
   turnTimeMs: 4500, decisionTimeMs: 900, deploymentTimeMs: 2250,
+  minimumRootCoverage: 0,
 })
 
 /** Keep one continuation per battle/player; pass it back even if a command must be retried. */
@@ -57,6 +60,8 @@ export interface ShortSearchDecision {
   considered: number
   elapsedMs: number
   overTurnBudget: boolean
+  /** Additive diagnostic for a soft per-decision cutoff overrun. */
+  overDecisionBudget?: boolean
   stopReason: 'selected' | 'terminal' | 'other-player' | 'no-actions' | 'time-budget' | 'node-budget' | 'action-budget' | 'random-boundary'
   continuation: ShortSearchContinuation
   trace: ShortSearchTrace[]
@@ -118,6 +123,45 @@ function priority(c: CandidateAction, observation: AIObservation) {
     if (hostiles.length) rank += Math.min(...hostiles.map(p => Math.abs(a.targetX! - p.x!) + Math.abs(a.targetY! - p.y!)))
   }
   return rank
+}
+
+const ordinaryRootAction = (c: CandidateAction) => !structural(c) && c.kind !== 'end-turn'
+
+/**
+ * Keep the legacy candidate selector for ordinary practice searches. Tutorial
+ * callers may request a small root floor so a stop baseline is compared with
+ * representatives from skill, card, and movement families before a soft time
+ * cutoff is allowed to stop the search.
+ */
+function selectRootCoverageCandidates(
+  legal: CandidateAction[],
+  observation: AIObservation,
+  limit: number,
+  coverage: number,
+) {
+  const selected: CandidateAction[] = []
+  const add = (candidate: CandidateAction | undefined) => {
+    if (candidate && selected.length < limit && !selected.some(item => item.id === candidate.id)) selected.push(candidate)
+  }
+  add(legal.find(candidate => candidate.kind === 'end-turn'))
+  const skills = legal.filter(candidate => candidate.kind === 'basic-skill' || candidate.kind === 'charge-skill')
+  const orderedSkills = skills.length ? selectShortSearchCandidates(skills, observation, Math.min(limit, skills.length)) : []
+  const skillRepresentatives: CandidateAction[] = []
+  const skillActors = new Set<string>()
+  for (const candidate of orderedSkills) {
+    const key = actor(candidate)
+    if (skillActors.has(key)) continue
+    skillActors.add(key)
+    skillRepresentatives.push(candidate)
+  }
+  const card = selectShortSearchCandidates(legal.filter(candidate => candidate.kind === 'card'), observation, 1)[0]
+  const move = selectShortSearchCandidates(legal.filter(candidate => candidate.kind === 'move'), observation, 1)[0]
+  for (const candidate of [skillRepresentatives[0], card, move, ...skillRepresentatives.slice(1)]) {
+    if (selected.length >= coverage) break
+    add(candidate)
+  }
+  for (const candidate of selectShortSearchCandidates(legal, observation, limit)) add(candidate)
+  return selected
 }
 
 /** Round-robin actor/skill families, then alternate directed and dispersed alternatives within each family. */
@@ -186,8 +230,10 @@ export function planShortSearchAction(state: BattleState, playerId: string, root
   const started = now()
   const config = { ...SHORT_SEARCH_DEFAULTS, ...options.config }
   for (const [key, value] of Object.entries(config)) {
-    if (!Number.isSafeInteger(value) || value < (key.endsWith('Ms') ? 0 : 1)) throw new Error(`Invalid short-search ${key}`)
+    const minimum = key === 'minimumRootCoverage' || key.endsWith('Ms') ? 0 : 1
+    if (!Number.isSafeInteger(value) || value < minimum) throw new Error(`Invalid short-search ${key}`)
   }
+  if ((config.minimumRootCoverage ?? 0) > 12) throw new Error('Invalid short-search minimumRootCoverage')
   const actionsTaken = options.actionsTakenThisTurn ?? 0
   let decisionTimeMs = config.decisionTimeMs
   let decisionNodeLimit = config.nodesPerDecision
@@ -204,6 +250,7 @@ export function planShortSearchAction(state: BattleState, playerId: string, root
   const trace: ShortSearchTrace[] = []
   let best: Node | undefined
   let fallback: CandidateAction | undefined
+  let rootCoverageEvaluated = 0
   let stopReason: ShortSearchDecision['stopReason'] = 'selected'
   let lastTime = started
   const elapsed = () => {
@@ -219,14 +266,15 @@ export function planShortSearchAction(state: BattleState, playerId: string, root
       nextAction: best?.sequence[0] ?? fallback, sequence: best?.sequence ?? (fallback ? [fallback] : []),
       score: best?.score, nodes, considered, elapsedMs,
       overTurnBudget: config.turnTimeMs > 0 && total > config.turnTimeMs,
+      overDecisionBudget: decisionTimeMs > 0 && elapsedMs > decisionTimeMs,
       stopReason, continuation: { turnKey, nodes: (old?.nodes ?? 0) + nodes, elapsedMs: total }, trace,
     }
   }
-  const budgetStop = () => {
+  const budgetStop = (allowDecisionOverrun = false) => {
     const ms = elapsed()
-    if ((config.turnTimeMs > 0 && (old?.elapsedMs ?? 0) + ms >= config.turnTimeMs)
-      || (decisionTimeMs > 0 && ms >= decisionTimeMs)) return 'time-budget' as const
+    if (config.turnTimeMs > 0 && (old?.elapsedMs ?? 0) + ms >= config.turnTimeMs) return 'time-budget' as const
     if (nodes >= decisionNodeLimit || (old?.nodes ?? 0) + nodes >= config.nodesPerTurn) return 'node-budget' as const
+    if (!allowDecisionOverrun && decisionTimeMs > 0 && ms >= decisionTimeMs) return 'time-budget' as const
     return undefined
   }
   if (environment.isTerminal(state)) { stopReason = 'terminal'; return finish() }
@@ -255,6 +303,21 @@ export function planShortSearchAction(state: BattleState, playerId: string, root
   if (actionsTaken >= config.maxActionsPerTurn - 1 && fallback?.kind === 'end-turn') {
     stopReason = 'action-budget'; return finish()
   }
+  const requestedRootCoverage = config.minimumRootCoverage ?? 0
+  // A fairness comparison needs the stop baseline plus one ordinary action;
+  // normalize a caller's positive minimum to that smallest useful floor.
+  const requiredRootCoverage = requestedRootCoverage > 0 ? Math.max(2, requestedRootCoverage) : 0
+  const entryRootCoverageAvailable = !deploymentDecision
+    && requiredRootCoverage > 0
+    && requiredRootCoverage <= decisionNodeLimit
+    && (old?.nodes ?? 0) + requiredRootCoverage <= config.nodesPerTurn
+    && (config.turnTimeMs === 0 || (old?.elapsedMs ?? 0) < config.turnTimeMs)
+    && actionsTaken < config.maxActionsPerTurn - 1
+  const stopBaseline = legal.find(candidate => candidate.kind === 'end-turn')
+  const ordinaryRootActions = legal.filter(ordinaryRootAction)
+  const rootCoverage = entryRootCoverageAvailable && stopBaseline && ordinaryRootActions.length
+    ? Math.min(requiredRootCoverage, 1 + ordinaryRootActions.length)
+    : 0
   const evalScore = (o: AIObservation) => {
     const score = options.evaluate(o)
     if (!Number.isFinite(score)) throw new Error('Non-finite public evaluation')
@@ -269,21 +332,27 @@ export function planShortSearchAction(state: BattleState, playerId: string, root
     // Allocate a per-parent quota so the first branch cannot consume the entire next depth.
     const quota = Math.max(1, Math.floor((decisionNodeLimit - nodes) / beam.length))
     for (const parent of beam) {
-      const stop = budgetStop()
+      const stop = budgetStop(depth === 0 && rootCoverage > 0 && rootCoverageEvaluated < rootCoverage)
       if (stop) { stopReason = stop; break search }
       const candidates = depth === 0 ? legal : environment.listLegalActions(parent.state, playerId)
       considered += candidates.length
-      const admitted = selectShortSearchCandidates(candidates, parent.observation,
-        Math.min(quota, deploymentDecision ? config.deploymentNodesPerDecision
-          : depth === 0 ? config.rootCandidates : config.childCandidates))
+      const rootLimit = Math.min(quota, deploymentDecision ? config.deploymentNodesPerDecision
+        : depth === 0 ? Math.max(config.rootCandidates, rootCoverage) : config.childCandidates)
+      const admitted = depth === 0 && rootCoverage > 0
+        ? selectRootCoverageCandidates(candidates, parent.observation, rootLimit, rootCoverage)
+        : selectShortSearchCandidates(candidates, parent.observation, rootLimit)
       const ids = new Set(admitted.map(c => c.id))
       for (const c of candidates) if (!ids.has(c.id)) trace.push({ depth, candidateId: c.id,
         rootId: parent.sequence[0]?.id ?? c.id, reason: 'candidate-limit' })
       for (const candidate of admitted) {
         if (candidate.kind === 'reserve-deployment' && candidate.action.type === 'deployReservePiece'
           && candidate.action.toX === undefined) continue
-        const stop = budgetStop()
+        const countsTowardsRootCoverage = candidate.kind === 'end-turn' || ordinaryRootAction(candidate)
+        const rootFairnessPending = depth === 0 && rootCoverage > 0
+          && countsTowardsRootCoverage && rootCoverageEvaluated < rootCoverage
+        const stop = budgetStop(rootFairnessPending)
         if (stop) { stopReason = stop; break search }
+        if (depth === 0 && rootCoverage > 0 && countsTowardsRootCoverage) rootCoverageEvaluated++
         nodes++
         const row: ShortSearchTrace = { depth, candidateId: candidate.id,
           rootId: parent.sequence[0]?.id ?? candidate.id, reason: 'evaluated' }

@@ -740,8 +740,7 @@
       layer.dataset.rootId = effectGroup.rootEventId
       const bannerElapsedMs = queue.getDiagnostics().bannerProgressMs
       const bannerDurationMs = bannerDuration(bannerGroup)
-      layer.innerHTML = '<div class="battle-vignette-veil" aria-hidden="true"></div>'
-        + '<div class="battle-vignette-status" data-action="' + escapeHtml(rootEvent.kind) + '" data-faction="' + escapeHtml(identity.faction) + '" role="status" aria-live="polite"'
+      layer.innerHTML = '<div class="battle-vignette-status" data-action="' + escapeHtml(rootEvent.kind) + '" data-faction="' + escapeHtml(identity.faction) + '" role="status" aria-live="polite"'
         + ' style="--banner-duration:' + (bannerDurationMs / speed) + 'ms;--banner-elapsed:-'
         + (bannerElapsedMs / speed) + 'ms">'
         + (card ? renderCard(rootEvent, card) : '<span class="battle-vignette-label">'
