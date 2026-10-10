@@ -116,7 +116,6 @@
     var saved = sessionFor(base())
     setHidden('homeLoginFields', !!saved)
     setHidden('homeCommunityRetry', !saved)
-    setHidden('homeLogout', !saved)
     var email = node('homeAccountEmail'), password = node('homeAccountPassword')
     if (email) email.required = !saved
     if (password) password.required = !saved
@@ -198,16 +197,16 @@
   }
 
   function disableControls(disabled) {
-    ;['homeLoginSubmit', 'homeLogout', 'homeCommunityRetry', 'homeAccountServer', 'homeAccountManage', 'homeGuestSave'].forEach(function (id) {
+    ;['homeLoginSubmit', 'homeCommunityRetry', 'homeAccountServer', 'homeAccountManage', 'homeGuestSave'].forEach(function (id) {
       var element = node(id); if (element) element.disabled = disabled
     })
   }
 
   async function run(work) {
-    if (busy) return
+    if (busy) return false
     busy = true
     disableControls(true)
-    try { await work() } catch (error) { setText('homeAccountStatus', error && error.message ? error.message : '请求失败') }
+    try { await work(); return true } catch (error) { setText('homeAccountStatus', error && error.message ? error.message : '请求失败'); return false }
     finally {
       busy = false
       disableControls(false)
@@ -311,19 +310,17 @@
     })
   }
 
-  node('homeLogout').onclick = function () {
-    void run(async function () {
-      var origin = base(), saved = sessionFor(origin), token = saved && saved.token
-      sessionEpoch += 1
-      stopHeartbeat()
-      try { if (token) await request(origin, '/official/auth/logout', {}, token, 'POST') }
-      finally {
-        if (token) clearCurrentSession(origin, token)
-        else { connected = false; window.RvBUtils.clearOfficialSession(origin); showSession() }
-      }
-      var current = sessionFor(origin)
-      if (!current || !token || current.token === token) setText('homeAccountStatus', '已退出，可继续离线游玩')
-    })
+  async function logout() {
+    var origin = base(), saved = sessionFor(origin), token = saved && saved.token
+    sessionEpoch += 1
+    stopHeartbeat()
+    try { if (token) await request(origin, '/official/auth/logout', {}, token, 'POST') }
+    finally {
+      if (token) clearCurrentSession(origin, token)
+      else { connected = false; window.RvBUtils.clearOfficialSession(origin); showSession() }
+    }
+    var current = sessionFor(origin)
+    if (!current || !token || current.token === token) setText('homeAccountStatus', '已退出，可继续离线游玩')
   }
 
   node('homeCommunityRetry').onclick = function () {
@@ -367,6 +364,7 @@
   window.RvBHomeAccount = {
     refresh: refresh,
     autoConnect: autoConnect,
+    logout: function () { return run(logout) },
     open: function () {
       suppressPrompt = true
       if (!busy) {
@@ -378,6 +376,7 @@
       node('accountDialog').showModal()
     },
   }
+  if (window.RvBPlayerProfile && typeof window.RvBPlayerProfile.setLogoutHandler === 'function') window.RvBPlayerProfile.setLogoutHandler(function () { return window.RvBHomeAccount.logout() })
   window.addEventListener('storage', refresh)
   window.addEventListener('rvb-official-presence', handlePresenceStatus)
   refresh()

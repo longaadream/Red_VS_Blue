@@ -171,7 +171,9 @@ describe('RED-227 local skill choice sequence', () => {
     const { state, action } = fixture()
     const pending = applyBattleAction(state, action).pendingTargetSelection!
     const changed = { ...pending, transaction: { ...pending.transaction!, currentInteraction: {
-      ...pending.transaction!.currentInteraction!, consumerOrdinal: pending.transaction!.currentInteraction!.consumerOrdinal + 1,
+      ...pending.transaction!.currentInteraction!,
+      consumerOrdinal: pending.transaction!.currentInteraction!.consumerOrdinal + 1,
+      consumerOccurrence: (pending.transaction!.currentInteraction!.consumerOccurrence ?? 0) + 1,
     } } }
     expect(skillChoicePromptKey('target', pending as unknown as Record<string, unknown>))
       .not.toBe(skillChoicePromptKey('target', changed as unknown as Record<string, unknown>))

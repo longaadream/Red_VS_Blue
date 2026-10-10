@@ -273,6 +273,12 @@ suite('RED-242 official community against real PostgreSQL', () => {
     expect((await request(outsider, '/official/community/board?limit=20')).body.posts)
       .not.toEqual(expect.arrayContaining([expect.objectContaining({ id: postId })]))
 
+    const hiddenSearch = await app!.community.moderation(0, { q: 'moderation target', status: 'hidden', kind: 'posts' })
+    expect(hiddenSearch.posts).toEqual(expect.arrayContaining([expect.objectContaining({ id: postId, hidden: true, deleted: false })]))
+    expect(hiddenSearch.replies).toHaveLength(0)
+    const visiblePosts = await app!.community.moderation(0, { status: 'visible', kind: 'posts' })
+    expect(visiblePosts.posts).not.toEqual(expect.arrayContaining([expect.objectContaining({ id: postId })]))
+
     const panel = await startControlPanel({
       ranked: app!.ranked,
       community: app!.community,
@@ -300,12 +306,60 @@ suite('RED-242 official community against real PostgreSQL', () => {
       await panel.close()
     }
 
+    const unauthorizedRestore = await fetch(origin + '/official/admin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${outsider.token}` },
+      body: JSON.stringify({ action: 'community-restore-post', value: postId, reason: 'restore attempt' }),
+    })
+    expect(unauthorizedRestore.status).toBe(403)
+    const restored = await fetch(origin + '/official/admin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminSecret}` },
+      body: JSON.stringify({ action: 'community-restore-post', value: postId, reason: 'restore for review' }),
+    })
+    expect(restored.status).toBe(200)
+    expect((await request(outsider, '/official/community/board?limit=20')).body.posts)
+      .toEqual(expect.arrayContaining([expect.objectContaining({ id: postId })]))
+    const reply = await request<{ id: string }>(outsider, `/official/community/posts/${postId}/replies`, { body: 'reply moderation target' })
+    expect(reply.status).toBe(200)
+    const hiddenReply = await fetch(origin + '/official/admin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminSecret}` },
+      body: JSON.stringify({ action: 'community-hide-reply', value: reply.body.id, reason: 'reply moderation' }),
+    })
+    expect(hiddenReply.status).toBe(200)
+    expect((await app!.community.moderation(0, { q: 'reply moderation target', status: 'hidden', kind: 'replies' })).replies)
+      .toEqual(expect.arrayContaining([expect.objectContaining({ id: reply.body.id, hidden: true })]))
+    const restoredReply = await fetch(origin + '/official/admin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminSecret}` },
+      body: JSON.stringify({ action: 'community-restore-reply', value: reply.body.id, reason: 'reply restore' }),
+    })
+    expect(restoredReply.status).toBe(200)
+    expect((await request(outsider, `/official/community/posts/${postId}/replies?limit=20`)).body.replies)
+      .toEqual(expect.arrayContaining([expect.objectContaining({ id: reply.body.id })]))
+
+    const deletedPost = await request<{ id: string }>(author, '/official/community/posts', {
+      kind: 'discussion', title: 'deleted moderation target', body: 'author deleted',
+    })
+    expect(deletedPost.status).toBe(200)
+    expect((await request(author, `/official/community/posts/${deletedPost.body.id}/delete`, {})).status).toBe(200)
+    const restoreDeleted = await fetch(origin + '/official/admin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminSecret}` },
+      body: JSON.stringify({ action: 'community-restore-post', value: deletedPost.body.id, reason: 'cannot restore author deletion' }),
+    })
+    expect(restoreDeleted.status).toBe(409)
+    expect((await app!.community.moderation(0, { status: 'deleted', kind: 'posts' })).posts)
+      .toEqual(expect.arrayContaining([expect.objectContaining({ id: deletedPost.body.id, deleted: true })]))
+
     const audit = await app!.pool.query<{ action: string; detail: { value?: string; reason?: string } }>(
       'SELECT action, detail FROM official_audit ORDER BY id DESC LIMIT 20',
     )
-    const moderationAudit = audit.rows.find(row => row.detail.value === postId)
+    const moderationAudit = audit.rows.find(row => row.action === 'community-hide-post' && row.detail.value === postId)
     expect(moderationAudit).toMatchObject({ action: expect.stringMatching(/community|moder/i) })
     expect(moderationAudit!.detail.reason).toBe('integration test')
+    expect(audit.rows.some(row => row.action === 'community-restore-post' && row.detail.value === postId)).toBe(true)
   }, 120_000)
 
   it('keeps older posts and replies reachable through bounded moderation pages', async () => {
@@ -326,6 +380,10 @@ suite('RED-242 official community against real PostgreSQL', () => {
     expect(second.replies.some(row => row.id === prefix + '-reply-1')).toBe(true)
     await app!.community.administer('community-hide-post', prefix + '-1', 'history moderation')
     expect((await app!.community.moderation(100)).posts.find(row => row.id === prefix + '-1')?.hidden).toBe(true)
+    await app!.community.administer('community-restore-post', prefix + '-1', 'history restore')
+    expect((await app!.community.moderation(100, { status: 'visible', kind: 'posts' })).posts.find(row => row.id === prefix + '-1')?.hidden).toBe(false)
+    await expect(app!.community.moderation(0, { status: 'unknown' })).rejects.toThrow('审核状态无效')
+    await expect(app!.community.moderation(0, { q: 'x'.repeat(201) })).rejects.toThrow('审核搜索内容长度无效')
     await expect(app!.community.moderation(-1)).rejects.toThrow('审核页码无效')
     await expect(app!.community.moderation(1.5)).rejects.toThrow('审核页码无效')
     await expect(app!.community.moderation(1000001)).rejects.toThrow('审核页码无效')

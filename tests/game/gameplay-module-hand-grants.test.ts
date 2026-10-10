@@ -41,7 +41,7 @@ describe('semantic hand generation', () => {
         const expected = run(false, seed, count), actual = run(true, seed, count)
         expect(actual, `${id}:${seed}:${count}`).toEqual(expected)
         expect(actual.result.success).toBe(true)
-        if (id === 'elune-blessing') expect(actual.state.players[0].buffs['elune-blessing-buff']).toEqual({ multiplier: 2, uses: 1 })
+        if (id === 'elune-blessing') expect(actual.state.players[0].buffs['elune-blessing-buff']).toEqual({ multiplier: 1.5, uses: 1 })
       }
     } finally {
       clearRuleCache(); clearSkillDefinitionCache()

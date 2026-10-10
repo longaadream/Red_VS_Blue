@@ -3,7 +3,7 @@ import type { Pool, PoolClient } from 'pg'
 import type { BattleAuthorityCheckpointRecord } from '@/lib/game/battle-transition'
 import type { BattleState } from '@/lib/game/turn'
 import { Accounts, OfficialError, transaction, type Account } from './accounts'
-import { PREGAME_SCHEMA, createPregame, advancePregame, applyPregameAction, publicPregame, pregameBattlePlayers, readPregame, validateRankedMapPool } from './pregame'
+import { PREGAME_SCHEMA, createPregame, advancePregame, applyPregameAction, publicPregame, pregameBattlePlayers, readPregame, validateRankedMapPool, getRankedMapPoolState } from './pregame'
 import type { Player } from '@/lib/game/room-model'
 import { assertGameProfileCompatibleV1 } from '@/lib/content-pipeline/runtime/profile-game-identity'
 
@@ -43,6 +43,13 @@ export class Ranked {
   private busy = false
   private stopping = false
   private lastError = ''
+  /**
+   * A resource-pack change can invalidate the saved pool after it was
+   * confirmed.  Keep that failure latched until a successful map-pool admin
+   * action; otherwise restoring the old pack while this process is alive
+   * would silently resume admissions without an operator review.
+   */
+  private mapPoolNeedsConfirmation = false
   private readonly lifecycleTasks = new Map<string, Promise<unknown>>()
   private async serialize<T>(id: string, task: () => Promise<T>): Promise<T> {
     const previous = this.lifecycleTasks.get(id) ?? Promise.resolve()
@@ -55,11 +62,46 @@ export class Ranked {
     if (!Number.isInteger(maxMatches) || maxMatches < 1 || maxMatches > 50) throw new Error('排位并发局数须为1–50')
   }
   private async lock(client: PoolClient) { await client.query('SELECT pg_advisory_xact_lock(196196)') }
+  private async ensureMapPoolGate(client: PoolClient, state: ReturnType<typeof getRankedMapPoolState>) {
+    // This check must use the database, not the process latch.  The caller
+    // holds the same advisory lock as map-pool administration, so the audit
+    // record and the admission decision are committed as one transaction.
+    const latest = (await client.query("SELECT action FROM official_audit WHERE action IN ('map-pool','map-pool-invalid') ORDER BY id DESC LIMIT 1")).rows[0]?.action
+    if (!state.blocked && latest !== 'map-pool-invalid') {
+      this.mapPoolNeedsConfirmation = false
+      return false
+    }
+    if (latest !== 'map-pool-invalid') {
+      await client.query('INSERT INTO official_audit(action,detail) VALUES($1,$2)', ['map-pool-invalid', {
+        reason: state.reason ?? 'ranked-map-pool-requires-admin-confirmation',
+        invalidIds: state.invalidIds,
+      }])
+    }
+    this.mapPoolNeedsConfirmation = true
+    return true
+  }
   get maxMatches() { return this.capacity }
   async initialize() {
     await this.pool.query(RANKED_SCHEMA)
     await this.pool.query(PREGAME_SCHEMA)
     this.capacity = (await this.pool.query('UPDATE official_settings SET max_matches=coalesce(max_matches,$1) RETURNING max_matches', [this.capacity])).rows[0].max_matches
+    const persisted = await transaction(this.pool, async client => {
+      await this.lock(client)
+      const settings = (await client.query('SELECT ranked_maps FROM official_settings')).rows[0]
+      const state = getRankedMapPoolState(settings.ranked_maps)
+      const latestMapPoolAudit = (await client.query("SELECT action FROM official_audit WHERE action IN ('map-pool','map-pool-invalid') ORDER BY id DESC LIMIT 1")).rows[0]?.action
+      if (state.blocked && latestMapPoolAudit !== 'map-pool-invalid') {
+        await client.query('INSERT INTO official_audit(action,detail) VALUES($1,$2)', ['map-pool-invalid', { reason: state.reason, invalidIds: state.invalidIds }])
+      }
+      return { state, latestMapPoolAudit }
+    })
+    this.mapPoolNeedsConfirmation = this.mapPoolNeedsConfirmation || persisted.state.blocked || persisted.latestMapPoolAudit === 'map-pool-invalid'
+  }
+  /** State exposed to the local control panel, including a latched failure. */
+  getRankedMapPoolState(saved: unknown) {
+    const state = getRankedMapPoolState(saved)
+    if (!this.mapPoolNeedsConfirmation) return state
+    return { ...state, blocked: true, reason: state.reason ?? 'ranked-map-pool-requires-admin-confirmation' }
   }
   async start(lifecycle: Lifecycle) {
     this.lifecycle = lifecycle
@@ -84,15 +126,22 @@ export class Ranked {
     if (this.stopping || this.lastError) throw new OfficialError('服务器正在维护，请稍后重试', 503)
     let profileIdentity
     try { profileIdentity = assertGameProfileCompatibleV1(identity) } catch { throw new OfficialError('游戏版本与服务器不兼容，请更新后再匹配', 409) }
-    await transaction(this.pool, async client => {
+    const blocked = await transaction(this.pool, async client => {
       await this.lock(client)
       const account = (await client.query('SELECT banned,ranked_disabled FROM official_accounts WHERE id=$1', [accountId])).rows[0]
       if (!account || account.banned || account.ranked_disabled) throw new OfficialError('该账号的排位资格已被限制', 403)
-      if ((await client.query('SELECT maintenance FROM official_settings')).rows[0].maintenance) throw new OfficialError('排位正在维护', 503)
+      const settings = (await client.query('SELECT maintenance,ranked_maps FROM official_settings')).rows[0]
+      if (settings.maintenance) throw new OfficialError('排位正在维护', 503)
+      const rawMapPool = getRankedMapPoolState(settings.ranked_maps)
+      if (await this.ensureMapPoolGate(client, rawMapPool)) {
+        return true
+      }
       if ((await client.query('SELECT 1 FROM official_claims WHERE account_id=$1', [accountId])).rowCount) throw new OfficialError('请先完成当前比赛', 409)
       if ((await client.query('SELECT 1 FROM official_cooldowns WHERE account_id=$1 AND until_at>now()', [accountId])).rowCount) throw new OfficialError('频繁长时间掉线，匹配冷却尚未结束', 429)
       await client.query(`INSERT INTO official_queue(account_id,profile_identity) VALUES($1,$2) ON CONFLICT(account_id) DO UPDATE SET seen_at=now(),profile_identity=excluded.profile_identity`, [accountId, profileIdentity])
+      return false
     })
+    if (blocked) throw new OfficialError('排位地图池需要管理员确认后才能开始新比赛', 503)
   }
   async cancel(accountId: string) {
     await transaction(this.pool, async client => { await this.lock(client); await client.query('DELETE FROM official_queue WHERE account_id=$1', [accountId]) })
@@ -143,6 +192,14 @@ export class Ranked {
       await client.query(`DELETE FROM official_queue WHERE seen_at<now()-interval '20 seconds' OR account_id IN (SELECT id FROM official_accounts WHERE banned OR ranked_disabled)`)
       const settings = (await client.query('SELECT * FROM official_settings')).rows[0]
       if (settings.maintenance || this.stopping) return
+      const rawMapPool = getRankedMapPoolState(settings.ranked_maps)
+      // A resource-pack update may leave the persisted selection pointing at
+      // missing or ineligible maps.  Existing matches continue through
+      // reconcile; only creation of a new match is blocked until an
+      // administrator saves a valid pool.
+      if (await this.ensureMapPoolGate(client, rawMapPool)) {
+        return
+      }
       const count = Number((await client.query(`SELECT count(*) FROM official_matches WHERE status='assigned'`)).rows[0].count)
       if (count >= settings.max_matches) return
       const queue = (await client.query(`SELECT q.account_id,q.profile_identity FROM official_queue q WHERE NOT EXISTS (SELECT 1 FROM official_claims c WHERE c.account_id=q.account_id) ORDER BY q.created_at,q.account_id LIMIT 2`)).rows
@@ -295,7 +352,8 @@ export class Ranked {
       } else if (action === 'map-pool') {
         let pool: unknown
         try { pool = JSON.parse(value) } catch { throw new OfficialError('地图池格式错误') }
-        await client.query('UPDATE official_settings SET ranked_maps=$1', [JSON.stringify(validateRankedMapPool(pool))])
+        const validated = validateRankedMapPool(pool)
+        await client.query('UPDATE official_settings SET ranked_maps=$1', [JSON.stringify(validated)])
       } else if (action === 'announcement') {
         if (value.length > 1000) throw new OfficialError('公告不能超过1000字')
         await client.query('UPDATE official_settings SET announcement=$1', [value.trim()])
@@ -308,6 +366,7 @@ export class Ranked {
       } else throw new OfficialError('未知管理操作')
       await client.query('INSERT INTO official_audit(action,detail) VALUES($1,$2)', [action, { value, reason: reason.trim() }])
     })
+    if (action === 'map-pool') this.mapPoolNeedsConfirmation = false
     if (action === 'capacity') this.capacity = Number(value)
     if (['ban', 'kick'].includes(action)) await this.lifecycle?.revokeAccount?.(value)
   }

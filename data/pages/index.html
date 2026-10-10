@@ -11,6 +11,7 @@
   <script src="js/lan-discover.js"></script>
   <script src="js/crypto-lib.js"></script>
   <script src="js/identity.js"></script>
+  <script src="js/compatibility-presentation.js"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
     body {
@@ -71,6 +72,41 @@
     .user-pill:hover { background: #18243a; border-color: #64748b; }
     .user-dot { width: 7px; height: 7px; border-radius: 50%; background: #f59e0b; }
     .user-elo { color: #94a3b8; font-size: 11px; }
+    .header-actions { display: flex; align-items: flex-start; justify-content: flex-end; gap: 10px; min-width: 0; }
+    .application-exit-control {
+      position: fixed !important;
+      top: max(16px, env(safe-area-inset-top)) !important;
+      right: max(16px, env(safe-area-inset-right)) !important;
+      z-index: 2147483647 !important;
+      display: grid;
+      justify-items: end;
+      gap: 4px;
+      pointer-events: auto;
+    }
+    .application-exit-control[hidden] { display: none !important; }
+    .application-exit-button {
+      min-height: 42px;
+      padding: 9px 13px;
+      border: 1px solid #7f1d1d;
+      border-radius: 9px;
+      background: #35151d;
+      color: #fecaca;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 800;
+    }
+    .official-update-panel .application-exit-button {
+      min-height: 42px !important;
+      padding: 9px 13px !important;
+      border: 1px solid #7f1d1d !important;
+      background: #35151d !important;
+      color: #fecaca !important;
+      font-size: 13px !important;
+      font-weight: 800 !important;
+    }
+    .application-exit-button:hover { background: #4c1d27; border-color: #ef4444; }
+    .application-exit-button:disabled { cursor: wait; opacity: .7; }
+    .application-exit-error { max-width: 18ch; color: #fca5a5; font-size: 11px; line-height: 1.35; text-align: right; }
 
     /* ── Primary workspace ── */
     .menu-workspace {
@@ -263,6 +299,8 @@
       .connection-groups { grid-template-columns: 1fr; }
       .action-button { min-height: 74px; grid-template-columns: 50px minmax(0, 1fr) auto; gap: 12px; padding: 12px; }
       .action-code { width: 50px; height: 44px; }
+      .header-actions { gap: 6px; }
+      .application-exit-button { min-height: 38px; padding: 7px 9px; font-size: 12px; }
       .utility-button { flex-direction: column; gap: 3px; text-align: center; }
       .utility-meta { max-width: 100%; }
     }
@@ -407,11 +445,17 @@
         <span class="brand-vs">vs</span>
         <span class="brand-blue">BLUE</span>
       </h1>
-      <button id="userPill" class="user-pill" type="button" onclick="openIdentitySheet()" aria-label="登录或管理服务器账号">
-        <span class="user-dot" id="userDot"></span>
-        <span id="userName">玩家</span>
-        <span class="user-elo" id="userElo"></span>
-      </button>
+      <div class="header-actions">
+        <button id="userPill" class="user-pill" type="button" onclick="openIdentitySheet()" aria-label="登录或管理服务器账号">
+          <span class="user-dot" id="userDot"></span>
+          <span id="userName">玩家</span>
+          <span class="user-elo" id="userElo"></span>
+        </button>
+        <div class="application-exit-control" data-application-exit-control hidden>
+          <button id="applicationExitButton" class="application-exit-button" data-application-exit type="button" aria-describedby="applicationExitError">退出程序</button>
+          <span id="applicationExitError" class="application-exit-error" data-application-exit-error role="alert" hidden></span>
+        </div>
+      </div>
     </header>
 
     <details style="margin:0 0 12px auto;max-width:300px;color:var(--ink, #ead4a3)">
@@ -563,6 +607,7 @@
         <span class="utility-title">开发者中心</span><span class="utility-meta">固定种子与赛后 Trace</span>
       </button>
     </footer>
+  <div id="compatibilityRecovery" class="compatibility-recovery" role="alert" hidden></div>
   </div>
 
   <!-- ── Connect Sheet ── -->
@@ -635,6 +680,7 @@
       </form>
       </details>
       <div id="lanConnectError" role="alert" style="display:none;margin-bottom:8px"></div>
+      <div id="lanCompatibilityRecovery" class="compatibility-recovery" role="alert" hidden></div>
       <div class="lan-progress-bar"><div class="lan-progress-fill" id="lanProgressFill"></div></div>
       <div class="lan-scanning" id="lanScanningRow"><span class="spin">⟳</span><span id="lanScanningText">快速扫描中（约10秒）…</span></div>
       <label>玩法 <select id="lanModeFilter" onchange="filterLanRooms()"><option value="all">全部</option><option value="1v1">1v1 对战</option><option value="2v2">2v2 组队</option><option value="pve">PVE 冒险</option></select></label><div class="lan-server-list" id="lanServerList">
@@ -660,7 +706,6 @@
         <button type="button" id="homeAccountManage">注册 / 找回密码</button>
       </div>
       <button type="button" id="homeCommunityRetry" hidden>重新连接社区</button>
-      <button type="button" id="homeLogout" hidden>退出登录</button>
     </form>
     <hr>
     <label>离线 / LAN 昵称<input id="homeGuestName" maxlength="20" style="display:block;width:100%;box-sizing:border-box;margin:8px 0;padding:10px"></label>
@@ -890,6 +935,7 @@
 
     function showJoinSheet() {
       _lanFound = []
+      if (typeof clearCompatibilityRecovery === 'function') clearCompatibilityRecovery(document.getElementById('lanCompatibilityRecovery'))
       document.getElementById('lanOverlay').classList.add('show')
       document.getElementById('lanSubtitle').textContent = '正在搜索局域网主机…'
       document.getElementById('lanServerList').innerHTML = '<div class="lan-empty">尚未发现主机</div>'
@@ -1011,9 +1057,12 @@
     async function connectLanServer(url, roomId) {
       if (_lanScanner) _lanScanner.cancel()
       _lanScanner = null
+      const recoveryHost = document.getElementById('lanCompatibilityRecovery')
+      if (typeof clearCompatibilityRecovery === 'function') clearCompatibilityRecovery(recoveryHost)
       document.getElementById('lanScanningRow').style.display = 'none'
       document.getElementById('lanRescanBtn').style.display = 'block'
       const errorBox = document.getElementById('lanConnectError')
+      errorBox.hidden = false
       errorBox.style.display = 'block'
       errorBox.textContent = '正在连接…'
       try {
@@ -1028,7 +1077,9 @@
         if (await checkProfileAndGo(url, 'lan', roomId ? { joinRoom: roomId } : undefined)) closeLanSheet()
         else errorBox.textContent = '未进入大厅，请检查刚才的资源版本提示。'
       } catch (error) {
-        errorBox.textContent = '无法连接 ' + url + '：' + error.message + '。请确认房主显示“服务器已运行”。使用 Radmin 等虚拟局域网时，请填写房主的虚拟网卡 IP 和游戏端口；同一 Wi-Fi／热点才使用对应无线网卡地址。'
+        const detail = '无法连接 ' + url + '：' + error.message + '。请确认房主显示“服务器已运行”。使用 Radmin 等虚拟局域网时，请填写房主的虚拟网卡 IP 和游戏端口；同一 Wi-Fi／热点才使用对应无线网卡地址。'
+        errorBox.textContent = detail
+        showCompatibilityRecovery(error, detail, error && error.context && error.context.field, recoveryHost)
       }
     }
 
@@ -1131,7 +1182,9 @@
       } catch (e) {
         if (btn) btn.textContent = '›'
         if (desc) desc.textContent = '对阵 AI，开始独立 PVE 冒险'
-        alert('创建 PVE 房间失败：' + ((e && e.message) || e))
+        const detail = '创建 PVE 房间失败：' + ((e && e.message) || e)
+        showCompatibilityRecovery(e, detail)
+        alert(detail)
       }
     }
 
@@ -1465,33 +1518,86 @@
         || !/^[a-f0-9]{64}$/.test(identity.resolvedProfileHash)
         || !/^[a-f0-9]{64}$/.test(identity.authorityContentHash)
       ) {
-        throw new Error('本地 Profile Identity 无效，请打开“资源包管理”检查安装状态')
+        const invalid = new Error('本地 Profile Identity 无效，请打开“资源包管理”检查安装状态')
+        invalid.code = 'PROFILE_INVALID'
+        throw invalid
       }
       try { localStorage.setItem('rvb_game_profile_identity', JSON.stringify(identity)) } catch {}
       return identity
     }
 
 
+    function getCompatibilityRecoveryHost(target) {
+      if (target) return target
+      const lanOverlay = document.getElementById('lanOverlay')
+      const lanHost = document.getElementById('lanCompatibilityRecovery')
+      if (lanOverlay && lanHost && lanOverlay.classList.contains('show')) return lanHost
+      return document.getElementById('compatibilityRecovery')
+    }
+
+    function showCompatibilityRecovery(error, message, field, target) {
+      const host = getCompatibilityRecoveryHost(target)
+      const presentation = window.RvBCompatibilityPresentation
+      if (!host || !presentation || typeof presentation.render !== 'function') return null
+      const entry = presentation.render(host, error, { message, field, buttonClass: 'btn-primary' })
+      if (!entry && host.id === 'lanCompatibilityRecovery') {
+        host.textContent = message
+        host.hidden = false
+      }
+      return entry
+    }
+
+    function clearCompatibilityRecovery(target) {
+      const hosts = target
+        ? [target]
+        : [document.getElementById('compatibilityRecovery'), document.getElementById('lanCompatibilityRecovery')]
+      const presentation = window.RvBCompatibilityPresentation
+      if (!presentation || typeof presentation.clear !== 'function') return
+      hosts.forEach(host => { if (host) presentation.clear(host) })
+    }
+
     async function checkProfileAndGo(serverUrl, mode, intent) {
       let installed
       try {
         installed = await getLocalGameProfileIdentity(serverUrl)
       } catch (error) {
-        alert('无法进入大厅：' + ((error && error.message) || error))
+        const detail = '无法进入大厅：' + ((error && error.message) || error)
+        showCompatibilityRecovery(error, detail)
+        alert(detail)
         return false
       }
       try {
         const data = await RvBColyseus.requestCatalogIdentityAt(serverUrl, 'remote-server')
-        if (!/^[a-f0-9]{64}$/.test(data?.profileIdentity?.resolvedProfileHash || '')) throw new Error('主机返回的资源身份无效')
+        if (!/^[a-f0-9]{64}$/.test(data?.profileIdentity?.resolvedProfileHash || '')) {
+          const invalid = new Error('主机返回的资源身份无效')
+          invalid.code = 'PROFILE_INVALID'
+          throw invalid
+        }
         for (const key of ['schemaVersion', 'engineAbi', 'runnerRevision', 'authorityContentHash']) {
-          if (!data?.profileIdentity || installed[key] !== data.profileIdentity[key]) throw new Error('主机与本机资源版本不同，请两端使用配套版本')
+          if (!data?.profileIdentity || installed[key] !== data.profileIdentity[key]) {
+            const mismatch = new Error('主机与本机资源版本不同，请两端使用配套版本')
+            mismatch.code = key === 'engineAbi'
+              ? 'ENGINE_ABI_MISMATCH'
+              : key === 'runnerRevision'
+                ? 'RUNNER_REVISION_MISMATCH'
+                : 'PROFILE_IDENTITY_MISMATCH'
+            mismatch.context = { field: key, actual: installed, expected: data?.profileIdentity }
+            throw mismatch
+          }
         }
         if (data && data.profileIdentity) {
           try { localStorage.setItem('rvb_server_profile_identity', JSON.stringify(data.profileIdentity)) } catch {}
         }
       } catch (error) {
-        alert('无法进入大厅：' + ((error && error.message) || error))
+        const detail = '无法进入大厅：' + ((error && error.message) || error)
+        showCompatibilityRecovery(error, detail, error && error.context && error.context.field)
+        alert(detail)
         return false
+      }
+      if (typeof clearCompatibilityRecovery === 'function') clearCompatibilityRecovery()
+      else {
+        const recovery = document.getElementById('compatibilityRecovery')
+        if (recovery && window.RvBCompatibilityPresentation) window.RvBCompatibilityPresentation.clear(recovery)
       }
       goLobby(mode, serverUrl, intent)
       return true
@@ -1564,6 +1670,54 @@
       })
     }
 
+    function initApplicationExitControl() {
+      const control = document.querySelector('[data-application-exit-control]')
+      const button = control && control.querySelector('[data-application-exit]')
+      const error = control && control.querySelector('[data-application-exit-error]')
+      const api = window.electronAPI
+      if (!control || !button) return
+      if (!api || typeof api.requestApplicationExit !== 'function') {
+        control.hidden = true
+        return
+      }
+
+      control.hidden = false
+      const headerParent = control.parentElement
+      const updatePanel = document.querySelector('dialog.official-update-panel')
+      const syncExitLayer = () => {
+        if (!headerParent) return
+        const destination = updatePanel?.open ? updatePanel : headerParent
+        if (control.parentElement !== destination) destination.appendChild(control)
+      }
+      if (updatePanel) {
+        const panelObserver = new MutationObserver(syncExitLayer)
+        panelObserver.observe(updatePanel, { attributes: true, attributeFilter: ['open'] })
+        window.addEventListener('pagehide', () => panelObserver.disconnect(), { once: true })
+        syncExitLayer()
+      }
+      let exitRequested = false
+      button.addEventListener('click', async () => {
+        if (exitRequested || button.disabled) return
+        exitRequested = true
+        button.disabled = true
+        if (error) {
+          error.hidden = true
+          error.textContent = ''
+        }
+        try {
+          await api.requestApplicationExit()
+        } catch (reason) {
+          exitRequested = false
+          button.disabled = false
+          if (error) {
+            error.hidden = false
+            error.textContent = '退出失败，请稍后重试'
+          }
+          console.error('[client] application exit request failed:', reason)
+        }
+      })
+    }
+
     window.addEventListener('load', () => { if (new URLSearchParams(location.search).get('lan') === 'join') showJoinSheet() })
     // ── Service Worker ────────────────────────────────────────────────────────
     // 版本标识，方便确认运行的是最新构建
@@ -1614,6 +1768,7 @@
       }
       updateTutorialEntry()
       void initWindowFullscreenSetting()
+      initApplicationExitControl()
       // Show connected server in server section if saved
       const saved = getSavedUrl()
       if (saved) {

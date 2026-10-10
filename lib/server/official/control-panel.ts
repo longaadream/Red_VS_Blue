@@ -55,7 +55,8 @@ export async function startControlPanel(options: { ranked: Ranked; mail: Mail; a
           (SELECT count(*)::int FROM official_matches WHERE status='settled') settled`)).rows[0]
         const rooms = await matchMaker.query({ name: 'battle' })
         const connections = rooms.reduce((sum, room) => sum + (matchMaker.getLocalRoomById(room.roomId)?.clients.length || 0), 0)
-        json(res, 200, { settings, counts, connections, health: options.ranked.health(), runtime: { uptimeSeconds: Math.floor((Date.now() - startedAt) / 1000), memoryMiB: Math.round(process.memoryUsage().rss / 1048576), database: 'connected', poolActive: pool.totalCount - pool.idleCount, poolWaiting: pool.waitingCount }, mail: options.mail.status(), playerUrl: `http://127.0.0.1:${options.playerPort}/official.html` }); return
+        const hasCommunity = Boolean(community())
+        json(res, 200, { settings, counts, connections, rankedMaps: options.ranked.getRankedMapPoolState(settings.ranked_maps), capabilities: { rankedMapCatalog: true, communityModeration: hasCommunity, communityRestore: hasCommunity, communitySearch: hasCommunity }, health: options.ranked.health(), runtime: { uptimeSeconds: Math.floor((Date.now() - startedAt) / 1000), memoryMiB: Math.round(process.memoryUsage().rss / 1048576), database: 'connected', poolActive: pool.totalCount - pool.idleCount, poolWaiting: pool.waitingCount }, mail: options.mail.status(), playerUrl: `http://127.0.0.1:${options.playerPort}/official.html` }); return
       }
       if (req.method === 'GET' && url.pathname === '/api/accounts') {
         const q = (url.searchParams.get('q') || '').trim().slice(0, 254), offset = Math.min(1000000, Math.max(0, Number(url.searchParams.get('offset')) || 0)) | 0
@@ -70,7 +71,7 @@ export async function startControlPanel(options: { ranked: Ranked; mail: Mail; a
       }
       if (req.method === 'GET' && url.pathname === '/api/community') {
         const service = community(); if (!service) throw new OfficialError('请使用新版Windows启动器打开完整社区审核功能', 503)
-        json(res, 200, await service.moderation(Number(url.searchParams.get('offset') ?? 0))); return
+        json(res, 200, await service.moderation(Number(url.searchParams.get('offset') ?? 0), { q: url.searchParams.get('q') ?? '', status: url.searchParams.get('status') ?? 'all' })); return
       }
       if (req.method === 'GET' && url.pathname === '/api/matches') {
         const filter = url.searchParams.get('status') || 'assigned'
@@ -106,7 +107,7 @@ export async function startControlPanel(options: { ranked: Ranked; mail: Mail; a
             const stop = () => { if (scheduled) return; scheduled = true; setImmediate(() => { void options.shutdown().catch(() => console.error('[official-panel] SHUTDOWN_FAILED')) }) }
             res.once('finish', stop); res.once('close', stop)
             if (res.destroyed) stop()
-          } else if (['community-hide', 'community-hide-post', 'community-hide-reply'].includes(action)) {
+          } else if (['community-hide', 'community-hide-post', 'community-hide-reply', 'community-restore-post', 'community-restore-reply'].includes(action)) {
             const service = community(); if (!service) throw new OfficialError('请使用新版Windows启动器打开完整社区审核功能', 503)
             if (!reason.trim() || reason.length > 300) throw new OfficialError('请填写1–300字的操作原因')
             await service.administer(action, value, reason)

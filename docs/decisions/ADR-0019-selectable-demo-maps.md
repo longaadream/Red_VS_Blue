@@ -93,3 +93,7 @@ Demo v0.1 原合同只允许 `large-hole-arena`，服务器、LAN、HTTP、Relay
 - `tests/game/map-selection.test.ts`
 - `tests/game/deployment.test.ts`
 - `tests/game/relay-deployment.test.ts`
+
+## RED-250 用户批准的新增地图（2026-10-09）
+
+用户在验收中明确要求增加双桥分区地图和数张更连通地图。双人目录在原四图之后加入 twin-bridges（双桥裂谷）、crossroads-plaza（四通广场）、island-courtyard（群垒庭院）、broad-ring（宽环回廊）；本节取代早期四图数量限制。保持已有权威状态ID校验、未知地图失败关闭、房间选图冻结与部署算法；2v2/PVE专用地图不变。全部使用既有中立地形，没有新的地块效果或随机过程。双桥为两条单格宽道路跨越中央裂谷；另外三张没有单格割点，保留不同遮挡/路线形状。测试与人工预览记录见 RED250 QA。

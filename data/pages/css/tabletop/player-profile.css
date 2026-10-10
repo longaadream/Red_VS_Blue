@@ -97,6 +97,9 @@
 .rvb-profile-heading h2 { margin: 0; color: var(--rvb-profile-ink); font: 32px/1.15 var(--table-heading, Georgia, serif); overflow-wrap: anywhere; }
 .rvb-profile-id { margin: 5px 0 0; color: var(--rvb-profile-muted); font: 12px/1.5 Consolas, monospace; overflow-wrap: anywhere; }
 .rvb-profile-status { min-height: 21px; margin: 10px 0 0; color: var(--rvb-profile-red); font-size: 13px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.rvb-profile-account-actions { display: flex; align-items: center; justify-content: flex-end; gap: 10px; min-height: 33px; margin: 3px 0 8px; }
+.rvb-profile-account-status { flex: 1 1 auto; min-height: 20px; margin: 0; color: var(--rvb-profile-red); font-size: 12px; text-align: right; }
+.rvb-profile-logout { flex: 0 0 auto; min-height: 44px; padding: 5px 11px; }
 
 .rvb-profile-tabs {
   display: flex;

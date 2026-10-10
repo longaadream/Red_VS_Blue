@@ -1,0 +1,144 @@
+{
+  "fixture": true,
+  "notHumanAcceptance": true,
+  "results": [
+    {
+      "stage": "friendly",
+      "width": 1280,
+      "height": 720,
+      "file": "docs/qa/RED250/march-friendly-1280x720.png",
+      "text": "圣光惩击触发了圣铸进军：选择一名友方角色（可取消本次附加选择）",
+      "overlayVisible": true,
+      "controlsVisible": true,
+      "prompt": {
+        "x": 337.75,
+        "y": 92,
+        "width": 604.5,
+        "height": 27,
+        "scrollWidth": 605,
+        "clientWidth": 605
+      },
+      "cancel": {
+        "hidden": false,
+        "disabled": false,
+        "height": 48,
+        "hit": true
+      }
+    },
+    {
+      "stage": "landing",
+      "width": 1280,
+      "height": 720,
+      "file": "docs/qa/RED250/march-landing-1280x720.png",
+      "text": "圣铸进军：选择图拉扬的落点（点击高亮格）（可取消本次附加选择）",
+      "overlayVisible": true,
+      "controlsVisible": true,
+      "prompt": {
+        "x": 337.75,
+        "y": 92,
+        "width": 604.5,
+        "height": 27,
+        "scrollWidth": 605,
+        "clientWidth": 605
+      },
+      "cancel": {
+        "hidden": false,
+        "disabled": false,
+        "height": 48,
+        "hit": true
+      }
+    },
+    {
+      "stage": "waiting",
+      "width": 1280,
+      "height": 720,
+      "file": "docs/qa/RED250/march-waiting-1280x720.png",
+      "text": "你的行动触发了对方响应，请等待对方完成选择",
+      "overlayVisible": true,
+      "controlsVisible": false,
+      "prompt": {
+        "x": 435.25,
+        "y": 92,
+        "width": 409.5,
+        "height": 27,
+        "scrollWidth": 410,
+        "clientWidth": 410
+      },
+      "cancel": {
+        "hidden": true,
+        "disabled": true,
+        "height": 0,
+        "hit": false
+      }
+    },
+    {
+      "stage": "friendly",
+      "width": 844,
+      "height": 390,
+      "file": "docs/qa/RED250/march-friendly-844x390.png",
+      "text": "圣光惩击触发了圣铸进军：选择一名友方角色（可取消本次附加选择）",
+      "overlayVisible": true,
+      "controlsVisible": true,
+      "prompt": {
+        "x": 174,
+        "y": 10,
+        "width": 496,
+        "height": 24,
+        "scrollWidth": 496,
+        "clientWidth": 496
+      },
+      "cancel": {
+        "hidden": false,
+        "disabled": false,
+        "height": 48,
+        "hit": true
+      }
+    },
+    {
+      "stage": "landing",
+      "width": 844,
+      "height": 390,
+      "file": "docs/qa/RED250/march-landing-844x390.png",
+      "text": "圣铸进军：选择图拉扬的落点（点击高亮格）（可取消本次附加选择）",
+      "overlayVisible": true,
+      "controlsVisible": true,
+      "prompt": {
+        "x": 174,
+        "y": 10,
+        "width": 496,
+        "height": 24,
+        "scrollWidth": 496,
+        "clientWidth": 496
+      },
+      "cancel": {
+        "hidden": false,
+        "disabled": false,
+        "height": 48,
+        "hit": true
+      }
+    },
+    {
+      "stage": "waiting",
+      "width": 844,
+      "height": 390,
+      "file": "docs/qa/RED250/march-waiting-844x390.png",
+      "text": "你的行动触发了对方响应，请等待对方完成选择",
+      "overlayVisible": true,
+      "controlsVisible": false,
+      "prompt": {
+        "x": 254,
+        "y": 64,
+        "width": 336,
+        "height": 24,
+        "scrollWidth": 336,
+        "clientWidth": 336
+      },
+      "cancel": {
+        "hidden": true,
+        "disabled": true,
+        "height": 0,
+        "hit": false
+      }
+    }
+  ]
+}

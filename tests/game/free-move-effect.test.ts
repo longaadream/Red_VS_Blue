@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { createFlowRuntime } from '@/lib/game/flow-runtime'
 import { globalTriggerSystem } from '@/lib/game/triggers'
+import { loadRuleById } from '@/lib/game/skills'
 import { makePiece, makeState } from '../helpers/minimal-state'
 
 beforeEach(() => globalTriggerSystem.clearRules())
@@ -72,5 +73,19 @@ describe('effect-granted ordinary movement', () => {
       fromX: 1, fromY: 1, toX: 2, toY: 2, freeMove: true,
     })
     expect(afterMovePath).toEqual({ pathCells: expectedPath, contactCells: expectedPath })
+  })
+
+  it('grants momentum for the actual detour path of a free ordinary move', () => {
+    const piece = makePiece({ instanceId: 'momentum-mover', templateId: 'sonic', x: 0, y: 0, moveRange: 4,
+      statusTags: [{ type: 'momentum-core', stacks: 0 }], rules: [loadRuleById('rule-momentum-gain')!] })
+    const blocker = makePiece({ instanceId: 'momentum-blocker', ownerPlayerId: 'player-blue', x: 1, y: 0 })
+    const state = makeState({ pieces: [piece, blocker], width: 5, height: 3 })
+    const expectedPath = [{ x: 0, y: 1 }, { x: 1, y: 1 }, { x: 2, y: 1 }, { x: 2, y: 0 }]
+    const flow = createFlowRuntime(state, {}, 'pending', {})
+
+    expect(flow.effects.freeMove(piece.instanceId, { x: 2, y: 0 })).toMatchObject({ success: true })
+    expect((state.pieces.find(candidate => candidate.instanceId === piece.instanceId) as { momentum?: number }).momentum)
+      .toBe(expectedPath.length)
+    expect(state.actions?.find(action => action.type === 'move')?.payload?.path).toEqual(expectedPath)
   })
 })

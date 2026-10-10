@@ -1,0 +1,30 @@
+{
+  "fixture": "clone of captured live training state, no live mutation",
+  "turn": {
+    "currentPlayerId": "training-blue",
+    "turnNumber": 2,
+    "phase": "action",
+    "actions": {
+      "hasMoved": false,
+      "hasUsedBasicSkill": false,
+      "hasUsedChargeSkill": false
+    },
+    "refreshedAtTurn": 2
+  },
+  "action": {
+    "type": "playCard",
+    "playerId": "training-blue",
+    "cardInstanceId": "ci-holy-heal-575511391",
+    "stateRevision": 9
+  },
+  "marker": {
+    "training-blue-2": 2
+  },
+  "preparationStatus": "ready",
+  "pendingAfter": false,
+  "actionPointsBefore": 7,
+  "actionPointsAfter": 6,
+  "handBefore": 2,
+  "handAfter": 1,
+  "inputUnchanged": true
+}

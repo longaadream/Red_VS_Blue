@@ -4,9 +4,58 @@ import os from 'node:os'
 import path from 'node:path'
 import { createHash } from 'node:crypto'
 import { spawnSync } from 'node:child_process'
-import { validate, verifyPackage, serve, normalizeShellScript } from '../../scripts/server-admin/admin.mjs'
+import { validate, verifyPackage, serve, normalizeShellScript, execute } from '../../scripts/server-admin/admin.mjs'
 
 describe('server admin boundaries', () => {
+  it('normalizes the script at the status execution boundary and preserves failed status', async () => {
+    const runner = vi.fn(async (_command, _args, input) => {
+      expect(input).not.toMatch(/[\r\uFEFF]/)
+      const result = spawnSync('C:/Program Files/Git/bin/bash.exe', ['-s', '--', 'status', 'rvb-game', '', ''], { encoding: 'utf8', input })
+      if (result.status !== 0) throw Error(result.stderr)
+      return result.stdout
+    })
+    const readScript = async () => '\uFEFFset -eu\r\ncase "$1" in status) echo STATUS_OK;; *) exit 2;; esac\r\n'
+    await expect(execute({ host: 'example.test', key: path.resolve('key'), action: 'status' }, { runner, readScript })).resolves.toContain('STATUS_OK')
+    expect(runner.mock.calls[0][0]).toBe('ssh')
+    expect(runner.mock.calls[0][1]).toContain('StrictHostKeyChecking=yes')
+    await expect(execute({ host: 'example.test', key: path.resolve('key'), action: 'status' }, { runner: async () => { throw Error('SSH failed') }, readScript })).rejects.toThrow('SSH failed')
+  })
+  it('forwards community queries and remembers only non-secret connection settings across restart', async () => {
+    const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'rvb-admin-settings-'))
+    const settingsPath = path.join(directory, 'connection.json')
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {})
+    const proxyRunner = vi.fn(async () => '{"posts":[],"replies":[],"more":false}')
+    let server = await serve({ proxyRunner, settingsPath })
+    const session = () => {
+      const url = new URL(String(log.mock.calls.at(-1)?.[0]).split('：')[1])
+      return { origin: url.origin, headers: { Origin: url.origin, Authorization: 'Bearer ' + url.hash.slice(1), 'Content-Type': 'application/json' } }
+    }
+    try {
+      let current = session()
+      const input = { host: 'example.test', key: path.resolve('test-key'), action: 'connect-panel', panelPort: 4567, panelToken: 's'.repeat(43) }
+      expect((await fetch(current.origin + '/api', { method: 'POST', headers: current.headers, body: JSON.stringify(input) })).status).toBe(200)
+      const response = await fetch(current.origin + '/api/community?q=hello%20world&status=hidden&offset=100', { headers: current.headers })
+      expect(response.status).toBe(200)
+      expect(await response.json()).toMatchObject({ posts: [], replies: [] })
+      expect((proxyRunner.mock.calls[0] as unknown as [string, string[], string])[2]).toContain('/api/community?q=hello%20world&status=hidden&offset=100')
+      const saved = await fs.readFile(settingsPath, 'utf8')
+      expect(saved).toContain('example.test')
+      expect(saved).not.toContain(input.panelToken)
+      expect(saved).not.toContain('panelPort')
+      await new Promise<void>(resolve => server.close(() => resolve()))
+      server = await serve({ proxyRunner, settingsPath })
+      current = session()
+      const restored = await (await fetch(current.origin + '/api/local-status', { headers: current.headers })).json()
+      expect(restored.connection.host).toBe('example.test')
+      expect(restored.connected).toBe(false)
+      expect(restored.toolVersion).toEqual(expect.any(String))
+      expect((await fetch(current.origin + '/api/local-status')).status).toBe(403)
+    } finally {
+      await new Promise<void>(resolve => server.close(() => resolve()))
+      log.mockRestore()
+      await fs.rm(directory, { recursive: true, force: true })
+    }
+  })
   it('executes Windows CRLF scripts with a BOM as Linux shell input', async () => {
     const source = await fs.readFile('scripts/server-admin/remote.sh', 'utf8')
     const windows = '\uFEFF' + source.replace(/\r?\n/g, '\r\n')
@@ -68,6 +117,29 @@ describe('server admin boundaries', () => {
       expect(call[2]).toContain('Authorization: Bearer ' + remoteToken)
       expect(call[2]).toContain('data = ' + JSON.stringify(body))
       expect(call[3]).toBeGreaterThan(300000)
+    } finally { log.mockRestore(); await new Promise<void>(resolve => server.close(() => resolve())) }
+  })
+  it('preserves an old server missing-feature status while other routes remain available', async () => {
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {})
+    const runner = vi.fn(async (_command, _args, input) => {
+      // Model SSH latency so the two read requests overlap at the proxy.
+      await new Promise(resolve => setTimeout(resolve, 30))
+      return input.includes('/api/community')
+        ? 'Not found\n__RVB_HTTP_STATUS__:404'
+        : '{"rows":[]}\n__RVB_HTTP_STATUS__:200'
+    })
+    const server = await serve({ proxyRunner: runner })
+    try {
+      const url = new URL(String(log.mock.calls.at(-1)?.[0]).split('：')[1])
+      const headers = { Origin: url.origin, Authorization: 'Bearer ' + url.hash.slice(1), 'Content-Type': 'application/json' }
+      await fetch(url.origin + '/api', { method: 'POST', headers, body: JSON.stringify({ ...config, action: 'connect-panel', panelPort: 4567, panelToken: 'a'.repeat(43) }) })
+      const [unsupported, accounts] = await Promise.all([
+        fetch(url.origin + '/api/community', { headers }),
+        fetch(url.origin + '/api/accounts', { headers }),
+      ])
+      expect(unsupported.status).toBe(404)
+      expect((await unsupported.json()).error).toContain('升级')
+      expect(accounts.status).toBe(200)
     } finally { log.mockRestore(); await new Promise<void>(resolve => server.close(() => resolve())) }
   })
   it('stops a failed candidate before restoring the old service and rejects effective path mismatch', async () => {

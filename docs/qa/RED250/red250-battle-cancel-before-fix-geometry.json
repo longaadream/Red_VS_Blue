@@ -1,0 +1,190 @@
+{
+  "1280x720": {
+    "viewport": {
+      "width": 1280,
+      "height": 720
+    },
+    "controls": {
+      "visible": true,
+      "display": "flex",
+      "rect": {
+        "x": 16,
+        "y": 572,
+        "width": 229.125,
+        "height": 64,
+        "top": 572,
+        "right": 245.125,
+        "bottom": 636,
+        "left": 16
+      },
+      "parentId": null,
+      "handCardCount": 3,
+      "hudPresent": true,
+      "characterPanelPresent": true,
+      "characterDock": {
+        "open": true,
+        "display": "flex",
+        "visible": true,
+        "rect": {
+          "left": 16,
+          "top": 110,
+          "right": 330,
+          "bottom": 636,
+          "width": 314,
+          "height": 526
+        },
+        "scrolled": true,
+        "scrollTop": 841,
+        "scrollHeight": 1361,
+        "clientHeight": 520
+      }
+    },
+    "values": {
+      "targetPromptText": {
+        "visible": true,
+        "hidden": false,
+        "disabled": false,
+        "text": "选择目标",
+        "rect": {
+          "left": 601,
+          "top": 92,
+          "right": 679,
+          "bottom": 119,
+          "width": 78,
+          "height": 27
+        },
+        "hitTag": "DIV",
+        "hitId": "boardStage3d",
+        "hitButton": false
+      },
+      "targetCancelButton": {
+        "visible": true,
+        "hidden": false,
+        "disabled": false,
+        "text": "取消目标选择",
+        "rect": {
+          "left": 123.25,
+          "top": 580,
+          "right": 237.125,
+          "bottom": 628,
+          "width": 113.875,
+          "height": 48
+        },
+        "hitTag": "BUTTON",
+        "hitId": "targetCancelButton",
+        "hitButton": true
+      },
+      "targetConfirmButton": {
+        "visible": true,
+        "hidden": false,
+        "disabled": false,
+        "text": "确认选择",
+        "rect": {
+          "left": 24,
+          "top": 580,
+          "right": 115.25,
+          "bottom": 628,
+          "width": 91.25,
+          "height": 48
+        },
+        "hitTag": "BUTTON",
+        "hitId": "targetConfirmButton",
+        "hitButton": true
+      }
+    }
+  },
+  "844x390": {
+    "viewport": {
+      "width": 844,
+      "height": 390
+    },
+    "controls": {
+      "visible": true,
+      "display": "flex",
+      "rect": {
+        "x": 16,
+        "y": 242,
+        "width": 227.25,
+        "height": 64,
+        "top": 242,
+        "right": 243.25,
+        "bottom": 306,
+        "left": 16
+      },
+      "parentId": null,
+      "handCardCount": 3,
+      "hudPresent": true,
+      "characterPanelPresent": true,
+      "characterDock": {
+        "open": true,
+        "display": "flex",
+        "visible": true,
+        "rect": {
+          "left": 6,
+          "top": 56,
+          "right": 294,
+          "bottom": 382,
+          "width": 288,
+          "height": 326
+        },
+        "scrolled": true,
+        "scrollTop": 694,
+        "scrollHeight": 1344,
+        "clientHeight": 320
+      }
+    },
+    "values": {
+      "targetPromptText": {
+        "visible": true,
+        "hidden": false,
+        "disabled": false,
+        "text": "选择目标",
+        "rect": {
+          "left": 16,
+          "top": 10,
+          "right": 80,
+          "bottom": 34,
+          "width": 64,
+          "height": 24
+        },
+        "hitTag": "DIV",
+        "hitId": null,
+        "hitButton": false
+      },
+      "targetCancelButton": {
+        "visible": true,
+        "hidden": false,
+        "disabled": false,
+        "text": "取消目标选择",
+        "rect": {
+          "left": 123.25,
+          "top": 250,
+          "right": 235.25,
+          "bottom": 298,
+          "width": 112,
+          "height": 48
+        },
+        "hitTag": "BUTTON",
+        "hitId": "targetCancelButton",
+        "hitButton": true
+      },
+      "targetConfirmButton": {
+        "visible": true,
+        "hidden": false,
+        "disabled": false,
+        "text": "确认选择",
+        "rect": {
+          "left": 24,
+          "top": 250,
+          "right": 115.25,
+          "bottom": 298,
+          "width": 91.25,
+          "height": 48
+        },
+        "hitTag": "BUTTON",
+        "hitId": "targetConfirmButton",
+        "hitButton": true
+      }
+    }
+  }
+}

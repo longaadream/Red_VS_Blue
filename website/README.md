@@ -9,11 +9,13 @@
 在仓库根目录运行，并明确指定本次已验收的资源快照和新的输出目录：
 
 ```powershell
-node scripts/build-official-site.mjs --source output/RED245/resource/source-1.0.12-safe --output output/RED245/official-site
-py -m http.server 4188 --directory output/RED245/official-site
+node scripts/build-official-site.mjs --source output/RED251/resource/source-1.0.13 --output output/RED251/website/COS-website-ready
+py -m http.server 4188 --directory output/RED251/website/COS-website-ready
 ```
 
-输出为命令指定的目录，预览地址 `http://127.0.0.1:4188/`。`--source` 和 `--output` 都是必填项；资源快照缺失、输出目录已存在或图鉴资料不完整时构建失败，不会静默回退到旧资源或覆盖已有输出。当前官网同步客户端 0.1.13、资源 1.0.12，最低客户端为 0.1.13。正式发布新的资源时须同时更新构建快照、图鉴标签、发布清单、HTML 兜底链接和资源发布页链接。
+输出为命令指定的目录，预览地址 `http://127.0.0.1:4188/`。`--source` 和 `--output` 都是必填项；资源快照缺失、输出目录已存在或图鉴资料不完整时构建失败，不会静默回退到旧资源或覆盖已有输出。当前官网同步客户端 0.1.14、资源 1.0.13，最低客户端为 0.1.14。正式发布新的资源时须同时更新构建快照、图鉴标签、发布清单、HTML 兜底链接和资源发布页链接。构建器仍要求显式传入资源快照目录，不绕过快照签名与来源检查。
+
+0.1.14 更新文案同步官网首页：统一服务器管理面板与排位地图池、四张新增地图（双桥裂谷、四通广场、群垒庭院、宽环回廊），以及目标选择、预演、续选和取消流程的修复。
 
 游戏内 `pieces.html` 与官网生成器共用 `data/pages/js/gallery-content.js`：排除 PVE 专用模式及旧版 pve- 模板，保留兼容 PVP/PVE 的普通角色。官网从同一资源快照读取棋子图像、描述、基础技能、可解锁技能与解锁来源、关键词的短/长解释、相关卡牌的图像/消耗/效果，不导出规则代码。搜索同时覆盖棋子描述、技能文本、关键词和关联卡牌；未列入快照关键词词典的通用效果标签仍保留在技能描述中。生成遇到缺失棋子、技能或卡牌定义，或公共棋子缺图时直接报错。
 

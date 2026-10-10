@@ -21,14 +21,6 @@ function characterSource(name: string) {
   return characterDock.slice(start, end)
 }
 
-function markup(id: string) {
-  const start = page.indexOf(`<div id="${id}"`)
-  if (start < 0) throw new Error(`Missing #${id}`)
-  const end = page.indexOf('</div>', start)
-  if (end < 0) throw new Error(`Could not isolate #${id}`)
-  return page.slice(start, end + '</div>'.length)
-}
-
 function classList() {
   const values = new Set<string>()
   return {
@@ -190,7 +182,7 @@ function renderScenario(input: OverlayScenario = {}) {
   return { context, body, overlay, prompt, cancel, controls }
 }
 
-describe('target prompt and controls separation', () => {
+describe('target prompt and controls layout', () => {
   it('keeps a no-target card preview and its pending submission outside target controls', () => {
     const result = renderScenario({
       pendingSkill: null,
@@ -252,25 +244,31 @@ describe('target prompt and controls separation', () => {
     expect(result.controls.classList.contains('show')).toBe(true)
   })
 
-  it('keeps the instruction text and action controls in separate public regions', () => {
-    const overlayMarkup = markup('targetOverlay')
+  it('keeps the prompt and action controls together in a stable public group', () => {
+    const overlayStart = page.indexOf('<div id="targetOverlay"')
+    const overlayEnd = page.indexOf('<!-- Fullscreen log overlay -->', overlayStart)
+    const overlayMarkup = page.slice(overlayStart, overlayEnd)
 
-    expect(overlayMarkup).toContain('class="target-prompt" id="targetPromptText"')
+    expect(overlayMarkup).toContain('<div id="targetOverlay">')
+    expect(overlayMarkup).toContain('class="target-prompt" id="targetPromptText" role="status" aria-live="polite"')
+    expect(overlayMarkup).toContain('<div id="targetSelectionControls" role="group" aria-label="目标选择操作">')
+    expect(overlayMarkup).toContain('id="targetCancelButton"')
+    expect(overlayMarkup).toContain('id="targetConfirmButton"')
     expect(overlayMarkup).not.toContain('target-mode-card')
-    expect(overlayMarkup).not.toContain('targetCancelButton')
-    expect(page).toMatch(/<div id="targetSelectionControls"[\s\S]*?id="targetCancelButton"/)
-    expect(page).toMatch(/<div id="targetSelectionControls"[\s\S]*?id="targetConfirmButton"/)
-    expect(page).toMatch(/const overlay = document\.getElementById\('targetSelectionControls'\)/)
+    expect(page).toMatch(/const controls = document\.getElementById\('targetSelectionControls'\)/)
+    expect(page).toMatch(/const overlay = document\.getElementById\('targetOverlay'\)/)
+    expect(page).toMatch(/if \(controls\.parentElement !== overlay\) overlay\.appendChild\(controls\)/)
     expect(page).toMatch(/controls\.classList\.toggle\('show', active\)/)
-    expect(page).toMatch(/skillRow\.insertBefore\(overlay, description\)/)
-    expect(page).toMatch(/overlay\.parentElement !== skillRow \|\| description\.previousElementSibling !== overlay/)
-    expect(page).toMatch(/target-skill-controls/)
-    expect(page).toMatch(/draft\.skill && targetSubmissionPending\.draft\.skill\.skillId/)
+    expect(page).not.toContain('skillRow.insertBefore(overlay, description)')
+    expect(page).not.toContain('target-skill-controls')
     expect(page).toMatch(/resolve: button => button\.dataset\.targetMode \? null/)
     expect(page).toMatch(/window\.refreshTargetSkillButtonState\(\)/)
-    expect(page).toMatch(/cancelButton\.hidden = currentSkillButton \|\|/)
+    expect(page).toMatch(/cancelButton\.hidden = !!\(authoritativeSelection && authoritativeSelection\.canCancel === false\)/)
     expect(page).toMatch(/event\.key === 'Escape' && \(pendingSkill \|\| pendingCardAction \|\| targetSubmissionPending\)/)
     expect(tacticalCss).toMatch(/body #targetOverlay #targetPromptText[\s\S]*color: #ffe08a !important/)
+    expect(tacticalCss).toMatch(/body #targetOverlay[\s\S]*gap: 8px !important/)
+    expect(tacticalCss).toMatch(/body #targetSelectionControls[\s\S]*position: static !important/)
+    expect(tacticalCss).toMatch(/body #targetSelectionControls button[\s\S]*min-height: 48px !important[\s\S]*font-size: 14px !important[\s\S]*font-weight: 800 !important/)
     expect(tacticalCss).toMatch(/character-cast\.is-cancel-mode[\s\S]*font-size: 16px[\s\S]*font-weight: 900/)
     expect(tacticalCss).toMatch(/character-cast\.is-cancel-mode[\s\S]*color: var\(--comic-ink, #30231c\) !important/)
     expect(tacticalCss).toMatch(/character-cast\.is-cancel-disabled[\s\S]*color: var\(--battle-text-muted, #655443\) !important/)
@@ -280,7 +278,6 @@ describe('target prompt and controls separation', () => {
     expect(characterDock).toMatch(/button\.dataset\.targetMode==='cancel'/)
     expect(characterDock).toMatch(/dispatchBattleIntent\(\{type:'cancel-target'\}\)/)
     expect(characterDock).toMatch(/setCancelMeta\(skillMeta,cancelMode,cancelStateLabel\)/)
-    expect(characterDock).toMatch(/targetControls\.nextElementSibling===description/)
   })
 
   it('uses the skill cost slot for cancel state and restores its original metadata', () => {
@@ -369,7 +366,7 @@ describe('target prompt and controls separation', () => {
     expect(button.click).toHaveBeenCalledTimes(2)
   })
 
-  it('keeps the fallback cancel control when a matching skill row is closed', () => {
+  it('keeps the shared cancel control visible when a matching skill row is open', () => {
     const overlay = element()
     const prompt = element()
     const multiSummary = element()
@@ -418,66 +415,53 @@ describe('target prompt and controls separation', () => {
     modal.style.display = 'flex'
     body.classList.add('character-dock-open')
     new Script('renderTargetOverlay()').runInContext(context)
-    expect(cancel.hidden).toBe(true)
+    expect(cancel.hidden).toBe(false)
   })
 
-  it('mounts the existing controls beside the matching skill title and before its description', () => {
+  it('mounts the existing controls into the stable overlay host across sheet redraws', () => {
     const body = treeNode('documentBody')
+    const targetOverlay = treeNode('targetOverlay')
     const modal = treeNode()
     modal.classList.add('character-dock')
-    const layout = treeNode('pieceInfoLayout')
-    layout.classList.add('pi-layout')
-    const content = treeNode('pieceInfoContent')
-    const row = treeNode('skillRow')
-    row.classList.add('pi-skill')
-    const cast = treeNode()
-    cast.classList.add('character-cast')
-    cast.dataset.skillId = 'skill-a'
-    const description = treeNode()
-    description.classList.add('pi-skill-desc')
-    row.appendChild(cast)
-    row.appendChild(description)
-    content.appendChild(row)
-    layout.appendChild(content)
-    modal.appendChild(layout)
     const controls = treeNode('targetSelectionControls')
     body.appendChild(modal)
+    body.appendChild(targetOverlay)
     body.appendChild(controls)
 
-    const elements: Record<string, TreeNode> = { pieceInfoModal: modal, targetSelectionControls: controls }
+    const elements: Record<string, TreeNode> = {
+      pieceInfoModal: modal,
+      targetOverlay,
+      targetSelectionControls: controls,
+    }
     const context = createContext({
       document: {
         body,
         getElementById: (id: string) => elements[id] || null,
-        querySelectorAll: (selector: string) => findNodes(body, selector),
       },
       pendingSkill: { skillId: 'skill-a' },
       targetSubmissionPending: null,
       currentPieceInfoSource: 'board',
     })
     new Script(source('placeTargetOverlayHost')).runInContext(context)
-    new Script('placeTargetOverlayHost(true)').runInContext(context)
+    new Script('placeTargetOverlayHost()').runInContext(context)
 
-    expect(controls.parentElement?.id).toBe('skillRow')
-    expect(row.children.indexOf(controls)).toBe(row.children.indexOf(description) - 1)
-    expect(cast.children).not.toContain(controls)
-    expect(row.classList.contains('target-skill-controls')).toBe(true)
+    expect(controls.parentElement).toBe(targetOverlay)
+    expect(targetOverlay.children).toContain(controls)
 
-  // A redraw pass must reuse the already adjacent node. Moving it again
-  // would blur a focused cancel button even though the target row is stable.
-  const movesAfterFirstMount = row.insertBeforeCalls
-  new Script('placeTargetOverlayHost(true)').runInContext(context)
-  expect(row.insertBeforeCalls).toBe(movesAfterFirstMount)
+    // A redraw pass must reuse the same stable node. Moving it again would
+    // blur a focused cancel button even though the target session is stable.
+    const movesAfterFirstMount = targetOverlay.children.length
+    new Script('placeTargetOverlayHost()').runInContext(context)
+    expect(targetOverlay.children.length).toBe(movesAfterFirstMount)
 
-    // A stale/unknown skill row uses the public body fallback and clears the
-    // previous row marker instead of leaving controls in a dead row.
+    // A skill switch and the inactive render path retain the same public host;
+    // controls never follow a scrollable skill row or fall back to the corner.
     context.pendingSkill = { skillId: 'missing-skill' }
-    new Script('placeTargetOverlayHost(true)').runInContext(context)
-    expect(controls.parentElement?.id).toBe('pieceInfoLayout')
-    expect(row.classList.contains('target-skill-controls')).toBe(false)
+    new Script('placeTargetOverlayHost()').runInContext(context)
+    expect(controls.parentElement).toBe(targetOverlay)
 
-    new Script('placeTargetOverlayHost(false)').runInContext(context)
-    expect(controls.parentElement?.id).toBe('documentBody')
+    new Script('placeTargetOverlayHost()').runInContext(context)
+    expect(controls.parentElement).toBe(targetOverlay)
   })
 
   it('restores the normal target hint after temporary invalid-target feedback', () => {

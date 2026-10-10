@@ -1,29 +1,33 @@
 {
-  "version": "0.1.13",
+  "version": "0.1.15",
   "windows": {
-    "url": "https://github.com/longaadream/Red_VS_Blue/releases/download/v0.1.13/RED-vs-BLUE-0.1.13-Setup.exe"
+    "url": "https://github.com/longaadream/Red_VS_Blue/releases/download/v0.1.15/RED-vs-BLUE-0.1.15-Setup.exe"
   },
   "android": {
-    "url": "https://github.com/longaadream/Red_VS_Blue/releases/download/v0.1.13/RED-vs-BLUE-0.1.13-Android.apk"
+    "url": "https://github.com/longaadream/Red_VS_Blue/releases/download/v0.1.15/RED-vs-BLUE-0.1.15-Android.apk"
   },
   "resource": {
-    "version": "1.0.12",
-    "minimumClientVersion": "0.1.13",
-    "contentHash": "25b673f202e1b9eeace0fce32398439c3178c7b128b23a32b3710e5c7e6d2346",
-    "url": "https://github.com/longaadream/Red_VS_Blue/releases/download/content-test-25b673f202e1b9eeace0fce32398439c3178c7b128b23a32b3710e5c7e6d2346/content.rvbpack"
+    "version": "1.0.14",
+    "minimumClientVersion": "0.1.15",
+    "contentHash": "7d39c4b75b448278eae84e1c53bb0741b2d2b3bd75052caefb699b758e619459",
+    "url": "https://github.com/longaadream/Red_VS_Blue/releases/download/content-test-7d39c4b75b448278eae84e1c53bb0741b2d2b3bd75052caefb699b758e619459/content.rvbpack"
   },
   "notes": [
     {
-      "title": "移动与预演",
-      "body": "支持拖动规划多段转弯路径，补齐技能、手牌及地格预演，修复目标选择和训练营移动后的操作问题。"
+      "title": "战斗规则修复",
+      "body": "动能按实际经过路径累计；修复飞雷神回合结束续选、猗窝座瞬步、影分身身份显示及玩家效果伤害归属。"
     },
     {
-      "title": "社区与回放",
-      "body": "新增好友、公告板、约桌帖子与在线社区入口；可查看资料、对局战绩和已结束对局回放。"
+      "title": "圣光与角色调整",
+      "body": "一护卍解消耗2CP，泰兰德增幅50%且赐福冷却2回合；维伦可获得圣光手牌，圣铸进军每张圣光牌触发一次可拐弯的免费移动。"
+    },
+    {
+      "title": "更新入口",
+      "body": "服务器版本检查不通过时，可从提示进入对应的客户端或资源更新界面。"
     },
     {
       "title": "发行同步",
-      "body": "Windows、Android、官方服务器与引擎同步本版本规则，请使用配套资源包 1.0.12。"
+      "body": "客户端与服务端0.1.15，配套资源包1.0.14；继续提供管理面板和四张新增地图。"
     }
   ]
 }

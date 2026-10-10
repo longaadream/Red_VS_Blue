@@ -1,0 +1,1094 @@
+{
+  "fixture": true,
+  "notHumanAcceptance": true,
+  "results": [
+    {
+      "mode": "training",
+      "viewportWidth": 1280,
+      "viewportHeight": 720,
+      "wrap": "wrap",
+      "overflowX": "visible",
+      "overflowY": "visible",
+      "width": 304,
+      "height": 96,
+      "scrollWidth": 304,
+      "clientWidth": 304,
+      "buttons": [
+        {
+          "id": "back-btn",
+          "label": "离开对局",
+          "x": 968,
+          "y": 16,
+          "width": 42,
+          "height": 42,
+          "hit": true
+        },
+        {
+          "id": "battleSettingsButton",
+          "label": "打开对局设置",
+          "x": 1018,
+          "y": 16,
+          "width": 42,
+          "height": 42,
+          "hit": true
+        },
+        {
+          "id": "rulebookButton",
+          "label": "打开规则书",
+          "x": 1068,
+          "y": 16,
+          "width": 42,
+          "height": 42,
+          "hit": true
+        },
+        {
+          "id": "btnSurrender",
+          "label": "投降",
+          "x": 1118,
+          "y": 16,
+          "width": 42,
+          "height": 42,
+          "hit": true
+        },
+        {
+          "id": "btnSwitchPov",
+          "label": "切换视角",
+          "x": 1168,
+          "y": 16,
+          "width": 42,
+          "height": 42,
+          "hit": true
+        },
+        {
+          "id": "btnResetCD",
+          "label": "重置冷却",
+          "x": 1218,
+          "y": 16,
+          "width": 42,
+          "height": 42,
+          "hit": true
+        },
+        {
+          "id": "social-toggle",
+          "label": "桌边便笺",
+          "x": 1218,
+          "y": 66,
+          "width": 42,
+          "height": 42,
+          "hit": true
+        }
+      ],
+      "waitingPromptClear": {
+        "prompt": {
+          "left": 435.25,
+          "right": 844.75,
+          "top": 92,
+          "bottom": 119
+        },
+        "buttons": [
+          {
+            "id": "",
+            "x": 968,
+            "y": 16,
+            "hit": true,
+            "clear": true
+          },
+          {
+            "id": "battleSettingsButton",
+            "x": 1018,
+            "y": 16,
+            "hit": true,
+            "clear": true
+          },
+          {
+            "id": "rulebookButton",
+            "x": 1068,
+            "y": 16,
+            "hit": true,
+            "clear": true
+          },
+          {
+            "id": "btnSurrender",
+            "x": 1118,
+            "y": 16,
+            "hit": true,
+            "clear": true
+          },
+          {
+            "id": "btnSwitchPov",
+            "x": 1168,
+            "y": 16,
+            "hit": true,
+            "clear": true
+          },
+          {
+            "id": "btnResetCD",
+            "x": 1218,
+            "y": 16,
+            "hit": true,
+            "clear": true
+          },
+          {
+            "id": "",
+            "x": 1218,
+            "y": 66,
+            "hit": true,
+            "clear": true
+          }
+        ]
+      }
+    },
+    {
+      "mode": "network",
+      "viewportWidth": 1280,
+      "viewportHeight": 720,
+      "wrap": "wrap",
+      "overflowX": "visible",
+      "overflowY": "visible",
+      "width": 304,
+      "height": 96,
+      "scrollWidth": 304,
+      "clientWidth": 304,
+      "buttons": [
+        {
+          "id": "back-btn",
+          "label": "离开对局",
+          "x": 968,
+          "y": 16,
+          "width": 42,
+          "height": 42,
+          "hit": true
+        },
+        {
+          "id": "battleSettingsButton",
+          "label": "打开对局设置",
+          "x": 1018,
+          "y": 16,
+          "width": 42,
+          "height": 42,
+          "hit": true
+        },
+        {
+          "id": "rulebookButton",
+          "label": "打开规则书",
+          "x": 1068,
+          "y": 16,
+          "width": 42,
+          "height": 42,
+          "hit": true
+        },
+        {
+          "id": "btnSurrender",
+          "label": "投降",
+          "x": 1118,
+          "y": 16,
+          "width": 42,
+          "height": 42,
+          "hit": true
+        },
+        {
+          "id": "spectatingToggle",
+          "label": "关闭观战",
+          "x": 1168,
+          "y": 16,
+          "width": 42,
+          "height": 42,
+          "hit": true
+        },
+        {
+          "id": "spectatorInvite",
+          "label": "复制房间邀请码",
+          "x": 1218,
+          "y": 16,
+          "width": 42,
+          "height": 42,
+          "hit": true
+        },
+        {
+          "id": "social-toggle",
+          "label": "桌边便笺",
+          "x": 1218,
+          "y": 66,
+          "width": 42,
+          "height": 42,
+          "hit": true
+        }
+      ],
+      "waitingPromptClear": {
+        "prompt": {
+          "left": 435.25,
+          "right": 844.75,
+          "top": 92,
+          "bottom": 119
+        },
+        "buttons": [
+          {
+            "id": "",
+            "x": 968,
+            "y": 16,
+            "hit": true,
+            "clear": true
+          },
+          {
+            "id": "battleSettingsButton",
+            "x": 1018,
+            "y": 16,
+            "hit": true,
+            "clear": true
+          },
+          {
+            "id": "rulebookButton",
+            "x": 1068,
+            "y": 16,
+            "hit": true,
+            "clear": true
+          },
+          {
+            "id": "btnSurrender",
+            "x": 1118,
+            "y": 16,
+            "hit": true,
+            "clear": true
+          },
+          {
+            "id": "spectatingToggle",
+            "x": 1168,
+            "y": 16,
+            "hit": true,
+            "clear": true
+          },
+          {
+            "id": "spectatorInvite",
+            "x": 1218,
+            "y": 16,
+            "hit": true,
+            "clear": true
+          },
+          {
+            "id": "",
+            "x": 1218,
+            "y": 66,
+            "hit": true,
+            "clear": true
+          }
+        ]
+      }
+    },
+    {
+      "mode": "training",
+      "viewportWidth": 844,
+      "viewportHeight": 390,
+      "wrap": "wrap",
+      "overflowX": "visible",
+      "overflowY": "visible",
+      "width": 304,
+      "height": 95,
+      "scrollWidth": 304,
+      "clientWidth": 304,
+      "buttons": [
+        {
+          "id": "back-btn",
+          "label": "离开对局",
+          "x": 557,
+          "y": 0,
+          "width": 44,
+          "height": 44,
+          "hit": true
+        },
+        {
+          "id": "battleSettingsButton",
+          "label": "打开对局设置",
+          "x": 604,
+          "y": 0,
+          "width": 44,
+          "height": 44,
+          "hit": true
+        },
+        {
+          "id": "rulebookButton",
+          "label": "打开规则书",
+          "x": 651,
+          "y": 0,
+          "width": 44,
+          "height": 44,
+          "hit": true
+        },
+        {
+          "id": "btnSurrender",
+          "label": "投降",
+          "x": 698,
+          "y": 0,
+          "width": 44,
+          "height": 44,
+          "hit": true
+        },
+        {
+          "id": "btnSwitchPov",
+          "label": "切换视角",
+          "x": 745,
+          "y": 0,
+          "width": 44,
+          "height": 44,
+          "hit": true
+        },
+        {
+          "id": "btnResetCD",
+          "label": "重置冷却",
+          "x": 792,
+          "y": 0,
+          "width": 44,
+          "height": 44,
+          "hit": true
+        },
+        {
+          "id": "social-toggle",
+          "label": "桌边便笺",
+          "x": 792,
+          "y": 47,
+          "width": 44,
+          "height": 44,
+          "hit": true
+        }
+      ],
+      "waitingPromptClear": {
+        "prompt": {
+          "left": 8,
+          "right": 344,
+          "top": 64,
+          "bottom": 88
+        },
+        "buttons": [
+          {
+            "id": "",
+            "x": 557,
+            "y": 0,
+            "hit": true,
+            "clear": true
+          },
+          {
+            "id": "battleSettingsButton",
+            "x": 604,
+            "y": 0,
+            "hit": true,
+            "clear": true
+          },
+          {
+            "id": "rulebookButton",
+            "x": 651,
+            "y": 0,
+            "hit": true,
+            "clear": true
+          },
+          {
+            "id": "btnSurrender",
+            "x": 698,
+            "y": 0,
+            "hit": true,
+            "clear": true
+          },
+          {
+            "id": "btnSwitchPov",
+            "x": 745,
+            "y": 0,
+            "hit": true,
+            "clear": true
+          },
+          {
+            "id": "btnResetCD",
+            "x": 792,
+            "y": 0,
+            "hit": true,
+            "clear": true
+          },
+          {
+            "id": "",
+            "x": 792,
+            "y": 47,
+            "hit": true,
+            "clear": true
+          }
+        ]
+      }
+    },
+    {
+      "mode": "network",
+      "viewportWidth": 844,
+      "viewportHeight": 390,
+      "wrap": "wrap",
+      "overflowX": "visible",
+      "overflowY": "visible",
+      "width": 304,
+      "height": 95,
+      "scrollWidth": 304,
+      "clientWidth": 304,
+      "buttons": [
+        {
+          "id": "back-btn",
+          "label": "离开对局",
+          "x": 557,
+          "y": 0,
+          "width": 44,
+          "height": 44,
+          "hit": true
+        },
+        {
+          "id": "battleSettingsButton",
+          "label": "打开对局设置",
+          "x": 604,
+          "y": 0,
+          "width": 44,
+          "height": 44,
+          "hit": true
+        },
+        {
+          "id": "rulebookButton",
+          "label": "打开规则书",
+          "x": 651,
+          "y": 0,
+          "width": 44,
+          "height": 44,
+          "hit": true
+        },
+        {
+          "id": "btnSurrender",
+          "label": "投降",
+          "x": 698,
+          "y": 0,
+          "width": 44,
+          "height": 44,
+          "hit": true
+        },
+        {
+          "id": "spectatingToggle",
+          "label": "关闭观战",
+          "x": 745,
+          "y": 0,
+          "width": 44,
+          "height": 44,
+          "hit": true
+        },
+        {
+          "id": "spectatorInvite",
+          "label": "复制房间邀请码",
+          "x": 792,
+          "y": 0,
+          "width": 44,
+          "height": 44,
+          "hit": true
+        },
+        {
+          "id": "social-toggle",
+          "label": "桌边便笺",
+          "x": 792,
+          "y": 47,
+          "width": 44,
+          "height": 44,
+          "hit": true
+        }
+      ],
+      "waitingPromptClear": {
+        "prompt": {
+          "left": 8,
+          "right": 344,
+          "top": 64,
+          "bottom": 88
+        },
+        "buttons": [
+          {
+            "id": "",
+            "x": 557,
+            "y": 0,
+            "hit": true,
+            "clear": true
+          },
+          {
+            "id": "battleSettingsButton",
+            "x": 604,
+            "y": 0,
+            "hit": true,
+            "clear": true
+          },
+          {
+            "id": "rulebookButton",
+            "x": 651,
+            "y": 0,
+            "hit": true,
+            "clear": true
+          },
+          {
+            "id": "btnSurrender",
+            "x": 698,
+            "y": 0,
+            "hit": true,
+            "clear": true
+          },
+          {
+            "id": "spectatingToggle",
+            "x": 745,
+            "y": 0,
+            "hit": true,
+            "clear": true
+          },
+          {
+            "id": "spectatorInvite",
+            "x": 792,
+            "y": 0,
+            "hit": true,
+            "clear": true
+          },
+          {
+            "id": "",
+            "x": 792,
+            "y": 47,
+            "hit": true,
+            "clear": true
+          }
+        ]
+      }
+    },
+    {
+      "mode": "training",
+      "viewportWidth": 667,
+      "viewportHeight": 375,
+      "wrap": "wrap",
+      "overflowX": "visible",
+      "overflowY": "visible",
+      "width": 266.796875,
+      "height": 95,
+      "scrollWidth": 267,
+      "clientWidth": 267,
+      "buttons": [
+        {
+          "id": "back-btn",
+          "label": "离开对局",
+          "x": 427,
+          "y": 0,
+          "width": 44,
+          "height": 44,
+          "hit": true
+        },
+        {
+          "id": "battleSettingsButton",
+          "label": "打开对局设置",
+          "x": 474,
+          "y": 0,
+          "width": 44,
+          "height": 44,
+          "hit": true
+        },
+        {
+          "id": "rulebookButton",
+          "label": "打开规则书",
+          "x": 521,
+          "y": 0,
+          "width": 44,
+          "height": 44,
+          "hit": true
+        },
+        {
+          "id": "btnSurrender",
+          "label": "投降",
+          "x": 568,
+          "y": 0,
+          "width": 44,
+          "height": 44,
+          "hit": true
+        },
+        {
+          "id": "btnSwitchPov",
+          "label": "切换视角",
+          "x": 615,
+          "y": 0,
+          "width": 44,
+          "height": 44,
+          "hit": true
+        },
+        {
+          "id": "btnResetCD",
+          "label": "重置冷却",
+          "x": 568,
+          "y": 47,
+          "width": 44,
+          "height": 44,
+          "hit": true
+        },
+        {
+          "id": "social-toggle",
+          "label": "桌边便笺",
+          "x": 615,
+          "y": 47,
+          "width": 44,
+          "height": 44,
+          "hit": true
+        }
+      ],
+      "waitingPromptClear": {
+        "prompt": {
+          "left": 8,
+          "right": 344,
+          "top": 64,
+          "bottom": 88
+        },
+        "buttons": [
+          {
+            "id": "",
+            "x": 427,
+            "y": 0,
+            "hit": true,
+            "clear": true
+          },
+          {
+            "id": "battleSettingsButton",
+            "x": 474,
+            "y": 0,
+            "hit": true,
+            "clear": true
+          },
+          {
+            "id": "rulebookButton",
+            "x": 521,
+            "y": 0,
+            "hit": true,
+            "clear": true
+          },
+          {
+            "id": "btnSurrender",
+            "x": 568,
+            "y": 0,
+            "hit": true,
+            "clear": true
+          },
+          {
+            "id": "btnSwitchPov",
+            "x": 615,
+            "y": 0,
+            "hit": true,
+            "clear": true
+          },
+          {
+            "id": "btnResetCD",
+            "x": 568,
+            "y": 47,
+            "hit": true,
+            "clear": true
+          },
+          {
+            "id": "",
+            "x": 615,
+            "y": 47,
+            "hit": true,
+            "clear": true
+          }
+        ]
+      }
+    },
+    {
+      "mode": "network",
+      "viewportWidth": 667,
+      "viewportHeight": 375,
+      "wrap": "wrap",
+      "overflowX": "visible",
+      "overflowY": "visible",
+      "width": 266.796875,
+      "height": 95,
+      "scrollWidth": 267,
+      "clientWidth": 267,
+      "buttons": [
+        {
+          "id": "back-btn",
+          "label": "离开对局",
+          "x": 427,
+          "y": 0,
+          "width": 44,
+          "height": 44,
+          "hit": true
+        },
+        {
+          "id": "battleSettingsButton",
+          "label": "打开对局设置",
+          "x": 474,
+          "y": 0,
+          "width": 44,
+          "height": 44,
+          "hit": true
+        },
+        {
+          "id": "rulebookButton",
+          "label": "打开规则书",
+          "x": 521,
+          "y": 0,
+          "width": 44,
+          "height": 44,
+          "hit": true
+        },
+        {
+          "id": "btnSurrender",
+          "label": "投降",
+          "x": 568,
+          "y": 0,
+          "width": 44,
+          "height": 44,
+          "hit": true
+        },
+        {
+          "id": "spectatingToggle",
+          "label": "关闭观战",
+          "x": 615,
+          "y": 0,
+          "width": 44,
+          "height": 44,
+          "hit": true
+        },
+        {
+          "id": "spectatorInvite",
+          "label": "复制房间邀请码",
+          "x": 568,
+          "y": 47,
+          "width": 44,
+          "height": 44,
+          "hit": true
+        },
+        {
+          "id": "social-toggle",
+          "label": "桌边便笺",
+          "x": 615,
+          "y": 47,
+          "width": 44,
+          "height": 44,
+          "hit": true
+        }
+      ],
+      "waitingPromptClear": {
+        "prompt": {
+          "left": 8,
+          "right": 344,
+          "top": 64,
+          "bottom": 88
+        },
+        "buttons": [
+          {
+            "id": "",
+            "x": 427,
+            "y": 0,
+            "hit": true,
+            "clear": true
+          },
+          {
+            "id": "battleSettingsButton",
+            "x": 474,
+            "y": 0,
+            "hit": true,
+            "clear": true
+          },
+          {
+            "id": "rulebookButton",
+            "x": 521,
+            "y": 0,
+            "hit": true,
+            "clear": true
+          },
+          {
+            "id": "btnSurrender",
+            "x": 568,
+            "y": 0,
+            "hit": true,
+            "clear": true
+          },
+          {
+            "id": "spectatingToggle",
+            "x": 615,
+            "y": 0,
+            "hit": true,
+            "clear": true
+          },
+          {
+            "id": "spectatorInvite",
+            "x": 568,
+            "y": 47,
+            "hit": true,
+            "clear": true
+          },
+          {
+            "id": "",
+            "x": 615,
+            "y": 47,
+            "hit": true,
+            "clear": true
+          }
+        ]
+      }
+    },
+    {
+      "mode": "training",
+      "viewportWidth": 600,
+      "viewportHeight": 800,
+      "wrap": "wrap",
+      "overflowX": "visible",
+      "overflowY": "visible",
+      "width": 240,
+      "height": 100,
+      "scrollWidth": 240,
+      "clientWidth": 240,
+      "buttons": [
+        {
+          "id": "back-btn",
+          "label": "离开对局",
+          "x": 388,
+          "y": 52,
+          "width": 44,
+          "height": 44,
+          "hit": true
+        },
+        {
+          "id": "battleSettingsButton",
+          "label": "打开对局设置",
+          "x": 440,
+          "y": 52,
+          "width": 44,
+          "height": 44,
+          "hit": true
+        },
+        {
+          "id": "rulebookButton",
+          "label": "打开规则书",
+          "x": 492,
+          "y": 52,
+          "width": 44,
+          "height": 44,
+          "hit": true
+        },
+        {
+          "id": "btnSurrender",
+          "label": "投降",
+          "x": 544,
+          "y": 52,
+          "width": 44,
+          "height": 44,
+          "hit": true
+        },
+        {
+          "id": "btnSwitchPov",
+          "label": "切换视角",
+          "x": 442,
+          "y": 104,
+          "width": 44,
+          "height": 44,
+          "hit": true
+        },
+        {
+          "id": "btnResetCD",
+          "label": "重置冷却",
+          "x": 494,
+          "y": 104,
+          "width": 44,
+          "height": 44,
+          "hit": true
+        },
+        {
+          "id": "social-toggle",
+          "label": "桌边便笺",
+          "x": 546,
+          "y": 105,
+          "width": 42,
+          "height": 42,
+          "hit": true
+        }
+      ],
+      "waitingPromptClear": {
+        "prompt": {
+          "left": 8,
+          "right": 336,
+          "top": 64,
+          "bottom": 112
+        },
+        "buttons": [
+          {
+            "id": "",
+            "x": 388,
+            "y": 52,
+            "hit": true,
+            "clear": true
+          },
+          {
+            "id": "battleSettingsButton",
+            "x": 440,
+            "y": 52,
+            "hit": true,
+            "clear": true
+          },
+          {
+            "id": "rulebookButton",
+            "x": 492,
+            "y": 52,
+            "hit": true,
+            "clear": true
+          },
+          {
+            "id": "btnSurrender",
+            "x": 544,
+            "y": 52,
+            "hit": true,
+            "clear": true
+          },
+          {
+            "id": "btnSwitchPov",
+            "x": 442,
+            "y": 104,
+            "hit": true,
+            "clear": true
+          },
+          {
+            "id": "btnResetCD",
+            "x": 494,
+            "y": 104,
+            "hit": true,
+            "clear": true
+          },
+          {
+            "id": "",
+            "x": 546,
+            "y": 105,
+            "hit": true,
+            "clear": true
+          }
+        ]
+      }
+    },
+    {
+      "mode": "network",
+      "viewportWidth": 600,
+      "viewportHeight": 800,
+      "wrap": "wrap",
+      "overflowX": "visible",
+      "overflowY": "visible",
+      "width": 240,
+      "height": 100,
+      "scrollWidth": 240,
+      "clientWidth": 240,
+      "buttons": [
+        {
+          "id": "back-btn",
+          "label": "离开对局",
+          "x": 388,
+          "y": 52,
+          "width": 44,
+          "height": 44,
+          "hit": true
+        },
+        {
+          "id": "battleSettingsButton",
+          "label": "打开对局设置",
+          "x": 440,
+          "y": 52,
+          "width": 44,
+          "height": 44,
+          "hit": true
+        },
+        {
+          "id": "rulebookButton",
+          "label": "打开规则书",
+          "x": 492,
+          "y": 52,
+          "width": 44,
+          "height": 44,
+          "hit": true
+        },
+        {
+          "id": "btnSurrender",
+          "label": "投降",
+          "x": 544,
+          "y": 52,
+          "width": 44,
+          "height": 44,
+          "hit": true
+        },
+        {
+          "id": "spectatingToggle",
+          "label": "关闭观战",
+          "x": 442,
+          "y": 104,
+          "width": 44,
+          "height": 44,
+          "hit": true
+        },
+        {
+          "id": "spectatorInvite",
+          "label": "复制房间邀请码",
+          "x": 494,
+          "y": 104,
+          "width": 44,
+          "height": 44,
+          "hit": true
+        },
+        {
+          "id": "social-toggle",
+          "label": "桌边便笺",
+          "x": 546,
+          "y": 105,
+          "width": 42,
+          "height": 42,
+          "hit": true
+        }
+      ],
+      "waitingPromptClear": {
+        "prompt": {
+          "left": 8,
+          "right": 336,
+          "top": 64,
+          "bottom": 112
+        },
+        "buttons": [
+          {
+            "id": "",
+            "x": 388,
+            "y": 52,
+            "hit": true,
+            "clear": true
+          },
+          {
+            "id": "battleSettingsButton",
+            "x": 440,
+            "y": 52,
+            "hit": true,
+            "clear": true
+          },
+          {
+            "id": "rulebookButton",
+            "x": 492,
+            "y": 52,
+            "hit": true,
+            "clear": true
+          },
+          {
+            "id": "btnSurrender",
+            "x": 544,
+            "y": 52,
+            "hit": true,
+            "clear": true
+          },
+          {
+            "id": "spectatingToggle",
+            "x": 442,
+            "y": 104,
+            "hit": true,
+            "clear": true
+          },
+          {
+            "id": "spectatorInvite",
+            "x": 494,
+            "y": 104,
+            "hit": true,
+            "clear": true
+          },
+          {
+            "id": "",
+            "x": 546,
+            "y": 105,
+            "hit": true,
+            "clear": true
+          }
+        ]
+      }
+    }
+  ]
+}

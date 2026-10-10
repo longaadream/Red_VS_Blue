@@ -80,6 +80,7 @@ export function executeFreeMove(
       fromY: change.from.y,
       toX: change.to.x,
       toY: change.to.y,
+      path: change.path.map(cell => ({ ...cell })),
       freeMove: true,
       message: `${piece.name || piece.templateId}进行了免费移动`,
     },

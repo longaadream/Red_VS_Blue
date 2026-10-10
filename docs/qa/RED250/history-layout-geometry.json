@@ -1,0 +1,888 @@
+{
+  "fixture": true,
+  "notHumanAcceptance": true,
+  "model": "representative skill root, three fixture effect events, two-level causePath response",
+  "layoutSource": "data/pages/css/battle-context-ui.css",
+  "results": [
+    {
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "expanded": true,
+      "collapseReason": "",
+      "dock": {
+        "left": 904,
+        "right": 1264,
+        "top": 90,
+        "bottom": 373,
+        "width": 360,
+        "height": 283
+      },
+      "item": {
+        "left": 915,
+        "right": 1243,
+        "top": 152,
+        "bottom": 419.5,
+        "width": 328,
+        "height": 267.5,
+        "clientWidth": 328,
+        "scrollWidth": 328
+      },
+      "list": {
+        "rect": {
+          "left": 915,
+          "right": 1253,
+          "top": 152,
+          "bottom": 362,
+          "width": 338,
+          "height": 210
+        },
+        "clientWidth": 328,
+        "scrollWidth": 328,
+        "clientHeight": 210,
+        "scrollHeight": 273
+      },
+      "effectRowCount": 3,
+      "rows": [
+        {
+          "eventId": "holy-root",
+          "rect": {
+            "left": 923,
+            "right": 1235,
+            "top": 160,
+            "bottom": 226.5,
+            "width": 312,
+            "height": 66.5
+          },
+          "clientWidth": 312,
+          "scrollWidth": 312,
+          "amount": null,
+          "children": [
+            {
+              "className": "action-history-entity is-piece",
+              "text": "图图拉杨·圣光守望者·超长名称测试",
+              "rect": {
+                "left": 923,
+                "right": 1111.67,
+                "top": 160,
+                "bottom": 181,
+                "width": 188.67,
+                "height": 21
+              },
+              "minWidth": "0px",
+              "flexShrink": "1",
+              "overflowX": "visible",
+              "whiteSpace": "nowrap"
+            },
+            {
+              "className": "action-history-predicate is-skill-release",
+              "text": "释放圣铸进军·神圣惩戒·超长技能标题布局测试",
+              "rect": {
+                "left": 923,
+                "right": 1156.67,
+                "top": 187,
+                "bottom": 200.75,
+                "width": 233.67,
+                "height": 13.75
+              },
+              "minWidth": "0px",
+              "flexShrink": "1",
+              "overflowX": "visible",
+              "whiteSpace": "nowrap"
+            },
+            {
+              "className": "action-history-complement",
+              "text": "发起行动 · 触发响应",
+              "rect": {
+                "left": 923,
+                "right": 1022.39,
+                "top": 209.75,
+                "bottom": 223.5,
+                "width": 99.39,
+                "height": 13.75
+              },
+              "minWidth": "0px",
+              "flexShrink": "1",
+              "overflowX": "visible",
+              "whiteSpace": "nowrap"
+            },
+            {
+              "className": "action-history-entity is-tile",
+              "text": "地格",
+              "rect": {
+                "left": 1028.39,
+                "right": 1062.39,
+                "top": 206.75,
+                "bottom": 226.5,
+                "width": 34,
+                "height": 19.75
+              },
+              "minWidth": "0px",
+              "flexShrink": "1",
+              "overflowX": "visible",
+              "whiteSpace": "nowrap"
+            }
+          ],
+          "withinItem": true
+        },
+        {
+          "eventId": "holy-damage",
+          "rect": {
+            "left": 997,
+            "right": 1235,
+            "top": 332.5,
+            "bottom": 355.5,
+            "width": 238,
+            "height": 23
+          },
+          "clientWidth": 237,
+          "scrollWidth": 237,
+          "amount": {
+            "text": "987654",
+            "rect": {
+              "left": 1137,
+              "right": 1187.7,
+              "top": 336.13,
+              "bottom": 351.88,
+              "width": 50.7,
+              "height": 15.75
+            },
+            "withinRow": true,
+            "overlaps": []
+          },
+          "children": [
+            {
+              "className": "action-history-entity is-piece",
+              "text": "图",
+              "rect": {
+                "left": 1006,
+                "right": 1027,
+                "top": 333.5,
+                "bottom": 354.5,
+                "width": 21,
+                "height": 21
+              },
+              "minWidth": "0px",
+              "flexShrink": "1",
+              "overflowX": "visible",
+              "whiteSpace": "nowrap"
+            },
+            {
+              "className": "action-history-predicate",
+              "text": "造成伤害",
+              "rect": {
+                "left": 1033,
+                "right": 1104,
+                "top": 332.5,
+                "bottom": 355.5,
+                "width": 71,
+                "height": 23
+              },
+              "minWidth": "0px",
+              "flexShrink": "1",
+              "overflowX": "visible",
+              "whiteSpace": "nowrap"
+            },
+            {
+              "className": "action-history-entity is-piece",
+              "text": "乌",
+              "rect": {
+                "left": 1110,
+                "right": 1131,
+                "top": 333.5,
+                "bottom": 354.5,
+                "width": 21,
+                "height": 21
+              },
+              "minWidth": "0px",
+              "flexShrink": "1",
+              "overflowX": "visible",
+              "whiteSpace": "nowrap"
+            },
+            {
+              "className": "action-history-complement is-amount",
+              "text": "987654",
+              "rect": {
+                "left": 1137,
+                "right": 1187.7,
+                "top": 336.13,
+                "bottom": 351.88,
+                "width": 50.7,
+                "height": 15.75
+              },
+              "minWidth": "18px",
+              "flexShrink": "0",
+              "overflowX": "visible",
+              "whiteSpace": "nowrap"
+            }
+          ],
+          "withinItem": true
+        },
+        {
+          "eventId": "holy-heal",
+          "rect": {
+            "left": 997,
+            "right": 1235,
+            "top": 359.5,
+            "bottom": 382.5,
+            "width": 238,
+            "height": 23
+          },
+          "clientWidth": 237,
+          "scrollWidth": 237,
+          "amount": {
+            "text": "123456",
+            "rect": {
+              "left": 1137,
+              "right": 1187.7,
+              "top": 363.13,
+              "bottom": 378.88,
+              "width": 50.7,
+              "height": 15.75
+            },
+            "withinRow": true,
+            "overlaps": []
+          },
+          "children": [
+            {
+              "className": "action-history-entity is-piece",
+              "text": "图",
+              "rect": {
+                "left": 1006,
+                "right": 1027,
+                "top": 360.5,
+                "bottom": 381.5,
+                "width": 21,
+                "height": 21
+              },
+              "minWidth": "0px",
+              "flexShrink": "1",
+              "overflowX": "visible",
+              "whiteSpace": "nowrap"
+            },
+            {
+              "className": "action-history-predicate",
+              "text": "恢复生命",
+              "rect": {
+                "left": 1033,
+                "right": 1104,
+                "top": 359.5,
+                "bottom": 382.5,
+                "width": 71,
+                "height": 23
+              },
+              "minWidth": "0px",
+              "flexShrink": "1",
+              "overflowX": "visible",
+              "whiteSpace": "nowrap"
+            },
+            {
+              "className": "action-history-entity is-piece",
+              "text": "图",
+              "rect": {
+                "left": 1110,
+                "right": 1131,
+                "top": 360.5,
+                "bottom": 381.5,
+                "width": 21,
+                "height": 21
+              },
+              "minWidth": "0px",
+              "flexShrink": "1",
+              "overflowX": "visible",
+              "whiteSpace": "nowrap"
+            },
+            {
+              "className": "action-history-complement is-amount",
+              "text": "123456",
+              "rect": {
+                "left": 1137,
+                "right": 1187.7,
+                "top": 363.13,
+                "bottom": 378.88,
+                "width": 50.7,
+                "height": 15.75
+              },
+              "minWidth": "18px",
+              "flexShrink": "0",
+              "overflowX": "visible",
+              "whiteSpace": "nowrap"
+            }
+          ],
+          "withinItem": true
+        },
+        {
+          "eventId": "holy-status",
+          "rect": {
+            "left": 997,
+            "right": 1235,
+            "top": 386.5,
+            "bottom": 409.5,
+            "width": 238,
+            "height": 23
+          },
+          "clientWidth": 237,
+          "scrollWidth": 237,
+          "amount": null,
+          "children": [
+            {
+              "className": "action-history-entity is-piece",
+              "text": "蓝",
+              "rect": {
+                "left": 1006,
+                "right": 1027,
+                "top": 387.5,
+                "bottom": 408.5,
+                "width": 21,
+                "height": 21
+              },
+              "minWidth": "0px",
+              "flexShrink": "1",
+              "overflowX": "visible",
+              "whiteSpace": "nowrap"
+            },
+            {
+              "className": "action-history-predicate",
+              "text": "圣盾",
+              "rect": {
+                "left": 1033,
+                "right": 1082,
+                "top": 386.5,
+                "bottom": 409.5,
+                "width": 49,
+                "height": 23
+              },
+              "minWidth": "0px",
+              "flexShrink": "1",
+              "overflowX": "visible",
+              "whiteSpace": "nowrap"
+            },
+            {
+              "className": "action-history-entity is-piece",
+              "text": "乌",
+              "rect": {
+                "left": 1088,
+                "right": 1109,
+                "top": 387.5,
+                "bottom": 408.5,
+                "width": 21,
+                "height": 21
+              },
+              "minWidth": "0px",
+              "flexShrink": "1",
+              "overflowX": "visible",
+              "whiteSpace": "nowrap"
+            },
+            {
+              "className": "action-history-complement is-effect",
+              "text": "圣盾·深层响应状态",
+              "rect": {
+                "left": 1115,
+                "right": 1232.66,
+                "top": 386.5,
+                "bottom": 409.5,
+                "width": 117.66,
+                "height": 23
+              },
+              "minWidth": "0px",
+              "flexShrink": "1",
+              "overflowX": "visible",
+              "whiteSpace": "nowrap"
+            }
+          ],
+          "withinItem": true
+        }
+      ],
+      "responses": [
+        {
+          "rect": {
+            "left": 937,
+            "right": 1235,
+            "top": 230.5,
+            "bottom": 409.5,
+            "width": 298,
+            "height": 179
+          },
+          "title": {
+            "left": 949,
+            "right": 1235,
+            "top": 230.5,
+            "bottom": 270.5,
+            "width": 286,
+            "height": 40
+          },
+          "titleScrollWidth": 286,
+          "titleClientWidth": 286
+        },
+        {
+          "rect": {
+            "left": 963,
+            "right": 1235,
+            "top": 274.5,
+            "bottom": 409.5,
+            "width": 272,
+            "height": 135
+          },
+          "title": {
+            "left": 975,
+            "right": 1235,
+            "top": 274.5,
+            "bottom": 328.5,
+            "width": 260,
+            "height": 54
+          },
+          "titleScrollWidth": 260,
+          "titleClientWidth": 260
+        }
+      ],
+      "violations": [],
+      "source": "production tabletop CSS + BattleEffectIcons + BattleActionIdentity + BattleActionHistory",
+      "modelEffectEventIds": [
+        "holy-damage",
+        "holy-heal",
+        "holy-status"
+      ]
+    },
+    {
+      "viewport": {
+        "width": 844,
+        "height": 390
+      },
+      "expanded": true,
+      "collapseReason": "narrow compact-landscape",
+      "dock": {
+        "left": 468,
+        "right": 828,
+        "top": 60,
+        "bottom": 231,
+        "width": 360,
+        "height": 171
+      },
+      "item": {
+        "left": 479,
+        "right": 807,
+        "top": 122,
+        "bottom": 389.5,
+        "width": 328,
+        "height": 267.5,
+        "clientWidth": 328,
+        "scrollWidth": 328
+      },
+      "list": {
+        "rect": {
+          "left": 479,
+          "right": 817,
+          "top": 122,
+          "bottom": 220,
+          "width": 338,
+          "height": 98
+        },
+        "clientWidth": 328,
+        "scrollWidth": 328,
+        "clientHeight": 98,
+        "scrollHeight": 273
+      },
+      "effectRowCount": 3,
+      "rows": [
+        {
+          "eventId": "holy-root",
+          "rect": {
+            "left": 487,
+            "right": 799,
+            "top": 130,
+            "bottom": 196.5,
+            "width": 312,
+            "height": 66.5
+          },
+          "clientWidth": 312,
+          "scrollWidth": 312,
+          "amount": null,
+          "children": [
+            {
+              "className": "action-history-entity is-piece",
+              "text": "图图拉杨·圣光守望者·超长名称测试",
+              "rect": {
+                "left": 487,
+                "right": 675.67,
+                "top": 130,
+                "bottom": 151,
+                "width": 188.67,
+                "height": 21
+              },
+              "minWidth": "0px",
+              "flexShrink": "1",
+              "overflowX": "visible",
+              "whiteSpace": "nowrap"
+            },
+            {
+              "className": "action-history-predicate is-skill-release",
+              "text": "释放圣铸进军·神圣惩戒·超长技能标题布局测试",
+              "rect": {
+                "left": 487,
+                "right": 720.67,
+                "top": 157,
+                "bottom": 170.75,
+                "width": 233.67,
+                "height": 13.75
+              },
+              "minWidth": "0px",
+              "flexShrink": "1",
+              "overflowX": "visible",
+              "whiteSpace": "nowrap"
+            },
+            {
+              "className": "action-history-complement",
+              "text": "发起行动 · 触发响应",
+              "rect": {
+                "left": 487,
+                "right": 586.39,
+                "top": 179.75,
+                "bottom": 193.5,
+                "width": 99.39,
+                "height": 13.75
+              },
+              "minWidth": "0px",
+              "flexShrink": "1",
+              "overflowX": "visible",
+              "whiteSpace": "nowrap"
+            },
+            {
+              "className": "action-history-entity is-tile",
+              "text": "地格",
+              "rect": {
+                "left": 592.39,
+                "right": 626.39,
+                "top": 176.75,
+                "bottom": 196.5,
+                "width": 34,
+                "height": 19.75
+              },
+              "minWidth": "0px",
+              "flexShrink": "1",
+              "overflowX": "visible",
+              "whiteSpace": "nowrap"
+            }
+          ],
+          "withinItem": true
+        },
+        {
+          "eventId": "holy-damage",
+          "rect": {
+            "left": 561,
+            "right": 799,
+            "top": 302.5,
+            "bottom": 325.5,
+            "width": 238,
+            "height": 23
+          },
+          "clientWidth": 237,
+          "scrollWidth": 237,
+          "amount": {
+            "text": "987654",
+            "rect": {
+              "left": 701,
+              "right": 751.7,
+              "top": 306.13,
+              "bottom": 321.88,
+              "width": 50.7,
+              "height": 15.75
+            },
+            "withinRow": true,
+            "overlaps": []
+          },
+          "children": [
+            {
+              "className": "action-history-entity is-piece",
+              "text": "图",
+              "rect": {
+                "left": 570,
+                "right": 591,
+                "top": 303.5,
+                "bottom": 324.5,
+                "width": 21,
+                "height": 21
+              },
+              "minWidth": "0px",
+              "flexShrink": "1",
+              "overflowX": "visible",
+              "whiteSpace": "nowrap"
+            },
+            {
+              "className": "action-history-predicate",
+              "text": "造成伤害",
+              "rect": {
+                "left": 597,
+                "right": 668,
+                "top": 302.5,
+                "bottom": 325.5,
+                "width": 71,
+                "height": 23
+              },
+              "minWidth": "0px",
+              "flexShrink": "1",
+              "overflowX": "visible",
+              "whiteSpace": "nowrap"
+            },
+            {
+              "className": "action-history-entity is-piece",
+              "text": "乌",
+              "rect": {
+                "left": 674,
+                "right": 695,
+                "top": 303.5,
+                "bottom": 324.5,
+                "width": 21,
+                "height": 21
+              },
+              "minWidth": "0px",
+              "flexShrink": "1",
+              "overflowX": "visible",
+              "whiteSpace": "nowrap"
+            },
+            {
+              "className": "action-history-complement is-amount",
+              "text": "987654",
+              "rect": {
+                "left": 701,
+                "right": 751.7,
+                "top": 306.13,
+                "bottom": 321.88,
+                "width": 50.7,
+                "height": 15.75
+              },
+              "minWidth": "18px",
+              "flexShrink": "0",
+              "overflowX": "visible",
+              "whiteSpace": "nowrap"
+            }
+          ],
+          "withinItem": true
+        },
+        {
+          "eventId": "holy-heal",
+          "rect": {
+            "left": 561,
+            "right": 799,
+            "top": 329.5,
+            "bottom": 352.5,
+            "width": 238,
+            "height": 23
+          },
+          "clientWidth": 237,
+          "scrollWidth": 237,
+          "amount": {
+            "text": "123456",
+            "rect": {
+              "left": 701,
+              "right": 751.7,
+              "top": 333.13,
+              "bottom": 348.88,
+              "width": 50.7,
+              "height": 15.75
+            },
+            "withinRow": true,
+            "overlaps": []
+          },
+          "children": [
+            {
+              "className": "action-history-entity is-piece",
+              "text": "图",
+              "rect": {
+                "left": 570,
+                "right": 591,
+                "top": 330.5,
+                "bottom": 351.5,
+                "width": 21,
+                "height": 21
+              },
+              "minWidth": "0px",
+              "flexShrink": "1",
+              "overflowX": "visible",
+              "whiteSpace": "nowrap"
+            },
+            {
+              "className": "action-history-predicate",
+              "text": "恢复生命",
+              "rect": {
+                "left": 597,
+                "right": 668,
+                "top": 329.5,
+                "bottom": 352.5,
+                "width": 71,
+                "height": 23
+              },
+              "minWidth": "0px",
+              "flexShrink": "1",
+              "overflowX": "visible",
+              "whiteSpace": "nowrap"
+            },
+            {
+              "className": "action-history-entity is-piece",
+              "text": "图",
+              "rect": {
+                "left": 674,
+                "right": 695,
+                "top": 330.5,
+                "bottom": 351.5,
+                "width": 21,
+                "height": 21
+              },
+              "minWidth": "0px",
+              "flexShrink": "1",
+              "overflowX": "visible",
+              "whiteSpace": "nowrap"
+            },
+            {
+              "className": "action-history-complement is-amount",
+              "text": "123456",
+              "rect": {
+                "left": 701,
+                "right": 751.7,
+                "top": 333.13,
+                "bottom": 348.88,
+                "width": 50.7,
+                "height": 15.75
+              },
+              "minWidth": "18px",
+              "flexShrink": "0",
+              "overflowX": "visible",
+              "whiteSpace": "nowrap"
+            }
+          ],
+          "withinItem": true
+        },
+        {
+          "eventId": "holy-status",
+          "rect": {
+            "left": 561,
+            "right": 799,
+            "top": 356.5,
+            "bottom": 379.5,
+            "width": 238,
+            "height": 23
+          },
+          "clientWidth": 237,
+          "scrollWidth": 237,
+          "amount": null,
+          "children": [
+            {
+              "className": "action-history-entity is-piece",
+              "text": "蓝",
+              "rect": {
+                "left": 570,
+                "right": 591,
+                "top": 357.5,
+                "bottom": 378.5,
+                "width": 21,
+                "height": 21
+              },
+              "minWidth": "0px",
+              "flexShrink": "1",
+              "overflowX": "visible",
+              "whiteSpace": "nowrap"
+            },
+            {
+              "className": "action-history-predicate",
+              "text": "圣盾",
+              "rect": {
+                "left": 597,
+                "right": 646,
+                "top": 356.5,
+                "bottom": 379.5,
+                "width": 49,
+                "height": 23
+              },
+              "minWidth": "0px",
+              "flexShrink": "1",
+              "overflowX": "visible",
+              "whiteSpace": "nowrap"
+            },
+            {
+              "className": "action-history-entity is-piece",
+              "text": "乌",
+              "rect": {
+                "left": 652,
+                "right": 673,
+                "top": 357.5,
+                "bottom": 378.5,
+                "width": 21,
+                "height": 21
+              },
+              "minWidth": "0px",
+              "flexShrink": "1",
+              "overflowX": "visible",
+              "whiteSpace": "nowrap"
+            },
+            {
+              "className": "action-history-complement is-effect",
+              "text": "圣盾·深层响应状态",
+              "rect": {
+                "left": 679,
+                "right": 796.66,
+                "top": 356.5,
+                "bottom": 379.5,
+                "width": 117.66,
+                "height": 23
+              },
+              "minWidth": "0px",
+              "flexShrink": "1",
+              "overflowX": "visible",
+              "whiteSpace": "nowrap"
+            }
+          ],
+          "withinItem": true
+        }
+      ],
+      "responses": [
+        {
+          "rect": {
+            "left": 501,
+            "right": 799,
+            "top": 200.5,
+            "bottom": 379.5,
+            "width": 298,
+            "height": 179
+          },
+          "title": {
+            "left": 513,
+            "right": 799,
+            "top": 200.5,
+            "bottom": 240.5,
+            "width": 286,
+            "height": 40
+          },
+          "titleScrollWidth": 286,
+          "titleClientWidth": 286
+        },
+        {
+          "rect": {
+            "left": 527,
+            "right": 799,
+            "top": 244.5,
+            "bottom": 379.5,
+            "width": 272,
+            "height": 135
+          },
+          "title": {
+            "left": 539,
+            "right": 799,
+            "top": 244.5,
+            "bottom": 298.5,
+            "width": 260,
+            "height": 54
+          },
+          "titleScrollWidth": 260,
+          "titleClientWidth": 260
+        }
+      ],
+      "violations": [],
+      "source": "production tabletop CSS + BattleEffectIcons + BattleActionIdentity + BattleActionHistory",
+      "modelEffectEventIds": [
+        "holy-damage",
+        "holy-heal",
+        "holy-status"
+      ]
+    }
+  ]
+}

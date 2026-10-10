@@ -107,6 +107,12 @@ export type CommunityPostInput = {
   roomCode?: unknown
 }
 
+export type CommunityModerationFilters = {
+  q?: unknown
+  status?: unknown
+  kind?: unknown
+}
+
 export type Community = {
   initialize(): Promise<void>
   search(accountId: string, query: unknown): Promise<Array<{ id: string; name: string }>>
@@ -137,7 +143,7 @@ export type Community = {
   createReply(accountId: string, postId: unknown, body: unknown): Promise<string>
   deletePost(accountId: string, postId: unknown): Promise<void>
   deleteReply(accountId: string, postIdOrReplyId: unknown, replyId?: unknown): Promise<void>
-  moderation(offset?: number): Promise<{ posts: Array<Record<string, unknown>>; replies: Array<Record<string, unknown>>; more: boolean }>
+  moderation(offset?: number, filters?: CommunityModerationFilters): Promise<{ posts: Array<Record<string, unknown>>; replies: Array<Record<string, unknown>>; more: boolean }>
   administer(action: string, value: unknown, reason?: unknown): Promise<void>
 }
 
@@ -163,6 +169,26 @@ function plainText(value: unknown, options: TextOptions): string {
   if (/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f\u0080-\u009f]/.test(result)) throw new OfficialError(`${options.field}包含不可用字符`)
   if (options.printable && !/^[\x20-\x7e]*$/.test(result)) throw new OfficialError(`${options.field}包含不可用字符`)
   return result
+}
+
+type ModerationStatus = 'all' | 'visible' | 'hidden' | 'deleted'
+type ModerationKind = 'all' | 'posts' | 'replies'
+
+function moderationQuery(value: unknown): string {
+  if (value === undefined || value === null || value === '') return ''
+  return plainText(value, { field: '审核搜索内容', max: 200, required: false })
+}
+
+function moderationStatus(value: unknown): ModerationStatus {
+  if (value === undefined || value === null || value === '') return 'all'
+  if (value === 'all' || value === 'visible' || value === 'hidden' || value === 'deleted') return value
+  throw new OfficialError('审核状态无效')
+}
+
+function moderationKind(value: unknown): ModerationKind {
+  if (value === undefined || value === null || value === '') return 'all'
+  if (value === 'all' || value === 'posts' || value === 'replies') return value
+  throw new OfficialError('审核内容类型无效')
 }
 
 function optionalRoomCode(value: unknown): string | null {
@@ -514,19 +540,56 @@ export class CommunityService implements Community {
     })
   }
 
-  async moderation(offset = 0) {
+  async moderation(offset = 0, filters: CommunityModerationFilters = {}) {
     if (!Number.isSafeInteger(offset) || offset < 0 || offset > 1000000) throw new OfficialError('审核页码无效')
-    const posts = await this.pool.query(`SELECT p.id,p.author_id,a.name AS author_name,p.kind,p.title,p.body,p.room_code,
-      p.created_at,p.deleted_at,p.hidden_at,p.hidden_reason
-      FROM official_community_posts p JOIN official_accounts a ON a.id=p.author_id
-      ORDER BY p.created_at DESC,p.id DESC LIMIT 101 OFFSET $1`, [offset])
-    const replies = await this.pool.query(`SELECT r.id,r.post_id,r.author_id,a.name AS author_name,r.body,
-      r.created_at,r.deleted_at,r.hidden_at,r.hidden_reason
-      FROM official_community_replies r JOIN official_accounts a ON a.id=r.author_id
-      ORDER BY r.created_at DESC,r.id DESC LIMIT 101 OFFSET $1`, [offset])
+    if (!filters || typeof filters !== 'object' || Array.isArray(filters)) throw new OfficialError('审核筛选无效')
+    const query = moderationQuery(filters.q)
+    const status = moderationStatus(filters.status)
+    const kind = moderationKind(filters.kind)
+
+    const queryRows = async (contentKind: 'post' | 'reply') => {
+      const alias = contentKind === 'post' ? 'p' : 'r'
+      const clauses: string[] = []
+      const params: unknown[] = []
+      const parameter = (value: unknown) => {
+        params.push(value)
+        return `$${params.length}`
+      }
+      if (status === 'visible') clauses.push(`${alias}.deleted_at IS NULL AND ${alias}.hidden_at IS NULL`)
+      else if (status === 'hidden') clauses.push(`${alias}.deleted_at IS NULL AND ${alias}.hidden_at IS NOT NULL`)
+      else if (status === 'deleted') clauses.push(`${alias}.deleted_at IS NOT NULL`)
+      if (query) {
+        const value = parameter(query)
+        const fields = contentKind === 'post'
+          ? [`${alias}.id`, `${alias}.title`, `${alias}.body`, 'a.id', 'a.name']
+          : [`${alias}.id`, `${alias}.post_id`, `${alias}.body`, 'a.id', 'a.name', 'parent.title']
+        clauses.push(`(${fields.map(field => `strpos(lower(${field}),lower(${value}))>0`).join(' OR ')})`)
+      }
+      const offsetParameter = parameter(offset)
+      const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : ''
+      params.push(101)
+      const limitParameter = `$${params.length}`
+      const result = contentKind === 'post'
+        ? await this.pool.query(`SELECT p.id,p.author_id,a.name AS author_name,p.kind,p.title,p.body,p.room_code,
+            p.created_at,p.deleted_at,p.hidden_at,p.hidden_reason
+            FROM official_community_posts p JOIN official_accounts a ON a.id=p.author_id
+            ${where}
+            ORDER BY p.created_at DESC,p.id DESC LIMIT ${limitParameter} OFFSET ${offsetParameter}`, params)
+        : await this.pool.query(`SELECT r.id,r.post_id,r.author_id,a.name AS author_name,r.body,
+            r.created_at,r.deleted_at,r.hidden_at,r.hidden_reason
+            FROM official_community_replies r
+            JOIN official_accounts a ON a.id=r.author_id
+            JOIN official_community_posts parent ON parent.id=r.post_id
+            ${where}
+            ORDER BY r.created_at DESC,r.id DESC LIMIT ${limitParameter} OFFSET ${offsetParameter}`, params)
+      return result.rows
+    }
+
+    const postRows = kind === 'replies' ? [] : await queryRows('post')
+    const replyRows = kind === 'posts' ? [] : await queryRows('reply')
     return {
-      more: posts.rows.length > 100 || replies.rows.length > 100,
-      posts: posts.rows.slice(0, 100).map(row => ({
+      more: postRows.length > 100 || replyRows.length > 100,
+      posts: postRows.slice(0, 100).map(row => ({
         id: row.id,
         author: { id: row.author_id, name: row.author_name },
         kind: row.kind,
@@ -538,7 +601,7 @@ export class CommunityService implements Community {
         hidden: !!row.hidden_at,
         hiddenReason: row.hidden_reason ?? undefined,
       })),
-      replies: replies.rows.slice(0, 100).map(row => ({
+      replies: replyRows.slice(0, 100).map(row => ({
         id: row.id,
         postId: row.post_id,
         author: { id: row.author_id, name: row.author_name },
@@ -552,9 +615,10 @@ export class CommunityService implements Community {
   }
 
   async administer(action: string, value: unknown, reasonValue?: unknown) {
-    const reason = plainText(reasonValue ?? '', { field: '操作原因', max: 300 })
+    const reason = plainText(reasonValue ?? '', { field: '操作原因', max: 300, required: false })
     if (!reason) throw new OfficialError('请填写1–300字的操作原因')
     const rawValue = plainText(value, { field: '审核目标', max: 160, printable: true })
+    const restoring = action === 'community-restore-post' || action === 'community-restore-reply'
     let kind: 'post' | 'reply'
     let id: string
     if (action === 'community-hide') {
@@ -564,17 +628,27 @@ export class CommunityService implements Community {
       if (prefix !== 'post' && prefix !== 'reply') throw new OfficialError('审核目标无效')
       kind = prefix
       id = accountId(rawValue.slice(separator + 1))
-    } else if (action === 'community-hide-post' || action === 'community-hide-reply') {
+    } else if (action === 'community-hide-post' || action === 'community-hide-reply'
+      || action === 'community-restore-post' || action === 'community-restore-reply') {
       kind = action.endsWith('-post') ? 'post' : 'reply'
       id = accountId(rawValue)
     } else throw new OfficialError('未知社区管理操作')
-
     await transaction(this.pool, async client => {
       const table = kind === 'post' ? 'official_community_posts' : 'official_community_replies'
-      const updated = await client.query(`UPDATE ${table}
-        SET hidden_at=coalesce(hidden_at,now()),hidden_by='local-admin',hidden_reason=$2
-        WHERE id=$1 RETURNING id`, [id, reason])
-      if (!updated.rowCount) throw new OfficialError('审核目标不存在', 404)
+      const current = (await client.query<{ id: string; deleted_at: Date | null; hidden_at: Date | null }>(
+        `SELECT id,deleted_at,hidden_at FROM ${table} WHERE id=$1 FOR UPDATE`, [id],
+      )).rows[0]
+      if (!current) throw new OfficialError('审核目标不存在', 404)
+      if (restoring) {
+        if (current.deleted_at) throw new OfficialError('作者已删除的内容不能恢复', 409)
+        if (!current.hidden_at) throw new OfficialError('审核目标未隐藏', 409)
+        await client.query(`UPDATE ${table}
+          SET hidden_at=NULL,hidden_by=NULL,hidden_reason=NULL WHERE id=$1`, [id])
+      } else {
+        await client.query(`UPDATE ${table}
+          SET hidden_at=coalesce(hidden_at,now()),hidden_by='local-admin',hidden_reason=$2
+          WHERE id=$1`, [id, reason])
+      }
       const auditValue = action === 'community-hide' ? rawValue : id
       await client.query('INSERT INTO official_audit(action,detail) VALUES($1,$2)', [action, { value: auditValue, reason }])
     })

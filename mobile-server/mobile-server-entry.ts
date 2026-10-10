@@ -760,6 +760,10 @@ function handleGetMaps(): string {
     'open-expanse': '开阔原野',
     'winding-pass': '回风曲径',
     'narrow-corridors': '狭廊要道',
+    'twin-bridges': '双桥裂谷',
+    'crossroads-plaza': '四通广场',
+    'island-courtyard': '群垒庭院',
+    'broad-ring': '宽环回廊',
   }
   return ok({ maps: SELECTABLE_MAP_IDS.map(id => ({ id, name: names[id] })) })
 }

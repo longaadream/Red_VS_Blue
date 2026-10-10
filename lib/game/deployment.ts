@@ -58,6 +58,31 @@ export function reservePiecesForPlayer(
   return stableId ? reserves[stableId] ?? [] : []
 }
 
+const LIGHTFORGED_TURN_MARKERS = 'turalyonLightforgedTurns'
+
+/** Project the one owner-scoped source marker required by public card preview. */
+function projectSourceTurnMarkers(
+  source: BattleState,
+  projected: BattleState,
+  viewerId: string,
+): void {
+  const markerStore = projected.extensions?.[LIGHTFORGED_TURN_MARKERS]
+  if (!projected.extensions || markerStore === undefined) return
+  if (!markerStore || typeof markerStore !== 'object' || Array.isArray(markerStore)) {
+    projected.extensions[LIGHTFORGED_TURN_MARKERS] = {}
+    return
+  }
+  const piecesById = new Map(source.pieces.map(piece => [piece.instanceId, piece]))
+  const visibleMarkers: Record<string, number> = {}
+  for (const [sourceId, marker] of Object.entries(markerStore as Record<string, unknown>)) {
+    const sourcePiece = piecesById.get(sourceId)
+    if (!sourcePiece || !Number.isSafeInteger(marker)) continue
+    if (String(sourcePiece.ownerPlayerId ?? '').trim().toLowerCase() !== viewerId) continue
+    visibleMarkers[sourceId] = marker as number
+  }
+  projected.extensions[LIGHTFORGED_TURN_MARKERS] = visibleMarkers
+}
+
 /**
  * Legacy final positions are public after both locks. Progressive offers and
  * legal placement cells are projected only to the active owner; opponents,
@@ -71,6 +96,7 @@ export function toPublicBattleState(
   const projected = cloneSerializable(state)
   const viewerId = String(viewerPlayerId ?? '').trim().toLowerCase()
   projectSkillPresentation(state, projected, viewerPlayerId)
+  projectSourceTurnMarkers(state, projected, viewerId)
   for (const player of projected.players) {
     if (viewerId && player.playerId.trim().toLowerCase() === viewerId) continue
     player.hand = player.hand.map((_card, index) => ({

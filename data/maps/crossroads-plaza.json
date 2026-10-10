@@ -1,0 +1,48 @@
+{
+  "id": "crossroads-plaza",
+  "name": "四通广场",
+  "layout": [
+    "####################",
+    "#..................#",
+    "#..................#",
+    "#..CCC........CCC..#",
+    "#..CCC........CCC..#",
+    "#..................#",
+    "#.......CCCC.......#",
+    "#.......CCCC.......#",
+    "#.......CCCC.......#",
+    "#..................#",
+    "#..CCC........CCC..#",
+    "#..CCC........CCC..#",
+    "#..................#",
+    "#..................#",
+    "#..................#",
+    "####################"
+  ],
+  "legend": [
+    {
+      "char": "#",
+      "type": "wall",
+      "walkable": false,
+      "bulletPassable": false
+    },
+    {
+      "char": ".",
+      "type": "floor",
+      "walkable": true,
+      "bulletPassable": true
+    },
+    {
+      "char": "C",
+      "type": "cover",
+      "walkable": true,
+      "bulletPassable": false
+    },
+    {
+      "char": "T",
+      "type": "hole",
+      "walkable": false,
+      "bulletPassable": true
+    }
+  ]
+}

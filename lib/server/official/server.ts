@@ -5,7 +5,7 @@ import path from 'node:path'
 import { equalToken } from './token'
 import { createColyseusBattleServer, attachPostgresPoolErrorHandler } from '../colyseus/create-colyseus-server'
 import { PostgresAuthorityRepository } from '../postgres/postgres-authority-repository'
-import { ACCOUNT_SCHEMA, Accounts, type MailSender } from './accounts'
+import { ACCOUNT_SCHEMA, Accounts, OfficialError, type MailSender } from './accounts'
 import { Ranked } from './ranked'
 import { mountOfficialApi } from './http'
 import { Community } from './community'
@@ -41,11 +41,11 @@ export async function createOfficialServer(options: { databaseUrl: string; mail:
           if (!['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(request.socket.remoteAddress ?? '') || !equalToken(provided, expected)) { response.status(403).json({ error: '仅允许本机管理员操作' }); return }
           try {
             const action = String(request.body?.action), value = String(request.body?.value), reason = String(request.body?.reason ?? '')
-            if (action === 'community-hide' || action === 'community-hide-post' || action === 'community-hide-reply') await community.administer(action, value, reason)
+            if (['community-hide', 'community-hide-post', 'community-hide-reply', 'community-restore-post', 'community-restore-reply'].includes(action)) await community.administer(action, value, reason)
             else await ranked.administer(action, value, reason)
             response.json({ ok: true })
           }
-          catch (error) { response.status(400).json({ error: error instanceof Error ? error.message : '管理操作失败' }) }
+          catch (error) { response.status(error instanceof OfficialError ? error.status : 400).json({ error: error instanceof Error ? error.message : '管理操作失败' }) }
         })
         if (options.pagesRoot) {
           app.get('/', (_request, response) => response.redirect('/official.html'))

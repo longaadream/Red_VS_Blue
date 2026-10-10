@@ -8,6 +8,7 @@ function harness() {
   const values = new Map<string, string>()
   const sessions = new Map<string, any>()
   const requests: any[] = []
+  const logoutHandlers: Array<() => unknown> = []
   const node = (id: string) => nodes[id] ||= { value: '', addEventListener() {}, showModal() {}, close() {}, style: {} }
   const context = createContext({
     document: { getElementById: node }, URL, URLSearchParams, AbortSignal,
@@ -18,6 +19,7 @@ function harness() {
     },
     window: {
       addEventListener() {}, location: {},
+      RvBPlayerProfile: { setLogoutHandler: (handler: () => unknown) => logoutHandlers.push(handler) },
       RvBIdentity: { getIdentity: () => ({ displayName: '游客' }), setDisplayName() {} },
       RvBUtils: {
         readOfficialSession: (url: string) => sessions.get(url),
@@ -27,7 +29,7 @@ function harness() {
     },
   })
   runInContext(readFileSync('data/pages/js/home-account.js', 'utf8'), context)
-  return { context, node, sessions, requests }
+  return { context, node, sessions, requests, logoutHandlers }
 }
 
 it('opens server login instead of exposing mnemonic accounts', () => {
@@ -66,10 +68,11 @@ it('rejects insecure remote login before sending credentials', async () => {
 })
 
 it('allows local logout and another login even when the server is unreachable', async () => {
-  const { context, node, sessions } = harness()
+  const { context, node, sessions, logoutHandlers } = harness()
   sessions.set('https://play.redvsblue.top', { token: 'expired', account: { name: '旧账号' } })
   runInContext('window.RvBHomeAccount.open(); fetch = async function () { throw new Error("网络不可用") }', context)
-  node('homeLogout').onclick()
+  expect(logoutHandlers).toHaveLength(1)
+  logoutHandlers[0]()
   await new Promise(resolve => setTimeout(resolve, 0))
   expect(sessions.has('https://play.redvsblue.top')).toBe(false)
   expect(node('homeLoginFields').hidden).toBe(false)

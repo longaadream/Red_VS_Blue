@@ -13,7 +13,7 @@
   "type": "super",
   "cooldownTurns": 0,
   "maxCharges": 0,
-  "chargeCost": 1,
+  "chargeCost": 2,
   "powerMultiplier": 1,
   "actionPointCost": 0,
   "targeting": {

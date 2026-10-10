@@ -20,6 +20,8 @@
     statsRequest: 0,
     focused: null,
     controllers: [],
+    logoutHandler: null,
+    logoutBusy: false,
   }
   var cardQueue = Object.create(null)
   var cardCache = Object.create(null)
@@ -104,6 +106,44 @@
     } catch {
       return null
     }
+  }
+
+  function isOwnProfile(context, accountId) {
+    return !!(context && context.account && idOf(context.account) === idOf(accountId))
+  }
+
+  function updateAccountActions(visible) {
+    if (!state.refs || !state.refs.logout) return
+    var available = visible && typeof state.logoutHandler === 'function'
+    state.refs.accountActions.hidden = !available
+    state.refs.logout.hidden = !available
+    state.refs.logout.disabled = state.logoutBusy
+    if (!state.logoutBusy) setText(state.refs.logoutStatus, '')
+  }
+
+  function setLogoutHandler(handler) {
+    state.logoutHandler = typeof handler === 'function' ? handler : null
+    updateAccountActions(isOwnProfile(state.context, state.accountId))
+  }
+
+  function logoutFromProfile() {
+    var refs = state.refs
+    if (!refs || state.logoutBusy || !isOwnProfile(state.context, state.accountId) || typeof state.logoutHandler !== 'function' || !currentContext(state.context)) return Promise.resolve(false)
+    var epoch = state.epoch; var context = state.context; var accountId = state.accountId
+    state.logoutBusy = true
+    refs.logout.disabled = true
+    setText(refs.logoutStatus, '正在退出…')
+    return Promise.resolve().then(function () { return state.logoutHandler() }).then(function (result) {
+      var active = state.refs === refs && state.epoch === epoch && state.context === context && state.accountId === accountId
+      if (active && result === false && currentContext(context)) {
+        state.logoutBusy = false; refs.logout.disabled = false; setText(refs.logoutStatus, '退出登录失败，请重试'); return false
+      }
+      if (active) closeDialog()
+      return result
+    }).catch(function (error) {
+      if (state.refs === refs && state.epoch === epoch && state.context === context && state.accountId === accountId) { state.logoutBusy = false; refs.logout.disabled = false; setText(refs.logoutStatus, error && error.message ? error.message : '退出登录失败') }
+      return false
+    })
   }
 
   function readContext() {
@@ -462,6 +502,14 @@
     dialog.appendChild(header)
     var status = addText(dialog, 'p', 'rvb-profile-status', '')
     status.id = 'rvbPlayerProfileStatus'; status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite')
+    var accountActions = make('section', 'rvb-profile-account-actions')
+    accountActions.hidden = true
+    accountActions.setAttribute('aria-label', '账号操作')
+    var logoutStatus = addText(accountActions, 'p', 'rvb-profile-account-status', '')
+    logoutStatus.setAttribute('role', 'status')
+    var logout = make('button', 'button rvb-profile-logout', '退出登录')
+    logout.type = 'button'; logout.id = 'rvbPlayerProfileLogout'; logout.hidden = true
+    accountActions.appendChild(logout); dialog.appendChild(accountActions)
     var tabs = make('div', 'rvb-profile-tabs')
     tabs.setAttribute('role', 'tablist'); tabs.setAttribute('aria-label', '玩家资料内容')
     ;[['overview', '概览'], ['edit', '编辑资料'], ['history', '对局历史']].forEach(function (entry) {
@@ -501,12 +549,14 @@
     document.body.appendChild(dialog)
     var refs = {
       close: close, avatar: headerAvatar, title: title, id: heading.lastChild, status: status,
+      accountActions: accountActions, logout: logout, logoutStatus: logoutStatus,
       tabs: tabs, panels: { overview: overview, edit: edit, history: history }, metrics: metrics, rosterGrid: rosterGrid,
       recentList: recentList, form: form, nameInput: nameInput, picker: picker, editStatus: editStatus, save: save,
       historyStatus: historyStatus, historyList: historyList, more: more,
     }
     state.dialog = dialog; state.refs = refs
     close.addEventListener('click', function () { closeDialog() })
+    logout.addEventListener('click', function () { void logoutFromProfile() })
     dialog.addEventListener('click', function (event) {
       var tab = event.target.closest ? event.target.closest('[data-profile-tab]') : null
       if (tab) { selectTab(tab.dataset.profileTab); return }
@@ -545,6 +595,11 @@
     setText(refs.title, '玩家资料')
     setText(refs.id, '')
     setText(refs.status, '')
+    refs.logout.hidden = true
+    refs.accountActions.hidden = true
+    state.logoutBusy = false
+    refs.logout.disabled = false
+    setText(refs.logoutStatus, '')
     setText(refs.editStatus, '')
     setText(refs.historyStatus, '')
     refs.nameInput.value = ''
@@ -759,7 +814,8 @@
     var refs = state.refs
     state.profile = profile || {}
     state.pendingAvatarId = idOf(profile && (profile.avatarCharacterId || (profile.avatar && profile.avatar.id))) || null
-    var ownProfile = !!(state.context && state.context.account && idOf(state.context.account) === state.accountId)
+    var ownProfile = isOwnProfile(state.context, state.accountId)
+    updateAccountActions(ownProfile)
     refs.tabs.querySelectorAll('[data-profile-tab="edit"]').forEach(function (button) { button.hidden = !ownProfile })
     if (!ownProfile) refs.panels.edit.hidden = true
     setText(refs.title, nameOf(profile, '未知玩家'))
@@ -803,10 +859,12 @@
       resetDialogContent(false)
       state.refs.tabs.querySelectorAll('[data-profile-tab="edit"]').forEach(function (button) { button.hidden = true })
       state.refs.panels.edit.hidden = true
+      updateAccountActions(false)
       state.focused = previousFocus; openDialogElement(dialog); selectTab('overview'); setStatus(error.message); return Promise.resolve(false)
     }
     state.epoch += 1; abortRequests(); clearCardQueue(); state.context = context; state.accountId = accountId; state.profile = null; state.catalog = null; state.history = []; state.historyCursor = null; state.historyLoaded = false; state.historyLoading = false; state.pendingAvatarId = null; state.focused = previousFocus
     resetDialogContent(true)
+    updateAccountActions(isOwnProfile(context, accountId))
     state.refs.tabs.querySelectorAll('[data-profile-tab="edit"]').forEach(function (button) { button.hidden = true })
     state.refs.panels.edit.hidden = true
     openDialogElement(dialog); selectTab('overview'); setText(state.refs.title, '读取玩家资料…'); setText(state.refs.id, '账号 ID · ' + accountId); setStatus('正在读取资料…')
@@ -1055,6 +1113,7 @@
     loadHistoryInto: loadHistoryInto,
     loadCharacterStats: loadCharacterStats,
     localImage: localImage,
+    setLogoutHandler: setLogoutHandler,
   }
   if (global.addEventListener) {
     global.addEventListener('storage', onStorage)

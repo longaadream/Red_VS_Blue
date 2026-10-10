@@ -1,5 +1,122 @@
-<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>红蓝对决 · 服务器管理</title><link rel="stylesheet" href="style.css">
-<body><header><span>RED vs BLUE / OPERATIONS</span><h1>服务器运维</h1><a id="panel-link" href="/">← 返回完整服务器指挥台</a><p>本机 SSH 控制台 · 香港节点</p></header><main>
-<section><h2>连接服务器</h2><div class="grid"><label>地址<input id="host" value="38.22.90.175"></label><label>SSH 端口<input id="port" value="22"></label><label>用户<input id="user" value="root"></label><label>服务<select id="service"><option value="rvb-game">游戏服务</option><option value="rvb-relay">普通房间转发</option><option value="rvb-official">官方排位（待部署）</option></select></label></div><label>本机 SSH 私钥路径<input id="key" placeholder="C:\Users\你的用户名\.ssh\服务器密钥"></label><label>数据库名称<input id="database" placeholder="备份与更新游戏服务时填写"></label><p class="note">沿用本机 known_hosts 验证服务器身份；私钥不会上传。排位需先完成邮件和数据库配置。</p><div class="actions"><button data-action="status">查看状态与版本</button><button data-action="logs">最近日志</button><button data-action="backup">备份数据库</button></div></section>
-<section><h2>版本与资源</h2><p>上传包含资源和引擎的完整构建目录，先校验，再启用。</p><label>本机部署包目录<input id="directory" placeholder="…\output\linux-room-server\candidate-xxxx"></label><label>版本名称<input id="release" placeholder="candidate-xxxx"></label><button data-action="stage">校验并上传候选</button><hr><label class="check"><input type="checkbox" id="maintenance">已结束现有对局，且本版本不含数据库迁移</label><p class="note">启用会停服并备份数据库，再切换版本。回退时填写上方版本列表中的旧版本名称。切换失败会尝试恢复旧版。</p><button class="danger" data-action="activate">启用所填版本 / 回退</button></section>
-<section class="wide"><h2>连接原服务器指挥台</h2><p>保留账号、对局、SMTP、赛季、公告、备份恢复和审计功能。服务端必须先启动原指挥台；端口和令牌来自其本机管理地址，不是玩家服务端口。</p><details><summary>手动连接（通常无需填写）</summary><div class="grid"><label>远程指挥台端口<input id="panelPort" placeholder="启动时分配的回环端口"></label><label>会话令牌<input id="panelToken" type="password" autocomplete="off" placeholder="管理地址 # 后的内容"></label></div></details><button data-action="connect-panel">通过 SSH 自动连接指挥台</button><p class="note">凭据仅保留在当前管理进程内存，通过 SSH 访问服务器回环地址。自动读取服务器受限目录中的管理地址，不需要开放管理端口。</p></section><section class="wide"><div class="output-head"><h2>操作记录</h2><span id="state" role="status">尚未连接</span></div><pre id="output" aria-live="polite">点击“查看状态与版本”开始。日志可能包含玩家信息，请谨慎分享。</pre></section></main><script src="ui.js"></script></body></html>
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>RED vs BLUE · 服务器运维</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body data-app="server-admin">
+  <div class="ops-shell">
+    <aside class="ops-sidebar" aria-label="运维导航">
+      <a class="ops-brand" href="/ops" aria-label="服务器运维首页">
+        <span class="brand-mark" aria-hidden="true">RB</span>
+        <span><strong>RED <i>vs</i> BLUE</strong><small>服务器运维</small></span>
+      </a>
+      <div class="sidebar-label">管理工作区</div>
+      <nav class="ops-nav">
+        <button type="button" data-ops-view="connection" aria-current="page"><span aria-hidden="true">⌁</span>连接与状态</button>
+        <button type="button" data-ops-view="deploy"><span aria-hidden="true">↥</span>版本与资源</button>
+        <button type="button" data-ops-view="activity"><span aria-hidden="true">≡</span>操作记录</button>
+      </nav>
+      <div class="sidebar-footer">
+        <span class="live-dot" aria-hidden="true"></span><span id="tool-connection">本机工具未连接</span>
+        <a id="panel-link" href="/">打开服务器指挥台 <span aria-hidden="true">↗</span></a>
+      </div>
+    </aside>
+
+    <div class="ops-content">
+      <header class="ops-topbar">
+        <div>
+          <div class="eyebrow">OPERATIONS CONSOLE</div>
+          <h1>服务器运维</h1>
+        </div>
+        <div class="topbar-meta">
+          <span id="tool-version">工具版本读取中</span>
+          <span class="status-pill" id="state" role="status"><span class="status-dot" aria-hidden="true"></span>尚未连接</span>
+        </div>
+      </header>
+
+      <main>
+        <div id="notice" class="notice" role="status" aria-live="polite"></div>
+
+        <section id="connection" data-ops-section="connection">
+          <div class="section-heading">
+            <div><div class="eyebrow">REMOTE ACCESS</div><h2>连接服务器</h2><p>通过本机 SSH 连接远程服务。连接信息会保存在本机，私钥只使用路径，不会上传。</p></div>
+            <span class="section-index">01</span>
+          </div>
+          <div class="panel-grid">
+            <div class="card card-primary">
+              <div class="card-heading"><div><h3>SSH 连接</h3><p class="card-caption">当前主机的非敏感配置</p></div><span class="card-badge">LOCAL ONLY</span></div>
+              <div class="form-grid">
+                <label>服务器地址<input id="host" placeholder="输入服务器域名或内网地址" autocomplete="off" inputmode="url"></label>
+                <label>SSH 端口<input id="port" value="22" inputmode="numeric" autocomplete="off"></label>
+                <label>用户<input id="user" value="root" autocomplete="username"></label>
+                <label>管理服务<select id="service"><option value="rvb-game">游戏服务</option><option value="rvb-relay">普通房间转发</option><option value="rvb-official">官方排位</option></select></label>
+              </div>
+              <label>本机 SSH 私钥路径<input id="key" placeholder="C:\\Users\\你的用户名\\.ssh\\服务器密钥" autocomplete="off"></label>
+              <label>数据库名称<input id="database" placeholder="备份与更新游戏服务时填写" autocomplete="off"></label>
+              <p class="field-help">沿用本机 known_hosts 验证服务器身份。管理端口不会开放到公网。</p>
+              <div class="action-row">
+                <button class="button-primary" data-action="status">查看状态与版本</button>
+                <button data-action="logs">最近日志</button>
+                <button data-action="backup">备份数据库</button>
+              </div>
+            </div>
+            <div class="card card-summary">
+              <div class="card-heading"><div><h3>连接后可用</h3><p class="card-caption">选择服务器指挥台后继续运营工作</p></div><span class="summary-icon" aria-hidden="true">→</span></div>
+              <ul class="feature-list">
+                <li><span>运行状态</span><small>服务、版本和最近日志</small></li>
+                <li><span>数据库安全</span><small>在确认后创建远程备份</small></li>
+                <li><span>官方指挥台</span><small>账号、赛季、公告和社区审核</small></li>
+              </ul>
+              <div class="card-callout"><strong>连接原服务器指挥台</strong><p>连接成功后使用同一会话进入官方管理面板。</p><button class="button-secondary" data-action="connect-panel">通过 SSH 自动连接指挥台 <span aria-hidden="true">↗</span></button></div>
+            </div>
+          </div>
+          <details class="advanced card">
+            <summary>手动填写远程指挥台地址（通常无需填写）</summary>
+            <div class="form-grid">
+              <label>远程指挥台端口<input id="panelPort" placeholder="启动时分配的回环端口" inputmode="numeric" autocomplete="off"></label>
+              <label>会话令牌<input id="panelToken" type="password" autocomplete="off" placeholder="管理地址 # 后的内容"></label>
+            </div>
+            <p class="field-help">令牌只保留在当前管理进程和当前浏览器会话内，不会写入连接配置。</p>
+          </details>
+        </section>
+
+        <section id="deploy" data-ops-section="deploy" hidden>
+          <div class="section-heading">
+            <div><div class="eyebrow">RELEASE CONTROL</div><h2>版本与资源</h2><p>上传完整资源与引擎构建目录，校验通过后再执行切换。</p></div>
+            <span class="section-index">02</span>
+          </div>
+          <div class="card card-primary">
+            <div class="card-heading"><div><h3>候选版本</h3><p class="card-caption">候选上传不会立即生效</p></div><span class="card-badge">VERIFIED PACKAGE</span></div>
+            <label>本机部署包目录<input id="directory" placeholder="…\\output\\linux-room-server\\candidate-xxxx" autocomplete="off"></label>
+            <div class="form-grid"><label>版本名称<input id="release" placeholder="candidate-xxxx" autocomplete="off"></label><div></div></div>
+            <button class="button-primary" data-action="stage">校验并上传候选</button>
+          </div>
+          <div class="card card-warning">
+            <div class="card-heading"><div><h3>启用或回退</h3><p class="card-caption">此操作会停止服务并创建数据库备份</p></div><span class="warning-icon" aria-hidden="true">!</span></div>
+            <label class="check-row"><input type="checkbox" id="maintenance"><span>我已确认现有对局结束，且本版本不含数据库迁移</span></label>
+            <p class="field-help">填写上方版本名称后执行。切换失败会尝试恢复旧版本；数据库不会回退。</p>
+            <button class="button-danger" data-action="activate">启用所填版本 / 回退</button>
+          </div>
+        </section>
+
+        <section id="activity" data-ops-section="activity" hidden>
+          <div class="section-heading">
+            <div><div class="eyebrow">ACTIVITY LOG</div><h2>操作记录</h2><p>记录当前管理工具最近一次操作的结果和诊断信息。</p></div>
+            <span class="section-index">03</span>
+          </div>
+          <div class="card log-card">
+            <div class="log-toolbar"><span class="log-led" aria-hidden="true"></span><span>REMOTE COMMAND OUTPUT</span><span class="log-time" id="log-time"></span></div>
+            <pre id="output" aria-live="polite">点击“查看状态与版本”开始。日志可能包含玩家信息，请谨慎分享。</pre>
+          </div>
+        </section>
+      </main>
+      <footer>本机管理工具 · 管理地址仅供本机使用 · <span id="footer-service">等待连接</span></footer>
+    </div>
+  </div>
+  <script src="ui.js"></script>
+</body>
+</html>

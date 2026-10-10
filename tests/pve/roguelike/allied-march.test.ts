@@ -8,7 +8,7 @@ import {adventureBoundary,insideZone,selectAdventureActor} from '../../../lib/ga
 import {getServerGameProfileIdentityV1} from '../../../lib/content-pipeline/runtime/profile-game-identity'
 import {changePiecePositions} from '../../../lib/game/position-change'
 
-it('2v2 march moves another owner through an ally, without granting ordinary control',()=>{
+it('2v2 march moves another owner around an occupied ally without granting ordinary control',()=>{
   const caster=makePiece({instanceId:'caster',templateId:'turalyon',ownerPlayerId:'red-a',x:0,y:0,rules:[loadRuleById('rule-turalyon-lightforged-march',true)!]})
   const mate=makePiece({instanceId:'mate',ownerPlayerId:'red-b',x:1,y:1,currentHp:5,maxHp:10})
   const blocker=makePiece({instanceId:'blocker',ownerPlayerId:'red-a',x:2,y:1})
@@ -21,9 +21,10 @@ it('2v2 march moves another owner through an ally, without granting ordinary con
   expect(p.candidates).toContainEqual({type:'piece',pieceId:'mate'})
   s=applyBattleAction(s,{type:'pendingTargetSelect',playerId:'red-a',targetPieceId:'mate',selectionId:p.selectionId,stateRevision:p.stateRevision})
   p=s.pendingTargetSelection!
-  expect(p.candidates).toContainEqual({type:'cell',x:3,y:1})
-  s=applyBattleAction(s,{type:'pendingTargetSelect',playerId:'red-a',targetX:3,targetY:1,selectionId:p.selectionId,stateRevision:p.stateRevision})
-  expect(s.pieces.find(p=>p.instanceId==='mate')).toMatchObject({x:3,y:1,ownerPlayerId:'red-b'})
+  expect(p.candidates).toContainEqual({type:'cell',x:2,y:2})
+  expect(p.candidates).not.toContainEqual({type:'cell',x:3,y:1})
+  s=applyBattleAction(s,{type:'pendingTargetSelect',playerId:'red-a',targetX:2,targetY:2,selectionId:p.selectionId,stateRevision:p.stateRevision})
+  expect(s.pieces.find(p=>p.instanceId==='mate')).toMatchObject({x:2,y:2,ownerPlayerId:'red-b'})
 })
 
 it('PVE march offers only legal encounter cells and moves a teammate',async()=>{

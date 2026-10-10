@@ -22,14 +22,14 @@ describe('Windows visible startup', () => {
     const js = ts.transpile(source, { target: ts.ScriptTarget.ES2022 })
     const result = vm.runInNewContext(`${js}; showStartupWindow()`, {
       createGameWindow: () => win, startupPageUrl: () => 'file:///startup/index.html',
-      setTimeout, startupInProgress: true, requestApplicationExit() {},
+      setTimeout, startupInProgress: true, requestApplicationExit: () => Promise.resolve(),
     })
     expect(await result).toBe(win)
   })
 
   it('requires durable shutdown even while the startup window is visible', async () => {
     const main = readFileSync('electron-client/main.ts', 'utf8')
-    const source = main.slice(main.indexOf('function requestApplicationExit()'), main.indexOf('// ─── 本地服务器管理'))
+    const source = main.slice(main.indexOf('function requestApplicationExit('), main.indexOf('// ─── 本地服务器管理'))
     for (const startupInProgress of [false, true]) {
       const drains: boolean[] = []
       const context = {
@@ -49,7 +49,7 @@ describe('Windows visible startup', () => {
   it('keeps the startup window open when durable exit needs a retry', async () => {
     const main = readFileSync('electron-client/main.ts', 'utf8')
     const show = main.slice(main.indexOf('async function showStartupWindow()'), main.indexOf('function getApplicationIconPath()'))
-    const exit = main.slice(main.indexOf('function requestApplicationExit()'), main.indexOf('// ─── 本地服务器管理'))
+    const exit = main.slice(main.indexOf('function requestApplicationExit('), main.indexOf('// ─── 本地服务器管理'))
     const listeners: Record<string, (event: { preventDefault: () => void }) => void> = {}
     let prevented = false
     let exited = false
@@ -65,7 +65,7 @@ describe('Windows visible startup', () => {
     }
     await vm.runInNewContext(ts.transpile(exit + show) + '; showStartupWindow()', context)
     listeners.close({ preventDefault: () => { prevented = true } })
-    await context.appExitPromise
+    await expect(context.appExitPromise).rejects.toThrow('PROFILE_DURABLE_DRAIN_FAILED')
     expect(prevented).toBe(true)
     expect(exited).toBe(false)
     expect(context.appExitPromise).toBeNull()
@@ -96,7 +96,7 @@ describe('Windows visible startup', () => {
 
   it('cancels a menu navigation even before its URL commits', async () => {
     const main = readFileSync('electron-client/main.ts', 'utf8')
-    const source = main.slice(main.indexOf('function requestApplicationExit()'), main.indexOf('// ─── 本地服务器管理'))
+    const source = main.slice(main.indexOf('function requestApplicationExit('), main.indexOf('// ─── 本地服务器管理'))
     const actions: string[] = []
     const context = {
       startupInProgress: true, initialLocalStartupPromise: null, startupCancelled: false, startupCompletedStages: 5, officialUpdateApplying: false,
@@ -170,7 +170,7 @@ describe('actual startup handler under delayed service responses', () => {
       createGameWindow: () => ({ on: (name: string, callback: typeof listeners[string]) => { listeners[name] = callback }, loadURL: async () => {}, webContents: { executeJavaScript: async () => {} } }),
       startupPageUrl: () => 'file:///startup/index.html', setTimeout, startupInProgress: false,
       initialLocalStartupPromise: Promise.resolve(), allowAppExit: false,
-      requestApplicationExit: () => { exiting = true },
+      requestApplicationExit: () => { exiting = true; return Promise.resolve() },
     })
     listeners.close({ preventDefault: () => { prevented = true } })
     expect(prevented).toBe(true)

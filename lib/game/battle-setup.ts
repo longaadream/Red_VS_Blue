@@ -4,7 +4,7 @@ import {
   getServerGameProfileIdentityV1,
   type GameProfileIdentityV1,
 } from '../content-pipeline/runtime/profile-game-identity'
-import { assertSelectableMapId } from './map-selection'
+import { assertRankedMapId, assertSelectableMapId } from './map-selection'
 import { rng } from "./rng"
 import type { BoardMap } from "./map"
 import type { PieceInstance, PieceTemplate, PieceStats } from "./piece"
@@ -769,6 +769,8 @@ export async function createInitialBattleForPlayers(
     firstPlayerId?: PlayerId
     rootSeed?: number
     deploymentEnabled?: boolean
+    /** Trusted official ranked room; uses the active dynamic 1v1 map catalog. */
+    rankedMap?: boolean
     /** New matches default to progressive-reserve-v1; legacy is replay/test compatibility only. */
     deploymentMode?: DeploymentMode
     deploymentStartedAt?: number
@@ -817,7 +819,9 @@ export async function createInitialBattleForPlayers(
     if (!Number.isSafeInteger(options.deploymentStartedAt) || (options.deploymentStartedAt ?? -1) < 0) {
       throw new Error('Demo deployment requires an explicit non-negative deployment start time')
     }
-    resolvedMapId = assertSelectableMapId(mapId, options.matchMode)
+    resolvedMapId = options.rankedMap
+      ? assertRankedMapId(mapId)
+      : assertSelectableMapId(mapId, options.matchMode)
     const comparePlayerIds = progressiveDeployment
       ? compareStableProgressivePlayerIds
       : compareStableText

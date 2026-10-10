@@ -29,6 +29,8 @@
 
 官方置顶公告沿用 `official_settings.announcement` 及本机管理面板。帖子/回复隐藏仅由本机受认证管理面板执行，不创建客户端可声明的管理员角色。
 
+本机审核面板通过 `GET /api/community` 分页读取帖子和回复，`offset` 限制在0至1000000，单类最多返回100条并按创建时间及id稳定排序。可用 `q` 搜索内容、作者名称或账号id，`status` 支持 `all`、`visible`、`hidden`、`deleted`；服务层还支持 `kind=all|posts|replies` 只读取一种内容。管理操作通过现有本机可信入口执行 `community-hide-post`、`community-hide-reply`、`community-restore-post` 和 `community-restore-reply`，均要求原因并写入 `official_audit`。恢复只清除审核隐藏状态，作者已删除的帖子或回复始终拒绝恢复。
+
 审核列表按 offset 翻页，每页最多100条帖子和100条回复；上一页/下一页可到达历史内容。服务端只接受0至1000000的整数offset，作者删除及隐藏记录继续保留以供审核。
 
 ## 持久化和边界

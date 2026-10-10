@@ -503,10 +503,9 @@ function forceKillServer(): void {
   killProcessTree(proc)
 }
 
-function requestApplicationExit(): void {
+function requestApplicationExit(): Promise<void> {
   if (officialUpdateApplying && !allowAppExit) {
-    void enqueueProfileMutation(async () => { requestApplicationExit() })
-    return
+    return enqueueProfileMutation(() => requestApplicationExit())
   }
   if (startupInProgress || initialLocalStartupPromise) {
     startupInProgress = true
@@ -527,9 +526,9 @@ function requestApplicationExit(): void {
   }
   if (allowAppExit) {
     app.exit(0)
-    return
+    return Promise.resolve()
   }
-  if (appExitPromise) return
+  if (appExitPromise) return appExitPromise
   appExitPromise = killServer(true)
     .then(() => {
       allowAppExit = true
@@ -543,7 +542,9 @@ function requestApplicationExit(): void {
         '无法安全退出',
         '战斗记录尚未确认写入数据库，游戏服务仍保持运行。请稍后再次退出；不要强制结束进程。',
       )
+      throw error
     })
+  return appExitPromise
 }
 
 // ─── 本地服务器管理 ───────────────────────────────────────────────────────────
@@ -2067,11 +2068,11 @@ async function showStartupWindow(): Promise<BrowserWindow> {
   win.on('close', event => {
     if ((startupInProgress || initialLocalStartupPromise) && !allowAppExit) {
       event.preventDefault()
-      requestApplicationExit()
+      void requestApplicationExit().catch(() => {})
     }
   })
   win.on('closed', () => {
-    if (startupInProgress || initialLocalStartupPromise) requestApplicationExit()
+    if (startupInProgress || initialLocalStartupPromise) void requestApplicationExit().catch(() => {})
   })
   await win.loadURL(startupPageUrl())
   // Let the renderer paint before starting the expensive local services.
@@ -2447,6 +2448,13 @@ handleTrusted('set-window-fullscreen', ['game'], (_event, fullscreen: unknown) =
   return setMainWindowFullscreen(fullscreen)
 })
 
+// The renderer may request the same guarded application shutdown used by the
+// native close button. Keep this scoped to the trusted game window so other
+// renderer roles cannot terminate the client.
+handleTrusted('request-application-exit', ['game'], () => {
+  return requestApplicationExit()
+})
+
 // 读取已保存的远程服务器地址（UI 初始化时调用）
 handleTrusted('get-remote-url', ['connect'], () => getOnlineServerUrl())
 
@@ -2787,8 +2795,8 @@ if (!app.requestSingleInstanceLock()) {
 
 // 主进程异常退出兜底——保证 Node 子进程不会成为孤儿进程
 process.on('exit', () => { try { forceKillServer() } catch {} })
-process.on('SIGINT', requestApplicationExit)
-process.on('SIGTERM', requestApplicationExit)
+process.on('SIGINT', () => { void requestApplicationExit().catch(() => {}) })
+process.on('SIGTERM', () => { void requestApplicationExit().catch(() => {}) })
 
 app.whenReady().then(async () => {
   if (process.platform === 'win32') app.setAppUserModelId('com.redvsblue.client')
@@ -2860,14 +2868,14 @@ app.whenReady().then(async () => {
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
-    requestApplicationExit()
+    void requestApplicationExit().catch(() => {})
   }
 })
 
 app.on('before-quit', event => {
   if (allowAppExit) return
   event.preventDefault()
-  requestApplicationExit()
+  void requestApplicationExit().catch(() => {})
 })
 
 // 关键兜底：所有窗口都关闭、quit 完成后强制退出主进程，

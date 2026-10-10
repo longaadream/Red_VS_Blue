@@ -41,6 +41,19 @@ export function getAllMaps(mode:ContentMode='pvp'): BoardMap[] {
   return Object.values(mapsCache).filter(map=>isContentAvailable(map,mode))
 }
 
+/**
+ * Return every map that was loaded from the active data root.
+ *
+ * Consumers that need a mode-specific catalog should continue to use
+ * getAllMaps(mode).  The ranked administrator needs to show maps that are
+ * loaded but ineligible (for example PVE-only maps), so it must be able to
+ * inspect the unfiltered repository as well.
+ */
+export function getAllLoadedMaps(): BoardMap[] {
+  ensureLoaded()
+  return Object.values(mapsCache)
+}
+
 export function getMapById(id: string): BoardMap | undefined {
   ensureLoaded()
   return mapsCache[id]

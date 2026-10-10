@@ -126,9 +126,9 @@ describe('RED-120 character data contract', () => {
 
     const expected = {
       'ichigo-zangetsu': ['对本棋子相邻的1个敌方棋子造成等同于本棋子攻击力的物理伤害。', 1, 1],
-      'ichigo-getsuga-tensho': ['向同一行或同一列的1个方向发射弹射物，对路径上的第1个敌方棋子造成等同于本棋子攻击力150%的法术伤害。', 2, 1],
+      'ichigo-getsuga-tensho': ['向同一行或同一列的1个方向发射弹射物，对路径上的第1个敌方棋子造成等同于本棋子攻击力150%的法术伤害。', 2, 2],
       'ichigo-bankai-tensa-zangetsu': ['攻击力+1、移动力+2并获得1临时行动点，失去【月牙天冲】，获得初始冷却为0的【黑色月牙天冲】。', 0, 0],
-      'ichigo-black-getsuga-tensho': ['向同一行或同一列的1个方向发射弹射物，对路径上的所有敌方棋子造成等同于本棋子攻击力200%的法术伤害；命中后，可以传送至第1个被命中敌方棋子相邻的1个空格。', 2, 1],
+      'ichigo-black-getsuga-tensho': ['向同一行或同一列的1个方向发射弹射物，对路径上的所有敌方棋子造成等同于本棋子攻击力200%的法术伤害；命中后，可以传送至第1个被命中敌方棋子相邻的1个空格。', 2, 2],
       'itachi-tsukuyomi': ['选择6格内的1个敌方棋子，使其下1个使用的技能额外增加1回合冷却。', 0, 1],
       'itachi-amaterasu': ['选择5格内的1个敌方棋子，将其所在格变为天照地格，并使其获得1层天照。', 2, 2],
       'itachi-totsuka-blade': ['万花筒。选择3格内的1个敌方棋子，造成等同于本棋子攻击力200%的法术伤害，并使其所有主动技能进入1回合冷却。', 2, 2],
@@ -347,7 +347,7 @@ describe('RED-120 Ichigo combat behavior', () => {
     let state = makeState({ pieces: [ichigo, enemy], width: 6, height: 3 })
     state.players[0].actionPoints = 3
     state.players[0].maxActionPoints = 3
-    state.players[0].chargePoints = 1
+    state.players[0].chargePoints = 2
 
     state = runBattleAction(state, selectedAction(state, {
       type: 'useBasicSkill', playerId: 'player-red', pieceId: 'ichigo', skillId: 'ichigo-getsuga-tensho',
@@ -383,8 +383,27 @@ describe('RED-120 Ichigo combat behavior', () => {
     expect(state.pieces.find(piece => piece.instanceId === 'ichigo')).toMatchObject({ x: 0, y: 1 })
     expect(state.pieces.find(piece => piece.instanceId === 'enemy')?.currentHp).toBe(31)
     expect(state.players[0].actionPoints).toBe(0)
-    expect(state.pieces.find(piece => piece.instanceId === 'ichigo')?.skills[0].currentCooldown).toBe(1)
+    expect(state.pieces.find(piece => piece.instanceId === 'ichigo')?.skills[0].currentCooldown).toBe(2)
     expect(state.extensions?.ichigoBlackGetsugaTeleportByCaster).toBeUndefined()
+
+    state = runBattleAction(state, { type: 'endTurn', playerId: 'player-red' }, { rootSeed: ROOT_SEED }).state
+    expect(state.pieces.find(piece => piece.instanceId === 'ichigo')?.skills[0].currentCooldown).toBe(1)
+    state = runBattleAction(state, { type: 'beginPhase' }, { rootSeed: ROOT_SEED }).state
+    state = runBattleAction(state, { type: 'endTurn', playerId: 'player-blue' }, { rootSeed: ROOT_SEED }).state
+    state = runBattleAction(state, { type: 'beginPhase' }, { rootSeed: ROOT_SEED }).state
+    expect(state.turn.currentPlayerId).toBe('player-red')
+    expect(state.pieces.find(piece => piece.instanceId === 'ichigo')?.skills[0].currentCooldown).toBe(1)
+    state.skillsById ||= {}
+    const cooldownBlocked = prepareAction(state, {
+      type: 'useBasicSkill', playerId: 'player-red', pieceId: 'ichigo', skillId: 'ichigo-black-getsuga-tensho',
+      targetX: 5, targetY: 1,
+    })
+    expect(cooldownBlocked).toMatchObject({
+      kind: 'invalid',
+      message: expect.stringMatching(/cooldown/),
+    })
+    state = runBattleAction(state, { type: 'endTurn', playerId: 'player-red' }, { rootSeed: ROOT_SEED }).state
+    expect(state.pieces.find(piece => piece.instanceId === 'ichigo')?.skills[0].currentCooldown).toBe(0)
   })
 
   it('penetrates enemies up to blocking terrain and uses the selected adjacent landing', () => {
@@ -536,7 +555,7 @@ describe('RED-120 Itachi combat behavior', () => {
     const state = makeState({ pieces: [itachi, target], width: 6, height: 2 })
     executeDirect(loadSkill('itachi-amaterasu'), state, itachi, target)
 
-    expect(state.extensions?.amaterasuCells).toEqual([{ x: 3, y: 0 }])
+    expect(state.extensions?.amaterasuCells).toEqual([{ x: 3, y: 0, sourcePieceId: itachi.instanceId, ownerPlayerId: itachi.ownerPlayerId }])
     expect(state.extensions?.tileEffects).toContainEqual(expect.objectContaining({ x: 3, y: 0, tileType: 'amaterasu' }))
     expect(target.statusTags).toContainEqual(expect.objectContaining({ type: 'amaterasu-burn', stacks: 1, intensity: 1 }))
     expect(state.players[0].rules?.map(rule => rule.id)).toEqual(expect.arrayContaining([
@@ -559,7 +578,7 @@ describe('RED-120 Itachi combat behavior', () => {
     expect(target.statusTags.filter((tag: any) => tag.type === 'amaterasu-burn')).toEqual([
       expect.objectContaining({ id: 'existing-burn', stacks: 4, intensity: 1 }),
     ])
-    expect(state.extensions?.amaterasuCells).toEqual([{ x: 3, y: 0 }])
+    expect(state.extensions?.amaterasuCells).toEqual([{ x: 3, y: 0, sourcePieceId: itachi.instanceId, ownerPlayerId: itachi.ownerPlayerId }])
   })
 
   it('pays for Totsuka Blade and keeps active skills unavailable throughout the next enemy turn', () => {

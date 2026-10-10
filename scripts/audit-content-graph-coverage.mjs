@@ -23,7 +23,7 @@ import { fileURLToPath } from 'node:url'
 export const CONTENT_GRAPH_VERSION = 'rvb-content-graph/v1'
 export const GRAPH_COMPILER_VERSION = 'rvb-content-graph-compiler/v1'
 export const BASE_BRANCH = 'main'
-export const BASE_SHA = '00df31f8bd35b34200d507fd83853bf5ac99ba94'
+export const BASE_SHA = '082166c6b803b2e838bce5f0f6824c5bbc714dd6'
 export const GROUPS = ['pieces', 'skills', 'rules', 'cards']
 export const CODE_FIELDS = new Set(['code', 'skillCode', 'previewCode', 'effect'])
 export const MIGRATION_STATUSES = ['declarative', 'legacy', 'graph-unverified', 'graph-partial', 'graph-validated']

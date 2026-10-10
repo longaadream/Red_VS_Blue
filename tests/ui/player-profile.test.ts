@@ -217,6 +217,8 @@ describe('RED-244 player profile UI contract', () => {
     expect(source).toContain("surrender: '投降'")
     expect(source).toContain("core_destroyed: '核心被消灭'")
     expect(source).toContain("var download = make('button', 'button', '下载回放')")
+    expect(source).toContain('setLogoutHandler: setLogoutHandler')
+    expect(source).toContain('rvbPlayerProfileLogout')
   })
 
   it('keeps avatar rendering on the local images root', () => {
@@ -288,6 +290,56 @@ describe('RED-244 player profile UI contract', () => {
     expect(dialog.querySelectorAll('.rvb-profile-metric')).toHaveLength(0)
     expect(dialog.querySelectorAll('.rvb-roster-card')).toHaveLength(0)
     expect(dialog.querySelector('.rvb-profile-status')?.textContent).toContain('请先登录官方账号')
+  })
+
+  it('delegates self logout from the profile even when loading the profile fails', async () => {
+    const testVm = createProfileVm({ failProfileIds: ['a1'] })
+    let logoutCalls = 0
+    testVm.profile.setLogoutHandler(() => { logoutCalls += 1 })
+    await testVm.profile.open('a1')
+
+    const dialog = testVm.document.getElementById('rvbPlayerProfileDialog')!
+    const logout = testVm.document.getElementById('rvbPlayerProfileLogout')!
+    expect(logout.hidden).toBe(false)
+    expect(dialog.querySelector('.rvb-profile-status')?.textContent).toContain('玩家资料读取失败')
+
+    logout.dispatch('click')
+    await new Promise(resolve => setTimeout(resolve, 0))
+    expect(logoutCalls).toBe(1)
+    expect(dialog.open).toBe(false)
+  })
+
+  it('does not offer profile logout for another account or without a host callback', async () => {
+    const testVm = createProfileVm()
+    await testVm.profile.open('opponent')
+    expect(testVm.document.getElementById('rvbPlayerProfileLogout')?.hidden).toBe(true)
+
+    await testVm.profile.open('a1')
+    expect(testVm.document.getElementById('rvbPlayerProfileLogout')?.hidden).toBe(true)
+  })
+
+  it('does not let a late logout close a replacement profile or run twice', async () => {
+    let releaseLogout: (() => void) | null = null
+    let logoutCalls = 0
+    const testVm = createProfileVm()
+    testVm.profile.setLogoutHandler(() => {
+      logoutCalls += 1
+      return new Promise<void>(resolve => { releaseLogout = resolve })
+    })
+    await testVm.profile.open('a1')
+    const dialog = testVm.document.getElementById('rvbPlayerProfileDialog')!
+    const logout = testVm.document.getElementById('rvbPlayerProfileLogout')!
+    logout.dispatch('click')
+    await Promise.resolve()
+    logout.dispatch('click')
+    expect(logoutCalls).toBe(1)
+    expect(logout.disabled).toBe(true)
+
+    await testVm.profile.open('opponent')
+    releaseLogout!()
+    await new Promise(resolve => setTimeout(resolve, 0))
+    expect(dialog.open).toBe(true)
+    expect(logout.hidden).toBe(true)
   })
 
   it('closes the dialog when the close button receives a click event', async () => {
@@ -373,6 +425,8 @@ describe('RED-244 player profile UI contract', () => {
       expect(html).toContain('js/player-profile.js')
       expect(html).toContain('js/developer-tools/match-trace.js')
     })
+    expect(readFileSync(`${root}/community.html`, 'utf8')).not.toContain('id="communityLogout"')
+    expect(readFileSync(`${root}/official.html`, 'utf8')).not.toContain('id="logout"')
     const officialScript = readFileSync(`${root}/js/official.js`, 'utf8')
     expect(officialScript).toContain("tab.setAttribute('data-rank-tab', 'stats')")
     expect(officialScript).toContain("target.setAttribute('data-profile-stats', '')")
@@ -380,6 +434,8 @@ describe('RED-244 player profile UI contract', () => {
     expect(officialScript).toContain("initialQuery.get('tab') === 'history'")
     expect(officialScript).toContain("selectRankTab('history')")
     expect(readFileSync(`${root}/js/community.js`, 'utf8')).toContain('decoratePlayer')
+    expect(readFileSync(`${root}/js/community.js`, 'utf8')).toContain('setLogoutHandler(logout)')
+    expect(officialScript).toContain('setLogoutHandler(window.RvBOfficial.logout)')
     expect(readFileSync(`${root}/js/home-account.js`, 'utf8')).toContain('RvBPlayerProfile.renderIdentity')
   })
 })

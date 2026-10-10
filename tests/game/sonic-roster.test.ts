@@ -925,6 +925,79 @@ describe('Sonic roster mechanics', () => {
     expect(((next.pieces[0]) as { momentum?: number }).momentum).toBe(2)
   })
 
+  it('grants momentum for every cell in an executed detour path', () => {
+    const piece = makePiece({
+      instanceId: 'detour-sonic', templateId: 'sonic', x: 0, y: 0, moveRange: 4,
+      skills: [{ skillId: 'sonic-spin-dash' }],
+    })
+    piece.statusTags = [{ type: 'momentum-core', stacks: 0 }]
+    attachRule(piece, 'rule-momentum-gain')
+    const blocker = makePiece({ instanceId: 'detour-blocker', ownerPlayerId: 'player-blue', x: 1, y: 0 })
+    const state = makeState({ pieces: [piece, blocker], width: 5, height: 3 })
+    const path = [{ x: 0, y: 1 }, { x: 1, y: 1 }, { x: 2, y: 1 }, { x: 2, y: 0 }]
+
+    const next = applyBattleAction(state, {
+      type: 'move', playerId: 'player-red', pieceId: piece.instanceId, toX: 2, toY: 0, path,
+    })
+
+    expect((next.pieces.find(candidate => candidate.instanceId === piece.instanceId) as { momentum?: number }).momentum)
+      .toBe(path.length)
+    expect(next.actions?.find(action => action.type === 'move')?.payload?.path).toEqual(path)
+  })
+
+  it.each([
+    ['blocked', [{ x: 1, y: 0 }, { x: 2, y: 0 }], true],
+    ['repeated', [{ x: 1, y: 0 }, { x: 1, y: 0 }, { x: 2, y: 0 }], false],
+  ] as Array<[string, Array<{ x: number; y: number }>, boolean]>)('does not gain momentum when a %s normal move is rejected', (_label, path, blocked) => {
+    const piece = makePiece({ instanceId: 'rejected-sonic', templateId: 'sonic', x: 0, y: 0, moveRange: 3 })
+    piece.statusTags = [{ type: 'momentum-core', stacks: 0 }]
+    attachRule(piece, 'rule-momentum-gain')
+    const pieces = [piece]
+    if (blocked) pieces.push(makePiece({ instanceId: 'rejection-blocker', ownerPlayerId: 'player-blue', x: 1, y: 0 }))
+    const state = makeState({ pieces, currentPlayerId: 'player-red', phase: 'action', width: 5, height: 2 })
+
+    expect(() => applyBattleAction(state, {
+      type: 'move', playerId: 'player-red', pieceId: piece.instanceId, toX: 2, toY: 0, path,
+    })).toThrow()
+    const rejected = state.pieces.find(candidate => candidate.instanceId === piece.instanceId)!
+    expect((rejected as { momentum?: number }).momentum).toBeUndefined()
+    expect(rejected.statusTags).toEqual([expect.objectContaining({ type: 'momentum-core', stacks: 0 })])
+    expect(state.actions).toEqual([])
+  })
+
+  it('replays the same path and momentum result for a fixed seed', () => {
+    const path = [{ x: 0, y: 1 }, { x: 1, y: 1 }, { x: 2, y: 1 }, { x: 2, y: 0 }]
+    const execute = () => {
+      const piece = makePiece({ instanceId: 'replay-sonic', templateId: 'sonic', x: 0, y: 0, moveRange: 4 })
+      piece.statusTags = [{ type: 'momentum-core', stacks: 0 }]
+      attachRule(piece, 'rule-momentum-gain')
+      const blocker = makePiece({ instanceId: 'replay-blocker', ownerPlayerId: 'player-blue', x: 1, y: 0 })
+      const state = makeState({ pieces: [piece, blocker], currentPlayerId: 'player-red', phase: 'action', width: 5, height: 3 })
+      return runBattleAction(state, {
+        type: 'move', playerId: 'player-red', pieceId: piece.instanceId, toX: 2, toY: 0, path,
+      }, { rootSeed: 257 })
+    }
+
+    const first = execute()
+    const second = execute()
+    expect(first.stateHash).toBe(second.stateHash)
+    expect(first.actionHash).toBe(second.actionHash)
+    expect(first.state.pieces.find(piece => piece.instanceId === 'replay-sonic')).toMatchObject({ momentum: path.length })
+    expect(first.state.actions?.find(action => action.type === 'move')?.payload?.path).toEqual(path)
+  })
+
+  it('does not fall back to endpoint displacement when a movement log has no path', () => {
+    const piece = makePiece({ instanceId: 'legacy-momentum', x: 0, y: 0, statusTags: [{ type: 'momentum-core', stacks: 0 }] })
+    const rule = loadRuleById('rule-momentum-gain')!
+    const state = makeState({ pieces: [piece] })
+    state.actions!.push({ type: 'move', playerId: piece.ownerPlayerId, turn: 1,
+      payload: { pieceId: piece.instanceId, fromX: 0, fromY: 0, toX: 2, toY: 0 } })
+
+    expect(rule.effect(state, { rulePiece: piece, sourcePiece: piece })).toMatchObject({ success: false })
+    expect(piece.statusTags).toEqual([expect.objectContaining({ type: 'momentum-core', stacks: 0 })])
+    expect((piece as { momentum?: number }).momentum).toBeUndefined()
+  })
+
   it.each(['sonic', 'shadow', 'tails'])('hydrates %s’s template-declared momentum rules before a normal move', (templateId) => {
     const template = JSON.parse(readFileSync(resolve(process.cwd(), `data/pieces/${templateId}.json`), 'utf8'))
     const state = makeState({ width: 8, height: 8 })

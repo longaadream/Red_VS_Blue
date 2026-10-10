@@ -1,0 +1,36 @@
+{
+  "fixture": "reconstructed from actual post-cancellation state and screenshot; not captured original pending",
+  "restoredFields": "Aizen HP4, Sonic position(17,7)/momentum4, Ulquiorra HP12, caster AP10",
+  "original": {
+    "x": 17,
+    "y": 6
+  },
+  "replacement": {
+    "x": 15,
+    "y": 6
+  },
+  "aizen": {
+    "x": 16,
+    "y": 5
+  },
+  "candidates": [
+    {
+      "type": "piece",
+      "pieceId": "training-red-1"
+    },
+    {
+      "type": "piece",
+      "pieceId": "training-red-2"
+    }
+  ],
+  "input": {
+    "type": "pendingTargetSelect",
+    "playerId": "training-blue",
+    "targetPieceId": "training-red-1",
+    "selectionId": "pending-1-h-y33v2l",
+    "stateRevision": 17
+  },
+  "error": "请选择正方向内的敌人",
+  "pendingUnchanged": true,
+  "after": null
+}

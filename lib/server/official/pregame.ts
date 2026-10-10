@@ -1,6 +1,6 @@
 import { randomInt } from 'node:crypto'
 import type { PoolClient } from 'pg'
-import { assertSelectableMapId, SELECTABLE_MAP_IDS } from '@/lib/game/map-selection'
+import { assertRankedMapId, getRankedMapPoolState } from '@/lib/game/map-selection'
 import { getMapById } from '@/lib/game/map-repository'
 import { getDemoPieceIds, getPieceById } from '@/lib/game/piece-repository'
 import { DEMO_ROSTER_MANIFEST_VERSION, validateDemoRosterSelection } from '@/lib/game/roster-contract'
@@ -17,15 +17,27 @@ ALTER TABLE official_queue ADD COLUMN IF NOT EXISTS profile_identity JSONB;
 export type PregamePlayer = { id: string; name: string; seat: 'red' | 'blue'; alignment: 'light' | 'dark' | null; pieces: string[]; locked: boolean; autoFilled: boolean; ban: string | null; banSubmitted: boolean; revision: number }
 export type PregameState = { version: 1; profileIdentity: GameProfileIdentityV1; seed: number; phase: 'veto' | 'roster' | 'starting' | 'battle'; pool: string[]; mapId: string | null; deadlineAt: number; players: PregamePlayer[] }
 
+// Re-export the pure snapshot helper from the game layer so management code
+// can use the same catalog and validation semantics as ranked admission.
+export { getRankedMapPoolState }
+
 export function validateRankedMapPool(value: unknown): string[] {
-  if (!Array.isArray(value) || value.length < 3 || value.length > SELECTABLE_MAP_IDS.length || new Set(value).size !== value.length) throw new OfficialError('排位地图池须包含至少3张不同的1v1地图')
-  try { return value.map(id => assertSelectableMapId(id, '1v1')) }
+  if (!Array.isArray(value) || value.length < 3 || new Set(value).size !== value.length) {
+    throw new OfficialError('排位地图池须包含至少3张不同的1v1地图')
+  }
+  try { return value.map(id => assertRankedMapId(id)) }
   catch { throw new OfficialError('地图不在可用1v1目录中') }
 }
-export function rankedMapCatalog(ids: string[]) {
+export function rankedMapCatalog(ids: string[], allowUnavailable = false) {
   return ids.map(id => {
     const map = getMapById(id)
-    if (!map) throw new OfficialError('排位地图资源不可用', 503)
+    if (!map) {
+      if (!allowUnavailable) throw new OfficialError('排位地图资源不可用', 503)
+      // A pregame owns its map IDs at creation time.  Keep its public
+      // snapshot readable after a resource-pack change instead of rewriting
+      // or dropping the frozen selection.
+      return { id, name: id, width: 0, height: 0, tiles: [] }
+    }
     return { id, name: map.name, width: map.width, height: map.height,
       tiles: map.tiles.map(t => ({ x: t.x, y: t.y, type: t.props.type })) }
   })
@@ -91,7 +103,7 @@ export function applyPregameAction(state: PregameState, playerId: string, input:
 export function publicPregame(state: PregameState, playerId: string, now: number) {
   if (!state.players.some(p => p.id === playerId)) throw new OfficialError('没有参赛资格', 403)
   return { version: state.version, phase: state.phase, mapId: state.mapId, deadlineAt: state.deadlineAt, serverNow: now,
-    maps: rankedMapCatalog(state.pool), players: state.players.map(p => ({ id: p.id, name: p.name, seat: p.seat, locked: p.locked,
+    maps: rankedMapCatalog(state.pool, true), players: state.players.map(p => ({ id: p.id, name: p.name, seat: p.seat, locked: p.locked,
       banSubmitted: p.banSubmitted, ban: state.phase !== 'veto' || p.id === playerId ? p.ban : null,
       ...(p.id === playerId ? { alignment: p.alignment, pieces: p.pieces, autoFilled: p.autoFilled, revision: p.revision } : {}) })) }
 }

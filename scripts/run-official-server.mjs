@@ -33,7 +33,6 @@ if (updatePackIndex >= 0) {
     try {
       process.env.APP_ROOT_DIR = root
       process.env.USER_DATA_DIR = stateRoot
-      process.env.RVB_PROFILE_ROOT = root
       const { installProfileArchiveV1 } = await import('../lib/content-pipeline/runtime/profile-archive.ts')
       const { getProfileRuntimeContextV1 } = await import('../lib/content-pipeline/runtime/profile-runtime.ts')
       const context = getProfileRuntimeContextV1()
@@ -72,7 +71,6 @@ if (updatePackIndex >= 0) {
 process.on('exit', acquireOfficialProcessLock(stateRoot))
 process.env.APP_ROOT_DIR = root
 process.env.USER_DATA_DIR = stateRoot
-process.env.RVB_PROFILE_ROOT = root
 const pagesRoot = path.join(root, 'data', 'pages')
 let config = process.argv.includes('--configure') ? await configureWindows(file, open, pagesRoot) : loadConfig(file) || await configureWindows(file, open, pagesRoot)
 const mail = createLiveMailer(config.smtp, smtp => { const next = { ...config, smtp }; saveConfig(file, next); config = next })

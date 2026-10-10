@@ -70,7 +70,7 @@ body {
   min-height: 0;
   max-width: 306px !important;
   padding: 0 !important;
-  flex-wrap: nowrap !important;
+  flex-wrap: wrap !important;
 }
 
 .turn-summary {
@@ -831,9 +831,8 @@ body.character-dock-open #pieceInfoModal.character-dock .pi-skill.is-targeting-s
   outline-offset: 1px;
 }
 
-/* A single instruction uses the existing font with a local readable color and
-   glyph outline, without a card, backdrop or input interception. Only action
-   controls enter the sheet. */
+/* Keep the prompt and its actions together in a stable, screen-level group.
+   This stays above the board while a character sheet is open or scrolling. */
 body #targetOverlay {
   position: fixed !important;
   inset: 92px 16px auto !important;
@@ -846,6 +845,8 @@ body #targetOverlay {
   backdrop-filter: none !important;
   pointer-events: none !important;
   justify-content: center !important;
+  align-items: center !important;
+  gap: 8px !important;
   z-index: 90 !important;
 }
 body #targetOverlay #targetPromptText {
@@ -861,27 +862,38 @@ body #targetOverlay #targetPromptText {
   -webkit-text-stroke: 2px #16110d;
   paint-order: stroke fill;
   text-shadow: -1px 0 #16110d, 1px 0 #16110d, 0 -1px #16110d, 0 1px #16110d;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-align: center;
   max-width: 100%;
 }
 body.target-mode-active #opponentHandStack { visibility: hidden !important; }
 body.target-mode-active #statusMsg,
 body.target-mode-active #dmBubble { display: none !important; }
+body.pending-response-waiting #statusMsg { display: none !important; }
 body #targetSelectionControls {
   display: none;
-  position: fixed;
-  left: 16px;
-  bottom: 84px;
+  position: static !important;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  width: auto;
+  max-width: calc(100vw - 32px);
   gap: 8px;
-  padding: 8px;
-  z-index: 90;
+  margin: 0;
+  padding: 0;
+  z-index: auto;
   pointer-events: auto;
 }
 body #targetSelectionControls.show { display: flex; flex-wrap: wrap; }
 body #targetSelectionControls .target-multi-summary { flex-basis: 100%; }
-body #targetSelectionControls button { min-height: 48px !important; }
+body #targetSelectionControls button {
+  min-width: 112px;
+  min-height: 48px !important;
+  font-size: 14px !important;
+  font-weight: 800 !important;
+}
 body.character-dock-open #pieceInfoModal.character-dock .pi-layout {
   position: relative !important;
 }
@@ -895,56 +907,6 @@ body.target-mode-active #pieceInfoModal.character-dock .pi-layout > .pi-sheet {
   min-height: 0 !important;
   height: auto !important;
   flex: 1 1 auto !important;
-}
-
-body.character-dock-open #pieceInfoModal.character-dock .pi-layout > #targetSelectionControls {
-  position: static !important;
-  flex: 0 0 auto !important;
-  align-self: stretch !important;
-  width: 100% !important;
-  box-sizing: border-box;
-  display: none;
-  align-items: stretch !important;
-  padding: 8px !important;
-  gap: 8px !important;
-  background: transparent !important;
-  pointer-events: auto !important;
-  z-index: 8;
-}
-
-body.character-dock-open #pieceInfoModal.character-dock .pi-layout > #targetSelectionControls.show {
-  display: flex !important;
-}
-
-body.character-dock-open #pieceInfoModal.character-dock .target-cancel-btn {
-  min-height: 48px !important;
-}
-
-/* Target controls belong to the active skill's title action area. They stay
-   siblings of .character-cast and are inserted before the description so
-   cancelling cannot trigger the release button or its drag handler. */
-body.character-dock-open #pieceInfoModal.character-dock .pi-skill.target-skill-controls > #targetSelectionControls {
-  position: static !important;
-  inset: auto !important;
-  width: 100% !important;
-  box-sizing: border-box;
-  display: none;
-  flex: 0 0 auto !important;
-  align-self: stretch !important;
-  margin: 4px 0 0 !important;
-  padding: 0 !important;
-  gap: 8px !important;
-  z-index: 8;
-  pointer-events: auto !important;
-}
-
-body.character-dock-open #pieceInfoModal.character-dock .pi-skill.target-skill-controls > #targetSelectionControls.show {
-  display: flex !important;
-  flex-wrap: wrap;
-}
-
-body.character-dock-open #pieceInfoModal.character-dock .pi-skill.target-skill-controls > #targetSelectionControls button {
-  min-height: 48px !important;
 }
 
 body.character-dock-open #pieceInfoModal.character-dock .character-cast.is-cancel-mode .pi-skill-meta,
@@ -961,9 +923,8 @@ body.character-dock-open #pieceInfoModal.character-dock .character-cast.is-cance
   color: var(--battle-text-muted, #655443) !important;
 }
 
-/* Card/rule targeting still uses the body fallback. Keep it above the mobile
-   hand toggles when no skill row is available. */
-body #targetSelectionControls { z-index: 110; }
+/* Card/rule targeting uses the same centered group as skill targeting. */
+body #targetOverlay #targetSelectionControls { z-index: auto; }
 
 @media (min-width: 761px) and (min-height: 601px) {
   /* Give the reading surface enough vertical room for the existing header,
@@ -996,11 +957,10 @@ body #targetSelectionControls { z-index: 110; }
     inset: 52px 8px auto 8px !important;
     width: auto !important;
     max-width: none !important;
-    height: 44px !important;
+    height: auto !important;
     min-height: 0 !important;
-    flex-wrap: nowrap !important;
-    overflow-x: auto !important;
-    overflow-y: hidden !important;
+    flex-wrap: wrap !important;
+    overflow: visible !important;
     pointer-events: none !important;
   }
   body:not(.full-map) .topbar > * { pointer-events: auto !important; flex-shrink: 0; }
@@ -1044,6 +1004,7 @@ body #targetSelectionControls { z-index: 110; }
   body.character-dock-open #pieceInfoModal.character-dock .character-portrait { width: 38px; height: 38px; }
   body.target-mode-active #pieceInfoModal.character-dock .pi-piece-state { display: none; }
   body #targetOverlay { top: calc(env(safe-area-inset-top) + 10px) !important; }
+  body.pending-response-waiting #targetOverlay { top: calc(env(safe-area-inset-top) + 64px) !important; }
   body #targetOverlay #targetPromptText { font-size: 16px !important; }
 }
 

@@ -1,4 +1,5 @@
 import type { BattleState } from './turn'
+import { getDataRoot } from '@/lib/app-paths'
 import type { RuleExecutionContext } from './rule-runtime'
 import {
   assertCardDefinition,
@@ -41,6 +42,11 @@ const ARMOR_SKILL_ID = 'tails-armor-assembly'
 const ARMOR_MODULES = ['attack', 'defense', 'heal', 'speed'] as const
 const ARMOR_GENERATOR_SEED = 0x41524d52
 
+const PURE_TARGET_RULE_FIELDS = new Set(['currentHp', 'maxHp', 'attack', 'defense', 'moveRange'])
+const PURE_TARGET_RULE_OPERATORS = new Set(['gt', 'gte', 'lt', 'lte', 'eq', 'ne'])
+const PURE_TARGET_RULE_KEYS = new Set(['id', 'name', 'description', 'targetValidation'])
+const PURE_TARGET_VALIDATION_KEYS = new Set(['type', 'sourceField', 'targetField', 'operator', 'message'])
+
 type ArmorModule = typeof ARMOR_MODULES[number]
 
 function cloneJson<T>(value: T): T {
@@ -53,6 +59,64 @@ function stableJson(value: unknown): unknown {
   return Object.fromEntries(
     Object.keys(value).sort().map(key => [key, stableJson(value[key])]),
   )
+}
+
+function hasOnlyKeys(value: JsonRecord, allowed: Set<string>, required: Set<string>): boolean {
+  const keys = Object.keys(value)
+  return keys.every(key => allowed.has(key))
+    && [...required].every(key => Object.prototype.hasOwnProperty.call(value, key))
+}
+
+/**
+ * Prove a target rule from the canonical resource itself. `loadRuleById`
+ * intentionally compiles every rule to an effect function, so its compiled
+ * shape alone cannot prove that the source had no executable effect. Read and
+ * validate the raw canonical JSON first, then require the normal compiler to
+ * accept the same pure declaration.
+ */
+export function isCanonicalPureTargetValidationRule(ruleId: unknown): ruleId is string {
+  if (typeof ruleId !== 'string' || !/^rule-[a-z0-9-]+$/i.test(ruleId)) return false
+  let raw: JsonRecord
+  try {
+    // Keep the same runtime loader path as loadRuleById so browser VFS builds
+    // can provide their existing fs/path shims.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const fs = require('fs') as { readFileSync(path: string, encoding: string): string }
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const path = require('path') as { join(...parts: string[]): string }
+    raw = JSON.parse(fs.readFileSync(
+      path.join(getDataRoot(), 'rules', `${ruleId}.json`),
+      'utf8',
+    )) as JsonRecord
+  } catch {
+    return false
+  }
+
+  if (!record(raw)
+    || !hasOnlyKeys(raw, PURE_TARGET_RULE_KEYS, new Set(['id', 'name', 'description', 'targetValidation']))) return false
+  if (raw.id !== ruleId || typeof raw.name !== 'string' || !raw.name
+    || typeof raw.description !== 'string' || !raw.description) return false
+  const validation = raw.targetValidation
+  if (!record(validation)
+    || !hasOnlyKeys(validation, PURE_TARGET_VALIDATION_KEYS, new Set(['type', 'sourceField', 'targetField', 'operator']))
+    || validation.type !== 'comparePieceNumber'
+    || typeof validation.sourceField !== 'string'
+    || typeof validation.targetField !== 'string'
+    || !PURE_TARGET_RULE_FIELDS.has(validation.sourceField)
+    || !PURE_TARGET_RULE_FIELDS.has(validation.targetField)
+    || typeof validation.operator !== 'string'
+    || !PURE_TARGET_RULE_OPERATORS.has(validation.operator)
+    || (validation.message !== undefined && typeof validation.message !== 'string')) return false
+
+  try {
+    const isolated = createRuleExecutionContext(new TriggerSystem())
+    const compiled = withRuleExecutionContext(isolated, () => loadRuleById(ruleId, true, true))
+    return !!compiled
+      && compiled.trigger?.type === 'targetValidation'
+      && JSON.stringify(stableJson(compiled.targetValidation)) === JSON.stringify(stableJson(validation))
+  } catch {
+    return false
+  }
 }
 
 function armorModulesForCardId(cardId: string): [ArmorModule, ArmorModule] | undefined {

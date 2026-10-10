@@ -3,8 +3,9 @@
  function mount(){
   const dialog=document.getElementById('battleSettings'),open=document.getElementById('battleSettingsButton')
   if(!dialog||!open)return
-  const api=window.electronAPI,input=dialog.querySelector('[data-window-fullscreen]'),error=dialog.querySelector('[data-window-fullscreen-error]')
+  const api=window.electronAPI,input=dialog.querySelector('[data-window-fullscreen]'),error=dialog.querySelector('[data-window-fullscreen-error]'),exit=dialog.querySelector('[data-application-exit]'),exitError=dialog.querySelector('[data-application-exit-error]')
   const supported=api&&typeof api.getWindowFullscreen==='function'&&typeof api.setWindowFullscreen==='function'
+  const exitSupported=api&&typeof api.requestApplicationExit==='function'
   async function refreshFullscreen(){
    if(!supported)return
    try{input.checked=await api.getWindowFullscreen()}catch(reason){console.warn('读取窗口全屏状态失败',reason);error.textContent='无法读取全屏状态'}
@@ -20,6 +21,23 @@
     window.addEventListener('pagehide',()=>unsubscribe(),{once:true})
    }
   }
+  if(exit){
+    if(!exitSupported)exit.hidden=true
+    else{
+     exit.hidden=false
+     let exitRequested=false
+     exit.addEventListener('click',async function(){
+      if(exitRequested||exit.disabled)return
+      exitRequested=true;exit.disabled=true
+      if(exitError){exitError.hidden=true;exitError.textContent=''}
+      try{await api.requestApplicationExit()}catch(reason){
+       exitRequested=false;exit.disabled=false
+       if(exitError){exitError.hidden=false;exitError.textContent='退出失败，请稍后重试'}
+       console.error('请求退出程序失败',reason)
+      }
+     })
+    }
+   }
   open.addEventListener('click',function(){
    dialog.querySelector('[data-sound-volume]').value=Math.round(window.BattleAudio.volume()*100)
    dialog.querySelector('[data-sound-label]').textContent=window.BattleAudio.volume()?Math.round(window.BattleAudio.volume()*100)+'%':'静音'

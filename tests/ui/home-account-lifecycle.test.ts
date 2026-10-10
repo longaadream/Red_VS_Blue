@@ -136,7 +136,7 @@ it('does not clear or overwrite a newer session when logout returns late', async
       : { ok: true, status: 200, json: async () => url.endsWith('/official/me') ? { account: { id: 'account-1', name: '旧账号' } } : { ok: true } },
   })
   await page.flush()
-  page.nodes.get('homeLogout').onclick()
+  runInContext('window.RvBHomeAccount.logout()', page.context)
   await page.flush()
   page.sessions.set(origin, { url: origin, token: 'new-token', account: { id: 'account-2', name: '新账号' } })
   releaseLogout?.({ ok: true, status: 200, json: async () => ({ ok: true }) })

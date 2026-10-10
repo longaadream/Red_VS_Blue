@@ -154,10 +154,9 @@
   function renderAuth() {
     var session = state.origin ? currentSession(state.origin) : null
     var loggedIn = !!(session && state.token && session.token === state.token)
-    var auth = node('communityAuth'), content = node('communityContent'), logout = node('communityLogout'), accountButton = node('communityAccountButton')
+    var auth = node('communityAuth'), content = node('communityContent'), accountButton = node('communityAccountButton')
     if (auth) auth.hidden = loggedIn
     if (content) content.hidden = !loggedIn
-    if (logout) logout.hidden = !loggedIn
     if (accountButton) renderAccountIdentity(accountButton, loggedIn ? (state.account || session.account) : null, loggedIn ? ((state.account && state.account.name) || (session.account && session.account.name) || '已登录') : '登录账号')
     if (loggedIn) {
       if (state.account == null) state.account = session.account
@@ -546,6 +545,7 @@
       if (state.epoch === operationEpoch && sameSession(snap.origin, snap.token)) window.RvBUtils.clearOfficialSession(snap.origin)
       if (state.epoch === operationEpoch) { state.token = ''; state.account = null; state.connected = false; state.epoch += 1; resetCommunityData(); renderAuth(); setStatus('communityAuthStatus', '已退出，可继续离线游戏') }
     }
+    return !sameSession(snap.origin, snap.token)
   }
   async function refreshAll() {
     if (!state.token) { renderAuth(); node('communityEmail').focus(); return }
@@ -555,7 +555,6 @@
 
   function bind() {
     node('communityLoginForm').addEventListener('submit', function (event) { event.preventDefault(); void runBusy('login', node('communityLoginSubmit'), login) })
-    node('communityLogout').addEventListener('click', function (event) { void runBusy('logout', event.currentTarget, logout) })
     node('communityRefresh').addEventListener('click', function (event) { void runBusy('connect', event.currentTarget, refreshAll) })
     node('friendsRefresh').addEventListener('click', function (event) { void runBusy('friends-refresh', event.currentTarget, function () { return loadFriends() }) })
     node('boardRefresh').addEventListener('click', function (event) { void runBusy('board-refresh', event.currentTarget, function () { state.boardCursor = null; return loadBoard(false, event.currentTarget) }) })
@@ -580,6 +579,7 @@
     renderSearch(); renderFriends(); renderBoard()
   }
   window.RvBCommunity = { state: state, login: login, logout: logout, refresh: refreshAll, loadFriends: loadFriends, loadBoard: loadBoard, searchAccounts: searchAccounts }
+  if (window.RvBPlayerProfile && typeof window.RvBPlayerProfile.setLogoutHandler === 'function') window.RvBPlayerProfile.setLogoutHandler(logout)
   window.addEventListener('rvb-official-presence', handlePresenceStatus)
   bind()
   initialize()

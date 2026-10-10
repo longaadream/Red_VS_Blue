@@ -5,16 +5,20 @@ import {
   MapSelectionError,
   SELECTABLE_MAP_IDS,
   assertSelectableMapId,
+  assertRankedMapId,
+  getRankedMapCatalog,
+  getRankedMapPoolState,
   getSelectableMapCatalog,
 } from '@/lib/game/map-selection'
 
 describe('RED-119 authoritative map selection', () => {
-  it('exposes the four selectable maps in one stable order', () => {
+  it('exposes the selectable maps in one stable order', () => {
     expect(SELECTABLE_MAP_IDS).toEqual([
       'large-hole-arena',
       'open-expanse',
       'winding-pass',
       'narrow-corridors',
+      'twin-bridges', 'crossroads-plaza', 'island-courtyard', 'broad-ring',
     ])
     expect(getSelectableMapCatalog().map(map => map.id)).toEqual(SELECTABLE_MAP_IDS)
   })
@@ -84,5 +88,62 @@ describe('RED-119 authoritative map selection', () => {
         code: 'MAP_NOT_SELECTABLE',
       })
     }
+  })
+
+  it('discovers every loaded map while keeping new maps disabled by default', () => {
+    const savedPool = ['large-hole-arena', 'open-expanse', 'winding-pass', 'narrow-corridors']
+    const state = getRankedMapPoolState(savedPool)
+    expect(state.catalog.map(map => map.id)).toEqual([
+      'adventure-act-1-v1',
+      'adventure-act-2-v1',
+      'adventure-act-3-v1',
+      'broad-ring',
+      'crossroads-plaza',
+      'island-courtyard',
+      'large-hole-arena',
+      'narrow-corridors',
+      'open-expanse',
+      'twin-bridges',
+      'twin-fronts',
+      'winding-pass',
+    ])
+    expect(state.catalog.filter(map => map.eligible).map(map => map.id)).toEqual([...SELECTABLE_MAP_IDS].sort())
+    expect(state.enabledIds).toEqual(savedPool)
+    for (const id of SELECTABLE_MAP_IDS.slice(4)) {
+      expect(state.catalog.find(map => map.id === id)).toMatchObject({ eligible: true })
+      expect(state.enabledIds).not.toContain(id)
+    }
+    expect(state.blocked).toBe(false)
+    expect(state.catalog.find(map => map.id === 'twin-fronts')).toMatchObject({ eligible: false })
+    expect(getRankedMapCatalog()).toEqual(state.catalog)
+  })
+
+  it('blocks admissions when a saved pool contains a removed map without trimming the selection', () => {
+    const state = getRankedMapPoolState([...SELECTABLE_MAP_IDS, 'removed-resource-map'])
+    expect(state).toMatchObject({ blocked: true, invalidIds: ['removed-resource-map'] })
+    expect(state.enabledIds).toEqual([...SELECTABLE_MAP_IDS])
+  })
+
+  it('accepts a newly loaded valid 1v1 map through the ranked boundary', () => {
+    const source = getRankedMapCatalog().find(map => map.id === 'open-expanse')!
+    const map = mapRepository.getMapById('open-expanse')!
+    const winding = mapRepository.getMapById('winding-pass')!
+    const loaded = vi.spyOn(mapRepository, 'getAllLoadedMaps').mockReturnValue([
+      map,
+      winding,
+      { ...map, id: 'resource-pack-map', name: '资源包地图' },
+    ])
+    try {
+      expect(assertRankedMapId('resource-pack-map')).toBe('resource-pack-map')
+      const state = getRankedMapPoolState(['resource-pack-map', 'open-expanse', 'winding-pass'])
+      expect(state).toMatchObject({ blocked: false, enabledIds: ['resource-pack-map', 'open-expanse', 'winding-pass'] })
+      expect(state.catalog.find(entry => entry.id === 'resource-pack-map')).toMatchObject({
+        name: '资源包地图',
+        eligible: true,
+      })
+    } finally {
+      loaded.mockRestore()
+    }
+    expect(source.eligible).toBe(true)
   })
 })

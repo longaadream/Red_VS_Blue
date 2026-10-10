@@ -29,6 +29,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   relayControl: (options: { action: 'status' | 'publish' | 'stop'; relayUrl?: string; name?: string; visible?: boolean; turnTimerEnabled?: boolean; publishKey?: string }) => ipcRenderer.invoke('relay-control', options),
   getWindowFullscreen: (): Promise<boolean> => ipcRenderer.invoke('get-window-fullscreen'),
   setWindowFullscreen: (fullscreen: boolean): Promise<boolean> => ipcRenderer.invoke('set-window-fullscreen', fullscreen),
+  requestApplicationExit: () => ipcRenderer.invoke('request-application-exit'),
   onWindowFullscreenChanged: (callback: (fullscreen: boolean) => void) => {
     const listener = (_event: unknown, fullscreen: unknown) => {
       if (typeof fullscreen === 'boolean') callback(fullscreen)

@@ -72,11 +72,17 @@ describe('main menu LAN entry', () => {
     const local = { schemaVersion: 'rvb-game-profile-identity/v1', engineAbi: 'rvb-engine/v1', runnerRevision: 'rvb-battle-runner/v2', resolvedProfileHash: 'a'.repeat(64), authorityContentHash: 'b'.repeat(64) }
     const remote = { ...local, resolvedProfileHash: 'c'.repeat(64), authorityContentHash: cosmeticOnly ? local.authorityContentHash : 'd'.repeat(64) }
     const goLobby = vi.fn(), alert = vi.fn()
-    const context = createContext({ getLocalGameProfileIdentity: async () => local, RvBColyseus: { requestCatalogIdentityAt: async () => ({ profileIdentity: remote }) }, localStorage: { setItem: vi.fn() }, goLobby, alert })
+    const showCompatibilityRecovery = vi.fn()
+    const context = createContext({ getLocalGameProfileIdentity: async () => local, RvBColyseus: { requestCatalogIdentityAt: async () => ({ profileIdentity: remote }) }, localStorage: { setItem: vi.fn() }, document: { getElementById: () => null }, window: {}, showCompatibilityRecovery, goLobby, alert })
     new Script(html.slice(html.indexOf('async function checkProfileAndGo'), html.indexOf('function updatePackBadge'))).runInContext(context)
     const accepted = await new Script('checkProfileAndGo("http://10.41.179.82:2567", "lan")').runInContext(context)
     expect(accepted).toBe(cosmeticOnly)
     expect(goLobby).toHaveBeenCalledTimes(cosmeticOnly ? 1 : 0)
+    if (!cosmeticOnly) expect(showCompatibilityRecovery).toHaveBeenCalledWith(
+      expect.objectContaining({ code: 'PROFILE_IDENTITY_MISMATCH' }),
+      expect.stringContaining('无法进入大厅'),
+      'authorityContentHash',
+    )
   })
 
   it('delegates both discovery transports to the cancellable scanner', () => {
@@ -95,7 +101,7 @@ describe('main menu LAN entry', () => {
   })
   it('does not enter a lobby when remote profile validation fails', async () => {
     const goLobby = vi.fn(), alert = vi.fn()
-    const context = createContext({ getLocalGameProfileIdentity: async () => ({}), RvBColyseus: { requestCatalogIdentityAt: async () => { throw Error('host unreachable') } }, goLobby, alert, console })
+    const context = createContext({ getLocalGameProfileIdentity: async () => ({}), RvBColyseus: { requestCatalogIdentityAt: async () => { throw Error('host unreachable') } }, showCompatibilityRecovery: vi.fn(), goLobby, alert, console })
     new Script(html.slice(html.indexOf('async function checkProfileAndGo'), html.indexOf('function updatePackBadge'))).runInContext(context)
     await new Script('checkProfileAndGo("http://10.41.179.82:2567", "lan")').runInContext(context)
     expect(goLobby).not.toHaveBeenCalled()
