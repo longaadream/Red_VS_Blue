@@ -14,7 +14,7 @@ import {
 } from '@/lib/content-pipeline/runtime/profile-game-identity'
 import { hashBattleState } from '@/lib/game/battle-runner'
 import { getBattleStorage, withServerSkills } from '@/lib/game/battle-storage'
-import { assertSelectableMapId, getSelectableMapCatalog } from '@/lib/game/map-selection'
+import { assertRankedMapId, assertSelectableMapId, getSelectableMapCatalog } from '@/lib/game/map-selection'
 import { isPlayerSeat, normalizeContentAlignment, type PlayerSeat } from '@/lib/game/match-identity'
 import { getAvailablePieces } from '@/lib/game/piece-repository'
 import {
@@ -223,9 +223,15 @@ export function createBattleRoomClass(dependencies: BattleRoomDependencies) {
           })
         }
         try {
-          const mapId = assertSelectableMapId(options.mapId ?? (options.mode === '2v2' ? 'twin-fronts' : 'open-expanse'), options.mode)
+          const trustedOfficial = options.officialPlayers !== undefined
+            && !!dependencies.official
+            && options.officialCapability === dependencies.official.capability
+          if (options.officialPlayers !== undefined && !trustedOfficial) throw new Error('Trusted ranked roster required')
+          const mapId = trustedOfficial
+            ? assertRankedMapId(options.mapId)
+            : assertSelectableMapId(options.mapId ?? (options.mode === '2v2' ? 'twin-fronts' : 'open-expanse'), options.mode)
           const room: GameRoom = {
-            officialRanked: !!dependencies.official,
+            officialRanked: trustedOfficial,
             id: this.roomId,
             name: normalizeRoomName(options.name, this.roomId),
             status: 'waiting',

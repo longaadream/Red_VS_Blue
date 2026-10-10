@@ -1,0 +1,16 @@
+<section id="remote-ops" data-ops-section="remote-ops" hidden>
+  <div class="heading"><div><small>REMOTE ACCESS</small><h1>服务器运维</h1><p class="muted">通过本机 SSH 管理远程服务，连接后可返回官方指挥台。</p></div><span class="stamp" id="ops-state">尚未连接</span></div>
+  <div id="ops-notice" role="status" aria-live="polite"></div>
+  <div class="ops-panel-grid">
+    <div class="paper config-form">
+      <div class="subheading"><div><h2>SSH 连接</h2><p class="muted">连接配置只保存在本机；私钥只使用路径，不会上传。</p></div><span id="ops-tool-version" class="feature-state">工具版本读取中</span></div>
+      <div class="form-grid"><label>服务器地址<input id="ops-host" placeholder="输入服务器域名或内网地址" autocomplete="off"></label><label>SSH 端口<input id="ops-port" value="22" inputmode="numeric" autocomplete="off"></label><label>用户<input id="ops-user" value="root" autocomplete="username"></label><label>管理服务<select id="ops-service"><option value="rvb-game">游戏服务</option><option value="rvb-relay">普通房间转发</option><option value="rvb-official">官方排位</option></select></label></div>
+      <label>本机 SSH 私钥路径<input id="ops-key" placeholder="C:\\Users\\你的用户名\\.ssh\\服务器密钥" autocomplete="off"></label><label>数据库名称<input id="ops-database" placeholder="备份与更新游戏服务时填写" autocomplete="off"></label><p class="muted">沿用本机 known_hosts 验证服务器身份。管理端口不会开放到公网。</p>
+      <div class="ops-action-row"><button class="ops-button-primary" data-ops-action="status">查看状态与版本</button><button data-ops-action="logs">最近日志</button><button data-ops-action="backup">备份数据库</button></div>
+      <details class="ops-advanced"><summary>手动填写远程指挥台地址（通常无需填写）</summary><div class="form-grid"><label>远程指挥台端口<input id="ops-panelPort" inputmode="numeric" autocomplete="off"></label><label>会话令牌<input id="ops-panelToken" type="password" autocomplete="off"></label></div><p class="muted">令牌只保留在当前浏览器会话内，不会写入连接配置。</p></details>
+    </div>
+    <div class="paper ops-summary"><h2>连接后可用</h2><ul><li>运行状态、服务版本和最近日志</li><li>确认后创建数据库备份</li><li>账号、赛季、公告和社区审核</li></ul><button class="ops-button-secondary" data-ops-action="connect-panel">通过 SSH 自动连接指挥台 ↗</button></div>
+  </div>
+  <div class="paper ops-deploy"><div class="subheading"><div><h2>版本与资源</h2><p class="muted">候选包先校验上传，再由管理员确认启用或回退。</p></div></div><label>本机部署包目录<input id="ops-directory" placeholder="…\\output\\linux-room-server\\candidate-xxxx" autocomplete="off"></label><div class="form-grid"><label>版本名称<input id="ops-release" placeholder="candidate-xxxx" autocomplete="off"></label><div></div></div><div class="ops-action-row"><button class="ops-button-primary" data-ops-action="stage">校验并上传候选</button><label class="ops-check"><input type="checkbox" id="ops-maintenance"><span>确认对局已结束且无数据库迁移</span></label><button class="ops-button-danger" data-ops-action="activate">启用所填版本 / 回退</button></div></div>
+  <div class="paper ops-log-card"><div class="ops-log-toolbar"><span aria-hidden="true">●</span><span>REMOTE COMMAND OUTPUT</span><span id="ops-log-time"></span></div><pre id="ops-output" aria-live="polite">点击“查看状态与版本”开始。日志可能包含玩家信息，请谨慎分享。</pre></div>
+</section>
